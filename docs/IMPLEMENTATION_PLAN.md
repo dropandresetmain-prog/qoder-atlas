@@ -77,6 +77,18 @@ Stay in the same Qoder chat for sequential work within a lane while context rema
 - a materially different investigation;
 - a task where accumulated context is more likely to distract than help.
 
+Recommended branch/worktree topology after Checkpoint A:
+- `lane/core`
+- `lane/ingestion`
+- `lane/providers`
+- `lane/intelligence`
+- `lane/ui`
+- `integration/vertical-loop`
+
+All lane branches must fan out from the same accepted Checkpoint A base SHA. Record that SHA in the tracker before launch. The integration branch also starts from that base and deliberately brings in completed package commits/branches. Do not let five lanes merge independently to `main` while their seams are still unverified.
+
+The Prompter must still state the actual branch/worktree/head in every execution prompt; these names are defaults, not permission to guess repository state.
+
 ### 2.5 Mocks and external dependency posture
 
 Mocks/replay belong only at external provider/action boundaries. The internal graph/mutation/impact/planning/viability/authority/case pipeline remains real.
@@ -608,6 +620,37 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
 
 `Implemented` means a lane has finished and verified its package. `Integrated` means its behavior is merged and seam-tested in the candidate. `Complete` means the relevant checkpoint acceptance gate has passed.
+
+## 5.1 Requirement and test traceability
+
+This matrix prevents a Quest from treating a work package as a vague feature label. It is the minimum traceability; task-specific Specs may add narrower tests but may not delete required evidence.
+
+| Package | Primary requirements | Required evidence |
+|---|---|---|
+| F0 | NFR-03, NFR-05 | runnable/no-credential smoke, SQLite round trip, baseline commands |
+| F1 | FR-01, FR-03–FR-06, FR-09–FR-11, FR-14; NFR-01, NFR-02, NFR-04 | `T-DOM` |
+| F2 | FR-07, FR-08, FR-10–FR-16 | compile/runtime contract tests; relevant `T-DOM` |
+| F3 | NFR-01, NFR-02 | scenario schema-load assertions |
+| A1 | FR-01, FR-04, FR-14; NFR-04, NFR-05 | `T-PERSIST`, mutation subset of `T-PROP` |
+| A2 | FR-05, FR-06 | `T-EVAL`, `T-PROP` |
+| A3 | FR-09; NFR-04 | `T-OVERLAY` |
+| A4 | FR-10, FR-11 | `T-AUTH` + case transition tests |
+| B1 | FR-02, FR-03, FR-14 | ingestion/source contract tests + relevant `T-DOM` |
+| B2 | FR-02, FR-18 | extraction/schema/evidence tests + relevant `T-AI` |
+| B3 | FR-03, FR-17 | `T-AI` preference/research assertions |
+| C1 | FR-08, FR-15; NFR-03, NFR-05 | `T-ADAPTER` mode/error/sanitization tests |
+| C2 | FR-08 | Atlas `T-ADAPTER` + one LIVE Search/Verify development proof |
+| C3 | FR-16; NFR-03 | routing `T-ADAPTER` + no-credential failure path |
+| D1 | FR-07; NFR-04 | `T-AI` schema/error boundary |
+| D2 | FR-03, FR-17 | `T-AI` semantics/preference/research |
+| D3 | FR-07; NFR-04 | `T-AI` planner strategies/tool requests |
+| E1–E2 | FR-12, FR-13 | typed-fixture UI state/interaction evidence |
+| I1–I5 | FR-01–FR-18 as used by Scenario A; NFR-03–NFR-06 | seam tests + `T-E2E` |
+| G1 | NFR-01, NFR-02 | `T-GEN` Scenario B |
+| G2 | FR-05, FR-06, FR-09–FR-11 as exercised | selected `T-EVAL/T-PROP/T-OVERLAY/T-AUTH` |
+| G3 | NFR-02 | hardcoding portion of `T-GEN` |
+| R1 | FR-14, FR-15; NFR-03, NFR-05, NFR-06 | `T-PERSIST`, fallback `T-ADAPTER/T-AI`, replay E2E |
+| FINAL | all implemented MVP requirements | `T-RELEASE` |
 
 ## 6. File ownership and collision control
 
