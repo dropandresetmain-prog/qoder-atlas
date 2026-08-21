@@ -1,6 +1,6 @@
 # Implementation Plan
 
-**Status:** Active execution SSOT. F0–F3 (Checkpoint A) implemented and awaiting formal acceptance.  
+**Status:** Active execution SSOT. F0–F3 (Checkpoint A) implemented; targeted review-fix pass applied (3592a0e); awaiting formal acceptance.  
 **Product:** AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
@@ -658,6 +658,7 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 | F1 | Domain + operational contracts | Implemented | F0 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 869765e — T-DOM suite passes |
 | F2 | Shared capability/service/read-model contracts | Implemented | F0,F1 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 54b7eed — seam/envelope contract tests pass |
 | F3 | Acceptance scenario specs | Implemented | F1,F2 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | dfc2c8d — both scenarios schema-load via same contracts |
+| CA-R | Checkpoint A review-fix pass (findings 1–5) | Implemented | F0,F1,F2,F3 | main | Review-driven contract correction | 3592a0e — instant timestamp ordering; read-only ToolRequest vocabulary; AuthorisedExecution executor gate; UNKNOWN default element health; relation-vocabulary normalization (ADR-023..027); 38/38 tests green |
 | A1 | Persistence + validated mutation | Not Started | F1,F2 | core | Qwen3.8 xHigh; Qwen3.7 Max long-horizon value | — |
 | A2 | Constraints + blast radius | Not Started | A1,F3 | core | Qwen3.8 xHigh; GLM-5.3 Max if hard logic/debug | — |
 | A3 | Overlays + viability | Not Started | A2 | core | Qwen3.8 xHigh; Qwen3.7 Max value; GLM if debugging | — |
@@ -681,6 +682,8 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 | FINAL | Candidate review/release gate | Not Started | Checkpoint C | fresh reviewer | Sol/Opus preferred; Qoder-only GLM-5.3 or Kimi-K3 by risk; V4 Pro only explicit hard need | — |
 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
+
+**Checkpoint A safe fan-out SHA:** the pushed `main` HEAD containing this tracker update (review-fix code at `3592a0e`, docs update `2f44a0b` preserved). Lane worktrees fan out from that SHA after formal acceptance.
 
 `Implemented` = package completed/verified in lane.  
 `Integrated` = merged and seam-tested.  
