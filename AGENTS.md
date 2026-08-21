@@ -1,67 +1,203 @@
 # AGENTS.md
 
 ## Mission
-Build the Atlas × Alibaba Cloud hackathon product described in `docs/PRODUCT_SPEC.md` and `docs/ARCHITECTURE.md` without demo-specific hardcoding.
 
-Read before making broad changes:
+Build the Atlas × Alibaba Cloud hackathon product described in the repository source-of-truth documents without demo-specific hardcoding.
+
+The normal orchestration lifecycle is:
+
+`Planner / Architect -> Prompter -> Implementer -> Integrator -> Reviewer when warranted -> Final Candidate`
+
+Not every work package or checkpoint requires an independent Reviewer. Review is a risk-control step, not a ritual.
+
+## Read before broad work
+
+Inspect current repository state before changing code. Read the relevant sections of:
+
 1. `docs/PRODUCT_SPEC.md`
 2. `docs/ARCHITECTURE.md`
-3. `docs/IMPLEMENTATION_PLAN.md`
-4. `docs/ROADMAP.md`
+3. `docs/IMPLEMENTATION_PLAN.md` — execution SSOT
+4. `docs/ROADMAP.md` — scope/status SSOT
 5. `docs/DECISIONS.md`
-6. task-specific Qoder Spec
+6. `docs/TESTING.md`
+7. `docs/AGENT_MODEL_SELECTION.md`
+8. task-specific Qoder Spec
 
 For Atlas capability questions, consult the authoritative research in `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
 
+## Orchestration roles
+
+### Planner / Architect
+Owns architecture, shared contracts, decomposition, dependencies, lane boundaries, collision analysis, and acceptance criteria.
+
+- Inspect current repo/docs before planning.
+- Prefer safe parallelism after shared contracts are frozen.
+- Specify dependencies, overlapping paths, integration order, and merge risks.
+- Do not force parallelism across unresolved architecture or heavily overlapping files.
+- Produce plans later agents can execute without re-planning the product.
+
+### Prompter
+Turns an approved work package from `docs/IMPLEMENTATION_PLAN.md` into an execution prompt.
+
+Include:
+- exact branch/worktree/head;
+- work-package ID and objective;
+- authoritative files;
+- owned/do-not-touch paths;
+- frozen contracts;
+- acceptance criteria;
+- scoped verification;
+- explicit exclusions;
+- bounded delegation guidance;
+- expected completion report.
+
+Do not redesign approved architecture unless a concrete contradiction is found.
+
+### Implementer
+Owns one assigned lane/work package.
+
+- Verify branch, worktree, head, and authoritative files before editing.
+- Execute the approved plan; do not silently reopen architecture.
+- Keep changes in scope and owned paths.
+- Surface material discoveries/architecture gaps instead of expanding scope.
+- Delegate bounded, independently verifiable tasks where useful.
+- Keep architecture, integration decisions, high-risk work, and final lane verification with the primary agent.
+- Run the narrowest tests/checks proving the changed behavior and relevant failure paths.
+- Do not run the full repository gate merely because a package is complete.
+
+### Integrator
+Combines completed lane work and owns cross-lane seams.
+
+- Verify lane heads, ancestry, reports, and intended merge order.
+- Resolve overlapping-file conflicts deliberately.
+- Reuse valid lane evidence.
+- Test newly created seams/conflict resolutions rather than rerunning every historical check.
+- Own application/orchestration wiring and shared-contract mismatch resolution.
+- Do not let a lane "fix" integration by introducing local contract variants.
+
+### Reviewer
+Used deliberately for final candidate review, material architecture change, or genuinely high-risk work.
+
+- Prefer a different model family from the main implementer/integrator.
+- Reuse existing evidence unless a concrete review question needs more execution.
+- Classify every finding exactly: `Act Now`, `Investigate Now`, `Park for Later`, or `Ignore / Accept Risk`.
+- For fixes, require targeted evidence that the finding is closed; do not restart a full review cycle automatically.
+
 ## Architectural invariants
-- The trip/state graph is central. Chat is an interface, not the source of truth.
-- One generalized recovery engine must support TMC, corporate/event and future traveller use cases.
-- AI may interpret, extract, map, identify uncertainty, infer soft preferences, judge semantic consequences and propose recovery strategies.
-- Deterministic code owns schema/business validation, graph mutation, arithmetic, timezone/time-window checks, buffers, dependency propagation, policy thresholds, permissions, state transitions, viability and execution validation.
+
+- The trip/state graph is central. Chat is an interface, not source of truth.
+- One generalized recovery engine supports TMC, corporate/event, group, and future traveller use cases.
+- AI may interpret, extract, map, identify uncertainty, infer soft preferences, judge semantic consequences, and propose recovery strategies.
+- Deterministic code owns schema/business validation, graph mutation, arithmetic, timezone/time-window checks, buffers, dependency propagation, policy thresholds, permissions, state transitions, scenario viability, and execution validation.
 - Never allow `LLM -> irreversible/money-moving API`.
 - Required flow: `AI proposal -> validation -> deterministic viability -> authority -> executor -> observe -> state update`.
 - Prefer deterministic mapping for structured provider data.
+- Candidate recovery options live in scenario overlays until observed execution updates authoritative state.
+- `UNKNOWN` is valid; do not convert missing/stale evidence into certainty.
+- Explicit instructions outrank latent preferences. Latent preferences remain soft signals.
 
 ## Anti-hardcoding
-Never add scenario-specific branches, fixture IDs, traveller/event names, locations, suppliers or route-specific conditions to domain logic.
+
+Never add scenario-specific branches, fixture IDs, traveller/event names, locations, routes, or supplier-specific conditions to domain/recovery logic.
+
+Provider-specific logic belongs only in the concrete adapter.
 
 Demo facts belong in fixtures/configuration/sources. At least two materially different scenarios must run through the same application code without changes.
 
-If the approved ontology cannot express a requirement, stop and report an **architecture gap**. Do not patch around it.
+If the approved ontology/contracts cannot express a requirement, stop and report an **architecture gap**. Do not hardcode around it.
+
+Qwen3.8-Max has shown a project-specific tendency toward local/hardcoded solutions; when it is used, enforce these rules explicitly and verify with the anti-hardcoding gate.
 
 ## External capability boundaries
+
 - Atlas is a flight adapter, not the architecture.
 - Mocks are allowed only at external provider/action boundaries.
-- Internal ingestion, graph mutation, propagation, planning, viability, authority, observation and state transitions must remain real.
-- Use LIVE / RECORD / REPLAY where practical. LIVE and REPLAY must share normalization and engine paths.
-- Do not make Booking.com, Google Routes, Gmail, Timatic or any optional external service a hard dependency unless roadmap status explicitly changes.
+- Internal ingestion, mutation, impact propagation, planning, viability, authority, observation, and state transitions remain real.
+- Use LIVE / RECORD / REPLAY where practical. LIVE and REPLAY share normalization/downstream paths.
+- Booking.com, Google Routes, Gmail, Timatic, Atlas Singapore fixtures, and other optional services must not become core dependencies unless `ROADMAP.md` explicitly changes status.
+- Do not spend prolonged implementation time solving optional provider/model activation issues.
 
 ## Persistence
-Use SQLite behind repository interfaces unless deployment constraints prove it unsuitable. Do not introduce a graph database or infrastructure platform without a demonstrated requirement.
 
-## Qoder workflow
-- Use Spec-driven Quest for medium/large implementation work. Review the generated Spec before Build.
+Use SQLite behind repository interfaces unless deployment/runtime evidence proves it unsuitable.
+
+Do not introduce Neo4j, microservices, Kafka, Kubernetes, or similar infrastructure without a demonstrated requirement.
+
+## Qoder workflow and model routing
+
+Follow `docs/AGENT_MODEL_SELECTION.md`.
+
+- Qoder is the default implementation harness.
+- Use Spec-driven Quest for substantial work packages.
+- Check generated Specs against `docs/IMPLEMENTATION_PLAN.md` before Build.
 - Freeze shared contracts before parallel implementation.
-- Use separate worktrees/Quests for independent lanes after contracts are stable.
-- Do not let a lane change shared contracts to make local implementation easier. Report the mismatch for integration review.
-- Keep architecture, cross-lane integration, verification and high-risk changes with the primary model/lead.
-- Delegate bounded boilerplate/tests/docs to cheaper models/subagents where useful.
-- Use cheap Alibaba Model Studio models for plumbing/tests when output quality is not the point.
+- Use separate worktrees/Quests for independent lanes, not every small task.
+- Stay in the same chat for sequential work in one lane while context remains useful.
+- Use a fresh chat for a separate lane, integrator, independent review, or materially different investigation.
+- Model choice is separate from the execution prompt.
+- Delegate bounded work to cheaper/specialist subagents when useful.
+- Runtime Model Studio plumbing should start with a cheap model; upgrade only when quality is proven blocking.
 
-## Completion discipline
-Before declaring a milestone/task complete:
-- run relevant tests
-- run build/typecheck/lint where applicable
-- verify failure/fallback behaviour
-- check for scenario-specific hardcoding
-- ensure no secret or sensitive raw provider data is committed
-- update roadmap/status docs when scope or implementation state changes
-- record significant architecture decisions in `docs/DECISIONS.md`
-- classify every new issue: Act Now / Investigate Now / Park for Later / Ignore or Accept Risk
+## Verification is cumulative evidence
 
-Use exact-path Git staging. Do not stage unrelated files.
+Follow `docs/TESTING.md`.
 
-## Source-of-truth precedence
-Current tested code > `docs/ARCHITECTURE.md` > `docs/PRODUCT_SPEC.md` > `docs/IMPLEMENTATION_PLAN.md` > `docs/ROADMAP.md` > `docs/DECISIONS.md` > README.
+- **Implementation:** narrow tests/checks for changed behavior and relevant failures.
+- **Integration:** seam/conflict/new-interaction tests; reuse valid lane evidence.
+- **Review:** inspect existing evidence first; execute more only for concrete uncertainties.
+- **Final candidate:** canonical broad gate on the exact candidate SHA.
 
-If tested code intentionally changes an approved contract, update the relevant source-of-truth documents in the same milestone. Accidental divergence is a bug.
+Never claim a check passed unless it actually ran successfully. Do not use paid/live provider calls in routine verification unless explicitly needed and authorized.
+
+## Issue and scope discipline
+
+Every discovered issue/risk must be classified:
+- Act Now
+- Investigate Now
+- Park for Later
+- Ignore / Accept Risk
+
+Do not merely summarize issues; decide what happens to each.
+
+Every intentionally excluded capability remains explicitly in `docs/ROADMAP.md` under Stretch/Deferred/Rejected with reason and revisit condition. Never silently drop scope.
+
+## Git and worktrees
+
+Branches/worktrees are orchestration boundaries.
+
+- Verify actual branch/head before implementation/integration.
+- Parallel lanes must not share uncommitted local state.
+- Use narrow exact-path staging; do not default to `git add .` / `git add -A`.
+- Commit coherent, testable checkpoints.
+- Before claiming pushed/integrated state, verify actual branch/commit/remote.
+
+## Completion report / handoff
+
+After an implementation package, report only material evidence:
+
+1. **In simple terms:** what now works and what intentionally did not change.
+2. Branch/worktree and exact head.
+3. Work-package ID(s).
+4. Files changed.
+5. Behavior changed.
+6. Tests/checks actually run and results.
+7. Failure/fallback behavior verified.
+8. Unexpected findings/risks and triage.
+9. Documentation updated.
+10. Commit SHA/state.
+11. Exact next dependent package/integration action.
+
+Do not pad the report by repeating the implementation plan.
+
+## Source-of-truth roles
+
+- verified runtime/code/tests = implemented reality;
+- `docs/PRODUCT_SPEC.md` = product requirements;
+- `docs/ARCHITECTURE.md` = logical architecture/invariants;
+- `docs/IMPLEMENTATION_PLAN.md` = single active execution plan and work-package status;
+- `docs/ROADMAP.md` = capability scope/status, including Stretch/Deferred;
+- `docs/DECISIONS.md` = settled architecture decisions;
+- `docs/TESTING.md` = verification taxonomy;
+- `docs/AGENT_MODEL_SELECTION.md` = routing guidance.
+
+If code and an approved contract disagree, treat it as drift or an architecture gap to resolve; do not silently assume either side wins. When implementation intentionally changes an approved contract, update the relevant SSOT docs in the same integrated change.
