@@ -52,20 +52,39 @@ Do not review/test the whole repository after every work package.
 
 A targeted review fix needs targeted proof that the finding is closed. It does not restart the entire review cycle automatically.
 
-### 2.3 Qwen-first model routing
+### 2.3 Price-aware capability-first model routing
 
-Follow `docs/AGENT_MODEL_SELECTION.md`.
+Follow `docs/AGENT_MODEL_SELECTION.md`; it is the routing authority if any shorthand below becomes stale.
 
-Default substantial implementation uses **Qwen3.8-Max or Qwen3.7-Max**. We explicitly want to test Qoder long-horizon execution rather than route difficult-looking work away from Qwen pre-emptively.
+The rule is **not** "use the strongest model available." Use the cheapest model likely to complete and verify the task with low rework, then pay for a specialist only when the task shape justifies it.
 
-- **Qwen3.8-Max Medium:** bounded package with frozen contracts.
-- **Qwen3.8-Max xHigh:** long-horizon lane, integration, architecture-sensitive multi-file work.
-- **Qwen3.7-Max:** main long-horizon/cost-efficient alternative, particularly for scheduled/off-peak work.
-- **Qwen3.7-Plus:** bounded delegation/tests/fixtures/simple components.
-- **GLM-5.3 High/Max:** escalation for repeated Qwen contract violations/hardcoding, difficult deterministic/provider debugging, or a seam Qwen cannot resolve cleanly. It is not the automatic default for every hard-looking task.
-- Kimi/DeepSeek/other families are specialist/review options as defined in `AGENT_MODEL_SELECTION.md`.
+Current working hierarchy:
+
+- **Qwen3.8-Max Medium/xHigh:** default substantial Qoder implementation and integration. During the published off-peak window it is especially strong value.
+- **Qwen3.7-Max:** first long-horizon/value experiment, especially for overnight/off-peak autonomous runs with frozen contracts and objective acceptance tests.
+- **Qwen3.7-Plus:** bounded delegation/tests/fixtures/simple components and repetitive work after semantics freeze.
+- **Kimi-K2.7-Code:** focused implementation or routine different-family review without paying premium-model rates.
+- **DeepSeek-V4-Flash:** cheap different-family review/second opinion. Prefer Flash or Kimi-K2.7-Code before V4 Pro for ordinary review.
+- **GLM-5.3 High/Max:** hard deterministic/provider/runtime debugging and difficult integration seams. Use because its engineering/debugging profile is useful, not because a task merely looks important.
+- **Kimi-K3 High/Max:** premium long-horizon/large-context experiment. Use when endurance/context retention is the hypothesis being tested; do not route routine work to K3 at ~0.8x.
+- **DeepSeek-V4-Pro High/Max:** premium adversarial reasoning specialist only when a concrete hard disagreement/debugging/review need remains. It is **not** the routine reviewer.
+- **External GPT-5.6 Sol / Claude Opus 5:** architecture, architecture-gap resolution, and consequential independent review when a ceiling model is justified.
+
+Current published pricing makes these distinctions material. During Qwen3.8 off-peak (~0.25x), GLM-5.3 (~0.6x) costs roughly 2.4x as much and Kimi-K3 / DeepSeek-V4-Pro (~0.8x) roughly 3.2x as much. Qwen3.7-Max and Plus can be cheaper still off-peak. Confirm live rates in Qoder `/model` before a pricing-sensitive run.
 
 Qwen3.8-Max has previously needed handholding and can hardcode when scope is vague. Mitigate with exact package IDs, owned paths, frozen contracts, anti-hardcoding rules, scenario substitution tests, and hard-stop rules rather than avoiding Qwen entirely.
+
+#### Long-horizon model experiment
+
+We want our own repository evidence rather than relying only on public benchmarks.
+
+For substantial, testable autonomous packages, compare in this order where practical:
+1. **Qwen3.7-Max off-peak** — value/endurance baseline;
+2. **Qwen3.8-Max xHigh** — stronger Qwen baseline;
+3. **Kimi-K3 High/Max** — premium endurance/context comparison after the Qwen baselines;
+4. **GLM-5.3** only when the package is debugging/integration-heavy enough to test its specialist hypothesis.
+
+Track completion without intervention, test evidence, hardcoding/architecture drift, reviewer findings, human steering, wall-clock time, Credits consumed, and final rework. Do not call materially different tasks a controlled benchmark.
 
 Runtime Alibaba Model Studio model choice is separate. Start cheap for plumbing and upgrade only if output quality is demonstrably blocking the integrated loop.
 
@@ -173,7 +192,7 @@ Run **F0–F3 as one long-horizon Foundation/Contract session**. This is intenti
 
 Preferred interface: JetBrains Qoder Agent Mode if stable; Quest is also suitable. CLI `/goal` is optional.
 
-Recommended model: Qwen3.8-Max xHigh first; Qwen3.7-Max is a valid long-horizon alternative. GLM is escalation only.
+Recommended model for equivalent future foundation/contract work: Qwen3.8-Max xHigh first; Qwen3.7-Max is the long-horizon/value alternative. Kimi-K3 is a later controlled long-horizon comparison, not an automatic premium default. GLM-5.3 is for hard debugging/integration rather than routine foundation work.
 
 ## F0 — Stack, skeleton, baseline commands, ownership map
 
@@ -292,7 +311,7 @@ After Checkpoint A, launch five isolated lane worktrees in parallel. Packages in
 
 ## Lane A — Core state, viability, case, authority
 
-Recommended: Qwen3.8-Max xHigh / Qwen3.7-Max. GLM-5.3 only for hard escalation.
+Recommended: **Qwen3.8-Max xHigh** as default. **Qwen3.7-Max** is the first long-horizon/value alternative. Use **GLM-5.3 High/Max** for genuinely difficult deterministic/state/viability debugging. Kimi-K3 is a controlled premium long-horizon comparison, not the normal owner.
 
 ### A1 — Persistence + validated mutation
 - SQLite repositories;
@@ -342,7 +361,7 @@ Do not build a universal rules platform.
 
 ## Lane B — Source/context ingestion
 
-Recommended: Qwen3.8-Max Medium/xHigh or Qwen3.7-Max; Qwen3.7-Plus for bounded helpers.
+Recommended: **Qwen3.8-Max Medium/xHigh** for lane ownership; **Qwen3.7-Max** for a long autonomous value run; **Qwen3.7-Plus** or **Kimi-K2.7-Code** for bounded helpers/extraction plumbing.
 
 ### B1 — Source/provenance framework
 - `SourceInput`;
@@ -376,7 +395,7 @@ Never `source -> graph`.
 
 ## Lane C — Travel capability adapters
 
-Recommended: Qwen3.8-Max / Qwen3.7-Max. Escalate difficult Atlas/provider debugging to GLM-5.3 rather than redesigning interfaces.
+Recommended: **Qwen3.8-Max** as default; **Qwen3.7-Max** for well-specified autonomous adapter work; **Kimi-K2.7-Code** for bounded adapter implementation. Escalate difficult Atlas/provider/runtime debugging to **GLM-5.3 High/Max** rather than redesigning interfaces.
 
 ### C1 — Provider base + LIVE/RECORD/REPLAY
 - mode selection;
@@ -406,7 +425,7 @@ Google LIVE setup is non-blocking.
 
 ## Lane D — Model Studio intelligence and research
 
-Recommended: Qwen3.8-Max / Qwen3.7-Max for implementation. Runtime Model Studio starts with a cheap model.
+Recommended implementation model: **Qwen3.8-Max** by default; **Qwen3.7-Max** for autonomous value runs; **Kimi-K2.7-Code** for bounded client/plumbing. Kimi-K3 is only justified if planner/research implementation genuinely becomes a broad-context long-horizon task. Runtime Model Studio starts with a cheap model.
 
 ### D1 — Model Studio structured client
 - runtime config/client;
@@ -446,7 +465,7 @@ Planner may iterate after capability results. Deterministic engine decides viabi
 
 ## Lane E — Operator/traveller UI
 
-Recommended: Qwen3.8-Max / Qwen3.7-Max. Design user-down.
+Recommended: **Qwen3.8-Max Medium** for lane ownership; **Kimi-K2.7-Code** or **Qwen3.7-Plus** for bounded components. Cursor Composer 2.5 may be used externally for rapid interactive UI polish when its harness is advantageous, but the main implementation remains Qoder-heavy.
 
 ### E1 — User journeys/state inventory
 Operator must answer:
@@ -484,7 +503,7 @@ Wiring happens with the integrator. UI lane must not invent incompatible backend
 
 Integration is not a sixth parallel lane. Start as stable outputs become available.
 
-Recommended integrator: Qwen3.8-Max xHigh / Qwen3.7-Max. Escalate to GLM only for concrete difficult seams.
+Recommended integrator: **Qwen3.8-Max xHigh** first. Use **GLM-5.3 High/Max** for concrete difficult deterministic/provider/runtime seams. Use **Kimi-K3 High/Max** only if repository breadth/endurance is demonstrably the bottleneck. Qwen3.7-Max remains a value-oriented long autonomous alternative when the integration package is sufficiently frozen.
 
 ### I1 — Source/profile -> validated persistent Trip
 B + A1.
@@ -590,7 +609,13 @@ This integrated SHA becomes the **demo candidate**.
 
 This is the one planned independent review checkpoint.
 
-Prefer a different family from the primary integrator.
+Prefer a different family from the primary integrator, but **do not select DeepSeek-V4-Pro merely for family independence**.
+
+Preferred review order:
+1. **external GPT-5.6 Sol High or Claude Opus 5 High** for consequential final-candidate review when available;
+2. if Qoder-only, **GLM-5.3 Max** when the risk is deterministic/provider/debugging-heavy or **Kimi-K3 High/Max** when broad repository context is the issue;
+3. **Kimi-K2.7-Code / DeepSeek-V4-Flash** for bounded targeted follow-up review;
+4. **DeepSeek-V4-Pro** only when a specific hard/adversarial reasoning need remains after cheaper review or we deliberately want a Pro benchmark.
 
 Review:
 - deterministic mutation/viability;
@@ -629,31 +654,31 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 
 | ID | Work package | Status | Depends on | Default worktree | Recommended Qoder profile | Evidence / commit |
 |---|---|---|---|---|---|---|
-| F0 | Stack + skeleton + file map | Implemented | — | main | Qwen3.8 xHigh / Qwen3.7 Max | 908e8aa — foundation smoke tests, credential-free REPLAY boot |
-| F1 | Domain + operational contracts | Implemented | F0 | main | Qwen3.8 xHigh / Qwen3.7 Max | 869765e — T-DOM suite passes |
-| F2 | Shared capability/service/read-model contracts | Implemented | F0,F1 | main | Qwen3.8 xHigh / Qwen3.7 Max | 54b7eed — seam/envelope contract tests pass |
-| F3 | Acceptance scenario specs | Implemented | F1,F2 | main | Qwen3.8 xHigh / Qwen3.7 Max | dfc2c8d — both scenarios schema-load via same contracts |
-| A1 | Persistence + validated mutation | Not Started | F1,F2 | core | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| A2 | Constraints + blast radius | Not Started | A1,F3 | core | Qwen3.8 xHigh; GLM escalation | — |
-| A3 | Overlays + viability | Not Started | A2 | core | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| A4 | Case + authority + observation | Not Started | A1,A2,F2 | core | Qwen3.8 xHigh; GLM escalation | — |
-| B1 | Source/provenance framework | Not Started | F1,F2 | ingestion | Qwen3.8 Medium / Qwen3.7 Max | — |
-| B2 | Web/document/policy/insurance ingestion | Not Started | B1 | ingestion | Qwen3.8 Medium / Qwen3.7 Max | — |
-| B3 | Traveller/research context | Not Started | B1,D1 | ingestion | Qwen3.8 Medium / Qwen3.7 Max | — |
-| C1 | Provider modes + recording/error envelope | Not Started | F2 | providers | Qwen3.8 Medium / Qwen3.7 Max | — |
-| C2 | Atlas Search/Verify/rules | Not Started | C1 | providers | Qwen3.8 xHigh / Qwen3.7 Max; GLM escalation | — |
-| C3 | Google Routes optional adapter | Not Started | C1 | providers | Qwen3.8 Medium / Qwen3.7-Plus | — |
-| D1 | Model Studio structured client | Not Started | F1,F2 | intelligence | Qwen3.8 Medium / Qwen3.7 Max | — |
+| F0 | Stack + skeleton + file map | Implemented | — | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 908e8aa — foundation smoke tests, credential-free REPLAY boot |
+| F1 | Domain + operational contracts | Implemented | F0 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 869765e — T-DOM suite passes |
+| F2 | Shared capability/service/read-model contracts | Implemented | F0,F1 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 54b7eed — seam/envelope contract tests pass |
+| F3 | Acceptance scenario specs | Implemented | F1,F2 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | dfc2c8d — both scenarios schema-load via same contracts |
+| A1 | Persistence + validated mutation | Not Started | F1,F2 | core | Qwen3.8 xHigh; Qwen3.7 Max long-horizon value | — |
+| A2 | Constraints + blast radius | Not Started | A1,F3 | core | Qwen3.8 xHigh; GLM-5.3 Max if hard logic/debug | — |
+| A3 | Overlays + viability | Not Started | A2 | core | Qwen3.8 xHigh; Qwen3.7 Max value; GLM if debugging | — |
+| A4 | Case + authority + observation | Not Started | A1,A2,F2 | core | Qwen3.8 xHigh; GLM-5.3 for hard authority/state seam | — |
+| B1 | Source/provenance framework | Not Started | F1,F2 | ingestion | Qwen3.8 Medium; Qwen3.7 Max; Plus/K2.7 helpers | — |
+| B2 | Web/document/policy/insurance ingestion | Not Started | B1 | ingestion | Qwen3.8 Medium/xHigh; Plus/K2.7 helpers | — |
+| B3 | Traveller/research context | Not Started | B1,D1 | ingestion | Qwen3.8 Medium/xHigh; Qwen3.7 Max | — |
+| C1 | Provider modes + recording/error envelope | Not Started | F2 | providers | Qwen3.8 Medium; Kimi-K2.7-Code alternative | — |
+| C2 | Atlas Search/Verify/rules | Not Started | C1 | providers | Qwen3.8 xHigh; GLM-5.3 High/Max for provider debugging | — |
+| C3 | Google Routes optional adapter | Not Started | C1 | providers | Qwen3.7-Plus / Kimi-K2.7-Code / Qwen3.8 Medium | — |
+| D1 | Model Studio structured client | Not Started | F1,F2 | intelligence | Qwen3.8 Medium / Kimi-K2.7-Code | — |
 | D2 | Semantic preferences + research | Not Started | D1,F3 | intelligence | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| D3 | RecoveryPlanner | Not Started | D1,A2,F2,F3 | intelligence | Qwen3.8 xHigh / Qwen3.7 Max; GLM escalation | — |
-| E1 | User journeys + read-model fixtures | Not Started | F2,F3 | ui | Qwen3.8 Medium / Qwen3.7 Max | — |
-| E2 | Operator + traveller UI | Not Started | E1 | ui | Qwen3.8 Medium / Qwen3.7 Max | — |
-| I1–I5 | Vertical integration | Not Started | lane outputs | integration | Qwen3.8 xHigh / Qwen3.7 Max; GLM escalation | — |
+| D3 | RecoveryPlanner | Not Started | D1,A2,F2,F3 | intelligence | Qwen3.8 xHigh; Kimi-K3 only as premium long-horizon trial; GLM if debugging | — |
+| E1 | User journeys + read-model fixtures | Not Started | F2,F3 | ui | Qwen3.8 Medium / Kimi-K2.7-Code / Plus helpers | — |
+| E2 | Operator + traveller UI | Not Started | E1 | ui | Qwen3.8 Medium / Kimi-K2.7-Code; Composer 2.5 external optional | — |
+| I1–I5 | Vertical integration | Not Started | lane outputs | integration | Qwen3.8 xHigh; GLM-5.3 hard seams; Kimi-K3 only if breadth/endurance warrants | — |
 | G1 | Scenario B substitution | Not Started | Checkpoint B | integration | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| G2 | Selected robustness | Not Started | Checkpoint B | integration/core | Qwen3.8 xHigh / task-dependent | — |
-| G3 | Hardcoding audit | Not Started | G1 | review/bounded | Qwen3.7-Plus / different-family reviewer | — |
-| R1 | Reliability/replay | Not Started | Checkpoint B | integration | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| FINAL | Candidate review/release gate | Not Started | Checkpoint C | fresh reviewer | different family / high-capability | — |
+| G2 | Selected robustness | Not Started | Checkpoint B | integration/core | Qwen3.8 xHigh; GLM-5.3 if debugging-heavy | — |
+| G3 | Hardcoding audit | Not Started | G1 | review/bounded | Kimi-K2.7-Code / DeepSeek-V4-Flash / Plus; different-family preferred | — |
+| R1 | Reliability/replay | Not Started | Checkpoint B | integration | Qwen3.8 xHigh; GLM-5.3 for hard failures | — |
+| FINAL | Candidate review/release gate | Not Started | Checkpoint C | fresh reviewer | Sol/Opus preferred; Qoder-only GLM-5.3 or Kimi-K3 by risk; V4 Pro only explicit hard need | — |
 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
 
@@ -856,7 +881,7 @@ Run **F0–F3 as one Foundation/Contract long-horizon task**.
 
 Preferred interface: **JetBrains Qoder Agent Mode** if it is the most stable surface. Quest is also suitable. CLI `/goal`/worktree execution is optional.
 
-Preferred model: **Qwen3.8-Max xHigh**, with Qwen3.7-Max as the main alternative.
+Preferred model for equivalent future foundation work: **Qwen3.8-Max xHigh**. For the upcoming build, use **Qwen3.7-Max** as the first long-horizon/value experiment on a substantial frozen package, then compare against **Qwen3.8-Max xHigh**; test **Kimi-K3 High/Max** only after the Qwen baselines if a premium endurance/context comparison is useful.
 
 The initial prompt must instruct the agent to:
 1. inspect current SSOT docs and authoritative Atlas research;
