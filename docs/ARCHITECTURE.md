@@ -27,11 +27,11 @@ The planner may propose how the trip should change. It does not get to declare t
 
 ### Interpretation and normalization
 - structured inputs: deterministic mapper where possible
-- unstructured inputs: Qwen extracts/maps into approved schemas
+- unstructured inputs: Model Studio/Qwen extracts/maps into approved schemas
 - output: `MutationProposal` / structured rules / uncertainty, never direct graph writes
 
 ### State and viability
-- authoritative Trip graph
+- authoritative Trip graph/state
 - fact provenance/freshness
 - deterministic constraint evaluation
 - dependency propagation
@@ -92,7 +92,7 @@ Structured rules from suppliers, organisations, immigration/entry sources or ins
 ### Constraint
 Evaluatable condition referencing relevant entities/facts.
 
-Suggested fields:
+Suggested conceptual fields:
 - kind: temporal, transfer, location, entry, accessibility, supplier, policy, financial, objective
 - hardness: HARD / SOFT
 - owner/source authority
@@ -183,10 +183,12 @@ Legal/entry facts require authoritative sources. Operational immigration timing 
 ## 8. Mutation pipeline
 
 Structured provider input:
+
 `Provider payload -> deterministic mapper -> MutationProposal -> schema/business validation -> deterministic graph mutation`
 
 Unstructured input:
-`Email/web/document/chat -> Qwen extraction/mapping -> MutationProposal + evidence + uncertainty -> schema/business validation -> identity/conflict/authority checks -> deterministic graph mutation`
+
+`Email/web/document/chat -> AI extraction/mapping -> MutationProposal + evidence + uncertainty -> schema/business validation -> identity/conflict/authority checks -> deterministic graph mutation`
 
 Bound mutation vocabulary, e.g. UPSERT_ENTITY, UPSERT_FACT, ADD_RELATION, REMOVE_RELATION, UPSERT_CONSTRAINT, WAIVE_OR_REPRIORITIZE_OBJECTIVE where authorised.
 
@@ -271,31 +273,34 @@ Each adapter advertises supported operations and side-effect level. Atlas is the
 ## 14. Current external implementation posture
 
 ### Atlas
-Treat `atlas-hackathon-lab` reports as authoritative. Hackathon direct-API targets:
+Treat `atlas-hackathon-lab` reports as authoritative. Mandatory hackathon direct-API targets:
 - `search.do`
 - `verify.do`
-- fare/change/refund/no-show rule structures from Search/Verify
-- `getLuggage.do` and `seatAvailability.do` only when useful
+- fare/change/refund/no-show rule structures needed by recovery
 
-Stretch-only until safely exercised: `order.do`, `queryOrderDetails.do`, incident/webhook and broader refund/post-ticket surfaces. Do not call ordinary cached Search “live inventory.”
+Conditional/Stretch:
+- `getLuggage.do` and `seatAvailability.do` only if a chosen scenario needs them
+- `order.do`, `queryOrderDetails.do`, incident/webhook and broader refund/post-ticket surfaces until safely exercised
+
+Do not call ordinary cached Search “live inventory.”
 
 ### Alibaba Cloud Model Studio
-Use OpenAI-compatible/Responses surfaces with Qwen for extraction, planning and semantic judgement. Built-in web search/extraction may provide sourced dynamic context. Start with cheap models for plumbing. Validate structured output.
+Use structured/OpenAI-compatible/Responses surfaces with Qwen or another suitable Model Studio model for extraction, planning and semantic judgement. Built-in web research may provide sourced dynamic context. Start with cheap runtime models for plumbing; validate structured output.
 
 ### Google Routes
-Optional `computeRoutes` adapter for traffic-aware driving/transit context. It must fail gracefully or use recorded/fallback context if credentials are absent.
+Optional `computeRoutes` adapter for traffic-aware driving/transit context. It must fail gracefully or use recorded/sourced/unknown context if credentials/network are absent.
 
 ### Hotel
-Generic HotelCapability works from imported booking/policy data without a transactional hotel API. Booking.com Demand API is a stretch investigation; if partner credentials appear, it may provide accommodation search/order-management capabilities. Never make it a core dependency.
+Generic HotelCapability works from imported booking/policy data without a transactional hotel API. Booking.com Demand API is Stretch; if partner credentials become immediately available it may be added behind the same capability boundary.
 
 ### Entry/immigration
-Use authoritative sources for legal facts. Commercial IATA Timatic/AutoCheck is future/deferred.
+Use authoritative sources for legal facts. Commercial Timatic/AutoCheck is future/deferred.
 
 ### Insurance
 Ingest at least one real policy/document into structured rules. Do not automate claims in MVP.
 
 ### Future adapters
-Potential adapters include Gmail (`users.messages.*`, `users.history.list`, `users.watch`), Booking.com Demand, Expedia Rapid, Timatic AutoCheck, Amadeus, Sabre, Travelport and other NDC/GDS systems. They plug into capability/source interfaces rather than alter graph logic.
+Potential adapters include Gmail, Booking.com Demand, Expedia Rapid, Timatic, Amadeus, Sabre, Travelport and other NDC/GDS systems. They plug into capability/source interfaces rather than alter graph logic.
 
 ## 15. Case state machine
 
@@ -307,7 +312,9 @@ Resolution outcomes include FULLY_RECOVERED and RECOVERED_WITH_LOSS. An API succ
 
 ## 16. Persistence
 
-Use repository interfaces with SQLite initially. Keep rich trip/case state JSON-friendly to avoid premature relational graph schema design. Logical stores: trips, cases, signals/events, sources, audit. Do not introduce Neo4j merely because the domain is graph-shaped.
+Use repository interfaces with SQLite initially. Keep rich trip/case state JSON-friendly to avoid premature relational graph-schema design. Logical stores: trips, cases, signals/events, sources, audit.
+
+Do not introduce a graph database merely because the domain is graph-shaped.
 
 ## 17. UI read-model boundary
 
@@ -318,3 +325,27 @@ Operator projections expose readiness, current case, what changed, affected down
 Traveller projections expose status, what changed, what matters, actions being taken, choices requiring input and whether the remainder is viable.
 
 A graph visualization may exist in demo/debug views, but internal terminology must not drive user-facing information architecture.
+
+## 18. Logical architecture vs frozen implementation contracts
+
+This document defines **logical architecture and invariants**, not exact TypeScript filenames or final interface syntax.
+
+`docs/IMPLEMENTATION_PLAN.md` Checkpoint A turns this architecture into executable contracts:
+
+- domain/operational runtime schemas;
+- service boundaries;
+- capability interfaces;
+- persistence interfaces;
+- planner input/output;
+- UI read models;
+- exact path ownership.
+
+Before Checkpoint A is accepted, examples/pseudocode here are architectural guidance rather than permission for parallel agents to invent incompatible schemas.
+
+After contract freeze:
+- implementation lanes consume the shared contracts;
+- a lane may not fork/redefine them locally;
+- if implementation evidence shows a contract is inadequate, raise an **architecture gap** to the lead/integrator;
+- any accepted cross-cutting contract change updates this document/`DECISIONS.md` where the logical architecture changed, plus affected tests and the implementation-plan tracker.
+
+Do not solve a contract mismatch with demo-specific branches or parallel local DTOs.
