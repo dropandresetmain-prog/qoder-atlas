@@ -30,6 +30,13 @@ logs/
 .qoder/settings.local.json
 .qoder/worktrees/
 
+# Other local agent / review worktrees
+.claude/settings.json
+.claude/settings.local.json
+.claude/worktrees/
+.codex/worktrees/
+.review-worktrees/
+
 # OS / editors
 .DS_Store
 Thumbs.db
