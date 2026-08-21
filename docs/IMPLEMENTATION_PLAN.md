@@ -1,6 +1,6 @@
 # Implementation Plan
 
-**Status:** Active execution SSOT. F0–F3 (Checkpoint A) implemented; targeted review-fix pass applied (3592a0e / tracker at addad36); awaiting Review Gate A targeted closure confirmation before fan-out.  
+**Status:** Active execution SSOT. Checkpoint A accepted (REV-A Complete; closure commit pinned as the accepted fan-out base); lane fan-out in progress.  
 **Product:** AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
@@ -320,6 +320,8 @@ Independent review must inspect the **actual proposed fan-out SHA**, with focus 
 - whether contract tests prove the claims they make.
 
 Checkpoint A passes only when Review Gate A passes. If review finds blocking issues, fix them on the shared-contract owner branch, run targeted closure evidence plus invalidated checks, and obtain targeted reviewer confirmation before fan-out. A docs-only reconciliation that does not alter reviewed contracts does not by itself invalidate code-review evidence.
+
+**Review Gate A is closed (REV-A Complete).** Initial independent review passed; the follow-up static review found five blocking shared-contract defects and the targeted fix pass at `3592a0e` closed all five: epoch/instant timestamp comparison; read-only `ToolOperation` vocabulary; `AuthorisedExecution` + deterministic execution gate; `TripElement` default `UNKNOWN`; deliberate typed-field relation normalization (ADR-023..027). Closure evidence: 38/38 tests, typecheck/lint/build clean, credential-free REPLAY health smoke, anti-hardcoding scan clean; no unresolved `Act Now` or checkpoint-threatening `Investigate Now` findings remain. No further Checkpoint A review is required unless a frozen contract is subsequently changed.
 
 After acceptance, shared contract changes become lead/integrator-owned cross-lane changes.
 
@@ -703,7 +705,7 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 | F2 | Shared capability/service/read-model contracts | Implemented | F0,F1 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 54b7eed — seam/envelope contract tests pass |
 | F3 | Acceptance scenario specs | Implemented | F1,F2 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | dfc2c8d — both scenarios schema-load via same contracts |
 | CA-R | Checkpoint A review-fix pass (findings 1–5) | Implemented | F0,F1,F2,F3 | main | Review-driven contract correction | 3592a0e — instant timestamp ordering; read-only ToolRequest vocabulary; AuthorisedExecution executor gate; UNKNOWN default element health; relation-vocabulary normalization (ADR-023..027); 38/38 tests green |
-| REV-A | Review Gate A — contract freeze / fan-out | In Progress | CA-R | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Initial independent review passed pre-fix SHA; static review found 5 blocking contract issues; fixes at 3592a0e / tracker at addad36; targeted closure confirmation pending |
+| REV-A | Review Gate A — contract freeze / fan-out | Complete | CA-R | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Initial independent review passed; static review found 5 blocking contract issues; all five closed by fixes at 3592a0e (epoch/instant comparison; read-only ToolOperation vocabulary; AuthorisedExecution execution gate; UNKNOWN default element health; typed-field relation normalization — ADR-023..027); 38/38 tests + typecheck/lint/build + credential-free REPLAY smoke + anti-hardcoding scan clean; closure recorded on main over b0145d5; no further Checkpoint A review unless a frozen contract changes |
 | A1 | Persistence + validated mutation | Not Started | REV-A | core | Qwen3.8 xHigh; Qwen3.7 Max long-horizon value | — |
 | A2 | Constraints + blast radius | Not Started | A1,F3 | core | Qwen3.8 xHigh; GLM-5.3 Max if hard logic/debug | — |
 | A3 | Overlays + viability | Not Started | A2 | core | Qwen3.8 xHigh; Qwen3.7 Max value; GLM if debugging | — |
@@ -730,7 +732,7 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
 
-**Checkpoint A fan-out rule:** fan-out only from the exact pushed `main` SHA after `REV-A` is marked `Complete`. The reviewed contract-fix code is at `3592a0e` with tracker/reconciliation at `addad36`; a later docs-only merge that does not alter reviewed contracts may become the accepted fan-out SHA without invalidating the targeted code-review evidence.
+**Checkpoint A fan-out rule:** fan-out only from the exact pushed `main` SHA after `REV-A` is marked `Complete`. `REV-A` is `Complete`; the reviewed contract-fix code is at `3592a0e` with docs-only reconciliation at `addad36` and review-gate definitions at `b0145d5`. The docs-only Checkpoint A closure commit on top of `b0145d5` is the accepted fan-out SHA: every lane branch must originate from that exact SHA. A later docs-only tracker commit may remain on `main` without invalidating the fan-out base.
 
 `Implemented` = package completed/verified in lane.  
 `Integrated` = merged and seam-tested.  
@@ -935,14 +937,14 @@ Every investigation ends with `Adopt Now | Keep Stretch | Defer | Reject`, evide
 
 ## 12. What happens next
 
-Foundation F0–F3 is complete and the targeted Checkpoint A review fixes are implemented/pushed. **Do not rerun or re-plan Foundation.**
+Checkpoint A is **accepted** (REV-A Complete; five review findings closed) and lane fan-out is set up from the closure commit SHA. **Do not rerun or re-plan Foundation.**
 
 Current next action:
-1. run the **targeted Review Gate A closure confirmation** against the pushed contract-fix state (`3592a0e` code, `addad36` tracker/reconciliation; use the latest main SHA if only docs changed afterward);
-2. if the reviewer confirms the five findings are closed with no new blocking `Act Now` / checkpoint-threatening `Investigate Now` issue, mark `REV-A` and Checkpoint A `Complete`;
-3. merge/reconcile any docs-only review-gate update without changing the frozen contracts;
-4. record the exact final pushed `main` SHA as the accepted Checkpoint A fan-out SHA;
-5. fan out `lane/core`, `lane/ingestion`, `lane/providers`, `lane/intelligence`, `lane/ui`, and prepare `integration/vertical-loop` from that exact accepted SHA;
-6. execute downstream lanes autonomously until Checkpoint B or a Section 2.5 hard stop.
+1. begin lane implementation from the accepted fan-out base SHA (the Checkpoint A closure commit; recorded in the tracker):
+   - `lane/core` starts with **A1** (`T-PERSIST` + mutation `T-PROP` subset);
+   - `lane/ingestion` starts with **B1**; `lane/providers` with **C1**; `lane/intelligence` with **D1**; `lane/ui` with **E1**;
+2. keep all lanes on their own worktree/branch; shared contracts stay frozen — any material contract change is a Section 2.5 hard stop and lead/integrator-owned;
+3. `integration/vertical-loop` remains prepared but unimplemented; integration begins incrementally as seam pairs stabilize (I1 = B + A1 is the first seam);
+4. execute downstream lanes autonomously until Checkpoint B or a Section 2.5 hard stop.
 
-Only after Review Gate A passes should the five implementation lanes launch in parallel.
+Review Gates B/C/Final remain mandatory per Section 3 and `docs/TESTING.md`.
