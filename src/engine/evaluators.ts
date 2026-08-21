@@ -248,7 +248,13 @@ function evaluateTransfer(constraint: Constraint, ctx: EvaluationContext): Const
   const leg = subject as TransportLeg;
   const upstream = upstreamArrivalAtPlace(leg.data.originPlaceId, ctx, new Set());
   if (!upstream) {
-    return evaluation(constraint, 'UNKNOWN', `no upstream arrival evidence at ${leg.data.originPlaceId}`);
+    return evaluation(
+      constraint,
+      'UNKNOWN',
+      subject.reservationState === 'NONE' && subject.flexibility !== 'FIXED'
+        ? `on-demand transfer schedulable only once upstream arrival at ${leg.data.originPlaceId} is known`
+        : `no upstream arrival evidence at ${leg.data.originPlaceId}`,
+    );
   }
   const departure = factInstant(leg.data.scheduledDeparture, ctx.now);
   if ('instant' in departure) {
@@ -261,7 +267,7 @@ function evaluateTransfer(constraint: Constraint, ctx: EvaluationContext): Const
   }
   if (subject.reservationState === 'NONE' && subject.flexibility !== 'FIXED') {
     // On-demand flexible leg: schedulable after the known upstream arrival.
-    return evaluation(constraint, 'PASS', 'on-demand transfer can be scheduled after upstream arrival');
+    return evaluation(constraint, 'PASS', `on-demand transfer can be scheduled after upstream arrival at ${upstream}`);
   }
   return evaluation(constraint, 'UNKNOWN', 'no departure evidence for booked transfer');
 }

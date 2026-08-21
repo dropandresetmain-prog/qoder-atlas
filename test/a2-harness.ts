@@ -16,6 +16,8 @@ import { SqlMutationService } from '../src/engine/mutation.ts';
 import { ScenarioSpecSchema, type ScenarioSpec } from '../src/scenarios/spec.ts';
 import type { TripElement } from '../src/domain/elements.ts';
 import type { MutationProposal } from '../src/operational/mutation.ts';
+import type { TripSnapshot } from '../src/operational/snapshot.ts';
+import type { IsoDateTime } from '../src/domain/common.ts';
 
 export function loadScenario(path: string): ScenarioSpec {
   return ScenarioSpecSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
@@ -59,6 +61,51 @@ export async function seedScenario(h: ScenarioHarness, spec: ScenarioSpec): Prom
   for (const anchorEvent of spec.context.anchorEvents) {
     await h.entities.upsert({ entityType: 'ANCHOR_EVENT', entity: anchorEvent });
   }
+}
+
+/**
+ * Assemble a planner-safe snapshot from persisted authoritative state.
+ * Same shape A4/integration will use to feed the viability engine.
+ */
+export async function snapshotOf(
+  h: ScenarioHarness,
+  tripId: string,
+  takenAt: IsoDateTime,
+): Promise<TripSnapshot> {
+  const trip = await h.trips.getTrip(tripId);
+  if (!trip) throw new Error(`unknown trip ${tripId}`);
+  const constraints = (await h.entities.list('CONSTRAINT'))
+    .filter((e): e is { entityType: 'CONSTRAINT'; entity: import('../src/domain/constraints.ts').Constraint } => e.entityType === 'CONSTRAINT')
+    .map((e) => e.entity);
+  const ruleSets = (await h.entities.list('RULE_SET'))
+    .filter((e): e is { entityType: 'RULE_SET'; entity: import('../src/domain/rules.ts').RuleSet } => e.entityType === 'RULE_SET')
+    .map((e) => e.entity);
+  const places = (await h.entities.list('PLACE'))
+    .filter((e): e is { entityType: 'PLACE'; entity: import('../src/domain/entities.ts').Place } => e.entityType === 'PLACE')
+    .map((e) => e.entity);
+  const travellers = (await h.entities.list('TRAVELLER'))
+    .filter((e): e is { entityType: 'TRAVELLER'; entity: import('../src/domain/entities.ts').Traveller } => e.entityType === 'TRAVELLER')
+    .map((e) => e.entity);
+  const organisations = (await h.entities.list('ORGANISATION'))
+    .filter((e): e is { entityType: 'ORGANISATION'; entity: import('../src/domain/entities.ts').Organisation } => e.entityType === 'ORGANISATION')
+    .map((e) => e.entity);
+  const anchor = trip.anchorEventId
+    ? await h.entities.get('ANCHOR_EVENT', trip.anchorEventId)
+    : undefined;
+  return {
+    tripId,
+    takenAt,
+    tripVersion: trip.version,
+    trip,
+    travellers,
+    organisations,
+    anchorEvent: anchor?.entityType === 'ANCHOR_EVENT' ? anchor.entity : undefined,
+    places,
+    ruleSets,
+    constraints,
+    preferences: [],
+    sourceRecords: [],
+  };
 }
 
 /**
