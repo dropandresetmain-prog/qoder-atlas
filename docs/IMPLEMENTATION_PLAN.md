@@ -1,6 +1,6 @@
 # Implementation Plan
 
-**Status:** Active execution SSOT. F0–F3 (Checkpoint A) implemented; targeted review-fix pass applied (3592a0e); awaiting formal acceptance.  
+**Status:** Active execution SSOT. F0–F3 (Checkpoint A) implemented; targeted review-fix pass applied (3592a0e / tracker at addad36); awaiting Review Gate A targeted closure confirmation before fan-out.  
 **Product:** AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
@@ -11,9 +11,9 @@ Read with:
 - `docs/PRODUCT_SPEC.md` — product requirements (`FR-*`, `NFR-*`)
 - `docs/ARCHITECTURE.md` — logical architecture and invariants
 - `docs/ROADMAP.md` — product scope/status, including Stretch/Deferred
-- `docs/TESTING.md` — verification taxonomy (`T-*`)
+- `docs/TESTING.md` — verification taxonomy (`T-*`) and detailed review-gate scope
 - `docs/DECISIONS.md` — settled architecture decisions
-- `docs/AGENT_MODEL_SELECTION.md` — model/interface routing
+- `docs/AGENT_MODEL_SELECTION.md` — model/interface/reviewer routing
 - `.qoder/rules/environment-recovery.md` — terminal/tool recovery
 
 ## 1. Build objective and completion definition
@@ -47,10 +47,17 @@ Do not review/test the whole repository after every work package.
 
 - **Package implementation:** narrowest tests/checks proving changed behavior and relevant failure paths.
 - **Integration:** reuse valid lane evidence; test new seams/conflict resolutions plus checkpoint acceptance flow.
-- **Independent review:** only for a material architecture/high-risk change or the final candidate gate.
+- **Formal checkpoint review:** independent review is mandatory at **Checkpoint A, Checkpoint B, Checkpoint C, and Final Candidate**. Scope is proportional to the risk at that stage; reviewers inspect the actual candidate SHA/evidence rather than trusting the implementer report.
+- **Exceptional review between checkpoints:** add a targeted independent review only for evidence-backed material architecture/shared-contract changes, meaningful irreversible/provider-money risk, destructive persistence/auth/security risk, or integration evidence suggesting correlated blind spots.
 - **Final candidate:** broad canonical build/typecheck/lint/test/generalisation/replay/secret gate on the exact SHA.
 
+Every review finding is triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
+
+A formal checkpoint passes only when there are no unresolved **Act Now** findings and no unresolved **Investigate Now** finding that threatens that checkpoint's acceptance criteria. Parked/accepted hackathon risks do not block progress.
+
 A targeted review fix needs targeted proof that the finding is closed. It does not restart the entire review cycle automatically.
+
+Detailed review scope lives in `docs/TESTING.md`. Reviewer-model choice follows `docs/AGENT_MODEL_SELECTION.md`; this plan defines **when review is required and what gate it protects**, not a duplicate model ranking.
 
 ### 2.3 Price-aware capability-first model routing
 
@@ -182,7 +189,7 @@ Optional services must not block core delivery:
 
 ## 3. Build checkpoints
 
-There are **three build checkpoints plus one final candidate gate**. Work packages below are execution units, not extra milestones.
+There are **three build checkpoints plus one final candidate gate**. Each has a mandatory independent review gate before acceptance. Work packages below are execution units, not extra milestones.
 
 # Checkpoint A — Contracts and runnable foundation
 
@@ -293,13 +300,26 @@ Each scenario defines expected pre-disruption state, TripSignal, blast-radius as
 
 ## Checkpoint A gate
 
-Stop for user/lead acceptance only after:
+Stop for checkpoint review only after:
 - F0–F3 compile/load/pass their scoped checks;
 - `PROJECT_FILE_MAP.md` exists;
 - Section 6 has exact paths;
 - the execution tracker records actual base SHA/evidence;
 - architecture/decisions docs are reconciled for any material change;
 - both scenarios fit without special-case application logic.
+
+### Review Gate A — mandatory before fan-out
+
+Independent review must inspect the **actual proposed fan-out SHA**, with focus on:
+- runnable credential-free foundation;
+- frozen domain/operational/service/capability/read-model contracts;
+- deterministic/AI safety boundaries;
+- timezone/freshness and authority semantics;
+- two-scenario generality and anti-hardcoding;
+- lane ownership/collision risk;
+- whether contract tests prove the claims they make.
+
+Checkpoint A passes only when Review Gate A passes. If review finds blocking issues, fix them on the shared-contract owner branch, run targeted closure evidence plus invalidated checks, and obtain targeted reviewer confirmation before fan-out. A docs-only reconciliation that does not alter reviewed contracts does not by itself invalidate code-review evidence.
 
 After acceptance, shared contract changes become lead/integrator-owned cross-lane changes.
 
@@ -524,7 +544,7 @@ E consumes application projections. No bespoke demo JSON behind the main flow.
 
 ## Checkpoint B gate
 
-Stop for user/lead checkpoint only when:
+Stop for checkpoint review only when:
 - Scenario A executes I1–I5 without manual state edits;
 - Atlas Search/Verify/rules have real adapter evidence and replay the same path;
 - unsupported external action boundaries are explicit/simulated honestly;
@@ -533,7 +553,21 @@ Stop for user/lead checkpoint only when:
 - restart/reload preserves critical Trip/Case state;
 - no Stretch capability is required for a valid loop.
 
-If this fails, do not start Stretch work.
+### Review Gate B — mandatory before Checkpoint B acceptance
+
+Run an independent review of the **integrated high-risk path**, not a ceremonial full-lane rereview. At minimum inspect:
+- validated mutation/persistence and blast-radius propagation;
+- overlay isolation and deterministic viability;
+- planner/capability separation;
+- deterministic authority and irreversible-action gate;
+- executor -> observation -> state-update/replan loop;
+- LIVE/RECORD/REPLAY equivalence and honest provider-boundary simulation;
+- UI use of actual application read models;
+- Scenario A `T-E2E` and restart/persistence evidence.
+
+Reuse still-valid lane evidence. Expand into lane internals only when the seam/evidence gives a concrete reason.
+
+Checkpoint B passes only when its implementation criteria **and Review Gate B** pass. If this fails, fix the integrated loop before treating Checkpoint B as accepted and do not start Stretch work.
 
 # Checkpoint C — Generalisation, reliability, demo candidate
 
@@ -595,7 +629,7 @@ Provider-specific code inside the relevant adapter is allowed.
 
 ## Checkpoint C gate
 
-Stop for user/lead checkpoint only when:
+Stop for checkpoint review only when:
 - Scenario A full replay works reliably;
 - Scenario B passes without application-source changes;
 - selected robustness tests pass;
@@ -603,19 +637,25 @@ Stop for user/lead checkpoint only when:
 - reset/reseed and restart work;
 - roadmap accurately reflects every cut/stretch/deferred/blocked/implemented item.
 
-This integrated SHA becomes the **demo candidate**.
+### Review Gate C — mandatory before demo-candidate status
+
+Run an independent **generalisation + reliability** review focused on:
+- Scenario B using the same application code;
+- scenario/event/traveller/city/route/fixture hardcoding;
+- provider-specific logic contained inside adapters;
+- selected robustness cases being real rather than scripted;
+- reset/reseed, persistence restart and fallback behavior;
+- replay/sanitized recording safety;
+- docs/README/demo claims matching implemented reality;
+- any shared-contract change since Checkpoint A being explicitly reconciled across affected lanes.
+
+This is not another full release audit. Checkpoint C passes only when its implementation criteria **and Review Gate C** pass. The accepted integrated SHA then becomes the **demo candidate**.
 
 # Final candidate gate
 
-This is the one planned independent review checkpoint.
+This is the fourth mandatory independent review checkpoint and the broadest review/release gate.
 
-Prefer a different family from the primary integrator, but **do not select DeepSeek-V4-Pro merely for family independence**.
-
-Preferred review order:
-1. **external GPT-5.6 Sol High or Claude Opus 5 High** for consequential final-candidate review when available;
-2. if Qoder-only, **GLM-5.3 Max** when the risk is deterministic/provider/debugging-heavy or **Kimi-K3 High/Max** when broad repository context is the issue;
-3. **Kimi-K2.7-Code / DeepSeek-V4-Flash** for bounded targeted follow-up review;
-4. **DeepSeek-V4-Pro** only when a specific hard/adversarial reasoning need remains after cheaper review or we deliberately want a Pro benchmark.
+Reviewer-model selection follows the current `docs/AGENT_MODEL_SELECTION.md`. Prefer independence from the primary integrator where practical, but do not duplicate or freeze a model-ranking list here.
 
 Review:
 - deterministic mutation/viability;
@@ -625,13 +665,17 @@ Review:
 - persistence;
 - policy/constraint enforcement;
 - AI schema boundaries;
+- both accepted scenarios;
 - demo hardcoding;
-- user-facing claims vs implemented reality.
+- reset/reseed and fallback behavior;
+- secret/recording hygiene;
+- user-facing claims vs implemented reality;
+- demo flow readiness.
 
 Every finding is triaged:
 `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
 
-Only Act Now findings that block demo truth/correctness/safety must be fixed before candidate acceptance. Fixes require targeted proof, not automatic full-review repetition.
+Only Act Now findings that block demo truth/correctness/safety and checkpoint-threatening Investigate Now findings must be resolved before candidate acceptance. Fixes require targeted proof, not automatic full-review repetition.
 
 Canonical release verification on exact candidate SHA:
 - build;
@@ -659,35 +703,38 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 | F2 | Shared capability/service/read-model contracts | Implemented | F0,F1 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | 54b7eed — seam/envelope contract tests pass |
 | F3 | Acceptance scenario specs | Implemented | F1,F2 | main | Historical: Qwen3.8 xHigh / Qwen3.7 Max | dfc2c8d — both scenarios schema-load via same contracts |
 | CA-R | Checkpoint A review-fix pass (findings 1–5) | Implemented | F0,F1,F2,F3 | main | Review-driven contract correction | 3592a0e — instant timestamp ordering; read-only ToolRequest vocabulary; AuthorisedExecution executor gate; UNKNOWN default element health; relation-vocabulary normalization (ADR-023..027); 38/38 tests green |
-| A1 | Persistence + validated mutation | Not Started | F1,F2 | core | Qwen3.8 xHigh; Qwen3.7 Max long-horizon value | — |
+| REV-A | Review Gate A — contract freeze / fan-out | In Progress | CA-R | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Initial independent review passed pre-fix SHA; static review found 5 blocking contract issues; fixes at 3592a0e / tracker at addad36; targeted closure confirmation pending |
+| A1 | Persistence + validated mutation | Not Started | REV-A | core | Qwen3.8 xHigh; Qwen3.7 Max long-horizon value | — |
 | A2 | Constraints + blast radius | Not Started | A1,F3 | core | Qwen3.8 xHigh; GLM-5.3 Max if hard logic/debug | — |
 | A3 | Overlays + viability | Not Started | A2 | core | Qwen3.8 xHigh; Qwen3.7 Max value; GLM if debugging | — |
 | A4 | Case + authority + observation | Not Started | A1,A2,F2 | core | Qwen3.8 xHigh; GLM-5.3 for hard authority/state seam | — |
-| B1 | Source/provenance framework | Not Started | F1,F2 | ingestion | Qwen3.8 Medium; Qwen3.7 Max; Plus/K2.7 helpers | — |
+| B1 | Source/provenance framework | Not Started | REV-A | ingestion | Qwen3.8 Medium; Qwen3.7 Max; Plus/K2.7 helpers | — |
 | B2 | Web/document/policy/insurance ingestion | Not Started | B1 | ingestion | Qwen3.8 Medium/xHigh; Plus/K2.7 helpers | — |
 | B3 | Traveller/research context | Not Started | B1,D1 | ingestion | Qwen3.8 Medium/xHigh; Qwen3.7 Max | — |
-| C1 | Provider modes + recording/error envelope | Not Started | F2 | providers | Qwen3.8 Medium; Kimi-K2.7-Code alternative | — |
+| C1 | Provider modes + recording/error envelope | Not Started | REV-A | providers | Qwen3.8 Medium; Kimi-K2.7-Code alternative | — |
 | C2 | Atlas Search/Verify/rules | Not Started | C1 | providers | Qwen3.8 xHigh; GLM-5.3 High/Max for provider debugging | — |
 | C3 | Google Routes optional adapter | Not Started | C1 | providers | Qwen3.7-Plus / Kimi-K2.7-Code / Qwen3.8 Medium | — |
-| D1 | Model Studio structured client | Not Started | F1,F2 | intelligence | Qwen3.8 Medium / Kimi-K2.7-Code | — |
+| D1 | Model Studio structured client | Not Started | REV-A | intelligence | Qwen3.8 Medium / Kimi-K2.7-Code | — |
 | D2 | Semantic preferences + research | Not Started | D1,F3 | intelligence | Qwen3.8 xHigh / Qwen3.7 Max | — |
 | D3 | RecoveryPlanner | Not Started | D1,A2,F2,F3 | intelligence | Qwen3.8 xHigh; Kimi-K3 only as premium long-horizon trial; GLM if debugging | — |
-| E1 | User journeys + read-model fixtures | Not Started | F2,F3 | ui | Qwen3.8 Medium / Kimi-K2.7-Code / Plus helpers | — |
+| E1 | User journeys + read-model fixtures | Not Started | REV-A | ui | Qwen3.8 Medium / Kimi-K2.7-Code / Plus helpers | — |
 | E2 | Operator + traveller UI | Not Started | E1 | ui | Qwen3.8 Medium / Kimi-K2.7-Code; Composer 2.5 external optional | — |
 | I1–I5 | Vertical integration | Not Started | lane outputs | integration | Qwen3.8 xHigh; GLM-5.3 hard seams; Kimi-K3 only if breadth/endurance warrants | — |
-| G1 | Scenario B substitution | Not Started | Checkpoint B | integration | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| G2 | Selected robustness | Not Started | Checkpoint B | integration/core | Qwen3.8 xHigh; GLM-5.3 if debugging-heavy | — |
+| REV-B | Review Gate B — integrated vertical loop | Not Started | I1–I5 | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Integrated high-risk-path review before Checkpoint B acceptance |
+| G1 | Scenario B substitution | Not Started | REV-B | integration | Qwen3.8 xHigh / Qwen3.7 Max | — |
+| G2 | Selected robustness | Not Started | REV-B | integration/core | Qwen3.8 xHigh; GLM-5.3 if debugging-heavy | — |
 | G3 | Hardcoding audit | Not Started | G1 | review/bounded | Kimi-K2.7-Code / DeepSeek-V4-Flash / Plus; different-family preferred | — |
-| R1 | Reliability/replay | Not Started | Checkpoint B | integration | Qwen3.8 xHigh; GLM-5.3 for hard failures | — |
-| FINAL | Candidate review/release gate | Not Started | Checkpoint C | fresh reviewer | Sol/Opus preferred; Qoder-only GLM-5.3 or Kimi-K3 by risk; V4 Pro only explicit hard need | — |
+| R1 | Reliability/replay | Not Started | REV-B | integration | Qwen3.8 xHigh; GLM-5.3 for hard failures | — |
+| REV-C | Review Gate C — generalisation / reliability | Not Started | G1,G2,G3,R1 | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Generalisation/reliability review before demo-candidate status |
+| FINAL | Review Gate Final + candidate release gate | Not Started | REV-C | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Broad independent review + `T-RELEASE` on exact candidate SHA |
 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
 
-**Checkpoint A safe fan-out SHA:** the pushed `main` HEAD containing this tracker update (review-fix code at `3592a0e`, docs update `2f44a0b` preserved). Lane worktrees fan out from that SHA after formal acceptance.
+**Checkpoint A fan-out rule:** fan-out only from the exact pushed `main` SHA after `REV-A` is marked `Complete`. The reviewed contract-fix code is at `3592a0e` with tracker/reconciliation at `addad36`; a later docs-only merge that does not alter reviewed contracts may become the accepted fan-out SHA without invalidating the targeted code-review evidence.
 
 `Implemented` = package completed/verified in lane.  
 `Integrated` = merged and seam-tested.  
-`Complete` = relevant checkpoint gate passed.
+`Complete` = relevant checkpoint/review gate passed.
 
 ## 5. Requirement / verification traceability
 
@@ -699,6 +746,7 @@ Minimum traceability; task Specs may add narrower evidence but cannot delete req
 | F1 | FR-01,03–06,09–11,14; NFR-01,02,04 | `T-DOM` |
 | F2 | FR-07,08,10–16 | contract tests / relevant `T-DOM` |
 | F3 | NFR-01,02 | scenario schema-load assertions |
+| REV-A | Checkpoint A contract/fan-out risk | independent review of actual proposed fan-out SHA + targeted closure evidence for blockers |
 | A1 | FR-01,04,14 | `T-PERSIST`, mutation `T-PROP` subset |
 | A2 | FR-05,06 | `T-EVAL`, `T-PROP` |
 | A3 | FR-09 | `T-OVERLAY` |
@@ -714,11 +762,13 @@ Minimum traceability; task Specs may add narrower evidence but cannot delete req
 | D3 | FR-07 | `T-AI` planner strategies/tool requests |
 | E1–E2 | FR-12,13 | typed UI-state/interaction evidence |
 | I1–I5 | Scenario A requirements | seam tests + `T-E2E` |
+| REV-B | Checkpoint B integrated-loop risk | independent integrated high-risk-path review + Checkpoint B evidence |
 | G1 | NFR-01,02 | `T-GEN` Scenario B |
 | G2 | exercised FRs | selected evaluator/propagation/overlay/authority tests |
 | G3 | NFR-02 | hardcoding portion of `T-GEN` |
 | R1 | FR-14,15; NFR-03,05,06 | persistence/fallback/replay E2E |
-| FINAL | all implemented MVP requirements | `T-RELEASE` |
+| REV-C | Checkpoint C generalisation/reliability risk | independent generalisation/reliability review + Checkpoint C evidence |
+| FINAL | all implemented MVP requirements | independent final review + `T-RELEASE` |
 
 ## 6. File ownership and collision control
 
@@ -745,17 +795,19 @@ If two lanes require the same implementation file, they are not independent unti
 ## 7. Dependency / parallelisation map
 
 ```text
-F0 -> F1 -> F2 -> F3 -> CHECKPOINT A
-                     |
-        +------------+-------------+-------------+-------------+
-        |            |             |             |             |
-      Lane A       Lane B        Lane C        Lane D        Lane E
-   A1->A2->A3    B1->B2       C1->C2       D1->D2       E1->E2
+F0 -> F1 -> F2 -> F3 -> REVIEW A -> CHECKPOINT A ACCEPTED
+                                      |
+        +-----------------------------+-----------------------------+
+        |            |             |             |                 |
+      Lane A       Lane B        Lane C        Lane D            Lane E
+   A1->A2->A3    B1->B2       C1->C2       D1->D2           E1->E2
     \    ->A4     \->B3        \->C3        \->D3
-        |            |             |             |             |
-        +------------+-------------+-------------+-------------+
+        |            |             |             |                 |
+        +------------+-------------+-------------+-----------------+
                                   |
                           I1 -> I2 -> I3 -> I4 -> I5
+                                  |
+                              REVIEW B
                                   |
                            CHECKPOINT B
                               /       \
@@ -763,12 +815,14 @@ F0 -> F1 -> F2 -> F3 -> CHECKPOINT A
                               \       /
                                G2/G3
                                   |
+                              REVIEW C
+                                  |
                            CHECKPOINT C
                                   |
-                                FINAL
+                            FINAL REVIEW
 ```
 
-D1, C1, B1, E1 and A1 can begin as soon as their frozen dependencies exist. Integration should begin incrementally as seam pairs stabilize rather than waiting for lane polish.
+D1, C1, B1, E1 and A1 can begin as soon as Review Gate A is accepted and their frozen dependencies exist. Integration should begin incrementally as seam pairs stabilize rather than waiting for lane polish.
 
 ## 8. Work-package execution contract
 
@@ -814,6 +868,7 @@ Do not repeat the implementation plan in the handoff.
 
 - use exact-path staging;
 - coherent, testable lane commits;
+- **push integration/checkpoint candidates before formal review so reviewers/lead can inspect the exact remote SHA**;
 - integrator verifies real branch heads/ancestry/merge order;
 - reuse valid lane evidence and run invalidated/seam checks only;
 - never mechanically resolve overlapping-file conflicts;
@@ -878,22 +933,16 @@ Decision: Stretch implementation only if bounded/safe; do not chase account/tick
 
 Every investigation ends with `Adopt Now | Keep Stretch | Defer | Reject`, evidence, and roadmap update if status changes.
 
-## 12. What happens first
+## 12. What happens next
 
-Run **F0–F3 as one Foundation/Contract long-horizon task**.
+Foundation F0–F3 is complete and the targeted Checkpoint A review fixes are implemented/pushed. **Do not rerun or re-plan Foundation.**
 
-Preferred interface: **JetBrains Qoder Agent Mode** if it is the most stable surface. Quest is also suitable. CLI `/goal`/worktree execution is optional.
+Current next action:
+1. run the **targeted Review Gate A closure confirmation** against the pushed contract-fix state (`3592a0e` code, `addad36` tracker/reconciliation; use the latest main SHA if only docs changed afterward);
+2. if the reviewer confirms the five findings are closed with no new blocking `Act Now` / checkpoint-threatening `Investigate Now` issue, mark `REV-A` and Checkpoint A `Complete`;
+3. merge/reconcile any docs-only review-gate update without changing the frozen contracts;
+4. record the exact final pushed `main` SHA as the accepted Checkpoint A fan-out SHA;
+5. fan out `lane/core`, `lane/ingestion`, `lane/providers`, `lane/intelligence`, `lane/ui`, and prepare `integration/vertical-loop` from that exact accepted SHA;
+6. execute downstream lanes autonomously until Checkpoint B or a Section 2.5 hard stop.
 
-Preferred model for equivalent future foundation work: **Qwen3.8-Max xHigh**. For the upcoming build, use **Qwen3.7-Max** as the first long-horizon/value experiment on a substantial frozen package, then compare against **Qwen3.8-Max xHigh**; test **Kimi-K3 High/Max** only after the Qwen baselines if a premium endurance/context comparison is useful.
-
-The initial prompt must instruct the agent to:
-1. inspect current SSOT docs and authoritative Atlas research;
-2. execute F0–F3 sequentially;
-3. recover transient terminal/tool problems using `.qoder/rules/environment-recovery.md`;
-4. make ordinary implementation decisions autonomously;
-5. update `PROJECT_FILE_MAP.md`, exact path ownership, tracker/evidence, and any actually changed architecture decisions;
-6. run only F0–F3 scoped verification;
-7. continue until **Checkpoint A** unless a Section 2.5 hard stop occurs;
-8. stop at Checkpoint A with a concise contract-freeze report for user approval.
-
-Only after Checkpoint A acceptance should the five implementation lanes launch in parallel.
+Only after Review Gate A passes should the five implementation lanes launch in parallel.
