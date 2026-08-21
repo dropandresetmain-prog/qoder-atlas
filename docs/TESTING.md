@@ -1,74 +1,211 @@
 # Testing Strategy
 
 ## Purpose
-Tests must prove the application is a generalized trip-resolution engine rather than a scripted demo.
 
-## Layers
+Tests must prove that the application is a generalized trip-resolution engine rather than a scripted demo.
 
-### 1. Domain/schema tests
-Validate entity/operational schemas, invalid enum/type rejection, relationship/constraint reference integrity, authority/ownership rules, explicit vs latent preference precedence, and uncertainty/provenance representation.
+Verification is **cumulative evidence**, not a ritual where every stage reruns every check.
 
-### 2. Deterministic evaluator tests
-Cover timezone normalization, time-window arithmetic, duration/buffer envelopes, hotel/check-in cutoffs, transfer/connectivity constraints, flexible required TransportLeg fulfilment, accessibility constraints, policy/spend thresholds, PASS/FAIL/UNKNOWN distinction, and irreversible loss without engine termination.
+- work packages run scoped tests for changed behavior and justified failure paths;
+- integration reuses valid lane evidence and tests newly created seams;
+- independent review primarily inspects existing evidence unless a concrete uncertainty needs new execution;
+- the final candidate runs the canonical broad gate on the exact candidate SHA.
 
-### 3. Graph mutation/propagation tests
-A changed fact should mutate only after validation, reevaluate directly referenced constraints, propagate through relevant dependencies, produce an ImpactAssessment, avoid automatically marking every downstream element invalid, and preserve audit/history.
+`docs/IMPLEMENTATION_PLAN.md` assigns these test IDs to work packages.
 
-### 4. Scenario overlay tests
-Candidate recovery changes must not mutate authoritative state; must produce deterministic viability; hard-constraint failures reject scenarios; soft tradeoffs remain available for ranking; authoritative state changes only after observed execution success.
+## Test IDs
 
-### 5. Authority tests
-Given identical ActionIntent + policy/context, result is deterministic. Cover auto-approved, traveller approval, organisation approval, human escalation and blocked outcomes.
+### T-DOM — Domain/schema contracts
+Validate:
+- entity/operational schemas;
+- invalid enum/type rejection;
+- relationship/constraint reference integrity;
+- source authority/provenance/freshness representation;
+- explicit vs latent preference precedence;
+- UNKNOWN representation;
+- flexible required/unbooked transport;
+- recovered-with-loss outcome.
 
-### 6. AI contract tests
-Use cheap Model Studio model or saved outputs for plumbing. Validate schema-constrained extraction, malformed output rejection, uncertainty surfaced rather than guessed, explicit instruction overriding latent preference, planner structured strategies/tool needs, and inability to bypass authority/execution gates.
+### T-EVAL — Deterministic evaluators
+Cover:
+- timezone normalization;
+- time-window arithmetic;
+- duration/buffer envelopes;
+- hotel/check-in/no-show windows required by scenarios;
+- transfer/connectivity constraints;
+- flexible `TransportLeg` fulfilment;
+- accessibility requirements;
+- policy/spend thresholds;
+- PASS/FAIL/UNKNOWN distinction;
+- irreversible loss without engine termination.
 
-### 7. Adapter contract tests
-For each adapter test normalization, structured errors, no secret leakage, LIVE/REPLAY equivalence where supported, and provider failure without RecoveryCase crash.
+### T-PROP — Mutation and blast-radius propagation
+Validate:
+- only validated proposals mutate state;
+- changed facts reevaluate relevant constraints;
+- dependency propagation produces `ImpactAssessment`;
+- downstream state is not blanket-invalidated;
+- direct failures, at-risk items, safe objectives, unknowns, and irreversible losses remain distinguishable;
+- audit/history is preserved.
 
-Atlas minimum: Search, Verify, fare/rule normalization.
-Google Routes: route normalization + missing-credential/failure fallback.
+### T-OVERLAY — Scenario overlays and viability
+Validate:
+- candidate changes never mutate authoritative state;
+- overlay evaluation is deterministic;
+- hard-constraint failures make a scenario infeasible;
+- soft tradeoffs remain available for ranking;
+- successful observed execution is required before authoritative replacement state appears.
 
-### 8. Persistence tests
-- Trip/Case survive restart
-- audit/source history persists
-- version/state transitions are retained
-- fixture/reset process creates deterministic demo state
+### T-AUTH — Authority and case lifecycle
+For identical `ActionIntent + policy/context`, authority outcome is deterministic.
 
-## Generalisation / anti-hardcoding gate
+Cover:
+- AUTO_APPROVED;
+- REQUIRES_TRAVELLER;
+- REQUIRES_ORGANISATION_APPROVER;
+- REQUIRES_HUMAN_AGENT;
+- BLOCKED;
+- executing/verifying loops;
+- API success without restored viability does not resolve the case;
+- FULLY_RECOVERED and RECOVERED_WITH_LOSS.
 
-At least two materially different scenarios pass through same application code:
+### T-AI — AI contracts
+Use cheap Model Studio calls or saved outputs for plumbing where useful.
 
-### Scenario A — AnchorEvent speaker
+Validate:
+- schema-constrained extraction;
+- malformed output rejection;
+- uncertainty surfaced rather than guessed;
+- explicit instruction overriding latent preference;
+- planner structured strategies/tool needs;
+- legal/entry facts require authoritative sourcing;
+- operational research estimates retain source/uncertainty;
+- model output cannot bypass mutation/viability/authority/execution gates.
+
+Prompt quality should not become an external-model rabbit hole before the integrated loop works.
+
+### T-ADAPTER — External capability contracts
+For each adapter validate:
+- normalized success result;
+- structured error/unavailable result;
+- no secret leakage;
+- LIVE/REPLAY same normalizer/downstream path where supported;
+- provider failure does not crash RecoveryCase;
+- replay data remains provider-shaped enough to exercise the real normalizer.
+
+Mandatory Atlas:
+- Search;
+- Verify;
+- fare/change/refund/no-show rule normalization required by the scenario.
+
+Google Routes:
+- route normalization;
+- missing-credential/network fallback.
+
+### T-PERSIST — Persistence/restart
+Validate:
+- Trip/Case survive process restart/reload;
+- audit/source history persists;
+- state transitions/versioning remain coherent;
+- deterministic fixture/reset/reseed creates known demo state.
+
+### T-GEN — Generalisation / anti-hardcoding
+At least two materially different scenarios pass through the same application code:
+
+**Scenario A — AnchorEvent speaker**
 Event obligations, organiser policy, traveller interaction, disrupted flight, downstream transfer/hotel/event objectives.
 
-### Scenario B — TMC/corporate traveller
-Employer policy, spend threshold, corporate objective, TMC/operator role, different routing/supplier context.
+**Scenario B — TMC/corporate traveller**
+Different governance/policy, approval/spend path, objective, route/context, and supplier data.
 
-Changing scenarios may change only source documents/pages, fixture/config data, traveller/organisation/event/policy values and provider responses. It must not require source-code edits.
+Changing scenarios may change only source documents/pages, fixture/config data, traveller/organisation/AnchorEvent/policy values, and provider responses.
 
-Perform code search for fixture/event/traveller/city names in domain/recovery logic. Supplier names are allowed only in concrete adapters.
+Search for:
+- fixture/event/traveller names;
+- city/airport/route constants;
+- provider branches outside adapters;
+- scenario-specific conditions in domain/recovery/application code.
 
-## Robustness scenarios
-- late-night arrival vs hotel reception/no-show rule
-- public transport unavailable; flexible taxi/private transfer remains viable
-- flight -> separately booked rail/ferry connection
-- visa/entry/immigration buffer invalidates nominal connection
-- accessibility invalidates cheaper recovery
-- shared transfer/resource affects another traveller
-- trip objective already lost; remainder recoverable
-- stale imported hotel data produces UNKNOWN/reverification rather than false PASS
+Any genuine missing abstraction is an architecture gap, not permission to hardcode.
 
-## Pre-milestone checklist
-- relevant tests pass
-- build/typecheck/lint pass where configured
-- failure/fallback paths tested
-- no scenario-specific domain branch added
-- roadmap/docs updated for scope/status changes
-- issues classified Act Now / Investigate Now / Park for Later / Ignore or Accept Risk
-- secrets and unsafe raw recordings absent from Git
+### T-E2E — Integrated recovery loop
+Prove:
 
-## Demo-readiness gate
+`source/profile -> validated persistent state -> TripSignal -> mutation -> ImpactAssessment -> RecoveryPlanner -> capability results -> scenario overlays -> deterministic viability -> authority -> action/simulation -> observation -> resolved state/read models`
 
-A demo is not ready merely because screens render. Required real internal pipeline:
-`input/signal -> validated mutation -> impact/blast radius -> planner -> capability results -> scenario viability -> authority -> action/simulation -> observation -> updated resolved state`
+No manual state edits are allowed between stages.
+
+At least one development proof must show Atlas LIVE Search/Verify through the real adapter. Routine E2E may use replay.
+
+### T-RELEASE — Final candidate gate
+On the exact candidate SHA:
+- build;
+- typecheck;
+- lint;
+- full automated test suite appropriate to stack;
+- Scenario A E2E/replay;
+- Scenario B `T-GEN`;
+- hardcoding audit/search;
+- reset/reseed;
+- persistence restart;
+- provider/model fallback smoke tests;
+- secret/sanitized-recording review.
+
+## Robustness scenario pool
+
+Do not require every robustness scenario before the core works. Select the highest-value subset in `IMPLEMENTATION_PLAN.md`.
+
+Candidate scenarios:
+- late arrival vs hotel reception/no-show;
+- public transport unavailable; flexible taxi/private transfer remains viable;
+- separately booked rail/ferry connection;
+- visa/entry/immigration buffer invalidates nominal connection;
+- accessibility invalidates cheaper recovery;
+- shared transfer/resource affects another traveller;
+- trip objective already lost; remainder recoverable;
+- stale imported hotel data produces UNKNOWN/reverification rather than false PASS.
+
+## Work-package verification rule
+
+Before an implementer declares a work package implemented:
+- run the `T-*` categories assigned in `IMPLEMENTATION_PLAN.md`;
+- run build/typecheck/lint only when the changed package or repository baseline makes them useful, not automatically all three for every tiny task;
+- verify relevant failure/fallback behavior;
+- verify no scenario-specific domain branch was added;
+- ensure no secret/unsafe raw provider data is committed;
+- report exact commands/evidence honestly.
+
+## Integration verification rule
+
+The integrator:
+- verifies lane branch/head evidence;
+- reuses scoped lane tests that remain valid;
+- tests newly created seams and conflict resolutions;
+- runs `T-E2E` once the vertical loop exists;
+- does not rerun every historical test after each merge by habit.
+
+## Independent review rule
+
+Independent review is not required for every work package or checkpoint.
+
+Use it when:
+- architecture/shared contracts changed materially after freeze;
+- a real irreversible/provider-money boundary is introduced;
+- persistence/auth/security work has meaningful destructive risk;
+- integration failure suggests correlated blind spots;
+- the final candidate is ready.
+
+Review findings are triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`. Fixes require targeted closure evidence.
+
+## Demo-readiness definition
+
+A demo is not ready merely because screens render.
+
+Required:
+- real internal pipeline (`T-E2E`);
+- real Atlas adapter evidence plus reliable replay;
+- second-scenario generalisation (`T-GEN`);
+- deterministic viability/authority boundaries;
+- persistent/resettably seeded state;
+- UI reading real application state;
+- external simulation only where provider transactions are unsupported/unavailable.
