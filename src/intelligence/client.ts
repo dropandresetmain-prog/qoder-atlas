@@ -264,6 +264,11 @@ export class ModelStudioClient {
     return this.apiKey !== undefined && this.apiKey !== '';
   }
 
+  /** Transport mode (LIVE vs REPLAY) for capability descriptors/meta. */
+  get mode(): 'LIVE' | 'REPLAY' {
+    return this.transport.mode;
+  }
+
   async call<T>(task: ModelTask<T>): Promise<ModelCallResult<T>> {
     const baseMeta: ModelCallMeta = {
       providerId: MODEL_STUDIO_PROVIDER_ID,

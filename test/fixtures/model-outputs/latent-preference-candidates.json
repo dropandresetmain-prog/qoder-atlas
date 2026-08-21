@@ -1,0 +1,36 @@
+{
+  "candidates": [
+    {
+      "classification": "COMFORT_PREFERENCE",
+      "statement": "traveller tends to prefer aisle seats on long flights",
+      "evidence": "two previous bookings noted aisle seat requests",
+      "confidence": 0.6,
+      "conflictsWith": []
+    },
+    {
+      "classification": "ACCESSIBILITY_REQUIREMENT",
+      "statement": "traveller requires step-free transfers",
+      "evidence": "profile states reduced mobility",
+      "confidence": 0.95,
+      "conflictsWith": []
+    },
+    {
+      "classification": "LEGAL_OR_ENTRY_REQUIREMENT",
+      "statement": "entry requires a valid visa for the destination",
+      "evidence": "profile nationality versus destination entry rules",
+      "confidence": 0.8,
+      "conflictsWith": []
+    },
+    {
+      "classification": "COMFORT_PREFERENCE",
+      "statement": "traveller likely prefers the window seat",
+      "evidence": "single ambiguous hint in a message",
+      "confidence": 0.3,
+      "conflictsWith": ["traveller tends to prefer aisle seats on long flights"]
+    }
+  ],
+  "requirementStatements": [
+    "traveller requires step-free transfers",
+    "entry requires a valid visa for the destination"
+  ]
+}
