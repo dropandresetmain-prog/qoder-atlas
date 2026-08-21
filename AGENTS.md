@@ -21,7 +21,8 @@ Inspect current repository state before changing code. Read the relevant section
 5. `docs/DECISIONS.md`
 6. `docs/TESTING.md`
 7. `docs/AGENT_MODEL_SELECTION.md`
-8. task-specific Qoder Spec
+8. `.qoder/rules/environment-recovery.md` when terminal/tool execution is involved
+9. task-specific Qoder Spec
 
 For Atlas capability questions, consult the authoritative research in `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
 
@@ -83,6 +84,16 @@ Used deliberately for final candidate review, material architecture change, or g
 - Classify every finding exactly: `Act Now`, `Investigate Now`, `Park for Later`, or `Ignore / Accept Risk`.
 - For fixes, require targeted evidence that the finding is closed; do not restart a full review cycle automatically.
 
+## Checkpoint autonomy
+
+The user should normally be needed only at the formal checkpoints defined in `docs/IMPLEMENTATION_PLAN.md`. Between checkpoints, continue autonomously.
+
+Do not ask the user for routine choices about libraries, file layout, test naming, styling, bounded bug fixes, or other decisions already constrained by the approved architecture. Make the best bounded choice and continue.
+
+Stop early only for a documented hard-stop condition: material shared-contract/product change, genuine architecture gap, unapproved irreversible action, required new credential/manual account action, destructive operation outside the approved workflow, critical-path provider blocker with no fallback, unresolved environment failure after the recovery protocol, or a material product choice not resolved by the docs.
+
+If one task is blocked, triage it and continue independent work where possible instead of waiting.
+
 ## Architectural invariants
 
 - The trip/state graph is central. Chat is an interface, not source of truth.
@@ -128,6 +139,7 @@ Do not introduce Neo4j, microservices, Kafka, Kubernetes, or similar infrastruct
 Follow `docs/AGENT_MODEL_SELECTION.md`.
 
 - Qoder is the default implementation harness.
+- Qwen3.8-Max / Qwen3.7-Max are the normal implementation defaults; GLM-5.3 is an escalation for difficult debugging/integration rather than the default for every hard-looking task.
 - Use Spec-driven Quest for substantial work packages.
 - Check generated Specs against `docs/IMPLEMENTATION_PLAN.md` before Build.
 - Freeze shared contracts before parallel implementation.
@@ -137,6 +149,18 @@ Follow `docs/AGENT_MODEL_SELECTION.md`.
 - Model choice is separate from the execution prompt.
 - Delegate bounded work to cheaper/specialist subagents when useful.
 - Runtime Model Studio plumbing should start with a cheap model; upgrade only when quality is proven blocking.
+- JetBrains Agent Mode is the preferred stable long-horizon surface when available. For parallel lanes, isolate with Git worktrees and use separate IDE windows/sessions unless Quest provides stable native Worktree execution.
+- CLI parallel sessions/`--worktree`/`/goal`/Subagents are useful but optional; do not make a known-buggy CLI the sole critical path.
+
+## Environment and terminal recovery
+
+Follow `.qoder/rules/environment-recovery.md`. A terminal/tool problem is not evidence that application code is wrong.
+
+- In JetBrains, if an otherwise valid command suddenly fails/hangs because the terminal session is stale, reset/reopen the terminal once and retry before changing code.
+- On CLI `permission denied`, inspect command/file permissions and invocation first. Prefer `bash path/to/script.sh` or the package-manager command when execution permission is unnecessary; use `chmod +x` only when the repository intentionally requires the executable bit.
+- Do not automatically use `--yolo` or weaken permission controls to get unstuck.
+- Do not rewrite source code to accommodate a broken shell, stale working directory, or permission wrapper.
+- After bounded recovery attempts, switch surface (CLI -> JetBrains or vice versa) if practical. If the environment still blocks critical work, record evidence and stop/triage instead of looping indefinitely.
 
 ## Verification is cumulative evidence
 
