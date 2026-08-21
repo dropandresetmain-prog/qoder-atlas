@@ -1,0 +1,22 @@
+{
+  "strategies": [
+    {
+      "summary": "Attempt to change the flight directly",
+      "candidateOperations": [],
+      "toolRequests": [
+        {
+          "capability": "FLIGHT",
+          "operation": "flight.change",
+          "parameters": {},
+          "purpose": "attempt a consequential provider action from the planner"
+        }
+      ],
+      "assumptions": [],
+      "uncertainties": [],
+      "expectedOutcomes": []
+    }
+  ],
+  "toolRequests": [],
+  "assumptions": [],
+  "uncertainties": []
+}
