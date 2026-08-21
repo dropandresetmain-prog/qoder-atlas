@@ -8,10 +8,11 @@ Verification is **cumulative evidence**, not a ritual where every stage reruns e
 
 - work packages run scoped tests for changed behavior and justified failure paths;
 - integration reuses valid lane evidence and tests newly created seams;
-- independent review primarily inspects existing evidence unless a concrete uncertainty needs new execution;
+- **Checkpoint A, Checkpoint B, Checkpoint C, and Final Candidate each have an explicit independent review gate** with scope proportional to the risk at that stage;
+- independent reviewers inspect existing evidence first and run additional checks only when a concrete uncertainty needs execution;
 - the final candidate runs the canonical broad gate on the exact candidate SHA.
 
-`docs/IMPLEMENTATION_PLAN.md` assigns these test IDs to work packages.
+`docs/IMPLEMENTATION_PLAN.md` assigns these test IDs to work packages. Model selection for implementation/review remains owned by `docs/AGENT_MODEL_SELECTION.md`; this document defines **when and what to review**, not which model must do it.
 
 ## Test IDs
 
@@ -175,6 +176,8 @@ Before an implementer declares a work package implemented:
 - ensure no secret/unsafe raw provider data is committed;
 - report exact commands/evidence honestly.
 
+A work-package completion is **not** an independent review checkpoint unless it contains a material architecture/high-risk change that triggers an exceptional review under the rule below.
+
 ## Integration verification rule
 
 The integrator:
@@ -184,18 +187,100 @@ The integrator:
 - runs `T-E2E` once the vertical loop exists;
 - does not rerun every historical test after each merge by habit.
 
-## Independent review rule
+## Independent review checkpoints
 
-Independent review is not required for every work package or checkpoint.
+Independent review is mandatory at the four formal gates below. This is deliberate risk control, not a request to re-review every package or every historical line of code.
 
-Use it when:
-- architecture/shared contracts changed materially after freeze;
-- a real irreversible/provider-money boundary is introduced;
+A reviewer must inspect the **actual repository SHA and evidence**, not merely accept the implementer's report. Reviewer findings are triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
+
+A checkpoint passes when there are no unresolved **Act Now** findings and no unresolved **Investigate Now** finding that threatens that checkpoint's acceptance criteria. Parked/accepted hackathon risks do not block progress.
+
+A targeted review fix requires targeted closure evidence. It does **not** automatically trigger another full review of unrelated areas.
+
+### Review Gate A — contract freeze / fan-out
+
+Runs after F0–F3 scoped verification and before downstream lane fan-out.
+
+Review focus:
+- runnable credential-free foundation;
+- shared domain/operational/service/capability/read-model contracts;
+- deterministic/AI safety boundaries;
+- timezone/freshness and authority semantics in frozen shared code;
+- two-scenario generality;
+- anti-hardcoding;
+- lane ownership/collision risk;
+- whether tests meaningfully prove the contract claims.
+
+The output is `PASS` or `FAIL — FIX REQUIRED` plus a safe fan-out SHA if passed.
+
+Checkpoint A review may include static architecture/code review in addition to an independent coding-agent review because errors here multiply across all downstream lanes.
+
+### Review Gate B — integrated vertical recovery loop
+
+Runs after I1–I5 meet Checkpoint B acceptance and before treating the vertical loop as accepted.
+
+Review focus is the **integrated high-risk path**, not a ceremonial re-review of every lane:
+- validated mutation and persistence;
+- impact/blast-radius propagation;
+- scenario overlay isolation and deterministic viability;
+- planner/capability separation;
+- deterministic authority and irreversible-action gate;
+- executor/observation/state-update loop;
+- LIVE/RECORD/REPLAY equivalence and provider-boundary simulation truthfulness;
+- UI consuming actual read models rather than bespoke demo data;
+- Scenario A `T-E2E` evidence and restart/persistence behavior.
+
+If a lane's previous scoped evidence remains valid, reuse it. Expand review into lane internals only when the integrated seam or evidence gives a concrete reason.
+
+### Review Gate C — generalisation / reliability / demo candidate
+
+Runs after G1–G3 and R1 meet Checkpoint C acceptance, before declaring the integrated SHA the demo candidate.
+
+Review focus:
+- Scenario B runs through the same application code;
+- no scenario/event/traveller/city/route/fixture hardcoding in production logic;
+- provider-specific logic remains inside adapters;
+- selected robustness cases are real rather than scripted;
+- reset/reseed and persistence restart are reliable;
+- unavailable/provider/model fallback behavior is honest;
+- replay and sanitized recordings are demo-safe;
+- docs/README/demo claims match implemented reality;
+- any shared-contract change since Checkpoint A was deliberately reconciled rather than hidden in a lane.
+
+This is primarily a **generalisation + reliability audit**, not another full release audit.
+
+### Review Gate Final — release/demo candidate
+
+Runs on the exact final candidate SHA.
+
+This is the broad independent release review plus `T-RELEASE` canonical verification.
+
+Review focus includes:
+- deterministic mutation/viability/authority safety boundaries;
+- persistence;
+- provider/action boundaries;
+- LIVE/RECORD/REPLAY consistency;
+- policy/constraint enforcement;
+- AI schema boundaries;
+- both accepted scenarios;
+- hardcoding;
+- reset/reseed and fallback behavior;
+- secret/recording hygiene;
+- user-facing claims vs implemented reality;
+- demo flow readiness.
+
+Only after this gate and `T-RELEASE` pass is the repository considered final-candidate complete.
+
+## Exceptional review trigger
+
+Outside the four mandatory gates, add a targeted independent review only when evidence warrants it, for example:
+- architecture/shared contracts change materially after Checkpoint A freeze;
+- a real irreversible/provider-money boundary is introduced or materially changed;
 - persistence/auth/security work has meaningful destructive risk;
 - integration failure suggests correlated blind spots;
-- the final candidate is ready.
+- a reviewer identifies a cross-cutting issue whose closure cannot be established by targeted tests alone.
 
-Review findings are triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`. Fixes require targeted closure evidence.
+Do not add independent reviews merely because a package is important or because a model completed a large amount of code.
 
 ## Demo-readiness definition
 
