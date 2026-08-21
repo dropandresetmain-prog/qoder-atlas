@@ -1,0 +1,420 @@
+{
+  "scenarioId": "scenario-corporate-tmc",
+  "title": "Corporate traveller: return flight cancelled before a hard return-by deadline",
+  "operatorModel": "TMC services a corporate employer trip governed by employer travel policy",
+  "context": {
+    "sources": [
+      {
+        "id": "src_b_corporate_policy",
+        "kind": "POLICY_DOCUMENT",
+        "title": "Employer travel policy",
+        "authority": "AUTHORITATIVE",
+        "retrievedAt": "2026-08-20T09:00:00-06:00",
+        "contentRef": "sources/corporate-policy.md"
+      },
+      {
+        "id": "src_b_traveller_profile",
+        "kind": "PROFILE",
+        "title": "Employee travel profile",
+        "authority": "ASSERTED",
+        "retrievedAt": "2026-08-20T09:05:00-06:00",
+        "contentRef": "sources/traveller-profile.md"
+      },
+      {
+        "id": "src_b_client_invite",
+        "kind": "EMAIL",
+        "title": "Client workshop invitation",
+        "authority": "CONNECTED",
+        "retrievedAt": "2026-08-25T14:00:00-06:00",
+        "contentRef": "sources/client-invite.txt"
+      },
+      {
+        "id": "src_b_flight_confirmation",
+        "kind": "BOOKING_CONFIRMATION",
+        "title": "Corporate itinerary confirmation",
+        "authority": "CONNECTED",
+        "retrievedAt": "2026-09-10T10:00:00-06:00",
+        "contentRef": "sources/flight-confirmation.txt"
+      },
+      {
+        "id": "src_b_hotel_confirmation",
+        "kind": "BOOKING_CONFIRMATION",
+        "title": "Corporate-rate hotel confirmation",
+        "authority": "CONNECTED",
+        "retrievedAt": "2026-09-10T10:05:00-06:00",
+        "contentRef": "sources/hotel-confirmation.txt"
+      },
+      {
+        "id": "src_b_provider_state",
+        "kind": "PROVIDER_STATE",
+        "title": "Airline operations feed via TMC desk",
+        "authority": "AUTHORITATIVE",
+        "retrievedAt": "2026-09-21T16:00:00-06:00"
+      },
+      {
+        "id": "src_b_traveller_message",
+        "kind": "MANUAL",
+        "title": "Traveller instruction after cancellation",
+        "authority": "ASSERTED",
+        "retrievedAt": "2026-09-21T16:40:00-06:00",
+        "contentRef": "sources/traveller-message.txt"
+      }
+    ],
+    "organisations": [
+      {
+        "id": "org_b_tmc",
+        "name": "Meridian Travel Management",
+        "roles": ["OPERATOR"],
+        "contact": "servicing@example.com"
+      },
+      {
+        "id": "org_b_employer",
+        "name": "Northgate Consulting Group",
+        "roles": ["POLICY_OWNER", "APPROVER", "PAYER", "DUTY_OF_CARE"],
+        "contact": "travel-desk@example.com"
+      }
+    ],
+    "travellers": [
+      {
+        "id": "trv_b_consultant",
+        "name": "Beatriz Ortega",
+        "homePlaceId": "plc_b_home_office",
+        "nationalityCodes": {
+          "value": ["MEX"],
+          "sourceId": "src_b_traveller_profile",
+          "authority": "ASSERTED",
+          "observedAt": "2026-08-20T09:05:00-06:00"
+        },
+        "passports": {
+          "value": [{ "countryCode": "MEX", "expiresAt": "2031-03-01T00:00:00-06:00" }],
+          "sourceId": "src_b_traveller_profile",
+          "authority": "ASSERTED",
+          "observedAt": "2026-08-20T09:05:00-06:00"
+        },
+        "communicationPreference": "email-and-sms"
+      }
+    ],
+    "anchorEvents": [],
+    "places": [
+      { "id": "plc_b_mex_airport", "name": "Mexico City International", "kind": "AIRPORT", "timezone": "America/Mexico_City", "externalRefs": [{ "system": "iata", "value": "MEX" }] },
+      { "id": "plc_b_gdl_airport", "name": "Guadalajara International", "kind": "AIRPORT", "timezone": "America/Mexico_City", "externalRefs": [{ "system": "iata", "value": "GDL" }] },
+      { "id": "plc_b_hotel", "name": "Centro Executive Hotel", "kind": "HOTEL", "timezone": "America/Mexico_City" },
+      { "id": "plc_b_client_site", "name": "Client campus Guadalajara", "kind": "ADDRESS", "timezone": "America/Mexico_City" },
+      { "id": "plc_b_home_office", "name": "Northgate Mexico City office", "kind": "ADDRESS", "timezone": "America/Mexico_City" }
+    ],
+    "ruleSets": [
+      {
+        "id": "rs_b_corporate_policy",
+        "kind": "ORGANISATION",
+        "name": "Employer travel policy",
+        "ownerOrganisationId": "org_b_employer",
+        "sourceId": "src_b_corporate_policy",
+        "rules": [
+          {
+            "id": "rule_b_spend_limit",
+            "kind": "SPEND_LIMIT",
+            "sourceId": "src_b_corporate_policy",
+            "description": "Per-trip flight spend ceiling",
+            "maxAmount": { "amount": 400, "currency": "USD" }
+          },
+          {
+            "id": "rule_b_change_approval",
+            "kind": "APPROVAL_REQUIRED",
+            "sourceId": "src_b_corporate_policy",
+            "description": "All flight changes require travel-manager approval",
+            "approver": "ORGANISATION_APPROVER",
+            "operations": ["flight.change", "flight.cancel"]
+          },
+          {
+            "id": "rule_b_cabin",
+            "kind": "OTHER",
+            "sourceId": "src_b_corporate_policy",
+            "statement": "Economy cabin only for domestic trips under four hours."
+          }
+        ]
+      },
+      {
+        "id": "rs_b_hotel_terms",
+        "kind": "SUPPLIER",
+        "name": "Corporate-rate hotel terms",
+        "sourceId": "src_b_hotel_confirmation",
+        "rules": [
+          {
+            "id": "rule_b_hotel_cancel",
+            "kind": "CANCELLATION_TERMS",
+            "sourceId": "src_b_hotel_confirmation",
+            "refundable": true,
+            "refundDeadline": "2026-09-20T18:00:00-06:00"
+          }
+        ]
+      }
+    ],
+    "preferences": [
+      {
+        "id": "pref_b_aisle",
+        "travellerId": "trv_b_consultant",
+        "statement": "Prefers an aisle seat on flights",
+        "origin": {
+          "kind": "EXPLICIT_PERSISTENT",
+          "statedAt": "2026-08-20T09:05:00-06:00"
+        },
+        "sourceId": "src_b_traveller_profile"
+      }
+    ]
+  },
+  "trip": {
+    "id": "trip_b",
+    "label": "Client workshop trip",
+    "travellerIds": ["trv_b_consultant"],
+    "operatorOrganisationId": "org_b_tmc",
+    "elements": [
+      {
+        "id": "el_b_flight_out",
+        "tripId": "trip_b",
+        "elementKind": "TRANSPORT_LEG",
+        "importance": "REQUIRED",
+        "flexibility": "CHANGEABLE",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "mode": "FLIGHT",
+          "originPlaceId": "plc_b_mex_airport",
+          "destinationPlaceId": "plc_b_gdl_airport",
+          "scheduledDeparture": {
+            "value": "2026-09-20T07:00:00-06:00",
+            "sourceId": "src_b_flight_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-10T10:00:00-06:00"
+          },
+          "scheduledArrival": {
+            "value": "2026-09-20T08:20:00-06:00",
+            "sourceId": "src_b_flight_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-10T10:00:00-06:00"
+          },
+          "bookingRef": { "system": "provider-flight-sandbox", "reference": "FL-B-3001" }
+        }
+      },
+      {
+        "id": "el_b_transfer_out",
+        "tripId": "trip_b",
+        "elementKind": "TRANSPORT_LEG",
+        "importance": "REQUIRED",
+        "flexibility": "FLEXIBLE",
+        "reservationState": "CONFIRMED",
+        "notes": "Company-arranged private transfer",
+        "data": {
+          "mode": "PRIVATE_TRANSFER",
+          "originPlaceId": "plc_b_gdl_airport",
+          "destinationPlaceId": "plc_b_hotel",
+          "scheduledDeparture": {
+            "value": "2026-09-20T08:45:00-06:00",
+            "sourceId": "src_b_flight_confirmation",
+            "authority": "ASSERTED",
+            "observedAt": "2026-09-10T10:00:00-06:00"
+          },
+          "bookingRef": { "system": "corp-transfer-desk", "reference": "CT-B-77" }
+        }
+      },
+      {
+        "id": "el_b_hotel",
+        "tripId": "trip_b",
+        "elementKind": "STAY",
+        "importance": "REQUIRED",
+        "flexibility": "CHANGEABLE",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "placeId": "plc_b_hotel",
+          "checkIn": {
+            "value": "2026-09-20T15:00:00-06:00",
+            "sourceId": "src_b_hotel_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-10T10:05:00-06:00"
+          },
+          "checkOut": {
+            "value": "2026-09-21T12:00:00-06:00",
+            "sourceId": "src_b_hotel_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-10T10:05:00-06:00"
+          },
+          "bookingRef": { "system": "corp-hotel-tool", "reference": "HTL-B-4004" },
+          "policyRuleSetIds": ["rs_b_hotel_terms"]
+        }
+      },
+      {
+        "id": "el_b_workshop",
+        "tripId": "trip_b",
+        "elementKind": "ENGAGEMENT",
+        "importance": "REQUIRED",
+        "flexibility": "FIXED",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "title": "Client delivery workshop",
+          "placeId": "plc_b_client_site",
+          "startsAt": {
+            "value": "2026-09-21T09:00:00-06:00",
+            "sourceId": "src_b_client_invite",
+            "authority": "CONNECTED",
+            "observedAt": "2026-08-25T14:00:00-06:00"
+          },
+          "endsAt": {
+            "value": "2026-09-21T17:00:00-06:00",
+            "sourceId": "src_b_client_invite",
+            "authority": "CONNECTED",
+            "observedAt": "2026-08-25T14:00:00-06:00"
+          },
+          "participantRole": "CONSULTANT"
+        }
+      },
+      {
+        "id": "el_b_flight_back",
+        "tripId": "trip_b",
+        "elementKind": "TRANSPORT_LEG",
+        "importance": "REQUIRED",
+        "flexibility": "CHANGEABLE",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "mode": "FLIGHT",
+          "originPlaceId": "plc_b_gdl_airport",
+          "destinationPlaceId": "plc_b_mex_airport",
+          "scheduledDeparture": {
+            "value": "2026-09-21T19:00:00-06:00",
+            "sourceId": "src_b_flight_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-10T10:00:00-06:00"
+          },
+          "scheduledArrival": {
+            "value": "2026-09-21T20:25:00-06:00",
+            "sourceId": "src_b_flight_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-10T10:00:00-06:00"
+          },
+          "bookingRef": { "system": "provider-flight-sandbox", "reference": "FL-B-3002" }
+        }
+      }
+    ],
+    "objectives": [
+      {
+        "id": "obj_b_workshop",
+        "tripId": "trip_b",
+        "statement": "Attend and complete the client workshop on 2026-09-21",
+        "hardness": "HARD",
+        "linkedElementIds": ["el_b_workshop", "el_b_flight_out"],
+        "sourceId": "src_b_client_invite"
+      },
+      {
+        "id": "obj_b_return",
+        "tripId": "trip_b",
+        "statement": "Be back at the home office by 08:30 on 2026-09-22 for the steering meeting",
+        "hardness": "HARD",
+        "linkedElementIds": ["el_b_flight_back"],
+        "sourceId": "src_b_client_invite"
+      }
+    ],
+    "relations": [
+      {
+        "kind": "CONNECTS_TO",
+        "from": { "entityType": "TRIP_ELEMENT", "id": "el_b_flight_out" },
+        "to": { "entityType": "TRIP_ELEMENT", "id": "el_b_transfer_out" }
+      },
+      {
+        "kind": "CONNECTS_TO",
+        "from": { "entityType": "TRIP_ELEMENT", "id": "el_b_transfer_out" },
+        "to": { "entityType": "TRIP_ELEMENT", "id": "el_b_hotel" }
+      },
+      {
+        "kind": "DEPENDS_ON",
+        "from": { "entityType": "TRIP_OBJECTIVE", "id": "obj_b_return" },
+        "to": { "entityType": "TRIP_ELEMENT", "id": "el_b_flight_back" }
+      }
+    ],
+    "governedByRuleSetIds": ["rs_b_corporate_policy"],
+    "viability": "VIABLE",
+    "version": 1,
+    "updatedAt": "2026-09-11T09:00:00-06:00"
+  },
+  "constraints": [
+    {
+      "id": "c_b_workshop_attendance",
+      "kind": "TEMPORAL",
+      "hardness": "HARD",
+      "evaluator": "DETERMINISTIC",
+      "status": "PASS",
+      "description": "Arrival in the client city at least one evening before the workshop",
+      "refs": [
+        { "entityType": "TRIP_ELEMENT", "id": "el_b_flight_out" },
+        { "entityType": "TRIP_ELEMENT", "id": "el_b_workshop" }
+      ],
+      "parameters": { "minBufferMinutes": 720 }
+    },
+    {
+      "id": "c_b_return_buffer",
+      "kind": "TEMPORAL",
+      "hardness": "HARD",
+      "evaluator": "DETERMINISTIC",
+      "status": "PASS",
+      "description": "Return arrival plus ground buffer before the 08:30 steering meeting",
+      "refs": [
+        { "entityType": "TRIP_ELEMENT", "id": "el_b_flight_back" },
+        { "entityType": "TRIP_OBJECTIVE", "id": "obj_b_return" }
+      ],
+      "parameters": { "minBufferMinutes": 90 }
+    },
+    {
+      "id": "c_b_hotel_cancel_terms",
+      "kind": "POLICY",
+      "hardness": "SOFT",
+      "evaluator": "DETERMINISTIC",
+      "status": "PASS",
+      "description": "Hotel remains refundable until the cancellation deadline",
+      "refs": [{ "entityType": "TRIP_ELEMENT", "id": "el_b_hotel" }],
+      "derivedFromRuleId": "rule_b_hotel_cancel",
+      "ruleSetId": "rs_b_hotel_terms"
+    }
+  ],
+  "disruption": {
+    "signal": {
+      "id": "sig_b_cancel",
+      "kind": "FLIGHT_CANCELLATION",
+      "occurredAt": "2026-09-21T16:00:00-06:00",
+      "receivedAt": "2026-09-21T16:02:00-06:00",
+      "sourceId": "src_b_provider_state",
+      "authority": "AUTHORITATIVE",
+      "confidence": 1,
+      "tripId": "trip_b",
+      "subjectRef": { "entityType": "TRIP_ELEMENT", "id": "el_b_flight_back" },
+      "summary": "Evening return flight cancelled by airline",
+      "payload": { "reason": "crew_scheduling", "bookingReference": "FL-B-3002" }
+    },
+    "postDisruptionPreferences": [
+      {
+        "id": "pref_b_steering_priority",
+        "travellerId": "trv_b_consultant",
+        "tripId": "trip_b",
+        "statement": "I must be at the Monday 08:30 steering meeting; book the earliest option that gets me there",
+        "origin": {
+          "kind": "EXPLICIT_INSTRUCTION",
+          "issuedAt": "2026-09-21T16:40:00-06:00",
+          "issuedBy": "trv_b_consultant"
+        },
+        "sourceId": "src_b_traveller_message"
+      }
+    ]
+  },
+  "expectations": {
+    "impact": {
+      "severity": "HIGH",
+      "directFailureElementIds": ["el_b_flight_back"],
+      "atRiskElementIds": [],
+      "threatenedObjectiveIds": ["obj_b_return"]
+    },
+    "authority": {
+      "expectedOutcome": "REQUIRES_ORGANISATION_APPROVER",
+      "approverDescription": "Employer policy requires travel-manager approval for every flight change"
+    },
+    "recovery": {
+      "expectedResolution": "RECOVERED_WITH_LOSS",
+      "remainingLossObjectiveIds": ["obj_b_return"],
+      "actionOperation": "flight.change"
+    }
+  }
+}

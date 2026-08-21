@@ -1,0 +1,16 @@
+CORPORATE ITINERARY CONFIRMATION (via Meridian Travel Management)
+
+Traveller: Beatriz Ortega
+
+Outbound FL-B-3001 (provider-flight-sandbox)
+  Mexico City International (MEX) -> Guadalajara International (GDL)
+  Depart 2026-09-20 07:00 (-06:00)  Arrive 2026-09-20 08:20 (-06:00)
+  Economy, CONFIRMED
+
+Return FL-B-3002 (provider-flight-sandbox)
+  Guadalajara International (GDL) -> Mexico City International (MEX)
+  Depart 2026-09-21 19:00 (-06:00)  Arrive 2026-09-21 20:25 (-06:00)
+  Economy, CONFIRMED
+
+Ground: private transfer CT-B-77 arranged for airport -> hotel on arrival,
+departing approx 08:45 on 2026-09-20.

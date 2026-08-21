@@ -1,0 +1,10 @@
+BOOKING CONFIRMATION — Flight
+
+Reference: FL-A-1001 (provider-flight-sandbox)
+Passenger: Ari Vance
+Route: Incheon International (ICN) -> Narita International (NRT)
+Departure: 2026-09-13 08:10 (+09:00)
+Arrival: 2026-09-13 10:40 (+09:00)
+Cabin: Economy
+Status: CONFIRMED
+Booked and paid by: DevSummit 2026 Organising Team

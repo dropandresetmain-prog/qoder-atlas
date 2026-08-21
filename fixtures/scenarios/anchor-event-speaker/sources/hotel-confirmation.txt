@@ -1,0 +1,13 @@
+BOOKING CONFIRMATION — Hotel
+
+Reference: HTL-A-2002 (provider-hotel-import)
+Property: Bayside Conference Hotel
+Guest: Ari Vance
+Check-in: 2026-09-13 from 15:00 (+09:00)
+Check-out: 2026-09-16 by 11:00 (+09:00)
+
+Arrival policy:
+- Reception is staffed around the clock.
+- Rooms held without arrival are released at 02:00 the following morning
+  unless a late arrival is noted in advance (no-show cutoff).
+- Late arrivals after 23:00 must be noted in advance.

@@ -1,0 +1,10 @@
+HOTEL CONFIRMATION — corporate rate
+
+Reference: HTL-B-4004 (corp-hotel-tool)
+Property: Centro Executive Hotel, Guadalajara
+Guest: Beatriz Ortega
+Check-in: 2026-09-20 from 15:00 (-06:00)
+Check-out: 2026-09-21 by 12:00 (-06:00)
+
+Terms: refundable until 2026-09-20 18:00 (-06:00); after that the first
+night is charged.

@@ -1,0 +1,480 @@
+{
+  "scenarioId": "scenario-anchor-event-speaker",
+  "title": "Invited speaker: arrival flight cancelled before anchor-event keynote",
+  "operatorModel": "Event organiser sponsors and governs an invited-speaker trip",
+  "context": {
+    "sources": [
+      {
+        "id": "src_a_event_page",
+        "kind": "WEBPAGE",
+        "title": "DevSummit 2026 programme page",
+        "uri": "https://example.org/devsummit-2026/programme",
+        "authority": "CONNECTED",
+        "retrievedAt": "2026-09-01T10:00:00+09:00",
+        "contentRef": "sources/event-page.md"
+      },
+      {
+        "id": "src_a_traveller_profile",
+        "kind": "PROFILE",
+        "title": "Speaker profile import",
+        "authority": "ASSERTED",
+        "retrievedAt": "2026-09-01T10:05:00+09:00",
+        "contentRef": "sources/traveller-profile.md"
+      },
+      {
+        "id": "src_a_flight_confirmation",
+        "kind": "BOOKING_CONFIRMATION",
+        "title": "Outbound flight confirmation",
+        "authority": "CONNECTED",
+        "retrievedAt": "2026-09-02T09:00:00+09:00",
+        "contentRef": "sources/flight-confirmation.txt"
+      },
+      {
+        "id": "src_a_hotel_confirmation",
+        "kind": "BOOKING_CONFIRMATION",
+        "title": "Hotel confirmation and arrival policy",
+        "authority": "CONNECTED",
+        "retrievedAt": "2026-09-02T09:10:00+09:00",
+        "contentRef": "sources/hotel-confirmation.txt"
+      },
+      {
+        "id": "src_a_organiser_policy",
+        "kind": "POLICY_DOCUMENT",
+        "title": "Invited-speaker travel policy",
+        "authority": "AUTHORITATIVE",
+        "retrievedAt": "2026-09-01T11:00:00+09:00",
+        "contentRef": "sources/organiser-policy.md"
+      },
+      {
+        "id": "src_a_insurance_policy",
+        "kind": "INSURANCE_DOCUMENT",
+        "title": "Speaker travel protection policy",
+        "authority": "AUTHORITATIVE",
+        "retrievedAt": "2026-09-01T11:05:00+09:00",
+        "contentRef": "sources/insurance-policy.md"
+      },
+      {
+        "id": "src_a_provider_state",
+        "kind": "PROVIDER_STATE",
+        "title": "Carrier flight status feed",
+        "authority": "AUTHORITATIVE",
+        "retrievedAt": "2026-09-12T18:00:00+09:00"
+      },
+      {
+        "id": "src_a_traveller_message",
+        "kind": "MANUAL",
+        "title": "Traveller message after cancellation",
+        "authority": "ASSERTED",
+        "retrievedAt": "2026-09-12T19:30:00+09:00",
+        "contentRef": "sources/traveller-message.txt"
+      },
+      {
+        "id": "src_a_transfer_research",
+        "kind": "RESEARCH",
+        "title": "Airport-to-hotel travel time research",
+        "authority": "INFERRED",
+        "retrievedAt": "2026-09-03T08:00:00+09:00",
+        "contentRef": "sources/transfer-research.md"
+      }
+    ],
+    "organisations": [
+      {
+        "id": "org_a_organiser",
+        "name": "DevSummit 2026 Organising Team",
+        "roles": ["EVENT_ORGANISER", "POLICY_OWNER", "APPROVER", "PAYER"],
+        "contact": "speakers@example.org"
+      }
+    ],
+    "travellers": [
+      {
+        "id": "trv_a_speaker",
+        "name": "Ari Vance",
+        "homePlaceId": "plc_a_sel_city",
+        "nationalityCodes": {
+          "value": ["USA"],
+          "sourceId": "src_a_traveller_profile",
+          "authority": "ASSERTED",
+          "observedAt": "2026-09-01T10:05:00+09:00"
+        },
+        "passports": {
+          "value": [{ "countryCode": "USA" }],
+          "sourceId": "src_a_traveller_profile",
+          "authority": "ASSERTED",
+          "observedAt": "2026-09-01T10:05:00+09:00"
+        },
+        "insuranceRuleSetIds": ["rs_a_insurance"],
+        "communicationPreference": "chat-first"
+      }
+    ],
+    "anchorEvents": [
+      {
+        "id": "ev_a_devsummit",
+        "name": "DevSummit 2026",
+        "kind": "CONFERENCE",
+        "placeId": "plc_a_venue",
+        "window": {
+          "startsAt": "2026-09-14T09:00:00+09:00",
+          "endsAt": "2026-09-16T18:00:00+09:00"
+        },
+        "organiserOrganisationId": "org_a_organiser",
+        "instructions": {
+          "value": "Invited speakers must check in at the speaker desk no later than 45 minutes before their session.",
+          "sourceId": "src_a_event_page",
+          "authority": "CONNECTED",
+          "observedAt": "2026-09-01T10:00:00+09:00"
+        },
+        "sourceIds": ["src_a_event_page"]
+      }
+    ],
+    "places": [
+      { "id": "plc_a_sel_city", "name": "Seoul", "kind": "CITY", "timezone": "Asia/Seoul" },
+      {
+        "id": "plc_a_sel_airport",
+        "name": "Incheon International Airport",
+        "kind": "AIRPORT",
+        "timezone": "Asia/Seoul",
+        "externalRefs": [{ "system": "iata", "value": "ICN" }]
+      },
+      {
+        "id": "plc_a_tyo_airport",
+        "name": "Narita International Airport",
+        "kind": "AIRPORT",
+        "timezone": "Asia/Tokyo",
+        "externalRefs": [{ "system": "iata", "value": "NRT" }]
+      },
+      { "id": "plc_a_hotel", "name": "Bayside Conference Hotel", "kind": "HOTEL", "timezone": "Asia/Tokyo" },
+      { "id": "plc_a_venue", "name": "DevSummit Main Hall", "kind": "VENUE", "timezone": "Asia/Tokyo" }
+    ],
+    "ruleSets": [
+      {
+        "id": "rs_a_organiser_policy",
+        "kind": "EVENT",
+        "name": "Invited-speaker travel policy",
+        "ownerOrganisationId": "org_a_organiser",
+        "sourceId": "src_a_organiser_policy",
+        "rules": [
+          {
+            "id": "rule_a_spend_limit",
+            "kind": "SPEND_LIMIT",
+            "sourceId": "src_a_organiser_policy",
+            "description": "Per-speaker recovery spend ceiling",
+            "maxAmount": { "amount": 1500, "currency": "USD" }
+          },
+          {
+            "id": "rule_a_approval_threshold",
+            "kind": "APPROVAL_ABOVE_SPEND",
+            "sourceId": "src_a_organiser_policy",
+            "description": "Organiser approval required for large fare deltas",
+            "threshold": { "amount": 300, "currency": "USD" },
+            "approver": "ORGANISATION_APPROVER"
+          },
+          {
+            "id": "rule_a_change_costs",
+            "kind": "OTHER",
+            "sourceId": "src_a_organiser_policy",
+            "statement": "The organiser covers reasonable rebooking fees for invited speakers."
+          }
+        ]
+      },
+      {
+        "id": "rs_a_hotel_policy",
+        "kind": "SUPPLIER",
+        "name": "Hotel arrival policy",
+        "sourceId": "src_a_hotel_confirmation",
+        "rules": [
+          {
+            "id": "rule_a_noshow_cutoff",
+            "kind": "NO_SHOW_CUTOFF",
+            "sourceId": "src_a_hotel_confirmation",
+            "cutoffAt": "2026-09-14T02:00:00+09:00",
+            "consequence": "First-night room is released unless a late arrival is noted"
+          },
+          {
+            "id": "rule_a_late_arrival",
+            "kind": "OTHER",
+            "sourceId": "src_a_hotel_confirmation",
+            "statement": "Late arrivals after 23:00 must be noted in advance; reception is staffed around the clock."
+          }
+        ]
+      },
+      {
+        "id": "rs_a_insurance",
+        "kind": "INSURANCE",
+        "name": "Speaker travel protection",
+        "sourceId": "src_a_insurance_policy",
+        "rules": [
+          {
+            "id": "rule_a_cover_delay",
+            "kind": "INSURANCE_COVERAGE",
+            "sourceId": "src_a_insurance_policy",
+            "description": "Delay and missed-connection coverage",
+            "coveredReasons": ["trip_delay", "missed_connection", "travel_supplier_insolvency"],
+            "excess": { "amount": 50, "currency": "USD" },
+            "maxPayout": { "amount": 1200, "currency": "USD" }
+          }
+        ]
+      }
+    ],
+    "preferences": [
+      {
+        "id": "pref_a_direct_flights",
+        "travellerId": "trv_a_speaker",
+        "statement": "Usually chooses direct flights when available",
+        "origin": {
+          "kind": "LATENT_INFERRED",
+          "evidence": "past itinerary patterns",
+          "confidence": 0.6,
+          "inferredAt": "2026-09-01T10:05:00+09:00"
+        },
+        "sourceId": "src_a_traveller_profile"
+      }
+    ]
+  },
+  "trip": {
+    "id": "trip_a",
+    "label": "Keynote speaker trip",
+    "travellerIds": ["trv_a_speaker"],
+    "operatorOrganisationId": "org_a_organiser",
+    "anchorEventId": "ev_a_devsummit",
+    "elements": [
+      {
+        "id": "el_a_flight_out",
+        "tripId": "trip_a",
+        "elementKind": "TRANSPORT_LEG",
+        "importance": "REQUIRED",
+        "flexibility": "CHANGEABLE",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "mode": "FLIGHT",
+          "originPlaceId": "plc_a_sel_airport",
+          "destinationPlaceId": "plc_a_tyo_airport",
+          "scheduledDeparture": {
+            "value": "2026-09-13T08:10:00+09:00",
+            "sourceId": "src_a_flight_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-02T09:00:00+09:00"
+          },
+          "scheduledArrival": {
+            "value": "2026-09-13T10:40:00+09:00",
+            "sourceId": "src_a_flight_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-02T09:00:00+09:00"
+          },
+          "bookingRef": { "system": "provider-flight-sandbox", "reference": "FL-A-1001" }
+        }
+      },
+      {
+        "id": "el_a_hotel",
+        "tripId": "trip_a",
+        "elementKind": "STAY",
+        "importance": "REQUIRED",
+        "flexibility": "FIXED",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "placeId": "plc_a_hotel",
+          "checkIn": {
+            "value": "2026-09-13T15:00:00+09:00",
+            "sourceId": "src_a_hotel_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-02T09:10:00+09:00"
+          },
+          "checkOut": {
+            "value": "2026-09-16T11:00:00+09:00",
+            "sourceId": "src_a_hotel_confirmation",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-02T09:10:00+09:00"
+          },
+          "bookingRef": { "system": "provider-hotel-import", "reference": "HTL-A-2002" },
+          "policyRuleSetIds": ["rs_a_hotel_policy"]
+        }
+      },
+      {
+        "id": "el_a_transfer",
+        "tripId": "trip_a",
+        "elementKind": "TRANSPORT_LEG",
+        "importance": "REQUIRED",
+        "flexibility": "FLEXIBLE",
+        "reservationState": "NONE",
+        "notes": "On-demand airport-to-hotel transfer; no booking exists yet",
+        "data": {
+          "mode": "TAXI_OR_RIDEHAIL",
+          "originPlaceId": "plc_a_tyo_airport",
+          "destinationPlaceId": "plc_a_hotel",
+          "durationEstimate": {
+            "expectedMinutes": 55,
+            "conservativeMinutes": 80,
+            "sourceId": "src_a_transfer_research",
+            "observedAt": "2026-09-03T08:00:00+09:00",
+            "quality": "MEDIUM"
+          }
+        }
+      },
+      {
+        "id": "el_a_keynote",
+        "tripId": "trip_a",
+        "elementKind": "ENGAGEMENT",
+        "importance": "REQUIRED",
+        "flexibility": "FIXED",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "title": "Opening keynote",
+          "placeId": "plc_a_venue",
+          "startsAt": {
+            "value": "2026-09-14T10:00:00+09:00",
+            "sourceId": "src_a_event_page",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-01T10:00:00+09:00"
+          },
+          "endsAt": {
+            "value": "2026-09-14T11:00:00+09:00",
+            "sourceId": "src_a_event_page",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-01T10:00:00+09:00"
+          },
+          "anchorEventId": "ev_a_devsummit",
+          "participantRole": "KEYNOTE_SPEAKER"
+        }
+      },
+      {
+        "id": "el_a_dinner",
+        "tripId": "trip_a",
+        "elementKind": "ENGAGEMENT",
+        "importance": "PREFERRED",
+        "flexibility": "FIXED",
+        "reservationState": "CONFIRMED",
+        "data": {
+          "title": "Speaker dinner",
+          "placeId": "plc_a_venue",
+          "startsAt": {
+            "value": "2026-09-14T19:00:00+09:00",
+            "sourceId": "src_a_event_page",
+            "authority": "CONNECTED",
+            "observedAt": "2026-09-01T10:00:00+09:00"
+          },
+          "anchorEventId": "ev_a_devsummit",
+          "participantRole": "GUEST"
+        }
+      }
+    ],
+    "objectives": [
+      {
+        "id": "obj_a_keynote",
+        "tripId": "trip_a",
+        "statement": "Deliver the opening keynote at 10:00 on 2026-09-14",
+        "hardness": "HARD",
+        "linkedElementIds": ["el_a_keynote", "el_a_flight_out"],
+        "sourceId": "src_a_event_page"
+      },
+      {
+        "id": "obj_a_dinner",
+        "tripId": "trip_a",
+        "statement": "Attend the speaker dinner",
+        "hardness": "SOFT",
+        "linkedElementIds": ["el_a_dinner"],
+        "sourceId": "src_a_event_page"
+      }
+    ],
+    "relations": [
+      {
+        "kind": "CONNECTS_TO",
+        "from": { "entityType": "TRIP_ELEMENT", "id": "el_a_flight_out" },
+        "to": { "entityType": "TRIP_ELEMENT", "id": "el_a_transfer" }
+      },
+      {
+        "kind": "CONNECTS_TO",
+        "from": { "entityType": "TRIP_ELEMENT", "id": "el_a_transfer" },
+        "to": { "entityType": "TRIP_ELEMENT", "id": "el_a_hotel" }
+      },
+      {
+        "kind": "DEPENDS_ON",
+        "from": { "entityType": "TRIP_ELEMENT", "id": "el_a_keynote" },
+        "to": { "entityType": "TRIP_ELEMENT", "id": "el_a_flight_out" }
+      }
+    ],
+    "governedByRuleSetIds": ["rs_a_organiser_policy"],
+    "viability": "VIABLE",
+    "version": 1,
+    "updatedAt": "2026-09-05T12:00:00+09:00"
+  },
+  "constraints": [
+    {
+      "id": "c_a_arrive_before_keynote",
+      "kind": "TEMPORAL",
+      "hardness": "HARD",
+      "evaluator": "DETERMINISTIC",
+      "status": "PASS",
+      "description": "Arrive at the venue at least 60 minutes before the keynote",
+      "refs": [
+        { "entityType": "TRIP_ELEMENT", "id": "el_a_flight_out" },
+        { "entityType": "TRIP_ELEMENT", "id": "el_a_keynote" }
+      ],
+      "parameters": { "minBufferMinutes": 60 }
+    },
+    {
+      "id": "c_a_hotel_no_show",
+      "kind": "SUPPLIER",
+      "hardness": "HARD",
+      "evaluator": "DETERMINISTIC",
+      "status": "PASS",
+      "description": "Check in or note late arrival before the no-show cutoff",
+      "refs": [{ "entityType": "TRIP_ELEMENT", "id": "el_a_hotel" }],
+      "derivedFromRuleId": "rule_a_noshow_cutoff",
+      "ruleSetId": "rs_a_hotel_policy"
+    },
+    {
+      "id": "c_a_transfer_feasible",
+      "kind": "TRANSFER",
+      "hardness": "SOFT",
+      "evaluator": "DETERMINISTIC",
+      "status": "PASS",
+      "description": "Airport-to-hotel transfer fits between arrival and check-in needs",
+      "refs": [{ "entityType": "TRIP_ELEMENT", "id": "el_a_transfer" }]
+    }
+  ],
+  "disruption": {
+    "signal": {
+      "id": "sig_a_cancel",
+      "kind": "FLIGHT_CANCELLATION",
+      "occurredAt": "2026-09-12T18:00:00+09:00",
+      "receivedAt": "2026-09-12T18:01:00+09:00",
+      "sourceId": "src_a_provider_state",
+      "authority": "AUTHORITATIVE",
+      "confidence": 1,
+      "tripId": "trip_a",
+      "subjectRef": { "entityType": "TRIP_ELEMENT", "id": "el_a_flight_out" },
+      "summary": "Outbound flight cancelled by carrier",
+      "payload": { "reason": "operational", "bookingReference": "FL-A-1001" }
+    },
+    "postDisruptionPreferences": [
+      {
+        "id": "pref_a_keynote_priority",
+        "travellerId": "trv_a_speaker",
+        "tripId": "trip_a",
+        "statement": "Getting me to the keynote on time matters most; skip the dinner if we have to choose",
+        "origin": {
+          "kind": "EXPLICIT_INSTRUCTION",
+          "issuedAt": "2026-09-12T19:30:00+09:00",
+          "issuedBy": "trv_a_speaker"
+        },
+        "sourceId": "src_a_traveller_message"
+      }
+    ]
+  },
+  "expectations": {
+    "impact": {
+      "severity": "HIGH",
+      "directFailureElementIds": ["el_a_flight_out"],
+      "atRiskElementIds": ["el_a_transfer", "el_a_hotel"],
+      "threatenedObjectiveIds": ["obj_a_keynote"]
+    },
+    "authority": {
+      "expectedOutcome": "REQUIRES_TRAVELLER",
+      "approverDescription": "Fare delta stays under the organiser approval threshold, so traveller confirmation gates the itinerary change"
+    },
+    "recovery": {
+      "expectedResolution": "FULLY_RECOVERED",
+      "remainingLossObjectiveIds": [],
+      "actionOperation": "flight.change"
+    }
+  }
+}
