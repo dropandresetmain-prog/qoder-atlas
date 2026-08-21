@@ -25,7 +25,11 @@ import {
   UI_STATE_INVENTORY,
   type UiStateTrigger,
 } from '../src/ui/state-inventory.ts';
-import { caseDetailViewIssues } from '../src/ui/case-view-model.ts';
+import { caseDetailViewIssues, type CaseDetailView } from '../src/ui/case-view-model.ts';
+import { renderOperatorDashboard, renderOperatorDashboardBody } from '../src/ui/screens/operator-dashboard.ts';
+import { deriveStepIndex, renderCaseDetail } from '../src/ui/screens/operator-case.ts';
+import { renderTravellerTrip } from '../src/ui/screens/traveller.ts';
+import { renderPage } from '../src/ui/page.ts';
 import {
   CASE_FIXTURES,
   TRAVELLER_FIXTURES,
@@ -34,10 +38,18 @@ import {
   disruptedTrip,
   operatorDashboard,
   operatorDashboardAlt,
+  operatorDashboardError,
+  operatorDashboardLoaded,
+  operatorDashboardLoading,
   readyTrip,
   recoveringTrip,
   resolvedTrip,
   resolvedWithLossTrip,
+  travellerAwaitingInputEnvelope,
+  travellerDisruptedEnvelope,
+  travellerError,
+  travellerLoading,
+  travellerResolvedWithLossEnvelope,
   unknownTrip,
 } from '../src/ui/fixtures/readmodels.ts';
 
@@ -190,4 +202,187 @@ test('user-facing vocabulary contains no internal jargon', () => {
       assert.ok(!lowered.includes(term), `jargon "${term}" in: ${phrase}`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// E2 — rendering proofs
+// ---------------------------------------------------------------------------
+
+function allRenderedScreens(): { id: string; html: string }[] {
+  const screens: { id: string; html: string }[] = [
+    { id: 'dashboard', html: renderOperatorDashboard(operatorDashboardLoaded) },
+    { id: 'dashboard-alt', html: renderOperatorDashboard({ state: 'LOADED', data: operatorDashboardAlt }) },
+    { id: 'dashboard-loading', html: renderOperatorDashboard(operatorDashboardLoading) },
+    { id: 'dashboard-error', html: renderOperatorDashboard(operatorDashboardError) },
+    { id: 'traveller-loading', html: renderTravellerTrip(travellerLoading) },
+    { id: 'traveller-error', html: renderTravellerTrip(travellerError) },
+  ];
+  for (const fixture of CASE_FIXTURES) {
+    screens.push({ id: `case-${fixture.id}`, html: renderCaseDetail({ state: 'LOADED', data: fixture.view }) });
+  }
+  for (const fixture of TRAVELLER_FIXTURES) {
+    screens.push({ id: `traveller-${fixture.id}`, html: renderTravellerTrip({ state: 'LOADED', data: fixture.view }) });
+  }
+  return screens;
+}
+
+test('no internal jargon leaks into any rendered screen', () => {
+  for (const screen of allRenderedScreens()) {
+    const lowered = screen.html.toLowerCase();
+    for (const term of FORBIDDEN_UI_TERMS) {
+      assert.ok(!lowered.includes(term), `jargon "${term}" leaked in ${screen.id}`);
+    }
+    // Generic internal vocabulary must not be primary UI language either.
+    for (const term of ['trip signal', 'blast radius', 'recovery strategy']) {
+      assert.ok(!lowered.includes(term), `internal phrase "${term}" leaked in ${screen.id}`);
+    }
+  }
+});
+
+test('dashboard renders every status and orders attention first', () => {
+  const html = renderOperatorDashboardBody(operatorDashboard);
+  for (const status of ALL_STATUSES) {
+    assert.ok(html.includes(`data-status="${status}"`), `missing status card: ${status}`);
+  }
+  const disruptedAt = html.indexOf('data-status="DISRUPTED"');
+  const readyAt = html.indexOf('data-status="READY"');
+  assert.ok(disruptedAt >= 0 && readyAt >= 0 && disruptedAt < readyAt, 'disrupted must precede ready');
+  assert.ok(html.includes('Decisions needed'), 'pending decisions panel expected');
+  assert.ok(html.includes('Still unclear'), 'uncertainty must be visible');
+});
+
+test('switching typed fixture data changes nothing in component code paths', () => {
+  const primary = renderOperatorDashboardBody(operatorDashboard);
+  const alternate = renderOperatorDashboardBody(operatorDashboardAlt);
+  assert.equal((primary.match(/data-trip-id=/g) ?? []).length, operatorDashboard.trips.length);
+  assert.equal((alternate.match(/data-trip-id=/g) ?? []).length, operatorDashboardAlt.trips.length);
+  assert.ok(alternate.includes('Dana Whitfield'));
+  assert.ok(!alternate.includes('Alex Reyes'), 'datasets must not bleed into each other');
+});
+
+test('loading and error surfaces never fabricate data', () => {
+  const loading = renderOperatorDashboard(operatorDashboardLoading);
+  assert.ok(loading.includes('data-ui-state="loading"'));
+  assert.ok(!loading.includes('Alex Reyes'));
+  assert.ok(!loading.includes('data-trip-id'));
+
+  const error = renderOperatorDashboard(operatorDashboardError);
+  assert.ok(error.includes('data-ui-state="error"'));
+  assert.ok(error.includes('trip summary service did not respond'));
+  assert.ok(!error.includes('data-trip-id'));
+
+  const loadingTraveller = renderTravellerTrip(travellerLoading);
+  assert.ok(loadingTraveller.includes('data-ui-state="loading"'));
+  const errorTraveller = renderTravellerTrip(travellerError);
+  assert.ok(errorTraveller.includes('data-ui-state="error"'));
+  assert.ok(errorTraveller.includes('Nothing about your trip has changed'));
+});
+
+test('case detail tells the full recovery story incl. rejected attractive option', () => {
+  const rejected = CASE_FIXTURES.find((f) => f.id === 'rejected-option');
+  assert.ok(rejected);
+  const html = renderCaseDetail({ state: 'LOADED', data: rejected.view });
+  assert.ok(html.includes('What changed'));
+  assert.ok(html.includes('What is affected'));
+  assert.ok(html.includes('Must not be missed'), 'critical objective must be called out');
+  assert.ok(html.includes('What we checked'));
+  assert.ok(html.includes('data-verdict="NOT_VIABLE"'));
+  assert.ok(html.includes('Arrives after the speaking slot'), 'rejection reason must be visible');
+  assert.ok(html.includes('data-verdict="VIABLE"'));
+  assert.ok(html.includes('Still being checked'), 'UNKNOWN option verdict rendered');
+});
+
+test('approval requirement is explicit with who, why, and amount', () => {
+  const approvalCase = CASE_FIXTURES.find((f) => f.id === 'awaiting-approval');
+  assert.ok(approvalCase);
+  const html = renderCaseDetail({ state: 'LOADED', data: approvalCase.view });
+  assert.ok(html.includes('Approval needed from the organisation'));
+  assert.ok(html.includes('travel policy'));
+  assert.ok(html.includes('data-approval-state="PENDING"'));
+});
+
+test('resolution outcomes render honestly, including loss', () => {
+  const full = CASE_FIXTURES.find((f) => f.id === 'resolved-fully');
+  const loss = CASE_FIXTURES.find((f) => f.id === 'resolved-with-loss');
+  assert.ok(full && loss);
+  const fullHtml = renderCaseDetail({ state: 'LOADED', data: full.view });
+  assert.ok(fullHtml.includes('data-outcome="FULLY_RECOVERED"'));
+  const lossHtml = renderCaseDetail({ state: 'LOADED', data: loss.view });
+  assert.ok(lossHtml.includes('data-outcome="RECOVERED_WITH_LOSS"'));
+  assert.ok(lossHtml.includes('Trip recovered — with a loss'));
+  assert.ok(lossHtml.includes('Could not be kept'));
+  assert.ok(lossHtml.includes('Welcome dinner with the organisers'));
+  assert.ok(!lossHtml.includes('Everything originally planned is kept'));
+
+  const travellerLoss = renderTravellerTrip(travellerResolvedWithLossEnvelope);
+  assert.ok(travellerLoss.includes('could not be kept'), 'traveller loss must stay honest');
+});
+
+test('traveller surfaces: disrupted hero, decision buttons, viability', () => {
+  const disrupted = renderTravellerTrip(travellerDisruptedEnvelope);
+  assert.ok(disrupted.includes('Your trip needs attention'));
+  assert.ok(disrupted.includes('traveller-shell'), 'mobile-first layout expected');
+
+  const awaiting = renderTravellerTrip(travellerAwaitingInputEnvelope);
+  assert.ok(awaiting.includes('We need your input'));
+  assert.ok(awaiting.includes('data-case-id="case-choice"'));
+  assert.equal((awaiting.match(/<button type="submit"/g) ?? []).length, 2);
+  assert.ok(awaiting.includes('Nothing is booked until you choose'));
+  assert.ok(awaiting.includes('data-viability="AT_RISK"'));
+});
+
+test('mobile traveller page shell carries responsive metadata', () => {
+  const page = renderPage(
+    { title: 'Your trip', active: 'traveller', surface: 'traveller' },
+    renderTravellerTrip(travellerDisruptedEnvelope),
+  );
+  assert.ok(page.includes('width=device-width, initial-scale=1'));
+  assert.ok(page.includes('traveller-shell'));
+  assert.ok(page.includes('<style>'), 'theme inlined: no static asset dependency');
+});
+
+test('recovery progress is derived from evidence, never asserted for UNKNOWN', () => {
+  const unknownCase: CaseDetailView = {
+    ...CASE_FIXTURES.find((f) => f.id === 'rejected-option')!.view,
+    status: 'UNKNOWN',
+  };
+  assert.equal(deriveStepIndex(unknownCase), undefined);
+  const resolvedCase = CASE_FIXTURES.find((f) => f.id === 'resolved-fully');
+  assert.ok(resolvedCase);
+  assert.equal(deriveStepIndex(resolvedCase.view), 6);
+  const executing = CASE_FIXTURES.find((f) => f.id === 'actions-in-progress');
+  assert.ok(executing);
+  assert.equal(deriveStepIndex(executing.view), 4);
+});
+
+test('malformed case views are refused instead of guessed', () => {
+  const broken = CASE_FIXTURES.find((f) => f.id === 'rejected-option');
+  assert.ok(broken);
+  const malformed: CaseDetailView = {
+    ...broken.view,
+    options: broken.view.options.map((option) =>
+      option.verdict === 'NOT_VIABLE' ? { ...option, rejectionReason: undefined } : option,
+    ),
+  };
+  const html = renderCaseDetail({ state: 'LOADED', data: malformed });
+  assert.ok(html.includes('cannot be displayed'));
+  assert.ok(!html.includes('data-verdict'));
+});
+
+test('dynamic values are HTML-escaped', () => {
+  const hostile = {
+    ...operatorDashboard,
+    trips: [
+      {
+        ...readyTrip,
+        label: '<script>alert(1)</script>',
+        whatChanged: 'a < b & c > d "quoted"',
+      },
+    ],
+    summary: { ready: 1, atRisk: 0, disrupted: 0, recovering: 0, awaitingDecision: 0 },
+  };
+  const html = renderOperatorDashboardBody(hostile);
+  assert.ok(!html.includes('<script>alert(1)</script>'));
+  assert.ok(html.includes('&lt;script&gt;'));
+  assert.ok(html.includes('a &lt; b &amp; c &gt; d &quot;quoted&quot;'));
 });

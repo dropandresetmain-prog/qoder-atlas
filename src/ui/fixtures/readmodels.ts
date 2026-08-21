@@ -39,6 +39,20 @@ export const readyTrip: OperatorTripView = {
   updatedAt: '2026-09-14T08:00:00+08:00',
 };
 
+export const atRiskTrip: OperatorTripView = {
+  tripId: 'trip-at-risk',
+  label: 'Ivy Tan — Innovation Summit 2026',
+  travellerNames: ['Ivy Tan'],
+  anchorEventName: 'Innovation Summit 2026',
+  status: 'AT_RISK',
+  affectedItems: ['Airport transfer'],
+  systemActivity: ['Watching the arrival window against the transfer'],
+  pendingDecisions: [],
+  uncertainties: ['Whether the expected delay will break the transfer connection'],
+  travellerResponseStatus: 'NOT_REQUIRED',
+  updatedAt: UI_FIXTURE_NOW,
+};
+
 export const disruptedTrip: OperatorTripView = {
   tripId: 'trip-disrupted',
   label: 'Alex Reyes — Innovation Summit 2026',
@@ -167,6 +181,7 @@ export const resolvedWithLossTrip: OperatorTripView = {
 
 export const operatorTrips: readonly OperatorTripView[] = [
   readyTrip,
+  atRiskTrip,
   disruptedTrip,
   recoveringTrip,
   awaitingTravellerTrip,
@@ -178,7 +193,7 @@ export const operatorTrips: readonly OperatorTripView[] = [
 
 export const operatorDashboard: OperatorDashboardView = {
   generatedAt: UI_FIXTURE_NOW,
-  summary: { ready: 1, atRisk: 0, disrupted: 1, recovering: 3, awaitingDecision: 2 },
+  summary: { ready: 1, atRisk: 1, disrupted: 1, recovering: 3, awaitingDecision: 2 },
   trips: [...operatorTrips],
 };
 
