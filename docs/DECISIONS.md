@@ -92,3 +92,23 @@ Generic hotel ingestion/reasoning must work without Booking.com. Adopt Demand AP
 **Status:** Accepted
 
 Use repository docs for durable product/architecture truth and Qoder Quest Specs as bounded implementation contracts. Freeze shared contracts before parallel worktrees/Quests.
+
+## ADR-019 — TypeScript on Node.js ≥24, single package, no web framework
+**Status:** Accepted (F0)
+
+End-to-end TypeScript in one package (no workspaces/services). Node >= 24 runs sources directly via type stripping (`node --test`, `npm run dev`); `tsc` emits `dist/` for build/start. HTTP layer is `node:http` with a small router; no Express/Next until a lane demonstrates material need. ESLint 9 flat config, Node built-in test runner. Chosen as the smallest practical stack consistent with ARCHITECTURE.md §16/§17.
+
+## ADR-020 — Built-in `node:sqlite` behind repository interfaces
+**Status:** Accepted (F0)
+
+Persistence uses Node's built-in `node:sqlite` (synchronous, zero native dependencies) behind the `src/contracts/repositories.ts` interfaces, per ADR-009. If runtime evidence proves it unsuitable, swap to `better-sqlite3` inside `src/persistence/` without touching domain logic.
+
+## ADR-021 — Zod runtime validation at all external/model boundaries
+**Status:** Accepted (F0/F1)
+
+Zod v4 schemas are the executable form of the F1 domain/operational contracts and config validation. Malformed AI/provider/fixture input fails safely at parse time (NFR-04).
+
+## ADR-022 — Frozen shared contract surface at Checkpoint A
+**Status:** Accepted (pending formal Checkpoint A acceptance)
+
+`src/domain/**`, `src/operational/**`, `src/contracts/**`, the `ScenarioSpec` contract (`src/scenarios/**`), both scenario bundle semantics, and the `.env.example` variable names are frozen. After acceptance, changes are lead/integrator-owned cross-lane changes per IMPLEMENTATION_PLAN.md §2.1. Planner output structurally excludes executable side effects; provider results use the `CapabilityResult` envelope; LIVE/REPLAY share one `normalize()` path via the `ProviderAdapter` shape.

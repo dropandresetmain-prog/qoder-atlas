@@ -9,32 +9,44 @@ This file defines setup expectations, not secret values.
 
 ## Expected configuration areas
 
-Exact variable names are frozen during application foundation.
+Variable names were frozen during the F0 foundation and are implemented in `src/config/config.ts` (see `.env.example`). The app starts with **zero** variables set (REPLAY/local defaults).
 
 ### Application
-- environment
-- base URL/callback origin if needed
-- log level
-- adapter mode: `LIVE | RECORD | REPLAY`
-- recording/fixture path
+- `APP_ENVIRONMENT` — `local | dev | demo` (default `local`)
+- `LOG_LEVEL` — `debug | info | warn | error` (default `info`)
+- `HTTP_PORT` — application server port (default `8787`)
+- `ADAPTER_MODE` — `LIVE | RECORD | REPLAY` (default `REPLAY`)
+- `RECORDINGS_DIR` — sanitized provider-shaped recordings (default `recordings`)
+- `FIXTURES_DIR` — scenario fixtures (default `fixtures`)
 
 ### SQLite
-- database file path
+- `SQLITE_PATH` — database file path (default `data/app.sqlite`; `:memory:` in tests)
 
 No external database account is required locally. SQLite is embedded. Persistence goes through repository interfaces so deployment can replace it if local disk is ephemeral.
 
 ### Alibaba Cloud Model Studio
-Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Configuration includes API key/region/base endpoint/model IDs required by selected SDK/API.
+Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Only required for LIVE intelligence; REPLAY/local runs need none.
+
+- `MODEL_STUDIO_API_KEY`
+- `MODEL_STUDIO_BASE_URL`
+- `MODEL_STUDIO_MODEL`
 
 Start with inexpensive model for plumbing/tests. Upgrade only if evidence shows quality blocks acceptance.
 
 ### Atlas direct API
-Needed for LIVE flight capability. Configuration includes sandbox/client credentials and environment/base URL.
+Needed only for LIVE flight capability.
+
+- `ATLAS_ENV` (default `sandbox`)
+- `ATLAS_BASE_URL`
+- `ATLAS_CLIENT_ID`
+- `ATLAS_CLIENT_SECRET`
 
 Authoritative capability docs live in `dropandresetmain-prog/atlas-hackathon-lab`. Do not treat sandbox Search data as real market evidence.
 
 ### Google Maps Routes
-Optional/non-blocking dynamic routing. Setup generally requires Google Cloud project, billing enabled, Routes API enabled and restricted API key. Core must support REPLAY/fallback when absent.
+Optional/non-blocking dynamic routing. Core must support REPLAY/fallback when absent.
+
+- `GOOGLE_ROUTES_API_KEY`
 
 ### Booking.com Demand API
 Not required for MVP. Credentials/access are a separate bounded investigation. Do not add variables until access is approved and adapter accepted into scope.

@@ -59,6 +59,28 @@ Do not infer production market behaviour from sandbox data.
 
 ## Status
 
-Planning baseline only. No application code has been implemented yet.
+**Checkpoint A (foundation + frozen contracts) implemented, pending formal acceptance.**
 
-The first implementation gate is to freeze shared schemas/contracts before parallel build lanes begin.
+What exists today:
+
+- runnable TypeScript/Node ≥ 24 application skeleton (starts with zero credentials in REPLAY mode)
+- executable domain + operational contracts with Zod runtime validation (`src/domain/`, `src/operational/`)
+- frozen shared seams: repositories, provider-neutral capabilities, capability result envelopes, application service boundaries, planner input/output, operator/traveller read models (`src/contracts/`)
+- two materially different acceptance scenarios (`fixtures/scenarios/anchor-event-speaker`, `fixtures/scenarios/corporate-tmc`) loading through the same contracts
+- SQLite persistence skeleton behind repository interfaces, LIVE/RECORD/REPLAY adapter modes
+
+Downstream implementation lanes (core engine, ingestion, providers, intelligence, UI) start after Checkpoint A acceptance.
+
+## Quickstart
+
+```bash
+npm install
+npm test          # contract + foundation + scenario tests
+npm run typecheck # tsc, no emit
+npm run lint      # eslint
+npm run build     # tsc -> dist/
+npm run dev       # run src/main.ts directly (Node type stripping)
+npm start         # run compiled dist/main.js (after build)
+```
+
+Configuration is optional; see `.env.example` and `docs/ENVIRONMENT.md`. The default mode is `REPLAY` with no external credentials required.

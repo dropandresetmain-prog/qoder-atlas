@@ -1,6 +1,6 @@
 # Implementation Plan
 
-**Status:** Active execution SSOT. No application code has been implemented yet.  
+**Status:** Active execution SSOT. F0–F3 (Checkpoint A) implemented and awaiting formal acceptance.  
 **Product:** AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
@@ -629,10 +629,10 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 
 | ID | Work package | Status | Depends on | Default worktree | Recommended Qoder profile | Evidence / commit |
 |---|---|---|---|---|---|---|
-| F0 | Stack + skeleton + file map | Not Started | — | foundation | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| F1 | Domain + operational contracts | Not Started | F0 | foundation | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| F2 | Shared capability/service/read-model contracts | Not Started | F0,F1 | foundation | Qwen3.8 xHigh / Qwen3.7 Max | — |
-| F3 | Acceptance scenario specs | Not Started | F1,F2 | foundation | Qwen3.8 xHigh / Qwen3.7 Max | — |
+| F0 | Stack + skeleton + file map | Implemented | — | main | Qwen3.8 xHigh / Qwen3.7 Max | 908e8aa — foundation smoke tests, credential-free REPLAY boot |
+| F1 | Domain + operational contracts | Implemented | F0 | main | Qwen3.8 xHigh / Qwen3.7 Max | 869765e — T-DOM suite passes |
+| F2 | Shared capability/service/read-model contracts | Implemented | F0,F1 | main | Qwen3.8 xHigh / Qwen3.7 Max | 54b7eed — seam/envelope contract tests pass |
+| F3 | Acceptance scenario specs | Implemented | F1,F2 | main | Qwen3.8 xHigh / Qwen3.7 Max | dfc2c8d — both scenarios schema-load via same contracts |
 | A1 | Persistence + validated mutation | Not Started | F1,F2 | core | Qwen3.8 xHigh / Qwen3.7 Max | — |
 | A2 | Constraints + blast radius | Not Started | A1,F3 | core | Qwen3.8 xHigh; GLM escalation | — |
 | A3 | Overlays + viability | Not Started | A2 | core | Qwen3.8 xHigh / Qwen3.7 Max | — |
@@ -694,19 +694,23 @@ Minimum traceability; task Specs may add narrower evidence but cannot delete req
 
 ## 6. File ownership and collision control
 
-F0 must replace provisional paths below with exact paths after stack choice.
+Exact paths as of the F0–F3 foundation (authoritative map: `docs/architecture/PROJECT_FILE_MAP.md`).
 
-| Area | Primary owner | Other lanes may | Must not |
-|---|---|---|---|
-| shared schemas/contracts | Foundation/lead | import/use | change after freeze without lead reconciliation |
-| domain/engine/cases/persistence | Lane A | call public interfaces | add provider/UI/prompt logic |
-| ingestion/sources | Lane B | produce shared contracts | mutate Trip directly |
-| providers/recordings | Lane C | consume capability contracts | add trip-specific recovery policy |
-| AI/planner | Lane D | consume snapshots/evaluator evidence | mutate state or approve/execute |
-| web UI | Lane E | consume read models/app APIs | redefine domain DTOs |
-| orchestration/application seams | Integrator/lead | report mismatch | parallel lane edits |
-| scenarios/fixtures | lead owns semantics | use/add scoped data | embed fixture facts in production logic |
-| architecture/roadmap/implementation SSOT | lead/integrator | propose update | silently alter scope/contracts |
+| Area | Exact paths | Primary owner | Other lanes may | Must not |
+|---|---|---|---|---|
+| shared domain/operational schemas | `src/domain/**`, `src/operational/**` | Foundation/lead | import/use | change after freeze without lead reconciliation |
+| shared seams (repos/capabilities/services/planner/read models/envelopes) | `src/contracts/**` | Foundation/lead | implement/consume | fork local variants |
+| scenario bundles + loader | `fixtures/scenarios/**`, `src/scenarios/**` | lead owns semantics | use/add scoped data | embed fixture facts in production logic |
+| config/env/server/util skeleton | `src/config/**`, `src/server/**`, `src/util/**`, `src/main.ts` | Foundation/integrator | extend via integrator | parallel lane edits |
+| persistence implementation | `src/persistence/**` | Lane A | call repository interfaces | add provider/UI/prompt logic |
+| core engine (mutation/constraints/overlays/case/authority) | `src/engine/**` (created by Lane A) | Lane A | call public interfaces | add provider/UI/prompt logic |
+| ingestion/sources | `src/ingest/**` (created by Lane B) | Lane B | produce proposals/rules | mutate Trip directly |
+| providers/recordings | `src/providers/**`, `recordings/**`, `fixtures/recordings/**` | Lane C | consume capability contracts | add trip-specific recovery policy |
+| AI/planner runtime | `src/intelligence/**` (created by Lane D) | Lane D | consume snapshots/evaluator evidence | mutate state or approve/execute |
+| web UI | `src/ui/**` (created by Lane E) | Lane E | consume read models/app APIs | redefine domain DTOs |
+| orchestration/application seams | `src/app/**` (created by Integrator) | Integrator/lead | report mismatch | parallel lane edits |
+| tests | `test/**` | package owner | scoped additions | weaken contract tests without lead |
+| architecture/roadmap/implementation SSOT | `docs/**`, `.qoder/rules/**` | lead/integrator | propose update | silently alter scope/contracts |
 
 If two lanes require the same implementation file, they are not independent until ownership/overlap is resolved.
 
