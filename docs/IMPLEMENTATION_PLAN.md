@@ -732,7 +732,7 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
 
-**Checkpoint A fan-out rule:** fan-out only from the exact pushed `main` SHA after `REV-A` is marked `Complete`. `REV-A` is `Complete`; the reviewed contract-fix code is at `3592a0e` with docs-only reconciliation at `addad36` and review-gate definitions at `b0145d5`. The docs-only Checkpoint A closure commit on top of `b0145d5` is the accepted fan-out SHA: every lane branch must originate from that exact SHA. A later docs-only tracker commit may remain on `main` without invalidating the fan-out base.
+**Checkpoint A fan-out rule:** fan-out only from the exact pushed `main` SHA after `REV-A` is marked `Complete`. `REV-A` is `Complete`; the reviewed contract-fix code is at `3592a0e` with docs-only reconciliation at `addad36` and review-gate definitions at `b0145d5`. **CHECKPOINT_A_CLOSURE_SHA = `aa54a2e59f7e0393a2e85225ed4453d3da027d39`** (docs-only closure commit on top of `b0145d5`) is the accepted fan-out base: every lane branch must originate from that exact SHA. This tracker-only commit records the SHA and may remain on `main` without invalidating the fan-out base.
 
 `Implemented` = package completed/verified in lane.  
 `Integrated` = merged and seam-tested.  
