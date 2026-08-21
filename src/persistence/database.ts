@@ -10,11 +10,14 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * JSON-friendly logical stores. Lane A1 may evolve column sets as long as the
  * repository interfaces in `src/contracts/repositories.ts` stay stable.
+ *
+ * A1 additions: `entities` (context entities + constraints outside the Trip
+ * aggregate) and `source_contents` (raw content kept outside trip state).
  */
 const DDL = `
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS cases (
   id TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL,
   status TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 0,
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -49,6 +53,18 @@ CREATE TABLE IF NOT EXISTS sources (
   kind TEXT NOT NULL,
   retrieved_at TEXT NOT NULL,
   data TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS source_contents (
+  source_id TEXT PRIMARY KEY,
+  content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS entities (
+  entity_type TEXT NOT NULL,
+  id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  PRIMARY KEY (entity_type, id)
 );
 
 CREATE TABLE IF NOT EXISTS audit (
@@ -85,4 +101,20 @@ export function kvGet(db: DatabaseSync, key: string): string | undefined {
     | { value: string }
     | undefined;
   return row?.value;
+}
+
+/**
+ * Run `work` inside an IMMEDIATE transaction. Any thrown error rolls the
+ * whole unit of work back — authoritative mutations are all-or-nothing.
+ */
+export function withTransaction<T>(db: DatabaseSync, work: () => T): T {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = work();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
