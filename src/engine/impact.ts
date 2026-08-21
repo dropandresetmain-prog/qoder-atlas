@@ -113,6 +113,18 @@ export class ImpactEngine implements ImpactService {
       const subject = trip.elements.find((e) => e.id === signal.subjectRef!.id);
       if (!subject) continue;
       if (directFailures.some((f) => f.elementId === subject.id)) continue;
+      // Authoritative post-signal evidence (e.g. an observed rebooking)
+      // outranks the cancellation signal; the signal no longer implies failure.
+      const signalInstant = signal.receivedAt ?? signal.occurredAt;
+      const departureFact =
+        subject.elementKind === 'TRANSPORT_LEG' ? subject.data.scheduledDeparture : undefined;
+      if (
+        departureFact &&
+        departureFact.authority === 'AUTHORITATIVE' &&
+        instantMillis(departureFact.observedAt) >= instantMillis(signalInstant)
+      ) {
+        continue;
+      }
       if (signal.authority === 'AUTHORITATIVE' || signal.authority === 'CONNECTED') {
         directFailures.push({
           elementId: subject.id,

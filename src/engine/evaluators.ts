@@ -192,6 +192,9 @@ function evaluateTemporal(constraint: Constraint, ctx: EvaluationContext): Const
     instantB = elementStartInstant(secondElement, ctx.now);
   } else {
     const objective = findObjective(ctx, secondRef);
+    if (objective?.status === 'WAIVED') {
+      return evaluation(constraint, 'PASS', `deadline objective ${secondRef.id} is waived`);
+    }
     if (objective) {
       // Objective deadline: resolve from linked elements other than the subject.
       for (const linkedId of objective.linkedElementIds) {
