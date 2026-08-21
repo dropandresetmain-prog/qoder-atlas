@@ -19,6 +19,9 @@ coverage/
 *.db-wal
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+data/
 
 # Provider recordings and local runtime data
 recordings/private/
