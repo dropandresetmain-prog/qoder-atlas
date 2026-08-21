@@ -1,0 +1,16 @@
+{
+  "id": "rec_c47bcdae6b369baf521a9a2b03638faf",
+  "providerId": "google-routes",
+  "operation": "route_context",
+  "recordedAt": "2026-08-22T00:00:00Z",
+  "sanitized": true,
+  "raw": {
+    "routes": [
+      {
+        "duration": "900s",
+        "durationInTraffic": "1380s",
+        "distanceMeters": 15400
+      }
+    ]
+  }
+}

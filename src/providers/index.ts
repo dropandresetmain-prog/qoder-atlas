@@ -9,3 +9,5 @@ export type { FileRecordingStoreOptions, RecordingStore } from './recordingStore
 export { REDACTED, containsAnySecret, sanitizeRaw } from './sanitize.ts';
 export { ATLAS_PROVIDER_ID, AtlasFlightAdapter } from './atlas/adapter.ts';
 export type { AtlasAdapterOptions } from './atlas/adapter.ts';
+export { GOOGLE_ROUTES_PROVIDER_ID, GoogleRoutesAdapter, normalizeRouteContext } from './googleRoutes/adapter.ts';
+export type { GoogleRoutesAdapterOptions } from './googleRoutes/adapter.ts';
