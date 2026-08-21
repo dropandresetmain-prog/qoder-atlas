@@ -12,6 +12,7 @@ import type { CaseStatus } from '../operational/case.ts';
 import type { ImpactAssessment } from '../operational/impact.ts';
 import type {
   ActionIntent,
+  AuthorisedExecution,
   AuthorityDecision,
   ExecutionResult,
 } from '../operational/intent.ts';
@@ -103,9 +104,15 @@ export interface AuthorityEngine {
 // Execution + observation
 // ---------------------------------------------------------------------------
 
-/** Executes only AUTHORISED intents; enforced by implementation (FR-10). */
+/**
+ * Executes only through an AuthorisedExecution envelope: an intent paired
+ * with the deterministic AuthorityDecision that authorised it (FR-10,
+ * ADR-025). Implementations MUST validate the pair with
+ * `executionGateIssues()` and refuse when any issue is reported; an intent
+ * merely marked AUTHORISED by an arbitrary caller is not executable evidence.
+ */
 export interface ExecutorService {
-  execute(intent: ActionIntent): Promise<ExecutionResult>;
+  execute(execution: AuthorisedExecution): Promise<ExecutionResult>;
 }
 
 export interface ObservationOutcome {

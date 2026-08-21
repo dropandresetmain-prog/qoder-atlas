@@ -96,6 +96,55 @@ export const AuthorityDecisionSchema = z.strictObject({
 });
 export type AuthorityDecision = z.infer<typeof AuthorityDecisionSchema>;
 
+/**
+ * Authorised execution envelope (FR-10, ADR-025). The executor seam accepts
+ * an intent ONLY together with the deterministic AuthorityDecision that
+ * authorised it. An ActionIntent merely constructed with status AUTHORISED
+ * by an arbitrary caller/model is not executable evidence.
+ */
+export const AuthorisedExecutionSchema = z.strictObject({
+  intent: ActionIntentSchema,
+  authority: AuthorityDecisionSchema,
+});
+export type AuthorisedExecution = z.infer<typeof AuthorisedExecutionSchema>;
+
+/**
+ * Deterministic authority gate shared by executor implementations and tests.
+ * Returns [] only when the paired authority decision is valid evidence for
+ * executing the intent. Implementations MUST refuse to execute when this
+ * returns any issue; intent.status alone is never sufficient.
+ */
+export function executionGateIssues(execution: AuthorisedExecution): string[] {
+  const issues: string[] = [];
+  const { intent, authority } = execution;
+
+  if (authority.intentId !== intent.id) {
+    issues.push(`authority decision ${authority.id} does not reference intent ${intent.id}`);
+  }
+  switch (authority.outcome) {
+    case 'AUTO_APPROVED':
+      break;
+    case 'REQUIRES_TRAVELLER':
+    case 'REQUIRES_ORGANISATION_APPROVER':
+    case 'REQUIRES_HUMAN_AGENT':
+      if (authority.approval === undefined) {
+        issues.push(`outcome ${authority.outcome} requires a recorded approval`);
+      } else if (authority.approval.decision !== 'APPROVED') {
+        issues.push(`approval for outcome ${authority.outcome} was declined`);
+      }
+      break;
+    case 'BLOCKED':
+      issues.push('authority decision is BLOCKED; execution is forbidden');
+      break;
+  }
+  return issues;
+}
+
+/** True only when the authority evidence permits crossing the execution boundary. */
+export function isExecutable(execution: AuthorisedExecution): boolean {
+  return executionGateIssues(execution).length === 0;
+}
+
 /** Where execution evidence came from (FR-15 + ADR-007 boundary simulation). */
 export const ExecutionProvenanceSchema = z.enum(['LIVE', 'RECORD', 'REPLAY', 'SIMULATED']);
 export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;

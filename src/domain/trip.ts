@@ -50,8 +50,15 @@ export type TripObjective = z.infer<typeof TripObjectiveSchema>;
 // Relations
 // ---------------------------------------------------------------------------
 
+/**
+ * Executable relation vocabulary — deliberately minimal (ADR-012, ADR-026).
+ * The prose relations PART_OF, PARTICIPATES_IN, GOVERNED_BY and COVERED_BY
+ * from ARCHITECTURE.md §4 are represented by typed aggregate fields
+ * (TripElement.tripId, Trip.anchorEventId, Trip.travellerIds,
+ * governedByRuleSetIds, insuranceRuleSetIds, AnchorEvent.organiserOrganisationId),
+ * not as edges; lanes must not reintroduce them as relations.
+ */
 export const TripRelationKindSchema = z.enum([
-  'PART_OF',
   'CONNECTS_TO',
   'DEPENDS_ON',
   'SHARES_RESOURCE_WITH',

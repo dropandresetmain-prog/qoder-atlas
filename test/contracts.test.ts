@@ -33,6 +33,19 @@ import type {
 import type { Trip } from '../src/domain/trip.ts';
 import type { TripSnapshot } from '../src/operational/snapshot.ts';
 import type { ImpactAssessment } from '../src/operational/impact.ts';
+import {
+  ToolRequestSchema,
+  ToolOperationSchema,
+  TOOL_OPERATION_FAMILY,
+} from '../src/operational/strategy.ts';
+import {
+  AuthorisedExecutionSchema,
+  CapabilityOperationSchema,
+  executionGateIssues,
+  isExecutable,
+  type ActionIntent,
+  type AuthorityDecision,
+} from '../src/operational/intent.ts';
 
 const AT = '2026-09-14T09:00:00+09:00';
 
@@ -290,4 +303,185 @@ test('flight search query stays provider-neutral', () => {
     passengers: { adults: 1 },
   };
   assert.equal(query.origin.system, 'iata');
+});
+
+test('tool requests: planner can request required read-only operations', () => {
+  const readOnlyRequests = [
+    { capability: 'FLIGHT', operation: 'flight.search' },
+    { capability: 'FLIGHT', operation: 'flight.verify' },
+    { capability: 'FLIGHT', operation: 'flight.fare_rules' },
+    { capability: 'FLIGHT', operation: 'flight.refund_quote' },
+    { capability: 'HOTEL', operation: 'hotel.context' },
+    { capability: 'ROUTING', operation: 'routing.context' },
+    { capability: 'RESEARCH', operation: 'research.entry_requirements' },
+    { capability: 'RESEARCH', operation: 'research.local_context' },
+  ] as const;
+  for (const [index, request] of readOnlyRequests.entries()) {
+    const parsed = ToolRequestSchema.parse({
+      id: `tool_${index}`,
+      capability: request.capability,
+      operation: request.operation,
+      purpose: 'information for recovery planning',
+    });
+    assert.equal(parsed.operation, request.operation);
+  }
+});
+
+test('tool requests: consequential operations are rejected, not re-routable', () => {
+  const consequential = [
+    { capability: 'FLIGHT', operation: 'flight.change' },
+    { capability: 'FLIGHT', operation: 'flight.cancel' },
+    { capability: 'HOTEL', operation: 'hotel.modify' },
+    { capability: 'HOTEL', operation: 'hotel.cancel' },
+    { capability: 'COMMUNICATION', operation: 'communication.notify' },
+    { capability: 'COMMUNICATION', operation: 'communication.request_approval' },
+    { capability: 'SIMULATION', operation: 'simulation.provider_action' },
+  ] as const;
+  for (const request of consequential) {
+    assert.throws(
+      () =>
+        ToolRequestSchema.parse({
+          id: 'tool_bad',
+          capability: request.capability,
+          operation: request.operation,
+          purpose: 'attempted side effect via planner',
+        }),
+      (err: unknown) => err instanceof Error,
+      `tool request must reject ${request.operation}`,
+    );
+  }
+  // Arbitrary unknown operation strings are rejected too.
+  assert.throws(() =>
+    ToolRequestSchema.parse({
+      id: 'tool_unknown',
+      capability: 'FLIGHT',
+      operation: 'flight.do_whatever',
+      purpose: 'x',
+    }),
+  );
+});
+
+test('tool requests: capability/operation mismatch is refused and vocabulary stays read-only', () => {
+  assert.throws(() =>
+    ToolRequestSchema.parse({
+      id: 'tool_mismatch',
+      capability: 'HOTEL',
+      operation: 'flight.search',
+      purpose: 'x',
+    }),
+  );
+  const capabilityOperations = new Set<string>(CapabilityOperationSchema.options);
+  for (const operation of ToolOperationSchema.options) {
+    assert.ok(capabilityOperations.has(operation), `tool op not a capability op: ${operation}`);
+  }
+  for (const operation of ToolOperationSchema.options) {
+    assert.ok(TOOL_OPERATION_FAMILY[operation], `missing family mapping for ${operation}`);
+  }
+});
+
+function sampleIntent(overrides: Partial<ActionIntent> = {}): ActionIntent {
+  return {
+    id: 'ai_1',
+    caseId: 'case_1',
+    operation: 'flight.change',
+    capability: 'FLIGHT',
+    parameters: {},
+    sideEffectLevel: 'MONEY_MOVING',
+    evidenceRefs: [],
+    status: 'PROPOSED',
+    createdAt: AT,
+    ...overrides,
+  };
+}
+
+function sampleDecision(overrides: Partial<AuthorityDecision> = {}): AuthorityDecision {
+  return {
+    id: 'ad_1',
+    intentId: 'ai_1',
+    outcome: 'AUTO_APPROVED',
+    decidedAt: AT,
+    ruleTrace: ['spend below threshold'],
+    conditions: [],
+    ...overrides,
+  };
+}
+
+test('authority gate: valid deterministic authority evidence permits execution', () => {
+  const auto = AuthorisedExecutionSchema.parse({
+    intent: sampleIntent({ status: 'AUTHORISED' }),
+    authority: sampleDecision(),
+  });
+  assert.deepEqual(executionGateIssues(auto), []);
+  assert.equal(isExecutable(auto), true);
+
+  const approved = AuthorisedExecutionSchema.parse({
+    intent: sampleIntent(),
+    authority: sampleDecision({
+      outcome: 'REQUIRES_ORGANISATION_APPROVER',
+      approval: {
+        decidedAt: AT,
+        decidedBy: { entityType: 'ORGANISATION', id: 'org_1' },
+        decision: 'APPROVED',
+      },
+    }),
+  });
+  assert.deepEqual(executionGateIssues(approved), []);
+});
+
+test('authority gate: mismatched, missing, declined and blocked evidence are rejected', () => {
+  const mismatched = AuthorisedExecutionSchema.parse({
+    intent: sampleIntent(),
+    authority: sampleDecision({ intentId: 'ai_other' }),
+  });
+  assert.ok(executionGateIssues(mismatched).some((i) => i.includes('does not reference')));
+
+  const missingApproval = AuthorisedExecutionSchema.parse({
+    intent: sampleIntent(),
+    authority: sampleDecision({ outcome: 'REQUIRES_TRAVELLER' }),
+  });
+  assert.ok(executionGateIssues(missingApproval).some((i) => i.includes('requires a recorded approval')));
+
+  const declined = AuthorisedExecutionSchema.parse({
+    intent: sampleIntent(),
+    authority: sampleDecision({
+      outcome: 'REQUIRES_ORGANISATION_APPROVER',
+      approval: {
+        decidedAt: AT,
+        decidedBy: { entityType: 'ORGANISATION', id: 'org_1' },
+        decision: 'DECLINED',
+      },
+    }),
+  });
+  assert.ok(executionGateIssues(declined).some((i) => i.includes('declined')));
+
+  const blocked = AuthorisedExecutionSchema.parse({
+    intent: sampleIntent(),
+    authority: sampleDecision({ outcome: 'BLOCKED' }),
+  });
+  assert.ok(executionGateIssues(blocked).some((i) => i.includes('BLOCKED')));
+  assert.equal(isExecutable(blocked), false);
+});
+
+test('authority gate: a self-marked AUTHORISED intent alone cannot open the executor', () => {
+  // An arbitrary caller/model constructs an intent with status AUTHORISED.
+  // Without a matching permissive AuthorityDecision the gate stays closed:
+  // intent.status is never consulted by the gate.
+  const forged = sampleIntent({ status: 'AUTHORISED' });
+  const blockedPair = AuthorisedExecutionSchema.parse({
+    intent: forged,
+    authority: sampleDecision({ intentId: forged.id, outcome: 'BLOCKED' }),
+  });
+  assert.equal(isExecutable(blockedPair), false);
+
+  const mismatchedPair = AuthorisedExecutionSchema.parse({
+    intent: forged,
+    authority: sampleDecision({ intentId: 'ai_not_this_one', outcome: 'AUTO_APPROVED' }),
+  });
+  assert.equal(isExecutable(mismatchedPair), false);
+
+  const awaitingApprovalPair = AuthorisedExecutionSchema.parse({
+    intent: forged,
+    authority: sampleDecision({ intentId: forged.id, outcome: 'REQUIRES_HUMAN_AGENT' }),
+  });
+  assert.equal(isExecutable(awaitingApprovalPair), false);
 });

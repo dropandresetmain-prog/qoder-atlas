@@ -119,15 +119,17 @@ Structured proposed side effect with operation, target/provider, price delta, re
 
 Keep topology small and semantics precise.
 
-Initial relationships:
-- `PART_OF`: TripElement -> Trip, Trip -> AnchorEvent where applicable
-- `PARTICIPATES_IN`: Traveller/Organisation -> Trip/Engagement with role metadata
-- `CONNECTS_TO`: actual expected journey transition, e.g. Flight -> AirportTransfer
-- `DEPENDS_ON`: viability of one entity/objective depends on another state/condition
-- `GOVERNED_BY`: Trip/element -> RuleSet/Policy
-- `COVERED_BY`: Trip/element -> InsurancePolicy
-- `REQUIRES`: entity/objective -> requirement/context
-- `SHARES_RESOURCE_WITH`: operationally coupled travellers/elements, e.g. shared transfer
+Initial relationships (conceptual):
+- `PART_OF`: TripElement -> Trip, Trip -> AnchorEvent where applicable — represented by **typed aggregate fields** (`TripElement.tripId`, `Trip.anchorEventId`), not as edges;
+- `PARTICIPATES_IN`: Traveller/Organisation -> Trip/Engagement with role metadata — represented by **typed aggregate fields** (`Trip.travellerIds`, `Engagement.participantRole`, organisation roles), not as edges;
+- `CONNECTS_TO`: actual expected journey transition, e.g. Flight -> AirportTransfer;
+- `DEPENDS_ON`: viability of one entity/objective depends on another state/condition;
+- `GOVERNED_BY`: Trip/element -> RuleSet/Policy — represented by **typed aggregate fields** (`Trip.governedByRuleSetIds`, element `governedByRuleSetIds`), not as edges;
+- `COVERED_BY`: Trip/element -> InsurancePolicy — represented by **typed aggregate fields** (`Traveller.insuranceRuleSetIds`), not as edges;
+- `REQUIRES`: entity/objective -> requirement/context;
+- `SHARES_RESOURCE_WITH`: operationally coupled travellers/elements, e.g. shared transfer.
+
+The executable relation vocabulary (`TripRelationKindSchema`) therefore contains only `CONNECTS_TO`, `DEPENDS_ON`, `SHARES_RESOURCE_WITH` and `REQUIRES` (ADR-026). This is deliberate normalization, not an oversight: field-represented semantics must not be reintroduced as edges, and lanes must not add duplicate relation types for them.
 
 Do not encode every rule as an edge. `MUST_ARRIVE_BEFORE`, `MUST_OCCUR_BEFORE`, `INVALIDATES_IF` and similar semantics belong in constraints/predicates so topology does not explode.
 

@@ -16,6 +16,27 @@ export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 export type IsoDateTime = z.infer<typeof IsoDateTimeSchema>;
 
 /**
+ * Epoch milliseconds for an IsoDateTime value. All chronological ordering
+ * MUST go through instant comparison: lexicographic ordering of ISO strings
+ * with differing UTC offsets is not chronologically correct.
+ */
+export function instantMillis(iso: IsoDateTime): number {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) {
+    throw new RangeError(`invalid IsoDateTime: ${iso}`);
+  }
+  return t;
+}
+
+/** -1 when a is before b, 1 when after, 0 when the same instant. */
+export function compareInstants(a: IsoDateTime, b: IsoDateTime): -1 | 0 | 1 {
+  const diff = instantMillis(a) - instantMillis(b);
+  if (diff < 0) return -1;
+  if (diff > 0) return 1;
+  return 0;
+}
+
+/**
  * Fact authority ladder. Higher authority + freshness wins deterministic
  * truth-resolution; last-write-wins is forbidden (ARCHITECTURE.md §5).
  */
@@ -36,7 +57,7 @@ export function resolveAuthoritativeFact<T extends { authority: FactAuthority; o
 ): T {
   const rankDiff = FACT_AUTHORITY_RANK[a.authority] - FACT_AUTHORITY_RANK[b.authority];
   if (rankDiff !== 0) return rankDiff > 0 ? a : b;
-  return a.observedAt >= b.observedAt ? a : b;
+  return compareInstants(a.observedAt, b.observedAt) >= 0 ? a : b;
 }
 
 /** Reference to a persisted SourceRecord (see contracts/repositories.ts). */
@@ -103,7 +124,7 @@ export type Fact<T> = {
 
 /** Evidence freshness judgement: stale facts must degrade to UNKNOWN downstream. */
 export function isFactStale(fact: { validUntil?: string }, now: string): boolean {
-  return fact.validUntil !== undefined && fact.validUntil < now;
+  return fact.validUntil !== undefined && compareInstants(fact.validUntil, now) < 0;
 }
 
 /** Duration envelope (ARCHITECTURE.md §7) — no fake precision. */

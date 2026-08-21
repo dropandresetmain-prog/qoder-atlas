@@ -244,6 +244,7 @@
         "importance": "REQUIRED",
         "flexibility": "CHANGEABLE",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "mode": "FLIGHT",
           "originPlaceId": "plc_a_sel_airport",
@@ -270,6 +271,7 @@
         "importance": "REQUIRED",
         "flexibility": "FIXED",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "placeId": "plc_a_hotel",
           "checkIn": {
@@ -295,6 +297,7 @@
         "importance": "REQUIRED",
         "flexibility": "FLEXIBLE",
         "reservationState": "NONE",
+        "status": "VALID",
         "notes": "On-demand airport-to-hotel transfer; no booking exists yet",
         "data": {
           "mode": "TAXI_OR_RIDEHAIL",
@@ -316,6 +319,7 @@
         "importance": "REQUIRED",
         "flexibility": "FIXED",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "title": "Opening keynote",
           "placeId": "plc_a_venue",
@@ -342,6 +346,7 @@
         "importance": "PREFERRED",
         "flexibility": "FIXED",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "title": "Speaker dinner",
           "placeId": "plc_a_venue",

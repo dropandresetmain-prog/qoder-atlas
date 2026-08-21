@@ -14,6 +14,8 @@ import {
   FACT_AUTHORITY_RANK,
   resolveAuthoritativeFact,
   isFactStale,
+  compareInstants,
+  instantMillis,
   IsoDateTimeSchema,
   TripElementSchema,
   TripSchema,
@@ -30,6 +32,7 @@ import {
   isLegalCaseTransition,
 } from '../src/operational/case.ts';
 import { MutationProposalSchema, ENTITY_SCHEMA_BY_TYPE } from '../src/operational/mutation.ts';
+import { z } from 'zod';
 
 const AT = '2026-09-14T09:00:00+09:00';
 
@@ -51,7 +54,12 @@ test('transport: required + flexible + unbooked/on-demand leg is representable',
   assert.equal(parsed.importance, 'REQUIRED');
   assert.equal(parsed.flexibility, 'FLEXIBLE');
   assert.equal(parsed.reservationState, 'NONE');
-  assert.equal(parsed.status, 'VALID'); // defaulted, not fabricated
+  // Unevaluated elements default to UNKNOWN: missing evidence must not
+  // become fabricated VALID certainty. An evaluated state must be asserted
+  // explicitly (as the scenarios do for their pre-disruption state).
+  assert.equal(parsed.status, 'UNKNOWN');
+  const evaluated = TripElementSchema.parse({ ...transfer, status: 'VALID' });
+  assert.equal(evaluated.status, 'VALID');
 
   // And required + changeable + confirmed (the flight shape) is equally valid.
   const flight = TripElementSchema.parse({
@@ -135,6 +143,46 @@ test('facts: authority, confidence and freshness are representable and resolvabl
   assert.equal(resolveAuthoritativeFact(emailFact, providerFact), providerFact);
   assert.equal(isFactStale(providerFact, '2026-09-15T00:30:00+09:00'), true);
   assert.equal(isFactStale(providerFact, '2026-09-14T12:00:00+09:00'), false);
+});
+
+test('timestamps: ordering is chronological across differing UTC offsets, not lexical', () => {
+  // 01:00Z expressed at +09:00 vs 02:30Z expressed at +00:00.
+  // Lexically '2026-09-14T10:00:00+09:00' > '2026-09-14T02:30:00+00:00',
+  // but chronologically the +00:00 instant is 90 minutes LATER.
+  const lexicalWinnerButEarlier = '2026-09-14T10:00:00+09:00';
+  const lexicalLoserButLater = '2026-09-14T02:30:00+00:00';
+
+  assert.equal(instantMillis(lexicalWinnerButEarlier), Date.parse('2026-09-14T01:00:00Z'));
+  assert.equal(compareInstants(lexicalWinnerButEarlier, lexicalLoserButLater), -1);
+  assert.equal(compareInstants(lexicalLoserButLater, lexicalWinnerButEarlier), 1);
+  assert.equal(compareInstants('2026-09-14T10:00:00+09:00', '2026-09-14T01:00:00+00:00'), 0);
+  assert.throws(() => instantMillis('not-a-timestamp'), RangeError);
+
+  // Truth-resolution on equal authority must pick the chronologically
+  // fresher observation even when lexical order disagrees.
+  const factSchema = FactSchema(z.string());
+  const earlier = factSchema.parse({
+    value: 'old',
+    sourceId: 'src_1',
+    authority: 'CONNECTED',
+    observedAt: lexicalWinnerButEarlier,
+  });
+  const later = factSchema.parse({
+    value: 'new',
+    sourceId: 'src_2',
+    authority: 'CONNECTED',
+    observedAt: lexicalLoserButLater,
+  });
+  assert.equal(resolveAuthoritativeFact(earlier, later), later);
+  assert.equal(resolveAuthoritativeFact(later, earlier), later);
+
+  // Freshness across offsets: validUntil 2026-09-13T20:00Z expressed at
+  // +09:00 is chronologically BEFORE now 2026-09-13T21:30Z, although the
+  // lexical comparison ('2026-09-14...' > '2026-09-13...') would say fresh.
+  const staleAcrossOffsets = { validUntil: '2026-09-14T05:00:00+09:00' };
+  assert.equal(isFactStale(staleAcrossOffsets, '2026-09-13T21:30:00+00:00'), true);
+  assert.equal(isFactStale(staleAcrossOffsets, '2026-09-13T19:00:00+00:00'), false);
+  assert.equal(isFactStale({}, '2026-09-13T21:30:00+00:00'), false);
 });
 
 test('cases: FULLY_RECOVERED and RECOVERED_WITH_LOSS resolutions are representable', () => {

@@ -61,8 +61,11 @@ const TripElementBaseSchema = z.strictObject({
   importance: ImportanceSchema,
   flexibility: FlexibilitySchema,
   reservationState: ReservationStateSchema,
-  /** Derived by propagation; defaults to VALID until evidence says otherwise. */
-  status: ElementHealthSchema.default('VALID'),
+  /**
+   * Derived by deterministic evaluation. Unevaluated elements default to
+   * UNKNOWN: missing evidence must never become fabricated VALID certainty.
+   */
+  status: ElementHealthSchema.default('UNKNOWN'),
   dependsOn: z.array(EntityIdSchema).default([]),
   governedByRuleSetIds: z.array(EntityIdSchema).default([]),
   notes: z.string().optional(),

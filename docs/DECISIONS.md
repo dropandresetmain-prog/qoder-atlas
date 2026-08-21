@@ -112,3 +112,28 @@ Zod v4 schemas are the executable form of the F1 domain/operational contracts an
 **Status:** Accepted (pending formal Checkpoint A acceptance)
 
 `src/domain/**`, `src/operational/**`, `src/contracts/**`, the `ScenarioSpec` contract (`src/scenarios/**`), both scenario bundle semantics, and the `.env.example` variable names are frozen. After acceptance, changes are lead/integrator-owned cross-lane changes per IMPLEMENTATION_PLAN.md §2.1. Planner output structurally excludes executable side effects; provider results use the `CapabilityResult` envelope; LIVE/REPLAY share one `normalize()` path via the `ProviderAdapter` shape.
+
+## ADR-023 — Timestamp ordering is instant-based, never lexicographic
+**Status:** Accepted (Checkpoint A review fix)
+
+`IsoDateTime` values carry explicit UTC offsets, so lexicographic string ordering is not chronologically correct across offsets. All ordering/freshness logic (`resolveAuthoritativeFact`, `isFactStale`, and any future comparator) must go through `compareInstants`/`instantMillis` in `src/domain/common.ts`. No date/time framework is introduced; the runtime parses the accepted ISO contract reliably.
+
+## ADR-024 — Planner tool requests use a closed read-only vocabulary
+**Status:** Accepted (Checkpoint A review fix)
+
+`ToolRequest.operation` is restricted to `ToolOperationSchema` (flight search/verify/fare_rules/refund_quote, hotel.context, routing.context, research.entry_requirements, research.local_context) with a capability-family consistency check. Consequential operations (flight.change, flight.cancel, hotel.modify/cancel, communication.*, simulation.*) are structurally unrequestable by the planner and exist only on the ActionIntent/authority path. Excluding `actionIntents` from `PlannerOutput` alone was insufficient; this closes the tool-request escape path.
+
+## ADR-025 — Execution requires explicit deterministic authority evidence
+**Status:** Accepted (Checkpoint A review fix)
+
+`ExecutorService.execute` accepts an `AuthorisedExecution` envelope: the `ActionIntent` paired with the `AuthorityDecision` that authorised it. The shared deterministic gate `executionGateIssues()` (in `src/operational/intent.ts`) must return no issues before any executor implementation proceeds: intent-id match, non-BLOCKED outcome, and a recorded APPROVED approval wherever the outcome requires one. An intent merely constructed with `status = AUTHORISED` is never executable evidence.
+
+## ADR-026 — Relation vocabulary normalization
+**Status:** Accepted (Checkpoint A review fix)
+
+`PART_OF`, `PARTICIPATES_IN`, `GOVERNED_BY` and `COVERED_BY` from ARCHITECTURE.md §4 are deliberately represented by typed aggregate fields (`tripId`, `anchorEventId`, `travellerIds`, participant roles, `governedByRuleSetIds`, `insuranceRuleSetIds`, `organiserOrganisationId`) rather than edges. The executable `TripRelationKindSchema` contains only `CONNECTS_TO`, `DEPENDS_ON`, `SHARES_RESOURCE_WITH`, `REQUIRES`; `PART_OF` was removed from the enum. Lanes must not reintroduce field-represented semantics as edges or add duplicate relation kinds.
+
+## ADR-027 — Unevaluated TripElement health defaults to UNKNOWN
+**Status:** Accepted (Checkpoint A review fix)
+
+`TripElement.status` defaults to `UNKNOWN`, not `VALID`: missing evidence must never become fabricated certainty (ARCHITECTURE.md §5, FR-05). Evaluated health must be asserted explicitly by deterministic evaluation or by scenario fixtures stating their evaluated pre-disruption state.

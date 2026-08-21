@@ -175,6 +175,7 @@
         "importance": "REQUIRED",
         "flexibility": "CHANGEABLE",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "mode": "FLIGHT",
           "originPlaceId": "plc_b_mex_airport",
@@ -201,6 +202,7 @@
         "importance": "REQUIRED",
         "flexibility": "FLEXIBLE",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "notes": "Company-arranged private transfer",
         "data": {
           "mode": "PRIVATE_TRANSFER",
@@ -222,6 +224,7 @@
         "importance": "REQUIRED",
         "flexibility": "CHANGEABLE",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "placeId": "plc_b_hotel",
           "checkIn": {
@@ -247,6 +250,7 @@
         "importance": "REQUIRED",
         "flexibility": "FIXED",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "title": "Client delivery workshop",
           "placeId": "plc_b_client_site",
@@ -272,6 +276,7 @@
         "importance": "REQUIRED",
         "flexibility": "CHANGEABLE",
         "reservationState": "CONFIRMED",
+        "status": "VALID",
         "data": {
           "mode": "FLIGHT",
           "originPlaceId": "plc_b_gdl_airport",

@@ -21,14 +21,57 @@ export const CapabilityFamilySchema = z.enum([
 ]);
 export type CapabilityFamily = z.infer<typeof CapabilityFamilySchema>;
 
+/**
+ * Closed READ-ONLY operation vocabulary for planner tool requests (FR-07,
+ * FR-10, ADR-024). The planner may ask for information; it can never request
+ * a consequential provider action. Consequential operations (flight.change,
+ * flight.cancel, hotel.modify, hotel.cancel, communication.*, simulation.*)
+ * are deliberately absent and exist only on the ActionIntent/authority path.
+ * Values must remain a subset of CapabilityOperationSchema (test-enforced).
+ */
+export const ToolOperationSchema = z.enum([
+  'flight.search',
+  'flight.verify',
+  'flight.fare_rules',
+  'flight.refund_quote',
+  'hotel.context',
+  'routing.context',
+  'research.entry_requirements',
+  'research.local_context',
+]);
+export type ToolOperation = z.infer<typeof ToolOperationSchema>;
+
+/** Capability family each tool operation belongs to; keeps requests coherent. */
+export const TOOL_OPERATION_FAMILY: Record<ToolOperation, CapabilityFamily> = {
+  'flight.search': 'FLIGHT',
+  'flight.verify': 'FLIGHT',
+  'flight.fare_rules': 'FLIGHT',
+  'flight.refund_quote': 'FLIGHT',
+  'hotel.context': 'HOTEL',
+  'routing.context': 'ROUTING',
+  'research.entry_requirements': 'RESEARCH',
+  'research.local_context': 'RESEARCH',
+};
+
 /** Information/tool need the planner asks the orchestrator to fulfil. */
-export const ToolRequestSchema = z.strictObject({
-  id: EntityIdSchema,
-  capability: CapabilityFamilySchema,
-  operation: z.string(),
-  parameters: z.record(z.string(), z.unknown()).default({}),
-  purpose: z.string(),
-});
+export const ToolRequestSchema = z
+  .strictObject({
+    id: EntityIdSchema,
+    capability: CapabilityFamilySchema,
+    operation: ToolOperationSchema,
+    parameters: z.record(z.string(), z.unknown()).default({}),
+    purpose: z.string(),
+  })
+  .superRefine((request, ctx) => {
+    const expectedFamily = TOOL_OPERATION_FAMILY[request.operation];
+    if (request.capability !== expectedFamily) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['capability'],
+        message: `operation ${request.operation} belongs to capability ${expectedFamily}, not ${request.capability}`,
+      });
+    }
+  });
 export type ToolRequest = z.infer<typeof ToolRequestSchema>;
 
 export const RecoveryStrategySchema = z.strictObject({
