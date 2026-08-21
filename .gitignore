@@ -1,0 +1,37 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies / builds
+node_modules/
+.next/
+dist/
+build/
+coverage/
+.cache/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Provider recordings and local runtime data
+recordings/private/
+data/local/
+logs/
+*.log
+
+# Qoder machine-local configuration/worktrees
+.qoder/settings.local.json
+.qoder/worktrees/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
