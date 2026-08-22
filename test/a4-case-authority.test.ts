@@ -16,6 +16,7 @@ import {
 } from '../src/engine/authority.ts';
 import { BoundaryExecutor } from '../src/engine/executor.ts';
 import { DeterministicObservationService, CaseVerifier } from '../src/engine/observation.ts';
+import { buildEvaluationContext } from '../src/engine/evaluationContext.ts';
 import {
   loadScenario,
   scenarioHarness,
@@ -556,4 +557,120 @@ test('Scenario B: organisation approval + waived objective resolve RECOVERED_WIT
   assert.deepEqual(verification.remainingLossRefs, spec.expectations.recovery.remainingLossObjectiveIds);
   const resolved = await caseService.transition('case_b', 'RESOLVED', at, { resolution: verification.resolution });
   assert.equal(resolved.resolution?.outcome, 'RECOVERED_WITH_LOSS');
+});
+
+// ---------------------------------------------------------------------------
+// PL-4 regressions: verification context and evaluation instant
+// ---------------------------------------------------------------------------
+
+test('verification helper carries the full generic evaluation context (PL-4)', async () => {
+  const spec = loadScenario(SCENARIO_A_PATH);
+  const h = scenarioHarness();
+  await seedScenario(h, spec);
+  const at = '2026-09-12T18:01:00+09:00';
+  const ctx = await buildEvaluationContext(h.entities, spec.trip, at);
+  assert.equal(ctx.now, at);
+  assert.equal(ctx.trip.id, spec.trip.id);
+  assert.equal(ctx.places.size, spec.context.places.length, 'every persisted place is available');
+  assert.deepEqual(ctx.travellers.map((t) => t.id), spec.context.travellers.map((t) => t.id));
+  assert.equal(ctx.anchorEvent?.id, spec.trip.anchorEventId, 'anchor event resolved from the trip');
+  for (const ruleSet of spec.context.ruleSets) {
+    assert.ok(ctx.ruleSets.has(ruleSet.id), `rule set ${ruleSet.id} in scope`);
+  }
+});
+
+test('verifier evaluates at the post-execution instant, not the original assessment time (PL-4)', async () => {
+  const spec = loadScenario(SCENARIO_A_PATH);
+  const h = scenarioHarness();
+  await seedScenario(h, spec);
+  const { executor, observation, verifier } = services(h);
+  const signal = spec.disruption.signal;
+  const at = signal.receivedAt ?? signal.occurredAt; // assessment instant 18:01
+
+  // A refund-window policy rule: refundable until 19:00 the same evening —
+  // AFTER the disruption was assessed but BEFORE the recovery executes.
+  const ruleSet = {
+    id: 'rs_pl4_refund',
+    kind: 'SUPPLIER' as const,
+    name: 'Carrier fare terms (PL-4 fixture)',
+    sourceId: signal.sourceId,
+    rules: [
+      {
+        id: 'rule_pl4_refund',
+        kind: 'CANCELLATION_TERMS' as const,
+        sourceId: signal.sourceId,
+        appliesTo: ['flight.change'],
+        refundable: true,
+        refundDeadline: '2026-09-12T19:00:00+09:00',
+      },
+    ],
+  };
+  await h.entities.upsert({ entityType: 'RULE_SET', entity: ruleSet });
+  await h.entities.upsert({
+    entityType: 'CONSTRAINT',
+    entity: {
+      id: 'cons_pl4_refund',
+      kind: 'POLICY',
+      hardness: 'HARD',
+      evaluator: 'DETERMINISTIC',
+      status: 'UNKNOWN',
+      description: 'change must happen inside the refund window',
+      refs: [{ entityType: 'TRIP_ELEMENT', id: 'el_a_flight_out' }],
+      ruleSetId: 'rs_pl4_refund',
+      derivedFromRuleId: 'rule_pl4_refund',
+    },
+  });
+
+  // Cancel, then recover through the real executor + observation path.
+  await h.mutations.applyProposal(cancellationProposal(spec));
+  const theIntent = intent({ id: 'int_pl4', caseId: 'case_pl4', createdAt: at });
+  const approvedAuthority: AuthorityDecision = {
+    id: 'authority-pl4',
+    intentId: 'int_pl4',
+    outcome: 'REQUIRES_TRAVELLER',
+    decidedAt: at,
+    ruleTrace: [],
+    conditions: [],
+    approval: {
+      decidedAt: at,
+      decidedBy: { entityType: 'TRAVELLER', id: 'trv_a_speaker' },
+      decision: 'APPROVED',
+    },
+  };
+  const executedAt = '2026-09-12T19:30:00+09:00'; // after the refund deadline
+  const result = await executor.execute({ intent: theIntent, authority: approvedAuthority });
+  assert.equal(result.status, 'SUCCESS');
+  const original = spec.trip.elements.find((e) => e.id === 'el_a_flight_out');
+  assert.ok(original);
+  const rebooked = {
+    ...original,
+    reservationState: 'CONFIRMED',
+    status: 'VALID',
+    data: {
+      ...original.data,
+      scheduledDeparture: { value: '2026-09-13T09:00:00+09:00', sourceId: signal.sourceId, authority: 'AUTHORITATIVE', observedAt: executedAt },
+      scheduledArrival: { value: '2026-09-13T11:30:00+09:00', sourceId: signal.sourceId, authority: 'AUTHORITATIVE', observedAt: executedAt },
+    },
+  };
+  const outcome = await observation.observe({
+    ...result,
+    executedAt,
+    observedEffects: {
+      ...result.observedEffects,
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_a_flight_out', data: rebooked }],
+    },
+  });
+  assert.equal(outcome.stateUpdated, true);
+
+  // Evaluated at the ORIGINAL assessment instant the refund window is still
+  // open — but that instant predates execution and must not decide recovery.
+  const stale = await verifier.verify(spec.trip.id, at);
+  assert.equal(stale.suggestedCaseStatus, 'RESOLVED');
+
+  // Verified at the post-execution instant the window has closed: a hard
+  // FAIL remains, so the case must NOT resolve on execution success.
+  const verification = await verifier.verify(spec.trip.id, executedAt);
+  assert.equal(verification.suggestedCaseStatus, 'PLANNING');
+  assert.deepEqual(verification.hardFailureIds, ['cons_pl4_refund']);
+  assert.equal(verification.resolution, undefined);
 });

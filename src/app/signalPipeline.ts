@@ -13,8 +13,6 @@ import type { EntityId, Fact, IsoDateTime } from '../domain/common.ts';
 import { IsoDateTimeSchema } from '../domain/common.ts';
 import type { Trip } from '../domain/trip.ts';
 import { ReservationStateSchema } from '../domain/elements.ts';
-import type { Place, Traveller } from '../domain/entities.ts';
-import type { RuleSet } from '../domain/rules.ts';
 import { TripSignalSchema, type TripSignal } from '../operational/signal.ts';
 import type { MutationOperation } from '../operational/mutation.ts';
 import type { ImpactAssessment } from '../operational/impact.ts';
@@ -28,7 +26,8 @@ import type {
 import type { ConstraintEvaluation, MutationService, ValidationIssue } from '../contracts/services.ts';
 import type { EntityStore } from '../persistence/entityStore.ts';
 import { ImpactEngine, impactProposal } from '../engine/impact.ts';
-import { evaluateConstraints, type EvaluationContext } from '../engine/evaluators.ts';
+import { evaluateConstraints } from '../engine/evaluators.ts';
+import { buildEvaluationContext } from '../engine/evaluationContext.ts';
 import { CaseService } from '../engine/case.ts';
 import { constraintsForTrip } from './snapshot.ts';
 
@@ -271,34 +270,4 @@ async function mustTrip(trips: TripRepository, tripId: EntityId): Promise<Trip> 
   const trip = await trips.getTrip(tripId);
   if (!trip) throw new Error(`unknown trip ${tripId}`);
   return trip;
-}
-
-/** Same context shape the ImpactEngine uses, rebuilt from persisted state. */
-async function buildEvaluationContext(
-  entities: EntityStore,
-  trip: Trip,
-  now: IsoDateTime,
-): Promise<EvaluationContext> {
-  const places = new Map<string, Place>(
-    (await entities.list('PLACE'))
-      .filter((entry) => entry.entityType === 'PLACE')
-      .map((entry) => [entry.entity.id, entry.entity]),
-  );
-  const ruleSets = new Map<string, RuleSet>(
-    (await entities.list('RULE_SET'))
-      .filter((entry) => entry.entityType === 'RULE_SET')
-      .map((entry) => [entry.entity.id, entry.entity]),
-  );
-  const travellers: Traveller[] = (await entities.list('TRAVELLER'))
-    .filter((entry) => entry.entityType === 'TRAVELLER')
-    .map((entry) => entry.entity);
-  const anchorEntry = trip.anchorEventId ? await entities.get('ANCHOR_EVENT', trip.anchorEventId) : undefined;
-  return {
-    trip,
-    places,
-    ruleSets,
-    travellers,
-    anchorEvent: anchorEntry?.entityType === 'ANCHOR_EVENT' ? anchorEntry.entity : undefined,
-    now,
-  };
 }

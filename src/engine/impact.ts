@@ -29,7 +29,8 @@ import type {
 import type { MutationOperation, MutationProposal } from '../operational/mutation.ts';
 import type { TripRepository, SignalRepository } from '../contracts/repositories.ts';
 import type { EntityStore } from '../persistence/entityStore.ts';
-import { evaluateConstraints, isCancelled, elementStartInstant, type EvaluationContext } from './evaluators.ts';
+import { evaluateConstraints, isCancelled, elementStartInstant } from './evaluators.ts';
+import { buildEvaluationContext } from './evaluationContext.ts';
 
 export interface ImpactEngineDeps {
   trips: TripRepository;
@@ -61,30 +62,8 @@ export class ImpactEngine implements ImpactService {
     const constraints = (await this.entities.list('CONSTRAINT'))
       .filter((entry) => entry.entityType === 'CONSTRAINT')
       .map((entry) => entry.entity);
-    const ruleSets = new Map<string, RuleSet>(
-      (await this.entities.list('RULE_SET'))
-        .filter((entry) => entry.entityType === 'RULE_SET')
-        .map((entry) => [entry.entity.id, entry.entity]),
-    );
-    const places = new Map(
-      (await this.entities.list('PLACE'))
-        .filter((entry) => entry.entityType === 'PLACE')
-        .map((entry) => [entry.entity.id, entry.entity]),
-    );
-    const travellers = (await this.entities.list('TRAVELLER'))
-      .filter((entry) => entry.entityType === 'TRAVELLER')
-      .map((entry) => entry.entity);
-    const anchorEntry = trip.anchorEventId
-      ? await this.entities.get('ANCHOR_EVENT', trip.anchorEventId)
-      : undefined;
-    const ctx: EvaluationContext = {
-      trip,
-      places,
-      ruleSets,
-      travellers,
-      anchorEvent: anchorEntry?.entityType === 'ANCHOR_EVENT' ? anchorEntry.entity : undefined,
-      now: assessedAt,
-    };
+    const ctx = await buildEvaluationContext(this.entities, trip, assessedAt);
+    const ruleSets = ctx.ruleSets;
 
     const evaluations = evaluateConstraints(constraints, ctx);
     const statusByConstraint = new Map<string, ConstraintStatus>(

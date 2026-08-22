@@ -494,7 +494,7 @@ export class RecoveryExecutionService {
       };
     }
 
-    const verification = await this.deps.verifier.verify(tripId);
+    const verification = await this.deps.verifier.verify(tripId, at);
     await this.deps.audit.append({
       occurredAt: at,
       actor: 'app:recovery-execution',

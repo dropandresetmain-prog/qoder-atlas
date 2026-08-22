@@ -8,7 +8,7 @@
  * or looping back into assessment/planning/verification.
  */
 import { z } from 'zod';
-import type { EntityId } from '../domain/common.ts';
+import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import { MutationOperationSchema, type MutationProposal } from '../operational/mutation.ts';
 import type { ExecutionResult } from '../operational/intent.ts';
 import type { CaseResolution } from '../operational/case.ts';
@@ -20,9 +20,9 @@ import type {
 } from '../contracts/services.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { Constraint } from '../domain/constraints.ts';
-import type { RuleSet } from '../domain/rules.ts';
-import { evaluateConstraints, type EvaluationContext } from './evaluators.ts';
+import { evaluateConstraints } from './evaluators.ts';
 import { ImpactEngine, type ImpactEngineDeps } from './impact.ts';
+import { buildEvaluationContext } from './evaluationContext.ts';
 
 const ObservedOperationsSchema = z.array(MutationOperationSchema);
 
@@ -114,24 +114,20 @@ export class CaseVerifier {
     this.entities = deps.entities;
   }
 
-  async verify(tripId: EntityId): Promise<VerificationResult> {
+  /**
+   * Verify post-execution state. Constraints evaluate with the SAME full
+   * generic context the impact engine uses (places, travellers, rule sets,
+   * anchor event) and at the verification instant — the execution moment
+   * when supplied, not the original assessment instant (PL-4).
+   */
+  async verify(tripId: EntityId, verifiedAt?: IsoDateTime): Promise<VerificationResult> {
     const assessment = await this.impact.assess(tripId);
     const constraints = (await this.entities.list('CONSTRAINT'))
       .filter((entry) => entry.entityType === 'CONSTRAINT')
       .map((entry) => entry.entity);
-    const ruleSets = new Map<string, RuleSet>(
-      (await this.entities.list('RULE_SET'))
-        .filter((entry) => entry.entityType === 'RULE_SET')
-        .map((entry) => [entry.entity.id, entry.entity]),
-    );
     const tripRecord = await this.impactTrip(tripId);
-    const ctx: EvaluationContext = {
-      trip: tripRecord,
-      places: new Map(),
-      ruleSets,
-      travellers: [],
-      now: assessment.assessedAt,
-    };
+    const evaluatedAt = verifiedAt ?? assessment.assessedAt;
+    const ctx = await buildEvaluationContext(this.entities, tripRecord, evaluatedAt);
     const evaluations = evaluateConstraints(constraints, ctx);
     const hardnessById = new Map<string, Constraint['hardness']>(constraints.map((c) => [c.id, c.hardness]));
     const hardFailureIds = evaluations
@@ -160,8 +156,8 @@ export class CaseVerifier {
       suggestedCaseStatus: 'RESOLVED',
       resolution: {
         outcome,
-        resolvedAt: assessment.assessedAt,
-        summary: `viability re-evaluated at ${assessment.assessedAt}: ${outcome}`,
+        resolvedAt: evaluatedAt,
+        summary: `viability re-evaluated at ${evaluatedAt}: ${outcome}`,
         remainingLossRefs,
       },
       hardFailureIds,
