@@ -37,6 +37,7 @@ import { ModelStudioClient, ScriptedModelTransport } from '../src/intelligence/c
 import { ModelStudioRecoveryPlanner } from '../src/intelligence/planner.ts';
 import type { TransportLeg } from '../src/domain/elements.ts';
 import type { IsoDateTime } from '../src/domain/common.ts';
+import type { FlightOffer } from '../src/contracts/capabilities.ts';
 import type { MutationOperation } from '../src/operational/mutation.ts';
 import {
   buildTimezoneResolver,
@@ -67,6 +68,27 @@ const READ_AT = '2026-09-12T21:30:00+09:00';
 const MORNING_OFFER_ID = 'ATLSBX-20260914-KE711-E7';
 const EVENING_OFFER_ID = 'ATLSBX-20260913-OZ104-E3';
 const AFTERNOON_OFFER_ID = 'ATLSBX-20260913-KE705-B1';
+
+interface OfferFacts {
+  departure: IsoDateTime;
+  arrival: IsoDateTime;
+  offerId: string;
+  price: { amount: number; currency: string };
+}
+
+/**
+ * PL-5: strategy schedules/prices are DERIVED from the REPLAY-normalized
+ * provider output, never hardcoded in the test. Any normalizer regression
+ * changes the derived facts and breaks this E2E directly.
+ */
+function offerFacts(searchData: { offers: FlightOffer[] }, offerId: string): OfferFacts {
+  const offer = searchData.offers.find((candidate) => candidate.offerId === offerId);
+  assert.ok(offer, `REPLAY search output must contain ${offerId}`);
+  const first = offer.segments[0];
+  const last = offer.segments[offer.segments.length - 1];
+  assert.ok(first && last, `offer ${offerId} must carry normalized segments`);
+  return { departure: first.departure, arrival: last.arrival, offerId, price: offer.totalPrice };
+}
 
 function createHarness(dbPath: string) {
   const db = openDatabase(dbPath);
@@ -207,6 +229,20 @@ test('T-E2E: Scenario A recovers through the full generalized vertical loop (REP
   const origin = places.find((place) => place.id === cancelledLeg.data.originPlaceId)!;
   const destination = places.find((place) => place.id === cancelledLeg.data.destinationPlaceId)!;
   const sourceId = spec.disruption.signal.sourceId;
+  // PL-5: the scripted planner's strategy facts come from the REPLAY search
+  // output itself (same adapter/normalizer as the dispatched round-1 call),
+  // so a normalizer regression breaks this loop instead of being masked by
+  // duplicated test constants.
+  const searchResult = await adapter.searchFlights({
+    origin: { system: origin.externalRefs![0]!.system, value: origin.externalRefs![0]!.value },
+    destination: { system: destination.externalRefs![0]!.system, value: destination.externalRefs![0]!.value },
+    departureDate: cancelledLeg.data.scheduledDeparture!.value.slice(0, 10),
+    passengers: { adults: 1 },
+  });
+  assert.ok(searchResult.ok, 'REPLAY search must succeed');
+  const morningOffer = offerFacts(searchResult.data, MORNING_OFFER_ID);
+  const eveningOffer = offerFacts(searchResult.data, EVENING_OFFER_ID);
+  const afternoonOffer = offerFacts(searchResult.data, AFTERNOON_OFFER_ID);
   const round1 = {
     toolRequests: [
       {
@@ -230,37 +266,37 @@ test('T-E2E: Scenario A recovers through the full generalized vertical loop (REP
         summary: 'Rebook on the cheapest next-morning replacement',
         candidateOperations: replacementOperations(
           cancelledLeg,
-          { departure: '2026-09-14T09:05:00+09:00', arrival: '2026-09-14T11:35:00+09:00', offerId: MORNING_OFFER_ID },
+          { departure: morningOffer.departure, arrival: morningOffer.arrival, offerId: morningOffer.offerId },
           sourceId,
         ),
         assumptions: [],
         uncertainties: [],
         expectedOutcomes: [],
-        costImpact: { amount: 162.1, currency: 'USD' },
+        costImpact: morningOffer.price,
       },
       {
         summary: 'Rebook on the same-day evening replacement',
         candidateOperations: replacementOperations(
           cancelledLeg,
-          { departure: '2026-09-13T18:25:00+09:00', arrival: '2026-09-13T20:55:00+09:00', offerId: EVENING_OFFER_ID },
+          { departure: eveningOffer.departure, arrival: eveningOffer.arrival, offerId: eveningOffer.offerId },
           sourceId,
         ),
         assumptions: [],
         uncertainties: [],
         expectedOutcomes: [],
-        costImpact: { amount: 242.6, currency: 'USD' },
+        costImpact: eveningOffer.price,
       },
       {
         summary: 'Rebook on the same-day afternoon replacement',
         candidateOperations: replacementOperations(
           cancelledLeg,
-          { departure: '2026-09-13T14:05:00+09:00', arrival: '2026-09-13T16:40:00+09:00', offerId: AFTERNOON_OFFER_ID },
+          { departure: afternoonOffer.departure, arrival: afternoonOffer.arrival, offerId: afternoonOffer.offerId },
           sourceId,
         ),
         assumptions: [],
         uncertainties: [],
         expectedOutcomes: [],
-        costImpact: { amount: 416.9, currency: 'USD' },
+        costImpact: afternoonOffer.price,
       },
     ],
     toolRequests: [
@@ -364,7 +400,7 @@ test('T-E2E: Scenario A recovers through the full generalized vertical loop (REP
   )) as TransportLeg;
   assert.equal(recoveredLeg.reservationState, 'CONFIRMED');
   assert.equal(recoveredLeg.data.bookingRef?.reference, EVENING_OFFER_ID);
-  assert.equal(recoveredLeg.data.scheduledArrival?.value, '2026-09-13T20:55:00+09:00');
+  assert.equal(recoveredLeg.data.scheduledArrival?.value, eveningOffer.arrival, 'confirmed arrival matches REPLAY-normalized evidence');
 
   // -- Stage 5: real read models reconstruct the resolved state ------------
   const readDeps = readModelDeps(harness);

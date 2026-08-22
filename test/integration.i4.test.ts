@@ -351,6 +351,7 @@ test('i4: Scenario A loop — traveller approval -> simulated flight.change -> o
 
   // Observation applied validated mutations; the verifier resolved the case.
   assert.ok(executed.observation && executed.observation.stateUpdated, 'observed effects must mutate validated state');
+  assert.ok(executed.observation.appliedOperationCount > 0, 'observed effects must carry real operations');
   assert.ok(executed.verification, 'state update must trigger deterministic re-evaluation');
   assert.equal(executed.verification.resolution?.outcome, setup.spec.expectations.recovery.expectedResolution);
   assert.deepEqual(executed.verification.resolution?.remainingLossRefs, []);
@@ -568,6 +569,81 @@ test('i4: failed execution produces no false recovery', async () => {
   );
   assert.ok(leg && leg.elementKind === 'TRANSPORT_LEG');
   assert.equal(leg.reservationState, 'CANCELLED', 'failed execution must leave the trip disrupted');
+});
+
+test('i4: successful execution with a remaining hard failure stays unresolved (PL-5)', async () => {
+  const harness = createHarness();
+  const setup = await setupDisruptedTrip(harness);
+  const planning = await planRecovery(harness, setup);
+  const strategy = planning.strategies.find((candidate) => candidate.id === planning.bestStrategyId);
+  assert.ok(strategy, 'planning must rank a best feasible strategy');
+  const caseId = setup.signalResult.caseId;
+
+  // A hard policy constraint that still FAILs at execution time: the refund
+  // window on the booking closed before the recovery executed. Engine
+  // evidence, not a guess.
+  await harness.entities.upsert({
+    entityType: 'RULE_SET',
+    entity: {
+      id: 'rs_pl5_refund_window',
+      kind: 'SUPPLIER',
+      name: 'Refund window terms (PL-5 invariant fixture)',
+      sourceId: setup.spec.disruption.signal.sourceId,
+      rules: [
+        {
+          id: 'rule_pl5_refund_window',
+          kind: 'CANCELLATION_TERMS',
+          sourceId: setup.spec.disruption.signal.sourceId,
+          appliesTo: ['flight.change'],
+          refundable: true,
+          refundDeadline: '2026-09-12T00:00:00+09:00', // passed before execution
+        },
+      ],
+    },
+  });
+  await harness.entities.upsert({
+    entityType: 'CONSTRAINT',
+    entity: {
+      id: 'cons_pl5_refund_window',
+      kind: 'POLICY',
+      hardness: 'HARD',
+      evaluator: 'DETERMINISTIC',
+      status: 'UNKNOWN',
+      description: 'change must happen inside the refund window',
+      refs: [{ entityType: 'TRIP_ELEMENT', id: setup.cancelledLeg.id }],
+      ruleSetId: 'rs_pl5_refund_window',
+      derivedFromRuleId: 'rule_pl5_refund_window',
+    },
+  });
+
+  const { service, calls } = createService(harness, planning.strategies, new BoundaryExecutor());
+  const begin = await service.beginStrategy({ snapshot: setup.snapshot, caseId, strategy, at: BEGIN_AT });
+  await service.recordApproval({
+    caseId,
+    intentId: begin.intent.id,
+    decidedBy: { entityType: 'TRAVELLER', id: setup.spec.context.travellers[0]!.id },
+    decidedAt: APPROVAL_AT,
+    verdict: 'APPROVED',
+  });
+
+  // The full successful path really runs: gate -> executor -> observation.
+  const executed = await service.executeApproved({ caseId, intentId: begin.intent.id, at: EXECUTE_AT });
+  assert.equal(executed.executed, true);
+  assert.equal(executed.result?.status, 'SUCCESS');
+  assert.equal(executed.result?.provenance, 'SIMULATED');
+  assert.ok(executed.observation?.stateUpdated, 'observed effects still mutate validated state');
+  assert.ok(executed.observation.appliedOperationCount > 0, 'observed effects carry real operations');
+  assert.equal(calls(), 1, 'the provider boundary was actually exercised');
+
+  // ...yet provider success alone never resolves: the hard failure remains,
+  // so verification loops back to planning instead of resolving.
+  assert.ok(executed.verification, 'state update must trigger re-evaluation');
+  assert.deepEqual(executed.verification.hardFailureIds, ['cons_pl5_refund_window']);
+  assert.equal(executed.verification.resolution, undefined);
+  assert.equal(executed.caseStatus, 'PLANNING');
+  const recoveryCase = (await harness.cases.getCase(caseId))!;
+  assert.equal(recoveryCase.status, 'PLANNING');
+  assert.equal(recoveryCase.resolution, undefined, 'successful execution + hard failure must not resolve');
 });
 
 test('i4: case, intents, execution results and resolution survive restart', async () => {
