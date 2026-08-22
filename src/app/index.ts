@@ -2,4 +2,5 @@
 export * from './bootstrap.ts';
 export * from './extraction.ts';
 export * from './preferenceStore.ts';
+export * from './signalPipeline.ts';
 export * from './snapshot.ts';

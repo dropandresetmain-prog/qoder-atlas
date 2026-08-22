@@ -120,7 +120,7 @@ function collectPlaceIds(trip: Trip, anchorEvent: AnchorEvent | undefined): Set<
  * at one of the trip's elements or objectives. Generic ref matching — no
  * scenario knowledge.
  */
-async function constraintsForTrip(entities: EntityStore, trip: Trip): Promise<Constraint[]> {
+export async function constraintsForTrip(entities: EntityStore, trip: Trip): Promise<Constraint[]> {
   const tripRefIds = new Set<EntityId>([
     ...trip.elements.map((element) => element.id),
     ...trip.objectives.map((objective) => objective.id),
