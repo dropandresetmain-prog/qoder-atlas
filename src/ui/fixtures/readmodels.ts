@@ -14,6 +14,8 @@
 import type {
   OperatorDashboardView,
   OperatorTripView,
+  ProgrammeTravellerView,
+  ProgrammeView,
   ReadModelEnvelope,
   TravellerTripView,
 } from '../../contracts/readmodels.ts';
@@ -245,6 +247,266 @@ export const operatorDashboardAlt: OperatorDashboardView = {
       updatedAt: UI_FIXTURE_NOW,
     },
   ],
+};
+
+// ---------------------------------------------------------------------------
+// Programme views (Northstar RV-N10) — preview-only fixtures.
+//
+// Synthetic programme + traveller names; no real event or attendee is
+// implied. The dataset is the demo shape (one healthy ~45-traveller
+// programme plus a second view that surfaces an endangered commitment),
+// so UI lane evidence can render the page at scale and prove the
+// missing-information / endangered / status-priority paths. None of
+// these fixtures is wired to the integrated truth path; they exist for
+// preview and tests only.
+// ---------------------------------------------------------------------------
+
+const PROGRAMME_NOW: IsoDateTime = UI_FIXTURE_NOW;
+
+interface ProgrammeTravellerSeed {
+  id: string;
+  name: string;
+  status: ProgrammeTravellerView['status'];
+  caseCount: number;
+  decisions: number;
+  uncertainties: string[];
+}
+
+function makeProgrammeTraveller(
+  seed: ProgrammeTravellerSeed,
+  anchorEventId: ProgrammeView['anchorEventId'],
+): ProgrammeTravellerView {
+  return {
+    tripId: `trip-${seed.id}` as ProgrammeTravellerView['tripId'],
+    travellerId: `trav-${seed.id}` as ProgrammeTravellerView['travellerId'],
+    travellerName: seed.name,
+    status: seed.status,
+    activeCaseIds: Array.from(
+      { length: seed.caseCount },
+      (_, i) => `case-${anchorEventId}-${seed.id}-${i + 1}` as ProgrammeTravellerView['activeCaseIds'][number],
+    ),
+    decisionsRequired: seed.decisions,
+    uncertainties: seed.uncertainties,
+    updatedAt: PROGRAMME_NOW,
+  };
+}
+
+// Synthetic demo names — distinct, ordered, and never duplicated. The
+// number 45 is the demo-programme scale; the deterministic order makes
+// the dataset easy to eyeball while building the screen.
+const HEALTHY_PROGRAMME_SEEDS: readonly ProgrammeTravellerSeed[] = [
+  { id: '01', name: 'Aaliyah Brooks', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '02', name: 'Beatrice Cho', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '03', name: 'Camila Duarte', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '04', name: 'Daniyar Iskakov', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '05', name: 'Eleanor Vance', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '06', name: 'Felix Hartmann', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '07', name: 'Greta Lindqvist', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '08', name: 'Hiroshi Tanaka', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '09', name: 'Ines Costa', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '10', name: 'Jasper O\u2019Donnell', status: 'READY', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '11', name: 'Kenji Mori', status: 'PLANNING', caseCount: 1, decisions: 0, uncertainties: [] },
+  { id: '12', name: 'Lila Ben Salah', status: 'PLANNING', caseCount: 1, decisions: 0, uncertainties: [] },
+  { id: '13', name: 'Mateo Aguirre', status: 'PLANNING', caseCount: 1, decisions: 0, uncertainties: [] },
+  { id: '14', name: 'Naomi Eze', status: 'PLANNING', caseCount: 1, decisions: 0, uncertainties: [] },
+  { id: '15', name: 'Owen MacLeod', status: 'PLANNING', caseCount: 1, decisions: 0, uncertainties: [] },
+  { id: '16', name: 'Priya Subramanian', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: [
+    'Passport number is missing from the intake form',
+    'Preferred arrival window is unconfirmed',
+  ] },
+  { id: '17', name: 'Quentin Lefebvre', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: [
+    'Dietary requirements not yet supplied',
+  ] },
+  { id: '18', name: 'Rosa Marin', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: [
+    'Home airport not recorded',
+  ] },
+  { id: '19', name: 'Soren Iverson', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: [
+    'Mobility statement missing from intake',
+    'Emergency contact not recorded',
+  ] },
+  { id: '20', name: 'Tariq Al-Sayed', status: 'CHANGE_REQUESTED', caseCount: 1, decisions: 1, uncertainties: [
+    'Requested change being checked against the current trip',
+  ] },
+  { id: '21', name: 'Una Petrova', status: 'CHANGE_REQUESTED', caseCount: 1, decisions: 1, uncertainties: [
+    'Requested change being checked against the current trip',
+  ] },
+  { id: '22', name: 'Valentina Cruz', status: 'CHANGE_REQUESTED', caseCount: 1, decisions: 1, uncertainties: [
+    'Requested change being checked against the current trip',
+  ] },
+  { id: '23', name: 'Wesley Owens', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: [
+    'Onward connection may not hold for the new arrival',
+  ] },
+  { id: '24', name: 'Xiulan Zhao', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: [
+    'Hotel check-in window depends on a transfer that is not yet confirmed',
+  ] },
+  { id: '25', name: 'Yusuf Demir', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: [
+    'Visa appointment confirmation still pending',
+  ] },
+  { id: '26', name: 'Zara Khan', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: [
+    'Conference pass collection window is unconfirmed',
+  ] },
+  { id: '27', name: 'Arvid Sjoberg', status: 'DISRUPTED', caseCount: 1, decisions: 0, uncertainties: [
+    'Replacement flight availability is not yet confirmed',
+  ] },
+  { id: '28', name: 'Beatriz Almeida', status: 'DISRUPTED', caseCount: 1, decisions: 0, uncertainties: [
+    'Replacement hotel not yet identified',
+  ] },
+  { id: '29', name: 'Cyrus Mehrabi', status: 'RECOVERING', caseCount: 1, decisions: 1, uncertainties: [
+    'Replacement option is being checked against the rest of the trip',
+  ] },
+  { id: '30', name: 'Daria Volkova', status: 'RECOVERING', caseCount: 1, decisions: 1, uncertainties: [
+    'Replacement option is being checked against the rest of the trip',
+  ] },
+  { id: '31', name: 'Elias Okafor', status: 'RECOVERING', caseCount: 1, decisions: 0, uncertainties: [
+    'Transfer is being rebooked',
+  ] },
+  { id: '32', name: 'Faye Larrabee', status: 'RECOVERING', caseCount: 1, decisions: 0, uncertainties: [] },
+  { id: '33', name: 'Gianluca Romano', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '34', name: 'Halle Bergstrom', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '35', name: 'Ibrahim Coulibaly', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '36', name: 'Junia Park', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '37', name: 'Kasper Vogel', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '38', name: 'Lior Adler', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '39', name: 'Mira Haq', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '40', name: 'Nina Volkov', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '41', name: 'Otto Larsson', status: 'RESOLVED', caseCount: 0, decisions: 0, uncertainties: [] },
+  { id: '42', name: 'Polly Nyong\u2019o', status: 'UNKNOWN', caseCount: 0, decisions: 0, uncertainties: [
+    'No flight status update in the last 24 hours',
+    'Hotel check-in time not on file',
+  ] },
+  { id: '43', name: 'Quincy Adebayo', status: 'UNKNOWN', caseCount: 0, decisions: 0, uncertainties: [
+    'Train connection not yet confirmed',
+  ] },
+  { id: '44', name: 'Rina Suzuki', status: 'UNKNOWN', caseCount: 0, decisions: 0, uncertainties: [
+    'Connecting flight status feed delayed',
+  ] },
+  { id: '45', name: 'Sami Lehtinen', status: 'UNKNOWN', caseCount: 0, decisions: 0, uncertainties: [
+    'Pickup time from venue not yet scheduled',
+  ] },
+];
+
+// Helper local to the fixture module: cast a literal to the frozen
+// ProgrammeTravellerView so the seeds above stay readable.
+function traveller(
+  seed: ProgrammeTravellerSeed,
+  anchorEventId: ProgrammeView['anchorEventId'],
+): ProgrammeTravellerView {
+  return makeProgrammeTraveller(seed, anchorEventId);
+}
+
+function summaryFor(travellers: readonly ProgrammeTravellerView[]): ProgrammeView['summary'] {
+  const counts: ProgrammeView['summary'] = {
+    total: travellers.length,
+    ready: 0,
+    planning: 0,
+    needsTravellerInfo: 0,
+    changeRequested: 0,
+    atRisk: 0,
+    disrupted: 0,
+    recovering: 0,
+    awaitingDecision: 0,
+    resolved: 0,
+    unknown: 0,
+  };
+  for (const t of travellers) {
+    switch (t.status) {
+      case 'READY':
+        counts.ready += 1;
+        break;
+      case 'PLANNING':
+        counts.planning += 1;
+        break;
+      case 'NEEDS_TRAVELLER_INFO':
+        counts.needsTravellerInfo += 1;
+        break;
+      case 'CHANGE_REQUESTED':
+        counts.changeRequested += 1;
+        break;
+      case 'AT_RISK':
+        counts.atRisk += 1;
+        break;
+      case 'DISRUPTED':
+        counts.disrupted += 1;
+        break;
+      case 'RECOVERING':
+        counts.recovering += 1;
+        break;
+      case 'RESOLVED':
+        counts.resolved += 1;
+        break;
+      case 'UNKNOWN':
+        counts.unknown += 1;
+        break;
+    }
+    counts.awaitingDecision += t.decisionsRequired;
+  }
+  return counts;
+}
+
+const HEALTHY_ANCHOR_EVENT_ID = 'event-summit-2026' as ProgrammeView['anchorEventId'];
+
+export const healthyProgramme: ProgrammeView = {
+  generatedAt: PROGRAMME_NOW,
+  anchorEventId: HEALTHY_ANCHOR_EVENT_ID,
+  anchorEventName: 'Atlas Innovation Summit 2026',
+  summary: summaryFor(HEALTHY_PROGRAMME_SEEDS.map((s) => traveller(s, HEALTHY_ANCHOR_EVENT_ID))),
+  travellers: HEALTHY_PROGRAMME_SEEDS.map((s) => traveller(s, HEALTHY_ANCHOR_EVENT_ID)),
+  endangeredCommitments: [],
+  unresolvedUncertainties: [
+    'Welcome dinner venue capacity not yet confirmed with the venue',
+  ],
+};
+
+const ENDANGERED_ANCHOR_EVENT_ID = 'event-summit-2026-alt' as ProgrammeView['anchorEventId'];
+
+export const programmeWithEndangeredCommitment: ProgrammeView = {
+  generatedAt: PROGRAMME_NOW,
+  anchorEventId: ENDANGERED_ANCHOR_EVENT_ID,
+  anchorEventName: 'Atlas Innovation Summit 2026 \u2014 venue shift',
+  summary: summaryFor([
+    traveller({ id: 'a1', name: 'Wren Calloway', status: 'DISRUPTED', caseCount: 1, decisions: 0, uncertainties: ['Hotel closed the booking window early'] }, ENDANGERED_ANCHOR_EVENT_ID),
+    traveller({ id: 'a2', name: 'Xander Olufemi', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: ['Transfer is at risk because of the venue change'] }, ENDANGERED_ANCHOR_EVENT_ID),
+    traveller({ id: 'a3', name: 'Yael Berenson', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: ['New venue address not yet confirmed to the traveller'] }, ENDANGERED_ANCHOR_EVENT_ID),
+  ]),
+  travellers: [
+    traveller({ id: 'a1', name: 'Wren Calloway', status: 'DISRUPTED', caseCount: 1, decisions: 0, uncertainties: ['Hotel closed the booking window early'] }, ENDANGERED_ANCHOR_EVENT_ID),
+    traveller({ id: 'a2', name: 'Xander Olufemi', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: ['Transfer is at risk because of the venue change'] }, ENDANGERED_ANCHOR_EVENT_ID),
+    traveller({ id: 'a3', name: 'Yael Berenson', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: ['New venue address not yet confirmed to the traveller'] }, ENDANGERED_ANCHOR_EVENT_ID),
+  ],
+  endangeredCommitments: [
+    {
+      commitmentId: 'commit-venue-shift' as ProgrammeView['endangeredCommitments'][number]['commitmentId'],
+      title: 'Welcome dinner at the riverside venue',
+      reason: 'Original venue closed; replacement not yet booked for everyone travelling.',
+      affectedTravellerIds: [
+        'trav-a1' as ProgrammeView['endangeredCommitments'][number]['affectedTravellerIds'][number],
+        'trav-a2' as ProgrammeView['endangeredCommitments'][number]['affectedTravellerIds'][number],
+        'trav-a3' as ProgrammeView['endangeredCommitments'][number]['affectedTravellerIds'][number],
+      ],
+    },
+  ],
+  unresolvedUncertainties: [
+    'Whether the welcome dinner can be moved to the alternate venue in time',
+  ],
+};
+
+export const programmeLoading: ReadModelEnvelope<ProgrammeView> = { state: 'LOADING' };
+
+export const programmeError: ReadModelEnvelope<ProgrammeView> = {
+  state: 'ERROR',
+  errorMessage: 'The programme service did not respond. The trips have not been changed by this.',
+};
+
+export const healthyProgrammeLoaded: ReadModelEnvelope<ProgrammeView> = {
+  state: 'LOADED',
+  generatedAt: PROGRAMME_NOW,
+  data: healthyProgramme,
+};
+
+export const programmeWithEndangeredCommitmentLoaded: ReadModelEnvelope<ProgrammeView> = {
+  state: 'LOADED',
+  generatedAt: PROGRAMME_NOW,
+  data: programmeWithEndangeredCommitment,
 };
 
 // ---------------------------------------------------------------------------

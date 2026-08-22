@@ -92,6 +92,11 @@ export function renderTravellerTripBody(view: TravellerTripView): string {
   </div>`
       : '';
   const inputs = view.inputRequested.map(inputCard).join('');
+  // Northstar RV-N10: when the traveller is blocked on intake, surface the
+  // prompts in a single "What we need from you" panel so the existing
+  // input cards (decision buttons) stay where they are. Pure addition —
+  // the rest of the screen is unchanged.
+  const needsFromYou = renderNeedsFromYouPanel(view);
   const resolution = view.resolutionSummary
     ? `
   <div class="card t-card" data-ui-section="resolution">
@@ -104,12 +109,32 @@ export function renderTravellerTripBody(view: TravellerTripView): string {
   ${hero(view)}
   ${whatChanged}
   ${whatMatters}
+  ${needsFromYou}
   ${inputs}
   ${actions}
   ${resolution}
   ${viabilityBlock(view.remainderViable)}
   <p class="t-foot">Updated ${escapeHtml(formatInstant(view.updatedAt))}</p>
 </main>`;
+}
+
+/**
+ * Northstar addition: when the trip is waiting on traveller input, render a
+ * single panel that lists every prompt together so the traveller sees the
+ * whole ask in one place. Omitted entirely when there is nothing to ask.
+ */
+function renderNeedsFromYouPanel(view: TravellerTripView): string {
+  const blocking =
+    view.status === 'NEEDS_TRAVELLER_INFO' || view.inputRequested.length > 0;
+  if (!blocking) return '';
+  const items = view.inputRequested
+    .map((request) => `<li>${escapeHtml(request.prompt)}</li>`)
+    .join('');
+  return `
+  <div class="card t-card" data-ui-section="needs-from-you">
+    <h2>What we need from you</h2>
+    <ul class="plain-list">${items || '<li>Nothing right now — we will come back when we do need you.</li>'}</ul>
+  </div>`;
 }
 
 /** Full traveller screen from the frozen envelope; honest about loading/error. */

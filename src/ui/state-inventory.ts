@@ -165,6 +165,32 @@ export const UI_STATE_INVENTORY: readonly UiStateSpec[] = [
     userMeaning: 'The trip was recovered, but something could not be kept; shown honestly.',
     answers: ['Has the trip actually been recovered?', 'What changed?', 'Is the rest of my trip viable?'],
   },
+  // Northstar RV-N10 — programme surface: the same loading / error / data
+  // states exist for the per-Event programme read model, plus the
+  // data-loaded-with-missing-info state that the missing-information
+  // panel renders. These are data, not prose: tests and the operator
+  // programme screen both pull from the same UiStateTrigger vocabulary.
+  {
+    id: 'programme-loading',
+    surface: 'OPERATOR',
+    trigger: 'LOADING',
+    userMeaning: 'We are loading the latest confirmed trip information for this event.',
+    answers: ['Who is ready?', 'What is the system doing?'],
+  },
+  {
+    id: 'programme-error',
+    surface: 'OPERATOR',
+    trigger: 'ERROR',
+    userMeaning: 'We cannot show the latest programme right now. Nothing about the trips has been changed by this.',
+    answers: ['Who is ready?', 'What remains uncertain?'],
+  },
+  {
+    id: 'programme-loaded-missing-info',
+    surface: 'OPERATOR',
+    trigger: 'NEEDS_TRAVELLER_INFO',
+    userMeaning: 'Some travellers in this event still need to share details before their trip can be finished; the list is shown explicitly.',
+    answers: ['What decision is required?', 'What remains uncertain?'],
+  },
 ];
 
 /**
