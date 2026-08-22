@@ -1,6 +1,6 @@
 # Implementation Plan
 
-**Status:** Active execution SSOT. Checkpoint A accepted (REV-A Complete; closure commit pinned as the accepted fan-out base); lane fan-out in progress.  
+**Status:** Active execution SSOT. Checkpoint A accepted (REV-A Complete; closure commit pinned as the accepted fan-out base); **Checkpoint B accepted (REV-B Complete)**; Checkpoint C execution started on branch `checkpoint-c`.  
 **Product:** AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
@@ -722,7 +722,7 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 | E1 | User journeys + read-model fixtures | Implemented | REV-A | ui | Qwen3.8 Medium / Kimi-K2.7-Code / Plus helpers | Lane b465199 (cherry-picked 0b5d012) — journeys/state inventory + preview fixtures (preview/test only) |
 | E2 | Operator + traveller UI | Implemented | E1 | ui | Qwen3.8 Medium / Kimi-K2.7-Code; Composer 2.5 external optional | Lane 52b5ad1 (cherry-picked 00c2032) — pure renderers over frozen read models + UI-local CaseDetailView with consistency guard |
 | I1–I5 | Vertical integration | Integrated | lane outputs | integration | Qwen3.8 xHigh; GLM-5.3 hard seams; Kimi-K3 only if breadth/endurance warrants | I1 2f91ff3 (validated seed -> persistent Trip, restart), I2 ea6e107 (signal -> mutation -> impact -> case), I3 6860fb4 (planner -> REPLAY capabilities -> overlays -> viability, infeasible candidate rejected), I4 3818464 (authority -> approval -> simulated execution -> observation -> FULLY_RECOVERED; gate refuses forged authority), I5 0e6ba65 (real read models -> operator/traveller UI + HTTP); T-E2E at 84a82b9; 262/262 tests; Checkpoint B candidate pending REV-B |
-| REV-B | Review Gate B — integrated vertical loop | Not Started | I1–I5 | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Integrated high-risk-path review before Checkpoint B acceptance |
+| REV-B | Review Gate B — integrated vertical loop | Complete | I1–I5 | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | **PASS — CHECKPOINT B ACCEPTED.** Independent review of candidate SHA `b650031147085fddb1d50f75ed455d43514f1f20` (integration/vertical-loop) passed; 262/262 tests, typecheck/lint/build clean at the candidate. Reviewer findings carried into Checkpoint C as inputs: PL-1 UPSERT_ENTITY fact-authority bypass (Act Now); PL-2 DST fold rule not universally first-occurrence (Fix during C); PL-3 no runtime disruption trigger (Act Now); PL-4 CaseVerifier builds a thinner EvaluationContext than impact/viability and verifies at assessedAt (Act Now before robustness); PL-5 strengthen core invariant tests — successful action + remaining hard failure must stay unresolved; Scenario A T-E2E values tied to REPLAY-normalized output (Act Now); PL-6 doc/demo truthfulness (Act Now during C). Merged to main at `bbc234f`. |
 | G1 | Scenario B substitution | Not Started | REV-B | integration | Qwen3.8 xHigh / Qwen3.7 Max | — |
 | G2 | Selected robustness | Not Started | REV-B | integration/core | Qwen3.8 xHigh; GLM-5.3 if debugging-heavy | — |
 | G3 | Hardcoding audit | Not Started | G1 | review/bounded | Kimi-K2.7-Code / DeepSeek-V4-Flash / Plus; different-family preferred | — |
