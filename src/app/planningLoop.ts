@@ -187,7 +187,8 @@ export async function runPlanningLoop(
   };
 }
 
-async function evaluateCandidate(
+/** Deterministic overlay evaluation for one candidate (also used by I5 read models). */
+export async function evaluateCandidate(
   viability: ViabilityEngine,
   snapshot: TripSnapshot,
   strategy: RecoveryStrategy,

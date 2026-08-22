@@ -37,7 +37,7 @@ import type {
   ObservationService,
   PrincipalRecord,
 } from '../contracts/services.ts';
-import type { AuditRepository, CaseRepository } from '../contracts/repositories.ts';
+import type { AuditRepository, CaseRepository, TripRepository } from '../contracts/repositories.ts';
 import { CaseService } from '../engine/case.ts';
 import { withApproval } from '../engine/authority.ts';
 import type { CaseVerifier, VerificationResult } from '../engine/observation.ts';
@@ -208,13 +208,13 @@ export function confirmedOperationsFor(
  */
 export function createRecoveryExecutor(deps: {
   inner: ExecutorService;
-  strategyFor: (intent: ActionIntent) => RecoveryStrategy | undefined;
+  strategyFor: (intent: ActionIntent) => RecoveryStrategy | undefined | Promise<RecoveryStrategy | undefined>;
 }): ExecutorService {
   return {
     execute: async (execution: AuthorisedExecution): Promise<ExecutionResult> => {
       const result = await deps.inner.execute(execution);
       if (result.status !== 'SUCCESS') return result;
-      const strategy = deps.strategyFor(execution.intent);
+      const strategy = await deps.strategyFor(execution.intent);
       if (!strategy) return result;
       const operations = confirmedOperationsFor(strategy.candidateOperations, result.executedAt);
       if (operations.length === 0) return result;
@@ -580,4 +580,64 @@ export class RecoveryExecutionService {
     while (existing.includes(`${base}-${suffix}`)) suffix += 1;
     return `${base}-${suffix}`;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Traveller decision entry point (I5 traveller interaction)
+// ---------------------------------------------------------------------------
+
+export interface TravellerDecisionInput {
+  caseId: EntityId;
+  verdict: 'APPROVED' | 'DECLINED';
+  at: IsoDateTime;
+  note?: string;
+}
+
+export interface TravellerDecisionOutcome {
+  accepted: boolean;
+  error?: 'unknown_case' | 'no_pending_traveller_decision' | 'unknown_trip';
+  verdict?: 'APPROVED' | 'DECLINED';
+  caseStatus?: CaseStatus;
+  execution?: ExecutionStageOutcome;
+}
+
+/**
+ * Settle a pending traveller approval through the real lifecycle: approval
+ * proceeds to gate-checked execution and observation; decline loops the case
+ * back to planning. The traveller principal is derived from the case's trip —
+ * no caller-supplied authority is ever trusted.
+ */
+export async function settleTravellerDecision(
+  deps: { service: RecoveryExecutionService; cases: CaseRepository; trips: TripRepository },
+  input: TravellerDecisionInput,
+): Promise<TravellerDecisionOutcome> {
+  const recoveryCase = await deps.cases.getCase(input.caseId);
+  if (!recoveryCase) return { accepted: false, error: 'unknown_case' };
+  const pending = recoveryCase.authorityDecisions.find(
+    (decision) => decision.outcome === 'REQUIRES_TRAVELLER' && decision.approval === undefined,
+  );
+  if (!pending) {
+    return { accepted: false, error: 'no_pending_traveller_decision', caseStatus: recoveryCase.status };
+  }
+  const trip = await deps.trips.getTrip(recoveryCase.tripId);
+  const travellerId = trip?.travellerIds[0];
+  if (!trip || !travellerId) return { accepted: false, error: 'unknown_trip' };
+
+  const approval = await deps.service.recordApproval({
+    caseId: input.caseId,
+    intentId: pending.intentId,
+    decidedBy: { entityType: 'TRAVELLER', id: travellerId },
+    decidedAt: input.at,
+    verdict: input.verdict,
+    ...(input.note ? { note: input.note } : {}),
+  });
+  if (input.verdict === 'DECLINED') {
+    return { accepted: true, verdict: 'DECLINED', caseStatus: approval.caseStatus };
+  }
+  const execution = await deps.service.executeApproved({
+    caseId: input.caseId,
+    intentId: pending.intentId,
+    at: input.at,
+  });
+  return { accepted: true, verdict: 'APPROVED', caseStatus: execution.caseStatus, execution };
 }
