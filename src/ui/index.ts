@@ -11,5 +11,6 @@ export * from './components.ts';
 export * from './page.ts';
 export * from './screens/operator-dashboard.ts';
 export * from './screens/operator-case.ts';
+export * from './screens/operator-programme.ts';
 export * from './screens/traveller.ts';
 export * as fixtures from './fixtures/readmodels.ts';

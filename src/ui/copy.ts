@@ -95,6 +95,75 @@ export const OPTION_VERDICT_LABEL: Record<'VIABLE' | 'NOT_VIABLE' | 'UNKNOWN', s
   UNKNOWN: 'Still being checked',
 };
 
+// ---------------------------------------------------------------------------
+// Northstar programme surface (RV-N10) — labels live next to the others so
+// the same user-facing vocabulary drives every screen.
+// ---------------------------------------------------------------------------
+
+/** Operator-side heading for the per-AnchorEvent programme surface. */
+export const PROGRAMME_HEADING = 'Event programme';
+
+/** Short description under the programme page heading. */
+export const PROGRAMME_SUBHEADING =
+  'Every traveller travelling to this event, in one place, with the status of each trip.';
+
+/** One-line explanation for the per-status tiles row. */
+export const PROGRAMME_TILES_LEGEND = 'Counts by trip status across the whole programme.';
+
+/** Short label for the endangered-commitments section. */
+export const PROGRAMME_ENDANGERED_TITLE = 'At-risk shared commitments';
+
+/** Heading for the programme-level "missing information" panel. */
+export const PROGRAMME_MISSING_INFO_TITLE = 'Missing information';
+
+/** Affordance: single-traveller intake. */
+export const PROGRAMME_INTAKE_ADD_LABEL = 'Add one traveller';
+
+/** Affordance: bulk import of a traveller list. */
+export const PROGRAMME_INTAKE_BULK_LABEL = 'Bulk import travellers';
+
+/** Column headers for the programme traveller table. */
+export const PROGRAMME_TABLE_HEADERS = {
+  name: 'Traveller',
+  status: 'Status',
+  cases: 'Active cases',
+  decisions: 'Decisions needed',
+  uncertainties: 'Still unclear',
+} as const;
+
+/** Tile label keyed by the ProgrammeStatusSummary field. */
+export const PROGRAMME_TILE_LABEL: Record<ProgrammeStatusSummaryTileKeys, string> = {
+  total: 'Total travellers',
+  ready: 'Ready',
+  planning: 'Trip being planned',
+  needsTravellerInfo: 'Needs traveller details',
+  changeRequested: 'Change requested',
+  atRisk: 'At risk',
+  disrupted: 'Needs attention',
+  recovering: 'Recovery under way',
+  awaitingDecision: 'Decisions needed',
+  resolved: 'Recovered',
+  unknown: 'Unconfirmed',
+};
+
+/**
+ * Status keys that appear in ProgrammeStatusSummary and have a matching
+ * tile label above. Centralised so a future summary field always gets a
+ * tile or a deliberate omission, never a missing label.
+ */
+export type ProgrammeStatusSummaryTileKeys =
+  | 'total'
+  | 'ready'
+  | 'planning'
+  | 'needsTravellerInfo'
+  | 'changeRequested'
+  | 'atRisk'
+  | 'disrupted'
+  | 'recovering'
+  | 'awaitingDecision'
+  | 'resolved'
+  | 'unknown';
+
 /**
  * Internal terms that must never appear in rendered user-facing output.
  * Matched case-insensitively by the jargon gate test.
