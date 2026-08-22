@@ -4,3 +4,4 @@ export * from './schemas.ts';
 export * from './semantics.ts';
 export * from './research.ts';
 export * from './planner.ts';
+export * from './fallbackPlanner.ts';

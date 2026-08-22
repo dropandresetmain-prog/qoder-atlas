@@ -36,6 +36,21 @@ export interface TravellerDecisionHttpResult {
   resolutionOutcome?: string;
 }
 
+/**
+ * Generic runtime recovery flow (R1/PL-3). Handlers receive the parsed JSON
+ * body and return the wire status + body; scenario-neutral validation and
+ * engine calls live in the application layer that implements them.
+ */
+export interface RuntimeHandlers {
+  disruption(body: unknown): Promise<{ status: number; body: unknown }>;
+  plan(body: unknown): Promise<{ status: number; body: unknown }>;
+  begin(body: unknown): Promise<{ status: number; body: unknown }>;
+  decide(body: unknown): Promise<{ status: number; body: unknown }>;
+  execute(body: unknown): Promise<{ status: number; body: unknown }>;
+  reset(body: unknown): Promise<{ status: number; body: unknown }>;
+  state(): Promise<{ status: number; body: unknown }>;
+}
+
 /** Application endpoints the HTTP surface projects; wired by the integrator. */
 export interface AppEndpoints {
   now(): IsoDateTime;
@@ -48,6 +63,8 @@ export interface AppEndpoints {
     body: TravellerDecisionBody,
     at: IsoDateTime,
   ): Promise<TravellerDecisionHttpResult>;
+  /** Present when the runtime recovery/reset flow is wired. */
+  runtime?: RuntimeHandlers;
 }
 
 const PAGE_LINKS = { dashboard: '/operator', traveller: '/traveller' };
@@ -115,8 +132,10 @@ async function handle(
     sendJson(res, 200, {
       name: 'AI Trip Recovery / Resolution Layer',
       adapterMode: config.adapterMode,
-      checkpoint: 'B candidate — generalized vertical recovery loop',
-      surfaces: endpoints ? ['/operator', '/traveller'] : [],
+      checkpoint: 'C candidate — generalized recovery + runtime disruption/reset flow',
+      surfaces: endpoints
+        ? [...['/operator', '/traveller'], ...(endpoints.runtime ? ['/api/runtime/state'] : [])]
+        : [],
     });
     return;
   }
@@ -204,6 +223,47 @@ async function handle(
     );
     sendJson(res, result.accepted ? 200 : 409, result);
     return;
+  }
+
+  // --- Generic runtime recovery flow (R1/PL-3) -----------------------------
+  if (segments[0] === 'api' && segments[1] === 'runtime' && endpoints.runtime) {
+    const action = segments[2];
+    if (action === 'state' && req.method === 'GET') {
+      const outcome = await endpoints.runtime.state();
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (action === 'state') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readBody(req));
+    } catch {
+      sendJson(res, 400, { error: 'invalid_json' });
+      return;
+    }
+    const handlers = endpoints.runtime;
+    switch (action) {
+      case 'disruption':
+      case 'plan':
+      case 'begin':
+      case 'decide':
+      case 'execute':
+      case 'reset': {
+        const outcome = await handlers[action](parsed);
+        sendJson(res, outcome.status, outcome.body);
+        return;
+      }
+      default:
+        sendJson(res, 404, { error: 'not_found', path: url.pathname });
+        return;
+    }
   }
 
   sendJson(res, 404, { error: 'not_found', path: url.pathname });

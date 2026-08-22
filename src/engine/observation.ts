@@ -122,10 +122,18 @@ export class CaseVerifier {
    */
   async verify(tripId: EntityId, verifiedAt?: IsoDateTime): Promise<VerificationResult> {
     const assessment = await this.impact.assess(tripId);
+    const tripRecord = await this.impactTrip(tripId);
+    // Trip-scoped constraints: only those whose refs point at this trip's
+    // elements or objectives. Constraints from other trips must not affect
+    // this trip's verification (generic ref matching, no scenario knowledge).
+    const tripRefIds = new Set<EntityId>([
+      ...tripRecord.elements.map((element) => element.id),
+      ...tripRecord.objectives.map((objective) => objective.id),
+    ]);
     const constraints = (await this.entities.list('CONSTRAINT'))
       .filter((entry) => entry.entityType === 'CONSTRAINT')
-      .map((entry) => entry.entity);
-    const tripRecord = await this.impactTrip(tripId);
+      .map((entry) => entry.entity)
+      .filter((constraint) => constraint.refs.some((ref) => tripRefIds.has(ref.id)));
     const evaluatedAt = verifiedAt ?? assessment.assessedAt;
     const ctx = await buildEvaluationContext(this.entities, tripRecord, evaluatedAt);
     const evaluations = evaluateConstraints(constraints, ctx);
