@@ -248,12 +248,15 @@ export function atlasScheduleToIso(value: string, timezone: string): IsoDateTime
 /**
  * Deterministic wall-clock -> instant conversion for an IANA timezone.
  *
- * The offset at the naive instant (interpreting the wall clock as UTC) picks
- * the pre-transition side, so DST folds (ambiguous local time) resolve to the
- * FIRST occurrence. When the true instant sits across a transition from the
- * naive instant, a second candidate from that instant's own offset is
- * checked. Nonexistent local times (DST gaps) and any input that does not
- * round-trip fail structured instead of guessing.
+ * Candidate enumeration (ADR-028): offsets are probed at the naive instant
+ * and at ±14h around it — a window wider than any UTC offset on Earth — so
+ * both sides of any DST transition are always represented, for every zone.
+ * Every candidate instant is checked by round-tripping it back to its local
+ * wall clock; a DST fold yields two valid candidates and the EARLIEST
+ * instant (the first occurrence of the local time) wins deterministically.
+ * Nonexistent local times (DST gaps) and any input without a round-tripping
+ * candidate fail structured instead of guessing. Host-timezone independent:
+ * everything below uses Intl with an explicit timeZone.
  */
 function atlasLocalScheduleToIso(
   value: string,
@@ -265,17 +268,19 @@ function atlasLocalScheduleToIso(
   minute: number,
 ): string {
   const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
-  const candidates: number[] = [];
-  const first = naiveUtc - timezoneOffsetMinutes(naiveUtc, timezone) * 60_000;
-  candidates.push(first);
-  const second = naiveUtc - timezoneOffsetMinutes(first, timezone) * 60_000;
-  if (second !== first) candidates.push(second);
-  for (const instant of candidates) {
-    if (renderLocalWall(instant, timezone) === value) {
-      return formatIsoWithOffset(instant, timezone);
-    }
+  const probes = [naiveUtc, naiveUtc - 14 * 3_600_000, naiveUtc + 14 * 3_600_000];
+  const candidates = new Set<number>();
+  for (const probe of probes) {
+    candidates.add(naiveUtc - timezoneOffsetMinutes(probe, timezone) * 60_000);
   }
-  throw new Error(`ambiguous local schedule ${value} in timezone ${timezone}`);
+  const roundTripping = [...candidates]
+    .filter((instant) => renderLocalWall(instant, timezone) === value)
+    .sort((a, b) => a - b);
+  const earliest = roundTripping[0];
+  if (earliest === undefined) {
+    throw new Error(`ambiguous local schedule ${value} in timezone ${timezone}`);
+  }
+  return formatIsoWithOffset(earliest, timezone);
 }
 
 /** Signed UTC offset (minutes) of a timezone at a given instant. */

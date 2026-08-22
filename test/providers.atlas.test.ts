@@ -370,13 +370,23 @@ test('ADR-028: DST fold resolves deterministically to the first occurrence', () 
   assert.equal(atlasScheduleToIso('202611010130', 'America/New_York'), '2026-11-01T01:30:00-04:00');
   // And the winter-side conversion keeps the standard offset.
   assert.equal(atlasScheduleToIso('202611011200', 'America/New_York'), '2026-11-01T12:00:00-05:00');
+  // The fold boundary itself: the first-occurring 01:00 keeps the summer offset.
+  assert.equal(atlasScheduleToIso('202611010100', 'America/New_York'), '2026-11-01T01:00:00-04:00');
+  // 2026-10-25 01:30 Europe/London occurs twice (BST -> GMT); first is +01:00.
+  assert.equal(atlasScheduleToIso('202610250130', 'Europe/London'), '2026-10-25T01:30:00+01:00');
+  // Southern hemisphere: 2026-04-05 02:30 Australia/Sydney repeats; first is AEDT.
+  assert.equal(atlasScheduleToIso('202604050230', 'Australia/Sydney'), '2026-04-05T02:30:00+11:00');
 });
 
 test('ADR-028: post-transition schedules resolve; nonexistent DST-gap times fail structured', () => {
   // Valid local time right after spring-forward resolves on the new offset.
   assert.equal(atlasScheduleToIso('202603080330', 'America/New_York'), '2026-03-08T03:30:00-04:00');
   // 02:30 does not exist on 2026-03-08; refuse rather than guess.
-  assert.throws(() => atlasScheduleToIso('202603080230', 'America/New_York'), /ambiguous local schedule/);
+  assert.throws(() => atlasScheduleToIso('202603080230', 'America/New_York'), /ambiguous local schedule 202603080230 in timezone America\/New_York/);
+  // London gap: 2026-03-29 01:30 never exists (GMT -> BST).
+  assert.throws(() => atlasScheduleToIso('202603290130', 'Europe/London'), /ambiguous local schedule/);
+  // Sydney gap: 2026-10-04 02:30 never exists (AEST -> AEDT).
+  assert.throws(() => atlasScheduleToIso('202610040230', 'Australia/Sydney'), /ambiguous local schedule/);
 });
 
 test('ADR-028: REPLAY search without a timezone resolver fails structured, never fabricates Z', async () => {
@@ -388,6 +398,24 @@ test('ADR-028: REPLAY search without a timezone resolver fails structured, never
     assert.equal(result.error.code, 'invalid_raw_response');
     assert.match(result.error.message, /timezone resolver/);
   }
+});
+
+test('ADR-028 (PL-2): conversion is host-timezone independent', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const script =
+    "const { atlasScheduleToIso } = await import('./src/providers/atlas/normalize.ts');" +
+    "process.stdout.write(atlasScheduleToIso('202611010130', 'America/New_York'))";
+  const results = ['Pacific/Kiritimati', 'America/New_York', 'Asia/Kolkata'].map((tz) =>
+    execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      cwd: process.cwd(),
+      env: { ...process.env, TZ: tz },
+    }).toString(),
+  );
+  assert.deepEqual(
+    results,
+    ['2026-11-01T01:30:00-04:00', '2026-11-01T01:30:00-04:00', '2026-11-01T01:30:00-04:00'],
+    'host TZ must never leak into normalized instants',
+  );
 });
 
 test('ADR-028: unresolvable airport fails structured instead of guessing an offset', async () => {
