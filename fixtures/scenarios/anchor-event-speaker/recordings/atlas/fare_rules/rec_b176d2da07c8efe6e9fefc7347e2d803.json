@@ -1,0 +1,49 @@
+{
+  "id": "rec_b176d2da07c8efe6e9fefc7347e2d803",
+  "providerId": "atlas",
+  "operation": "fare_rules",
+  "recordedAt": "2026-09-12T18:30:00.000+09:00",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "atlsbx-sess-i3demo-0001",
+    "routing": {
+      "routingIdentifier": "ATLSBX-20260913-OZ104-E3",
+      "currency": "USD",
+      "adultPrice": 210,
+      "adultTax": 32.6,
+      "fromSegments": [
+        {
+          "carrier": "OZ",
+          "flightNumber": "104",
+          "depAirport": "ICN",
+          "arrAirport": "NRT",
+          "depTime": "202609131825",
+          "arrTime": "202609132055",
+          "duration": 150,
+          "cabinClass": 1,
+          "fareFamily": "ECON_FLEX",
+          "seatCount": 5
+        }
+      ],
+      "retSegments": [],
+      "rule": {
+        "changesRules": [
+          {
+            "changesFee": 50,
+            "changesStatus": "T",
+            "currency": "USD"
+          }
+        ],
+        "refundRules": [
+          {
+            "refundFee": 90,
+            "refundStatus": "F",
+            "currency": "USD"
+          }
+        ]
+      }
+    }
+  }
+}

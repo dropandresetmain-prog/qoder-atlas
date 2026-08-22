@@ -1,0 +1,13 @@
+{
+  "strategies": [],
+  "toolRequests": [],
+  "assumptions": [],
+  "uncertainties": [],
+  "actionIntents": [
+    {
+      "id": "intent_smuggled",
+      "operation": "flight.change",
+      "sideEffectLevel": "IRREVERSIBLE"
+    }
+  ]
+}

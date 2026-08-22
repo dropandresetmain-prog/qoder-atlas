@@ -1,0 +1,72 @@
+{
+  "strategies": [
+    {
+      "summary": "Rebook onto an earlier same-day flight and keep the downstream chain",
+      "candidateOperations": [
+        {
+          "op": "UPSERT_FACT",
+          "target": { "entityType": "TRIP_ELEMENT", "id": "el_1" },
+          "factPath": "data.scheduledDeparture.value",
+          "value": "2026-09-14T06:30:00+09:00",
+          "sourceId": "src_offer",
+          "authority": "CONNECTED"
+        }
+      ],
+      "toolRequests": [
+        {
+          "capability": "FLIGHT",
+          "operation": "flight.search",
+          "parameters": { "departureWindow": "same-day-earlier" },
+          "purpose": "find earlier replacement options"
+        },
+        {
+          "capability": "FLIGHT",
+          "operation": "flight.fare_rules",
+          "parameters": {},
+          "purpose": "check change fees before proposing rebooking"
+        }
+      ],
+      "assumptions": ["an earlier same-day option exists with available seats"],
+      "uncertainties": ["seat availability on earlier options is unverified"],
+      "expectedOutcomes": ["downstream arrivals remain within required windows"],
+      "costImpact": { "amount": 180, "currency": "USD" }
+    },
+    {
+      "summary": "Hold the current itinerary and adjust downstream timing",
+      "candidateOperations": [],
+      "toolRequests": [
+        {
+          "capability": "ROUTING",
+          "operation": "routing.context",
+          "parameters": {},
+          "purpose": "estimate ground transport duration under disruption"
+        },
+        {
+          "capability": "RESEARCH",
+          "operation": "research.local_context",
+          "parameters": { "topic": "local transport availability" },
+          "purpose": "ground local timing assumptions"
+        }
+      ],
+      "assumptions": ["downstream items tolerate a late arrival"],
+      "uncertainties": ["downstream tolerance is not yet verified"],
+      "expectedOutcomes": ["itinerary preserved without rebooking cost"]
+    }
+  ],
+  "toolRequests": [
+    {
+      "capability": "FLIGHT",
+      "operation": "flight.verify",
+      "parameters": {},
+      "purpose": "verify the leading replacement offer before ranking"
+    }
+  ],
+  "assumptions": ["impact assessment reflects the latest signal"],
+  "uncertainties": [
+    {
+      "statement": "replacement flight availability is not yet confirmed",
+      "severity": "HIGH"
+    }
+  ],
+  "rationale": "Two materially different strategies: rebook earlier vs hold and adjust; both need read-only verification before ranking."
+}

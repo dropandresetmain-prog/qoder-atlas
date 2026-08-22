@@ -15,6 +15,8 @@ Status vocabulary:
 
 ## Planned MVP
 
+Capability status: the Scenario A vertical recovery loop (ingestion -> persistent trip -> signal/impact -> planner/capabilities/viability -> authority/execution/observation -> real operator/traveller read models) is **Integrated** on `integration/vertical-loop` and runs credential-free in REPLAY; Checkpoint B acceptance remains pending Review Gate B. Execution evidence lives in `docs/IMPLEMENTATION_PLAN.md` Section 4.
+
 ### Core state and recovery engine
 - Organisation, Traveller, AnchorEvent, Trip, TripElement, TripObjective, Place
 - RuleSet/Policy and Constraint model

@@ -1,0 +1,32 @@
+{
+  "findings": [
+    {
+      "statement": "Travellers with this nationality may enter visa-free for short stays under the official entry rules",
+      "kind": "LEGAL_ENTRY_FACT",
+      "authorityClaim": "AUTHORITATIVE",
+      "sourceUris": ["https://official-immigration-portal.example/entry-rules"],
+      "confidence": 0.9
+    },
+    {
+      "statement": "A transit visa is probably required for the layover",
+      "kind": "LEGAL_ENTRY_FACT",
+      "authorityClaim": "ASSERTED",
+      "sourceUris": [],
+      "confidence": 0.4
+    },
+    {
+      "statement": "Immigration processing at this hub typically takes 30-60 minutes at this hour",
+      "kind": "OPERATIONAL_ESTIMATE",
+      "authorityClaim": "CONNECTED",
+      "sourceUris": ["https://airport-operator.example/terminal-info"],
+      "uncertainty": "queue times vary with arrival banks"
+    },
+    {
+      "statement": "Ground transfer should take roughly forty-five minutes",
+      "kind": "OPERATIONAL_ESTIMATE",
+      "authorityClaim": "INFERRED",
+      "sourceUris": []
+    }
+  ],
+  "insufficientEvidence": false
+}

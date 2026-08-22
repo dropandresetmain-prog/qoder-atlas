@@ -1,0 +1,16 @@
+{
+  "strategies": [
+    {
+      "summary": "Strategy claiming a deterministic check it never performed",
+      "candidateOperations": [],
+      "toolRequests": [],
+      "assumptions": [],
+      "uncertainties": [],
+      "expectedOutcomes": [],
+      "viabilityVerified": true
+    }
+  ],
+  "toolRequests": [],
+  "assumptions": [],
+  "uncertainties": []
+}
