@@ -982,7 +982,7 @@ RV-N0 contract freeze — COMPLETE
 
 - **NORTHSTAR_CONTRACT_BASE_SHA = `70d4b8664c80583e964ff2c509cbda61b4b640aa`** — the immutable accepted executable-contract baseline (RV-N0 freeze, ADR-034..041). Never amended or replaced.
 - **NORTHSTAR_EXECUTION_BASE_SHA = `53c7a3ba2feeb184153f127d4c81bac7e64e7838`** — the docs-only execution-plan reconciliation commit that introduced the four-wave plan. The diff CONTRACT_BASE → EXECUTION_BASE is documentation only.
-- **NORTHSTAR_WAVE12_BASE_SHA** — recorded by the docs-only Wave 1+2 cadence reconciliation commit (this correction). The diff EXECUTION_BASE → WAVE12_BASE is documentation only. **All Wave 1/Wave 2 implementation worktrees fan out from NORTHSTAR_WAVE12_BASE_SHA**, never from CONTRACT_BASE or EXECUTION_BASE directly, so every lane inherits the corrected execution/review plan.
+- **NORTHSTAR_WAVE12_BASE_SHA = `0950870d10df157fdeed967a3a49f9279039855a`** — recorded by the docs-only Wave 1+2 cadence reconciliation commit (this correction). The diff EXECUTION_BASE → WAVE12_BASE is documentation only. **All Wave 1/Wave 2 implementation worktrees fan out from NORTHSTAR_WAVE12_BASE_SHA**, never from CONTRACT_BASE or EXECUTION_BASE directly, so every lane inherits the corrected execution/review plan.
 
 **Contract assumptions lanes must not redefine** (change only through lead reconciliation, like Checkpoint A frozen contracts):
 - SignalKind stays closed except the already-added `ANCHOR_COMMITMENT_CHANGE`.
