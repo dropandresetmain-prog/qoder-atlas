@@ -316,6 +316,16 @@ Use Sol/Opus when integration exposes a genuine cross-cutting architecture decis
 
 Independent review is deliberate risk control, not a ritual after every package.
 
+**Northstar gate reviewer routing (bound, see `IMPLEMENTATION_PLAN.md` Section 13):**
+
+| Gate | Default reviewer | Fallback(s) | Note |
+|---|---|---|---|
+| NS Review 1 (after NS-G1) | DeepSeek-V4-Flash | Kimi-K2.7-Code | fresh different-family reviewer vs the primary Qwen implementer |
+| NS Review 2 (after NS-G2) | DeepSeek-V4-Pro Max | GLM-5.3 Max only if GLM did not materially implement/debug/fix the reviewed paths; then Kimi-K3 Max or external Claude Opus 5 High if independence would otherwise be compromised | intentional premium use — highest-risk integrated backend checkpoint |
+| Final Candidate Review | Claude Opus 5 High/Max externally | `AGENT_MODEL_SELECTION.md` escalation guidance; document any substituted reviewer | Qwen-heavy implementation + Sol already architecture/lead support → Opus as independent ceiling family |
+
+Review 2 architecture disagreements may be escalated to GPT-5.6 Sol High or Claude Opus 5 High. NS-G3 is a human product-owner product/demo evaluation, not a model review.
+
 **Routine different-family review of Qwen work:**
 - Kimi-K2.7-Code;
 - DeepSeek-V4-Flash;
@@ -441,7 +451,7 @@ For the current hackathon build:
 6. **Hard deterministic/provider/debugging work:** GLM-5.3.
 7. **Premium long-horizon/context experiment:** Kimi-K3.
 8. **DeepSeek-V4-Pro:** premium adversarial specialist only; never the automatic reviewer.
-9. **Final consequential review:** prefer external Sol/Opus or, if Qoder-only, the strongest suitable different-family specialist justified by the actual risk.
+9. **Final consequential review:** prefer external Claude Opus 5 High/Max (bound as the default Final Candidate Reviewer for the Northstar programme); if external Opus is unavailable, follow this document's escalation guidance and record the substitution. Sol remains the architecture/lead-support ceiling challenger.
 10. **Use off-peak pricing opportunistically, but never delay critical-path work purely to save Credits.**
 
 ## 14. Source refresh checklist

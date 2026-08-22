@@ -212,7 +212,7 @@ The integrator:
 
 ## Independent review checkpoints
 
-Independent review is mandatory at the four formal gates below. This is deliberate risk control, not a request to re-review every package or every historical line of code.
+Independent review is mandatory at the four historical formal gates below (A/B/C/Final). In addition, the Northstar programme adds bounded post-Checkpoint-C execution gates — NS-G1/NS-G2 with mandatory different-family Reviews 1 and 2, the NS-G3 human product/demo evaluation, and Wave 4 stabilisation before the Final Candidate Review (`IMPLEMENTATION_PLAN.md` Section 13; reviewer routing in `AGENT_MODEL_SELECTION.md`). This is deliberate risk control, not a request to re-review every package or every historical line of code.
 
 A reviewer must inspect the **actual repository SHA and evidence**, not merely accept the implementer's report. Reviewer findings are triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
 
@@ -294,9 +294,31 @@ Review focus includes:
 
 Only after this gate and `T-RELEASE` pass is the repository considered final-candidate complete.
 
+## Northstar execution gates (post-Checkpoint-C, bounded)
+
+These gates do not reopen or replace accepted Checkpoints A/B/C; they exist because a single multi-day autonomous implementation horizon is deliberately not trusted.
+
+### NS-G1 — Programme Foundation (Wave 1)
+Acceptance per `IMPLEMENTATION_PLAN.md` Section 13: ~40–45 traveller programme import; individual add/update through the same normalized contract; messy reasonable input maps to validated drafts; missing facts never hallucinated; shared commitments link correctly; programme read model works; policy/funding structures work; Checkpoint C behavior remains green; alternate event/location data requires no application-code change. Test evidence extends the T-NORTHSTAR contract families (intake equivalence, commitment linkage, anti-hardcoding alternate-data).
+
+### Review 1 — after NS-G1
+Default DeepSeek-V4-Flash; fallback Kimi-K2.7-Code; fresh different-family from the primary Qwen implementer. Focus: architecture drift; conference/event-specific hardcoding; duplicated programme truth outside authoritative state; AI output bypassing validation/promotion; fabricated defaults / UNKNOWN becoming certainty; shared commitment semantics; intake equivalence; alternate-event substitution; frozen RV-N0 contracts silently changed; test quality. No unresolved Act Now or gate-threatening Investigate Now may pass NS-G1.
+
+### NS-G2 — Resolution Capabilities (Wave 2)
+Backend convergence acceptance: the four shapes 0/A/B/C (incomplete → viable Trip; traveller changes desired target; provider changes current reality; AnchorEvent/shared commitment changes objective/context) all traverse the same generalized planning/overlay/viability/authority/execution/observation architecture where applicable. Test evidence extends T-NORTHSTAR (ChangeRequest variants A1/A2/A3, funding, hotel adapter lifecycle, Atlas LIVE/RECORD/REPLAY equivalence).
+
+### Review 2 — after NS-G2
+Default DeepSeek-V4-Pro Max (intentional premium use for the highest-risk integrated backend checkpoint); fallbacks per `AGENT_MODEL_SELECTION.md`. Adversarial focus list in `IMPLEMENTATION_PLAN.md` Section 13: authoritative vs desired target state; model-created judging criteria; mutation safety; overlay isolation; deterministic viability; UNKNOWN never PASS; funding/policy correctness; authority/approval; LLM → irreversible API prohibition; execution gate; provider success != resolved; observation/state update; fan-out correctness; unrelated Trips unaffected; LIVE/RECORD/REPLAY identical normalization; provider boundaries and degradation; generalisation; hardcoding; meaningful tests.
+
+### NS-G3 — Integrated Product (Wave 3)
+Human product-owner evaluation of Cases A/B/C integration and the demo criteria in Section 13 — not a broad code review. LIVE/SANDBOX/RECORD/REPLAY/SIMULATED labels must be truthful.
+
+### Wave 4 — Stabilisation / Code Freeze
+Repeated reset → programme → initial planning → Case A / Case B / Case C runs plus failure/degradation paths (Atlas unavailable, hotel unavailable, model unavailable, malformed AI, missing traveller facts, approval declined, no viable recovery → recover/degrade/ask/block/escalate, never crash or fabricated success), followed by the canonical release verification list above.
+
 ## Exceptional review trigger
 
-Outside the four mandatory gates, add a targeted independent review only when evidence warrants it, for example:
+Outside the historical four mandatory gates and the Northstar execution gates above, add a targeted independent review only when evidence warrants it, for example:
 - architecture/shared contracts change materially after Checkpoint A freeze;
 - a real irreversible/provider-money boundary is introduced or materially changed;
 - persistence/auth/security work has meaningful destructive risk;

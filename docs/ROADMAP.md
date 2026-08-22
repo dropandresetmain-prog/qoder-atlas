@@ -60,12 +60,12 @@ Truth boundary: the engine has been proven against **curated/provider-shaped sce
 - Atlas fare/change/refund/no-show rule normalization needed by recovery
 - LIVE development proof plus RECORD/REPLAY through the same normalizer
 
-### Hotel capability — Planned MVP (Northstar, RV-N6/N8)
-Promoted from Stretch investigation to Planned MVP by the RV-N0 contract freeze:
+### Hotel capability — Planned MVP (Northstar, RV-N7; recording discipline with RV-N6)
+Promoted from Stretch investigation to Planned MVP by the RV-N0 contract freeze; promoted further to **MINIMUM with one proper real hotel API adapter** by the post-N0 execution-plan reconciliation:
 - provider-neutral `HotelCapability` seam: search/quote/book/retrieve plus context/modify/cancel (contracts frozen at `NORTHSTAR_CONTRACT_BASE_SHA`)
-- MVP runs on imported booking/policy data; after freeze at most one real hotel API adapter behind the same boundary
+- one proper real hotel API adapter is **MINIMUM**: candidate remains Duffel Stays first, Nuitée fallback if empirical access fails; real/sandbox lifecycle search / quote-or-revalidate / book / retrieve / policy / cancel as available
 - change treated as cancel+rebook until a provider exposes real modification endpoints
-- RECORD/REPLAY through the shared normalizer; Booking.com Demand API remains Stretch if partner credentials are immediately practical
+- LIVE/SANDBOX and REPLAY share normalization/downstream code; Booking.com Demand API remains a further candidate if partner credentials are immediately practical
 
 ### Product surfaces
 - role-neutral operator dashboard/read models
@@ -86,7 +86,7 @@ Promoted from Stretch investigation to Planned MVP by the RV-N0 contract freeze:
 
 **Purpose:** prove that the generalized engine works against externally sourced / provider-produced inputs rather than only curated scenario fixtures.
 
-**Status:** active milestone opened at Checkpoint C closeout. The investigation phase completed (11 reality-validation reports + synthesis decision package on `main`). The **Northstar wave RV-N0..RV-N12** is now the programme-scale execution phase of this milestone, fanning out from `NORTHSTAR_CONTRACT_BASE_SHA` on branch `northstar/contract-freeze` (see `docs/IMPLEMENTATION_PLAN.md` Section 13).
+**Status:** active milestone opened at Checkpoint C closeout. The investigation phase completed (11 reality-validation reports + synthesis decision package on `main`). The **Northstar wave RV-N0..RV-N12** is now the programme-scale execution phase of this milestone, executed as four bounded waves with NS-G1/NS-G2/NS-G3 gates and independent Reviews 1/2; executable contracts are immutable at `NORTHSTAR_CONTRACT_BASE_SHA` and all implementation worktrees fan out from `NORTHSTAR_EXECUTION_BASE_SHA` on branch `northstar/contract-freeze` (see `docs/IMPLEMENTATION_PLAN.md` Section 13).
 
 For each external surface the milestone will investigate and decide where to use: real external source content; provider sandbox/test APIs; LIVE read-only APIs where low-risk and economically bounded; RECORD/REPLAY; or external-boundary simulation only where real/sandbox access is not worth the complexity. Every decision ends with an explicit `Adopt | Defer | Reject` and a roadmap/tracker update. No new product integration is authorized by this milestone until its investigations conclude.
 
@@ -101,12 +101,14 @@ For each external surface the milestone will investigate and decide where to use
 7. **Model Studio reality pass** — actual Qwen extraction/planning against previously unseen real-world inputs.
 8. **Traveller-initiated change / resolution** — the system must support not only externally caused disruptions but also traveller-requested changes: fly a different day; fly at a different time; take a different route; extend or shorten a stay; change hotel; leave earlier/later; reprioritise an objective; voluntarily abandon an objective; request a preference-driven modification. These enter the **same** generalized engine as TripSignals / change intents and trigger: intent/change -> state/context update -> blast radius -> recovery/resolution strategies -> deterministic whole-trip viability -> policy/authority -> execution -> observation -> resolved state. No second "traveller modification engine" is created; this is central to the wider Trip Resolution thesis.
 
-### Northstar scope record (frozen at RV-N0)
+### Northstar scope record (frozen at RV-N0, corrected at NORTHSTAR_EXECUTION_BASE)
 
 Northstar = the AI resolution layer for event travel: one programme at a time (~40–45 inbound travellers), generic across tournaments, corporate offsites, productions, conferences.
 
-- **MIN:** programme aggregate + shared commitments (per-traveller importance); pre-authoritative intake drafts promoted through the frozen mutation path; initial planning through the same engine; declarative ChangeRequest/ResolutionTarget (window shifts, later/direct transport, stay proximity); mixed funding (FUNDED_WINDOW + CostAllocation); ANCHOR_COMMITMENT_CHANGE event-side signal + fan-out; ProgrammeView operator read model; provider-neutral hotel seam over imported data; transfer seam with honest absence; deterministic policy temporal normalization; Cases A/B/C at programme scale.
-- **STRETCH:** one real hotel API adapter post-freeze; Hotelbeds Transfers adapter (P1 #1); immigration validation (P1); LLM-mapped roster channel; event URL/email re-ingestion; multi-window funding splits; endangered-commitment drill-down UI.
+Scope corrections recorded at the docs-only execution-plan reconciliation (see `IMPLEMENTATION_PLAN.md` Section 13): LLM-assisted traveller/event-list mapping is **MINIMUM** (not Stretch); one proper real hotel API adapter (Duffel Stays first, Nuitée fallback) is **MINIMUM** (not Stretch); immigration/entry is **Stretch P1** (not Park); traveller mobile surface is explicit MIN scope.
+
+- **MIN:** programme aggregate + shared commitments (per-traveller importance); pre-authoritative intake drafts (manual + bulk CSV/XLSX/table + LLM-assisted mapping of reasonable messy lists/briefs) promoted through the frozen mutation path; initial planning through the same engine; declarative ChangeRequest/ResolutionTarget (A1 window shift self-funded — polished demo; A2 later/direct flight; A3 hotel closer to venue); mixed funding (FUNDED_WINDOW + CostAllocation); ANCHOR_COMMITMENT_CHANGE event-side signal + fan-out; ProgrammeView operator read model + operator programme dashboard + traveller mobile surface; one real hotel API adapter behind the provider-neutral hotel seam; Atlas LIVE/RECORD/REPLAY reality path; routing + private-transfer reasoning; transfer seam with honest absence; deterministic policy temporal normalization; Cases A/B/C at programme scale.
+- **STRETCH (S1..S8, pull only after NS-G3 and only if Minimum A/B/C are integrated and reliable):** S1 Hotelbeds Transfers transactional adapter (P1 #1); S2 bounded immigration/entry context (P1 — NOT Park); S3 event URL/programme re-ingestion; S4 disruption/email ingestion; S5 Northstar Skill; S6 richer insurance path; S7 live Google Routes with corrected guardrails; S8 Atlas baggage/seats if useful; multi-window funding splits; endangered-commitment drill-down UI. Event/org policy, supplier policies and one useful insurance-policy path remain supported data/context. Do not start new Stretch work after 26 Aug unless it closes an existing demo blocker.
 - **PARK (excluded from Northstar):** participant sourcing, registration, CRM, ticketing; check-in/logistics marketplaces; partial-attendance heuristics; coordinated multi-traveller changes; insurance claims automation.
 
 All exclusions under "Deferred / Not in MVP" remain in force unchanged.
@@ -117,14 +119,14 @@ Stretch work starts only after the generalized core vertical loop passes the imp
 
 ### Ground transfer capability (Hotelbeds Transfers) — Stretch P1 #1
 **Why stretch:** the provider-neutral `TransferCapability` seam is frozen at `NORTHSTAR_CONTRACT_BASE_SHA` and MVP honestly reports capability absence; a real adapter adds transactional ground coverage without changing engine logic.
-**Revisit when:** hotel capability (RV-N6) is stable; Hotelbeds Transfers API access is practical. This is the first Stretch candidate of the Northstar wave (RV-N7).
+**Revisit when:** the hotel adapter (RV-N7) is stable; Hotelbeds Transfers API access is practical. This is Stretch P1 #1 of the Northstar wave (S1 in the post-NS-G3 stretch pull list); routing + private-transfer reasoning itself is MIN scope in Wave 2 (RV-N8).
 
 ### Immigration/entry validation — Stretch P1
 **Why stretch:** entry research with source/uncertainty is MVP; authoritative real-time document/visa validation needs commercial sources (Timatic/AutoCheck) and legal-grade accuracy.
 **Revisit when:** a commercial entry-data source is accessible and a programme context makes validation decisively valuable.
 
 ### Event URL/email re-ingestion
-**Why stretch:** initial ingestion of event pages/emails is MVP; picking up changed programme facts (rescheduled sessions, new venue) from re-crawled sources is a bounded extension of the existing source framework (RV-N9 STRETCH).
+**Why stretch:** initial ingestion of event pages/emails is MVP; picking up changed programme facts (rescheduled sessions, new venue) from re-crawled sources is a bounded extension of the existing source framework (Stretch S3 in the post-NS-G3 pull list; the former RV-N9 re-ingestion scope was re-scoped by the execution-plan reconciliation).
 **Revisit when:** programme intake and commitment fan-out are stable.
 
 ### Atlas baggage / seat reasoning
