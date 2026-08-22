@@ -117,6 +117,27 @@ export const UI_STATE_INVENTORY: readonly UiStateSpec[] = [
     answers: ['What remains uncertain?', 'Am I okay?'],
   },
   {
+    id: 'planning',
+    surface: 'BOTH',
+    trigger: 'PLANNING',
+    userMeaning: 'The traveller is confirmed but no complete trip is booked yet; building the first viable plan.',
+    answers: ['Who is ready?', 'What is the system doing?', 'What remains uncertain?'],
+  },
+  {
+    id: 'needs-traveller-info',
+    surface: 'BOTH',
+    trigger: 'NEEDS_TRAVELLER_INFO',
+    userMeaning: 'We need details from the traveller before onboarding can complete.',
+    answers: ['What do you need from me?', 'What remains uncertain?'],
+  },
+  {
+    id: 'change-requested',
+    surface: 'BOTH',
+    trigger: 'CHANGE_REQUESTED',
+    userMeaning: 'The traveller asked to change something; options are being resolved against the current trip.',
+    answers: ['What changed?', 'What is the system doing?', 'What decision is required?'],
+  },
+  {
     id: 'awaiting-traveller-input',
     surface: 'BOTH',
     trigger: 'AWAITING_TRAVELLER_INPUT',

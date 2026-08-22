@@ -13,6 +13,9 @@ export type StatusTone = 'ok' | 'watch' | 'alert' | 'active' | 'done' | 'neutral
 
 export const STATUS_LABEL: Record<ReadModelStatus, string> = {
   READY: 'Ready',
+  PLANNING: 'Trip being planned',
+  NEEDS_TRAVELLER_INFO: 'Needs traveller details',
+  CHANGE_REQUESTED: 'Change requested',
   AT_RISK: 'At risk',
   DISRUPTED: 'Needs attention',
   RECOVERING: 'Recovery under way',
@@ -22,6 +25,9 @@ export const STATUS_LABEL: Record<ReadModelStatus, string> = {
 
 export const STATUS_TONE: Record<ReadModelStatus, StatusTone> = {
   READY: 'ok',
+  PLANNING: 'active',
+  NEEDS_TRAVELLER_INFO: 'watch',
+  CHANGE_REQUESTED: 'active',
   AT_RISK: 'watch',
   DISRUPTED: 'alert',
   RECOVERING: 'active',
@@ -32,6 +38,9 @@ export const STATUS_TONE: Record<ReadModelStatus, StatusTone> = {
 /** One-line plain-language explanation shown next to operator status badges. */
 export const STATUS_EXPLANATION: Record<ReadModelStatus, string> = {
   READY: 'Everything on this trip is confirmed and on track.',
+  PLANNING: 'The traveller is confirmed; we are building the first workable trip plan.',
+  NEEDS_TRAVELLER_INFO: 'We are waiting on details from the traveller before we can finish onboarding.',
+  CHANGE_REQUESTED: 'The traveller asked for a change; options are being checked against the current trip.',
   AT_RISK: 'Something may still go wrong; we are watching it closely.',
   DISRUPTED: 'Plans changed and part of this trip no longer works as booked.',
   RECOVERING: 'We are actively working on a replacement plan.',
@@ -42,6 +51,9 @@ export const STATUS_EXPLANATION: Record<ReadModelStatus, string> = {
 /** Traveller hero headline per trip status. Never claims success it cannot prove. */
 export const TRAVELLER_HEADLINE: Record<ReadModelStatus, string> = {
   READY: 'You are all set',
+  PLANNING: 'We are planning your trip',
+  NEEDS_TRAVELLER_INFO: 'We need a few details from you',
+  CHANGE_REQUESTED: 'We are looking into your request',
   AT_RISK: 'Heads up about your trip',
   DISRUPTED: 'Your trip needs attention',
   RECOVERING: 'We are working on your trip',
@@ -52,6 +64,9 @@ export const TRAVELLER_HEADLINE: Record<ReadModelStatus, string> = {
 /** Subline shown under the traveller hero headline. */
 export const TRAVELLER_SUBLINE: Record<ReadModelStatus, string> = {
   READY: 'All of your bookings are confirmed. Nothing needs your attention.',
+  PLANNING: 'No bookings are confirmed yet. We will show options as soon as they are checked.',
+  NEEDS_TRAVELLER_INFO: 'Please share the details we asked for so we can complete your plan.',
+  CHANGE_REQUESTED: 'Nothing has been changed yet. We will come back with options and any decisions needed.',
   AT_RISK: 'Part of your trip may be affected. We are keeping an eye on it.',
   DISRUPTED: 'Something changed and part of your trip no longer works as planned.',
   RECOVERING: 'We are finding a new plan and will only ask you when we need you.',

@@ -16,8 +16,17 @@ export interface ReadModelEnvelope<T> {
   generatedAt?: IsoDateTime;
 }
 
+/**
+ * Operational status for a traveller/trip surface.
+ * - PLANNING: confirmed traveller, no viable trip yet (initial planning).
+ * - NEEDS_TRAVELLER_INFO: intake/promotion blocked on traveller input.
+ * - CHANGE_REQUESTED: traveller ChangeRequest accepted, resolution in flight.
+ */
 export type ReadModelStatus =
   | 'READY'
+  | 'PLANNING'
+  | 'NEEDS_TRAVELLER_INFO'
+  | 'CHANGE_REQUESTED'
   | 'AT_RISK'
   | 'DISRUPTED'
   | 'RECOVERING'
@@ -67,6 +76,62 @@ export interface OperatorDashboardView {
   generatedAt: IsoDateTime;
   summary: OperatorDashboardSummary;
   trips: OperatorTripView[];
+}
+
+// ---------------------------------------------------------------------------
+// Programme projection (Northstar)
+// ---------------------------------------------------------------------------
+
+/** Per-status rollup for every traveller/trip in one AnchorEvent programme. */
+export interface ProgrammeStatusSummary {
+  total: number;
+  ready: number;
+  planning: number;
+  needsTravellerInfo: number;
+  changeRequested: number;
+  atRisk: number;
+  disrupted: number;
+  recovering: number;
+  awaitingDecision: number;
+  resolved: number;
+  unknown: number;
+}
+
+/** A shared event commitment with evidence of danger, from authoritative state. */
+export interface EndangeredCommitmentView {
+  commitmentId: EntityId;
+  title: string;
+  /** Deterministic reason the commitment is endangered. */
+  reason: string;
+  /** Travellers whose engagement of it is threatened. */
+  affectedTravellerIds: EntityId[];
+}
+
+/** One traveller's programme-level row: status + open cases + decisions. */
+export interface ProgrammeTravellerView {
+  tripId: EntityId;
+  travellerId: EntityId;
+  travellerName: string;
+  status: ReadModelStatus;
+  activeCaseIds: EntityId[];
+  decisionsRequired: number;
+  uncertainties: string[];
+  updatedAt: IsoDateTime;
+}
+
+/**
+ * Operator view over one AnchorEvent programme — a pure projection over
+ * authoritative AnchorEvent / Trip / RecoveryCase state (no UI-local truth).
+ */
+export interface ProgrammeView {
+  generatedAt: IsoDateTime;
+  anchorEventId: EntityId;
+  anchorEventName: string;
+  summary: ProgrammeStatusSummary;
+  travellers: ProgrammeTravellerView[];
+  endangeredCommitments: EndangeredCommitmentView[];
+  /** Unresolved UNKNOWN evidence across the programme. */
+  unresolvedUncertainties: string[];
 }
 
 // ---------------------------------------------------------------------------

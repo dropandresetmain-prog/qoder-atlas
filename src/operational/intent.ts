@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { EntityIdSchema, EntityRefSchema, IsoDateTimeSchema, MoneySchema } from '../domain/common.ts';
+import { PayerSchema } from '../domain/rules.ts';
 import { CapabilityFamilySchema } from './strategy.ts';
 
 export const SideEffectLevelSchema = z.enum([
@@ -19,7 +20,8 @@ export type SideEffectLevel = z.infer<typeof SideEffectLevelSchema>;
 /**
  * Provider-neutral operation vocabulary. Concrete adapters map these to
  * provider endpoints (e.g. flight.search -> Atlas search.do); the mapping is
- * adapter-private.
+ * adapter-private. Consequential entries exist ONLY for the ActionIntent /
+ * authority path; the planner's read-only vocabulary is ToolOperationSchema.
  */
 export const CapabilityOperationSchema = z.enum([
   'flight.search',
@@ -29,9 +31,19 @@ export const CapabilityOperationSchema = z.enum([
   'flight.cancel',
   'flight.refund_quote',
   'hotel.context',
+  'hotel.search',
+  'hotel.quote',
+  'hotel.book',
+  'hotel.retrieve',
   'hotel.modify',
   'hotel.cancel',
   'routing.context',
+  'transfer.search',
+  'transfer.quote',
+  'transfer.book',
+  'transfer.retrieve',
+  'transfer.amend',
+  'transfer.cancel',
   'research.entry_requirements',
   'research.local_context',
   'communication.notify',
@@ -51,6 +63,23 @@ export const ActionIntentStatusSchema = z.enum([
 ]);
 export type ActionIntentStatus = z.infer<typeof ActionIntentStatusSchema>;
 
+/**
+ * Deterministic payer allocation for an intent's incremental cost (ADR-037).
+ * Produced by the authority/allocation step from FUNDED_WINDOW rules and the
+ * traveller's funding declaration — never by the LLM, never by assumption.
+ * Absent allocation means allocation has not yet been computed (UNKNOWN),
+ * which authority must treat as unresolved, not as event-funded.
+ */
+export const CostAllocationSchema = z.strictObject({
+  coveredAmount: MoneySchema.optional(),
+  incrementalAmount: MoneySchema.optional(),
+  coveredBy: PayerSchema.optional(),
+  incrementalPayer: PayerSchema.optional(),
+  /** Rule ids that produced the allocation, for the authority trace. */
+  derivedFromRuleIds: z.array(EntityIdSchema).default([]),
+});
+export type CostAllocation = z.infer<typeof CostAllocationSchema>;
+
 export const ActionIntentSchema = z.strictObject({
   id: EntityIdSchema,
   caseId: EntityIdSchema,
@@ -60,6 +89,8 @@ export const ActionIntentSchema = z.strictObject({
   parameters: z.record(z.string(), z.unknown()).default({}),
   sideEffectLevel: SideEffectLevelSchema,
   priceDelta: MoneySchema.optional(),
+  /** Deterministic payer allocation of `priceDelta` when mixed funding applies. */
+  costAllocation: CostAllocationSchema.optional(),
   /** Evidence refs supporting the intent (viability results, quotes...). */
   evidenceRefs: z.array(EntityIdSchema).default([]),
   expectedResult: z.string().optional(),

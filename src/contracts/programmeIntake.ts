@@ -1,0 +1,96 @@
+/**
+ * Northstar RV-N0 — programme traveller intake contract (ADR-035).
+ *
+ * One normalized intake surface for every onboarding path:
+ *   - manual single-traveller entry
+ *   - later add/update of one traveller
+ *   - bulk CSV/XLSX import (adapters parse; this contract is NOT CSV-shaped)
+ *   - LLM-assisted mapping from a messy event brief / traveller list
+ *
+ * Drafts are PRE-AUTHORITATIVE. AI or parsers may populate them from anything,
+ * but only deterministic validation + an explicit promotion step (through the
+ * frozen MutationService proposal path) ever creates authoritative Traveller /
+ * Trip state. A draft alone can never write trip state.
+ */
+import { z } from 'zod';
+import { EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
+
+/**
+ * How this draft entered the system. Deterministic promotion rules may treat
+ * provenance classes differently (e.g. LLM-mapped drafts require review),
+ * but the authoritative gate is the promotion step, not this field.
+ */
+export const IntakeChannelSchema = z.enum([
+  'MANUAL_ENTRY',
+  'BULK_IMPORT',
+  'LLM_MAPPED',
+  'LATER_UPDATE',
+]);
+export type IntakeChannel = z.infer<typeof IntakeChannelSchema>;
+
+/**
+ * Deterministic identity hints used to resolve a draft against an existing
+ * Traveller. None are mandatory; the promotion resolver decides matches and
+ * records unresolved ambiguity as uncertainty rather than guessing.
+ */
+export const TravellerIdentityHintSchema = z.strictObject({
+  email: z.string().optional(),
+  phoneE164: z.string().optional(),
+  lastName: z.string().optional(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  passportNumber: z.string().optional(),
+});
+export type TravellerIdentityHint = z.infer<typeof TravellerIdentityHintSchema>;
+
+/**
+ * One traveller as supplied by the organiser. Every field except a display
+ * name is optional so sparse/messy intake is representable; missing facts
+ * become explicit uncertainty at promotion, never fabricated values.
+ */
+export const ProgrammeTravellerDraftSchema = z.strictObject({
+  /** Draft-local id; authoritative EntityIds are assigned only at promotion. */
+  draftId: EntityIdSchema,
+  displayName: z.string(),
+  identity: TravellerIdentityHintSchema.default({}),
+  /** Home city/airport hint, free text — resolved against Place at promotion. */
+  homeLocationText: z.string().optional(),
+  nationalityCodes: z.array(z.string()).default([]),
+  /** Accessibility statements as stated; classification happens downstream. */
+  accessibilityStatements: z.array(z.string()).default([]),
+  /** Free-form notes from the source (dietary, loyalty, special handling). */
+  notes: z.array(z.string()).default([]),
+  /** Which shared programme items this traveller participates in. */
+  anchorCommitmentIds: z.array(EntityIdSchema).default([]),
+});
+export type ProgrammeTravellerDraft = z.infer<typeof ProgrammeTravellerDraftSchema>;
+
+/**
+ * A batch of traveller drafts for one programme, however it was produced.
+ * Bulk and LLM paths both land here; equivalence between channels is a
+ * promotion-time property, not a schema difference.
+ */
+export const ProgrammeImportDraftSchema = z.strictObject({
+  id: EntityIdSchema,
+  anchorEventId: EntityIdSchema,
+  channel: IntakeChannelSchema,
+  /** Source the drafts were produced from (uploaded file, brief, manual). */
+  sourceId: EntityIdSchema,
+  receivedAt: IsoDateTimeSchema,
+  travellers: z.array(ProgrammeTravellerDraftSchema).default([]),
+  /** Statements the mapper could not resolve into drafts. */
+  unresolvedStatements: z.array(z.string()).default([]),
+});
+export type ProgrammeImportDraft = z.infer<typeof ProgrammeImportDraftSchema>;
+
+/**
+ * Result of deterministic promotion of one draft. Promotion is the ONLY path
+ * from draft to authoritative state; failures stay as issues/uncertainty.
+ */
+export const PromotionOutcomeSchema = z.strictObject({
+  draftId: EntityIdSchema,
+  promoted: z.boolean(),
+  travellerId: EntityIdSchema.optional(),
+  tripId: EntityIdSchema.optional(),
+  issues: z.array(z.string()).default([]),
+});
+export type PromotionOutcome = z.infer<typeof PromotionOutcomeSchema>;

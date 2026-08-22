@@ -5,3 +5,5 @@ export * from './capabilities.ts';
 export * from './services.ts';
 export * from './planner.ts';
 export * from './readmodels.ts';
+export * from './changeRequest.ts';
+export * from './programmeIntake.ts';

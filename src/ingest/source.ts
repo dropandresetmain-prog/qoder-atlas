@@ -57,6 +57,12 @@ export const IngestionContextSchema = z.strictObject({
   travellerId: EntityIdSchema.optional(),
   organisationId: EntityIdSchema.optional(),
   anchorEventId: EntityIdSchema.optional(),
+  /**
+   * Explicit IANA timezone for deterministic normalization of extracted
+   * temporal values (ADR-040). Absence forces honest rejection of naive
+   * timestamps rather than guessed offsets.
+   */
+  timezone: z.string().optional(),
 });
 export type IngestionContext = z.infer<typeof IngestionContextSchema>;
 

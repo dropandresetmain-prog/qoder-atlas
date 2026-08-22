@@ -129,8 +129,11 @@ export interface RoutingCapability {
 // ---------------------------------------------------------------------------
 
 /**
- * Hotel capability works from imported booking/policy data; transactional
- * modify/cancel may be simulated at the provider boundary (ADR-007).
+ * Hotel capability covers BOTH imported booking/policy context (getStayContext)
+ * and a provider-neutral transactional surface (search/quote/book/retrieve,
+ * modify/cancel where the provider supports them). Transactional modify/cancel
+ * may be simulated at the provider boundary (ADR-007); providers without
+ * in-place modification are handled as cancel + rebook inside the adapter.
  */
 export interface StayContextQuery {
   stayElementId: EntityId;
@@ -142,6 +145,93 @@ export interface StayContext {
   noShowCutoff?: IsoDateTime;
   lateArrivalSupported?: boolean;
   cancellation?: { refundable: boolean; deadline?: IsoDateTime; fee?: Money };
+}
+
+/** Provider-opaque location input: external ref or coordinates + radius. */
+export interface HotelSearchQuery {
+  location: {
+    externalRef?: ExternalRef;
+    coordinates?: { latitude: number; longitude: number; radiusKm?: number };
+  };
+  /** Local dates at the property (YYYY-MM-DD). */
+  checkInDate: string;
+  checkOutDate: string;
+  guests?: { adults: number; children?: number };
+  rooms?: number;
+}
+
+export interface HotelPropertyView {
+  /** Opaque provider identifier — preserved exactly, never reinterpreted. */
+  propertyId: string;
+  name: string;
+  address?: string;
+  coordinates?: { latitude: number; longitude: number };
+  externalRefs?: ExternalRef[];
+}
+
+export interface HotelRateView {
+  /** Opaque provider rate/offer identifier. */
+  rateId: string;
+  propertyId: string;
+  roomDescription?: string;
+  totalPrice: Money;
+  /** Provider-neutral cancellation posture. */
+  refundable: boolean;
+  cancellationDeadline?: IsoDateTime;
+  cancellationFee?: Money;
+  availability: 'AVAILABLE' | 'LIMITED' | 'UNKNOWN';
+  expiresAt?: IsoDateTime;
+}
+
+export interface HotelSearchOutcome {
+  properties: HotelPropertyView[];
+  rates: HotelRateView[];
+}
+
+export interface HotelQuoteQuery {
+  rateId: string;
+  /** Opaque provider workflow state carried between search and quote. */
+  workflowState?: Record<string, unknown>;
+}
+
+export interface HotelQuoteOutcome {
+  status: 'QUOTED' | 'PRICE_CHANGED' | 'UNAVAILABLE';
+  quotedPrice?: Money;
+  priceDelta?: Money;
+  /** Handle required by bookStay; provider-opaque. */
+  quoteId?: string;
+  workflowState?: Record<string, unknown>;
+}
+
+export interface HotelBookQuery {
+  quoteId: string;
+  /** Guest identity sufficient for the provider; adapter maps specifics. */
+  guestNames: string[];
+  /** Opaque provider payment handle (balance/card/virtual); never raw card data. */
+  paymentRef?: string;
+  /** Idempotency / reconciliation reference owned by the caller. */
+  clientReference?: string;
+}
+
+export interface HotelBookingOutcome {
+  confirmed: boolean;
+  bookingId?: string;
+  providerConfirmationCode?: string;
+  totalPrice?: Money;
+  provenance: 'LIVE' | 'REPLAY' | 'SIMULATED';
+}
+
+export interface HotelRetrieveQuery {
+  bookingId: string;
+}
+
+export interface HotelBookingStatusView {
+  bookingId: string;
+  status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'UNKNOWN';
+  propertyName?: string;
+  checkIn?: IsoDateTime;
+  checkOut?: IsoDateTime;
+  cancellationFee?: Money;
 }
 
 export interface HotelActionQuery {
@@ -161,9 +251,101 @@ export interface HotelActionOutcome {
 
 export interface HotelCapability {
   readonly descriptor: CapabilityDescriptor;
+  /** Imported-booking context (Checkpoint-C surface; unchanged). */
   getStayContext(query: StayContextQuery): Promise<CapabilityResult<StayContext>>;
+  /** Transactional discovery/quote/book/retrieve (Northstar initial planning). */
+  searchHotels(query: HotelSearchQuery): Promise<CapabilityResult<HotelSearchOutcome>>;
+  quoteRate(query: HotelQuoteQuery): Promise<CapabilityResult<HotelQuoteOutcome>>;
+  bookStay(query: HotelBookQuery): Promise<CapabilityResult<HotelBookingOutcome>>;
+  retrieveBooking(query: HotelRetrieveQuery): Promise<CapabilityResult<HotelBookingStatusView>>;
+  /**
+   * In-place modification where the provider supports it; adapters without it
+   * implement this as cancel + rebook and report so in the outcome.
+   */
   modifyStay(query: HotelActionQuery): Promise<CapabilityResult<HotelActionOutcome>>;
   cancelStay(query: HotelActionQuery): Promise<CapabilityResult<HotelActionOutcome>>;
+}
+
+// ---------------------------------------------------------------------------
+// Ground transfer (transactional inventory; routing context stays in Routing)
+// ---------------------------------------------------------------------------
+
+export interface TransferSearchQuery {
+  pickup: { externalRef?: ExternalRef; coordinates?: { latitude: number; longitude: number }; addressText?: string };
+  dropoff: { externalRef?: ExternalRef; coordinates?: { latitude: number; longitude: number }; addressText?: string };
+  pickupAt: IsoDateTime;
+  passengers: number;
+}
+
+export interface TransferOptionView {
+  /** Opaque provider option identifier. */
+  optionId: string;
+  vehicleClass?: string;
+  totalPrice: Money;
+  availability: 'AVAILABLE' | 'LIMITED' | 'UNKNOWN';
+  expiresAt?: IsoDateTime;
+}
+
+export interface TransferSearchOutcome {
+  options: TransferOptionView[];
+}
+
+export interface TransferQuoteQuery {
+  optionId: string;
+  workflowState?: Record<string, unknown>;
+}
+
+export interface TransferQuoteOutcome {
+  status: 'QUOTED' | 'PRICE_CHANGED' | 'UNAVAILABLE';
+  quotedPrice?: Money;
+  quoteId?: string;
+  workflowState?: Record<string, unknown>;
+}
+
+export interface TransferBookQuery {
+  quoteId: string;
+  passengerNames: string[];
+  paymentRef?: string;
+  clientReference?: string;
+}
+
+export interface TransferBookingOutcome {
+  confirmed: boolean;
+  bookingId?: string;
+  provenance: 'LIVE' | 'REPLAY' | 'SIMULATED';
+}
+
+export interface TransferRetrieveQuery {
+  bookingId: string;
+}
+
+export interface TransferBookingStatusView {
+  bookingId: string;
+  status: 'CONFIRMED' | 'AMENDED' | 'CANCELLED' | 'COMPLETED' | 'UNKNOWN';
+  pickupAt?: IsoDateTime;
+  cancellationFee?: Money;
+}
+
+export interface TransferAmendQuery {
+  bookingId: string;
+  newPickupAt?: IsoDateTime;
+  newPassengers?: number;
+}
+
+export interface TransferActionQuery {
+  bookingId: string;
+  reason?: string;
+}
+
+export interface TransferCapability {
+  readonly descriptor: CapabilityDescriptor;
+  searchTransfers(query: TransferSearchQuery): Promise<CapabilityResult<TransferSearchOutcome>>;
+  quoteTransfer(query: TransferQuoteQuery): Promise<CapabilityResult<TransferQuoteOutcome>>;
+  bookTransfer(query: TransferBookQuery): Promise<CapabilityResult<TransferBookingOutcome>>;
+  retrieveBooking(query: TransferRetrieveQuery): Promise<CapabilityResult<TransferBookingStatusView>>;
+  /** Provider-dependent: adapters without amendment implement amend as cancel + rebook. */
+  amendBooking(query: TransferAmendQuery): Promise<CapabilityResult<TransferBookingOutcome>>;
+  cancelBooking(query: TransferActionQuery): Promise<CapabilityResult<TransferBookingOutcome>>;
 }
 
 // ---------------------------------------------------------------------------

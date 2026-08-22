@@ -6,6 +6,23 @@ This defines what product must demonstrate, not final video script.
 
 A replacement flight is not necessarily a recovered trip. The system maintains viability of the whole trip rather than returning a chatbot answer or list of alternatives.
 
+## Northstar framing (primary, RV-N0 freeze)
+
+Northstar — the AI resolution layer for event travel. The primary demo narrative is one event-travel programme (roughly 40–45 inbound travellers) run end to end through the real engine:
+
+1. **Programme scale.** Operator view over the whole programme: per-status rollups, shared commitments, per-traveller importance — not 40 separate single-trip widgets.
+2. **Initialisation.** Intake drafts (manual/bulk/LLM-assisted) are promoted through the validated path; trips start empty (zero elements, UNKNOWN viability) and initial planning builds them through the same engine that later handles disruptions.
+3. **Case A — traveller change.** A traveller asks to arrive earlier, leave later, and fund the difference themselves. Declarative target → funding allocation → authority → execution → observed state. No booked state mutates until authorised.
+4. **Case B — hero recovery.** A provider disruption endangers a shared commitment. Blast radius across Engagement-linked trips, deterministic viability, one attractive candidate rejected against a hard objective, authority + execution, resolution judged by observed state.
+5. **Case C — event-side change.** The organiser reschedules/relocates a commitment. One `ANCHOR_COMMITMENT_CHANGE` signal fans out to every linked traveller with differentiated handling by per-traveller importance.
+6. **Recovered programme.** The programme read model returns to a consistent resolved state with every per-traveller case closed and the audit trail intact.
+
+Case semantics are frozen in `PRODUCT_SPEC.md` ("Frozen acceptance Cases A/B/C"); demo data is fixture content only.
+
+**Provenance labels.** Every demo segment discloses its boundary exactly, using these labels: **LIVE** (real provider/model call), **SANDBOX** (provider test environment), **RECORD** (captured live/sandbox interaction), **REPLAY** (recorded responses through the same normalizer/engine), **SIMULATED** (external-boundary effect with no real provider — disclosed, core engine stays real). REPLAY is the default for routine runs; LIVE/SANDBOX only where budgeted and claimed.
+
+The Checkpoint C single-traveller scenario shape below remains valid as the engine's historical proof path and backup narrative; the Northstar framing supersedes it as the primary story.
+
 ## Primary scenario shape
 
 An organiser manages multiple invited travellers around an AnchorEvent. One traveller's trip becomes disrupted. Exact event/traveller/location remain input data, not application logic.

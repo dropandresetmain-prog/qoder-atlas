@@ -62,6 +62,10 @@ Persistent context may include identity, home airport, nationality/passport cont
 ### AnchorEvent
 Optional shared context for multiple Trips: conference, concert, retreat, tournament, wedding, offsite, trade mission, etc. It can provide shared location, schedule, engagements, organiser instructions and policy without duplicating those inputs across travellers.
 
+For Northstar (ADR-034) the AnchorEvent is additionally the **programme aggregate** ("mother graph" in product language): shared programme truth/context for many traveller Trips. This is NOT a second graph engine or a graph database — it is one AnchorEvent entity plus typed references from Trips and Engagements, with programme-level state derived as read models.
+
+Shared programme items are addressable `AnchorCommitment` children of the AnchorEvent (generic kinds: SESSION / SOCIAL / LOGISTICS / OTHER). A per-trip `Engagement` references one commitment via `data.anchorCommitmentId`. Commitments carry **no** importance or hardness: how binding a commitment is differs per traveller and is expressed by each trip's own engagement `importance`. Changes to a commitment propagate via `ANCHOR_COMMITMENT_CHANGE` signals and a programme fan-out coordinator (see §3a).
+
 ### Trip
 Aggregate root for operational journey state. A Trip links travellers, TripElements, objectives, applicable rules/constraints, governance and viability state.
 
@@ -113,7 +117,31 @@ Operational workflow record referencing triggering signals, affected elements, f
 Structured hypothetical recovery plan containing candidate mutations, tool needs, assumptions, unresolved uncertainty, cost/impact and expected outcomes.
 
 ### ActionIntent
-Structured proposed side effect with operation, target/provider, price delta, reversibility/side-effect level, evidence and expected result.
+Structured proposed side effect with operation, target/provider, price delta, reversibility/side-effect level, evidence and expected result. Where mixed funding applies, the intent additionally carries a deterministic `CostAllocation` (covered vs incremental amounts and payers, derived from `FUNDED_WINDOW` rules and the traveller's funding declaration — see §12a).
+
+## 3a. Programme semantics (Northstar, ADR-034..038)
+
+### Programme fan-out coordinator
+When a shared commitment changes, a programme-level coordinator:
+1. validates the `ANCHOR_COMMITMENT_CHANGE` payload shape;
+2. identifies every Engagement across all Trips whose `anchorCommitmentId` matches;
+3. fans the change out into **ordinary per-Trip processing** — one signal-driven impact/recovery pass per affected Trip.
+
+The coordinator never teaches the ImpactEngine to reason over a whole event; the engine keeps its proven per-Trip scope. The coordinator is deterministic discovery + dispatch, not a second engine.
+
+### Programme traveller intake (ADR-035)
+One normalized pre-authoritative contract (`ProgrammeImportDraft` / `ProgrammeTravellerDraft`) serves manual entry, later add/update, bulk file import and LLM-assisted mapping from messy briefs. Drafts are data only; deterministic validation and promotion through the frozen mutation path is the sole route to authoritative Traveller/Trip state. Single and bulk paths are equivalent at promotion time; the channel is provenance, not behaviour.
+
+### Initial trip planning (ADR-038)
+A confirmed traveller with commitments and policy but no viable trip yet enters the SAME generalized engine. A Trip may legitimately have zero elements and viability `UNKNOWN`; a case carries `caseKind: INITIAL_PLANNING` as classification evidence only. The planner proposes candidate elements; overlay viability, authority, execution and observation are unchanged. There is no separate booking engine: the engine's assumptions (an existing failed element, a disruption signal, an already-invalid booking) do not gate the pipeline — missing required elements are simply what candidates add.
+
+### Traveller ChangeRequest / ResolutionTarget (ADR-036)
+Traveller desire != authoritative provider state. A request becomes a `ChangeRequest` carrying a declarative `ResolutionTarget`: desired trip-window shifts, transport attributes, stay proximity and objective effects — and nothing else. The target contains no element mutations, booking ids or provider operations, so a request can never encode a state change. The request normalizes into a `TRAVELLER_INPUT` signal; the standard pipeline compares the target against the CURRENT authoritative trip, plans strategies, evaluates overlays, applies policy/authority, executes and observes. Booked flight/hotel schedules never mutate because a traveller asked for a new schedule.
+
+The same contract represents at least: (1) earlier arrival + later departure + partial self-funding; (2) later/different flight, preferably direct; (3) hotel change closer to the event venue.
+
+### Programme-level read model
+Programme/operator state is a projection over authoritative AnchorEvent / Trip / RecoveryCase state (`ProgrammeView`): per-status rollups, endangered commitments with affected travellers, active cases, decisions required, unresolved uncertainty. No UI-local truth.
 
 ## 4. Graph relationships
 
@@ -268,9 +296,9 @@ Two families:
 Normalize event webpages, emails, calendar, traveller messages, provider webhooks, uploads and web research into approved source data or TripSignals.
 
 ### Operational capability adapters
-Provider-neutral operations such as flight.search/verify/rules/book/modify/refund, hotel.read/search/modify/cancel, routing.route, entry.research/check, insurance.read/evaluate, communication.notify/request_approval.
+Provider-neutral operations such as flight.search/verify/rules/book/modify/refund, hotel.search/quote/book/retrieve/read/modify/cancel, transfer.search/quote/book/retrieve/amend/cancel, routing.route, entry.research/check, insurance.read/evaluate, communication.notify/request_approval.
 
-Each adapter advertises supported operations and side-effect level. Atlas is the hackathon flight adapter; future GDS/NDC systems plug into the same interface.
+Each adapter advertises supported operations and side-effect level. Atlas is the hackathon flight adapter; future GDS/NDC systems plug into the same interface. Read-only operations may back planner tools; consequential operations are only reachable through the authority path and are never exposed as tool vocabulary.
 
 ## 14. Current external implementation posture
 
@@ -293,7 +321,10 @@ Use structured/OpenAI-compatible/Responses surfaces with Qwen or another suitabl
 Optional `computeRoutes` adapter for traffic-aware driving/transit context. It must fail gracefully or use recorded/sourced/unknown context if credentials/network are absent.
 
 ### Hotel
-Generic HotelCapability works from imported booking/policy data without a transactional hotel API. Booking.com Demand API is Stretch; if partner credentials become immediately available it may be added behind the same capability boundary.
+`HotelCapability` is the provider-neutral seam: search/quote/book/retrieve on top of imported booking/policy data, plus context/modify/cancel. MVP runs on imported booking/policy data without a transactional hotel API. After contract freeze, one real hotel API adapter may be added behind the same boundary. Until a provider says "cancelled", the system treats change as cancel+rebook, not mutation. Booking.com Demand API remains Stretch; if partner credentials become immediately available it may be added behind the same capability boundary.
+
+### Ground transfer
+`TransferCapability` is a provider-neutral seam (search/quote/book/retrieve/amend/cancel) with the same CapabilityResult envelope and opaque provider ids. No adapter is implemented in MVP; dispatch reports honest capability absence. Hotelbeds Transfers API is the first candidate (Stretch P1).
 
 ### Entry/immigration
 Use authoritative sources for legal facts. Commercial Timatic/AutoCheck is future/deferred.

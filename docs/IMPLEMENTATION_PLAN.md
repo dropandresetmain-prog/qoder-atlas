@@ -732,6 +732,7 @@ This table is the execution status SSOT. Update it as work moves; do not create 
 | R1 | Reliability/replay | Integrated | REV-B | integration | Qwen3.8 xHigh; GLM-5.3 for hard failures | Generic runtime recovery/reset flow over HTTP (`/api/runtime/{disruption,plan,begin,decide,execute,reset,state}`): scenario-neutral `RuntimeOrchestrator` + `src/app/compose.ts` shared by `main.ts` and tests (no separate demo path), deterministic `DeterministicFallbackPlanner` (credential-free REPLAY planning; Model Studio planner used only when configured), audited single-transaction reset + reseed through the same validated `seedScenarioBundle` mutation path (no manual SQLite edits), every stage caller-supplied instants. Three engine/verifier gaps closed generically: `CaseVerifier` now trip-scopes constraints by ref matching (other trips' constraints can no longer poison verification), `POST /api/runtime/state` returns 405, provider-success-only still never resolves. Evidence: `test/integration.r1.test.ts` — credential-free full loop over HTTP (disruption → plan → begin → wrong-principal refused → correct APPROVED → execute → RESOLVED FULLY_RECOVERED), gate refusal of unapproved execution, repeat-execute refused on RESOLVED, reset restores byte-identical seeded state, and two identical runs + file-DB restart yield byte-identical trip JSON. |
 | REV-C-FIX | Review Gate C fix set (WP-C1..C5) | Implemented | G1,G2,G3,R1 | checkpoint-c | Review-driven engine/app correction | Five review fix packages on `checkpoint-c`: **WP-C1** planner-authored operations can no longer reach authoritative state — observation allowlist `confirmedOperationsFor` (confirmed TRIP_ELEMENT upserts + WAIVE_OR_REPRIORITIZE_OBJECTIVE only) plus defence-in-depth overlay rejection of candidates mutating judging criteria (`src/app/recoveryExecution.ts`, `src/engine/overlay.ts`; permanent regression `test/g2-robustness.test.ts` "WP-C1 regression: a planner-authored constraint downgrade never becomes truth"). **WP-C2** fact authority binds the authoritative mutation path, not overlay planning — `applyOperationToState` explicit `enforceFactAuthority` modes (true from SqlMutationService, false from OverlayViabilityEngine); PARK-2 omission of an incumbent AUTHORITATIVE fact = FACT_OUTRANKED conflict; G2-1 candidate facts reverted to CONNECTED and completed to AUTHORITATIVE by `confirmedData()` at observation (`src/engine/applyOperations.ts`, `src/engine/mutation.ts`; `test/a3-overlay.test.ts` rewritten, `test/a1-mutation.test.ts` PARK-2 test). **WP-C3** assessed irreversible losses persist through validated mutation and bind resolution — objective LOST upserts ordered after the whole-trip viability upsert in `impactProposal`; CaseVerifier never returns FULLY_RECOVERED while a loss stands unacknowledged (`src/engine/impact.ts`, `src/engine/observation.ts`; regression `test/g2-robustness.test.ts` "WP-C3 regression..."; ADR-033 records LossRecord's authoritative home). **WP-C4** `recordApproval` verifies the principal is in the trip's principal scope via generic ref matching (shared `principalScopeForTrip` walk); refusal is an audited APPROVAL_REJECTED with reason, not a throw (`src/app/recoveryExecution.ts`, `src/app/snapshot.ts`; `test/integration.i4.test.ts` unrelated-org refused + employer accepted). **WP-C5** doc/comment truth: README `src/app/` path, DEMO.md credential-free planner honesty (fallback planner scope, FLIGHT_DELAY zero strategies, Scenario B `bestStrategyId=undefined`, WP-C2 effect), ADR-031 addendum (PARK-6 decision), CaseVerifier comment correction; PARK-3 comments + ROADMAP Stretch entry only; PARK-7 blast radius reported in completion report (behavior unchanged, awaiting reviewer). New ADR-032 (fact authority seam). Read models present persisted planning-time verdicts (PLANNING_COMPLETED audit `candidateVerdicts`) instead of re-deriving overlays against post-resolution state. 284/284 tests (baseline 279) + typecheck/lint/build clean. |
 | REV-C | Review Gate C — generalisation / reliability | Complete | G1,G2,G3,R1 | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | **PASS — CHECKPOINT C ACCEPTED.** Initial independent review of candidate `364b9bae6a0d5b754b3cfe192d95ad35ad7b4704` found issues (did not pass unconditionally); all closed by the review-fix set WP-C1..C5 at `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d` with targeted closure passing (284/284 tests, typecheck/lint/build clean). Accepted demo candidate / baseline SHA: `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d`. Merged to main by fast-forward during closeout; Reality Validation milestone intentionally precedes Final Candidate preparation |
+| RV-N0 | Northstar contract reconciliation + freeze | Complete | REV-C, reality-validation docs | northstar/contract-freeze | lead | A–J contracts (ADR-034..041): AnchorCommitment+Engagement linkage, intake drafts, initial planning caseKind, ChangeRequest/ResolutionTarget, FUNDED_WINDOW/CostAllocation, ANCHOR_COMMITMENT_CHANGE, ProgrammeView, hotel/transfer seams, temporal normalization; 300/300 tests + typecheck/lint/build + anti-hardcoding scan clean. NORTHSTAR_CONTRACT_BASE_SHA recorded in commit message. |
 | FINAL | Review Gate Final + candidate release gate | Not Started | REV-C | fresh reviewer | See `docs/AGENT_MODEL_SELECTION.md` | Broad independent review + `T-RELEASE` on exact candidate SHA |
 
 Statuses: `Not Started | In Progress | Blocked | Implemented | Integrated | Complete | Dropped`.
@@ -774,6 +775,7 @@ Minimum traceability; task Specs may add narrower evidence but cannot delete req
 | G3 | NFR-02 | hardcoding portion of `T-GEN` |
 | R1 | FR-14,15; NFR-03,05,06 | persistence/fallback/replay E2E |
 | REV-C | Checkpoint C generalisation/reliability risk | independent generalisation/reliability review + Checkpoint C evidence |
+| RV-N0..N12 | FR-19..25; NFR-01,02 | `test/northstar-contracts.test.ts`, programme-scale integration, Cases A/B/C acceptance at scale, alternate-data anti-hardcoding pass |
 | FINAL | all implemented MVP requirements | independent final review + `T-RELEASE` |
 
 ## 6. File ownership and collision control
@@ -944,8 +946,57 @@ Every investigation ends with `Adopt Now | Keep Stretch | Defer | Reject`, evide
 Checkpoints A, B, and C are **accepted** (REV-A, REV-B, REV-C Complete). Checkpoint C's accepted SHA `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d` is the demo candidate / baseline and has been merged to `main`.
 
 Current next action:
-1. open the **Reality Validation** milestone (defined in `docs/ROADMAP.md`): prove the generalized engine against externally sourced / provider-produced inputs (real content, provider sandboxes, bounded LIVE where safe, RECORD/REPLAY, boundary simulation) instead of only curated scenario fixtures;
-2. branch the investigation phase from the exact closeout SHA recorded on `main` (REALITY_VALIDATION_BASE_SHA in the Checkpoint C closeout commit);
-3. do not begin Final Candidate preparation until Reality Validation completes and the final candidate is prepared from its outcome.
+1. execute the **Northstar wave RV-N0..RV-N12** (Section 13 below), fanning out from the recorded contract-freeze base `NORTHSTAR_CONTRACT_BASE_SHA` on branch `northstar/contract-freeze`;
+2. keep the Reality Validation milestone open — the Northstar wave is its programme-scale execution phase (externally sourced / provider-produced inputs, RECORD/REPLAY default, bounded LIVE);
+3. do not begin Final Candidate preparation until the Northstar wave's integration packages (RV-N11/N12) complete and Review Gate Final passes.
 
 Review Gate Final remains mandatory per Section 3 and `docs/TESTING.md`.
+
+## 13. Northstar wave — RV-N0..RV-N12
+
+Northstar framing: the AI resolution layer for event travel. One event-travel programme at a time, roughly 40–45 inbound travellers, generic across tournaments / corporate offsites / productions / conferences. Contract base frozen by RV-N0 (branch `northstar/contract-freeze`): `AnchorCommitment` + Engagement linkage, pre-authoritative intake drafts, initial planning via the generalized engine, declarative `ChangeRequest`/`ResolutionTarget`, `FUNDED_WINDOW` + `CostAllocation`, `ANCHOR_COMMITMENT_CHANGE` signal, `ProgrammeView` read model, provider-neutral hotel/transfer capability seams, deterministic policy temporal normalization (ADR-034..041; contract tests `test/northstar-contracts.test.ts`). **NORTHSTAR_CONTRACT_BASE_SHA** is recorded in the RV-N0 commit message.
+
+**Contract assumptions lanes must not redefine** (change only through lead reconciliation, like Checkpoint A frozen contracts):
+- SignalKind stays closed except the already-added `ANCHOR_COMMITMENT_CHANGE`.
+- `ChangeRequest.target` is declarative only — no element mutations, booking ids or provider operations inside intake.
+- Importance/hardness is per traveller (Engagement/objectives), never on shared `AnchorCommitment`.
+- Drafts become authoritative only through the frozen MutationService promotion path.
+- Initial planning reuses the existing case state machine; `caseKind` is classification evidence, not a behaviour fork.
+- ToolOperationSchema stays a strict subset of CapabilityOperationSchema (test-enforced); consequential hotel/transfer ops never enter tool vocabulary.
+- Anti-hardcoding rule: no event/customer/route/airline/hotel/date/Case-id content in `src/**` (all in `fixtures/`); test with alternate data.
+
+**Environment notes:** Atlas LIVE budget ≈ 1,000 calls for the whole wave — REPLAY is the default mode, LIVE only for bounded proof recordings. Location is not fixed to any city/airport; fixtures and recordings must stay relocatable.
+
+### Lanes
+
+| Lane | Packages | Scope |
+|---|---|---|
+| lane/programme-core | RV-N1, RV-N3, RV-N5 | commitment fan-out coordination, initial-planning run through the engine, ChangeRequest → target-state planning |
+| lane/intake-policy | RV-N2, RV-N4, RV-N9 | intake draft promotion, FUNDED_WINDOW/CostAllocation evaluation, policy temporal normalization + re-ingestion |
+| lane/providers | RV-N6, RV-N7, RV-N8 | hotel capability adapter (post-freeze, at most one real API), transfer seam adapter (Stretch P1), RECORD/REPLAY discipline |
+| lane/ui | RV-N10 | programme operator views over `ProgrammeView` + new statuses (PLANNING, NEEDS_TRAVELLER_INFO, CHANGE_REQUESTED) |
+| integration/northstar | RV-N11, RV-N12 | programme-scale integration, Cases A/B/C acceptance runs |
+
+### Work packages
+
+| ID | Work package | Status | Depends on | Lane | MIN/STRETCH/PARK |
+|---|---|---|---|---|---|
+| RV-N0 | Northstar contract reconciliation + freeze | Complete | main @ REALITY_VALIDATION_BASE | lead | MIN: A–J contract schemas + ADR-034..041 + doc updates + contract tests |
+| RV-N1 | Commitment fan-out coordinator | Not Started | RV-N0 | programme-core | MIN: Engagement-linked fan-out from ANCHOR_COMMITMENT_CHANGE to per-traveller cases; PARK: partial-attendance heuristics |
+| RV-N2 | Programme intake promotion | Not Started | RV-N0 | intake-policy | MIN: draft → Trip/Traveller promotion through MutationService with honest PromotionOutcome issues; STRETCH: LLM-mapped roster channel |
+| RV-N3 | Initial planning through the engine | Not Started | RV-N0,RV-N1 | programme-core | MIN: zero-element trips planned via overlay engine with caseKind INITIAL_PLANNING; PARK: group-wide bulk booking optimization |
+| RV-N4 | Mixed funding evaluation | Not Started | RV-N0 | intake-policy | MIN: FUNDED_WINDOW rule evaluation + CostAllocation on ActionIntent; STRETCH: multi-window / partial coverage splits |
+| RV-N5 | ChangeRequest target-state planning | Not Started | RV-N0,RV-N3 | programme-core | MIN: 3 frozen variants (window shift self-funded, later/direct transport, stay proximity) → declarative target → authority path; PARK: multi-traveller coordinated changes |
+| RV-N6 | Hotel capability adapter | Not Started | RV-N0 | providers | MIN: search/quote/book/retrieve over imported data + cancel+rebook modification path; STRETCH: one real hotel API adapter post-freeze |
+| RV-N7 | Transfer capability adapter | Not Started | RV-N0 | providers | STRETCH (P1): Hotelbeds Transfers or equivalent behind the seam; MIN scope is honest capability-absence reporting only |
+| RV-N8 | Provider RECORD/REPLAY discipline for new seams | Not Started | RV-N0,RV-N6 | providers | MIN: recorded hotel interactions replayed through shared normalizer; PARK: transfer recordings until an adapter exists |
+| RV-N9 | Policy temporal normalization + re-ingestion | Not Started | RV-N0 | intake-policy | MIN: normalize-on-promotion + uncertainty surfacing; STRETCH: event URL/email re-ingestion picking up changed programme facts |
+| RV-N10 | Programme operator UI | Not Started | RV-N0 | ui | MIN: ProgrammeView rendering + new statuses in state inventory/copy; STRETCH: endangered-commitment drill-down |
+| RV-N11 | Programme-scale integration | Not Started | RV-N1..RV-N10 | integration | MIN: one full programme lifecycle (~40–45 travellers) through the real engine, REPLAY default |
+| RV-N12 | Cases A/B/C acceptance + scale smoke | Not Started | RV-N11 | integration | MIN: frozen Cases A/B/C green at programme scale + alternate-data anti-hardcoding pass |
+
+### Scope record (RV-N0 freeze)
+
+- **MIN (must have):** A–J contract schemas, commitment linkage, intake drafts, initial planning path, ChangeRequest variants, funding rules, event-side signal, programme read model, hotel/transfer seams, temporal normalization, Cases A/B/C frozen, doc SSOT updates.
+- **STRETCH:** real hotel API adapter, Hotelbeds transfers, LLM-mapped roster channel, event re-ingestion, multi-window funding splits, ~40–45 traveller performance headroom beyond smoke.
+- **PARK:** participant sourcing/registration/CRM/ticketing, immigration automation, partial-attendance heuristics, coordinated multi-traveller changes, insurance claim automation.

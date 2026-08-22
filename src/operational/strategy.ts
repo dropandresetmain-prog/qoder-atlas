@@ -14,6 +14,12 @@ export const CapabilityFamilySchema = z.enum([
   'FLIGHT',
   'ROUTING',
   'HOTEL',
+  /**
+   * Transactional ground transfer inventory (private transfers, shuttles).
+   * Deliberately distinct from ROUTING: routing answers "how long would a
+   * drive take", TRANSFER answers "what can be booked at what price".
+   */
+  'TRANSFER',
   'RESEARCH',
   'INGESTION',
   'COMMUNICATION',
@@ -25,8 +31,9 @@ export type CapabilityFamily = z.infer<typeof CapabilityFamilySchema>;
  * Closed READ-ONLY operation vocabulary for planner tool requests (FR-07,
  * FR-10, ADR-024). The planner may ask for information; it can never request
  * a consequential provider action. Consequential operations (flight.change,
- * flight.cancel, hotel.modify, hotel.cancel, communication.*, simulation.*)
- * are deliberately absent and exist only on the ActionIntent/authority path.
+ * flight.cancel, hotel.book/modify/cancel, transfer.book/amend/cancel,
+ * communication.*, simulation.*) are deliberately absent and exist only on
+ * the ActionIntent/authority path.
  * Values must remain a subset of CapabilityOperationSchema (test-enforced).
  */
 export const ToolOperationSchema = z.enum([
@@ -35,7 +42,13 @@ export const ToolOperationSchema = z.enum([
   'flight.fare_rules',
   'flight.refund_quote',
   'hotel.context',
+  'hotel.search',
+  'hotel.quote',
+  'hotel.retrieve',
   'routing.context',
+  'transfer.search',
+  'transfer.quote',
+  'transfer.retrieve',
   'research.entry_requirements',
   'research.local_context',
 ]);
@@ -48,7 +61,13 @@ export const TOOL_OPERATION_FAMILY: Record<ToolOperation, CapabilityFamily> = {
   'flight.fare_rules': 'FLIGHT',
   'flight.refund_quote': 'FLIGHT',
   'hotel.context': 'HOTEL',
+  'hotel.search': 'HOTEL',
+  'hotel.quote': 'HOTEL',
+  'hotel.retrieve': 'HOTEL',
   'routing.context': 'ROUTING',
+  'transfer.search': 'TRANSFER',
+  'transfer.quote': 'TRANSFER',
+  'transfer.retrieve': 'TRANSFER',
   'research.entry_requirements': 'RESEARCH',
   'research.local_context': 'RESEARCH',
 };

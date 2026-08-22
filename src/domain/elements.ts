@@ -109,6 +109,12 @@ export const EngagementSchema = TripElementBaseSchema.extend({
     startsAt: FactSchema(IsoDateTimeSchema),
     endsAt: FactSchema(IsoDateTimeSchema).optional(),
     anchorEventId: EntityIdSchema.optional(),
+    /**
+     * Shared programme item this engagement refers to (ADR-034). Commitment
+     * changes fan out via this id; the per-traveller binding strength lives
+     * in the element's own `importance`, never on the commitment itself.
+     */
+    anchorCommitmentId: EntityIdSchema.optional(),
     participantRole: z.string().optional(),
   }),
 });

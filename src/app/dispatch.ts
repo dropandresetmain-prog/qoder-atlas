@@ -164,7 +164,13 @@ export async function dispatchToolRequest(
       return toDispatchResult(await capabilities.research.researchLocalContext(parsed.data));
     }
     case 'hotel.context':
-      // No hotel adapter exists in this build; the request is honest data.
+    case 'hotel.search':
+    case 'hotel.quote':
+    case 'hotel.retrieve':
+    case 'transfer.search':
+    case 'transfer.quote':
+    case 'transfer.retrieve':
+      // No hotel/transfer adapter exists in this build; the request is honest data.
       return capabilityAbsent(operation.data);
     default:
       return capabilityAbsent(String(request.operation));

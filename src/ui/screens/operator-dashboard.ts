@@ -31,9 +31,12 @@ const STATUS_PRIORITY: Record<ReadModelStatus, number> = {
   DISRUPTED: 0,
   AT_RISK: 1,
   RECOVERING: 2,
-  UNKNOWN: 3,
-  READY: 4,
-  RESOLVED: 5,
+  NEEDS_TRAVELLER_INFO: 3,
+  CHANGE_REQUESTED: 4,
+  UNKNOWN: 5,
+  PLANNING: 6,
+  READY: 7,
+  RESOLVED: 8,
 };
 
 const RESPONSE_STATUS_LABEL: Record<NonNullable<OperatorTripView['travellerResponseStatus']>, string> = {

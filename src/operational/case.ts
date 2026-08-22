@@ -46,6 +46,15 @@ export const ResolutionOutcomeSchema = z.enum([
 ]);
 export type ResolutionOutcome = z.infer<typeof ResolutionOutcomeSchema>;
 
+/**
+ * What the case is trying to achieve (ADR-038). RECOVERY restores viability
+ * after disruption/change; INITIAL_PLANNING creates the first viable plan for
+ * a trip that may have no elements yet. Both run through the SAME generalized
+ * engine — this flag is classification evidence, never a fork in behaviour.
+ */
+export const CaseKindSchema = z.enum(['RECOVERY', 'INITIAL_PLANNING']);
+export type CaseKind = z.infer<typeof CaseKindSchema>;
+
 export const CaseResolutionSchema = z.strictObject({
   outcome: ResolutionOutcomeSchema,
   resolvedAt: IsoDateTimeSchema,
@@ -58,6 +67,8 @@ export type CaseResolution = z.infer<typeof CaseResolutionSchema>;
 export const RecoveryCaseSchema = z.strictObject({
   id: EntityIdSchema,
   tripId: EntityIdSchema,
+  /** Defaults to RECOVERY so closed-checkpoint cases keep loading unchanged. */
+  caseKind: CaseKindSchema.default('RECOVERY'),
   status: CaseStatusSchema,
   openedAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,

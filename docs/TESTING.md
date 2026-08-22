@@ -129,6 +129,29 @@ Search for:
 
 Any genuine missing abstraction is an architecture gap, not permission to hardcode.
 
+### T-NORTHSTAR — Northstar contract and programme-scale families (RV-N0+)
+
+Contract baseline: `test/northstar-contracts.test.ts` at `NORTHSTAR_CONTRACT_BASE_SHA`. Families below extend it in later RV-N packages without weakening the frozen contracts.
+
+**Contract families (frozen at RV-N0):**
+- commitment linkage: `AnchorCommitment` shared children, Engagement `anchorCommitmentId` fan-out, importance per traveller — never global hardness;
+- intake equivalence: every `IntakeChannel` promotes `ProgrammeTravellerDraft` through the same validated mutation path with honest `PromotionOutcome` issues — no direct Trip/Booking writes;
+- initial planning: zero-element trips with UNKNOWN viability are legal; `caseKind` defaults RECOVERY and legacy cases load unchanged;
+- ChangeRequest variants: the three frozen shapes (window shift + self-funding, later/direct transport, stay proximity) validate; requests containing element mutations/booking ids/provider operations are rejected;
+- funding: `FUNDED_WINDOW` rule + `CostAllocation` fields validate; payer vocabulary closed;
+- event-side signal: `ANCHOR_COMMITMENT_CHANGE` payload validates; provider signal kinds never carry event-side facts;
+- programme read model: `ProgrammeView` shape (status rollups, endangered commitments, active cases, decisions required, uncertainty);
+- tool-vocabulary safety: extended `ToolOperationSchema` remains a strict subset of `CapabilityOperationSchema`; consequential hotel.book/transfer.* never appear as tool operations;
+- temporal normalization: offset-qualified passthrough, naive values normalized only with explicit IANA timezone, absent timezone → uncertainty (undefined), never a guessed offset.
+
+**Programme-scale families (RV-N1..N12):**
+- commitment fan-out reaches every linked Engagement and only those;
+- initial planning through the overlay engine reaches resolved trips without provider calls;
+- Cases A/B/C as frozen in `PRODUCT_SPEC.md` ("Frozen acceptance Cases A/B/C"), each at programme scale;
+- ~40–45 traveller scale smoke: seeding, fan-out, reset/reseed and restart remain deterministic and complete at that traveller count.
+
+**Anti-hardcoding / alternate-data rule (Northstar):** every Northstar acceptance test must pass with an alternate fixture set — different event type, different cities/airports/hotels/dates, different traveller identities. No WiT/conference/speaker/SIN/KUL/route/airline/hotel/fixture/demo-date/Case-id logic may exist in `src/**`; the hardcoding search of T-GEN is extended with these families.
+
 ### T-E2E — Integrated recovery loop
 Prove:
 

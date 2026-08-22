@@ -9,6 +9,7 @@
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import {
   isLegalCaseTransition,
+  type CaseKind,
   type CaseStatus,
   type RecoveryCase,
   type CaseResolution,
@@ -38,6 +39,8 @@ export interface OpenCaseInput {
   id: EntityId;
   tripId: EntityId;
   openedAt: IsoDateTime;
+  /** Classification evidence only; behaviour stays engine-generic (ADR-038). */
+  caseKind?: CaseKind;
   triggeredBySignalIds?: EntityId[];
   affectedElementIds?: EntityId[];
   failedConstraintIds?: EntityId[];
@@ -54,6 +57,7 @@ export class CaseService {
     const recoveryCase: RecoveryCase = {
       id: input.id,
       tripId: input.tripId,
+      caseKind: input.caseKind ?? 'RECOVERY',
       status: 'DETECTED',
       openedAt: input.openedAt,
       updatedAt: input.openedAt,

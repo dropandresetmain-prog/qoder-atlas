@@ -10,6 +10,32 @@ The product asks:
 
 > **Does this trip still accomplish what it was supposed to accomplish?**
 
+## Northstar hackathon wedge
+
+The hackathon customer context is deliberately narrowed to one:
+
+> **Northstar — the AI resolution layer for event travel.**
+
+The broader architecture remains coordinated travel resolution across operator
+types (ADR-001). For the hackathon we demonstrate it through one coordinated
+event-travel programme: an organiser coordinating roughly 40–45 inbound
+travellers for one event (for example, conference speakers). The event itself
+may be real or synthetic; the architecture must stay generic enough that the
+same ontology later represents sports tournaments, corporate offsites, touring
+productions, trade missions, film/TV production travel, and other coordinated
+event travel. No conference-specific or speaker-specific domain logic is
+permitted (`NFR-02`).
+
+Northstar begins **after participants are confirmed**. It is NOT building
+speaker sourcing, invitations, registration, attendee CRM, agenda creation,
+event ticketing, or general event management. Northstar consumes relevant
+event context and coordinates travel around it.
+
+The core invariant is unchanged:
+
+> AI proposal → validation → deterministic viability → authority → executor →
+> observe → state update. Never LLM → irreversible/money-moving API.
+
 ## Problem
 
 Travel disruptions are not isolated booking problems. A flight change can invalidate airport transport, hotel arrival, an event obligation, a separately booked onward leg, policy compliance, accessibility requirements, insurance decisions, or duty-of-care status.
@@ -48,6 +74,14 @@ The operator can answer:
 - what remains uncertain?
 - has the operational problem actually been resolved?
 
+At programme scale the operator additionally answers:
+- across the whole programme (all travellers of one AnchorEvent): how many are
+  READY / PLANNING / NEEDS_TRAVELLER_INFO / AT_RISK / DISRUPTED /
+  CHANGE_REQUESTED / RECOVERING / AWAITING_DECISION / RESOLVED?
+- which shared event commitments are endangered, and which travellers are
+  affected by each?
+- which cases are active and which decisions are outstanding?
+
 ### Traveller
 The traveller can answer:
 - am I okay?
@@ -58,6 +92,46 @@ The traveller can answer:
 - is the rest of my trip still viable?
 
 User-facing language must avoid internal graph/agent terminology.
+
+## Northstar product model
+
+The programme supports six situations through the same engine:
+
+1. **Programme initialisation** — the organiser adds one traveller manually,
+   bulk-uploads travellers, or supplies an event brief / traveller list in a
+   reasonable messy format that AI maps into approved schemas
+   (`FR-19` `FR-20`).
+2. **Initial trip planning** — no viable trip may exist yet; the system finds
+   a viable trip satisfying event commitments, traveller constraints, policy
+   and authority (`FR-21`).
+3. **Traveller-requested changes** — the same resolution engine processes a
+   declared target state; existing provider state does not mutate merely
+   because a traveller asked for something (`FR-22`).
+4. **Provider disruptions** — flight cancellation/delay and whole-trip blast
+   radius with recovery (existing engine).
+5. **Event-side changes** — a shared event commitment moves or is cancelled;
+   unchanged bookings may become invalid; fan-out reaches linked trips
+   (`FR-23`).
+6. **Real-world traveller failures** — missed flight, late arrival, changed
+   plans, withdrawal — through the same generic ontology/state machinery.
+
+### Event-level shared context ("mother graph")
+
+AnchorEvent is the shared programme truth/context; Trip is the individual
+traveller operational aggregate; many Trips reference one AnchorEvent.
+Programme-level operator state is a derived read model over those Trips — not
+a second graph engine and not a graph database. Shared event commitments are
+addressable AnchorEvent children (`AnchorCommitment`); a traveller Engagement
+references a commitment so that commitment changes fan out into ordinary
+per-Trip processing. Commitment importance differs per traveller and lives on
+the per-trip Engagement, never globally on the event (`FR-24`).
+
+### Mixed funding
+
+The system reasons about event-funded travel windows, traveller-funded
+extensions, and split incremental costs. Funding allocation is deterministic:
+a funded coverage window plus payer responsibility rules plus the traveller's
+own declaration — never hardcoded extension semantics (`FR-25`).
 
 ## Core domain
 
@@ -195,6 +269,27 @@ Legal/entry facts must be grounded in authoritative sources. Agentic web researc
 ### FR-18 — Insurance policy reasoning
 At least one real insurance policy/document shall be ingested as data and made available to recovery/impact reasoning without hardcoding policy clauses into domain logic.
 
+### FR-19 — Programme traveller intake
+The system shall offer one normalized pre-authoritative intake contract usable by manual single-traveller entry, later add/update of one traveller, bulk file import, and LLM-assisted mapping from messy event briefs/traveller lists. Drafts shall never mutate authoritative state; only deterministic validation and promotion through the validated mutation path creates Traveller/Trip state. The file format is not the domain API.
+
+### FR-20 — LLM-assisted programme mapping
+The system shall accept an event brief and/or traveller list in a reasonable messy format and use AI to map it into the approved intake and commitment schemas. Unmapped or ambiguous material shall remain explicit uncertainty / human review, never silently coerced.
+
+### FR-21 — Initial viable trip planning
+For a confirmed traveller with event commitments and policy but no viable trip yet, the system shall create the first viable plan through the same generalized resolution engine (planner/provider queries → candidate overlays → deterministic viability → authority → execution → observation). No separate booking engine shall be introduced.
+
+### FR-22 — Traveller-requested changes
+A traveller request shall be represented as a declarative target state (ChangeRequest / ResolutionTarget) separate from current authoritative state. Provider/booked state shall not mutate merely because a request was made; the change flows through the standard signal → plan → viability → authority → execute → observe pipeline. The same contract must represent at least: trip-window extension with partial self-funding, a later/different (preferably direct) flight, and a hotel change closer to the event venue.
+
+### FR-23 — Event-side change propagation
+A change to a shared event commitment shall be a first-class normalized signal (`ANCHOR_COMMITMENT_CHANGE`) with a typed payload. A programme-level coordinator shall identify every Engagement linked to the commitment and fan the change out into ordinary per-Trip processing. Provider signal kinds shall never be reused for event-side changes.
+
+### FR-24 — Shared commitments and programme read model
+Shared event commitments shall be addressable children of AnchorEvent, referenceable by per-trip Engagements, and commitment bindingness shall differ per traveller (element importance), never fixed globally. A programme-level operator read model shall project per-status rollups, endangered commitments with affected travellers, active cases, decisions required, and unresolved uncertainty from authoritative state — no UI-local truth.
+
+### FR-25 — Mixed funding
+The system shall represent event-funded coverage windows and payer responsibility for incremental costs, and shall compute deterministic cost allocations (covered vs incremental, by payer) for consequential actions, reasoned from policy rules and the traveller's own funding declaration.
+
 ## Non-functional requirements
 
 ### NFR-01 — Generalisation
@@ -235,6 +330,30 @@ The MVP must contain a genuine vertical loop, not a UI shell:
 - SQLite persistence and auditability (`FR-01`, `FR-14`);
 - LIVE/RECORD/REPLAY where practical (`FR-15`);
 - two-scenario generalisation (`NFR-01`, `NFR-02`).
+
+The Northstar MVP additionally requires (see `IMPLEMENTATION_PLAN.md` RV wave):
+
+- programme initialisation: manual + bulk + LLM-assisted intake with
+  deterministic promotion (`FR-19`, `FR-20`);
+- initial viable trip planning through the generalized engine (`FR-21`);
+- traveller ChangeRequest resolution with mixed funding (`FR-22`, `FR-25`);
+- event-side change fan-out (`FR-23`);
+- shared commitments + programme-level operator read model (`FR-24`);
+- one real hotel API adapter after contract freeze, behind the frozen
+  provider-neutral hotel capability (`FR-08`);
+- routing context plus a provider-neutral ground-transfer seam
+  (`FR-08`, `FR-16`);
+- Cases A/B/C acceptance (traveller change, provider disruption, event-side
+  change) at programme scale (~40–45 travellers) with replay/reset
+  reliability (`NFR-05`).
+
+### Frozen acceptance Cases A/B/C (RV-N0)
+
+Frozen at contract level; lanes may instantiate data but must not redefine semantics. All three run at programme scale (~40–45 travellers) through the same engine, REPLAY default, alternate-data anti-hardcoding pass required.
+
+- **Case A — traveller change, self-funded window shift (FR-22, FR-25).** One traveller requests arriving earlier and departing later than the event-funded window, funding the incremental cost themselves. Acceptance: ChangeRequest captured as declarative target; FUNDED_WINDOW rule yields covered vs incremental allocation; the request resolves through signal → plan → viability → authority → execute → observe without mutating booked state until authorised; programme read model reflects the change without disturbing other travellers.
+- **Case B — provider disruption, hero recovery (FR-05..FR-11).** A transport disruption endangers a shared commitment for a subset of travellers. Acceptance: provider signal drives blast radius across Engagement-linked trips; deterministic viability ranks candidates; authority + execution restore viability; resolution judged by observed state and constraints, never provider success alone; the programme read model shows endangered commitment → recovery → recovered programme.
+- **Case C — event-side change, programme fan-out (FR-23, FR-24).** A shared commitment is rescheduled/relocated/cancelled by the event organiser. Acceptance: one ANCHOR_COMMITMENT_CHANGE signal (never a provider signal kind); fan-out reaches every linked Engagement; per-traveller importance drives differentiated handling; trips that remain viable are untouched; the programme recovers to a consistent state with per-traveller cases resolved.
 
 ## Explicit non-goals for MVP
 

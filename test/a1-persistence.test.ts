@@ -45,6 +45,7 @@ function makeCase(version = 0): RecoveryCase {
   return {
     id: 'case_persist_1',
     tripId: 'trip_persist_1',
+    caseKind: 'RECOVERY',
     status: 'DETECTED',
     openedAt: NOW,
     updatedAt: NOW,

@@ -95,6 +95,36 @@ export const AnchorEventKindSchema = z.enum([
 ]);
 export type AnchorEventKind = z.infer<typeof AnchorEventKindSchema>;
 
+/**
+ * Generic classes of shared programme items. Deliberately event-neutral:
+ * SESSION covers talks/matches/performances/meetings; SOCIAL covers meals
+ * and receptions; LOGISTICS covers shared transport windows/check-ins.
+ */
+export const AnchorCommitmentKindSchema = z.enum(['SESSION', 'SOCIAL', 'LOGISTICS', 'OTHER']);
+export type AnchorCommitmentKind = z.infer<typeof AnchorCommitmentKindSchema>;
+
+/**
+ * A shared, addressable programme item of an AnchorEvent (ADR-034). Many
+ * traveller Engagements across different Trips may reference one commitment
+ * via `Engagement.data.anchorCommitmentId`, so a commitment change can be
+ * fanned out into ordinary per-Trip processing.
+ *
+ * Commitments carry NO importance/hardness: how binding a commitment is
+ * differs per traveller and lives on each Engagement (`importance`), never
+ * globally on the event.
+ */
+export const AnchorCommitmentSchema = z.strictObject({
+  id: EntityIdSchema,
+  anchorEventId: EntityIdSchema,
+  title: z.string(),
+  kind: AnchorCommitmentKindSchema.default('OTHER'),
+  placeId: EntityIdSchema.optional(),
+  startsAt: FactSchema(IsoDateTimeSchema),
+  endsAt: FactSchema(IsoDateTimeSchema).optional(),
+  sourceId: EntityIdSchema.optional(),
+});
+export type AnchorCommitment = z.infer<typeof AnchorCommitmentSchema>;
+
 export const AnchorEventSchema = z.strictObject({
   id: EntityIdSchema,
   name: z.string(),
@@ -107,6 +137,8 @@ export const AnchorEventSchema = z.strictObject({
   organiserOrganisationId: EntityIdSchema.optional(),
   /** Organiser instructions/briefing, with provenance. */
   instructions: FactSchema(z.string()).optional(),
+  /** Shared programme items; trips link via Engagement.anchorCommitmentId. */
+  commitments: z.array(AnchorCommitmentSchema).default([]),
   sourceIds: z.array(EntityIdSchema).default([]),
 });
 export type AnchorEvent = z.infer<typeof AnchorEventSchema>;

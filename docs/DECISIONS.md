@@ -173,3 +173,43 @@ Scenario overlay candidates are HELD hypotheses about a possible replacement boo
 **Status:** Accepted (Checkpoint C, REV-C-FIX WP-C3)
 
 An impact assessment can record an irreversible loss (a HARD objective whose moment passed or whose elements are all fixed-and-lost). Before REV-C-FIX the loss lived only in the transient `ImpactAssessment`: after the remainder recovered, re-assessment no longer reported it and the verifier could return FULLY_RECOVERED with the loss unacknowledged. Chosen resolution: the assessment's `impactProposal` — the same normal validated mutation that persists constraint statuses and trip viability — also marks each lost objective `LOST` (`UPSERT_ENTITY TRIP_OBJECTIVE`, applied after the trip viability upsert so the objective upsert lands on top). `LossRecord` itself remains an operational evidence type (`src/operational/impact.ts`); its *authoritative home* is the objective's persisted status. `CaseVerifier.verify` then counts objectives with status WAIVED/REPRIORITY/LOST plus any still-assessed irreversible losses as `remainingLossRefs`; FULLY_RECOVERED is impossible while any loss stands, and a waiver/reprioritisation converts the loss into explicit traveller evidence (`RECOVERED_WITH_LOSS`). Rejected alternative: a case-level loss ledger would duplicate trip truth and survive case closure with no owner; the objective already models exactly this state.
+
+## ADR-034 — AnchorEvent is the programme aggregate; commitments are shared children, never globally hard
+**Status:** Accepted (RV-N0 contract freeze)
+
+One AnchorEvent models one event-travel programme (the "mother graph"): its place/date Facts plus an optional `commitments: AnchorCommitment[]` (SESSION | SOCIAL | LOGISTICS | OTHER, with startsAt/endsAt Facts and optional placeId). Commitments are shared by all travellers in the programme — they must never be duplicated per traveller. Linkage is through `Engagement.anchorCommitmentId`, and importance lives per traveller on the Engagement, never as global hardness on the commitment itself: whether a commitment is immovable for a given traveller is derived from that traveller's objectives/constraints, not asserted on the shared object. `commitments` defaults to `[]`, so existing AnchorEvents load unchanged. Rejected alternative: a second graph engine or per-traveller commitment copies — both would fork truth and break the single-source-of-truth invariant.
+
+## ADR-035 — Programme intake is pre-authoritative drafts promoted only through the frozen mutation path
+**Status:** Accepted (RV-N0 contract freeze)
+
+Participant rosters arrive before any traveller has spoken to the system, through arbitrary channels (manual entry, bulk import, LLM-mapped documents, later updates) — modelled by `IntakeChannel` and `ProgrammeImportDraft`. Intake produces `ProgrammeTravellerDraft` records (identity hints only — email/phone/lastName/dateOfBirth/passportNumber all optional; accessibility statements; commitment links), never direct Trip or Booking writes. Drafts become authoritative Trip/Traveller entities only through the same validated MutationService promotion path that every other state change uses (`PromotionOutcome` reports per-draft issues honestly). This preserves the invariant that no source — human, file or LLM — writes authoritative state directly, and makes "participant confirmed, no bookings yet" a legal programme state.
+
+## ADR-036 — ChangeRequest is a declarative target state, not a set of booking mutations
+**Status:** Accepted (RV-N0 contract freeze)
+
+A traveller's change message ("arrive earlier, leave later, I'll pay myself", "later or direct flight", "hotel closer to the venue") is captured as `ChangeRequest`: intentKind (ADJUST_TRIP_WINDOW | CHANGE_TRANSPORT_SCHEDULE | CHANGE_STAY | CANCEL_BOOKING | ADJUST_OBJECTIVE | OTHER), urgency (HARD_INSTRUCTION | SOFT_PREFERENCE), a declarative `ResolutionTarget` (arriveBy/departAfter windows, transport preferences, stay proximity ref, objective effects WAIVE/REPRIORITY) and an optional `FundingDeclaration`. The target describes the desired end state; it never contains element mutations, booking ids or provider operations. Traveller desire is not provider state: a ChangeRequest feeds the same planning/authority/execution path as disruption recovery. Rejected alternative: mapping utterances straight onto mutation payloads — it would embed provider assumptions in intake and make unmet requests indistinguishable from executed ones.
+
+## ADR-037 — Mixed funding is a FUNDED_WINDOW policy rule plus explicit CostAllocation, never global
+**Status:** Accepted (RV-N0 contract freeze)
+
+Programme funding is modelled as a `FUNDED_WINDOW` PolicyRule (windowStart/windowEnd, `coveredBy: Payer`, `incrementalPayer` defaulting to TRAVELLER) evaluated like any other rule, and each ActionIntent may carry a `CostAllocation` (coveredAmount, incrementalAmount, coveredBy, incrementalPayer, derivedFromRuleIds). Payer vocabulary is closed (EVENT_ORGANISATION | TRAVELLER | ORGANISATION | OTHER). Funding is derived per action from rule evidence; there is no global "this programme is funded" flag and no money movement without authority. The traveller's self-funding declaration in a ChangeRequest is evidence that feeds allocation, not an automatic charge.
+
+## ADR-038 — Initial planning runs on the same engine; caseKind is classification evidence, not a behaviour fork
+**Status:** Accepted (RV-N0 contract freeze)
+
+A Trip with zero elements and UNKNOWN viability is already legal, and the overlay engine already accepts add-only candidates, so "the programme just started, nothing is booked yet" needs no separate InitialBookingEngine. `RecoveryCase` gains `caseKind: CaseKind` (RECOVERY | INITIAL_PLANNING, default RECOVERY) as classification evidence for reporting and UI; the state machine, mutation path, verification and resolution semantics are identical for both kinds. Rejected alternative: a bespoke booking engine for initial planning — it would fork the authority path and duplicate validation.
+
+## ADR-039 — Event-side changes arrive as ANCHOR_COMMITMENT_CHANGE, never as FLIGHT_SCHEDULE_CHANGE
+**Status:** Accepted (RV-N0 contract freeze)
+
+A rescheduled session, relocated venue or cancelled programme item is an event-side fact, not a provider schedule fact. `SignalKind` gains exactly one closed-vocabulary addition: `ANCHOR_COMMITMENT_CHANGE` with a validated payload (anchorEventId, commitmentId, changeKind RESCHEDULED | RELOCATED | CANCELLED | OTHER, new timing/place, summary). Fan-out derives affected trips through Engagement.anchorCommitmentId linkage; each affected traveller's case is opened from this one programme-level signal. Misusing FLIGHT_SCHEDULE_CHANGE for event-side changes would poison provider-state reasoning and attribution. The closed SignalKind vocabulary otherwise remains frozen.
+
+## ADR-040 — Extracted policy temporals are deterministically normalized before promotion; ambiguity becomes uncertainty
+**Status:** Accepted (RV-N0 contract freeze)
+
+Policy/rule drafts extracted from event pages and emails often carry naive dates and times ("check-in from 14:00", "sessions end 18:00 local"). Before rule promotion, `normalizeRuleDraftTemporals` converts naive datetime/date-only values to explicit-offset ISO using only an explicitly supplied IANA timezone (from the ingestion context); offset-qualified values pass through unchanged. If no timezone is available, normalization fails and the value is surfaced as uncertainty rather than guessed. Rejected alternative: LLM or default-timezone inference at promotion time — a silent wrong timezone in a NO_SHOW_CUTOFF or CANCELLATION_TERMS rule is a money-moving error, and promotion must be deterministic.
+
+## ADR-041 — Hotel and transfer capability seams are provider-neutral; change is cancel+rebook until a provider contradicts
+**Status:** Accepted (RV-N0 contract freeze)
+
+`HotelCapability` (search/quote/book/retrieve on top of context/modify/cancel) and `TransferCapability` (search/quote/book/retrieve/amend/cancel) are provider-neutral seams with CapabilityResult envelopes and opaque provider ids. MVP runs on imported booking/policy data; after freeze at most one real hotel API adapter and, as Stretch P1, one transfer adapter may be added behind the same boundaries. Read-only hotel/transfer operations may back planner tools; consequential ones (hotel.book, transfer.book/amend/cancel) are authority-path only and excluded from ToolOperationSchema, test-enforced. Providers are treated as immutable-booking systems until they expose real change endpoints: "move the stay" is cancel+rebook, never assumed in-place mutation.

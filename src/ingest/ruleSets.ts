@@ -21,6 +21,7 @@ import {
   type NormalizationEnv,
 } from './artifacts.ts';
 import { hashId } from './ids.ts';
+import { normalizeRuleDraftTemporals } from './temporal.ts';
 import type { ExtractedInsurance, ExtractedRuleSet } from './semantic.ts';
 
 /**
@@ -92,15 +93,19 @@ export function ruleDraftsToRuleSet(
 ): RuleSet | undefined {
   const validRules: Array<Record<string, unknown>> = [];
   for (const rule of draft.rules) {
+    // Deterministic temporal normalization before promotion (ADR-040):
+    // naive/unnormalized temporals without an explicit timezone context stay
+    // invalid and become uncertainty — model sloppiness is never promoted.
+    const normalizedRule = normalizeRuleDraftTemporals(rule, env.context.timezone);
     // Pre-validate with the same deterministic ids buildRuleSetWithIds assigns.
     const candidate = {
-      ...rule,
-      id: hashId('rule', env.source.id, draft.name, String(validRules.length), String(rule['kind'] ?? '')),
+      ...normalizedRule,
+      id: hashId('rule', env.source.id, draft.name, String(validRules.length), String(normalizedRule['kind'] ?? '')),
       sourceId: env.source.id,
     };
     const parsed = PolicyRuleSchema.safeParse(candidate);
     if (parsed.success) {
-      validRules.push(rule);
+      validRules.push(normalizedRule);
     } else {
       addUncertainty(
         artifacts,

@@ -24,6 +24,14 @@ export const RuleSetKindSchema = z.enum([
 ]);
 export type RuleSetKind = z.infer<typeof RuleSetKindSchema>;
 
+/**
+ * Generic responsibility classes for who pays (ADR-037). Deliberately not
+ * tied to any event-role semantics: deterministic allocation combines a
+ * funded window with these classes and the traveller's own declaration.
+ */
+export const PayerSchema = z.enum(['EVENT_ORGANISATION', 'TRAVELLER', 'ORGANISATION', 'OTHER']);
+export type Payer = z.infer<typeof PayerSchema>;
+
 /** Who a rule directs decisions to; resolved deterministically by authority. */
 export const ApproverPrincipalSchema = z.enum([
   'TRAVELLER',
@@ -105,6 +113,21 @@ export const PolicyRuleSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     ...RuleBase,
+    /**
+     * Funding coverage window (ADR-037): costs falling inside the window are
+     * the covered payer's responsibility; incremental costs outside it fall
+     * to `incrementalPayer`. Deterministic allocation/approval reasoning uses
+     * this plus the traveller's own funding declaration — never hardcoded
+     * extension semantics.
+     */
+    kind: z.literal('FUNDED_WINDOW'),
+    windowStart: IsoDateTimeSchema.optional(),
+    windowEnd: IsoDateTimeSchema.optional(),
+    coveredBy: PayerSchema,
+    incrementalPayer: PayerSchema.default('TRAVELLER'),
+  }),
+  z.strictObject({
+    ...RuleBase,
     kind: z.literal('ENTRY_REQUIREMENT'),
     requirement: z.string(),
     /** Legal/entry facts require authoritative sourcing (FR-17, ADR-015). */
@@ -129,6 +152,7 @@ export const PolicyRuleKindSchema = z.enum([
   'CANCELLATION_TERMS',
   'NO_SHOW_TERMS',
   'INSURANCE_COVERAGE',
+  'FUNDED_WINDOW',
   'ENTRY_REQUIREMENT',
   'OTHER',
 ]);
