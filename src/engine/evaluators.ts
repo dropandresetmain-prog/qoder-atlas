@@ -240,6 +240,18 @@ function evaluateSupplier(constraint: Constraint, ctx: EvaluationContext): Const
   return evaluation(constraint, 'UNKNOWN', `no deterministic supplier rule resolved for ${constraint.id}`);
 }
 
+/**
+ * On-demand transfer leg: flexible, no fixed schedule, and either unbooked
+ * (NONE) or fulfilled on-demand (a durationEstimate with no scheduled times
+ * is the ontology marker for on-demand fulfilment — elements.ts). A booked
+ * leg always carries a scheduled departure; a CONFIRMED on-demand leg keeps
+ * its schedulable nature after execution.
+ */
+function isOnDemandTransfer(leg: TransportLeg): boolean {
+  if (leg.flexibility === 'FIXED' || leg.data.scheduledDeparture !== undefined) return false;
+  return leg.reservationState === 'NONE' || leg.data.durationEstimate !== undefined;
+}
+
 /** TRANSFER: leg fits between upstream arrival and downstream need. */
 function evaluateTransfer(constraint: Constraint, ctx: EvaluationContext): ConstraintEvaluation {
   const subject = constraint.refs[0] ? findElement(ctx, constraint.refs[0]) : undefined;
@@ -254,7 +266,7 @@ function evaluateTransfer(constraint: Constraint, ctx: EvaluationContext): Const
     return evaluation(
       constraint,
       'UNKNOWN',
-      subject.reservationState === 'NONE' && subject.flexibility !== 'FIXED'
+      isOnDemandTransfer(leg)
         ? `on-demand transfer schedulable only once upstream arrival at ${leg.data.originPlaceId} is known`
         : `no upstream arrival evidence at ${leg.data.originPlaceId}`,
     );
@@ -268,7 +280,7 @@ function evaluateTransfer(constraint: Constraint, ctx: EvaluationContext): Const
     }
     return evaluation(constraint, 'FAIL', `departure only ${Math.round(gapMinutes)}min after upstream arrival`);
   }
-  if (subject.reservationState === 'NONE' && subject.flexibility !== 'FIXED') {
+  if (isOnDemandTransfer(leg)) {
     // On-demand flexible leg: schedulable after the known upstream arrival.
     return evaluation(constraint, 'PASS', `on-demand transfer can be scheduled after upstream arrival at ${upstream}`);
   }
