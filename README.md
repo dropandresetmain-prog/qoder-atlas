@@ -57,7 +57,7 @@ Do not infer production market behaviour from sandbox data.
 
 ## Status
 
-**Checkpoint A/B accepted. Checkpoint C candidate (generalisation + reliability + demo-ready runtime flow) in progress on `checkpoint-c`, pending Review Gate C.**
+**Checkpoint A/B/C accepted. Checkpoint C (`3b2f0da`, generalisation + reliability + demo-ready runtime flow) passed Review Gate C after its review-fix set and is the accepted demo candidate / baseline. Reality Validation (externally sourced inputs) is the next milestone; final candidate preparation has not started.**
 
 What exists today:
 

@@ -15,7 +15,9 @@ Status vocabulary:
 
 ## Planned MVP
 
-Capability status: the Scenario A vertical recovery loop (ingestion -> persistent trip -> signal/impact -> planner/capabilities/viability -> authority/execution/observation -> real operator/traveller read models) is **Implemented** and Checkpoint B has been **accepted** (REV-B Complete; reviewed candidate `b650031`, merged to `main`). Checkpoint C (generalisation, reliability, demo candidate) is in progress on `checkpoint-c`: Scenario B generalisation, four robustness cases, and the generic runtime disruption/reset flow (scenario-neutral HTTP seam, deterministic credential-free fallback planner, audited transactional reset/reseed) are Integrated; hardcoding audit and Review Gate C remain. Execution evidence lives in `docs/IMPLEMENTATION_PLAN.md` Section 4.
+Capability status: the Scenario A vertical recovery loop (ingestion -> persistent trip -> signal/impact -> planner/capabilities/viability -> authority/execution/observation -> real operator/traveller read models) is **Implemented** and Checkpoint B has been **accepted** (REV-B Complete; reviewed candidate `b650031`, merged to `main`). Checkpoint C (generalisation, reliability, demo candidate) is **accepted** (REV-C Complete; accepted SHA `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d`, merged to `main`): Scenario B runs through the identical application code, four robustness cases pass through the real engine, the hardcoding audit found no scenario content outside `fixtures/`, and the generic runtime disruption/reset flow is reliable and replayable. Execution evidence lives in `docs/IMPLEMENTATION_PLAN.md` Section 4.
+
+Truth boundary: the engine has been proven against **curated/provider-shaped scenarios** (fixture sources, REPLAY provider recordings, scripted/test planner inputs). It has **not yet** been proven against arbitrary externally sourced inputs: arbitrary real booking import end-to-end, arbitrary URL -> assembled Trip end-to-end, selected external integrations through actual provider calls, or real/sandbox search and servicing surfaces beyond the Atlas Search/Verify development proof. Closing that gap is the purpose of the Reality Validation milestone below.
 
 ### Core state and recovery engine
 - Organisation, Traveller, AnchorEvent, Trip, TripElement, TripObjective, Place
@@ -72,6 +74,25 @@ Capability status: the Scenario A vertical recovery loop (ingestion -> persisten
 - persistent Trip/Case state
 - at least two materially different scenarios through same engine
 - anti-hardcoding scenario substitution test
+
+## Reality Validation — In Progress (active milestone, before Final Candidate preparation)
+
+**Purpose:** prove that the generalized engine works against externally sourced / provider-produced inputs rather than only curated scenario fixtures.
+
+**Status:** active milestone opened at Checkpoint C closeout. No implementation has started; this section records scope only. The investigation phase will branch from the Checkpoint C closeout SHA on `main`.
+
+For each external surface the milestone will investigate and decide where to use: real external source content; provider sandbox/test APIs; LIVE read-only APIs where low-risk and economically bounded; RECORD/REPLAY; or external-boundary simulation only where real/sandbox access is not worth the complexity. Every decision ends with an explicit `Adopt | Defer | Reject` and a roadmap/tracker update. No new product integration is authorized by this milestone until its investigations conclude.
+
+### Investigation areas (high level)
+
+1. **Atlas sandbox capability reality pass** — actual Search/Verify/rules and relevant sandbox operations; verify Singapore-route availability empirically rather than assuming the published fixture list is exhaustive; investigate bounded sandbox order/change/refund capability where useful.
+2. **Hotel provider investigation** — compare providers based on BOTH hackathon sandbox feasibility and credible future TMC adoption; hotel search/availability/quote; booking; modification/rebooking; cancellation; supplier policy/rule data.
+3. **Ground routing / transport** — Google Routes LIVE with strict spend/usage guardrails if economically safe; investigate transactional ground-transfer sandbox APIs separately.
+4. **Generic real-source ingestion** — URL ingestion; event pages; webpages; booking confirmations; PDFs/documents; email/plain text; policies.
+5. **Generic Trip assembly** — arbitrary imported sources -> Trip; entity resolution; timezone/place resolution; dependency proposals; objective/context extraction; uncertainty handling.
+6. **Dynamic context/research** — event schedules; supplier policies; immigration/entry context; insurance; organisation policy; local operating context.
+7. **Model Studio reality pass** — actual Qwen extraction/planning against previously unseen real-world inputs.
+8. **Traveller-initiated change / resolution** — the system must support not only externally caused disruptions but also traveller-requested changes: fly a different day; fly at a different time; take a different route; extend or shorten a stay; change hotel; leave earlier/later; reprioritise an objective; voluntarily abandon an objective; request a preference-driven modification. These enter the **same** generalized engine as TripSignals / change intents and trigger: intent/change -> state/context update -> blast radius -> recovery/resolution strategies -> deterministic whole-trip viability -> policy/authority -> execution -> observation -> resolved state. No second "traveller modification engine" is created; this is central to the wider Trip Resolution thesis.
 
 ## Stretch
 
