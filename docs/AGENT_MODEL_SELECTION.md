@@ -320,8 +320,8 @@ Independent review is deliberate risk control, not a ritual after every package.
 
 | Gate | Default reviewer | Fallback(s) | Note |
 |---|---|---|---|
-| NS Review 1 (after NS-G1) | DeepSeek-V4-Flash | Kimi-K2.7-Code | fresh different-family reviewer vs the primary Qwen implementer |
-| NS Review 2 (after NS-G2) | DeepSeek-V4-Pro Max | GLM-5.3 Max only if GLM did not materially implement/debug/fix the reviewed paths; then Kimi-K3 Max or external Claude Opus 5 High if independence would otherwise be compromised | intentional premium use — highest-risk integrated backend checkpoint |
+| NS Review 1 (after NS-G1) | — (no longer scheduled) | voluntary bounded different-family review: DeepSeek-V4-Flash or Kimi-K2.7-Code | NS-G1 is an internal integration gate; the primary agent continues automatically into Wave 2 when it is green |
+| NS Review 2 (after NS-G2) | DeepSeek-V4-Pro Max | GLM-5.3 Max only if reviewer independence is preserved (GLM did not materially implement/debug/fix the reviewed paths) | intentional premium use — highest-risk integrated backend checkpoint |
 | Final Candidate Review | Claude Opus 5 High/Max externally | `AGENT_MODEL_SELECTION.md` escalation guidance; document any substituted reviewer | Qwen-heavy implementation + Sol already architecture/lead support → Opus as independent ceiling family |
 
 Review 2 architecture disagreements may be escalated to GPT-5.6 Sol High or Claude Opus 5 High. NS-G3 is a human product-owner product/demo evaluation, not a model review.

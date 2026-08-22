@@ -658,7 +658,7 @@ This is not another full release audit. Checkpoint C passes only when its implem
 
 # Final candidate gate
 
-This is the broadest independent review/release gate (the fourth historically accepted gate — after Review Gates A/B/C — with the bounded Northstar execution gates NS-G1/NS-G2/Review 1/Review 2 and the NS-G3 product evaluation preceding it; see Section 13).
+This is the broadest independent review/release gate (the fourth historically accepted gate — after Review Gates A/B/C — with the bounded Northstar execution gates NS-G1/NS-G2/Review 2 and the NS-G3 product evaluation preceding it; see Section 13).
 
 Reviewer-model selection follows the current `docs/AGENT_MODEL_SELECTION.md`. Prefer independence from the primary integrator where practical, but do not duplicate or freeze a model-ranking list here.
 
@@ -947,7 +947,7 @@ Every investigation ends with `Adopt Now | Keep Stretch | Defer | Reject`, evide
 Checkpoints A, B, and C are **accepted** (REV-A, REV-B, REV-C Complete). Checkpoint C's accepted SHA `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d` is the demo candidate / baseline and has been merged to `main`.
 
 Current next action:
-1. execute the **Northstar waves 1–4** (Section 13 below) as four bounded horizons with independent gates — not one uninterrupted autonomous run; implementation worktrees fan out from `NORTHSTAR_EXECUTION_BASE_SHA` (the docs-only execution-plan reconciliation commit on `northstar/contract-freeze`) so they inherit the corrected execution/review plan;
+1. execute the **Northstar Wave 1 + Wave 2 as ONE continuous long-horizon mission** (Section 13 below): Wave 1 → NS-G1 (internal integration gate) → automatically continue into Wave 2 → NS-G2 → mandatory Independent Review 2. Review 1 is no longer a scheduled mandatory gate. Implementation worktrees fan out from `NORTHSTAR_WAVE12_BASE_SHA` (recorded by this docs-only cadence reconciliation on top of `northstar/contract-freeze`) so they inherit the corrected execution/review plan;
 2. keep the Reality Validation milestone open — the Northstar wave is its programme-scale execution phase (externally sourced / provider-produced inputs, RECORD/REPLAY default, bounded LIVE);
 3. do not begin Final Candidate preparation until Wave 4 stabilisation completes and Review Gate Final passes.
 
@@ -957,12 +957,32 @@ Review Gate Final remains mandatory per Section 3 and `docs/TESTING.md`.
 
 Northstar framing: the AI resolution layer for event travel. One event-travel programme at a time, roughly 40–45 inbound travellers, generic across tournaments / corporate offsites / productions / conferences.
 
-**Long-horizon execution discipline (post-N0 decision):** RV-N1..N12 are deliberately NOT one uninterrupted autonomous run. A single multi-day autonomous implementation horizon is not trusted. Execution proceeds in four bounded waves, each ending in a checkpoint and — for waves 1 and 2 — a mandatory independent review by a fresh different-family reviewer. These Northstar gates (NS-G1/NS-G2/NS-G3, Reviews 1/2) are bounded **post-Checkpoint-C execution gates**; they do not reopen, re-review or replace accepted Checkpoints A/B/C.
+**Long-horizon execution discipline (post-Wave-1/2 unification decision):** RV-N1..N12 are deliberately NOT one uninterrupted autonomous run across all waves. A single multi-day autonomous implementation horizon is not trusted. Execution proceeds in bounded waves, each ending in a checkpoint. **Wave 1 and Wave 2 are now ONE continuous long-horizon mission**: after the internal NS-G1 integration gate passes, the primary agent continues automatically into Wave 2 without a scheduled independent review. Independent Review 2 remains mandatory after NS-G2. These Northstar gates (NS-G1/NS-G2/NS-G3, Review 2) are bounded **post-Checkpoint-C execution gates**; they do not reopen, re-review or replace accepted Checkpoints A/B/C.
+
+**Cadence (authoritative):**
+
+```
+RV-N0 contract freeze — COMPLETE
+→ Wave 1 Programme Foundation
+→ NS-G1 internal integration gate
+→ automatically continue into Wave 2 (no scheduled Review 1)
+→ NS-G2 backend convergence gate
+→ mandatory Independent Review 2
+→ human checkpoint
+→ Wave 3 Integrated Northstar Product
+→ NS-G3 product/demo checkpoint
+→ Stretch pull decision
+→ Wave 4 Stabilisation
+→ Final Candidate Review
+```
+
+**NS-G1** is a real internal integration/acceptance gate (full suite, typecheck, lint, build, targeted anti-hardcoding scan, alternate-data substitution), but it is NOT a human/reviewer checkpoint: a green NS-G1 means the primary agent continues directly into Wave 2. A bounded different-family review may still be used voluntarily between NS-G1 and Wave 2 if concrete evidence suggests a problem, but it is no longer a scheduled mandatory gate.
 
 ### Bases and fan-out discipline
 
 - **NORTHSTAR_CONTRACT_BASE_SHA = `70d4b8664c80583e964ff2c509cbda61b4b640aa`** — the immutable accepted executable-contract baseline (RV-N0 freeze, ADR-034..041). Never amended or replaced.
-- **NORTHSTAR_EXECUTION_BASE_SHA** — recorded in the docs-only execution-plan reconciliation commit that introduced this four-wave plan. The diff CONTRACT_BASE → EXECUTION_BASE is documentation only. **All implementation worktrees fan out from NORTHSTAR_EXECUTION_BASE_SHA**, never from CONTRACT_BASE directly, so every lane inherits the corrected execution/review plan.
+- **NORTHSTAR_EXECUTION_BASE_SHA = `53c7a3ba2feeb184153f127d4c81bac7e64e7838`** — the docs-only execution-plan reconciliation commit that introduced the four-wave plan. The diff CONTRACT_BASE → EXECUTION_BASE is documentation only.
+- **NORTHSTAR_WAVE12_BASE_SHA** — recorded by the docs-only Wave 1+2 cadence reconciliation commit (this correction). The diff EXECUTION_BASE → WAVE12_BASE is documentation only. **All Wave 1/Wave 2 implementation worktrees fan out from NORTHSTAR_WAVE12_BASE_SHA**, never from CONTRACT_BASE or EXECUTION_BASE directly, so every lane inherits the corrected execution/review plan.
 
 **Contract assumptions lanes must not redefine** (change only through lead reconciliation, like Checkpoint A frozen contracts):
 - SignalKind stays closed except the already-added `ANCHOR_COMMITMENT_CHANGE`.
@@ -1001,7 +1021,7 @@ RV-N6..N9 meanings were re-scoped after the user's post-N0 decision. No executab
 
 Wave 1 also carries: relevant Model Studio extraction plumbing; bounded provider-access smoke investigations (Duffel Stays / Nuitée / Hotelbeds access reality) run in parallel and recorded per `Adopt | Defer | Reject`.
 
-### WAVE 1 — Programme Foundation → NS-G1 → Review 1
+### WAVE 1 — Programme Foundation → NS-G1 → automatically into Wave 2
 
 Goal: Northstar understands and operationalises one event programme.
 
@@ -1018,7 +1038,7 @@ Scope: RV-N1 commitment fan-out; RV-N2 intake (manual + bulk + LLM-assisted mapp
 - existing Checkpoint C behavior remains green;
 - alternate event/location data requires no application-code change.
 
-**Review 1 (mandatory, after NS-G1):** default reviewer **DeepSeek-V4-Flash**; fallback **Kimi-K2.7-Code**. Must be a fresh different-family reviewer from the primary Qwen implementer. Focus: architecture drift; conference/event-specific hardcoding; duplicated programme truth outside authoritative state; AI output bypassing validation/promotion; fabricated defaults / UNKNOWN becoming certainty; shared commitment semantics; intake equivalence; alternate-event substitution; frozen RV-N0 contracts silently changed; test quality. Every finding triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`; no unresolved Act Now or gate-threatening Investigate Now may pass NS-G1.
+**NS-G1 is an internal integration gate, not a reviewer/human checkpoint.** When it is green the primary agent continues automatically into Wave 2. **Review 1 is no longer a scheduled mandatory gate** (former default reviewer DeepSeek-V4-Flash / fallback Kimi-K2.7-Code): a bounded different-family review of the Wave 1 seam may still be used voluntarily if evidence suggests a problem (architecture drift; conference/event-specific hardcoding; duplicated programme truth outside authoritative state; AI output bypassing validation/promotion; fabricated defaults / UNKNOWN becoming certainty; shared commitment semantics; intake equivalence; alternate-event substitution; frozen RV-N0 contracts silently changed; test quality), but it must not block Wave 2 progress as a scheduled gate.
 
 ### WAVE 2 — Resolution Capabilities → NS-G2 → Review 2
 
@@ -1039,7 +1059,7 @@ Hotel reality: one proper **real hotel API adapter is MINIMUM**. Candidate remai
 - **B:** provider changes current reality;
 - **C:** AnchorEvent/shared commitment changes objective/context.
 
-**Review 2 (mandatory, after NS-G2):** default reviewer **DeepSeek-V4-Pro Max** — an intentional premium use because this is the highest-risk integrated backend checkpoint. Fallback: **GLM-5.3 Max** ONLY if GLM did not materially implement/debug/fix the reviewed paths. Second fallback if reviewer independence would otherwise be compromised: **Kimi-K3 Max** or external **Claude Opus 5 High**. Adversarial focus: current authoritative state vs desired target state; model-created judging criteria; mutation safety; overlay isolation; deterministic viability; UNKNOWN never treated as PASS; mixed-funding and policy correctness; authority/approval paths; LLM → irreversible API prohibition; execution gate; provider success != resolved case; observation and state update; event-level fan-out correctness; unrelated Trips remaining unaffected; LIVE/RECORD/REPLAY identical normalization; hotel and Atlas provider boundaries; provider failure/degradation; alternate event/location generalisation; hardcoding; meaningful tests rather than scripted assertions. Architecture disagreements from Review 2 may be escalated to **GPT-5.6 Sol High** or **Claude Opus 5 High**.
+**Review 2 (mandatory, after NS-G2):** default reviewer **DeepSeek-V4-Pro Max** — an intentional premium use because this is the highest-risk integrated backend checkpoint. Fallback: **GLM-5.3 Max** only if reviewer independence is preserved (GLM did not materially implement/debug/fix the reviewed paths). Architecture/review escalation if required: **GPT-5.6 Sol High** or **Claude Opus 5 High**. Adversarial focus: current authoritative state vs desired target state; model-created judging criteria; mutation safety; overlay isolation; deterministic viability; UNKNOWN never treated as PASS; mixed-funding and policy correctness; authority/approval paths; LLM → irreversible API prohibition; execution gate; provider success != resolved case; observation and state update; event-level fan-out correctness; unrelated Trips remaining unaffected; LIVE/RECORD/REPLAY identical normalization; hotel and Atlas provider boundaries; provider failure/degradation; alternate event/location generalisation; hardcoding; meaningful tests rather than scripted assertions. Architecture disagreements from Review 2 may be escalated to **GPT-5.6 Sol High** or **Claude Opus 5 High**.
 
 ### WAVE 3 — Integrated Northstar Product → NS-G3 → Stretch pull decision
 
