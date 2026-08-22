@@ -144,3 +144,20 @@ Zod v4 schemas are the executable form of the F1 domain/operational contracts an
 Atlas `depTime`/`arrTime` schedule strings (`YYYYMMDDHHmm`) are airport-local wall-clock times with no offset. This was established by analysing sandbox captures: cross-timezone legs shift by exactly the local-time difference of their endpoints (e.g. DXB→RUH −60 min, LAX→ATL +180 min), while same-timezone legs match flight duration exactly. The Lane C mapping to `...Z` (fabricated UTC) is therefore wrong in general and was removed: `normalizeSearch` now requires an `AtlasTimezoneResolver` (airport code → IANA timezone) supplied by the application from its authoritative place data, converts wall clock to an honest offset instant deterministically, and fails normalization with a structured `PROVIDER_ERROR` when the timezone cannot be resolved. No frozen contract changed; honest `IsoDateTime` representation is possible, so UNKNOWN/uncertainty lives in the capability failure, not in a guessed offset.
 
 DST fold resolution (Checkpoint C, PL-2): the conversion enumerates candidate instants by probing the zone offset at the naive instant and at ±14h around it (wider than any UTC offset), round-trips every candidate back to its local wall clock, and selects the EARLIEST instant that round-trips — the first occurrence of the repeated local time, for every IANA zone, not just ones where the naive-offset heuristic happens to land on the fold. Nonexistent DST-gap times (no round-tripping candidate) fail structured with `ambiguous local schedule`. The conversion stays host-timezone independent (Intl with explicit `timeZone`) and never weakens the fail-closed rule.
+
+## ADR-029 — Generic runtime seam over demo-specific endpoints
+**Status:** Accepted (Checkpoint C, R1/PL-3)
+
+The demo/runtime flow is exposed as a scenario-neutral operation vocabulary — `POST /api/runtime/{disruption,plan,begin,decide,execute,reset}` plus `GET /api/runtime/state` — where handlers validate wire JSON at the boundary and delegate to the same engine services the tests use. There are no scenario-specific endpoints and no separate demo code path: `src/app/compose.ts` composes the application once and is shared by `src/main.ts` and the integration tests. Every stage requires a caller-supplied instant (`at`), so runs are deterministic and never wall-clock-stamped.
+
+Deterministic reset/reseed is a single audited transaction: wipe the logical tables, then reseed every fixture bundle through the same validated `seedScenarioBundle` mutation path as bootstrap — no manual SQLite edits. Recovery planning stays credential-free in REPLAY: the Model Studio planner is used only when configured; otherwise a deterministic fallback planner derives strategies from replayed capability results (never claiming feasibility it did not evaluate).
+
+## ADR-030 — CaseVerifier evaluates trip-scoped constraints only
+**Status:** Accepted (Checkpoint C, R1)
+
+Constraint verification is scoped to constraints whose refs point at the verified trip's elements or objectives (generic ref matching, identical semantics to the snapshot layer). Verification of one trip must never be poisoned by constraints belonging to another trip once multiple scenario bundles share one store; provider success alone still never resolves — the verifier remains the sole resolution authority.
+
+## ADR-031 — On-demand transfer legs are schedulable, not unknown
+**Status:** Accepted (Checkpoint C, G2)
+
+A ground TRANSFER leg with no scheduled departure is schedulable on demand when it is unbooked or already confirmed with a duration estimate (`flexibility ≠ FIXED`, no `scheduledDeparture`, and `reservationState NONE` or `durationEstimate` present). Such legs evaluate against upstream arrival knowledge instead of returning UNKNOWN, and a CONFIRMED on-demand leg keeps this property post-execution. This keeps confirmed taxi/private-transfer recoveries from stalling verification at UNKNOWN without ever fabricating a schedule.
