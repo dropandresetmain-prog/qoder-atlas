@@ -1,0 +1,49 @@
+{
+  "id": "rec_974c0af8e15fc22d0357d8f50ad89ad8",
+  "providerId": "atlas",
+  "operation": "fare_rules",
+  "recordedAt": "2026-09-21T16:46:00.000-06:00",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "atlmex-sess-g1demo-0001",
+    "routing": {
+      "routingIdentifier": "ATLMEX-20260922-VB210-B4",
+      "currency": "USD",
+      "adultPrice": 58,
+      "adultTax": 18.9,
+      "fromSegments": [
+        {
+          "carrier": "VB",
+          "flightNumber": "210",
+          "depAirport": "GDL",
+          "arrAirport": "MEX",
+          "depTime": "202609220940",
+          "arrTime": "202609221105",
+          "duration": 85,
+          "cabinClass": 1,
+          "fareFamily": "ECON_SAVER",
+          "seatCount": 4
+        }
+      ],
+      "retSegments": [],
+      "rule": {
+        "changesRules": [
+          {
+            "changesFee": 25,
+            "changesStatus": "T",
+            "currency": "USD"
+          }
+        ],
+        "refundRules": [
+          {
+            "refundFee": 60,
+            "refundStatus": "F",
+            "currency": "USD"
+          }
+        ]
+      }
+    }
+  }
+}

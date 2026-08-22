@@ -173,7 +173,10 @@ function confirmedData(data: Record<string, unknown>, confirmedAt: IsoDateTime):
  * Overlay candidates are HELD hypotheses; a provider confirmation turns them
  * into confirmed authoritative element state. Purely structural: reservation
  * state/status become CONFIRMED/VALID and every schedule fact is upgraded to
- * AUTHORITATIVE evidence at the execution instant. No scenario knowledge.
+ * AUTHORITATIVE evidence at the execution instant. Other bounded vocabulary
+ * operations (objective waivers/reprioritisations, relation changes, ...)
+ * pass through unchanged — they carry no provider facts to upgrade, and a
+ * confirmed execution must be able to observe them. No scenario knowledge.
  */
 export function confirmedOperationsFor(
   operations: MutationOperation[],
@@ -181,7 +184,10 @@ export function confirmedOperationsFor(
 ): MutationOperation[] {
   const confirmed: MutationOperation[] = [];
   for (const operation of operations) {
-    if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') continue;
+    if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') {
+      confirmed.push(operation);
+      continue;
+    }
     const element = operation.data as Record<string, unknown>;
     const data = element['data'];
     confirmed.push({

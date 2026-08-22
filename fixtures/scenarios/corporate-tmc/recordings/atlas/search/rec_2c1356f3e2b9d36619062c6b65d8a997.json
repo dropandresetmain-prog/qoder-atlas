@@ -1,0 +1,124 @@
+{
+  "id": "rec_2c1356f3e2b9d36619062c6b65d8a997",
+  "providerId": "atlas",
+  "operation": "search",
+  "recordedAt": "2026-09-21T16:45:00.000-06:00",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "routings": [
+      {
+        "routingIdentifier": "ATLMEX-20260922-AM033-E2",
+        "currency": "USD",
+        "adultPrice": 84,
+        "adultTax": 21.4,
+        "fromSegments": [
+          {
+            "carrier": "AM",
+            "flightNumber": "033",
+            "depAirport": "GDL",
+            "arrAirport": "MEX",
+            "depTime": "202609220655",
+            "arrTime": "202609220820",
+            "duration": 85,
+            "cabinClass": 1,
+            "fareFamily": "ECON_FLEX",
+            "seatCount": 6
+          }
+        ],
+        "retSegments": [],
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 25,
+              "changesStatus": "T",
+              "currency": "USD"
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 60,
+              "refundStatus": "F",
+              "currency": "USD"
+            }
+          ]
+        }
+      },
+      {
+        "routingIdentifier": "ATLMEX-20260922-VB210-B4",
+        "currency": "USD",
+        "adultPrice": 58,
+        "adultTax": 18.9,
+        "fromSegments": [
+          {
+            "carrier": "VB",
+            "flightNumber": "210",
+            "depAirport": "GDL",
+            "arrAirport": "MEX",
+            "depTime": "202609220940",
+            "arrTime": "202609221105",
+            "duration": 85,
+            "cabinClass": 1,
+            "fareFamily": "ECON_SAVER",
+            "seatCount": 4
+          }
+        ],
+        "retSegments": [],
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 25,
+              "changesStatus": "T",
+              "currency": "USD"
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 60,
+              "refundStatus": "F",
+              "currency": "USD"
+            }
+          ]
+        }
+      },
+      {
+        "routingIdentifier": "ATLMEX-20260922-AM117-E5",
+        "currency": "USD",
+        "adultPrice": 96,
+        "adultTax": 22.6,
+        "fromSegments": [
+          {
+            "carrier": "AM",
+            "flightNumber": "117",
+            "depAirport": "GDL",
+            "arrAirport": "MEX",
+            "depTime": "202609221830",
+            "arrTime": "202609221955",
+            "duration": 85,
+            "cabinClass": 1,
+            "fareFamily": "ECON_FLEX",
+            "seatCount": 7
+          }
+        ],
+        "retSegments": [],
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 25,
+              "changesStatus": "T",
+              "currency": "USD"
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 60,
+              "refundStatus": "F",
+              "currency": "USD"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

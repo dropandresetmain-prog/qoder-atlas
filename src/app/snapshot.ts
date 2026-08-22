@@ -44,9 +44,24 @@ export async function buildTripSnapshot(
     : undefined;
   const anchorEvent = anchorEntry?.entityType === 'ANCHOR_EVENT' ? anchorEntry.entity : undefined;
 
+  const constraints = await constraintsForTrip(deps.entities, trip);
+
+  const ruleSetIds = collectRuleSetIds(trip, travellers, constraints);
+  const ruleSets: RuleSet[] = [];
+  for (const ruleSetId of [...ruleSetIds].sort()) {
+    const entry = await deps.entities.get('RULE_SET', ruleSetId);
+    if (entry && entry.entityType === 'RULE_SET') ruleSets.push(entry.entity);
+  }
+
   const organisationIds = new Set<EntityId>();
   if (trip.operatorOrganisationId) organisationIds.add(trip.operatorOrganisationId);
   if (anchorEvent?.organiserOrganisationId) organisationIds.add(anchorEvent.organiserOrganisationId);
+  // Rule-set owners are in-scope principals too: a governing policy may name
+  // an approving/paying organisation distinct from the operator, and authority
+  // decisions are derived from this rule data. Generic ownerRef walk only.
+  for (const ruleSet of ruleSets) {
+    if (ruleSet.ownerOrganisationId) organisationIds.add(ruleSet.ownerOrganisationId);
+  }
   const organisations: Organisation[] = [];
   for (const organisationId of [...organisationIds].sort()) {
     const entry = await deps.entities.get('ORGANISATION', organisationId);
@@ -58,15 +73,6 @@ export async function buildTripSnapshot(
   for (const placeId of [...placeIds].sort()) {
     const entry = await deps.entities.get('PLACE', placeId);
     if (entry && entry.entityType === 'PLACE') places.push(entry.entity);
-  }
-
-  const constraints = await constraintsForTrip(deps.entities, trip);
-
-  const ruleSetIds = collectRuleSetIds(trip, travellers, constraints);
-  const ruleSets: RuleSet[] = [];
-  for (const ruleSetId of [...ruleSetIds].sort()) {
-    const entry = await deps.entities.get('RULE_SET', ruleSetId);
-    if (entry && entry.entityType === 'RULE_SET') ruleSets.push(entry.entity);
   }
 
   const preferences = await deps.preferences.listForTrip(tripId, trip.travellerIds);
