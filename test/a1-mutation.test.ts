@@ -494,3 +494,314 @@ test('mutation: RULE_SET upsert keeps provenance in entity store', async () => {
   const stored = await entities.get('RULE_SET', 'rs_m1');
   assert.equal(stored?.entityType, 'RULE_SET');
 });
+
+// ---------------------------------------------------------------------------
+// PL-1 regressions: UPSERT_ENTITY must honour the same fact authority ladder
+// as UPSERT_FACT — never last-write-wins through a whole-entity payload.
+// ---------------------------------------------------------------------------
+
+/** Seed element with the AUTHORITATIVE departure fact replaced. */
+function elementWithDeparture(fact: {
+  value: string;
+  sourceId: string;
+  authority: 'AUTHORITATIVE' | 'CONNECTED' | 'ASSERTED' | 'INFERRED';
+  observedAt: string;
+}): Trip {
+  const trip = seedTrip();
+  const leg = trip.elements[0];
+  if (leg?.elementKind === 'TRANSPORT_LEG') {
+    leg.data = { ...leg.data, scheduledDeparture: fact };
+  }
+  return trip;
+}
+
+test('mutation PL-1: weaker whole-entity upsert cannot replace a stronger fact', async () => {
+  const { trips, mutations } = harness();
+  const trip = seedTrip();
+  await trips.saveTrip(trip);
+  const incumbentLeg = trip.elements[0];
+  assert.ok(incumbentLeg);
+
+  // Same element, but its AUTHORITATIVE departure fact is downgraded to an
+  // INFERRED rumor inside a whole-entity payload.
+  const rumorElement = structuredClone(incumbentLeg);
+  assert.equal(rumorElement.elementKind, 'TRANSPORT_LEG');
+  rumorElement.data = {
+    ...rumorElement.data,
+    scheduledDeparture: {
+      value: '2026-09-01T23:59:00+09:00',
+      sourceId: 'src_m_rumor',
+      authority: 'INFERRED',
+      observedAt: '2026-08-20T20:00:00+09:00', // newer observation, weaker authority
+    },
+  };
+
+  const outcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_weaker',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: rumorElement }],
+    }),
+  );
+  assert.equal(outcome.accepted, false);
+  assert.ok(outcome.issues.some((i) => i.code === 'FACT_OUTRANKED' && i.path === 'data.scheduledDeparture'));
+  const stored = await trips.getTrip('trip_m1');
+  const leg = stored?.elements.find((e) => e.id === 'el_m_flight');
+  assert.equal(
+    leg?.elementKind === 'TRANSPORT_LEG' && leg.data.scheduledDeparture?.value,
+    '2026-09-01T08:00:00+09:00',
+    'authoritative evidence untouched',
+  );
+  assert.equal(stored?.version, 0);
+});
+
+test('mutation PL-1: equivalent UPSERT_FACT and UPSERT_ENTITY conflicts behave identically', async () => {
+  const { trips, mutations } = harness();
+  await trips.saveTrip(seedTrip());
+  const weakerFact = {
+    value: '2026-09-01T23:59:00+09:00',
+    sourceId: 'src_m_rumor',
+    authority: 'INFERRED' as const,
+    observedAt: '2026-08-20T20:00:00+09:00',
+  };
+
+  const byFact = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_fact',
+      operations: [
+        {
+          op: 'UPSERT_FACT',
+          target: { entityType: 'TRIP_ELEMENT', id: 'el_m_flight' },
+          factPath: 'data.scheduledDeparture',
+          sourceId: weakerFact.sourceId,
+          authority: weakerFact.authority,
+          value: weakerFact,
+        },
+      ],
+    }),
+  );
+  assert.equal(byFact.accepted, false);
+  const factCodes = byFact.issues.map((i) => i.code).sort();
+
+  const trip = seedTrip();
+  const leg = trip.elements[0];
+  assert.ok(leg);
+  const element = structuredClone(leg);
+  assert.equal(element.elementKind, 'TRANSPORT_LEG');
+  element.data = { ...element.data, scheduledDeparture: weakerFact };
+  const byEntity = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_entity',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: element }],
+    }),
+  );
+  assert.equal(byEntity.accepted, false, 'entity upsert must conflict exactly like the fact upsert');
+  assert.deepEqual(byEntity.issues.map((i) => i.code).sort(), factCodes);
+});
+
+test('mutation PL-1: stronger or fresher facts still win through entity upsert', async () => {
+  const { trips, mutations } = harness();
+  // Incumbent is only CONNECTED; an AUTHORITATIVE provider confirmation wins.
+  await trips.saveTrip(
+    elementWithDeparture({
+      value: '2026-09-01T08:00:00+09:00',
+      sourceId: 'src_m_provider',
+      authority: 'CONNECTED',
+      observedAt: '2026-08-19T09:00:00+09:00',
+    }),
+  );
+  const trip = seedTrip();
+  const leg = trip.elements[0];
+  assert.ok(leg);
+  const stronger = structuredClone(leg);
+  assert.equal(stronger.elementKind, 'TRANSPORT_LEG');
+  stronger.data = {
+    ...stronger.data,
+    scheduledDeparture: {
+      value: '2026-09-01T09:00:00+09:00',
+      sourceId: 'src_m_provider',
+      authority: 'AUTHORITATIVE',
+      observedAt: '2026-08-20T10:00:00+09:00',
+    },
+  };
+  const strongerOutcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_stronger',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: stronger }],
+    }),
+  );
+  assert.equal(strongerOutcome.accepted, true, 'stronger authority must replace weaker evidence');
+  const afterStronger = await trips.getTrip('trip_m1');
+  const legAfter = afterStronger?.elements.find((e) => e.id === 'el_m_flight');
+  assert.equal(
+    legAfter?.elementKind === 'TRANSPORT_LEG' && legAfter.data.scheduledDeparture?.value,
+    '2026-09-01T09:00:00+09:00',
+  );
+
+  // Equal authority: fresher observation wins, older observation loses.
+  const fresher = structuredClone(stronger);
+  assert.equal(fresher.elementKind, 'TRANSPORT_LEG');
+  fresher.data = {
+    ...fresher.data,
+    scheduledDeparture: {
+      value: '2026-09-01T09:30:00+09:00',
+      sourceId: 'src_m_provider',
+      authority: 'AUTHORITATIVE',
+      observedAt: '2026-08-20T12:00:00+09:00',
+    },
+  };
+  const fresherOutcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_fresher',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: fresher }],
+    }),
+  );
+  assert.equal(fresherOutcome.accepted, true);
+
+  const stale = structuredClone(fresher);
+  assert.equal(stale.elementKind, 'TRANSPORT_LEG');
+  stale.data = {
+    ...stale.data,
+    scheduledDeparture: {
+      value: '2026-09-01T07:00:00+09:00',
+      sourceId: 'src_m_provider',
+      authority: 'AUTHORITATIVE',
+      observedAt: '2026-08-20T11:00:00+09:00', // older than the fresher one now stored
+    },
+  };
+  const staleOutcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_stale',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: stale }],
+    }),
+  );
+  assert.equal(staleOutcome.accepted, false);
+  assert.ok(staleOutcome.issues.some((i) => i.code === 'FACT_OUTRANKED'));
+  const finalLeg = (await trips.getTrip('trip_m1'))?.elements.find((e) => e.id === 'el_m_flight');
+  assert.equal(
+    finalLeg?.elementKind === 'TRANSPORT_LEG' && finalLeg.data.scheduledDeparture?.value,
+    '2026-09-01T09:30:00+09:00',
+    'fresher evidence retained',
+  );
+});
+
+test('mutation PL-1: one outranked fact in a multi-fact entity blocks the whole write', async () => {
+  const { trips, mutations } = harness();
+  await trips.saveTrip(seedTrip());
+  const trip = seedTrip();
+  const leg = trip.elements[0];
+  assert.ok(leg);
+
+  // Arrival fact is stronger/fresher (should win), departure fact is weaker
+  // (must lose) — the losing fact alone must reject the entire payload, so
+  // the winning arrival is not applied either.
+  const mixed = structuredClone(leg);
+  assert.equal(mixed.elementKind, 'TRANSPORT_LEG');
+  mixed.data = {
+    ...mixed.data,
+    scheduledDeparture: {
+      value: '2026-09-01T06:00:00+09:00',
+      sourceId: 'src_m_rumor',
+      authority: 'INFERRED',
+      observedAt: '2026-08-20T20:00:00+09:00',
+    },
+    scheduledArrival: {
+      value: '2026-09-01T12:30:00+09:00',
+      sourceId: 'src_m_provider',
+      authority: 'AUTHORITATIVE',
+      observedAt: '2026-08-20T20:00:00+09:00',
+    },
+  };
+  const outcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_atomic',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: mixed }],
+    }),
+  );
+  assert.equal(outcome.accepted, false);
+  const stored = await trips.getTrip('trip_m1');
+  const storedLeg = stored?.elements.find((e) => e.id === 'el_m_flight');
+  assert.equal(stored?.version, 0);
+  assert.equal(
+    storedLeg?.elementKind === 'TRANSPORT_LEG' && storedLeg.data.scheduledArrival?.value,
+    '2026-09-01T11:00:00+09:00',
+    'no partial application: the winning arrival fact must not leak in',
+  );
+  assert.equal(
+    storedLeg?.elementKind === 'TRANSPORT_LEG' && storedLeg.data.scheduledDeparture?.value,
+    '2026-09-01T08:00:00+09:00',
+  );
+});
+
+test('mutation PL-1: context entity upserts respect incumbent facts too', async () => {
+  const { trips, entities, mutations } = harness();
+  await trips.saveTrip(seedTrip());
+
+  const anchor = {
+    id: 'anchor_pl1',
+    name: 'Keynote',
+    kind: 'CONFERENCE' as const,
+    window: { startsAt: '2026-09-14T09:00:00+09:00', endsAt: '2026-09-14T10:00:00+09:00' },
+    instructions: {
+      value: 'Badge required; arrive 30 minutes early.',
+      sourceId: 'src_m_organiser',
+      authority: 'AUTHORITATIVE' as const,
+      observedAt: '2026-08-19T09:00:00+00:00',
+    },
+    sourceIds: ['src_m_organiser'],
+  };
+  const create = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_anchor_create',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'ANCHOR_EVENT', id: anchor.id, data: anchor }],
+    }),
+  );
+  assert.equal(create.accepted, true);
+
+  // Weaker source tries to rewrite the instructions through a whole-entity
+  // payload — must be rejected, and the stored entity must be untouched.
+  const weaker = {
+    ...anchor,
+    instructions: {
+      value: 'No badge needed.',
+      sourceId: 'src_m_rumor',
+      authority: 'INFERRED' as const,
+      observedAt: '2026-08-20T09:00:00+00:00',
+    },
+  };
+  const weakerOutcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_anchor_weaker',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'ANCHOR_EVENT', id: anchor.id, data: weaker }],
+    }),
+  );
+  assert.equal(weakerOutcome.accepted, false);
+  assert.ok(weakerOutcome.issues.some((i) => i.code === 'FACT_OUTRANKED' && i.path === 'instructions'));
+  const stored = await entities.get('ANCHOR_EVENT', anchor.id);
+  assert.equal(
+    (stored?.entity as { instructions?: { value: string } }).instructions?.value,
+    'Badge required; arrive 30 minutes early.',
+  );
+
+  // Authoritative restatement at a fresher instant still wins.
+  const updated = {
+    ...anchor,
+    instructions: {
+      value: 'Badge required; side entrance this week.',
+      sourceId: 'src_m_organiser',
+      authority: 'AUTHORITATIVE' as const,
+      observedAt: '2026-08-20T09:00:00+00:00',
+    },
+  };
+  const updatedOutcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_pl1_anchor_update',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'ANCHOR_EVENT', id: anchor.id, data: updated }],
+    }),
+  );
+  assert.equal(updatedOutcome.accepted, true);
+  const updatedStored = await entities.get('ANCHOR_EVENT', anchor.id);
+  assert.equal(
+    (updatedStored?.entity as { instructions?: { value: string } }).instructions?.value,
+    'Badge required; side entrance this week.',
+  );
+});

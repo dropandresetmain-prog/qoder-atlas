@@ -70,20 +70,31 @@ export class SqlMutationService implements MutationService {
     }
 
     // Build the working state: all trips (targets may live in any trip) plus
-    // every entity referenced by fact operations.
+    // every incumbent entity referenced by fact or entity operations, so
+    // UPSERT_FACT and UPSERT_ENTITY conflict checks see the existing evidence.
     const trips = new Map<string, Trip>();
     for (const summary of await this.deps.trips.listTrips()) {
       const trip = await this.deps.trips.getTrip(summary.tripId);
       if (trip) trips.set(summary.tripId, structuredClone(trip));
     }
     const state: WorkingState = { trips, entities: new Map() };
+    const preloadEntity = async (entityType: string, id: string): Promise<void> => {
+      if (entityType !== 'ORGANISATION' && entityType !== 'TRAVELLER' && entityType !== 'ANCHOR_EVENT' && entityType !== 'PLACE' && entityType !== 'RULE_SET') {
+        return;
+      }
+      const key = entityKey(entityType, id);
+      if (state.entities.has(key)) return;
+      const existing = await this.deps.entities.get(entityType, id);
+      if (existing) state.entities.set(key, structuredClone(existing));
+    };
     for (const op of valid.operations) {
       if (op.op === 'UPSERT_FACT') {
         const { entityType, id } = op.target;
-        if (entityType === 'TRAVELLER' || entityType === 'ANCHOR_EVENT') {
-          const existing = await this.deps.entities.get(entityType, id);
-          if (existing) state.entities.set(entityKey(entityType, id), structuredClone(existing));
-        }
+        await preloadEntity(entityType, id);
+      }
+      if (op.op === 'UPSERT_ENTITY') {
+        const dataId = op.id ?? (op.data as { id?: string }).id;
+        if (dataId) await preloadEntity(op.entityType, dataId);
       }
     }
 

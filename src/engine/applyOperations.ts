@@ -143,6 +143,38 @@ function looksLikeFact(candidate: unknown): candidate is Fact<unknown> {
 }
 
 /**
+ * Walk an incoming entity payload against its incumbent and collect every
+ * fact-path where the existing evidence outranks the incoming fact. This
+ * gives UPSERT_ENTITY the exact same authority ladder as UPSERT_FACT: a
+ * whole-entity upsert can never silently bypass fact authority
+ * (ARCHITECTURE.md §5). Non-fact fields are unaffected; facts absent from
+ * the incoming payload are not touched by this check.
+ */
+function collectEntityFactConflicts(
+  incumbent: unknown,
+  incoming: unknown,
+  path: string,
+  issues: ApplyIssue[],
+): void {
+  if (looksLikeFact(incoming)) {
+    if (looksLikeFact(incumbent) && !incomingFactWins(incumbent, incoming)) {
+      issues.push({
+        code: 'FACT_OUTRANKED',
+        message: `incoming fact at ${path || '(root)'} is outranked by existing evidence (authority ${incumbent.authority} observed ${incumbent.observedAt})`,
+        path: path || undefined,
+      });
+    }
+    return;
+  }
+  if (typeof incoming !== 'object' || incoming === null || Array.isArray(incoming)) return;
+  if (typeof incumbent !== 'object' || incumbent === null || Array.isArray(incumbent)) return;
+  const incumbentRecord = incumbent as Record<string, unknown>;
+  for (const [key, value] of Object.entries(incoming as Record<string, unknown>)) {
+    collectEntityFactConflicts(incumbentRecord[key], value, path ? `${path}.${key}` : key, issues);
+  }
+}
+
+/**
  * Fact conflict resolution per ARCHITECTURE.md §5: authority rank first, then
  * freshness; a stale incumbent never outranks fresh evidence.
  */
@@ -184,6 +216,12 @@ export function applyOperationToState(
       const id = op.id ?? data.id;
       if (op.entityType === 'TRIP') {
         const trip = op.data as Trip;
+        const incumbent = state.trips.get(trip.id);
+        if (incumbent) {
+          const issues: ApplyIssue[] = [];
+          collectEntityFactConflicts(incumbent, trip, '', issues);
+          if (issues.length > 0) return { ok: false, issues };
+        }
         state.trips.set(trip.id, trip);
         return { ok: true, applied: { op, affectedTripId: trip.id, detail: `upsert trip ${trip.id}` } };
       }
@@ -192,6 +230,12 @@ export function applyOperationToState(
         const trip = state.trips.get(element.tripId);
         if (!trip) {
           return { ok: false, issues: [{ code: 'TARGET_NOT_FOUND', message: `element ${id}: parent trip ${element.tripId} not found` }] };
+        }
+        const incumbent = trip.elements.find((e) => e.id === element.id);
+        if (incumbent) {
+          const issues: ApplyIssue[] = [];
+          collectEntityFactConflicts(incumbent, element, '', issues);
+          if (issues.length > 0) return { ok: false, issues };
         }
         upsertElementInTrip(trip, element);
         return { ok: true, applied: { op, affectedTripId: trip.id, detail: `upsert element ${id}` } };
@@ -202,8 +246,20 @@ export function applyOperationToState(
         if (!trip) {
           return { ok: false, issues: [{ code: 'TARGET_NOT_FOUND', message: `objective ${id}: parent trip ${objective.tripId} not found` }] };
         }
+        const incumbent = trip.objectives.find((o) => o.id === objective.id);
+        if (incumbent) {
+          const issues: ApplyIssue[] = [];
+          collectEntityFactConflicts(incumbent, objective, '', issues);
+          if (issues.length > 0) return { ok: false, issues };
+        }
         upsertObjectiveInTrip(trip, objective);
         return { ok: true, applied: { op, affectedTripId: trip.id, detail: `upsert objective ${id}` } };
+      }
+      const existing = state.entities.get(entityKey(op.entityType, id));
+      if (existing) {
+        const issues: ApplyIssue[] = [];
+        collectEntityFactConflicts(existing.entity, op.data, '', issues);
+        if (issues.length > 0) return { ok: false, issues };
       }
       const entry = { entityType: op.entityType, entity: op.data } as ContextEntity;
       state.entities.set(entityKey(op.entityType, id), entry);
