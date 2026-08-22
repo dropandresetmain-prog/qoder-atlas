@@ -25,7 +25,7 @@ Variable names were frozen during the F0 foundation and are implemented in `src/
 No external database account is required locally. SQLite is embedded. Persistence goes through repository interfaces so deployment can replace it if local disk is ephemeral.
 
 ### Alibaba Cloud Model Studio
-Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Only required for LIVE intelligence; REPLAY/local runs need none.
+Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Only required for LIVE intelligence; REPLAY/local runs need none. When unconfigured, the recovery planner degrades to the built-in deterministic fallback planner, so the full REPLAY recovery loop (plan → approve → execute → verify) remains runnable with zero credentials.
 
 - `MODEL_STUDIO_API_KEY`
 - `MODEL_STUDIO_BASE_URL`

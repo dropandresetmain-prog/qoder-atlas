@@ -42,8 +42,6 @@ The system combines:
 - SQLite persistence
 - LIVE / RECORD / REPLAY external adapters where practical
 
-See [PRODUCT_SPEC](docs/PRODUCT_SPEC.md), [ARCHITECTURE](docs/ARCHITECTURE.md), [IMPLEMENTATION_PLAN](docs/IMPLEMENTATION_PLAN.md), and [ROADMAP](docs/ROADMAP.md).
-
 ## Atlas source of truth
 
 Atlas capability research lives in the separate repository `dropandresetmain-prog/atlas-hackathon-lab`.
@@ -59,17 +57,25 @@ Do not infer production market behaviour from sandbox data.
 
 ## Status
 
-**Checkpoint A (foundation + frozen contracts) implemented, pending formal acceptance.**
+**Checkpoint A/B accepted. Checkpoint C candidate (generalisation + reliability + demo-ready runtime flow) in progress on `checkpoint-c`, pending Review Gate C.**
 
 What exists today:
 
-- runnable TypeScript/Node ≥ 24 application skeleton (starts with zero credentials in REPLAY mode)
-- executable domain + operational contracts with Zod runtime validation (`src/domain/`, `src/operational/`)
-- frozen shared seams: repositories, provider-neutral capabilities, capability result envelopes, application service boundaries, planner input/output, operator/traveller read models (`src/contracts/`)
-- two materially different acceptance scenarios (`fixtures/scenarios/anchor-event-speaker`, `fixtures/scenarios/corporate-tmc`) loading through the same contracts
-- SQLite persistence skeleton behind repository interfaces, LIVE/RECORD/REPLAY adapter modes
+- runnable TypeScript/Node ≥ 24 application (starts with zero credentials in REPLAY mode)
+- full vertical recovery loop: ingestion → persistent trip graph → signal/impact → planner/capabilities/deterministic viability → authority → execution → observation → verification (`src/engine/`, `src/application/`, `src/intelligence/`)
+- two materially different scenarios through the same application code: anchor-event/organiser (`fixtures/scenarios/anchor-event-speaker`) and corporate TMC (`fixtures/scenarios/corporate-tmc`), plus selected robustness cases (hotel no-show cutoff, transit cutoff with on-demand taxi, accessibility, already-lost objective)
+- deterministic runtime recovery/reset flow over HTTP: `POST /api/runtime/{disruption,plan,begin,decide,execute,reset}` + `GET /api/runtime/state` (scenario-neutral; every stage takes a caller-supplied instant; reset reseed is audited and transactional — no manual database surgery)
+- SQLite persistence behind repository interfaces; LIVE/RECORD/REPLAY external adapters sharing one normalizer
+- credential-free recovery planning: Model Studio planner is used only when configured; otherwise a deterministic fallback planner produces strategies from replayed capability results
 
-Downstream implementation lanes (core engine, ingestion, providers, intelligence, UI) start after Checkpoint A acceptance.
+## Integration truth (LIVE / REPLAY / simulated)
+
+- **Atlas flight search**: LIVE-developed against the sandbox environment; the shipped default demo path replays sanitized, provider-shaped recordings through the same normalizer (REPLAY). Recordings are hash-keyed by `provider|operation|request`.
+- **Atlas order execution**: the execution boundary applies deterministic authority and guardrails, but order effects are **simulated at the provider boundary** (recorded/synthetic provider effects fed through the real observation/verification pipeline). Real `order.do` execution is stretch scope.
+- **Alibaba Cloud Model Studio**: structured extraction/planning when credentials are configured (LIVE); otherwise the deterministic fallback planner is used. The replay path never requires Model Studio credentials.
+- **Google Routes**: optional dynamic ground-context adapter; absent or unconfigured, ground legs use sourced/unknown fallbacks and never block recovery.
+
+See [PRODUCT_SPEC](docs/PRODUCT_SPEC.md), [ARCHITECTURE](docs/ARCHITECTURE.md), [IMPLEMENTATION_PLAN](docs/IMPLEMENTATION_PLAN.md), [DEMO](docs/DEMO.md), and [ROADMAP](docs/ROADMAP.md).
 
 ## Quickstart
 

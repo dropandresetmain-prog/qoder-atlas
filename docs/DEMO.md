@@ -52,6 +52,22 @@ Final demo may use recorded/replayed API/model responses for reliability/cost pr
 ## Backup scenario
 Maintain a materially different TMC/corporate scenario through same engine for robustness and backup demo path.
 
+## Current runtime demo path (Checkpoint C candidate)
+
+The demo flow runs through the generic runtime API — no manual database surgery, no optional credentials, every stage carries an explicit instant:
+
+```
+POST /api/runtime/disruption   # TripSignal in -> case opened, impact reported
+POST /api/runtime/plan         # capability-backed strategies + rejected candidates
+POST /api/runtime/begin        # chosen strategy -> ActionIntent + authority outcome
+POST /api/runtime/decide       # recorded APPROVED/DECLINED by the right principal
+POST /api/runtime/execute      # approved execution -> observation -> verification
+POST /api/runtime/reset        # audited wipe + reseed to the known starting state
+GET  /api/runtime/state        # trips + open cases projection
+```
+
+All six stages go through the same application code the tests use (`src/app/compose.ts`); REPLAY recordings feed the real normalizer/engine, and provider order effects at the execution boundary are disclosed as simulated.
+
 ## Demo readiness checklist
 - deterministic reset to known starting state
 - no manual database/state surgery
