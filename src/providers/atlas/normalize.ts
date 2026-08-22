@@ -5,9 +5,12 @@
  * Mapping policy:
  * - Opaque workflow identifiers (routingIdentifier, sessionId) are preserved
  *   exactly and never reinterpreted.
- * - Atlas schedule strings are local-format provider values with unconfirmed
- *   timezone semantics; they are mapped to UTC-offset instants so they
- *   satisfy IsoDateTime without inventing a timezone.
+ * - Atlas schedule strings (`YYYYMMDDHHmm`) are airport-local wall-clock
+ *   times with no offset (confirmed against sandbox captures: cross-timezone
+ *   legs shift by exactly the local-time difference of their endpoints).
+ *   They are converted to honest instants with a caller-supplied IANA
+ *   timezone resolver; an unresolvable airport fails normalization instead
+ *   of fabricating a UTC offset (ADR-028).
  * - Rule letter codes are unmapped provider values: `T` maps to
  *   allowed/refundable, anything else stays restrictive and carries the raw
  *   code in notes. UNKNOWN stays UNKNOWN.
@@ -35,9 +38,20 @@ export interface PassengerCounts {
   infants?: number;
 }
 
-export function normalizeSearch(body: AtlasSearchBody, passengers: PassengerCounts): FlightSearchOutcome {
+/**
+ * Resolves a provider airport code (e.g. an IATA code) to an IANA timezone
+ * identifier. Supplied by the application from its authoritative place data;
+ * the adapter itself carries no location knowledge.
+ */
+export type AtlasTimezoneResolver = (airportCode: string) => string | undefined;
+
+export function normalizeSearch(
+  body: AtlasSearchBody,
+  passengers: PassengerCounts,
+  timezoneResolver?: AtlasTimezoneResolver,
+): FlightSearchOutcome {
   const routings = body.routings ?? [];
-  return { offers: routings.map((routing) => toFlightOffer(routing, passengers)) };
+  return { offers: routings.map((routing) => toFlightOffer(routing, passengers, timezoneResolver)) };
 }
 
 export function normalizeVerify(body: AtlasVerifyBody, passengers?: PassengerCounts): FlightVerifyOutcome {
@@ -130,8 +144,14 @@ export function normalizeFareRules(rule: AtlasRule | undefined): FareRulesOutcom
 
 // ---------------------------------------------------------------------------
 
-function toFlightOffer(routing: AtlasRouting, passengers: PassengerCounts): FlightOffer {
-  const segments = [...routing.fromSegments, ...routing.retSegments].map(toSegmentView);
+function toFlightOffer(
+  routing: AtlasRouting,
+  passengers: PassengerCounts,
+  timezoneResolver?: AtlasTimezoneResolver,
+): FlightOffer {
+  const segments = [...routing.fromSegments, ...routing.retSegments].map((segment) =>
+    toSegmentView(segment, timezoneResolver),
+  );
   if (segments.length === 0) {
     throw new Error('Atlas routing has no segments');
   }
@@ -161,12 +181,12 @@ function toFlightOffer(routing: AtlasRouting, passengers: PassengerCounts): Flig
   return offer;
 }
 
-function toSegmentView(segment: AtlasSegment): FlightSegmentView {
+function toSegmentView(segment: AtlasSegment, timezoneResolver?: AtlasTimezoneResolver): FlightSegmentView {
   const view: FlightSegmentView = {
     origin: { system: 'IATA', value: segment.depAirport },
     destination: { system: 'IATA', value: segment.arrAirport },
-    departure: atlasScheduleToIso(segment.depTime),
-    arrival: atlasScheduleToIso(segment.arrTime),
+    departure: atlasScheduleAtAirport(segment.depTime, segment.depAirport, timezoneResolver),
+    arrival: atlasScheduleAtAirport(segment.arrTime, segment.arrAirport, timezoneResolver),
   };
   if (segment.carrier !== undefined && segment.carrier !== '') view.carrierCode = segment.carrier;
   if (segment.flightNumber !== undefined && segment.flightNumber !== '') view.flightNumber = segment.flightNumber;
@@ -197,11 +217,108 @@ function cabinOf(cabinClass: number | undefined): string | undefined {
   }
 }
 
-export function atlasScheduleToIso(value: string): IsoDateTime {
+/**
+ * Atlas schedule strings are airport-local wall-clock times (`YYYYMMDDHHmm`,
+ * no offset). Converting them to an honest instant requires the airport's
+ * IANA timezone; without a resolver or mapping the conversion refuses rather
+ * than fabricating a `Z` suffix.
+ */
+export function atlasScheduleAtAirport(
+  value: string,
+  airportCode: string,
+  timezoneResolver?: AtlasTimezoneResolver,
+): IsoDateTime {
+  if (!timezoneResolver) {
+    throw new Error('atlas schedule normalization requires a timezone resolver (airport-local times)');
+  }
+  const timezone = timezoneResolver(airportCode);
+  if (!timezone) {
+    throw new Error(`cannot resolve timezone for airport ${airportCode}; refusing to fabricate a UTC offset`);
+  }
+  return atlasScheduleToIso(value, timezone);
+}
+
+export function atlasScheduleToIso(value: string, timezone: string): IsoDateTime {
   const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(value);
   if (!match) throw new Error(`unsupported Atlas schedule format: ${value}`);
-  const iso = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00Z`;
-  return toIsoDateTime(iso);
+  const [, year, month, day, hour, minute] = match;
+  return toIsoDateTime(atlasLocalScheduleToIso(value, timezone, Number(year), Number(month), Number(day), Number(hour), Number(minute)));
+}
+
+/**
+ * Deterministic wall-clock -> instant conversion for an IANA timezone.
+ *
+ * The offset at the naive instant (interpreting the wall clock as UTC) picks
+ * the pre-transition side, so DST folds (ambiguous local time) resolve to the
+ * FIRST occurrence. When the true instant sits across a transition from the
+ * naive instant, a second candidate from that instant's own offset is
+ * checked. Nonexistent local times (DST gaps) and any input that does not
+ * round-trip fail structured instead of guessing.
+ */
+function atlasLocalScheduleToIso(
+  value: string,
+  timezone: string,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+): string {
+  const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const candidates: number[] = [];
+  const first = naiveUtc - timezoneOffsetMinutes(naiveUtc, timezone) * 60_000;
+  candidates.push(first);
+  const second = naiveUtc - timezoneOffsetMinutes(first, timezone) * 60_000;
+  if (second !== first) candidates.push(second);
+  for (const instant of candidates) {
+    if (renderLocalWall(instant, timezone) === value) {
+      return formatIsoWithOffset(instant, timezone);
+    }
+  }
+  throw new Error(`ambiguous local schedule ${value} in timezone ${timezone}`);
+}
+
+/** Signed UTC offset (minutes) of a timezone at a given instant. */
+function timezoneOffsetMinutes(millis: number, timezone: string): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const parts = formatter.formatToParts(new Date(millis));
+  const part = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? '0');
+  const renderedUtc = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), 0);
+  return Math.round((renderedUtc - millis) / 60_000);
+}
+
+function renderLocalWall(millis: number, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const parts = formatter.formatToParts(new Date(millis));
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${part('year')}${part('month')}${part('day')}${part('hour')}${part('minute')}`;
+}
+
+/** ISO string with the target timezone's own offset (host timezone never leaks). */
+function formatIsoWithOffset(millis: number, timezone: string): string {
+  const offsetMinutes = timezoneOffsetMinutes(millis, timezone);
+  const shifted = new Date(millis + offsetMinutes * 60_000);
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMinutes);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `${shifted.toISOString().slice(0, 19)}${sign}${hh}:${mm}`;
 }
 
 function toIsoDateTime(value: string): IsoDateTime {

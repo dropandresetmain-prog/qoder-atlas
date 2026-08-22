@@ -137,3 +137,8 @@ Zod v4 schemas are the executable form of the F1 domain/operational contracts an
 **Status:** Accepted (Checkpoint A review fix)
 
 `TripElement.status` defaults to `UNKNOWN`, not `VALID`: missing evidence must never become fabricated certainty (ARCHITECTURE.md §5, FR-05). Evaluated health must be asserted explicitly by deterministic evaluation or by scenario fixtures stating their evaluated pre-disruption state.
+
+## ADR-028 — Atlas schedule times are airport-local; resolve honestly or fail structured
+**Status:** Accepted (Checkpoint B integration, cross-lane issue 1)
+
+Atlas `depTime`/`arrTime` schedule strings (`YYYYMMDDHHmm`) are airport-local wall-clock times with no offset. This was established by analysing sandbox captures: cross-timezone legs shift by exactly the local-time difference of their endpoints (e.g. DXB→RUH −60 min, LAX→ATL +180 min), while same-timezone legs match flight duration exactly. The Lane C mapping to `...Z` (fabricated UTC) is therefore wrong in general and was removed: `normalizeSearch` now requires an `AtlasTimezoneResolver` (airport code → IANA timezone) supplied by the application from its authoritative place data, converts wall clock to an honest offset instant deterministically (DST folds → first occurrence; nonexistent DST-gap times fail structured), and fails normalization with a structured `PROVIDER_ERROR` when the timezone cannot be resolved. No frozen contract changed; honest `IsoDateTime` representation is possible, so UNKNOWN/uncertainty lives in the capability failure, not in a guessed offset.

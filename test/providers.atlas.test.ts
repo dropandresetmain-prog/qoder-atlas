@@ -17,6 +17,11 @@ import type { FlightSearchQuery } from '../src/contracts/capabilities.ts';
 
 const FIXTURES = 'fixtures/recordings';
 
+/** Curated Lane C recordings cover a single-timezone domestic route. */
+const MANILA_TIMEZONE = 'Asia/Manila';
+const fixtureTimezoneResolver = (): ((code: string) => string | undefined) => (code) =>
+  code === 'MNL' || code === 'CEB' ? MANILA_TIMEZONE : undefined;
+
 const SEARCH_QUERY: FlightSearchQuery = {
   origin: { system: 'IATA', value: 'MNL' },
   destination: { system: 'IATA', value: 'CEB' },
@@ -29,7 +34,7 @@ function fixtureStore(): FileRecordingStore {
 }
 
 function replayAdapter(store = fixtureStore()): AtlasFlightAdapter {
-  return new AtlasFlightAdapter({ mode: 'REPLAY', store });
+  return new AtlasFlightAdapter({ mode: 'REPLAY', store, timezoneResolver: fixtureTimezoneResolver() });
 }
 
 function loadOnlyRecording(operation: string): { id: string; raw: Record<string, unknown> } {
@@ -81,8 +86,8 @@ test('C2: REPLAY search normalizes curated recording through the real normalizer
   const segment = first.segments[0]!;
   assert.deepEqual(segment.origin, { system: 'IATA', value: rawSegment.depAirport });
   assert.deepEqual(segment.destination, { system: 'IATA', value: rawSegment.arrAirport });
-  assert.equal(segment.departure, atlasScheduleToIso(rawSegment.depTime));
-  assert.equal(segment.arrival, atlasScheduleToIso(rawSegment.arrTime));
+  assert.equal(segment.departure, atlasScheduleToIso(rawSegment.depTime, MANILA_TIMEZONE));
+  assert.equal(segment.arrival, atlasScheduleToIso(rawSegment.arrTime, MANILA_TIMEZONE));
   if (rawSegment.fareFamily) assert.equal(first.fareFamily, rawSegment.fareFamily);
 
   const seatCounts = rawFirst.fromSegments.map((s) => s.seatCount).filter((c): c is number => typeof c === 'number');
@@ -198,11 +203,16 @@ test('C2: LIVE/REPLAY equivalence — identical raw payload yields identical nor
     clientId: 'cid',
     clientSecret: 'csecret',
     fetchImpl: stubFetch,
+    timezoneResolver: fixtureTimezoneResolver(),
   });
   const liveSide = await recordAdapter.searchFlights(SEARCH_QUERY);
   assert.equal(liveSide.ok, true);
 
-  const replaySide = await new AtlasFlightAdapter({ mode: 'REPLAY', store }).searchFlights(SEARCH_QUERY);
+  const replaySide = await new AtlasFlightAdapter({
+    mode: 'REPLAY',
+    store,
+    timezoneResolver: fixtureTimezoneResolver(),
+  }).searchFlights(SEARCH_QUERY);
   assert.equal(replaySide.ok, true);
 
   if (liveSide.ok && replaySide.ok) {
@@ -227,6 +237,7 @@ test('C2: RECORD sanitizes credentials out of persisted recordings', async () =>
     clientId: 'cid',
     clientSecret: injectedSecret,
     fetchImpl: stubFetch,
+    timezoneResolver: fixtureTimezoneResolver(),
   });
   const result = await adapter.searchFlights(SEARCH_QUERY);
   assert.equal(result.ok, true);
@@ -338,4 +349,58 @@ test('C2: invalid search query is rejected without any provider call', async () 
   assert.equal(result.ok, false);
   assert.equal(called, false);
   if (!result.ok) assert.equal(result.error.category, 'INVALID_REQUEST');
+});
+
+test('ADR-028: airport-local schedules convert to honest offset instants per timezone', () => {
+  // Single-timezone domestic leg: both endpoints share the local offset.
+  assert.equal(atlasScheduleToIso('202608201430', 'Asia/Manila'), '2026-08-20T14:30:00+08:00');
+  // Cross-timezone endpoints resolve independently, never as UTC.
+  assert.equal(atlasScheduleToIso('202608201430', 'Asia/Seoul'), '2026-08-20T14:30:00+09:00');
+  assert.equal(atlasScheduleToIso('202608201430', 'America/New_York'), '2026-08-20T14:30:00-04:00');
+  // Same wall clock at different airports is a different instant.
+  assert.notEqual(
+    Date.parse(atlasScheduleToIso('202608201430', 'Asia/Seoul')),
+    Date.parse(atlasScheduleToIso('202608201430', 'Asia/Manila')),
+  );
+});
+
+test('ADR-028: DST fold resolves deterministically to the first occurrence', () => {
+  // 2026-11-01 01:30 America/New_York occurs twice (clocks fall back);
+  // the first occurrence is EDT (-04:00).
+  assert.equal(atlasScheduleToIso('202611010130', 'America/New_York'), '2026-11-01T01:30:00-04:00');
+  // And the winter-side conversion keeps the standard offset.
+  assert.equal(atlasScheduleToIso('202611011200', 'America/New_York'), '2026-11-01T12:00:00-05:00');
+});
+
+test('ADR-028: post-transition schedules resolve; nonexistent DST-gap times fail structured', () => {
+  // Valid local time right after spring-forward resolves on the new offset.
+  assert.equal(atlasScheduleToIso('202603080330', 'America/New_York'), '2026-03-08T03:30:00-04:00');
+  // 02:30 does not exist on 2026-03-08; refuse rather than guess.
+  assert.throws(() => atlasScheduleToIso('202603080230', 'America/New_York'), /ambiguous local schedule/);
+});
+
+test('ADR-028: REPLAY search without a timezone resolver fails structured, never fabricates Z', async () => {
+  const adapter = new AtlasFlightAdapter({ mode: 'REPLAY', store: fixtureStore() });
+  const result = await adapter.searchFlights(SEARCH_QUERY);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.category, 'PROVIDER_ERROR');
+    assert.equal(result.error.code, 'invalid_raw_response');
+    assert.match(result.error.message, /timezone resolver/);
+  }
+});
+
+test('ADR-028: unresolvable airport fails structured instead of guessing an offset', async () => {
+  const partialResolver = (): undefined => undefined;
+  const adapter = new AtlasFlightAdapter({
+    mode: 'REPLAY',
+    store: fixtureStore(),
+    timezoneResolver: partialResolver,
+  });
+  const result = await adapter.searchFlights(SEARCH_QUERY);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.category, 'PROVIDER_ERROR');
+    assert.match(result.error.message, /cannot resolve timezone for airport/);
+  }
 });

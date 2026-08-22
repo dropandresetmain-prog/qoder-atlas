@@ -24,6 +24,7 @@ import {
   normalizeFareRules,
   normalizeSearch,
   normalizeVerify,
+  type AtlasTimezoneResolver,
   type PassengerCounts,
 } from './normalize.ts';
 import {
@@ -45,6 +46,12 @@ export interface AtlasAdapterOptions {
   clientSecret?: string;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /**
+   * Maps segment airport codes to IANA timezones so airport-local schedule
+   * strings normalize to honest instants (ADR-028). Supplied by the
+   * application from its authoritative place data.
+   */
+  timezoneResolver?: AtlasTimezoneResolver;
 }
 
 export class AtlasFlightAdapter implements FlightCapability {
@@ -56,6 +63,7 @@ export class AtlasFlightAdapter implements FlightCapability {
   private readonly clientSecret?: string;
   private readonly timeoutMs?: number;
   private readonly fetchImpl?: typeof fetch;
+  private readonly timezoneResolver?: AtlasTimezoneResolver;
   /** Passenger counts per offer, remembered from search for verify pricing. */
   private readonly offerPassengers = new Map<string, PassengerCounts>();
 
@@ -67,6 +75,7 @@ export class AtlasFlightAdapter implements FlightCapability {
     this.clientSecret = options.clientSecret;
     this.timeoutMs = options.timeoutMs;
     this.fetchImpl = options.fetchImpl;
+    this.timezoneResolver = options.timezoneResolver;
     this.descriptor = {
       family: 'FLIGHT',
       providerId: ATLAS_PROVIDER_ID,
@@ -101,7 +110,7 @@ export class AtlasFlightAdapter implements FlightCapability {
         });
         return AtlasSearchBodySchema.parse(body);
       },
-      normalize: (raw) => normalizeSearch(raw, passengers),
+      normalize: (raw) => normalizeSearch(raw, passengers, this.timezoneResolver),
     };
 
     const result = await runAdapter(adapter, this.store, query, {
