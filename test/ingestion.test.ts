@@ -432,7 +432,7 @@ test('B2: missing extractor is honest pending-integration uncertainty, not failu
   const capability = createSourceIngestionCapability(deps());
   const outcome = okData(await capability.ingest({ kind: 'EMAIL', content: 'flight cancelled, sorry' }));
   assert.ok(
-    outcome.uncertainties.some((u) => u.statement.includes('Model Studio client (Lane D1) is not wired yet')),
+    outcome.uncertainties.some((u) => u.statement.includes('no extractor is configured')),
   );
 });
 

@@ -114,11 +114,12 @@ async function runExtraction(
     return;
   }
   if (!deps.extractionClient) {
-    // Pending Lane D (D1) wiring: the seam exists, the client does not yet.
+    // No semantic extractor configured (Model Studio client is wired by the
+    // app composition when credentials are present; absent in REPLAY defaults).
     addUncertainty(
       artifacts,
       env,
-      'Text content requires semantic extraction but no extractor is configured; Model Studio client (Lane D1) is not wired yet',
+      'Text content requires semantic extraction but no extractor is configured',
       'MEDIUM',
     );
     return;
