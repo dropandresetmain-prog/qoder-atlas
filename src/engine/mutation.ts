@@ -100,7 +100,9 @@ export class SqlMutationService implements MutationService {
 
     const applied: AppliedOperation[] = [];
     for (const op of valid.operations) {
-      const result = applyOperationToState(state, op, valid.requestedAt);
+      // Authoritative mutation: the fact-authority ladder is enforced
+      // explicitly here (never implicit; overlays opt out — ADR-032).
+      const result = applyOperationToState(state, op, valid.requestedAt, { enforceFactAuthority: true });
       if (!result.ok) {
         await this.audit(valid.id, 'MUTATION_REJECTED', firstTripHint(valid), {
           proposalId: valid.id,

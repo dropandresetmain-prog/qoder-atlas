@@ -136,6 +136,8 @@ function createExecutionService(harness: Harness): RecoveryExecutionService {
     }),
     observation: new DeterministicObservationService({ mutations: harness.mutations }),
     verifier: new CaseVerifier({ trips: harness.trips, signals: harness.signals, entities: harness.entities }),
+    trips: harness.trips,
+    entities: harness.entities,
   };
   return new RecoveryExecutionService(deps);
 }

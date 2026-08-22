@@ -104,6 +104,8 @@ function createExecutionService(harness: Harness, strategies: RecoveryStrategy[]
     }),
     observation: new DeterministicObservationService({ mutations: harness.mutations }),
     verifier: new CaseVerifier({ trips: harness.trips, signals: harness.signals, entities: harness.entities }),
+    trips: harness.trips,
+    entities: harness.entities,
   };
   return new RecoveryExecutionService(deps);
 }
@@ -231,12 +233,16 @@ test('G2-1: delayed arrival breaching the hotel no-show cutoff recovers via same
   const evening = offerFacts(searchResult.data, EVENING_OFFER_ID);
 
   const sourceId = delaySignal.sourceId;
+  // WP-C2 honesty: a planner-authored candidate carries provider evidence at
+  // CONNECTED at best. It must still evaluate against the AUTHORITATIVE delay
+  // fact (the incumbent) — provenance never blocks planning; confirmedData()
+  // performs the CONNECTED -> AUTHORITATIVE upgrade at execution observation.
   const replaceWith = (offer: OfferFacts) =>
     legReplacement(delayedLeg, {
       data: {
         ...delayedLeg.data,
-        scheduledDeparture: { value: offer.departure, sourceId, authority: 'AUTHORITATIVE' as const, observedAt: PLANNING_AT },
-        scheduledArrival: { value: offer.arrival, sourceId, authority: 'AUTHORITATIVE' as const, observedAt: PLANNING_AT },
+        scheduledDeparture: { value: offer.departure, sourceId, authority: 'CONNECTED' as const, observedAt: PLANNING_AT },
+        scheduledArrival: { value: offer.arrival, sourceId, authority: 'CONNECTED' as const, observedAt: PLANNING_AT },
         bookingRef: { system: 'atlas', reference: offer.offerId },
       },
     });
@@ -303,6 +309,10 @@ test('G2-1: delayed arrival breaching the hotel no-show cutoff recovers via same
   const recovered = (await harness.trips.getTrip(spec.trip.id))!.elements.find((e) => e.id === 'el_a_flight_out') as TransportLeg;
   assert.equal(recovered.reservationState, 'CONFIRMED');
   assert.equal(recovered.data.scheduledArrival?.value, evening.arrival);
+  // The candidate entered planning as CONNECTED evidence; execution
+  // observation upgraded it to AUTHORITATIVE via confirmedData().
+  assert.equal(recovered.data.scheduledArrival?.authority, 'AUTHORITATIVE', 'confirmedData() completes the ladder');
+  assert.equal(recovered.data.scheduledDeparture?.authority, 'AUTHORITATIVE');
 });
 
 // ---------------------------------------------------------------------------
@@ -738,6 +748,239 @@ test('G2-3: hard accessibility requirement rejects the cheaper alternative; acce
   assert.equal(recovered.reservationState, 'CONFIRMED');
 });
 
+test('WP-C1 regression: a planner-authored constraint downgrade never becomes truth (G2-3)', async () => {
+  // The reviewer's permanent case: a fourth strategy rebooks onto the excluded
+  // PUBLIC_TRANSIT mode AND carries a UPSERT_CONSTRAINT downgrading the HARD
+  // accessibility constraint to SOFT with an empty unsupportedModes list —
+  // i.e. the candidate edits the very criteria it is judged against. Both
+  // seams of the WP-C1 fix must hold:
+  //   1. plan time: the overlay rejects judging-criteria mutation with a
+  //      deterministic reason (candidate recorded NOT_VIABLE, nothing else);
+  //   2. execution: even a forced lifecycle run cannot persist the downgrade
+  //      — confirmedOperationsFor() drops everything outside the allowlist.
+  const harness = createHarness();
+  const TRIP_AT = '2026-09-20T09:00:00+09:00';
+  await seedProposal(harness, {
+    id: 'prop-g3b-seed',
+    origin: 'SYSTEM',
+    requestedAt: TRIP_AT,
+    rationale: 'seed WP-C1 accessibility trip',
+    operations: [
+      { op: 'UPSERT_ENTITY', entityType: 'PLACE', id: 'plc_g3b_airport', data: { id: 'plc_g3b_airport', kind: 'AIRPORT', timezone: 'Asia/Tokyo' } },
+      { op: 'UPSERT_ENTITY', entityType: 'PLACE', id: 'plc_g3b_venue', data: { id: 'plc_g3b_venue', kind: 'VENUE', timezone: 'Asia/Tokyo' } },
+      { op: 'UPSERT_ENTITY', entityType: 'TRAVELLER', id: 'trv_g3b', data: { id: 'trv_g3b', name: 'WP-C1 Traveller' } },
+      {
+        op: 'UPSERT_ENTITY',
+        entityType: 'TRIP',
+        id: 'trip_g3b',
+        data: {
+          id: 'trip_g3b',
+          travellerIds: ['trv_g3b'],
+          version: 0,
+          elements: [
+            {
+              id: 'el_g3b_flight',
+              tripId: 'trip_g3b',
+              elementKind: 'TRANSPORT_LEG',
+              importance: 'REQUIRED',
+              flexibility: 'CHANGEABLE',
+              reservationState: 'CONFIRMED',
+              status: 'VALID',
+              data: {
+                mode: 'FLIGHT',
+                originPlaceId: 'plc_g3b_airport',
+                destinationPlaceId: 'plc_g3b_airport',
+                scheduledDeparture: { value: '2026-09-22T08:00:00+09:00', sourceId: 'src_g3b_booking', authority: 'CONNECTED', observedAt: TRIP_AT },
+                scheduledArrival: { value: '2026-09-22T10:00:00+09:00', sourceId: 'src_g3b_booking', authority: 'CONNECTED', observedAt: TRIP_AT },
+                bookingRef: { system: 'provider-sandbox', reference: 'FL-G3B-01' },
+              },
+            },
+            {
+              id: 'el_g3b_panel',
+              tripId: 'trip_g3b',
+              elementKind: 'ENGAGEMENT',
+              importance: 'REQUIRED',
+              flexibility: 'FIXED',
+              reservationState: 'CONFIRMED',
+              status: 'VALID',
+              data: {
+                title: 'Panel discussion',
+                placeId: 'plc_g3b_venue',
+                startsAt: { value: '2026-09-22T18:00:00+09:00', sourceId: 'src_g3b_invite', authority: 'CONNECTED', observedAt: TRIP_AT },
+                endsAt: { value: '2026-09-22T19:30:00+09:00', sourceId: 'src_g3b_invite', authority: 'CONNECTED', observedAt: TRIP_AT },
+              },
+            },
+          ],
+          objectives: [
+            { id: 'obj_g3b_panel', tripId: 'trip_g3b', statement: 'Reach the panel discussion', hardness: 'HARD', linkedElementIds: ['el_g3b_panel', 'el_g3b_flight'] },
+          ],
+          relations: [],
+          governedByRuleSetIds: [],
+          viability: 'VIABLE',
+          updatedAt: TRIP_AT,
+        },
+      },
+      {
+        op: 'UPSERT_CONSTRAINT',
+        constraint: {
+          id: 'c_g3b_arrive',
+          kind: 'TEMPORAL',
+          hardness: 'HARD',
+          evaluator: 'DETERMINISTIC',
+          status: 'PASS',
+          description: 'Arrive before the panel',
+          refs: [
+            { entityType: 'TRIP_ELEMENT', id: 'el_g3b_flight' },
+            { entityType: 'TRIP_ELEMENT', id: 'el_g3b_panel' },
+          ],
+          parameters: { minBufferMinutes: 60 },
+        },
+      },
+      {
+        op: 'UPSERT_CONSTRAINT',
+        constraint: {
+          id: 'c_g3b_access',
+          kind: 'ACCESSIBILITY',
+          hardness: 'HARD',
+          evaluator: 'DETERMINISTIC',
+          status: 'PASS',
+          description: 'Replacement leg must be step-free accessible',
+          refs: [{ entityType: 'TRIP_ELEMENT', id: 'el_g3b_flight' }],
+          parameters: { unsupportedModes: ['PUBLIC_TRANSIT'] },
+        },
+      },
+    ],
+  });
+
+  const cancelSignal: TripSignal = {
+    id: 'sig_g3b_cancel',
+    kind: 'FLIGHT_CANCELLATION',
+    occurredAt: '2026-09-21T19:55:00+09:00',
+    receivedAt: '2026-09-21T20:00:00+09:00',
+    sourceId: 'src_g3b_provider',
+    authority: 'AUTHORITATIVE',
+    confidence: 1,
+    tripId: 'trip_g3b',
+    subjectRef: { entityType: 'TRIP_ELEMENT', id: 'el_g3b_flight' },
+    summary: 'Flight cancelled by carrier',
+    payload: { reason: 'operational' },
+  };
+  const signalResult = await processSignal(
+    { trips: harness.trips, signals: harness.signals, entities: harness.entities, cases: harness.cases, mutations: harness.mutations, audit: harness.audit },
+    cancelSignal,
+  );
+  assert.equal(signalResult.mutationAccepted, true);
+
+  const PLANNING_AT = '2026-09-21T20:30:00+09:00';
+  const snapshot = await buildTripSnapshot(snapshotDeps(harness), 'trip_g3b', PLANNING_AT);
+  const cancelledLeg = snapshot.trip.elements.find((e) => e.id === 'el_g3b_flight') as TransportLeg;
+  const sourceId = cancelSignal.sourceId;
+  const accessEntry = await harness.entities.get('CONSTRAINT', 'c_g3b_access');
+  assert.ok(accessEntry && accessEntry.entityType === 'CONSTRAINT');
+
+  const legOps = (mode: string) =>
+    legReplacement(cancelledLeg, {
+      data: {
+        mode,
+        originPlaceId: cancelledLeg.data.originPlaceId,
+        destinationPlaceId: cancelledLeg.data.destinationPlaceId,
+        scheduledDeparture: { value: '2026-09-22T13:00:00+09:00', sourceId, authority: 'CONNECTED' as const, observedAt: PLANNING_AT },
+        scheduledArrival: { value: '2026-09-22T15:00:00+09:00', sourceId, authority: 'CONNECTED' as const, observedAt: PLANNING_AT },
+        bookingRef: { system: 'recovery-desk', reference: `G3B-${mode}` },
+      },
+    });
+
+  // Strategy 4 (the malicious one): rebook on the excluded mode AND downgrade
+  // the accessibility constraint that is judging the candidate.
+  const malicious = {
+    summary: 'Cheap rail link and relax the accessibility policy',
+    candidateOperations: [
+      legOps('PUBLIC_TRANSIT'),
+      {
+        op: 'UPSERT_CONSTRAINT' as const,
+        constraint: { ...accessEntry.entity, hardness: 'SOFT' as const, parameters: { unsupportedModes: [] } },
+      },
+    ],
+    assumptions: [],
+    uncertainties: [],
+    expectedOutcomes: [],
+    costImpact: { amount: 30, currency: 'USD' as const },
+  };
+  const honest = {
+    summary: 'Accessible private transfer replacement',
+    candidateOperations: [legOps('PRIVATE_TRANSFER')],
+    assumptions: [],
+    uncertainties: [],
+    expectedOutcomes: [],
+    costImpact: { amount: 180, currency: 'USD' as const },
+  };
+
+  const planning = await runPlanningLoop(
+    {
+      planner: scriptedPlanner(
+        [{ strategies: [malicious, honest], toolRequests: [], assumptions: [], uncertainties: [], rationale: 'cheap rail with policy edit vs accessible car' }],
+        'g2w',
+        PLANNING_AT,
+      ),
+      capabilities: {},
+      viability: new OverlayViabilityEngine(),
+      cases: harness.cases,
+      audit: harness.audit,
+    },
+    {
+      caseId: signalResult.caseId,
+      snapshot,
+      triggeringSignals: [cancelSignal],
+      impact: signalResult.assessment,
+      capabilityRegistry: [],
+      planningAt: PLANNING_AT,
+    },
+  );
+
+  // Seam 1: rejected at plan time with a deterministic reason naming the
+  // judging criteria; never silently evaluated, never ranked.
+  const maliciousCandidate = planning.candidates.find((c) => c.strategy.summary.includes('rail'))!;
+  assert.equal(maliciousCandidate.feasible, false);
+  assert.ok(
+    maliciousCandidate.rejectionReasons.some(
+      (reason) => reason.includes('judging criteria') && reason.includes('c_g3b_access'),
+    ),
+    `expected judging-criteria rejection, got: ${JSON.stringify(maliciousCandidate.rejectionReasons)}`,
+  );
+  const honestCandidate = planning.candidates.find((c) => c.strategy.summary.includes('transfer'))!;
+  assert.equal(honestCandidate.feasible, true);
+  assert.equal(planning.bestStrategyId, honestCandidate.strategy.id);
+
+  // The authoritative constraint is unchanged at plan time.
+  const accessAfterPlanning = await harness.entities.get('CONSTRAINT', 'c_g3b_access');
+  assert.ok(accessAfterPlanning && accessAfterPlanning.entityType === 'CONSTRAINT');
+  assert.equal(accessAfterPlanning.entity.hardness, 'HARD');
+  assert.deepEqual(accessAfterPlanning.entity.parameters, { unsupportedModes: ['PUBLIC_TRANSIT'] });
+
+  // Seam 2: force the malicious strategy through the full lifecycle anyway.
+  // The constraint downgrade can never reach authoritative state, because
+  // observation only admits the confirmed TRIP_ELEMENT allowlist; and the
+  // PUBLIC_TRANSIT leg still fails the untouched HARD accessibility check,
+  // so the case must not resolve.
+  const service = createExecutionService(harness, planning.strategies);
+  const begin = await service.beginStrategy({ snapshot, caseId: signalResult.caseId, strategy: maliciousCandidate.strategy, at: '2026-09-21T20:45:00+09:00' });
+  assert.equal(begin.decision.outcome, 'AUTO_APPROVED');
+  const executed = await service.executeApproved({ caseId: signalResult.caseId, intentId: begin.intent.id, at: '2026-09-21T21:00:00+09:00' });
+  assert.notEqual(executed.caseStatus, 'RESOLVED', 'a criteria-editing candidate never resolves the case');
+
+  const accessFinal = await harness.entities.get('CONSTRAINT', 'c_g3b_access');
+  assert.ok(accessFinal && accessFinal.entityType === 'CONSTRAINT');
+  assert.equal(accessFinal.entity.hardness, 'HARD', 'planner-authored downgrade never reaches authoritative state');
+  assert.deepEqual(accessFinal.entity.parameters, { unsupportedModes: ['PUBLIC_TRANSIT'] });
+
+  // The honest recovery still works after the attempted sabotage.
+  const honestBegin = await service.beginStrategy({ snapshot, caseId: signalResult.caseId, strategy: honestCandidate.strategy, at: '2026-09-21T21:10:00+09:00' });
+  assert.equal(honestBegin.decision.outcome, 'AUTO_APPROVED');
+  const honestExecuted = await service.executeApproved({ caseId: signalResult.caseId, intentId: honestBegin.intent.id, at: '2026-09-21T21:20:00+09:00' });
+  assert.equal(honestExecuted.caseStatus, 'RESOLVED');
+  assert.equal(honestExecuted.verification?.resolution?.outcome, 'FULLY_RECOVERED');
+});
+
 // ---------------------------------------------------------------------------
 // Case 4 — already-lost objective; remainder recovers
 // ---------------------------------------------------------------------------
@@ -959,4 +1202,190 @@ test('G2-4: already-lost objective is recorded as loss; remainder recovers RECOV
   assert.equal(prepObjective.status, 'WAIVED');
   const meetingObjective = recoveredTrip.objectives.find((o) => o.id === 'obj_g4_meeting')!;
   assert.equal(meetingObjective.status, 'ACTIVE', 'the recovered objective carries no loss');
+});
+
+test('WP-C3 regression: assessed irreversible loss binds resolution without a planner waiver (G2-4)', async () => {
+  // The identical G2-4 disruption, but the planner recovers the remainder
+  // WITHOUT waiving the already-lost prep objective. Before WP-C3 the case
+  // resolved FULLY_RECOVERED because re-assessment after repair no longer
+  // reports the loss. Now the assessed loss persists through the validated
+  // mutation (objective LOST) and resolution stays honest: never
+  // FULLY_RECOVERED while the loss stands unacknowledged.
+  const harness = createHarness();
+  const TRIP_AT = '2026-09-12T09:00:00+09:00';
+  await seedProposal(harness, {
+    id: 'prop-g4c-seed',
+    origin: 'SYSTEM',
+    requestedAt: TRIP_AT,
+    rationale: 'seed WP-C3 already-lost objective trip',
+    operations: [
+      { op: 'UPSERT_ENTITY', entityType: 'PLACE', id: 'plc_g4c_airport', data: { id: 'plc_g4c_airport', kind: 'AIRPORT', timezone: 'Asia/Tokyo' } },
+      { op: 'UPSERT_ENTITY', entityType: 'PLACE', id: 'plc_g4c_office', data: { id: 'plc_g4c_office', kind: 'ADDRESS', timezone: 'Asia/Tokyo' } },
+      { op: 'UPSERT_ENTITY', entityType: 'TRAVELLER', id: 'trv_g4c', data: { id: 'trv_g4c', name: 'WP-C3 Traveller' } },
+      {
+        op: 'UPSERT_ENTITY',
+        entityType: 'TRIP',
+        id: 'trip_g4c',
+        data: {
+          id: 'trip_g4c',
+          travellerIds: ['trv_g4c'],
+          version: 0,
+          elements: [
+            {
+              id: 'el_g4c_flight',
+              tripId: 'trip_g4c',
+              elementKind: 'TRANSPORT_LEG',
+              importance: 'REQUIRED',
+              flexibility: 'CHANGEABLE',
+              reservationState: 'CONFIRMED',
+              status: 'VALID',
+              data: {
+                mode: 'FLIGHT',
+                originPlaceId: 'plc_g4c_airport',
+                destinationPlaceId: 'plc_g4c_airport',
+                scheduledDeparture: { value: '2026-09-15T08:00:00+09:00', sourceId: 'src_g4c_booking', authority: 'CONNECTED', observedAt: TRIP_AT },
+                scheduledArrival: { value: '2026-09-15T10:30:00+09:00', sourceId: 'src_g4c_booking', authority: 'CONNECTED', observedAt: TRIP_AT },
+                bookingRef: { system: 'provider-sandbox', reference: 'FL-G4C-01' },
+              },
+            },
+            {
+              id: 'el_g4c_meeting',
+              tripId: 'trip_g4c',
+              elementKind: 'ENGAGEMENT',
+              importance: 'REQUIRED',
+              flexibility: 'FIXED',
+              reservationState: 'CONFIRMED',
+              status: 'VALID',
+              data: {
+                title: 'Client meeting',
+                placeId: 'plc_g4c_office',
+                startsAt: { value: '2026-09-15T14:00:00+09:00', sourceId: 'src_g4c_invite', authority: 'CONNECTED', observedAt: TRIP_AT },
+                endsAt: { value: '2026-09-15T15:30:00+09:00', sourceId: 'src_g4c_invite', authority: 'CONNECTED', observedAt: TRIP_AT },
+              },
+            },
+          ],
+          objectives: [
+            { id: 'obj_g4c_prep', tripId: 'trip_g4c', statement: 'Run the on-site morning prep before the client meeting', hardness: 'HARD', linkedElementIds: ['el_g4c_flight'] },
+            { id: 'obj_g4c_meeting', tripId: 'trip_g4c', statement: 'Attend the client meeting', hardness: 'HARD', linkedElementIds: ['el_g4c_meeting', 'el_g4c_flight'] },
+          ],
+          relations: [],
+          governedByRuleSetIds: [],
+          viability: 'VIABLE',
+          updatedAt: TRIP_AT,
+        },
+      },
+      {
+        op: 'UPSERT_CONSTRAINT',
+        constraint: {
+          id: 'c_g4c_arrive',
+          kind: 'TEMPORAL',
+          hardness: 'HARD',
+          evaluator: 'DETERMINISTIC',
+          status: 'PASS',
+          description: 'Arrive before the client meeting',
+          refs: [
+            { entityType: 'TRIP_ELEMENT', id: 'el_g4c_flight' },
+            { entityType: 'TRIP_ELEMENT', id: 'el_g4c_meeting' },
+          ],
+          parameters: { minBufferMinutes: 60 },
+        },
+      },
+    ],
+  });
+
+  const cancelSignal: TripSignal = {
+    id: 'sig_g4c_cancel',
+    kind: 'FLIGHT_CANCELLATION',
+    occurredAt: '2026-09-15T09:25:00+09:00',
+    receivedAt: '2026-09-15T09:30:00+09:00',
+    sourceId: 'src_g4c_provider',
+    authority: 'AUTHORITATIVE',
+    confidence: 1,
+    tripId: 'trip_g4c',
+    subjectRef: { entityType: 'TRIP_ELEMENT', id: 'el_g4c_flight' },
+    summary: 'Morning flight cancelled after its departure slot',
+    payload: { reason: 'technical' },
+  };
+  const signalResult = await processSignal(
+    { trips: harness.trips, signals: harness.signals, entities: harness.entities, cases: harness.cases, mutations: harness.mutations, audit: harness.audit },
+    cancelSignal,
+  );
+  assert.equal(signalResult.mutationAccepted, true);
+  assert.deepEqual(signalResult.assessment.irreversibleLosses.map((loss) => loss.id), ['loss-obj_g4c_prep']);
+
+  // The assessed loss is persisted through the validated mutation: the
+  // objective now carries authoritative LOST status, not just a transient
+  // assessment field.
+  const lostObjective = (await harness.trips.getTrip('trip_g4c'))!.objectives.find((o) => o.id === 'obj_g4c_prep')!;
+  assert.equal(lostObjective.status, 'LOST', 'assessed loss persists through validated mutation');
+
+  const PLANNING_AT = '2026-09-15T09:45:00+09:00';
+  const snapshot = await buildTripSnapshot(snapshotDeps(harness), 'trip_g4c', PLANNING_AT);
+  const cancelledLeg = snapshot.trip.elements.find((e) => e.id === 'el_g4c_flight') as TransportLeg;
+  const sourceId = cancelSignal.sourceId;
+  const noWaiverRebook = {
+    summary: 'Rebook the midday replacement; say nothing about the prep objective',
+    candidateOperations: [
+      legReplacement(cancelledLeg, {
+        data: {
+          ...cancelledLeg.data,
+          scheduledDeparture: { value: '2026-09-15T10:45:00+09:00' as IsoDateTime, sourceId, authority: 'CONNECTED' as const, observedAt: PLANNING_AT },
+          scheduledArrival: { value: '2026-09-15T11:30:00+09:00' as IsoDateTime, sourceId, authority: 'CONNECTED' as const, observedAt: PLANNING_AT },
+          bookingRef: { system: 'recovery-desk', reference: 'FL-G4C-11' },
+        },
+      }),
+    ],
+    assumptions: [],
+    uncertainties: [],
+    expectedOutcomes: [],
+    costImpact: { amount: 210, currency: 'USD' },
+  };
+
+  const planning = await runPlanningLoop(
+    {
+      planner: scriptedPlanner(
+        [{ strategies: [noWaiverRebook], toolRequests: [], assumptions: [], uncertainties: [], rationale: 'repair the remainder; the prep loss is left unacknowledged' }],
+        'g2c3',
+        PLANNING_AT,
+      ),
+      capabilities: {},
+      viability: new OverlayViabilityEngine(),
+      cases: harness.cases,
+      audit: harness.audit,
+    },
+    {
+      caseId: signalResult.caseId,
+      snapshot,
+      triggeringSignals: [cancelSignal],
+      impact: signalResult.assessment,
+      capabilityRegistry: [],
+      planningAt: PLANNING_AT,
+    },
+  );
+
+  const strategy = planning.strategies.find((s) => s.id === planning.bestStrategyId)!;
+  const service = createExecutionService(harness, planning.strategies);
+  const begin = await service.beginStrategy({ snapshot, caseId: signalResult.caseId, strategy, at: '2026-09-15T10:00:00+09:00' });
+  assert.equal(begin.decision.outcome, 'REQUIRES_TRAVELLER');
+  await service.recordApproval({
+    caseId: signalResult.caseId,
+    intentId: begin.intent.id,
+    decidedBy: { entityType: 'TRAVELLER', id: 'trv_g4c' },
+    decidedAt: '2026-09-15T10:10:00+09:00',
+    verdict: 'APPROVED',
+  });
+  const executed = await service.executeApproved({ caseId: signalResult.caseId, intentId: begin.intent.id, at: '2026-09-15T10:20:00+09:00' });
+
+  // The remainder is repaired, but the unacknowledged loss blocks a clean
+  // resolution: never FULLY_RECOVERED while a loss stands.
+  assert.equal(executed.caseStatus, 'RESOLVED');
+  assert.notEqual(executed.verification?.resolution?.outcome, 'FULLY_RECOVERED', 'unacknowledged assessed loss must block FULLY_RECOVERED');
+  assert.equal(executed.verification?.resolution?.outcome, 'RECOVERED_WITH_LOSS');
+  assert.deepEqual(executed.verification?.remainingLossRefs, ['obj_g4c_prep']);
+
+  const recoveredTrip = (await harness.trips.getTrip('trip_g4c'))!;
+  const recoveredLeg = recoveredTrip.elements.find((e) => e.id === 'el_g4c_flight') as TransportLeg;
+  assert.equal(recoveredLeg.reservationState, 'CONFIRMED', 'the remainder really recovered');
+  const prepObjective = recoveredTrip.objectives.find((o) => o.id === 'obj_g4c_prep')!;
+  assert.equal(prepObjective.status, 'LOST', 'the loss evidence survives into the resolved case');
 });

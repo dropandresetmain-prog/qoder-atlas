@@ -105,6 +105,10 @@ Stretch work starts only after the generalized core vertical loop passes the imp
 **Why stretch:** ontology supports shared resources; polished multi-traveller cascade adds propagation/UI complexity.
 **Revisit when:** single-trip propagation/generalisation is robust.
 
+### Deriving accessibility requirements from traveller profiles (PARK-3)
+**Why stretch:** today accessibility constraints are explicit authored policy (`unsupportedModes` parameters); deriving them from `Traveller.accessibilityRequirements` would let the engine invent its own judging criteria, which the deterministic viability model deliberately avoids (REV-C-FIX, comments in `src/engine/evaluators.ts`).
+**Revisit when:** a profile-to-constraint derivation rule is defined that keeps criteria explicit, traceable to a source, and auditable like any other constraint.
+
 ## Deferred / Not in MVP
 
 ### Timatic commercial integration

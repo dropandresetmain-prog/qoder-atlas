@@ -98,10 +98,11 @@ export interface VerificationResult {
 
 /**
  * Deterministic resolution verifier. FULLY_RECOVERED requires no direct
- * failures, no hard constraint FAIL/UNKNOWN and no recorded objective loss.
- * RECOVERED_WITH_LOSS requires the same viability except for explicitly
- * waived/reprioritised objectives (recorded loss evidence). Anything less
- * loops back into the lifecycle — success alone never resolves.
+ * failures, no hard constraint FAIL/UNKNOWN, no recorded objective loss AND
+ * no assessed irreversible loss left unacknowledged. RECOVERED_WITH_LOSS
+ * requires the same viability except for explicitly waived/reprioritised
+ * objectives or assessed LOST objectives (recorded loss evidence). Anything
+ * less loops back into the lifecycle — success alone never resolves.
  */
 export class CaseVerifier {
   private readonly impact: ImpactEngine;
@@ -115,10 +116,17 @@ export class CaseVerifier {
   }
 
   /**
-   * Verify post-execution state. Constraints evaluate with the SAME full
-   * generic context the impact engine uses (places, travellers, rule sets,
-   * anchor event) and at the verification instant — the execution moment
-   * when supplied, not the original assessment instant (PL-4).
+   * Verify post-execution state. Constraints are evaluated with the full
+   * generic EvaluationContext shape shared with impact/viability
+   * (buildEvaluationContext populates places, travellers, rule sets and the
+   * anchor event) at the verification instant — the execution moment when
+   * supplied, not the original assessment instant (PL-4). Truthfully, the
+   * current evaluator vocabulary reads the trip and its rule sets from that
+   * context; places/travellers/anchor event are carried so evaluators that
+   * need them never degrade to UNKNOWN for a thin context, not because every
+   * evaluator consumes them today (PARK-3: deriving new evidence, e.g.
+   * accessibility requirements from traveller profiles, is logged scope, not
+   * implemented behaviour).
    */
   async verify(tripId: EntityId, verifiedAt?: IsoDateTime): Promise<VerificationResult> {
     const assessment = await this.impact.assess(tripId);
@@ -156,9 +164,24 @@ export class CaseVerifier {
     if (hardUnknownIds.length > 0) {
       return { suggestedCaseStatus: 'VERIFYING', hardFailureIds, hardUnknownIds, remainingLossRefs: [] };
     }
-    const remainingLossRefs = tripRecord.objectives
-      .filter((o) => o.status === 'WAIVED' || o.status === 'REPRIORITY')
-      .map((o) => o.id);
+    // Recorded loss evidence (REV-C WP-C3, ADR-033): waived/reprioritised
+    // objectives PLUS objectives the impact assessment marked LOST. A loss
+    // assessed at disruption time survives recovery of the remainder — the
+    // re-assessment no longer reports it once the element is repaired, so the
+    // persisted LOST status is what keeps resolution honest. An assessed loss
+    // whose objective somehow carries no persisted evidence is included from
+    // the current assessment as well: FULLY_RECOVERED is never returned while
+    // any irreversible loss stands unacknowledged.
+    const remainingLossRefs: EntityId[] = [];
+    for (const objective of tripRecord.objectives) {
+      if (objective.status === 'WAIVED' || objective.status === 'REPRIORITY' || objective.status === 'LOST') {
+        remainingLossRefs.push(objective.id);
+      }
+    }
+    for (const loss of assessment.irreversibleLosses) {
+      const objectiveId = loss.relatedRefs[0];
+      if (objectiveId && !remainingLossRefs.includes(objectiveId)) remainingLossRefs.push(objectiveId);
+    }
     const outcome = remainingLossRefs.length > 0 ? 'RECOVERED_WITH_LOSS' : 'FULLY_RECOVERED';
     return {
       suggestedCaseStatus: 'RESOLVED',

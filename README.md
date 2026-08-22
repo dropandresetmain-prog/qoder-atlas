@@ -62,7 +62,7 @@ Do not infer production market behaviour from sandbox data.
 What exists today:
 
 - runnable TypeScript/Node ≥ 24 application (starts with zero credentials in REPLAY mode)
-- full vertical recovery loop: ingestion → persistent trip graph → signal/impact → planner/capabilities/deterministic viability → authority → execution → observation → verification (`src/engine/`, `src/application/`, `src/intelligence/`)
+- full vertical recovery loop: ingestion → persistent trip graph → signal/impact → planner/capabilities/deterministic viability → authority → execution → observation → verification (`src/engine/`, `src/app/`, `src/intelligence/`)
 - two materially different scenarios through the same application code: anchor-event/organiser (`fixtures/scenarios/anchor-event-speaker`) and corporate TMC (`fixtures/scenarios/corporate-tmc`), plus selected robustness cases (hotel no-show cutoff, transit cutoff with on-demand taxi, accessibility, already-lost objective)
 - deterministic runtime recovery/reset flow over HTTP: `POST /api/runtime/{disruption,plan,begin,decide,execute,reset}` + `GET /api/runtime/state` (scenario-neutral; every stage takes a caller-supplied instant; reset reseed is audited and transactional — no manual database surgery)
 - SQLite persistence behind repository interfaces; LIVE/RECORD/REPLAY external adapters sharing one normalizer

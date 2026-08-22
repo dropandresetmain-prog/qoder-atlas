@@ -170,6 +170,16 @@ export async function runPlanningLoop(
       strategyCount: strategies.length,
       feasibleCount: feasible.length,
       bestStrategyId: ranked[0]?.strategy.id,
+      // Persisted planning-time verdicts: the read models present this
+      // deterministic evidence instead of re-deriving overlays against
+      // post-resolution state (which the executed strategy has already
+      // changed — waived objectives and confirmed legs would re-colour
+      // rejected options and erase the honest rejection evidence).
+      candidateVerdicts: candidates.map((candidate) => ({
+        strategyId: candidate.strategy.id,
+        feasible: candidate.feasible,
+        rejectionReasons: candidate.rejectionReasons,
+      })),
     },
   });
 

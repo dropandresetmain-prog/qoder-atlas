@@ -122,6 +122,57 @@ function collectPlaceIds(trip: Trip, anchorEvent: AnchorEvent | undefined): Set<
 }
 
 /**
+ * Generic principal scope for one trip (REV-C WP-C4): the trip's travellers
+ * plus every organisation reachable from authoritative state — the operator,
+ * the anchor-event organiser, and the owners of governing rule sets. This is
+ * the SAME walk `buildTripSnapshot` performs, exposed so approval-time scope
+ * membership checks can never diverge from the snapshot principal scope.
+ * Generic ref matching only; no scenario knowledge.
+ */
+export async function principalScopeForTrip(
+  deps: { trips: TripRepository; entities: EntityStore },
+  tripId: EntityId,
+): Promise<{ travellers: Traveller[]; organisations: Organisation[] }> {
+  const trip = await deps.trips.getTrip(tripId);
+  if (!trip) throw new Error(`unknown trip ${tripId}`);
+
+  const travellers: Traveller[] = [];
+  for (const travellerId of trip.travellerIds) {
+    const entry = await deps.entities.get('TRAVELLER', travellerId);
+    if (entry && entry.entityType === 'TRAVELLER') travellers.push(entry.entity);
+  }
+
+  const anchorEntry = trip.anchorEventId
+    ? await deps.entities.get('ANCHOR_EVENT', trip.anchorEventId)
+    : undefined;
+  const anchorEvent = anchorEntry?.entityType === 'ANCHOR_EVENT' ? anchorEntry.entity : undefined;
+
+  const constraints = await constraintsForTrip(deps.entities, trip);
+  const ruleSetIds = collectRuleSetIds(trip, travellers, constraints);
+
+  const organisationIds = new Set<EntityId>();
+  if (trip.operatorOrganisationId) organisationIds.add(trip.operatorOrganisationId);
+  if (anchorEvent?.organiserOrganisationId) organisationIds.add(anchorEvent.organiserOrganisationId);
+  // Rule-set owners are in-scope principals too: a governing policy may name
+  // an approving/paying organisation distinct from the operator, and authority
+  // decisions are derived from this rule data. Generic ownerRef walk only.
+  for (const ruleSetId of [...ruleSetIds].sort()) {
+    const entry = await deps.entities.get('RULE_SET', ruleSetId);
+    if (entry && entry.entityType === 'RULE_SET' && entry.entity.ownerOrganisationId) {
+      organisationIds.add(entry.entity.ownerOrganisationId);
+    }
+  }
+
+  const organisations: Organisation[] = [];
+  for (const organisationId of [...organisationIds].sort()) {
+    const entry = await deps.entities.get('ORGANISATION', organisationId);
+    if (entry && entry.entityType === 'ORGANISATION') organisations.push(entry.entity);
+  }
+
+  return { travellers, organisations };
+}
+
+/**
  * Constraints in scope for this trip: any stored constraint whose refs point
  * at one of the trip's elements or objectives. Generic ref matching — no
  * scenario knowledge.

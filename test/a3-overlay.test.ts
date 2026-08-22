@@ -210,29 +210,99 @@ test('malformed candidate operations are rejected loudly, never silently evaluat
   );
 });
 
-test('candidate facts outranked by existing evidence reject the overlay', async () => {
+test('overlays evaluate weaker candidate facts instead of rejecting them (fact authority binds mutation, not planning)', async () => {
+  const { spec, h, snapshot, takenAt } = await disruptedScenarioA();
+  // WP-C2 / ADR-032: candidates are hypotheses about a replacement booking
+  // carrying CONNECTED evidence at best. The overlay must never reject them
+  // on fact-authority grounds — the ladder binds the authoritative mutation
+  // path and is completed by confirmedData() at execution observation, which
+  // performs the CONNECTED -> AUTHORITATIVE upgrade.
+  //
+  // First confirm the incumbent arrival fact through the authoritative path,
+  // exactly as execution observation does: the delay/cancellation evidence
+  // becomes AUTHORITATIVE.
+  const incumbent = snapshot.trip.elements.find((e) => e.id === 'el_a_flight_out');
+  assert.ok(incumbent && incumbent.elementKind === 'TRANSPORT_LEG');
+  const incumbentLeg = incumbent as Extract<TripElement, { elementKind: 'TRANSPORT_LEG' }>;
+  assert.ok(incumbentLeg.data.scheduledArrival, 'incumbent arrival fact present');
+  const confirmed = await h.mutations.applyProposal({
+    id: 'prop-confirm-a3',
+    origin: 'PROVIDER',
+    sourceId: spec.disruption.signal.sourceId,
+    requestedAt: takenAt,
+    rationale: 'execution observation confirms the incumbent arrival fact',
+    operations: [
+      {
+        op: 'UPSERT_FACT',
+        target: { entityType: 'TRIP_ELEMENT', id: 'el_a_flight_out' },
+        factPath: 'data.scheduledArrival',
+        value: { ...incumbentLeg.data.scheduledArrival, authority: 'AUTHORITATIVE' },
+        sourceId: spec.disruption.signal.sourceId,
+        authority: 'AUTHORITATIVE',
+      },
+    ],
+  });
+  assert.equal(confirmed.accepted, true, JSON.stringify(confirmed.issues));
+
+  // A CONNECTED replacement candidate must remain evaluable against that
+  // AUTHORITATIVE incumbent — a provenance judgement here would reject every
+  // rebooking hypothesis for a delay/cancellation.
+  const connectedLeg = rebookedFlight(spec, '2026-09-13T11:30:00+09:00', takenAt);
+  if (connectedLeg.elementKind === 'TRANSPORT_LEG') {
+    connectedLeg.data.scheduledDeparture = {
+      ...connectedLeg.data.scheduledDeparture!,
+      authority: 'CONNECTED',
+    };
+    connectedLeg.data.scheduledArrival = {
+      ...connectedLeg.data.scheduledArrival!,
+      authority: 'CONNECTED',
+    };
+  }
+  const authoritativeSnapshot = await snapshotOf(h, spec.trip.id, takenAt);
+  const authoritativeLeg = authoritativeSnapshot.trip.elements.find((e) => e.id === 'el_a_flight_out');
+  assert.ok(
+    authoritativeLeg && authoritativeLeg.elementKind === 'TRANSPORT_LEG',
+  );
+  assert.equal(
+    authoritativeLeg.elementKind === 'TRANSPORT_LEG'
+      ? authoritativeLeg.data.scheduledArrival?.authority
+      : undefined,
+    'AUTHORITATIVE',
+    'incumbent fact is confirmed before the candidate is evaluated',
+  );
+  const result = await engine.evaluateOverlay({
+    baseSnapshot: authoritativeSnapshot,
+    candidateOperations: [
+      {
+        op: 'UPSERT_ENTITY',
+        entityType: 'TRIP_ELEMENT',
+        id: 'el_a_flight_out',
+        data: connectedLeg,
+      },
+    ],
+  });
+  assert.equal(result.feasible, true, JSON.stringify({ hard: result.hardFailureIds, unknown: result.unknownIds }));
+  const arrival = result.constraintResults.find((r) => r.constraintId === 'c_a_arrive_before_keynote');
+  assert.equal(arrival?.status, 'PASS', JSON.stringify(arrival));
+});
+
+test('overlays reject candidates that mutate the judging criteria themselves', async () => {
   const { snapshot } = await disruptedScenarioA();
-  // UPSERT_FACT with weaker authority than the incumbent CONNECTED fact must
-  // be rejected by the shared fact-authority semantics — never applied.
+  // WP-C1 defence in depth: a candidate that downgrades an existing base
+  // constraint — the very criteria the overlay is judged against — is
+  // rejected deterministically, before any evaluation can be self-serving.
+  const downgrade = snapshot.constraints.find((c) => c.id === 'c_a_arrive_before_keynote');
+  assert.ok(downgrade, 'base constraint present in snapshot');
   await assert.rejects(
     engine.evaluateOverlay({
       baseSnapshot: snapshot,
       candidateOperations: [
         {
-          op: 'UPSERT_FACT',
-          target: { entityType: 'TRIP_ELEMENT', id: 'el_a_flight_out' },
-          factPath: 'data.scheduledArrival',
-          value: {
-            value: '2026-09-13T11:30:00+09:00',
-            sourceId: 'src_overlay_rumour',
-            authority: 'INFERRED',
-            observedAt: '2026-09-01T00:00:00+09:00',
-          },
-          sourceId: 'src_overlay_rumour',
-          authority: 'INFERRED',
+          op: 'UPSERT_CONSTRAINT',
+          constraint: { ...downgrade, hardness: 'SOFT' },
         },
       ],
     }),
-    /overlay candidate rejected/,
+    /overlay candidate rejected: candidate mutates judging criteria: constraint c_a_arrive_before_keynote/,
   );
 });

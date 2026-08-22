@@ -231,6 +231,16 @@ export class ImpactEngine implements ImpactService {
 
     // 6. Severity. Losses are CRITICAL; direct failure threatening objectives
     //    is HIGH; degraded state without threatened objectives is MEDIUM.
+    //
+    // PARK-7 (stop-and-ask, REV-C-FIX): severity intentionally ignores hard
+    // constraint FAILs that threaten no objective. A hard policy/cutoff
+    // failure with no threatened objective therefore caps at MEDIUM. This
+    // remains deliberate pending review: changing severity semantics ripples
+    // into planning urgency, UI attention ordering and fixture expectations;
+    // blast radius is documented in the REV-C-FIX completion report. The
+    // hard failures themselves are never lost — they surface in
+    // `policyImplications`, constraint statuses, viability, and verification
+    // regardless of severity.
     const severity = irreversibleLosses.length > 0
       ? 'CRITICAL'
       : directFailures.length > 0 && threatenedObjectives.length > 0
@@ -267,9 +277,19 @@ function resolveRule(constraint: Constraint, ruleSets: Map<string, RuleSet>) {
 }
 
 /**
- * Mutation proposal that persists an assessment's constraint statuses and the
- * derived trip viability. Must go through MutationService — never applied
- * directly to authoritative state.
+ * Mutation proposal that persists an assessment's constraint statuses, the
+ * derived trip viability AND the assessed irreversible losses. Must go
+ * through MutationService — never applied directly to authoritative state.
+ *
+ * Loss binding (REV-C WP-C3, ADR-033): every assessed irreversible loss maps
+ * to exactly one HARD objective (the loss id is `loss-<objectiveId>` and
+ * `relatedRefs[0]` is that objective). At assessment time the affected
+ * objective is marked LOST through this normal validated mutation path, so
+ * the loss has an authoritative home and re-assessment after recovery cannot
+ * silently "un-lose" it. The CaseVerifier then requires each lost objective
+ * to be explicitly waived/reprioritised before FULLY_RECOVERED is possible.
+ * Objectives already waived/reprioritised carry stronger evidence and are
+ * left untouched (idempotent on re-assessment).
  */
 export function impactProposal(
   assessment: ImpactAssessment,
@@ -284,6 +304,10 @@ export function impactProposal(
       op: 'UPSERT_CONSTRAINT' as const,
       constraint: { ...c, status: statusById.get(c.id)! },
     }));
+
+  // Trip viability BEFORE loss bindings: operations apply sequentially to one
+  // working state, and a whole-trip upsert replaces the aggregate — the
+  // objective LOST upserts below must land on top of it, never under it.
   const viability =
     assessment.directFailures.length > 0
       ? 'DISRUPTED'
@@ -298,6 +322,19 @@ export function impactProposal(
       data: { ...trip, viability },
     });
   }
+
+  for (const loss of assessment.irreversibleLosses) {
+    const objectiveId = loss.relatedRefs[0];
+    const objective = objectiveId ? trip.objectives.find((o) => o.id === objectiveId) : undefined;
+    if (!objective || objective.status !== 'ACTIVE') continue;
+    operations.push({
+      op: 'UPSERT_ENTITY',
+      entityType: 'TRIP_OBJECTIVE',
+      id: objective.id,
+      data: { ...objective, status: 'LOST' },
+    });
+  }
+
   if (operations.length === 0) {
     operations.push({
       op: 'UPSERT_ENTITY',

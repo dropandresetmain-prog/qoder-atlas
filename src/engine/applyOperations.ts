@@ -37,6 +37,20 @@ export interface AppliedOperation {
 export type ApplyIssue = { code: string; message: string; path?: string };
 
 /**
+ * Where the operation is being applied. Fact authority (the ARCHITECTURE.md §5
+ * ladder) binds AUTHORITATIVE mutation only: overlay candidates are hypotheses
+ * about a possible replacement booking, so the viability engine applies them
+ * with `enforceFactAuthority: false` — a CONNECTED replacement schedule is
+ * evaluable against an AUTHORITATIVE incumbent, and `confirmedData()` performs
+ * the CONNECTED -> AUTHORITATIVE upgrade at execution. The authoritative
+ * MutationService passes `enforceFactAuthority: true` (the default), where
+ * weaker/stale evidence can never replace stronger evidence.
+ */
+export interface ApplyOptions {
+  enforceFactAuthority?: boolean;
+}
+
+/**
  * Result of applying one operation. `superseded` means the operation was a
  * no-op because existing evidence outranks it (never a silent overwrite).
  */
@@ -147,8 +161,15 @@ function looksLikeFact(candidate: unknown): candidate is Fact<unknown> {
  * fact-path where the existing evidence outranks the incoming fact. This
  * gives UPSERT_ENTITY the exact same authority ladder as UPSERT_FACT: a
  * whole-entity upsert can never silently bypass fact authority
- * (ARCHITECTURE.md §5). Non-fact fields are unaffected; facts absent from
- * the incoming payload are not touched by this check.
+ * (ARCHITECTURE.md §5). Non-fact fields are unaffected.
+ *
+ * PARK-2: the walk also covers incumbent fact paths ABSENT from the incoming
+ * payload. A whole-entity upsert that omits confirmed (AUTHORITATIVE)
+ * evidence would otherwise erase it with no conflict at all; omission of
+ * confirmed evidence is therefore treated as an outranking conflict. Weaker
+ * incumbent facts (CONNECTED and below) remain replaceable — a whole-entity
+ * replacement legitimately supersedes them. Generic traversal only; no field
+ * lists, no scenario knowledge.
  */
 function collectEntityFactConflicts(
   incumbent: unknown,
@@ -169,8 +190,28 @@ function collectEntityFactConflicts(
   if (typeof incoming !== 'object' || incoming === null || Array.isArray(incoming)) return;
   if (typeof incumbent !== 'object' || incumbent === null || Array.isArray(incumbent)) return;
   const incumbentRecord = incumbent as Record<string, unknown>;
-  for (const [key, value] of Object.entries(incoming as Record<string, unknown>)) {
+  const incomingRecord = incoming as Record<string, unknown>;
+  for (const [key, value] of Object.entries(incomingRecord)) {
     collectEntityFactConflicts(incumbentRecord[key], value, path ? `${path}.${key}` : key, issues);
+  }
+  for (const [key, value] of Object.entries(incumbentRecord)) {
+    if (key in incomingRecord) continue;
+    const childPath = path ? `${path}.${key}` : key;
+    if (looksLikeFact(value)) {
+      if (value.authority === 'AUTHORITATIVE') {
+        issues.push({
+          code: 'FACT_OUTRANKED',
+          message: `incoming payload omits the incumbent fact at ${childPath}: confirmed evidence (authority AUTHORITATIVE observed ${value.observedAt}) cannot be erased by omission`,
+          path: childPath,
+        });
+      }
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      // The incoming payload omits this whole subtree: any confirmed fact
+      // inside it would be silently erased.
+      collectEntityFactConflicts(value, {}, childPath, issues);
+    }
   }
 }
 
@@ -204,12 +245,21 @@ function upsertObjectiveInTrip(trip: Trip, objective: TripObjective): void {
  * Apply one operation to the working state (mutates the WorkingState only).
  * All schema validation must already have succeeded; the errors produced here
  * are semantic (missing target, fact conflict, duplicate relation...).
+ *
+ * Fact-authority enforcement is explicit per call site via `options`:
+ * authoritative mutation (`SqlMutationService`) enforces the ladder; overlay
+ * evaluation (`OverlayViabilityEngine`) passes
+ * `{ enforceFactAuthority: false }` because candidates are hypotheses, not
+ * claims of provenance. The default enforces, so forgetting the option is
+ * fail-closed, never fail-open.
  */
 export function applyOperationToState(
   state: WorkingState,
   op: MutationOperation,
   at: string,
+  options: ApplyOptions = {},
 ): ApplyResult {
+  const enforceFactAuthority = options.enforceFactAuthority ?? true;
   switch (op.op) {
     case 'UPSERT_ENTITY': {
       const data = op.data as { id: string; tripId?: string };
@@ -217,7 +267,7 @@ export function applyOperationToState(
       if (op.entityType === 'TRIP') {
         const trip = op.data as Trip;
         const incumbent = state.trips.get(trip.id);
-        if (incumbent) {
+        if (incumbent && enforceFactAuthority) {
           const issues: ApplyIssue[] = [];
           collectEntityFactConflicts(incumbent, trip, '', issues);
           if (issues.length > 0) return { ok: false, issues };
@@ -232,7 +282,7 @@ export function applyOperationToState(
           return { ok: false, issues: [{ code: 'TARGET_NOT_FOUND', message: `element ${id}: parent trip ${element.tripId} not found` }] };
         }
         const incumbent = trip.elements.find((e) => e.id === element.id);
-        if (incumbent) {
+        if (incumbent && enforceFactAuthority) {
           const issues: ApplyIssue[] = [];
           collectEntityFactConflicts(incumbent, element, '', issues);
           if (issues.length > 0) return { ok: false, issues };
@@ -247,7 +297,7 @@ export function applyOperationToState(
           return { ok: false, issues: [{ code: 'TARGET_NOT_FOUND', message: `objective ${id}: parent trip ${objective.tripId} not found` }] };
         }
         const incumbent = trip.objectives.find((o) => o.id === objective.id);
-        if (incumbent) {
+        if (incumbent && enforceFactAuthority) {
           const issues: ApplyIssue[] = [];
           collectEntityFactConflicts(incumbent, objective, '', issues);
           if (issues.length > 0) return { ok: false, issues };
@@ -256,7 +306,7 @@ export function applyOperationToState(
         return { ok: true, applied: { op, affectedTripId: trip.id, detail: `upsert objective ${id}` } };
       }
       const existing = state.entities.get(entityKey(op.entityType, id));
-      if (existing) {
+      if (existing && enforceFactAuthority) {
         const issues: ApplyIssue[] = [];
         collectEntityFactConflicts(existing.entity, op.data, '', issues);
         if (issues.length > 0) return { ok: false, issues };
@@ -281,7 +331,7 @@ export function applyOperationToState(
         return { ok: false, issues: [{ code: 'FACT_SHAPE_INVALID', message: `fact at ${op.factPath} is missing provenance fields` }] };
       }
       const incumbent = location.parent[location.key];
-      if (looksLikeFact(incumbent) && !incomingFactWins(incumbent, incoming)) {
+      if (enforceFactAuthority && looksLikeFact(incumbent) && !incomingFactWins(incumbent, incoming)) {
         // Never a silent overwrite: keep the stronger/current evidence and
         // surface the conflict explicitly.
         return { ok: false, issues: [{ code: 'FACT_OUTRANKED', message: `incoming fact for ${op.factPath} is outranked by existing evidence (authority ${incumbent.authority} observed ${incumbent.observedAt})` }] };

@@ -282,6 +282,16 @@ function evaluateTransfer(constraint: Constraint, ctx: EvaluationContext): Const
   }
   if (isOnDemandTransfer(leg)) {
     // On-demand flexible leg: schedulable after the known upstream arrival.
+    // PARK-6 decision (REV-C-FIX): `minBufferMinutes` is deliberately NOT
+    // enforced on this branch. An unscheduled on-demand leg has no departure
+    // to measure a buffer against — its departure is chosen at scheduling
+    // time, after the upstream arrival is known, so the required gap is
+    // satisfiable by construction; rejecting it here would punish evidence
+    // that is deterministically schedulable. The buffer binds the moment the
+    // leg gains a scheduled departure: the branch above enforces
+    // minBufferMinutes against every real `scheduledDeparture`. Enforcing it
+    // blindly on the on-demand branch would either fabricate a departure
+    // instant to compare against, or fail a leg the traveller can still meet.
     return evaluation(constraint, 'PASS', `on-demand transfer can be scheduled after upstream arrival at ${upstream}`);
   }
   return evaluation(constraint, 'UNKNOWN', 'no departure evidence for booked transfer');
@@ -311,7 +321,17 @@ function evaluateLocation(constraint: Constraint, ctx: EvaluationContext): Const
   return evaluation(constraint, 'UNKNOWN', 'LOCATION constraint needs placeId parameter or a second ref');
 }
 
-/** ACCESSIBILITY: parameter-driven mode exclusions; never a guess. */
+/**
+ * ACCESSIBILITY: parameter-driven mode exclusions; never a guess.
+ *
+ * PARK-3 (stop-and-ask): accessibility requirements are currently declared
+ * explicitly as constraint parameters (`unsupportedModes`) — fixtures/authored
+ * policy state. DERIVING accessibility requirements from traveller profiles
+ * (e.g. `Traveller.accessibilityRequirements` feeding the constraint set) is
+ * intentionally NOT implemented here: it would invent judging criteria from
+ * profile data, and the deterministic engine only evaluates criteria that
+ * exist as explicit constraints. Logged as Stretch scope in docs/ROADMAP.md.
+ */
 function evaluateAccessibility(constraint: Constraint, ctx: EvaluationContext): ConstraintEvaluation {
   const subject = constraint.refs[0] ? findElement(ctx, constraint.refs[0]) : undefined;
   if (!subject) return evaluation(constraint, 'UNKNOWN', 'subject element not found');

@@ -38,9 +38,11 @@ import type {
   PrincipalRecord,
 } from '../contracts/services.ts';
 import type { AuditRepository, CaseRepository, TripRepository } from '../contracts/repositories.ts';
+import type { EntityStore } from '../persistence/entityStore.ts';
 import { CaseService } from '../engine/case.ts';
 import { withApproval } from '../engine/authority.ts';
 import type { CaseVerifier, VerificationResult } from '../engine/observation.ts';
+import { principalScopeForTrip } from './snapshot.ts';
 
 // ---------------------------------------------------------------------------
 // Deterministic action-intent construction
@@ -173,10 +175,18 @@ function confirmedData(data: Record<string, unknown>, confirmedAt: IsoDateTime):
  * Overlay candidates are HELD hypotheses; a provider confirmation turns them
  * into confirmed authoritative element state. Purely structural: reservation
  * state/status become CONFIRMED/VALID and every schedule fact is upgraded to
- * AUTHORITATIVE evidence at the execution instant. Other bounded vocabulary
- * operations (objective waivers/reprioritisations, relation changes, ...)
- * pass through unchanged — they carry no provider facts to upgrade, and a
- * confirmed execution must be able to observe them. No scenario knowledge.
+ * AUTHORITATIVE evidence at the execution instant. No scenario knowledge.
+ *
+ * Observation vocabulary is an explicit allowlist (REV-C WP-C1): an execution
+ * observation may legitimately carry only confirmed TRIP_ELEMENT upserts and
+ * objective waivers/reprioritisations (G1 depends on waivers surviving
+ * observation into authoritative state). Everything else in the mutation
+ * vocabulary — UPSERT_CONSTRAINT, UPSERT_ENTITY of RULE_SET / TRAVELLER /
+ * ORGANISATION / PLACE / TRIP / TRIP_OBJECTIVE, UPSERT_FACT, ADD_RELATION
+ * and REMOVE_RELATION — is policy/state that no provider result can observe,
+ * so it is never admitted into the observation mutation. A planner-authored
+ * constraint downgrade can therefore never reach authoritative state through
+ * execution (FR-09, ADR-003, ADR-004).
  */
 export function confirmedOperationsFor(
   operations: MutationOperation[],
@@ -184,8 +194,13 @@ export function confirmedOperationsFor(
 ): MutationOperation[] {
   const confirmed: MutationOperation[] = [];
   for (const operation of operations) {
-    if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') {
+    if (operation.op === 'WAIVE_OR_REPRIORITIZE_OBJECTIVE') {
+      // Explicit instruction evidence observed through execution survives.
       confirmed.push(operation);
+      continue;
+    }
+    if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') {
+      // Not observable from a provider result: never admitted.
       continue;
     }
     const element = operation.data as Record<string, unknown>;
@@ -244,6 +259,10 @@ export interface RecoveryExecutionDependencies {
   executor: ExecutorService;
   observation: ObservationService;
   verifier: CaseVerifier;
+  /** Approval-time principal scope resolution (WP-C4): trip repository. */
+  trips: TripRepository;
+  /** Approval-time principal scope resolution (WP-C4): entity store. */
+  entities: EntityStore;
 }
 
 export interface BeginStrategyInput {
@@ -374,6 +393,33 @@ export class RecoveryExecutionService {
     const allowedTypes = APPROVER_ENTITY_TYPES[decision.outcome];
     if (!allowedTypes || !allowedTypes.includes(input.decidedBy.entityType)) {
       const reason = `principal type ${input.decidedBy.entityType} cannot approve outcome ${decision.outcome}`;
+      await this.deps.audit.append({
+        occurredAt: input.decidedAt,
+        actor: 'app:recovery-execution',
+        action: 'APPROVAL_REJECTED',
+        subject: recoveryCase.tripId,
+        payload: { caseId: input.caseId, intentId: input.intentId, reason },
+      });
+      return { accepted: false, decision, caseStatus: recoveryCase.status, reason };
+    }
+
+    // WP-C4: approval is type-checked AND identity-checked. The approving
+    // principal must actually belong to this trip's principal scope — generic
+    // ref resolution from authoritative state, no scenario knowledge. An id
+    // that does not exist in the store (or has no relationship to the trip)
+    // is refused as an audited APPROVAL_REJECTED, never a throw.
+    const scope = await principalScopeForTrip(
+      { trips: this.deps.trips, entities: this.deps.entities },
+      recoveryCase.tripId,
+    );
+    const scopeRefIds = new Set<string>([
+      ...scope.travellers.map((traveller) => `TRAVELLER:${traveller.id}`),
+      ...scope.organisations.map((organisation) => `ORGANISATION:${organisation.id}`),
+    ]);
+    if (!scopeRefIds.has(`${input.decidedBy.entityType}:${input.decidedBy.id}`)) {
+      const reason =
+        `principal ${input.decidedBy.entityType}:${input.decidedBy.id} is not in the principal scope ` +
+        `of trip ${recoveryCase.tripId}`;
       await this.deps.audit.append({
         occurredAt: input.decidedAt,
         actor: 'app:recovery-execution',

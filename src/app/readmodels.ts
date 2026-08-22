@@ -293,12 +293,41 @@ export async function projectCaseDetail(
     };
   });
 
-  // Options: re-derived deterministic verdicts on isolated overlays.
+  // Options: planning-time deterministic verdicts first (persisted in the
+  // PLANNING_COMPLETED audit entry). Re-deriving overlays against current
+  // post-resolution state is dishonest evidence: the executed strategy has
+  // already changed the state it would evaluate against (waived objectives
+  // and confirmed legs re-colour previously rejected options). Only fall
+  // back to live re-evaluation when the planning audit carries no verdict.
   const planningAudit = await deps.audit.query({ action: 'PLANNING_COMPLETED', subject: trip.id });
-  const bestStrategyId = planningAudit[planningAudit.length - 1]?.payload['bestStrategyId'] as EntityId | undefined;
+  const latestPlanning = planningAudit[planningAudit.length - 1];
+  const bestStrategyId = latestPlanning?.payload['bestStrategyId'] as EntityId | undefined;
+  const persistedVerdicts = new Map<string, { feasible: boolean; rejectionReasons: string[] }>();
+  const rawVerdicts = latestPlanning?.payload['candidateVerdicts'];
+  if (Array.isArray(rawVerdicts)) {
+    for (const entry of rawVerdicts) {
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        typeof (entry as { strategyId?: unknown }).strategyId === 'string' &&
+        typeof (entry as { feasible?: unknown }).feasible === 'boolean'
+      ) {
+        const verdict = entry as { strategyId: string; feasible: boolean; rejectionReasons?: unknown };
+        persistedVerdicts.set(verdict.strategyId, {
+          feasible: verdict.feasible,
+          rejectionReasons: Array.isArray(verdict.rejectionReasons)
+            ? verdict.rejectionReasons.filter((reason): reason is string => typeof reason === 'string')
+            : [],
+        });
+      }
+    }
+  }
   const options: RecoveryOptionView[] = [];
   for (const strategy of recoveryCase.strategies) {
-    const candidate = await evaluateCandidate(deps.viability, snapshot, strategy);
+    const persisted = persistedVerdicts.get(strategy.id);
+    const candidate = persisted
+      ? { feasible: persisted.feasible, rejectionReasons: persisted.rejectionReasons }
+      : await evaluateCandidate(deps.viability, snapshot, strategy);
     const intent = recoveryCase.actionIntents.find((i) => i.strategyId === strategy.id);
     const decision = intent
       ? recoveryCase.authorityDecisions.find((d) => d.intentId === intent.id)

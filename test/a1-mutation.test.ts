@@ -805,3 +805,58 @@ test('mutation PL-1: context entity upserts respect incumbent facts too', async 
     'Badge required; side entrance this week.',
   );
 });
+
+test('mutation PARK-2: omitting a confirmed fact from an entity payload is a conflict, not an erase', async () => {
+  const { trips, mutations } = harness();
+  await trips.saveTrip(seedTrip());
+  const trip = seedTrip();
+  const leg = trip.elements[0];
+  assert.ok(leg);
+  assert.equal(leg.elementKind, 'TRANSPORT_LEG');
+
+  // Whole-element replacement that omits the AUTHORITATIVE departure fact.
+  // Without the omission walk this payload would silently erase confirmed
+  // evidence; PARK-2 treats the omission as an outranking conflict.
+  const omitting = structuredClone(leg);
+  assert.equal(omitting.elementKind, 'TRANSPORT_LEG');
+  delete (omitting.data as { scheduledDeparture?: unknown }).scheduledDeparture;
+  const outcome = await mutations.applyProposal(
+    proposal({
+      id: 'prop_park2_omit',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: omitting }],
+    }),
+  );
+  assert.equal(outcome.accepted, false);
+  assert.ok(
+    outcome.issues.some(
+      (i) => i.code === 'FACT_OUTRANKED' && i.path === 'data.scheduledDeparture' && i.message.includes('omission'),
+    ),
+    JSON.stringify(outcome.issues),
+  );
+  const stored = await trips.getTrip('trip_m1');
+  const storedLeg = stored?.elements.find((e) => e.id === 'el_m_flight');
+  assert.equal(
+    storedLeg?.elementKind === 'TRANSPORT_LEG' && storedLeg.data.scheduledDeparture?.value,
+    '2026-09-01T08:00:00+09:00',
+    'confirmed evidence survives the rejected omission',
+  );
+  assert.equal(stored?.version, 0);
+
+  // Omission of a weaker incumbent fact (CONNECTED) remains a legitimate
+  // replacement: a whole-entity upsert supersedes non-confirmed evidence.
+  await trips.saveTrip(
+    elementWithDeparture({
+      value: '2026-09-01T08:00:00+09:00',
+      sourceId: 'src_m_provider',
+      authority: 'CONNECTED',
+      observedAt: '2026-08-19T09:00:00+09:00',
+    }),
+  );
+  const weakerOmission = await mutations.applyProposal(
+    proposal({
+      id: 'prop_park2_omit_weaker',
+      operations: [{ op: 'UPSERT_ENTITY', entityType: 'TRIP_ELEMENT', id: 'el_m_flight', data: omitting }],
+    }),
+  );
+  assert.equal(weakerOmission.accepted, true, 'CONNECTED incumbents remain replaceable');
+});

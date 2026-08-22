@@ -278,6 +278,8 @@ function createService(harness: Harness, strategies: RecoveryStrategy[], inner: 
     executor: spy.executor,
     observation: new DeterministicObservationService({ mutations: harness.mutations }),
     verifier: new CaseVerifier({ trips: harness.trips, signals: harness.signals, entities: harness.entities }),
+    trips: harness.trips,
+    entities: harness.entities,
   };
   return { service: new RecoveryExecutionService(deps), calls: spy.calls };
 }
@@ -383,6 +385,63 @@ test('i4: Scenario A loop — traveller approval -> simulated flight.change -> o
   }
   const executionAudit = (await harness.audit.query({ action: 'EXECUTION_COMPLETED' }))[0]!;
   assert.equal(executionAudit.payload['simulated'], true, 'simulated execution must be labelled honestly');
+});
+
+test('i4: WP-C4 approval is identity-checked — unrelated organisation refused and audited, in-scope employer accepted', async () => {
+  // REV-C WP-C4: recordApproval verifies the approving principal against the
+  // trip's principal scope (generic ref matching). An organisation with no
+  // relationship to the trip is refused with an audited APPROVAL_REJECTED —
+  // never a throw — while the in-scope employer (rule-set owner) still
+  // approves, and the loop still completes to recovery.
+  const harness = createHarness();
+  const setup = await setupDisruptedTrip(harness);
+  const planning = await planRecovery(harness, setup);
+  const afternoon = planning.strategies.find((candidate) => candidate.summary.includes('afternoon'));
+  assert.ok(afternoon, 'planner must offer the afternoon strategy');
+
+  const { service, calls } = createService(harness, planning.strategies, new BoundaryExecutor());
+  const caseId = setup.signalResult.caseId;
+  const begin = await service.beginStrategy({ snapshot: setup.snapshot, caseId, strategy: afternoon, at: BEGIN_AT });
+  assert.equal(begin.decision.outcome, 'REQUIRES_ORGANISATION_APPROVER');
+
+  // An unrelated organisation: valid type, real-looking id, zero relationship
+  // to this trip. Refused — audited, not thrown.
+  const attacker = await service.recordApproval({
+    caseId,
+    intentId: begin.intent.id,
+    decidedBy: { entityType: 'ORGANISATION', id: 'org_totally_unrelated_attacker' },
+    decidedAt: APPROVAL_AT,
+    verdict: 'APPROVED',
+    note: 'approving on behalf of everyone',
+  });
+  assert.equal(attacker.accepted, false, 'out-of-scope principal must be refused');
+  assert.match(attacker.reason ?? '', /not in the principal scope/, 'refusal names the scope problem');
+  assert.equal(attacker.caseStatus, 'AWAITING_APPROVAL', 'case still awaits the right approver');
+  const refusedAudits = await harness.audit.query({ action: 'APPROVAL_REJECTED' });
+  assert.ok(
+    refusedAudits.some(
+      (entry) =>
+        entry.payload['intentId'] === begin.intent.id &&
+        String(entry.payload['reason']).includes('org_totally_unrelated_attacker'),
+    ),
+    'refusal is audited with the principal identity',
+  );
+  assert.equal(calls(), 0, 'refused approval never reaches the executor');
+
+  // The in-scope employer organisation (owner of the governing rule set)
+  // still passes the identity check and completes the loop.
+  const organisationId = setup.spec.context.organisations[0]!.id;
+  const approval = await service.recordApproval({
+    caseId,
+    intentId: begin.intent.id,
+    decidedBy: { entityType: 'ORGANISATION', id: organisationId },
+    decidedAt: APPROVAL_AT,
+    verdict: 'APPROVED',
+  });
+  assert.equal(approval.accepted, true, 'rule-set-owner organisation stays in scope');
+  const executed = await service.executeApproved({ caseId, intentId: begin.intent.id, at: EXECUTE_AT });
+  assert.equal(executed.caseStatus, 'RESOLVED');
+  assert.equal(executed.verification?.resolution?.outcome, 'FULLY_RECOVERED');
 });
 
 test('i4: fare delta above threshold routes to organisation approval', async () => {

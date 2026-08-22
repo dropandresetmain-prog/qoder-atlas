@@ -109,6 +109,8 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     }),
     observation: new DeterministicObservationService({ mutations }),
     verifier: new CaseVerifier({ trips, signals, entities }),
+    trips,
+    entities,
   });
 
   // Read-only capability wiring: Atlas always present (REPLAY is

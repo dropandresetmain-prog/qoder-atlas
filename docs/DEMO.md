@@ -68,6 +68,15 @@ GET  /api/runtime/state        # trips + open cases projection
 
 All six stages go through the same application code the tests use (`src/app/compose.ts`); REPLAY recordings feed the real normalizer/engine, and provider order effects at the execution boundary are disclosed as simulated.
 
+### Credential-free planner honesty (what the fallback planner does and does not do)
+
+Without Model Studio credentials the runtime uses the deterministic fallback planner, and its limits are part of the honest demo story:
+
+- It handles only disruptions whose impact assessment contains a directly-failed FLIGHT leg. A pure FLIGHT_DELAY (no cancellation, no failed leg) therefore produces zero strategies with an explicit HIGH uncertainty ("fallback planner failed closed; no strategies fabricated") — the delay-recovery case (G2-1) is exercised in tests with the scripted planner, not by the fallback planner.
+- It never authors waivers or reprioritisations: it only enumerates one replacement strategy per normalized flight.search offer, with CONNECTED facts. Feasibility, rejection and ranking belong to the deterministic viability engine; waivers enter only through explicit traveller/planner evidence.
+- Scenario B (corporate-tmc) credential-free: the disruption cancels the return leg and every replayed next-day replacement arrives after the 08:30 steering meeting plus buffer, so `c_b_return_buffer` stays unresolvable and planning honestly reports `bestStrategyId = undefined` — no fabricated waiver closes the case. The full RECOVERED_WITH_LOSS loop for Scenario B is proven in tests (G1) with a planner that carries the traveller's explicit steering evidence and a waiver.
+- REV-C-FIX (WP-C2) effect on the delay case: candidate facts now enter planning at CONNECTED authority (honest provider evidence, never planner-claimed AUTHORITATIVE), are evaluated against the AUTHORITATIVE delay fact without rejection, and receive the CONNECTED → AUTHORITATIVE upgrade only at execution observation via `confirmedData()`.
+
 ## Demo readiness checklist
 - deterministic reset to known starting state
 - no manual database/state surgery
