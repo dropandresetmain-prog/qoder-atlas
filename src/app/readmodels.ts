@@ -83,7 +83,7 @@ function describeElement(element: TripElement): string {
   return ref ? `${label} · ${ref}` : label;
 }
 
-function statusFromCase(status: CaseStatus): ReadModelStatus {
+export function statusFromCase(status: CaseStatus): ReadModelStatus {
   switch (status) {
     case 'RESOLVED':
       return 'RESOLVED';
@@ -98,7 +98,7 @@ function statusFromCase(status: CaseStatus): ReadModelStatus {
   }
 }
 
-function statusForTrip(trip: Trip, latestCase?: RecoveryCase): ReadModelStatus {
+export function statusForTrip(trip: Trip, latestCase?: RecoveryCase): ReadModelStatus {
   if (latestCase) return statusFromCase(latestCase.status);
   switch (trip.viability) {
     case 'VIABLE':
@@ -114,7 +114,7 @@ function statusForTrip(trip: Trip, latestCase?: RecoveryCase): ReadModelStatus {
   }
 }
 
-async function latestCaseFor(cases: CaseRepository, tripId: EntityId): Promise<RecoveryCase | undefined> {
+export async function latestCaseFor(cases: CaseRepository, tripId: EntityId): Promise<RecoveryCase | undefined> {
   const all = await cases.listCasesForTrip(tripId);
   return [...all].sort((a, b) => b.version - a.version || b.updatedAt.localeCompare(a.updatedAt))[0];
 }
