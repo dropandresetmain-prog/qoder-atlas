@@ -4,5 +4,6 @@ export * from './dispatch.ts';
 export * from './extraction.ts';
 export * from './planningLoop.ts';
 export * from './preferenceStore.ts';
+export * from './recoveryExecution.ts';
 export * from './signalPipeline.ts';
 export * from './snapshot.ts';
