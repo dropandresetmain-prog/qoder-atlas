@@ -99,9 +99,9 @@ This is the same baseline the primary investigator recorded (`docs/reality-valid
 - `src/providers/googleRoutes/adapter.ts:92-102` — `computeRoutes` does the right thing in three branches:
   1. `mode === 'REPLAY'` → throws `CapabilityFailure('PROVIDER_ERROR', 'google_live_call_in_replay', …)` (the runner catches this and returns the structured error envelope; no crash).
   2. `!this.apiKey` → throws `CapabilityFailure('NOT_CONFIGURED', 'google_routes_missing_key', 'Google Routes requires GOOGLE_ROUTES_API_KEY')`. This is the structured `NOT_CONFIGURED` path the question asks about.
-  3. With a key → POSTs `https://routes.googleapis.com/directions/v2:computeRoutes` with `x-goog-api-key` and the field mask `routes.duration,routes.durationInTraffic,routes.distanceMeters`.
+  3. With a key → POSTs `https://routes.googleapis.com/directions/v2:computeRoutes` with `x-goog-api-key` and the field mask `routes.duration,routes.staticDuration,routes.distanceMeters`.
 - HTTP error mapping (`adapter.ts:131-148`): `401/403 → AUTH`, `429 → RATE_LIMITED`, `400 → INVALID_REQUEST`, `>=500 → PROVIDER_ERROR` (retryable). All wrapped in `CapabilityResult`, never thrown to the caller.
-- `fixtures/recordings/google-routes/route_context/rec_c47bcdae6b369baf521a9a2b03638faf.json` — committed sanitized recording with a real-shape payload (`duration: 900s, durationInTraffic: 1380s, distanceMeters: 15400`). REPLAY works without any key.
+- `fixtures/recordings/google-routes/route_context/rec_c47bcdae6b369baf521a9a2b03638faf.json` — committed sanitized recording with a real-shape payload (`duration: 1380s` traffic-aware, `staticDuration: 900s`, `distanceMeters: 15400`). REPLAY works without any key.
 - `src/config/config.ts:95-99, 130-132` — env name is `GOOGLE_ROUTES_API_KEY`; `hasLiveCredentials('googleRoutes')` returns `Boolean(config.providers.googleRoutes.apiKey)`. Absent key → adapter still constructs, runs in REPLAY, or returns the structured failure.
 - `docs/ENVIRONMENT.md:46-50` — explicit "Optional/non-blocking dynamic routing. Core must support REPLAY/fallback when absent." The code matches the contract.
 

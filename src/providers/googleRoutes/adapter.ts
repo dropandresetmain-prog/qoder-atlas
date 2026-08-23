@@ -21,7 +21,11 @@ import { capabilityFailure, runAdapter } from '../runner.ts';
 export const GOOGLE_ROUTES_PROVIDER_ID = 'google-routes';
 
 const COMPUTE_ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-const FIELD_MASK = 'routes.duration,routes.durationInTraffic,routes.distanceMeters';
+// Routes API v2 semantics (verified against official docs): `routes.duration`
+// is the traffic-aware estimate when routingPreference is TRAFFIC_AWARE /
+// TRAFFIC_AWARE_OPTIMAL, `routes.staticDuration` is the free-flow duration.
+// There is no `routes.durationInTraffic` field in v2.
+const FIELD_MASK = 'routes.duration,routes.staticDuration,routes.distanceMeters';
 
 export interface GoogleRoutesAdapterOptions {
   mode: AdapterMode;
@@ -34,7 +38,7 @@ export interface GoogleRoutesAdapterOptions {
 interface ComputeRoutesRaw {
   routes?: Array<{
     duration?: string;
-    durationInTraffic?: string;
+    staticDuration?: string;
     distanceMeters?: number;
   }>;
 }
@@ -201,7 +205,10 @@ export function normalizeRouteContext(raw: ComputeRoutesRaw, observedAt: IsoDate
   if (!route) {
     throw new Error('Google Routes returned no routes for this query');
   }
-  const expectedSeconds = parseDurationSeconds(route.durationInTraffic ?? route.duration);
+  // Routes API v2: `duration` is the traffic-aware estimate under
+  // TRAFFIC_AWARE / TRAFFIC_AWARE_OPTIMAL (falls back to free-flow for other
+  // preferences); `staticDuration` is the free-flow duration when requested.
+  const expectedSeconds = parseDurationSeconds(route.duration);
   if (expectedSeconds === undefined) {
     throw new Error('Google Routes returned no usable duration');
   }
@@ -213,7 +220,7 @@ export function normalizeRouteContext(raw: ComputeRoutesRaw, observedAt: IsoDate
     observedAt,
     quality: 'MEDIUM',
   };
-  const staticSeconds = parseDurationSeconds(route.duration);
+  const staticSeconds = parseDurationSeconds(route.staticDuration);
   if (staticSeconds !== undefined) {
     estimate.minimumMinutes = Math.max(0, Math.round(staticSeconds / 60));
     estimate.conservativeMinutes = Math.max(expectedMinutes, Math.ceil((staticSeconds * 1.5) / 60));
@@ -225,9 +232,8 @@ export function normalizeRouteContext(raw: ComputeRoutesRaw, observedAt: IsoDate
   if (typeof route.distanceMeters === 'number') {
     context.distanceKm = Math.round((route.distanceMeters / 1000) * 10) / 10;
   }
-  const trafficSeconds = parseDurationSeconds(route.durationInTraffic);
-  if (trafficSeconds !== undefined) {
-    const traffic = trafficConditionOf(staticSeconds, trafficSeconds);
+  if (staticSeconds !== undefined && staticSeconds > 0) {
+    const traffic = trafficConditionOf(staticSeconds, expectedSeconds);
     if (traffic) context.trafficCondition = traffic;
   }
   return context;

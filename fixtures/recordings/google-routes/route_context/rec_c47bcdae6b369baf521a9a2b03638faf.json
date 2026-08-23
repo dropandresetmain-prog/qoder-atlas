@@ -7,8 +7,8 @@
   "raw": {
     "routes": [
       {
-        "duration": "900s",
-        "durationInTraffic": "1380s",
+        "duration": "1380s",
+        "staticDuration": "900s",
         "distanceMeters": 15400
       }
     ]
