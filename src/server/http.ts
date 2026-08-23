@@ -51,6 +51,19 @@ export interface RuntimeHandlers {
   state(): Promise<{ status: number; body: unknown }>;
 }
 
+/**
+ * Programme coordination surface (Northstar RV-N1/RV-N2). Handlers receive
+ * wire JSON and return status + body; validation and engine calls live in
+ * src/app/programmeHttp.ts. Present only when the programme service is
+ * wired by the integrator.
+ */
+export interface ProgrammeHandlers {
+  view(params: { anchorEventId: string; at: string }): Promise<{ status: number; body: unknown }>;
+  applyContext(body: unknown): Promise<{ status: number; body: unknown }>;
+  intakeImport(body: unknown): Promise<{ status: number; body: unknown }>;
+  commitmentChange(body: unknown): Promise<{ status: number; body: unknown }>;
+}
+
 /** Application endpoints the HTTP surface projects; wired by the integrator. */
 export interface AppEndpoints {
   now(): IsoDateTime;
@@ -65,6 +78,8 @@ export interface AppEndpoints {
   ): Promise<TravellerDecisionHttpResult>;
   /** Present when the runtime recovery/reset flow is wired. */
   runtime?: RuntimeHandlers;
+  /** Present when the Northstar programme surface is wired. */
+  programme?: ProgrammeHandlers;
 }
 
 const PAGE_LINKS = { dashboard: '/operator', traveller: '/traveller' };
@@ -264,6 +279,45 @@ async function handle(
         sendJson(res, 404, { error: 'not_found', path: url.pathname });
         return;
     }
+  }
+
+  // --- Programme coordination surface (Northstar RV-N1/RV-N2) -------------
+  if (endpoints.programme && segments[0] === 'api' && segments[1] === 'programme') {
+    const handlers = endpoints.programme;
+    if (req.method === 'GET' && segments[2]) {
+      const at = url.searchParams.get('at') ?? endpoints.now();
+      const outcome = await handlers.view({ anchorEventId: segments[2], at });
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readBody(req));
+    } catch {
+      sendJson(res, 400, { error: 'invalid_json' });
+      return;
+    }
+    if (segments[2] === 'context') {
+      const outcome = await handlers.applyContext(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'import') {
+      const outcome = await handlers.intakeImport(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'commitment-change') {
+      const outcome = await handlers.commitmentChange(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    sendJson(res, 404, { error: 'not_found', path: url.pathname });
+    return;
   }
 
   sendJson(res, 404, { error: 'not_found', path: url.pathname });

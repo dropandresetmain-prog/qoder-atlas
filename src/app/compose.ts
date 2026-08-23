@@ -49,6 +49,8 @@ import {
 } from './index.ts';
 import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
+import { ProgrammeService } from './programme.ts';
+import { createProgrammeHandlers } from './programmeHttp.ts';
 
 export interface ComposedRuntime {
   db: DatabaseSync;
@@ -167,6 +169,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     fixturesDir: config.fixturesDir,
   });
 
+  const programmeService = new ProgrammeService({ mutations, entities, trips, sources, audit });
   const endpoints: AppEndpoints = {
     now: () => new Date().toISOString(),
     operatorDashboard: (at) => projectOperatorDashboard(readDeps, at),
@@ -204,6 +207,16 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
           strategyCount: recoveryCase.strategies.length,
         })),
       }),
+    }),
+    programme: createProgrammeHandlers({
+      service: programmeService,
+      readDeps,
+      mutations,
+      entities,
+      trips,
+      signals,
+      cases,
+      audit,
     }),
   };
 
