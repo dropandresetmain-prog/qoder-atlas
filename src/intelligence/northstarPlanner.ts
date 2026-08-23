@@ -15,15 +15,21 @@
  *    flight.search evidence for (home airport -> event airport) and, when
  *    evidence exists, proposes HELD arrival legs. Unknown origin/destination
  *    evidence fails closed with uncertainty — never a fabricated route.
- *  - window shift (path A): a ChangeRequest carries arriveBy/departAfter in
- *    its TRAVELLER_INPUT signal payload. The planner requests flight.search
- *    for the same route on the requested date and proposes replacing the
- *    affected leg — the same encoding recovery uses.
+ *  - window shift (path A): a ChangeRequest carries the COMPLETE declarative
+ *    ResolutionTarget in its TRAVELLER_INPUT signal payload (REV-2 WP-R3).
+ *    The planner selects the affected leg BY DIRECTION from place evidence
+ *    (arriveBy -> the leg arriving at the event place; departAfter -> the leg
+ *    departing it — never array order), emits one flight.search per
+ *    requested window dimension, and proposes replacing each dimension's leg
+ *    once evidence exists. Dimensions the planner cannot act on (direct
+ *    preference, departure bounds, stay proximity, objective effects) fail
+ *    closed with explicit uncertainty — silent dropping is the defect.
  *
  * Both branches emit proposals ONLY; deterministic viability, authority and
  * execution gates downstream decide what actually changes.
  */
 import type { EntityId, IsoDateTime, UncertaintyRecord } from '../domain/common.ts';
+import { ResolutionTargetSchema, type ResolutionTarget } from '../contracts/changeRequest.ts';
 import type { FlightOffer } from '../contracts/capabilities.ts';
 import type { PlannerInput, PlannerOutput, RecoveryPlanner } from '../contracts/planner.ts';
 import type { TripSignal } from '../operational/signal.ts';
@@ -52,6 +58,17 @@ export interface NorthstarPlannerOptions {
   idFactory?: (prefix: string) => string;
   now?: () => IsoDateTime;
 }
+
+/** A parsed change-request trigger: the full declarative target plus
+ * explicit uncertainty statements for every dimension this planner cannot
+ * act on. Failing closed with stated uncertainty replaces silent dropping. */
+interface WindowShiftTrigger {
+  target: ResolutionTarget;
+  actionable: boolean;
+  uncertaintyStatements: string[];
+}
+
+type WindowDimension = 'arriveBy' | 'departAfter';
 
 export class NorthstarPlanner implements RecoveryPlanner {
   private readonly inner: RecoveryPlanner;
@@ -231,32 +248,123 @@ export class NorthstarPlanner implements RecoveryPlanner {
   private windowShiftOutput(input: PlannerInput): PlannerOutput | undefined {
     const trigger = this.windowShiftTrigger(input.triggeringSignals);
     if (!trigger) return undefined;
+    const { target } = trigger;
+    const uncertainties = trigger.uncertaintyStatements.map((statement) => this.uncertainty(statement, 'MEDIUM'));
 
-    const leg = input.snapshot.trip.elements.find(
+    // A target with no actionable window dimension still owns the planning
+    // turn: return the recorded uncertainties instead of falling through to
+    // the inner planner (which silently ignored A2/A3 requests).
+    if (!trigger.actionable) {
+      return {
+        strategies: [],
+        toolRequests: [],
+        assumptions: [],
+        uncertainties: [
+          this.uncertainty(
+            'change request carries no window dimension this planner can act on; unsupported dimensions are recorded, never silently dropped',
+            'HIGH',
+          ),
+          ...uncertainties,
+        ],
+        rationale: 'northstar window-shift planner failed closed on unactionable target dimensions',
+      };
+    }
+
+    const dimensions: WindowDimension[] = [
+      ...(target.arriveBy !== undefined ? (['arriveBy'] as const) : []),
+      ...(target.departAfter !== undefined ? (['departAfter'] as const) : []),
+    ];
+    const eventPlaceId =
+      input.snapshot.anchorEvent?.placeId ??
+      input.snapshot.trip.elements.find(
+        (element): element is Engagement => element.elementKind === 'ENGAGEMENT',
+      )?.data.placeId;
+    const flightLegs = input.snapshot.trip.elements.filter(
       (element): element is TransportLeg =>
         element.elementKind === 'TRANSPORT_LEG' && element.data.mode === 'FLIGHT',
     );
-    if (!leg) {
-      return this.degraded('window-shift change request requires an existing flight leg to re-search');
+
+    // Direction comes from PLACE evidence, never array order: arriveBy
+    // targets the leg arriving AT the event place; departAfter the leg
+    // departing FROM it. When an itinerary leg matches, it outranks the
+    // shared arrival slot (promotion-time constraint subject, REV-2 WP-R2);
+    // the slot stays rebookable only when it IS the trip's only flight leg.
+    const legFor = (dimension: WindowDimension): TransportLeg | undefined => {
+      if (!eventPlaceId) return undefined;
+      const matches = flightLegs.filter((element) =>
+        dimension === 'arriveBy'
+          ? element.data.destinationPlaceId === eventPlaceId
+          : element.data.originPlaceId === eventPlaceId,
+      );
+      if (matches.length === 0) return undefined;
+      const itinerary = matches.filter((element) => element.id !== `el-${input.snapshot.tripId}-arrival`);
+      return itinerary[0] ?? matches[0];
+    };
+
+    // One search per requested dimension. A dimension with an existing leg
+    // re-searches that leg's route; one without a leg falls back to the
+    // home/event corridor when both ends carry airport evidence.
+    const toolRequests: ToolRequest[] = [];
+    const selected: Array<{ dimension: WindowDimension; leg: TransportLeg }> = [];
+    for (const dimension of dimensions) {
+      const requested = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
+      const requestedDate = requested?.slice(0, 10);
+      if (!requested || !requestedDate) continue;
+      const leg = legFor(dimension);
+      if (leg) {
+        const originRef = airportRefFor(this.placeById(input, leg.data.originPlaceId));
+        const destinationRef = airportRefFor(this.placeById(input, leg.data.destinationPlaceId));
+        if (!originRef || !destinationRef) {
+          uncertainties.push(
+            this.uncertainty(
+              `${dimension} leg ${leg.id} places carry no airport-code refs; cannot re-search that leg`,
+              'MEDIUM',
+            ),
+          );
+          continue;
+        }
+        toolRequests.push(
+          this.searchRequest(originRef, destinationRef, requestedDate, leg.data.originPlaceId, leg.data.destinationPlaceId),
+        );
+        selected.push({ dimension, leg });
+        continue;
+      }
+      const corridor = this.windowCorridor(input, dimension, eventPlaceId);
+      if (!corridor) {
+        uncertainties.push(
+          this.uncertainty(
+            `${dimension} requested but no flight leg ${dimension === 'arriveBy' ? 'arrives at' : 'departs from'} the event place and no home/event corridor evidence exists; cannot derive a route`,
+            'MEDIUM',
+          ),
+        );
+        continue;
+      }
+      toolRequests.push(
+        this.searchRequest(corridor.originRef, corridor.destinationRef, requestedDate, corridor.originPlaceId, corridor.destinationPlaceId),
+      );
     }
-    const originPlace = this.placeById(input, leg.data.originPlaceId);
-    const destinationPlace = this.placeById(input, leg.data.destinationPlaceId);
-    const originRef = airportRefFor(originPlace);
-    const destinationRef = airportRefFor(destinationPlace);
-    if (!originRef || !destinationRef) {
-      return this.degraded('flight leg places carry no airport-code refs; cannot re-search');
+    if (selected.length === 0) {
+      return {
+        strategies: [],
+        toolRequests,
+        assumptions: [],
+        uncertainties,
+        rationale: 'northstar window-shift planner found no rebookable leg; evidence requests and uncertainty only',
+      };
     }
-    const requestedDate = trigger.date;
 
     const evidence = this.flightSearchEvidence(input);
     if (!evidence) {
       return {
         strategies: [],
-        toolRequests: [
-          this.searchRequest(originRef, destinationRef, requestedDate, leg.data.originPlaceId, leg.data.destinationPlaceId),
+        toolRequests,
+        assumptions: [
+          `window shift requested (${dimensions.join(', ')}); replacement evidence required first`,
         ],
-        assumptions: [`window shift requested for ${requestedDate}; replacement evidence required first`],
-        uncertainties: [this.uncertainty('change-request resolution active: awaiting flight.search evidence', 'MEDIUM')],
+        uncertainties: [
+          this.uncertainty('change-request resolution active: awaiting flight.search evidence', 'MEDIUM'),
+          ...uncertainties,
+        ],
         rationale: 'northstar window-shift planner requests replacement evidence before proposing',
       };
     }
@@ -268,67 +376,132 @@ export class NorthstarPlanner implements RecoveryPlanner {
       authority: 'CONNECTED' as const,
       observedAt: input.snapshot.takenAt,
     });
-    const strategies = [...evidence.offers]
+    const strategies: RecoveryStrategy[] = [...evidence.offers]
       .sort((a, b) => a.totalPrice.amount - b.totalPrice.amount || a.offerId.localeCompare(b.offerId))
-      .map((offer): RecoveryStrategy => {
-        const first = offer.segments[0];
-        const last = offer.segments[offer.segments.length - 1];
-        const candidateOperations: MutationOperation[] = [
-          {
-            op: 'UPSERT_ENTITY',
-            entityType: 'TRIP_ELEMENT',
-            data: {
-              ...leg,
-              reservationState: 'HELD',
-              status: 'UNKNOWN',
+      .flatMap((offer) =>
+        selected.map(({ dimension, leg }): RecoveryStrategy => {
+          const first = offer.segments[0];
+          const last = offer.segments[offer.segments.length - 1];
+          const windowEvidence = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
+          const candidateOperations: MutationOperation[] = [
+            {
+              op: 'UPSERT_ENTITY',
+              entityType: 'TRIP_ELEMENT',
               data: {
-                ...leg.data,
-                ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
-                ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
-                bookingRef: { system: 'flight-provider', reference: offer.offerId },
+                ...leg,
+                reservationState: 'HELD',
+                status: 'UNKNOWN',
+                data: {
+                  ...leg.data,
+                  ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
+                  ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
+                  bookingRef: { system: 'flight-provider', reference: offer.offerId },
+                },
               },
             },
-          },
-        ];
-        return {
-          id: this.idFactory('strat'),
-          caseId: input.caseId,
-          summary: `Rebook ${leg.id} on offer ${offer.offerId} (${trigger.kind})`,
-          candidateOperations,
-          toolRequests: [],
-          assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
-          uncertainties: [],
-          expectedOutcomes: [`the trip window satisfies the traveller request (${trigger.kind} ${requestedDate})`],
-          costImpact: offer.totalPrice,
-          createdAt: this.now(),
-        };
-      });
+          ];
+          return {
+            id: this.idFactory('strat'),
+            caseId: input.caseId,
+            summary: `Rebook ${leg.id} on offer ${offer.offerId} (${dimension})`,
+            candidateOperations,
+            toolRequests: [],
+            assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
+            uncertainties: [],
+            expectedOutcomes: [`the trip window satisfies the traveller request (${dimension} ${windowEvidence})`],
+            costImpact: offer.totalPrice,
+            createdAt: this.now(),
+          };
+        }),
+      );
     return {
       strategies,
-      toolRequests: [],
+      toolRequests,
       assumptions: ['window-shift strategies are enumerated from flight.search evidence; viability owns feasibility'],
-      uncertainties: [],
+      uncertainties,
       rationale: 'northstar window-shift planner enumerates replacement offers; viability owns feasibility',
     };
   }
 
-  /** Extracts arriveBy/departAfter evidence from TRAVELLER_INPUT payloads. */
-  private windowShiftTrigger(
-    signals: TripSignal[],
-  ): { kind: 'arriveBy' | 'departAfter'; date: string } | undefined {
+  /**
+   * Route evidence for a window dimension that has no existing leg:
+   * arriveBy searches home -> event place; departAfter searches event
+   * place -> home. Both ends need airport-code evidence; absence fails
+   * closed upstream.
+   */
+  private windowCorridor(
+    input: PlannerInput,
+    dimension: WindowDimension,
+    eventPlaceId: EntityId | undefined,
+  ): { originRef: { system: string; value: string }; destinationRef: { system: string; value: string }; originPlaceId: EntityId; destinationPlaceId: EntityId } | undefined {
+    if (!eventPlaceId) return undefined;
+    const eventPlace = this.placeById(input, eventPlaceId);
+    const eventRef = airportRefFor(eventPlace);
+    const home = this.travellerHomeAirport(input);
+    if (!eventPlace || !eventRef || !home) return undefined;
+    return dimension === 'arriveBy'
+      ? { originRef: home.ref, destinationRef: eventRef, originPlaceId: home.placeId, destinationPlaceId: eventPlace.id }
+      : { originRef: eventRef, destinationRef: home.ref, originPlaceId: eventPlace.id, destinationPlaceId: home.placeId };
+  }
+
+  /**
+   * Extracts the COMPLETE ResolutionTarget from TRAVELLER_INPUT payloads.
+   * Every dimension the window-shift planner cannot act on is captured as an
+   * explicit uncertainty statement: silent dropping is the defect this
+   * trigger exists to prevent (REV-2 WP-R3).
+   */
+  private windowShiftTrigger(signals: TripSignal[]): WindowShiftTrigger | undefined {
     for (let index = signals.length - 1; index >= 0; index -= 1) {
       const signal = signals[index];
       if (!signal || signal.kind !== 'TRAVELLER_INPUT') continue;
       const payload = signal.payload as Record<string, unknown>;
       if (payload['changeRequestId'] === undefined) continue;
-      const arriveBy = payload['arriveBy'];
-      if (typeof arriveBy === 'string' && arriveBy.length >= 10) {
-        return { kind: 'arriveBy', date: arriveBy.slice(0, 10) };
+
+      let target: ResolutionTarget | undefined;
+      const parsed = ResolutionTargetSchema.safeParse(payload['target']);
+      if (parsed.success) {
+        target = parsed.data;
+      } else {
+        // Legacy payloads carried only the two window fields; keep reading
+        // them so persisted signals stay interpretable.
+        const arriveBy = payload['arriveBy'];
+        const departAfter = payload['departAfter'];
+        if (typeof arriveBy === 'string' || typeof departAfter === 'string') {
+          target = {
+            objectiveEffects: [],
+            ...(typeof arriveBy === 'string' ? { arriveBy } : {}),
+            ...(typeof departAfter === 'string' ? { departAfter } : {}),
+          };
+        }
       }
-      const departAfter = payload['departAfter'];
-      if (typeof departAfter === 'string' && departAfter.length >= 10) {
-        return { kind: 'departAfter', date: departAfter.slice(0, 10) };
+      if (!target) continue;
+
+      const uncertaintyStatements: string[] = [];
+      if (target.transport?.preferDirect) {
+        uncertaintyStatements.push(
+          'transport.preferDirect requested: direct-flight ranking is not supported by this planner yet; the preference is recorded, not silently dropped',
+        );
       }
+      if (target.transport?.earliestDeparture !== undefined || target.transport?.latestDeparture !== undefined) {
+        uncertaintyStatements.push(
+          'transport departure bounds requested: earliest/latest departure filtering is not supported by this planner yet; the bounds are recorded, not silently dropped',
+        );
+      }
+      if (target.preferredStayProximityRef) {
+        uncertaintyStatements.push(
+          'stay proximity requested: no hotel search capability is composed yet; the proximity preference is recorded, not silently dropped',
+        );
+      }
+      for (const effect of target.objectiveEffects) {
+        uncertaintyStatements.push(
+          `objective effect requested for ${effect.objectiveId} (${effect.effect}): objective waivers are authority-gated state changes, never planner-authored; the request is recorded for the authority stage`,
+        );
+      }
+      return {
+        target,
+        actionable: target.arriveBy !== undefined || target.departAfter !== undefined,
+        uncertaintyStatements,
+      };
     }
     return undefined;
   }

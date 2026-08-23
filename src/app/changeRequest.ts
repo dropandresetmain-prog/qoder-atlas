@@ -225,11 +225,13 @@ export async function resolveChangeRequest(
     payload: {
       changeRequestId: request.id,
       intentKind: request.intentKind,
-      // Declarative window evidence for the shared planning loop: the
-      // Northstar planner branch reads these to re-search the affected leg.
-      // Absent deltas stay absent — never defaulted.
-      ...(request.target.arriveBy !== undefined ? { arriveBy: request.target.arriveBy } : {}),
-      ...(request.target.departAfter !== undefined ? { departAfter: request.target.departAfter } : {}),
+      // The COMPLETE declarative ResolutionTarget travels into the shared
+      // planning loop (REV-2 WP-R3): every dimension — window shifts,
+      // transport attributes, stay proximity, objective effects — reaches
+      // the planner, which acts on what it can and records explicit
+      // uncertainty for the rest. Partial forwarding silently dropped the
+      // non-window dimensions; silence is the defect.
+      target: request.target,
     },
   });
   await deps.signals.saveSignal(signal);
