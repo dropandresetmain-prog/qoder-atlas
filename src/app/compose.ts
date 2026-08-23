@@ -32,6 +32,7 @@ import { FileRecordingStore } from '../providers/recordingStore.ts';
 import { ModelStudioClient } from '../intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../intelligence/planner.ts';
 import { DeterministicFallbackPlanner } from '../intelligence/fallbackPlanner.ts';
+import { NorthstarPlanner } from '../intelligence/northstarPlanner.ts';
 import type { CapabilityDescriptor } from '../contracts/capabilities.ts';
 import type { RecoveryPlanner } from '../contracts/planner.ts';
 import type { DatabaseSync } from 'node:sqlite';
@@ -132,7 +133,9 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     baseUrl: config.providers.atlas.baseUrl,
     clientId: config.providers.atlas.clientId,
     clientSecret: config.providers.atlas.clientSecret,
-    timezoneResolver: await buildTimezoneResolver(entities)(),
+    // Lazy: Northstar programme intake may promote airport places AFTER boot;
+    // normalization must stay honest against current authoritative state.
+    timezoneResolverFactory: buildTimezoneResolver(entities),
   });
   const routing = new GoogleRoutesAdapter({
     mode: config.adapterMode,
@@ -148,9 +151,12 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     model: config.providers.modelStudio.model,
     baseUrl: config.providers.modelStudio.baseUrl,
   });
-  const planner: RecoveryPlanner = modelClient.isConfigured()
+  const basePlanner: RecoveryPlanner = modelClient.isConfigured()
     ? new ModelStudioRecoveryPlanner({ client: modelClient })
     : new DeterministicFallbackPlanner();
+  // Northstar branches (initial planning, window shift) wrap the base
+  // planner; everything else flows through the shared I3 loop.
+  const planner: RecoveryPlanner = new NorthstarPlanner(basePlanner);
 
   const orchestrator = new RuntimeOrchestrator({
     db: database,

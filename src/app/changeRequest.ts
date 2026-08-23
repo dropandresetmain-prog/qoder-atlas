@@ -222,7 +222,15 @@ export async function resolveChangeRequest(
       ? { subjectRef: { entityType: 'TRAVELLER', id: request.travellerId } satisfies EntityRef }
       : {}),
     summary: `ChangeRequest ${request.id} (${request.intentKind}/${request.urgency}): ${request.utterance ?? 'declarative target deltas'}`,
-    payload: { changeRequestId: request.id, intentKind: request.intentKind },
+    payload: {
+      changeRequestId: request.id,
+      intentKind: request.intentKind,
+      // Declarative window evidence for the shared planning loop: the
+      // Northstar planner branch reads these to re-search the affected leg.
+      // Absent deltas stay absent — never defaulted.
+      ...(request.target.arriveBy !== undefined ? { arriveBy: request.target.arriveBy } : {}),
+      ...(request.target.departAfter !== undefined ? { departAfter: request.target.departAfter } : {}),
+    },
   });
   await deps.signals.saveSignal(signal);
 

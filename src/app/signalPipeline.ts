@@ -10,7 +10,7 @@
  * timestamped from signal evidence, never a wall clock.
  */
 import type { EntityId, Fact, IsoDateTime } from '../domain/common.ts';
-import { IsoDateTimeSchema } from '../domain/common.ts';
+import { EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
 import type { Trip } from '../domain/trip.ts';
 import { ReservationStateSchema } from '../domain/elements.ts';
 import { TripSignalSchema, type TripSignal } from '../operational/signal.ts';
@@ -245,6 +245,51 @@ export function signalMutationOperations(signal: TripSignal, trip: Trip): Mutati
         });
       }
       return operations;
+    }
+    case 'ANCHOR_COMMITMENT_CHANGE': {
+      if (element.elementKind !== 'ENGAGEMENT') return [];
+      if (signal.authority !== 'AUTHORITATIVE' && signal.authority !== 'CONNECTED') return [];
+      if (signal.payload['changeKind'] === 'CANCELLED') {
+        if (element.reservationState === 'CANCELLED') return [];
+        return [
+          {
+            op: 'UPSERT_ENTITY',
+            entityType: 'TRIP_ELEMENT',
+            id: element.id,
+            data: { ...element, reservationState: 'CANCELLED' },
+          },
+        ];
+      }
+      let data = { ...element.data };
+      let changed = false;
+      for (const [field, payloadKey] of [['startsAt', 'newStartsAt'], ['endsAt', 'newEndsAt']] as const) {
+        const parsed = IsoDateTimeSchema.safeParse(signal.payload[payloadKey]);
+        if (!parsed.success) continue;
+        const fact: Fact<IsoDateTime> = {
+          value: parsed.data,
+          sourceId: signal.sourceId,
+          authority: signal.authority,
+          observedAt,
+        };
+        data = { ...data, [field]: fact };
+        changed = true;
+      }
+      if (typeof signal.payload['newPlaceId'] === 'string') {
+        const parsed = EntityIdSchema.safeParse(signal.payload['newPlaceId']);
+        if (parsed.success && parsed.data !== element.data.placeId) {
+          data = { ...data, placeId: parsed.data };
+          changed = true;
+        }
+      }
+      if (!changed) return [];
+      return [
+        {
+          op: 'UPSERT_ENTITY',
+          entityType: 'TRIP_ELEMENT',
+          id: element.id,
+          data: { ...element, data },
+        },
+      ];
     }
     default:
       // Signals without a deterministic state implication (weather, operator

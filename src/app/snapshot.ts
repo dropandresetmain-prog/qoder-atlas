@@ -68,7 +68,7 @@ export async function buildTripSnapshot(
     if (entry && entry.entityType === 'ORGANISATION') organisations.push(entry.entity);
   }
 
-  const placeIds = collectPlaceIds(trip, anchorEvent);
+  const placeIds = collectPlaceIds(trip, anchorEvent, travellers);
   const places: Place[] = [];
   for (const placeId of [...placeIds].sort()) {
     const entry = await deps.entities.get('PLACE', placeId);
@@ -104,8 +104,8 @@ export async function buildTripSnapshot(
   });
 }
 
-/** Places referenced by the trip's elements or its anchor event. */
-function collectPlaceIds(trip: Trip, anchorEvent: AnchorEvent | undefined): Set<EntityId> {
+/** Places referenced by the trip's elements, its anchor event, or travellers' homes. */
+function collectPlaceIds(trip: Trip, anchorEvent: AnchorEvent | undefined, travellers: Traveller[]): Set<EntityId> {
   const ids = new Set<EntityId>();
   for (const element of trip.elements) {
     if (element.elementKind === 'TRANSPORT_LEG') {
@@ -118,6 +118,11 @@ function collectPlaceIds(trip: Trip, anchorEvent: AnchorEvent | undefined): Set<
     }
   }
   if (anchorEvent?.placeId) ids.add(anchorEvent.placeId);
+  // Northstar initial planning needs traveller home-airport evidence; home
+  // places are authoritative Place evidence, not planner guesses.
+  for (const traveller of travellers) {
+    if (traveller.homePlaceId) ids.add(traveller.homePlaceId);
+  }
   return ids;
 }
 

@@ -208,6 +208,19 @@ export class ProgrammeService {
       ...(traveller.notes.length > 0 ? { communicationPreference: traveller.notes.join('; ') } : {}),
     };
 
+    // Home-airport linkage (Northstar initial planning evidence): an exact,
+    // unambiguous match between homeLocationText and an authoritative AIRPORT
+    // place (airport-code ref or place name) links the traveller home.
+    // Anything else stays missing — never guessed.
+    if (traveller.homeLocationText) {
+      const home = await this.resolveHomeAirport(traveller.homeLocationText);
+      if (home === 'AMBIGUOUS') {
+        issues.push('home location matches more than one known airport; refusing to guess which one');
+      } else if (home) {
+        travellerEntity.homePlaceId = home;
+      }
+    }
+
     // Commitment linkage: draft ids must exist on the programme's event.
     const validCommitmentIds: EntityId[] = [];
     for (const commitmentId of traveller.anchorCommitmentIds) {
@@ -320,6 +333,29 @@ export class ProgrammeService {
       ...(outcome.accepted ? { travellerId, tripId: resolvedTripId } : {}),
       issues: [...issues, ...outcome.issues.map((issue) => `${issue.code}: ${issue.message}`)],
     };
+  }
+
+  /**
+   * Match free-form home location text against authoritative AIRPORT places.
+   * Exact case-insensitive match on an airport-code external ref or the place
+   * name. Ambiguous matches refuse; no match stays missing (anti-fabrication).
+   */
+  private async resolveHomeAirport(homeLocationText: string): Promise<EntityId | 'AMBIGUOUS' | undefined> {
+    const wanted = homeLocationText.trim().toLowerCase();
+    if (wanted === '') return undefined;
+    const airports = (await this.deps.entities.list('PLACE'))
+      .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
+      .map((entry) => entry.entity)
+      .filter((place) => place.kind === 'AIRPORT');
+    const matches = airports.filter((place) => {
+      if (place.name && place.name.trim().toLowerCase() === wanted) return true;
+      return place.externalRefs.some(
+        (ref) => ref.system === 'airport-code' && ref.value.trim().toLowerCase() === wanted,
+      );
+    });
+    if (matches.length === 0) return undefined;
+    if (matches.length > 1) return 'AMBIGUOUS';
+    return matches[0]?.id;
   }
 
   private async resolveExistingTraveller(
@@ -472,7 +508,13 @@ export async function prepareCommitmentFanOut(
           tripId: trip.id,
           subjectRef: { entityType: 'TRIP_ELEMENT', id: engagement.id },
           summary: payload.summary ?? `shared commitment ${payload.changeKind.toLowerCase()} affecting engagement ${engagement.id}`,
-          payload: { commitmentId: payload.commitmentId, changeKind: payload.changeKind },
+          payload: {
+            commitmentId: payload.commitmentId,
+            changeKind: payload.changeKind,
+            ...(payload.newStartsAt ? { newStartsAt: payload.newStartsAt } : {}),
+            ...(payload.newEndsAt ? { newEndsAt: payload.newEndsAt } : {}),
+            ...(payload.newPlaceId ? { newPlaceId: payload.newPlaceId } : {}),
+          },
         }),
       );
     }

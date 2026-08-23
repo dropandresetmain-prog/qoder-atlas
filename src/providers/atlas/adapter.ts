@@ -52,6 +52,12 @@ export interface AtlasAdapterOptions {
    * application from its authoritative place data.
    */
   timezoneResolver?: AtlasTimezoneResolver;
+  /**
+   * Lazy variant: resolved at call time against current authoritative state
+   * (Northstar programme places may be promoted after adapter construction).
+   * `timezoneResolver` wins when both are present.
+   */
+  timezoneResolverFactory?: () => Promise<AtlasTimezoneResolver | undefined>;
 }
 
 export class AtlasFlightAdapter implements FlightCapability {
@@ -64,6 +70,7 @@ export class AtlasFlightAdapter implements FlightCapability {
   private readonly timeoutMs?: number;
   private readonly fetchImpl?: typeof fetch;
   private readonly timezoneResolver?: AtlasTimezoneResolver;
+  private readonly timezoneResolverFactory?: () => Promise<AtlasTimezoneResolver | undefined>;
   /** Passenger counts per offer, remembered from search for verify pricing. */
   private readonly offerPassengers = new Map<string, PassengerCounts>();
 
@@ -76,6 +83,7 @@ export class AtlasFlightAdapter implements FlightCapability {
     this.timeoutMs = options.timeoutMs;
     this.fetchImpl = options.fetchImpl;
     this.timezoneResolver = options.timezoneResolver;
+    this.timezoneResolverFactory = options.timezoneResolverFactory;
     this.descriptor = {
       family: 'FLIGHT',
       providerId: ATLAS_PROVIDER_ID,
@@ -94,6 +102,9 @@ export class AtlasFlightAdapter implements FlightCapability {
       ...(query.passengers.children === undefined ? {} : { children: query.passengers.children }),
       ...(query.passengers.infants === undefined ? {} : { infants: query.passengers.infants }),
     };
+    // Lazy timezone evidence: authoritative places promoted after construction
+    // (e.g. Northstar programme intake) must still normalize honestly.
+    const timezoneResolver = this.timezoneResolver ?? (await this.resolveTimezones());
     const adapter: ProviderAdapter<FlightSearchQuery, AtlasSearchBody, FlightSearchOutcome> = {
       providerId: ATLAS_PROVIDER_ID,
       mode: this.mode,
@@ -110,7 +121,7 @@ export class AtlasFlightAdapter implements FlightCapability {
         });
         return AtlasSearchBodySchema.parse(body);
       },
-      normalize: (raw) => normalizeSearch(raw, passengers, this.timezoneResolver),
+      normalize: (raw) => normalizeSearch(raw, passengers, timezoneResolver),
     };
 
     const result = await runAdapter(adapter, this.store, query, {
@@ -189,6 +200,16 @@ export class AtlasFlightAdapter implements FlightCapability {
 
   private secrets(): string[] {
     return [this.clientId, this.clientSecret].filter((value): value is string => typeof value === 'string');
+  }
+
+  /** Resolve lazy timezone evidence; a resolver failure is empty evidence. */
+  private async resolveTimezones(): Promise<AtlasTimezoneResolver | undefined> {
+    if (!this.timezoneResolverFactory) return undefined;
+    try {
+      return await this.timezoneResolverFactory();
+    } catch {
+      return undefined;
+    }
   }
 }
 
