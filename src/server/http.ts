@@ -22,6 +22,8 @@ import { renderOperatorDashboardBody } from '../ui/screens/operator-dashboard.ts
 import { renderCaseDetailBody, renderCaseDetail } from '../ui/screens/operator-case.ts';
 import { renderProgramme } from '../ui/screens/operator-programme.ts';
 import { renderTravellerTrip } from '../ui/screens/traveller.ts';
+import type { TravellerPresentation } from '../ui/traveller-presentation.ts';
+import { SettleTracker, addClassToTagsContaining } from './settle.ts';
 
 export interface HealthView {
   status: 'ok';
@@ -101,6 +103,12 @@ export interface AppEndpoints {
   operatorDashboard(at: IsoDateTime): Promise<OperatorDashboardView>;
   caseDetail(caseId: EntityId, at: IsoDateTime): Promise<CaseDetailView | undefined>;
   travellerTrip(tripId: EntityId, at: IsoDateTime): Promise<TravellerTripView | undefined>;
+  /**
+   * Kimi handoff item 2: optional per-trip presentation (commitment card,
+   * option details keyed by the exact option strings, contact). Projected
+   * from authoritative state by the integrator; absent = plain-language page.
+   */
+  travellerPresentation?(tripId: EntityId, at: IsoDateTime): Promise<TravellerPresentation | undefined>;
   firstTripId(): Promise<EntityId | undefined>;
   travellerDecision(
     caseId: EntityId,
@@ -153,8 +161,11 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 export function createAppServer(config: AppConfig, endpoints?: AppEndpoints): Server {
+  // DESIGN.md §6.1: the settle animation fires only when a re-render carries
+  // a changed value — tracked here across renders of the same server.
+  const settle = new SettleTracker();
   return createServer((req: IncomingMessage, res: ServerResponse) => {
-    void handle(config, endpoints, req, res).catch((error) => {
+    void handle(config, endpoints, settle, req, res).catch((error) => {
       sendJson(res, 500, { error: 'internal', message: error instanceof Error ? error.message : String(error) });
     });
   });
@@ -163,6 +174,7 @@ export function createAppServer(config: AppConfig, endpoints?: AppEndpoints): Se
 async function handle(
   config: AppConfig,
   endpoints: AppEndpoints | undefined,
+  settle: SettleTracker,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -199,7 +211,26 @@ async function handle(
   // --- Operator HTML surfaces -------------------------------------------
   if (req.method === 'GET' && url.pathname === '/operator') {
     const view = await endpoints.operatorDashboard(endpoints.now());
-    const body = renderOperatorDashboardBody(view);
+    let body = renderOperatorDashboardBody(view);
+    // DESIGN.md §6.1 settle: trip status changes (and new trips) settle;
+    // unchanged values render without the marker — no fake animation.
+    const statusByTrip = new Map(view.trips.map((trip) => [trip.tripId, trip.status]));
+    const changedKeys = settle.diffAndRecord(
+      new Map([
+        ['operator:onTrack', String(view.trips.filter((t) => t.status === 'READY' || t.status === 'RESOLVED').length)],
+        ...view.trips.map((trip) => [`operator:trip:${trip.tripId}`, trip.status] as const),
+      ]),
+    );
+    for (const key of changedKeys) {
+      const tripId = key.startsWith('operator:trip:') ? key.slice('operator:trip:'.length) : undefined;
+      const status = tripId ? statusByTrip.get(tripId) : undefined;
+      if (tripId && status) {
+        // Fleet cell (data-fleet-trip) and roster row (data-trip-id) settle
+        // together — one trip, both of its dashboard incarnations.
+        body = addClassToTagsContaining(body, `data-fleet-trip="${tripId}"`, 'just-changed');
+        body = addClassToTagsContaining(body, `data-trip-id="${tripId}"`, 'just-changed');
+      }
+    }
     sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: PAGE_LINKS }, body));
     return;
   }
@@ -248,9 +279,22 @@ async function handle(
     const at = endpoints.now();
     const tripId = url.searchParams.get('trip') ?? (await endpoints.firstTripId());
     const view = tripId ? await endpoints.travellerTrip(tripId, at) : undefined;
-    const body = renderTravellerTrip(
+    const presentation =
+      view && tripId && endpoints.travellerPresentation
+        ? await endpoints.travellerPresentation(tripId, at)
+        : undefined;
+    let body = renderTravellerTrip(
       view ? { state: 'LOADED', data: view, generatedAt: at } : { state: 'ERROR', errorMessage: 'No trip is being managed yet', generatedAt: at },
+      presentation,
     );
+    // DESIGN.md §6.1 settle: the status block settles only when the trip's
+    // status actually changed since the previous render of this surface.
+    if (view && tripId) {
+      const changed = settle.diffAndRecord(new Map([[`traveller:trip:${tripId}:status`, view.status]]));
+      if (changed.length > 0) {
+        body = addClassToTagsContaining(body, `data-status="${view.status}"`, 'just-changed');
+      }
+    }
     sendHtml(
       res,
       view ? 200 : 404,
@@ -373,6 +417,11 @@ async function handle(
       case 'execute':
       case 'reset': {
         const outcome = await handlers[action](parsed);
+        // A reset starts a clean board: nothing on the re-seeded baseline
+        // "changed" relative to the wiped state, so settle memory clears.
+        // Scoped to the reset action only — the block above is shared by all
+        // six runtime actions and settle memory must survive the others.
+        if (action === 'reset' && outcome.status === 200) settle.reset();
         sendJson(res, outcome.status, outcome.body);
         return;
       }

@@ -41,6 +41,8 @@ import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate } from './planningLoop.ts';
 import { describeAllocation } from '../engine/funding.ts';
+import { projectCaseChain } from './chain.ts';
+import type { AnchorEvent, Place } from '../domain/entities.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -348,7 +350,9 @@ export async function projectCaseDetail(
       ...(decision && decision.outcome !== 'AUTO_APPROVED' ? { requiresApproval: true } : {}),
       // Mixed funding (ADR-037): the deterministic allocation persisted on
       // the intent — projected verbatim, never re-derived in the view.
-      ...(intent?.costAllocation ? { costAllocation: intent.costAllocation } : {}),
+      ...(intent?.costAllocation
+        ? { costAllocation: intent.costAllocation, costAllocationSummary: describeAllocation(intent.costAllocation) }
+        : {}),
     });
   }
 
@@ -416,6 +420,19 @@ export async function projectCaseDetail(
     .map((ref) => trip.objectives.find((o) => o.id === ref)?.statement)
     .filter((statement): statement is string => Boolean(statement));
 
+  // Journey chain (DESIGN.md §4.2): every trip element projected from its
+  // own reservation/health evidence + case impact; never fabricated.
+  const places = new Map<string, Place>();
+  for (const entry of await deps.snapshot.entities.list('PLACE')) {
+    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
+  }
+  let anchorEvent: AnchorEvent | undefined;
+  if (trip.anchorEventId) {
+    const entry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
+    if (entry?.entityType === 'ANCHOR_EVENT') anchorEvent = entry.entity;
+  }
+  const chain = projectCaseChain(trip, recoveryCase, { places, ...(anchorEvent ? { anchorEvent } : {}) });
+
   return {
     caseId: recoveryCase.id,
     tripId: trip.id,
@@ -428,6 +445,7 @@ export async function projectCaseDetail(
       .filter((element): element is TripElement => Boolean(element))
       .map(describeElement),
     ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
+    ...(chain ? { chain } : {}),
     checks,
     options,
     ...(approval ? { approval } : {}),

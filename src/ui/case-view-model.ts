@@ -47,6 +47,11 @@ export interface RecoveryOptionView {
    * means allocation is UNKNOWN — never silently event-funded.
    */
   costAllocation?: CostAllocation;
+  /**
+   * User-facing one-liner for costAllocation (projected by the read model
+   * from the same allocation — the renderer stays a pure function of data).
+   */
+  costAllocationSummary?: string;
 }
 
 export interface ApprovalRequirementView {

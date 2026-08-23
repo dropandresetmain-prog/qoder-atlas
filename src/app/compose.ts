@@ -22,6 +22,7 @@ import {
 } from '../persistence/repositories.ts';
 import { SqliteEntityStore } from '../persistence/entityStore.ts';
 import { SqlMutationService } from '../engine/mutation.ts';
+import { ImpactEngine } from '../engine/impact.ts';
 import { OverlayViabilityEngine } from '../engine/overlay.ts';
 import { BoundaryExecutor } from '../engine/executor.ts';
 import { DeterministicAuthorityEngine, ruleSetSource } from '../engine/authority.ts';
@@ -61,6 +62,8 @@ import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
+import { latestCaseFor } from './readmodels.ts';
+import { projectTravellerPresentation } from './travellerPresentation.ts';
 
 export interface ComposedRuntime {
   db: DatabaseSync;
@@ -227,6 +230,59 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     operatorDashboard: (at) => projectOperatorDashboard(readDeps, at),
     caseDetail: (caseId, at) => projectCaseDetail(readDeps, caseId, at),
     travellerTrip: (tripId, at) => projectTravellerTrip(readDeps, tripId, at),
+    // Kimi handoff item 2: the concierge presentation is projected from the
+    // SAME authoritative state the read models use — commitment card from
+    // engagement/commitment evidence, option details keyed by the exact
+    // 'Approve'/'Decline' option strings the trip view emits.
+    travellerPresentation: async (tripId) => {
+      const trip = await trips.getTrip(tripId);
+      if (!trip) return undefined;
+      const recoveryCase = await latestCaseFor(cases, tripId);
+      // Planning-time verdicts are the honest feasibility evidence for the
+      // pending option (same persisted source the case view uses).
+      const planningAudit = await audit.query({ action: 'PLANNING_COMPLETED', subject: tripId });
+      const latestPlanning = planningAudit[planningAudit.length - 1];
+      const verdicts = new Map<string, { feasible: boolean; rejectionReasons: string[] }>();
+      const rawVerdicts = latestPlanning?.payload['candidateVerdicts'];
+      if (Array.isArray(rawVerdicts)) {
+        for (const entry of rawVerdicts) {
+          if (
+            entry &&
+            typeof entry === 'object' &&
+            typeof (entry as { strategyId?: unknown }).strategyId === 'string' &&
+            typeof (entry as { feasible?: unknown }).feasible === 'boolean'
+          ) {
+            const verdict = entry as { strategyId: string; feasible: boolean; rejectionReasons?: unknown };
+            verdicts.set(verdict.strategyId, {
+              feasible: verdict.feasible,
+              rejectionReasons: Array.isArray(verdict.rejectionReasons)
+                ? verdict.rejectionReasons.filter((reason): reason is string => typeof reason === 'string')
+                : [],
+            });
+          }
+        }
+      }
+      const criticalObjectiveAtRisk = await (async () => {
+        const assessment = await new ImpactEngine({ trips, signals, entities }).assess(tripId);
+        for (const threatened of assessment.threatenedObjectives) {
+          const objective = trip.objectives.find((candidate) => candidate.id === threatened.objectiveId);
+          if (objective?.hardness === 'HARD') return objective.statement;
+        }
+        return undefined;
+      })();
+      return projectTravellerPresentation(
+        {
+          entities,
+          verdictFor: (strategyId) => verdicts.get(strategyId),
+          ...(latestPlanning?.payload['bestStrategyId'] !== undefined
+            ? { bestStrategyId: latestPlanning.payload['bestStrategyId'] as string }
+            : {}),
+        },
+        trip,
+        recoveryCase,
+        criticalObjectiveAtRisk,
+      );
+    },
     firstTripId: async () => (await trips.listTrips())[0]?.tripId,
     travellerDecision: async (caseId, body, at) => {
       const outcome = await settleTravellerDecision(

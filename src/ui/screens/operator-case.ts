@@ -142,6 +142,9 @@ function optionCard(option: RecoveryOptionView): string {
       })()
     : '';
   const approval = option.requiresApproval ? '<span class="chip">Needs approval</span>' : '';
+  const allocation = option.costAllocationSummary
+    ? `<span class="chip">${escapeHtml(option.costAllocationSummary)}</span>`
+    : '';
   const rejection = option.rejectionReason
     ? `<p class="rejection"><strong>Why not:</strong> ${escapeHtml(option.rejectionReason)}</p>`
     : '';
@@ -153,7 +156,7 @@ function optionCard(option: RecoveryOptionView): string {
       ${verdict}
     </div>
     ${summary}
-    <div class="option-meta">${cost}${approval}</div>
+    <div class="option-meta">${cost}${approval}${allocation}</div>
     ${rejection}
   </div>`;
 }
