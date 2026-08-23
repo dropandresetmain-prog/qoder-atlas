@@ -217,6 +217,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
       signals,
       cases,
       audit,
+      modelClient,
     }),
   };
 

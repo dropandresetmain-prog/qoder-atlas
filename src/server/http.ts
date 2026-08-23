@@ -9,11 +9,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AppConfig } from '../config/config.ts';
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
-import type { OperatorDashboardView, TravellerTripView } from '../contracts/readmodels.ts';
+import type { OperatorDashboardView, ProgrammeView, TravellerTripView } from '../contracts/readmodels.ts';
 import type { CaseDetailView } from '../ui/case-view-model.ts';
 import { renderPage } from '../ui/page.ts';
 import { renderOperatorDashboardBody } from '../ui/screens/operator-dashboard.ts';
 import { renderCaseDetailBody, renderCaseDetail } from '../ui/screens/operator-case.ts';
+import { renderProgramme } from '../ui/screens/operator-programme.ts';
 import { renderTravellerTrip } from '../ui/screens/traveller.ts';
 
 export interface HealthView {
@@ -62,6 +63,8 @@ export interface ProgrammeHandlers {
   applyContext(body: unknown): Promise<{ status: number; body: unknown }>;
   intakeImport(body: unknown): Promise<{ status: number; body: unknown }>;
   commitmentChange(body: unknown): Promise<{ status: number; body: unknown }>;
+  mapRoster(body: unknown): Promise<{ status: number; body: unknown }>;
+  mapBrief(body: unknown): Promise<{ status: number; body: unknown }>;
 }
 
 /** Application endpoints the HTTP surface projects; wired by the integrator. */
@@ -174,6 +177,36 @@ async function handle(
       ? renderCaseDetailBody(view)
       : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${segments[2]} is known`, generatedAt: at });
     sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: PAGE_LINKS }, body));
+    return;
+  }
+
+  // --- Programme HTML surface (Northstar RV-N10) --------------------------
+  if (req.method === 'GET' && url.pathname === '/programme') {
+    if (!endpoints.programme) {
+      sendJson(res, 404, { error: 'not_found', path: url.pathname });
+      return;
+    }
+    const at = url.searchParams.get('at') ?? endpoints.now();
+    const eventId = url.searchParams.get('event');
+    const outcome = eventId
+      ? await endpoints.programme.view({ anchorEventId: eventId, at })
+      : { status: 400, body: { error: 'missing_event_param' } };
+    const body =
+      outcome.status === 200
+        ? renderProgramme({ state: 'LOADED', data: outcome.body as ProgrammeView, generatedAt: at })
+        : renderProgramme({
+            state: 'ERROR',
+            errorMessage:
+              outcome.status === 404
+                ? `No programme is known for event ${eventId ?? ''}.`
+                : 'The programme could not be loaded: the request was invalid.',
+            generatedAt: at,
+          });
+    sendHtml(
+      res,
+      outcome.status === 200 ? 200 : outcome.status === 404 ? 404 : 400,
+      renderPage({ title: 'Programme', active: 'dashboard', links: PAGE_LINKS }, body),
+    );
     return;
   }
 
@@ -313,6 +346,16 @@ async function handle(
     }
     if (segments[2] === 'commitment-change') {
       const outcome = await handlers.commitmentChange(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'map-roster') {
+      const outcome = await handlers.mapRoster(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'map-brief') {
+      const outcome = await handlers.mapBrief(parsed);
       sendJson(res, outcome.status, outcome.body);
       return;
     }

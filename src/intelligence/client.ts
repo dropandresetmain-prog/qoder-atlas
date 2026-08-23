@@ -264,6 +264,23 @@ export class ModelStudioClient {
     return this.apiKey !== undefined && this.apiKey !== '';
   }
 
+  /**
+   * Raw completion passthrough for seams that perform their own JSON/schema
+   * validation (e.g. programme intake extraction). Fails closed in LIVE mode
+   * when no credentials are configured — never reaches the network.
+   */
+  async complete(request: CompletionRequest, timeoutMs: number): Promise<CompletionResponse> {
+    if (!this.isConfigured() && this.transport.mode === 'LIVE') {
+      throw new ModelTransportError(
+        'NOT_CONFIGURED',
+        'model_studio_credentials_missing',
+        'Model Studio credentials are not configured',
+        false,
+      );
+    }
+    return this.transport.complete(request, timeoutMs);
+  }
+
   /** Transport mode (LIVE vs REPLAY) for capability descriptors/meta. */
   get mode(): 'LIVE' | 'REPLAY' {
     return this.transport.mode;

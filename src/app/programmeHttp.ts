@@ -17,6 +17,9 @@ import { RuleSetSchema } from '../domain/rules.ts';
 import type { ProgrammeService } from './programme.ts';
 import { processCommitmentChange, intakeUncertainties } from './programme.ts';
 import { projectProgrammeView } from './programmeReadmodel.ts';
+import { mapEventBriefWithModel, mapRosterWithModel } from '../intelligence/programmeExtraction.ts';
+import type { ModelClientLike } from '../intelligence/programmeExtraction.ts';
+import { recognizedPolicyClausesToRuleSet } from '../ingest/programmeClauses.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
 import type { SignalRepository, CaseRepository, TripRepository } from '../contracts/repositories.ts';
 import type { MutationService } from '../contracts/services.ts';
@@ -32,6 +35,12 @@ export interface ProgrammeHandlerDeps {
   signals: SignalRepository;
   cases: CaseRepository;
   audit: AuditRepository;
+  /**
+   * Optional Model Studio seam for LLM-assisted intake mapping (RV-N2). When
+   * absent the mapping endpoints fail closed with 503; drafts produced here
+   * never promote state — they still flow through the intake import contract.
+   */
+  modelClient?: ModelClientLike;
 }
 
 type WireResult = { status: number; body: unknown };
@@ -59,6 +68,13 @@ const CommitmentChangeBodySchema = z.strictObject({
   signal: TripSignalSchema,
 });
 
+const MappingBodySchema = z.strictObject({
+  content: z.string().min(1),
+  at: IsoDateTimeSchema,
+  sourceId: EntityIdSchema,
+  timezone: z.string().optional(),
+});
+
 function invalid(error: z.ZodError): WireResult {
   return {
     status: 400,
@@ -74,6 +90,8 @@ export function createProgrammeHandlers(deps: ProgrammeHandlerDeps): {
   applyContext(body: unknown): Promise<WireResult>;
   intakeImport(body: unknown): Promise<WireResult>;
   commitmentChange(body: unknown): Promise<WireResult>;
+  mapRoster(body: unknown): Promise<WireResult>;
+  mapBrief(body: unknown): Promise<WireResult>;
 } {
   return {
     async view(params) {
@@ -147,6 +165,63 @@ export function createProgrammeHandlers(deps: ProgrammeHandlerDeps): {
             caseStatus: processed.caseStatus,
           })),
           issues: outcome.issues,
+        },
+      };
+    },
+
+    /**
+     * LLM-assisted roster mapping (RV-N2). Drafts only — nothing is promoted
+     * here; the caller posts the drafts back through /api/programme/import.
+     */
+    async mapRoster(body) {
+      const parsed = MappingBodySchema.safeParse(body);
+      if (!parsed.success) return invalid(parsed.error);
+      if (!deps.modelClient) {
+        return { status: 503, body: { error: 'model_client_unavailable' } };
+      }
+      const result = await mapRosterWithModel(deps.modelClient, {
+        content: parsed.data.content,
+        at: parsed.data.at,
+      });
+      if (!result.ok) {
+        return { status: 422, body: { error: 'mapping_failed', reason: result.reason } };
+      }
+      return {
+        status: 200,
+        body: { drafts: result.drafts, unresolvedStatements: result.unresolvedStatements },
+      };
+    },
+
+    /**
+     * LLM-assisted event brief mapping (RV-N2). Extraction only; recognized
+     * clauses pass straight through the deterministic clause adapter — the
+     * returned ruleSet is a proposal, never applied to state here.
+     */
+    async mapBrief(body) {
+      const parsed = MappingBodySchema.safeParse(body);
+      if (!parsed.success) return invalid(parsed.error);
+      if (!deps.modelClient) {
+        return { status: 503, body: { error: 'model_client_unavailable' } };
+      }
+      const result = await mapEventBriefWithModel(deps.modelClient, {
+        content: parsed.data.content,
+        at: parsed.data.at,
+      });
+      if (!result.ok) {
+        return { status: 422, body: { error: 'mapping_failed', reason: result.reason } };
+      }
+      const clauseOutcome = recognizedPolicyClausesToRuleSet({
+        clauses: result.value.policyClauses,
+        ruleSetId: `rs-brief-${parsed.data.sourceId}`,
+        sourceId: parsed.data.sourceId,
+        ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
+      });
+      return {
+        status: 200,
+        body: {
+          event: result.value,
+          ...(clauseOutcome.ruleSet ? { ruleSet: clauseOutcome.ruleSet } : {}),
+          uncertainties: clauseOutcome.uncertainties.map((u) => u.statement),
         },
       };
     },
