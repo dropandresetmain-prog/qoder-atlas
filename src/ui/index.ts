@@ -6,6 +6,7 @@
 export * from './copy.ts';
 export * from './state-inventory.ts';
 export * from './case-view-model.ts';
+export * from './traveller-presentation.ts';
 export * from './html.ts';
 export * from './components.ts';
 export * from './page.ts';

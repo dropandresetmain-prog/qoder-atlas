@@ -21,6 +21,7 @@ import type {
 } from '../../contracts/readmodels.ts';
 import type { IsoDateTime } from '../../domain/common.ts';
 import type { CaseDetailView } from '../case-view-model.ts';
+import type { TravellerPresentation } from '../traveller-presentation.ts';
 
 export const UI_FIXTURE_NOW: IsoDateTime = '2026-09-14T09:30:00+08:00';
 
@@ -657,6 +658,12 @@ export const caseWithRejectedOption: CaseDetailView = {
   whatChanged: 'The flight on 15 September was cancelled by the airline.',
   affectedItems: ['Airport transfer', 'Hotel arrival window', 'Speaking slot on 16 September'],
   criticalObjectiveAtRisk: 'Speaking slot on 16 September at 09:00 — this cannot move.',
+  chain: [
+    { id: 'leg-out', kind: 'Flight', label: 'Flight on 15 September', detail: 'Cancelled by the airline', state: 'BROKEN' },
+    { id: 'leg-transfer', kind: 'Transfer', label: 'Airport transfer', detail: 'Pickup no longer matches any arrival', state: 'BROKEN' },
+    { id: 'leg-hotel', kind: 'Stay', label: 'Hotel · 2 nights', detail: 'Check-in against a new arrival is unconfirmed', state: 'UNKNOWN' },
+    { id: 'leg-slot', kind: 'Commitment', label: 'Speaking slot · 16 Sep 09:00', detail: 'Fixed — this cannot move', state: 'AT_RISK', commitment: true },
+  ],
   checks: [
     { id: 'chk-arrival', label: 'New arrival is before the speaking slot', result: 'PASS' },
     { id: 'chk-transfer', label: 'Enough time from the airport to the hotel', result: 'PASS' },
@@ -772,6 +779,12 @@ export const caseRecoveringActions: CaseDetailView = {
   status: 'RECOVERING',
   whatChanged: 'The return flight was rescheduled and no longer connects.',
   affectedItems: ['Return flight', 'Airport transfer'],
+  chain: [
+    { id: 'leg-stay', kind: 'Stay', label: 'Hotel · 3 nights', detail: 'Unaffected', state: 'CONFIRMED' },
+    { id: 'leg-return', kind: 'Flight', label: 'Return flight · 18 September', detail: 'Replacement approved, being booked', state: 'PROPOSED' },
+    { id: 'leg-transfer', kind: 'Transfer', label: 'Airport transfer', detail: 'Queued for rebooking against the new flight', state: 'UNBOOKED' },
+    { id: 'leg-home', kind: 'Commitment', label: 'Home before the Monday board meeting', detail: 'Fixed', state: 'AT_RISK', commitment: true },
+  ],
   checks: [
     { id: 'chk-return', label: 'Replacement return connects in time', result: 'PASS' },
   ],
@@ -807,6 +820,12 @@ export const caseResolvedFully: CaseDetailView = {
   status: 'RESOLVED',
   whatChanged: 'The original flight was cancelled; a replacement was booked and confirmed.',
   affectedItems: ['Airport transfer', 'Hotel arrival window'],
+  chain: [
+    { id: 'leg-flight', kind: 'Flight', label: 'Replacement flight · arrives 07:10', detail: 'Booked and confirmed', state: 'CONFIRMED' },
+    { id: 'leg-transfer', kind: 'Transfer', label: 'Airport transfer', detail: 'Updated to the new arrival', state: 'CONFIRMED' },
+    { id: 'leg-hotel', kind: 'Stay', label: 'Hotel · arrival window', detail: 'Updated', state: 'CONFIRMED' },
+    { id: 'leg-slot', kind: 'Commitment', label: 'Speaking slot · 09:00', detail: 'Kept', state: 'CONFIRMED', commitment: true },
+  ],
   checks: [
     { id: 'chk-arrival', label: 'New arrival is before the speaking slot', result: 'PASS' },
     { id: 'chk-transfer', label: 'Transfer lines up with the new arrival', result: 'PASS' },
@@ -843,6 +862,12 @@ export const caseResolvedWithLoss: CaseDetailView = {
   status: 'RESOLVED',
   whatChanged: 'A strike cancelled the original routing; a replacement was booked.',
   affectedItems: ['Welcome dinner', 'Airport transfer'],
+  chain: [
+    { id: 'leg-flight', kind: 'Flight', label: 'Replacement routing', detail: 'Booked and confirmed', state: 'CONFIRMED' },
+    { id: 'leg-transfer', kind: 'Transfer', label: 'Airport transfer', detail: 'Updated', state: 'CONFIRMED' },
+    { id: 'leg-dinner', kind: 'Event', label: 'Welcome dinner', detail: 'Could not be kept — no option preserved both', state: 'BROKEN' },
+    { id: 'leg-event', kind: 'Commitment', label: 'Main event', detail: 'Reached in time', state: 'CONFIRMED', commitment: true },
+  ],
   checks: [
     { id: 'chk-event', label: 'Arrives before the main event', result: 'PASS' },
     { id: 'chk-dinner', label: 'Arrives before the welcome dinner', result: 'FAIL' },
@@ -898,3 +923,50 @@ export const TRAVELLER_FIXTURES: readonly NamedFixture<TravellerTripView>[] = [
   { id: 'resolved-fully', title: 'Resolved — fully', view: travellerResolvedFully },
   { id: 'resolved-with-loss', title: 'Resolved — with loss', view: travellerResolvedWithLoss },
 ];
+
+// ---------------------------------------------------------------------------
+// Traveller presentations (UI-local props) — photography, commitment card,
+// rich option cards. Keyed by fixture id; option details keyed by the exact
+// option string. Pure presentation: no trip facts live here.
+// ---------------------------------------------------------------------------
+
+const SUMMIT_COMMITMENT: TravellerPresentation['commitmentCard'] = {
+  label: 'The reason for the trip',
+  title: 'Your talk at Innovation Summit 2026',
+  meta: '16 Sep · 09:00 · Main hall',
+};
+
+export const TRAVELLER_PRESENTATIONS: Record<string, TravellerPresentation> = {
+  disrupted: {
+    heroImageUrl: 'assets/sg-dusk.png',
+    heroImageAlt: 'The destination city at dusk',
+    commitmentCard: SUMMIT_COMMITMENT,
+    contactName: 'the events team',
+  },
+  'awaiting-input': {
+    heroImageUrl: 'assets/sg-dusk.png',
+    heroImageAlt: 'The destination city at dusk',
+    commitmentCard: SUMMIT_COMMITMENT,
+    contactName: 'the events team',
+    optionDetails: {
+      'Earlier flight — arrive with time to spare': {
+        commitmentEffect: 'keeps',
+        route: { from: 'LHR 11:35', to: 'SIN 07:55', stops: '1 stop' },
+        note: 'Arrives the morning before — the welcome dinner and your talk are safe.',
+        flag: 'Recommended',
+      },
+      'Later flight — cheaper, but you would miss the welcome dinner': {
+        commitmentEffect: 'breaks',
+        route: { from: 'LHR 21:05', to: 'SIN 22:40', stops: 'Direct' },
+        note: 'Lands after the welcome dinner starts. Your talk the next morning is unaffected.',
+        flag: 'Misses the dinner',
+      },
+    },
+  },
+  'resolved-fully': {
+    heroImageUrl: 'assets/sg-dusk.png',
+    heroImageAlt: 'The destination city at dusk',
+    commitmentCard: SUMMIT_COMMITMENT,
+    contactName: 'the events team',
+  },
+};
