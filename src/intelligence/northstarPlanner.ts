@@ -42,6 +42,20 @@ function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Deterministic id factory (REV-2 WP-R5): a per-prefix sequence. Given the
+ * same input sequence the same ids come out, which keeps persisted case
+ * state REPLAY-reproducible. Math.random() ids broke that (ADR-029).
+ */
+export function deterministicIdFactory(): (prefix: string) => string {
+  const counters = new Map<string, number>();
+  return (prefix: string): string => {
+    const next = (counters.get(prefix) ?? 0) + 1;
+    counters.set(prefix, next);
+    return `${prefix}-${String(next).padStart(4, '0')}`;
+  };
+}
+
 /** Deterministic local-date arithmetic: YYYY-MM-DD minus one day. */
 function previousLocalDate(iso: IsoDateTime): string {
   const day = iso.slice(0, 10);
@@ -73,12 +87,20 @@ type WindowDimension = 'arriveBy' | 'departAfter';
 export class NorthstarPlanner implements RecoveryPlanner {
   private readonly inner: RecoveryPlanner;
   private readonly idFactory: (prefix: string) => string;
-  private readonly now: () => IsoDateTime;
+  private readonly nowOverride: (() => IsoDateTime) | undefined;
 
   constructor(inner: RecoveryPlanner, options: NorthstarPlannerOptions = {}) {
     this.inner = inner;
     this.idFactory = options.idFactory ?? newId;
-    this.now = options.now ?? ((): IsoDateTime => new Date().toISOString());
+    // No wall-clock default (ADR-029, REV-2 WP-R5): without an explicit
+    // override, strategy timestamps derive from the snapshot instant — the
+    // evaluation 'at' — so REPLAY runs reproduce identical persisted state.
+    this.nowOverride = options.now;
+  }
+
+  /** Strategy timestamps: explicit override, else the snapshot instant. */
+  private instant(input: PlannerInput): IsoDateTime {
+    return this.nowOverride ? this.nowOverride() : input.snapshot.takenAt;
   }
 
   async plan(input: PlannerInput): Promise<PlannerOutput> {
@@ -237,7 +259,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
       uncertainties: [],
       expectedOutcomes: ['the programme traveller gains a schedulable arrival before the anchor event window'],
       costImpact: offer.totalPrice,
-      createdAt: this.now(),
+      createdAt: this.instant(input),
     };
   }
 
@@ -410,7 +432,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
             uncertainties: [],
             expectedOutcomes: [`the trip window satisfies the traveller request (${dimension} ${windowEvidence})`],
             costImpact: offer.totalPrice,
-            createdAt: this.now(),
+            createdAt: this.instant(input),
           };
         }),
       );

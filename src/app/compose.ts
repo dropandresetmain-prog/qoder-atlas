@@ -33,7 +33,7 @@ import { FileRecordingStore } from '../providers/recordingStore.ts';
 import { ModelStudioClient } from '../intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../intelligence/planner.ts';
 import { DeterministicFallbackPlanner } from '../intelligence/fallbackPlanner.ts';
-import { NorthstarPlanner } from '../intelligence/northstarPlanner.ts';
+import { deterministicIdFactory, NorthstarPlanner } from '../intelligence/northstarPlanner.ts';
 import type { CapabilityDescriptor } from '../contracts/capabilities.ts';
 import type { RecoveryPlanner } from '../contracts/planner.ts';
 import type { ToolDispatchCapabilities } from './dispatch.ts';
@@ -66,6 +66,8 @@ export interface ComposedRuntime {
   capabilities: ToolDispatchCapabilities;
   /** Advertised capability descriptors (registry evidence). */
   capabilityDescriptors: CapabilityDescriptor[];
+  /** The composed recovery planner (deterministic id/timestamp wiring). */
+  planner: RecoveryPlanner;
   /** Which planner powers runtime planning (credential check, not scenario). */
   plannerMode: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
   /** Seeded during composition (empty when the store was already populated). */
@@ -172,8 +174,14 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     ? new ModelStudioRecoveryPlanner({ client: modelClient })
     : new DeterministicFallbackPlanner();
   // Northstar branches (initial planning, window shift) wrap the base
-  // planner; everything else flows through the shared I3 loop.
-  const planner: RecoveryPlanner = new NorthstarPlanner(basePlanner);
+  // planner; everything else flows through the shared I3 loop. Strategy
+  // ids come from a deterministic per-prefix sequence (REV-2 WP-R5):
+  // Math.random ids broke REPLAY reproducibility of persisted case state,
+  // and createdAt derives from the snapshot instant — never wall-clock
+  // (ADR-029).
+  const planner: RecoveryPlanner = new NorthstarPlanner(basePlanner, {
+    idFactory: deterministicIdFactory(),
+  });
 
   const orchestrator = new RuntimeOrchestrator({
     db: database,
@@ -266,6 +274,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     readDeps,
     capabilities,
     capabilityDescriptors,
+    planner,
     plannerMode: modelClient.isConfigured() ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     seededScenarioIds,
   };

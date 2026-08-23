@@ -12,8 +12,11 @@
  *   responsibility;
  * - incremental costs outside every covered window fall to the rule's
  *   `incrementalPayer`;
- * - multiple windows: the first matching rule in input order governs
- *   (deterministic rule order, same discipline as the authority engine);
+ * - multiple windows: the first rule whose window CONTAINS the anchor in
+ *   input order governs (deterministic rule order, same discipline as the
+ *   authority engine). A window that merely fails to contain the anchor
+ *   never decides who pays — the payer must not depend on array order
+ *   (REV-2 WP-R5);
  * - the traveller's funding declaration is a desire, not an allocation: it
  *   never overrides rule-derived allocation, but when no rule governs it is
  *   recorded as the declaration evidence instead of being silently dropped.
@@ -52,10 +55,19 @@ export function allocateCost(input: CostAllocationInput): CostAllocation | undef
   for (const rule of fundedWindows) {
     if (rule.kind !== 'FUNDED_WINDOW') continue;
     const inside = isInFundedWindow(rule.windowStart, rule.windowEnd, input.costAccruesAt);
-    if (inside === undefined) continue; // window cannot decide without a temporal anchor
-    return allocation(input.priceDelta, inside ? rule.coveredBy : rule.incrementalPayer, [rule.id]);
+    // Only a window that CONTAINS the anchor governs. Returning on the
+    // first rule that merely CAN decide (anchor present but outside) made
+    // the payer depend on array order — id sort, in practice (REV-2 WP-R5).
+    if (inside === true) return allocation(input.priceDelta, rule.coveredBy, [rule.id]);
   }
-  return undefined;
+  // No window contains the anchor. With an anchor present the cost accrues
+  // outside every covered window: it falls to the incremental payer of the
+  // first governing rule in input order (the documented contract). Without
+  // an anchor no window can decide at all — allocation stays unresolved.
+  if (!input.costAccruesAt) return undefined;
+  const governing = fundedWindows[0];
+  if (!governing || governing.kind !== 'FUNDED_WINDOW') return undefined;
+  return allocation(input.priceDelta, governing.incrementalPayer, [governing.id]);
 }
 
 function isInFundedWindow(

@@ -270,8 +270,15 @@ function declaredCost(strategy: RecoveryStrategy): number {
 /**
  * Airport-code -> IANA timezone resolver built from persisted PLACE entities
  * (generic externalRef matching; the adapter carries no location knowledge,
- * ADR-028). Unknown codes return undefined so normalization fails honestly.
+ * ADR-028). Only airport-code refs may resolve — 'airport-code' (Northstar
+ * vocabulary) and 'iata'/'IATA' (Checkpoint-era + Atlas normalization +
+ * ingestion vocabulary): a city_code / venue / property ref whose value
+ * collides with an airport code must never silently supply an offset
+ * (REV-2 WP-R5). Unknown codes return undefined so normalization fails
+ * honestly.
  */
+const AIRPORT_REF_SYSTEMS = new Set(['airport-code', 'iata']);
+
 export function buildTimezoneResolver(entities: EntityStore): () => Promise<AtlasTimezoneResolver> {
   return async () => {
     const byCode = new Map<string, string>();
@@ -279,6 +286,7 @@ export function buildTimezoneResolver(entities: EntityStore): () => Promise<Atla
       if (entry.entityType !== 'PLACE') continue;
       const place = entry.entity;
       for (const ref of place.externalRefs ?? []) {
+        if (!AIRPORT_REF_SYSTEMS.has(ref.system.toLowerCase())) continue;
         if (place.timezone && ref.value) byCode.set(ref.value.toUpperCase(), place.timezone);
       }
     }
