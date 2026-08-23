@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import type {
   FlightCapability,
+  HotelCapability,
   ResearchCapability,
   RoutingCapability,
 } from '../contracts/capabilities.ts';
@@ -22,6 +23,7 @@ export interface ToolDispatchCapabilities {
   flight?: FlightCapability;
   routing?: RoutingCapability;
   research?: ResearchCapability;
+  hotel?: HotelCapability;
 }
 
 export type ToolDispatchResult =
@@ -66,6 +68,34 @@ const LOCAL_CONTEXT_PARAMETERS = z.strictObject({
   topic: z.string().min(1),
   placeRef: externalRef.optional(),
 });
+
+// Hotel read-only operations. Parameter shapes mirror the frozen capability
+// queries exactly, so a REPLAY recording keyed by the canonical query stays
+// reachable through tool dispatch (same hash, same recording).
+const HOTEL_STAY_CONTEXT_PARAMETERS = z.strictObject({ stayElementId: z.string().min(1) });
+
+const HOTEL_SEARCH_PARAMETERS = z.strictObject({
+  location: z.strictObject({
+    externalRef: externalRef.optional(),
+    coordinates: z
+      .strictObject({ latitude: z.number(), longitude: z.number(), radiusKm: z.number().positive().optional() })
+      .optional(),
+  }),
+  checkInDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  checkOutDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // Deterministic occupancy defaults: recorded REPLAY queries were keyed
+  // with these present, and a missing occupancy is never a guess at the
+  // provider — it is this documented dispatch default.
+  guests: z.strictObject({ adults: z.number().int().min(1), children: z.number().int().min(0).optional() }).default({ adults: 1 }),
+  rooms: z.number().int().min(1).default(1),
+});
+
+const HOTEL_QUOTE_PARAMETERS = z.strictObject({
+  rateId: z.string().min(1),
+  workflowState: z.record(z.string(), z.unknown()).optional(),
+});
+
+const HOTEL_RETRIEVE_PARAMETERS = z.strictObject({ bookingId: z.string().min(1) });
 
 function invalidParameters(detail: string): ToolDispatchResult {
   return {
@@ -163,14 +193,34 @@ export async function dispatchToolRequest(
       }
       return toDispatchResult(await capabilities.research.researchLocalContext(parsed.data));
     }
-    case 'hotel.context':
-    case 'hotel.search':
-    case 'hotel.quote':
-    case 'hotel.retrieve':
+    case 'hotel.context': {
+      if (!capabilities.hotel) return capabilityAbsent(operation.data);
+      const parsed = HOTEL_STAY_CONTEXT_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`hotel.context: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.hotel.getStayContext(parsed.data));
+    }
+    case 'hotel.search': {
+      if (!capabilities.hotel) return capabilityAbsent(operation.data);
+      const parsed = HOTEL_SEARCH_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`hotel.search: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.hotel.searchHotels(parsed.data));
+    }
+    case 'hotel.quote': {
+      if (!capabilities.hotel) return capabilityAbsent(operation.data);
+      const parsed = HOTEL_QUOTE_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`hotel.quote: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.hotel.quoteRate(parsed.data));
+    }
+    case 'hotel.retrieve': {
+      if (!capabilities.hotel) return capabilityAbsent(operation.data);
+      const parsed = HOTEL_RETRIEVE_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`hotel.retrieve: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.hotel.retrieveBooking(parsed.data));
+    }
     case 'transfer.search':
     case 'transfer.quote':
     case 'transfer.retrieve':
-      // No hotel/transfer adapter exists in this build; the request is honest data.
+      // No transfer adapter exists in this build; the request is honest data.
       return capabilityAbsent(operation.data);
     default:
       return capabilityAbsent(String(request.operation));
@@ -218,6 +268,19 @@ export function summarizeToolResult(operation: string, result: ToolDispatchResul
     case 'research.local_context': {
       const findings = (data['findings'] ?? []) as Array<Record<string, unknown>>;
       return `${operation}: ${findings.length} finding(s)`;
+    }
+    case 'hotel.search': {
+      const properties = (data['properties'] ?? []) as Array<Record<string, unknown>>;
+      const rates = (data['rates'] ?? []) as Array<Record<string, unknown>>;
+      return `${operation}: ${properties.length} propert(y/ies), ${rates.length} rate(s)`;
+    }
+    case 'hotel.quote':
+      return `${operation}: ${String(data['status'] ?? 'UNKNOWN')}${data['quoteId'] ? ` quoteId ${String(data['quoteId'])}` : ''}`;
+    case 'hotel.retrieve':
+      return `${operation}: ${String(data['status'] ?? 'UNKNOWN')}`;
+    case 'hotel.context': {
+      const propertyName = data['propertyName'];
+      return `${operation}: ${typeof propertyName === 'string' ? propertyName : 'unknown property'}`;
     }
     default:
       return `${operation}: completed`;

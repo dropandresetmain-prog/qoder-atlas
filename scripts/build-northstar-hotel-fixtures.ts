@@ -1,6 +1,7 @@
 /**
- * Generates sanitized, deterministic test-local Duffel Stays recording
- * fixtures used by test/northstar-hotel.test.ts.
+ * Generates sanitized, deterministic Duffel Stays recording fixtures under
+ * the curated corpus (fixtures/recordings/duffel-stays), replayable by both
+ * test/northstar-hotel.test.ts and the composed application (REV-2 WP-R4).
  *
  * Run: `node --experimental-strip-types scripts/build-northstar-hotel-fixtures.ts`
  * Idempotent: writes the same bytes every time.
@@ -136,7 +137,7 @@ const cases: Array<{ operation: string; request: unknown; raw: unknown }> = [
 for (const { operation, request, raw } of cases) {
   const id = recordingIdFor(PROVIDER, operation, request);
   const relativePath = `${PROVIDER}/${operation}/${id}.json`;
-  const path = join('test', 'fixtures', 'recordings', relativePath);
+  const path = join('fixtures', 'recordings', relativePath);
   mkdirSync(dirname(path), { recursive: true });
   const recording = {
     id,

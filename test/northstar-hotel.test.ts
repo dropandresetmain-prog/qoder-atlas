@@ -34,7 +34,7 @@ import type {
   HotelActionQuery,
 } from '../src/contracts/capabilities.ts';
 
-const TEST_FIXTURES = 'test/fixtures/recordings';
+const TEST_FIXTURES = 'fixtures/recordings';
 
 const SEARCH_QUERY: HotelSearchQuery = {
   location: { externalRef: { system: 'city_code', value: 'STAY-CT-001' } },

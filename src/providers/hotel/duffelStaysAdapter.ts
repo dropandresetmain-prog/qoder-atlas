@@ -47,11 +47,11 @@ import { capabilityFailure, runAdapter } from '../runner.ts';
 export const DUFFEL_STAYS_PROVIDER_ID = 'duffel-stays';
 
 /**
- * Synthetic default endpoint; real deployments override via DUFFEL_STAYS_BASE_URL.
- * The default target is intentionally a placeholder host so accidental LIVE
- * calls without credentials fail closed at the network layer too.
+ * Default endpoint per the Wave-1 provider-access plan: the real Duffel
+ * host. LIVE/RECORD still fail closed with NOT_CONFIGURED when no token is
+ * configured, so the default host is never reached by accident.
  */
-const DEFAULT_DUFFEL_STAYS_BASE_URL = 'https://stays.duffel.example/v2';
+const DEFAULT_DUFFEL_STAYS_BASE_URL = 'https://api.duffel.com';
 
 /** Raw body shapes for a Duffel-like stays API. The schema is intentionally
  *  permissive (zod object) — recordings may carry extra provider fields; the
@@ -305,7 +305,7 @@ export class DuffelStaysAdapter implements HotelCapability {
       throw capabilityFailure(
         'NOT_CONFIGURED',
         'duffel_stays_missing_credentials',
-        'Duffel Stays LIVE/RECORD requires DUFFEL_STAYS_BASE_URL and DUFFEL_STAYS_API_KEY',
+        'Duffel Stays LIVE/RECORD requires DUFFEL_TOKEN (and optionally DUFFEL_BASE_URL)',
       );
     }
     return { baseUrl: this.baseUrl, apiKey: this.apiKey };

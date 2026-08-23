@@ -31,6 +31,11 @@ const GoogleRoutesConfigSchema = z.object({
   apiKey: z.string().optional(),
 });
 
+const DuffelStaysConfigSchema = z.object({
+  baseUrl: z.string().optional(),
+  token: z.string().optional(),
+});
+
 export const AppConfigSchema = z.object({
   environment: z.enum(['local', 'dev', 'demo']).default('local'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -43,6 +48,7 @@ export const AppConfigSchema = z.object({
     atlas: AtlasConfigSchema.prefault({}),
     modelStudio: ModelStudioConfigSchema.prefault({}),
     googleRoutes: GoogleRoutesConfigSchema.prefault({}),
+    duffelStays: DuffelStaysConfigSchema.prefault({}),
   }),
 });
 
@@ -95,6 +101,10 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
       googleRoutes: {
         apiKey: optional(env.GOOGLE_ROUTES_API_KEY),
       },
+      duffelStays: {
+        baseUrl: optional(env.DUFFEL_BASE_URL),
+        token: optional(env.DUFFEL_TOKEN),
+      },
     },
   };
 }
@@ -117,7 +127,10 @@ export function loadConfig(
 }
 
 /** True when the given provider section has enough config for LIVE use. */
-export function hasLiveCredentials(config: AppConfig, provider: 'atlas' | 'modelStudio' | 'googleRoutes'): boolean {
+export function hasLiveCredentials(
+  config: AppConfig,
+  provider: 'atlas' | 'modelStudio' | 'googleRoutes' | 'duffelStays',
+): boolean {
   switch (provider) {
     case 'atlas': {
       const a = config.providers.atlas;
@@ -129,5 +142,9 @@ export function hasLiveCredentials(config: AppConfig, provider: 'atlas' | 'model
     }
     case 'googleRoutes':
       return Boolean(config.providers.googleRoutes.apiKey);
+    case 'duffelStays':
+      // The base URL defaults to the real host (see the Duffel Stays
+      // adapter), so the token alone makes LIVE reachable.
+      return Boolean(config.providers.duffelStays.token);
   }
 }

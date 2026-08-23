@@ -67,6 +67,8 @@ Promoted from Stretch investigation to Planned MVP by the RV-N0 contract freeze;
 - change treated as cancel+rebook until a provider exposes real modification endpoints
 - LIVE/SANDBOX and REPLAY share normalization/downstream code; Booking.com Demand API remains a further candidate if partner credentials are immediately practical
 
+**Status (REV-2 WP-R4 correction):** the Duffel Stays adapter is **wired and REPLAY-proven against synthetic fixtures only** — composed into the runtime, `hotel.*` read-only tool operations route through it, and the committed `fixtures/recordings/duffel-stays` corpus replays the full lifecycle through the shared normalization path. **The real/sandbox lifecycle is outstanding**; blocker is the manual Stays-access step (request Duffel Stays access, create a `duffel_test_` token, set `DUFFEL_TOKEN` / `DUFFEL_BASE_URL`). Until a real capture exists, LIVE/RECORD fail closed with NOT_CONFIGURED. The earlier unqualified "DONE / MINIMUM satisfied" reading of RV-N7 is withdrawn.
+
 ### Product surfaces
 - role-neutral operator dashboard/read models
 - traveller trip page/conversation/read models

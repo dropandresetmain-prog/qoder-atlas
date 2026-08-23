@@ -386,7 +386,7 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     },
   };
 
-  const server = createAppServer({ environment: 'local', logLevel: 'info', adapterMode: 'REPLAY', httpPort: 0, sqlitePath: ':memory:', recordingsDir: 'recordings', fixturesDir: 'fixtures', providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {} } }, endpoints);
+  const server = createAppServer({ environment: 'local', logLevel: 'info', adapterMode: 'REPLAY', httpPort: 0, sqlitePath: ':memory:', recordingsDir: 'recordings', fixturesDir: 'fixtures', providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, duffelStays: {} } }, endpoints);
   await new Promise<void>((resolvePromise) => server.listen(0, resolvePromise));
   const port = (server.address() as AddressInfo).port;
   const base = `http://localhost:${port}`;

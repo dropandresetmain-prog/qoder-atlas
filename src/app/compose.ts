@@ -28,6 +28,7 @@ import { CaseVerifier, DeterministicObservationService } from '../engine/observa
 import type { AppEndpoints } from '../server/http.ts';
 import { AtlasFlightAdapter } from '../providers/atlas/adapter.ts';
 import { GoogleRoutesAdapter } from '../providers/googleRoutes/adapter.ts';
+import { DuffelStaysAdapter, DUFFEL_STAYS_DEFAULT_BASE_URL } from '../providers/hotel/duffelStaysAdapter.ts';
 import { FileRecordingStore } from '../providers/recordingStore.ts';
 import { ModelStudioClient } from '../intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../intelligence/planner.ts';
@@ -35,6 +36,7 @@ import { DeterministicFallbackPlanner } from '../intelligence/fallbackPlanner.ts
 import { NorthstarPlanner } from '../intelligence/northstarPlanner.ts';
 import type { CapabilityDescriptor } from '../contracts/capabilities.ts';
 import type { RecoveryPlanner } from '../contracts/planner.ts';
+import type { ToolDispatchCapabilities } from './dispatch.ts';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   buildTimezoneResolver,
@@ -60,6 +62,10 @@ export interface ComposedRuntime {
   orchestrator: RuntimeOrchestrator;
   executionService: RecoveryExecutionService;
   readDeps: ReadModelDependencies;
+  /** The wired capability adapters (tool dispatch surface). */
+  capabilities: ToolDispatchCapabilities;
+  /** Advertised capability descriptors (registry evidence). */
+  capabilityDescriptors: CapabilityDescriptor[];
   /** Which planner powers runtime planning (credential check, not scenario). */
   plannerMode: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
   /** Seeded during composition (empty when the store was already populated). */
@@ -119,11 +125,15 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
 
   // Read-only capability wiring: Atlas always present (REPLAY is
   // credential-free); Google Routes contributes only when configured or
-  // recorded. Scenario bundles may ship their own recordings.
+  // recorded; Duffel Stays replays the curated hotel corpus without
+  // credentials and fails closed (NOT_CONFIGURED) for LIVE/RECORD without
+  // DUFFEL_TOKEN. Scenario bundles may ship their own recordings; the
+  // curated fixtures/recordings corpus is readable by the composed app too.
   const recordingReadDirs = [
     ...readdirSync(join(config.fixturesDir, 'scenarios'), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(config.fixturesDir, 'scenarios', entry.name, 'recordings')),
+    join(config.fixturesDir, 'recordings'),
     config.recordingsDir,
   ];
   const recordingStore = new FileRecordingStore({ readDirs: recordingReadDirs });
@@ -142,7 +152,14 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     store: recordingStore,
     apiKey: config.providers.googleRoutes.apiKey,
   });
-  const capabilityDescriptors: CapabilityDescriptor[] = [flight.descriptor, routing.descriptor];
+  const hotel = new DuffelStaysAdapter({
+    mode: config.adapterMode,
+    store: recordingStore,
+    baseUrl: config.providers.duffelStays.baseUrl ?? DUFFEL_STAYS_DEFAULT_BASE_URL,
+    apiKey: config.providers.duffelStays.token,
+  });
+  const capabilities: ToolDispatchCapabilities = { flight, routing, hotel };
+  const capabilityDescriptors: CapabilityDescriptor[] = [flight.descriptor, routing.descriptor, hotel.descriptor];
 
   // Planner: LIVE Model Studio when configured; otherwise the deterministic
   // fallback planner — the credential-free replay path must complete the loop.
@@ -170,7 +187,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     mutations,
     execution: executionService,
     planner,
-    capabilities: { flight, routing },
+    capabilities,
     capabilityDescriptors,
     viability,
     fixturesDir: config.fixturesDir,
@@ -233,7 +250,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
       cases,
       audit,
       planner,
-      capabilities: { flight, routing },
+      capabilities,
       capabilityDescriptors,
       viability,
       sources,
@@ -247,6 +264,8 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     orchestrator,
     executionService,
     readDeps,
+    capabilities,
+    capabilityDescriptors,
     plannerMode: modelClient.isConfigured() ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     seededScenarioIds,
   };
