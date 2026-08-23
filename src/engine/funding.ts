@@ -44,30 +44,58 @@ export interface CostAllocationInput {
 }
 
 /**
+ * Who pays for a cost accruing at a given instant, decided ONLY by
+ * FUNDED_WINDOW rules. Amount-agnostic: the same window logic governs the
+ * provisional payer decision at request time (no cost known yet) and the
+ * authoritative allocation at intent time (real cost known). Returns
+ * undefined when no window rule can decide — that absence IS the UNKNOWN
+ * state.
+ */
+export interface PayerDecision {
+  kind: 'COVERED' | 'INCREMENTAL';
+  payer: Payer;
+  derivedFromRuleIds: EntityId[];
+}
+
+export function payerDecisionFor(
+  rules: PolicyRule[],
+  costAccruesAt: IsoDateTime | undefined,
+): PayerDecision | undefined {
+  const fundedWindows = rules.filter((rule) => rule.kind === 'FUNDED_WINDOW');
+  if (fundedWindows.length === 0) return undefined;
+
+  for (const rule of fundedWindows) {
+    if (rule.kind !== 'FUNDED_WINDOW') continue;
+    const inside = isInFundedWindow(rule.windowStart, rule.windowEnd, costAccruesAt);
+    // Only a window that CONTAINS the anchor governs. Returning on the
+    // first rule that merely CAN decide (anchor present but outside) made
+    // the payer depend on array order — id sort, in practice (REV-2 WP-R5).
+    if (inside === true) return { kind: 'COVERED', payer: rule.coveredBy, derivedFromRuleIds: [rule.id] };
+  }
+  // No window contains the anchor. With an anchor present the cost accrues
+  // outside every covered window: it falls to the incremental payer of the
+  // first governing rule in input order (the documented contract). Without
+  // an anchor no window can decide at all — the decision stays unresolved.
+  if (!costAccruesAt) return undefined;
+  const governing = fundedWindows[0];
+  if (!governing || governing.kind !== 'FUNDED_WINDOW') return undefined;
+  return { kind: 'INCREMENTAL', payer: governing.incrementalPayer, derivedFromRuleIds: [governing.id] };
+}
+
+/** Turn a payer decision into a CostAllocation once the amount is known. */
+export function allocationFromDecision(priceDelta: Money, decision: PayerDecision): CostAllocation {
+  return allocation(priceDelta, decision.payer, decision.derivedFromRuleIds);
+}
+
+/**
  * Deterministic payer allocation. Returns undefined when no FUNDED_WINDOW
  * rule can decide — that absence IS the UNKNOWN state (contract: absent
  * allocation means allocation has not been computed).
  */
 export function allocateCost(input: CostAllocationInput): CostAllocation | undefined {
-  const fundedWindows = input.rules.filter((rule) => rule.kind === 'FUNDED_WINDOW');
-  if (fundedWindows.length === 0) return undefined;
-
-  for (const rule of fundedWindows) {
-    if (rule.kind !== 'FUNDED_WINDOW') continue;
-    const inside = isInFundedWindow(rule.windowStart, rule.windowEnd, input.costAccruesAt);
-    // Only a window that CONTAINS the anchor governs. Returning on the
-    // first rule that merely CAN decide (anchor present but outside) made
-    // the payer depend on array order — id sort, in practice (REV-2 WP-R5).
-    if (inside === true) return allocation(input.priceDelta, rule.coveredBy, [rule.id]);
-  }
-  // No window contains the anchor. With an anchor present the cost accrues
-  // outside every covered window: it falls to the incremental payer of the
-  // first governing rule in input order (the documented contract). Without
-  // an anchor no window can decide at all — allocation stays unresolved.
-  if (!input.costAccruesAt) return undefined;
-  const governing = fundedWindows[0];
-  if (!governing || governing.kind !== 'FUNDED_WINDOW') return undefined;
-  return allocation(input.priceDelta, governing.incrementalPayer, [governing.id]);
+  const decision = payerDecisionFor(input.rules, input.costAccruesAt);
+  if (!decision) return undefined;
+  return allocationFromDecision(input.priceDelta, decision);
 }
 
 function isInFundedWindow(

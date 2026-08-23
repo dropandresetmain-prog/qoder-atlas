@@ -123,6 +123,8 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     verifier: new CaseVerifier({ trips, signals, entities }),
     trips,
     entities,
+    // Funding evidence lives on triggering signals (change-request anchors).
+    signals,
   });
 
   // Read-only capability wiring: Atlas always present (REPLAY is

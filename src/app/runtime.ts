@@ -38,7 +38,9 @@ import { seedScenarioBundle } from './bootstrap.ts';
 import type { RecoveryExecutionService } from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
+import type { ActionIntent } from '../operational/intent.ts';
 import type { Money } from '../domain/common.ts';
+import { describeAllocation } from '../engine/funding.ts';
 
 export interface RuntimeDependencies {
   db: DatabaseSync;
@@ -85,6 +87,8 @@ export interface RuntimeBeginOutcome {
   caseStatus: string;
   executable: boolean;
   ruleTrace: string[];
+  /** Mixed-funding allocation (ADR-037); absent when UNKNOWN. */
+  funding?: { allocation: NonNullable<ActionIntent['costAllocation']>; summary: string };
 }
 
 export interface RuntimeDecisionOutcome {
@@ -210,6 +214,9 @@ export class RuntimeOrchestrator {
       caseStatus: staged.caseStatus,
       executable: staged.executable,
       ruleTrace: staged.decision.ruleTrace,
+      ...(staged.intent.costAllocation
+        ? { funding: { allocation: staged.intent.costAllocation, summary: describeAllocation(staged.intent.costAllocation) } }
+        : {}),
     };
   }
 
