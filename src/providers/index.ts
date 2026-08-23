@@ -35,3 +35,14 @@ export type {
   DuffelStaysSearchRaw,
   DuffelStaysStayContextRaw,
 } from './hotel/duffelStaysAdapter.ts';
+export {
+  routeContextFor,
+  transferWindowImpact,
+} from './routing/reasoning.ts';
+export type {
+  RouteContextForOptions,
+  RouteContextForResult,
+  TransferWindowClassification,
+  TransferWindowInputs,
+  TransferWindowOutcome,
+} from './routing/reasoning.ts';
