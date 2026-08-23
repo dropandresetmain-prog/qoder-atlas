@@ -267,7 +267,7 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
       intentKind: 'ADJUST_TRIP_WINDOW',
       urgency: 'SOFT_PREFERENCE',
       utterance: 'I would like to arrive two days earlier, stay through Sunday, and I will pay extra myself',
-      target: { arriveBy: '2026-09-04T18:00:00+08:00', departAfter: '2026-09-13T00:00:00+08:00' },
+      target: { arriveBy: '2026-09-04T18:00:00+08:00', departAfter: '2026-09-13T00:00:00+08:00', objectiveEffects: [] },
       fundingDeclaration: 'TRAVELLER_FUNDED',
     };
     const combined = await resolveChangeRequest(changeDeps, { request: combinedRequest, at: '2026-09-03T00:00:00+00:00' });
@@ -295,7 +295,7 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
       intentKind: 'ADJUST_TRIP_WINDOW',
       urgency: 'HARD_INSTRUCTION',
       utterance: 'I would like to arrive two days earlier',
-      target: { arriveBy: '2026-09-04T18:00:00+08:00' },
+      target: { arriveBy: '2026-09-04T18:00:00+08:00', objectiveEffects: [] },
       fundingDeclaration: 'TRAVELLER_FUNDED',
     };
     const outcome1 = await resolveChangeRequest(changeDeps, { request: request1, at: '2026-09-03T00:00:00+00:00' });
@@ -380,7 +380,7 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
     // Authoritative state: the arrival slot now carries the new confirmed offer.
     const tripAfter1 = (await trips.getTrip(tripId))!;
     const slotAfter1 = tripAfter1.elements.find((el) => el.id === `el-${tripId}-arrival`);
-    assert.equal(slotAfter1?.data.bookingRef?.reference, 'opaque-routing-convergence-shift');
+    assert.equal(slotAfter1?.elementKind === 'TRANSPORT_LEG' ? slotAfter1.data.bookingRef?.reference : undefined, 'opaque-routing-convergence-shift');
     assert.equal(slotAfter1?.reservationState, 'CONFIRMED');
 
     // ------------------------------------------------------------------
@@ -396,7 +396,7 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
       intentKind: 'ADJUST_TRIP_WINDOW',
       urgency: 'HARD_INSTRUCTION',
       utterance: 'I will stay through Sunday and pay the extra myself',
-      target: { departAfter: '2026-09-13T00:00:00+08:00' },
+      target: { departAfter: '2026-09-13T00:00:00+08:00', objectiveEffects: [] },
       fundingDeclaration: 'TRAVELLER_FUNDED',
     };
     const outcome2 = await resolveChangeRequest(changeDeps, { request: request2, at: '2026-09-03T04:00:00+00:00' });
@@ -449,7 +449,7 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
 
     const tripAfter2 = (await trips.getTrip(tripId))!;
     const retAfter2 = tripAfter2.elements.find((el) => el.id === `el-${tripId}-ret`);
-    assert.equal(retAfter2?.data.bookingRef?.reference, 'opaque-routing-w3-depart-late');
+    assert.equal(retAfter2?.elementKind === 'TRANSPORT_LEG' ? retAfter2.data.bookingRef?.reference : undefined, 'opaque-routing-w3-depart-late');
     assert.equal(retAfter2?.reservationState, 'CONFIRMED');
 
     // Whole-trip reverification: after BOTH funded changes the trip is viable.
@@ -459,7 +459,7 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
     // Isolation: the second traveller's trip kept its original bookings.
     const otherTripAfter = (await trips.getTrip(otherTripId))!;
     const otherArrival = otherTripAfter.elements.find((el) => el.id === `el-${otherTripId}-arrival`);
-    assert.equal(otherArrival?.data.bookingRef?.reference, 'BOOKED-OUT');
+    assert.equal(otherArrival?.elementKind === 'TRANSPORT_LEG' ? otherArrival.data.bookingRef?.reference : undefined, 'BOOKED-OUT');
   } finally {
     composed.db.close();
   }

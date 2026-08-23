@@ -11,6 +11,12 @@ import type { AppConfig } from '../config/config.ts';
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { OperatorDashboardView, ProgrammeView, TravellerTripView } from '../contracts/readmodels.ts';
 import type { CaseDetailView } from '../ui/case-view-model.ts';
+import type {
+  ApprovalsQueueView,
+  ProviderSurfaceView,
+  TripActivityView,
+  TripUncertaintiesView,
+} from '../app/waveReadmodels.ts';
 import { renderPage } from '../ui/page.ts';
 import { renderOperatorDashboardBody } from '../ui/screens/operator-dashboard.ts';
 import { renderCaseDetailBody, renderCaseDetail } from '../ui/screens/operator-case.ts';
@@ -77,6 +83,18 @@ export interface ResolutionHandlers {
   changeRequest(body: unknown): Promise<{ status: number; body: unknown }>;
 }
 
+/**
+ * Wave 3 operational surfaces (Gate 2): app-layer projections the UI lane
+ * renders verbatim — approval queue, activity stream, uncertainties, and
+ * truthful provider provenance. Never inferred on the frontend.
+ */
+export interface WaveSurfaces {
+  approvalsQueue(at: IsoDateTime): Promise<ApprovalsQueueView>;
+  tripActivity(tripId: EntityId, at: IsoDateTime): Promise<TripActivityView | undefined>;
+  tripUncertainties(tripId: EntityId, at: IsoDateTime): Promise<TripUncertaintiesView | undefined>;
+  providers(at: IsoDateTime): Promise<ProviderSurfaceView>;
+}
+
 /** Application endpoints the HTTP surface projects; wired by the integrator. */
 export interface AppEndpoints {
   now(): IsoDateTime;
@@ -89,6 +107,9 @@ export interface AppEndpoints {
     body: TravellerDecisionBody,
     at: IsoDateTime,
   ): Promise<TravellerDecisionHttpResult>;
+  /** Present when the Wave 3 operational surfaces (approvals/activity/
+   *  uncertainties/provenance) are wired. */
+  wave?: WaveSurfaces;
   /** Present when the runtime recovery/reset flow is wired. */
   runtime?: RuntimeHandlers;
   /** Present when the Northstar programme surface is wired. */
@@ -259,6 +280,41 @@ async function handle(
       return;
     }
     sendJson(res, 200, view);
+    return;
+  }
+
+  // --- Wave 3 operational surfaces (Gate 2) -------------------------------
+  if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'wave' && endpoints.wave) {
+    if (segments[2] === 'approvals') {
+      sendJson(res, 200, await endpoints.wave.approvalsQueue(endpoints.now()));
+      return;
+    }
+    if (segments[2] === 'providers') {
+      sendJson(res, 200, await endpoints.wave.providers(endpoints.now()));
+      return;
+    }
+    if (segments[2] === 'trips' && segments[3]) {
+      const tripId = segments[3];
+      if (segments[4] === 'activity') {
+        const view = await endpoints.wave.tripActivity(tripId, endpoints.now());
+        if (!view) {
+          sendJson(res, 404, { error: 'unknown_trip', tripId });
+          return;
+        }
+        sendJson(res, 200, view);
+        return;
+      }
+      if (segments[4] === 'uncertainties') {
+        const view = await endpoints.wave.tripUncertainties(tripId, endpoints.now());
+        if (!view) {
+          sendJson(res, 404, { error: 'unknown_trip', tripId });
+          return;
+        }
+        sendJson(res, 200, view);
+        return;
+      }
+    }
+    sendJson(res, 404, { error: 'not_found', path: url.pathname });
     return;
   }
 

@@ -41,9 +41,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   buildTimezoneResolver,
   createRecoveryExecutor,
+  projectApprovalsQueue,
   projectCaseDetail,
   projectOperatorDashboard,
+  projectProviderSurface,
   projectTravellerTrip,
+  projectTripActivity,
+  projectTripUncertainties,
   RecoveryExecutionService,
   seedScenarioBundle,
   settleTravellerDecision,
@@ -225,6 +229,12 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
           ? { resolutionOutcome: outcome.execution.verification.resolution.outcome }
           : {}),
       };
+    },
+    wave: {
+      approvalsQueue: (at) => projectApprovalsQueue(readDeps, at),
+      tripActivity: (tripId, at) => projectTripActivity(readDeps, tripId, at),
+      tripUncertainties: (tripId, at) => projectTripUncertainties(readDeps, tripId, at),
+      providers: (at) => Promise.resolve(projectProviderSurface(capabilityDescriptors, at)),
     },
     runtime: createRuntimeHandlers({
       orchestrator,
