@@ -1,0 +1,95 @@
+{
+  "id": "rec_ac9fd89bb364d688bbeadef62be55aa5",
+  "providerId": "atlas",
+  "operation": "search",
+  "recordedAt": "2026-08-23T00:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "routings": [
+      {
+        "routingIdentifier": "opaque-routing-identifier-001",
+        "fid": "synthetic-fid-search",
+        "currency": "USD",
+        "adultPrice": 100,
+        "adultTax": 20,
+        "childPrice": 80,
+        "childTax": 16,
+        "infantPrice": 10,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T00:00:00Z",
+        "refreshTime": "2026-08-23T00:00:00Z",
+        "fromSegments": [
+          {
+            "carrier": "XX",
+            "operatingCarrier": "XX",
+            "flightNumber": "XX101",
+            "depAirport": "MNL",
+            "arrAirport": "CEB",
+            "depTime": "202609052000",
+            "arrTime": "202609052130",
+            "duration": 90,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Cheapest",
+            "seatCount": 9,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 7,
+              "baggageSize": "56*36*23cm",
+              "baggageType": "CabinBaggageOverheadLocker",
+              "passengerType": 0,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "rec_1b513b60f5c68d28b3eedc70800f5e3d",
+  "providerId": "duffel-stays",
+  "operation": "retrieve",
+  "recordedAt": "2026-08-23T00:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "booking_id": "stay_booking_001",
+      "status": "CONFIRMED",
+      "property_name": "Property-Synthetic-001",
+      "check_in": "2026-10-01T15:00:00+08:00",
+      "check_out": "2026-10-04T11:00:00+08:00"
+    }
+  }
+}
