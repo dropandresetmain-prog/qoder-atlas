@@ -168,15 +168,23 @@ export class ProgrammeService {
     const { draft, traveller, at } = input;
     const issues: string[] = [];
 
-    // Deterministic identity resolution against persisted travellers. The
-    // ontology carries name + passport evidence; ambiguity is recorded,
-    // never guessed away.
-    const existing = await this.resolveExistingTraveller(traveller);
-    if (existing === 'AMBIGUOUS') {
+    // Fail-closed identity resolution: a draft may only be reconciled with an
+    // existing Traveller through the stable deterministic identifier
+    // `trv-{anchorEventId}-{draftId}`. Display-name similarity is never
+    // identity evidence — fresh intake with a coincidental name collision
+    // simply creates a distinct Traveller (no merge is possible by
+    // construction), while an UPDATE that cannot identify its subject refuses.
+    const existing = await this.resolveExistingTraveller(traveller, draft.anchorEventId);
+    if (!existing && draft.channel === 'LATER_UPDATE') {
+      const collision = await this.sameProgrammeNameCollision(traveller, draft.anchorEventId);
       return {
         draftId: traveller.draftId,
         promoted: false,
-        issues: ['identity hints match more than one existing traveller; refusing to guess which one'],
+        issues: [
+          collision > 0
+            ? `LATER_UPDATE could not safely identify the traveller: display name matches ${collision} existing traveller(s) in this programme and no deterministic identifier was supplied; refusing to guess — no existing trip was modified`
+            : 'LATER_UPDATE could not identify an existing traveller: no deterministic identifier matches a persisted Traveller; refusing to apply an update with an unknown subject',
+        ],
       };
     }
 
@@ -407,27 +415,40 @@ export class ProgrammeService {
     return matches[0]?.id;
   }
 
+  /**
+   * Fail-closed identity resolution (Wave 3 triage). The ONLY evidence strong
+   * enough to reconcile a draft with an existing Traveller is the stable
+   * deterministic promotion identifier `trv-{anchorEventId}-{draftId}` — the
+   * same derivation `promoteOne` uses at creation. Display-name similarity is
+   * NEVER identity evidence here: two different people may share a name, and
+   * the frozen Traveller entity carries no stored hint (email/phone/DoB) that
+   * could corroborate one. What this method does not establish, no other code
+   * guesses away — the caller surfaces the collision instead.
+   */
   private async resolveExistingTraveller(
     traveller: ProgrammeTravellerDraft,
-  ): Promise<Traveller | 'AMBIGUOUS' | undefined> {
-    const all = (await this.deps.entities.list('TRAVELLER'))
-      .filter((entry) => entry.entityType === 'TRAVELLER')
-      .map((entry) => entry.entity);
-    const normalizedName = traveller.displayName.trim().toLowerCase();
-    const passport = traveller.identity.passportNumber;
-    const matches = all.filter((candidate) => {
-      if (candidate.name.trim().toLowerCase() === normalizedName) return true;
-      if (passport) {
-        const passportValues = candidate.passports?.value ?? [];
-        if (passportValues.some((value) => value.countryCode && passport.startsWith(value.countryCode))) {
-          return false; // weak prefix is not a match
-        }
-      }
-      return false;
-    });
-    if (matches.length === 0) return undefined;
-    if (matches.length > 1) return 'AMBIGUOUS';
-    return matches[0];
+    anchorEventId: EntityId,
+  ): Promise<Traveller | undefined> {
+    const deterministicId = `trv-${anchorEventId}-${traveller.draftId}`;
+    const entry = await this.deps.entities.get('TRAVELLER', deterministicId);
+    return entry?.entityType === 'TRAVELLER' ? entry.entity : undefined;
+  }
+
+  /**
+   * Count persisted travellers in the SAME programme whose display name equals
+   * the draft's (case-insensitive, trimmed). Cross-programme names are
+   * unrelated by construction — intake never scopes identity beyond the draft's
+   * own anchor event. A non-zero count means promotion must fail closed unless
+   * the deterministic identifier already resolved the draft.
+   */
+  private async sameProgrammeNameCollision(traveller: ProgrammeTravellerDraft, anchorEventId: EntityId): Promise<number> {
+    const wanted = traveller.displayName.trim().toLowerCase();
+    if (wanted.length === 0) return 0;
+    return (await this.deps.entities.list('TRAVELLER'))
+      .filter((entry): entry is { entityType: 'TRAVELLER'; entity: Traveller } => entry.entityType === 'TRAVELLER')
+      .map((entry) => entry.entity)
+      .filter((candidate) => candidate.id.startsWith(`trv-${anchorEventId}-`))
+      .filter((candidate) => candidate.name.trim().toLowerCase() === wanted).length;
   }
 
   private async findTripForTraveller(travellerId: EntityId): Promise<EntityId | undefined> {
