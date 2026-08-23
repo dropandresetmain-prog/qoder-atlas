@@ -35,6 +35,8 @@ import { processSignal, type ProcessedSignal } from './signalPipeline.ts';
 import { runPlanningLoop, type ToolActivity } from './planningLoop.ts';
 import type { ToolDispatchCapabilities } from './dispatch.ts';
 import { seedScenarioBundle } from './bootstrap.ts';
+import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
+import type { ProgrammeService } from './programme.ts';
 import type { RecoveryExecutionService } from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
@@ -59,6 +61,12 @@ export interface RuntimeDependencies {
   viability: ViabilityEngine;
   /** Scenario bundles live under `<fixturesDir>/scenarios` (generic walk). */
   fixturesDir: string;
+  /**
+   * Optional programme bundles under `<fixturesDir>/programmes`: reset also
+   * reseeds programme-scale state through the programme services. Absent
+   * keeps the scenario-only reset semantics unchanged.
+   */
+  programmeService?: ProgrammeService;
 }
 
 export interface RuntimePlanOutcome {
@@ -111,6 +119,8 @@ export interface RuntimeResetOutcome {
   reset: true;
   seededScenarios: string[];
   tripIds: EntityId[];
+  /** Programme bundles reseeded (empty when none are wired). */
+  seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }>;
 }
 
 /**
@@ -260,9 +270,10 @@ export class RuntimeOrchestrator {
 
   /**
    * Deterministic reset/reseed: wipe every logical store in one transaction,
-   * then reseed all accepted scenario bundles through the same validated seed
-   * path bootstrap uses. Identical fixtures => identical starting state; no
-   * manual database surgery needed to restore the demo.
+   * then reseed all accepted scenario bundles AND programme bundles through
+   * the same validated seed paths bootstrap uses. Identical fixtures =>
+   * identical starting state (trips, programmes, audit) — no residue between
+   * demo cases and no manual database surgery anywhere in the demo flow.
    */
   async reset(at: IsoDateTime): Promise<RuntimeResetOutcome> {
     withTransaction(this.deps.db, () => {
@@ -286,14 +297,26 @@ export class RuntimeOrchestrator {
       seededScenarios.push(outcome.scenarioId);
       tripIds.push(outcome.tripId);
     }
+
+    // Programme-scale state reseeds through the SAME services the HTTP
+    // surface uses — the bundle carries all demo facts.
+    const seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }> = [];
+    if (this.deps.programmeService) {
+      for (const programmeDir of listProgrammeDirs(join(this.deps.fixturesDir, 'programmes'))) {
+        const outcome = await seedProgrammeBundle(this.deps.programmeService, programmeDir);
+        seededProgrammes.push({ anchorEventId: outcome.anchorEventId, promotedCount: outcome.promotedCount });
+        tripIds.push(...outcome.tripIds);
+      }
+    }
+
     await this.deps.audit.append({
       occurredAt: at,
       actor: 'app:runtime',
       action: 'RUNTIME_RESET',
       subject: tripIds[0],
-      payload: { seededScenarios, tripIds },
+      payload: { seededScenarios, tripIds, seededProgrammes },
     });
-    return { reset: true, seededScenarios, tripIds };
+    return { reset: true, seededScenarios, tripIds, seededProgrammes };
   }
 
   private snapshotDeps(): SnapshotDependencies {

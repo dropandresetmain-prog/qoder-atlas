@@ -1,0 +1,792 @@
+{
+  "context": {
+    "at": "2026-08-31T00:00:00+00:00",
+    "sourceId": "src-evt-w3-demo",
+    "organisation": {
+      "id": "org-evt-w3-demo",
+      "name": "Synthetic Programme Organiser",
+      "roles": [
+        "EVENT_ORGANISER",
+        "PAYER"
+      ]
+    },
+    "places": [
+      {
+        "id": "plc-evt-w3-demo-venue",
+        "name": "Synthetic Summit Venue",
+        "kind": "VENUE",
+        "timezone": "Asia/Singapore",
+        "externalRefs": []
+      },
+      {
+        "id": "plc-evt-w3-demo-airport",
+        "name": "Synthetic Summit Airport",
+        "kind": "AIRPORT",
+        "timezone": "Asia/Singapore",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "SYN"
+          }
+        ]
+      }
+    ],
+    "anchorEvent": {
+      "id": "evt-w3-demo",
+      "name": "Synthetic Programme Summit",
+      "kind": "CONFERENCE",
+      "placeId": "plc-evt-w3-demo-venue",
+      "window": {
+        "startsAt": "2026-09-07T00:00:00+08:00",
+        "endsAt": "2026-09-11T23:59:00+08:00"
+      },
+      "organiserOrganisationId": "org-evt-w3-demo",
+      "commitments": [
+        {
+          "id": "cmt-evt-w3-demo-opening",
+          "anchorEventId": "evt-w3-demo",
+          "title": "Opening Session",
+          "kind": "SESSION",
+          "placeId": "plc-evt-w3-demo-venue",
+          "startsAt": {
+            "value": "2026-09-08T15:00:00+08:00",
+            "sourceId": "src-evt-w3-demo",
+            "authority": "AUTHORITATIVE",
+            "observedAt": "2026-08-31T00:00:00+00:00"
+          },
+          "endsAt": {
+            "value": "2026-09-08T17:00:00+08:00",
+            "sourceId": "src-evt-w3-demo",
+            "authority": "AUTHORITATIVE",
+            "observedAt": "2026-08-31T00:00:00+00:00"
+          },
+          "sourceId": "src-evt-w3-demo"
+        },
+        {
+          "id": "cmt-evt-w3-demo-closing",
+          "anchorEventId": "evt-w3-demo",
+          "title": "Closing Session",
+          "kind": "SESSION",
+          "placeId": "plc-evt-w3-demo-venue",
+          "startsAt": {
+            "value": "2026-09-11T09:00:00+08:00",
+            "sourceId": "src-evt-w3-demo",
+            "authority": "AUTHORITATIVE",
+            "observedAt": "2026-08-31T00:00:00+00:00"
+          },
+          "endsAt": {
+            "value": "2026-09-11T11:00:00+08:00",
+            "sourceId": "src-evt-w3-demo",
+            "authority": "AUTHORITATIVE",
+            "observedAt": "2026-08-31T00:00:00+00:00"
+          },
+          "sourceId": "src-evt-w3-demo"
+        }
+      ],
+      "sourceIds": []
+    },
+    "ruleSets": [
+      {
+        "id": "rs-evt-w3-demo-funding",
+        "kind": "EVENT",
+        "name": "event funding window",
+        "ownerOrganisationId": "org-evt-w3-demo",
+        "sourceId": "src-evt-w3-demo",
+        "rules": [
+          {
+            "id": "rule-evt-w3-demo-funded-window",
+            "kind": "FUNDED_WINDOW",
+            "sourceId": "src-evt-w3-demo",
+            "appliesTo": [],
+            "windowStart": "2026-09-07T00:00:00+08:00",
+            "windowEnd": "2026-09-11T23:59:00+08:00",
+            "coveredBy": "EVENT_ORGANISATION",
+            "incrementalPayer": "TRAVELLER"
+          }
+        ]
+      }
+    ]
+  },
+  "importDraft": {
+    "id": "import-evt-w3-demo",
+    "anchorEventId": "evt-w3-demo",
+    "channel": "BULK_IMPORT",
+    "sourceId": "src-evt-w3-demo",
+    "receivedAt": "2026-08-31T00:00:00+00:00",
+    "travellers": [
+      {
+        "draftId": "draft-1",
+        "displayName": "Delegate 01",
+        "identity": {
+          "email": "delegate1@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-2",
+        "displayName": "Delegate 02",
+        "identity": {
+          "email": "delegate2@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-3",
+        "displayName": "Delegate 03",
+        "identity": {
+          "email": "delegate3@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-4",
+        "displayName": "Delegate 04",
+        "identity": {
+          "email": "delegate4@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-5",
+        "displayName": "Delegate 05",
+        "identity": {
+          "email": "delegate5@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-6",
+        "displayName": "Delegate 06",
+        "identity": {
+          "email": "delegate6@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-7",
+        "displayName": "Delegate 07",
+        "identity": {
+          "email": "delegate7@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-8",
+        "displayName": "Delegate 08",
+        "identity": {
+          "email": "delegate8@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-9",
+        "displayName": "Delegate 09",
+        "identity": {
+          "email": "delegate9@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-10",
+        "displayName": "Delegate 10",
+        "identity": {
+          "email": "delegate10@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-11",
+        "displayName": "Delegate 11",
+        "identity": {
+          "email": "delegate11@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-12",
+        "displayName": "Delegate 12",
+        "identity": {
+          "email": "delegate12@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-13",
+        "displayName": "Delegate 13",
+        "identity": {
+          "email": "delegate13@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-14",
+        "displayName": "Delegate 14",
+        "identity": {
+          "email": "delegate14@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-15",
+        "displayName": "Delegate 15",
+        "identity": {
+          "email": "delegate15@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-16",
+        "displayName": "Delegate 16",
+        "identity": {
+          "email": "delegate16@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-17",
+        "displayName": "Delegate 17",
+        "identity": {
+          "email": "delegate17@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-18",
+        "displayName": "Delegate 18",
+        "identity": {
+          "email": "delegate18@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-19",
+        "displayName": "Delegate 19",
+        "identity": {
+          "email": "delegate19@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-20",
+        "displayName": "Delegate 20",
+        "identity": {
+          "email": "delegate20@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-21",
+        "displayName": "Delegate 21",
+        "identity": {
+          "email": "delegate21@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-22",
+        "displayName": "Delegate 22",
+        "identity": {
+          "email": "delegate22@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-23",
+        "displayName": "Delegate 23",
+        "identity": {
+          "email": "delegate23@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-24",
+        "displayName": "Delegate 24",
+        "identity": {
+          "email": "delegate24@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-25",
+        "displayName": "Delegate 25",
+        "identity": {
+          "email": "delegate25@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-26",
+        "displayName": "Delegate 26",
+        "identity": {
+          "email": "delegate26@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-27",
+        "displayName": "Delegate 27",
+        "identity": {
+          "email": "delegate27@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-28",
+        "displayName": "Delegate 28",
+        "identity": {
+          "email": "delegate28@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-29",
+        "displayName": "Delegate 29",
+        "identity": {
+          "email": "delegate29@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-30",
+        "displayName": "Delegate 30",
+        "identity": {
+          "email": "delegate30@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-opening"
+        ]
+      },
+      {
+        "draftId": "draft-31",
+        "displayName": "Delegate 31",
+        "identity": {
+          "email": "delegate31@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-32",
+        "displayName": "Delegate 32",
+        "identity": {
+          "email": "delegate32@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-33",
+        "displayName": "Delegate 33",
+        "identity": {
+          "email": "delegate33@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-34",
+        "displayName": "Delegate 34",
+        "identity": {
+          "email": "delegate34@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-35",
+        "displayName": "Delegate 35",
+        "identity": {
+          "email": "delegate35@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-36",
+        "displayName": "Delegate 36",
+        "identity": {
+          "email": "delegate36@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-37",
+        "displayName": "Delegate 37",
+        "identity": {
+          "email": "delegate37@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-38",
+        "displayName": "Delegate 38",
+        "identity": {
+          "email": "delegate38@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-39",
+        "displayName": "Delegate 39",
+        "identity": {
+          "email": "delegate39@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-40",
+        "displayName": "Delegate 40",
+        "identity": {
+          "email": "delegate40@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-41",
+        "displayName": "Delegate 41",
+        "identity": {
+          "email": "delegate41@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      },
+      {
+        "draftId": "draft-42",
+        "displayName": "Delegate 42",
+        "identity": {
+          "email": "delegate42@example.test"
+        },
+        "homeLocationText": "SYN",
+        "nationalityCodes": [
+          "SG"
+        ],
+        "accessibilityStatements": [],
+        "notes": [],
+        "anchorCommitmentIds": [
+          "cmt-evt-w3-demo-closing"
+        ]
+      }
+    ],
+    "unresolvedStatements": []
+  }
+}
