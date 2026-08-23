@@ -13,3 +13,25 @@ export { atlasScheduleAtAirport, atlasScheduleToIso } from './atlas/normalize.ts
 export type { AtlasTimezoneResolver } from './atlas/normalize.ts';
 export { GOOGLE_ROUTES_PROVIDER_ID, GoogleRoutesAdapter, normalizeRouteContext } from './googleRoutes/adapter.ts';
 export type { GoogleRoutesAdapterOptions } from './googleRoutes/adapter.ts';
+export {
+  DUFFEL_STAYS_PROVIDER_ID,
+  DUFFEL_STAYS_DEFAULT_BASE_URL,
+  DuffelStaysAdapter,
+  normalizeBook,
+  normalizeCancel,
+  normalizeModify,
+  normalizeQuote,
+  normalizeRetrieve,
+  normalizeSearch,
+  normalizeStayContext,
+} from './hotel/duffelStaysAdapter.ts';
+export type {
+  DuffelStaysAdapterOptions,
+  DuffelStaysBookRaw,
+  DuffelStaysCancelRaw,
+  DuffelStaysModifyRaw,
+  DuffelStaysQuoteRaw,
+  DuffelStaysRetrieveRaw,
+  DuffelStaysSearchRaw,
+  DuffelStaysStayContextRaw,
+} from './hotel/duffelStaysAdapter.ts';

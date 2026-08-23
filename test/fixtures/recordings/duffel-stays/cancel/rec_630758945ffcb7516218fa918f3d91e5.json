@@ -1,0 +1,15 @@
+{
+  "id": "rec_630758945ffcb7516218fa918f3d91e5",
+  "providerId": "duffel-stays",
+  "operation": "cancel",
+  "recordedAt": "2026-08-23T00:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "confirmed": true,
+      "reference": "cancel-ref-001",
+      "fee_amount": "0",
+      "fee_currency": "USD"
+    }
+  }
+}
