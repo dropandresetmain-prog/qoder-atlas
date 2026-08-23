@@ -51,6 +51,7 @@ import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
 import { ProgrammeService } from './programme.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
+import { createResolutionHandlers } from './resolutionHttp.ts';
 
 export interface ComposedRuntime {
   db: DatabaseSync;
@@ -218,6 +219,19 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
       cases,
       audit,
       modelClient,
+    }),
+    resolution: createResolutionHandlers({
+      trips,
+      entities,
+      signals,
+      cases,
+      audit,
+      planner,
+      capabilities: { flight, routing },
+      capabilityDescriptors,
+      viability,
+      sources,
+      preferences,
     }),
   };
 

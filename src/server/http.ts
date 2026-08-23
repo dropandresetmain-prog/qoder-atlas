@@ -67,6 +67,16 @@ export interface ProgrammeHandlers {
   mapBrief(body: unknown): Promise<{ status: number; body: unknown }>;
 }
 
+/**
+ * Resolution surface (Northstar RV-N3/RV-N5). Initial planning for
+ * engagement-only trips and traveller ChangeRequest resolution; handlers
+ * receive wire JSON and return status + body.
+ */
+export interface ResolutionHandlers {
+  initialPlan(body: unknown): Promise<{ status: number; body: unknown }>;
+  changeRequest(body: unknown): Promise<{ status: number; body: unknown }>;
+}
+
 /** Application endpoints the HTTP surface projects; wired by the integrator. */
 export interface AppEndpoints {
   now(): IsoDateTime;
@@ -83,6 +93,8 @@ export interface AppEndpoints {
   runtime?: RuntimeHandlers;
   /** Present when the Northstar programme surface is wired. */
   programme?: ProgrammeHandlers;
+  /** Present when the Northstar resolution surface is wired. */
+  resolution?: ResolutionHandlers;
 }
 
 const PAGE_LINKS = { dashboard: '/operator', traveller: '/traveller' };
@@ -356,6 +368,34 @@ async function handle(
     }
     if (segments[2] === 'map-brief') {
       const outcome = await handlers.mapBrief(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    sendJson(res, 404, { error: 'not_found', path: url.pathname });
+    return;
+  }
+
+  // --- Resolution surface (Northstar RV-N3/RV-N5) ---------------------------
+  if (endpoints.resolution && segments[0] === 'api' && segments[1] === 'resolution') {
+    const handlers = endpoints.resolution;
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readBody(req));
+    } catch {
+      sendJson(res, 400, { error: 'invalid_json' });
+      return;
+    }
+    if (segments[2] === 'initial-plan') {
+      const outcome = await handlers.initialPlan(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'change-request') {
+      const outcome = await handlers.changeRequest(parsed);
       sendJson(res, outcome.status, outcome.body);
       return;
     }
