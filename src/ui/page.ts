@@ -1,6 +1,9 @@
 /**
  * E2 — HTML document shell. Nav links are injected so the integrator (E3)
  * can map them onto real application routes; previews use relative files.
+ *
+ * The brand block is the only place the product wordmark lives; screens
+ * never restate it. Theme is inlined (no static-asset dependency).
  */
 import { THEME_CSS } from './theme.ts';
 import { escapeHtml } from './html.ts';
@@ -37,12 +40,12 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(options.title)} · Atlas Trip Recovery</title>
+<title>${escapeHtml(options.title)} · Northstar</title>
 <style>${THEME_CSS}</style>
 </head>
-<body>
+<body class="${isOperator ? 'surface-operator' : 'surface-traveller'}">
 <header class="topbar">
-  <div class="brand">Atlas Trip Recovery<small>keeps the whole trip working</small></div>
+  <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar<small>keeps the whole trip working</small></div>
   ${nav}
 </header>
 ${bodyHtml}

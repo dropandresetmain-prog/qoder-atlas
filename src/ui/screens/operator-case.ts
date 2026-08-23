@@ -29,6 +29,7 @@ import {
   type CaseCheckView,
   type CaseDetailView,
   type CaseResolutionView,
+  type ChainLinkView,
   type RecoveryOptionView,
 } from '../case-view-model.ts';
 
@@ -72,6 +73,39 @@ const CHECK_ICONS: Record<CaseCheckView['result'], { icon: string; iconClass: st
   FAIL: { icon: '✕', iconClass: 'ic-fail' },
   UNKNOWN: { icon: '?', iconClass: 'ic-unknown' },
 };
+
+// ---------------------------------------------------------------------------
+// Journey chain — the trip as a chain of dependent components (DESIGN.md §4.2)
+// ---------------------------------------------------------------------------
+
+/** Visual state per link. Green is healthy, grey is missing/unverified. */
+const CHAIN_LINK_STYLE: Record<ChainLinkView['state'], { cls: string; glyph: string; word: string }> = {
+  CONFIRMED: { cls: 'st-confirmed', glyph: '✓', word: 'Confirmed' },
+  PROPOSED: { cls: 'st-proposed', glyph: '◌', word: 'Proposed' },
+  BROKEN: { cls: 'st-broken', glyph: '✕', word: 'Broken' },
+  UNBOOKED: { cls: 'st-unbooked', glyph: '○', word: 'Not booked' },
+  UNKNOWN: { cls: 'st-unknown', glyph: '?', word: 'Unconfirmed' },
+  AT_RISK: { cls: 'st-atrisk', glyph: '▲', word: 'At risk' },
+};
+
+function chainLink(link: ChainLinkView): string {
+  const style = CHAIN_LINK_STYLE[link.state];
+  const glyph = link.commitment ? '✦' : style.glyph;
+  const detail = link.detail ? `<div class="l-detail">${escapeHtml(link.detail)}</div>` : '';
+  return `
+  <div class="link ${style.cls}${link.commitment ? ' is-commitment' : ''}" data-link-state="${escapeHtml(link.state)}">
+    <div class="l-kind"><span class="l-glyph" aria-hidden="true">${glyph}</span>${escapeHtml(link.kind)}</div>
+    <div class="l-name">${escapeHtml(link.label)}</div>
+    ${detail}
+    <div class="l-state">${escapeHtml(style.word)}</div>
+  </div>`;
+}
+
+/** The chain section; omitted entirely when the projection has no chain. */
+function chainSection(chain: readonly ChainLinkView[] | undefined): string | undefined {
+  if (!chain || chain.length === 0) return undefined;
+  return `<div class="chain" role="list" aria-label="The trip as a chain of dependent parts">${chain.map(chainLink).join('')}</div>`;
+}
 
 function checksSection(checks: readonly CaseCheckView[]): string | undefined {
   if (checks.length === 0) return undefined;
@@ -214,6 +248,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   </div>
   ${stepper(view)}
   ${changed}
+  ${optionalSection('The trip as it stands', chainSection(view.chain))}
   ${optionalSection(
     'What is affected',
     view.affectedItems.length > 0

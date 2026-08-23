@@ -65,7 +65,7 @@ const SUMMARY_TILE_TONE: Record<keyof Omit<ProgrammeStatusSummary, 'total'>, Sta
   atRisk: 'watch',
   disrupted: 'alert',
   recovering: 'active',
-  awaitingDecision: 'neutral',
+  awaitingDecision: 'alert',
   resolved: 'done',
   unknown: 'neutral',
 };

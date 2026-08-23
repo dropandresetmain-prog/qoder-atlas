@@ -73,6 +73,39 @@ export interface CaseResolutionView {
 }
 
 /**
+ * One link of the trip as a chain (docs/DESIGN.md §4.2). The chain is how
+ * the case view answers "is the trip still a trip?" — fixing one booking is
+ * not fixing the trip.
+ *
+ * Colour logic is binding (user-directed):
+ * - CONFIRMED renders green — a healthy component is never grey;
+ * - PROPOSED renders dashed brass — checked option, not booked yet;
+ * - BROKEN renders vermilion — no longer works as booked;
+ * - UNBOOKED / UNKNOWN render grey — grey means missing or unverifiable;
+ * - AT_RISK renders brass — standing, but something it depends on moved.
+ */
+export type ChainLinkState =
+  | 'CONFIRMED'
+  | 'PROPOSED'
+  | 'BROKEN'
+  | 'UNBOOKED'
+  | 'UNKNOWN'
+  | 'AT_RISK';
+
+export interface ChainLinkView {
+  id: EntityId;
+  /** Component kind, user-facing, e.g. "Flight", "Transfer", "Stay". */
+  kind: string;
+  /** Short name, e.g. "SQ 317 · London → Singapore". */
+  label: string;
+  /** Supporting detail, e.g. "Cancelled 15 Sep" or "2 nights · check-in 15:00". */
+  detail?: string;
+  state: ChainLinkState;
+  /** The commitment link carries the ✦ and never disappears. */
+  commitment?: boolean;
+}
+
+/**
  * Mixed-funding evidence for a case (ADR-037): the deterministic allocation
  * attached to the case's latest priced intent, with a user-facing summary.
  * Absent on the view when no allocation could be derived — UNKNOWN stays
@@ -95,6 +128,12 @@ export interface CaseDetailView {
   affectedItems: string[];
   /** The must-not-miss objective currently threatened, user-facing. */
   criticalObjectiveAtRisk?: string;
+  /**
+   * The trip as a chain of dependent components, ordered travel-first to
+   * commitment. Optional: when the projection cannot provide it, the case
+   * view falls back to the affected-items list. Never fabricated.
+   */
+  chain?: ChainLinkView[];
   checks: CaseCheckView[];
   options: RecoveryOptionView[];
   approval?: ApprovalRequirementView;

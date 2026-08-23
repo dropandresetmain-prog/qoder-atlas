@@ -7,7 +7,7 @@
  * This is a lane-local inspection aid, not application code: the integrator
  * (E3/I5) serves the same renderers from real read-model endpoints.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, copyFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -21,6 +21,7 @@ import type { CaseDetailView } from './case-view-model.ts';
 import {
   CASE_FIXTURES,
   TRAVELLER_FIXTURES,
+  TRAVELLER_PRESENTATIONS,
   operatorDashboardAlt,
   operatorDashboardError,
   operatorDashboardLoaded,
@@ -31,6 +32,7 @@ import {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const outDir = path.join(repoRoot, 'data', 'ui-preview');
+const assetsSource = path.join(repoRoot, 'fixtures', 'ui');
 
 const LINKS = { dashboard: 'operator-dashboard.html', traveller: 'traveller-awaiting-input.html' };
 
@@ -59,7 +61,7 @@ function buildPages(): GeneratedPage[] {
   }
   for (const fixture of TRAVELLER_FIXTURES) {
     pages.push(
-      page(`traveller-${fixture.id}.html`, `Traveller — ${fixture.title}`, { title: fixture.title, active: 'traveller', surface: 'traveller' }, renderTravellerTrip({ state: 'LOADED', data: fixture.view })),
+      page(`traveller-${fixture.id}.html`, `Traveller — ${fixture.title}`, { title: fixture.title, active: 'traveller', surface: 'traveller' }, renderTravellerTrip({ state: 'LOADED', data: fixture.view }, TRAVELLER_PRESENTATIONS[fixture.id])),
     );
   }
   pages.push(
@@ -89,6 +91,22 @@ for (const generated of pages) {
   await writeFile(path.join(outDir, generated.file), generated.html, 'utf8');
 }
 await writeFile(path.join(outDir, 'index.html'), indexPage(pages), 'utf8');
+
+// Presentation assets (destination photography) are referenced relatively;
+// copy them next to the generated pages when present. Missing assets degrade
+// to the ink-gradient hero — the preview never fails over a photo.
+try {
+  const assetFiles = (await readdir(assetsSource)).filter((f) => !f.startsWith('.'));
+  if (assetFiles.length > 0) {
+    const assetsOut = path.join(outDir, 'assets');
+    await mkdir(assetsOut, { recursive: true });
+    for (const file of assetFiles) {
+      await copyFile(path.join(assetsSource, file), path.join(assetsOut, file));
+    }
+  }
+} catch {
+  console.log('No fixtures/ui assets found; heroes render as ink gradients.');
+}
 
 console.log(`Wrote ${pages.length + 1} preview pages to ${outDir}`);
 console.log(`Open: ${pathToFileURL(path.join(outDir, 'index.html')).href}`);

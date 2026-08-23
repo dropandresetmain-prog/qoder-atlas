@@ -1,32 +1,26 @@
 /**
  * E2 — operator dashboard: the opening/demo hero surface.
  *
- * Answers the operator journey: who is ready / at risk / disrupted, what
- * changed, what the system is doing, what decisions are pending, what is
- * uncertain, and whether trips are actually recovered. Pure function of the
- * frozen OperatorDashboardView envelope; no scenario logic.
+ * Layout (docs/DESIGN.md): one ink readout (on-track count) + the fleet dot
+ * grid (every trip at a glance), then the "Decisions needed" queue, then the
+ * full roster ordered attention-first. Colour means state only: a healthy
+ * trip is green, grey means unconfirmed/unbooked — never "fine".
+ *
+ * Pure function of the frozen OperatorDashboardView envelope; no scenario
+ * logic, no fabricated freshness.
  */
 import type {
-  OperatorDashboardSummary,
   OperatorDashboardView,
   OperatorDecisionRequest,
   OperatorTripView,
   ReadModelEnvelope,
   ReadModelStatus,
 } from '../../contracts/readmodels.ts';
-import type { StatusTone } from '../copy.ts';
-import { STATUS_TONE } from '../copy.ts';
+import { STATUS_LABEL } from '../copy.ts';
 import { escapeHtml, formatInstant, formatMoney } from '../html.ts';
-import {
-  bulletList,
-  errorPanel,
-  loadingPanel,
-  statusBadge,
-  toneClass,
-  uncertaintyList,
-} from '../components.ts';
+import { errorPanel, loadingPanel, statusBadge } from '../components.ts';
 
-/** Urgency ordering for trip cards; deterministic, status-driven only. */
+/** Urgency ordering for rows and grid cells; deterministic, status-driven only. */
 const STATUS_PRIORITY: Record<ReadModelStatus, number> = {
   DISRUPTED: 0,
   AT_RISK: 1,
@@ -39,31 +33,79 @@ const STATUS_PRIORITY: Record<ReadModelStatus, number> = {
   RESOLVED: 8,
 };
 
-const RESPONSE_STATUS_LABEL: Record<NonNullable<OperatorTripView['travellerResponseStatus']>, string> = {
-  AWAITING: 'Waiting for the traveller to respond',
-  RESPONDED: 'The traveller has responded',
-  NOT_REQUIRED: '',
+/**
+ * Fleet-grid cell class per status. Binding colour logic (DESIGN.md §2.2):
+ * green = confirmed/healthy, brass = waiting/watching, vermilion = broken,
+ * ink = system working, hollow grey = unknown/unbooked (never "fine").
+ */
+const FLEET_CELL: Record<ReadModelStatus, string> = {
+  READY: 'd-ok',
+  RESOLVED: 'd-ok',
+  AT_RISK: 'd-watch',
+  NEEDS_TRAVELLER_INFO: 'd-watch',
+  CHANGE_REQUESTED: 'd-watch',
+  DISRUPTED: 'd-bad',
+  RECOVERING: 'd-active',
+  PLANNING: 'd-active',
+  UNKNOWN: 'd-empty',
 };
 
-function tile(label: string, count: number, tone: StatusTone, attention = false): string {
+function sortByUrgency(trips: readonly OperatorTripView[]): OperatorTripView[] {
+  return [...trips].sort((a, b) => {
+    const diff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
+    return diff !== 0 ? diff : a.tripId.localeCompare(b.tripId);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Readout: ink block + fleet grid
+// ---------------------------------------------------------------------------
+
+function readoutBlock(view: OperatorDashboardView): string {
+  const trips = view.trips;
+  const onTrack = trips.filter((t) => t.status === 'READY' || t.status === 'RESOLVED').length;
+  const watching = trips.filter((t) => t.status === 'AT_RISK' || t.status === 'NEEDS_TRAVELLER_INFO').length;
+  const working = trips.filter((t) => t.status === 'RECOVERING' || t.status === 'CHANGE_REQUESTED' || t.status === 'PLANNING').length;
+  const unknown = trips.filter((t) => t.status === 'UNKNOWN').length;
+  const decisions = view.summary.awaitingDecision;
   return `
-  <div class="${toneClass(tone, 'tile')}${attention ? ' is-attention' : ''}">
-    <div class="tile-count">${count}</div>
-    <div class="tile-label">${escapeHtml(label)}</div>
+  <div class="readout-ink">
+    <div class="ri-label">On track</div>
+    <div class="big big-settle">${onTrack}<span class="unit">/${trips.length}</span></div>
+    <div class="sub">
+      <span class="seg-warn">${watching} watching</span><span class="dot">·</span>
+      <span class="${decisions > 0 ? 'seg-bad' : 'seg-dim'}">${decisions} need a decision</span><span class="dot">·</span>
+      <span class="seg-dim">${working} in recovery</span><span class="dot">·</span>
+      <span class="seg-dim">${unknown} unconfirmed</span>
+    </div>
   </div>`;
 }
 
-function summaryTiles(summary: OperatorDashboardSummary, resolvedCount: number): string {
+function fleetGrid(view: OperatorDashboardView): string {
+  const sorted = sortByUrgency(view.trips);
+  const cells = sorted
+    .map((trip, i) => {
+      const label = `${trip.label ?? trip.tripId} — ${STATUS_LABEL[trip.status]}`;
+      return `<i class="${FLEET_CELL[trip.status]}" style="--i:${i}" data-fleet-status="${escapeHtml(trip.status)}" title="${escapeHtml(label)}"></i>`;
+    })
+    .join('');
   return `
-  <section class="tiles" aria-label="Trip readiness summary">
-    ${tile('Ready', summary.ready, 'ok')}
-    ${tile('At risk', summary.atRisk, 'watch', summary.atRisk > 0)}
-    ${tile('Needs attention', summary.disrupted, 'alert', summary.disrupted > 0)}
-    ${tile('Recovery under way', summary.recovering, 'active', summary.recovering > 0)}
-    ${tile('Recovered', resolvedCount, 'done')}
-    ${tile('Decisions needed', summary.awaitingDecision, 'neutral', summary.awaitingDecision > 0)}
-  </section>`;
+  <div class="readout-fleet">
+    <div class="fc-head"><span>Fleet · ${view.trips.length} trips</span><span class="fc-live">Live</span></div>
+    <div class="dotgrid" role="img" aria-label="All trips at a glance, ordered by what needs attention first">${cells}</div>
+    <div class="legend">
+      <span><i class="l-ok"></i>Ready / recovered</span>
+      <span><i class="l-watch"></i>Watching</span>
+      <span><i class="l-bad"></i>Needs attention</span>
+      <span><i class="l-active"></i>Recovery under way</span>
+      <span><i class="l-empty"></i>Unconfirmed</span>
+    </div>
+  </div>`;
 }
+
+// ---------------------------------------------------------------------------
+// Decisions queue
+// ---------------------------------------------------------------------------
 
 interface PendingDecisionRow {
   trip: OperatorTripView;
@@ -80,83 +122,67 @@ function collectPendingDecisions(view: OperatorDashboardView): PendingDecisionRo
   return rows;
 }
 
+function decisionRow({ trip, decision }: PendingDecisionRow, index: number): string {
+  const isApproval = decision.decisionType === 'APPROVAL';
+  const glyph = isApproval ? '!' : '?';
+  const glyphClass = isApproval ? 'g-bad' : 'g-warn';
+  const amount = decision.amount ? ` · ${escapeHtml(formatMoney(decision.amount))}` : '';
+  const when = decision.requestedAt ? formatInstant(decision.requestedAt) : 'timing unconfirmed';
+  return `
+  <div class="qrow" style="--i:${index}" data-case-id="${escapeHtml(decision.caseId)}">
+    <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
+    <span class="q-name">${escapeHtml(trip.label ?? trip.tripId)}</span>
+    <span class="q-issue">${escapeHtml(decision.description)}${amount}</span>
+    <span class="q-time">${escapeHtml(when)}</span>
+  </div>`;
+}
+
 function decisionsPanel(rows: PendingDecisionRow[]): string {
   if (rows.length === 0) return '';
-  const items = rows
-    .map(({ trip, decision }) => {
-      const amount = decision.amount ? ` · ${escapeHtml(formatMoney(decision.amount))}` : '';
-      const kind = decision.decisionType === 'APPROVAL' ? 'Approval' : 'Input needed';
-      return `<li><strong>${escapeHtml(trip.label ?? trip.tripId)}</strong> — ${escapeHtml(decision.description)} <span class="chip">${escapeHtml(kind)}</span>${amount}</li>`;
-    })
-    .join('');
   return `
   <section class="section" aria-label="Pending decisions">
-    <h2>Decisions needed</h2>
-    <div class="panel callout tone-watch" data-ui-section="pending-decisions">
-      <ul class="plain-list">${items}</ul>
-    </div>
+    <h2>Decisions needed <span class="count c-alert">${rows.length}</span></h2>
+    <div class="queue stagger" data-ui-section="pending-decisions">${rows.map(decisionRow).join('')}</div>
   </section>`;
 }
 
-function tripCard(trip: OperatorTripView): string {
-  const tone = STATUS_TONE[trip.status];
-  const changedCallout = trip.whatChanged
-    ? `<div class="${toneClass(tone, 'callout')}"><p class="callout-title">What changed</p><p>${escapeHtml(trip.whatChanged)}</p></div>`
-    : '';
-  const eventRow = trip.anchorEventName
-    ? `<div class="kv"><p class="kv-label">Event</p><p>${escapeHtml(trip.anchorEventName)}</p></div>`
-    : '';
-  const decisions = trip.pendingDecisions
-    .map(
-      (decision) =>
-        `<li>${escapeHtml(decision.description)}${decision.amount ? ` (${escapeHtml(formatMoney(decision.amount))})` : ''}</li>`,
-    )
-    .join('');
-  const decisionsBlock = decisions
-    ? `<div class="kv"><p class="kv-label">Decision needed</p><ul class="plain-list">${decisions}</ul></div>`
-    : '';
-  const affectedBlock =
-    trip.affectedItems.length > 0
-      ? `<div class="kv"><p class="kv-label">Also affected</p>${bulletList(trip.affectedItems, '')}</div>`
-      : '';
-  const activityBlock =
-    trip.systemActivity.length > 0
-      ? `<div class="kv"><p class="kv-label">What we are doing</p>${bulletList(trip.systemActivity, '')}</div>`
-      : '';
-  const resolutionBlock = trip.resolutionSummary
-    ? `<div class="kv"><p class="kv-label">Outcome</p><div class="callout tone-ok"><p>${escapeHtml(trip.resolutionSummary)}</p></div></div>`
-    : '';
-  const responseLabel = trip.travellerResponseStatus ? RESPONSE_STATUS_LABEL[trip.travellerResponseStatus] : '';
-  const responseBlock = responseLabel ? `<p class="card-sub">${escapeHtml(responseLabel)}</p>` : '';
+// ---------------------------------------------------------------------------
+// Roster
+// ---------------------------------------------------------------------------
 
+function tripRowIssue(trip: OperatorTripView): string {
+  if (trip.whatChanged) return escapeHtml(trip.whatChanged);
+  if (trip.resolutionSummary) return escapeHtml(trip.resolutionSummary);
+  return escapeHtml(STATUS_LABEL[trip.status]);
+}
+
+function tripRow(trip: OperatorTripView, index: number): string {
+  const sub = [trip.travellerNames.join(', '), trip.anchorEventName].filter(Boolean).join(' · ');
+  const extras: string[] = [];
+  if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
+  if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
+  const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
   return `
-  <article class="card trip-card status-${trip.status.toLowerCase()}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}">
-    <div class="card-head">
-      <div>
-        <h3 class="card-title">${escapeHtml(trip.label ?? trip.tripId)}</h3>
-        <p class="card-sub">${escapeHtml(trip.travellerNames.join(', '))}</p>
-      </div>
-      ${statusBadge(trip.status)}
+  <div class="brow" style="--i:${index}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}">
+    <span class="b-dot ${FLEET_CELL[trip.status]}" aria-hidden="true"></span>
+    <div>
+      <div class="b-name">${escapeHtml(trip.label ?? trip.tripId)}</div>
+      ${sub ? `<div class="b-extra">${escapeHtml(sub)}</div>` : ''}
     </div>
-    ${eventRow}
-    ${changedCallout}
-    ${affectedBlock}
-    ${activityBlock}
-    ${decisionsBlock}
-    ${uncertaintyList(trip.uncertainties)}
-    ${resolutionBlock}
-    ${responseBlock}
-    <p class="card-foot">Updated ${escapeHtml(formatInstant(trip.updatedAt))}</p>
-  </article>`;
+    <div>
+      <div class="b-issue">${tripRowIssue(trip)}</div>
+      ${extraLine}
+    </div>
+    <div class="b-right">
+      ${statusBadge(trip.status)}
+      <div class="b-time">${escapeHtml(formatInstant(trip.updatedAt))}</div>
+    </div>
+  </div>`;
 }
 
 /** Dashboard body from a loaded view (also used directly by tests). */
 export function renderOperatorDashboardBody(view: OperatorDashboardView): string {
-  const resolvedCount = view.trips.filter((trip) => trip.status === 'RESOLVED').length;
-  const sorted = [...view.trips].sort((a, b) => {
-    const diff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
-    return diff !== 0 ? diff : a.tripId.localeCompare(b.tripId);
-  });
+  const sorted = sortByUrgency(view.trips);
   return `
 <main class="shell">
   <div class="page-head">
@@ -164,12 +190,14 @@ export function renderOperatorDashboardBody(view: OperatorDashboardView): string
     <p class="sub">Every managed trip, ordered by what needs attention first.</p>
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
   </div>
-  ${summaryTiles(view.summary, resolvedCount)}
+  <div class="readout">
+    ${readoutBlock(view)}
+    ${fleetGrid(view)}
+  </div>
   ${decisionsPanel(collectPendingDecisions(view))}
   <section class="section" aria-label="Trips">
-    <div class="trip-grid">
-      ${sorted.map(tripCard).join('\n')}
-    </div>
+    <h2>All trips <span class="count">${view.trips.length}</span></h2>
+    <div class="board stagger">${sorted.map(tripRow).join('')}</div>
   </section>
   <p class="footnote">Statuses update when the underlying bookings are confirmed, not when a message is sent.</p>
 </main>`;
