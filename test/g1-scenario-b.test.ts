@@ -395,28 +395,50 @@ test('G1: Scenario B recovers RECOVERED_WITH_LOSS through identical application 
     }
   }
 
-  // Deterministic viability: the no-waiver candidate stays UNKNOWN on the
-  // deadline constraint and is rejected by the engine (UNKNOWN is never
-  // PASS); the cheaper waiver-backed replacement ranks first.
+  // Deterministic viability (REV-2 WP-R1): the no-waiver candidate stays
+  // UNKNOWN on the deadline constraint and is rejected by the engine (UNKNOWN
+  // is never PASS). The waiver-backed candidates are now rejected OUTRIGHT by
+  // the overlay: obj_b_return is a judging objective (c_b_return_buffer
+  // references it), so a candidate cannot waive its own judge to flip a hard
+  // UNKNOWN to PASS. The planning loop therefore crowns no winner —
+  // feasibility is honest, and the waiver can reach authoritative state only
+  // through an approved authority decision (Stage 5), never via overlay play.
   const noWaiver = planning.candidates.find((candidate) => candidate.strategy.summary.includes('without touching'))!;
   assert.equal(noWaiver.feasible, false);
   assert.ok(
     noWaiver.rejectionReasons.some(
       (reason) => reason.includes('c_b_return_buffer') && reason.includes('UNKNOWN'),
     ),
-    'engine-owned rejection: the unwaved deadline constraint remains UNKNOWN',
+    'engine-owned rejection: the unwaived deadline constraint remains UNKNOWN',
   );
-  const waiverCandidates = planning.candidates.filter((candidate) => candidate.feasible);
-  assert.equal(waiverCandidates.length, 2, 'both waiver-backed strategies are deterministically feasible');
-  assert.equal(planning.rankedFeasibleIds[0], planning.bestStrategyId);
-  const best = planning.strategies.find((strategy) => strategy.id === planning.bestStrategyId)!;
-  assert.ok(best.summary.includes('cheapest'), 'cheapest hard-viable waiver-backed option wins');
+  assert.ok(
+    noWaiver.viability!.softTradeoffs.some((tradeoff) => tradeoff.includes('c_b_hotel_cancel_terms')),
+    'expired hotel refund window is reported as a soft tradeoff, never a blocker',
+  );
+  const waiverCandidates = planning.candidates.filter((candidate) =>
+    candidate.strategy.candidateOperations.some((operation) => operation.op === 'WAIVE_OR_REPRIORITIZE_OBJECTIVE'),
+  );
+  assert.equal(waiverCandidates.length, 2, 'both waiver-backed strategies reach the overlay');
   for (const candidate of waiverCandidates) {
+    assert.equal(candidate.feasible, false, 'waiving the judging objective cannot make a candidate feasible');
     assert.ok(
-      candidate.viability!.softTradeoffs.some((tradeoff) => tradeoff.includes('c_b_hotel_cancel_terms')),
-      'expired hotel refund window is reported as a soft tradeoff, never a blocker',
+      candidate.rejectionReasons.some((reason) => reason.includes('objective obj_b_return')),
+      'overlay rejects waiving the judging objective with deterministic evidence',
     );
   }
+  assert.equal(planning.rankedFeasibleIds.length, 0, 'no candidate is honestly feasible: the deadline is unmeetable');
+  assert.equal(planning.bestStrategyId, undefined, 'the loop never crowns an infeasible candidate');
+
+  // Recovery therefore proceeds through EXPLICIT APPROVAL rather than the
+  // feasibility ranking: the cheapest rebook carries the traveller's waiver,
+  // which lands only because the authority decision backing execution is
+  // APPROVED (see Stage 5). Selection here is the traveller's/ desk's choice,
+  // not a viability verdict.
+  const best = planning.strategies.find((strategy) => strategy.summary.includes('cheapest'))!;
+  assert.ok(
+    best.candidateOperations.some((operation) => operation.op === 'WAIVE_OR_REPRIORITIZE_OBJECTIVE'),
+    'the approval-gated recovery carries the waiver',
+  );
 
   // Planning never mutates authoritative state.
   const preExecutionLeg = ((await harness.trips.getTrip(spec.trip.id))!.elements.find(

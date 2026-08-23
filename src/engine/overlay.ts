@@ -13,13 +13,22 @@
  * pressure planners into fabricating provenance. Missing targets and
  * judging-criteria mutation (below) are still rejected loudly.
  *
- * Judging-criteria integrity: a candidate may never mutate the constraints
- * or rule sets that already exist in the base snapshot — those ARE the
- * criteria this engine judges the candidate with (REV-C WP-C1 defence in
- * depth). Downgrading, removing or rewriting an incumbent constraint/rule
- * set to make the candidate pass is rejected deterministically. Adding brand
+ * Judging-criteria integrity: a candidate may never mutate the constraints,
+ * rule sets or judging objectives that already exist in the base snapshot —
+ * those ARE the criteria this engine judges the candidate with (REV-C WP-C1
+ * defence in depth, REV-2 WP-R1 extension). Downgrading, removing or
+ * rewriting an incumbent constraint/rule set to make the candidate pass is
+ * rejected deterministically, and so is waiving/reprioritising an objective
+ * that a constraint judges with: such an objective is part of the evaluation
+ * basis, and letting a candidate waive it would let it flip a hard
+ * FAIL/UNKNOWN to PASS by removing its own judge. An objective no constraint
+ * references judges nothing, so a candidate waiver of it cannot game
+ * viability; it is still consequential and only reaches authoritative state
+ * through an approved authority decision (recoveryExecution). Adding brand
  * new constraints remains legal: a candidate can only make its own judgement
- * stricter, never looser.
+ * stricter, never looser. A waiver that never passes this guard can still
+ * reach authoritative state the legitimate way: as an approved authority
+ * decision observed through execution (src/app/recoveryExecution.ts).
  *
  * Feasibility rule: feasible iff no HARD constraint FAILs and no HARD
  * constraint stays UNKNOWN. Soft failures/trade-offs never block feasibility
@@ -63,13 +72,22 @@ function validateCandidate(op: MutationOperation): string[] {
 
 /**
  * Structural judging-criteria guard: operations that would mutate a
- * constraint or rule set already present in the base snapshot. Purely
- * id-based against the overlay's starting state — no scenario knowledge.
+ * constraint, rule set or judging objective already present in the base
+ * snapshot. Purely id-based against the overlay's starting state — no
+ * scenario knowledge.
+ *
+ * A judging objective is one a base constraint references (its deadline /
+ * status feeds a constraint evaluation). Waiving such an objective removes
+ * the candidate's own judge and can flip a hard FAIL/UNKNOWN to PASS, so it
+ * is rejected. An objective no constraint references is not a judging
+ * criterion; a candidate waiver of it cannot affect viability and is left to
+ * the approval-gated observation path.
  */
 function judgingCriteriaIssue(
   op: MutationOperation,
   baseConstraintIds: ReadonlySet<string>,
   baseRuleSetIds: ReadonlySet<string>,
+  judgingObjectiveIds: ReadonlySet<string>,
 ): string | undefined {
   if (op.op === 'UPSERT_CONSTRAINT' && baseConstraintIds.has(op.constraint.id)) {
     return (
@@ -85,6 +103,12 @@ function judgingCriteriaIssue(
         'and cannot be upserted by a candidate under evaluation'
       );
     }
+  }
+  if (op.op === 'WAIVE_OR_REPRIORITIZE_OBJECTIVE' && judgingObjectiveIds.has(op.objectiveId)) {
+    return (
+      `candidate mutates judging criteria: objective ${op.objectiveId} is referenced by a base constraint ` +
+      'and cannot be waived or reprioritised by a candidate under evaluation'
+    );
   }
   return undefined;
 }
@@ -119,16 +143,23 @@ export class OverlayViabilityEngine implements ViabilityEngine {
     const state = stateFromSnapshot(snapshot);
 
     // The judging criteria are fixed before any candidate applies:
-    // constraints and rule sets present in the base snapshot.
+    // constraints and rule sets present in the base snapshot, plus the
+    // objectives those constraints reference (they feed constraint verdicts).
     const baseConstraintIds = new Set(snapshot.constraints.map((c) => c.id));
     const baseRuleSetIds = new Set(snapshot.ruleSets.map((rs) => rs.id));
+    const judgingObjectiveIds = new Set<string>();
+    for (const constraint of snapshot.constraints) {
+      for (const ref of constraint.refs) {
+        if (ref.entityType === 'TRIP_OBJECTIVE') judgingObjectiveIds.add(ref.id);
+      }
+    }
 
     for (const op of input.candidateOperations) {
       const issues = validateCandidate(op);
       if (issues.length > 0) {
         throw new Error(`overlay candidate rejected: ${issues.join('; ')}`);
       }
-      const criteriaIssue = judgingCriteriaIssue(op, baseConstraintIds, baseRuleSetIds);
+      const criteriaIssue = judgingCriteriaIssue(op, baseConstraintIds, baseRuleSetIds, judgingObjectiveIds);
       if (criteriaIssue) {
         throw new Error(`overlay candidate rejected: ${criteriaIssue}`);
       }

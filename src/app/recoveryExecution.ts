@@ -59,8 +59,15 @@ interface ConsequentialOperation {
  * overlay operations. Purely structural: what kind of trip element the
  * candidate replaces determines the operation vocabulary entry — no
  * scenario/destination knowledge anywhere on this path.
+ *
+ * REV-2 WP-R1: waiving or reprioritising a traveller objective is itself a
+ * consequential act on the traveller's trip. A strategy carrying a waiver must
+ * therefore never be classified REVERSIBLE (which the default authority ladder
+ * auto-approves): the side-effect level is escalated to IRREVERSIBLE so the
+ * intent reaches an approval-requiring authority outcome.
  */
 export function consequentialOperationFor(operations: MutationOperation[]): ConsequentialOperation {
+  const carriesWaiver = operations.some((operation) => operation.op === 'WAIVE_OR_REPRIORITIZE_OBJECTIVE');
   for (const operation of operations) {
     if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') continue;
     const element = operation.data as Record<string, unknown>;
@@ -74,10 +81,19 @@ export function consequentialOperationFor(operations: MutationOperation[]): Cons
       }
     }
     if (elementKind === 'STAY') {
-      return { operation: 'hotel.modify', capability: 'HOTEL', sideEffectLevel: 'REVERSIBLE' };
+      // A waiver riding with a stay change still demands approval.
+      return {
+        operation: 'hotel.modify',
+        capability: 'HOTEL',
+        sideEffectLevel: carriesWaiver ? 'IRREVERSIBLE' : 'REVERSIBLE',
+      };
     }
   }
-  return { operation: 'simulation.provider_action', capability: 'SIMULATION', sideEffectLevel: 'REVERSIBLE' };
+  return {
+    operation: 'simulation.provider_action',
+    capability: 'SIMULATION',
+    sideEffectLevel: carriesWaiver ? 'IRREVERSIBLE' : 'REVERSIBLE',
+  };
 }
 
 /** Provider-facing parameters derived from the candidate element payloads. */
@@ -187,16 +203,29 @@ function confirmedData(data: Record<string, unknown>, confirmedAt: IsoDateTime):
  * so it is never admitted into the observation mutation. A planner-authored
  * constraint downgrade can therefore never reach authoritative state through
  * execution (FR-09, ADR-003, ADR-004).
+ *
+ * Waiver provenance (REV-2 WP-R1): a waiver is admitted into the observation
+ * mutation only when the execution it rides on is backed by an explicitly
+ * APPROVED authority decision. A planner-authored waiver that was never
+ * approved — including anything that slipped through as AUTO_APPROVED — is
+ * dropped here, making the approval provenance explicit instead of implicit.
  */
 export function confirmedOperationsFor(
   operations: MutationOperation[],
   confirmedAt: IsoDateTime,
+  authority?: AuthorityDecision,
 ): MutationOperation[] {
+  const waiverApproved =
+    authority !== undefined &&
+    authority.outcome !== 'AUTO_APPROVED' &&
+    authority.approval !== undefined &&
+    authority.approval.decision === 'APPROVED';
   const confirmed: MutationOperation[] = [];
   for (const operation of operations) {
     if (operation.op === 'WAIVE_OR_REPRIORITIZE_OBJECTIVE') {
-      // Explicit instruction evidence observed through execution survives.
-      confirmed.push(operation);
+      // Explicit instruction evidence observed through execution survives —
+      // but only when an approved authority decision originates it.
+      if (waiverApproved) confirmed.push(operation);
       continue;
     }
     if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') {
@@ -237,7 +266,9 @@ export function createRecoveryExecutor(deps: {
       if (result.status !== 'SUCCESS') return result;
       const strategy = await deps.strategyFor(execution.intent);
       if (!strategy) return result;
-      const operations = confirmedOperationsFor(strategy.candidateOperations, result.executedAt);
+      // Waiver provenance: the authority decision backing THIS execution is
+      // the only evidence that can admit a waiver into observation.
+      const operations = confirmedOperationsFor(strategy.candidateOperations, result.executedAt, execution.authority);
       if (operations.length === 0) return result;
       return {
         ...result,
