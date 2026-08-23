@@ -1,0 +1,193 @@
+{
+  "id": "rec_b3356c66cb435b7bba351460b3ed74b3",
+  "providerId": "nuitee",
+  "operation": "stay_context",
+  "recordedAt": "2026-08-23T12:59:11.392Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "940nnns93",
+      "clientReference": "qoder-atlas-rv-n7",
+      "supplierBookingId": "940nnns93",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-10-01",
+      "checkout": "2026-10-04",
+      "hotel": {
+        "hotelId": "lp21d9f",
+        "name": "Concorde Hotel Singapore"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "",
+            "retailRate": {
+              "total": {
+                "amount": 569.4,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": ""
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Property service charge",
+                  "amount": 56.94,
+                  "currency": "USD"
+                },
+                {
+                  "included": false,
+                  "description": "TAX",
+                  "amount": 51.25,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-10-01 23:59:59",
+                  "amount": 569.4,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "RO",
+            "boardName": "Room Only",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Northstar",
+          "lastName": "Replay",
+          "childrenAges": [],
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-10-01 23:59:59",
+                "amount": 569.4,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFER2BLFCEGN2CKNDUCWSEJVGUUUKHIEZEQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZI42DERCRJ5FFUR2FLFCEGTSCKRFEMWCIJMZFURCHIVNFIUKOKJLEOVKSKRBU2USVI42FOVCDJVNFSR2ZGJKEWN2DKNEVUSCILFGVEUKHJEZUIQKPJJJUQQKZIRFU2QSRKBIVSWCZKVJFER2FGJKECN2CKZDVSNCUJFGUERCLJJEFGR2VKNDUUWKSKRCU2QSTI5MVOVCBJ5FE4R2JGRBUCTKCKZEESWKEIFEVS7BVGY4S4NBQPQZDAMRWFUYDSLJSHAQDANJ2GAYDUMBQPRJE67D4PR6EIRKMKVMEKICQJRKVG7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+          "occupancy_number": 1,
+          "amount": 569.4,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Northstar",
+              "lastName": "Replay",
+              "email": "booker@example.com",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Northstar",
+        "lastName": "Replay",
+        "email": "booker@example.com",
+        "phone": "0000000000"
+      },
+      "createdAt": "2026-08-23T12:59:11",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-10-01 23:59:59",
+            "amount": 569.4,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "",
+      "optionalFees": "",
+      "mandatoryFees": "",
+      "knowBeforeYouGo": "",
+      "price": 569.4,
+      "sellingPriceToUser": 569.4,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Northstar",
+      "lastName": "Replay",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "aVFthZabE",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_FoiJlSiufQkRtcGZYTwJU",
+      "sellingPrice": "569.4",
+      "exchangeRate": 0.8560780079292404,
+      "exchangeRateUsd": 1,
+      "email": "booker@example.com",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-10-01T23:59:59Z",
+      "userId": 383174,
+      "nationality": "US",
+      "holderTitle": "",
+      "hotelId": "lp21d9f",
+      "hotelName": "Concorde Hotel Singapore",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 22.77,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "<br/><br/>Rate Notes:Hotel Tariff Notes:Rate strictly not applicable to Singapore Citizen and Permanent Residents.<br/>",
+      "payLaterDeadline": null
+    }
+  }
+}

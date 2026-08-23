@@ -31,9 +31,10 @@ const GoogleRoutesConfigSchema = z.object({
   apiKey: z.string().optional(),
 });
 
-const DuffelStaysConfigSchema = z.object({
-  baseUrl: z.string().optional(),
-  token: z.string().optional(),
+const NuiteeConfigSchema = z.object({
+  searchBaseUrl: z.string().optional(),
+  bookingBaseUrl: z.string().optional(),
+  apiKey: z.string().optional(),
 });
 
 export const AppConfigSchema = z.object({
@@ -48,7 +49,7 @@ export const AppConfigSchema = z.object({
     atlas: AtlasConfigSchema.prefault({}),
     modelStudio: ModelStudioConfigSchema.prefault({}),
     googleRoutes: GoogleRoutesConfigSchema.prefault({}),
-    duffelStays: DuffelStaysConfigSchema.prefault({}),
+    nuitee: NuiteeConfigSchema.prefault({}),
   }),
 });
 
@@ -101,9 +102,10 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
       googleRoutes: {
         apiKey: optional(env.GOOGLE_ROUTES_API_KEY),
       },
-      duffelStays: {
-        baseUrl: optional(env.DUFFEL_BASE_URL),
-        token: optional(env.DUFFEL_TOKEN),
+      nuitee: {
+        searchBaseUrl: optional(env.NUITEE_SEARCH_BASE_URL),
+        bookingBaseUrl: optional(env.NUITEE_BOOKING_BASE_URL),
+        apiKey: optional(env.NUITEE_API_KEY),
       },
     },
   };
@@ -129,7 +131,7 @@ export function loadConfig(
 /** True when the given provider section has enough config for LIVE use. */
 export function hasLiveCredentials(
   config: AppConfig,
-  provider: 'atlas' | 'modelStudio' | 'googleRoutes' | 'duffelStays',
+  provider: 'atlas' | 'modelStudio' | 'googleRoutes' | 'nuitee',
 ): boolean {
   switch (provider) {
     case 'atlas': {
@@ -142,9 +144,9 @@ export function hasLiveCredentials(
     }
     case 'googleRoutes':
       return Boolean(config.providers.googleRoutes.apiKey);
-    case 'duffelStays':
-      // The base URL defaults to the real host (see the Duffel Stays
-      // adapter), so the token alone makes LIVE reachable.
-      return Boolean(config.providers.duffelStays.token);
+    case 'nuitee':
+      // Both base URLs default to the real Nuitee Connect hosts (see the
+      // Nuitée adapter), so the API key alone makes LIVE reachable.
+      return Boolean(config.providers.nuitee.apiKey);
   }
 }

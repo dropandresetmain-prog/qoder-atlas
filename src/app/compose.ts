@@ -28,7 +28,7 @@ import { CaseVerifier, DeterministicObservationService } from '../engine/observa
 import type { AppEndpoints } from '../server/http.ts';
 import { AtlasFlightAdapter } from '../providers/atlas/adapter.ts';
 import { GoogleRoutesAdapter } from '../providers/googleRoutes/adapter.ts';
-import { DuffelStaysAdapter, DUFFEL_STAYS_DEFAULT_BASE_URL } from '../providers/hotel/duffelStaysAdapter.ts';
+import { NuiteeAdapter } from '../providers/hotel/nuiteeAdapter.ts';
 import { FileRecordingStore } from '../providers/recordingStore.ts';
 import { ModelStudioClient } from '../intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../intelligence/planner.ts';
@@ -127,9 +127,9 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
 
   // Read-only capability wiring: Atlas always present (REPLAY is
   // credential-free); Google Routes contributes only when configured or
-  // recorded; Duffel Stays replays the curated hotel corpus without
+  // recorded; Nuitée (liteAPI) replays the curated hotel corpus without
   // credentials and fails closed (NOT_CONFIGURED) for LIVE/RECORD without
-  // DUFFEL_TOKEN. Scenario bundles may ship their own recordings; the
+  // NUITEE_API_KEY. Scenario bundles may ship their own recordings; the
   // curated fixtures/recordings corpus is readable by the composed app too.
   const recordingReadDirs = [
     ...readdirSync(join(config.fixturesDir, 'scenarios'), { withFileTypes: true })
@@ -154,11 +154,12 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     store: recordingStore,
     apiKey: config.providers.googleRoutes.apiKey,
   });
-  const hotel = new DuffelStaysAdapter({
+  const hotel = new NuiteeAdapter({
     mode: config.adapterMode,
     store: recordingStore,
-    baseUrl: config.providers.duffelStays.baseUrl ?? DUFFEL_STAYS_DEFAULT_BASE_URL,
-    apiKey: config.providers.duffelStays.token,
+    searchBaseUrl: config.providers.nuitee.searchBaseUrl,
+    bookingBaseUrl: config.providers.nuitee.bookingBaseUrl,
+    apiKey: config.providers.nuitee.apiKey,
   });
   const capabilities: ToolDispatchCapabilities = { flight, routing, hotel };
   const capabilityDescriptors: CapabilityDescriptor[] = [flight.descriptor, routing.descriptor, hotel.descriptor];

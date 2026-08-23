@@ -14,27 +14,32 @@ export type { AtlasTimezoneResolver } from './atlas/normalize.ts';
 export { GOOGLE_ROUTES_PROVIDER_ID, GoogleRoutesAdapter, normalizeRouteContext } from './googleRoutes/adapter.ts';
 export type { GoogleRoutesAdapterOptions } from './googleRoutes/adapter.ts';
 export {
-  DUFFEL_STAYS_PROVIDER_ID,
-  DUFFEL_STAYS_DEFAULT_BASE_URL,
-  DuffelStaysAdapter,
+  NUITEE_PROVIDER_ID,
+  NUITEE_DEFAULT_SEARCH_BASE_URL,
+  NUITEE_DEFAULT_BOOKING_BASE_URL,
+  NUITEE_HOTEL_ID_REF_SYSTEM,
+  NuiteeAdapter,
+  mapBookingStatus,
   normalizeBook,
   normalizeCancel,
-  normalizeModify,
   normalizeQuote,
   normalizeRetrieve,
   normalizeSearch,
   normalizeStayContext,
-} from './hotel/duffelStaysAdapter.ts';
+  splitGuestName,
+} from './hotel/nuiteeAdapter.ts';
 export type {
-  DuffelStaysAdapterOptions,
-  DuffelStaysBookRaw,
-  DuffelStaysCancelRaw,
-  DuffelStaysModifyRaw,
-  DuffelStaysQuoteRaw,
-  DuffelStaysRetrieveRaw,
-  DuffelStaysSearchRaw,
-  DuffelStaysStayContextRaw,
-} from './hotel/duffelStaysAdapter.ts';
+  NuiteeAdapterOptions,
+  NuiteeBookRaw,
+  NuiteeCancelPolicyInfoRaw,
+  NuiteeCancelRaw,
+  NuiteeMoneyRaw,
+  NuiteePrebookRaw,
+  NuiteeRateRaw,
+  NuiteeRetrieveRaw,
+  NuiteeRoomTypeRaw,
+  NuiteeSearchRaw,
+} from './hotel/nuiteeAdapter.ts';
 export {
   routeContextFor,
   transferWindowImpact,

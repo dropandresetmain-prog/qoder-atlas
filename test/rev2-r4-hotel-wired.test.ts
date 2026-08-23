@@ -1,22 +1,21 @@
 /**
- * REV-2 WP-R4 — Hotel Minimum: the Duffel Stays adapter must be WIRED.
+ * REV-2 WP-R4-REDO — Hotel Minimum: the Nuitée (liteAPI) adapter must be WIRED.
  *
- * Failing-first regression suite for the Review 2 finding: the complete
- * HotelCapability adapter was unreachable — compose.ts wired only
- * { flight, routing }, dispatch.ts returned capabilityAbsent for every
- * hotel.* operation, no DUFFEL_* names existed in config, the default base
- * URL was a placeholder host, and the REPLAY corpus lived where only the
- * unit test could see it.
+ * Successor of the WP-R4 Duffel Stays suite. Duffel Stays is unavailable in
+ * Singapore, so the IMPLEMENTATION_PLAN Section 13 fallback clause fired and
+ * Nuitée takes the hotel seam; the fixtures/recordings/nuitee corpus is a
+ * genuine liteAPI sandbox capture (scripts/build-northstar-hotel-fixtures.ts).
  *
  * Post-fix expectations (credential-free):
- *  - DUFFEL_TOKEN / DUFFEL_BASE_URL are registered config names following
- *    the Atlas pattern, with hasLiveCredentials('duffelStays');
- *  - the adapter's default base URL is the real host (Wave-1 plan), and
+ *  - NUITEE_API_KEY / NUITEE_SEARCH_BASE_URL / NUITEE_BOOKING_BASE_URL are
+ *    registered config names following the Atlas pattern, with
+ *    hasLiveCredentials('nuitee');
+ *  - the adapter's default base URLs are the real Nuitee Connect hosts, and
  *    LIVE/RECORD still fail closed with NOT_CONFIGURED without credentials;
  *  - the COMPOSED app injects the adapter: its capability descriptors
  *    include the HOTEL family, and dispatching hotel.search through the
  *    same tool dispatcher the planning loop uses replays the committed
- *    fixtures/recordings/duffel-stays corpus — not only the unit test.
+ *    fixtures/recordings/nuitee corpus — not only the unit test.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,84 +25,99 @@ import { resolve } from 'node:path';
 import { AppConfigSchema, hasLiveCredentials, loadConfig } from '../src/config/config.ts';
 import { composeAppRuntime } from '../src/app/compose.ts';
 import { dispatchToolRequest } from '../src/app/dispatch.ts';
-import { DUFFEL_STAYS_DEFAULT_BASE_URL } from '../src/providers/hotel/duffelStaysAdapter.ts';
+import {
+  NUITEE_DEFAULT_BOOKING_BASE_URL,
+  NUITEE_DEFAULT_SEARCH_BASE_URL,
+  NUITEE_PROVIDER_ID,
+} from '../src/providers/hotel/nuiteeAdapter.ts';
+import {
+  NUITEE_CAPTURE_QUOTE_QUERY,
+  NUITEE_CAPTURE_RETRIEVE_QUERY,
+  NUITEE_CAPTURE_SEARCH_QUERY,
+} from './fixtures/nuitee-hotel-queries.ts';
 
-test('rev2-r4: DUFFEL_TOKEN / DUFFEL_BASE_URL register as config with hasLiveCredentials', () => {
-  // Absent credentials: the app still loads, and duffelStays is not live.
+test('rev2-r4: NUITEE_* variables register as config with hasLiveCredentials', () => {
+  // Absent credentials: the app still loads, and nuitee is not live.
   const bare = loadConfig({}, tmpdir());
-  assert.equal(hasLiveCredentials(bare, 'duffelStays'), false, 'no token -> not live');
+  assert.equal(hasLiveCredentials(bare, 'nuitee'), false, 'no key -> not live');
 
-  // Present credentials (Wave-1 frozen names): live becomes true. The base
-  // URL defaults to the real host, so the token alone is sufficient.
+  // Present credentials: live becomes true. Both base URLs default to the
+  // real Nuitee Connect hosts, so the API key alone is sufficient.
   const credentialed = loadConfig(
-    { DUFFEL_TOKEN: 'duffel_test_example', DUFFEL_BASE_URL: 'https://api.duffel.com' },
+    {
+      NUITEE_API_KEY: 'sand_example',
+      NUITEE_SEARCH_BASE_URL: 'https://api.liteapi.travel/v3.0',
+      NUITEE_BOOKING_BASE_URL: 'https://book.liteapi.travel/v3.0',
+    },
     tmpdir(),
   );
-  assert.equal(credentialed.providers.duffelStays.token, 'duffel_test_example');
-  assert.equal(credentialed.providers.duffelStays.baseUrl, 'https://api.duffel.com');
-  assert.equal(hasLiveCredentials(credentialed, 'duffelStays'), true, 'token -> live');
+  assert.equal(credentialed.providers.nuitee.apiKey, 'sand_example');
+  assert.equal(credentialed.providers.nuitee.searchBaseUrl, 'https://api.liteapi.travel/v3.0');
+  assert.equal(credentialed.providers.nuitee.bookingBaseUrl, 'https://book.liteapi.travel/v3.0');
+  assert.equal(hasLiveCredentials(credentialed, 'nuitee'), true, 'key -> live');
 
-  const tokenOnly = loadConfig({ DUFFEL_TOKEN: 'duffel_test_example' }, tmpdir());
-  assert.equal(hasLiveCredentials(tokenOnly, 'duffelStays'), true, 'base URL default makes the token sufficient');
+  const keyOnly = loadConfig({ NUITEE_API_KEY: 'sand_example' }, tmpdir());
+  assert.equal(hasLiveCredentials(keyOnly, 'nuitee'), true, 'default hosts make the key sufficient');
 });
 
-test('rev2-r4: adapter default base URL is the real host, never a placeholder', () => {
-  assert.equal(DUFFEL_STAYS_DEFAULT_BASE_URL, 'https://api.duffel.com');
+test('rev2-r4: adapter default base URLs are the real Nuitee Connect hosts', () => {
+  assert.equal(NUITEE_DEFAULT_SEARCH_BASE_URL, 'https://api.liteapi.travel/v3.0');
+  assert.equal(NUITEE_DEFAULT_BOOKING_BASE_URL, 'https://book.liteapi.travel/v3.0');
 });
 
-test('rev2-r4: composed app wires the hotel adapter and replays the committed corpus', async () => {
+test('rev2-r4: composed app wires the hotel adapter and replays the genuine corpus', async () => {
   const config = AppConfigSchema.parse({
     environment: 'local',
     adapterMode: 'REPLAY',
     sqlitePath: ':memory:',
     fixturesDir: resolve('fixtures'),
-    providers: { atlas: {}, modelStudio: {}, googleRoutes: {}, duffelStays: {} },
+    providers: { atlas: {}, modelStudio: {}, googleRoutes: {}, nuitee: {} },
   });
   const composed = await composeAppRuntime(config);
   try {
     // The descriptor surface advertises the HOTEL family in REPLAY.
     const hotelDescriptor = composed.capabilityDescriptors.find((descriptor) => descriptor.family === 'HOTEL');
     assert.ok(hotelDescriptor, 'the composed app advertises a HOTEL capability');
-    assert.equal(hotelDescriptor!.providerId, 'duffel-stays');
+    assert.equal(hotelDescriptor!.providerId, NUITEE_PROVIDER_ID);
     assert.equal(hotelDescriptor!.mode, 'REPLAY');
 
     // The SAME dispatcher the planning loop uses serves hotel.search from
-    // the committed fixtures/recordings/duffel-stays corpus.
+    // the committed fixtures/recordings/nuitee corpus.
     const search = await dispatchToolRequest(composed.capabilities, {
       id: 'tool-hotel-search',
       capability: 'HOTEL',
       operation: 'hotel.search',
-      parameters: {
-        location: { externalRef: { system: 'city_code', value: 'STAY-CT-001' } },
-        checkInDate: '2026-10-01',
-        checkOutDate: '2026-10-04',
-      },
-      purpose: 'regression: composed app replays the hotel corpus',
+      parameters: { ...NUITEE_CAPTURE_SEARCH_QUERY },
+      purpose: 'regression: composed app replays the genuine hotel corpus',
     });
     assert.equal(search.ok, true, JSON.stringify(search.ok ? undefined : search.error));
     if (search.ok) {
-      assert.equal(search.providerId, 'duffel-stays');
-      const properties = search.data['properties'] as Array<{ name: string }>;
-      assert.equal(properties.length, 1);
-      assert.equal(properties[0]!.name, 'Property-Synthetic-001');
+      assert.equal(search.providerId, NUITEE_PROVIDER_ID);
+      const properties = search.data['properties'] as Array<{ propertyId: string; name: string }>;
+      assert.ok(properties.length > 0);
+      assert.ok(properties.some((property) => property.propertyId === 'lp21d9f'));
       assert.ok(search.recordingId?.startsWith('rec_'), 'replay is recording-bound');
     }
 
-    // Quote and retrieve replay through the same seam.
+    // Quote and retrieve replay through the same seam with the genuine
+    // captured identifiers.
     const quote = await dispatchToolRequest(composed.capabilities, {
       id: 'tool-hotel-quote',
       capability: 'HOTEL',
       operation: 'hotel.quote',
-      parameters: { rateId: 'rate_synthetic_001' },
+      parameters: { rateId: NUITEE_CAPTURE_QUOTE_QUERY.rateId },
       purpose: 'regression: quote replays',
     });
     assert.equal(quote.ok, true, JSON.stringify(quote.ok ? undefined : quote.error));
+    if (quote.ok) {
+      assert.equal(quote.data['status'], 'QUOTED');
+    }
 
     const retrieve = await dispatchToolRequest(composed.capabilities, {
       id: 'tool-hotel-retrieve',
       capability: 'HOTEL',
       operation: 'hotel.retrieve',
-      parameters: { bookingId: 'stay_booking_001' },
+      parameters: { bookingId: NUITEE_CAPTURE_RETRIEVE_QUERY.bookingId },
       purpose: 'regression: retrieve replays',
     });
     assert.equal(retrieve.ok, true, JSON.stringify(retrieve.ok ? undefined : retrieve.error));

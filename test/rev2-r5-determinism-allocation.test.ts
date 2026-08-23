@@ -289,7 +289,7 @@ test('rev2-r5: the COMPOSED runtime planner is deterministic — no Math.random 
     adapterMode: 'REPLAY',
     sqlitePath: ':memory:',
     fixturesDir: resolve('fixtures'),
-    providers: { atlas: {}, modelStudio: {}, googleRoutes: {}, duffelStays: {} },
+    providers: { atlas: {}, modelStudio: {}, googleRoutes: {}, nuitee: {} },
   });
   const firstRuntime = await composeAppRuntime(config);
   const secondRuntime = await composeAppRuntime(config);
