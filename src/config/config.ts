@@ -6,6 +6,7 @@
  * - Optional provider credentials are never required at startup; capability adapters
  *   decide at construction time whether their configured mode needs credentials.
  * - Variable names are frozen here and mirrored in `.env.example` / docs/ENVIRONMENT.md.
+ * - Loading precedence: safe defaults → .env → .env.local → process environment.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -112,8 +113,14 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
 }
 
 /**
- * Load configuration. Reads `.env` from the working directory when present,
- * then overlays real environment variables (real env wins).
+ * Load configuration.
+ *
+ * Precedence (lowest → highest):
+ *   safe defaults → .env → .env.local → process environment
+ *
+ * Both `.env` and `.env.local` are optional; the application boots
+ * without either. `.env.local` overrides `.env` for the same key;
+ * real process environment always wins.
  */
 export function loadConfig(
   env: Record<string, string | undefined> = process.env,
@@ -124,7 +131,13 @@ export function loadConfig(
   if (existsSync(envPath)) {
     fileEnv = parseEnvFile(readFileSync(envPath, 'utf8'));
   }
-  const merged = mapEnv({ ...fileEnv, ...env });
+  let localEnv: Record<string, string> = {};
+  const envLocalPath = resolve(cwd, '.env.local');
+  if (existsSync(envLocalPath)) {
+    localEnv = parseEnvFile(readFileSync(envLocalPath, 'utf8'));
+  }
+  // Precedence: defaults < .env < .env.local < process env
+  const merged = mapEnv({ ...fileEnv, ...localEnv, ...env });
   return AppConfigSchema.parse(merged);
 }
 
