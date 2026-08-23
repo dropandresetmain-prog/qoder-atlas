@@ -1038,6 +1038,8 @@ Scope: RV-N1 commitment fan-out; RV-N2 intake (manual + bulk + LLM-assisted mapp
 - existing Checkpoint C behavior remains green;
 - alternate event/location data requires no application-code change.
 
+**NS-G1 RESULT — GREEN. NS_G1_SHA = `8ea33f2161a54e10c604a1ceb2758710470d5eac`** (branch `integration/northstar`). Evidence: 337/337 tests (43-traveller scale, manual/bulk equivalence, missing-fact honesty, commitment linkage by id, programme read model, deterministic funding, alternate-event substitution, REPLAY LLM mapping, programme HTTP + HTML surfaces); typecheck clean; lint clean; `npm run build` clean; targeted anti-hardcoding scan over `src/**` found no scenario/city/airline/fixture content (only `Asia/Singapore` timezone strings and incidental substring matches in comments). Per the gate definition this is an internal gate: the primary agent continues directly into Wave 2.
+
 **NS-G1 is an internal integration gate, not a reviewer/human checkpoint.** When it is green the primary agent continues automatically into Wave 2. **Review 1 is no longer a scheduled mandatory gate** (former default reviewer DeepSeek-V4-Flash / fallback Kimi-K2.7-Code): a bounded different-family review of the Wave 1 seam may still be used voluntarily if evidence suggests a problem (architecture drift; conference/event-specific hardcoding; duplicated programme truth outside authoritative state; AI output bypassing validation/promotion; fabricated defaults / UNKNOWN becoming certainty; shared commitment semantics; intake equivalence; alternate-event substitution; frozen RV-N0 contracts silently changed; test quality), but it must not block Wave 2 progress as a scheduled gate.
 
 ### WAVE 2 — Resolution Capabilities → NS-G2 → Review 2
