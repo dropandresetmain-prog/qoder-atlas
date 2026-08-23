@@ -180,7 +180,11 @@ export class NorthstarPlanner implements RecoveryPlanner {
       authority: 'CONNECTED' as const,
       observedAt: input.snapshot.takenAt,
     });
-    const elementId = `el-${input.snapshot.tripId}-arrival-${offer.offerId}`;
+    // Shared arrival slot: the promotion-time arrival constraint references
+    // this trip-known element id (REV-2 WP-R2), so every offer fills the SAME
+    // slot and the viability engine can judge it. The chosen offer stays
+    // identifiable via bookingRef.
+    const elementId = `el-${input.snapshot.tripId}-arrival`;
     const candidateOperations: MutationOperation[] = [
       {
         op: 'UPSERT_ENTITY',

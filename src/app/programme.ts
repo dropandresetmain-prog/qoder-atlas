@@ -28,6 +28,7 @@ import type {
 import type { RuleSet } from '../domain/rules.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { Engagement } from '../domain/elements.ts';
+import type { Constraint } from '../domain/constraints.ts';
 import {
   ProgrammeImportDraftSchema,
   type ProgrammeImportDraft,
@@ -120,11 +121,12 @@ export class ProgrammeService {
   async intakeImportDraft(input: { importDraft: ProgrammeImportDraft; at: IsoDateTime }): Promise<ImportDraftOutcome> {
     const draft = ProgrammeImportDraftSchema.parse(input.importDraft);
     const anchorEvent = await this.getAnchorEvent(draft.anchorEventId);
+    const governingRuleSetIds = await this.governingRuleSetIdsFor(anchorEvent);
     const commitmentById = new Map((anchorEvent?.commitments ?? []).map((commitment) => [commitment.id, commitment]));
 
     const outcomes: PromotionOutcome[] = [];
     for (const traveller of draft.travellers) {
-      outcomes.push(await this.promoteOne({ draft, traveller, at: input.at, commitmentById }));
+      outcomes.push(await this.promoteOne({ draft, traveller, at: input.at, commitmentById, governingRuleSetIds }));
     }
 
     await this.deps.audit.append({
@@ -161,6 +163,7 @@ export class ProgrammeService {
     traveller: ProgrammeTravellerDraft;
     at: IsoDateTime;
     commitmentById: Map<EntityId, AnchorEvent['commitments'][number]>;
+    governingRuleSetIds: EntityId[];
   }): Promise<PromotionOutcome> {
     const { draft, traveller, at } = input;
     const issues: string[] = [];
@@ -281,8 +284,10 @@ export class ProgrammeService {
           id: `obj-${resolvedTripId}-${index + 1}`,
           tripId: resolvedTripId,
           statement: `Participate in “${commitment?.title ?? commitmentId}”`,
-          // Binding strength is per traveller and unconfirmed at intake:
-          // soft until the traveller or operator confirms otherwise.
+          // Binding strength is per traveller (ADR-034: commitments carry no
+          // global hardness) and intake evidence offers none — SOFT is the
+          // derived outcome of that absence, recorded explicitly below, never
+          // a silent constant.
           hardness: 'SOFT' as const,
           status: 'ACTIVE' as const,
           linkedElementIds: [`el-${resolvedTripId}-eng-${index + 1}`],
@@ -298,12 +303,56 @@ export class ProgrammeService {
         elements: engagements,
         objectives,
         relations: [],
-        governedByRuleSetIds: [],
+        // Programme policy applicability is derived from evidence: rule sets
+        // owned by the event's organiser. Element-level governing stays empty
+        // at intake — no rule-set-to-element evidence exists yet.
+        governedByRuleSetIds: input.governingRuleSetIds,
         viability: 'UNKNOWN',
         version: 0,
         updatedAt: at,
       };
       operations.push({ op: 'UPSERT_ENTITY', entityType: 'TRIP', id: resolvedTripId, data: tripEntity });
+
+      // Judgeability (REV-2 WP-R2): every commitment-linked engagement gains
+      // a deterministic TEMPORAL HARD constraint binding arrival evidence to
+      // the commitment start. Arrival evidence arrives later via recovery
+      // proposals, so the constraint references the trip's shared arrival
+      // slot — a promotion-known element id the planner fills. Until some
+      // evidence fills it the constraint stays HARD UNKNOWN, so no candidate
+      // ignoring the arrival requirement can ever be feasible.
+      const arrivalSlotId = `el-${resolvedTripId}-arrival`;
+      for (const engagement of engagements) {
+        const constraint: Constraint = {
+          id: `c-${resolvedTripId}-arrival-before-${engagement.id}`,
+          kind: 'TEMPORAL',
+          hardness: 'HARD',
+          evaluator: 'DETERMINISTIC',
+          status: 'UNKNOWN',
+          description: 'arrival evidence must precede the linked commitment start',
+          refs: [
+            { entityType: 'TRIP_ELEMENT', id: arrivalSlotId },
+            { entityType: 'TRIP_ELEMENT', id: engagement.id },
+          ],
+          // Programme intake carries no arrival-buffer evidence: the
+          // minBufferMinutes parameter is deliberately ABSENT (evaluator
+          // default zero applies), recorded as a decision — never fabricated.
+          sourceId: draft.sourceId,
+        };
+        operations.push({ op: 'UPSERT_CONSTRAINT', constraint });
+      }
+
+      // Absent evidence is a recorded decision, not a silent constant.
+      issues.push(
+        'recorded decision: objective hardness SOFT — intake carries no binding-strength evidence (ADR-034); reprioritisation remains an approval-gated state change',
+      );
+      issues.push(
+        'recorded decision: arrival-buffer parameter absent — programme intake carries no buffer evidence; zero buffer is a recorded absence, not a fabricated default',
+      );
+      if (input.governingRuleSetIds.length === 0) {
+        issues.push(
+          'recorded decision: no governing rule sets attached — no rule set owned by the event organiser exists at promotion time',
+        );
+      }
     } else {
       // LATER_UPDATE path: keep the existing trip; only traveller facts move.
       issues.push(...(validCommitmentIds.length > 0 && draft.channel === 'LATER_UPDATE'
@@ -392,6 +441,22 @@ export class ProgrammeService {
   private async getAnchorEvent(anchorEventId: EntityId): Promise<AnchorEvent | undefined> {
     const entry = await this.deps.entities.get('ANCHOR_EVENT', anchorEventId);
     return entry?.entityType === 'ANCHOR_EVENT' ? entry.entity : undefined;
+  }
+
+  /**
+   * Rule sets applicable to a programme trip: those owned by the anchor
+   * event's organiser organisation. Generic ownership derivation only — no
+   * scenario knowledge. Sorted for deterministic promotion output.
+   */
+  private async governingRuleSetIdsFor(anchorEvent: AnchorEvent | undefined): Promise<EntityId[]> {
+    if (!anchorEvent?.organiserOrganisationId) return [];
+    const organiserOrganisationId = anchorEvent.organiserOrganisationId;
+    return (await this.deps.entities.list('RULE_SET'))
+      .filter((entry): entry is { entityType: 'RULE_SET'; entity: RuleSet } => entry.entityType === 'RULE_SET')
+      .map((entry) => entry.entity)
+      .filter((ruleSet) => ruleSet.ownerOrganisationId === organiserOrganisationId)
+      .map((ruleSet) => ruleSet.id)
+      .sort();
   }
 }
 
@@ -615,6 +680,20 @@ export function intakeUncertainties(importDraft: ProgrammeImportDraft, outcomes:
     });
   });
   for (const outcome of outcomes) {
+    // Recorded decisions (promotion-time derivations where intake evidence is
+    // absent) are honest unknowns for downstream consumers — surfaced as
+    // uncertainties, identical wording, in outcome order.
+    outcome.issues
+      .filter((issue) => issue.startsWith('recorded decision:'))
+      .forEach((decision, index) => {
+        records.push({
+          id: `unc-intake-${importDraft.id}-${outcome.draftId}-decision-${index + 1}`,
+          statement: decision,
+          aboutRefs: [],
+          sourceId: importDraft.sourceId,
+          severity: 'MEDIUM',
+        });
+      });
     if (outcome.promoted) continue;
     records.push({
       id: `unc-intake-${importDraft.id}-${outcome.draftId}`,

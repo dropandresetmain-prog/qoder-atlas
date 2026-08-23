@@ -30,6 +30,8 @@ import type { AddressInfo } from 'node:net';
 import { AppConfigSchema } from '../src/config/config.ts';
 import { createAppServer } from '../src/server/http.ts';
 import { composeAppRuntime } from '../src/app/compose.ts';
+import { buildTripSnapshot } from '../src/app/snapshot.ts';
+import type { MutationOperation } from '../src/operational/mutation.ts';
 
 const AT = '2026-09-01T00:00:00+00:00';
 const HOME_TZ = 'Asia/Singapore';
@@ -86,6 +88,22 @@ function programmeContext(eventId: string) {
           },
           sourceId: `src-${eventId}`,
         },
+        // A second commitment so the programme can contain a trip that is
+        // genuinely UNLINKED from the opening commitment (path C isolation).
+        {
+          id: `cmt-${eventId}-closing`,
+          anchorEventId: eventId,
+          title: 'Closing Session',
+          kind: 'SESSION',
+          placeId: venuePlaceId,
+          startsAt: {
+            value: '2026-09-11T09:00:00+08:00',
+            sourceId: `src-${eventId}`,
+            authority: 'AUTHORITATIVE',
+            observedAt: AT,
+          },
+          sourceId: `src-${eventId}`,
+        },
       ],
       sourceIds: [],
     },
@@ -136,9 +154,10 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
     const create = await postJson(base, '/api/programme/context', context);
     assert.equal(create.status, 200);
 
-    // Two travellers: one with resolvable home evidence (airport code), one
+    // Three travellers: one with resolvable home evidence (airport code), one
     // without — missing facts must stay missing and initial planning must
-    // fail closed for them.
+    // fail closed for them — and one linked ONLY to the closing commitment,
+    // so path C has a genuinely unlinked trip in the same event.
     const importDraft = {
       id: `import-${eventId}`,
       anchorEventId: eventId,
@@ -165,12 +184,52 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
           notes: [],
           anchorCommitmentIds: [`cmt-${eventId}-opening`],
         },
+        {
+          draftId: 'draft-3',
+          displayName: 'Traveller Closing Only',
+          identity: {},
+          nationalityCodes: [],
+          accessibilityStatements: [],
+          notes: [],
+          anchorCommitmentIds: [`cmt-${eventId}-closing`],
+        },
       ],
       unresolvedStatements: [],
     };
     const bulk = await postJson(base, '/api/programme/import', { importDraft, at: AT });
     assert.equal(bulk.status, 200);
-    assert.equal(bulk.body['promotedCount'], 2);
+    assert.equal(bulk.body['promotedCount'], 3);
+
+    // A SECOND event with its own trip: path C fan-out must neither count
+    // nor touch trips outside the changed commitment's event.
+    const otherEventId = 'evt-conv-other';
+    const otherContext = programmeContext(otherEventId);
+    const otherCreate = await postJson(base, '/api/programme/context', otherContext);
+    assert.equal(otherCreate.status, 200);
+    const otherImport = await postJson(base, '/api/programme/import', {
+      importDraft: {
+        id: `import-${otherEventId}`,
+        anchorEventId: otherEventId,
+        channel: 'BULK_IMPORT',
+        sourceId: `src-${otherEventId}`,
+        receivedAt: AT,
+        travellers: [
+          {
+            draftId: 'draft-1',
+            displayName: 'Other Event Traveller',
+            identity: {},
+            nationalityCodes: [],
+            accessibilityStatements: [],
+            notes: [],
+            anchorCommitmentIds: [`cmt-${otherEventId}-opening`],
+          },
+        ],
+        unresolvedStatements: [],
+      },
+      at: AT,
+    });
+    assert.equal(otherImport.status, 200);
+    const otherTripId = 'trip-trv-evt-conv-other-draft-1';
 
     // ------------------------------------------------------------------
     // PATH 0 — engagement-only trip -> viable trip
@@ -197,11 +256,61 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
     assert.equal(initial.status, 200);
     assert.equal(initial.body['accepted'], true);
     const caseId = initial.body['caseId'] as string;
-    const strategies = initial.body['strategies'] as Array<{ id: string; feasible: boolean; summary: string }>;
+    const strategies = initial.body['strategies'] as Array<{ id: string; feasible: boolean; summary: string; rejectionReasons: string[] }>;
     assert.ok(strategies.length >= 1, 'flight.search evidence yields arrival strategies');
+
+    // Anti-vacuity (REV-2): the promoted trip must actually be judgeable. A
+    // HARD arrival constraint exists in authoritative state, and the SAME
+    // viability engine that judged the strategies distinguishes timely from
+    // late arrivals against it — these assertions fail if viability (or the
+    // promotion-time constraint) is removed entirely.
+    const preSnapshot = await buildTripSnapshot(composed.readDeps.snapshot, linkedTripId, '2026-09-02T00:00:00+00:00');
+    const arrivalConstraints = preSnapshot.constraints.filter((c) => c.kind === 'TEMPORAL' && c.hardness === 'HARD');
+    assert.ok(arrivalConstraints.length >= 1, 'promoted programme trip carries a HARD arrival constraint');
+    const slotId = `el-${linkedTripId}-arrival`;
+    assert.ok(
+      arrivalConstraints.some((c) => c.refs.some((ref) => ref.id === slotId)),
+      'the arrival constraint binds the trip arrival slot',
+    );
+
     const feasible = strategies.filter((s) => s.feasible);
     assert.ok(feasible.length >= 1, 'the viability engine accepts the arrival strategy');
     assert.ok(feasible.some((s) => /opaque-routing-convergence-arrival/.test(s.summary)), 'strategy is evidence-bound');
+
+    // Negative probe: a too-late arrival into the SAME slot is rejected by
+    // the same engine with a named hard failure.
+    const lateProbe: MutationOperation = {
+      op: 'UPSERT_ENTITY',
+      entityType: 'TRIP_ELEMENT',
+      data: {
+        id: slotId,
+        tripId: linkedTripId,
+        elementKind: 'TRANSPORT_LEG',
+        importance: 'PREFERRED',
+        flexibility: 'FIXED',
+        reservationState: 'HELD',
+        status: 'UNKNOWN',
+        dependsOn: [],
+        governedByRuleSetIds: [],
+        data: {
+          mode: 'FLIGHT',
+          originPlaceId: `plc-${eventId}-home`,
+          destinationPlaceId: `plc-${eventId}-airport`,
+          scheduledArrival: {
+            value: '2026-09-08T16:30:00+08:00',
+            sourceId: `src-${eventId}`,
+            authority: 'CONNECTED',
+            observedAt: '2026-09-02T00:00:00+00:00',
+          },
+        },
+      },
+    };
+    const lateVerdict = await composed.readDeps.viability.evaluateOverlay({
+      baseSnapshot: preSnapshot,
+      candidateOperations: [lateProbe],
+    });
+    assert.equal(lateVerdict.feasible, false, 'viability rejects a too-late arrival');
+    assert.ok(lateVerdict.hardFailureIds.length >= 1, 'the rejection names a HARD constraint');
 
     // Deterministic authority: money-moving booking requires the traveller.
     const bestStrategyId = feasible[0]!.id;
@@ -341,8 +450,8 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
       },
     });
     assert.equal(fanOut.status, 200);
-    assert.equal(fanOut.body['linkedTripCount'], 2, 'both programme trips link the opening commitment');
-    assert.equal(fanOut.body['unlinkedTripCount'], 0);
+    assert.equal(fanOut.body['linkedTripCount'], 2, 'both opening-linked programme trips link the opening commitment');
+    assert.equal(fanOut.body['unlinkedTripCount'], 1, 'the closing-only trip is unlinked but counted for the same event');
 
     // Authoritative engagement fact moved only on the linked trips.
     const linkedRow = composed.db.prepare('SELECT data FROM trips WHERE id = ?').get(linkedTripId) as { data: string };
@@ -350,5 +459,20 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
     const engagement = linkedTrip.elements.find((el) => el.elementKind === 'ENGAGEMENT');
     const startsAt = engagement?.data as { startsAt?: { value: string } };
     assert.equal(startsAt?.startsAt?.value, '2026-09-08T10:00:00+08:00', 'linked engagement reflects the new start');
+
+    // Isolation: the unlinked same-event trip keeps its original engagement
+    // fact, and the second event's trip is untouched entirely.
+    const closingRow = composed.db.prepare('SELECT data FROM trips WHERE id = ?').get('trip-trv-evt-conv-draft-3') as { data: string };
+    const closingTrip = JSON.parse(closingRow.data) as { elements: Array<{ elementKind: string; data: Record<string, unknown> }> };
+    const closingEngagement = closingTrip.elements.find((el) => el.elementKind === 'ENGAGEMENT');
+    const closingStartsAt = closingEngagement?.data as { startsAt?: { value: string }; anchorCommitmentId?: string };
+    assert.equal(closingStartsAt?.anchorCommitmentId, `cmt-${eventId}-closing`);
+    assert.equal(closingStartsAt?.startsAt?.value, '2026-09-11T09:00:00+08:00', 'unlinked engagement fact is untouched');
+
+    const otherRow = composed.db.prepare('SELECT data FROM trips WHERE id = ?').get(otherTripId) as { data: string };
+    const otherTrip = JSON.parse(otherRow.data) as { elements: Array<{ elementKind: string; data: Record<string, unknown> }> };
+    const otherEngagement = otherTrip.elements.find((el) => el.elementKind === 'ENGAGEMENT');
+    const otherStartsAt = otherEngagement?.data as { startsAt?: { value: string } };
+    assert.equal(otherStartsAt?.startsAt?.value, '2026-09-08T15:00:00+08:00', 'second-event engagement fact is untouched');
   });
 });
