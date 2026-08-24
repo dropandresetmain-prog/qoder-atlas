@@ -423,7 +423,7 @@ export class NuiteeAdapter implements HotelCapability {
       throw capabilityFailure(
         'NETWORK',
         'nuitee_network_error',
-        `Nuitée unreachable: ${error instanceof Error ? error.message : String(error)}`,
+        `Nuitée unreachable (${error instanceof Error ? error.name : 'unknown'})`,
         true,
       );
     }
@@ -443,10 +443,12 @@ export class NuiteeAdapter implements HotelCapability {
           true,
         );
       }
+      // P0.3: raw error bodies are never echoed — they can carry PII or
+      // echoed credentials; the structured HTTP-status code is enough.
       throw capabilityFailure(
         'PROVIDER_ERROR',
         `nuitee_http_${response.status}`,
-        `Nuitée failed: ${text.slice(0, 200)}`,
+        `Nuitée failed (HTTP ${response.status})`,
       );
     }
     try {

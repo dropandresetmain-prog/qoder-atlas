@@ -292,3 +292,24 @@ ADR-047 left an accepted open risk: authority evaluated spend rules against `Act
 - **Contract delta (tiny, additive):** one optional field on `ActionIntentSchema`; `AuthorityDecision.conditions` gains a `spendExposure=…` entry when present; no other frozen contract changed. The Atlas adapter's ADR-047 pre-pay re-check keeps working unchanged because it consumes the same `authorisedAmount` the executor now fills from the frozen exposure.
 
 Canonical evidence (permanent tests, `test/wave3r-p0-spend-authority.test.ts`): delta 40 / gross 250 vs SPEND_LIMIT 100 ⇒ cannot execute; same vs threshold 100 ⇒ explicit approval required; executor ceiling == authority-reviewed gross exposure (never the delta); post-authority strategy mutation cannot raise the ceiling; missing/incomparable gross spend fails closed. Reworked: `wave3r-dr2-provider-execution.test.ts` `1D-2b` and `wave3r-r1-fixes.test.ts` R1-I1 now pin the gross-exposure semantics. Full suite (including the new file) green.
+
+## ADR-049 — Atlas order-status truthfulness: observed provider state dominates (Mission 2 Phase 0 / P0.2)
+**Status:** Accepted (Wave 3R Mission 2 Phase 0, branch `wave3r/product-build`)
+
+Before this ADR, `normalizeOrderDetails` (`src/providers/atlas/transactionAdapter.ts`) could infer `TICKETED` from ticket references alone, even when the provider had not reported a ticketed order state — and a ticketed-then-cancelled order was unrepresentable. Official Atlas documentation (`query-order`) enumerates `orderStatus` as `0` Unpaid, `1` Ticketing-in-Process (paid), `2` Ticketed, `-3` Cancelled, and `ticketStatus` `0` not issued / `1` issued. The normalizer now maps the OBSERVED provider order state directly and exclusively: `0`→HELD, `1`→PAID, `2`→TICKETED, `-3`→CANCELLED (issued ticket references preserved as reconciliation data inside `transactionState`), anything else→UNKNOWN. Ticket references alone never imply a ticketed order; an unmapped or absent status is honest UNKNOWN, never a guess. Contract delta: none — the mapping is internal to the adapter; `FlightOrderStatusView` is unchanged. Permanent tests: `test/wave3r-p0-order-status.test.ts` (four cases: enum dominance, refs-alone→UNKNOWN, ticketed-then-cancelled→CANCELLED with refs preserved, unmapped status→UNKNOWN).
+
+## ADR-050 — Provider error hygiene and strict extraction prompting (Mission 2 Phase 0 / P0.3 + P0.4)
+**Status:** Accepted (Wave 3R Mission 2 Phase 0, branch `wave3r/product-build`)
+
+**P0.3 — raw provider text never persists.** Execution results and outcome details persist into RecoveryCase state and the audit chain; provider HTTP bodies and free-text `msg` fields can echo PII or credentials, so they are never embedded in any error/detail string that crosses the adapter boundary:
+
+- Atlas client (`src/providers/atlas/client.ts`): `httpStatusFailure` and `assertProviderSuccess` carry endpoint + HTTP/provider status code only; the provider `msg` is dropped, the `providerMessage` body-parser removed. Network failures carry the error NAME, never its message.
+- Atlas transaction adapter: `providerDetail` emits `provider status <n>` only — no free text — across all ~13 outcome-detail call sites.
+- Executor (`src/app/providerExecution.ts`): provider-failure messages carry `category/code` (structured, stable) and drop the free-text `message` component (7 call sites).
+- Nuitée and Google Routes adapters: the same discipline (no body slices, no error-message echoes).
+
+Structured triage survives: provider id, category, structured code, bounded summary, retryability. Permanent test `test/wave3r-p0-provider-error-hygiene.test.ts` drives a hostile provider error echoing a fake passport number, PAN and API secret through the REAL Atlas transaction adapter → composed provider-backed executor → `RecoveryExecutionService` with SQLite case/audit persistence, and asserts the persisted case and audit projections contain the structured code/status but none of the echoed secrets. `test/providers.atlas.test.ts` C2 reworked to assert the non-echo.
+
+**P0.4 — strict validated extraction.** `EXTRACTION_SYSTEM_PROMPT` (`src/app/extraction.ts`) now states, for every task in `ExtractionTaskSchema`, the exact target schema name, field names, optional/required status, defaults, and the complete closed enum vocabularies (AnchorEventKind, RuleSetKind, AccessibilityRequirementKind, PreferenceBasis, SignalKind). The model is told to emit a single bare JSON object matching the task schema with no extra keys — the output still only enters the application through `validateExtraction`'s strict-object zod gate, which is the actual safety boundary. Extraction replay tests re-run green (i1/ingestion/i3/northstar suites unchanged).
+
+Contract delta: none — error strings are internal evidence, and the extraction prompt is adapter-internal; no frozen schema changed.

@@ -354,7 +354,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, verify.meta.mode,
         'offer_verification_failed',
-        `offer verification failed: ${verify.error.category}/${verify.error.code}: ${verify.error.message}`,
+        `offer verification failed: ${verify.error.category}/${verify.error.code}`,
         undefined,
         verify.error.retryable,
       );
@@ -407,7 +407,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, create.meta.mode,
         'order_create_failed',
-        `order creation failed: ${create.error.category}/${create.error.code}: ${create.error.message}`,
+        `order creation failed: ${create.error.category}/${create.error.code}`,
       );
     }
     const orderRef = create.data.transactionState?.orderRef;
@@ -504,7 +504,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, pay.meta.mode,
         'order_pay_failed',
-        `payment failed: ${pay.error.category}/${pay.error.code}: ${pay.error.message}`,
+        `payment failed: ${pay.error.category}/${pay.error.code}`,
         heldEffects,
       );
     }
@@ -628,7 +628,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, quote.meta.mode,
         'cancel_quote_failed',
-        `cancellation quote failed: ${quote.error.category}/${quote.error.code}: ${quote.error.message}`,
+        `cancellation quote failed: ${quote.error.category}/${quote.error.code}`,
       );
     }
     const quoteEffects = {
@@ -692,7 +692,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, submit.meta.mode,
         'cancel_submit_failed',
-        `cancellation submission failed: ${submit.error.category}/${submit.error.code}: ${submit.error.message}`,
+        `cancellation submission failed: ${submit.error.category}/${submit.error.code}`,
         quoteEffects,
       );
     }
@@ -807,7 +807,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, quote.meta.mode,
         'hotel_quote_failed',
-        `replacement quote failed: ${quote.error.category}/${quote.error.code}: ${quote.error.message}`,
+        `replacement quote failed: ${quote.error.category}/${quote.error.code}`,
         undefined,
         quote.error.retryable,
       );
@@ -863,7 +863,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, book.meta.mode,
         'hotel_book_failed',
-        `replacement booking failed: ${book.error.category}/${book.error.code}: ${book.error.message}`,
+        `replacement booking failed: ${book.error.category}/${book.error.code}`,
         undefined,
         book.error.retryable,
       );

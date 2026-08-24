@@ -587,8 +587,12 @@ function money(amount: number | null | undefined, currency: string | null | unde
   return { amount, currency };
 }
 
+/**
+ * P0.3: outcome details persist into case/audit state, so provider free-text
+ * (msg) is never embedded — only the structured provider status code.
+ */
 function providerDetail(raw: { status: number; msg?: string | null }): string {
-  return `provider status ${raw.status}${raw.msg ? `: ${raw.msg}` : ''}`;
+  return `provider status ${raw.status}`;
 }
 
 /** First usable order reference from a duplicate-detection payload. */
@@ -718,18 +722,38 @@ export function normalizeOrderDetails(
   if (raw.status !== 0) {
     return { ...base, status: 'UNKNOWN', detail: `order query failed (${providerDetail(raw)})` };
   }
-  // Issued tickets are the strongest observation: TICKETED regardless of the
-  // coarse order-status digit. PAID alone never implies ticketing completed.
-  if (ticketRefs.length > 0) {
-    return { ...base, status: 'TICKETED', detail: 'provider observes issued ticket(s)' };
-  }
+  // P0.2: the OBSERVED PROVIDER ORDER STATE dominates. Ticket references are
+  // reconciliation data (carried in transactionState either way), but they
+  // never infer TICKETED on their own: a ticketed-then-cancelled order still
+  // carries its issued ticket numbers while the provider reports it
+  // cancelled. Atlas documents orderStatus as `0` unpaid (held), `1`
+  // ticketing-in-process (payment accepted), `2` ticketed, `-3` cancelled.
   const orderStatus = raw.orderStatus === undefined ? undefined : String(raw.orderStatus);
   if (orderStatus === '0') return { ...base, status: 'HELD', detail: 'provider observes an unpaid held order' };
   if (orderStatus === '1') {
     return { ...base, status: 'PAID', detail: 'payment accepted; ticketing may still be in progress' };
   }
   if (orderStatus === '2') return { ...base, status: 'TICKETED', detail: 'provider observes the order as ticketed' };
-  return { ...base, status: 'UNKNOWN', detail: `unmapped provider order status ${String(raw.orderStatus)}` };
+  if (orderStatus === '-3') {
+    return {
+      ...base,
+      status: 'CANCELLED',
+      detail:
+        ticketRefs.length > 0
+          ? 'provider observes the order as cancelled; issued ticket reference(s) preserved as reconciliation data'
+          : 'provider observes the order as cancelled',
+    };
+  }
+  // Unmapped or absent order state: no trustworthy observation. Ticket
+  // references alone never promote the order to TICKETED.
+  return {
+    ...base,
+    status: 'UNKNOWN',
+    detail:
+      orderStatus === undefined
+        ? 'provider reported no order status; ticket references alone never imply a ticketed order'
+        : `unmapped provider order status ${orderStatus}`,
+  };
 }
 
 export function normalizeCancellationQuote(

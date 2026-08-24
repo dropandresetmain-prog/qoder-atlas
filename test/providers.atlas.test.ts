@@ -277,7 +277,10 @@ test('C2: non-zero provider status becomes structured PROVIDER_ERROR data', asyn
   if (!result.ok) {
     assert.equal(result.error.category, 'PROVIDER_ERROR');
     assert.equal(result.error.code, 'atlas_provider_status_5');
-    assert.match(result.error.message, /provider rejected the request/);
+    // P0.3: structured code + bounded summary only — the provider's free-text
+    // msg is never echoed into the error (it can carry PII or echoed secrets).
+    assert.ok(!result.error.message.includes('provider rejected the request'));
+    assert.match(result.error.message, /provider status 5/);
   }
 });
 

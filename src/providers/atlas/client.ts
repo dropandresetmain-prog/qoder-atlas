@@ -77,14 +77,14 @@ export class AtlasClient {
       throw capabilityFailure(
         'NETWORK',
         'atlas_network_error',
-        `Atlas ${endpoint} unreachable: ${error instanceof Error ? error.message : String(error)}`,
+        `Atlas ${endpoint} unreachable (${error instanceof Error ? error.name : 'unknown'})`,
         true,
       );
     }
 
     const text = await response.text();
     if (!response.ok) {
-      throw httpStatusFailure(endpoint, response.status, text);
+      throw httpStatusFailure(endpoint, response.status);
     }
 
     try {
@@ -119,46 +119,40 @@ export function validatedBaseUrl(baseUrl: string): string {
   return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
 }
 
-function httpStatusFailure(endpoint: string, status: number, bodyText: string): never {
-  const detail = providerMessage(bodyText) ?? `HTTP ${status}`;
+/**
+ * P0.3 — provider free text (msg fields, HTTP bodies) is never echoed into
+ * CapabilityError messages. Errors carry provider identity + category +
+ * structured code + bounded summary only; raw bodies can hold PII or echoed
+ * credentials and persist into case/audit state.
+ */
+function httpStatusFailure(endpoint: string, status: number): never {
   if (status === 401 || status === 403) {
-    throw capabilityFailure('AUTH', `atlas_http_${status}`, `Atlas ${endpoint} rejected credentials: ${detail}`);
+    throw capabilityFailure('AUTH', `atlas_http_${status}`, `Atlas ${endpoint} rejected credentials (HTTP ${status})`);
   }
   if (status === 429) {
     throw capabilityFailure('RATE_LIMITED', 'atlas_http_429', `Atlas ${endpoint} rate limited`, true);
   }
   if (status === 400 || status === 404 || status === 422) {
-    throw capabilityFailure('INVALID_REQUEST', `atlas_http_${status}`, `Atlas ${endpoint}: ${detail}`);
+    throw capabilityFailure('INVALID_REQUEST', `atlas_http_${status}`, `Atlas ${endpoint} rejected the request (HTTP ${status})`);
   }
   throw capabilityFailure(
     'PROVIDER_ERROR',
     `atlas_http_${status}`,
-    `Atlas ${endpoint} failed: ${detail}`,
+    `Atlas ${endpoint} failed (HTTP ${status})`,
     status >= 500,
   );
-}
-
-function providerMessage(bodyText: string): string | undefined {
-  try {
-    const parsed: unknown = JSON.parse(bodyText);
-    if (parsed && typeof parsed === 'object' && typeof (parsed as { msg?: unknown }).msg === 'string') {
-      return (parsed as { msg: string }).msg;
-    }
-  } catch {
-    // Non-JSON error body: fall through to the generic HTTP status message.
-  }
-  return undefined;
 }
 
 /** Atlas signals provider-level success with numeric status 0. */
 export function assertProviderSuccess(raw: unknown, endpoint: string): void {
   const body = raw as { status?: unknown; msg?: unknown };
   if (body.status !== 0) {
-    const msg = typeof body.msg === 'string' && body.msg !== '' ? body.msg : 'provider returned non-zero status';
+    // P0.3: the provider's free-text msg is never echoed — it can contain PII
+    // or echoed credentials. The structured code carries the status for triage.
     throw capabilityFailure(
       'PROVIDER_ERROR',
       `atlas_provider_status_${String(body.status)}`,
-      `Atlas ${endpoint}: ${msg}`,
+      `Atlas ${endpoint} rejected the request (provider status ${String(body.status)})`,
     );
   }
 }

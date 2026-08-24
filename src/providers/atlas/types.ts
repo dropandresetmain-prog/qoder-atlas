@@ -192,8 +192,13 @@ export const AtlasOrderDetailsBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
   orderNo: z.string().nullable().optional(),
-  /** Observed provider values: "0" held, "1" paid, "2" ticketed. */
+  /**
+   * Observed provider order lifecycle (Atlas queryOrderDetails.do docs):
+   * "0" unpaid/held, "1" ticketing-in-process (paid), "2" ticketed,
+   * "-3" cancelled. Observed order state dominates ticket references.
+   */
   orderStatus: z.union([z.string(), z.number()]).nullable().optional(),
+  /** Observed ticket issuance: "0" not issued, "1" issued. */
   ticketStatus: z.union([z.string(), z.number()]).nullable().optional(),
   totalPrice: z.number().nullable().optional(),
   currency: z.string().nullable().optional(),

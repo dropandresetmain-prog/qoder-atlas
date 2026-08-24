@@ -127,7 +127,7 @@ export class GoogleRoutesAdapter implements RoutingCapability {
       throw capabilityFailure(
         'NETWORK',
         'google_routes_network_error',
-        `Google Routes unreachable: ${error instanceof Error ? error.message : String(error)}`,
+        `Google Routes unreachable (${error instanceof Error ? error.name : 'unknown'})`,
         true,
       );
     }
@@ -141,7 +141,8 @@ export class GoogleRoutesAdapter implements RoutingCapability {
         throw capabilityFailure('RATE_LIMITED', 'google_routes_http_429', 'Google Routes rate limited', true);
       }
       if (response.status === 400) {
-        throw capabilityFailure('INVALID_REQUEST', 'google_routes_http_400', `Google Routes: ${text.slice(0, 200)}`);
+        // P0.3: raw error bodies are never echoed into error messages.
+        throw capabilityFailure('INVALID_REQUEST', 'google_routes_http_400', 'Google Routes rejected the request (HTTP 400)');
       }
       throw capabilityFailure(
         'PROVIDER_ERROR',
