@@ -10,6 +10,12 @@ import { join } from 'node:path';
 
 const FIXTURES_ROOT = join(process.cwd(), 'fixtures');
 
+/** Minimal shape this file reads off the raw programme fixture JSON. */
+interface ProgrammeTravellerDraftLike {
+  draftId: string;
+  homeLocationText?: string;
+}
+
 test('DR-9.1: synthetic-summit programme has 67 speakers', () => {
   const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
   const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
@@ -21,7 +27,9 @@ test('DR-9.2: synthetic-summit programme has 42 travel-required speakers', () =>
   const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
   const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
 
-  const travelRequired = programme.importDraft.travellers.filter((t: any) => t.homeLocationText !== 'SYN');
+  const travelRequired = programme.importDraft.travellers.filter(
+    (t: ProgrammeTravellerDraftLike) => t.homeLocationText !== 'SYN',
+  );
   assert.equal(travelRequired.length, 42, 'programme must have exactly 42 travel-required speakers');
 });
 
@@ -29,7 +37,9 @@ test('DR-9.3: synthetic-summit programme has 25 local speakers', () => {
   const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
   const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
 
-  const local = programme.importDraft.travellers.filter((t: any) => t.homeLocationText === 'SYN');
+  const local = programme.importDraft.travellers.filter(
+    (t: ProgrammeTravellerDraftLike) => t.homeLocationText === 'SYN',
+  );
   assert.equal(local.length, 25, 'programme must have exactly 25 local speakers');
 });
 
@@ -118,7 +128,9 @@ test('DR-9.11: scenario packs reference valid travellers', () => {
   const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
   const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
 
-  const travellerIds = new Set(programme.importDraft.travellers.map((t: any) => `draft-${t.draftId}`));
+  const travellerIds = new Set(
+    programme.importDraft.travellers.map((t: ProgrammeTravellerDraftLike) => `draft-${t.draftId}`),
+  );
 
   const s1Path = join(FIXTURES_ROOT, 'scenarios/s1-supplier-disruption/scenario.json');
   const s1 = JSON.parse(readFileSync(s1Path, 'utf-8'));

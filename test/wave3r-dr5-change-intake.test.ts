@@ -33,7 +33,6 @@ import {
 import { ChangeRequestSchema, type ChangeRequest } from '../src/contracts/changeRequest.ts';
 import type { ProgrammeImportDraft } from '../src/contracts/programmeIntake.ts';
 import type { AnchorEvent, Organisation, Place } from '../src/domain/entities.ts';
-import type { TransportLeg } from '../src/domain/elements.ts';
 
 const AT = '2026-09-01T00:00:00+00:00';
 

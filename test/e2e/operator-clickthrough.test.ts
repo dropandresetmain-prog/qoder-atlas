@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import type { Server } from 'node:http';
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Browser } from 'playwright';
 
 import { AppConfigSchema } from '../../src/config/config.ts';
 import { composeAppRuntime } from '../../src/app/compose.ts';
@@ -113,43 +113,7 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Wait for the form submission and page reload (same URL, new content)
   await page.waitForLoadState('networkidle', { timeout: 10000 });
-  // Give the server a moment to process and the page to update
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Debug: check what's actually on the page
-  const debugHtml = await page.content();
-  if (!debugHtml.includes('begin-strategy-btn')) {
-    console.log('DEBUG: Page content after plan click:');
-    console.log('Has plan-recovery-btn:', debugHtml.includes('plan-recovery-btn'));
-    console.log('Has begin-strategy-btn:', debugHtml.includes('begin-strategy-btn'));
-    console.log('Has recovery-actions:', debugHtml.includes('recovery-actions'));
-    console.log('Has error:', debugHtml.includes('error') || debugHtml.includes('Error'));
-    
-    // Extract error message if present
-    const errorMatch = debugHtml.match(/class="error[^"]*"[^>]*>([^<]+)/);
-    if (errorMatch) {
-      console.log('Error message:', errorMatch[1]);
-    }
-    
-    // Check for alert or dialog
-    const alertMatch = debugHtml.match(/alert|dialog|modal/i);
-    if (alertMatch) {
-      console.log('Found alert/dialog reference');
-    }
-    
-    // Print a snippet around any error-related content
-    const errorIdx = debugHtml.toLowerCase().indexOf('error');
-    if (errorIdx > -1) {
-      console.log('Error context:', debugHtml.substring(Math.max(0, errorIdx - 100), errorIdx + 300));
-    }
-    
-    // Print the main content area
-    const mainIdx = debugHtml.indexOf('<main');
-    if (mainIdx > -1) {
-      console.log('Main content:', debugHtml.substring(mainIdx, mainIdx + 1000));
-    }
-  }
-  
+
   // Wait for the "Begin Strategy" button to appear (indicates planning succeeded and options exist)
   await page.waitForSelector('[data-test="begin-strategy-btn"]', { timeout: 10000 });
 

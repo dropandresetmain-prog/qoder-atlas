@@ -19,11 +19,12 @@ import { createHash } from 'node:crypto';
 import type { EntityId, IsoDateTime, UncertaintyRecord } from '../domain/common.ts';
 import { EntityIdSchema, IsoDateTimeSchema, UncertaintyRecordSchema } from '../domain/common.ts';
 import type { AnchorEvent, Organisation, Place } from '../domain/entities.ts';
-import type { RuleSet } from '../domain/rules.ts';
 import type { ProgrammeImportDraft, ProgrammeTravellerDraft } from '../contracts/programmeIntake.ts';
 import { ProgrammeImportDraftSchema } from '../contracts/programmeIntake.ts';
 import type { RosterParseResult, RosterRecord } from './rosterParser.ts';
 import { parseRosterFromCsv } from './rosterParser.ts';
+import type { ProgrammeContextInput, ImportDraftOutcome } from './programme.ts';
+import type { ValidationIssue } from '../contracts/services.ts';
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -109,11 +110,7 @@ function makeUncertainty(
   };
 }
 
-function rosterRecordToDraft(
-  record: RosterRecord,
-  index: number,
-  anchorEventId: EntityId,
-): ProgrammeTravellerDraft {
+function rosterRecordToDraft(record: RosterRecord, index: number): ProgrammeTravellerDraft {
   const draftId = `upload-${index + 1}`;
   const identity: { email?: string; phoneE164?: string } = {};
   if (record.contact?.email) identity.email = record.contact.email;
@@ -155,13 +152,13 @@ export function createDraftProgrammeBundle(input: UploadIntakeInput): DraftProgr
 
   // Convert roster records to traveller drafts.
   const travellers: ProgrammeTravellerDraft[] = rosterResult.records.map((record, index) =>
-    rosterRecordToDraft(record, index, input.anchorEventId),
+    rosterRecordToDraft(record, index),
   );
 
   // Event brief: if structured input provided, use it; otherwise record uncertainty.
   let organisation: Organisation | undefined;
   let anchorEvent: AnchorEvent | undefined;
-  let places: Place[] = [];
+  const places: Place[] = [];
 
   if (input.eventBrief) {
     const brief = input.eventBrief;
@@ -277,16 +274,18 @@ export function createDraftProgrammeBundle(input: UploadIntakeInput): DraftProgr
  * Promote a draft programme bundle through the existing ProgrammeService.
  * This is the bridge from DR-10 upload to the authoritative promotion path.
  */
+export interface PromoteDraftBundleService {
+  applyProgrammeContext: (input: ProgrammeContextInput) => Promise<{ accepted: boolean; issues: ValidationIssue[] }>;
+  intakeImportDraft: (input: { importDraft: ProgrammeImportDraft; at: IsoDateTime }) => Promise<ImportDraftOutcome>;
+}
+
 export async function promoteDraftBundle(
-  service: {
-    applyProgrammeContext: (input: any) => Promise<{ accepted: boolean; issues: any[] }>;
-    intakeImportDraft: (input: { importDraft: ProgrammeImportDraft; at: IsoDateTime }) => Promise<any>;
-  },
+  service: PromoteDraftBundleService,
   bundle: DraftProgrammeBundle,
 ): Promise<{
   contextAccepted: boolean;
-  contextIssues: any[];
-  intakeOutcome: any;
+  contextIssues: ValidationIssue[];
+  intakeOutcome: ImportDraftOutcome | undefined;
 }> {
   const contextResult = await service.applyProgrammeContext(bundle.context);
   if (!contextResult.accepted) {

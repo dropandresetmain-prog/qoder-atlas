@@ -10,7 +10,7 @@
  */
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { Trip } from '../domain/trip.ts';
-import type { TripElement } from '../domain/elements.ts';
+import type { TripElement, TransportMode } from '../domain/elements.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import type { CaseStatus } from '../operational/case.ts';
@@ -56,6 +56,18 @@ const ELEMENT_KIND_LABEL: Record<TripElement['elementKind'], string> = {
   ENGAGEMENT: 'Engagement',
 };
 
+const TRANSPORT_MODE_LABEL: Record<TransportMode, string> = {
+  FLIGHT: 'flight',
+  TRAIN: 'train',
+  FERRY: 'ferry',
+  PUBLIC_TRANSIT: 'public transit',
+  TAXI_OR_RIDEHAIL: 'taxi',
+  PRIVATE_TRANSFER: 'private transfer',
+  CAR_RENTAL: 'rental car',
+  WALKING: 'walking',
+  OTHER: 'transport',
+};
+
 /** Generic audit-action -> user-facing activity copy. */
 const ACTIVITY_COPY: Record<string, string> = {
   SIGNAL_PROCESSED: 'Disruption recorded and trip state updated',
@@ -82,9 +94,10 @@ function describeElement(element: TripElement): string {
   if (element.elementKind === 'ENGAGEMENT') return label;
   // DR-8: the raw provider booking reference (e.g. an Atlas order id) is an
   // internal identifier, not user-facing copy — describe the element kind
-  // only. Machine-readable identity still lives in the wire/JSON views and
-  // DOM data-* attributes, never here.
-  if (element.elementKind === 'TRANSPORT_LEG') return `${label} (${element.data.mode})`;
+  // and mode through label maps only, never a raw enum value. Machine-
+  // readable identity still lives in the wire/JSON views and DOM data-*
+  // attributes, never here.
+  if (element.elementKind === 'TRANSPORT_LEG') return `${label} (${TRANSPORT_MODE_LABEL[element.data.mode]})`;
   return label;
 }
 

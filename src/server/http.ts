@@ -111,6 +111,35 @@ export interface EventIngestHandlers {
 }
 
 /**
+ * DR-5 — natural-language traveller entry point. Converges on the SAME
+ * resolveChangeRequest engine the structured `/api/resolution/change-request`
+ * route uses; both entry points coexist.
+ */
+export interface TravellerHandlers {
+  changeRequest(body: unknown): Promise<{ status: number; body: unknown }>;
+}
+
+/**
+ * DR-6 — event-change preview (no-mutate dry-run) + commit. Commit performs
+ * the real change through the SAME processCommitmentChange fan-out the
+ * legacy `/api/programme/commitment-change` route uses.
+ */
+export interface EventChangePreviewHandlers {
+  preview(anchorEventId: string, body: unknown): Promise<{ status: number; body: unknown }>;
+  commit(anchorEventId: string, body: unknown): Promise<{ status: number; body: unknown }>;
+}
+
+/**
+ * DR-10 — programme roster/upload intake. Draft generation never mutates
+ * state; promotion goes through the existing validated ProgrammeService path.
+ */
+export interface UploadIntakeHandlers {
+  rosterParse(body: unknown): Promise<{ status: number; body: unknown }>;
+  uploadDraft(body: unknown): Promise<{ status: number; body: unknown }>;
+  uploadPromote(body: unknown): Promise<{ status: number; body: unknown }>;
+}
+
+/**
  * Wave 3 operational surfaces (Gate 2): app-layer projections the UI lane
  * renders verbatim — approval queue, activity stream, uncertainties, and
  * truthful provider provenance. Never inferred on the frontend.
@@ -145,6 +174,12 @@ export interface AppEndpoints {
   resolution?: ResolutionHandlers;
   /** Present when the DR-3 flight-event ingress is wired. */
   events?: EventIngestHandlers;
+  /** Present when the DR-5 natural-language traveller entry point is wired. */
+  traveller?: TravellerHandlers;
+  /** Present when the DR-6 event-change preview/commit surface is wired. */
+  eventChangePreview?: EventChangePreviewHandlers;
+  /** Present when the DR-10 roster/upload intake surface is wired. */
+  upload?: UploadIntakeHandlers;
   /** Demo-only: scenario triggers for local clickaround. */
   demo?: DemoSurface;
 }
@@ -324,6 +359,24 @@ async function handle(
     return;
   }
 
+  // --- DR-5: natural-language traveller change-request entry point --------
+  if (endpoints.traveller && segments[0] === 'api' && segments[1] === 'traveller' && segments[2] === 'change-request') {
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await readBody(req));
+    } catch {
+      sendJson(res, 400, { error: 'invalid_json' });
+      return;
+    }
+    const outcome = await endpoints.traveller.changeRequest(parsed);
+    sendJson(res, outcome.status, outcome.body);
+    return;
+  }
+
   // --- Wave 3 operational surfaces (Gate 2) -------------------------------
   if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'wave' && endpoints.wave) {
     if (segments[2] === 'approvals') {
@@ -446,6 +499,35 @@ async function handle(
       parsed = JSON.parse(await readBody(req));
     } catch {
       sendJson(res, 400, { error: 'invalid_json' });
+      return;
+    }
+    // DR-10: /api/programme/roster/parse, /api/programme/upload/draft|promote.
+    if (endpoints.upload && segments[2] === 'roster' && segments[3] === 'parse') {
+      const outcome = await endpoints.upload.rosterParse(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (endpoints.upload && segments[2] === 'upload' && segments[3] === 'draft') {
+      const outcome = await endpoints.upload.uploadDraft(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (endpoints.upload && segments[2] === 'upload' && segments[3] === 'promote') {
+      const outcome = await endpoints.upload.uploadPromote(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+
+    // DR-6: /api/programme/:anchorEventId/change-preview|change-commit —
+    // segments[2] here is the dynamic anchorEventId, not a fixed action.
+    if (endpoints.eventChangePreview && segments[2] && segments[3] === 'change-preview') {
+      const outcome = await endpoints.eventChangePreview.preview(segments[2], parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (endpoints.eventChangePreview && segments[2] && segments[3] === 'change-commit') {
+      const outcome = await endpoints.eventChangePreview.commit(segments[2], parsed);
+      sendJson(res, outcome.status, outcome.body);
       return;
     }
     if (segments[2] === 'context') {

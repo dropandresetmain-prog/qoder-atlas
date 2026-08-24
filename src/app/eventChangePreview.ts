@@ -16,16 +16,12 @@ import { instantMillis } from '../domain/common.ts';
 import type { AnchorEvent } from '../domain/entities.ts';
 import type { Engagement } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
-import type { Constraint } from '../domain/constraints.ts';
 import type { TripSignal } from '../operational/signal.ts';
-import { AnchorCommitmentChangePayloadSchema } from '../operational/signal.ts';
 import type { EntityStore } from '../persistence/entityStore.ts';
 import type { TripRepository, SignalRepository, CaseRepository, AuditRepository } from '../contracts/repositories.ts';
 import type { MutationService } from '../contracts/services.ts';
 import { processCommitmentChange, type CommitmentFanOutOutcome } from './programme.ts';
-import { constraintsForTrip } from './snapshot.ts';
-import { evaluateConstraints, elementStartInstant } from '../engine/evaluators.ts';
-import { buildEvaluationContext } from '../engine/evaluationContext.ts';
+import { elementStartInstant } from '../engine/evaluators.ts';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -186,7 +182,7 @@ function evaluateLinkedTrip(
   trip: Trip,
   engagement: Engagement,
   input: EventChangePreviewInput,
-  commitment: AnchorEvent['commitments'][number],
+  _commitment: AnchorEvent['commitments'][number],
 ): LinkedTripEvaluation {
   const reasons: string[] = [];
   const constraintFailures: Array<{ constraintId: EntityId; description: string }> = [];
@@ -205,7 +201,7 @@ function evaluateLinkedTrip(
 
   // For temporal changes, simulate the new engagement times and check
   // whether the trip's constraints would fail.
-  let hypotheticalEngagement = { ...engagement, data: { ...engagement.data } };
+  const hypotheticalEngagement = { ...engagement, data: { ...engagement.data } };
   let temporalChange = false;
 
   if (input.newStartsAt) {
@@ -251,15 +247,6 @@ function evaluateLinkedTrip(
       constraintFailures: [],
     };
   }
-
-  // Build a hypothetical trip with the modified engagement and evaluate
-  // constraints against it. This is the core generic affectedness check.
-  const hypotheticalTrip: Trip = {
-    ...trip,
-    elements: trip.elements.map((el) =>
-      el.id === engagement.id ? hypotheticalEngagement : el,
-    ),
-  };
 
   // Check if the engagement would miss connecting transport (flight).
   let engagementMissesFlight = false;

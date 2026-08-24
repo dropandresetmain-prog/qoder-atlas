@@ -23,7 +23,6 @@ import { SqlMutationService } from '../src/engine/mutation.ts';
 import { ProgrammeService } from '../src/app/programme.ts';
 import { parseRosterFromCsv } from '../src/app/rosterParser.ts';
 import { createDraftProgrammeBundle, promoteDraftBundle } from '../src/app/uploadIntake.ts';
-import type { AnchorEvent, Organisation, Place } from '../src/domain/entities.ts';
 
 const AT = '2026-09-01T00:00:00+00:00';
 
@@ -160,7 +159,7 @@ test('dr10: draft bundle promotes through existing ProgrammeService contracts', 
   assert.ok(result.intakeOutcome);
   assert.equal(result.intakeOutcome.accepted, true);
   assert.equal(result.intakeOutcome.outcomes.length, 2);
-  assert.equal(result.intakeOutcome.outcomes.filter((o: any) => o.promoted).length, 2);
+  assert.equal(result.intakeOutcome.outcomes.filter((o) => o.promoted).length, 2);
 
   // Verify trips were created.
   const tripSummaries = await harness.trips.listTrips();
@@ -300,9 +299,10 @@ test('dr10: deterministic path requires no credentials', async () => {
   const result = await promoteDraftBundle(harness.service, bundle);
 
   assert.equal(result.contextAccepted, true);
+  assert.ok(result.intakeOutcome, 'intake outcome present once context is accepted');
   assert.equal(result.intakeOutcome.accepted, true);
   assert.equal(result.intakeOutcome.outcomes.length, 1);
-  assert.equal(result.intakeOutcome.outcomes[0].promoted, true);
+  assert.equal(result.intakeOutcome.outcomes[0]!.promoted, true);
 
   // Verify the trip was created.
   const tripSummaries = await harness.trips.listTrips();

@@ -284,7 +284,9 @@ test('DR-8.5: forbidden-jargon scan — no internal IDs or raw evidence in rende
     const caseId = disruption.caseId;
 
     const plan = await composed.orchestrator.plan({ caseId, at: '2026-09-12T18:30:00+09:00' });
-    const begin = await composed.orchestrator.begin({
+    // begin() is the side effect under test (advances the case to a state
+    // with a pending intent); its return value isn't needed here.
+    await composed.orchestrator.begin({
       caseId,
       strategyId: plan.bestStrategyId!,
       at: '2026-09-12T18:40:00+09:00',
@@ -331,6 +333,29 @@ test('DR-8.5: forbidden-jargon scan — no internal IDs or raw evidence in rende
     // changed" is the traveller-facing section populated once a disruption
     // has been recorded against this trip.
     assert.ok(travellerHtml.includes('What changed'), 'traveller view has user-facing content');
+  } finally {
+    composed.db.close();
+  }
+});
+
+test('DR-8.5b: transport mode enum never leaks raw into visible copy (regression)', async () => {
+  const composed = await composeAppRuntime(runtimeConfig);
+  try {
+    const spec = loadScenario(SCENARIO_A_DIR);
+    // el_a_transfer (mode TAXI_OR_RIDEHAIL) becomes AT_RISK once the
+    // disruption cascades — describeElement() must describe it through a
+    // label map, never interpolate the raw TransportMode enum value.
+    const disruption = await composed.orchestrator.processDisruption(spec.disruption.signal);
+    const caseId = disruption.caseId;
+    const at = '2026-09-12T18:10:00+09:00';
+
+    const caseDetail = await composed.endpoints.caseDetail(caseId, at);
+    assert.ok(caseDetail, 'case detail projected');
+    const caseHtml = renderCaseDetailBody(caseDetail!);
+    const visible = visibleText(caseHtml).toLowerCase();
+
+    assert.ok(!visible.includes('taxi_or_ridehail'), 'raw TransportMode enum never leaks into visible copy');
+    assert.ok(visible.includes('taxi'), 'the mode is still described in plain English');
   } finally {
     composed.db.close();
   }

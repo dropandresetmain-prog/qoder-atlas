@@ -27,17 +27,14 @@ import {
 import {
   EntityIdSchema,
   IsoDateTimeSchema,
-  type EntityId,
   type IsoDateTime,
   type UncertaintyRecord,
-  UncertaintyRecordSchema,
 } from '../domain/common.ts';
 import type { ModelStudioClient, ModelTask } from '../intelligence/client.ts';
 import {
   resolveChangeRequest,
   type ChangeRequestDeps,
   type ChangeRequestResolveOutcome,
-  type ChangeRequestResolveRequest,
 } from './changeRequest.ts';
 
 // ---------------------------------------------------------------------------
@@ -310,8 +307,6 @@ function interpretDeterministic(input: ChangeIntakeInput): ChangeIntakeResult {
 }
 
 function matchPatterns(text: string): DeterministicMatch | undefined {
-  const lower = text.toLowerCase();
-
   // Urgency detection: HARD_INSTRUCTION if text contains binding language.
   const isHard = /\b(must|need|require|insist|demand|urgent|immediately)\b/i.test(text);
   const urgency: ChangeRequestUrgency = isHard ? 'HARD_INSTRUCTION' : 'SOFT_PREFERENCE';

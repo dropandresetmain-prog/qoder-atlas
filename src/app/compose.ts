@@ -65,6 +65,9 @@ import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
+import { createChangeIntakeHandlers } from './changeIntakeHttp.ts';
+import { createEventChangePreviewHandlers } from './eventChangePreviewHttp.ts';
+import { createUploadIntakeHandlers } from './uploadIntakeHttp.ts';
 import { SqliteEventInboxStore } from './eventInboxStore.ts';
 import { createEventIngestHandlers } from './eventIngestHttp.ts';
 import { AtlasFlightEventNormalizer } from '../providers/atlas/eventNormalizer.ts';
@@ -436,6 +439,23 @@ export async function composeAppRuntime(
       trips,
       orchestrator,
     }),
+    traveller: createChangeIntakeHandlers({
+      modelClient,
+      trips,
+      entities,
+      signals,
+      cases,
+      audit,
+    }),
+    eventChangePreview: createEventChangePreviewHandlers({
+      mutations,
+      entities,
+      trips,
+      signals,
+      cases,
+      audit,
+    }),
+    upload: createUploadIntakeHandlers(programmeService),
     demo,
   };
 

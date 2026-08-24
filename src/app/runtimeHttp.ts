@@ -14,7 +14,6 @@ import { TripSignalSchema } from '../operational/signal.ts';
 import type { RuntimeOrchestrator } from './runtime.ts';
 import { reportMissedFlight } from './missedFlight.ts';
 import type { TripRepository } from '../contracts/repositories.ts';
-import type { MutationService } from '../contracts/services.ts';
 import type { SqlMutationService } from '../engine/mutation.ts';
 
 const InstantBody = z.strictObject({ at: IsoDateTimeSchema });
