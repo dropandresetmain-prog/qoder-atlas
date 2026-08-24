@@ -146,6 +146,8 @@ Stretch work starts only after the generalized core vertical loop passes the imp
 
 **However, cancellation via a separate endpoint (`void.do`) genuinely works** for carriers Atlas supports it for (documented as ~23 airlines across Americas/Europe/Japan/Korea) — proven end to end on Volaris: real quote (`isVoidable:true`, `estimatedRefundAmount: 191.98 USD`), real submission (accepted, tracked, `voidCode 202608-0038`), real status query. On Malindo/Batik Air it correctly failed with a *different*, airline-support-specific reason (`843`), not the sandbox-ticket limitation. **A real, provider-executed cancellation is achievable in this sandbox** for the right carrier — the initial "cancellation is impossible" framing was an over-generalization from the refund-specific finding and has been corrected. See `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md` §4A/§4B/§4C.
 
+**Mission 3 refinement (25 Aug 2026, branch `wave3r/reality-convergence`):** `voidQuotation.do` was probed on a fresh ticketed order and confirmed **READ_ONLY** — it returns a quotation and does not void; the full quote→submit→status chain then completed, with cancellation settling **asynchronously as PROCESSING** (status query is the honest observation point). The full LIVE chain search/verify/hold/pay/retrieve/cancel is re-proven on this branch's evidence.
+
 **DR-0 sandbox database-size finding (24 Aug 2026):** the documented "9 airlines / 36 routes" is materially wrong as a ceiling. A broad empirical sweep (67 route/direction pairs) found **28 distinct airlines** and 52 populated pairs (78%), spanning Southeast Asia, Northeast Asia, the Middle East, Europe, and the Americas (LCC-dominated; no full-service/legacy long-haul carrier observed). Treat the documented list as a stale floor, not a limit, for scenario design. See `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md` §6A.
 **Revisit when:** G3R-R1 transaction-safety review returned `FIX REQUIRED` against SHA `3fea722cf3e144ed925c4ef000b0bf85a6360360`, with four required fixes (side-effect misclassification, provider-SUCCESS-to-confirmed-state promotion, missing adapter-side payment ceiling re-check, payment proceeding on unreviewed spend). All four fixes landed on `wave3r/g3r-r1-fixes` (ADR-047). Re-review is required before Mission 2; wider carrier/route coverage sampling belongs to DR-9 scenario selection.
 
@@ -230,8 +232,8 @@ The documented fixture list omitted SIN, but a direct empirical probe shows the 
 ### Booking.com Demand access — Investigate Now
 Decision needed: whether valid partner credentials can be obtained immediately enough to implement/test. If not, keep Stretch and stop the investigation.
 
-### Google Routes setup — Act Now, non-blocking
-Create/reuse Google Cloud project/API key when convenient. Core application must run without live Google via replay/sourced/unknown fallback.
+### Google Routes setup — RESOLVED (Mission 3, 25 Aug 2026)
+A bounded LIVE check with the configured key succeeded (read-only route context), and the adapter remains fail-closed via REPLAY when unconfigured. No further setup action needed.
 
 ### Atlas order execution — Stretch investigation
 Starts only after the generalized vertical loop is stable. Stop if activation/account/ticketing complexity threatens core implementation.

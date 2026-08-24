@@ -1043,27 +1043,31 @@ After accepted integration milestone, commit and push the branch. Do not merge t
 
 ## 19. Current decision state
 
+> Updated 25 Aug 2026 after Mission 3 (LOCAL REALITY CONVERGENCE) on
+> `wave3r/reality-convergence` — candidate pushed for NS-G3R review.
+
 ### WHAT WE KNOW
 
 - generalized engine/state/viability/authority foundations are accepted through NS-G2;
-- current product candidate failed NS-G3 mainly on human-operability/reality seams plus known runtime state defects;
-- Nuitée sandbox lifecycle is genuinely available in the current project evidence;
-- Atlas Search/Verify/rule surfaces are proven and Atlas documents transactional/webhook surfaces, but exact account activation/behavior must be empirically revalidated;
-- Model Studio runtime capability exists but live product proof is incomplete;
-- graph-native event-change consequence preview is a major differentiator worth protecting.
+- Model Studio LIVE extraction/ChangeRequest/validation is proven fail-closed with real credentials (Mission 3 §3);
+- Atlas sandbox transactional reality is proven for this account: search/verify/hold/pay/retrieve/cancel quote+submit+observe; `voidQuotation` is READ_ONLY (returns a quotation, does not void) and cancel completes asynchronously as PROCESSING (Mission 3 §2);
+- Nuitée sandbox full lifecycle is proven: quote → authority → book → CONFIRMED → cancel displaced → verify (Mission 3 §4);
+- Google Routes is LIVE-accessible within bounded read-only use (Mission 3 §6);
+- the POST /api/events/atlas ingress drives the full signal → case chain from provider-shaped payloads (Mission 3 §7);
+- all four product scenarios (S1–S4) run through real HTTP surfaces in REPLAY with the visible chain from natural source to final state; organiser+traveller browser clickthrough is green (582/582 gate);
+- recordings corpora are secret-free (env-value scan) and REPLAY/RECORD normalize byte-identically to LIVE shapes; reset/reseed is deterministic (byte-identical runtime state).
 
 ### WHAT WE DO NOT KNOW
 
-- exact Atlas sandbox transactional capabilities enabled for this account today;
-- whether sandbox orders can produce a genuine schedule-change/cancellation webhook on demand;
-- which Atlas-supported event city/origin topology gives the strongest demo;
-- exact after-sales flight operations we can truthfully claim;
-- current Google Routes live accessibility.
+- whether the Atlas sandbox can emit a genuine provider-side schedule-change/cancellation webhook on demand (the ingress is proven with provider-shaped payloads through the real boundary; an organic push remains unobserved);
+- which Atlas-supported city/origin topology gives the strongest LIVE demo beyond the proven sandbox routes;
+- the durability/latency behavior of the Atlas async cancel (PROCESSING) over longer horizons;
+- how window-shift planning should source airport evidence for event venues: no shipped scenario fixture links a venue place to an airport (the planner fails closed honestly; see Mission 3 §8 S2 finding).
 
 ### KEY ASSUMPTION
 
-We can keep the domain engine generic and choose synthetic demo routes/scenarios around operations that are independently proven against sandbox/provider reality. A simulated source cancellation may enter the real webhook boundary when Atlas cannot generate the event, without weakening downstream proof.
+The domain engine stays generic and demo scenarios are composed around independently proven sandbox capabilities; a simulated source event may enter the real webhook boundary when Atlas cannot generate the event organically, without weakening downstream proof. The venue→airport evidence gap is closed by fixture/ontology work, not by planner fabrication.
 
 ### WHAT TO TEST NEXT
 
-**DR-0 — Capability Reality Gate:** Atlas sandbox transaction/webhook/incident coverage + summit-location/route recommendation, Nuitée multi-case lifecycle, Model Studio live smoke, bounded Google Routes check. No broad product coding until the consequential capability envelope is known.
+NS-G3R independent review at the exact pushed SHA: rerun the four scenarios + browser rehearsal on a fresh clone, recheck the LIVE evidence inventory against `output/wave3r-mission3-*`, and decide the venue→airport finding (Park for Later vs Investigate Now before demo).

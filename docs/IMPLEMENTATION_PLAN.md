@@ -1122,6 +1122,21 @@ Hotel reality: one proper **real hotel API adapter is MINIMUM**. Candidate remai
 > `origin/g3r-r0-fix`); Mission 1 (DR-1/DR-2, runtime truth + real provider
 > execution) executes on branch `wave3r/runtime-execution` against that frozen
 > seam. See `docs/WAVE3R_DEMO_READINESS_PLAN.md` for gate results.
+>
+> Status update (25 Aug 2026): Mission 3 (LOCAL REALITY CONVERGENCE →
+> NS-G3R candidate) executed on branch `wave3r/reality-convergence` from base
+> `7c53296`. LIVE evidence captured for Model Studio, Atlas sandbox
+> (search/verify/hold/pay/retrieve/cancel incl. voidQuotation READ_ONLY
+> probe), Nuitée (quote→book→CONFIRMED→cancel→verify), bounded Google Routes,
+> and the POST /api/events/atlas ingress chain; all four product scenarios
+> (S1–S4) driven through real HTTP surfaces in REPLAY; organiser+traveller
+> browser clickthrough green (which surfaced and fixed a traveller
+> decision-form wiring defect); sanitisation/replay-parity/reseed-determinism
+> evidence committed under `output/wave3r-mission3-*`. Gate: 582/582 tests,
+> typecheck/lint/build clean. One explicitly unresolved finding kept honest:
+> window-shift planning fails closed on shipped fixtures whose event venues
+> carry no airport-code ref (no venue→airport link mechanism exists).
+> Candidate published for NS-G3R review; NOT merged to `main`.
 
 Goal: turn the accepted backend into the judge-facing product.
 
