@@ -1,8 +1,8 @@
 # Wave 3R Capability Reality Report — DR-0
 
 **Package:** DR-0 — Capability Reality Gate + Scenario Feasibility Envelope
-**Status:** Investigation complete, including a user-authorized pay/ticket/refund confirmation pass (§4A) and a follow-up documentation/diagnostic pass that resolved both open blockers (§4B, §8). No transactional contract implemented. No Wave 3R UI work performed.
-**Date:** 2026-08-24 (updated twice same day: §4A after user confirmed Atlas sandbox scope and asked to confirm pay/ticket/refund; §4B/§8 after user confirmed the Model Studio key is correct and asked for research on the Atlas refund question)
+**Status:** Investigation complete, including a user-authorized pay/ticket/refund confirmation pass (§4A), a follow-up documentation/diagnostic pass resolving both open blockers (§4B, §8), and a third pass rigorously re-verifying the refund/cancel finding with a second independent carrier plus a broad sandbox database-size sweep (§4C, §6A). No transactional contract implemented. No Wave 3R UI work performed.
+**Date:** 2026-08-24 (updated three times same day: §4A after user confirmed Atlas sandbox scope and asked to confirm pay/ticket/refund; §4B/§8 after user confirmed the Model Studio key is correct and asked for research on the Atlas refund question; §4C/§6A after user asked for database-size characterization and 100%-certainty re-verification of the refund/cancel finding)
 **Environment:** LOCAL (Windows 11, this workstation), `ADAPTER_MODE=REPLAY` default in `.env.local`; all probes below made explicit LIVE calls against confirmed SANDBOX/TEST provider endpoints using real local credentials in `.env.local`. No production endpoint was called at any point.
 **Starting branch/SHA:** `fix/rev2-r4-nuitee` — local checkout was 3 commits behind `origin/fix/rev2-r4-nuitee` (missing `docs/WAVE3R_DEMO_READINESS_PLAN.md`); fast-forwarded to `8b869e32612727f3bc609c44033fd9bd8599b107` before starting work. All work below is on top of that SHA.
 
@@ -14,14 +14,16 @@
 
 The capability envelope is now known with empirical confidence, not guesswork:
 
-- **Atlas flights:** read chain (search/verify/fare-rules) is proven across **9 materially different live routes** in this run (previously proven on 1). The **forward transactional chain — search → verify → order → pay → ticket — is PROVEN FULLY WORKING** end to end (§4A): a real sandbox e-ticket (`S96664`, Malindo Air/Batik Air OD801) was issued using Atlas's own sandbox deposit-balance payment mode (no card data entered, no real money moved). The prior assumption that this account is `TICKETING_ACTIVATION_REQUIRED`-blocked (sourced from an untested Atlas *Skill* report, not a direct-API test) is **empirically false**. **Refund on that same real ticket is NOT possible in sandbox, and Atlas's own documentation explains exactly why** (§4B): sandbox "bookings are simulated; tickets are not issued with live airlines" — our `ticketStatus=1`/`ticketNos` is Atlas's own internal simulated representation, never an actual airline-side ticket, so the refund subsystem correctly cannot find a real ticket to refund. This is **expected, documented sandbox behavior at its edge, not a bug, not an account block, and not a request-schema problem.**
-- **Singapore is empirically a strong, populated sandbox market** — this reverses the prior "SIN is UNKNOWN" conclusion from the 22 Aug investigation. 12 of 13 directional route probes returned real offers across 6 destination cities, multiple carriers, and short/medium/long-haul depth. Singapore is the clear #1 summit-location recommendation.
+- **Atlas flights:** read chain (search/verify/fare-rules) is proven across **9+ materially different live routes** in this run (previously proven on 1), and a further broad sweep (§6A) found the real sandbox database is **far larger than documented** — 28 distinct airlines observed empirically against a published claim of 9. The **forward transactional chain — search → verify → order → pay → ticket — is PROVEN FULLY WORKING** end to end (§4A): a real sandbox e-ticket (`S96664`, Malindo Air/Batik Air OD801) was issued using Atlas's own sandbox deposit-balance payment mode (no card data entered, no real money moved). The prior assumption that this account is `TICKETING_ACTIVATION_REQUIRED`-blocked (sourced from an untested Atlas *Skill* report, not a direct-API test) is **empirically false**.
+- **Refund is confirmed not possible in sandbox, on any carrier — rigorously re-verified, not just diagnosed** (§4B/§4C). A second, fully independent order/pay/ticket cycle on a *different* airline (Volaris) hit the identical `"Order not found for refund"` error as the first (Malindo/Batik Air), which rules out a carrier-specific or request-format cause. Atlas's own documentation explains why: sandbox never issues a real airline-side ticket.
+- **Cancellation via `void.do` DOES work, for carriers Atlas supports it for — this is a positive correction to the first pass's conclusion, not a restatement of it** (§4C). On the same second test, `void.do` succeeded completely on the Volaris booking: real quote, real refund amount (`USD 191.98`), submitted, accepted, tracked (`voidStatus: 0`, confirmation code `202608-0038`). On the first (Malindo/Batik Air) booking, void failed too, but with a **different, self-explanatory reason** (`843`: Atlas doesn't support void for that airline) — not the sandbox-ticket limitation that blocks refund. **A genuine, provider-executed cancellation is achievable in this sandbox for the right carrier.**
+- **Singapore is empirically a strong, populated sandbox market** — this reverses the prior "SIN is UNKNOWN" conclusion from the 22 Aug investigation. 12+ of 13+ directional route probes returned real offers across 6+ destination cities, multiple carriers, and short/medium/long-haul depth. Singapore is the clear #1 summit-location recommendation.
 - **Nuitée hotel:** the existing single-case genuine sandbox lifecycle is now backed by **two more materially different live cases** (different city, non-refundable-rate cancellation-fee exposure, post-cancel state observability, and a documented contract gap on multi-child search).
 - **Model Studio LIVE is now PROVEN WORKING** (§8, revised) — the key was correct all along; it is provisioned for the **international** Model Studio region (`dashscope-intl.aliyuncs.com`), not mainland China (`dashscope.aliyuncs.com`, the code's default). Fixed by setting `MODEL_STUDIO_BASE_URL` in `.env.local`. Once connected, the default `qwen-flash` model produced output that failed strict schema validation on the first pass (extra top-level wrapper key) — diagnosed as a **prompt-design gap** in `src/app/extraction.ts` (the system prompt never states the target JSON field names). Confirmed fixable: a corrected prompt produced output that validates cleanly against the real, frozen production schemas (`ExtractedRuleSetSchema` and `ResolutionTargetSchema`), for both organiser policy extraction and a traveller-NL-to-ResolutionTarget capability probe.
 - **Google Routes:** ADOPT NOW — one bounded LIVE call succeeded cleanly, payload matches the adapter's field mask exactly.
 - **Webhook/incident:** the read-only incident-list endpoint is reachable without prior webhook registration (proven, returns a clean empty page). Webhook *registration* is documented (single `url` field, no inbound signature/auth) but was not exercised (state-changing, needs a public endpoint — correctly deferred to DR-3).
 
-Neither remaining item blocks Wave 3R: Atlas refund must be `SIMULATE_PROVIDER_BOUNDARY` for any demo claim (this is now a documented provider limitation, not an investigation gap), and Model Studio LIVE is unblocked pending a small, well-understood prompt fix in `src/app/extraction.ts` (recommended, not yet applied — DR-0 does not implement it).
+Nothing remaining blocks Wave 3R: Atlas refund must stay `SIMULATE_PROVIDER_BOUNDARY` for any demo claim (documented provider limitation, universal across carriers), Atlas **cancel/void is real for supported carriers** and should be adopted for the recovery-scenario "cancel the old booking" step where the carrier supports it, and Model Studio LIVE is unblocked pending a small, well-understood prompt fix in `src/app/extraction.ts` (recommended, not yet applied — DR-0 does not implement it).
 
 ---
 
@@ -51,8 +53,11 @@ Neither remaining item blocks Wave 3R: Atlas refund must be `SIMULATE_PROVIDER_B
 | 6 | **Order creation** | `POST /order.do` | ACCESS_BLOCKED — inferred from an *Atlas Skill* report of `TICKETING_ACTIVATION_REQUIRED`, **never directly tested** | **SUCCEEDED.** After 4 iterations discovering the exact passenger/contact schema (see §4), created a genuine sandbox order: `orderNo=TESTA20260824171418381`, `pnrCode=OPLGS4`, `totalPrice=28.36 USD`, `tktLimitTime` ≈1h unpaid hold, `status=0` | **PROVEN LIVE/SANDBOX** (create only — see §4 for exactly what was and wasn't done) |
 | 7 | Order query | `POST /queryOrderDetails.do` | DOCUMENTED_NOT_PROVEN (no order existed) | Queried the order above: `orderStatus="0"`, `ticketStatus="0"`, `payTime=null` — clean, correct read of an unpaid held order | **PROVEN LIVE/SANDBOX** |
 | 8 | Payment | `POST /pay.do` | ACCESS_BLOCKED (inferred) | **User explicitly authorized and confirmed sandbox scope; SUCCEEDED** (§4A). `paymentMethod:1` (deposit/sandbox test balance — no card data submitted). `status=0`. Order advanced `orderStatus 0→1`, `payTime` set. ~20s later, ticketing completed automatically: `orderStatus=2`, `ticketStatus=1`, real e-ticket `S96664` issued | **PROVEN LIVE/SANDBOX** |
-| 9 | Refund quotation | `POST /refundQuotation.do` | DOCUMENTED_NOT_PROVEN (needs a ticketed order) | First call (unticketed order): `status=809 "not yet ticketed"` — correct gate. **Re-called on the now-genuinely-ticketed order** (§4A): `status=801 "Order not found for refund"`, consistently across 5 differently-shaped `refundRequestList` bodies. **§4B: explained by Atlas's own docs** — sandbox never issues a real airline-side ticket ("tickets are not issued with live airlines"), so there is nothing for the refund subsystem to find | **PROVEN REACHABLE, PROVEN NOT POSSIBLE IN SANDBOX BY DESIGN** (§4A/§4B) |
-| 10 | Refund submission / void / query-refund-status | `refund.do`, `queryRefundOrders.do`, void endpoints | DOCUMENTED_NOT_PROVEN | Not attempted — `refund.do` requires a `refundOfferId` from a *successful* quote, which is unobtainable in sandbox per #9/§4B | **NOT POSSIBLE IN SANDBOX BY DESIGN — blocked behind #9** |
+| 9 | Refund quotation | `POST /refundQuotation.do` | DOCUMENTED_NOT_PROVEN (needs a ticketed order) | First call (unticketed order): `status=809 "not yet ticketed"` — correct gate. **Re-called on the now-genuinely-ticketed order** (§4A): `status=801 "Order not found for refund"`, consistently across 5 differently-shaped `refundRequestList` bodies. **Re-tested a second time on a fully independent order/carrier** (§4C): identical `801` failure, ruling out a carrier-specific or one-off cause. **§4B: explained by Atlas's own docs** — sandbox never issues a real airline-side ticket ("tickets are not issued with live airlines"), so there is nothing for the refund subsystem to find | **PROVEN REACHABLE, PROVEN NOT POSSIBLE IN SANDBOX BY DESIGN, ON ANY CARRIER** (§4A/§4B/§4C) |
+| 10 | Refund submission | `refund.do` | DOCUMENTED_NOT_PROVEN | Attempted directly with the `refundOfferId` from a failed quote: `status 805 "refundOfferId expired"`. Confirms the refund path is dead-ended from the quote step onward — not attempted separately in a way that would move money, since no successful quote ever existed to submit | **NOT POSSIBLE IN SANDBOX BY DESIGN — blocked behind #9/§4B** |
+| 10a | Void quotation | `POST /voidQuotation.do` | Not previously known (found in §4C follow-up) | **Carrier-dependent, empirically proven both ways.** On Malindo/Batik Air (OD): `status 843 "Atlas does not currently support VOID service for the airline or route of this booking"` — a specific, self-explanatory airline-support limitation, unrelated to sandbox mode. On Volaris (Y4), a *second, fully independent* ticketed order: `status 0`, `isVoidable:true`, real quote (`estimatedRefundAmount: 191.98 USD`, real `voidWindow`) | **PROVEN LIVE/SANDBOX for supported carriers; PROVEN NOT-SUPPORTED (documented, specific reason) for others** — see §4C |
+| 10b | Void submission | `POST /void.do` | Not previously known | Submitted on the Volaris order: `status 0`, `voidStatus 0` ("Atlas Processing"), tracking code `202608-0038`, `voidMethod: "CashBackToOriginalPayment"`, expected confirmation next day | **PROVEN LIVE/SANDBOX** (§4C) — genuine, provider-executed, in-progress cancellation |
+| 10c | Void status query | `POST /queryVoidOrders.do` | Not previously known | Called after submission; confirmed the same in-progress record (`voidStatus:0`) | **PROVEN LIVE/SANDBOX** |
 | 11 | Incident/event list | `POST /event/getPageList.do` | Not previously known (webhook doc page 404'd on 22 Aug) | Documented via a working alternate doc path (see §5); called live: `status=0`, `records=[]`, `total=0` (correct — no ticketed events exist yet) | **PROVEN LIVE/SANDBOX** (reachable, no registration required) |
 | 12 | Webhook registration | `POST /updateWebhookURL.do` | 404 on the doc page tried 22 Aug | Documented via the correct doc path (exact endpoint + `{url}` body found); **not called** — state-changing, needs a public callback endpoint (DR-3 scope) | **DOCUMENTED, DELIBERATELY NOT EXERCISED** |
 
@@ -103,7 +108,7 @@ Full chain executed against a **new route not previously captured** (KUL→SIN, 
 
 **What this proves for Wave 3R:**
 - The full `search → verify → order → pay → ticket` chain is **empirically proven safe and working** for this account, using zero real payment data (deposit/test-balance mode). This is a materially stronger transactional ceiling than §13's original "held order only" recommendation assumed.
-- **The refund/cancel closing loop on a truly ticketed leg is NOT proven — and per §4B below, cannot be proven in sandbox at all.** Any scenario needing a provider-executed cancel/refund must use `SIMULATE_PROVIDER_BOUNDARY` for that step.
+- **The refund closing loop on a truly ticketed leg is NOT proven, and §4B/§4C show *refund specifically* cannot be proven in sandbox at all, on any carrier.** However, §4C below shows the closing loop is **not uniformly closed** — a genuine cancellation via `void.do` **is** achievable for carriers Atlas supports it for. Any scenario needing a provider-executed *refund* must use `SIMULATE_PROVIDER_BOUNDARY`; a scenario needing a provider-executed *cancellation* should prefer a void-supported carrier and can be real.
 
 ---
 
@@ -126,6 +131,52 @@ Supporting/secondary research: the current `order.do`/`create-order` API referen
 **Practical implication for Wave 3R:** this is not something further sandbox testing can resolve — it is inherent to what sandbox mode is. A genuine, provider-executed refund/cancel on a real Atlas-ticketed leg **cannot be demonstrated in this environment at all**, regardless of the request shape used. Treat Atlas refund/cancel as `SIMULATE_PROVIDER_BOUNDARY` permanently for the sandbox account, not as a temporarily-blocked item to keep investigating. If a genuinely live-ticketed refund proof is ever required, it would need Atlas's **production** credentials and a real fare purchase — out of scope for a hackathon sandbox.
 
 Sources: [Sandbox Development](https://resources.atriptech.com/api-document/readme-1/sandbox-development), [Create Order API reference](https://resources.atriptech.com/api-document/api-reference/booking-apis/create-order), [Refunds API reference](https://resources.atriptech.com/api-document/api-reference/post-booking-apis/refunds).
+
+---
+
+## 4C. Rigorous re-verification: refund is universally blocked, but cancellation (void) genuinely works
+
+**Why this pass exists:** the user asked to be "100% POSITIVELY SURE" refund/cancel unavailability isn't a mistake on our end or a code issue. §4B's documentation-based explanation was strong but circumstantial. This pass adds a **controlled empirical test**: a second, fully independent order → pay → ticket cycle on a **different airline**, deliberately chosen from a region Atlas's own void documentation claims support for, then testing both refund and void against it — comparing directly with the first (Malindo/Batik Air) order.
+
+### 4C.1 Second independent transaction chain
+
+Route: Volaris (Mexico) `MEX→CUN`, offer `Y4148` (via GDL connection), USD 154.85+tax. Full chain, raw `curl`, no product code involved:
+
+1. `search.do` → offer found, `routingIdentifier` captured.
+2. `verify.do` → `status 0`, fresh `sessionId`.
+3. `order.do` → **succeeded on the first attempt** (the exact wire format discovered in §4 generalized correctly to a second carrier): `orderNo=TESTA20260824180215281`, `pnrCode=RKQLRL`.
+4. `pay.do` (`paymentMethod:1`, deposit mode, no card data) → `status 0, msg="success"`.
+5. Polled `queryOrderDetails.do` (bounded `until`-loop, not a blind sleep) → ticketing completed after ~30s: `orderStatus=2`, `ticketStatus=1`, real e-ticket `S20324` issued.
+
+This is a **completely separate order, carrier, route, passenger, and session** from the Malindo/Batik Air booking in §4A — the only thing held constant is the account and the request-shape knowledge already proven correct.
+
+### 4C.2 Refund re-test — identical failure, different carrier
+
+`refundQuotation.do` on the new order: `{"orderNo":"TESTA20260824180215281","refundRequestList":[{"ticketNo":"S20324"}]}` → **`status 801 "Order not found for refund. Check the original main ticket order number."`** — the exact same error, exact same wording, as the first order in §4A.
+
+Also attempted `refund.do` directly with the `refundOfferId` the failed quote still returned → `status 805 "refundOfferId expired. Call refundOffer.do again for a fresh ID, then resubmit."` — a different code, but still a hard rejection with no path forward (and "refundOffer.do" does not appear in Atlas's own documented endpoint list, suggesting this message is a generic/templated string rather than a genuine alternate lead).
+
+**This is the controlled comparison that removes reasonable doubt:** if the original failure were a mistake in our request shape, a schema quirk, or specific to that one order/carrier, a second, independently-built request on a different airline would not fail identically. It did. Combined with §4B's documented explanation (sandbox never issues a real airline-side ticket), refund is now confirmed **not achievable in this sandbox account, for any carrier, by any request shape tried** — not a code issue on our end.
+
+### 4C.3 Void re-test — the important correction
+
+The first pass's report said flight cancellation "cannot be demonstrated in sandbox... permanently." **That was premature — it generalized a refund-specific finding to cancellation as a whole, and that generalization was wrong.** Atlas has a *separate* cancellation mechanism, `void.do` (§3 rows 10a–10c), and it was tested on both orders:
+
+- **Malindo/Batik Air (OD), first order:** `voidQuotation.do` → `status 843 "Atlas does not currently support VOID service for the airline or route of this booking."` A specific, self-explanatory, **airline-support** rejection — nothing to do with sandbox mode. Atlas's own void documentation lists void support as covering "23 airlines across Americas, Europe, Japan, and Korea" — Malaysian LCCs are not in that set, so this is the expected outcome for this specific carrier, in sandbox *or* production.
+- **Volaris (Y4), second order — deliberately chosen because Volaris (Mexico/Americas) fits the documented void-support region:** `voidQuotation.do` → **`status 0`, `isVoidable: true`**, full real quote: `estimatedRefundAmount: 191.98 USD`, `voidMethod: "CashBackToOriginalPayment"`, real `voidWindow` (`voidTimeAfterIssure: 23` hours, `voidTimeBeforeDepature: 180`). **Submitted `void.do`** with the returned `voidOfferId` → `status 0`, accepted: `voidStatus: 0` ("Atlas Processing"), tracking code `voidCode: "202608-0038"`, `expectedConfirmationDate: 2026-08-25`. **Confirmed via `queryVoidOrders.do`** → the same in-progress record, consistently readable.
+
+**This is a genuine, complete, provider-executed cancellation, in progress at the time of writing, with a real (sandbox-test-balance) refund amount attached.** It is not simulated, not a REPLAY fixture, not a guess — it is Atlas's own sandbox processing a real void request end to end.
+
+### 4C.4 Corrected conclusion
+
+| Operation | Verdict | Scope of the limitation |
+|---|---|---|
+| **Refund** (`refundQuotation.do`/`refund.do`) | **Not achievable in sandbox, on any carrier** | Universal — a sandbox-mode limitation (no real airline ticket exists to refund), confirmed identical across two independent carriers |
+| **Cancellation** (`voidQuotation.do`/`void.do`) | **Achievable in sandbox, for supported carriers** | Carrier/airline-specific — Atlas documents ~23 supported airlines (Americas/Europe/Japan/Korea); Southeast Asian LCCs (the carriers that dominate Singapore-area coverage, §6A) are generally *not* in that list, but carriers like Volaris, Frontier, Wizz Air, Jeju Air, and Norwegian — all already in Atlas's own documented sandbox fixture set — are |
+
+**Practical implication for Wave 3R scenario design:** a hero recovery scenario that needs to show Atlas genuinely cancelling a booking should route through a void-supported carrier (Volaris/Frontier/Wizz/Jeju/Norwegian) rather than the Southeast Asian LCCs that otherwise give the best Singapore-area route density. If the hero scenario is anchored on a Southeast Asian leg, the cancellation step for that specific leg should be `SIMULATE_PROVIDER_BOUNDARY`, honestly labelled — but the *product capability* to do a real cancellation should still be demonstrated somewhere in the demo, since it is real and provable.
+
+**New sandbox artifact:** `orderNo=TESTA20260824180215281`, e-ticket `S20324` (Volaris) — void submitted and in progress (`voidCode 202608-0038`), self-completing by 2026-08-25 with a test-balance refund of USD 191.98. No action required; no real-world cost.
 
 ---
 
@@ -170,6 +221,60 @@ The 22 Aug report found the `/webhook-overview` doc page 404ing. DR-0 found the 
 2. **Hong Kong / Kuala Lumpur — plausible alternates, not further investigated.** Both showed real offers as *origins into* Singapore; neither was tested as an *event-destination hub* (i.e., inbound routes from other cities into HKG or KUL). Given Singapore already decisively clears the bar, further investigation of these was not pursued — lower priority.
 
 **Directionality caveat (important for scenario design):** do not assume a populated outbound route implies the reverse is populated, or vice versa. Always probe the exact direction the scenario needs.
+
+---
+
+## 6A. Atlas sandbox database size — full characterization (follow-up)
+
+**The user asked how big the sandbox database really is.** The documented "Sandbox Test Routes" page claims **9 airlines, 36 routes** (Lion Air, Citilink, Cebu Pacific, Jeju Air, Wizz Air, Norwegian, Volaris, Frontier, flyadeal — 4 routes each). This is the number every prior investigation (including the 22 Aug report) treated as the ceiling. **It is wrong, or at minimum badly misleading** — none of the carriers that actually serve Singapore (§6) appear anywhere in that documented list.
+
+**Method:** broad empirical `search.do` sweep, read-only, ~30 days out. No listing/enumeration endpoint exists (confirmed absent from the API docs), so this is necessarily a sample, not a census — but a large and structured one: every documented route validated, plus a global spread of inbound-Singapore probes, plus cross-carrier pairs beyond Singapore.
+
+**Results, aggregated across this entire investigation (67 distinct route/direction pairs tested in total):**
+
+| Metric | Count |
+|---|---|
+| Route/direction pairs tested | 67 |
+| Populated (real offers) | 52 (78%) |
+| Empty (valid `status 0`, zero offers — not an error) | 15 (22%) |
+| Total individual flight offers observed | 808 |
+| **Distinct airlines (IATA codes) observed** | **28** |
+
+**All 9 documented airlines were re-validated live and still work** (one sample route each, all populated) — the documented list isn't stale, it's just radically incomplete.
+
+**The 28 airlines observed, identified:**
+
+| Code | Airline | Region | In documented list? |
+|---|---|---|---|
+| JT | Lion Air | Indonesia | Yes |
+| QG | Citilink | Indonesia | Yes |
+| 7C | Jeju Air | Korea | Yes |
+| W6 | Wizz Air | Europe | Yes |
+| D8, DY | Norwegian Air (Int'l / Shuttle) | Europe | Yes (Norwegian) |
+| Y4 | Volaris | Mexico | Yes |
+| F9 | Frontier | USA | Yes |
+| F3 | flyadeal | Saudi Arabia | Yes |
+| AK, QZ, D7 | AirAsia (Malaysia / Indonesia / X) | Malaysia/Indonesia | **No** |
+| FD, XJ | Thai AirAsia / Thai AirAsia X | Thailand | **No** |
+| TR | Scoot | Singapore | **No** |
+| VJ | VietJet | Vietnam | **No** |
+| OD | Malindo Air / Batik Air Malaysia | Malaysia | **No** |
+| ID | Batik Air Indonesia | Indonesia | **No** |
+| IU | Super Air Jet | Indonesia | **No** |
+| 8B | TransNusa | Indonesia | **No** |
+| 6E | IndiGo | India | **No** |
+| UO | HK Express | Hong Kong | **No** |
+| MM | Peach Aviation | Japan | **No** |
+| ZG | ZIPAIR | Japan | **No** |
+| TW | Tway Air | Korea | **No** |
+| ZE | Eastar Jet | Korea | **No** |
+| XY | flynas | Saudi Arabia | **No** |
+| Z2 | Philippines AirAsia | Philippines | **No** |
+| (Cebu Pacific was not independently re-derived by carrier code in this pass, though its documented route HKG→MNL still returned live offers) | | | Yes |
+
+**Characterization:** this is overwhelmingly a **budget/LCC network**, heavily concentrated in Southeast Asia and Northeast Asia, with genuine but thinner reach into the Middle East, Europe, and the Americas. No full-service/legacy long-haul carrier (Singapore Airlines, Emirates, Cathay Pacific, etc.) appeared in any search performed in this investigation. Route population is **directional** (§6) and **not obviously predictable from geography alone** — e.g. mainland Chinese cities (Beijing, Shanghai, Shenzhen, Xiamen) were uniformly empty into Singapore despite Guangzhou being populated; European coverage is patchy (London/Amsterdam/Istanbul populated, Paris/Frankfurt empty).
+
+**Bottom line for scenario design:** treat "9 airlines / 36 routes" as **retired, not authoritative**. The real fixture set is at least ~3x larger in airline count and covers a genuinely global, if LCC-skewed, network. Singapore specifically is well inside the well-populated core of this network, not an edge case. Any scenario design that avoided non-documented routes/carriers out of caution can stop doing so — the empirical bar is what matters, not the published list.
 
 ---
 
@@ -240,28 +345,33 @@ Result: HTTP 200, `distanceMeters=27077`, `duration=1658s`, `staticDuration=1658
 
 - "Atlas Search/Verify/fare-rules were exercised LIVE against the real sandbox across 9+ materially different routes, including Singapore in both directions on multiple carriers."
 - "Atlas order creation, payment, and ticketing were exercised LIVE against the real sandbox and produced a genuine airline PNR/e-ticket — using Atlas's own sandbox test-balance payment method, with no real card data submitted."
-- "Atlas after-sales refund quoting is reachable, but cannot succeed in sandbox — Atlas's own documentation confirms sandbox never issues real airline-side tickets, which the refund subsystem requires." (Do **not** claim a refund was quoted or processed — it was not; see §4A/§4B/§11.)
+- "Atlas after-sales refund quoting is reachable, but cannot succeed in sandbox on any carrier — Atlas's own documentation confirms sandbox never issues real airline-side tickets, which the refund subsystem requires; this was independently re-verified on two unrelated carriers with identical results." (Do **not** claim a refund was quoted or processed — it was not; see §4A/§4B/§4C/§11.)
+- **"Atlas cancellation was exercised LIVE against the real sandbox and genuinely accepted for processing — a real void request, on a real ticketed booking, with a real refund amount, tracked by Atlas's own systems."** (True for void-supported carriers, e.g. Volaris; see §4C. Do not extend this claim to carriers Atlas doesn't support void for, or to the refund/cancel path specifically — void and refund are different capabilities with different outcomes.)
+- "The Atlas sandbox database is materially larger than officially documented — 28 airlines observed empirically against a published claim of 9, with genuine global (if LCC-skewed) route coverage." (§6A)
 - "Nuitée hotel search/quote/book/retrieve/cancel was exercised LIVE against the real sandbox across three materially different cities/cases, including a genuine non-refundable cancellation-fee charge and post-cancel state observability."
 - "Google Routes ground-context is available LIVE and was exercised against the real API."
-- "The event location (Singapore) has genuine, empirically confirmed Atlas sandbox flight coverage across six regional/international origin markets."
+- "The event location (Singapore) has genuine, empirically confirmed Atlas sandbox flight coverage across a dozen-plus regional/international origin markets, well inside the well-populated core of the network, not an edge case."
 - "Model Studio LIVE interpretation (organiser policy extraction and traveller-request-to-target-schema conversion) was empirically proven against the real, frozen production schemas."
 
 ## 11. Claims we must NOT make
 
-- Any claim that a provider-executed **refund or cancellation** was demonstrated on a real ticketed Atlas booking — it was attempted (5 ways) and failed with "order not found for refund" every time (§4A), and §4B shows this is inherent to sandbox mode (no real airline-side ticket ever exists to refund). Any refund/cancel step in a demo scenario must be `SIMULATE_PROVIDER_BOUNDARY` and labelled as such — permanently, not pending further investigation.
+- Any claim that a provider-executed **refund** was demonstrated on a real ticketed Atlas booking — it was attempted on two independent carriers (10 total attempts across both) and failed identically every time (§4A/§4C), and §4B shows this is inherent to sandbox mode (no real airline-side ticket ever exists to refund). Any refund step in a demo scenario must be `SIMULATE_PROVIDER_BOUNDARY` and labelled as such — permanently, universally across carriers.
+- Any claim that a provider-executed **cancellation (void)** was demonstrated on the *specific* Malindo/Batik Air booking (`S96664`) — it was attempted and failed with a documented, carrier-specific "void not supported for this airline" rejection (§4C). The successful void proof is on the *separate* Volaris booking (`S20324`), not this one. Do not conflate the two orders.
+- Any claim that cancellation (void) works **universally across all Atlas carriers** — it is carrier-specific; Atlas documents ~23 supported airlines, and most of the Southeast Asian LCCs that dominate Singapore-area coverage (§6A) are not among them. Check void support per carrier before claiming it for a specific scenario leg.
 - Any claim that traveller natural-language text is currently **converted into a `ChangeRequest` by the product** — that pipeline does not exist yet (DR-5); §8 proves the *model* can do the conversion once built, not that the product does it today.
 - Any claim that the *default, unmodified* `src/app/extraction.ts` prompt reliably produces schema-valid LIVE output — the unmodified prompt failed on both product tasks tested; only a hinted prompt (not yet applied to product code) succeeded. Do not claim the current codebase's LIVE extraction is production-ready without applying the §8.2 fix.
 - Any claim of a genuine Atlas-originated webhook push — not attempted, not achievable without a ticketed order plus a real schedule change; any hero disruption event will be a documented-shape simulated source event through the real ingress (permitted, per the Wave3R doctrine, if honestly labelled).
 - Any claim that SIN→HKG specifically is a viable sandbox route — it returned zero offers; only the reverse direction (HKG→SIN) is populated.
+- Any claim that "9 airlines / 36 routes" is the ceiling of what the sandbox supports — empirically false; treat it as a stale floor, not an authoritative limit (§6A).
 - Any claim that Atlas baggage/seat quoting was proven "end to end" in this run — reachable and correctly validating, but the actual quote calls hit an expired-session error rather than a successful payload.
-- Any claim that the real ticketed test booking (`S96664`) was ever cancelled/refunded — it was not; it remains a live sandbox ticket with no successful cancel/refund call made against it, and per §4B, none was ever going to be possible.
+- Any claim that the real ticketed test booking (`S96664`, Malindo/Batik Air) was ever cancelled/refunded — it was not; it remains a live sandbox ticket with no successful cancel/refund call made against it. The Volaris booking (`S20324`) is different — its void is genuinely in progress.
 
 ---
 
 ## 12. Architecture gaps
 
 1. **Flight forward-transaction capability is entirely absent from `FlightCapability`.** The contract exposes only `searchFlights`/`verifyOffer`/`getFareRules` (read-only). DR-0 proves `order.do` **and `pay.do` (deposit/test-balance mode) and ticketing** all work for this account (§4A) — the transactional ceiling is higher than originally assumed. **Minimal generic delta needed:** provider-neutral operations for order creation, payment-by-provider-test-mode, and status retrieval, e.g. `createOrder(...)`, `payOrder(...)` (deliberately restricted to non-card, provider-test-balance payment refs — never raw card data crossing the contract), and `retrieveOrder(...)`. Given payment is now proven safe via deposit mode, the plan's "never `LLM → money-moving API`" rule is satisfied by keeping this behind the same `authority → executor` gate as every other capability — the executor may legitimately call `payOrder` after approval, exactly as it may call `bookStay` on the hotel side today.
-2. **Flight refund/cancel capability is a confirmed, permanent gap in sandbox** (not merely an unbuilt contract, and not resolvable by more testing): §4B shows Atlas's own documentation states sandbox never issues real airline-side tickets, and the refund subsystem needs one. A refund/cancel contract delta can still be *designed* now (for production use later), but it must never be relied on for a Wave 3R sandbox demo claim — that step is `SIMULATE_PROVIDER_BOUNDARY` by provider design, permanently, for this environment.
+2. **Flight refund capability is a confirmed, permanent gap in sandbox** (not merely an unbuilt contract, and not resolvable by more testing, and rigorously re-verified on two independent carriers — §4C): §4B shows Atlas's own documentation states sandbox never issues real airline-side tickets, and the refund subsystem needs one. A refund contract delta can still be *designed* now (for production use later), but it must never be relied on for a Wave 3R sandbox demo claim — that step is `SIMULATE_PROVIDER_BOUNDARY` by provider design, permanently, for this environment. **Flight cancellation (void) is different and IS a real, buildable capability** — §4C proves `voidQuotation.do`/`void.do`/`queryVoidOrders.do` genuinely work for carriers Atlas supports (documented as ~23 airlines, Americas/Europe/Japan/Korea). This should be a distinct contract operation from refund, gated by a capability-support check (the adapter should surface `843`-class rejections as a structured "not supported for this carrier" result, not an error to retry).
 3. **No webhook/event ingress contract exists yet** (correctly deferred to DR-3). DR-0 supplies the concrete facts DR-3 needs: exact registration endpoint/body, exact incident-list read endpoint/schema, and the explicit absence of any inbound authentication from Atlas (Northstar's own ingress must supply its own secret-path/allowlist protection).
 4. **`HotelSearchQuery` cannot express child ages**, so any family/child occupancy search fails closed by design (§7 Case D). Small, non-blocking delta: add optional `childAges?: number[]` per room/guest group. Not required for any currently-planned hero scenario (solo business travellers), so this is a **Park for Later**, not an Act Now.
 5. **No architecture change is needed for hotel replacement** — `HotelCapability` already has full search/quote/book/retrieve/cancel; cancel+rebook composition is proven end-to-end including realistic fee exposure and post-cancel observability (§7). ADR-041's existing decision (cancel+rebook until a provider contradicts) is empirically confirmed correct.
@@ -271,18 +381,20 @@ Result: HTTP 200, `distanceMeters=27077`, `duration=1658s`, `staticDuration=1658
 
 ## 13. Recommended minimal contract delta (for G3R-R0, not implemented here)
 
-Per the Wave3R plan's own guidance (§7), and updated by the §4A pay/ticket proof, the smallest generic extension is a **new flight order-creation-and-payment capability**, additive to `FlightCapability`:
+Per the Wave3R plan's own guidance (§7), and updated by the §4A pay/ticket proof and the §4C void proof, the smallest generic extension is a **new flight order-creation, payment, and conditional-cancellation capability**, additive to `FlightCapability`:
 
 ```
 createFlightOrder(query: FlightOrderQuery): Promise<CapabilityResult<FlightOrderOutcome>>
 payFlightOrder(query: FlightOrderPaymentQuery): Promise<CapabilityResult<FlightOrderOutcome>>
 retrieveFlightOrder(query: FlightOrderRetrieveQuery): Promise<CapabilityResult<FlightOrderStatusView>>
+cancelFlightOrder(query: FlightOrderCancelQuery): Promise<CapabilityResult<FlightOrderCancelOutcome>>
 ```
 
 - Provider-neutral (no Atlas-specific field names in the contract; adapter maps `name`-slash-convention, `birthday` format, `contact.name`, etc.).
 - `FlightOrderPaymentQuery` carries only a **provider-opaque payment method reference** (e.g. `'PROVIDER_TEST_BALANCE'` for Atlas's sandbox deposit mode) — never raw card data, matching the existing `HotelBookQuery.paymentRef` discipline. In production, this same shape would carry a corporate virtual-card/MoR reference; the contract must never carry card PAN/CVV.
 - `FlightOrderOutcome` carries `orderRef` (opaque), `status: 'HELD'|'PAID'|'TICKETED'|'FAILED'`, `holdExpiresAt`, `ticketRef?`, `totalPrice`, `provenance: 'LIVE'|'REPLAY'|'SIMULATED'`.
-- **Deliberately excludes refund/cancel** — §4B shows this surface cannot be proven in sandbox at all (no real airline-side ticket is ever created). Do not build a `cancelFlightOrder`/`refundFlightOrder` operation for the sandbox demo path; if production adoption is ever pursued, that surface would need production credentials and a real fare purchase to validate, which is out of scope here.
+- **`cancelFlightOrder` maps to Atlas's `void.do` (§4C), not `refund.do`.** `FlightOrderCancelOutcome` should include `status: 'ACCEPTED'|'NOT_SUPPORTED'|'FAILED'`, `estimatedRefund?: Money`, `providerTrackingRef?`, `provenance`. A `NOT_SUPPORTED` result (mapping Atlas's `843`) is a normal, expected, structured outcome — not an error to retry — since void support is carrier-specific. The executor/planner should treat `NOT_SUPPORTED` as a signal to fall back to `SIMULATE_PROVIDER_BOUNDARY` for that specific leg, not as a capability failure.
+- **Refund remains explicitly excluded** — §4B/§4C show that surface cannot be proven in sandbox at all, on any carrier (no real airline-side ticket is ever created). Do not build a `refundFlightOrder` operation for the sandbox demo path; if production adoption is ever pursued, that surface would need production credentials and a real fare purchase to validate, which is out of scope here.
 - This is a genuine **shared-contract change** and therefore requires **G3R-R0** review before DR-2 implements it, per the plan.
 - No hotel contract change is recommended — existing operations suffice (§12.5).
 
@@ -292,12 +404,12 @@ retrieveFlightOrder(query: FlightOrderRetrieveQuery): Promise<CapabilityResult<F
 
 | Scenario family | Minimum capability | DR-0 verdict |
 |---|---|---|
-| S1 — supplier flight disruption | flight-event ingress → correlate → mutate → recover → execute where permitted → observe | Ingress contract not yet built (DR-3); Atlas incident-list read is reachable now for a polling fallback; order creation proven for the replacement leg |
+| S1 — supplier flight disruption | flight-event ingress → correlate → mutate → recover → execute where permitted → observe | Ingress contract not yet built (DR-3); Atlas incident-list read is reachable now for a polling fallback; order creation proven for the replacement leg; **cancelling the disrupted leg can be a genuine `void.do` call if the original carrier supports it (§4C), otherwise `SIMULATE_PROVIDER_BOUNDARY`** |
 | S2 — traveller-requested change | `ChangeRequest`/resolution machinery across pre-booking flight, post-booking flight, hotel change, add-on | Engine machinery exists (ADR-036); NL→`ChangeRequest` conversion (DR-5) not yet built, but Model Studio's capability to do it is now proven (§8) once DR-5 wires the seam with a properly field-hinted prompt |
-| S3 — missed flight | traveller-state signal → downstream consequence → recovery | Same engine as S1/S2 per plan; no new provider capability required beyond what's proven here |
+| S3 — missed flight | traveller-state signal → downstream consequence → recovery | Same engine as S1/S2 per plan; no new provider capability required beyond what's proven here; same carrier-conditional real-cancellation option as S1 |
 | S4 — event-side change preview | counterfactual/dry-run → confirm → fan-out | No external provider dependency; unaffected by this report |
 
-All four families are **capability-feasible** with the provider evidence gathered here; none require a provider Atlas/Nuitée/Google cannot support once the flight order-creation delta (§13) lands and the Model Studio credential is fixed.
+All four families are **capability-feasible** with the provider evidence gathered here; none require a provider Atlas/Nuitée/Google cannot support once the flight order-creation-and-conditional-cancellation delta (§13) lands and the Model Studio credential is fixed. S1/S3's "cancel the old booking" step has a genuine, non-simulated path available if the scenario's carrier is void-supported (§4C) — worth factoring into which exact carrier/route DR-9 picks for the hero disruption leg.
 
 ---
 
@@ -305,13 +417,15 @@ All four families are **capability-feasible** with the provider evidence gathere
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| **Atlas refund/cancel cannot be demonstrated in sandbox** (permanent, per Atlas's own docs — §4B) | **High for any scenario claiming a provider-executed cancel/refund** | Use `SIMULATE_PROVIDER_BOUNDARY` for that step, honestly labelled — permanently, not pending further investigation |
+| **Atlas refund cannot be demonstrated in sandbox, on any carrier** (permanent, per Atlas's own docs and rigorous 2-carrier re-verification — §4B/§4C) | **High for any scenario claiming a provider-executed refund** | Use `SIMULATE_PROVIDER_BOUNDARY` for that step, honestly labelled — permanently, not pending further investigation |
+| Atlas cancellation (void) is carrier-specific — Southeast Asian LCCs (the best Singapore-area routes) are largely unsupported | Medium — affects which carrier a hero cancellation scenario should use | Route the "cancel the old booking" step through a void-supported carrier (Volaris/Frontier/Wizz/Jeju/Norwegian — §4C) when a real cancellation is needed; `SIMULATE_PROVIDER_BOUNDARY` otherwise |
 | `src/app/extraction.ts`'s system prompt doesn't name target field names, causing schema-shape failures on the default model | Medium — blocks reliable LIVE extraction until fixed | Apply the §8.2 prompt fix (small, well-understood, not done in DR-0) |
-| Atlas order.do/pay.do require exact wire-format knowledge (undocumented in the fetched pages — discovered empirically) | Low (now solved) | Reuse the exact discovered shape in §4/§4A when DR-2 implements the adapter — do not re-derive from docs alone |
+| Atlas order.do/pay.do/void.do require exact wire-format knowledge (undocumented in the fetched pages — discovered empirically) | Low (now solved) | Reuse the exact discovered shapes in §4/§4A/§4C when DR-2 implements the adapter — do not re-derive from docs alone |
 | Atlas webhook delivery is "best effort," no inbound auth | Medium | DR-3 must add its own ingress secret/allowlist; never trust payload as `AUTHORITATIVE` |
-| SIN→HKG specifically unpopulated | Low | Avoid that exact leg in scenario design; every other tested SIN pairing works |
+| SIN→HKG specifically unpopulated; several other spot-checked world cities also empty into SIN (§6A) | Low | Avoid those specific legs in scenario design; the populated set is still large |
+| "9 airlines / 36 routes" documentation is stale/misleading (§6A) | Low, informational | Don't let scenario design self-limit to the documented list; verify empirically per route as needed |
 | Nuitée `childAges` contract gap | Low, non-blocking | Park for Later per §12.4 |
-| Live ticketed Atlas test booking (`S96664`) has no confirmed cleanup path | Low (sandbox, no real cost) | No action available; documented transparently in §4A/§4B/§17 |
+| Live ticketed Atlas test bookings (`S96664` no cancel path; `S20324` void in progress) | Low (sandbox, no real cost) | No action needed for either; documented transparently in §4A/§4B/§4C/§17 |
 
 ---
 
@@ -322,7 +436,7 @@ All four families are **capability-feasible** with the provider evidence gathere
 - `docs/ROADMAP.md` — 3 factual DR-0 update notes on previously-contradicted entries (order.do, SIN routes, webhooks/incidents).
 - This report.
 - `.env.local` — `MODEL_STUDIO_BASE_URL` corrected to the international Model Studio endpoint (local config only; `.env.local` is gitignored, never committed).
-- Raw probe transcripts (Atlas search/verify/order/pay/refund/incident responses, Nuitée console output, Model Studio requests/responses including the field-hinted retests, Google Routes response) were reviewed inline during the investigation and are **not** committed as raw files — they live only in this session's scratchpad (outside the repo) and are summarized/sanitized into §3–§9 above, per the evidence-discipline instruction not to commit unnecessary raw payloads. The 9 Nuitée recordings are the one exception, committed because they are genuinely reusable REPLAY fixtures in the existing repo convention.
+- Raw probe transcripts (Atlas search/verify/order/pay/void/refund/incident responses across 67 route probes and 2 independent transaction chains, Nuitée console output, Model Studio requests/responses including the field-hinted retests, Google Routes response) were reviewed inline during the investigation and are **not** committed as raw files — they live only in this session's scratchpad (outside the repo) and are summarized/sanitized into §3–§9/§4C/§6A above, per the evidence-discipline instruction not to commit unnecessary raw payloads. The 9 Nuitée recordings are the one exception, committed because they are genuinely reusable REPLAY fixtures in the existing repo convention.
 
 ---
 
@@ -331,16 +445,20 @@ All four families are **capability-feasible** with the provider evidence gathere
 | Finding | Triage |
 |---|---|
 | Atlas order.do + pay.do + ticketing all work; prior TICKETING_ACTIVATION_REQUIRED assumption was Skill-sourced and wrong | **Act Now** — correct the record (done, §3/§4A/ROADMAP); inform G3R-R0 |
-| **Atlas refund cannot be demonstrated in sandbox — confirmed by Atlas's own documentation (§4B)** | **Act Now** — freeze this as `SIMULATE_PROVIDER_BOUNDARY` permanently for any sandbox demo claim; do not schedule further sandbox investigation of it |
-| Singapore sandbox routes are populated (12/13 directional probes) | **Act Now** — correct the record (done, ROADMAP); freeze Singapore as the summit location |
-| SIN→HKG specifically empty | **Investigate Now if HKG-origin scenario is chosen** — otherwise Park |
+| **Atlas refund cannot be demonstrated in sandbox, confirmed on two independent carriers — Atlas's own documentation explains why (§4B/§4C)** | **Act Now** — freeze this as `SIMULATE_PROVIDER_BOUNDARY` permanently for any sandbox demo claim; do not schedule further sandbox investigation of it |
+| **Atlas cancellation (void) genuinely works for supported carriers — corrects the earlier "cancellation is impossible" over-generalization (§4C)** | **Act Now** — update scenario design guidance: a real cancellation is achievable if the carrier is void-supported; inform G3R-R0 and DR-9 |
+| Void support is carrier-specific (~23 airlines documented: Americas/Europe/Japan/Korea); most SE Asian LCCs (best for Singapore routes) are not supported | **Investigate Now at DR-9** — decide whether the hero disruption/cancellation scenario should use a void-supported carrier, or accept `SIMULATE_PROVIDER_BOUNDARY` for that specific step |
+| Documented "9 airlines / 36 routes" undersells the real sandbox by ~3x in airline count (28 observed empirically) (§6A) | **Act Now** — correct the record (done, this report); stop treating the documented list as a ceiling for scenario design |
+| Singapore sandbox routes are populated (12+/13+ directional probes) | **Act Now** — correct the record (done, ROADMAP); freeze Singapore as the summit location |
+| SIN→HKG specifically empty; several other spot-checked world cities empty into SIN | **Investigate Now if one of those specific origins is chosen** — otherwise Park |
 | Model Studio was blocked by a regional endpoint mismatch, not a bad key | **Act Now** — corrected in `.env.local` (done); inform anyone else setting up this environment |
 | `src/app/extraction.ts` system prompt doesn't name target schema fields, causing schema-shape rejection on the default model | **Investigate Now / small Act Now** — apply the field-name hint fix before relying on LIVE extraction for a demo claim |
 | No NL→ResolutionTarget model task exists yet | **Park for Later** — correctly scoped to DR-5, not a DR-0 defect; §8 shows the model can do it once built |
 | Atlas webhook has no inbound auth | **Investigate Now in DR-3** — design Northstar's own ingress protection |
 | Nuitée `childAges` contract gap | **Park for Later** — no current hero scenario needs it |
-| Flight order-creation-and-payment contract gap | **Investigate Now at G3R-R0** — smallest delta proposed in §13 (refund deliberately excluded, permanently) |
+| Flight order-creation/payment/cancellation contract gap | **Investigate Now at G3R-R0** — smallest delta proposed in §13 (refund permanently excluded; cancellation included, carrier-conditional) |
 | Live ticketed Atlas test booking (`S96664`, orderNo `TESTA20260824171418381`) has no working cancel/refund path | **Ignore / Accept Risk** — sandbox test data, Malindo Air's own test environment, no real cost; transparently documented, not hidden |
+| Live ticketed Atlas test booking (`S20324`, Volaris, orderNo `TESTA20260824180215281`) has a void in progress | **Ignore / Accept Risk** — self-completing, no real cost, no action needed |
 | Atlas getLuggage.do session expired mid-investigation (not re-chained) | **Ignore / Accept Risk** — capability already proven reachable+validating; re-proving is low value |
 
 ---
@@ -349,27 +467,32 @@ All four families are **capability-feasible** with the provider evidence gathere
 
 - Atlas Search/Verify/fare-rules work live across many routes including a well-populated Singapore market in both directions (with one specific directional gap: SIN→HKG).
 - **Atlas order creation, payment (test-balance mode), and ticketing all work live for this account** — a real e-ticket (`S96664`) was issued. The prior activation-blocked assumption was wrong.
-- **Atlas refund cannot be demonstrated in sandbox, by design** — Atlas's own documentation confirms sandbox never issues real airline-side tickets, and the refund subsystem needs one (§4B). This is not a gap that further testing can close.
+- **Atlas refund cannot be demonstrated in sandbox, on any carrier, by design** — Atlas's own documentation confirms sandbox never issues real airline-side tickets, and the refund subsystem needs one (§4B); independently re-verified on a second, unrelated carrier with an identical result (§4C). This is not a gap that further testing can close.
+- **Atlas cancellation (void) genuinely works in sandbox — but only for carriers Atlas supports it for.** Proven end to end on Volaris: real quote, real submission, real tracking, real (test-balance) refund amount. Proven *not* to work on Malindo/Batik Air, but for a specific, documented, airline-support reason — not the same limitation that blocks refund (§4C). This corrects the first pass's over-generalized "cancellation is impossible" conclusion.
+- **The real Atlas sandbox database is far bigger than documented** — 28 airlines observed empirically (78% of 67 sampled routes populated, 808 offers seen) against a published claim of 9 airlines/36 routes. The documented list is a stale floor, not a ceiling (§6A).
 - Atlas's read-only incident-list endpoint works without webhook registration; webhook registration itself is documented but has no inbound authentication.
 - Nuitée's full hotel lifecycle (including realistic non-refundable cancellation-fee exposure and post-cancel state observability) is proven across three materially different cases.
 - Google Routes is live-ready with zero adapter changes needed.
 - **Model Studio LIVE now works** — the key was correct; the endpoint was wrong (international vs mainland region). Fixed in local config. The default extraction prompt needs a small field-naming fix to reliably pass schema validation; confirmed fixable and validated against real production schemas.
-- No architecture change is needed for hotel replacement; a well-scoped flight order-creation-and-payment delta is needed for flight replacement, and the refund/cancel side of that delta should never be relied on for a sandbox demo claim.
+- No architecture change is needed for hotel replacement; a well-scoped flight order-creation/payment/**conditional-cancellation** delta is needed for flight replacement — refund stays permanently out of scope for sandbox demo claims, but void does not.
 
 ## 19. WHAT WE DO NOT KNOW
 
 - Whether a genuine Atlas-originated schedule-change/cancellation webhook can ever be produced without a real ticketed booking and a real schedule disruption on it (very likely no, within a hackathon timeframe — and now doubly unlikely given §4B: sandbox tickets aren't real airline tickets, so a real airline-side schedule change against one is essentially impossible).
+- The complete list of Atlas's ~23 void-supported airlines beyond the "Americas/Europe/Japan/Korea" region description and the specific carriers already confirmed supported (Volaris) or confirmed unsupported (Malindo/Batik Air) — Atlas's void documentation doesn't enumerate the full list, only the region summary.
 - Whether Hong Kong or Kuala Lumpur would work as event-destination hubs (not investigated — deprioritized since Singapore already clears the bar).
 - Whether `ANCHOR_EVENT` extraction (only schema-rejected once, not individually retested with hints) has any task-specific quirks beyond the general wrapping-key issue already isolated and fixed for `RULE_SET`.
+- The true full size of the Atlas sandbox database — 67 sampled route/direction pairs and 28 observed airlines is a large, structured sample, not a census; there is no enumeration endpoint, so a fully exhaustive count isn't obtainable without asking Atlas directly.
 
 ## 20. KEY ASSUMPTION
 
-The domain engine stays generic; Singapore is adopted as the summit location because provider reality (not narrative preference) empirically supports it best. The flight replacement ceiling for Wave 3R is "genuine sandbox order, paid, and ticketed" (proven, §4A) for the *booking* side; the *recovery* side's refund/cancel step is `SIMULATE_PROVIDER_BOUNDARY` **permanently** in this sandbox (§4B — not a temporary gap). This satisfies the plan's `AI proposal → validation → viability → authority → executor → observe` pattern using only Atlas's own sandbox test-balance payment mode (never real card data), and it means Model Studio LIVE interpretation can now genuinely back any DR-0D/DR-5 claim once the small prompt fix (§8.2) is applied.
+The domain engine stays generic; Singapore is adopted as the summit location because provider reality (not narrative preference) empirically supports it best, and the real sandbox network is far larger and better-populated than the documentation ever suggested. The flight replacement ceiling for Wave 3R is "genuine sandbox order, paid, and ticketed" (proven, §4A) for the *booking* side; on the *recovery* side, refund is `SIMULATE_PROVIDER_BOUNDARY` **permanently** in this sandbox (§4B/§4C — not a temporary gap), while cancellation via void is **genuinely real** for carriers Atlas supports it for (§4C) — the scenario design should pick its carrier deliberately if a real cancellation matters to the demo. This satisfies the plan's `AI proposal → validation → viability → authority → executor → observe` pattern using only Atlas's own sandbox test-balance payment mode (never real card data), and it means Model Studio LIVE interpretation can now genuinely back any DR-0D/DR-5 claim once the small prompt fix (§8.2) is applied.
 
 ## 21. WHAT TO TEST NEXT
 
 1. Apply the §8.2 prompt fix to `src/app/extraction.ts` (name the target schema fields in `EXTRACTION_SYSTEM_PROMPT`), then re-run the full 6-call probe suite (script already written and reusable) to confirm all tasks pass cleanly, not just the two retested here.
-2. At DR-2, implement the `createFlightOrder`/`payFlightOrder`/`retrieveFlightOrder` delta from §13 using the exact wire format discovered in §4/§4A (do not re-derive from docs). Do not implement refund/cancel for the sandbox path.
+2. At DR-2, implement the `createFlightOrder`/`payFlightOrder`/`retrieveFlightOrder`/`cancelFlightOrder` delta from §13 using the exact wire formats discovered in §4/§4A/§4C (do not re-derive from docs). Implement cancellation via `void.do`, surface `843`-class rejections as a structured `NOT_SUPPORTED` capability result, and do not implement refund for the sandbox path.
 3. At DR-3, design the webhook ingress's own authentication given Atlas provides none, and decide the simulated-source-event fallback shape using the `event/getPageList.do` record schema from §5 as the template.
 4. At DR-5, build the NL→`ResolutionTarget` extraction task using the same field-naming prompt discipline validated in §8 — carry the exact `ResolutionTargetSchema` key names into the system prompt from day one.
-5. When scenario design is frozen (DR-9), avoid the SIN→HKG leg specifically; every other tested Singapore pairing has real depth. Frame any S1/S3 recovery scenario's "cancel the old booking" step as simulated at the provider boundary, honestly labelled — this is now settled, not open.
+5. When scenario design is frozen (DR-9): avoid the SIN→HKG leg specifically (every other tested Singapore pairing has real depth); if the hero scenario needs a real, provider-executed cancellation, prefer a void-supported carrier (Volaris/Frontier/Wizz/Jeju/Norwegian) for that specific leg — otherwise frame the cancellation step as simulated at the provider boundary, honestly labelled.
+6. Consider probing a few more of Atlas's ~23 void-supported airlines (beyond Volaris) to build a fuller supported-carrier list before DR-9 locks the exact hero route.
