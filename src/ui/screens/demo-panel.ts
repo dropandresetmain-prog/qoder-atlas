@@ -62,7 +62,7 @@ export function renderDemoPanel(ctx: DemoPanelContext): string {
     <h2>State management</h2>
     <div class="demo-card">
       <h3>Reset programme</h3>
-      <p class="dc-note">Wipes all state and reseeds the 42-traveller demo programme + scenario fixtures from local JSON. No external calls.</p>
+      <p class="dc-note">Wipes all state and reseeds the 67-speaker demo programme + scenario fixtures from local JSON. No external calls.</p>
       <div class="dc-meta m-local">LOCAL ONLY — deterministic SQLite reset</div>
       <button class="demo-btn danger" data-demo-action="reset">Reset &amp; reseed</button>
       <div id="result-reset" class="demo-result" style="display:none;"></div>
@@ -86,7 +86,7 @@ export function renderDemoPanel(ctx: DemoPanelContext): string {
     <div class="demo-links">
       <a href="/operator">Operator dashboard</a>
       <a href="/traveller">Traveller view</a>
-      ${ctx.programmeEventId ? `<a href="/programme?event=${escapeHtml(ctx.programmeEventId)}">Programme (42 travellers)</a>` : ''}
+      ${ctx.programmeEventId ? `<a href="/programme?event=${escapeHtml(ctx.programmeEventId)}">Programme (67 speakers)</a>` : ''}
     </div>
   </div>
 
