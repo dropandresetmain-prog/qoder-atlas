@@ -1,0 +1,286 @@
+{
+  "probe": "wave3r-mission3-scenarios-live",
+  "generatedAt": "2026-08-24T22:11:23.059Z",
+  "boundary": "real HTTP surfaces only (no direct engine calls)",
+  "steps": [
+    {
+      "step": "s1_supplier_disruption.source",
+      "timestamp": "2026-08-24T22:11:21.943Z",
+      "result": {
+        "sourceLabel": "SIMULATED SOURCE EVENT via POST /api/events/atlas",
+        "correlatedTripId": "trip_a",
+        "caseId": "case-trip_a-sig-atlas-event-9903fa3df444cf3f"
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.impact",
+      "timestamp": "2026-08-24T22:11:21.953Z",
+      "result": {
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight cancellation",
+        "blastRadius": 1,
+        "criticalObjectiveAtRisk": "Deliver the opening keynote at 10:00 on 2026-09-14"
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.asserted_fail_closed",
+      "timestamp": "2026-08-24T22:11:21.970Z",
+      "result": {
+        "strategiesCount": 0,
+        "uncertainties": [
+          "deterministic fallback planner produced no strategies: no directly-failed flight leg identified in the impact assessment"
+        ],
+        "rationale": "fallback planner failed closed; no strategies fabricated",
+        "note": "ASSERTED ingress stays AT_RISK; planning refuses to fabricate strategies before provider confirmation"
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.lane_a.final",
+      "timestamp": "2026-08-24T22:11:21.975Z",
+      "result": {
+        "status": "DISRUPTED",
+        "optionsCount": 0,
+        "actionsCount": 0
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.confirmed_source",
+      "timestamp": "2026-08-24T22:11:22.139Z",
+      "result": {
+        "sourceLabel": "confirmed-authority disruption via POST /api/runtime/disruption",
+        "severity": "HIGH",
+        "directFailureIds": [
+          "el_a_flight_out"
+        ],
+        "threatenedObjectiveIds": [
+          "obj_a_keynote"
+        ],
+        "caseId": "case-trip_a-sig_a_cancel"
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.plan",
+      "timestamp": "2026-08-24T22:11:22.161Z",
+      "result": {
+        "bestStrategyId": "strat-0002",
+        "strategiesCount": 3,
+        "feasibleCount": 2,
+        "rejectedCount": 1
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.authority",
+      "timestamp": "2026-08-24T22:11:22.167Z",
+      "result": {
+        "outcome": "REQUIRES_TRAVELLER",
+        "intentId": "intent-case-trip_a-sig_a_cancel-strat-0002"
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.decision",
+      "timestamp": "2026-08-24T22:11:22.171Z",
+      "result": {
+        "decidedBy": "TRAVELLER",
+        "verdict": "APPROVED"
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.execution",
+      "timestamp": "2026-08-24T22:11:22.186Z",
+      "result": {
+        "executed": true,
+        "caseStatus": "RESOLVED",
+        "resolutionOutcome": "FULLY_RECOVERED",
+        "simulated": false,
+        "gateIssues": []
+      }
+    },
+    {
+      "step": "s1_supplier_disruption.final",
+      "timestamp": "2026-08-24T22:11:22.189Z",
+      "result": {
+        "status": "RESOLVED",
+        "resolutionOutcome": "FULLY_RECOVERED",
+        "optionsCount": 3,
+        "actionsCount": 1
+      }
+    },
+    {
+      "step": "s2_traveller_change.source",
+      "timestamp": "2026-08-24T22:11:22.339Z",
+      "result": {
+        "sourceLabel": "traveller NL text via POST /api/traveller/change-request",
+        "tripId": "trip_b",
+        "intentKind": "ADJUST_TRIP_WINDOW",
+        "urgency": "HARD_INSTRUCTION",
+        "implications": [
+          "arriveBy 2026-09-19T12:00:00-06:00 is 20h earlier than current earliest arrival 2026-09-20T08:20:00-06:00"
+        ],
+        "caseId": "case-cr-trip_b-cr-nl-1787609482336-yypc2e"
+      }
+    },
+    {
+      "step": "s2_traveller_change.impact",
+      "timestamp": "2026-08-24T22:11:22.342Z",
+      "result": {
+        "status": "CHANGE_REQUESTED",
+        "whatChanged": "I need to arrive by 2026-09-19T12:00:00-06:00 for the client workshop preparation.",
+        "blastRadius": 0
+      }
+    },
+    {
+      "step": "s2_traveller_change.plan",
+      "timestamp": "2026-08-24T22:11:22.345Z",
+      "result": {
+        "strategiesCount": 0,
+        "feasibleCount": 0,
+        "rejectedCount": 0,
+        "uncertainties": [
+          "arriveBy requested but no flight leg arrives at the event place and no home/event corridor evidence exists; cannot derive a route"
+        ],
+        "rationale": "northstar window-shift planner found no rebookable leg; evidence requests and uncertainty only"
+      }
+    },
+    {
+      "step": "s2_traveller_change.final",
+      "timestamp": "2026-08-24T22:11:22.345Z",
+      "result": {
+        "state": "EXPLICITLY_UNRESOLVED",
+        "rationale": "northstar window-shift planner found no rebookable leg; evidence requests and uncertainty only",
+        "note": "planning failed closed with explicit uncertainty; no strategies fabricated, case stays openly unresolved"
+      }
+    },
+    {
+      "step": "s2_traveller_change.final",
+      "timestamp": "2026-08-24T22:11:22.349Z",
+      "result": {
+        "status": "CHANGE_REQUESTED",
+        "optionsCount": 0,
+        "actionsCount": 0
+      }
+    },
+    {
+      "step": "s3_missed_connection.source",
+      "timestamp": "2026-08-24T22:11:22.504Z",
+      "result": {
+        "sourceLabel": "traveller report via POST /api/runtime/missed-flight",
+        "tripId": "trip_a",
+        "missedElementId": "el_a_flight_out",
+        "severity": "HIGH",
+        "directFailureIds": [
+          "el_a_flight_out"
+        ],
+        "threatenedObjectiveIds": [
+          "obj_a_keynote"
+        ],
+        "caseId": "case-trip_a-sig-missed-flight-el_a_flight_out-2026-09-13T07:00:00_09:00"
+      }
+    },
+    {
+      "step": "s3_missed_connection.impact",
+      "timestamp": "2026-08-24T22:11:22.507Z",
+      "result": {
+        "status": "CHANGE_REQUESTED",
+        "whatChanged": "Traveller reported missing a scheduled flight",
+        "blastRadius": 3,
+        "criticalObjectiveAtRisk": "Deliver the opening keynote at 10:00 on 2026-09-14"
+      }
+    },
+    {
+      "step": "s3_missed_connection.plan",
+      "timestamp": "2026-08-24T22:11:22.514Z",
+      "result": {
+        "bestStrategyId": "strat-0005",
+        "strategiesCount": 3,
+        "feasibleCount": 2,
+        "rejectedCount": 1
+      }
+    },
+    {
+      "step": "s3_missed_connection.authority",
+      "timestamp": "2026-08-24T22:11:22.516Z",
+      "result": {
+        "outcome": "REQUIRES_TRAVELLER",
+        "intentId": "intent-case-trip_a-sig-missed-flight-el_a_flight_out-2026-09-13T07:00:00_09:00-strat-0005"
+      }
+    },
+    {
+      "step": "s3_missed_connection.decision",
+      "timestamp": "2026-08-24T22:11:22.517Z",
+      "result": {
+        "decidedBy": "TRAVELLER",
+        "verdict": "APPROVED"
+      }
+    },
+    {
+      "step": "s3_missed_connection.execution",
+      "timestamp": "2026-08-24T22:11:22.530Z",
+      "result": {
+        "executed": true,
+        "caseStatus": "RESOLVED",
+        "resolutionOutcome": "FULLY_RECOVERED",
+        "simulated": true,
+        "gateIssues": []
+      }
+    },
+    {
+      "step": "s3_missed_connection.final",
+      "timestamp": "2026-08-24T22:11:22.534Z",
+      "result": {
+        "status": "RESOLVED",
+        "resolutionOutcome": "FULLY_RECOVERED",
+        "optionsCount": 3,
+        "actionsCount": 1
+      }
+    },
+    {
+      "step": "s4_event_change.preview",
+      "timestamp": "2026-08-24T22:11:22.683Z",
+      "result": {
+        "sourceLabel": "POST /api/programme/:eventId/change-preview (mutates NOTHING)",
+        "totalTravellers": 67,
+        "affectedCount": 43,
+        "unaffectedCount": 24,
+        "sampleAffectedTripId": "trip-trv-evt-w3-demo-draft-1"
+      }
+    },
+    {
+      "step": "s4_event_change.commit",
+      "timestamp": "2026-08-24T22:11:23.054Z",
+      "result": {
+        "processedCount": 43,
+        "tripsBefore": 69,
+        "casesOpened": 43
+      }
+    },
+    {
+      "step": "s4_event_change.fanout_case",
+      "timestamp": "2026-08-24T22:11:23.057Z",
+      "result": {
+        "caseId": "case-trip-trv-evt-w3-demo-draft-1-sig-fanout-sig-change-cmt-evt-w3-demo-opening-1787609482684-trip-trv-evt-w3-demo-draft-1-el-trip-trv-evt-w3-demo-draft-1-eng-1",
+        "tripId": "trip-trv-evt-w3-demo-draft-1",
+        "status": "DISRUPTED",
+        "whatChanged": "shared commitment rescheduled affecting engagement el-trip-trv-evt-w3-demo-draft-1-eng-1",
+        "blastRadius": 0
+      }
+    },
+    {
+      "step": "s4_event_change.final",
+      "timestamp": "2026-08-24T22:11:23.057Z",
+      "result": {
+        "state": "COMMITTED_FANOUT_PROCESSED",
+        "processedCount": 43
+      }
+    },
+    {
+      "step": "scenarios.verdict",
+      "timestamp": "2026-08-24T22:11:23.058Z",
+      "result": {
+        "s1": "PASS (dual lane: ASSERTED ingress fail-closed honest; confirmed-authority full loop FULLY_RECOVERED)",
+        "s2": "PASS (full chain to explicit unresolved: window-shift planner failed closed on missing route evidence, nothing fabricated)",
+        "s3": "PASS (missed connection full loop to FULLY_RECOVERED)",
+        "s4": "PASS (preview zero-mutation then commit fan-out to 43 cases)"
+      }
+    }
+  ]
+}
