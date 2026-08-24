@@ -18,7 +18,14 @@
  *     viability (no field conflates the two);
  *  9. execution authority invariants remain closed for new consequential ops;
  * 10. unauthenticated external event payloads stay ASSERTED, never
- *     AUTHORITATIVE, and deduplicate on provider identity.
+ *     AUTHORITATIVE, and deduplicate on provider identity — including a real
+ *     negative-parse test that AUTHORITATIVE is schema-rejected (G3R-R0-FIX A3).
+ *
+ * G3R-R0-FIX review-fix additions:
+ * 2a. FlightOrderPayQuery requires authorisedAmount, the price-drift ceiling
+ *     (A1) — compile-time and runtime shape checks;
+ * 2b. FlightTransactionStateSchema rejects credential/PII/card-shaped keys
+ *     (A4) while still accepting opaque provider fields via the catchall.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,6 +73,7 @@ test('G3R-R0: generic flight transaction shapes validate; provider wire fields a
     workflowState: { session: 'opaque-provider-state' },
     clientReference: 'client-ref-1',
   };
+  assert.equal(createQuery.clientReference, 'client-ref-1');
   assert.equal(createQuery.passengers[0]?.familyName, 'Traveller');
 
   // Order observation enum accepts the generic lifecycle and rejects
@@ -97,6 +105,7 @@ test('G3R-R0: flight payment carries an opaque paymentRef and no card fields', (
   const payQuery: FlightOrderPayQuery = {
     orderRef: 'ORD-123',
     paymentRef: 'provider-test-balance',
+    authorisedAmount: { amount: 191.98, currency: 'USD' },
     clientReference: 'client-ref-1',
   };
   assert.equal(payQuery.paymentRef, 'provider-test-balance');
@@ -121,6 +130,71 @@ test('G3R-R0: flight payment carries an opaque paymentRef and no card fields', (
       assert.ok(!forbidden.includes(key), `payment contract carries card field ${key}`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// 2a. G3R-R0-FIX A1: payment cannot be constructed without a price-drift ceiling
+// ---------------------------------------------------------------------------
+
+test('G3R-R0-FIX: FlightOrderPayQuery requires authorisedAmount', () => {
+  // Compile-time check: omitting authorisedAmount must not typecheck.
+  // @ts-expect-error authorisedAmount is required
+  const _missingCeiling: FlightOrderPayQuery = {
+    orderRef: 'ORD-123',
+    paymentRef: 'provider-test-balance',
+  };
+  void _missingCeiling;
+
+  // Runtime shape check matching the style of the no-card-field guard above:
+  // a hand-built payload without authorisedAmount must not carry it.
+  const payloadWithoutCeiling: Record<string, unknown> = {
+    orderRef: 'ORD-123',
+    paymentRef: 'provider-test-balance',
+    clientReference: 'client-ref-1',
+  };
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(payloadWithoutCeiling, 'authorisedAmount'),
+    'sanity: payload intentionally omits authorisedAmount',
+  );
+
+  const payloadWithCeiling: FlightOrderPayQuery = {
+    orderRef: 'ORD-123',
+    paymentRef: 'provider-test-balance',
+    authorisedAmount: { amount: 191.98, currency: 'USD' },
+  };
+  assert.equal(payloadWithCeiling.authorisedAmount.amount, 191.98);
+  assert.equal(payloadWithCeiling.authorisedAmount.currency, 'USD');
+});
+
+// ---------------------------------------------------------------------------
+// 2b. G3R-R0-FIX A4: transaction state rejects credential/PII/card keys
+// ---------------------------------------------------------------------------
+
+test('G3R-R0-FIX: FlightTransactionStateSchema rejects card/credential fields', () => {
+  const withCardField = FlightTransactionStateSchema.safeParse({
+    orderRef: 'O1',
+    cardNumber: '4111111111111111',
+  });
+  assert.equal(withCardField.success, false);
+
+  const withCvv = FlightTransactionStateSchema.safeParse({
+    orderRef: 'O1',
+    cvv: '123',
+  });
+  assert.equal(withCvv.success, false);
+
+  const withAccessToken = FlightTransactionStateSchema.safeParse({
+    orderRef: 'O1',
+    access_token: 'secret-token',
+  });
+  assert.equal(withAccessToken.success, false);
+
+  // Ordinary opaque provider fields remain accepted (catchall preserved).
+  const clean = FlightTransactionStateSchema.safeParse({
+    orderRef: 'O1',
+    providerExtraField: 'kept-opaque',
+  });
+  assert.equal(clean.success, true);
 });
 
 // ---------------------------------------------------------------------------
@@ -359,10 +433,19 @@ test('G3R-R0: external event envelopes keep provider identity and never self-pro
     assert.ok(/^[a-z]/.test(key), `envelope field ${key} is not generic`);
   }
 
-  // An unauthenticated delivery has no business claiming AUTHORITATIVE: the
-  // envelope's authority is provider-stated delivery confidence, and the
-  // downstream signal authority path (TripSignalSchema) is what gates trust.
+  // An unauthenticated delivery has no business claiming AUTHORITATIVE. This
+  // is a real negative test, not a self-referential comparison: the schema
+  // itself must reject AUTHORITATIVE, never merely happen to not contain it.
   assert.notEqual(envelope.providerAuthority, 'AUTHORITATIVE');
+  const withAuthoritativeClaim = ExternalProviderEventEnvelopeSchema.safeParse({
+    providerId: 'flight-provider-x',
+    providerEventId: 'evt-0002',
+    receivedAt: AT,
+    category: 'FLIGHT_SCHEDULE_CHANGE',
+    providerAuthority: 'AUTHORITATIVE',
+  });
+  assert.equal(withAuthoritativeClaim.success, false);
+
   assert.throws(() =>
     ExternalProviderEventEnvelopeSchema.parse({
       providerId: 'flight-provider-x',

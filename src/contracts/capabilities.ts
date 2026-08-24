@@ -14,7 +14,7 @@ import type {
   SourceKind,
   UncertaintyRecord,
 } from '../domain/common.ts';
-import { FactAuthoritySchema, IsoDateTimeSchema } from '../domain/common.ts';
+import { IsoDateTimeSchema } from '../domain/common.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import type { MutationProposal } from '../operational/mutation.ts';
 import type { TripSignal } from '../operational/signal.ts';
@@ -107,12 +107,6 @@ export interface FareRulesOutcome {
 // passenger name conventions) are adapter-private: only these generic
 // shapes cross into the application.
 
-/** Opaque external-system reference (reused from ExternalRef). */
-export const ExternalRefSchema = z.strictObject({
-  system: z.string().min(1),
-  value: z.string().min(1),
-});
-
 /**
  * Provider-neutral passenger identity. Adapters map to whatever name/date
  * representation the provider requires; the application never formats
@@ -126,8 +120,6 @@ export interface FlightPassengerInput {
   gender?: 'MALE' | 'FEMALE' | 'OTHER' | 'UNKNOWN';
   /** ICAO/IATA nationality code when the provider requires it. */
   nationality?: string;
-  /** Provider-specific required fields the application cannot derive. */
-  additionalFields?: Record<string, string>;
 }
 
 /** Provider-neutral booking contact details. */
@@ -148,14 +140,26 @@ export interface FlightOrderCreateQuery {
   contact: FlightContactInput;
   /** Opaque provider workflow state carried from verify, preserved exactly. */
   workflowState?: Record<string, unknown>;
-  /** Caller-owned reconciliation/idempotency reference. */
-  clientReference?: string;
+  /**
+   * Caller-owned idempotency key. Required: this is the one operation most
+   * exposed to duplicate-create risk, and it is what lets an executor
+   * retrieve-before-recreate after a timeout instead of blindly re-issuing
+   * create (ADR-042).
+   */
+  clientReference: string;
 }
 
 /**
  * Opaque provider workflow state for consequential flight transactions
  * (order refs, cancellation quote handles, tracking codes). Never
  * reinterpreted by the application; persisted for reconciliation.
+ *
+ * This state is owned by adapter/executor/reconciliation layers only — it
+ * must never be read by domain or planner code, and never rendered to a
+ * user-facing surface. The catchall lets adapter-specific reconciliation
+ * fields survive round-trip without reinterpretation, but the surrounding
+ * refinement rejects credential/PII/card-shaped keys outright so this seam
+ * can never become a leakage path for raw payment or auth material.
  */
 export const FlightTransactionStateSchema = z
   .strictObject({
@@ -174,7 +178,30 @@ export const FlightTransactionStateSchema = z
     /** Provider-reported expected confirmation instant (informational). */
     expectedConfirmationAt: IsoDateTimeSchema.optional(),
   })
-  .catchall(z.unknown());
+  .catchall(z.unknown())
+  .superRefine((value, ctx) => {
+    const forbiddenKeys = [
+      'pan',
+      'cardNumber',
+      'cardNum',
+      'cvv',
+      'cv2',
+      'expiryMonth',
+      'expiryYear',
+      'access_token',
+      'authorization',
+      'secret',
+    ];
+    for (const key of forbiddenKeys) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `transaction state must not carry credential/PII/card field ${key}`,
+        });
+      }
+    }
+  });
 export type FlightTransactionState = z.infer<typeof FlightTransactionStateSchema>;
 
 /** Provider-observed lifecycle state of a flight order. */
@@ -233,6 +260,17 @@ export interface FlightOrderPayQuery {
   orderRef: string;
   /** Opaque payment handle resolved/owned outside this contract. */
   paymentRef: string;
+  /**
+   * Deterministic price-drift ceiling that authority approved for this
+   * payment (ADR-042). The executor MUST compare the provider-reported
+   * payable total from `createOrder` against this ceiling before calling
+   * `payOrder`: if the payable total exceeds `authorisedAmount`, the
+   * currency differs, or no total is reported, the executor MUST NOT pay —
+   * it re-enters deterministic viability/authority with the observed price,
+   * leaving the order HELD. `ActionIntent.priceDelta` is a delta, not the
+   * payable ceiling, and must never be used for this comparison.
+   */
+  authorisedAmount: Money;
   clientReference?: string;
 }
 
@@ -320,10 +358,14 @@ export interface FlightCancellationStatusView {
 
 /**
  * Transactional flight capability (G3R-R0 / ADR-042..043). Read-only
- * discovery stays on FlightCapability; every method here is consequential
- * (pay/submit) or supports it, and is reachable only through the
+ * discovery stays on FlightCapability. Within this interface, methods split
+ * by side-effect level, not uniformly: `createOrder` / `payOrder` /
+ * `submitCancellation` are consequential and reachable ONLY through the
  * ActionIntent -> authority -> executor path, never through planner tool
- * requests (subset invariant test-enforced).
+ * requests. `retrieveOrder` / `quoteCancellation` / `retrieveCancellationStatus`
+ * are read-only and planner-requestable via `flight.order_status` /
+ * `flight.cancel_quote` / `flight.cancel_status` respectively (subset
+ * invariant test-enforced).
  *
  * Adapters that do not support an operation return a structured
  * CapabilityResult failure (category UNAVAILABLE) — never throw, never
@@ -352,8 +394,11 @@ export interface FlightTransactionCapability {
 // Provider-neutral intake seam for externally delivered flight events
 // (webhook/incident feeds). Raw payloads stay outside trip state; only the
 // normalized envelope crosses into the application, and it carries the
-// provider's own authority — an unauthenticated push arrives as ASSERTED,
-// never AUTHORITATIVE (TripSignal authority gating enforces this downstream).
+// provider's own authority — an unauthenticated push arrives as ASSERTED at
+// best. AUTHORITATIVE is excluded from `providerAuthority` at the schema
+// itself (ExternalProviderEventEnvelopeSchema below): the envelope cannot
+// self-declare authoritative trust, full stop — this is not a downstream
+// convention or safeguard elsewhere, it is enforced right here.
 
 /** Generic category of an external provider event; no provider names. */
 export const ProviderEventCategorySchema = z.enum([
@@ -382,8 +427,13 @@ export const ExternalProviderEventEnvelopeSchema = z.strictObject({
   /** Provider booking/order references for correlation, where supplied. */
   providerOrderRefs: z.array(z.string()).default([]),
   category: ProviderEventCategorySchema,
-  /** Provider-side delivery confidence, if the provider states one. */
-  providerAuthority: FactAuthoritySchema.optional(),
+  /**
+   * Provider-side delivery confidence, if the provider states one. Excludes
+   * AUTHORITATIVE at the schema itself: an externally delivered envelope can
+   * never self-declare authoritative trust (ADR-044) — that ceiling is
+   * enforced here, not by a downstream convention or safeguard elsewhere.
+   */
+  providerAuthority: z.enum(['CONNECTED', 'ASSERTED', 'INFERRED']).optional(),
   /**
    * Normalized payload; provider-specific raw payloads stay in the inbox
    * store/recording, never here.
