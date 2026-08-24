@@ -101,6 +101,16 @@ export interface ResolutionHandlers {
 }
 
 /**
+ * DR-3 — provider-neutral flight-event ingress surface. The real,
+ * credential-free natural-source boundary: a provider-shaped event posted
+ * here is persisted, deduplicated, normalized (behind the provider adapter)
+ * and fed into the ordinary recovery pipeline — never a demo shortcut.
+ */
+export interface EventIngestHandlers {
+  atlasEvent(body: unknown, at: IsoDateTime): Promise<{ status: number; body: unknown }>;
+}
+
+/**
  * Wave 3 operational surfaces (Gate 2): app-layer projections the UI lane
  * renders verbatim — approval queue, activity stream, uncertainties, and
  * truthful provider provenance. Never inferred on the frontend.
@@ -133,6 +143,8 @@ export interface AppEndpoints {
   programme?: ProgrammeHandlers;
   /** Present when the Northstar resolution surface is wired. */
   resolution?: ResolutionHandlers;
+  /** Present when the DR-3 flight-event ingress is wired. */
+  events?: EventIngestHandlers;
   /** Demo-only: scenario triggers for local clickaround. */
   demo?: DemoSurface;
 }
@@ -486,6 +498,29 @@ async function handle(
     }
     if (segments[2] === 'change-request') {
       const outcome = await handlers.changeRequest(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    sendJson(res, 404, { error: 'not_found', path: url.pathname });
+    return;
+  }
+
+  // --- Flight-event ingress (DR-3) — real natural-source boundary --------
+  if (endpoints.events && segments[0] === 'api' && segments[1] === 'events') {
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    if (segments[2] === 'atlas') {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: 'invalid_json' });
+        return;
+      }
+      const at = url.searchParams.get('at') ?? endpoints.now();
+      const outcome = await endpoints.events.atlasEvent(parsed, at);
       sendJson(res, outcome.status, outcome.body);
       return;
     }

@@ -65,6 +65,9 @@ import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
+import { SqliteEventInboxStore } from './eventInboxStore.ts';
+import { createEventIngestHandlers } from './eventIngestHttp.ts';
+import { AtlasFlightEventNormalizer } from '../providers/atlas/eventNormalizer.ts';
 import { loadScenario, listScenarioDirs } from '../scenarios/loader.ts';
 import type { ScenarioSpec } from '../scenarios/spec.ts';
 import type { DemoSurface } from '../server/http.ts';
@@ -120,6 +123,7 @@ export async function composeAppRuntime(
   const audit = new SqliteAuditRepository(database);
   const preferences = new SqlitePreferenceStore(database);
   const dossiers = new SqliteBookingDossierStore(database);
+  const eventInbox = new SqliteEventInboxStore(database);
   const mutations = new SqlMutationService({ db: database, trips, entities });
 
   // Deterministic generalized bootstrap: seed every accepted scenario bundle
@@ -425,6 +429,12 @@ export async function composeAppRuntime(
       viability,
       sources,
       preferences,
+    }),
+    events: createEventIngestHandlers({
+      inbox: eventInbox,
+      normalizer: new AtlasFlightEventNormalizer(),
+      trips,
+      orchestrator,
     }),
     demo,
   };
