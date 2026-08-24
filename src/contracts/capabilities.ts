@@ -157,9 +157,13 @@ export interface FlightOrderCreateQuery {
  * This state is owned by adapter/executor/reconciliation layers only — it
  * must never be read by domain or planner code, and never rendered to a
  * user-facing surface. The catchall lets adapter-specific reconciliation
- * fields survive round-trip without reinterpretation, but the surrounding
- * refinement rejects credential/PII/card-shaped keys outright so this seam
- * can never become a leakage path for raw payment or auth material.
+ * fields survive round-trip without reinterpretation. Adapters MUST populate
+ * only deliberately selected reconciliation fields — never dump a raw
+ * provider response into this shape. The surrounding refinement applies a
+ * case-insensitive, nested denylist of credential/PII/card-shaped keys and
+ * value patterns as defense-in-depth: it is a heuristic filter, not proof —
+ * a curated adapter mapping remains the primary guarantee that this seam
+ * does not carry raw payment or auth material.
  */
 export const FlightTransactionStateSchema = z
   .strictObject({
@@ -180,29 +184,81 @@ export const FlightTransactionStateSchema = z
   })
   .catchall(z.unknown())
   .superRefine((value, ctx) => {
-    const forbiddenKeys = [
-      'pan',
-      'cardNumber',
-      'cardNum',
-      'cvv',
-      'cv2',
-      'expiryMonth',
-      'expiryYear',
-      'access_token',
-      'authorization',
-      'secret',
-    ];
-    for (const key of forbiddenKeys) {
-      if (Object.prototype.hasOwnProperty.call(value, key)) {
+    flagTransactionStateSecrets(value, ctx);
+  });
+export type FlightTransactionState = z.infer<typeof FlightTransactionStateSchema>;
+
+/**
+ * Credential/PII denylist for transaction state. Matching is case-insensitive
+ * and ignores separators (camelCase/snake_case/kebab-case all hit the same
+ * canonical form), and the walk descends into nested objects/arrays so a
+ * buried payload cannot evade the top-level check. This is defense-in-depth:
+ * adapters remain responsible for curating exactly what they persist.
+ */
+const TRANSACTION_STATE_FORBIDDEN_KEYS = [
+  'pan',
+  'cardnumber',
+  'cardnum',
+  'cvv',
+  'cv2',
+  'expirymonth',
+  'expiryyear',
+  'accesstoken',
+  'authorization',
+  'secret',
+  'password',
+  'apikey',
+];
+
+/** Canonical denylist form: lowercase with every non-alphanumeric removed. */
+function canonicalSensitiveKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Fail-closed substring semantics: `clientSecret` or `companyApiKey` also
+ * trip the filter. Legitimate curated reconciliation field names contain
+ * none of these tokens, so the false-positive cost is acceptable here.
+ */
+function isForbiddenTransactionStateKey(key: string): boolean {
+  const canonical = canonicalSensitiveKey(key);
+  return TRANSACTION_STATE_FORBIDDEN_KEYS.some((forbidden) => canonical.includes(forbidden));
+}
+
+/**
+ * 15–19 digit runs look like PANs. The floor sits above the 13-digit airline
+ * ticket-number convention so legitimate ticketRefs are never false-positived.
+ */
+const PAN_LIKE_VALUE = /\b(?:\d[ -]?){15,19}\b/;
+
+function flagTransactionStateSecrets(value: unknown, ctx: { addIssue(issue: { code: 'custom'; path: Array<string | number>; message: string }): void }, path: Array<string | number> = []): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flagTransactionStateSecrets(item, ctx, [...path, index]));
+    return;
+  }
+  if (typeof value === 'string') {
+    if (PAN_LIKE_VALUE.test(value)) {
+      ctx.addIssue({
+        code: 'custom',
+        path,
+        message: 'transaction state must not carry card-number-shaped values',
+      });
+    }
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      if (isForbiddenTransactionStateKey(key)) {
         ctx.addIssue({
           code: 'custom',
-          path: [key],
+          path: [...path, key],
           message: `transaction state must not carry credential/PII/card field ${key}`,
         });
       }
+      flagTransactionStateSecrets(entry, ctx, [...path, key]);
     }
-  });
-export type FlightTransactionState = z.infer<typeof FlightTransactionStateSchema>;
+  }
+}
 
 /** Provider-observed lifecycle state of a flight order. */
 export const FlightOrderStatusSchema = z.enum([

@@ -197,6 +197,35 @@ test('G3R-R0-FIX: FlightTransactionStateSchema rejects card/credential fields', 
   assert.equal(clean.success, true);
 });
 
+test('Wave 3R DR-2.12: transaction state denylist is case-insensitive, nested and value-aware', () => {
+  // Case/separator variants of forbidden keys are rejected.
+  for (const variant of ['CardNumber', 'CARD_NUMBER', 'Cvv', 'AccessToken', 'AUTHORIZATION', 'clientSecret', 'apiKey', 'Password']) {
+    const parsed = FlightTransactionStateSchema.safeParse({ orderRef: 'O1', [variant]: 'x' });
+    assert.equal(parsed.success, false, `${variant} must be rejected`);
+  }
+
+  // A forbidden key buried in a nested catchall payload cannot evade.
+  const nested = FlightTransactionStateSchema.safeParse({
+    orderRef: 'O1',
+    providerBundle: { payment: { pan: '4111111111111111' }, list: [{ cvv: '123' }] },
+  });
+  assert.equal(nested.success, false, 'nested credential field must be rejected');
+
+  // PAN-shaped string values are rejected wherever they appear.
+  const panValue = FlightTransactionStateSchema.safeParse({ orderRef: '4111 1111 1111 1111' });
+  assert.equal(panValue.success, false, 'card-number-shaped value must be rejected');
+
+  // Legitimate reconciliation content still passes (ticket refs are short).
+  const legitimate = FlightTransactionStateSchema.safeParse({
+    orderRef: 'ORD-123',
+    providerRecordLocator: 'AB12CD',
+    ticketRefs: ['999-1234567890'],
+    cancellationQuoteRef: 'Q-1',
+    cancellationRequestRef: '202608-0038',
+  });
+  assert.equal(legitimate.success, true);
+});
+
 // ---------------------------------------------------------------------------
 // 3./4. Consequential flight operations cannot enter the planner vocabulary
 // ---------------------------------------------------------------------------
