@@ -75,7 +75,8 @@ import {
   type HotelReplacementDossier,
 } from '../src/app/providerExecution.ts';
 import { FileRecordingStore, recordingIdFor } from '../src/providers/recordingStore.ts';
-import { AtlasFlightTransactionAdapter } from '../src/providers/atlas/transactionAdapter.ts';
+import { AtlasFlightTransactionAdapter, normalizeOrderCreate } from '../src/providers/atlas/transactionAdapter.ts';
+import { AtlasOrderBodySchema } from '../src/providers/atlas/types.ts';
 import { CaseVerifier } from '../src/engine/observation.ts';
 import type { Constraint } from '../src/domain/constraints.ts';
 import {
@@ -910,4 +911,40 @@ test('1D-16: REPLAY transaction normalization is identical to the LIVE path', as
     assert.deepEqual(semantics(replayQuote.data), semantics(liveQuote.data));
     assert.equal(replayQuote.data.provenance, 'REPLAY');
   }
+});
+
+// ---------------------------------------------------------------------------
+// 17. Duplicate-detection adoption (create ambiguity reconciliation)
+// ---------------------------------------------------------------------------
+
+test('1D-17: duplicate-detection (status 318) adopts the existing held order from either wire shape', () => {
+  // Wire reality observed in the sandbox: duplicateOrders entries arrive BOTH
+  // as plain order-number strings and as objects carrying orderNo. The schema
+  // must accept both, and adoption must reconcile either shape without ever
+  // creating a second booking.
+  assert.equal(
+    AtlasOrderBodySchema.safeParse({ status: 318, duplicateOrders: ['TESTA-EXISTING-2'] }).success,
+    true,
+    'schema accepts string entries',
+  );
+  assert.equal(
+    AtlasOrderBodySchema.safeParse({ status: 318, duplicateOrders: [{ orderNo: 'TESTA-EXISTING-1' }] }).success,
+    true,
+    'schema accepts object entries',
+  );
+
+  const objectShape = normalizeOrderCreate(
+    { status: 318, duplicateOrders: [{ orderNo: 'TESTA-EXISTING-1' }] },
+    'LIVE',
+  );
+  assert.equal(objectShape.status, 'HELD');
+  assert.equal(objectShape.transactionState?.orderRef, 'TESTA-EXISTING-1');
+
+  const stringShape = normalizeOrderCreate({ status: 318, duplicateOrders: ['TESTA-EXISTING-2'] }, 'LIVE');
+  assert.equal(stringShape.status, 'HELD');
+  assert.equal(stringShape.transactionState?.orderRef, 'TESTA-EXISTING-2');
+
+  // No usable reference: nothing is adopted and the outcome fails honestly.
+  const unusable = normalizeOrderCreate({ status: 318, duplicateOrders: [] }, 'LIVE');
+  assert.equal(unusable.status, 'FAILED');
 });

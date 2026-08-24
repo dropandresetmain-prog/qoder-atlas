@@ -293,7 +293,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, verify.meta.mode,
         'offer_verification_failed',
-        `offer verification failed: ${verify.error.category}/${verify.error.code}`,
+        `offer verification failed: ${verify.error.category}/${verify.error.code}: ${verify.error.message}`,
         undefined,
         verify.error.retryable,
       );
@@ -551,7 +551,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, quote.meta.mode,
         'cancel_quote_failed',
-        `cancellation quote failed: ${quote.error.category}/${quote.error.code}`,
+        `cancellation quote failed: ${quote.error.category}/${quote.error.code}: ${quote.error.message}`,
       );
     }
     const quoteEffects = {
@@ -615,7 +615,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, submit.meta.mode,
         'cancel_submit_failed',
-        `cancellation submission failed: ${submit.error.category}/${submit.error.code}`,
+        `cancellation submission failed: ${submit.error.category}/${submit.error.code}: ${submit.error.message}`,
         quoteEffects,
       );
     }
@@ -730,7 +730,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, quote.meta.mode,
         'hotel_quote_failed',
-        `replacement quote failed: ${quote.error.category}/${quote.error.code}`,
+        `replacement quote failed: ${quote.error.category}/${quote.error.code}: ${quote.error.message}`,
         undefined,
         quote.error.retryable,
       );
@@ -776,7 +776,7 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, book.meta.mode,
         'hotel_book_failed',
-        `replacement booking failed: ${book.error.category}/${book.error.code}`,
+        `replacement booking failed: ${book.error.category}/${book.error.code}: ${book.error.message}`,
         undefined,
         book.error.retryable,
       );

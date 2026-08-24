@@ -146,32 +146,44 @@ export const AtlasPaxTicketInfoSchema = z.object({
 });
 export type AtlasPaxTicketInfo = z.infer<typeof AtlasPaxTicketInfoSchema>;
 
-/** order.do response (held order creation). */
+/**
+ * order.do response (held order creation).
+ *
+ * Wire reality: Atlas serializes absent fields as explicit JSON null (error
+ * bodies null every payload field), so every field is nullable.
+ */
 export const AtlasOrderBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
-  sessionId: z.string().optional(),
-  orderNo: z.string().optional(),
-  pnrCode: z.string().optional(),
-  totalPrice: z.number().optional(),
-  totalTransactionFee: z.number().optional(),
-  currency: z.string().optional(),
+  sessionId: z.string().nullable().optional(),
+  orderNo: z.string().nullable().optional(),
+  pnrCode: z.string().nullable().optional(),
+  totalPrice: z.number().nullable().optional(),
+  totalTransactionFee: z.number().nullable().optional(),
+  currency: z.string().nullable().optional(),
   /** Payment/ticketing deadline for the held order, provider-local time. */
   tktLimitTime: z.string().nullable().optional(),
-  paxTicketInfos: z.array(AtlasPaxTicketInfoSchema).optional(),
-  /** Returned with duplicate-detection status: the existing order(s). */
+  paxTicketInfos: z.array(AtlasPaxTicketInfoSchema).nullable().optional(),
+  /**
+   * Returned with duplicate-detection status: the existing order(s).
+   * Wire reality: observed BOTH as plain order-number strings and as objects
+   * carrying orderNo, depending on the duplicate-detection response.
+   */
   duplicateOrders: z
-    .array(z.object({ orderNo: z.string().optional() }).catchall(z.unknown()))
+    .array(
+      z.union([z.object({ orderNo: z.string().nullable().optional() }).catchall(z.unknown()), z.string()]),
+    )
+    .nullable()
     .optional(),
 });
 export type AtlasOrderBody = z.infer<typeof AtlasOrderBodySchema>;
 
-/** pay.do response. */
+/** pay.do response (absent fields arrive as explicit JSON null). */
 export const AtlasPayBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
-  orderNo: z.string().optional(),
-  paymentMethod: z.number().optional(),
+  orderNo: z.string().nullable().optional(),
+  paymentMethod: z.number().nullable().optional(),
 });
 export type AtlasPayBody = z.infer<typeof AtlasPayBodySchema>;
 
@@ -179,32 +191,33 @@ export type AtlasPayBody = z.infer<typeof AtlasPayBodySchema>;
 export const AtlasOrderDetailsBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
-  orderNo: z.string().optional(),
+  orderNo: z.string().nullable().optional(),
   /** Observed provider values: "0" held, "1" paid, "2" ticketed. */
-  orderStatus: z.union([z.string(), z.number()]).optional(),
-  ticketStatus: z.union([z.string(), z.number()]).optional(),
-  totalPrice: z.number().optional(),
-  currency: z.string().optional(),
+  orderStatus: z.union([z.string(), z.number()]).nullable().optional(),
+  ticketStatus: z.union([z.string(), z.number()]).nullable().optional(),
+  totalPrice: z.number().nullable().optional(),
+  currency: z.string().nullable().optional(),
   payTime: z.string().nullable().optional(),
   tktLimitTime: z.string().nullable().optional(),
-  pnrCode: z.string().optional(),
-  paxTicketInfos: z.array(AtlasPaxTicketInfoSchema).optional(),
+  pnrCode: z.string().nullable().optional(),
+  paxTicketInfos: z.array(AtlasPaxTicketInfoSchema).nullable().optional(),
   airlineBookings: z
-    .array(z.object({ airlinePnr: z.string().optional() }).catchall(z.unknown()))
+    .array(z.object({ airlinePnr: z.string().nullable().optional() }).catchall(z.unknown()))
+    .nullable()
     .optional(),
 });
 export type AtlasOrderDetailsBody = z.infer<typeof AtlasOrderDetailsBodySchema>;
 
 export const AtlasVoidFareAmountSchema = z.object({
-  currency: z.string().optional(),
-  originalFareAmount: z.number().optional(),
-  estimatedRefundAmount: z.number().optional(),
+  currency: z.string().nullable().optional(),
+  originalFareAmount: z.number().nullable().optional(),
+  estimatedRefundAmount: z.number().nullable().optional(),
 });
 export type AtlasVoidFareAmount = z.infer<typeof AtlasVoidFareAmountSchema>;
 
 export const AtlasVoidWindowSchema = z.object({
-  supportVoid: z.boolean().optional(),
-  allowVoid: z.boolean().optional(),
+  supportVoid: z.boolean().nullable().optional(),
+  allowVoid: z.boolean().nullable().optional(),
   voidTimeAfterIssure: z.string().nullable().optional(),
   voidTimeBeforeDepature: z.string().nullable().optional(),
   sameDayDeadlineTime: z.string().nullable().optional(),
@@ -216,19 +229,25 @@ export type AtlasVoidWindow = z.infer<typeof AtlasVoidWindowSchema>;
 export const AtlasVoidQuotationBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
-  orderNo: z.string().optional(),
-  isVoidable: z.boolean().optional(),
-  voidOfferId: z.string().optional(),
-  voidMethod: z.string().optional(),
-  fastConfirmation: z.number().optional(),
+  orderNo: z.string().nullable().optional(),
+  isVoidable: z.boolean().nullable().optional(),
+  voidOfferId: z.string().nullable().optional(),
+  voidMethod: z.string().nullable().optional(),
+  fastConfirmation: z.number().nullable().optional(),
   expectedConfirmationDate: z.string().nullable().optional(),
   expectedRefundDate: z.string().nullable().optional(),
-  voidTickets: z.array(z.string()).optional(),
-  voidFareAmount: AtlasVoidFareAmountSchema.optional(),
+  /**
+   * Wire reality: observed as an array of ticket OBJECTS (not strings) on a
+   * real voidQuotation.do response; the adapter never interprets it, so it is
+   * accepted as opaque entries.
+   */
+  voidTickets: z.array(z.unknown()).nullable().optional(),
+  voidFareAmount: AtlasVoidFareAmountSchema.nullable().optional(),
   serviceFee: z
-    .object({ currency: z.string().optional(), transactionFee: z.number().optional() })
+    .object({ currency: z.string().nullable().optional(), transactionFee: z.number().nullable().optional() })
+    .nullable()
     .optional(),
-  voidWindow: AtlasVoidWindowSchema.optional(),
+  voidWindow: AtlasVoidWindowSchema.nullable().optional(),
 });
 export type AtlasVoidQuotationBody = z.infer<typeof AtlasVoidQuotationBodySchema>;
 
@@ -236,24 +255,24 @@ export type AtlasVoidQuotationBody = z.infer<typeof AtlasVoidQuotationBodySchema
 export const AtlasVoidBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
-  orderNo: z.string().optional(),
-  voidCode: z.string().optional(),
+  orderNo: z.string().nullable().optional(),
+  voidCode: z.string().nullable().optional(),
   /** Provider-private processing state; mapped inside the adapter only. */
-  voidStatus: z.number().optional(),
+  voidStatus: z.number().nullable().optional(),
   cancelReason: z.string().nullable().optional(),
 });
 export type AtlasVoidBody = z.infer<typeof AtlasVoidBodySchema>;
 
 export const AtlasVoidOrderEntrySchema = z.object({
-  orderNo: z.string().optional(),
-  voidCode: z.string().optional(),
-  voidStatus: z.number().optional(),
-  voidOfferId: z.string().optional(),
-  voidMethod: z.string().optional(),
+  orderNo: z.string().nullable().optional(),
+  voidCode: z.string().nullable().optional(),
+  voidStatus: z.number().nullable().optional(),
+  voidOfferId: z.string().nullable().optional(),
+  voidMethod: z.string().nullable().optional(),
   cancelReason: z.string().nullable().optional(),
   expectedConfirmationDate: z.string().nullable().optional(),
   expectedRefundDate: z.string().nullable().optional(),
-  voidFareAmount: AtlasVoidFareAmountSchema.optional(),
+  voidFareAmount: AtlasVoidFareAmountSchema.nullable().optional(),
 });
 export type AtlasVoidOrderEntry = z.infer<typeof AtlasVoidOrderEntrySchema>;
 
@@ -261,6 +280,6 @@ export type AtlasVoidOrderEntry = z.infer<typeof AtlasVoidOrderEntrySchema>;
 export const AtlasVoidOrdersBodySchema = z.object({
   status: z.number(),
   msg: z.string().nullable().optional(),
-  voidOrders: z.array(AtlasVoidOrderEntrySchema).optional(),
+  voidOrders: z.array(AtlasVoidOrderEntrySchema).nullable().optional(),
 });
 export type AtlasVoidOrdersBody = z.infer<typeof AtlasVoidOrdersBodySchema>;

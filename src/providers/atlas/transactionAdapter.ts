@@ -449,8 +449,8 @@ export function atlasSgtDeadlineToIso(value: string | null | undefined): string 
   return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}+08:00`;
 }
 
-function money(amount: number | undefined, currency: string | undefined): Money | undefined {
-  if (amount === undefined || !currency) return undefined;
+function money(amount: number | null | undefined, currency: string | null | undefined): Money | undefined {
+  if (amount == null || !currency) return undefined;
   return { amount, currency };
 }
 
@@ -458,16 +458,30 @@ function providerDetail(raw: { status: number; msg?: string | null }): string {
   return `provider status ${raw.status}${raw.msg ? `: ${raw.msg}` : ''}`;
 }
 
+/** First usable order reference from a duplicate-detection payload. */
+function duplicateOrderRef(entries: AtlasOrderBody['duplicateOrders']): string | undefined {
+  for (const entry of entries ?? []) {
+    if (typeof entry === 'string') {
+      if (entry !== '') return entry;
+      continue;
+    }
+    if (typeof entry.orderNo === 'string' && entry.orderNo !== '') return entry.orderNo;
+  }
+  return undefined;
+}
+
 export function normalizeOrderCreate(raw: AtlasOrderBody, provenance: TransactionProvenance): FlightOrderOutcome {
   // Provider-native duplicate detection (create ambiguity reconciliation):
   // a repeated create for the same session returns the existing order — adopt
   // it instead of producing a second booking.
   if (raw.status === 318) {
-    const existing = raw.duplicateOrders?.find((entry) => typeof entry.orderNo === 'string' && entry.orderNo !== '');
-    if (existing?.orderNo) {
+    // Wire reality: duplicateOrders entries arrive as either plain order-number
+    // strings or objects carrying orderNo — both shapes are reconciled here.
+    const adopted = duplicateOrderRef(raw.duplicateOrders);
+    if (adopted) {
       return {
         status: 'HELD',
-        transactionState: { orderRef: existing.orderNo },
+        transactionState: { orderRef: adopted },
         detail: 'provider detected a duplicate order; existing held order adopted, no second booking created',
         provenance,
       };
@@ -639,7 +653,7 @@ export function normalizeCancellationQuote(
       ...(expectedReturn === undefined ? {} : { expectedReturn }),
       ...(conditions.length === 0 ? {} : { conditions }),
       transactionState: {
-        ...(raw.orderNo === undefined ? {} : { orderRef: raw.orderNo }),
+        ...(raw.orderNo ? { orderRef: raw.orderNo } : {}),
         cancellationQuoteRef: raw.voidOfferId,
       },
       detail: 'cancellation quote issued; submission is a separate consequential step',
@@ -744,7 +758,7 @@ export function normalizeCancellationStatus(
 }
 
 /** Provider-private void processing states -> generic cancellation status. */
-function mapVoidStatus(voidStatus: number | undefined): {
+function mapVoidStatus(voidStatus: number | null | undefined): {
   status: FlightCancellationStatusView['status'];
   detail?: string;
 } {
@@ -769,7 +783,7 @@ function mapVoidStatus(voidStatus: number | undefined): {
 }
 
 function ticketRefsFrom(
-  paxTicketInfos: Array<{ ticketNos?: string[] }> | undefined,
+  paxTicketInfos: Array<{ ticketNos?: string[] }> | null | undefined,
 ): string[] {
   const refs: string[] = [];
   for (const info of paxTicketInfos ?? []) {
