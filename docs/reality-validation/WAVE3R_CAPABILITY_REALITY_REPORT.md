@@ -1,8 +1,8 @@
 # Wave 3R Capability Reality Report — DR-0
 
 **Package:** DR-0 — Capability Reality Gate + Scenario Feasibility Envelope
-**Status:** Investigation complete. No transactional contract implemented. No Wave 3R UI work performed.
-**Date:** 2026-08-24
+**Status:** Investigation complete, including a user-authorized pay/ticket/refund confirmation pass (§4A). No transactional contract implemented. No Wave 3R UI work performed.
+**Date:** 2026-08-24 (updated same day — user explicitly confirmed the Atlas key is sandbox-scoped and asked to confirm pay/ticket/refund; §4A is the result)
 **Environment:** LOCAL (Windows 11, this workstation), `ADAPTER_MODE=REPLAY` default in `.env.local`; all probes below made explicit LIVE calls against confirmed SANDBOX/TEST provider endpoints using real local credentials in `.env.local`. No production endpoint was called at any point.
 **Starting branch/SHA:** `fix/rev2-r4-nuitee` — local checkout was 3 commits behind `origin/fix/rev2-r4-nuitee` (missing `docs/WAVE3R_DEMO_READINESS_PLAN.md`); fast-forwarded to `8b869e32612727f3bc609c44033fd9bd8599b107` before starting work. All work below is on top of that SHA.
 
@@ -14,7 +14,7 @@
 
 The capability envelope is now known with empirical confidence, not guesswork:
 
-- **Atlas flights:** read chain (search/verify/fare-rules) is proven across **9 materially different live routes** in this run (previously proven on 1). The **forward transactional chain is proven working** — `order.do` created a genuine sandbox order/PNR for this account; the prior assumption that this account is `TICKETING_ACTIVATION_REQUIRED`-blocked (sourced from an untested Atlas *Skill* report, not a direct-API test) is **empirically false** for order creation. Payment/ticketing was deliberately not exercised (unnecessary risk, not needed to answer the DR-0 question). Refund/after-sales endpoints are reachable and gate correctly ("not yet ticketed") — proven reachable, not proven end-to-end (would require completing a paid ticket, which was correctly not attempted).
+- **Atlas flights:** read chain (search/verify/fare-rules) is proven across **9 materially different live routes** in this run (previously proven on 1). The **forward transactional chain — search → verify → order → pay → ticket — is PROVEN FULLY WORKING** end to end (§4A): a real sandbox e-ticket (`S96664`, Malindo Air/Batik Air OD801) was issued using Atlas's own sandbox deposit-balance payment mode (no card data entered, no real money moved). The prior assumption that this account is `TICKETING_ACTIVATION_REQUIRED`-blocked (sourced from an untested Atlas *Skill* report, not a direct-API test) is **empirically false**. **Refund on that same real ticket is BLOCKED**, however: `refundQuotation.do` consistently returns `status 801 "Order not found for refund"` across 5 differently-shaped requests, on the exact order/ticket that just succeeded through pay+ticket — most likely a sandbox data-consistency gap between the ticketing and refund subsystems for `TESTA`-prefixed test orders, not an account block or a request-schema problem (see §4A for full diagnosis). **This is a real, unresolved gap for any Wave 3R scenario that needs to demonstrate a provider-executed refund/cancel on a truly ticketed leg.**
 - **Singapore is empirically a strong, populated sandbox market** — this reverses the prior "SIN is UNKNOWN" conclusion from the 22 Aug investigation. 12 of 13 directional route probes returned real offers across 6 destination cities, multiple carriers, and short/medium/long-haul depth. Singapore is the clear #1 summit-location recommendation.
 - **Nuitée hotel:** the existing single-case genuine sandbox lifecycle is now backed by **two more materially different live cases** (different city, non-refundable-rate cancellation-fee exposure, post-cancel state observability, and a documented contract gap on multi-child search).
 - **Model Studio LIVE is BLOCKED** — the configured `MODEL_STUDIO_API_KEY` is rejected by Alibaba's own endpoint with `invalid_api_key`. This is a credential problem, not a code or architecture problem (a raw `curl` against the documented endpoint fails identically to the app's `HttpModelTransport`). This blocks the DR-0D "LIVE Model Studio interpretation" claim until the user rotates/verifies the key.
@@ -50,13 +50,13 @@ The one blocker (Model Studio credential) does not block DR-1/DR-2 architecture 
 | 5 | Seat availability | `POST /seatAvailability.do` | PROVEN_SANDBOX (1 fixture, 22 Aug lab) | Live call on the new KUL→SIN session returned a real seat map (cabin layout, row range, exit rows, carrier OD) | **PROVEN LIVE/SANDBOX** (new route) |
 | 6 | **Order creation** | `POST /order.do` | ACCESS_BLOCKED — inferred from an *Atlas Skill* report of `TICKETING_ACTIVATION_REQUIRED`, **never directly tested** | **SUCCEEDED.** After 4 iterations discovering the exact passenger/contact schema (see §4), created a genuine sandbox order: `orderNo=TESTA20260824171418381`, `pnrCode=OPLGS4`, `totalPrice=28.36 USD`, `tktLimitTime` ≈1h unpaid hold, `status=0` | **PROVEN LIVE/SANDBOX** (create only — see §4 for exactly what was and wasn't done) |
 | 7 | Order query | `POST /queryOrderDetails.do` | DOCUMENTED_NOT_PROVEN (no order existed) | Queried the order above: `orderStatus="0"`, `ticketStatus="0"`, `payTime=null` — clean, correct read of an unpaid held order | **PROVEN LIVE/SANDBOX** |
-| 8 | Payment | `POST /pay.do` | ACCESS_BLOCKED (inferred) | **Not attempted** — deliberately out of scope; would move real functional state (ticketing) for no DR-0 evidence value and carries the highest residual risk in this investigation | **DOCUMENTED, DELIBERATELY UNPROVEN** |
-| 9 | Refund quotation | `POST /refundQuotation.do` | DOCUMENTED_NOT_PROVEN (needs a ticketed order) | Called against the unticketed order above: `status=809`, `msg="Order not yet ticketed. Wait until orderQuery.do returns order_status=2 before refunding."` — exactly the documented gate, cleanly reachable | **PROVEN LIVE/SANDBOX** (reachable + correctly gated; full refund flow needs a ticketed order, not attempted) |
-| 10 | Refund/void/apply | `refund.do`, `queryRefundOrders.do`, void endpoints | DOCUMENTED_NOT_PROVEN | Not attempted (needs ticketed order; see #8) | **DOCUMENTED, UNPROVEN** |
+| 8 | Payment | `POST /pay.do` | ACCESS_BLOCKED (inferred) | **User explicitly authorized and confirmed sandbox scope; SUCCEEDED** (§4A). `paymentMethod:1` (deposit/sandbox test balance — no card data submitted). `status=0`. Order advanced `orderStatus 0→1`, `payTime` set. ~20s later, ticketing completed automatically: `orderStatus=2`, `ticketStatus=1`, real e-ticket `S96664` issued | **PROVEN LIVE/SANDBOX** |
+| 9 | Refund quotation | `POST /refundQuotation.do` | DOCUMENTED_NOT_PROVEN (needs a ticketed order) | First call (unticketed order): `status=809 "not yet ticketed"` — correct gate. **Re-called on the now-genuinely-ticketed order** (§4A): `status=801 "Order not found for refund"`, consistently across 5 differently-shaped `refundRequestList` bodies (object-by-ticketNo, +airlinePNR+refundType, keyed by airlinePNR+carrier instead of orderNo, plain-string array → `9999` internal error on the malformed shape). The *identical* 801 across 3 well-formed variations indicates a lookup/data gap, not a schema problem | **PROVEN REACHABLE, BLOCKED ON THIS TICKETED ORDER** (see §4A diagnosis) |
+| 10 | Refund submission / void / query-refund-status | `refund.do`, `queryRefundOrders.do`, void endpoints | DOCUMENTED_NOT_PROVEN | Not attempted — `refund.do` requires a `refundOfferId` from a *successful* quote, which was never obtained (see #9); submitting against a known-failed quote has no evidence value | **DOCUMENTED, UNPROVEN — blocked behind #9** |
 | 11 | Incident/event list | `POST /event/getPageList.do` | Not previously known (webhook doc page 404'd on 22 Aug) | Documented via a working alternate doc path (see §5); called live: `status=0`, `records=[]`, `total=0` (correct — no ticketed events exist yet) | **PROVEN LIVE/SANDBOX** (reachable, no registration required) |
 | 12 | Webhook registration | `POST /updateWebhookURL.do` | 404 on the doc page tried 22 Aug | Documented via the correct doc path (exact endpoint + `{url}` body found); **not called** — state-changing, needs a public callback endpoint (DR-3 scope) | **DOCUMENTED, DELIBERATELY NOT EXERCISED** |
 
-**Note on the "TICKETING_ACTIVATION_REQUIRED" claim:** the 22 Aug report's blocker classification came from testing the *Atlas Skill* (an LLM/agent wrapper over the API), which failed for unrelated reasons documented separately ("Skill `search` fails while direct `search.do` succeeds" — an open question in that report). It was never a direct-API test. DR-0's direct-API test shows order creation working. **Do not carry the Skill-sourced blocker claim forward.**
+**Note on the "TICKETING_ACTIVATION_REQUIRED" claim:** the 22 Aug report's blocker classification came from testing the *Atlas Skill* (an LLM/agent wrapper over the API), which failed for unrelated reasons documented separately ("Skill `search` fails while direct `search.do` succeeds" — an open question in that report). It was never a direct-API test. DR-0's direct-API test shows order creation **and payment and ticketing** all working (§4A). **Do not carry the Skill-sourced blocker claim forward.**
 
 ---
 
@@ -77,7 +77,33 @@ Full chain executed against a **new route not previously captured** (KUL→SIN, 
 
 **No payment was submitted. No ticket was issued.** The order (`orderNo=TESTA20260824171418381`, `pnrCode=OPLGS4`, synthetic passenger `TEST/TRAVELLER`, contact `dr0-probe@example.com`) is an **unpaid, unticketed sandbox test order** that will expire on its own `tktLimitTime` (~1 hour from creation, 2026-08-24 ~18:34 SGT) with no further action required. This is standard, expected, low-risk sandbox behavior (equivalent to an abandoned cart) — no cleanup action was taken or is required.
 
-**What this proves for Wave 3R:** `AI proposal → validation → deterministic viability → authority → executor` can end in a real `order.do` call producing a genuine PNR-bearing held order, which is a legitimate, honest, non-money-moving "replacement secured" state for a demo (`SIMULATED`/`LIVE` labelled correctly: order creation is real; ticketing/payment is not exercised and must not be claimed as completed).
+**What this proves for Wave 3R:** `AI proposal → validation → deterministic viability → authority → executor` can end in a real `order.do` call producing a genuine PNR-bearing held order — and, per §4A below, that hold can be safely carried through to a genuine sandbox ticket without any real-money or real-card risk.
+
+---
+
+## 4A. Pay/ticket/refund confirmation (user-authorized follow-up, same day)
+
+**Context:** after the initial DR-0 pass above (which deliberately did not attempt payment), the user explicitly confirmed the Atlas credentials are sandbox-scoped and asked to confirm pay/ticket/refund. Environment was independently re-verified as sandbox (`ATLAS_BASE_URL=https://sandbox.atriptech.com`) before proceeding. No real card data was ever entered — Atlas's own sandbox `paymentMethod:1` ("deposit") draws against a pre-funded test account balance.
+
+**Chain executed, on the exact held order from §4 (`orderNo=TESTA20260824171418381`, still within its ~1h `tktLimitTime` window):**
+
+1. **`queryOrderDetails.do`** (read-only sanity check) → confirmed the order was still `orderStatus=0` (unpaid, held), not expired.
+2. **`pay.do`** — `{"orderNo":"TESTA20260824171418381","paymentMethod":1}` → **`status=0, msg="success"`**. First attempt, no iteration needed (the schema discovered for `order.do` in §4 generalized correctly).
+3. **`queryOrderDetails.do`** (immediately after) → `orderStatus` advanced `0→1`, `payTime="2026-08-24 17:31:39"` set. `ticketStatus` still `0` — ticketing is asynchronous.
+4. Waited 20 seconds, **`queryOrderDetails.do`** again → `orderStatus=2`, `ticketStatus=1`, and `paxTicketInfos[0]` now carries a **real e-ticket number `ticketNos:["S96664"]`** and `airlinePNRs:["S96664"]`. The order's `airlineBookings[0]` shows `airlineCode:"OD"`, `airlineName:"Malindo Air"`, `airlinePnr:"S96664"`, a real `itineraryDownload` URL, and a full `refundRules[]` table (the fare is fully refundable, zero penalty, from 365 days out down to 3 hours before departure — our 2026-09-23 departure is well inside that window).
+5. **`refundQuotation.do`** on the now-ticketed order → `status=801 "Order not found for refund. Check the original main ticket order number."` Tried **5 total variations**, all read-only/non-money-moving:
+   - `{"orderNo":..., "refundRequestList":[{"ticketNo":"S96664"}]}` → `801`
+   - `{"orderNo":..., "refundRequestList":[{"ticketNo":"S96664","passengerType":0,"airlinePNR":"S96664","refundType":0}]}` → `801` (identical error)
+   - `{"airlinePNR":"S96664","carrier":"OD","refundRequestList":[{"ticketNo":"S96664","passengerType":0}]}` (per the docs' alternate "airlinePNR+carrier" identification path) → `801` (identical error)
+   - `{"orderNo":..., "refundRequestList":["S96664"]}` (plain string, deliberately malformed to bound the shape space) → `status 9999 "Internal error"` — different failure class, confirming the object-array shape used in the first three attempts was structurally correct.
+   - Stopped at 5 attempts per the no-unbounded-retry rule. **The identical `801` across 3 well-formed, differently-keyed requests is itself the signal**: this is very unlikely to be a request-format problem (each earlier schema-discovery round in §4 produced a *different* error message per fix — this round did not). The most likely explanation is that `TESTA`-prefixed test/sandbox orders are not indexed in whatever backend `refundQuotation.do` queries, i.e. a sandbox test-mode data-consistency limitation between the ticketing and refund subsystems, not an account-level block and not a request-schema defect.
+6. **`refund.do` was not attempted.** It requires a `refundOfferId` returned by a *successful* quote; no successful quote was obtained. Submitting against a known-failed quote path has no evidence value and risks an ambiguous result — correctly not attempted per the no-blind-retry-on-money-moving-operations rule.
+
+**Resulting sandbox artifact:** `orderNo=TESTA20260824171418381` is now a **genuinely ticketed** sandbox booking (e-ticket `S96664`, Malindo Air/Batik Air OD801, KUL→SIN 2026-09-23), not merely a held/expiring order as reported in §4. No API-reachable cancel/refund/void path was found for it in this investigation. This is standard, low-risk sandbox test residue (no real inventory, no real payment card, Malindo Air's own sandbox environment) — no further cleanup action is available or required beyond what's documented here.
+
+**What this proves for Wave 3R:**
+- The full `search → verify → order → pay → ticket` chain is **empirically proven safe and working** for this account, using zero real payment data (deposit/test-balance mode). This is a materially stronger transactional ceiling than §13's original "held order only" recommendation assumed.
+- **The refund/cancel closing loop on a truly ticketed leg is NOT currently proven** — this directly affects any S1/S3 scenario that wants to show Atlas executing a real cancel/refund on a real ticket. Until this is resolved (see §21), such a scenario should either (a) use `SIMULATE_PROVIDER_BOUNDARY` for the refund/cancel step specifically while keeping the initial booking real, or (b) budget time to re-investigate whether a non-`TESTA`-prefixed order type (if one exists for this account) resolves the refund lookup.
 
 ---
 
@@ -179,46 +205,51 @@ Result: HTTP 200, `distanceMeters=27077`, `duration=1658s`, `staticDuration=1658
 ## 10. Allowed demo claims
 
 - "Atlas Search/Verify/fare-rules were exercised LIVE against the real sandbox across 9+ materially different routes, including Singapore in both directions on multiple carriers."
-- "Atlas order creation was exercised LIVE against the real sandbox and produced a genuine PNR-bearing order." (Do **not** extend this to "booked," "ticketed," "paid," or "confirmed with the airline" — none of those occurred.)
-- "Atlas after-sales refund quoting is reachable and correctly gates on ticket status." (Do **not** claim a refund was quoted or processed.)
+- "Atlas order creation, payment, and ticketing were exercised LIVE against the real sandbox and produced a genuine airline PNR/e-ticket — using Atlas's own sandbox test-balance payment method, with no real card data submitted."
+- "Atlas after-sales refund quoting is reachable." (Do **not** claim a refund was quoted, processed, or that the refund path is proven — it is not; see §4A/§11.)
 - "Nuitée hotel search/quote/book/retrieve/cancel was exercised LIVE against the real sandbox across three materially different cities/cases, including a genuine non-refundable cancellation-fee charge and post-cancel state observability."
 - "Google Routes ground-context is available LIVE and was exercised against the real API."
 - "The event location (Singapore) has genuine, empirically confirmed Atlas sandbox flight coverage across six regional/international origin markets."
 
 ## 11. Claims we must NOT make
 
-- Any claim that a flight was "booked and ticketed" — no payment/ticketing occurred anywhere in this investigation.
+- Any claim that a provider-executed **refund or cancellation** was demonstrated on a real ticketed Atlas booking — it was attempted (5 ways) and failed with "order not found for refund" every time (§4A). Any refund/cancel step in a demo scenario must be `SIMULATE_PROVIDER_BOUNDARY` and labelled as such unless this gap is independently re-resolved.
 - Any claim that Model Studio LIVE interpretation was demonstrated — it was attempted and blocked by an invalid credential; the fallback planner is what actually ran in every REPLAY-mode demo today.
 - Any claim that traveller natural-language text is currently converted into a `ChangeRequest` by the product — that pipeline does not exist yet (DR-5).
 - Any claim of a genuine Atlas-originated webhook push — not attempted, not achievable without a ticketed order plus a real schedule change; any hero disruption event will be a documented-shape simulated source event through the real ingress (permitted, per the Wave3R doctrine, if honestly labelled).
 - Any claim that SIN→HKG specifically is a viable sandbox route — it returned zero offers; only the reverse direction (HKG→SIN) is populated.
 - Any claim that Atlas baggage/seat quoting was proven "end to end" in this run — reachable and correctly validating, but the actual quote calls hit an expired-session error rather than a successful payload.
+- Any claim that the real ticketed test booking (`S96664`) was ever cancelled/refunded — it was not; it remains a live sandbox ticket with no successful cancel/refund call made against it.
 
 ---
 
 ## 12. Architecture gaps
 
-1. **Flight forward-transaction capability is entirely absent from `FlightCapability`.** The contract exposes only `searchFlights`/`verifyOffer`/`getFareRules` (read-only). DR-0 proves `order.do` works for this account. **Minimal generic delta needed:** one new provider-neutral operation, e.g. `createOrder(query): CapabilityResult<FlightOrderOutcome>` (`orderNo`, `pnrCode`, `totalPrice`, `tktLimitTime`, `status: 'HELD'|'FAILED'`, `provenance`), plus an `getOrderStatus`/`retrieveOrder` read. **Payment/ticketing should not be added** — the plan's own doctrine (never `LLM → money-moving API`, and DR-0 found no demo need to actually pay) supports treating "order held with a real PNR" as the honest transactional ceiling for Wave 3R.
-2. **No webhook/event ingress contract exists yet** (correctly deferred to DR-3). DR-0 supplies the concrete facts DR-3 needs: exact registration endpoint/body, exact incident-list read endpoint/schema, and the explicit absence of any inbound authentication from Atlas (Northstar's own ingress must supply its own secret-path/allowlist protection).
-3. **`HotelSearchQuery` cannot express child ages**, so any family/child occupancy search fails closed by design (§7 Case D). Small, non-blocking delta: add optional `childAges?: number[]` per room/guest group. Not required for any currently-planned hero scenario (solo business travellers), so this is a **Park for Later**, not an Act Now.
-4. **No architecture change is needed for hotel replacement** — `HotelCapability` already has full search/quote/book/retrieve/cancel; cancel+rebook composition is proven end-to-end including realistic fee exposure and post-cancel observability (§7). ADR-041's existing decision (cancel+rebook until a provider contradicts) is empirically confirmed correct.
-5. **Model Studio has no architecture gap** — the client/schema/fail-closed design is correct (confirmed by the raw-curl comparison); the blocker is purely a credential value.
+1. **Flight forward-transaction capability is entirely absent from `FlightCapability`.** The contract exposes only `searchFlights`/`verifyOffer`/`getFareRules` (read-only). DR-0 proves `order.do` **and `pay.do` (deposit/test-balance mode) and ticketing** all work for this account (§4A) — the transactional ceiling is higher than originally assumed. **Minimal generic delta needed:** provider-neutral operations for order creation, payment-by-provider-test-mode, and status retrieval, e.g. `createOrder(...)`, `payOrder(...)` (deliberately restricted to non-card, provider-test-balance payment refs — never raw card data crossing the contract), and `retrieveOrder(...)`. Given payment is now proven safe via deposit mode, the plan's "never `LLM → money-moving API`" rule is satisfied by keeping this behind the same `authority → executor` gate as every other capability — the executor may legitimately call `payOrder` after approval, exactly as it may call `bookStay` on the hotel side today.
+2. **Flight refund/cancel capability is a confirmed gap**, not merely an unbuilt contract: even the *raw provider API* could not produce a working refund quote on a genuinely ticketed order in this account (§4A, 5 attempts, consistent `801`). Any contract delta for refund should be built and *tested against a real ticketed order* before being relied on for a demo claim — do not assume documented behavior will work here.
+3. **No webhook/event ingress contract exists yet** (correctly deferred to DR-3). DR-0 supplies the concrete facts DR-3 needs: exact registration endpoint/body, exact incident-list read endpoint/schema, and the explicit absence of any inbound authentication from Atlas (Northstar's own ingress must supply its own secret-path/allowlist protection).
+4. **`HotelSearchQuery` cannot express child ages**, so any family/child occupancy search fails closed by design (§7 Case D). Small, non-blocking delta: add optional `childAges?: number[]` per room/guest group. Not required for any currently-planned hero scenario (solo business travellers), so this is a **Park for Later**, not an Act Now.
+5. **No architecture change is needed for hotel replacement** — `HotelCapability` already has full search/quote/book/retrieve/cancel; cancel+rebook composition is proven end-to-end including realistic fee exposure and post-cancel observability (§7). ADR-041's existing decision (cancel+rebook until a provider contradicts) is empirically confirmed correct.
+6. **Model Studio has no architecture gap** — the client/schema/fail-closed design is correct (confirmed by the raw-curl comparison); the blocker is purely a credential value.
 
 ---
 
 ## 13. Recommended minimal contract delta (for G3R-R0, not implemented here)
 
-Per the Wave3R plan's own guidance (§7), the smallest generic extension is a **new flight order-creation capability**, additive to `FlightCapability`:
+Per the Wave3R plan's own guidance (§7), and updated by the §4A pay/ticket proof, the smallest generic extension is a **new flight order-creation-and-payment capability**, additive to `FlightCapability`:
 
 ```
 createFlightOrder(query: FlightOrderQuery): Promise<CapabilityResult<FlightOrderOutcome>>
+payFlightOrder(query: FlightOrderPaymentQuery): Promise<CapabilityResult<FlightOrderOutcome>>
 retrieveFlightOrder(query: FlightOrderRetrieveQuery): Promise<CapabilityResult<FlightOrderStatusView>>
 ```
 
 - Provider-neutral (no Atlas-specific field names in the contract; adapter maps `name`-slash-convention, `birthday` format, `contact.name`, etc.).
-- `FlightOrderOutcome` carries `orderRef` (opaque), `status: 'HELD'|'FAILED'`, `holdExpiresAt`, `totalPrice`, `provenance: 'LIVE'|'REPLAY'|'SIMULATED'` — deliberately excludes any ticketing/payment field, keeping the ceiling at "held with a real PNR," matching what DR-0 actually proved and matching the never-`LLM→money-moving` rule (an executor calls this after authority approval; no payment step exists to gate).
+- `FlightOrderPaymentQuery` carries only a **provider-opaque payment method reference** (e.g. `'PROVIDER_TEST_BALANCE'` for Atlas's sandbox deposit mode) — never raw card data, matching the existing `HotelBookQuery.paymentRef` discipline. In production, this same shape would carry a corporate virtual-card/MoR reference; the contract must never carry card PAN/CVV.
+- `FlightOrderOutcome` carries `orderRef` (opaque), `status: 'HELD'|'PAID'|'TICKETED'|'FAILED'`, `holdExpiresAt`, `ticketRef?`, `totalPrice`, `provenance: 'LIVE'|'REPLAY'|'SIMULATED'`.
+- **Deliberately excludes refund/cancel** — §4A shows that surface is not currently provable even at the raw-provider level for this account/order type. Do not build a `cancelFlightOrder`/`refundFlightOrder` operation until it has been independently proven against a real ticketed order (retest with a non-`TESTA`-prefixed order if one becomes available, or escalate to Atlas support per their own error message).
 - This is a genuine **shared-contract change** and therefore requires **G3R-R0** review before DR-2 implements it, per the plan.
-- No hotel contract change is recommended — existing operations suffice (§12.4).
+- No hotel contract change is recommended — existing operations suffice (§12.5).
 
 ---
 
@@ -239,12 +270,13 @@ All four families are **capability-feasible** with the provider evidence gathere
 
 | Risk | Severity | Mitigation |
 |---|---|---|
+| **Atlas refund/cancel does not work on a real ticketed order** (5 attempts, consistent failure) | **High for any scenario claiming a provider-executed cancel/refund** | Use `SIMULATE_PROVIDER_BOUNDARY` for that step, honestly labelled, until independently re-resolved (§4A/§21) |
 | Model Studio API key invalid | **Blocks DR-0D/DR-5 LIVE claims** | User must rotate/verify `MODEL_STUDIO_API_KEY` in `.env.local` (Act Now, not code) |
-| Atlas order.do requires exact wire-format knowledge (undocumented in the fetched pages — discovered empirically) | Low (now solved) | Reuse the exact discovered shape in §4 when DR-2 implements the adapter — do not re-derive from docs alone |
+| Atlas order.do/pay.do require exact wire-format knowledge (undocumented in the fetched pages — discovered empirically) | Low (now solved) | Reuse the exact discovered shape in §4/§4A when DR-2 implements the adapter — do not re-derive from docs alone |
 | Atlas webhook delivery is "best effort," no inbound auth | Medium | DR-3 must add its own ingress secret/allowlist; never trust payload as `AUTHORITATIVE` |
 | SIN→HKG specifically unpopulated | Low | Avoid that exact leg in scenario design; every other tested SIN pairing works |
-| Nuitée `childAges` contract gap | Low, non-blocking | Park for Later per §12.3 |
-| Leftover unpaid Atlas test order | None (self-expiring) | No action required, documented in §17 |
+| Nuitée `childAges` contract gap | Low, non-blocking | Park for Later per §12.4 |
+| Live ticketed Atlas test booking (`S96664`) has no confirmed cleanup path | Low (sandbox, no real cost) | No action available; documented transparently in §4A/§17 |
 
 ---
 
@@ -262,15 +294,16 @@ All four families are **capability-feasible** with the provider evidence gathere
 
 | Finding | Triage |
 |---|---|
-| Atlas order.do works; prior TICKETING_ACTIVATION_REQUIRED assumption was Skill-sourced and wrong | **Act Now** — correct the record (done, §3/ROADMAP); inform G3R-R0 |
+| Atlas order.do + pay.do + ticketing all work; prior TICKETING_ACTIVATION_REQUIRED assumption was Skill-sourced and wrong | **Act Now** — correct the record (done, §3/§4A/ROADMAP); inform G3R-R0 |
+| **Atlas refund quotation fails on a real ticketed order (5 attempts, consistent `801`)** | **Investigate Now at G3R-R0** — do not build/rely on a flight-refund contract path until this is independently re-resolved (retest with a differently-sourced order, or open a support ticket with Atlas quoting the exact `orderNo`/`ticketNo`/error) |
 | Singapore sandbox routes are populated (12/13 directional probes) | **Act Now** — correct the record (done, ROADMAP); freeze Singapore as the summit location |
 | SIN→HKG specifically empty | **Investigate Now if HKG-origin scenario is chosen** — otherwise Park |
 | Model Studio API key invalid | **Act Now (user action)** — rotate/verify the key before DR-0D/DR-5 LIVE claims are made |
 | No NL→ResolutionTarget model task exists yet | **Park for Later** — correctly scoped to DR-5, not a DR-0 defect |
 | Atlas webhook has no inbound auth | **Investigate Now in DR-3** — design Northstar's own ingress protection |
 | Nuitée `childAges` contract gap | **Park for Later** — no current hero scenario needs it |
-| Flight order-creation contract gap | **Investigate Now at G3R-R0** — smallest delta proposed in §13 |
-| Leftover unpaid Atlas test order (TESTA20260824171418381) | **Ignore / Accept Risk** — self-expiring, no real cost, standard sandbox behavior |
+| Flight order-creation-and-payment contract gap | **Investigate Now at G3R-R0** — smallest delta proposed in §13 (refund deliberately excluded) |
+| Live ticketed Atlas test booking (`S96664`, orderNo `TESTA20260824171418381`) has no working cancel/refund path | **Ignore / Accept Risk** — sandbox test data, Malindo Air's own test environment, no real cost; transparently documented, not hidden |
 | Atlas getLuggage.do session expired mid-investigation (not re-chained) | **Ignore / Accept Risk** — capability already proven reachable+validating; re-proving is low value |
 
 ---
@@ -278,29 +311,30 @@ All four families are **capability-feasible** with the provider evidence gathere
 ## 18. WHAT WE KNOW
 
 - Atlas Search/Verify/fare-rules work live across many routes including a well-populated Singapore market in both directions (with one specific directional gap: SIN→HKG).
-- Atlas order creation works live for this account — the prior activation-blocked assumption was wrong.
-- Atlas after-sales endpoints are reachable and gate correctly on ticket status.
+- **Atlas order creation, payment (test-balance mode), and ticketing all work live for this account** — a real e-ticket (`S96664`) was issued. The prior activation-blocked assumption was wrong.
+- **Atlas refund quotation does NOT work on that same real ticketed order** — 5 differently-shaped attempts all failed with the identical "order not found for refund" error, most likely a sandbox test-order data-consistency gap rather than a request-format or account-level problem.
 - Atlas's read-only incident-list endpoint works without webhook registration; webhook registration itself is documented but has no inbound authentication.
 - Nuitée's full hotel lifecycle (including realistic non-refundable cancellation-fee exposure and post-cancel state observability) is proven across three materially different cases.
 - Google Routes is live-ready with zero adapter changes needed.
 - The Model Studio credential in `.env.local` is invalid per Alibaba's own error response — this is a credential issue, not a code issue.
-- No architecture change is needed for hotel replacement; a small, well-scoped flight order-creation delta is needed for flight replacement.
+- No architecture change is needed for hotel replacement; a well-scoped flight order-creation-and-payment delta is needed for flight replacement, and the refund/cancel side of that delta should NOT be built until independently re-proven.
 
 ## 19. WHAT WE DO NOT KNOW
 
-- Whether `pay.do`/ticketing actually completes for this account (deliberately not tested).
+- **Why Atlas's refund-lookup subsystem cannot find a real, genuinely ticketed `TESTA`-prefixed order** — is this specific to test-mode order numbers, a broader account gap, or a request field we didn't guess in 5 tries? Needs either an Atlas support ticket (quoting `orderNo=TESTA20260824171418381`, `ticketNo=S96664`, error `801`) or a retest against a differently-sourced order.
 - Whether a genuine Atlas-originated schedule-change/cancellation webhook can ever be produced without a real ticketed booking and a real schedule disruption on it (very likely no, within a hackathon timeframe).
 - Whether the correct Model Studio API key is simply a typo/stale value in `.env.local`, or a genuinely revoked/wrong key from Alibaba Cloud — the user must check the console.
 - Whether Hong Kong or Kuala Lumpur would work as event-destination hubs (not investigated — deprioritized since Singapore already clears the bar).
 
 ## 20. KEY ASSUMPTION
 
-The domain engine stays generic; Singapore is adopted as the summit location because provider reality (not narrative preference) empirically supports it best. The flight replacement ceiling for Wave 3R is "genuine sandbox order held with a real PNR," not "ticketed/paid" — this is both the safest financially and the most defensible truthfully, and it satisfies the plan's `AI proposal → validation → viability → authority → executor → observe` pattern without ever needing a money-moving step inside the demo.
+The domain engine stays generic; Singapore is adopted as the summit location because provider reality (not narrative preference) empirically supports it best. The flight replacement ceiling for Wave 3R is now "genuine sandbox order, paid, and ticketed" (proven, §4A) for the *booking* side, but "refund/cancel is `SIMULATE_PROVIDER_BOUNDARY` only" for the *recovery* side until §21.1 is resolved — this is both the safest financially and the most defensible truthfully, and it satisfies the plan's `AI proposal → validation → viability → authority → executor → observe` pattern using only Atlas's own sandbox test-balance payment mode (never real card data).
 
 ## 21. WHAT TO TEST NEXT
 
-1. Fix the Model Studio credential, then re-run the exact same 6 probe calls from §8 (script already written and reusable) to get the genuine DR-0D LIVE evidence this report is currently missing.
-2. At DR-2, implement the `createFlightOrder`/`retrieveFlightOrder` delta from §13 using the exact wire format discovered in §4 (do not re-derive from docs).
-3. At DR-3, design the webhook ingress's own authentication given Atlas provides none, and decide the simulated-source-event fallback shape using the `event/getPageList.do` record schema from §5 as the template.
-4. At DR-5, build the NL→`ResolutionTarget` extraction task against the schema already probed in §8 (once the credential works) — the schema-gate approach and prompt structure used here are reusable.
-5. When scenario design is frozen (DR-9), avoid the SIN→HKG leg specifically; every other tested Singapore pairing has real depth.
+1. **Resolve the Atlas refund-lookup gap** (§4A/§19) — either file a support request with Atlas quoting the exact order/ticket/error, or attempt one more full search→verify→order→pay→ticket→refund cycle on a *freshly created* order to rule out anything specific to the original `TESTA...81` order.
+2. Fix the Model Studio credential, then re-run the exact same 6 probe calls from §8 (script already written and reusable) to get the genuine DR-0D LIVE evidence this report is currently missing.
+3. At DR-2, implement the `createFlightOrder`/`payFlightOrder`/`retrieveFlightOrder` delta from §13 using the exact wire format discovered in §4/§4A (do not re-derive from docs).
+4. At DR-3, design the webhook ingress's own authentication given Atlas provides none, and decide the simulated-source-event fallback shape using the `event/getPageList.do` record schema from §5 as the template.
+5. At DR-5, build the NL→`ResolutionTarget` extraction task against the schema already probed in §8 (once the credential works) — the schema-gate approach and prompt structure used here are reusable.
+6. When scenario design is frozen (DR-9), avoid the SIN→HKG leg specifically; every other tested Singapore pairing has real depth.
