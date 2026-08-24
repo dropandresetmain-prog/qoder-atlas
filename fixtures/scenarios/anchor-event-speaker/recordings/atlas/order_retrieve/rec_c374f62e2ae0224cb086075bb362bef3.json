@@ -1,0 +1,26 @@
+{
+  "id": "rec_c374f62e2ae0224cb086075bb362bef3",
+  "providerId": "atlas",
+  "operation": "order_retrieve",
+  "recordedAt": "2026-08-24T16:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "orderNo": "ATLSBX-M2-ORD-001",
+    "orderStatus": "2",
+    "ticketStatus": "1",
+    "totalPrice": 242.6,
+    "currency": "USD",
+    "payTime": "2026-09-12 20:46:00",
+    "tktLimitTime": "2026-09-13 00:00:00",
+    "pnrCode": "M2PRUF",
+    "paxTicketInfos": [
+      {
+        "ticketNos": [
+          "M2TKT1"
+        ]
+      }
+    ]
+  }
+}

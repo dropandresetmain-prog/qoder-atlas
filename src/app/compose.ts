@@ -57,6 +57,8 @@ import {
   type ReadModelDependencies,
 } from './index.ts';
 import { createProviderBackedExecutor } from './providerExecution.ts';
+import { SqliteBookingDossierStore, type BookingDossierStore } from './dossierStore.ts';
+import { createFlightDossierResolver, createHotelDossierResolver } from './dossierResolver.ts';
 import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
 import { ProgrammeService } from './programme.ts';
@@ -73,6 +75,14 @@ export interface ComposedRuntime {
   orchestrator: RuntimeOrchestrator;
   executionService: RecoveryExecutionService;
   readDeps: ReadModelDependencies;
+  /**
+   * Application-owned booking dossier store (Mission 2): provider-facing
+   * booking identity seeded from operator/authoritative bundles and resolved
+   * per intent by the composed executor. Exposed so integration evidence and
+   * Mission-3 harnesses can verify seeding/resolution — never to derive
+   * identity from model output.
+   */
+  dossierStore: BookingDossierStore;
   /** The wired capability adapters (tool dispatch surface). */
   capabilities: ToolDispatchCapabilities;
   /** Advertised capability descriptors (registry evidence). */
@@ -109,6 +119,7 @@ export async function composeAppRuntime(
   const cases = new SqliteCaseRepository(database);
   const audit = new SqliteAuditRepository(database);
   const preferences = new SqlitePreferenceStore(database);
+  const dossiers = new SqliteBookingDossierStore(database);
   const mutations = new SqlMutationService({ db: database, trips, entities });
 
   // Deterministic generalized bootstrap: seed every accepted scenario bundle
@@ -124,7 +135,7 @@ export async function composeAppRuntime(
     for (const entry of readdirSync(scenariosRoot, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const outcome = await seedScenarioBundle(
-        { mutations, sources, preferences, audit },
+        { mutations, sources, preferences, audit, dossiers },
         join(scenariosRoot, entry.name),
       );
       seededScenarioIds.push(outcome.scenarioId);
@@ -216,12 +227,13 @@ export async function composeAppRuntime(
         flight,
         flightTransactions,
         hotel,
-        // Booking dossiers: the frozen Traveller ontology carries a display
-        // name only (no structured booking identity), so the composed
-        // runtime wires no default dossier — REPLAY keeps the historic
-        // simulation behavior and LIVE/RECORD fails closed instead of
-        // guessing identity. Runtimes with validated booking identity
-        // inject one; validation harnesses supply synthetic test dossiers.
+        // Booking dossiers: provider-facing booking identity comes from the
+        // application-owned validated store, resolved PER INTENT through the
+        // authoritative graph (case -> trip -> travellers) — never from LLM
+        // output, never scenario-keyed. Absent dossier => REPLAY keeps the
+        // simulation fallback, LIVE/RECORD fails closed (ADR-050).
+        flightDossier: createFlightDossierResolver({ cases, trips, dossiers }),
+        hotelDossier: createHotelDossierResolver({ cases, trips, dossiers }),
       }),
       strategyFor,
     }),
@@ -247,7 +259,10 @@ export async function composeAppRuntime(
   const useLivePlanner = config.adapterMode !== 'REPLAY' && modelClient.isConfigured();
   const basePlanner: RecoveryPlanner = useLivePlanner
     ? new ModelStudioRecoveryPlanner({ client: modelClient })
-    : new DeterministicFallbackPlanner();
+    // REV-2 WP-R5 doctrine extends to the fallback planner: persisted strategy
+    // ids feed intent ids, and REPLAY reproducibility demands deterministic
+    // ids — never randomUUID.
+    : new DeterministicFallbackPlanner({ idFactory: deterministicIdFactory() });
   // Northstar branches (initial planning, window shift) wrap the base
   // planner; everything else flows through the shared I3 loop. Strategy
   // ids come from a deterministic per-prefix sequence (REV-2 WP-R5):
@@ -275,6 +290,7 @@ export async function composeAppRuntime(
     viability,
     fixturesDir: config.fixturesDir,
     programmeService: bootProgrammeService,
+    dossiers,
   });
 
   // Demo-only surface: load scenario specs for human clickaround triggers.
@@ -407,6 +423,7 @@ export async function composeAppRuntime(
     orchestrator,
     executionService,
     readDeps,
+    dossierStore: dossiers,
     capabilities,
     capabilityDescriptors,
     planner,

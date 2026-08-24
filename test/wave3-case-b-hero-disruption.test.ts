@@ -11,8 +11,8 @@
  *   first-class (UNKNOWN != PASS);
  * - the programme view marks the speaker's trip and the endangered
  *   commitment; other trips stay isolated;
- * - the full loop (plan -> begin -> traveller approval -> simulated
- *   execution -> verification) resolves to FULLY_RECOVERED with the trip
+ * - the full loop (plan -> begin -> traveller approval -> provider-backed
+ *   REPLAY execution -> verification) resolves to FULLY_RECOVERED with the trip
  *   reverified VIABLE, and the activity stream records every real step.
  */
 import test from 'node:test';
@@ -114,7 +114,7 @@ test('Wave 3 Case B: hero disruption — blast radius visible in read models, fu
 
     // ------------------------------------------------------------------
     // 3. Recovery through the SAME engine: plan -> begin -> approval ->
-    //    simulated execution -> verified RESOLVED.
+    //    provider-backed REPLAY execution -> verified RESOLVED.
     // ------------------------------------------------------------------
     const plan = await composed.orchestrator.plan({ caseId, at: '2026-09-12T18:30:00+09:00' });
     assert.ok(plan.bestStrategyId, 'planning ranks an evidence-bound strategy');
@@ -141,7 +141,10 @@ test('Wave 3 Case B: hero disruption — blast radius visible in read models, fu
       at: '2026-09-12T18:55:00+09:00',
     });
     assert.equal(execute.executed, true);
-    assert.equal(execute.simulated, true, 'REPLAY stays at the simulated boundary — honest provenance');
+    // Mission 2: with validated dossiers seeded, the composed REPLAY flow
+    // traverses the provider-backed executor (recording-bound create/pay/
+    // retrieve), not the simulation boundary — same executor Mission 3 LIVE.
+    assert.equal(execute.simulated, false, 'REPLAY runs the provider-backed executor with the seeded dossier');
     assert.equal(execute.caseStatus, 'RESOLVED');
     assert.equal(execute.resolutionOutcome, 'FULLY_RECOVERED');
 

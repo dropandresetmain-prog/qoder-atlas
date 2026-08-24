@@ -1,0 +1,27 @@
+{
+  "flight": [
+    {
+      "travellerId": "trv_b_consultant",
+      "passengers": [
+        {
+          "givenName": "Beatriz",
+          "familyName": "Ortega",
+          "dateOfBirth": "1991-07-23",
+          "gender": "FEMALE",
+          "nationality": "MEX"
+        }
+      ],
+      "contact": {
+        "name": "Ortega/Beatriz",
+        "email": "beatriz.ortega@example.com"
+      },
+      "paymentRef": "atlas-sandbox-balance"
+    }
+  ],
+  "hotel": [
+    {
+      "travellerId": "trv_b_consultant",
+      "guestNames": ["Beatriz Ortega"]
+    }
+  ]
+}

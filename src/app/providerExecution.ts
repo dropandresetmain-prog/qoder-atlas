@@ -85,8 +85,15 @@ export interface ProviderBackedExecutorDependencies {
   flightTransactions?: FlightTransactionCapability;
   /** Hotel capability (quote/book/retrieve/cancel). */
   hotel?: HotelCapability;
-  flightDossier?: (intent: ActionIntent) => FlightBookingDossier | undefined;
-  hotelDossier?: (intent: ActionIntent) => HotelReplacementDossier | undefined;
+  /**
+   * Booking identity resolved per intent from APPLICATION-OWNED validated
+   * data (dossier stores seeded from operator/authoritative sources) — never
+   * from LLM output and never scenario-keyed. May resolve asynchronously
+   * against authoritative state. Absent dossier => structured refusal for
+   * consequential LIVE/RECORD execution.
+   */
+  flightDossier?: (intent: ActionIntent) => FlightBookingDossier | undefined | Promise<FlightBookingDossier | undefined>;
+  hotelDossier?: (intent: ActionIntent) => HotelReplacementDossier | undefined | Promise<HotelReplacementDossier | undefined>;
   /** Bounded ticketing observation window (async ticketing is real). */
   ticketingPoll?: { attempts: number; delayMs: number };
   sleep?: (ms: number) => Promise<void>;
@@ -327,7 +334,7 @@ export function createProviderBackedExecutor(
     // Validated booking identity is a precondition. REPLAY keeps the historic
     // simulation behavior when no dossier is wired; LIVE/RECORD fails closed —
     // a money-moving booking with guessed identity never runs.
-    const dossier = deps.flightDossier?.(intent);
+    const dossier = await deps.flightDossier?.(intent);
     if (!dossier) {
       if (deps.mode === 'REPLAY') return deps.fallback.execute(execution);
       return failure(
@@ -788,7 +795,7 @@ export function createProviderBackedExecutor(
     const providerId = hotel.descriptor.providerId;
     const clientReference = clientReferenceFor(intent);
 
-    const dossier = deps.hotelDossier?.(intent);
+    const dossier = await deps.hotelDossier?.(intent);
     if (!dossier) {
       // REPLAY keeps historic simulation behaviour; LIVE/RECORD fail closed —
       // a money-moving hotel booking without validated identity never runs.

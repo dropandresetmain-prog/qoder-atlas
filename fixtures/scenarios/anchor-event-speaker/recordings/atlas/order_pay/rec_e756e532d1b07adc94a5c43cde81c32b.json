@@ -1,0 +1,13 @@
+{
+  "id": "rec_e756e532d1b07adc94a5c43cde81c32b",
+  "providerId": "atlas",
+  "operation": "order_pay",
+  "recordedAt": "2026-08-24T16:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "orderNo": "ATLSBX-M2-ORD-001",
+    "paymentMethod": 1
+  }
+}

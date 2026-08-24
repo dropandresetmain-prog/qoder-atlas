@@ -1,0 +1,22 @@
+{
+  "flight": [
+    {
+      "travellerId": "trv_a_speaker",
+      "passengers": [
+        {
+          "givenName": "Ari",
+          "familyName": "Vance",
+          "dateOfBirth": "1988-04-12",
+          "gender": "MALE",
+          "nationality": "USA"
+        }
+      ],
+      "contact": {
+        "name": "Vance/Ari",
+        "email": "ari.vance@example.org"
+      },
+      "paymentRef": "atlas-sandbox-balance"
+    }
+  ],
+  "hotel": []
+}

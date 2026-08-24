@@ -37,6 +37,7 @@ import type { ToolDispatchCapabilities } from './dispatch.ts';
 import { seedScenarioBundle } from './bootstrap.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import type { ProgrammeService } from './programme.ts';
+import type { BookingDossierStore } from './dossierStore.ts';
 import { signalHorizon, liftToHorizon, type RecoveryExecutionService } from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
@@ -67,6 +68,12 @@ export interface RuntimeDependencies {
    * keeps the scenario-only reset semantics unchanged.
    */
   programmeService?: ProgrammeService;
+  /**
+   * Application-owned booking dossier store (Mission 2): reset wipes and
+   * reseeds provider-facing booking identity through the same bundle path.
+   * Absent keeps prior reset semantics (no dossiers seeded).
+   */
+  dossiers?: BookingDossierStore;
 }
 
 export interface RuntimePlanOutcome {
@@ -292,7 +299,9 @@ export class RuntimeOrchestrator {
    */
   async reset(at: IsoDateTime): Promise<RuntimeResetOutcome> {
     withTransaction(this.deps.db, () => {
-      for (const table of ['audit', 'source_contents', 'sources', 'signals', 'cases', 'trips', 'entities', 'preferences']) {
+      const tables = ['audit', 'source_contents', 'sources', 'signals', 'cases', 'trips', 'entities', 'preferences'];
+      if (this.deps.dossiers) tables.push('booking_dossiers');
+      for (const table of tables) {
         this.deps.db.exec(`DELETE FROM ${table}`);
       }
     });
@@ -306,6 +315,7 @@ export class RuntimeOrchestrator {
           sources: this.deps.sources,
           preferences: this.deps.preferences,
           audit: this.deps.audit,
+          ...(this.deps.dossiers ? { dossiers: this.deps.dossiers } : {}),
         },
         scenarioDir,
       );

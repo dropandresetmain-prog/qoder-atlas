@@ -11,6 +11,8 @@
  * scenario content. A third scenario seeds through this unchanged.
  */
 import { readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { EntityId } from '../domain/common.ts';
 import type { MutationOperation, MutationProposal } from '../operational/mutation.ts';
 import type { ScenarioSpec } from '../scenarios/spec.ts';
@@ -25,12 +27,21 @@ import type {
 } from '../contracts/repositories.ts';
 import type { MutationService } from '../contracts/services.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
+import { BookingDossierBundleSchema, type BookingDossierStore } from './dossierStore.ts';
 
 export interface SeedDependencies {
   mutations: MutationService;
   sources: SourceRepository;
   preferences: PreferenceStore;
   audit: AuditRepository;
+  /**
+   * Optional application-owned booking identity store. Scenario bundles may
+   * ship an optional `booking-dossiers.json` with operator-validated booking
+   * identity; it seeds the same way every bundle fact does. Absent store or
+   * file => nothing seeded, and the executor's fail-closed dossier semantics
+   * apply unchanged.
+   */
+  dossiers?: BookingDossierStore;
 }
 
 export interface SeedOutcome {
@@ -40,6 +51,7 @@ export interface SeedOutcome {
   tripVersion: number | undefined;
   sourceIds: EntityId[];
   preferenceCount: number;
+  dossierCount: number;
 }
 
 /** Seed one scenario bundle directory into authoritative persistent state. */
@@ -84,6 +96,29 @@ export async function seedScenarioBundle(
     await deps.preferences.save(preference);
   }
 
+  // 3b. Booking dossiers (application-owned store; provider-facing identity,
+  //     never part of the frozen entity registry). Referential integrity is
+  //     enforced here: every dossier must name a traveller the bundle seeds.
+  const dossierBundle = loadDossierBundle(scenarioDir);
+  let dossierCount = 0;
+  if (deps.dossiers && dossierBundle) {
+    const knownTravellerIds = new Set(spec.context.travellers.map((traveller) => traveller.id));
+    for (const dossier of dossierBundle.flight) {
+      if (!knownTravellerIds.has(dossier.travellerId)) {
+        throw new Error(`booking dossier references unknown traveller ${dossier.travellerId}`);
+      }
+      await deps.dossiers.saveFlight(dossier);
+      dossierCount += 1;
+    }
+    for (const dossier of dossierBundle.hotel) {
+      if (!knownTravellerIds.has(dossier.travellerId)) {
+        throw new Error(`booking dossier references unknown traveller ${dossier.travellerId}`);
+      }
+      await deps.dossiers.saveHotel(dossier);
+      dossierCount += 1;
+    }
+  }
+
   // 4. Bootstrap audit entry complementing the mutation-service audit trail.
   await deps.audit.append({
     occurredAt: spec.trip.updatedAt,
@@ -96,6 +131,7 @@ export async function seedScenarioBundle(
       sourceCount: spec.context.sources.length,
       preferenceCount: spec.context.preferences.length,
       appliedOperationCount: outcome.appliedOperationCount,
+      dossierCount,
     },
   });
 
@@ -106,7 +142,15 @@ export async function seedScenarioBundle(
     tripVersion: outcome.tripVersion,
     sourceIds: spec.context.sources.map((source) => source.id),
     preferenceCount: spec.context.preferences.length,
+    dossierCount,
   };
+}
+
+/** Optional `booking-dossiers.json` beside scenario.json; absent => none. */
+function loadDossierBundle(scenarioDir: string) {
+  const path = join(scenarioDir, 'booking-dossiers.json');
+  if (!existsSync(path)) return undefined;
+  return BookingDossierBundleSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
 }
 
 /**

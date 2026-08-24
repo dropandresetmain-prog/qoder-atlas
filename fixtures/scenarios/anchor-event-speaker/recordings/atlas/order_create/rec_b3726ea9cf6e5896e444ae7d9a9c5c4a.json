@@ -1,0 +1,24 @@
+{
+  "id": "rec_b3726ea9cf6e5896e444ae7d9a9c5c4a",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-08-24T16:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "atlsbx-sess-i3demo-0001",
+    "orderNo": "ATLSBX-M2-ORD-001",
+    "pnrCode": "M2PRUF",
+    "totalPrice": 242.6,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-09-12 23:59:00",
+    "paxTicketInfos": [
+      {
+        "ticketNos": []
+      }
+    ],
+    "duplicateOrders": null
+  }
+}
