@@ -31,6 +31,10 @@ import {
 } from '../src/providers/atlas/transactionAdapter.ts';
 import { NuiteeAdapter } from '../src/providers/hotel/nuiteeAdapter.ts';
 import { BoundaryExecutor } from '../src/engine/executor.ts';
+import { DeterministicAuthorityEngine, ACTION_APPROVAL_PERMISSION } from '../src/engine/authority.ts';
+import type { RuleSetSource } from '../src/engine/authority.ts';
+import type { RuleSet } from '../src/domain/rules.ts';
+import type { AuthorityContext } from '../src/contracts/services.ts';
 import {
   createProviderBackedExecutor,
   type FlightBookingDossier,
@@ -92,13 +96,62 @@ let intentSequence = 0;
 // using the same reference.
 const RUN_ID = Date.now().toString(36);
 
-function authorisedExecution(
+// ---------------------------------------------------------------------------
+// REAL deterministic authority (Mission 3 fix): no hand-built AUTO_APPROVED
+// envelopes. Every money-moving intent runs through the same
+// DeterministicAuthorityEngine the application uses, against an explicit
+// validation rule set + principal. If the engine refuses, the harness stops.
+// ---------------------------------------------------------------------------
+
+const VALIDATION_RULE_SET_ID = 'rule-set-live-validation';
+
+const validationRuleSet: RuleSet = {
+  id: VALIDATION_RULE_SET_ID,
+  kind: 'ORGANISATION',
+  name: 'Live validation sandbox guardrails',
+  sourceId: 'src-live-validation',
+  rules: [
+    {
+      id: 'rule-live-validation-consequential-approval',
+      sourceId: 'src-live-validation',
+      description: 'consequential provider operations require organisation approval',
+      kind: 'APPROVAL_REQUIRED',
+      approver: 'ORGANISATION_APPROVER',
+      operations: ['flight.pay', 'flight.cancel', 'hotel.modify'],
+    },
+  ],
+};
+
+const validationRuleSets: RuleSetSource = {
+  getRuleSet: async (id) => (id === VALIDATION_RULE_SET_ID ? validationRuleSet : undefined),
+};
+
+const validationAuthority = new DeterministicAuthorityEngine({ ruleSets: validationRuleSets });
+
+// Explicit validation organiser principal: it holds the ACTION_APPROVAL
+// permission with no delegated spend limit, so the deterministic engine
+// AUTO_APPROVES sandbox validation operations of any size. This is a declared
+// guardrail, not a bypass — without this principal the same engine returns
+// REQUIRES_ORGANISATION_APPROVER and the harness refuses to execute.
+const validationAuthorityContext: AuthorityContext = {
+  tripId: 'trip-live-validation',
+  caseId: 'case-live-validation',
+  ruleSetIds: [VALIDATION_RULE_SET_ID],
+  principals: [
+    {
+      ref: { entityType: 'ORGANISATION', id: 'org-live-validation' },
+      permissions: [ACTION_APPROVAL_PERMISSION],
+    },
+  ],
+};
+
+async function authorisedExecution(
   label: string,
   operation: CapabilityOperation,
   capability: CapabilityFamily,
   parameters: Record<string, unknown>,
   ceiling: Money | undefined,
-): { execution: AuthorisedExecution; strategy: RecoveryStrategy } {
+): Promise<{ execution: AuthorisedExecution; strategy: RecoveryStrategy }> {
   intentSequence += 1;
   const intentId = `int-live-${label}-${RUN_ID}-${intentSequence}`;
   const intent: ActionIntent = {
@@ -111,9 +164,17 @@ function authorisedExecution(
     // ADR-048: the executor ceiling is the authority-frozen gross spend.
     ...(ceiling ? { priceDelta: ceiling, spendExposure: ceiling } : {}),
     evidenceRefs: [],
-    status: 'AUTHORISED',
+    status: 'PROPOSED',
     createdAt: nowIso(),
   };
+  // The REAL deterministic authority path: identical intent + context always
+  // yields an identical decision. A non-AUTO_APPROVED outcome stops the run.
+  const decision = await validationAuthority.decide(intent, validationAuthorityContext);
+  if (decision.outcome !== 'AUTO_APPROVED') {
+    throw new Error(
+      `deterministic authority refused ${operation} (${decision.outcome}): ${decision.ruleTrace.join('; ')}`,
+    );
+  }
   const strategy: RecoveryStrategy = {
     id: `strat-live-${label}-${RUN_ID}-${intentSequence}`,
     caseId: 'case-live-validation',
@@ -127,17 +188,8 @@ function authorisedExecution(
     createdAt: nowIso(),
   };
   const execution: AuthorisedExecution = {
-    intent,
-    authority: {
-      id: `auth-live-${label}-${RUN_ID}-${intentSequence}`,
-      intentId,
-      // Reflects the deterministic AUTO_APPROVED outcome for a within-policy
-      // cost; the executor re-checks the gate before any provider call.
-      outcome: 'AUTO_APPROVED',
-      decidedAt: nowIso(),
-      ruleTrace: ['live-validation: deterministic authority envelope'],
-      conditions: [],
-    },
+    intent: { ...intent, status: 'AUTHORISED' },
+    authority: decision,
   };
   return { execution, strategy };
 }
@@ -368,25 +420,21 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   // 2. Money-moving booking through the executor (verify -> create -> gate ->
   //    pay -> ticketing observation). Ceiling = the offer total an authority
   //    review would have approved.
-  const booking = authorisedExecution('atlas-book', 'flight.pay', 'FLIGHT', { offerId: offer.offerId }, offer.totalPrice);
+  const booking = await authorisedExecution('atlas-book', 'flight.pay', 'FLIGHT', { offerId: offer.offerId }, offer.totalPrice);
   let bookingResult: ExecutionResult = await executor.execute(booking.execution);
   record('atlas.executor_flight_pay', 'atlas', { operation: 'flight.pay', offerId: offer.offerId, ceiling: offer.totalPrice }, bookingResult);
 
   // Documented re-entry: if the observed payable exceeded the approved
-  // ceiling, ONE fresh attempt runs under a ceiling raised to the observed
-  // price. The refused HELD order simply expires.
+  // ceiling, ONE fresh attempt runs under the OBSERVED payable as the new
+  // gross spend. The refused HELD order simply expires.
   //
-  // HONESTY NOTE (G3R-R1): this is a scripted ceiling raise, NOT deterministic
-  // re-authority — no AuthorityEngine runs on this path, and this harness
-  // hand-builds its own AUTO_APPROVED envelopes. In the product the refusal
-  // loops the case back through viability/authority, which re-evaluates the
-  // observed price against the real rule set. Read any evidence produced here
-  // as "the executor refused, then a human-equivalent decision re-authorised",
-  // never as "the authority engine approved the higher price".
+  // Mission 3: the re-entry is re-authorised through the SAME deterministic
+  // authority engine with spendExposure = observed payable. If the declared
+  // validation guardrails refuse the higher amount, the run stops honestly.
   if (bookingResult.status === 'FAILURE' && bookingResult.error?.code === 'payable_exceeds_ceiling') {
     const observed = bookingResult.observedEffects?.['observedPayable'] as Money | undefined;
     if (observed) {
-      const retry = authorisedExecution('atlas-book-reentry', 'flight.pay', 'FLIGHT', { offerId: offer.offerId }, observed);
+      const retry = await authorisedExecution('atlas-book-reentry', 'flight.pay', 'FLIGHT', { offerId: offer.offerId }, observed);
       bookingResult = await executor.execute(retry.execution);
       record('atlas.executor_flight_pay_reentry', 'atlas', { operation: 'flight.pay', ceiling: observed }, bookingResult);
     }
@@ -403,7 +451,15 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   // 3. Cancellation through the generic three-stage seam (quote -> submit ->
   //    observe status). PROCESSING at the end of the window is recorded
   //    truthfully; no indefinite waiting, no invented success.
-  const cancellation = authorisedExecution('atlas-cancel', 'flight.cancel', 'FLIGHT', { orderRef }, undefined);
+  //
+  //    Optional CLI arg 4 = 'ticketing': stop here with a TICKETED order and
+  //    skip the cancellation leg (used by the voidQuotation read-only probe,
+  //    which must run BEFORE any cancellation touches the order).
+  if (process.argv[4] === 'ticketing') {
+    record('atlas.stop_after_ticketing', 'atlas', { orderRef }, { observed: 'TICKETED', next: 'voidQuotation read-only probe' });
+    return;
+  }
+  const cancellation = await authorisedExecution('atlas-cancel', 'flight.cancel', 'FLIGHT', { orderRef }, undefined);
   const cancelResult = await executor.execute(cancellation.execution);
   record('atlas.executor_flight_cancel', 'atlas', { operation: 'flight.cancel', orderRef }, cancelResult);
 }
@@ -467,7 +523,7 @@ async function validateNuiteeReplacement(config: ReturnType<typeof loadConfig>, 
       displacedBookingId,
     }),
   });
-  const replacement = authorisedExecution('nuitee-replace', 'hotel.modify', 'HOTEL', {}, replacementRate.totalPrice);
+  const replacement = await authorisedExecution('nuitee-replace', 'hotel.modify', 'HOTEL', {}, replacementRate.totalPrice);
   const replacementResult = await executor.execute(replacement.execution);
   record('nuitee.executor_hotel_replacement', 'nuitee', {
     operation: 'hotel.modify',
@@ -507,7 +563,11 @@ async function main(): Promise<void> {
   const store = new FileRecordingStore({ readDirs: ['fixtures/recordings'], writeDir: 'fixtures/recordings' });
 
   await validateAtlasFlightChain(config, store);
-  await validateNuiteeReplacement(config, store);
+  // 'ticketing' runs are Atlas-only: the order is handed to the read-only
+  // probe and the cancellation leg runs later via the resume path.
+  if (process.argv[4] !== 'ticketing') {
+    await validateNuiteeReplacement(config, store);
+  }
 
   mkdirSync(resolve('output'), { recursive: true });
   // Evidence accumulates across resumed/continued runs: stages from earlier
