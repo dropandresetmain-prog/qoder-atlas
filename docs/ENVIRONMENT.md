@@ -33,6 +33,8 @@ Used for Qwen extraction/mapping, recovery planning/comparison and agentic web r
 
 Start with inexpensive model for plumbing/tests. Upgrade only if evidence shows quality blocks acceptance.
 
+**Regional endpoint (DR-0 finding, 24 Aug 2026):** Alibaba Cloud Model Studio has two separate regional deployments with disjoint key stores — mainland China (`https://dashscope.aliyuncs.com/compatible-mode/v1`, the code default) and international (`https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, Singapore-based). A key issued in one region's console returns `invalid_api_key` against the other region's endpoint even when the key is genuinely valid. If a LIVE call fails with `invalid_api_key` despite a correct key, try setting `MODEL_STUDIO_BASE_URL` to the international endpoint before assuming the key itself is wrong.
+
 ### Atlas direct API
 Needed only for LIVE flight capability.
 
