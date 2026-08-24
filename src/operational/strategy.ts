@@ -30,16 +30,22 @@ export type CapabilityFamily = z.infer<typeof CapabilityFamilySchema>;
 /**
  * Closed READ-ONLY operation vocabulary for planner tool requests (FR-07,
  * FR-10, ADR-024). The planner may ask for information; it can never request
- * a consequential provider action. Consequential operations (flight.change,
- * flight.cancel, hotel.book/modify/cancel, transfer.book/amend/cancel,
- * communication.*, simulation.*) are deliberately absent and exist only on
- * the ActionIntent/authority path.
+ * a consequential provider action. Consequential operations (flight.book,
+ * flight.pay, flight.change, flight.cancel, hotel.book/modify/cancel,
+ * transfer.book/amend/cancel, communication.*, simulation.*) are deliberately
+ * absent and exist only on the ActionIntent/authority path. Read-only
+ * transaction status/quote inspection (flight.order_status,
+ * flight.cancel_quote, flight.cancel_status) stays requestable, mirroring
+ * hotel.retrieve.
  * Values must remain a subset of CapabilityOperationSchema (test-enforced).
  */
 export const ToolOperationSchema = z.enum([
   'flight.search',
   'flight.verify',
   'flight.fare_rules',
+  'flight.order_status',
+  'flight.cancel_quote',
+  'flight.cancel_status',
   'flight.refund_quote',
   'hotel.context',
   'hotel.search',
@@ -59,6 +65,9 @@ export const TOOL_OPERATION_FAMILY: Record<ToolOperation, CapabilityFamily> = {
   'flight.search': 'FLIGHT',
   'flight.verify': 'FLIGHT',
   'flight.fare_rules': 'FLIGHT',
+  'flight.order_status': 'FLIGHT',
+  'flight.cancel_quote': 'FLIGHT',
+  'flight.cancel_status': 'FLIGHT',
   'flight.refund_quote': 'FLIGHT',
   'hotel.context': 'HOTEL',
   'hotel.search': 'HOTEL',

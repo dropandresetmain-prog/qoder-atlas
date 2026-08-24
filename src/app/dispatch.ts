@@ -166,11 +166,13 @@ export async function dispatchToolRequest(
       if (!parsed.success) return invalidParameters(`flight.fare_rules: ${parsed.error.issues.length} parameter issue(s)`);
       return toDispatchResult(await capabilities.flight.getFareRules(parsed.data));
     }
-    case 'flight.refund_quote': {
-      // In the vocabulary but no adapter implements it yet: structured
+    case 'flight.refund_quote':
+    case 'flight.order_status':
+    case 'flight.cancel_quote':
+    case 'flight.cancel_status':
+      // In the vocabulary but no adapter implements them yet: structured
       // unavailability, never a guess.
       return capabilityAbsent(operation.data);
-    }
     case 'routing.context': {
       if (!capabilities.routing) return capabilityAbsent(operation.data);
       const parsed = ROUTING_CONTEXT_PARAMETERS.safeParse(request.parameters);

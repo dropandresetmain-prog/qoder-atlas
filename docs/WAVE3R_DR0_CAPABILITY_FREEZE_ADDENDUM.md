@@ -1,6 +1,6 @@
 # Wave 3R — DR-0 Capability Freeze Addendum
 
-**Status:** Active planning reconciliation after DR-0 follow-up evidence  
+**Status:** G3R-R0 contract-freeze candidate complete — see ADR-042..044 in `docs/DECISIONS.md` and `test/wave3r-contracts.test.ts`; pending independent G3R-R0 review before downstream lanes consume the seam  
 **Date:** 24 Aug 2026  
 **Parent execution contract:** `docs/WAVE3R_DEMO_READINESS_PLAN.md`  
 **Evidence authority:** `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md`  
@@ -237,3 +237,5 @@ The domain remains provider-neutral. Atlas `void` is one adapter implementation 
 ### WHAT TO TEST NEXT
 
 **G3R-R0 — Capability / Architecture Contract Freeze.** Review the empirical DR-0 evidence, freeze the smallest generic forward-flight + cancellation + observation contract, preserve authority/idempotency/observation invariants, record the architecture decision, and stop before DR-2 implementation.
+
+**G3R-R0 CANDIDATE COMPLETE (24 Aug 2026).** The contract-freeze candidate is committed on this branch: `FlightTransactionCapability` (create/pay/retrieve + cancel quote/submit/status) and `ExternalProviderEventEnvelopeSchema`/`ExternalFlightEventNormalizer` in `src/contracts/capabilities.ts`; vocabulary additions `flight.book`, `flight.pay`, `flight.order_status`, `flight.cancel_quote`, `flight.cancel_status` in `src/operational/intent.ts`; read-only subset and planner-prompt updates in `src/operational/strategy.ts`, `src/app/dispatch.ts`, `src/intelligence/planner.ts`; invariant tests in `test/wave3r-contracts.test.ts`; decisions recorded as ADR-042..044. Hotel decision (Decision 10) CONFIRMED: no new hotel contract needed (ADR-041 unchanged). Independent G3R-R0 review runs before DR-1/DR-2 consume the seam.

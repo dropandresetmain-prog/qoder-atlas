@@ -142,6 +142,7 @@ Contract baseline: `test/northstar-contracts.test.ts` at `NORTHSTAR_CONTRACT_BAS
 - event-side signal: `ANCHOR_COMMITMENT_CHANGE` payload validates; provider signal kinds never carry event-side facts;
 - programme read model: `ProgrammeView` shape (status rollups, endangered commitments, active cases, decisions required, uncertainty);
 - tool-vocabulary safety: extended `ToolOperationSchema` remains a strict subset of `CapabilityOperationSchema`; consequential hotel.book/transfer.* never appear as tool operations;
+- Wave 3R transaction safety (G3R-R0, `test/wave3r-contracts.test.ts`): flight payment carries an opaque paymentRef and no card fields; `flight.book`/`flight.pay`/`flight.cancel` submission are authority-path only and never tool operations; read-only `flight.order_status`/`flight.cancel_quote`/`flight.cancel_status` stay a strict capability subset; unsupported cancellation is a structured outcome; cancellation acceptance is distinct from observed cancellation state; provider order/ticket observation never carries trip viability; external event envelopes keep provider identity and never self-promote to AUTHORITATIVE.
 - temporal normalization: offset-qualified passthrough, naive values normalized only with explicit IANA timezone, absent timezone → uncertainty (undefined), never a guessed offset.
 
 **Programme-scale families (RV-N1..N12):**
