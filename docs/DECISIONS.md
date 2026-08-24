@@ -236,3 +236,15 @@ DR-0 proved the cancellation lifecycle empirically: an eligibility/quote step wi
 **Status:** Accepted (Wave 3R G3R-R0 contract freeze)
 
 DR-3 needs a provider-neutral external event seam. The frozen contracts are `ExternalProviderEventEnvelopeSchema` (providerId + providerEventId identity for delivery idempotency, receivedAt/occurredAt, provider order refs for correlation, generic `ProviderEventCategorySchema`, normalized payload) and `ExternalFlightEventNormalizer` (raw payload → envelope + TripSignals, structured failure, never throws). No provider-specific event types enter the domain ontology. Trust handling exploits the existing fact-authority ladder without ontology change: the empirical finding that the first adapter's delivery channel documents no inbound signature/HMAC means its events MUST be normalized at `providerAuthority` ASSERTED at best; downstream, the existing TripSignal authority gating and the retrieve-and-reconcile discipline keep an unauthenticated push from outranking observed provider state or becoming authoritative trip truth directly. The path is: receive ASSERTED event → correlate via provider order refs → reconcile/query the provider where practical → validated TripSignal/state mutation. DR-3 additionally owns its own ingress protection (secret path/allowlisting) since the provider supplies none.
+
+## ADR-045 — Authority currency incomparability fails closed
+**Status:** Accepted (Wave 3R Mission 1, DR-1.3)
+
+G3R-R0 left one Investigate-Now item: `DeterministicAuthorityEngine` skipped spend rules whose currency differed from the intent's `priceDelta` currency, turning "cannot compare" into "no objection". With real sandbox payment about to be permitted, that leniency is unsafe and is now removed (`src/engine/authority.ts`):
+
+- **SPEND_LIMIT (hard ceiling):** a currency mismatch returns `BLOCKED` with structured, auditable `ruleTrace` reasoning. A binding hard ceiling that cannot be deterministically compared is never silently satisfied; the deterministic authority invents no FX conversion.
+- **APPROVAL_ABOVE_SPEND:** a currency mismatch now triggers the rule's approval requirement instead of skipping the threshold — the system cannot verify the spend is below the threshold, so execution must not proceed without explicit approval.
+- **Delegated authority cannot bypass either:** hard ceilings are evaluated before any delegation and now block outright on mismatch; a delegated principal whose `delegatedSpendLimit` currency is incomparable with the spend still cannot satisfy a spend-threshold requirement (existing skip semantics, retained).
+
+Rejected alternatives: keeping the skip (unsafe auto-execution exactly when real money moves); an internal FX table (invented rates are non-deterministic and financially wrong by construction); escalating SPEND_LIMIT mismatches to human approval instead of `BLOCKED` (a hard ceiling is a deterministic boundary — raising it means changing the rule set, not waiving the rule). Permanent tests pin all three behaviors (`test/wave3r-dr1-runtime-truth.test.ts`).
+

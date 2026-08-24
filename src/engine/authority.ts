@@ -64,12 +64,18 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
     const spend = intent.priceDelta;
     if (spend) conditions.push(`priceDelta=${spend.amount} ${spend.currency}`);
 
-    // 1. Hard spend ceiling: breaching it blocks execution outright.
+    // 1. Hard spend ceiling: breaching it blocks execution outright. A
+    //    binding ceiling whose currency cannot be deterministically compared
+    //    to the spend MUST fail closed (DR-1.3, ADR-045): "cannot compare" is
+    //    never "within limit", and authority invents no FX conversion.
     for (const rule of rules) {
       if (rule.kind !== 'SPEND_LIMIT' || !spend) continue;
       if (rule.maxAmount.currency !== spend.currency) {
-        ruleTrace.push(`rule ${rule.id}: currency ${spend.currency} not comparable to limit currency ${rule.maxAmount.currency}`);
-        continue;
+        ruleTrace.push(
+          `rule ${rule.id}: hard spend limit currency ${rule.maxAmount.currency} is not deterministically` +
+            ` comparable to spend currency ${spend.currency}; fail closed`,
+        );
+        return this.decision(intent, 'BLOCKED', ruleTrace, conditions);
       }
       if (spend.amount > rule.maxAmount.amount) {
         ruleTrace.push(`rule ${rule.id}: spend ${spend.amount} exceeds limit ${rule.maxAmount.amount}`);
@@ -88,11 +94,21 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
         break;
       }
     }
-    // 3. Spend-threshold approvals.
+    // 3. Spend-threshold approvals. An incomparable threshold currency fails
+    //    toward requiring approval (DR-1.3, ADR-045): the system can never
+    //    verify the spend is BELOW the threshold, so skipping it would turn
+    //    "cannot compare" into unsafe auto-execution.
     if (!required && spend) {
       for (const rule of rules) {
         if (rule.kind !== 'APPROVAL_ABOVE_SPEND') continue;
-        if (rule.threshold.currency !== spend.currency) continue;
+        if (rule.threshold.currency !== spend.currency) {
+          required = { approver: rule.approver, ruleId: rule.id };
+          ruleTrace.push(
+            `rule ${rule.id}: approval threshold currency ${rule.threshold.currency} not comparable to spend` +
+              ` currency ${spend.currency}; cannot verify spend is below threshold, approval required`,
+          );
+          break;
+        }
         if (spend.amount > rule.threshold.amount) {
           required = { approver: rule.approver, ruleId: rule.id };
           ruleTrace.push(`rule ${rule.id}: spend ${spend.amount} above approval threshold ${rule.threshold.amount}`);

@@ -37,7 +37,7 @@ import type { ToolDispatchCapabilities } from './dispatch.ts';
 import { seedScenarioBundle } from './bootstrap.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import type { ProgrammeService } from './programme.ts';
-import type { RecoveryExecutionService } from './recoveryExecution.ts';
+import { signalHorizon, liftToHorizon, type RecoveryExecutionService } from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import type { ActionIntent } from '../operational/intent.ts';
@@ -134,8 +134,16 @@ export class RuntimeOrchestrator {
     this.deps = deps;
   }
 
-  /** Stage 1 — TripSignal through the I2 pipeline (mutation -> impact -> case). */
-  async processDisruption(signal: TripSignal): Promise<ProcessedSignal> {
+  /** Stage 1 — TripSignal through the I2 pipeline (mutation -> impact -> case).
+   *
+   * DR-1.1: when the caller supplies an explicit instant and the signal carries
+   * no receivedAt of its own, the system stamps receivedAt with that instant so
+   * the signal's causal instant is coherent with when the runtime actually
+   * received it. Fixture-carried receivedAt is scenario truth and is preserved.
+   */
+  async processDisruption(signal: TripSignal, at?: IsoDateTime): Promise<ProcessedSignal> {
+    const coherentSignal =
+      signal.receivedAt === undefined && at !== undefined ? { ...signal, receivedAt: at } : signal;
     return processSignal(
       {
         trips: this.deps.trips,
@@ -145,7 +153,7 @@ export class RuntimeOrchestrator {
         mutations: this.deps.mutations,
         audit: this.deps.audit,
       },
-      signal,
+      coherentSignal,
     );
   }
 
@@ -157,6 +165,13 @@ export class RuntimeOrchestrator {
     const signal = signalId ? await this.deps.signals.getSignal(signalId) : undefined;
     if (!signal) throw new Error(`case ${input.caseId} has no persisted triggering signal`);
 
+    // Timeline coherence (DR-1.1): planning happens causally downstream of the
+    // disruption, so the planning/snapshot instant is lifted to the horizon.
+    const at = liftToHorizon(
+      input.at,
+      await signalHorizon(this.deps.signals, recoveryCase.triggeredBySignalIds),
+    );
+
     // Impact over the CURRENT authoritative state; the planner and viability
     // engine see the same assessment the pipeline produced.
     const impact = await new ImpactEngine({
@@ -165,7 +180,7 @@ export class RuntimeOrchestrator {
       entities: this.deps.entities,
     }).assess(recoveryCase.tripId, signal.id);
 
-    const snapshot = await buildTripSnapshot(this.snapshotDeps(), recoveryCase.tripId, input.at);
+    const snapshot = await buildTripSnapshot(this.snapshotDeps(), recoveryCase.tripId, at);
     const outcome = await runPlanningLoop(
       {
         planner: this.deps.planner,
@@ -180,7 +195,7 @@ export class RuntimeOrchestrator {
         triggeringSignals: [signal],
         impact,
         capabilityRegistry: this.deps.capabilityDescriptors,
-        planningAt: input.at,
+        planningAt: at,
       },
     );
     const after = await this.deps.cases.getCase(input.caseId);

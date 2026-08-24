@@ -13,7 +13,9 @@ import { MutationOperationSchema, type MutationProposal } from '../operational/m
 import type { ExecutionResult } from '../operational/intent.ts';
 import type { CaseResolution } from '../operational/case.ts';
 import type { CaseStatus } from '../operational/case.ts';
+import type { ImpactAssessment } from '../operational/impact.ts';
 import type {
+  MutationOutcome,
   MutationService,
   ObservationOutcome,
   ObservationService,
@@ -21,7 +23,7 @@ import type {
 import type { Trip } from '../domain/trip.ts';
 import type { Constraint } from '../domain/constraints.ts';
 import { evaluateConstraints } from './evaluators.ts';
-import { ImpactEngine, type ImpactEngineDeps } from './impact.ts';
+import { ImpactEngine, impactProposal, type ImpactEngineDeps } from './impact.ts';
 import { buildEvaluationContext } from './evaluationContext.ts';
 
 const ObservedOperationsSchema = z.array(MutationOperationSchema);
@@ -103,16 +105,26 @@ export interface VerificationResult {
  * requires the same viability except for explicitly waived/reprioritised
  * objectives or assessed LOST objectives (recorded loss evidence). Anything
  * less loops back into the lifecycle — success alone never resolves.
+ *
+ * DR-1.2: when constructed with a MutationService, a resolution also
+ * reconciles the AUTHORITATIVE Trip aggregate viability through the normal
+ * validated mutation path — a resolved RecoveryCase can no longer leave the
+ * trip stale at DISRUPTED. Reconciliation runs only after observation has
+ * applied execution evidence and verification passes; provider success alone
+ * never flips the aggregate. Without a MutationService (unit harnesses) the
+ * verifier stays read-only.
  */
 export class CaseVerifier {
   private readonly impact: ImpactEngine;
   private readonly trips: ImpactEngineDeps['trips'];
   private readonly entities: ImpactEngineDeps['entities'];
+  private readonly mutations?: MutationService;
 
-  constructor(deps: ImpactEngineDeps) {
+  constructor(deps: ImpactEngineDeps & { mutations?: MutationService }) {
     this.impact = new ImpactEngine(deps);
     this.trips = deps.trips;
     this.entities = deps.entities;
+    this.mutations = deps.mutations;
   }
 
   /**
@@ -183,6 +195,10 @@ export class CaseVerifier {
       if (objectiveId && !remainingLossRefs.includes(objectiveId)) remainingLossRefs.push(objectiveId);
     }
     const outcome = remainingLossRefs.length > 0 ? 'RECOVERED_WITH_LOSS' : 'FULLY_RECOVERED';
+    // DR-1.2: reconciliation happens only on a resolution outcome and through
+    // the validated mutation path. The verification result stands regardless
+    // of whether the reconciliation proposal is accepted (audit-only refusal).
+    await this.reconcileTripViability(tripId, assessment, constraints, evaluations, evaluatedAt);
     return {
       suggestedCaseStatus: 'RESOLVED',
       resolution: {
@@ -201,5 +217,38 @@ export class CaseVerifier {
     const trip = await this.trips.getTrip(tripId);
     if (!trip) throw new Error(`unknown trip ${tripId}`);
     return trip;
+  }
+
+  /**
+   * Persist the authoritative Trip aggregate viability derived from the
+   * verification evidence (DR-1.2). Deterministic proposal id/instant:
+   * identical verification evidence yields an identical proposal. Rejected
+   * proposals never alter the verification outcome — the read model and the
+   * aggregate stay auditable, never silently overridden.
+   */
+  private async reconcileTripViability(
+    tripId: EntityId,
+    assessment: ImpactAssessment,
+    constraints: Constraint[],
+    evaluations: Array<{ constraintId: EntityId; status: Constraint['status'] }>,
+    evaluatedAt: IsoDateTime,
+  ): Promise<void> {
+    if (!this.mutations) return;
+    // Re-read the aggregate NOW: observation evidence applied moments ago
+    // must be inside the reconciliation payload, or the whole-trip upsert
+    // would collide with the fact-authority ladder it is meant to respect.
+    const tripRecord = await this.impactTrip(tripId);
+    // EntityId-safe: ISO offsets carry '+' which the id pattern rejects.
+    const deterministicInstant = evaluatedAt.replace(/\+/g, '-');
+    const proposal = impactProposal(assessment, constraints, evaluations, tripRecord, {
+      reconcileViability: true,
+      proposalId: `prop-reconcile-${tripId}-${deterministicInstant}`,
+      requestedAt: evaluatedAt,
+    });
+    if (proposal.operations.length === 0) return;
+    const outcome: MutationOutcome = await this.mutations.applyProposal(proposal);
+    if (!outcome.accepted) {
+      // Audit-only: reconciliation refusal is evidence, not a verification fault.
+    }
   }
 }

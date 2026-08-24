@@ -15,7 +15,7 @@
  * RECOVERED_WITH_LOSS) or loops back into assessment/planning.
  */
 import type { EntityId, EntityRef, IsoDateTime } from '../domain/common.ts';
-import { IsoDateTimeSchema } from '../domain/common.ts';
+import { instantMillis, IsoDateTimeSchema } from '../domain/common.ts';
 import type { TripSnapshot } from '../operational/snapshot.ts';
 import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type {
@@ -164,6 +164,51 @@ export function principalsForSnapshot(snapshot: TripSnapshot): PrincipalRecord[]
       permissions: [] as string[],
     })),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Timeline coherence (DR-1.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The causal horizon of a case's triggering signals: the latest instant at
+ * which any triggering disruption was received (or occurred). Recovery work
+ * performed IN RESPONSE to those signals is causally downstream of them and
+ * must never be stamped earlier.
+ *
+ * Returns undefined when no signal instant is derivable (e.g. unit tests that
+ * drive the service without a signal repository) — callers then keep the
+ * requested instant unchanged.
+ */
+export async function signalHorizon(
+  signals: SignalRepository | undefined,
+  triggeredBySignalIds: EntityId[],
+): Promise<IsoDateTime | undefined> {
+  if (!signals) return undefined;
+  let horizon: IsoDateTime | undefined;
+  for (const signalId of triggeredBySignalIds) {
+    const signal = await signals.getSignal(signalId);
+    if (!signal) continue;
+    const instant = signal.receivedAt ?? signal.occurredAt;
+    if (horizon === undefined || instantMillis(instant) > instantMillis(horizon)) horizon = instant;
+  }
+  return horizon;
+}
+
+/**
+ * Lift a caller-supplied instant to the causal horizon when it predates it.
+ *
+ * This does NOT weaken the causal evidence rule (`observedAt >= signalInstant`
+ * in ImpactEngine): genuinely older evidence still loses. It only stops the
+ * runtime from stamping a response to a disruption with an instant that
+ * predates the disruption itself — which is what happens when a demo/UI
+ * surface supplies an ordinary wall-clock instant against a future-dated
+ * scenario timeline. Ordering goes through instant comparison, so the host
+ * timezone never changes the result.
+ */
+export function liftToHorizon(requestedAt: IsoDateTime, horizon: IsoDateTime | undefined): IsoDateTime {
+  if (horizon === undefined) return requestedAt;
+  return instantMillis(horizon) > instantMillis(requestedAt) ? horizon : requestedAt;
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +417,14 @@ export class RecoveryExecutionService {
    */
   async beginStrategy(input: BeginStrategyInput): Promise<AuthorityStageOutcome> {
     const recoveryCase = await this.mustGet(input.caseId);
+    // Timeline coherence (DR-1.1): the intent's effective instant is lifted to
+    // the causal horizon of the case's triggering signals, so the execution
+    // evidence this intent later produces is never stamped causally before the
+    // disruption it answers. A caller instant already past the horizon is kept.
+    const at = liftToHorizon(
+      input.at,
+      await signalHorizon(this.deps.signals, recoveryCase.triggeredBySignalIds),
+    );
     // Mixed funding (ADR-037): the authoritative CostAllocation is computed
     // HERE, where the strategy's real priceDelta is known — never at request
     // time, where no cost exists. Deterministic window rules + the cost
@@ -385,7 +438,7 @@ export class RecoveryExecutionService {
       id: this.nextIntentId(input.caseId, input.strategy.id, recoveryCase.actionIntents.map((i) => i.id)),
       caseId: input.caseId,
       strategy: input.strategy,
-      at: input.at,
+      at,
       ...(costAllocation ? { costAllocation } : {}),
     });
     const context: AuthorityContext = {
@@ -396,7 +449,7 @@ export class RecoveryExecutionService {
     };
     const decision = await this.deps.authority.decide(intent, context);
 
-    await this.caseService.record(input.caseId, input.at, {
+    await this.caseService.record(input.caseId, at, {
       actionIntents: [...recoveryCase.actionIntents, intent],
       authorityDecisions: [...recoveryCase.authorityDecisions, decision],
     });
@@ -409,10 +462,10 @@ export class RecoveryExecutionService {
           : decision.outcome === 'BLOCKED'
             ? 'ESCALATED'
             : 'AWAITING_APPROVAL';
-    const updated = await this.moveCase(input.caseId, target, input.at);
+    const updated = await this.moveCase(input.caseId, target, at);
 
     await this.deps.audit.append({
-      occurredAt: input.at,
+      occurredAt: at,
       actor: 'app:recovery-execution',
       action: 'AUTHORITY_DECIDED',
       subject: input.snapshot.tripId,
@@ -534,7 +587,13 @@ export class RecoveryExecutionService {
     if (!intent || !decision) {
       throw new Error(`case ${input.caseId} has no intent/authority pair for ${input.intentId}`);
     }
-    return this.executeEnvelope({ intent, authority: decision }, recoveryCase.tripId, input.at);
+    // Timeline coherence (DR-1.1): verification/case-transition instants are
+    // lifted to the causal horizon exactly like the intent's own instant.
+    const at = liftToHorizon(
+      input.at,
+      await signalHorizon(this.deps.signals, recoveryCase.triggeredBySignalIds),
+    );
+    return this.executeEnvelope({ intent, authority: decision }, recoveryCase.tripId, at);
   }
 
   /** Execute an explicit envelope; the deterministic gate is the only entry proof. */

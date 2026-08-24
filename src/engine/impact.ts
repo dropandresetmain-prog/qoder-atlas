@@ -11,7 +11,7 @@
  * UNKNOWN, threatened objectives and irreversible loss. A hard objective
  * becoming impossible records a LossRecord and NEVER terminates propagation.
  */
-import type { EntityId } from '../domain/common.ts';
+import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import { instantMillis } from '../domain/common.ts';
 import type { TripElement } from '../domain/elements.ts';
 import type { RuleSet } from '../domain/rules.ts';
@@ -290,12 +290,30 @@ function resolveRule(constraint: Constraint, ruleSets: Map<string, RuleSet>) {
  * to be explicitly waived/reprioritised before FULLY_RECOVERED is possible.
  * Objectives already waived/reprioritised carry stronger evidence and are
  * left untouched (idempotent on re-assessment).
+ *
+ * DR-1.2 reconciliation: by default a clean assessment keeps the trip's
+ * previous viability (disruption-time proposals only degrade, never upgrade).
+ * With `reconcileViability`, a clean assessment derives the aggregate from
+ * the validated current state — VIABLE, capped by hard constraint evidence
+ * (FAIL -> DISRUPTED, UNKNOWN -> AT_RISK) — so a resolved RecoveryCase can
+ * never leave the authoritative Trip stale at DISRUPTED. Hard FAIL/UNKNOWN
+ * still binds in both modes.
  */
+export interface ImpactProposalOptions {
+  /** Derive the trip viability from validated current state (DR-1.2). */
+  reconcileViability?: boolean;
+  /** Override the deterministic proposal id (verification instants). */
+  proposalId?: string;
+  /** Override the proposal's requestedAt instant. */
+  requestedAt?: IsoDateTime;
+}
+
 export function impactProposal(
   assessment: ImpactAssessment,
   constraints: Constraint[],
   evaluations: Array<{ constraintId: EntityId; status: ConstraintStatus }>,
   trip: Trip,
+  options: ImpactProposalOptions = {},
 ): MutationProposal {
   const statusById = new Map(evaluations.map((e) => [e.constraintId, e.status]));
   const operations: MutationOperation[] = constraints
@@ -308,12 +326,35 @@ export function impactProposal(
   // Trip viability BEFORE loss bindings: operations apply sequentially to one
   // working state, and a whole-trip upsert replaces the aggregate — the
   // objective LOST upserts below must land on top of it, never under it.
-  const viability =
-    assessment.directFailures.length > 0
-      ? 'DISRUPTED'
-      : assessment.affectedElements.length > 0 || assessment.threatenedObjectives.length > 0
-        ? 'AT_RISK'
-        : trip.viability;
+  let viability: Trip['viability'];
+  if (options.reconcileViability) {
+    // Post-verification reconciliation: the assessment and the trip-scoped
+    // constraint evaluations together ARE the current validated truth.
+    const hardnessById = new Map<EntityId, Constraint['hardness']>(
+      constraints.map((c) => [c.id, c.hardness]),
+    );
+    const hardFail = evaluations.some(
+      (e) => hardnessById.get(e.constraintId) === 'HARD' && e.status === 'FAIL',
+    );
+    const hardUnknown = evaluations.some(
+      (e) => hardnessById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN',
+    );
+    viability =
+      assessment.directFailures.length > 0 || hardFail
+        ? 'DISRUPTED'
+        : assessment.affectedElements.length > 0 ||
+            assessment.threatenedObjectives.length > 0 ||
+            hardUnknown
+          ? 'AT_RISK'
+          : 'VIABLE';
+  } else {
+    viability =
+      assessment.directFailures.length > 0
+        ? 'DISRUPTED'
+        : assessment.affectedElements.length > 0 || assessment.threatenedObjectives.length > 0
+          ? 'AT_RISK'
+          : trip.viability;
+  }
   if (viability !== trip.viability) {
     operations.push({
       op: 'UPSERT_ENTITY',
@@ -335,7 +376,10 @@ export function impactProposal(
     });
   }
 
-  if (operations.length === 0) {
+  // Disruption-time proposals must always leave an applied record; a
+  // reconciliation proposal that changes nothing is simply not submitted
+  // (callers treat an empty operation list as "nothing to reconcile").
+  if (operations.length === 0 && !options.reconcileViability) {
     operations.push({
       op: 'UPSERT_ENTITY',
       entityType: 'TRIP',
@@ -344,10 +388,12 @@ export function impactProposal(
     });
   }
   return {
-    id: `prop-impact-${assessment.id}`,
+    id: options.proposalId ?? `prop-impact-${assessment.id}`,
     origin: 'SYSTEM',
-    requestedAt: assessment.assessedAt,
-    rationale: `persist impact assessment ${assessment.id}`,
+    requestedAt: options.requestedAt ?? assessment.assessedAt,
+    rationale: options.reconcileViability
+      ? `reconcile trip viability from verification assessment ${assessment.id}`
+      : `persist impact assessment ${assessment.id}`,
     operations,
   };
 }

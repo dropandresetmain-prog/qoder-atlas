@@ -11,7 +11,7 @@
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
-import type { EntityId } from '../domain/common.ts';
+import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import { openDatabase } from '../persistence/database.ts';
 import {
   SqliteAuditRepository,
@@ -85,8 +85,20 @@ export interface ComposedRuntime {
   seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }>;
 }
 
-/** Compose the full application runtime over one SQLite database. */
-export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): Promise<ComposedRuntime> {
+/**
+ * Compose the full application runtime over one SQLite database.
+ *
+ * DR-1.1: an optional injectable `clock` supplies the runtime's effective
+ * "now" (defaults to the wall clock). Deterministic tests inject a fixed or
+ * timeline-coherent instant so read models and the traveller-decision path are
+ * reproducible; causal event time itself always flows through explicit `at`
+ * parameters / the case causal horizon, never through this clock.
+ */
+export async function composeAppRuntime(
+  config: AppConfig,
+  db?: DatabaseSync,
+  clock?: () => IsoDateTime,
+): Promise<ComposedRuntime> {
   const database = db ?? openDatabase(config.sqlitePath);
   const trips = new SqliteTripRepository(database);
   const entities = new SqliteEntityStore(database);
@@ -139,7 +151,9 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
         (await cases.getCase(intent.caseId))?.strategies.find((strategy) => strategy.id === intent.strategyId),
     }),
     observation: new DeterministicObservationService({ mutations }),
-    verifier: new CaseVerifier({ trips, signals, entities }),
+    // DR-1.2: the verifier reconciles authoritative Trip viability through
+    // the validated mutation path once a case resolves.
+    verifier: new CaseVerifier({ trips, signals, entities, mutations }),
     trips,
     entities,
     // Funding evidence lives on triggering signals (change-request anchors).
@@ -259,7 +273,9 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
         return { status: 404, body: { error: `unknown scenario: ${name}` } };
       }
       try {
-        const result = await orchestrator.processDisruption(spec.disruption.signal);
+        // DR-1.1: the demo instant is no longer ignored — it gives a signal
+        // without its own receivedAt a coherent system-owned receipt instant.
+        const result = await orchestrator.processDisruption(spec.disruption.signal, at);
         return {
           status: 200,
           body: {
@@ -277,8 +293,9 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
   };
 
   const programmeService = bootProgrammeService;
+  const now = clock ?? ((): IsoDateTime => new Date().toISOString());
   const endpoints: AppEndpoints = {
-    now: () => new Date().toISOString(),
+    now,
     operatorDashboard: (at) => projectOperatorDashboard(readDeps, at),
     caseDetail: (caseId, at) => projectCaseDetail(readDeps, caseId, at),
     travellerTrip: (tripId, at) => projectTravellerTrip(readDeps, tripId, at),
