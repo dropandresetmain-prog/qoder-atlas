@@ -1,0 +1,24 @@
+{
+  "id": "rec_2077a9e4b1c4424d9b39f65ac014c713",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-08-24T14:57:35.484Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "7596a812-0b3b-4cff-809f-e14da761c80d",
+    "orderNo": "TESTA20260824225735156",
+    "pnrCode": "WUDANG",
+    "totalPrice": 56.59,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-08-24 23:27:35",
+    "paxTicketInfos": [
+      {
+        "ticketNos": []
+      }
+    ],
+    "duplicateOrders": null
+  }
+}

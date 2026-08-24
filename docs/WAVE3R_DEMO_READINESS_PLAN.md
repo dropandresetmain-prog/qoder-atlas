@@ -761,6 +761,8 @@ Do not independently review every package. Review at consequential seams.
 
 Trigger: end DR-0 **if** transactional provider reality requires a shared-contract change.
 
+**Result: ACCEPTED (24 Aug 2026).** The frozen contract base is SHA `0c2f782ffbaf4fc569ab09f8ccad22e52c537516`, published as `origin/g3r-r0-fix` (branch `g3r-r0-fix`): `FlightTransactionCapability` + cancellation trio + external event envelope in `src/contracts/capabilities.ts`, vocabulary in `src/operational/intent.ts`/`src/operational/strategy.ts`, invariant tests in `test/wave3r-contracts.test.ts`, decisions ADR-042..044. The earlier unreviewed candidate `66f7838` is NOT the contract base. Wave 3R Mission 1 (`wave3r/runtime-execution`) consumes this frozen seam for DR-1/DR-2.
+
 Reviewer focus:
 
 - are capability claims empirically proven rather than inferred from docs?

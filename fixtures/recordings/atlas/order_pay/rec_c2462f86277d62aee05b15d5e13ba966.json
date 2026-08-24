@@ -1,0 +1,13 @@
+{
+  "id": "rec_c2462f86277d62aee05b15d5e13ba966",
+  "providerId": "atlas",
+  "operation": "order_pay",
+  "recordedAt": "2026-08-24T14:57:35.679Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "orderNo": "TESTA20260824225735156",
+    "paymentMethod": 1
+  }
+}

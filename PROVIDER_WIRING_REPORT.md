@@ -282,13 +282,25 @@ To determine the route, inspect the recording's request hash or the normalized o
 
 ---
 
+## 6. Wave 3R Mission 1 — Atlas transaction execution wiring (DR-2, 24 Aug 2026)
+
+Atlas is no longer read-only. The frozen G3R-R0 `FlightTransactionCapability` is implemented against the Atlas SANDBOX:
+
+- **Adapter**: `src/providers/atlas/transactionAdapter.ts` — `createOrder` (`/order.do`), `payOrder` (`/pay.do`, sandbox test-balance payment method only), `retrieveOrder` (`/queryOrderDetails.do`), `quoteCancellation` (`/voidQuotation.do`), `submitCancellation` (`/void.do`), `retrieveCancellationStatus` (`/queryVoidOrders.do`). Atlas terms such as `void` and provider status codes stay inside this adapter; generic code speaks only the six frozen operations.
+- **Fail-closed sandbox gate**: transactional calls are refused unless `isAtlasSandboxBaseUrl` accepts the configured base URL, and `payOrder` rejects every `paymentRef` except the approved opaque sandbox test-balance reference. REPLAY mode never performs a live call.
+- **Executor**: `src/app/providerExecution.ts` — provider-backed `ExecutorService` composition behind the existing recovery loop. Money-moving flight booking follows the Option-B sequence (verify → create → payment gate vs `authorisedAmount` → pay → bounded ticketing observation); ambiguous create/pay/cancel reconcile retrieve-before-retry; cancellation is quote → authority → submit → observe. Selection depends only on operation/capability/gate/mode.
+- **Recordings**: transaction operations record under `fixtures/recordings/atlas/{order_create,order_pay,order_retrieve,cancel_quote,cancel_submit,cancel_status}/` with the same deterministic `recordingIdFor` keys and sanitized request/response capture (auth headers stripped by the shared runner). LIVE and REPLAY share normalization, observation and downstream paths.
+- **Wire reality discovered**: Atlas serializes absent response fields as explicit JSON `null` (adapter schemas are null-tolerant), order creation requires a valid contact email, route-specific `bookingRequirement` can require passenger nationality (ISO 3166-1 alpha-2 — the Y4 domestic MEX→CUN route refused the order without it, provider status 407), `voidQuotation.do` returns `voidTickets` as an array of ticket objects rather than strings, duplicate-detection (provider status 318) returns `duplicateOrders` entries as either plain order-number strings or objects carrying `orderNo` (the adapter adopts the existing held order from either shape instead of creating a second booking), asynchronous ticketing can take several minutes on some fares (the executor reports an honest `ticketing_not_observed` TIMEOUT rather than inventing success), and multi-leg offers may be refused at `order.do` — all surfaced as structured provider outcomes, never exceptions.
+
+---
+
 ## Summary
 
 **Provider wiring**: Clean separation; global adapter mode; deterministic recording keys; env vars per provider.
 
 **Nuitée**: Full hotel lifecycle except modifyStay (structured UNAVAILABLE); single large search recording is a blocker.
 
-**Atlas**: Read-only flight surface; single search recording is a blocker for multi-route demos.
+**Atlas**: Read-only flight surface plus (Wave 3R Mission 1) the sandbox-only `FlightTransactionCapability` adapter and provider-backed executor; single search recording remains a blocker for multi-route demos.
 
 **Model Studio**: Degrades gracefully without credentials; REPLAY is test-only (no file recordings); fallback planner covers basic recovery.
 

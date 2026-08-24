@@ -1,0 +1,20 @@
+{
+  "id": "rec_6a4f1899223e88422973500cbfaba249",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-08-24T14:40:10.792Z",
+  "sanitized": true,
+  "raw": {
+    "status": 407,
+    "msg": "Passenger information does not meet the requirements: Nationality",
+    "sessionId": "76aed1e2-5fa7-4971-9ec8-a91728a562e0",
+    "orderNo": null,
+    "pnrCode": null,
+    "totalPrice": null,
+    "totalTransactionFee": null,
+    "currency": null,
+    "tktLimitTime": null,
+    "paxTicketInfos": null,
+    "duplicateOrders": null
+  }
+}

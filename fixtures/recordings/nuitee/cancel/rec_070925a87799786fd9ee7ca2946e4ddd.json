@@ -1,0 +1,17 @@
+{
+  "id": "rec_070925a87799786fd9ee7ca2946e4ddd",
+  "providerId": "nuitee",
+  "operation": "cancel",
+  "recordedAt": "2026-08-24T14:45:28.726Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "bq_LudhuK",
+      "cancellation_fee": 0,
+      "currency": "USD",
+      "refund_amount": 232.49,
+      "status": "CANCELLED"
+    },
+    "sandbox": true
+  }
+}

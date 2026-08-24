@@ -1,0 +1,24 @@
+{
+  "id": "rec_0278b5be81de9be306af3b5038f8c13b",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-08-24T14:43:47.731Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "4196c132-e572-460f-baa2-127a9ee5886f",
+    "orderNo": "TESTA20260824224347375",
+    "pnrCode": "FDJBQQ",
+    "totalPrice": 68.59,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-08-24 23:13:47",
+    "paxTicketInfos": [
+      {
+        "ticketNos": []
+      }
+    ],
+    "duplicateOrders": null
+  }
+}

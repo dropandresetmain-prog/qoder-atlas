@@ -1,0 +1,15 @@
+{
+  "id": "rec_7c359e7e508006148b0b255156eae29d",
+  "providerId": "atlas",
+  "operation": "cancel_submit",
+  "recordedAt": "2026-08-24T14:49:08.796Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "orderNo": "TESTA20260824224347375",
+    "voidCode": "202608-0039",
+    "voidStatus": 0,
+    "cancelReason": ""
+  }
+}

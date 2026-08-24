@@ -1,6 +1,6 @@
 # Wave 3R — DR-0 Capability Freeze Addendum
 
-**Status:** G3R-R0 contract-freeze candidate complete — see ADR-042..044 in `docs/DECISIONS.md` and `test/wave3r-contracts.test.ts`; pending independent G3R-R0 review before downstream lanes consume the seam  
+**Status:** G3R-R0 ACCEPTED — independent review accepted the contract-freeze base at SHA `0c2f782ffbaf4fc569ab09f8ccad22e52c537516` (published as `origin/g3r-r0-fix`); see ADR-042..044 in `docs/DECISIONS.md` and `test/wave3r-contracts.test.ts`. Downstream DR-1/DR-2 (Wave 3R Mission 1) consume the frozen seam.  
 **Date:** 24 Aug 2026  
 **Parent execution contract:** `docs/WAVE3R_DEMO_READINESS_PLAN.md`  
 **Evidence authority:** `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md`  
@@ -221,7 +221,7 @@ Do not claim:
 - Atlas cancellation via the void lifecycle is proven in sandbox for a supported carrier and explicitly unsupported for at least one other carrier.
 - Atlas refund execution is not available for the Wave 3R sandbox path and should not be relied on.
 - Nuitée replacement/cancellation observability is sufficient for safe hotel orchestration.
-- Model Studio LIVE works on the international endpoint; one small schema-field prompt correction remains before product extraction depends on it.
+- Model Studio LIVE works on the international endpoint; one small schema-field prompt correction remains before product extraction depends on it. **Status triage (24 Aug 2026): ACT NOW IN MISSION 2** — the fix is deliberately NOT part of Wave 3R Mission 1 (runtime truth + provider execution) and must not be silently forgotten there.
 - Google Routes LIVE is available.
 
 ### WHAT WE DO NOT KNOW

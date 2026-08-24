@@ -1,0 +1,120 @@
+{
+  "id": "rec_980c078fddd57ae8a5d3be04b68a7037",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-08-24T15:07:13.549Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "dr02Z8pMB",
+      "offerId": "3gAWonJzkd4AEaRzcmlk2gE_RzRaVE9OQldHRTNHS05SVUdZWVRPTVJXR1FaREFOWlJHNDJUTU5KV0dVM0dLTVJRRzQzVE1PSlhHUTNEUU5UR0c0MlRPTkJTR0EzVE9OUlpHWlNUTU5CV01ZM1RPN0JSRU1aREFNUldHRVlEQU1MNEdJWURFTlJSR0FZREk3REZOWlBWS1UzNEtWSlhZVktUSVI2RENRSlFJTjZESU5KU0hGNkdTVURIS1ZFSFlNSlhIQTNUS09CVUdBWkRRTUJSSEZTV0kyM1NFTVpUTU9CUUdZNFNHTlJXSEVXVEdOUllHQTNEUzdDU0laSEhZTVJRR0kzREFPSlNHNFlUQU1CUVBRWVhZVVJSR0EyRFE3QlNHSVpUU05CREtKSFNHVVNHSllSVEVNQlNHWVdUQU9KTkdJM1NBTUpRSElZREFJWaNwcmPLQGv-FHrhR66lb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDktMzAgMTA6MDA6MDCicnSjUkZOo2JyZKJST6RtcmlkwKNtcm7Ao2hkcMCjZnJuoKNzcm69U3RhbmRhcmQgUXVlZW4gV2l0aG91dCBXaW5kb3ejb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCShaF0szIwMjYtMDktMjcgMTA6MDA6MDChYctATrR64UeuFKFjo1VTRKJ0eaZhbW91bnSidHqjR01UhaF0szIwMjYtMDktMzAgMTA6MDA6MDChYctAa_4UeuFHrqFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjM2ODA2OaNzaWQCo2hpZKdscDU5ZGM1o29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0xMC0wMaJjb6oyMDI2LTEwLTA0o2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwMzQ0ZjlkNGRxS1FNN3RoUlA3TEtSWTVYVzVXa0ZuWGN2RUZFo2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSgom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctAM0euFHrhSKFjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAMeZmZmZmZqFjo1VTRKJscMCjYmt0BA==",
+      "hotelId": "lp59dc5",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I42FUVCPJZBFOR2FGNDUWTSSKVDVSWKUJ5GVEV2HKFNEIQKOLJJEONBSKRGU4SSXI5KTGR2LJVJFCRZUGNKE2T2KLBDVCM2EKFHFIR2HGQZFIT2OIJJUOQJTKRHU4US2I5NFGVCNJZBFOTKZGNKE6N2CKJCU2WSEIFGVEV2HIVMUIQKNJQ2EOSKZIRCU4USSI5AVSRCJG5CEMTS2KBLEWVJTGRFVMSSYLFLEWVCJKI3EIQ2RJJIUSTRWIREU4SSTJBDDMR2TKVCEQS2WIVEFSTKKLBEECM2UJNHUEVKHIFNEIUKNIJJEQRSTK5ETEM2TIVGVUVCNJ5BFCR2ZGRJUOTSSK5EEKV2UI5HFEWKHIEZUIUZXINJUSWSIJBMU2USRI5ETGRCBJ5FFGRZULFKECTKCKFIFCWKYLFKVEUSHIEZEIUJXIJJUOSK2KRJU4QSEJNFEQU2HKVJUOSSZKJKEKTKCKNDVSV2UIFHUUTSHJEZVGQKNJJIUQSKZIRAUSWL4GIZDGLRZGR6DEMBSGYWTAOJNGMYCAMJQHIYDAORQGB6FET34PR6HYU3UMFXGIYLSMQQFC5LFMVXCAV3JORUG65LUEBLWS3TEN53XYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+              "occupancyNumber": 1,
+              "name": "Standard Queen Without Window",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "<br/><br/>Airport transfer is not available at this property. <br/> In accordance with Hotel Licensing and National Registration Regulations, guests are required to present a valid form of government regulated identification (e.g original passport, Photo ID card) upon check-in. Any other forms of identification - such as Digital Singpass ID and any other form of membership cards are strictly not accepted for the registration process. <br/> In accordance with local government guidelines, all guests are required to show a physical photo ID, passport and credit card upon check-in. <br/> Iron and ironing board will be available upon request. <br/> No Smoking is allowed in all rooms <br/> The minimum age required to check in is 18 years. <br/> This hotel does not permit bulk bookings. Guests may reserve a maximum of 4 rooms per booking. <br/> This is a strictly non-smoking property.<br/>",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 223.94,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 234.69,
+                    "currency": "USD",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Sales tax",
+                    "amount": 19.28,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "Service charge (taxable)",
+                    "amount": 17.9,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-09-27 10:00:00",
+                    "amount": 61.41,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  },
+                  {
+                    "cancelTime": "2026-09-30 10:00:00",
+                    "amount": 223.94,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 234.69,
+      "isPackageRate": true,
+      "commission": 0,
+      "price": 223.94,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": false,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-10-01",
+      "checkout": "2026-10-04",
+      "sellingPriceToUser": 223.94
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

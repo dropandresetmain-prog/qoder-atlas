@@ -1116,6 +1116,12 @@ Hotel reality: one proper **real hotel API adapter is MINIMUM**. Candidate remai
 > (DR-0..DR-13) and gates (G3R-R0/R1/R2). This section is preserved as history
 > and is not reopened; do not resume executing it directly. RV-N0, NS-G1, NS-G2,
 > and Independent Review 2 above remain accepted.
+>
+> Status update: Gate G3R-R0 (frozen flight-transaction contracts) is **ACCEPTED**
+> at SHA `0c2f782ffbaf4fc569ab09f8ccad22e52c537516` (published as
+> `origin/g3r-r0-fix`); Mission 1 (DR-1/DR-2, runtime truth + real provider
+> execution) executes on branch `wave3r/runtime-execution` against that frozen
+> seam. See `docs/WAVE3R_DEMO_READINESS_PLAN.md` for gate results.
 
 Goal: turn the accepted backend into the judge-facing product.
 

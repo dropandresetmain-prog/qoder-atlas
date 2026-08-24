@@ -1,0 +1,56 @@
+{
+  "id": "rec_dd81ce9a3ad5723dd9e0d3b33484d249",
+  "providerId": "atlas",
+  "operation": "cancel_quote",
+  "recordedAt": "2026-08-24T15:02:57.628Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "orderNo": "TESTA20260824225735156",
+    "isVoidable": true,
+    "voidOfferId": "q_30795d2142e540ce923092ed962fd34f",
+    "voidMethod": "CashBackToOriginalPayment",
+    "fastConfirmation": 1,
+    "expectedConfirmationDate": "20260825",
+    "expectedRefundDate": null,
+    "voidTickets": [
+      {
+        "name": "NORTHSTAR/SANDBOX",
+        "lastName": "NORTHSTAR",
+        "firstName": "SANDBOX",
+        "ticketNo": "S44721",
+        "currency": "USD",
+        "originalFareAmount": 56.59,
+        "originalAncillaryAmount": 0,
+        "originalTotalAmount": 56.59,
+        "refundableAmountForFare": 56.59,
+        "refundableAmountForAncillaries": 0,
+        "refundReason": "4",
+        "airlinePenaltyAmountForFare": 0,
+        "airlinePenaltyAmountForAncillaries": 0,
+        "airlinePenaltyAmount": 0,
+        "estimatedRefundAmount": 56.59,
+        "originalTotalAmountWithTicket": 56.59,
+        "refundableAmountForAncillariesWithTicket": 0
+      }
+    ],
+    "voidFareAmount": {
+      "currency": "USD",
+      "originalFareAmount": 56.59,
+      "estimatedRefundAmount": 56.59
+    },
+    "serviceFee": {
+      "currency": "USD",
+      "transactionFee": 0
+    },
+    "voidWindow": {
+      "supportVoid": true,
+      "allowVoid": true,
+      "voidTimeAfterIssure": "23",
+      "voidTimeBeforeDepature": "180",
+      "sameDayDeadlineTime": null,
+      "sameDayTimezone": null
+    }
+  }
+}

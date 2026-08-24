@@ -1,0 +1,43 @@
+{
+  "id": "rec_1fb2eabfaaae64c147544a31bb2abd68",
+  "providerId": "atlas",
+  "operation": "order_retrieve",
+  "recordedAt": "2026-08-24T15:02:57.326Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "orderNo": "TESTA20260824225735156",
+    "orderStatus": "2",
+    "ticketStatus": "1",
+    "totalPrice": 56.59,
+    "currency": "USD",
+    "payTime": "2026-08-24 22:57:35",
+    "tktLimitTime": "2026-08-25 00:17:39",
+    "pnrCode": "WUDANG",
+    "paxTicketInfos": [
+      {
+        "ticketNos": [
+          "S44721"
+        ]
+      }
+    ],
+    "airlineBookings": [
+      {
+        "airlinePnr": "S44721",
+        "airlineCode": "Y4",
+        "airlineName": "Volaris",
+        "airlineWebSiteAddress": "https://www.volaris.com",
+        "mmbEmail": "wave3r-validation@example.com",
+        "tailDigitsOfPaymentCard": null,
+        "extras": [
+          {
+            "name": "email",
+            "remark": "email",
+            "value": "wave3r-validation@example.com"
+          }
+        ]
+      }
+    ]
+  }
+}

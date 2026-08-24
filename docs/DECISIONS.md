@@ -248,3 +248,17 @@ G3R-R0 left one Investigate-Now item: `DeterministicAuthorityEngine` skipped spe
 
 Rejected alternatives: keeping the skip (unsafe auto-execution exactly when real money moves); an internal FX table (invented rates are non-deterministic and financially wrong by construction); escalating SPEND_LIMIT mismatches to human approval instead of `BLOCKED` (a hard ceiling is a deterministic boundary — raising it means changing the rule set, not waiving the rule). Permanent tests pin all three behaviors (`test/wave3r-dr1-runtime-truth.test.ts`).
 
+## ADR-046 — Provider-backed execution composition: dossiers, payment gate, curated transaction state
+**Status:** Accepted (Wave 3R Mission 1, DR-2)
+
+DR-2 replaces simulation-first execution for operations a wired provider capability can actually perform, behind the same `ExecutorService` seam (`src/app/providerExecution.ts`), consuming the frozen G3R-R0 contracts (ADR-042/043). Decisions:
+
+- **Selection is capability-driven only.** Provider-backed execution dispatches on the `ActionIntent` operation, the configured capability, the execution gate and the adapter mode — never scenario/traveller/route/fixture identity. The simulation boundary remains the fallback where no provider path applies.
+- **Booking identity is an application-owned dossier, resolved per intent.** The frozen ontology's `Traveller` carries a display name only; real provider booking needs structured passenger/contact data. Absent dossier => structured refusal for consequential LIVE/RECORD booking (never guessed identity); REPLAY preserves historic simulation behavior. Injected dossiers must come from authoritative or operator-validated data, never from an LLM proposal.
+- **The ADR-042 payment gate is test-enforced in the executor** (`paymentGateVerdict`): the ceiling is the strategy `costImpact` authority reviewed (carried as `FlightOrderPayQuery.authorisedAmount`); missing payable total, currency mismatch, payable above ceiling or absent ceiling all refuse payment, preserve the HELD order and loop the case back through viability/authority. `ActionIntent.priceDelta` is never the ceiling.
+- **Sandbox payment is fail-closed.** The Atlas adapter maps the approved opaque test-balance reference to the provider's deposit/balance payment mechanism and rejects every other `paymentRef`; transactional calls are refused unless the configured base URL is unambiguously the sandbox host. No PAN/CVV vocabulary exists in the seam.
+- **`FlightTransactionState` population is curated.** Adapters set only deliberately selected reconciliation fields (order ref, record locator, hold expiry, ticket refs, cancellation quote/request refs) — never raw provider payloads. The schema denylist hardening (canonical, nested, PAN-value-aware) is a second heuristic line of defense, not the primary guarantee; the frozen schema itself was not reopened.
+- **Provenance honesty:** execution evidence reports the adapter's actual mode (LIVE stays LIVE, RECORD stays RECORD, REPLAY stays REPLAY); a provider-backed path never claims SIMULATED and a simulated fallback never claims LIVE.
+
+Rejected alternatives: a second ActionIntent for payment (rejected in ADR-042); scenario-keyed dossier lookup (hardcoding); using `priceDelta` as the payment ceiling (delta vs final payable confusion); broadening the frozen `FlightTransactionState` denylist into a redesigned schema (reopens a frozen contract for a problem curated mapping already solves). Permanent tests: `test/wave3r-dr2-provider-execution.test.ts`, `test/wave3r-contracts.test.ts`.
+

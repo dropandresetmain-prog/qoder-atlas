@@ -1,0 +1,20 @@
+{
+  "id": "rec_ceddec55b909d2a4b5489e43a70e27bd",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-08-24T14:37:17.373Z",
+  "sanitized": true,
+  "raw": {
+    "status": 323,
+    "msg": "Invalid email format in contact info. Use a valid email address.",
+    "sessionId": "b7c81808-faeb-4855-a2eb-d409b4576d43",
+    "orderNo": null,
+    "pnrCode": null,
+    "totalPrice": null,
+    "totalTransactionFee": null,
+    "currency": null,
+    "tktLimitTime": null,
+    "paxTicketInfos": null,
+    "duplicateOrders": null
+  }
+}

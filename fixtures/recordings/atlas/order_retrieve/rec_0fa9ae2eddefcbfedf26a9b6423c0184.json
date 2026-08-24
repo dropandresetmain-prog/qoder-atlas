@@ -1,0 +1,43 @@
+{
+  "id": "rec_0fa9ae2eddefcbfedf26a9b6423c0184",
+  "providerId": "atlas",
+  "operation": "order_retrieve",
+  "recordedAt": "2026-08-24T14:45:06.214Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "orderNo": "TESTA20260824224347375",
+    "orderStatus": "2",
+    "ticketStatus": "1",
+    "totalPrice": 68.59,
+    "currency": "USD",
+    "payTime": "2026-08-24 22:43:48",
+    "tktLimitTime": "2026-08-25 00:03:51",
+    "pnrCode": "FDJBQQ",
+    "paxTicketInfos": [
+      {
+        "ticketNos": [
+          "S53080"
+        ]
+      }
+    ],
+    "airlineBookings": [
+      {
+        "airlinePnr": "S53080",
+        "airlineCode": "Y4",
+        "airlineName": "Volaris",
+        "airlineWebSiteAddress": "https://www.volaris.com",
+        "mmbEmail": "wave3r-validation@example.com",
+        "tailDigitsOfPaymentCard": null,
+        "extras": [
+          {
+            "name": "email",
+            "remark": "email",
+            "value": "wave3r-validation@example.com"
+          }
+        ]
+      }
+    ]
+  }
+}
