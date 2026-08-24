@@ -28,6 +28,7 @@ import { DeterministicAuthorityEngine, ruleSetSource } from '../engine/authority
 import { CaseVerifier, DeterministicObservationService } from '../engine/observation.ts';
 import type { AppEndpoints } from '../server/http.ts';
 import { AtlasFlightAdapter } from '../providers/atlas/adapter.ts';
+import { AtlasFlightTransactionAdapter } from '../providers/atlas/transactionAdapter.ts';
 import { GoogleRoutesAdapter } from '../providers/googleRoutes/adapter.ts';
 import { NuiteeAdapter } from '../providers/hotel/nuiteeAdapter.ts';
 import { FileRecordingStore } from '../providers/recordingStore.ts';
@@ -55,6 +56,7 @@ import {
   SqlitePreferenceStore,
   type ReadModelDependencies,
 } from './index.ts';
+import { createProviderBackedExecutor } from './providerExecution.ts';
 import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
 import { ProgrammeService } from './programme.ts';
@@ -133,39 +135,14 @@ export async function composeAppRuntime(
     }
   }
 
-  const viability = new OverlayViabilityEngine();
-  const readDeps: ReadModelDependencies = {
-    snapshot: { trips, entities, preferences, sources },
-    signals,
-    cases,
-    audit,
-    viability,
-  };
-  const executionService = new RecoveryExecutionService({
-    cases,
-    audit,
-    authority: new DeterministicAuthorityEngine({ ruleSets: ruleSetSource(entities) }),
-    executor: createRecoveryExecutor({
-      inner: new BoundaryExecutor(),
-      strategyFor: async (intent) =>
-        (await cases.getCase(intent.caseId))?.strategies.find((strategy) => strategy.id === intent.strategyId),
-    }),
-    observation: new DeterministicObservationService({ mutations }),
-    // DR-1.2: the verifier reconciles authoritative Trip viability through
-    // the validated mutation path once a case resolves.
-    verifier: new CaseVerifier({ trips, signals, entities, mutations }),
-    trips,
-    entities,
-    // Funding evidence lives on triggering signals (change-request anchors).
-    signals,
-  });
-
-  // Read-only capability wiring: Atlas always present (REPLAY is
-  // credential-free); Google Routes contributes only when configured or
-  // recorded; Nuitée (liteAPI) replays the curated hotel corpus without
-  // credentials and fails closed (NOT_CONFIGURED) for LIVE/RECORD without
-  // NUITEE_API_KEY. Scenario bundles may ship their own recordings; the
-  // curated fixtures/recordings corpus is readable by the composed app too.
+  // Capability wiring: Atlas always present (REPLAY is credential-free);
+  // Google Routes contributes only when configured or recorded; Nuitée
+  // (liteAPI) replays the curated hotel corpus without credentials and fails
+  // closed (NOT_CONFIGURED) for LIVE/RECORD without NUITEE_API_KEY. Scenario
+  // bundles may ship their own recordings; the curated fixtures/recordings
+  // corpus is readable by the composed app too. The Atlas transaction
+  // adapter (DR-2) shares the same recording store and fails closed unless
+  // the configured environment is unambiguously the Atlas sandbox.
   const recordingReadDirs = [
     ...readdirSync(join(config.fixturesDir, 'scenarios'), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -184,6 +161,13 @@ export async function composeAppRuntime(
     // normalization must stay honest against current authoritative state.
     timezoneResolverFactory: buildTimezoneResolver(entities),
   });
+  const flightTransactions = new AtlasFlightTransactionAdapter({
+    mode: config.adapterMode,
+    store: recordingStore,
+    baseUrl: config.providers.atlas.baseUrl,
+    clientId: config.providers.atlas.clientId,
+    clientSecret: config.providers.atlas.clientSecret,
+  });
   const routing = new GoogleRoutesAdapter({
     mode: config.adapterMode,
     store: recordingStore,
@@ -196,8 +180,58 @@ export async function composeAppRuntime(
     bookingBaseUrl: config.providers.nuitee.bookingBaseUrl,
     apiKey: config.providers.nuitee.apiKey,
   });
-  const capabilities: ToolDispatchCapabilities = { flight, routing, hotel };
-  const capabilityDescriptors: CapabilityDescriptor[] = [flight.descriptor, routing.descriptor, hotel.descriptor];
+  const capabilities: ToolDispatchCapabilities = { flight, flightTransactions, routing, hotel };
+  const capabilityDescriptors: CapabilityDescriptor[] = [
+    flight.descriptor,
+    flightTransactions.descriptor,
+    routing.descriptor,
+    hotel.descriptor,
+  ];
+
+  const viability = new OverlayViabilityEngine();
+  const readDeps: ReadModelDependencies = {
+    snapshot: { trips, entities, preferences, sources },
+    signals,
+    cases,
+    audit,
+    viability,
+  };
+  const strategyFor = async (intent: { caseId: EntityId; strategyId?: EntityId }) =>
+    (await cases.getCase(intent.caseId))?.strategies.find((strategy) => strategy.id === intent.strategyId);
+  const executionService = new RecoveryExecutionService({
+    cases,
+    audit,
+    authority: new DeterministicAuthorityEngine({ ruleSets: ruleSetSource(entities) }),
+    executor: createRecoveryExecutor({
+      // DR-2.8: provider-backed execution replaces simulation-first for the
+      // operations the wired capabilities actually perform; the simulation
+      // boundary remains the fallback for unwired operations (ADR-007) and
+      // for REPLAY misses on recordings.
+      inner: createProviderBackedExecutor({
+        fallback: new BoundaryExecutor(),
+        mode: config.adapterMode,
+        strategyFor,
+        flight,
+        flightTransactions,
+        hotel,
+        // Booking dossiers: the frozen Traveller ontology carries a display
+        // name only (no structured booking identity), so the composed
+        // runtime wires no default dossier — REPLAY keeps the historic
+        // simulation behavior and LIVE/RECORD fails closed instead of
+        // guessing identity. Runtimes with validated booking identity
+        // inject one; validation harnesses supply synthetic test dossiers.
+      }),
+      strategyFor,
+    }),
+    observation: new DeterministicObservationService({ mutations }),
+    // DR-1.2: the verifier reconciles authoritative Trip viability through
+    // the validated mutation path once a case resolves.
+    verifier: new CaseVerifier({ trips, signals, entities, mutations }),
+    trips,
+    entities,
+    // Funding evidence lives on triggering signals (change-request anchors).
+    signals,
+  });
 
   // Planner: LIVE Model Studio only when explicitly NOT in REPLAY mode AND
   // the API key is configured; REPLAY must never make external AI calls even

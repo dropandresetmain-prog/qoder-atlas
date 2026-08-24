@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import type {
   FlightCapability,
+  FlightTransactionCapability,
   HotelCapability,
   ResearchCapability,
   RoutingCapability,
@@ -21,6 +22,8 @@ import { ToolOperationSchema } from '../operational/strategy.ts';
 
 export interface ToolDispatchCapabilities {
   flight?: FlightCapability;
+  /** Transactional flight capability — ONLY its read-only operations are dispatchable. */
+  flightTransactions?: FlightTransactionCapability;
   routing?: RoutingCapability;
   research?: ResearchCapability;
   hotel?: HotelCapability;
@@ -48,6 +51,18 @@ const FLIGHT_SEARCH_PARAMETERS = z.strictObject({
 });
 
 const FLIGHT_OFFER_PARAMETERS = z.strictObject({ offerId: z.string().min(1) });
+
+// Read-only transaction inspection (flight.order_status / cancel_quote /
+// cancel_status): consequential create/pay/submit stay unreachable from
+// tool dispatch — only these query shapes exist here.
+const FLIGHT_ORDER_STATUS_PARAMETERS = z.strictObject({
+  orderRef: z.string().min(1),
+  clientReference: z.string().optional(),
+});
+
+const FLIGHT_CANCEL_STATUS_PARAMETERS = FLIGHT_ORDER_STATUS_PARAMETERS.extend({
+  cancellationRequestRef: z.string().optional(),
+});
 
 const coordinates = z.strictObject({ latitude: z.number(), longitude: z.number() });
 
@@ -167,12 +182,27 @@ export async function dispatchToolRequest(
       return toDispatchResult(await capabilities.flight.getFareRules(parsed.data));
     }
     case 'flight.refund_quote':
-    case 'flight.order_status':
-    case 'flight.cancel_quote':
-    case 'flight.cancel_status':
-      // In the vocabulary but no adapter implements them yet: structured
-      // unavailability, never a guess.
+      // In the vocabulary but no adapter implements it: structured
+      // unavailability, never a guess (refund execution stays excluded).
       return capabilityAbsent(operation.data);
+    case 'flight.order_status': {
+      if (!capabilities.flightTransactions) return capabilityAbsent(operation.data);
+      const parsed = FLIGHT_ORDER_STATUS_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`flight.order_status: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.flightTransactions.retrieveOrder(parsed.data));
+    }
+    case 'flight.cancel_quote': {
+      if (!capabilities.flightTransactions) return capabilityAbsent(operation.data);
+      const parsed = FLIGHT_ORDER_STATUS_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`flight.cancel_quote: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.flightTransactions.quoteCancellation(parsed.data));
+    }
+    case 'flight.cancel_status': {
+      if (!capabilities.flightTransactions) return capabilityAbsent(operation.data);
+      const parsed = FLIGHT_CANCEL_STATUS_PARAMETERS.safeParse(request.parameters);
+      if (!parsed.success) return invalidParameters(`flight.cancel_status: ${parsed.error.issues.length} parameter issue(s)`);
+      return toDispatchResult(await capabilities.flightTransactions.retrieveCancellationStatus(parsed.data));
+    }
     case 'routing.context': {
       if (!capabilities.routing) return capabilityAbsent(operation.data);
       const parsed = ROUTING_CONTEXT_PARAMETERS.safeParse(request.parameters);
@@ -255,6 +285,12 @@ export function summarizeToolResult(operation: string, result: ToolDispatchResul
     }
     case 'flight.verify':
       return `${operation}: ${String(data['status'] ?? 'UNKNOWN')}`;
+    case 'flight.order_status':
+      return `${operation}: order ${String(data['orderRef'] ?? '?')} status ${String(data['status'] ?? 'UNKNOWN')}`;
+    case 'flight.cancel_quote':
+      return `${operation}: cancellation ${String(data['availability'] ?? 'UNKNOWN')}`;
+    case 'flight.cancel_status':
+      return `${operation}: cancellation ${String(data['status'] ?? 'UNKNOWN')}`;
     case 'flight.fare_rules': {
       const change = data['change'] as { allowed?: boolean; fee?: { amount?: number; currency?: string } } | undefined;
       const refund = data['refund'] as { refundable?: boolean } | undefined;

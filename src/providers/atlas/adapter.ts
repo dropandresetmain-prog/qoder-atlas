@@ -2,10 +2,11 @@
  * C2 — Atlas direct-API FlightCapability adapter (read-only surface).
  *
  * Implemented endpoints: search.do, verify.do (verify also carries the
- * fare/change/refund/no-show rule block needed by recovery). Transactional
- * surfaces (order.do, payment, ticketing, changes/cancels) are intentionally
- * not implemented. The adapter only maps between Atlas wire shapes and the
- * frozen provider-neutral contracts; viability/policy decisions stay in core.
+ * fare/change/refund/no-show rule block needed by recovery). The
+ * transactional surface (order/pay/query + cancellation) lives in the
+ * separate AtlasFlightTransactionAdapter (DR-2). This adapter only maps
+ * between Atlas wire shapes and the frozen provider-neutral contracts;
+ * viability/policy decisions stay in core.
  */
 import type { AdapterMode, CapabilityResult, ProviderAdapter } from '../../contracts/envelope.ts';
 import type {

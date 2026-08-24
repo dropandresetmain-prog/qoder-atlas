@@ -1,14 +1,31 @@
 /**
- * C2 — Atlas direct API HTTP client (read-only surface only).
+ * C2 — Atlas direct API HTTP client.
  *
  * The client only knows how to talk to Atlas and surface structured errors;
  * it never interprets business policy. Secrets travel in headers only and
  * are never logged or echoed into error messages.
+ *
+ * DR-2: the endpoint vocabulary now covers the proven transaction surface
+ * (order/pay/query + void quotation/submission/status). Environment policy
+ * (sandbox-only execution of consequential endpoints) is owned by the
+ * transaction adapter, not by this transport.
  */
 import { capabilityFailure } from '../runner.ts';
 
 export const ATLAS_READ_ONLY_ENDPOINTS = ['/search.do', '/verify.do'] as const;
 export type AtlasReadOnlyEndpoint = (typeof ATLAS_READ_ONLY_ENDPOINTS)[number];
+
+/** Consequential order-lifecycle endpoints (adapter-private wire names). */
+export const ATLAS_TRANSACTION_ENDPOINTS = [
+  '/order.do',
+  '/pay.do',
+  '/queryOrderDetails.do',
+  '/voidQuotation.do',
+  '/void.do',
+  '/queryVoidOrders.do',
+] as const;
+export type AtlasTransactionEndpoint = (typeof ATLAS_TRANSACTION_ENDPOINTS)[number];
+export type AtlasEndpoint = AtlasReadOnlyEndpoint | AtlasTransactionEndpoint;
 
 export interface AtlasClientConfig {
   baseUrl: string;
@@ -36,7 +53,7 @@ export class AtlasClient {
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
 
-  async post(endpoint: AtlasReadOnlyEndpoint, body: Record<string, unknown>): Promise<unknown> {
+  async post(endpoint: AtlasEndpoint, body: Record<string, unknown>): Promise<unknown> {
     const url = `${this.baseUrl}${endpoint}`;
     let response: Response;
     try {
@@ -134,7 +151,7 @@ function providerMessage(bodyText: string): string | undefined {
 }
 
 /** Atlas signals provider-level success with numeric status 0. */
-export function assertProviderSuccess(raw: unknown, endpoint: AtlasReadOnlyEndpoint): void {
+export function assertProviderSuccess(raw: unknown, endpoint: string): void {
   const body = raw as { status?: unknown; msg?: unknown };
   if (body.status !== 0) {
     const msg = typeof body.msg === 'string' && body.msg !== '' ? body.msg : 'provider returned non-zero status';

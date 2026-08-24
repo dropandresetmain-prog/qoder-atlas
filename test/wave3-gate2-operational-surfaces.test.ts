@@ -54,11 +54,17 @@ test('Wave 3 Gate 2: approvals queue, activity stream, uncertainties, and provid
     const providers = (await (await fetch(`${base}/api/wave/providers`)).json()) as {
       capabilities: Array<{ family: string; providerId: string; mode: string; modeLabel: string }>;
     };
-    assert.equal(providers.capabilities.length, 3, 'all wired capabilities advertise provenance');
+    assert.equal(providers.capabilities.length, 4, 'all wired capabilities advertise provenance');
     for (const capability of providers.capabilities) {
       assert.equal(capability.mode, 'REPLAY', 'adapter mode is projected verbatim, not beautified');
       assert.match(capability.modeLabel, /Replaying recorded provider responses/);
     }
+    // DR-2: the Atlas transaction capability advertises alongside the read
+    // adapters — same REPLAY honesty, no extra beautification.
+    const families = providers.capabilities.map((capability) => `${capability.family}:${capability.providerId}`);
+    assert.ok(families.includes('FLIGHT:atlas'), 'flight read capability advertised');
+    assert.ok(families.filter((entry) => entry === 'FLIGHT:atlas').length === 2, 'flight transaction capability advertised');
+    assert.ok(families.includes('HOTEL:nuitee'), 'hotel capability advertised');
 
     // --- Drive the engine to AWAITING_TRAVELLER over the runtime flow. ---
     const disruption = await postJson(base, '/api/runtime/disruption', spec.disruption.signal);
