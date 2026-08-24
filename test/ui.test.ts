@@ -8,6 +8,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+/**
+ * Strip all markup (tags + their attributes) down to text-node content only.
+ * URL paths, form actions, hidden inputs and data-* attributes are
+ * machine-readable DOM state, not user-visible copy — the forbidden-jargon
+ * gate must judge what a human actually reads, never the whole raw HTML.
+ */
+function visibleText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 import { EntityIdSchema, IsoDateTimeSchema } from '../src/domain/common.ts';
 import type { ReadModelStatus } from '../src/contracts/readmodels.ts';
 import {
@@ -228,7 +244,9 @@ function allRenderedScreens(): { id: string; html: string }[] {
 
 test('no internal jargon leaks into any rendered screen', () => {
   for (const screen of allRenderedScreens()) {
-    const lowered = screen.html.toLowerCase();
+    // VISIBLE text only: URL paths, form actions, hidden inputs and data-*
+    // attributes are machine-readable DOM state, not user-visible copy.
+    const lowered = visibleText(screen.html).toLowerCase();
     for (const term of FORBIDDEN_UI_TERMS) {
       assert.ok(!lowered.includes(term), `jargon "${term}" leaked in ${screen.id}`);
     }

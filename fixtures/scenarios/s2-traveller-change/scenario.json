@@ -1,0 +1,32 @@
+{
+  "scenarioId": "scenario-s2-traveller-change",
+  "family": "S2",
+  "title": "S2 — traveller-requested change (generic acceptance pack)",
+  "description": "A traveller-initiated ChangeRequest expressing a declarative target-state delta (arrive earlier). Feeds the same resolveChangeRequest engine whether it originates from the structured /api/resolution/change-request route or the natural-language /api/traveller/change-request intake.",
+  "context": {
+    "traveller": {
+      "draftId": "draft-2",
+      "anchorEventId": "evt-w3-demo",
+      "travellerId": "trv-evt-w3-demo-draft-2",
+      "tripId": "trip-trv-evt-w3-demo-draft-2"
+    },
+    "changeRequest": {
+      "utterance": "Could I arrive a day earlier so I can rest before the opening session?",
+      "request": {
+        "id": "chg-s2-traveller-change",
+        "tripId": "trip-trv-evt-w3-demo-draft-2",
+        "travellerId": "trv-evt-w3-demo-draft-2",
+        "sourceId": "src-s2-traveller-change",
+        "authority": "ASSERTED",
+        "issuedAt": "2026-09-04T10:00:00+00:00",
+        "intentKind": "ADJUST_TRIP_WINDOW",
+        "urgency": "SOFT_PREFERENCE",
+        "utterance": "Could I arrive a day earlier so I can rest before the opening session?",
+        "target": {
+          "arriveBy": "2026-09-07T12:00:00+08:00"
+        },
+        "fundingDeclaration": "UNKNOWN"
+      }
+    }
+  }
+}

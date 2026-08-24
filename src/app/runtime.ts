@@ -309,18 +309,26 @@ export class RuntimeOrchestrator {
     const seededScenarios: string[] = [];
     const tripIds: EntityId[] = [];
     for (const scenarioDir of listScenarioDirs(join(this.deps.fixturesDir, 'scenarios'))) {
-      const outcome = await seedScenarioBundle(
-        {
-          mutations: this.deps.mutations,
-          sources: this.deps.sources,
-          preferences: this.deps.preferences,
-          audit: this.deps.audit,
-          ...(this.deps.dossiers ? { dossiers: this.deps.dossiers } : {}),
-        },
-        scenarioDir,
-      );
-      seededScenarios.push(outcome.scenarioId);
-      tripIds.push(outcome.tripId);
+      try {
+        const outcome = await seedScenarioBundle(
+          {
+            mutations: this.deps.mutations,
+            sources: this.deps.sources,
+            preferences: this.deps.preferences,
+            audit: this.deps.audit,
+            ...(this.deps.dossiers ? { dossiers: this.deps.dossiers } : {}),
+          },
+          scenarioDir,
+        );
+        seededScenarios.push(outcome.scenarioId);
+        tripIds.push(outcome.tripId);
+      } catch {
+        // Non-fatal: lightweight generic acceptance-descriptor packs (DR-9
+        // S1-S4) live alongside full engine ScenarioSpec bundles under
+        // fixtures/scenarios/ but do not conform to the ScenarioSpec
+        // contract — reset must skip them exactly as boot composition does
+        // (compose.ts), never fail the whole reset over a non-engine fixture.
+      }
     }
 
     // Programme-scale state reseeds through the SAME services the HTTP

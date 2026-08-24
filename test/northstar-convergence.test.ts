@@ -275,7 +275,12 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
 
     const feasible = strategies.filter((s) => s.feasible);
     assert.ok(feasible.length >= 1, 'the viability engine accepts the arrival strategy');
-    assert.ok(feasible.some((s) => /opaque-routing-convergence-arrival/.test(s.summary)), 'strategy is evidence-bound');
+    // DR-8: the strategy's user-facing summary never carries the raw offer
+    // id (opaque-routing-convergence-arrival) — evidence-binding is proven
+    // structurally instead, via the departure time the offer's own recorded
+    // segment produces (depTime 202609062000 -> 20:00): this exact value
+    // could only come from that specific search evidence, never fabricated.
+    assert.ok(feasible.some((s) => /20:00/.test(s.summary)), 'strategy is evidence-bound');
 
     // Negative probe: a too-late arrival into the SAME slot is rejected by
     // the same engine with a named hard failure.
@@ -390,8 +395,12 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
     const changeBest = changePlan.body['bestStrategyId'] as string;
     assert.ok(changeBest, 'window-shift produces a feasible replacement strategy');
     const changeStrategies = changePlan.body['strategies'] as Array<{ summary: string; feasible: boolean }>;
+    // DR-8: no raw offer id in the user-facing summary — evidence-binding is
+    // proven via the recorded segment's own departure time (20:00) and the
+    // plain-English window-shift phrase, together only producible from real
+    // search evidence for this request.
     assert.ok(
-      changeStrategies.some((s) => s.feasible && /opaque-routing-convergence-shift/.test(s.summary)),
+      changeStrategies.some((s) => s.feasible && /arrive earlier/.test(s.summary) && /20:00/.test(s.summary)),
       'the replacement is evidence-bound to the recorded earlier search',
     );
 

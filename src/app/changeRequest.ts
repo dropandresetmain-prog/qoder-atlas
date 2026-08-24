@@ -217,7 +217,10 @@ export async function resolveChangeRequest(
     ...(request.travellerId
       ? { subjectRef: { entityType: 'TRAVELLER', id: request.travellerId } satisfies EntityRef }
       : {}),
-    summary: `ChangeRequest ${request.id} (${request.intentKind}/${request.urgency}): ${request.utterance ?? 'declarative target deltas'}`,
+    // DR-8: this summary is read verbatim as "what changed" copy downstream
+    // (readmodels.ts) — the request id and intentKind enum stay in payload
+    // for machine correlation, never in the human-facing summary text.
+    summary: request.utterance ?? 'Traveller requested a change to this trip',
     payload: {
       changeRequestId: request.id,
       intentKind: request.intentKind,

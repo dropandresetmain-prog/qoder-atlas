@@ -273,12 +273,14 @@ test('Wave 3 Case A: mixed funding — event covers the in-window arrival change
     const combined = await resolveChangeRequest(changeDeps, { request: combinedRequest, at: '2026-09-03T00:00:00+00:00' });
     assert.equal(combined.accepted, true);
     const combinedPlan = await composed.orchestrator.plan({ caseId: combined.caseId!, at: '2026-09-03T01:00:00+00:00' });
+    // DR-8: strategy summaries are user-facing copy and carry a plain-English
+    // phrase per window dimension, not the raw enum name.
     assert.ok(
-      combinedPlan.strategies.some((s) => s.feasible && /\(arriveBy\)/.test(s.summary)),
+      combinedPlan.strategies.some((s) => s.feasible && /arrive earlier/.test(s.summary)),
       'the combined request plans the arriveBy dimension from its own search evidence',
     );
     assert.ok(
-      combinedPlan.strategies.some((s) => s.feasible && /\(departAfter\)/.test(s.summary)),
+      combinedPlan.strategies.some((s) => s.feasible && /depart later/.test(s.summary)),
       'the combined request plans the departAfter dimension from its own search evidence',
     );
 

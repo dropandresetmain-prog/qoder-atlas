@@ -252,7 +252,11 @@ export class NorthstarPlanner implements RecoveryPlanner {
     return {
       id: this.idFactory('strat'),
       caseId: input.caseId,
-      summary: `Book arrival on offer ${offer.offerId}`,
+      // DR-8: read verbatim as the user-facing option title downstream
+      // (readmodels.ts) — no raw offer/element ids in it.
+      summary: first
+        ? `Book an arrival flight departing at ${first.departure.slice(11, 16)}`
+        : 'Book an arrival flight',
       candidateOperations,
       toolRequests: [],
       assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
@@ -460,10 +464,15 @@ export class NorthstarPlanner implements RecoveryPlanner {
                     },
                   },
                 ];
+                // DR-8: read verbatim as the user-facing option title
+                // downstream (readmodels.ts) — no raw leg/offer ids in it.
+                const windowPhrase = dimension === 'arriveBy' ? 'arrive earlier' : 'depart later';
                 return {
                   id: this.idFactory('strat'),
                   caseId: input.caseId,
-                  summary: `Rebook ${leg.id} on offer ${offer.offerId} (${dimension})`,
+                  summary: first
+                    ? `Rebook to ${windowPhrase}, departing at ${first.departure.slice(11, 16)}`
+                    : `Rebook to ${windowPhrase}`,
                   candidateOperations,
                   toolRequests: [],
                   assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],

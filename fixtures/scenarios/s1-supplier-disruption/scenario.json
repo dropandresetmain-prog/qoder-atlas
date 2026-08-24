@@ -1,0 +1,32 @@
+{
+  "scenarioId": "scenario-s1-supplier-disruption",
+  "family": "S1",
+  "title": "S1 — supplier-originated flight disruption (generic acceptance pack)",
+  "description": "A carrier-originated cancellation reaches the programme through the same generic disruption pipeline every supplier signal uses, whether it arrives via DR-3's real ingress or a directly-constructed TripSignal. References a real synthetic-summit traveller so the pack composes with the seeded 67/42 programme.",
+  "context": {
+    "traveller": {
+      "draftId": "draft-1",
+      "anchorEventId": "evt-w3-demo",
+      "travellerId": "trv-evt-w3-demo-draft-1",
+      "tripId": "trip-trv-evt-w3-demo-draft-1"
+    },
+    "disruption": {
+      "signal": {
+        "id": "sig-s1-supplier-disruption",
+        "kind": "FLIGHT_CANCELLATION",
+        "occurredAt": "2026-09-05T06:00:00+00:00",
+        "receivedAt": "2026-09-05T06:05:00+00:00",
+        "sourceId": "src-s1-supplier-disruption",
+        "authority": "ASSERTED",
+        "confidence": 0.6,
+        "tripId": "trip-trv-evt-w3-demo-draft-1",
+        "summary": "Carrier reported cancellation of the inbound flight",
+        "payload": {
+          "event": "FLIGHT_CANCELLATION",
+          "reason": "operational",
+          "providerOrderRef": "ATL-S1-0001"
+        }
+      }
+    }
+  }
+}

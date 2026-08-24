@@ -127,9 +127,14 @@ test('scenarios: preference reprioritisation is explicit and post-disruption', (
   assert.equal(b.context.preferences[0]?.origin.kind, 'EXPLICIT_PERSISTENT');
 });
 
-test('scenarios: unknown discovery lists exactly the two fixture bundles', () => {
+test('scenarios: discovery lists every directory carrying a scenario.json', () => {
+  // Discovery is presence-based (a scenario.json file), not schema-aware: it
+  // also finds the four lightweight DR-9 S1-S4 generic acceptance packs
+  // alongside the two full engine ScenarioSpec bundles (anchor-event-speaker,
+  // corporate-tmc) — boot/reset seeding is what filters to engine-loadable
+  // bundles (see compose.ts / runtime.ts reset()).
   const dirs = listScenarioDirs(FIXTURES_ROOT);
-  assert.equal(dirs.length, 2);
+  assert.equal(dirs.length, 6);
 });
 
 test('loader: dangling references fail schema-load instead of silently loading', () => {

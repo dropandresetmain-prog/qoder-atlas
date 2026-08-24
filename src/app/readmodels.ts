@@ -80,8 +80,12 @@ const ACTION_LABEL: Record<string, string> = {
 function describeElement(element: TripElement): string {
   const label = ELEMENT_KIND_LABEL[element.elementKind];
   if (element.elementKind === 'ENGAGEMENT') return label;
-  const ref = element.data.bookingRef?.reference;
-  return ref ? `${label} · ${ref}` : label;
+  // DR-8: the raw provider booking reference (e.g. an Atlas order id) is an
+  // internal identifier, not user-facing copy — describe the element kind
+  // only. Machine-readable identity still lives in the wire/JSON views and
+  // DOM data-* attributes, never here.
+  if (element.elementKind === 'TRANSPORT_LEG') return `${label} (${element.data.mode})`;
+  return label;
 }
 
 /**

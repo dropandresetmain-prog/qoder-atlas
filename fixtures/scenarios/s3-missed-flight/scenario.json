@@ -1,0 +1,31 @@
+{
+  "scenarioId": "scenario-s3-missed-flight",
+  "family": "S3",
+  "title": "S3 — missed connection / traveller-reported disruption (generic acceptance pack)",
+  "description": "A traveller-state signal reporting a missed connection after an upstream delay, structured the same way missedFlight.ts turns a traveller report into a generic TripSignal for the ordinary recovery pipeline.",
+  "context": {
+    "traveller": {
+      "draftId": "draft-3",
+      "anchorEventId": "evt-w3-demo",
+      "travellerId": "trv-evt-w3-demo-draft-3",
+      "tripId": "trip-trv-evt-w3-demo-draft-3"
+    },
+    "disruption": {
+      "signal": {
+        "id": "sig-s3-missed-flight",
+        "kind": "FLIGHT_DELAY",
+        "occurredAt": "2026-09-06T14:00:00+00:00",
+        "receivedAt": "2026-09-06T14:05:00+00:00",
+        "sourceId": "src-s3-missed-flight",
+        "authority": "ASSERTED",
+        "confidence": 0.8,
+        "tripId": "trip-trv-evt-w3-demo-draft-3",
+        "summary": "Traveller reported missing the connecting flight after the inbound leg was delayed",
+        "payload": {
+          "event": "MISSED_CONNECTION",
+          "travellerReport": "My connecting flight was delayed and I missed the next leg."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "scenarioId": "scenario-s4-event-change",
+  "family": "S4",
+  "title": "S4 — anchor-event commitment reschedule (generic acceptance pack)",
+  "description": "An organiser-side AnchorEvent commitment reschedule. No provider state is involved: the subject is the shared commitment itself, and the same ANCHOR_COMMITMENT_CHANGE fan-out that eventChangePreview.ts drives turns it into ordinary per-Trip impact/recovery processing for every linked Engagement.",
+  "context": {
+    "eventChange": {
+      "anchorEventId": "evt-w3-demo",
+      "commitmentId": "cmt-evt-w3-demo-opening",
+      "signal": {
+        "id": "sig-s4-event-change",
+        "kind": "ANCHOR_COMMITMENT_CHANGE",
+        "occurredAt": "2026-09-01T08:00:00+00:00",
+        "receivedAt": "2026-09-01T08:05:00+00:00",
+        "sourceId": "src-s4-event-change",
+        "authority": "AUTHORITATIVE",
+        "confidence": 1,
+        "summary": "Opening Session rescheduled two hours later",
+        "payload": {
+          "anchorEventId": "evt-w3-demo",
+          "commitmentId": "cmt-evt-w3-demo-opening",
+          "changeKind": "RESCHEDULED",
+          "newStartsAt": "2026-09-08T17:00:00+08:00",
+          "newEndsAt": "2026-09-08T19:00:00+08:00",
+          "summary": "Opening Session moved two hours later at organiser request"
+        }
+      }
+    }
+  }
+}

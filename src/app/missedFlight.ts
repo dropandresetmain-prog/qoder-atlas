@@ -94,7 +94,10 @@ export async function reportMissedFlight(
     confidence: 1,
     tripId: input.tripId,
     subjectRef: { entityType: 'TRIP_ELEMENT', id: missedElementId },
-    summary: `Traveller missed flight ${missedElementId}`,
+    // DR-8: read verbatim as "what changed" copy downstream (readmodels.ts)
+    // — the element id stays in subjectRef/payload for machine correlation,
+    // never in the human-facing summary text.
+    summary: 'Traveller reported missing a scheduled flight',
     payload: {
       event: 'MISSED_FLIGHT',
       elementId: missedElementId,

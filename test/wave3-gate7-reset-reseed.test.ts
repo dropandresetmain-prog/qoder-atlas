@@ -54,19 +54,28 @@ test('Wave 3 Gate 7: boot seed, deterministic reset/reseed at programme scale, n
     // --- Boot seed: scenarios + programme, one composition, no surgery. ----
     assert.ok(composed.seededScenarioIds.length >= 2, 'scenario bundles seeded at boot');
     assert.equal(composed.seededProgrammes.length, 1, 'the programme bundle seeded at boot');
-    assert.equal(composed.seededProgrammes[0]!.promotedCount, 42, 'the demo programme carries the full cohort');
+    // DR-9: the synthetic-summit programme carries the full 67-speaker
+    // cohort (42 requiring Northstar-arranged travel, 25 local/self-arranged)
+    // — every speaker is promoted to a Traveller + Trip regardless of travel
+    // need (ProgrammeService.promoteOne creates one Trip per draft), so the
+    // promoted cohort and programme rollup total are both 67, not 42.
+    assert.equal(composed.seededProgrammes[0]!.promotedCount, 67, 'the demo programme carries the full 67-speaker cohort');
 
     const programmeEventId = composed.seededProgrammes[0]!.anchorEventId;
     const bootView = (await (await fetch(`${base}/api/programme/${programmeEventId}?at=${encodeURIComponent('2026-09-01T00:00:00+00:00')}`)).json()) as {
       summary: { total: number };
       travellers: Array<{ tripId: string }>;
     };
-    assert.equal(bootView.summary.total, 42, 'programme rollup projects the seeded cohort');
+    assert.equal(bootView.summary.total, 67, 'programme rollup projects the seeded 67-speaker cohort');
 
     function tripRows(): Array<{ id: string; data: string }> {
       return composed.db.prepare('SELECT id, data FROM trips ORDER BY id').all() as Array<{ id: string; data: string }>;
     }
     const bootFingerprint = JSON.stringify(tripRows());
+    // Derived, not hardcoded: however many trips boot seeding actually
+    // produced (scenario bundle trips + one Trip per promoted speaker) is the
+    // ground truth reset must reproduce exactly.
+    const bootTripCount = tripRows().length;
 
     // --- Dirty the state with a real recovery flow (Case B residue). --------
     const disruption = await postJson(base, '/api/runtime/disruption', spec.disruption.signal);
@@ -109,14 +118,14 @@ test('Wave 3 Gate 7: boot seed, deterministic reset/reseed at programme scale, n
     // --- Reset: one endpoint restores the exact pristine demo. --------------
     const reset1 = await postJson(base, '/api/runtime/reset', { at: '2026-09-12T23:00:00+09:00' });
     assert.equal(reset1.status, 200);
-    assert.ok((reset1.body['seededProgrammes'] as Array<{ promotedCount: number }>).every((entry) => entry.promotedCount === 42));
+    assert.ok((reset1.body['seededProgrammes'] as Array<{ promotedCount: number }>).every((entry) => entry.promotedCount === 67));
 
     const stateAfterReset = (await (await fetch(`${base}/api/runtime/state`)).json()) as {
       trips: Array<{ tripId: string }>;
       openCases: unknown[];
     };
     assert.equal(stateAfterReset.openCases.length, 0, 'no case residue survives reset');
-    assert.equal(stateAfterReset.trips.length, 44, 'scenario trips + 42-traveller programme reseeded');
+    assert.equal(stateAfterReset.trips.length, bootTripCount, 'scenario trips + 67-speaker programme reseeded identically to boot');
     const oldCase = await fetch(`${base}/api/cases/${caseId}`);
     assert.equal(oldCase.status, 404, 'the recovery case is gone after reset');
 

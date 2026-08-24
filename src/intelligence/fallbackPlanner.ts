@@ -172,7 +172,12 @@ export class DeterministicFallbackPlanner implements RecoveryPlanner {
     return {
       id: this.idFactory('strat'),
       caseId: input.caseId,
-      summary: `Rebook ${leg.id} on offer ${offer.offerId}`,
+      // DR-8: this summary is read verbatim as the user-facing option title
+      // downstream (readmodels.ts) — describe the replacement in clean,
+      // human terms (departure time-of-day) rather than element/offer ids.
+      summary: first
+        ? `Rebook onto a replacement departing at ${first.departure.slice(11, 16)}`
+        : `Rebook onto a replacement flight`,
       candidateOperations,
       toolRequests: [],
       assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
