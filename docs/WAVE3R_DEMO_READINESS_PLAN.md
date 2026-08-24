@@ -105,6 +105,14 @@ Do not invent a new generalized RECORD abstraction if it is unnecessary.
 
 ## 4. Scenario capability matrix
 
+> **Superseded for scenario naming/intent:** the current frozen scenario
+> catalogue is `docs/SCENARIOS.md` (8 scenarios, S1–S8; Tier A: S1/S2/S3/S4/S7;
+> High-Priority Stretch: S5/S6/S8). The "S1–S4" family labels below are this
+> plan's older capability-matrix numbering and do not correspond one-to-one to
+> the catalogue IDs. The capability requirements below remain valid input to the
+> generalized pipeline; scenario selection/hero intent now follows
+> `docs/SCENARIOS.md`.
+
 All four scenario families below must work through the generalized pipeline before code freeze. The final video may show only the strongest 2–3 in depth.
 
 Exact cities, routes, people and timetable changes are intentionally **not frozen here**. A separate scenario-design task selects them after the Atlas/provider capability investigation.

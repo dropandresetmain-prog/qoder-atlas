@@ -19,6 +19,32 @@ Capability status: the Scenario A vertical recovery loop (ingestion -> persisten
 
 Truth boundary: the engine has been proven against **curated/provider-shaped scenarios** (fixture sources, REPLAY provider recordings, scripted/test planner inputs). It has **not yet** been proven against arbitrary externally sourced inputs: arbitrary real booking import end-to-end, arbitrary URL -> assembled Trip end-to-end, selected external integrations through actual provider calls, or real/sandbox search and servicing surfaces beyond the Atlas Search/Verify development proof. Closing that gap is the purpose of the Reality Validation milestone below.
 
+### Northstar scenario catalogue (frozen — `docs/SCENARIOS.md`)
+
+The final product scenario set is frozen at 8 scenarios; `docs/SCENARIOS.md` is
+the source of truth for scenario business narratives, capability claims,
+implementation priority and demo intent.
+
+- **Planned MVP executable / G3R closure scope:** S1 (airline schedule change
+  across several speakers), S2 (missed connection), S3 (event-side preview),
+  S4 (arrive Thursday morning), S7 (London → Tokyo origin change). These run
+  through the natural product/application boundaries and the same generalized
+  state/recovery/authority engine.
+- **High-Priority Stretch:** S5 (stay until Sunday), S6 (switch hotel — partner
+  joining), S8 (travel with the other speakers). For MVP/G3R these may be
+  represented using clearly disclosed SIMULATED scenario material; they are
+  not required to be fully executable for G3R.
+- **Reason for the split:** protect the generalized vertical loop and avoid
+  premature ontology expansion (no companion/occupancy/multi-payer or
+  scenario-specific risk ontology for MVP closure).
+- **Revisit condition:** after G3R closure / core stabilisation, if schedule
+  permits.
+
+ID disambiguation: the "S1..S8" labels in the post-NS-G3 stretch pull list in
+the Northstar scope record below (Hotelbeds Transfers, immigration, etc.) are a
+different, older numbering scheme for integration stretch items, not the
+scenario catalogue IDs in `docs/SCENARIOS.md`.
+
 ### Core state and recovery engine
 - Organisation, Traveller, AnchorEvent, Trip, TripElement, TripObjective, Place
 - RuleSet/Policy and Constraint model

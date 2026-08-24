@@ -2,6 +2,12 @@
 
 This defines what product must demonstrate, not final video script.
 
+**Scenario source of truth.** Scenario business narratives, capability claims,
+implementation priority and demo intent are frozen in `docs/SCENARIOS.md`
+(the 8-scenario Northstar catalogue, S1–S8). This document keeps demo
+principles, provenance definitions, runtime demo path and historical/backup
+paths; it is not the scenario catalogue.
+
 ## Core story
 
 A replacement flight is not necessarily a recovered trip. The system maintains viability of the whole trip rather than returning a chatbot answer or list of alternatives.
@@ -12,12 +18,13 @@ Northstar — the AI resolution layer for event travel. The primary demo narrati
 
 1. **Programme scale.** Operator view over the whole programme: per-status rollups, shared commitments, per-traveller importance — not 40 separate single-trip widgets.
 2. **Initialisation.** Intake drafts (manual/bulk/LLM-assisted) are promoted through the validated path; trips start empty (zero elements, UNKNOWN viability) and initial planning builds them through the same engine that later handles disruptions.
-3. **Case A — traveller change.** A traveller asks to arrive earlier, leave later, and fund the difference themselves. Declarative target → funding allocation → authority → execution → observed state. No booked state mutates until authorised.
-4. **Case B — hero recovery.** A provider disruption endangers a shared commitment. Blast radius across Engagement-linked trips, deterministic viability, one attractive candidate rejected against a hard objective, authority + execution, resolution judged by observed state.
-5. **Case C — event-side change.** The organiser reschedules/relocates a commitment. One `ANCHOR_COMMITMENT_CHANGE` signal fans out to every linked traveller with differentiated handling by per-traveller importance.
-6. **Recovered programme.** The programme read model returns to a consistent resolved state with every per-traveller case closed and the audit trail intact.
+3. **Current scenario set — see `docs/SCENARIOS.md`.** The frozen 8-scenario catalogue (S1–S8) defines the demo case selection: Tier A MVP-executable scenarios (S1 airline schedule change; S2 missed connection; S3 event-side preview; S4 Thursday-morning arrival; S7 London → Tokyo origin change) plus High-Priority Stretch scenarios (S5, S6, S8). The historical Case A/B/C wording below this list is retained as engine proof-path history only and is superseded by `docs/SCENARIOS.md` as the current scenario source of truth:
+   - *(historical)* Case A — traveller change: declarative target → funding allocation → authority → execution → observed state; no booked state mutates until authorised.
+   - *(historical)* Case B — hero recovery: provider disruption endangering a shared commitment; blast radius across Engagement-linked trips, deterministic viability, authority + execution, resolution judged by observed state.
+   - *(historical)* Case C — event-side change: one `ANCHOR_COMMITMENT_CHANGE` signal fanning out to every linked traveller with differentiated handling by per-traveller importance.
+4. **Recovered programme.** The programme read model returns to a consistent resolved state with every per-traveller case closed and the audit trail intact.
 
-Case semantics are frozen in `PRODUCT_SPEC.md` ("Frozen acceptance Cases A/B/C"); demo data is fixture content only.
+Case A/B/C semantics remain frozen in `PRODUCT_SPEC.md` ("Frozen acceptance Cases A/B/C") as historical engine acceptance cases; they are not the current final scenario source of truth (that is `docs/SCENARIOS.md`). Demo data is fixture content only.
 
 **Provenance labels.** Every demo segment discloses its boundary exactly, using these labels: **LIVE** (real provider/model call), **SANDBOX** (provider test environment), **RECORD** (captured live/sandbox interaction), **REPLAY** (recorded responses through the same normalizer/engine), **SIMULATED** (external-boundary effect with no real provider — disclosed, core engine stays real). REPLAY is the default for routine runs; LIVE/SANDBOX only where budgeted and claimed.
 

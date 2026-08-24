@@ -95,6 +95,12 @@ User-facing language must avoid internal graph/agent terminology.
 
 ## Northstar product model
 
+The generalized product supports the frozen Northstar scenario catalogue
+(`docs/SCENARIOS.md`, 8 scenarios S1–S8: Tier A MVP-executable S1/S2/S3/S4/S7;
+High-Priority Stretch S5/S6/S8). The six situations below remain the product
+model framing; the catalogue is the source of truth for scenario business
+narratives, capability claims and demo intent.
+
 The programme supports six situations through the same engine:
 
 1. **Programme initialisation** — the organiser adds one traveller manually,
@@ -348,6 +354,13 @@ The Northstar MVP additionally requires (see `IMPLEMENTATION_PLAN.md` RV wave):
   reliability (`NFR-05`).
 
 ### Frozen acceptance Cases A/B/C (RV-N0)
+
+**Supersession note:** Cases A/B/C remain frozen engine acceptance cases and
+historical proof paths, but they are no longer the current final scenario
+source of truth. The current final scenario catalogue is `docs/SCENARIOS.md`
+(frozen 8-scenario Northstar catalogue, S1–S8). Where any older wording says
+the current final scenario semantics are only Cases A/B/C, that wording is
+superseded by `docs/SCENARIOS.md`.
 
 Frozen at contract level; lanes may instantiate data but must not redefine semantics. All three run at programme scale (~40–45 travellers) through the same engine, REPLAY default, alternate-data anti-hardcoding pass required.
 
