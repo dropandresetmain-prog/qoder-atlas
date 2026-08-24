@@ -11,6 +11,7 @@
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
+import type { EntityId } from '../domain/common.ts';
 import { openDatabase } from '../persistence/database.ts';
 import {
   SqliteAuditRepository,
@@ -41,9 +42,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   buildTimezoneResolver,
   createRecoveryExecutor,
+  projectApprovalsQueue,
   projectCaseDetail,
   projectOperatorDashboard,
+  projectProviderSurface,
   projectTravellerTrip,
+  projectTripActivity,
+  projectTripUncertainties,
   RecoveryExecutionService,
   seedScenarioBundle,
   settleTravellerDecision,
@@ -53,6 +58,7 @@ import {
 import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
 import { ProgrammeService } from './programme.ts';
+import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
 
@@ -72,6 +78,8 @@ export interface ComposedRuntime {
   plannerMode: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
   /** Seeded during composition (empty when the store was already populated). */
   seededScenarioIds: string[];
+  /** Programme bundles seeded during composition (empty when populated). */
+  seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }>;
 }
 
 /** Compose the full application runtime over one SQLite database. */
@@ -90,6 +98,10 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
   // when the store is empty. Fixture loading is allowed; scenario-specific
   // runtime behavior is not — every bundle is treated identically.
   const seededScenarioIds: string[] = [];
+  const seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }> = [];
+  // Programme seeding (boot + reset) runs through the SAME services the HTTP
+  // surface uses; constructed once so both paths share one wiring.
+  const bootProgrammeService = new ProgrammeService({ mutations, entities, trips, sources, audit });
   if ((await trips.listTrips()).length === 0) {
     const scenariosRoot = join(config.fixturesDir, 'scenarios');
     for (const entry of readdirSync(scenariosRoot, { withFileTypes: true })) {
@@ -99,6 +111,10 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
         join(scenariosRoot, entry.name),
       );
       seededScenarioIds.push(outcome.scenarioId);
+    }
+    for (const programmeDir of listProgrammeDirs(join(config.fixturesDir, 'programmes'))) {
+      const outcome = await seedProgrammeBundle(bootProgrammeService, programmeDir);
+      seededProgrammes.push({ anchorEventId: outcome.anchorEventId, promotedCount: outcome.promotedCount });
     }
   }
 
@@ -123,6 +139,8 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     verifier: new CaseVerifier({ trips, signals, entities }),
     trips,
     entities,
+    // Funding evidence lives on triggering signals (change-request anchors).
+    signals,
   });
 
   // Read-only capability wiring: Atlas always present (REPLAY is
@@ -200,9 +218,10 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     capabilityDescriptors,
     viability,
     fixturesDir: config.fixturesDir,
+    programmeService: bootProgrammeService,
   });
 
-  const programmeService = new ProgrammeService({ mutations, entities, trips, sources, audit });
+  const programmeService = bootProgrammeService;
   const endpoints: AppEndpoints = {
     now: () => new Date().toISOString(),
     operatorDashboard: (at) => projectOperatorDashboard(readDeps, at),
@@ -223,6 +242,12 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
           ? { resolutionOutcome: outcome.execution.verification.resolution.outcome }
           : {}),
       };
+    },
+    wave: {
+      approvalsQueue: (at) => projectApprovalsQueue(readDeps, at),
+      tripActivity: (tripId, at) => projectTripActivity(readDeps, tripId, at),
+      tripUncertainties: (tripId, at) => projectTripUncertainties(readDeps, tripId, at),
+      providers: (at) => Promise.resolve(projectProviderSurface(capabilityDescriptors, at)),
     },
     runtime: createRuntimeHandlers({
       orchestrator,
@@ -278,5 +303,6 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     planner,
     plannerMode: modelClient.isConfigured() ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     seededScenarioIds,
+    seededProgrammes,
   };
 }

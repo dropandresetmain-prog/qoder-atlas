@@ -40,6 +40,7 @@ import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate } from './planningLoop.ts';
+import { describeAllocation } from '../engine/funding.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -116,7 +117,12 @@ export function statusForTrip(trip: Trip, latestCase?: RecoveryCase): ReadModelS
 
 export async function latestCaseFor(cases: CaseRepository, tripId: EntityId): Promise<RecoveryCase | undefined> {
   const all = await cases.listCasesForTrip(tripId);
-  return [...all].sort((a, b) => b.version - a.version || b.updatedAt.localeCompare(a.updatedAt))[0];
+  const ordered = [...all].sort((a, b) => b.version - a.version || b.updatedAt.localeCompare(a.updatedAt));
+  // A fresh request on a trip whose previous case already RESOLVED must not
+  // be shadowed by the closed case: an OPEN case always wins over RESOLVED
+  // ones; only among the same class does version/updatedAt decide.
+  const open = ordered.filter((c) => c.status !== 'RESOLVED');
+  return open[0] ?? ordered[0];
 }
 
 /** Deterministic constraint evaluation over current authoritative state. */
@@ -340,8 +346,22 @@ export async function projectCaseDetail(
       ...(strategy.id === bestStrategyId ? { recommended: true } : {}),
       ...(strategy.costImpact ? { costDelta: strategy.costImpact } : {}),
       ...(decision && decision.outcome !== 'AUTO_APPROVED' ? { requiresApproval: true } : {}),
+      // Mixed funding (ADR-037): the deterministic allocation persisted on
+      // the intent — projected verbatim, never re-derived in the view.
+      ...(intent?.costAllocation ? { costAllocation: intent.costAllocation } : {}),
     });
   }
+
+  // Case-level funding evidence: the latest intent carrying an allocation.
+  const fundedIntents = recoveryCase.actionIntents.filter((i) => i.costAllocation);
+  const fundingIntent = fundedIntents[fundedIntents.length - 1];
+  const funding =
+    fundingIntent?.costAllocation && fundingIntent.priceDelta
+      ? {
+          allocation: fundingIntent.costAllocation,
+          summary: describeAllocation(fundingIntent.costAllocation),
+        }
+      : undefined;
 
   // Critical objective currently threatened (HARD first).
   let criticalObjectiveAtRisk: string | undefined;
@@ -412,6 +432,7 @@ export async function projectCaseDetail(
     options,
     ...(approval ? { approval } : {}),
     actions,
+    ...(funding ? { funding } : {}),
     uncertainties: assessment.unresolvedUnknowns,
     ...(recoveryCase.resolution
       ? {
@@ -473,9 +494,16 @@ export async function projectTravellerTrip(
     for (const decision of pendingApprovalDecisions(recoveryCase)) {
       if (decision.outcome !== 'REQUIRES_TRAVELLER') continue;
       const intent = intentForDecision(recoveryCase, decision);
+      // Mixed funding (ADR-037): when a deterministic allocation exists the
+      // traveller is told who pays — the prompt is evidence, not a guess.
+      const fundingNote = intent?.costAllocation
+        ? ` Funding: ${describeAllocation(intent.costAllocation)}.`
+        : intent?.priceDelta
+          ? ' Funding: who pays has not been determined yet.'
+          : '';
       inputRequested.push({
         caseId: recoveryCase.id,
-        prompt: `Approve the proposed change${intent?.priceDelta ? ` (extra cost ${intent.priceDelta.amount} ${intent.priceDelta.currency})` : ''}?`,
+        prompt: `Approve the proposed change${intent?.priceDelta ? ` (extra cost ${intent.priceDelta.amount} ${intent.priceDelta.currency})` : ''}?${fundingNote}`,
         options: ['Approve', 'Decline'],
       });
     }

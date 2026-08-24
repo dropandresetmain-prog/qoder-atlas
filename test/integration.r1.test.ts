@@ -105,7 +105,10 @@ test('R1: credential-free runtime flow completes disruption -> recovery -> reset
       trips: Array<{ tripId: string }>;
       openCases: Array<{ caseId: string }>;
     };
-    assert.equal(state.trips.length, 2);
+    // Programme-scale demo: the two scenario trips plus the seeded programme
+    // cohort boot together; the store must start with no open cases.
+    assert.ok(state.trips.length >= 2);
+    assert.ok(state.trips.some((trip) => trip.tripId === spec.trip.id));
     assert.equal(state.openCases.length, 0);
 
     // Boundary validation: malformed bodies are refused structurally.
@@ -157,9 +160,10 @@ test('R1: credential-free runtime flow completes disruption -> recovery -> reset
     assert.equal(outbound.reservationState, 'CONFIRMED', 'reset restores the pristine trip');
 
     const resetDashboard = (await (await fetch(`${base}/api/operator/dashboard`)).json()) as {
-      trips: Array<{ status: string }>;
+      trips: Array<{ tripId: string; status: string }>;
     };
-    assert.ok(resetDashboard.trips.every((trip) => trip.status === 'READY'));
+    const scenarioRows = resetDashboard.trips.filter((trip) => trip.tripId === spec.trip.id);
+    assert.ok(scenarioRows.every((trip) => trip.status === 'READY'), 'scenario trips reset pristine');
   } finally {
     await new Promise<void>((resolvePromise, reject) =>
       server.close((error) => (error ? reject(error) : resolvePromise())),

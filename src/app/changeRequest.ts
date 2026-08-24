@@ -47,7 +47,7 @@ import type { EntityStore } from '../persistence/entityStore.ts';
 import { CaseService } from '../engine/case.ts';
 import { ImpactEngine } from '../engine/impact.ts';
 import type { RuleSet, PolicyRule } from '../domain/rules.ts';
-import { allocateCost } from '../engine/funding.ts';
+import { payerDecisionFor } from '../engine/funding.ts';
 
 // ---------------------------------------------------------------------------
 // Public surface
@@ -162,31 +162,27 @@ export async function resolveChangeRequest(
     at,
   );
 
-  // 4. Funding allocation. The frozen allocateCost needs a temporal anchor
-  //    for the priceDelta to decide; we anchor on `arriveBy` when the target
-  //    carries one (typical A1 case: arrive earlier / self-fund extension).
-  //    Without that anchor, allocation stays UNKNOWN and the uncertainty is
-  //    surfaced explicitly.
+  // 4. Funding: amount-agnostic PROVISIONAL payer decision at request time.
+  //    No cost is known yet (the change has not been priced), so allocating
+  //    an amount here would be fabrication. The frozen window logic decides
+  //    WHO pays from the temporal anchor; the authoritative CostAllocation
+  //    (with the real amount) is computed at the authority/intent stage once
+  //    a priced strategy exists (ADR-037). The anchor + declaration travel
+  //    through the signal payload so the intent stage can recompute the SAME
+  //    deterministic payer decision against the real priceDelta.
   const fundingRules = await collectFundingRules(deps.entities, trip);
   const costAccruesAt = request.target.arriveBy ?? request.target.departAfter;
-  const funding = allocateCost({
-    rules: fundingRules,
-    priceDelta: { amount: 0, currency: 'USD' },
-    ...(costAccruesAt ? { costAccruesAt } : {}),
-    ...(request.fundingDeclaration ? { fundingDeclaration: request.fundingDeclaration } : {}),
-  });
-  if (costAccruesAt && !funding && request.fundingDeclaration && request.fundingDeclaration !== 'UNKNOWN') {
+  const fundingDecision = payerDecisionFor(fundingRules, costAccruesAt);
+  if (fundingDecision) {
+    implications.push(
+      `funding payer decision: ${fundingDecision.kind === 'COVERED' ? 'covered by' : 'incremental payer'} ${fundingDecision.payer} per rule(s) ${fundingDecision.derivedFromRuleIds.join(', ')}; amounts are allocated when the change is priced`,
+    );
+  } else if (costAccruesAt && request.fundingDeclaration && request.fundingDeclaration !== 'UNKNOWN') {
     // No FUNDED_WINDOW rule governs the temporal anchor — the declaration is
     // recorded as evidence, not as allocation. Surfacing the gap is the
     // honest answer.
     implications.push(
       `funding declaration ${request.fundingDeclaration} recorded but no FUNDED_WINDOW rule governs ${costAccruesAt}; allocation unresolved`,
-    );
-  } else if (funding) {
-    implications.push(
-      funding.coveredBy
-        ? `funding allocation: covered by ${funding.coveredBy} per rule(s) ${funding.derivedFromRuleIds.join(', ')}`
-        : `funding allocation: incremental payer ${funding.incrementalPayer} per rule(s) ${funding.derivedFromRuleIds.join(', ')}`,
     );
   } else if (request.fundingDeclaration && request.fundingDeclaration !== 'UNKNOWN') {
     implications.push(
@@ -194,7 +190,7 @@ export async function resolveChangeRequest(
     );
   }
   const uncertainties: UncertaintyRecord[] = [...derivationUncertainties];
-  if (!funding && request.fundingDeclaration && request.fundingDeclaration !== 'UNKNOWN' && !costAccruesAt) {
+  if (!fundingDecision && request.fundingDeclaration && request.fundingDeclaration !== 'UNKNOWN' && !costAccruesAt) {
     uncertainties.push({
       id: EntityIdSchema.parse(`unc-fund-${request.id}`),
       statement: `funding allocation UNKNOWN: no temporal anchor in target; declaration ${request.fundingDeclaration} is evidence only`,
@@ -232,6 +228,12 @@ export async function resolveChangeRequest(
       // uncertainty for the rest. Partial forwarding silently dropped the
       // non-window dimensions; silence is the defect.
       target: request.target,
+      // Funding evidence for the authority/intent stage (ADR-037): the
+      // traveller's declaration plus the temporal anchor the window rules
+      // decide on. The authoritative CostAllocation is computed there once
+      // a priced strategy exists — never here, where no cost is known.
+      ...(request.fundingDeclaration ? { fundingDeclaration: request.fundingDeclaration } : {}),
+      ...(costAccruesAt ? { fundingCostAccruesAt: costAccruesAt } : {}),
     },
   });
   await deps.signals.saveSignal(signal);

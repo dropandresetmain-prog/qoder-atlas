@@ -325,9 +325,13 @@ export class NorthstarPlanner implements RecoveryPlanner {
 
     // One search per requested dimension. A dimension with an existing leg
     // re-searches that leg's route; one without a leg falls back to the
-    // home/event corridor when both ends carry airport evidence.
+    // home/event corridor when both ends carry airport evidence. Each
+    // request carries a deterministic dimension-scoped id so round-2
+    // evidence matching never confuses one dimension's offers with
+    // another's (a two-dimension change proposes each dimension's leg from
+    // ITS OWN search result).
     const toolRequests: ToolRequest[] = [];
-    const selected: Array<{ dimension: WindowDimension; leg: TransportLeg }> = [];
+    const selected: Array<{ dimension: WindowDimension; leg: TransportLeg; toolRequestId: string }> = [];
     for (const dimension of dimensions) {
       const requested = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
       const requestedDate = requested?.slice(0, 10);
@@ -345,10 +349,11 @@ export class NorthstarPlanner implements RecoveryPlanner {
           );
           continue;
         }
+        const toolRequestId = `tool-ws-${dimension}`;
         toolRequests.push(
-          this.searchRequest(originRef, destinationRef, requestedDate, leg.data.originPlaceId, leg.data.destinationPlaceId),
+          this.searchRequest(originRef, destinationRef, requestedDate, leg.data.originPlaceId, leg.data.destinationPlaceId, toolRequestId),
         );
-        selected.push({ dimension, leg });
+        selected.push({ dimension, leg, toolRequestId });
         continue;
       }
       const corridor = this.windowCorridor(input, dimension, eventPlaceId);
@@ -375,8 +380,29 @@ export class NorthstarPlanner implements RecoveryPlanner {
       };
     }
 
-    const evidence = this.flightSearchEvidence(input);
-    if (!evidence) {
+    // Per-dimension evidence: each dimension's strategies come from ITS OWN
+    // search result (matched by the dimension-scoped tool request id). A
+    // dimension whose search produced no offers is recorded as uncertainty —
+    // never re-coloured with another dimension's offers. Legacy callers that
+    // injected unscoped evidence fall back to the last global flight.search
+    // result (single-dimension requests keep working unchanged).
+    const evidenceForDimension = (toolRequestId: string): { offers: FlightOffer[] } | undefined => {
+      for (let index = input.priorToolResults.length - 1; index >= 0; index -= 1) {
+        const result = input.priorToolResults[index];
+        if (!result || result.toolRequestId !== toolRequestId) continue;
+        const offers = (result.data as Record<string, unknown>)['offers'];
+        if (Array.isArray(offers) && offers.length > 0) return { offers: offers as FlightOffer[] };
+        // A scoped result EXISTS for this dimension but carries no offers
+        // (failed search): another dimension's evidence must never colour
+        // this one — the honest outcome is uncertainty, recorded below.
+        return undefined;
+      }
+      // No scoped result at all (legacy unscoped injection): fall back to
+      // the last global flight.search evidence.
+      return this.flightSearchEvidence(input);
+    };
+    const scopedEvidence = selected.map((entry) => ({ ...entry, evidence: evidenceForDimension(entry.toolRequestId) }));
+    if (!scopedEvidence.some((entry) => entry.evidence)) {
       return {
         strategies: [],
         toolRequests,
@@ -390,6 +416,16 @@ export class NorthstarPlanner implements RecoveryPlanner {
         rationale: 'northstar window-shift planner requests replacement evidence before proposing',
       };
     }
+    for (const entry of scopedEvidence) {
+      if (!entry.evidence) {
+        uncertainties.push(
+          this.uncertainty(
+            `${entry.dimension}: no flight.search evidence was recorded for this dimension; no strategy fabricated for it`,
+            'MEDIUM',
+          ),
+        );
+      }
+    }
 
     const sourceId = input.triggeringSignals[0]?.sourceId ?? 'src:northstar-change';
     const fact = (value: IsoDateTime) => ({
@@ -398,43 +434,46 @@ export class NorthstarPlanner implements RecoveryPlanner {
       authority: 'CONNECTED' as const,
       observedAt: input.snapshot.takenAt,
     });
-    const strategies: RecoveryStrategy[] = [...evidence.offers]
-      .sort((a, b) => a.totalPrice.amount - b.totalPrice.amount || a.offerId.localeCompare(b.offerId))
-      .flatMap((offer) =>
-        selected.map(({ dimension, leg }): RecoveryStrategy => {
-          const first = offer.segments[0];
-          const last = offer.segments[offer.segments.length - 1];
-          const windowEvidence = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
-          const candidateOperations: MutationOperation[] = [
-            {
-              op: 'UPSERT_ENTITY',
-              entityType: 'TRIP_ELEMENT',
-              data: {
-                ...leg,
-                reservationState: 'HELD',
-                status: 'UNKNOWN',
-                data: {
-                  ...leg.data,
-                  ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
-                  ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
-                  bookingRef: { system: 'flight-provider', reference: offer.offerId },
-                },
-              },
-            },
-          ];
-          return {
-            id: this.idFactory('strat'),
-            caseId: input.caseId,
-            summary: `Rebook ${leg.id} on offer ${offer.offerId} (${dimension})`,
-            candidateOperations,
-            toolRequests: [],
-            assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
-            uncertainties: [],
-            expectedOutcomes: [`the trip window satisfies the traveller request (${dimension} ${windowEvidence})`],
-            costImpact: offer.totalPrice,
-            createdAt: this.instant(input),
-          };
-        }),
+    const strategies: RecoveryStrategy[] = scopedEvidence
+      .flatMap(({ dimension, leg, evidence }) =>
+        evidence
+          ? [...evidence.offers]
+              .sort((a, b) => a.totalPrice.amount - b.totalPrice.amount || a.offerId.localeCompare(b.offerId))
+              .map((offer): RecoveryStrategy => {
+                const first = offer.segments[0];
+                const last = offer.segments[offer.segments.length - 1];
+                const windowEvidence = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
+                const candidateOperations: MutationOperation[] = [
+                  {
+                    op: 'UPSERT_ENTITY',
+                    entityType: 'TRIP_ELEMENT',
+                    data: {
+                      ...leg,
+                      reservationState: 'HELD',
+                      status: 'UNKNOWN',
+                      data: {
+                        ...leg.data,
+                        ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
+                        ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
+                        bookingRef: { system: 'flight-provider', reference: offer.offerId },
+                      },
+                    },
+                  },
+                ];
+                return {
+                  id: this.idFactory('strat'),
+                  caseId: input.caseId,
+                  summary: `Rebook ${leg.id} on offer ${offer.offerId} (${dimension})`,
+                  candidateOperations,
+                  toolRequests: [],
+                  assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
+                  uncertainties: [],
+                  expectedOutcomes: [`the trip window satisfies the traveller request (${dimension} ${windowEvidence})`],
+                  costImpact: offer.totalPrice,
+                  createdAt: this.instant(input),
+                };
+              })
+          : [],
       );
     return {
       strategies,
@@ -556,9 +595,10 @@ export class NorthstarPlanner implements RecoveryPlanner {
     departureDate: string,
     originPlaceId: EntityId,
     destinationPlaceId: EntityId,
+    id?: string,
   ): ToolRequest {
     return {
-      id: this.idFactory('tool'),
+      id: id ?? this.idFactory('tool'),
       capability: 'FLIGHT',
       operation: 'flight.search',
       parameters: {

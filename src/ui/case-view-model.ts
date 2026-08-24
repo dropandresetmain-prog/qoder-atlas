@@ -14,6 +14,7 @@
 import type { EntityId, IsoDateTime, Money } from '../domain/common.ts';
 import type { ReadModelStatus } from '../contracts/readmodels.ts';
 import type { ResolutionOutcome } from '../operational/case.ts';
+import type { CostAllocation } from '../operational/intent.ts';
 
 /** Deterministic check outcome mirrors the frozen PASS/FAIL/UNKNOWN model. */
 export type CaseCheckResult = 'PASS' | 'FAIL' | 'UNKNOWN';
@@ -40,6 +41,12 @@ export interface RecoveryOptionView {
   /** Positive = extra cost, negative = saving, versus the original plan. */
   costDelta?: Money;
   requiresApproval?: boolean;
+  /**
+   * Deterministic payer allocation of this option's cost (ADR-037), present
+   * only when FUNDED_WINDOW rules + a cost anchor could decide. Absence
+   * means allocation is UNKNOWN — never silently event-funded.
+   */
+  costAllocation?: CostAllocation;
 }
 
 export interface ApprovalRequirementView {
@@ -98,6 +105,17 @@ export interface ChainLinkView {
   commitment?: boolean;
 }
 
+/**
+ * Mixed-funding evidence for a case (ADR-037): the deterministic allocation
+ * attached to the case's latest priced intent, with a user-facing summary.
+ * Absent on the view when no allocation could be derived — UNKNOWN stays
+ * visible instead of being silently treated as event-funded.
+ */
+export interface CaseFundingView {
+  allocation: CostAllocation;
+  summary: string;
+}
+
 export interface CaseDetailView {
   caseId: EntityId;
   tripId: EntityId;
@@ -120,6 +138,8 @@ export interface CaseDetailView {
   options: RecoveryOptionView[];
   approval?: ApprovalRequirementView;
   actions: ActionProgressView[];
+  /** Mixed-funding evidence (ADR-037); absent when allocation is UNKNOWN. */
+  funding?: CaseFundingView;
   uncertainties: string[];
   resolution?: CaseResolutionView;
   updatedAt: IsoDateTime;

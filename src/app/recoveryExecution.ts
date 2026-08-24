@@ -15,6 +15,7 @@
  * RECOVERED_WITH_LOSS) or loops back into assessment/planning.
  */
 import type { EntityId, EntityRef, IsoDateTime } from '../domain/common.ts';
+import { IsoDateTimeSchema } from '../domain/common.ts';
 import type { TripSnapshot } from '../operational/snapshot.ts';
 import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type {
@@ -37,10 +38,11 @@ import type {
   ObservationService,
   PrincipalRecord,
 } from '../contracts/services.ts';
-import type { AuditRepository, CaseRepository, TripRepository } from '../contracts/repositories.ts';
+import type { AuditRepository, CaseRepository, SignalRepository, TripRepository } from '../contracts/repositories.ts';
 import type { EntityStore } from '../persistence/entityStore.ts';
 import { CaseService } from '../engine/case.ts';
 import { withApproval } from '../engine/authority.ts';
+import { allocationFromDecision, payerDecisionFor } from '../engine/funding.ts';
 import type { CaseVerifier, VerificationResult } from '../engine/observation.ts';
 import { principalScopeForTrip } from './snapshot.ts';
 
@@ -129,6 +131,8 @@ export function buildActionIntent(input: {
   caseId: EntityId;
   strategy: RecoveryStrategy;
   at: IsoDateTime;
+  /** Deterministic payer allocation of priceDelta when mixed funding applies. */
+  costAllocation?: ActionIntent['costAllocation'];
 }): ActionIntent {
   const { operation, capability, sideEffectLevel } = consequentialOperationFor(input.strategy.candidateOperations);
   return {
@@ -140,6 +144,7 @@ export function buildActionIntent(input: {
     parameters: providerParametersFor(input.strategy),
     sideEffectLevel,
     ...(input.strategy.costImpact ? { priceDelta: input.strategy.costImpact } : {}),
+    ...(input.costAllocation ? { costAllocation: input.costAllocation } : {}),
     evidenceRefs: [],
     expectedResult: input.strategy.summary,
     status: 'PROPOSED',
@@ -294,6 +299,12 @@ export interface RecoveryExecutionDependencies {
   trips: TripRepository;
   /** Approval-time principal scope resolution (WP-C4): entity store. */
   entities: EntityStore;
+  /**
+   * Optional: triggering-signal evidence for funding anchors. Present in the
+   * composed runtime; absent only in unit tests that drive the service
+   * directly without signal history.
+   */
+  signals?: SignalRepository;
 }
 
 export interface BeginStrategyInput {
@@ -361,11 +372,21 @@ export class RecoveryExecutionService {
    */
   async beginStrategy(input: BeginStrategyInput): Promise<AuthorityStageOutcome> {
     const recoveryCase = await this.mustGet(input.caseId);
+    // Mixed funding (ADR-037): the authoritative CostAllocation is computed
+    // HERE, where the strategy's real priceDelta is known — never at request
+    // time, where no cost exists. Deterministic window rules + the cost
+    // anchor decide the payer; absent evidence the allocation stays UNKNOWN.
+    const costAllocation = await this.costAllocationFor(
+      input.snapshot,
+      recoveryCase.triggeredBySignalIds,
+      input.strategy,
+    );
     const intent = buildActionIntent({
       id: this.nextIntentId(input.caseId, input.strategy.id, recoveryCase.actionIntents.map((i) => i.id)),
       caseId: input.caseId,
       strategy: input.strategy,
       at: input.at,
+      ...(costAllocation ? { costAllocation } : {}),
     });
     const context: AuthorityContext = {
       tripId: input.snapshot.tripId,
@@ -402,6 +423,10 @@ export class RecoveryExecutionService {
         operation: intent.operation,
         outcome: decision.outcome,
         ruleTrace: decision.ruleTrace,
+        // Mixed-funding evidence (ADR-037): the deterministic allocation of
+        // the intent's priceDelta, when one was derivable from FUNDED_WINDOW
+        // rules + a cost anchor. Absence means allocation is UNKNOWN.
+        ...(costAllocation ? { costAllocation } : {}),
       },
     });
 
@@ -620,6 +645,71 @@ export class RecoveryExecutionService {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * Authoritative mixed-funding allocation for a strategy (ADR-037).
+   * Computed ONLY here, where the strategy's real priceDelta is known:
+   * deterministic FUNDED_WINDOW rules + a derived cost anchor decide the
+   * payer. Absent a governing rule, a cost amount, or an anchor, the
+   * allocation stays undefined — the UNKNOWN state, never a guess.
+   */
+  private async costAllocationFor(
+    snapshot: TripSnapshot,
+    triggeredBySignalIds: EntityId[],
+    strategy: RecoveryStrategy,
+  ): Promise<ActionIntent['costAllocation'] | undefined> {
+    if (!strategy.costImpact) return undefined;
+    // Deterministic rule order (REV-2 WP-R5 discipline): FUNDED_WINDOW rules
+    // from rule sets sorted by id, same as the change-request rule walk.
+    const rules = snapshot.ruleSets
+      .filter((ruleSet) => snapshot.trip.governedByRuleSetIds.includes(ruleSet.id))
+      .flatMap((ruleSet) => ruleSet.rules)
+      .filter((rule) => rule.kind === 'FUNDED_WINDOW');
+    if (rules.length === 0) return undefined;
+    const anchor = await this.fundingAnchorFor(triggeredBySignalIds, strategy);
+    const decision = payerDecisionFor(rules, anchor);
+    if (!decision) return undefined;
+    return allocationFromDecision(strategy.costImpact, decision);
+  }
+
+  /**
+   * When the strategy's cost accrues. Evidence order:
+   * 1. the new travel date named by the strategy's own candidate operations
+   *    (a flight change's cost accrues on its new departure date) — the
+   *    PER-INTENT anchor, so a two-dimension change allocates each intent
+   *    against its own accrual date;
+   * 2. an explicit anchor carried by a triggering signal (change requests
+   *    persist the target's temporal anchor as the request-level fallback);
+   * 3. nothing derivable — undefined, which keeps allocation UNKNOWN.
+   */
+  private async fundingAnchorFor(
+    triggeredBySignalIds: EntityId[],
+    strategy: RecoveryStrategy,
+  ): Promise<IsoDateTime | undefined> {
+    for (const operation of strategy.candidateOperations) {
+      if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') continue;
+      const element = operation.data as Record<string, unknown>;
+      if (element['elementKind'] !== 'TRANSPORT_LEG') continue;
+      const data = element['data'];
+      if (!data || typeof data !== 'object') continue;
+      const departure = (data as Record<string, unknown>)['scheduledDeparture'] as { value?: unknown } | undefined;
+      if (
+        departure &&
+        typeof departure.value === 'string' &&
+        IsoDateTimeSchema.safeParse(departure.value).success
+      ) {
+        return departure.value;
+      }
+    }
+    if (this.deps.signals) {
+      for (const signalId of triggeredBySignalIds) {
+        const signal = await this.deps.signals.getSignal(signalId);
+        const raw = (signal?.payload as Record<string, unknown> | undefined)?.['fundingCostAccruesAt'];
+        if (typeof raw === 'string' && IsoDateTimeSchema.safeParse(raw).success) return raw;
+      }
+    }
+    return undefined;
+  }
 
   private async mustGet(caseId: EntityId) {
     const recoveryCase = await this.deps.cases.getCase(caseId);

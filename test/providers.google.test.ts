@@ -44,7 +44,7 @@ test('C3: REPLAY normalizes the curated route recording with provenance', async 
 });
 
 test('C3: LIVE/REPLAY equivalence — identical raw yields identical normalized route context', async () => {
-  const raw = { routes: [{ duration: '600s', durationInTraffic: '720s', distanceMeters: 8000 }] };
+  const raw = { routes: [{ duration: '720s', staticDuration: '600s', distanceMeters: 8000 }] };
   const writeDir = mkdtempSync(join(tmpdir(), 'google-rec-'));
   const store = new FileRecordingStore({ readDirs: [writeDir], writeDir });
   const stubFetch: typeof fetch = async () => new Response(JSON.stringify(raw), { status: 200 });
@@ -139,11 +139,13 @@ test('C3: invalid query is rejected without a provider call', async () => {
 test('C3: traffic classification thresholds are deterministic', () => {
   const observedAt = '2026-09-05T08:00:00Z';
   const sourceId = 'src:google-routes:rec_test';
-  const heavy = normalizeRouteContext({ routes: [{ duration: '100s', durationInTraffic: '200s' }] }, observedAt, sourceId);
+  // Routes API v2: `duration` is the traffic-aware estimate, `staticDuration`
+  // is the free-flow duration.
+  const heavy = normalizeRouteContext({ routes: [{ duration: '200s', staticDuration: '100s' }] }, observedAt, sourceId);
   assert.equal(heavy.trafficCondition, 'HEAVY');
-  const moderate = normalizeRouteContext({ routes: [{ duration: '100s', durationInTraffic: '120s' }] }, observedAt, sourceId);
+  const moderate = normalizeRouteContext({ routes: [{ duration: '120s', staticDuration: '100s' }] }, observedAt, sourceId);
   assert.equal(moderate.trafficCondition, 'MODERATE');
-  const light = normalizeRouteContext({ routes: [{ duration: '100s', durationInTraffic: '100s' }] }, observedAt, sourceId);
+  const light = normalizeRouteContext({ routes: [{ duration: '100s', staticDuration: '100s' }] }, observedAt, sourceId);
   assert.equal(light.trafficCondition, 'LIGHT');
   const noTraffic = normalizeRouteContext({ routes: [{ duration: '100s' }] }, observedAt, sourceId);
   assert.equal(noTraffic.trafficCondition, undefined);

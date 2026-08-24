@@ -4,26 +4,44 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { loadConfig, hasLiveCredentials, parseEnvFile } from '../src/config/config.ts';
 import { openDatabase, kvGet, SCHEMA_VERSION } from '../src/persistence/database.ts';
 import { createAppServer } from '../src/server/http.ts';
 
+/** Empty directory so loadConfig does not pick up project .env / .env.local. */
+function emptyCwd(): string {
+  return mkdtempSync(join(tmpdir(), 'northstar-foundation-'));
+}
+
 test('config: loads with zero environment variables and defaults to REPLAY', () => {
-  const config = loadConfig({});
-  assert.equal(config.adapterMode, 'REPLAY');
-  assert.equal(config.environment, 'local');
-  assert.equal(config.sqlitePath, 'data/app.sqlite');
-  assert.equal(hasLiveCredentials(config, 'atlas'), false);
-  assert.equal(hasLiveCredentials(config, 'modelStudio'), false);
-  assert.equal(hasLiveCredentials(config, 'googleRoutes'), false);
+  const cwd = emptyCwd();
+  try {
+    const config = loadConfig({}, cwd);
+    assert.equal(config.adapterMode, 'REPLAY');
+    assert.equal(config.environment, 'local');
+    assert.equal(config.sqlitePath, 'data/app.sqlite');
+    assert.equal(hasLiveCredentials(config, 'atlas'), false);
+    assert.equal(hasLiveCredentials(config, 'modelStudio'), false);
+    assert.equal(hasLiveCredentials(config, 'googleRoutes'), false);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('config: env overrides are validated and rejected when invalid', () => {
-  const config = loadConfig({ ADAPTER_MODE: 'LIVE', HTTP_PORT: '9091' });
-  assert.equal(config.adapterMode, 'LIVE');
-  assert.equal(config.httpPort, 9091);
-  assert.throws(() => loadConfig({ ADAPTER_MODE: 'NOPE' }));
+  const cwd = emptyCwd();
+  try {
+    const config = loadConfig({ ADAPTER_MODE: 'LIVE', HTTP_PORT: '9091' }, cwd);
+    assert.equal(config.adapterMode, 'LIVE');
+    assert.equal(config.httpPort, 9091);
+    assert.throws(() => loadConfig({ ADAPTER_MODE: 'NOPE' }, cwd));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('config: parseEnvFile handles comments, quotes, blank lines', () => {
@@ -64,23 +82,28 @@ test('sqlite: schema migration and JSON round trip', () => {
 });
 
 test('server: starts without credentials and serves health in REPLAY mode', async () => {
-  const config = loadConfig({});
-  const server = createAppServer(config);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
-  const address = server.address();
-  assert.ok(typeof address === 'object' && address !== null);
+  const cwd = emptyCwd();
   try {
-    const res = await fetch(`http://localhost:${address.port}/health`);
-    assert.equal(res.status, 200);
-    const body = (await res.json()) as { status: string; adapterMode: string };
-    assert.equal(body.status, 'ok');
-    assert.equal(body.adapterMode, 'REPLAY');
+    const config = loadConfig({}, cwd);
+    const server = createAppServer(config);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const address = server.address();
+    assert.ok(typeof address === 'object' && address !== null);
+    try {
+      const res = await fetch(`http://localhost:${address.port}/health`);
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { status: string; adapterMode: string };
+      assert.equal(body.status, 'ok');
+      assert.equal(body.adapterMode, 'REPLAY');
 
-    const missing = await fetch(`http://localhost:${address.port}/does-not-exist`);
-    assert.equal(missing.status, 404);
+      const missing = await fetch(`http://localhost:${address.port}/does-not-exist`);
+      assert.equal(missing.status, 404);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve())),
+      );
+    }
   } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((err) => (err ? reject(err) : resolve())),
-    );
+    rmSync(cwd, { recursive: true, force: true });
   }
 });
