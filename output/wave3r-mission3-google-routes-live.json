@@ -1,0 +1,26 @@
+{
+  "probe": "wave3r-mission3-google-routes-live",
+  "generatedAt": "2026-08-24T21:57:24.477Z",
+  "provider": "google-routes",
+  "mode": "RECORD",
+  "bounded": "single route-context call; supporting context, not a blocker",
+  "result": {
+    "ok": true,
+    "routeContext": {
+      "duration": {
+        "expectedMinutes": 19,
+        "sourceId": "src:google-routes:rec_42f7cdb0a1d16a9bddd234f84447a89a",
+        "observedAt": "2026-08-24T21:57:24.304Z",
+        "quality": "MEDIUM",
+        "minimumMinutes": 21,
+        "conservativeMinutes": 32
+      },
+      "distanceKm": 19.8,
+      "trafficCondition": "LIGHT"
+    },
+    "meta": {
+      "providerId": "google-routes",
+      "mode": "RECORD"
+    }
+  }
+}
