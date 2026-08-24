@@ -61,6 +61,9 @@ import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
+import { loadScenario, listScenarioDirs } from '../scenarios/loader.ts';
+import type { ScenarioSpec } from '../scenarios/spec.ts';
+import type { DemoSurface } from '../server/http.ts';
 
 export interface ComposedRuntime {
   db: DatabaseSync;
@@ -182,14 +185,17 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
   const capabilities: ToolDispatchCapabilities = { flight, routing, hotel };
   const capabilityDescriptors: CapabilityDescriptor[] = [flight.descriptor, routing.descriptor, hotel.descriptor];
 
-  // Planner: LIVE Model Studio when configured; otherwise the deterministic
-  // fallback planner — the credential-free replay path must complete the loop.
+  // Planner: LIVE Model Studio only when explicitly NOT in REPLAY mode AND
+  // the API key is configured; REPLAY must never make external AI calls even
+  // when credentials are present. The deterministic fallback planner is the
+  // credential-free path that completes the loop without network calls.
   const modelClient = new ModelStudioClient({
     apiKey: config.providers.modelStudio.apiKey,
     model: config.providers.modelStudio.model,
     baseUrl: config.providers.modelStudio.baseUrl,
   });
-  const basePlanner: RecoveryPlanner = modelClient.isConfigured()
+  const useLivePlanner = config.adapterMode !== 'REPLAY' && modelClient.isConfigured();
+  const basePlanner: RecoveryPlanner = useLivePlanner
     ? new ModelStudioRecoveryPlanner({ client: modelClient })
     : new DeterministicFallbackPlanner();
   // Northstar branches (initial planning, window shift) wrap the base
@@ -220,6 +226,55 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     fixturesDir: config.fixturesDir,
     programmeService: bootProgrammeService,
   });
+
+  // Demo-only surface: load scenario specs for human clickaround triggers.
+  // Loads each scenario's disruption signal so the demo panel can fire them
+  // through the same orchestrator the HTTP surface uses. Never scenario-
+  // specific: every bundle is treated identically.
+  const scenarioSpecs = new Map<string, ScenarioSpec>();
+  for (const dir of listScenarioDirs(join(config.fixturesDir, 'scenarios'))) {
+    try {
+      const spec = loadScenario(dir);
+      const folderName = dir.split(/[\\/]/).pop() ?? spec.scenarioId;
+      scenarioSpecs.set(folderName, spec);
+    } catch {
+      // Non-fatal: a broken scenario fixture must not prevent the app from booting.
+    }
+  }
+  const demo: DemoSurface = {
+    scenarioNames: () => [...scenarioSpecs.keys()],
+    programmeEventIds: () => seededProgrammes.map((p) => p.anchorEventId),
+    plannerMode: () => useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
+    async reset(at) {
+      try {
+        const result = await orchestrator.reset(at);
+        return { status: 200, body: { message: 'reset complete', ...result } };
+      } catch (error) {
+        return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
+      }
+    },
+    async triggerScenario(name, at) {
+      const spec = scenarioSpecs.get(name);
+      if (!spec) {
+        return { status: 404, body: { error: `unknown scenario: ${name}` } };
+      }
+      try {
+        const result = await orchestrator.processDisruption(spec.disruption.signal);
+        return {
+          status: 200,
+          body: {
+            scenarioId: spec.scenarioId,
+            signalId: result.signalId,
+            caseId: result.caseId,
+            caseStatus: result.caseStatus,
+            severity: result.assessment.severity,
+          },
+        };
+      } catch (error) {
+        return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
+      }
+    },
+  };
 
   const programmeService = bootProgrammeService;
   const endpoints: AppEndpoints = {
@@ -290,6 +345,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
       sources,
       preferences,
     }),
+    demo,
   };
 
   return {
@@ -301,7 +357,7 @@ export async function composeAppRuntime(config: AppConfig, db?: DatabaseSync): P
     capabilities,
     capabilityDescriptors,
     planner,
-    plannerMode: modelClient.isConfigured() ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
+    plannerMode: useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     seededScenarioIds,
     seededProgrammes,
   };

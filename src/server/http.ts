@@ -22,12 +22,28 @@ import { renderOperatorDashboardBody } from '../ui/screens/operator-dashboard.ts
 import { renderCaseDetailBody, renderCaseDetail } from '../ui/screens/operator-case.ts';
 import { renderProgramme } from '../ui/screens/operator-programme.ts';
 import { renderTravellerTrip } from '../ui/screens/traveller.ts';
+import { renderDemoPanel } from '../ui/screens/demo-panel.ts';
 
 export interface HealthView {
   status: 'ok';
   environment: AppConfig['environment'];
   adapterMode: AppConfig['adapterMode'];
   time: string;
+}
+
+/**
+ * Demo-only surface: scenario trigger + reset for local clickaround.
+ * Never wired in production; only present when the composition loaded
+ * scenario fixtures for demo convenience.
+ */
+export interface DemoSurface {
+  scenarioNames(): string[];
+  /** Seeded programme event IDs for demo navigation links. */
+  programmeEventIds?(): string[];
+  /** Which planner is active (for the demo banner display). */
+  plannerMode?: () => 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+  reset(at: IsoDateTime): Promise<{ status: number; body: unknown }>;
+  triggerScenario(name: string, at: IsoDateTime): Promise<{ status: number; body: unknown }>;
 }
 
 export interface TravellerDecisionBody {
@@ -116,9 +132,21 @@ export interface AppEndpoints {
   programme?: ProgrammeHandlers;
   /** Present when the Northstar resolution surface is wired. */
   resolution?: ResolutionHandlers;
+  /** Demo-only: scenario triggers for local clickaround. */
+  demo?: DemoSurface;
 }
 
 const PAGE_LINKS = { dashboard: '/operator', traveller: '/traveller' };
+
+/** Build the demo banner options from the current config. */
+function demoBannerOptions(config: AppConfig, endpoints?: AppEndpoints): { demoBanner: { adapterMode: 'LIVE' | 'RECORD' | 'REPLAY'; plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK' } } {
+  return { demoBanner: { adapterMode: config.adapterMode, plannerMode: endpoints?.demo?.plannerMode?.() } };
+}
+
+/** Best-effort extraction of a seeded programme event ID for demo links. */
+function seededProgrammeEventId(endpoints: AppEndpoints): string | undefined {
+  return endpoints.demo?.programmeEventIds?.()[0];
+}
 
 function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -200,7 +228,7 @@ async function handle(
   if (req.method === 'GET' && url.pathname === '/operator') {
     const view = await endpoints.operatorDashboard(endpoints.now());
     const body = renderOperatorDashboardBody(view);
-    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: PAGE_LINKS }, body));
+    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && segments[0] === 'operator' && segments[1] === 'cases' && segments[2]) {
@@ -209,7 +237,7 @@ async function handle(
     const body = view
       ? renderCaseDetailBody(view)
       : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${segments[2]} is known`, generatedAt: at });
-    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: PAGE_LINKS }, body));
+    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
 
@@ -238,7 +266,7 @@ async function handle(
     sendHtml(
       res,
       outcome.status === 200 ? 200 : outcome.status === 404 ? 404 : 400,
-      renderPage({ title: 'Programme', active: 'dashboard', links: PAGE_LINKS }, body),
+      renderPage({ title: 'Programme', active: 'dashboard', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body),
     );
     return;
   }
@@ -254,7 +282,7 @@ async function handle(
     sendHtml(
       res,
       view ? 200 : 404,
-      renderPage({ title: 'Your trip', active: 'traveller', surface: 'traveller', links: PAGE_LINKS }, body),
+      renderPage({ title: 'Your trip', active: 'traveller', surface: 'traveller', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body),
     );
     return;
   }
@@ -452,6 +480,53 @@ async function handle(
     }
     if (segments[2] === 'change-request') {
       const outcome = await handlers.changeRequest(parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    sendJson(res, 404, { error: 'not_found', path: url.pathname });
+    return;
+  }
+
+  // --- Demo control panel (dev-only) --------------------------------------
+  if (req.method === 'GET' && url.pathname === '/demo') {
+    if (!endpoints.demo) {
+      sendJson(res, 404, { error: 'demo_not_available' });
+      return;
+    }
+    const programmeEventId = seededProgrammeEventId(endpoints);
+    const body = renderDemoPanel({
+      adapterMode: config.adapterMode,
+      plannerMode: endpoints.demo.plannerMode?.() ?? 'DETERMINISTIC_FALLBACK',
+      scenarioNames: endpoints.demo.scenarioNames(),
+      programmeEventId,
+    });
+    sendHtml(
+      res,
+      200,
+      renderPage(
+        { title: 'Demo controls', active: 'dashboard', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) },
+        body,
+      ),
+    );
+    return;
+  }
+  if (endpoints.demo && segments[0] === 'api' && segments[1] === 'demo') {
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { error: 'method_not_allowed', path: url.pathname });
+      return;
+    }
+    if (segments[2] === 'reset') {
+      const outcome = await endpoints.demo.reset(endpoints.now());
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'trigger') {
+      const name = url.searchParams.get('name');
+      if (!name) {
+        sendJson(res, 400, { error: 'missing_name_param' });
+        return;
+      }
+      const outcome = await endpoints.demo.triggerScenario(name, endpoints.now());
       sendJson(res, outcome.status, outcome.body);
       return;
     }

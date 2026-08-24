@@ -21,6 +21,16 @@ export interface PageOptions {
   links?: PageLinks;
   /** Traveller pages are mobile-first; nav collapses to a single link. */
   surface?: 'operator' | 'traveller';
+  /**
+   * Development/demo-only safety banner. When present, a clearly marked strip
+   * is rendered above the page content showing the adapter mode and a brief
+   * explanation of what external calls (if any) the current mode permits.
+   * Must never be wired in production.
+   */
+  demoBanner?: {
+    adapterMode: 'LIVE' | 'RECORD' | 'REPLAY';
+    plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+  };
 }
 
 export function renderPage(options: PageOptions, bodyHtml: string): string {
@@ -35,6 +45,9 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
     : `<nav aria-label="Main">
         <a href="${escapeHtml(dashboardHref)}">Operator view</a>
       </nav>`;
+  const banner = options.demoBanner
+    ? renderDemoBanner(options.demoBanner)
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -48,7 +61,34 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
   <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar<small>keeps the whole trip working</small></div>
   ${nav}
 </header>
+${banner}
 ${bodyHtml}
 </body>
 </html>`;
+}
+
+/**
+ * Development/demo-only safety strip. Clearly marked so it is never confused
+ * with a product control. Shows the adapter mode and a one-line explanation
+ * of what the current mode permits.
+ */
+function renderDemoBanner(banner: {
+  adapterMode: 'LIVE' | 'RECORD' | 'REPLAY';
+  plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+}): string {
+  const isReplay = banner.adapterMode === 'REPLAY';
+  const modeLabel = isReplay ? 'DEMO MODE — REPLAY' : `LIVE MODE — ${banner.adapterMode}`;
+  const modeNote = isReplay
+    ? 'No external provider calls will be made. All data comes from local fixtures and recorded responses.'
+    : banner.adapterMode === 'LIVE'
+      ? 'LIVE mode: external provider APIs may be called. Provider-side state changes are possible.'
+      : 'RECORD mode: external provider APIs are called and responses are recorded.';
+  const plannerNote = banner.plannerMode === 'MODEL_STUDIO'
+    ? ' AI planner: EXTERNAL AI API (Model Studio).'
+    : ' AI planner: local deterministic (no external calls).';
+  const toneClass = isReplay ? 'db-replay' : 'db-live';
+  return `<div class="demo-banner ${toneClass}" role="status" aria-label="Demo mode indicator">
+  <span class="db-mode">${escapeHtml(modeLabel)}</span>
+  <span class="db-note">${escapeHtml(modeNote)}${escapeHtml(plannerNote)} <a href="/demo" class="db-link">Demo controls</a></span>
+</div>`;
 }
