@@ -65,7 +65,6 @@ import type {
   StayContextQuery,
 } from '../src/contracts/capabilities.ts';
 import type { ActionIntent, AuthorisedExecution, AuthorityDecision, ExecutionResult } from '../src/operational/intent.ts';
-import type { RecoveryStrategy } from '../src/operational/strategy.ts';
 import type { ExecutorService } from '../src/contracts/services.ts';
 import type { Money } from '../src/domain/common.ts';
 import {
@@ -267,9 +266,10 @@ function flightIntent(overrides: Partial<ActionIntent> = {}): ActionIntent {
     capability: 'FLIGHT',
     parameters: { bookingRefs: [{ system: 'flight-provider', reference: 'offer-1' }] },
     sideEffectLevel: 'MONEY_MOVING',
-    // G3R-R1 I1: authority skips every spend rule when priceDelta is absent,
-    // so a consequential payment now refuses unless some spend was reviewed.
+    // G3R-R1 I1 / ADR-048: authority evaluates the gross spendExposure; a
+    // consequential payment refuses unless some gross spend was reviewed.
     priceDelta: { currency: 'USD', amount: 250 },
+    spendExposure: { currency: 'USD', amount: 250 },
     evidenceRefs: [],
     status: 'AUTHORISED',
     createdAt: AT,
@@ -290,21 +290,6 @@ function authorityFor(intent: ActionIntent): AuthorityDecision {
 
 function envelope(intent: ActionIntent): AuthorisedExecution {
   return { intent, authority: authorityFor(intent) };
-}
-
-function strategyWithCeiling(ceiling: Money | undefined): RecoveryStrategy {
-  return {
-    id: 'strat_dr2',
-    caseId: 'case_dr2',
-    summary: 'test strategy',
-    candidateOperations: [],
-    toolRequests: [],
-    assumptions: [],
-    uncertainties: [],
-    expectedOutcomes: [],
-    ...(ceiling ? { costImpact: ceiling } : {}),
-    createdAt: AT,
-  };
 }
 
 function recordingFallback(): { executor: ExecutorService; calls: number[] } {
@@ -346,20 +331,46 @@ function retrieveView(status: FlightOrderStatusView['status']): CapabilityResult
   });
 }
 
+/**
+ * ADR-048 harness shim: the authority-frozen gross spend lives ON THE INTENT
+ * (as `buildActionIntent` copies it from the strategy at construction). The
+ * helper stages that freeze by stamping the ceiling onto each executed
+ * intent's spendExposure; `undefined` removes it (unreviewed spend).
+ */
+function withFrozenCeiling(inner: ExecutorService, ceiling: Money | undefined): ExecutorService {
+  return {
+    execute: (execution: AuthorisedExecution) =>
+      inner.execute({
+        ...execution,
+        intent: ceiling
+          ? { ...execution.intent, spendExposure: ceiling }
+          : (() => {
+              // Drop any spendExposure (including an explicit `undefined`
+              // override the caller staged) to simulate unreviewed spend.
+              const intent: Record<string, unknown> = { ...execution.intent };
+              delete intent['spendExposure'];
+              return intent as unknown as ActionIntent;
+            })(),
+      }),
+  };
+}
+
 function flightExecutor(script: FakeFlightScript, ceiling: Money | undefined) {
   const fakes = fakeCapabilities(script);
   const fallback = recordingFallback();
-  const executor = createProviderBackedExecutor({
-    fallback: fallback.executor,
-    mode: 'LIVE',
-    strategyFor: async () => strategyWithCeiling(ceiling),
-    flight: fakes.flight,
-    flightTransactions: fakes.flightTransactions,
-    flightDossier: () => DOSSIER,
-    ticketingPoll: { attempts: 2, delayMs: 1 },
-    sleep: async () => undefined,
-    now: () => AT,
-  });
+  const executor = withFrozenCeiling(
+    createProviderBackedExecutor({
+      fallback: fallback.executor,
+      mode: 'LIVE',
+      flight: fakes.flight,
+      flightTransactions: fakes.flightTransactions,
+      flightDossier: () => DOSSIER,
+      ticketingPoll: { attempts: 2, delayMs: 1 },
+      sleep: async () => undefined,
+      now: () => AT,
+    }),
+    ceiling,
+  );
   return { executor, fakes, fallback };
 }
 
@@ -443,22 +454,26 @@ test('1D-4: missing payable total -> payOrder is never called', async () => {
   assert.equal(result.error?.code, 'payable_total_missing');
   assert.equal(fakes.calls.pay, 0, 'payOrder must never be called');
 
-  // Absent ceiling (strategy without costImpact) fails closed as well.
+  // Absent ceiling (intent without an authority-frozen spendExposure) fails
+  // closed as well. ADR-048: the reviewed-spend gate refuses BEFORE the
+  // payment-gate verdict is ever consulted.
   const noCeiling = flightExecutor({ create: heldCreate({ currency: 'USD', amount: 200 }) }, undefined);
   const noCeilingResult = await noCeiling.executor.execute(envelope(flightIntent({ id: 'int_no_ceiling' })));
-  assert.equal(noCeilingResult.error?.code, 'no_authorised_ceiling');
+  assert.equal(noCeilingResult.error?.code, 'authority_reviewed_no_spend');
   assert.equal(noCeiling.fakes.calls.pay, 0);
 });
 
-test('1D-2b: payOrder always carries the authoritative ceiling, never priceDelta', async () => {
+test('1D-2b: payOrder carries the authority-frozen spendExposure, never priceDelta', async () => {
   const { executor, fakes } = flightExecutor(
     {
       create: heldCreate({ currency: 'USD', amount: 200 }),
       pay: ok({ status: 'PAID', transactionState: { orderRef: 'ord-1' }, provenance: 'LIVE' }),
       retrieve: [retrieveView('TICKETED')],
     },
-    { currency: 'USD', amount: 250 },
+    { currency: 'USD', amount: 250 }, // authority-frozen gross spendExposure
   );
+  // Delta 40 vs gross 250: the ceiling must be the gross exposure authority
+  // reviewed, not the incremental delta.
   const intent = flightIntent({ priceDelta: { currency: 'USD', amount: 40 } });
   const result = await executor.execute(envelope(intent));
   assert.equal(result.status, 'SUCCESS');
@@ -627,14 +642,16 @@ const HOTEL_DOSSIER: HotelReplacementDossier = {
 function hotelExecutor(script: FakeHotelScript, ceiling: Money | undefined) {
   const { hotel, calls } = fakeHotel(script);
   const fallback = recordingFallback();
-  const executor = createProviderBackedExecutor({
-    fallback: fallback.executor,
-    mode: 'LIVE',
-    strategyFor: async () => strategyWithCeiling(ceiling),
-    hotel,
-    hotelDossier: () => HOTEL_DOSSIER,
-    now: () => AT,
-  });
+  const executor = withFrozenCeiling(
+    createProviderBackedExecutor({
+      fallback: fallback.executor,
+      mode: 'LIVE',
+      hotel,
+      hotelDossier: () => HOTEL_DOSSIER,
+      now: () => AT,
+    }),
+    ceiling,
+  );
   return { executor, calls, fallback };
 }
 

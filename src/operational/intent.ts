@@ -93,7 +93,20 @@ export const ActionIntentSchema = z.strictObject({
   capability: CapabilityFamilySchema,
   parameters: z.record(z.string(), z.unknown()).default({}),
   sideEffectLevel: SideEffectLevelSchema,
+  /**
+   * Incremental economic impact of the action (how much more/less the trip
+   * costs because of it). Incremental reasoning only — never the payment
+   * ceiling (ADR-048).
+   */
   priceDelta: MoneySchema.optional(),
+  /**
+   * Maximum gross provider charge the action will pay or commit (ADR-048).
+   * Authority evaluates SPEND_LIMIT / APPROVAL_ABOVE_SPEND against THIS for
+   * MONEY_MOVING intents, and the executor's payment ceiling derives from the
+   * authority-frozen value here — never re-read from mutable strategy state.
+   * A MONEY_MOVING intent without a deterministic gross spend fails closed.
+   */
+  spendExposure: MoneySchema.optional(),
   /** Deterministic payer allocation of `priceDelta` when mixed funding applies. */
   costAllocation: CostAllocationSchema.optional(),
   /** Evidence refs supporting the intent (viability results, quotes...). */

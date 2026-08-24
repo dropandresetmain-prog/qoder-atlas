@@ -12,8 +12,8 @@
  *    operations into confirmed trip state; only a result explicitly marked
  *    CONFIRMS_CANDIDATE_STATE (or the ADR-007 SIMULATED boundary) does.
  *  - R1-I1: a consequential payment/booking is refused when the intent
- *    carries no priceDelta, because authority never evaluated spend rules
- *    against an absent value.
+ *    carries no spendExposure, because authority never reviewed a gross
+ *    charge it did not see (ADR-048).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -269,8 +269,10 @@ function flightIntent(overrides: Partial<ActionIntent> = {}): ActionIntent {
     parameters: { bookingRefs: [{ system: 'flight-provider', reference: 'offer-1' }] },
     sideEffectLevel: 'MONEY_MOVING',
     // Mirrors wave3r-dr2-provider-execution.test.ts's flightIntent() default;
-    // R1-I1 tests must explicitly omit priceDelta to exercise the new gate.
+    // R1-I1 tests must explicitly omit spendExposure (the reviewed gross
+    // spend, ADR-048) to exercise the no-reviewed-spend gate.
     priceDelta: { currency: 'USD', amount: 250 },
+    spendExposure: { currency: 'USD', amount: 250 },
     evidenceRefs: [],
     status: 'AUTHORISED',
     createdAt: AT,
@@ -304,21 +306,6 @@ function envelope(intent: ActionIntent): AuthorisedExecution {
   return { intent, authority: authorityFor(intent) };
 }
 
-function strategyWithCeiling(ceiling: Money | undefined): RecoveryStrategy {
-  return {
-    id: 'strat_r1',
-    caseId: 'case_r1',
-    summary: 'test strategy',
-    candidateOperations: [],
-    toolRequests: [],
-    assumptions: [],
-    uncertainties: [],
-    expectedOutcomes: [],
-    ...(ceiling ? { costImpact: ceiling } : {}),
-    createdAt: AT,
-  };
-}
-
 function heldCreate(totalPrice?: Money): CapabilityResult<FlightOrderOutcome> {
   return ok({
     status: 'HELD',
@@ -338,13 +325,12 @@ function retrieveView(status: FlightOrderStatusView['status']): CapabilityResult
   });
 }
 
-function flightExecutor(script: FakeFlightScript, ceiling: Money | undefined) {
+function flightExecutor(script: FakeFlightScript) {
   const fakes = fakeFlight(script);
   const fallback = fallbackSpy();
   const executor = createProviderBackedExecutor({
     fallback: fallback.executor,
     mode: 'LIVE',
-    strategyFor: async () => strategyWithCeiling(ceiling),
     flight: fakes.flight,
     flightTransactions: fakes.flightTransactions,
     flightDossier: () => FLIGHT_DOSSIER,
@@ -355,13 +341,12 @@ function flightExecutor(script: FakeFlightScript, ceiling: Money | undefined) {
   return { executor, fakes, fallback };
 }
 
-function hotelExecutor(script: FakeHotelScript, ceiling: Money | undefined) {
+function hotelExecutor(script: FakeHotelScript) {
   const fakes = fakeHotel(script);
   const fallback = fallbackSpy();
   const executor = createProviderBackedExecutor({
     fallback: fallback.executor,
     mode: 'LIVE',
-    strategyFor: async () => strategyWithCeiling(ceiling),
     hotel: fakes.hotel,
     hotelDossier: () => HOTEL_DOSSIER,
     now: () => AT,
@@ -409,6 +394,9 @@ test('R1-A1: the resulting hotel.modify intent is never AUTO_APPROVED under an e
     capability: classified.capability,
     parameters: {},
     sideEffectLevel: classified.sideEffectLevel,
+    // ADR-048: a money-moving intent must carry a deterministic gross spend
+    // or authority fails closed before the default ladder is even reached.
+    spendExposure: { currency: 'USD', amount: 180 },
     evidenceRefs: [],
     status: 'PROPOSED',
     createdAt: AT,
@@ -456,7 +444,6 @@ test('R1-A1: hotel.modify declared REVERSIBLE is refused before any provider cal
       book: ok({ confirmed: true, bookingId: 'bk-new-1', totalPrice: { currency: 'USD', amount: 180 }, provenance: 'LIVE' }),
       cancel: ok({ confirmed: true, reference: 'cancel-ref-1', provenance: 'LIVE' }),
     },
-    { currency: 'USD', amount: 500 },
   );
   const result = await executor.execute(envelope(hotelIntent({ sideEffectLevel: 'REVERSIBLE' })));
   assert.equal(result.status, 'FAILURE');
@@ -598,15 +585,13 @@ test('R1-A2: ADR-007 regression guard — a SIMULATED success without the marker
 
 // ===========================================================================
 // R1-I1 — a consequential payment/booking is refused when authority reviewed
-// no spend at all (intent.priceDelta absent).
+// no gross spend at all (intent.spendExposure absent, ADR-048).
 // ===========================================================================
 
-test('R1-I1: flight.change with priceDelta absent refuses payment before any pay call', async () => {
-  const { executor, fakes } = flightExecutor(
-    { create: heldCreate({ currency: 'USD', amount: 200 }) },
-    { currency: 'USD', amount: 250 }, // a ceiling that would otherwise pass
-  );
-  const intent = flightIntent({ priceDelta: undefined });
+test('R1-I1: flight.change with no reviewed gross spend refuses payment before any pay call', async () => {
+  const { executor, fakes } = flightExecutor({ create: heldCreate({ currency: 'USD', amount: 200 }) });
+  // spendExposure absent: authority reviewed no gross charge for this payment.
+  const intent = flightIntent({ spendExposure: undefined });
   const result = await executor.execute(envelope(intent));
   assert.equal(result.status, 'FAILURE');
   assert.equal(result.error?.code, 'authority_reviewed_no_spend');
@@ -615,30 +600,30 @@ test('R1-I1: flight.change with priceDelta absent refuses payment before any pay
   assert.equal(effects['orderStatus'], 'HELD', 'the hold remains observable for re-entry');
 });
 
-test('R1-I1: flight.change with priceDelta present proceeds past the spend-reviewed gate', async () => {
-  const { executor, fakes } = flightExecutor(
-    {
-      create: heldCreate({ currency: 'USD', amount: 200 }),
-      pay: ok({ status: 'PAID', transactionState: { orderRef: 'ord-1' }, provenance: 'LIVE' }),
-      retrieve: [retrieveView('TICKETED')],
-    },
-    { currency: 'USD', amount: 250 },
-  );
-  // Same intent shape as the refused case above, but WITH priceDelta —
-  // proving the new gate is not simply blocking every payment outright.
-  const intent = flightIntent({ priceDelta: { currency: 'USD', amount: 40 } });
+test('R1-I1: flight.change with reviewed gross spend proceeds past the spend-reviewed gate', async () => {
+  const { executor, fakes } = flightExecutor({
+    create: heldCreate({ currency: 'USD', amount: 200 }),
+    pay: ok({ status: 'PAID', transactionState: { orderRef: 'ord-1' }, provenance: 'LIVE' }),
+    retrieve: [retrieveView('TICKETED')],
+  });
+  // Same intent shape as the refused case above, but WITH spendExposure —
+  // proving the gate is not simply blocking every payment outright. The
+  // delta (40) differs from the gross exposure (250): only the latter gates.
+  const intent = flightIntent({
+    priceDelta: { currency: 'USD', amount: 40 },
+    spendExposure: { currency: 'USD', amount: 250 },
+  });
   const result = await executor.execute(envelope(intent));
   assert.notEqual(result.error?.code, 'authority_reviewed_no_spend');
   assert.equal(result.status, 'SUCCESS');
   assert.equal(fakes.calls.pay, 1, 'payOrder was reached and called exactly once');
 });
 
-test('R1-I1: hotel.modify with priceDelta absent refuses booking before any bookStay call', async () => {
+test('R1-I1: hotel.modify with no reviewed gross spend refuses booking before any bookStay call', async () => {
   const { executor, fakes } = hotelExecutor(
     { quote: ok({ status: 'QUOTED', quoteId: 'quote-h1', quotedPrice: { currency: 'USD', amount: 180 } }) },
-    { currency: 'USD', amount: 500 }, // a ceiling that would otherwise pass
   );
-  const intent = hotelIntent({ priceDelta: undefined });
+  const intent = hotelIntent({ spendExposure: undefined });
   const result = await executor.execute(envelope(intent));
   assert.equal(result.status, 'FAILURE');
   assert.equal(result.error?.code, 'authority_reviewed_no_spend');

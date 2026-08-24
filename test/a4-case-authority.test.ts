@@ -146,14 +146,24 @@ test('authority: Scenario A money-moving change defaults to REQUIRES_TRAVELLER',
   const ctx = { tripId: spec.trip.id, caseId: 'case_x', ruleSetIds: spec.context.ruleSets.map((r) => r.id), principals: [] };
 
   const decision = await authority.decide(
-    intent({ id: 'int_a', caseId: 'case_x', priceDelta: { amount: 150, currency: 'USD' } }),
+    intent({
+      id: 'int_a',
+      caseId: 'case_x',
+      priceDelta: { amount: 150, currency: 'USD' },
+      spendExposure: { amount: 150, currency: 'USD' },
+    }),
     ctx,
   );
   assert.equal(decision.outcome, 'REQUIRES_TRAVELLER');
   assert.equal(decision.decidedAt, '2026-09-12T18:05:00+09:00');
   // Deterministic: same input, same decision.
   const again = await authority.decide(
-    intent({ id: 'int_a', caseId: 'case_x', priceDelta: { amount: 150, currency: 'USD' } }),
+    intent({
+      id: 'int_a',
+      caseId: 'case_x',
+      priceDelta: { amount: 150, currency: 'USD' },
+      spendExposure: { amount: 150, currency: 'USD' },
+    }),
     ctx,
   );
   assert.deepEqual(again, decision);
@@ -167,7 +177,12 @@ test('authority: spend above approval threshold routes to the rule approver', as
   const ctx = { tripId: spec.trip.id, caseId: 'case_x', ruleSetIds: spec.context.ruleSets.map((r) => r.id), principals: [] };
 
   const decision = await authority.decide(
-    intent({ id: 'int_a2', caseId: 'case_x', priceDelta: { amount: 500, currency: 'USD' } }),
+    intent({
+      id: 'int_a2',
+      caseId: 'case_x',
+      priceDelta: { amount: 500, currency: 'USD' },
+      spendExposure: { amount: 500, currency: 'USD' },
+    }),
     ctx,
   );
   assert.equal(decision.outcome, 'REQUIRES_ORGANISATION_APPROVER');
@@ -181,7 +196,12 @@ test('authority: breaching the hard spend limit blocks execution', async () => {
   const ctx = { tripId: spec.trip.id, caseId: 'case_x', ruleSetIds: spec.context.ruleSets.map((r) => r.id), principals: [] };
 
   const decision = await authority.decide(
-    intent({ id: 'int_block', caseId: 'case_x', priceDelta: { amount: 2000, currency: 'USD' } }),
+    intent({
+      id: 'int_block',
+      caseId: 'case_x',
+      priceDelta: { amount: 2000, currency: 'USD' },
+      spendExposure: { amount: 2000, currency: 'USD' },
+    }),
     ctx,
   );
   assert.equal(decision.outcome, 'BLOCKED');
@@ -194,7 +214,10 @@ test('authority: Scenario B operation-scoped approval requirement routes to the 
   const { authority } = services(h);
   const ctx = { tripId: spec.trip.id, caseId: 'case_x', ruleSetIds: spec.context.ruleSets.map((r) => r.id), principals: [] };
 
-  const change = await authority.decide(intent({ id: 'int_b1', caseId: 'case_x' }), ctx);
+  const change = await authority.decide(
+    intent({ id: 'int_b1', caseId: 'case_x', spendExposure: { amount: 150, currency: 'USD' } }),
+    ctx,
+  );
   assert.equal(change.outcome, 'REQUIRES_ORGANISATION_APPROVER');
 
   // An operation outside the rule's filter falls back to default authority.
@@ -224,7 +247,12 @@ test('authority: delegated spend authority satisfies the approval requirement de
   };
 
   const covered = await authority.decide(
-    intent({ id: 'int_d1', caseId: 'case_x', priceDelta: { amount: 500, currency: 'USD' } }),
+    intent({
+      id: 'int_d1',
+      caseId: 'case_x',
+      priceDelta: { amount: 500, currency: 'USD' },
+      spendExposure: { amount: 500, currency: 'USD' },
+    }),
     ctx,
   );
   assert.equal(covered.outcome, 'AUTO_APPROVED');
@@ -232,7 +260,12 @@ test('authority: delegated spend authority satisfies the approval requirement de
 
   // Same principal, spend beyond the delegated limit: approval still required.
   const uncovered = await authority.decide(
-    intent({ id: 'int_d2', caseId: 'case_x', priceDelta: { amount: 1200, currency: 'USD' } }),
+    intent({
+      id: 'int_d2',
+      caseId: 'case_x',
+      priceDelta: { amount: 1200, currency: 'USD' },
+      spendExposure: { amount: 1200, currency: 'USD' },
+    }),
     ctx,
   );
   assert.equal(uncovered.outcome, 'REQUIRES_ORGANISATION_APPROVER');
@@ -431,6 +464,7 @@ test('Scenario A: detected -> ... -> verified FULLY_RECOVERED through authority 
     caseId: 'case_a',
     createdAt: at,
     priceDelta: { amount: 150, currency: 'USD' },
+    spendExposure: { amount: 150, currency: 'USD' },
   });
   const ctx = { tripId: spec.trip.id, caseId: 'case_a', ruleSetIds: spec.context.ruleSets.map((r) => r.id), principals: [] };
   const decision = await authority.decide(theIntent, ctx);
@@ -500,7 +534,12 @@ test('Scenario B: organisation approval + waived objective resolve RECOVERED_WIT
   await caseService.transition('case_b', 'ASSESSING', at);
   await caseService.transition('case_b', 'PLANNING', at);
 
-  const theIntent = intent({ id: 'int_b_rebook', caseId: 'case_b', createdAt: at });
+  const theIntent = intent({
+    id: 'int_b_rebook',
+    caseId: 'case_b',
+    createdAt: at,
+    spendExposure: { amount: 150, currency: 'USD' },
+  });
   const ctx = { tripId: spec.trip.id, caseId: 'case_b', ruleSetIds: spec.context.ruleSets.map((r) => r.id), principals: [] };
   const decision = await authority.decide(theIntent, ctx);
   assert.equal(decision.outcome, spec.expectations.authority.expectedOutcome);

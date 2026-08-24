@@ -14,8 +14,10 @@
  *    authorised ceiling -> pay ONLY when safe -> retrieve through ticketing.
  *    Missing total, currency mismatch, or a payable above the ceiling leaves
  *    the order HELD and loops the case back to viability/authority.
- *    `ActionIntent.priceDelta` is never used as the payment ceiling; the
- *    ceiling is the strategy costImpact that authority reviewed.
+ *    The ceiling is the authority-frozen `ActionIntent.spendExposure` — the
+ *    maximum gross provider charge authority reviewed (ADR-048). Neither
+ *    `ActionIntent.priceDelta` (a delta) nor mutable strategy state is ever
+ *    used for this comparison; the executor holds no strategy resolver at all.
  *  - `flight.book` is hold-without-payment only and never chains into pay.
  *  - Ambiguous/timeout results reconcile via retrieve before any retry.
  *  - Cancellation quote != submission != observed cancellation; UNSUPPORTED
@@ -43,7 +45,6 @@ import type {
   SideEffectLevel,
 } from '../operational/intent.ts';
 import { CONFIRMS_CANDIDATE_STATE, executionGateIssues } from '../operational/intent.ts';
-import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type { ExecutorService } from '../contracts/services.ts';
 
 // ---------------------------------------------------------------------------
@@ -78,10 +79,6 @@ export interface ProviderBackedExecutorDependencies {
   fallback: ExecutorService;
   /** Adapter mode governing replay-miss fallback honesty. */
   mode: AdapterMode;
-  /** Strategy resolution for the authorised ceiling (costImpact). */
-  strategyFor: (
-    intent: ActionIntent,
-  ) => RecoveryStrategy | undefined | Promise<RecoveryStrategy | undefined>;
   /** Read-side flight capability (offer verify -> session state). */
   flight?: FlightCapability;
   /** Transactional flight capability (create/pay/retrieve/cancellation). */
@@ -160,9 +157,9 @@ export type PaymentGateVerdict =
 
 /**
  * Deterministic do-not-pay gate (ADR-042 A1/A2, test-enforced). The ceiling
- * is the amount authority reviewed (strategy costImpact); the payable is the
- * provider-observed total. Absence or incomparability fails CLOSED: no FX
- * invention, no priceDelta substitution, no silent pass.
+ * is the authority-frozen gross spend (intent spendExposure, ADR-048); the
+ * payable is the provider-observed total. Absence or incomparability fails
+ * CLOSED: no FX invention, no priceDelta substitution, no silent pass.
  */
 export function paymentGateVerdict(
   payable: Money | undefined,
@@ -256,25 +253,26 @@ export function createProviderBackedExecutor(
   const sleep = deps.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const poll = deps.ticketingPoll ?? DEFAULT_TICKETING_POLL;
 
-  async function ceilingFor(intent: ActionIntent): Promise<Money | undefined> {
-    const strategy = await deps.strategyFor(intent);
-    return strategy?.costImpact;
+  /**
+   * ADR-048: the payment ceiling is the authority-frozen gross spend the
+   * intent carries (`spendExposure`) — the maximum provider charge authority
+   * reviewed when it authorised THIS intent. The executor holds no strategy
+   * resolver: re-reading mutable strategy state after authority would let a
+   * later strategy mutation raise the authorised spend without review.
+   */
+  function ceilingFor(intent: ActionIntent): Money | undefined {
+    return intent.spendExposure;
   }
 
   /**
-   * G3R-R1 I1: authority evaluates `intent.priceDelta` against SPEND_LIMIT /
-   * APPROVAL_ABOVE_SPEND, and skips both rules entirely when it is absent.
-   * A consequential payment whose intent carried NO spend for authority to
-   * look at was therefore never cost-reviewed at all — refuse rather than
-   * pay on the strength of a ceiling authority never saw.
-   *
-   * NOTE: this deliberately does NOT assert `ceiling <= priceDelta`. The
-   * frozen design keeps `priceDelta` (a delta) and strategy `costImpact`
-   * (the payable total) separable, and reconciling their magnitudes is an
-   * open authority-semantics decision, not something to settle here.
+   * The spend authority actually reviewed against SPEND_LIMIT /
+   * APPROVAL_ABOVE_SPEND (ADR-048) — the intent's gross spendExposure, never
+   * the incremental priceDelta. A consequential payment whose intent carries
+   * no reviewed gross spend is refused: authority cannot have evaluated a
+   * charge it never saw, and the order remains HELD for re-entry.
    */
   function reviewedSpendFor(intent: ActionIntent): Money | undefined {
-    return intent.priceDelta;
+    return intent.spendExposure;
   }
 
   function failure(
@@ -450,12 +448,12 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, create.meta.mode,
         'authority_reviewed_no_spend',
-        'intent carries no priceDelta, so authority evaluated no spend rules for this payment;' +
+        'intent carries no spendExposure, so authority evaluated no gross spend for this payment;' +
           ' order remains HELD, re-enter authority with the observed price',
         { ...heldEffects, paymentGate: 'authority_reviewed_no_spend' },
       );
     }
-    const ceiling = await ceilingFor(intent);
+    const ceiling = ceilingFor(intent);
     const gate = paymentGateVerdict(create.data.totalPrice, ceiling);
     if (!gate.ok) {
       // DO NOT PAY. Preserve the HELD order and loop back to authority.
@@ -837,12 +835,12 @@ export function createProviderBackedExecutor(
       return providerFailure(
         execution, providerId, quote.meta.mode,
         'authority_reviewed_no_spend',
-        'intent carries no priceDelta, so authority evaluated no spend rules for this chargeable' +
+        'intent carries no spendExposure, so authority evaluated no gross spend for this chargeable' +
           ' replacement; booking refused, re-enter authority with the observed price',
         { observedPrice: quote.data.quotedPrice },
       );
     }
-    const ceiling = await ceilingFor(intent);
+    const ceiling = ceilingFor(intent);
     const gate = paymentGateVerdict(quote.data.quotedPrice, ceiling);
     if (!gate.ok) {
       return providerFailure(

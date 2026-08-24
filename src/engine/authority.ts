@@ -61,8 +61,23 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
     }
 
     const rules = await this.scopedRules(context.ruleSetIds);
-    const spend = intent.priceDelta;
-    if (spend) conditions.push(`priceDelta=${spend.amount} ${spend.currency}`);
+    // ADR-048: spend rules evaluate the GROSS provider charge the action will
+    // pay or commit (spendExposure), never the incremental priceDelta. Money-
+    // moving actions must carry a deterministic gross spend before authority
+    // permits them: a missing exposure is not "no spend" — it is unreviewed
+    // spend, which fails closed.
+    const spend = intent.spendExposure;
+    if (intent.sideEffectLevel === 'MONEY_MOVING' && !spend) {
+      ruleTrace.push(
+        'money-moving intent carries no deterministic spendExposure; the gross charge authority would' +
+          ' review is unknown and cannot execute unreviewed; fail closed',
+      );
+      return this.decision(intent, 'BLOCKED', ruleTrace, conditions);
+    }
+    if (spend) conditions.push(`spendExposure=${spend.amount} ${spend.currency}`);
+    if (intent.priceDelta) {
+      conditions.push(`priceDelta=${intent.priceDelta.amount} ${intent.priceDelta.currency}`);
+    }
 
     // 1. Hard spend ceiling: breaching it blocks execution outright. A
     //    binding ceiling whose currency cannot be deterministically compared

@@ -131,6 +131,16 @@ function providerParametersFor(strategy: RecoveryStrategy): Record<string, unkno
 /**
  * Deterministic strategy -> ActionIntent. Identical strategy + timestamp
  * always yields an identical intent; authority is never part of the output.
+ *
+ * ADR-048 spend semantics: `priceDelta` carries the INCREMENTAL economic
+ * impact, `spendExposure` carries the MAXIMUM GROSS provider charge the
+ * action will pay or commit. Both derive deterministically from the strategy
+ * at construction time: the strategy's costImpact IS the gross payable here,
+ * so the authority-frozen exposure is copied onto the intent once — the
+ * executor later reads ONLY `intent.spendExposure`, never mutable strategy
+ * state, so a strategy mutated after authority cannot raise the authorised
+ * spend. A MONEY_MOVING intent without a gross spend fails closed upstream
+ * in authority; non-money-moving intents leave the exposure absent.
  */
 export function buildActionIntent(input: {
   id: EntityId;
@@ -141,6 +151,7 @@ export function buildActionIntent(input: {
   costAllocation?: ActionIntent['costAllocation'];
 }): ActionIntent {
   const { operation, capability, sideEffectLevel } = consequentialOperationFor(input.strategy.candidateOperations);
+  const grossSpend = input.strategy.costImpact;
   return {
     id: input.id,
     caseId: input.caseId,
@@ -149,7 +160,8 @@ export function buildActionIntent(input: {
     capability,
     parameters: providerParametersFor(input.strategy),
     sideEffectLevel,
-    ...(input.strategy.costImpact ? { priceDelta: input.strategy.costImpact } : {}),
+    ...(grossSpend ? { priceDelta: grossSpend } : {}),
+    ...(sideEffectLevel === 'MONEY_MOVING' && grossSpend ? { spendExposure: grossSpend } : {}),
     ...(input.costAllocation ? { costAllocation: input.costAllocation } : {}),
     evidenceRefs: [],
     expectedResult: input.strategy.summary,
@@ -488,6 +500,10 @@ export class RecoveryExecutionService {
         operation: intent.operation,
         outcome: decision.outcome,
         ruleTrace: decision.ruleTrace,
+        // ADR-048: the gross spend authority reviewed, when one was frozen
+        // onto the intent. Authority decisions are auditable against the
+        // exact charge the executor may later commit.
+        ...(intent.spendExposure ? { reviewedSpendExposure: intent.spendExposure } : {}),
         // Mixed-funding evidence (ADR-037): the deterministic allocation of
         // the intent's priceDelta, when one was derivable from FUNDED_WINDOW
         // rules + a cost anchor. Absence means allocation is UNKNOWN.

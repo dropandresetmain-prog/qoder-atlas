@@ -210,7 +210,9 @@ export async function composeAppRuntime(
       inner: createProviderBackedExecutor({
         fallback: new BoundaryExecutor(),
         mode: config.adapterMode,
-        strategyFor,
+        // ADR-048: the payment ceiling is the authority-frozen
+        // intent.spendExposure; the executor holds no strategy resolver, so
+        // post-authority strategy mutations can never raise authorised spend.
         flight,
         flightTransactions,
         hotel,

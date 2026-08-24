@@ -500,6 +500,8 @@ function spendIntent(id: string, amount: number, currency: string): ActionIntent
     evidenceRefs: [],
     sideEffectLevel: 'MONEY_MOVING',
     priceDelta: { amount, currency },
+    // ADR-048: spend rules evaluate the gross provider charge, not the delta.
+    spendExposure: { amount, currency },
     status: 'PROPOSED',
     createdAt: '2026-08-24T09:00:00.000Z',
   };

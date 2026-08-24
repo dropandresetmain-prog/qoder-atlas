@@ -317,13 +317,15 @@ export interface FlightOrderPayQuery {
   /** Opaque payment handle resolved/owned outside this contract. */
   paymentRef: string;
   /**
-   * Deterministic price-drift ceiling that authority approved for this
-   * payment (ADR-042). The executor MUST compare the provider-reported
-   * payable total from `createOrder` against this ceiling before calling
-   * `payOrder`: if the payable total exceeds `authorisedAmount`, the
-   * currency differs, or no total is reported, the executor MUST NOT pay —
-   * it re-enters deterministic viability/authority with the observed price,
-   * leaving the order HELD. `ActionIntent.priceDelta` is a delta, not the
+   * Deterministic gross-spend ceiling that authority approved for this
+   * payment (ADR-042, ADR-048): the authority-frozen `ActionIntent.
+   * spendExposure` — the maximum provider charge the executor may commit.
+   * The executor MUST compare the provider-reported payable total from
+   * `createOrder` against this ceiling before calling `payOrder`: if the
+   * payable total exceeds `authorisedAmount`, the currency differs, or no
+   * total is reported, the executor MUST NOT pay — it re-enters
+   * deterministic viability/authority with the observed price, leaving the
+   * order HELD. `ActionIntent.priceDelta` is an incremental delta, not the
    * payable ceiling, and must never be used for this comparison.
    */
   authorisedAmount: Money;

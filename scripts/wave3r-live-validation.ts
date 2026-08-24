@@ -108,7 +108,8 @@ function authorisedExecution(
     capability,
     parameters,
     sideEffectLevel: 'MONEY_MOVING' as SideEffectLevel,
-    ...(ceiling ? { priceDelta: ceiling } : {}),
+    // ADR-048: the executor ceiling is the authority-frozen gross spend.
+    ...(ceiling ? { priceDelta: ceiling, spendExposure: ceiling } : {}),
     evidenceRefs: [],
     status: 'AUTHORISED',
     createdAt: nowIso(),
@@ -296,11 +297,9 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
     paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
   };
 
-  let strategyFor = async (): Promise<RecoveryStrategy | undefined> => undefined;
   const executor: ExecutorService = createProviderBackedExecutor({
     fallback: new BoundaryExecutor(),
     mode: 'RECORD',
-    strategyFor: (intent) => strategyFor(intent),
     flight,
     flightTransactions,
     flightDossier: () => dossier,
@@ -370,7 +369,6 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   //    pay -> ticketing observation). Ceiling = the offer total an authority
   //    review would have approved.
   const booking = authorisedExecution('atlas-book', 'flight.pay', 'FLIGHT', { offerId: offer.offerId }, offer.totalPrice);
-  strategyFor = async () => booking.strategy;
   let bookingResult: ExecutionResult = await executor.execute(booking.execution);
   record('atlas.executor_flight_pay', 'atlas', { operation: 'flight.pay', offerId: offer.offerId, ceiling: offer.totalPrice }, bookingResult);
 
@@ -389,7 +387,6 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
     const observed = bookingResult.observedEffects?.['observedPayable'] as Money | undefined;
     if (observed) {
       const retry = authorisedExecution('atlas-book-reentry', 'flight.pay', 'FLIGHT', { offerId: offer.offerId }, observed);
-      strategyFor = async () => retry.strategy;
       bookingResult = await executor.execute(retry.execution);
       record('atlas.executor_flight_pay_reentry', 'atlas', { operation: 'flight.pay', ceiling: observed }, bookingResult);
     }
@@ -407,7 +404,6 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   //    observe status). PROCESSING at the end of the window is recorded
   //    truthfully; no indefinite waiting, no invented success.
   const cancellation = authorisedExecution('atlas-cancel', 'flight.cancel', 'FLIGHT', { orderRef }, undefined);
-  strategyFor = async () => cancellation.strategy;
   const cancelResult = await executor.execute(cancellation.execution);
   record('atlas.executor_flight_cancel', 'atlas', { operation: 'flight.cancel', orderRef }, cancelResult);
 }
@@ -461,11 +457,9 @@ async function validateNuiteeReplacement(config: ReturnType<typeof loadConfig>, 
 
   // 3. Replacement orchestration THROUGH THE EXECUTOR: quote replacement ->
   //    cost gate -> book -> CONFIRMED -> cancel displaced -> CANCELLED.
-  let strategyFor = async (): Promise<RecoveryStrategy | undefined> => undefined;
   const executor: ExecutorService = createProviderBackedExecutor({
     fallback: new BoundaryExecutor(),
     mode: 'RECORD',
-    strategyFor: (intent) => strategyFor(intent),
     hotel,
     hotelDossier: (): HotelReplacementDossier => ({
       replacementRateId: replacementRate.rateId,
@@ -474,7 +468,6 @@ async function validateNuiteeReplacement(config: ReturnType<typeof loadConfig>, 
     }),
   });
   const replacement = authorisedExecution('nuitee-replace', 'hotel.modify', 'HOTEL', {}, replacementRate.totalPrice);
-  strategyFor = async () => replacement.strategy;
   const replacementResult = await executor.execute(replacement.execution);
   record('nuitee.executor_hotel_replacement', 'nuitee', {
     operation: 'hotel.modify',
