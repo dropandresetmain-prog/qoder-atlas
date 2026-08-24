@@ -136,8 +136,9 @@ Stretch work starts only after the generalized core vertical loop passes the imp
 **Revisit when:** the accepted demo/robustness scenario materially benefits from baggage, seating, or accessibility-specific seat data.
 
 ### Atlas real `order.do` / `queryOrderDetails.do` execution and observation
-**Why stretch:** state-changing and not yet exercised in the research account.
-**Revisit when:** Search/Verify adapter, deterministic authority/executor boundary, and vertical recovery loop are stable; bounded sandbox execution is available without jeopardising core delivery.
+**Why stretch:** state-changing; contract/executor wiring not yet built.
+**DR-0 update (24 Aug 2026):** empirically exercised — `order.do` reached with this account created a genuine unpaid sandbox order (orderNo `TESTA20260824171418381`, PNR `OPLGS4`, status 0) and `queryOrderDetails.do` / `refundQuotation.do` returned correct informative reads (the latter returned status 809 "not yet ticketed" as documented). Account is **not** ticketing-activation-blocked for `order.do` create. No payment was submitted; the order was left to expire unpaid. See `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md`.
+**Revisit when:** Wave 3R DR-0/G3R-R0 decides the minimal provider-neutral transactional contract delta (create-order semantics); bounded sandbox execution is available without jeopardising core delivery.
 
 ### Booking.com Demand API
 **Why stretch:** technically valuable hotel search/booking surface but access depends on Managed Affiliate Partner credentials/contract rather than simple self-service signup.
@@ -149,6 +150,7 @@ Stretch work starts only after the generalized core vertical loop passes the imp
 
 ### Atlas incidents/webhooks
 **Why stretch:** documented but not required to prove TripSignal normalization; a provider-boundary test signal can exercise the real internal pipeline.
+**DR-0 update (24 Aug 2026):** the read-only incident-list endpoint (`POST /event/getPageList.do`) is empirically reachable without prior webhook registration and returned a clean empty page (no ticketed orders yet to generate events). Webhook registration (`POST /updateWebhookURL.do`, body `{url}`) is documented but was **not** called in DR-0 (state-changing, needs a public callback URL — DR-3 scope). Atlas documents no inbound signature/auth mechanism for its callback POSTs; delivery is explicitly "best effort." See `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md`.
 **Revisit when:** Atlas access/activation is confirmed and integration is low risk.
 
 ### Gmail live ingestion
@@ -213,9 +215,8 @@ Revisit: productisation.
 
 Investigations are bounded and non-blocking. Each ends with `Adopt Now | Keep Stretch | Defer | Reject`.
 
-### Atlas Singapore sandbox routes — Investigate Now
-Current sandbox fixture list does not include SIN; this is not evidence Atlas lacks Singapore production content.
-Decision needed: whether hackathon/Atlas staff can enable a useful Singapore sandbox route. Never block architecture on this.
+### Atlas Singapore sandbox routes — RESOLVED (DR-0, 24 Aug 2026)
+The documented fixture list omitted SIN, but a direct empirical probe shows the sandbox **does** return real offers for SIN: SIN→{KUL,MNL,BKK,CGK,TYO,SYD} and {KUL,BKK,MNL,HKG,CGK,SYD}→SIN all returned populated `search.do` results (multiple carriers: TR/Scoot, VJ/VietJet, AK/AirAsia, FD/Thai AirAsia, OD/Batik, D7/AirAsia X). Only outbound SIN→HKG returned an empty (but valid, status 0) result — route population is directional, not symmetric. No organiser fixture request is needed. See `docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md` for the full route table and summit-location ranking.
 
 ### Booking.com Demand access — Investigate Now
 Decision needed: whether valid partner credentials can be obtained immediately enough to implement/test. If not, keep Stretch and stop the investigation.

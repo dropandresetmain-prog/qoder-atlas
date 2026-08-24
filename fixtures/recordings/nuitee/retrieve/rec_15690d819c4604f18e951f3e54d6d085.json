@@ -1,0 +1,199 @@
+{
+  "id": "rec_15690d819c4604f18e951f3e54d6d085",
+  "providerId": "nuitee",
+  "operation": "retrieve",
+  "recordedAt": "2026-08-24T09:10:00.822Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "VJs4QaxfG",
+      "clientReference": "qoder-atlas-dr0-case-a",
+      "supplierBookingId": "VJs4QaxfG",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CANCELLED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-11-10",
+      "checkout": "2026-11-12",
+      "hotel": {
+        "hotelId": "lp3643b",
+        "name": "Conrad Hong Kong"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "",
+            "retailRate": {
+              "total": {
+                "amount": 1012.59,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": ""
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "taxes",
+                  "amount": 26.89,
+                  "currency": "USD"
+                },
+                {
+                  "included": true,
+                  "description": "service charges",
+                  "amount": 89.61,
+                  "currency": "USD"
+                },
+                {
+                  "included": false,
+                  "description": "Service Charge",
+                  "amount": 1.28,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-11-09 02:00:00",
+                  "amount": 1012.59,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "RO",
+            "boardName": "Room Only",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Northstar",
+          "lastName": "DR0 Probe",
+          "childrenAges": [],
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-11-09 02:00:00",
+                "amount": 1012.59,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I5NFERCNJ5FFOTKVGNCE6TKSKFDVSWSEJVHEUV2HKFNEIQKOKJKUOWJSKRGVSWSYI5KTGVCRJZJFMR2JLFCE6TKSK5GVSM2HJVHFIRKQKFMVGR2NKJIUOSJTIRBU2SSSI5BDMRCFJVBFGR2ZLFKEGTKKKNIFEU2XGRMDEVSLJY3EMS2VGM2EWVSKKVETOQSSJFCVSRKHG5BFKR2VLJCFGN2EJJFUEVCWJNJUINCHIUZVIUKOLJLEOWK2IRFU6SSSI5EVSVCRKRBVOTKOJNBUOTKSKNDUSWSEJVHFURCIIUZUIUKMJJJUOSK2IRCU4USYKBJEURKNKRKDIR2JLFCEKTSSKJDUKWKEKNGUEU2HIFMUQWKPIJJFAUSKIRBU2SSWI5BDMRCDJVBFER2JGJKFGSJSINEUSUSWIVJFGT2FJVNEIQKNKJLUMVKZKRBUYSSRJBCVCRCBJVJDER2BLFBUO7BRGAYTELRVHF6DEMBSGYWTCMJNGA4SAMBSHIYDAORQGB6EESL4PR6HYS2JJZDSAQSFIQQEIRKMKVMEKICSJ5HU27BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+          "occupancy_number": 1,
+          "amount": 1012.59,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Northstar",
+              "lastName": "DR0 Probe",
+              "email": "booker@example.com",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Northstar",
+        "lastName": "DR0 Probe",
+        "email": "booker@example.com",
+        "phone": "0000000000"
+      },
+      "createdAt": "2026-08-24T09:10:00",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-11-09 02:00:00",
+            "amount": 1012.59,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "",
+      "optionalFees": "",
+      "mandatoryFees": "",
+      "knowBeforeYouGo": "",
+      "price": 1012.59,
+      "sellingPriceToUser": 1012.59,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Northstar",
+      "lastName": "DR0 Probe",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "RvKRDyoa0",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_hZzh5023iA-GftV_y51Rl",
+      "sellingPrice": "1012.59",
+      "exchangeRate": 0.8560780079292404,
+      "exchangeRateUsd": 1,
+      "email": "booker@example.com",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-11-09T02:00:00Z",
+      "userId": 383174,
+      "nationality": "US",
+      "holderTitle": "",
+      "hotelId": "lp3643b",
+      "hotelName": "Conrad Hong Kong",
+      "cancelledAt": "2026-08-24T09:10:01Z",
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 40.5,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": 383174,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "",
+      "payLaterDeadline": null
+    }
+  }
+}

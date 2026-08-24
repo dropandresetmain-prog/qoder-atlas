@@ -1,0 +1,179 @@
+{
+  "id": "rec_ade124aa0378588bdc364f479c954aa5",
+  "providerId": "nuitee",
+  "operation": "book",
+  "recordedAt": "2026-08-24T09:10:07.329Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "lwKa4cEKV",
+      "clientReference": "qoder-atlas-dr0-case-b",
+      "supplierBookingId": "lwKa4cEKV",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-12-05",
+      "checkout": "2026-12-06",
+      "hotel": {
+        "hotelId": "lp1e850",
+        "name": "Hotel Grand Pacific"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHJEZUOTKOKRDUOWSTJBMU2SSEI5EVSRCFJZJFER2JLFCEWN2CKNDUCWSEJVGUUU2HIEZUQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZI42DEVCNJVJFOR2BLFKESTK2LFFFEWSFKEZVERCHIVNEIS2NIJIUQQKSKRGU2USXIZKVSVCFJZFFCR2BGREFSVCTKNEVUSCILFGVEUKHJEZEIQKNLJJEOQKZIRJU4SS2KBIVSWCZKVJFER2BLJCECN2CKJDU2WKEJNHEERCLJJEFGR2UKNJUSWSIINDU2USRI5ETEQZSJVBFIRSVLFKECSKCKFEEKNKEJNHUURD4GEZTALRVGR6HYUSPPR6HY7CEMVWHK6DFEBJG633NPQYC4MBQPQYC4MBQPR6DALRQGB6DALRQGA",
+            "retailRate": {
+              "total": {
+                "amount": 130.54,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": "booking.com"
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "LOCAL_TAX",
+                  "amount": 12.9,
+                  "currency": "USD"
+                },
+                {
+                  "included": true,
+                  "description": "CITY_TAX",
+                  "amount": 11.61,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-12-05 23:59:59",
+                  "amount": 130.54,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "NRFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "Room Only",
+            "boardName": "RO",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Northstar",
+          "lastName": "DR0 Probe B",
+          "childrenAges": null,
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": null,
+            "hotelRemarks": [],
+            "refundableTag": "NRFN"
+          },
+          "room_id": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHJEZUOTKOKRDUOWSTJBMU2SSEI5EVSRCFJZJFER2JLFCEWN2CKNDUCWSEJVGUUU2HIEZUQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZI42DEVCNJVJFOR2BLFKESTK2LFFFEWSFKEZVERCHIVNEIS2NIJIUQQKSKRGU2USXIZKVSVCFJZFFCR2BGREFSVCTKNEVUSCILFGVEUKHJEZEIQKNLJJEOQKZIRJU4SS2KBIVSWCZKVJFER2BLJCECN2CKJDU2WKEJNHEERCLJJEFGR2UKNJUSWSIINDU2USRI5ETEQZSJVBFIRSVLFKECSKCKFEEKNKEJNHUURD4GEZTALRVGR6HYUSPPR6HY7CEMVWHK6DFEBJG633NPQYC4MBQPQYC4MBQPR6DALRQGB6DALRQGA",
+          "occupancy_number": 1,
+          "amount": 130.54,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Northstar",
+              "lastName": "DR0 Probe B",
+              "email": "booker@example.com",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Northstar",
+        "lastName": "DR0 Probe B",
+        "email": "booker@example.com",
+        "phone": "0000000000"
+      },
+      "createdAt": "2026-08-24T09:10:08",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": null,
+        "hotelRemarks": [],
+        "refundableTag": "NRFN"
+      },
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
+      "price": 130.54,
+      "sellingPriceToUser": 130.54,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Northstar",
+      "lastName": "DR0 Probe B",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "bpZGaFLq1",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_XhLtOvpyW86VAhEJt0RA5",
+      "sellingPrice": "130.54",
+      "exchangeRate": 0.8560780079292404,
+      "exchangeRateUsd": 1,
+      "email": "booker@example.com",
+      "tag": "NRFN",
+      "lastFreeCancellationDate": null,
+      "userId": 383174,
+      "nationality": "US",
+      "holderTitle": "",
+      "hotelId": "lp1e850",
+      "hotelName": "Hotel Grand Pacific",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 5.22,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "",
+      "payLaterDeadline": null
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

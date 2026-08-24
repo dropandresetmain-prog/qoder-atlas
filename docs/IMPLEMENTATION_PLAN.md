@@ -1,6 +1,7 @@
 # Implementation Plan
 
 **Status:** Active execution SSOT. Checkpoint A accepted (REV-A Complete; closure commit pinned as the accepted fan-out base); **Checkpoint B accepted (REV-B Complete)**; **Checkpoint C accepted (REV-C Complete; accepted SHA `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d` is the demo candidate / baseline)**. A Reality Validation milestone is intentionally added before Final Candidate preparation.  
+**Post-NS-G3 closure path:** the original NS-G3 candidate (Section "WAVE 3 — Integrated Northstar Product → NS-G3 → Stretch pull decision" below) is **NOT ACCEPTED**, superseded by the stricter **Wave 3R Demo Readiness closure** — see `docs/WAVE3R_DEMO_READINESS_PLAN.md` (subordinate to this document; governs Wave 3R execution/work-package detail). RV-N0, NS-G1, NS-G2, and Independent Review 2 remain accepted and are not reopened by Wave 3R.  
 **Product:** AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
@@ -1106,6 +1107,15 @@ Hotel reality: one proper **real hotel API adapter is MINIMUM**. Candidate remai
 6. (Tracker hygiene, closed by this record) the stale "git push remains blocked" note — `integration/northstar` is on the remote at `3009706`.
 
 ### WAVE 3 — Integrated Northstar Product → NS-G3 → Stretch pull decision
+
+> **NOT ACCEPTED / superseded (24 Aug 2026).** The candidate produced under this
+> section's NS-G3 path did not pass the human product-owner checkpoint. Wave 3R
+> ("Demo Readiness & Live Validation Closure") replaces the remainder of this
+> section's execution with a stricter, provider-reality-validated closure path.
+> See `docs/WAVE3R_DEMO_READINESS_PLAN.md` for the active work packages
+> (DR-0..DR-13) and gates (G3R-R0/R1/R2). This section is preserved as history
+> and is not reopened; do not resume executing it directly. RV-N0, NS-G1, NS-G2,
+> and Independent Review 2 above remain accepted.
 
 Goal: turn the accepted backend into the judge-facing product.
 
