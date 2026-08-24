@@ -208,3 +208,35 @@ export const ExecutionResultSchema = z.strictObject({
     .optional(),
 });
 export type ExecutionResult = z.infer<typeof ExecutionResultSchema>;
+
+/**
+ * `observedEffects` key by which a provider-backed execution asserts that the
+ * provider reached the TERMINAL state the strategy's candidate operations
+ * describe — a ticketed order, a confirmed replacement stay, an observed
+ * cancellation (G3R-R1 A2).
+ *
+ * Provider SUCCESS alone is NOT that assertion. A `flight.book` hold succeeds
+ * as an operation while the seat remains unpaid and unticketed; a cancellation
+ * can succeed as a submission while the order is still PROCESSING. Promoting
+ * either into confirmed authoritative trip state would make HELD
+ * indistinguishable from TICKETED, so candidate confirmation is opt-in and a
+ * provider-backed result that omits this marker never confirms anything.
+ *
+ * The ADR-007 simulation boundary keeps its historic behaviour and does not
+ * set the marker; see `confirmsCandidateOperations`.
+ */
+export const CONFIRMS_CANDIDATE_STATE = 'confirmsCandidateState';
+
+/**
+ * Whether an execution result may promote a strategy's candidate operations
+ * into confirmed authoritative state.
+ *
+ * SIMULATED results confirm as they always have (ADR-007: the boundary
+ * simulation IS the asserted outcome). Provider-backed results must say so
+ * explicitly via {@link CONFIRMS_CANDIDATE_STATE}.
+ */
+export function confirmsCandidateOperations(result: ExecutionResult): boolean {
+  if (result.status !== 'SUCCESS') return false;
+  if (result.provenance === 'SIMULATED') return true;
+  return result.observedEffects?.[CONFIRMS_CANDIDATE_STATE] === true;
+}

@@ -267,6 +267,9 @@ function flightIntent(overrides: Partial<ActionIntent> = {}): ActionIntent {
     capability: 'FLIGHT',
     parameters: { bookingRefs: [{ system: 'flight-provider', reference: 'offer-1' }] },
     sideEffectLevel: 'MONEY_MOVING',
+    // G3R-R1 I1: authority skips every spend rule when priceDelta is absent,
+    // so a consequential payment now refuses unless some spend was reviewed.
+    priceDelta: { currency: 'USD', amount: 250 },
     evidenceRefs: [],
     status: 'AUTHORISED',
     createdAt: AT,
@@ -609,7 +612,8 @@ function hotelIntent(): ActionIntent {
     id: 'int_dr2_hotel',
     operation: 'hotel.modify',
     capability: 'HOTEL',
-    sideEffectLevel: 'REVERSIBLE',
+    // G3R-R1 A1: a stay replacement books and cancels at a real provider.
+    sideEffectLevel: 'MONEY_MOVING',
     parameters: {},
   });
 }

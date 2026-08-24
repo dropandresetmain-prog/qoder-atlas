@@ -18,6 +18,10 @@
  *  - Payment uses ONLY the opaque sandbox test-balance handle; the seam
  *    structurally cannot carry PAN/CVV, and unrecognised payment refs are
  *    rejected rather than guessed.
+ *  - payOrder re-checks the authorisedAmount ceiling itself in LIVE/RECORD
+ *    (via its own retrieveOrder, before /pay.do is ever called) so the
+ *    ceiling enforcement is not solely the executor's responsibility.
+ *    REPLAY skips this pre-check (see payOrder for why).
  *  - transactionState is a curated mapping of deliberately selected
  *    reconciliation fields — raw provider responses are never dumped into it.
  *  - Provider status numbers are mapped inside this adapter only; generic
@@ -198,6 +202,30 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
         'payOrder only accepts the approved sandbox test-balance payment reference; ' +
           'no other payment handle is mapped (raw card data can never cross this seam)',
       );
+    }
+
+    // Adapter-level ceiling re-check (the defence-in-depth referenced by
+    // providerExecution.ts's "Pay with the authoritative ceiling attached
+    // (adapter re-checks too)"). The frozen FlightOrderPayQuery carries no
+    // provider-observed payable total, so this adapter obtains one itself —
+    // via its OWN retrieveOrder — before /pay.do is ever called.
+    //
+    // REPLAY is exempt and keeps today's behaviour unchanged: REPLAY makes
+    // no provider call at all, and the executor's paymentGateVerdict has
+    // already run against the same recorded create data, so a REPLAY
+    // pre-check would only add a recording dependency without adding safety.
+    //
+    // In RECORD mode this pre-pay retrieveOrder and the executor's later
+    // post-pay retrieveOrder share the same deterministic recording key
+    // (recordingIdFor is derived from providerId/operation/{orderRef}), so
+    // the post-pay observation is what ends up persisted to disk. That is
+    // expected, not a bug.
+    if (this.mode !== 'REPLAY') {
+      // Non-undefined means "stop": either a fail-closed refusal, or an
+      // already-paid/ticketed short-circuit success — either way /pay.do
+      // must not be called.
+      const preCheck = await this.preCheckPayable(query);
+      if (preCheck) return preCheck;
     }
 
     const provenance = this.provenance();
@@ -406,6 +434,111 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
       meta: { providerId: ATLAS_PROVIDER_ID, mode: this.mode, requestedAt: new Date().toISOString() },
     };
   }
+
+  /**
+   * Pre-payment ceiling re-check (LIVE/RECORD only; see payOrder). Returns
+   * `undefined` when the caller may safely proceed to /pay.do; otherwise
+   * returns the CapabilityResult the caller must return as-is, which is
+   * either:
+   *  - a fail-closed refusal (no totalPrice observed, currency mismatch,
+   *    payable exceeds authorisedAmount, or the order is CANCELLED/FAILED), or
+   *  - a successful FlightOrderOutcome reporting an already-PAID/TICKETED
+   *    order, with NO second payment issued.
+   * In every returned case /pay.do is never reached.
+   */
+  private async preCheckPayable(
+    query: FlightOrderPayQuery,
+  ): Promise<CapabilityResult<FlightOrderOutcome> | undefined> {
+    const retrieved = await this.retrieveOrder({ orderRef: query.orderRef });
+    if (!retrieved.ok) {
+      return this.paymentGuardFailure(
+        'atlas_payable_unverifiable',
+        `pre-payment order retrieval failed (${retrieved.error.category}/${retrieved.error.code}: ` +
+          `${retrieved.error.message}); authorised ceiling was ${formatMoney(query.authorisedAmount)}; ` +
+          'refusing to pay without an observed payable total',
+      );
+    }
+    const view = retrieved.data;
+
+    if (view.status === 'PAID' || view.status === 'TICKETING' || view.status === 'TICKETED') {
+      // Idempotency: the order is already beyond payment (TICKETING means
+      // paid with ticketing in flight). Report the observed state; never
+      // issue a second payment.
+      return {
+        ok: true,
+        data: {
+          status: view.status,
+          ...(view.transactionState === undefined ? {} : { transactionState: view.transactionState }),
+          ...(view.totalPrice === undefined ? {} : { totalPrice: view.totalPrice }),
+          detail:
+            `order already observed as ${view.status} at pre-payment check; ` +
+            'no second payment was issued',
+          provenance: view.provenance,
+        },
+        meta: retrieved.meta,
+      };
+    }
+
+    // Allowlist, not a denylist: HELD is the ONLY state a payment may be
+    // issued against. CANCELLED/FAILED have nothing to pay, and UNKNOWN (an
+    // unmapped provider status, or a failed status query) might well BE an
+    // already-paid order — paying into it risks a duplicate charge, so an
+    // unrecognised state fails closed rather than falling through.
+    if (view.status === 'UNKNOWN') {
+      // An unmapped provider status, or a status query that failed: the
+      // order might already be paid. Unverifiable, so fail closed.
+      return this.paymentGuardFailure(
+        'atlas_payable_unverifiable',
+        `pre-payment retrieve could not determine the state of order ${query.orderRef}` +
+          `${view.detail ? ` (${view.detail})` : ''}; refusing to pay against an unverifiable order`,
+      );
+    }
+    if (view.status !== 'HELD') {
+      return this.paymentGuardFailure(
+        'atlas_order_not_payable',
+        `pre-payment retrieve observes order ${query.orderRef} as ${view.status}, not HELD;` +
+          ' there is nothing awaiting payment',
+      );
+    }
+
+    if (!view.totalPrice) {
+      return this.paymentGuardFailure(
+        'atlas_payable_unverifiable',
+        `pre-payment retrieve reported no payable total for order ${query.orderRef} ` +
+          `(observed status ${view.status}); authorised ceiling was ${formatMoney(query.authorisedAmount)}; ` +
+          'refusing to pay without an observed payable total',
+      );
+    }
+    if (view.totalPrice.currency !== query.authorisedAmount.currency) {
+      return this.paymentGuardFailure(
+        'atlas_payable_currency_mismatch',
+        `observed payable currency ${view.totalPrice.currency} differs from authorised currency ` +
+          `${query.authorisedAmount.currency} (observed ${formatMoney(view.totalPrice)}, authorised ` +
+          `${formatMoney(query.authorisedAmount)}); refusing to invent an FX conversion`,
+      );
+    }
+    if (view.totalPrice.amount > query.authorisedAmount.amount) {
+      return this.paymentGuardFailure(
+        'atlas_payable_exceeds_authorised',
+        `observed payable ${formatMoney(view.totalPrice)} exceeds authorised ceiling ` +
+          `${formatMoney(query.authorisedAmount)}; refusing to pay above the authorised amount`,
+      );
+    }
+
+    return undefined;
+  }
+
+  private paymentGuardFailure<T>(code: string, message: string): CapabilityResult<T> {
+    return {
+      ok: false,
+      error: { category: 'INVALID_REQUEST', code, message },
+      meta: { providerId: ATLAS_PROVIDER_ID, mode: this.mode, requestedAt: new Date().toISOString() },
+    };
+  }
+}
+
+function formatMoney(money: Money): string {
+  return `${money.amount} ${money.currency}`;
 }
 
 /** True only when the base URL's host is unambiguously the Atlas sandbox. */

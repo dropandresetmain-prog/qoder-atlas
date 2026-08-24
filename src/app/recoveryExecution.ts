@@ -44,6 +44,7 @@ import { CaseService } from '../engine/case.ts';
 import { withApproval } from '../engine/authority.ts';
 import { allocationFromDecision, payerDecisionFor } from '../engine/funding.ts';
 import type { CaseVerifier, VerificationResult } from '../engine/observation.ts';
+import { confirmsCandidateOperations } from '../operational/intent.ts';
 import { principalScopeForTrip } from './snapshot.ts';
 
 // ---------------------------------------------------------------------------
@@ -83,11 +84,16 @@ export function consequentialOperationFor(operations: MutationOperation[]): Cons
       }
     }
     if (elementKind === 'STAY') {
-      // A waiver riding with a stay change still demands approval.
+      // G3R-R1 A1: a stay replacement books a chargeable replacement and
+      // cancels the displaced stay at a real provider. It was previously
+      // REVERSIBLE (auto-approved by the default ladder) — safe only while
+      // execution was simulated. MONEY_MOVING is the honest classification
+      // and, like IRREVERSIBLE, reaches an approval-requiring outcome, so a
+      // waiver riding along still demands approval.
       return {
         operation: 'hotel.modify',
         capability: 'HOTEL',
-        sideEffectLevel: carriesWaiver ? 'IRREVERSIBLE' : 'REVERSIBLE',
+        sideEffectLevel: 'MONEY_MOVING',
       };
     }
   }
@@ -313,7 +319,13 @@ export function createRecoveryExecutor(deps: {
   return {
     execute: async (execution: AuthorisedExecution): Promise<ExecutionResult> => {
       const result = await deps.inner.execute(execution);
-      if (result.status !== 'SUCCESS') return result;
+      // G3R-R1 A2: provider SUCCESS is not, by itself, the candidate state.
+      // A `flight.book` hold and an accepted-but-PROCESSING cancellation are
+      // both SUCCESSful operations that have NOT realised the strategy's
+      // candidate elements; confirming them here would make HELD
+      // indistinguishable from TICKETED in authoritative trip state. The
+      // ADR-007 simulation boundary keeps its historic confirming behaviour.
+      if (!confirmsCandidateOperations(result)) return result;
       const strategy = await deps.strategyFor(execution.intent);
       if (!strategy) return result;
       // Waiver provenance: the authority decision backing THIS execution is

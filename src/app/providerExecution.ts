@@ -40,8 +40,9 @@ import type {
   ActionIntent,
   AuthorisedExecution,
   ExecutionResult,
+  SideEffectLevel,
 } from '../operational/intent.ts';
-import { executionGateIssues } from '../operational/intent.ts';
+import { CONFIRMS_CANDIDATE_STATE, executionGateIssues } from '../operational/intent.ts';
 import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type { ExecutorService } from '../contracts/services.ts';
 
@@ -199,6 +200,52 @@ export function paymentGateVerdict(
 }
 
 // ---------------------------------------------------------------------------
+// Side-effect classification guard (G3R-R1 A1).
+// ---------------------------------------------------------------------------
+//
+// Authority decides on the intent's DECLARED sideEffectLevel: the default
+// ladder auto-approves REVERSIBLE and demands the traveller for anything
+// irreversible or money-moving. Once provider-backed execution replaced the
+// simulation boundary, a misclassified intent stopped being harmless — a
+// REVERSIBLE-declared `hotel.modify` would have reached a real chargeable
+// booking plus an irreversible cancellation under an auto-approval.
+//
+// So the executor refuses to make a provider call whose REAL side effect
+// outranks the level authority reviewed. This is a structural backstop, not
+// a replacement for correct classification in `consequentialOperationFor`.
+
+const SIDE_EFFECT_RANK: Record<SideEffectLevel, number> = {
+  READ_ONLY: 0,
+  REVERSIBLE: 1,
+  IRREVERSIBLE: 2,
+  MONEY_MOVING: 3,
+};
+
+/** The real side effect each provider-backed operation performs. */
+const REQUIRED_SIDE_EFFECT_LEVEL: Record<string, SideEffectLevel> = {
+  // Creates a provider-side order/hold; no money moves at create.
+  'flight.book': 'IRREVERSIBLE',
+  'flight.pay': 'MONEY_MOVING',
+  'flight.change': 'MONEY_MOVING',
+  'flight.cancel': 'IRREVERSIBLE',
+  // Books a chargeable replacement stay and cancels the displaced one.
+  'hotel.book': 'MONEY_MOVING',
+  'hotel.modify': 'MONEY_MOVING',
+};
+
+/**
+ * `undefined` when the declared level covers the operation's real side
+ * effect; otherwise the level the operation actually requires.
+ */
+export function insufficientSideEffectLevel(intent: ActionIntent): SideEffectLevel | undefined {
+  const required = REQUIRED_SIDE_EFFECT_LEVEL[intent.operation];
+  if (required === undefined) return undefined;
+  return SIDE_EFFECT_RANK[intent.sideEffectLevel] < SIDE_EFFECT_RANK[required]
+    ? required
+    : undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Executor
 // ---------------------------------------------------------------------------
 
@@ -212,6 +259,22 @@ export function createProviderBackedExecutor(
   async function ceilingFor(intent: ActionIntent): Promise<Money | undefined> {
     const strategy = await deps.strategyFor(intent);
     return strategy?.costImpact;
+  }
+
+  /**
+   * G3R-R1 I1: authority evaluates `intent.priceDelta` against SPEND_LIMIT /
+   * APPROVAL_ABOVE_SPEND, and skips both rules entirely when it is absent.
+   * A consequential payment whose intent carried NO spend for authority to
+   * look at was therefore never cost-reviewed at all — refuse rather than
+   * pay on the strength of a ceiling authority never saw.
+   *
+   * NOTE: this deliberately does NOT assert `ceiling <= priceDelta`. The
+   * frozen design keeps `priceDelta` (a delta) and strategy `costImpact`
+   * (the payable total) separable, and reconciling their magnitudes is an
+   * open authority-semantics decision, not something to settle here.
+   */
+  function reviewedSpendFor(intent: ActionIntent): Money | undefined {
+    return intent.priceDelta;
   }
 
   function failure(
@@ -375,11 +438,23 @@ export function createProviderBackedExecutor(
         provenance: provenanceFor(create.meta.mode),
         providerId,
         resultSummary: `order ${orderRef} held without payment`,
-        observedEffects: heldEffects,
+        // Deliberately NOT marked CONFIRMS_CANDIDATE_STATE: a hold is not a
+        // booking. HELD must never become a confirmed trip element (A2).
+        observedEffects: { ...heldEffects, holdOnly: true },
       };
     }
 
     // 3. Payment gate against the ceiling authority reviewed.
+    const reviewedSpend = reviewedSpendFor(intent);
+    if (!reviewedSpend) {
+      return providerFailure(
+        execution, providerId, create.meta.mode,
+        'authority_reviewed_no_spend',
+        'intent carries no priceDelta, so authority evaluated no spend rules for this payment;' +
+          ' order remains HELD, re-enter authority with the observed price',
+        { ...heldEffects, paymentGate: 'authority_reviewed_no_spend' },
+      );
+    }
     const ceiling = await ceilingFor(intent);
     const gate = paymentGateVerdict(create.data.totalPrice, ceiling);
     if (!gate.ok) {
@@ -388,11 +463,13 @@ export function createProviderBackedExecutor(
         execution, providerId, create.meta.mode,
         gate.code,
         `${gate.message}; order remains HELD, re-enter viability/authority with the observed price`,
-        { ...heldEffects, paymentGate: gate.code, authorisedCeiling: ceiling },
+        { ...heldEffects, paymentGate: gate.code, authorisedCeiling: ceiling, reviewedSpend },
       );
     }
 
-    // 4. Pay with the authoritative ceiling attached (adapter re-checks too).
+    // 4. Pay with the authoritative ceiling attached. The Atlas adapter
+    //    independently re-checks the observed payable against this ceiling
+    //    before issuing the provider payment (G3R-R1 A3).
     const pay = await transactions.payOrder({
       orderRef,
       paymentRef: dossier.paymentRef,
@@ -480,6 +557,8 @@ export function createProviderBackedExecutor(
             observedEffects: {
               operation: intent.operation,
               orderStatus: 'TICKETED',
+              // Issued tickets ARE the candidate state: safe to confirm.
+              [CONFIRMS_CANDIDATE_STATE]: true,
               ...finalData,
             },
           };
@@ -680,7 +759,7 @@ export function createProviderBackedExecutor(
         provenance: provenanceFor(mode),
         providerId,
         resultSummary: `order ${orderRef} observed cancelled`,
-        observedEffects: effects,
+        observedEffects: { ...effects, [CONFIRMS_CANDIDATE_STATE]: true },
       };
     }
     if (status === 'REJECTED') {
@@ -753,6 +832,16 @@ export function createProviderBackedExecutor(
 
     // 2. Cost gate against the ceiling authority reviewed (same discipline
     //    as flight payment: incomparable cost never books).
+    const reviewedSpend = reviewedSpendFor(intent);
+    if (!reviewedSpend) {
+      return providerFailure(
+        execution, providerId, quote.meta.mode,
+        'authority_reviewed_no_spend',
+        'intent carries no priceDelta, so authority evaluated no spend rules for this chargeable' +
+          ' replacement; booking refused, re-enter authority with the observed price',
+        { observedPrice: quote.data.quotedPrice },
+      );
+    }
     const ceiling = await ceilingFor(intent);
     const gate = paymentGateVerdict(quote.data.quotedPrice, ceiling);
     if (!gate.ok) {
@@ -760,7 +849,7 @@ export function createProviderBackedExecutor(
         execution, providerId, quote.meta.mode,
         gate.code,
         `${gate.message}; replacement booking refused`,
-        { observedPrice: quote.data.quotedPrice, paymentGate: gate.code, authorisedCeiling: ceiling },
+        { observedPrice: quote.data.quotedPrice, paymentGate: gate.code, authorisedCeiling: ceiling, reviewedSpend },
       );
     }
 
@@ -820,7 +909,11 @@ export function createProviderBackedExecutor(
         provenance: provenanceFor(retrieved.meta.mode),
         providerId,
         resultSummary: `replacement booking ${replacementBookingId} confirmed; no displaced stay to cancel`,
-        observedEffects: { operation: intent.operation, ...replacementEffects },
+        observedEffects: {
+          operation: intent.operation,
+          [CONFIRMS_CANDIDATE_STATE]: true,
+          ...replacementEffects,
+        },
       };
     }
     const displacedBookingId = dossier.displacedBookingId;
@@ -860,6 +953,7 @@ export function createProviderBackedExecutor(
       resultSummary: `replacement ${replacementBookingId} confirmed and displaced stay ${displacedBookingId} cancelled`,
       observedEffects: {
         operation: intent.operation,
+        [CONFIRMS_CANDIDATE_STATE]: true,
         ...replacementEffects,
         displacedBooking: {
           bookingId: displacedBookingId,
@@ -878,6 +972,20 @@ export function createProviderBackedExecutor(
     execute: async (execution: AuthorisedExecution): Promise<ExecutionResult> => {
       const issues = executionGateIssues(execution);
       if (issues.length > 0) return deps.fallback.execute(execution);
+      // Structural backstop: never let a provider call outrank the
+      // side-effect level authority actually reviewed (G3R-R1 A1). This
+      // fails LOUD rather than falling back to simulation, because a
+      // misclassified consequential intent is a policy defect to surface,
+      // not a case to quietly simulate.
+      const required = insufficientSideEffectLevel(execution.intent);
+      if (required !== undefined) {
+        return failure(
+          execution,
+          'side_effect_level_misclassified',
+          `operation ${execution.intent.operation} performs a ${required} provider side effect but the` +
+            ` intent authority reviewed was declared ${execution.intent.sideEffectLevel}; refusing to execute`,
+        );
+      }
       switch (execution.intent.operation) {
         case 'flight.book':
         case 'flight.pay':

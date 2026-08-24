@@ -375,8 +375,16 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   record('atlas.executor_flight_pay', 'atlas', { operation: 'flight.pay', offerId: offer.offerId, ceiling: offer.totalPrice }, bookingResult);
 
   // Documented re-entry: if the observed payable exceeded the approved
-  // ceiling, authority re-reviews the observed price and one fresh attempt
-  // runs under the revised ceiling. The refused HELD order simply expires.
+  // ceiling, ONE fresh attempt runs under a ceiling raised to the observed
+  // price. The refused HELD order simply expires.
+  //
+  // HONESTY NOTE (G3R-R1): this is a scripted ceiling raise, NOT deterministic
+  // re-authority — no AuthorityEngine runs on this path, and this harness
+  // hand-builds its own AUTO_APPROVED envelopes. In the product the refusal
+  // loops the case back through viability/authority, which re-evaluates the
+  // observed price against the real rule set. Read any evidence produced here
+  // as "the executor refused, then a human-equivalent decision re-authorised",
+  // never as "the authority engine approved the higher price".
   if (bookingResult.status === 'FAILURE' && bookingResult.error?.code === 'payable_exceeds_ceiling') {
     const observed = bookingResult.observedEffects?.['observedPayable'] as Money | undefined;
     if (observed) {
