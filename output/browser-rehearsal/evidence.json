@@ -1,0 +1,52 @@
+{
+  "verdict": "PASS",
+  "steps": [
+    {
+      "step": "demo-panel.mode",
+      "at": "2026-08-24T22:20:37.501Z",
+      "line": "Adapter: REPLAY · Planner: Deterministic fallback (local)"
+    },
+    {
+      "step": "demo-reset",
+      "at": "2026-08-24T22:20:38.502Z",
+      "result": "Reset complete. {\"message\":\"reset complete\",\"reset\":true,\"seededScenarios\":[\"scenario-anchor-event-speaker\",\"scenario-corporate-tmc\"],\"tripIds\":[\"trip_a\",\"trip_"
+    },
+    {
+      "step": "demo-trigger",
+      "at": "2026-08-24T22:20:38.673Z",
+      "caseId": "case-trip_a-sig_a_cancel",
+      "resultText": "Triggered. {\"scenarioId\":\"scenario-anchor-event-speaker\",\"signalId\":\"sig_a_cancel\",\"caseId\":\"case-trip_a-sig_a_cancel\",\"caseStatus\":\"ASSESSING\",\"severity\":\"HIGH\"}"
+    },
+    {
+      "step": "operator-dashboard",
+      "at": "2026-08-24T22:20:39.497Z",
+      "showsDisrupted": true
+    },
+    {
+      "step": "case.plan-recovery-click",
+      "at": "2026-08-24T22:20:40.853Z",
+      "optionsVisible": 0,
+      "beginButtonPresent": true
+    },
+    {
+      "step": "case.begin-strategy-click",
+      "at": "2026-08-24T22:20:41.326Z",
+      "approvalState": "PENDING"
+    },
+    {
+      "step": "traveller.approve-click",
+      "at": "2026-08-24T22:20:42.524Z",
+      "state": "RECOVERING"
+    },
+    {
+      "step": "case.final-after-approval",
+      "at": "2026-08-24T22:20:43.211Z",
+      "state": "RESOLVED"
+    },
+    {
+      "step": "traveller.reload-persistence",
+      "at": "2026-08-24T22:20:44.092Z",
+      "stillProgressed": true
+    }
+  ]
+}

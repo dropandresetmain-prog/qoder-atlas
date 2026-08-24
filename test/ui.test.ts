@@ -347,6 +347,15 @@ test('traveller surfaces: disrupted hero, decision buttons, viability', () => {
   assert.equal((awaiting.match(/<button type="submit"/g) ?? []).length, 2);
   assert.ok(awaiting.includes('Nothing is booked until you choose'));
   assert.ok(awaiting.includes('data-viability="AT_RISK"'));
+
+  // Regression (Mission 3 browser rehearsal): the decision form must be
+  // interceptable by the progressive enhancement script and must carry the
+  // decision vocabulary the /traveller-decision endpoint actually accepts —
+  // a native form-encoded POST of option labels was refused as invalid_json,
+  // leaving a raw error screen to a traveller who clicked a choice.
+  assert.ok(awaiting.includes('class="choice-form inline-form"'), 'decision form must be enhancement-intercepted');
+  assert.ok(awaiting.includes('name="decision"'), 'choice buttons must post the decision field');
+  assert.ok(!awaiting.includes('name="choice"'), 'option labels are display-only, never the wire field');
 });
 
 test('mobile traveller page shell carries responsive metadata', () => {

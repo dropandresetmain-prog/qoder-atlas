@@ -86,6 +86,15 @@ export function renderFormEnhancementScript(): string {
   return `<script>
 (function() {
   'use strict';
+  // e.submitter is not populated in every situation (e.g. keyboard or
+  // synthesized submissions), so also remember the last submit button the
+  // user clicked on each form — its name/value must reach the JSON body.
+  var lastClickedSubmitter = new WeakMap();
+  document.addEventListener('click', function(e) {
+    var el = e.target;
+    while (el && el.tagName !== 'BUTTON') el = el.parentElement;
+    if (el && el.type === 'submit' && el.form) lastClickedSubmitter.set(el.form, el);
+  }, true);
   document.addEventListener('submit', function(e) {
     var form = e.target;
     // Intercept forms with either 'action-form' or 'inline-form' class
@@ -108,7 +117,7 @@ export function renderFormEnhancementScript(): string {
     }
 
     // Also collect any named buttons that were clicked
-    var submitter = e.submitter;
+    var submitter = e.submitter || lastClickedSubmitter.get(form) || null;
     if (submitter && submitter.name && submitter.value) {
       body[submitter.name] = submitter.value;
     }

@@ -63,7 +63,17 @@ function commitmentCard(presentation?: TravellerPresentation): string {
   </div>`;
 }
 
-/** One choice as a rich option card when presentation detail exists. */
+/**
+ * One choice as a rich option card when presentation detail exists.
+ *
+ * Choice buttons carry name="decision" with APPROVED/DECLINED values so the
+ * progressive enhancement script (interaction.ts) can convert the submission
+ * into the JSON body the /traveller-decision endpoint actually expects.
+ */
+function choiceValue(option: string): string {
+  return option.toLowerCase() === 'decline' ? 'DECLINED' : 'APPROVED';
+}
+
 function richOptionButton(option: string, detail: TravellerOptionDetail): string {
   const edgeClass = detail.commitmentEffect === 'keeps' ? 'opt-reco' : detail.commitmentEffect === 'breaks' ? 'opt-miss' : '';
   const flag = detail.flag
@@ -74,7 +84,7 @@ function richOptionButton(option: string, detail: TravellerOptionDetail): string
     : '';
   const noteClass = detail.commitmentEffect === 'breaks' ? 'n-bad' : detail.commitmentEffect === 'keeps' ? 'n-ok' : '';
   const note = detail.note ? `<div class="opt-note ${noteClass}">${escapeHtml(detail.note)}</div>` : '';
-  return `<button type="submit" name="choice" value="${escapeHtml(option)}" class="optcard ${edgeClass}">
+  return `<button type="submit" name="decision" value="${choiceValue(option)}" class="optcard ${edgeClass}">
     <div class="opt-head"><span class="opt-title">${escapeHtml(option)}</span>${flag}</div>
     ${route}
     ${note}
@@ -87,7 +97,7 @@ function inputCard(request: TravellerInputRequest, presentation?: TravellerPrese
       const detail = presentation?.optionDetails?.[option];
       return detail
         ? richOptionButton(option, detail)
-        : `<button type="submit" name="choice" value="${escapeHtml(option)}" class="plain-choice">${escapeHtml(option)}</button>`;
+        : `<button type="submit" name="decision" value="${choiceValue(option)}" class="plain-choice">${escapeHtml(option)}</button>`;
     })
     .join('');
   const contact = presentation?.contactName
@@ -95,7 +105,7 @@ function inputCard(request: TravellerInputRequest, presentation?: TravellerPrese
     : '';
   const decided = request.decidedAt
     ? `<p class="choice-note">You answered on ${escapeHtml(formatInstant(request.decidedAt))}. Thank you.</p>`
-    : `<form class="choice-form" data-case-id="${escapeHtml(request.caseId)}" method="post" action="/api/cases/${escapeHtml(request.caseId)}/traveller-decision">
+    : `<form class="choice-form inline-form" data-case-id="${escapeHtml(request.caseId)}" method="post" action="/api/cases/${escapeHtml(request.caseId)}/traveller-decision">
         ${buttons}
         <p class="choice-note">Nothing is booked until you choose. We will check your choice against the rest of your trip first.${contact}</p>
       </form>`;
