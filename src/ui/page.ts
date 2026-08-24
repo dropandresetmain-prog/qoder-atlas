@@ -7,6 +7,7 @@
  */
 import { THEME_CSS } from './theme.ts';
 import { escapeHtml } from './html.ts';
+import { renderFormEnhancementScript } from './interaction.ts';
 
 export type NavTarget = 'dashboard' | 'case' | 'traveller';
 
@@ -63,6 +64,7 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
 </header>
 ${banner}
 ${bodyHtml}
+${renderFormEnhancementScript()}
 </body>
 </html>`;
 }

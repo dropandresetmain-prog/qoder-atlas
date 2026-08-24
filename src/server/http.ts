@@ -72,6 +72,7 @@ export interface RuntimeHandlers {
   execute(body: unknown): Promise<{ status: number; body: unknown }>;
   reset(body: unknown): Promise<{ status: number; body: unknown }>;
   state(): Promise<{ status: number; body: unknown }>;
+  reportMissedFlight(body: unknown): Promise<{ status: number; body: unknown }>;
 }
 
 /**
@@ -401,6 +402,11 @@ async function handle(
       case 'execute':
       case 'reset': {
         const outcome = await handlers[action](parsed);
+        sendJson(res, outcome.status, outcome.body);
+        return;
+      }
+      case 'missed-flight': {
+        const outcome = await handlers.reportMissedFlight(parsed);
         sendJson(res, outcome.status, outcome.body);
         return;
       }

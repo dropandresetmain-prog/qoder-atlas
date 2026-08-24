@@ -95,7 +95,7 @@ function inputCard(request: TravellerInputRequest, presentation?: TravellerPrese
     : '';
   const decided = request.decidedAt
     ? `<p class="choice-note">You answered on ${escapeHtml(formatInstant(request.decidedAt))}. Thank you.</p>`
-    : `<form class="choice-form" data-case-id="${escapeHtml(request.caseId)}" method="post">
+    : `<form class="choice-form" data-case-id="${escapeHtml(request.caseId)}" method="post" action="/api/cases/${escapeHtml(request.caseId)}/traveller-decision">
         ${buttons}
         <p class="choice-note">Nothing is booked until you choose. We will check your choice against the rest of your trip first.${contact}</p>
       </form>`;

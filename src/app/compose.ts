@@ -375,6 +375,8 @@ export async function composeAppRuntime(
     },
     runtime: createRuntimeHandlers({
       orchestrator,
+      trips,
+      mutations,
       state: async () => ({
         trips: (await trips.listTrips()).map((summary) => ({
           tripId: summary.tripId,

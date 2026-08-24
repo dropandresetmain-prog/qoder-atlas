@@ -145,9 +145,16 @@ function travellerRow(row: ProgrammeTravellerView): string {
   const uncertainties = row.uncertainties.length
     ? `<ul class="plain-list">${row.uncertainties.map((u) => `<li>${escapeHtml(u)}</li>`).join('')}</ul>`
     : `<p class="empty-note">—</p>`;
+  const firstActiveCaseId = row.activeCaseIds[0];
+  const caseLink = firstActiveCaseId
+    ? `/operator/cases/${escapeHtml(firstActiveCaseId)}`
+    : `/traveller?trip=${escapeHtml(row.tripId)}`;
+  const actionIndicator = row.decisionsRequired > 0
+    ? `<span class="action-indicator" title="${row.decisionsRequired} action${row.decisionsRequired === 1 ? '' : 's'} required">⚡</span>`
+    : '';
   return `
     <tr data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}">
-      <td>${escapeHtml(row.travellerName)}</td>
+      <td><a href="${caseLink}" class="traveller-link" data-test="programme-traveller-link">${escapeHtml(row.travellerName)}${actionIndicator}</a></td>
       <td>${statusBadge(row.status)}</td>
       <td>${row.activeCaseIds.length}</td>
       <td>${row.decisionsRequired}</td>

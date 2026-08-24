@@ -129,12 +129,12 @@ function decisionRow({ trip, decision }: PendingDecisionRow, index: number): str
   const amount = decision.amount ? ` · ${escapeHtml(formatMoney(decision.amount))}` : '';
   const when = decision.requestedAt ? formatInstant(decision.requestedAt) : 'timing unconfirmed';
   return `
-  <div class="qrow" style="--i:${index}" data-case-id="${escapeHtml(decision.caseId)}">
+  <a href="/operator/cases/${escapeHtml(decision.caseId)}" class="qrow" style="--i:${index}" data-case-id="${escapeHtml(decision.caseId)}" data-test="decision-link">
     <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
     <span class="q-name">${escapeHtml(trip.label ?? trip.tripId)}</span>
     <span class="q-issue">${escapeHtml(decision.description)}${amount}</span>
     <span class="q-time">${escapeHtml(when)}</span>
-  </div>`;
+  </a>`;
 }
 
 function decisionsPanel(rows: PendingDecisionRow[]): string {
@@ -162,8 +162,12 @@ function tripRow(trip: OperatorTripView, index: number): string {
   if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
+  const firstPendingDecision = trip.pendingDecisions[0];
+  const caseLink = firstPendingDecision
+    ? `/operator/cases/${escapeHtml(firstPendingDecision.caseId)}`
+    : `/traveller?trip=${escapeHtml(trip.tripId)}`;
   return `
-  <div class="brow" style="--i:${index}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}">
+  <a href="${caseLink}" class="brow" style="--i:${index}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}" data-test="trip-link">
     <span class="b-dot ${FLEET_CELL[trip.status]}" aria-hidden="true"></span>
     <div>
       <div class="b-name">${escapeHtml(trip.label ?? trip.tripId)}</div>
@@ -177,7 +181,7 @@ function tripRow(trip: OperatorTripView, index: number): string {
       ${statusBadge(trip.status)}
       <div class="b-time">${escapeHtml(formatInstant(trip.updatedAt))}</div>
     </div>
-  </div>`;
+  </a>`;
 }
 
 /** Dashboard body from a loaded view (also used directly by tests). */

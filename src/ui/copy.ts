@@ -179,8 +179,16 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'read model',
   'readmodel',
   'scenario overlay',
-  'constraint',
   'planner',
   'schema',
   'mutation',
+  // DR-8: internal identifiers and raw evidence must never reach user copy.
+  'atlsbx-',
+  'ruletrace',
+  'rule trace',
+  'caseid',
+  'intentid',
+  'strategyid',
+  'signalid',
+  'offerid',
 ];

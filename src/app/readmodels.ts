@@ -84,7 +84,20 @@ function describeElement(element: TripElement): string {
   return ref ? `${label} · ${ref}` : label;
 }
 
-export function statusFromCase(status: CaseStatus): ReadModelStatus {
+/**
+ * Derive ReadModelStatus from a RecoveryCase.
+ *
+ * DR-8: traveller-initiated change requests (TRAVELLER_INPUT signals) in
+ * early case states (DETECTED/ASSESSING/PLANNING/ESCALATED) render as
+ * CHANGE_REQUESTED, not DISRUPTED. Supplier-originated disruptions in the
+ * same states render as DISRUPTED. This distinction is critical for user
+ * copy: "The traveller asked for a change" vs "Plans changed and part of
+ * this trip no longer works as booked."
+ */
+export function statusFromCase(
+  status: CaseStatus,
+  isTravellerChangeRequest: boolean = false,
+): ReadModelStatus {
   switch (status) {
     case 'RESOLVED':
       return 'RESOLVED';
@@ -95,12 +108,33 @@ export function statusFromCase(status: CaseStatus): ReadModelStatus {
     case 'AWAITING_APPROVAL':
       return 'RECOVERING';
     default:
-      return 'DISRUPTED';
+      // DETECTED, ASSESSING, PLANNING, ESCALATED
+      return isTravellerChangeRequest ? 'CHANGE_REQUESTED' : 'DISRUPTED';
   }
 }
 
-export function statusForTrip(trip: Trip, latestCase?: RecoveryCase): ReadModelStatus {
-  if (latestCase) return statusFromCase(latestCase.status);
+/**
+ * DR-8: detect whether a case was triggered by a traveller change request.
+ * A case is traveller-initiated when its triggering signal is a
+ * TRAVELLER_INPUT kind. The signal kind is the authoritative evidence —
+ * never inferred from case status or strategy content.
+ */
+export async function isTravellerChangeRequest(
+  signals: SignalRepository,
+  recoveryCase: RecoveryCase,
+): Promise<boolean> {
+  for (const signalId of recoveryCase.triggeredBySignalIds) {
+    const signal = await signals.getSignal(signalId);
+    if (signal?.kind === 'TRAVELLER_INPUT') return true;
+  }
+  return false;
+}
+
+export async function statusForTrip(trip: Trip, latestCase?: RecoveryCase, signals?: SignalRepository): Promise<ReadModelStatus> {
+  if (latestCase) {
+    const isChangeRequest = signals ? await isTravellerChangeRequest(signals, latestCase) : false;
+    return statusFromCase(latestCase.status, isChangeRequest);
+  }
   switch (trip.viability) {
     case 'VIABLE':
       return 'READY';
@@ -179,7 +213,7 @@ export async function projectOperatorDashboard(
     const trip = await deps.snapshot.trips.getTrip(item.tripId);
     if (!trip) continue;
     const recoveryCase = await latestCaseFor(deps.cases, trip.id);
-    const status = statusForTrip(trip, recoveryCase);
+    const status = await statusForTrip(trip, recoveryCase, deps.signals);
     if (status === 'READY') summary.ready += 1;
     else if (status === 'AT_RISK') summary.atRisk += 1;
     else if (status === 'DISRUPTED') summary.disrupted += 1;
@@ -416,12 +450,14 @@ export async function projectCaseDetail(
     .map((ref) => trip.objectives.find((o) => o.id === ref)?.statement)
     .filter((statement): statement is string => Boolean(statement));
 
+  const isChangeRequest = triggeringSignals.some((s) => s.kind === 'TRAVELLER_INPUT');
+
   return {
     caseId: recoveryCase.id,
     tripId: trip.id,
     ...(trip.label ? { tripLabel: trip.label } : {}),
     travellerNames,
-    status: statusFromCase(recoveryCase.status),
+    status: statusFromCase(recoveryCase.status, isChangeRequest),
     ...(triggeringSignals[0] ? { whatChanged: triggeringSignals[0].summary } : {}),
     affectedItems: recoveryCase.affectedElementIds
       .map((id) => trip.elements.find((element) => element.id === id))
@@ -459,7 +495,7 @@ export async function projectTravellerTrip(
   const trip = await deps.snapshot.trips.getTrip(tripId);
   if (!trip) return undefined;
   const recoveryCase = await latestCaseFor(deps.cases, tripId);
-  const status = statusForTrip(trip, recoveryCase);
+  const status = await statusForTrip(trip, recoveryCase, deps.signals);
 
   const signals = await deps.signals.listSignalsForTrip(tripId);
   const lastSignal = signals[signals.length - 1];

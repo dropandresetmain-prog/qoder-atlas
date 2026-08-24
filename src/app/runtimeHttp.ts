@@ -12,6 +12,10 @@ import { z } from 'zod';
 import { EntityIdSchema, EntityRefSchema, IsoDateTimeSchema } from '../domain/common.ts';
 import { TripSignalSchema } from '../operational/signal.ts';
 import type { RuntimeOrchestrator } from './runtime.ts';
+import { reportMissedFlight } from './missedFlight.ts';
+import type { TripRepository } from '../contracts/repositories.ts';
+import type { MutationService } from '../contracts/services.ts';
+import type { SqlMutationService } from '../engine/mutation.ts';
 
 const InstantBody = z.strictObject({ at: IsoDateTimeSchema });
 
@@ -33,6 +37,13 @@ const DecideBodySchema = InstantBody.extend({
 const ExecuteBodySchema = InstantBody.extend({
   caseId: EntityIdSchema,
   intentId: EntityIdSchema,
+});
+
+const MissedFlightBodySchema = z.strictObject({
+  tripId: EntityIdSchema,
+  elementId: EntityIdSchema.optional(),
+  travellerReport: z.string(),
+  at: IsoDateTimeSchema,
 });
 
 type WireResult = { status: number; body: unknown };
@@ -92,6 +103,8 @@ function signalWire(processed: Awaited<ReturnType<RuntimeOrchestrator['processDi
 /** RuntimeHandlers over a wired orchestrator. */
 export function createRuntimeHandlers(deps: {
   orchestrator: RuntimeOrchestrator;
+  trips: TripRepository;
+  mutations: SqlMutationService;
   state: () => Promise<Record<string, unknown>>;
 }): {
   disruption(body: unknown): Promise<WireResult>;
@@ -101,8 +114,9 @@ export function createRuntimeHandlers(deps: {
   execute(body: unknown): Promise<WireResult>;
   reset(body: unknown): Promise<WireResult>;
   state(): Promise<WireResult>;
+  reportMissedFlight(body: unknown): Promise<WireResult>;
 } {
-  const { orchestrator } = deps;
+  const { orchestrator, trips, mutations } = deps;
   return {
     disruption(body) {
       return guarded(body, TripSignalSchema, async (signal) =>
@@ -152,6 +166,29 @@ export function createRuntimeHandlers(deps: {
     },
     async state() {
       return { status: 200, body: await deps.state() };
+    },
+    reportMissedFlight(body) {
+      return guarded(body, MissedFlightBodySchema, async (input) => {
+        const result = await reportMissedFlight(
+          { orchestrator, trips, mutations },
+          {
+            tripId: input.tripId,
+            elementId: input.elementId,
+            travellerReport: input.travellerReport,
+            at: input.at,
+          },
+        );
+        return {
+          signalId: result.signalId,
+          caseId: result.caseId,
+          caseStatus: result.caseStatus,
+          missedElementId: result.missedElementId,
+          mutationAccepted: result.processed.mutationAccepted,
+          severity: result.processed.assessment.severity,
+          directFailureIds: result.processed.assessment.directFailures.map((f) => f.elementId),
+          threatenedObjectiveIds: result.processed.assessment.threatenedObjectives.map((o) => o.objectiveId),
+        };
+      });
     },
   };
 }

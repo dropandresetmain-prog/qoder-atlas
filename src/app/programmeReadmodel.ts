@@ -22,16 +22,16 @@ import type {
   ProgrammeView,
 } from '../contracts/readmodels.ts';
 import { ImpactEngine } from '../engine/impact.ts';
-import { latestCaseFor, statusForTrip, statusFromCase, type ReadModelDependencies } from './readmodels.ts';
+import { latestCaseFor, statusForTrip, statusFromCase, isTravellerChangeRequest, type ReadModelDependencies } from './readmodels.ts';
 
 /**
  * Programme-level status derivation. Extends the operator-dashboard rules
  * with initial-planning awareness: a trip whose viability is still UNKNOWN
  * and that has no booked transport/stay yet is PLANNING, not READY.
  */
-function programmeStatusFor(trip: Trip, latestCaseStatus?: CaseStatus) {
+async function programmeStatusFor(trip: Trip, latestCaseStatus?: CaseStatus, isChangeRequest?: boolean) {
   if (latestCaseStatus) {
-    return statusFromCase(latestCaseStatus);
+    return statusFromCase(latestCaseStatus, isChangeRequest);
   }
   if (trip.viability === 'UNKNOWN' && !trip.elements.some((element) => element.elementKind !== 'ENGAGEMENT')) {
     return 'PLANNING' as const;
@@ -72,7 +72,8 @@ export async function projectProgrammeView(
     summary.total += 1;
 
     const recoveryCase = await latestCaseFor(deps.cases, trip.id);
-    const status = programmeStatusFor(trip, recoveryCase?.status);
+    const isChangeRequest = recoveryCase ? await isTravellerChangeRequest(deps.signals, recoveryCase) : false;
+    const status = await programmeStatusFor(trip, recoveryCase?.status, isChangeRequest);
     if (status === 'READY') summary.ready += 1;
     else if (status === 'PLANNING') summary.planning += 1;
     else if (status === 'NEEDS_TRAVELLER_INFO') summary.needsTravellerInfo += 1;

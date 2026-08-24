@@ -170,16 +170,33 @@ const APPROVAL_STATE_LABEL: Record<ApprovalRequirementView['state'], string> = {
   DECLINED: 'Declined',
 };
 
-function approvalPanel(approval?: ApprovalRequirementView): string | undefined {
+function approvalPanel(approval?: ApprovalRequirementView, caseId?: string): string | undefined {
   if (!approval) return undefined;
   const from = approval.requestedFrom === 'ORGANISATION' ? 'the organisation' : 'the traveller';
   const amount = approval.amount ? ` Amount: <strong>${escapeHtml(formatMoney(approval.amount))}</strong>.` : '';
+
+  let actionForms = '';
+  if (approval.state === 'PENDING' && caseId) {
+    actionForms = `
+    <div class="approval-actions">
+      <form method="POST" action="/api/cases/${escapeHtml(caseId)}/traveller-decision" class="inline-form">
+        <input type="hidden" name="decision" value="APPROVED">
+        <button type="submit" class="btn btn-primary">Approve</button>
+      </form>
+      <form method="POST" action="/api/cases/${escapeHtml(caseId)}/traveller-decision" class="inline-form">
+        <input type="hidden" name="decision" value="DECLINED">
+        <button type="submit" class="btn btn-danger">Decline</button>
+      </form>
+    </div>`;
+  }
+
   return `
   <div class="panel callout tone-${APPROVAL_STATE_TONE[approval.state]}" data-approval-state="${escapeHtml(approval.state)}">
     <p class="callout-title">Approval needed from ${escapeHtml(from)}</p>
     <p>${escapeHtml(approval.reason)}${amount}
       <span class="${toneClass(APPROVAL_STATE_TONE[approval.state], 'badge')}">${escapeHtml(APPROVAL_STATE_LABEL[approval.state])}</span>
     </p>
+    ${actionForms}
   </div>`;
 }
 
@@ -226,6 +243,43 @@ function resolutionPanel(resolution?: CaseResolutionView): string | undefined {
   </div>`;
 }
 
+function recoveryActionsPanel(view: CaseDetailView): string | undefined {
+  // If no options yet and case is DISRUPTED, show "Plan Recovery" button
+  if (view.status === 'DISRUPTED' && view.options.length === 0) {
+    return `
+    <div class="panel recovery-actions" data-ui-section="recovery-actions">
+      <p class="callout-title">Ready to plan recovery?</p>
+      <p>The system will analyze the disruption and generate recovery options.</p>
+      <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form">
+        <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+        <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+        <button type="submit" class="btn btn-primary" data-test="plan-recovery-btn">Plan Recovery</button>
+      </form>
+    </div>`;
+  }
+
+  // If options exist but no approval yet, show "Begin Strategy" button
+  // (regardless of status - after planning, status changes to PLANNING/RECOVERING)
+  if (view.options.length > 0 && !view.approval) {
+    const recommendedOption = view.options.find(o => o.recommended);
+    if (!recommendedOption) return undefined;
+
+    return `
+    <div class="panel recovery-actions" data-ui-section="recovery-actions">
+      <p class="callout-title">Ready to begin recovery?</p>
+      <p>The system has identified a recommended strategy. Click below to begin the recovery flow.</p>
+      <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
+        <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+        <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
+        <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+        <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin Strategy</button>
+      </form>
+    </div>`;
+  }
+
+  return undefined;
+}
+
 /** Case detail body from a loaded, validated view. */
 export function renderCaseDetailBody(view: CaseDetailView): string {
   const issues = caseDetailViewIssues(view);
@@ -260,7 +314,8 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     'Options on the table',
     view.options.length > 0 ? view.options.map(optionCard).join('') : undefined,
   )}
-  ${optionalSection('Approval', approvalPanel(view.approval))}
+  ${optionalSection('Recovery Actions', recoveryActionsPanel(view))}
+  ${optionalSection('Approval', approvalPanel(view.approval, view.caseId))}
   ${optionalSection('What is happening now', actionsSection(view.actions))}
   ${uncertaintyList(view.uncertainties)}
   ${optionalSection('Result', resolutionPanel(view.resolution))}
