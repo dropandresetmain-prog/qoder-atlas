@@ -1,0 +1,41 @@
+{
+  "mission": "Wave 3R Mission 3 — REPLAY/reset evidence",
+  "generatedAt": "2026-08-25",
+  "adapterMode": "REPLAY",
+  "sanitisation": {
+    "verdict": "CLEAN",
+    "scan": "scripts/wave3r-recording-secret-scan.mjs",
+    "envKeysChecked": [
+      "ATLAS_BASE_URL", "ATLAS_CLIENT_ID", "ATLAS_CLIENT_SECRET",
+      "MODEL_STUDIO_API_KEY", "MODEL_STUDIO_BASE_URL",
+      "NUITEE_API_KEY", "NUITEE_SEARCH_BASE_URL", "NUITEE_BOOKING_BASE_URL",
+      "GOOGLE_ROUTES_API_KEY", "SQLITE_PATH", "RECORDINGS_DIR", "FIXTURES_DIR"
+    ],
+    "filesScanned": 61,
+    "leaks": 0,
+    "recordingsWithoutSanitizedFlag": 0,
+    "tests": [
+      "providers.foundation.test.ts — C1 RECORD redacts secrets, keeps provider shape",
+      "northstar-atlas-replay.test.ts — RECORD persists sanitized recordings, no credential leak",
+      "northstar-hotel.test.ts — RV-N7 RECORD writes sanitized recordings"
+    ]
+  },
+  "replayParity": {
+    "verdict": "PASS",
+    "tests": [
+      "northstar-atlas-replay.test.ts — REPLAY and RECORD normalize identical LIVE-shaped payloads to identical outcomes; LIVE without credentials fails structured",
+      "providers.atlas.test.ts — C2 RECORD->REPLAY same normalizer identical output, same recordingId",
+      "northstar-hotel.test.ts — RV-N7 REPLAY and RECORD share one normalizer (byte-identical for same raw)",
+      "providers.foundation.test.ts — C1 REPLAY loads recorded raw and runs identical normalizer; deterministic recording ids"
+    ],
+    "runtime": "All Mission 3 scenario/browser evidence (S1-S4, rehearsal) ran through REPLAY on the committed recordings corpus with the same normalization path as LIVE"
+  },
+  "reseedDeterminism": {
+    "verdict": "PASS",
+    "tests": [
+      "wave3-gate7-reset-reseed.test.ts — boot seed, deterministic reset/reseed at programme scale, no residue"
+    ],
+    "runtime": "Two consecutive POST /api/demo/reset on the live server produced byte-identical /api/runtime/state output",
+    "browserRehearsal": "demo panel Reset & reseed clicked through the product UI returned reset:true with seededScenarios [scenario-anchor-event-speaker, scenario-corporate-tmc]"
+  }
+}
