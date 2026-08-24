@@ -463,6 +463,52 @@ test('1D-4: missing payable total -> payOrder is never called', async () => {
   assert.equal(noCeiling.fakes.calls.pay, 0);
 });
 
+test('1D-4b: create without payable observes it via retrieve before the gate (duplicate adoption)', async () => {
+  // Wire reality (Atlas status 318): duplicate detection adopts an existing
+  // HELD order whose create response carries explicit null totals. The gate
+  // must observe the payable through the read path — and stay fail-closed
+  // when the observed payable exceeds the ceiling.
+  const adopted = flightExecutor(
+    {
+      create: heldCreate(undefined),
+      pay: ok({ status: 'PAID', transactionState: { orderRef: 'ord-1' }, provenance: 'LIVE' }),
+      retrieve: [
+        ok({
+          orderRef: 'ord-1',
+          status: 'HELD' as const,
+          transactionState: { orderRef: 'ord-1' },
+          totalPrice: { currency: 'USD', amount: 200 },
+          observedAt: AT,
+          provenance: 'LIVE' as const,
+        }),
+        retrieveView('TICKETED'),
+      ],
+    },
+    { currency: 'USD', amount: 250 },
+  );
+  const result = await adopted.executor.execute(envelope(flightIntent({ id: 'int_adopted_pay' })));
+  assert.equal(result.status, 'SUCCESS');
+  assert.ok(adopted.fakes.calls.retrieve >= 1, 'payable observed through the read path');
+  assert.equal(adopted.fakes.calls.pay, 1);
+
+  // Observed payable above the ceiling still refuses before payOrder.
+  const excessive = ok({
+    orderRef: 'ord-1',
+    status: 'HELD' as const,
+    transactionState: { orderRef: 'ord-1' },
+    totalPrice: { currency: 'USD', amount: 300 },
+    observedAt: AT,
+    provenance: 'LIVE' as const,
+  });
+  const refused = flightExecutor(
+    { create: heldCreate(undefined), retrieve: [excessive] },
+    { currency: 'USD', amount: 250 },
+  );
+  const refusedResult = await refused.executor.execute(envelope(flightIntent({ id: 'int_adopted_excess' })));
+  assert.equal(refusedResult.error?.code, 'payable_exceeds_ceiling');
+  assert.equal(refused.fakes.calls.pay, 0, 'payOrder must never be called');
+});
+
 test('1D-2b: payOrder carries the authority-frozen spendExposure, never priceDelta', async () => {
   const { executor, fakes } = flightExecutor(
     {

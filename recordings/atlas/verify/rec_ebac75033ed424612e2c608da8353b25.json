@@ -1,0 +1,203 @@
+{
+  "id": "rec_ebac75033ed424612e2c608da8353b25",
+  "providerId": "atlas",
+  "operation": "verify",
+  "recordedAt": "2026-08-24T21:29:06.624Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "sessionId": "0541f47e-25c9-426d-a55f-40e855393137",
+    "maxSeats": 9,
+    "priceChange": {
+      "isPriceChange": false,
+      "newAdultPrice": 60.85,
+      "newAdultTax": 8,
+      "newChildPrice": 60.85,
+      "newChildTax": 8,
+      "newInfantPrice": 0,
+      "newInfantTax": 0,
+      "originalAdultPrice": 60.85,
+      "originalAdultTax": 8,
+      "originalChildPrice": 60.85,
+      "originalChildTax": 8,
+      "originalInfantPrice": 0,
+      "originalInfantTax": 0
+    },
+    "bookingRequirement": {
+      "passenger": {
+        "birthday": {
+          "required": true,
+          "type": "string"
+        },
+        "cardIssuePlace": {
+          "required": false,
+          "type": "string"
+        },
+        "cardNum": {
+          "required": false,
+          "type": "string"
+        },
+        "passengerType": {
+          "required": true,
+          "type": "int"
+        },
+        "gender": {
+          "required": true,
+          "type": "string"
+        },
+        "nationality": {
+          "required": true,
+          "type": "string"
+        },
+        "cardExpired": {
+          "required": false,
+          "type": "string"
+        },
+        "name": {
+          "required": true,
+          "type": "string"
+        },
+        "cardType": {
+          "required": false,
+          "type": "string"
+        }
+      }
+    },
+    "routing": {
+      "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDY4Ljg1XzY4Ljg1XzAuMDBfMC4wMF8xMzcuNzBfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeVExDLVk0MzQ4My0tQ1VOLTIwMjYwOTIzMTEwNC0yMDI2MDkyMzE0MjctWmVyby0xLV42OC44NV82OC44NV8wLjAwXzAuMDBfMTM3LjcwXkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReNjguODVeNjguODVeMC4wMF4wfDF8MjAyNjA4MjUwNTI5MDZ8MHwxNzg3NjA2OTQ2MzgyYzYzZWU3M2V8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8fA==.J3s+dJtMnz+HNX72dv6m4YMl5JhPTf1X6JTnRF0JOiU=",
+      "fid": "8rCOZq697h_91QWJwrdOjMCPZUokACZjiCjG6-E_HAJAKMr4tdueN9hdb239v6gV",
+      "currency": "USD",
+      "adultPrice": 60.85,
+      "adultTax": 8,
+      "childPrice": 60.85,
+      "childTax": 8,
+      "infantPrice": 0,
+      "infantTax": 0,
+      "expireTime": null,
+      "refreshTime": null,
+      "fromSegments": [
+        {
+          "carrier": "Y4",
+          "operatingCarrier": "",
+          "flightNumber": "Y43483",
+          "depAirport": "TLC",
+          "arrAirport": "CUN",
+          "depTime": "202609231104",
+          "arrTime": "202609231427",
+          "duration": 143,
+          "cabin": "",
+          "cabinClass": 1,
+          "fareFamily": "Zero",
+          "seatCount": 9,
+          "segmentIndex": 1
+        }
+      ],
+      "retSegments": [],
+      "riskSellout": false,
+      "rule": {
+        "changesRules": [
+          {
+            "changesFee": 0,
+            "changesStatus": "T",
+            "currency": "USD",
+            "revNoshow": "T",
+            "revNoshowFee": 0,
+            "ruleDetailList": [
+              {
+                "amount": 850,
+                "currency": "MXN",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 21600
+              },
+              {
+                "amount": 1100,
+                "currency": "MXN",
+                "status": "H",
+                "startMinute": 21600,
+                "endMinute": 240
+              },
+              {
+                "amount": 0,
+                "currency": "USD",
+                "status": "T",
+                "startMinute": 240,
+                "endMinute": 0
+              },
+              {
+                "amount": 0,
+                "currency": "USD",
+                "status": "T",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "refundRules": [
+          {
+            "refundFee": 0,
+            "refundStatus": "T",
+            "refundMethod": null,
+            "currency": "USD",
+            "refNoshow": "T",
+            "refNoshowFee": 0,
+            "ruleDetailList": []
+          }
+        ],
+        "baggageElements": [
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 10,
+            "baggageSize": "45*35*20cm",
+            "baggageType": "CabinBaggageUnderSeat",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 10,
+            "baggageSize": "45*35*20cm",
+            "baggageType": "CabinBaggageUnderSeat",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "45*35*20cm",
+            "baggageType": "CabinBaggageUnderSeat",
+            "passengerType": 2,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 2,
+            "segmentNo": 1
+          }
+        ],
+        "hasBaggage": 1
+      }
+    }
+  }
+}

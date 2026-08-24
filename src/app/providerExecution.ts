@@ -226,7 +226,7 @@ const SIDE_EFFECT_RANK: Record<SideEffectLevel, number> = {
 };
 
 /** The real side effect each provider-backed operation performs. */
-const REQUIRED_SIDE_EFFECT_LEVEL: Record<string, SideEffectLevel> = {
+export const REQUIRED_SIDE_EFFECT_LEVEL: Record<string, SideEffectLevel> = {
   // Creates a provider-side order/hold; no money moves at create.
   'flight.book': 'IRREVERSIBLE',
   'flight.pay': 'MONEY_MOVING',
@@ -461,14 +461,29 @@ export function createProviderBackedExecutor(
       );
     }
     const ceiling = ceilingFor(intent);
-    const gate = paymentGateVerdict(create.data.totalPrice, ceiling);
+    // The provider's create outcome may carry no price — Atlas adopts an
+    // existing HELD order on duplicate detection (status 318) and returns
+    // explicit nulls for the adopted order's totals. Observe the payable
+    // once through the read path before gating; absence still fails closed.
+    let observedPayable = create.data.totalPrice;
+    if (!observedPayable) {
+      const payableCheck = await transactions.retrieveOrder({
+        orderRef,
+        clientReference: clientReferenceFor(intent),
+      });
+      if (payableCheck.ok && payableCheck.data.totalPrice) {
+        observedPayable = payableCheck.data.totalPrice;
+      }
+    }
+    const gateEffects = { ...heldEffects, ...(observedPayable ? { observedPayable } : {}) };
+    const gate = paymentGateVerdict(observedPayable, ceiling);
     if (!gate.ok) {
       // DO NOT PAY. Preserve the HELD order and loop back to authority.
       return providerFailure(
         execution, providerId, create.meta.mode,
         gate.code,
         `${gate.message}; order remains HELD, re-enter viability/authority with the observed price`,
-        { ...heldEffects, paymentGate: gate.code, authorisedCeiling: ceiling, reviewedSpend },
+        { ...gateEffects, paymentGate: gate.code, authorisedCeiling: ceiling, reviewedSpend },
       );
     }
 

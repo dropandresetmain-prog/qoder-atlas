@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { FileRecordingStore, containsAnySecret } from '../src/providers/index.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
-import { atlasScheduleToIso, normalizeVerify } from '../src/providers/atlas/normalize.ts';
+import { atlasScheduleToIso, normalizeSearch, normalizeVerify } from '../src/providers/atlas/normalize.ts';
 import type { FlightSearchQuery } from '../src/contracts/capabilities.ts';
 
 const FIXTURES = 'fixtures/recordings';
@@ -434,4 +434,51 @@ test('ADR-028: unresolvable airport fails structured instead of guessing an offs
     assert.equal(result.error.category, 'PROVIDER_ERROR');
     assert.match(result.error.message, /cannot resolve timezone for airport/);
   }
+});
+
+test('Mission 3: one unresolvable airport drops only its offers, never the whole search', () => {
+  // Wire reality: a multi-city search result can reference an airport the
+  // application has no authoritative timezone for. That offer is dropped
+  // honestly (no fabricated offset) while the rest of the search survives;
+  // a fully unresolvable result still fails closed.
+  const body = {
+    status: 0,
+    routings: [
+      {
+        routingIdentifier: 'routing-known',
+        currency: 'USD',
+        adultPrice: 100,
+        adultTax: 10,
+        fromSegments: [
+          { depAirport: 'MNL', arrAirport: 'CEB', depTime: '202609050800', arrTime: '202609050930' },
+        ],
+        retSegments: [],
+      },
+      {
+        routingIdentifier: 'routing-unknown-airport',
+        currency: 'USD',
+        adultPrice: 90,
+        adultTax: 9,
+        fromSegments: [
+          { depAirport: 'MNL', arrAirport: 'XXX', depTime: '202609051000', arrTime: '202609051200' },
+        ],
+        retSegments: [],
+      },
+    ],
+  } as never as Parameters<typeof normalizeSearch>[0];
+  const resolver = (code: string): string | undefined =>
+    code === 'MNL' || code === 'CEB' ? MANILA_TIMEZONE : undefined;
+
+  const partial = normalizeSearch(body, { adults: 1 }, resolver);
+  assert.deepEqual(
+    partial.offers.map((offer) => offer.offerId),
+    ['routing-known'],
+    'unresolvable routing dropped; honest rest preserved',
+  );
+
+  assert.throws(
+    () => normalizeSearch(body, { adults: 1 }, () => undefined),
+    /cannot resolve timezone for airport/,
+    'nothing normalizable still fails closed',
+  );
 });

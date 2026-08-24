@@ -1,0 +1,209 @@
+{
+  "id": "rec_595632b491374593e6d759fb35d9945e",
+  "providerId": "nuitee",
+  "operation": "book",
+  "recordedAt": "2026-08-24T21:45:28.009Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "jEi56ER5e",
+      "clientReference": "wave3r-m1-displaced-1787607928009",
+      "supplierBookingId": "jEi56ER5e",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-10-01",
+      "checkout": "2026-10-04",
+      "hotel": {
+        "hotelId": "lp59dc5",
+        "name": "Value Hotel Balestier"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "I42FUVCPJZBFOR2FGNDUWTSSKVDVSWKUJ5GVEV2HKFNEIQKOLJKUONBTKRGU6SSXJVKVURCBJZNFQR2ZGRKE6TSCK5EECM2HJVHFUVSHGQZEIRKNIJMEONBTIRJU4VCGI5MTERCNLJJFQRZVGZCEGSK2KNDUCWSEJVGUUUKHIFMVQWKNKJIUOSJTIRBU2QSRI5JDMR2LGNJTOS2WJJMFSVSLKRIFES2WI5JEINCHIZAVIQKRGM2EOUJSKRCU6TBUJZDESR2PKZFUSUCRLFKE6T2CLBDVSWKEJ5HUEWCHJEZEIS2OKRNE6QSWIZEUSWSUI5MTIRCBJZJFURKNLJCEGTS2LFDFKWSUJVHUEUKHLE2FQWKVKNDUUWRWIRCU2QSTI5MVSRCTJVJFQR2FLFCECTKEGRDUMNSGIVGUUUKHIVMUQWKNKJKEOSK2IRGUSMSTJI2FEVSFKJJU6RKNLJCECTKSK5DFKWKEKNGEUU2HGRIUIQ2NIIZEOQKZINDXYMRTGIXDENT4GIYDENRNGA4S2MZQEAYTAORQGA5DAMD4KJHXY7D4PRJXIYLOMRQXEZBAKR3WS3RAO5UXI2DPOV2CAV3JNZSG6534GAXDAMD4GAXDAMD4PQYC4MBQPQYC4MBQ",
+            "retailRate": {
+              "total": {
+                "amount": 232.26,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": "booking.com"
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Sales tax",
+                  "amount": 20.59,
+                  "currency": "USD"
+                },
+                {
+                  "included": true,
+                  "description": "Service charge (taxable)",
+                  "amount": 17.94,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-10-01 23:59:59",
+                  "amount": 232.26,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "Room Only",
+            "boardName": "RO",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Northstar",
+          "lastName": "Sandbox",
+          "childrenAges": null,
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-09-27 10:00:00",
+                "amount": 63.69,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              },
+              {
+                "cancelTime": "2026-09-30 10:00:00",
+                "amount": 232.26,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I42FUVCPJZBFOR2FGNDUWTSSKVDVSWKUJ5GVEV2HKFNEIQKOLJKUONBTKRGU6SSXJVKVURCBJZNFQR2ZGRKE6TSCK5EECM2HJVHFUVSHGQZEIRKNIJMEONBTIRJU4VCGI5MTERCNLJJFQRZVGZCEGSK2KNDUCWSEJVGUUUKHIFMVQWKNKJIUOSJTIRBU2QSRI5JDMR2LGNJTOS2WJJMFSVSLKRIFES2WI5JEINCHIZAVIQKRGM2EOUJSKRCU6TBUJZDESR2PKZFUSUCRLFKE6T2CLBDVSWKEJ5HUEWCHJEZEIS2OKRNE6QSWIZEUSWSUI5MTIRCBJZJFURKNLJCEGTS2LFDFKWSUJVHUEUKHLE2FQWKVKNDUUWRWIRCU2QSTI5MVSRCTJVJFQR2FLFCECTKEGRDUMNSGIVGUUUKHIVMUQWKNKJKEOSK2IRGUSMSTJI2FEVSFKJJU6RKNLJCECTKSK5DFKWKEKNGEUU2HGRIUIQ2NIIZEOQKZINDXYMRTGIXDENT4GIYDENRNGA4S2MZQEAYTAORQGA5DAMD4KJHXY7D4PRJXIYLOMRQXEZBAKR3WS3RAO5UXI2DPOV2CAV3JNZSG6534GAXDAMD4GAXDAMD4PQYC4MBQPQYC4MBQ",
+          "occupancy_number": 1,
+          "amount": 232.26,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Northstar",
+              "lastName": "Sandbox",
+              "email": "booker@example.com",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Northstar",
+        "lastName": "Sandbox",
+        "email": "booker@example.com",
+        "phone": "0000000000"
+      },
+      "createdAt": "2026-08-24T21:45:28",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-09-27 10:00:00",
+            "amount": 63.69,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          },
+          {
+            "cancelTime": "2026-09-30 10:00:00",
+            "amount": 232.26,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
+      "price": 232.26,
+      "sellingPriceToUser": 232.26,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Northstar",
+      "lastName": "Sandbox",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "tGnaZIVxR",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_WloBudZcfMtmr8gwriABQ",
+      "sellingPrice": "232.26",
+      "exchangeRate": 0.8562614930719559,
+      "exchangeRateUsd": 1,
+      "email": "booker@example.com",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-09-27T10:00:00Z",
+      "userId": 383174,
+      "nationality": "US",
+      "holderTitle": "",
+      "hotelId": "lp59dc5",
+      "hotelName": "Value Hotel Balestier",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 9.29,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "<br/><br/>Airport transfer is not available at this property. <br/> In accordance with Hotel Licensing and National Registration Regulations, guests are required to present a valid form of government regulated identification (e.g original passport, Photo ID card) upon check-in. Any other forms of identification - such as Digital Singpass ID and any other form of membership cards are strictly not accepted for the registration process. <br/> In accordance with local government guidelines, all guests are required to show a physical photo ID, passport and credit card upon check-in. <br/> Iron and ironing board will be available upon request. <br/> No Smoking is allowed in all rooms <br/> The minimum age required to check in is 18 years. <br/> This hotel does not permit bulk bookings. Guests may reserve a maximum of 4 rooms per booking. <br/> This is a strictly non-smoking property.<br/>",
+      "payLaterDeadline": null
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

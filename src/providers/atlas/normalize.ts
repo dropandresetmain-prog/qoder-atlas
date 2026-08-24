@@ -51,7 +51,22 @@ export function normalizeSearch(
   timezoneResolver?: AtlasTimezoneResolver,
 ): FlightSearchOutcome {
   const routings = body.routings ?? [];
-  return { offers: routings.map((routing) => toFlightOffer(routing, passengers, timezoneResolver)) };
+  // Per-routing normalization: an offer whose airport-local schedules cannot
+  // honestly be converted (e.g. an airport with no authoritative timezone in
+  // the application's place data) is dropped rather than fabricated — but it
+  // must not poison the rest of the search. Everything fails closed only when
+  // NOTHING can be normalized honestly.
+  const offers: FlightOffer[] = [];
+  let lastFailure: Error | undefined;
+  for (const routing of routings) {
+    try {
+      offers.push(toFlightOffer(routing, passengers, timezoneResolver));
+    } catch (error) {
+      lastFailure = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  if (offers.length === 0 && lastFailure) throw lastFailure;
+  return { offers };
 }
 
 export function normalizeVerify(body: AtlasVerifyBody, passengers?: PassengerCounts): FlightVerifyOutcome {

@@ -1,0 +1,1646 @@
+{
+  "mission": "wave3r-mission-1c",
+  "mode": "RECORD (genuine LIVE sandbox execution, sanitized recordings persisted)",
+  "generatedAt": "2026-08-24T15:07:24.090Z",
+  "providers": {
+    "atlas": {
+      "host": "sandbox.atriptech.com",
+      "environment": "sandbox"
+    },
+    "nuitee": {
+      "searchHost": "api.liteapi.travel",
+      "bookingHost": "book.liteapi.travel",
+      "environment": "sandbox API key"
+    }
+  },
+  "stages": [
+    {
+      "stage": "atlas.resume_retrieve",
+      "provider": "atlas",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:02:57.627Z",
+      "request": {
+        "orderRef": "TESTA20260824225735156"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "orderRef": "TESTA20260824225735156",
+          "transactionState": {
+            "orderRef": "TESTA20260824225735156",
+            "providerRecordLocator": "S44721",
+            "ticketRefs": [
+              "S44721"
+            ],
+            "holdExpiresAt": "2026-08-25T00:17:39+08:00"
+          },
+          "totalPrice": {
+            "amount": 56.59,
+            "currency": "USD"
+          },
+          "observedAt": "2026-08-24T15:02:57.627Z",
+          "provenance": "LIVE",
+          "status": "TICKETED",
+          "detail": "provider observes issued ticket(s)"
+        },
+        "meta": {
+          "providerId": "atlas",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:02:57.326Z",
+          "recordingId": "rec_1fb2eabfaaae64c147544a31bb2abd68",
+          "latencyMs": 300
+        }
+      }
+    },
+    {
+      "stage": "atlas.executor_flight_cancel",
+      "provider": "atlas",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:02:59.274Z",
+      "request": {
+        "operation": "flight.cancel",
+        "orderRef": "TESTA20260824225735156"
+      },
+      "result": {
+        "id": "exec-int-live-atlas-cancel-1",
+        "intentId": "int-live-atlas-cancel-1",
+        "executedAt": "2026-08-24T15:02:59.274Z",
+        "status": "UNAVAILABLE",
+        "provenance": "RECORD",
+        "providerId": "atlas",
+        "resultSummary": "cancellation still processing; final provider state not yet observed",
+        "observedEffects": {
+          "cancellation": {
+            "orderRef": "TESTA20260824225735156",
+            "status": "PROCESSING",
+            "expectedReturn": {
+              "amount": 56.59,
+              "currency": "USD"
+            },
+            "transactionState": {
+              "orderRef": "TESTA20260824225735156",
+              "cancellationRequestRef": "202608-0040"
+            }
+          }
+        }
+      }
+    },
+    {
+      "stage": "nuitee.search",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:00.555Z",
+      "request": {
+        "location": {
+          "coordinates": {
+            "latitude": 1.2839,
+            "longitude": 103.8607,
+            "radiusKm": 5
+          }
+        },
+        "checkInDate": "2026-10-01",
+        "checkOutDate": "2026-10-04",
+        "guests": {
+          "adults": 1
+        },
+        "rooms": 1
+      },
+      "result": {
+        "ok": true,
+        "properties": 175,
+        "rates": 524
+      }
+    },
+    {
+      "stage": "nuitee.setup_quote_displaced",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:03.033Z",
+      "request": {
+        "rateId": "3gAWonJzkd4AEaRzcmlk2gE_RzRaVE9OQldHRTNHS05SVUdZWVRPTVJXR1FaREFOWlJHNDJUTU5KV0dVM0dLTVJRRzQzVE1PSlhHUTNEUU5UR0c0MlRPTkJTR0EzVE9OUlpHWlNUTU5CV01ZM1RPN0JSRU1aREFNUldHRVlEQU1MNEdJWURFTlJSR0FZREk3REZOWlBWS1UzNEtWSlhZVktUSVI2RENRSlFJTjZESU5KU0hGNkdTVURIS1ZFSFlNSlhIQTNUS09CU0c0WURPTVpRR05JWE1TU0dFTVpUTU9CUUdZNFNHTlJXSEVXVEdOUllHQTNEUzdDU0laSEhZTVJRR0kzREFPSlNHNFlUQU1CUVBRWVhZVVJSR0EyRFE3QlNHSVpUU05CREtKSFNHVVNHSllSVEVNQlNHWVdUQU9KTkdJM1NBTUpRSElZREFJWaNwcmPLQGv-FHrhR66lb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDktMzAgMTA6MDA6MDCicnSjUkZOo2JyZKJST6RtcmlkwKNtcm7Ao2hkcMCjZnJuoKNzcm69U3RhbmRhcmQgUXVlZW4gV2l0aG91dCBXaW5kb3ejb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCShaF0szIwMjYtMDktMjcgMTA6MDA6MDChYctATrR64UeuFKFjo1VTRKJ0eaZhbW91bnSidHqjR01UhaF0szIwMjYtMDktMzAgMTA6MDA6MDChYctAa_4UeuFHrqFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjM2ODA2OaNzaWQCo2hpZKdscDU5ZGM1o29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0xMC0wMaJjb6oyMDI2LTEwLTA0o2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwMzQzYjc2NDE1VkJSa1l4VkZOakg4UEpCdXZYTnNyVExRb2NYo2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSgom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctAM0euFHrhSKFjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAMeZmZmZmZqFjo1VTRKJscMCjYmt0BA=="
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "status": "QUOTED",
+          "quoteId": "TOt-gfThE",
+          "quotedPrice": {
+            "amount": 223.94,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:03:00.556Z",
+          "recordingId": "rec_4a1003789bf7cb4ae3de30d7f0b3c4b1",
+          "latencyMs": 2477
+        }
+      }
+    },
+    {
+      "stage": "nuitee.setup_book_displaced",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:07.511Z",
+      "request": {
+        "quoteId": "TOt-gfThE"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "confirmed": true,
+          "provenance": "LIVE",
+          "bookingId": "93v2q9BiF",
+          "providerConfirmationCode": "test",
+          "totalPrice": {
+            "amount": 223.94,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:03:03.033Z",
+          "recordingId": "rec_c8241607abb8e97e4bf95341a1af5a46",
+          "latencyMs": 4478
+        }
+      }
+    },
+    {
+      "stage": "nuitee.setup_retrieve_displaced",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:07.914Z",
+      "request": {
+        "bookingId": "93v2q9BiF"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "bookingId": "93v2q9BiF",
+          "status": "CONFIRMED",
+          "propertyName": "Value Hotel Balestier",
+          "cancellationFee": {
+            "amount": 61.41,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:03:07.511Z",
+          "recordingId": "rec_559901ef43595b6545719df7a49ed4cd",
+          "latencyMs": 403
+        }
+      }
+    },
+    {
+      "stage": "nuitee.executor_hotel_replacement",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:15.251Z",
+      "request": {
+        "operation": "hotel.modify",
+        "replacementRateId": "3gAWonJzkd4AEaRzcmlk2gE9RzRaVE9OQldHRTNHS05SVUdZWVRPTVJXR1FaREFOWlVHNDNUTU9KV01VWkRBTlpYR1k0VE9OQldIQTNHTU5aVkc0MkRFTUJYRzQzRFNOVEZHWTJETVpSWEc1NkRDSVpTR0FaRE1NSlFHQVlYWU1SUUdJM0RDTUJRR1I2R0szUzdLVkpYWVZLVFBSS1ZHUkQ0R0ZBVEFRMzRHUTJURU9MNE5GSUdPVktJUFFZVE9PQlhHVTRERU5aUUc0WlRBTTJST1pGRU1JWlRHWTREQU5SWkVNWkRDTlpZRlVaVE1PQlFHWTRYWVVTR0paNkRFTUJTR1lZRFNNUlhHRVlEQU1ENEdGNkZFTUpRR1E0SFlNUlRHSTJEU0kyU0o0UlZFUlNPRU1aREFNUldGVVlEU0xKU0c0UURDTUIyR0FZQ0ejcHJjy0BtD64UeuFIpW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZLMyMDI2LTA5LTMwIDEwOjAwOjAwonJ0o1JGTqNicmSiUk-kbXJpZMCjbXJuwKNoZHDAo2ZybqCjc3JuvFN0YW5kYXJkIFR3aW4gd2l0aG91dCBXaW5kb3ejb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCShaF0szIwMjYtMDktMjcgMTA6MDA6MDChYctAT-FHrhR64aFjo1VTRKJ0eaZhbW91bnSidHqjR01UhaF0szIwMjYtMDktMzAgMTA6MDA6MDChYctAbQ-uFHrhSKFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjM2ODA2OaNzaWQCo2hpZKdscDU5ZGM1o29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0xMC0wMaJjb6oyMDI2LTEwLTA0o2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwMzQzYjc2NDE1VkJSa1l4VkZOakg4UEpCdXZYTnNyVExRb2NYo2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSgom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctANJcKPXCj16Fjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAMfhR64UeuKFjo1VTRKJscMCjYmt0BA==",
+        "displacedBookingId": "93v2q9BiF",
+        "ceiling": {
+          "amount": 232.49,
+          "currency": "USD"
+        }
+      },
+      "result": {
+        "id": "exec-int-live-nuitee-replace-2",
+        "intentId": "int-live-nuitee-replace-2",
+        "executedAt": "2026-08-24T15:03:15.251Z",
+        "status": "SUCCESS",
+        "provenance": "RECORD",
+        "providerId": "nuitee",
+        "resultSummary": "replacement 1KjU9KtEY confirmed and displaced stay 93v2q9BiF cancelled",
+        "observedEffects": {
+          "operation": "hotel.modify",
+          "replacementBooking": {
+            "bookingId": "1KjU9KtEY",
+            "status": "CONFIRMED",
+            "totalPrice": {
+              "amount": 232.49,
+              "currency": "USD"
+            },
+            "providerConfirmationCode": "test"
+          },
+          "displacedBooking": {
+            "bookingId": "93v2q9BiF",
+            "status": "CANCELLED",
+            "cancellationFee": {
+              "amount": 61.41,
+              "currency": "USD"
+            }
+          }
+        }
+      }
+    },
+    {
+      "stage": "nuitee.cleanup_already_cancelled",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:15.672Z",
+      "request": {
+        "bookingId": "93v2q9BiF"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "bookingId": "93v2q9BiF",
+          "status": "CANCELLED",
+          "propertyName": "Value Hotel Balestier",
+          "cancellationFee": {
+            "amount": 61.41,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:03:15.251Z",
+          "recordingId": "rec_559901ef43595b6545719df7a49ed4cd",
+          "latencyMs": 420
+        }
+      }
+    },
+    {
+      "stage": "nuitee.cleanup_cancel",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:16.486Z",
+      "request": {
+        "bookingId": "1KjU9KtEY"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "confirmed": true,
+          "provenance": "LIVE",
+          "reference": "1KjU9KtEY",
+          "fee": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:03:16.140Z",
+          "recordingId": "rec_e9072e575e14bb7728f2c33c2f12d9bc",
+          "latencyMs": 346
+        }
+      }
+    },
+    {
+      "stage": "nuitee.cleanup_observe",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:03:16.896Z",
+      "request": {
+        "bookingId": "1KjU9KtEY"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "bookingId": "1KjU9KtEY",
+          "status": "CANCELLED",
+          "propertyName": "Value Hotel Balestier",
+          "cancellationFee": {
+            "amount": 63.76,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:03:16.487Z",
+          "recordingId": "rec_eaaaa14f64f869226a3d5e78f42b490e",
+          "latencyMs": 410
+        }
+      }
+    },
+    {
+      "stage": "atlas.search",
+      "provider": "atlas",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:05:46.509Z",
+      "request": {
+        "origin": {
+          "system": "iata",
+          "value": "MEX"
+        },
+        "destination": {
+          "system": "iata",
+          "value": "CUN"
+        },
+        "departureDate": "2026-09-23",
+        "passengers": {
+          "adults": 1
+        }
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "offers": [
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIxMy41M18yMTMuNTNfMC4wMF8wLjAwXzQyNy4wNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDgtLUdETC0yMDI2MDkyMzA4MTAtMjAyNjA5MjMwOTI4LVplcm8tMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtWmVyby0xLV4yMTMuNTNfMjEzLjUzXzAuMDBfMC4wMF80MjcuMDZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yMTMuNTNeMjEzLjUzXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.T/c07PBamJzASsB0Y+zYpsaOudb5zCj1yXBA1K4aiZ4=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T08:10:00-06:00",
+                  "arrival": "2026-09-23T09:28:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4148",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T14:30:00-06:00",
+                  "arrival": "2026-09-23T18:14:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41046",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 213.53
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE2MS4wNF8xNjEuMDRfMC4wMF8wLjAwXzMyMi4wOF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5OTFUtWTQxMjkxLS1HREwtMjAyNjA5MjMwNjMwLTIwMjYwOTIzMDc0NC1CYXNpYy0xLSNHREwtWTQxMDQ2LS1DVU4tMjAyNjA5MjMxNDMwLTIwMjYwOTIzMTgxNC1CYXNpYy0xLV4xNjEuMDRfMTYxLjA0XzAuMDBfMC4wMF8zMjIuMDheQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNjEuMDReMTYxLjA0XjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8./CQxEvA5lr2Zc7enpffwjESEvRXyOSSt7AQF7Id9xDM=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "NLU"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T06:30:00-06:00",
+                  "arrival": "2026-09-23T07:44:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41291",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T14:30:00-06:00",
+                  "arrival": "2026-09-23T18:14:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41046",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 161.04
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDkwLjE4XzkwLjE4XzAuMDBfMC4wMF8xODAuMzZfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeVExDLVk0MTIxMS0tR0RMLTIwMjYwOTIzMDgyNi0yMDI2MDkyMzA5MzUtWmVyby0xLSNHREwtWTQxMDUwLS1DVU4tMjAyNjA5MjMxMTQ0LTIwMjYwOTIzMTUyOC1aZXJvLTEtXjkwLjE4XzkwLjE4XzAuMDBfMC4wMF8xODAuMzZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF45MC4xOF45MC4xOF4wLjAwXjF8MXwyMDI2MDgyNDIzMDU0NnwwfDE3ODc1ODM5NDYwMjExOTc2ZTYyZHx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIyOjE1OjI1fA==.UhM/9L24mOxMxVj/QOyA/dfk2B6FbAFRSGJ4OKHH5dY=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "TLC"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T08:26:00-06:00",
+                  "arrival": "2026-09-23T09:35:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41211",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:44:00-06:00",
+                  "arrival": "2026-09-23T15:28:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41050",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 90.18
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE1Mi42OF8xNTIuNjhfMC4wMF8wLjAwXzMwNS4zNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5UTEMtWTQxMjExLS1HREwtMjAyNjA5MjMwODI2LTIwMjYwOTIzMDkzNS1CYXNpYy0xLSNHREwtWTQxMDQ2LS1DVU4tMjAyNjA5MjMxNDMwLTIwMjYwOTIzMTgxNC1CYXNpYy0xLV4xNTIuNjhfMTUyLjY4XzAuMDBfMC4wMF8zMDUuMzZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNTIuNjheMTUyLjY4XjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.aFMdtRNg4EViQgrO6UF7WfnlGmt6ZoOJ5kQsaCX3OOA=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "TLC"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T08:26:00-06:00",
+                  "arrival": "2026-09-23T09:35:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41211",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T14:30:00-06:00",
+                  "arrival": "2026-09-23T18:14:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41046",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 152.68
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE2OC4wN18xNjguMDdfMC4wMF8wLjAwXzMzNi4xNF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDgtLUdETC0yMDI2MDkyMzA4MTAtMjAyNjA5MjMwOTI4LVplcm8tMS0jR0RMLVk0MTA1MC0tQ1VOLTIwMjYwOTIzMTE0NC0yMDI2MDkyMzE1MjgtWmVyby0xLV4xNjguMDdfMTY4LjA3XzAuMDBfMC4wMF8zMzYuMTReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNjguMDdeMTY4LjA3XjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.LedUVhfZM2EcXgJ2I2VPQ6qzYL7I64P1DtYYt3sp4T0=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T08:10:00-06:00",
+                  "arrival": "2026-09-23T09:28:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4148",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:44:00-06:00",
+                  "arrival": "2026-09-23T15:28:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41050",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 168.07
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIwNi43MF8yMDYuNzBfMC4wMF8wLjAwXzQxMy40MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDAtLUdETC0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzE4LVplcm8tMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtWmVyby0xLV4yMDYuNzBfMjA2LjcwXzAuMDBfMC4wMF80MTMuNDBeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yMDYuNzBeMjA2LjcwXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.JYUHf+bhs5Jf473EVTFuXRmxl8q/yeT+FFZ+Dj7QDto=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T06:00:00-06:00",
+                  "arrival": "2026-09-23T07:18:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4140",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T14:30:00-06:00",
+                  "arrival": "2026-09-23T18:14:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41046",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 206.7
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDY4LjU5XzY4LjU5XzAuMDBfMC4wMF8xMzcuMThfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTkxVLVk0MzUzMy0tQ1VOLTIwMjYwOTIzMTEwMS0yMDI2MDkyMzE0MTYtWmVyby0xLV42OC41OV82OC41OV8wLjAwXzAuMDBfMTM3LjE4XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReNjguNTleNjguNTleMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.ljx37FJ2TIZgpRVx1lqm7LImdHL8dpG73/fXlDedvpc=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "NLU"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:01:00-06:00",
+                  "arrival": "2026-09-23T14:16:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43533",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 68.59
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIwNi40M18yMDYuNDNfMC4wMF8wLjAwXzQxMi44Nl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDItLUdETC0yMDI2MDkyMzEyMDAtMjAyNjA5MjMxMzE4LVBsdXMtMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtUGx1cy0xLV4yMDYuNDNfMjA2LjQzXzAuMDBfMC4wMF80MTIuODZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yMDYuNDNeMjA2LjQzXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.rOdhdE3+/e/gK1z8oxseKlUa3im6hb0/7cQl43u+K6I=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T12:00:00-06:00",
+                  "arrival": "2026-09-23T13:18:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4142",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T14:30:00-06:00",
+                  "arrival": "2026-09-23T18:14:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41046",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 206.43
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Plus",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDU2LjU5XzU2LjU5XzAuMDBfMC4wMF8xMTMuMThfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeVExDLVk0MzQ4My0tQ1VOLTIwMjYwOTIzMTEwNC0yMDI2MDkyMzE0MjctWmVyby0xLV41Ni41OV81Ni41OV8wLjAwXzAuMDBfMTEzLjE4XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReNTYuNTleNTYuNTleMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.vReqUuRx1ibliXYoKLYOFGIvCIrP/ViuFxdomLZN+eY=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "TLC"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:04:00-06:00",
+                  "arrival": "2026-09-23T14:27:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43483",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 56.59
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIwNi4yMF8yMDYuMjBfMC4wMF8wLjAwXzQxMi40MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5OTFUtWTQzMjk3LS1USUotMjAyNjA5MjMyMjM2LTIwMjYwOTI0MDA1Ni1CYXNpYy0xLSNUSUotWTQzMDgwLS1DVU4tMjAyNjA5MjQwNjU4LTIwMjYwOTI0MTMyMS1CYXNpYy0xLV4yMDYuMjBfMjA2LjIwXzAuMDBfMC4wMF80MTIuNDBeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yMDYuMjBeMjA2LjIwXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.Zk6aUZWukIg2guMh1gi3bXyJX3ZPZf74iQeofrG/bX8=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "NLU"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "TIJ"
+                  },
+                  "departure": "2026-09-23T22:36:00-06:00",
+                  "arrival": "2026-09-24T00:56:00-07:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43297",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "TIJ"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-24T06:58:00-07:00",
+                  "arrival": "2026-09-24T13:21:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43080",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 206.2
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwNy41M18xMDcuNTNfMC4wMF8wLjAwXzIxNS4wNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQ1NjE3LS1NVFktMjAyNjA5MjMwODE1LTIwMjYwOTIzMDk1MC1CYXNpYy0xLSNNVFktWTQ1NTg4LS1DVU4tMjAyNjA5MjMxNTM1LTIwMjYwOTIzMTg1OS1CYXNpYy0xLV4xMDcuNTNfMTA3LjUzXzAuMDBfMC4wMF8yMTUuMDZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMDcuNTNeMTA3LjUzXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.Mfo3II6DhVvb69xV6PVchhHUhGVeKQoAkltH8sYiyaU=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "departure": "2026-09-23T08:15:00-06:00",
+                  "arrival": "2026-09-23T09:50:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y45617",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T15:35:00-06:00",
+                  "arrival": "2026-09-23T18:59:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y45588",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 107.53
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEzMi41Nl8xMzIuNTZfMC4wMF8wLjAwXzI2NS4xMl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQyNDAtLU1UWS0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzM1LUJhc2ljLTEtI01UWS1ZNDU1ODYtLUNVTi0yMDI2MDkyMzEwMjAtMjAyNjA5MjMxMzQ0LUJhc2ljLTEtXjEzMi41Nl8xMzIuNTZfMC4wMF8wLjAwXzI2NS4xMl5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjEzMi41Nl4xMzIuNTZeMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.IhmjtGzGDxbtbWoxQgdgGkfI27UQZSizHhfFbmfkwMM=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "departure": "2026-09-23T06:00:00-06:00",
+                  "arrival": "2026-09-23T07:35:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4240",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T10:20:00-06:00",
+                  "arrival": "2026-09-23T13:44:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y45586",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 132.56
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDgzLjY0XzgzLjY0XzAuMDBfMC4wMF8xNjcuMjhfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MTAwLS1DVU4tMjAyNjA5MjMwNjQ1LTIwMjYwOTIzMTAwMy1aZXJvLTEtXjgzLjY0XzgzLjY0XzAuMDBfMC4wMF8xNjcuMjheQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF44My42NF44My42NF4wLjAwXjF8MXwyMDI2MDgyNDIzMDU0NnwwfDE3ODc1ODM5NDYwMjExOTc2ZTYyZHx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIyOjE1OjI1fA==.v+DCdgXB3WLo5BS+SyycdWnm+yN59Q5NFs7LdSMWP/s=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T06:45:00-06:00",
+                  "arrival": "2026-09-23T10:03:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4100",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 83.64
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDI2NC4xMl8yNjQuMTJfMC4wMF8wLjAwXzUyOC4yNF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxODgtLVRJSi0yMDI2MDkyMzIxNDUtMjAyNjA5MjQwMDE4LVplcm8tMS0jVElKLVk0MzA4MC0tQ1VOLTIwMjYwOTI0MDY1OC0yMDI2MDkyNDEzMjEtWmVyby0xLV4yNjQuMTJfMjY0LjEyXzAuMDBfMC4wMF81MjguMjReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yNjQuMTJeMjY0LjEyXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.LcfhwYykf+uiqTFRlm4Imi3dNpYyqWE7prCug6QAU/Y=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "TIJ"
+                  },
+                  "departure": "2026-09-23T21:45:00-06:00",
+                  "arrival": "2026-09-24T00:18:00-07:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4188",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "TIJ"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-24T06:58:00-07:00",
+                  "arrival": "2026-09-24T13:21:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43080",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 264.12
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDQyMS40Ml80MjEuNDJfMC4wMF8wLjAwXzg0Mi44NF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQyNDgtLU1UWS0yMDI2MDkyMzIxMDAtMjAyNjA5MjMyMjM1LUJhc2ljLTEtI01UWS1ZNDU1ODQtLUNVTi0yMDI2MDkyNDA2MDAtMjAyNjA5MjQwOTI0LUJhc2ljLTEtXjQyMS40Ml80MjEuNDJfMC4wMF8wLjAwXzg0Mi44NF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjQyMS40Ml40MjEuNDJeMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.s2naMq46CVu49FkzUFDd+KhkOKRwlMm0WLSMaPH/LsE=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "departure": "2026-09-23T21:00:00-06:00",
+                  "arrival": "2026-09-23T22:35:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4248",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-24T06:00:00-06:00",
+                  "arrival": "2026-09-24T09:24:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y45584",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 421.42
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE0Ny40OV8xNDcuNDlfMC4wMF8wLjAwXzI5NC45OF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDAtLUdETC0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzE4LUJhc2ljLTEtI0dETC1ZNDEwNTAtLUNVTi0yMDI2MDkyMzExNDQtMjAyNjA5MjMxNTI4LUJhc2ljLTEtXjE0Ny40OV8xNDcuNDlfMC4wMF8wLjAwXzI5NC45OF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjE0Ny40OV4xNDcuNDleMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.IxNCvnWEkXwHpRYS97gIMnL6wk53+8cTETX4AcV1Gvc=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T06:00:00-06:00",
+                  "arrival": "2026-09-23T07:18:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4140",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:44:00-06:00",
+                  "arrival": "2026-09-23T15:28:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41050",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 147.49
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEyNC40MV8xMjQuNDFfMC4wMF8wLjAwXzI0OC44Ml9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQyNDAtLU1UWS0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzM1LVplcm8tMS0jTVRZLVk0NTU4OC0tQ1VOLTIwMjYwOTIzMTUzNS0yMDI2MDkyMzE4NTktWmVyby0xLV4xMjQuNDFfMTI0LjQxXzAuMDBfMC4wMF8yNDguODJeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMjQuNDFeMTI0LjQxXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.awb1w3NLeIgowroXkU7WDaB7rPn2LCSkrZRV7bi7RqQ=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "departure": "2026-09-23T06:00:00-06:00",
+                  "arrival": "2026-09-23T07:35:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4240",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T15:35:00-06:00",
+                  "arrival": "2026-09-23T18:59:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y45588",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 124.41
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDExMi41NV8xMTIuNTVfMC4wMF8wLjAwXzIyNS4xMF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxMTAtLUNVTi0yMDI2MDkyMzIwNDUtMjAyNjA5MjMyMzU4LUJhc2ljLTEtXjExMi41NV8xMTIuNTVfMC4wMF8wLjAwXzIyNS4xMF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjExMi41NV4xMTIuNTVeMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.dD7rCqYLX4pidtzQ7MTfn/hbp61vVslpbF7qQS3BA7k=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T20:45:00-06:00",
+                  "arrival": "2026-09-23T23:58:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4110",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 112.55
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE0OC41NF8xNDguNTRfMC4wMF8wLjAwXzI5Ny4wOF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDAtLUdETC0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzE4LUJhc2ljLTEtI0dETC1ZNDEwNDgtLUNVTi0yMDI2MDkyMzA4MjAtMjAyNjA5MjMxMjA0LUJhc2ljLTEtXjE0OC41NF8xNDguNTRfMC4wMF8wLjAwXzI5Ny4wOF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjE0OC41NF4xNDguNTReMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.2xPjpq8P69JiJ5yadtUoNr1zKg8qVHUOgxtfmzsNOrk=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T06:00:00-06:00",
+                  "arrival": "2026-09-23T07:18:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4140",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T08:20:00-06:00",
+                  "arrival": "2026-09-23T12:04:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41048",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 148.54
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEzMy45OF8xMzMuOThfMC4wMF8wLjAwXzI2Ny45Nl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQyNDYtLU1UWS0yMDI2MDkyMzExMDUtMjAyNjA5MjMxMjQwLVplcm8tMS0jTVRZLVk0NTU4OC0tQ1VOLTIwMjYwOTIzMTUzNS0yMDI2MDkyMzE4NTktWmVyby0xLV4xMzMuOThfMTMzLjk4XzAuMDBfMC4wMF8yNjcuOTZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMzMuOTheMTMzLjk4XjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.30qXX95PxoaUbiYFX8uB102HyvVSC60XfGFiCzBj77Y=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "departure": "2026-09-23T11:05:00-06:00",
+                  "arrival": "2026-09-23T12:40:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4246",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MTY"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T15:35:00-06:00",
+                  "arrival": "2026-09-23T18:59:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y45588",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 133.98
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDYxLjYxXzYxLjYxXzAuMDBfMC4wMF8xMjMuMjJfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MTA0LS1DVU4tMjAyNjA5MjMxNzQ1LTIwMjYwOTIzMjEwMy1aZXJvLTEtXjYxLjYxXzYxLjYxXzAuMDBfMC4wMF8xMjMuMjJeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF42MS42MV42MS42MV4wLjAwXjF8MXwyMDI2MDgyNDIzMDU0NnwwfDE3ODc1ODM5NDYwMjExOTc2ZTYyZHx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIyOjE1OjI1fA==.NDF8Lh0XQuZB29hMVZSPB3YUHBvq0FP2LdKAE5gLpwo=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T17:45:00-06:00",
+                  "arrival": "2026-09-23T21:03:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4104",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 61.61
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE3Ny45Nl8xNzcuOTZfMC4wMF8wLjAwXzM1NS45Ml9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNTItLUdETC0yMDI2MDkyMzEwMDAtMjAyNjA5MjMxMTE4LUJhc2ljLTEtI0dETC1ZNDEwNDYtLUNVTi0yMDI2MDkyMzE0MzAtMjAyNjA5MjMxODE0LUJhc2ljLTEtXjE3Ny45Nl8xNzcuOTZfMC4wMF8wLjAwXzM1NS45Ml5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjE3Ny45Nl4xNzcuOTZeMC4wMF4xfDF8MjAyNjA4MjQyMzA1NDZ8MHwxNzg3NTgzOTQ2MDIxMTk3NmU2MmR8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMjoxNToyNXw=.ju+komNAfheOfcfwQ3fIUOdLnFCDimR4LRsMgGgHTrA=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T10:00:00-06:00",
+                  "arrival": "2026-09-23T11:18:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4152",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T14:30:00-06:00",
+                  "arrival": "2026-09-23T18:14:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41046",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 177.96
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEzNi4yN18xMzYuMjdfMC4wMF8wLjAwXzI3Mi41NF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxODAtLVRJSi0yMDI2MDkyMzA1MzAtMjAyNjA5MjMwODAzLVBsdXMtMS0jVElKLVk0MzA4Mi0tQ1VOLTIwMjYwOTIzMTAwNS0yMDI2MDkyMzE2MjgtUGx1cy0xLV4xMzYuMjdfMTM2LjI3XzAuMDBfMC4wMF8yNzIuNTReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMzYuMjdeMTM2LjI3XjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.ZdSXI3tyvfJg0a789mG8GiJnKLSRZwnDbeVY9X+VbmM=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "TIJ"
+                  },
+                  "departure": "2026-09-23T05:30:00-06:00",
+                  "arrival": "2026-09-23T08:03:00-07:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4180",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "TIJ"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T10:05:00-07:00",
+                  "arrival": "2026-09-23T16:28:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43082",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 136.27
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Plus",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwNy4wOF8xMDcuMDhfMC4wMF8wLjAwXzIxNC4xNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxMDItLUNVTi0yMDI2MDkyMzExMTAtMjAyNjA5MjMxNDI4LVplcm8tMS1eMTA3LjA4XzEwNy4wOF8wLjAwXzAuMDBfMjE0LjE2XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReMTA3LjA4XjEwNy4wOF4wLjAwXjF8MXwyMDI2MDgyNDIzMDU0NnwwfDE3ODc1ODM5NDYwMjExOTc2ZTYyZHx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIyOjE1OjI1fA==.28q4rRdaFb5fV2c3WJ2lPpZtpPADNH7JiOyWhpeGsK8=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:10:00-06:00",
+                  "arrival": "2026-09-23T14:28:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4102",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 107.08
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDg3LjAzXzg3LjAzXzcuNzBfMC4wMF8xODEuNzZfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0OTAwLS1HVUEtMjAyNjA5MjMxODU1LTIwMjYwOTIzMjA1MS1aZXJvLTEtI0dVQS1ZNDM5MzEtLUNVTi0yMDI2MDkyNDEzMjAtMjAyNjA5MjQxNjA5LVplcm8tMS1eODcuMDNfODcuMDNfNy43MF8wLjAwXzE4MS43Nl5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjg3LjAzXjg3LjAzXjcuNzBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.GMvfXtnoQ74nq+AcrFzf0r28BxPMxmUCWqzvOHUt7c0=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "MEX"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GUA"
+                  },
+                  "departure": "2026-09-23T18:55:00-06:00",
+                  "arrival": "2026-09-23T20:51:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y4900",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GUA"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-24T13:20:00-06:00",
+                  "arrival": "2026-09-24T16:09:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y43931",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 87.03
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Zero",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            },
+            {
+              "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwOC4wMV8xMDguMDFfMC4wMF8wLjAwXzIxNi4wMl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5OTFUtWTQxMjkxLS1HREwtMjAyNjA5MjMwNjMwLTIwMjYwOTIzMDc0NC1CYXNpYy0xLSNHREwtWTQxMDUwLS1DVU4tMjAyNjA5MjMxMTQ0LTIwMjYwOTIzMTUyOC1CYXNpYy0xLV4xMDguMDFfMTA4LjAxXzAuMDBfMC4wMF8yMTYuMDJeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMDguMDFeMTA4LjAxXjAuMDBeMXwxfDIwMjYwODI0MjMwNTQ2fDB8MTc4NzU4Mzk0NjAyMTE5NzZlNjJkfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjI6MTU6MjV8.KSnyKTkG40N9V9Ysdfa41fTjgiXAjpbhVDJTzdOPgxM=",
+              "segments": [
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "NLU"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "departure": "2026-09-23T06:30:00-06:00",
+                  "arrival": "2026-09-23T07:44:00-06:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41291",
+                  "cabin": "ECONOMY"
+                },
+                {
+                  "origin": {
+                    "system": "IATA",
+                    "value": "GDL"
+                  },
+                  "destination": {
+                    "system": "IATA",
+                    "value": "CUN"
+                  },
+                  "departure": "2026-09-23T11:44:00-06:00",
+                  "arrival": "2026-09-23T15:28:00-05:00",
+                  "carrierCode": "Y4",
+                  "flightNumber": "Y41050",
+                  "cabin": "ECONOMY"
+                }
+              ],
+              "totalPrice": {
+                "currency": "USD",
+                "amount": 108.01
+              },
+              "availability": "AVAILABLE",
+              "fareFamily": "Basic",
+              "expiresAt": "2026-08-24T15:16:25Z"
+            }
+          ]
+        },
+        "meta": {
+          "providerId": "atlas",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:05:46.220Z",
+          "recordingId": "rec_7f93d9c9362c617e3e686d7f4e6c73aa",
+          "latencyMs": 289
+        }
+      }
+    },
+    {
+      "stage": "atlas.offer_selected",
+      "provider": "atlas",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:05:46.509Z",
+      "request": {
+        "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwNy4wOF8xMDcuMDhfMC4wMF8wLjAwXzIxNC4xNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxMDItLUNVTi0yMDI2MDkyMzExMTAtMjAyNjA5MjMxNDI4LVplcm8tMS1eMTA3LjA4XzEwNy4wOF8wLjAwXzAuMDBfMjE0LjE2XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReMTA3LjA4XjEwNy4wOF4wLjAwXjF8MXwyMDI2MDgyNDIzMDU0NnwwfDE3ODc1ODM5NDYwMjExOTc2ZTYyZHx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIyOjE1OjI1fA==.28q4rRdaFb5fV2c3WJ2lPpZtpPADNH7JiOyWhpeGsK8="
+      },
+      "result": {
+        "totalPrice": {
+          "currency": "USD",
+          "amount": 107.08
+        },
+        "segments": [
+          "Y4Y4102 MEX-CUN"
+        ]
+      }
+    },
+    {
+      "stage": "atlas.executor_flight_pay",
+      "provider": "atlas",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:06.076Z",
+      "request": {
+        "operation": "flight.pay",
+        "offerId": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwNy4wOF8xMDcuMDhfMC4wMF8wLjAwXzIxNC4xNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxMDItLUNVTi0yMDI2MDkyMzExMTAtMjAyNjA5MjMxNDI4LVplcm8tMS1eMTA3LjA4XzEwNy4wOF8wLjAwXzAuMDBfMjE0LjE2XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReMTA3LjA4XjEwNy4wOF4wLjAwXjF8MXwyMDI2MDgyNDIzMDU0NnwwfDE3ODc1ODM5NDYwMjExOTc2ZTYyZHx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIyOjE1OjI1fA==.28q4rRdaFb5fV2c3WJ2lPpZtpPADNH7JiOyWhpeGsK8=",
+        "ceiling": {
+          "currency": "USD",
+          "amount": 107.08
+        }
+      },
+      "result": {
+        "id": "exec-int-live-atlas-book-1",
+        "intentId": "int-live-atlas-book-1",
+        "executedAt": "2026-08-24T15:07:06.076Z",
+        "status": "SUCCESS",
+        "provenance": "RECORD",
+        "providerId": "atlas",
+        "resultSummary": "order TESTA20260824230546320 paid and ticketed",
+        "observedEffects": {
+          "operation": "flight.pay",
+          "orderStatus": "TICKETED",
+          "transactionState": {
+            "orderRef": "TESTA20260824230546320",
+            "providerRecordLocator": "S34726",
+            "ticketRefs": [
+              "S34726"
+            ],
+            "holdExpiresAt": "2026-08-25T00:25:51+08:00"
+          },
+          "totalPrice": {
+            "amount": 107.08,
+            "currency": "USD"
+          }
+        }
+      }
+    },
+    {
+      "stage": "atlas.executor_flight_cancel",
+      "provider": "atlas",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:07.769Z",
+      "request": {
+        "operation": "flight.cancel",
+        "orderRef": "TESTA20260824230546320"
+      },
+      "result": {
+        "id": "exec-int-live-atlas-cancel-2",
+        "intentId": "int-live-atlas-cancel-2",
+        "executedAt": "2026-08-24T15:07:07.769Z",
+        "status": "UNAVAILABLE",
+        "provenance": "RECORD",
+        "providerId": "atlas",
+        "resultSummary": "cancellation still processing; final provider state not yet observed",
+        "observedEffects": {
+          "cancellation": {
+            "orderRef": "TESTA20260824230546320",
+            "status": "PROCESSING",
+            "expectedReturn": {
+              "amount": 107.08,
+              "currency": "USD"
+            },
+            "transactionState": {
+              "orderRef": "TESTA20260824230546320",
+              "cancellationRequestRef": "202608-0041"
+            }
+          }
+        }
+      }
+    },
+    {
+      "stage": "nuitee.search",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:13.549Z",
+      "request": {
+        "location": {
+          "coordinates": {
+            "latitude": 1.2839,
+            "longitude": 103.8607,
+            "radiusKm": 5
+          }
+        },
+        "checkInDate": "2026-10-01",
+        "checkOutDate": "2026-10-04",
+        "guests": {
+          "adults": 1
+        },
+        "rooms": 1
+      },
+      "result": {
+        "ok": true,
+        "properties": 174,
+        "rates": 521
+      }
+    },
+    {
+      "stage": "nuitee.setup_quote_displaced",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:16.202Z",
+      "request": {
+        "rateId": "3gAWonJzkd4AEaRzcmlk2gE_RzRaVE9OQldHRTNHS05SVUdZWVRPTVJXR1FaREFOWlJHNDJUTU5KV0dVM0dLTVJRRzQzVE1PSlhHUTNEUU5UR0c0MlRPTkJTR0EzVE9OUlpHWlNUTU5CV01ZM1RPN0JSRU1aREFNUldHRVlEQU1MNEdJWURFTlJSR0FZREk3REZOWlBWS1UzNEtWSlhZVktUSVI2RENRSlFJTjZESU5KU0hGNkdTVURIS1ZFSFlNSlhIQTNUS09CVUdBWkRRTUJSSEZTV0kyM1NFTVpUTU9CUUdZNFNHTlJXSEVXVEdOUllHQTNEUzdDU0laSEhZTVJRR0kzREFPSlNHNFlUQU1CUVBRWVhZVVJSR0EyRFE3QlNHSVpUU05CREtKSFNHVVNHSllSVEVNQlNHWVdUQU9KTkdJM1NBTUpRSElZREFJWaNwcmPLQGv-FHrhR66lb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDktMzAgMTA6MDA6MDCicnSjUkZOo2JyZKJST6RtcmlkwKNtcm7Ao2hkcMCjZnJuoKNzcm69U3RhbmRhcmQgUXVlZW4gV2l0aG91dCBXaW5kb3ejb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCShaF0szIwMjYtMDktMjcgMTA6MDA6MDChYctATrR64UeuFKFjo1VTRKJ0eaZhbW91bnSidHqjR01UhaF0szIwMjYtMDktMzAgMTA6MDA6MDChYctAa_4UeuFHrqFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjM2ODA2OaNzaWQCo2hpZKdscDU5ZGM1o29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0xMC0wMaJjb6oyMDI2LTEwLTA0o2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwMzQ0ZjlkNGRxS1FNN3RoUlA3TEtSWTVYVzVXa0ZuWGN2RUZFo2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSgom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctAM0euFHrhSKFjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAMeZmZmZmZqFjo1VTRKJscMCjYmt0BA=="
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "status": "QUOTED",
+          "quoteId": "dr02Z8pMB",
+          "quotedPrice": {
+            "amount": 223.94,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:07:13.549Z",
+          "recordingId": "rec_980c078fddd57ae8a5d3be04b68a7037",
+          "latencyMs": 2653
+        }
+      }
+    },
+    {
+      "stage": "nuitee.setup_book_displaced",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:20.420Z",
+      "request": {
+        "quoteId": "dr02Z8pMB"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "confirmed": true,
+          "provenance": "LIVE",
+          "bookingId": "VeUYA5TGq",
+          "providerConfirmationCode": "test",
+          "totalPrice": {
+            "amount": 223.94,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:07:16.203Z",
+          "recordingId": "rec_a6b1c3d0c33d63f3a75c5bb7079fd350",
+          "latencyMs": 4217
+        }
+      }
+    },
+    {
+      "stage": "nuitee.setup_retrieve_displaced",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:20.829Z",
+      "request": {
+        "bookingId": "VeUYA5TGq"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "bookingId": "VeUYA5TGq",
+          "status": "CONFIRMED",
+          "propertyName": "Value Hotel Balestier",
+          "cancellationFee": {
+            "amount": 61.41,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:07:20.420Z",
+          "recordingId": "rec_e1ad7e5d5f4f21de8b85f15e90e25501",
+          "latencyMs": 409
+        }
+      }
+    },
+    {
+      "stage": "nuitee.executor_hotel_replacement",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:22.941Z",
+      "request": {
+        "operation": "hotel.modify",
+        "replacementRateId": "3gAWonJzkd4AEaRzcmlk2gE9RzRaVE9OQldHRTNHS05SVUdZWVRPTVJXR1FaREFOWlVHNDNUTU9KV01VWkRBTlpYR1k0VE9OQldIQTNHTU5aVkc0MkRFTUJYRzQzRFNOVEZHWTJETVpSWEc1NkRDSVpTR0FaRE1NSlFHQVlYWU1SUUdJM0RDTUJRR1I2R0szUzdLVkpYWVZLVFBSS1ZHUkQ0R0ZBVEFRMzRHUTJURU9MNE5GSUdPVktJUFFZVE9PQlhHVTRESU1CU0hBWURDT0xGTVJWWEVJWlRHWTREQU5SWkVNWkRDTlpZRlVaVE1PQlFHWTRYWVVTR0paNkRFTUJTR1lZRFNNUlhHRVlEQU1ENEdGNkZFTUpRR1E0SFlNUlRHSTJEU0kyU0o0UlZFUlNPRU1aREFNUldGVVlEU0xKU0c0UURDTUIyR0FZQ0ejcHJjy0BtD64UeuFIpW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZLMyMDI2LTA5LTMwIDEwOjAwOjAwonJ0o1JGTqNicmSiUk-kbXJpZMCjbXJuwKNoZHDAo2ZybqCjc3JuvFN0YW5kYXJkIFR3aW4gd2l0aG91dCBXaW5kb3ejb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCShaF0szIwMjYtMDktMjcgMTA6MDA6MDChYctAT-FHrhR64aFjo1VTRKJ0eaZhbW91bnSidHqjR01UhaF0szIwMjYtMDktMzAgMTA6MDA6MDChYctAbQ-uFHrhSKFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjM2ODA2OaNzaWQCo2hpZKdscDU5ZGM1o29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0xMC0wMaJjb6oyMDI2LTEwLTA0o2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwMzQ0ZjlkNGRxS1FNN3RoUlA3TEtSWTVYVzVXa0ZuWGN2RUZFo2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSgom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctANJcKPXCj16Fjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAMfhR64UeuKFjo1VTRKJscMCjYmt0BA==",
+        "displacedBookingId": "VeUYA5TGq",
+        "ceiling": {
+          "amount": 232.49,
+          "currency": "USD"
+        }
+      },
+      "result": {
+        "id": "exec-int-live-nuitee-replace-3",
+        "intentId": "int-live-nuitee-replace-3",
+        "executedAt": "2026-08-24T15:07:22.941Z",
+        "status": "FAILURE",
+        "provenance": "RECORD",
+        "providerId": "nuitee",
+        "error": {
+          "code": "hotel_book_failed",
+          "message": "replacement booking failed: PROVIDER_ERROR/nuitee_http_400: Nuitée failed: {\"error\":{\"code\":4005,\"message\":\"duplicate booking attempt with existing client reference\"}}"
+        }
+      }
+    },
+    {
+      "stage": "nuitee.cleanup_cancel",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:23.669Z",
+      "request": {
+        "bookingId": "VeUYA5TGq"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "confirmed": true,
+          "provenance": "LIVE",
+          "reference": "VeUYA5TGq",
+          "fee": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:07:23.332Z",
+          "recordingId": "rec_4a7eea8a964b7ce73b425aa003b8f4f9",
+          "latencyMs": 337
+        }
+      }
+    },
+    {
+      "stage": "nuitee.cleanup_observe",
+      "provider": "nuitee",
+      "mode": "RECORD",
+      "timestamp": "2026-08-24T15:07:24.090Z",
+      "request": {
+        "bookingId": "VeUYA5TGq"
+      },
+      "result": {
+        "ok": true,
+        "data": {
+          "bookingId": "VeUYA5TGq",
+          "status": "CANCELLED",
+          "propertyName": "Value Hotel Balestier",
+          "cancellationFee": {
+            "amount": 61.41,
+            "currency": "USD"
+          }
+        },
+        "meta": {
+          "providerId": "nuitee",
+          "mode": "RECORD",
+          "requestedAt": "2026-08-24T15:07:23.669Z",
+          "recordingId": "rec_e1ad7e5d5f4f21de8b85f15e90e25501",
+          "latencyMs": 421
+        }
+      }
+    }
+  ]
+}

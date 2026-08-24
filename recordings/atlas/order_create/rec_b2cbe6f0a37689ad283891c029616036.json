@@ -1,0 +1,24 @@
+{
+  "id": "rec_b2cbe6f0a37689ad283891c029616036",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-08-24T21:41:21.625Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "94696d69-d2f4-4a9c-bf12-a505b10b297b",
+    "orderNo": "TESTA20260825054121298",
+    "pnrCode": "RFYUVU",
+    "totalPrice": 71.54,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-08-25 06:11:21",
+    "paxTicketInfos": [
+      {
+        "ticketNos": []
+      }
+    ],
+    "duplicateOrders": null
+  }
+}

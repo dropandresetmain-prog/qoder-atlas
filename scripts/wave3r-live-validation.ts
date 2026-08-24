@@ -37,6 +37,7 @@ import type { RuleSet } from '../src/domain/rules.ts';
 import type { AuthorityContext } from '../src/contracts/services.ts';
 import {
   createProviderBackedExecutor,
+  REQUIRED_SIDE_EFFECT_LEVEL,
   type FlightBookingDossier,
   type HotelReplacementDossier,
 } from '../src/app/providerExecution.ts';
@@ -154,13 +155,21 @@ async function authorisedExecution(
 ): Promise<{ execution: AuthorisedExecution; strategy: RecoveryStrategy }> {
   intentSequence += 1;
   const intentId = `int-live-${label}-${RUN_ID}-${intentSequence}`;
+  // The REAL application classification (providerExecution's structural
+  // backstop map), never a harness invention: flight.cancel is IRREVERSIBLE
+  // (the money already moved at pay; authority reviews the action, not a
+  // gross spend), flight.pay/hotel.modify are MONEY_MOVING. Declaring every
+  // operation MONEY_MOVING would trip the ADR-048 fail-closed spendExposure
+  // rule for non-chargeable actions and exercise a path the application
+  // itself never produces.
+  const sideEffectLevel = REQUIRED_SIDE_EFFECT_LEVEL[operation] ?? ('MONEY_MOVING' as SideEffectLevel);
   const intent: ActionIntent = {
     id: intentId,
     caseId: 'case-live-validation',
     operation,
     capability,
     parameters,
-    sideEffectLevel: 'MONEY_MOVING' as SideEffectLevel,
+    sideEffectLevel,
     // ADR-048: the executor ceiling is the authority-frozen gross spend.
     ...(ceiling ? { priceDelta: ceiling, spendExposure: ceiling } : {}),
     evidenceRefs: [],
@@ -363,7 +372,8 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   // completed. With a CLI orderRef, observe the existing order through the
   // adapter and continue the evidence chain from there — never double-pay or
   // double-create. Otherwise run the full search → book chain.
-  const resumeOrderRef = process.argv[3];
+  const resumeRaw = process.argv[3];
+  const resumeOrderRef = resumeRaw && resumeRaw !== '-' ? resumeRaw : undefined;
   let transactionState: Record<string, unknown> | undefined;
   let orderRef: string | undefined;
   if (resumeOrderRef) {
@@ -385,10 +395,13 @@ async function validateAtlasFlightChain(config: ReturnType<typeof loadConfig>, s
   } else {
   // 1. Search prerequisite (read-only). Route chosen from DR-0 evidence: a
   //    void-supported carrier region so the cancellation leg is provable.
+  //    VALIDATION_ORIGIN/VALIDATION_DESTINATION override the route so a
+  //    re-run can book a fresh passenger+flight combination instead of
+  //    re-adopting a prior order through duplicate detection (status 318).
   const departureDate = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
   const searchQuery = {
-    origin: { system: 'iata', value: 'MEX' },
-    destination: { system: 'iata', value: 'CUN' },
+    origin: { system: 'iata', value: process.env['VALIDATION_ORIGIN'] ?? 'MEX' },
+    destination: { system: 'iata', value: process.env['VALIDATION_DESTINATION'] ?? 'CUN' },
     departureDate,
     passengers: { adults: 1 },
   };
@@ -560,7 +573,11 @@ async function main(): Promise<void> {
     throw new Error('provider credentials absent; LIVE validation refused');
   }
 
-  const store = new FileRecordingStore({ readDirs: ['fixtures/recordings'], writeDir: 'fixtures/recordings' });
+  // LIVE evidence recordings persist to the app-owned `recordings/` store
+  // (the configured writable dir on the composed read path); the curated
+  // `fixtures/recordings` corpus is read-only reference data and must never
+  // be polluted by mission evidence.
+  const store = new FileRecordingStore({ readDirs: ['fixtures/recordings', 'recordings'], writeDir: 'recordings' });
 
   await validateAtlasFlightChain(config, store);
   // 'ticketing' runs are Atlas-only: the order is handed to the read-only

@@ -1,0 +1,209 @@
+{
+  "id": "rec_f8253ea48c6558fe16ae2a662e4bd483",
+  "providerId": "nuitee",
+  "operation": "book",
+  "recordedAt": "2026-08-24T21:44:46.847Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "Iced3TwyH",
+      "clientReference": "int-live-nuitee-replace-mt7rkkaw-2",
+      "supplierBookingId": "Iced3TwyH",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-10-01",
+      "checkout": "2026-10-04",
+      "hotel": {
+        "hotelId": "lp59dc5",
+        "name": "Value Hotel Balestier"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "I42DERCPJZNFOSCFGNDUWTKSKFDTIWSEJVNFEV2NLEZUOSKNKJIUONBTKRGU6SSYI5ITGRCRJZKEORZUGJKE6TSCKNDUCM2UJ5HFEWSHLJJVITKOIJLU2WJTKRHTOQSSIVGVURCBJVJFOR2FLFCECTKMGRDUSWKEIVHFEUSHIFMUISJXIRDE4WSQKZFVKMZUJNLEUWCZKZFVISKSGZCEGUKKKFEU4NSEJFHEUU2IIY3EOU2VIREEWVSFJBMU2SSYJBATGVCNJVBFQSCBGNKEKTSCKZDVUNCYIEZFGVKFJVNFITKPIJIUOWJUKNDU2SSRI5MVUUZSJVNFOSCBLFCE2T2MGRFUURCFGQ3UEU2HIFNEITKNIJNEOSJTKRAU2SSWJBDDMRCDG5BVGR2FLFKEWTKEGRDUSWSUKNGUEWCFJZFEKNSJGJJUSWSIINDU2USRI5ETGQZSJVBFURSVLJCE6SKCKFDUKNKEJNHUURD4GIZTSLRQG56DEMBSGYWTAOJNGMYCAMBRHI2TSORQGB6FET34PR6HYVCXJFHCAUSPJ5GSAV2JKREE6VKUEBLUSTSEJ5LXYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+            "retailRate": {
+              "total": {
+                "amount": 239.07,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": ""
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Property service charge",
+                  "amount": 23.91,
+                  "currency": "USD"
+                },
+                {
+                  "included": false,
+                  "description": "TAX",
+                  "amount": 21.52,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-10-01 23:59:59",
+                  "amount": 239.07,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "Room Only",
+            "boardName": "RO",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Northstar",
+          "lastName": "Sandbox",
+          "childrenAges": null,
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-09-27 01:59:00",
+                "amount": 108.17,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              },
+              {
+                "cancelTime": "2026-09-30 01:59:00",
+                "amount": 239.07,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I42DERCPJZNFOSCFGNDUWTKSKFDTIWSEJVNFEV2NLEZUOSKNKJIUONBTKRGU6SSYI5ITGRCRJZKEORZUGJKE6TSCKNDUCM2UJ5HFEWSHLJJVITKOIJLU2WJTKRHTOQSSIVGVURCBJVJFOR2FLFCECTKMGRDUSWKEIVHFEUSHIFMUISJXIRDE4WSQKZFVKMZUJNLEUWCZKZFVISKSGZCEGUKKKFEU4NSEJFHEUU2IIY3EOU2VIREEWVSFJBMU2SSYJBATGVCNJVBFQSCBGNKEKTSCKZDVUNCYIEZFGVKFJVNFITKPIJIUOWJUKNDU2SSRI5MVUUZSJVNFOSCBLFCE2T2MGRFUURCFGQ3UEU2HIFNEITKNIJNEOSJTKRAU2SSWJBDDMRCDG5BVGR2FLFKEWTKEGRDUSWSUKNGUEWCFJZFEKNSJGJJUSWSIINDU2USRI5ETGQZSJVBFURSVLJCE6SKCKFDUKNKEJNHUURD4GIZTSLRQG56DEMBSGYWTAOJNGMYCAMBRHI2TSORQGB6FET34PR6HYVCXJFHCAUSPJ5GSAV2JKREE6VKUEBLUSTSEJ5LXYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+          "occupancy_number": 1,
+          "amount": 239.07,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Northstar",
+              "lastName": "Sandbox",
+              "email": "booker@example.com",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Northstar",
+        "lastName": "Sandbox",
+        "email": "booker@example.com",
+        "phone": "0000000000"
+      },
+      "createdAt": "2026-08-24T21:44:47",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-09-27 01:59:00",
+            "amount": 108.17,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          },
+          {
+            "cancelTime": "2026-09-30 01:59:00",
+            "amount": 239.07,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
+      "price": 239.07,
+      "sellingPriceToUser": 239.07,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Northstar",
+      "lastName": "Sandbox",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "syR5j7HiC",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_6RLe-Rrx4SAMQNHh7wnK7",
+      "sellingPrice": "239.07",
+      "exchangeRate": 0.8562614930719559,
+      "exchangeRateUsd": 1,
+      "email": "booker@example.com",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-09-27T01:59:00Z",
+      "userId": 383174,
+      "nationality": "US",
+      "holderTitle": "",
+      "hotelId": "lp59dc5",
+      "hotelName": "Value Hotel Balestier",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 9.56,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "",
+      "payLaterDeadline": null
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

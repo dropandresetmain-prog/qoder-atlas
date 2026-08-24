@@ -1,0 +1,4783 @@
+{
+  "id": "rec_7f93d9c9362c617e3e686d7f4e6c73aa",
+  "providerId": "atlas",
+  "operation": "search",
+  "recordedAt": "2026-08-24T21:33:24.203Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "routings": [
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE0Ny42NF8xNDcuNjRfMC4wMF8wLjAwXzI5NS4yOF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDgtLUdETC0yMDI2MDkyMzA4MTAtMjAyNjA5MjMwOTI4LVplcm8tMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtWmVyby0xLV4xNDcuNjRfMTQ3LjY0XzAuMDBfMC4wMF8yOTUuMjheQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNDcuNjReMTQ3LjY0XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.OnPFJYr58aAaXxkk9jME/kDciM07ZN6vrb7tmvihQjw=",
+        "fid": "NeYq5c0d9gyVn92dv1s4Pn1NhD6ZOa1u_Yl6AQTmwUqhDY2q9_buJHIgD_dxK5t_ggmL5Sx6IK8KTdGrhcoUaKQGRjub3mIH",
+        "currency": "USD",
+        "adultPrice": 122.56,
+        "adultTax": 25.08,
+        "childPrice": 122.56,
+        "childTax": 25.08,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4148",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609230810",
+            "arrTime": "202609230928",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41046",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231430",
+            "arrTime": "202609231814",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE3MS42Nl8xNzEuNjZfMC4wMF8wLjAwXzM0My4zMl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5OTFUtWTQxMjkxLS1HREwtMjAyNjA5MjMwNjMwLTIwMjYwOTIzMDc0NC1aZXJvLTEtI0dETC1ZNDEwNDYtLUNVTi0yMDI2MDkyMzE0MzAtMjAyNjA5MjMxODE0LVplcm8tMS1eMTcxLjY2XzE3MS42Nl8wLjAwXzAuMDBfMzQzLjMyXkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReMTcxLjY2XjE3MS42Nl4wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.kK4IBkdE+wPC0np8RKp28TBBMVRe0Ou5S7fACjPMOhc=",
+        "fid": "72VmDDUizrRuYxepKMUasMXrn9gDf6IYkc0a-yQsGmoUJCpaA69FG3gFM9F4bWwpFFPARJUXnLDB1EDP9fqNIYZY1pLt0fLT",
+        "currency": "USD",
+        "adultPrice": 160.6,
+        "adultTax": 11.06,
+        "childPrice": 160.6,
+        "childTax": 11.06,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41291",
+            "depAirport": "NLU",
+            "arrAirport": "GDL",
+            "depTime": "202609230630",
+            "arrTime": "202609230744",
+            "duration": 74,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41046",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231430",
+            "arrTime": "202609231814",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwOS41Ml8xMDkuNTJfMC4wMF8wLjAwXzIxOS4wNF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5UTEMtWTQxMjExLS1HREwtMjAyNjA5MjMwODI2LTIwMjYwOTIzMDkzNS1aZXJvLTEtI0dETC1ZNDEwNTAtLUNVTi0yMDI2MDkyMzExNDQtMjAyNjA5MjMxNTI4LVplcm8tMS1eMTA5LjUyXzEwOS41Ml8wLjAwXzAuMDBfMjE5LjA0XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReMTA5LjUyXjEwOS41Ml4wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.liP8N4cWgh9NAbPFh9n0ZyZ+lc/sZUpQMEYVEMk3Cts=",
+        "fid": "k4MTH-z2eD22SNdFVe4iCUEw8RAtIN229Wc2aTPvlwim-rpv_Qktx7eZcXHdektyOhunzHdX7gYz9gujtoqyKqUQOZgOmzN3",
+        "currency": "USD",
+        "adultPrice": 95.38,
+        "adultTax": 14.14,
+        "childPrice": 95.38,
+        "childTax": 14.14,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41211",
+            "depAirport": "TLC",
+            "arrAirport": "GDL",
+            "depTime": "202609230826",
+            "arrTime": "202609230935",
+            "duration": 69,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 4,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41050",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231144",
+            "arrTime": "202609231528",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 4,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEyNy45NV8xMjcuOTVfMC4wMF8wLjAwXzI1NS45MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5UTEMtWTQxMjExLS1HREwtMjAyNjA5MjMwODI2LTIwMjYwOTIzMDkzNS1aZXJvLTEtI0dETC1ZNDEwNDYtLUNVTi0yMDI2MDkyMzE0MzAtMjAyNjA5MjMxODE0LVplcm8tMS1eMTI3Ljk1XzEyNy45NV8wLjAwXzAuMDBfMjU1LjkwXkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReMTI3Ljk1XjEyNy45NV4wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.lUDn4oNHsdZwq8BJQoHP3QMd642Z+3vbL7JAAQOzaiQ=",
+        "fid": "Wp_FV0q263yax8x_GW3s_UEw8RAtIN229Wc2aTPvlwim-rpv_Qktx7eZcXHdektyFFPARJUXnLDB1EDP9fqNIYZY1pLt0fLT",
+        "currency": "USD",
+        "adultPrice": 118.3,
+        "adultTax": 9.65,
+        "childPrice": 118.3,
+        "childTax": 9.65,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41211",
+            "depAirport": "TLC",
+            "arrAirport": "GDL",
+            "depTime": "202609230826",
+            "arrTime": "202609230935",
+            "duration": 69,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41046",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231430",
+            "arrTime": "202609231814",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEzMC42NF8xMzAuNjRfMC4wMF8wLjAwXzI2MS4yOF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDgtLUdETC0yMDI2MDkyMzA4MTAtMjAyNjA5MjMwOTI4LVplcm8tMS0jR0RMLVk0MTA1MC0tQ1VOLTIwMjYwOTIzMTE0NC0yMDI2MDkyMzE1MjgtWmVyby0xLV4xMzAuNjRfMTMwLjY0XzAuMDBfMC4wMF8yNjEuMjheQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMzAuNjReMTMwLjY0XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.9XVTEOAm+6bxlQNrRB2TN/c6m6Us0mibR1mT8a8ExRU=",
+        "fid": "jRwrlZhekS8R9tK0OzjWLH1NhD6ZOa1u_Yl6AQTmwUqhDY2q9_buJHIgD_dxK5t_3NQSUVGMY6c_wiM7eEcSVZZyQ4-y35eu",
+        "currency": "USD",
+        "adultPrice": 96.2,
+        "adultTax": 34.44,
+        "childPrice": 96.2,
+        "childTax": 34.44,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4148",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609230810",
+            "arrTime": "202609230928",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 4,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41050",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231144",
+            "arrTime": "202609231528",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 4,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE0Mi4zNV8xNDIuMzVfMC4wMF8wLjAwXzI4NC43MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDAtLUdETC0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzE4LVplcm8tMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtWmVyby0xLV4xNDIuMzVfMTQyLjM1XzAuMDBfMC4wMF8yODQuNzBeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNDIuMzVeMTQyLjM1XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.coTBw8FNi5iSDQUNn53gdDCynugBYrpKOComg2SSkWo=",
+        "fid": "lnM8XxjYNLUtKCgvzeO3i3lq1n3hc4o4_Yl6AQTmwUpAOflMxYaT13IgD_dxK5t_ggmL5Sx6IK8KTdGrhcoUaKQGRjub3mIH",
+        "currency": "USD",
+        "adultPrice": 110.49,
+        "adultTax": 31.86,
+        "childPrice": 110.49,
+        "childTax": 31.86,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4140",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609230600",
+            "arrTime": "202609230718",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41046",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231430",
+            "arrTime": "202609231814",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDkwLjkzXzkwLjkzXzAuMDBfMC4wMF8xODEuODZfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTkxVLVk0MzUzMy0tQ1VOLTIwMjYwOTIzMTEwMS0yMDI2MDkyMzE0MTYtWmVyby0xLV45MC45M185MC45M18wLjAwXzAuMDBfMTgxLjg2XkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReOTAuOTNeOTAuOTNeMC4wMF4xfDF8MjAyNjA4MjUwNTMzMjN8MHwxNzg3NjA3MjAzOTg0ODZiYTY2ZDZ8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMzoxNTo0OHw=.EFA+I7hrM/mJTth+fyAscRZUIstE7U+zhYlnzq1yZ7A=",
+        "fid": "14Qedevml6yiQRy_BYK8WeeASOMN5zDVlmpAG3aLluPVbF3lgipIt9hdb239v6gV",
+        "currency": "USD",
+        "adultPrice": 71.87,
+        "adultTax": 19.06,
+        "childPrice": 71.87,
+        "childTax": 19.06,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43533",
+            "depAirport": "NLU",
+            "arrAirport": "CUN",
+            "depTime": "202609231101",
+            "arrTime": "202609231416",
+            "duration": 135,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE2Ni45MV8xNjYuOTFfMC4wMF8wLjAwXzMzMy44Ml9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDItLUdETC0yMDI2MDkyMzEyMDAtMjAyNjA5MjMxMzE4LVplcm8tMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtWmVyby0xLV4xNjYuOTFfMTY2LjkxXzAuMDBfMC4wMF8zMzMuODJeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNjYuOTFeMTY2LjkxXjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.vAv3O4BbGAaX2RWsIsg81LCBiS4eH0XTJuKfGzfrtfY=",
+        "fid": "47uFSx5A4oS6iiQFwOqK9KjsJGacMv5U_Yl6AQTmwUpaDh5uNZaklHIgD_dxK5t_ggmL5Sx6IK8KTdGrhcoUaKQGRjub3mIH",
+        "currency": "USD",
+        "adultPrice": 137.45,
+        "adultTax": 29.46,
+        "childPrice": 137.45,
+        "childTax": 29.46,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4142",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609231200",
+            "arrTime": "202609231318",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41046",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231430",
+            "arrTime": "202609231814",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDY4Ljg1XzY4Ljg1XzAuMDBfMC4wMF8xMzcuNzBfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeVExDLVk0MzQ4My0tQ1VOLTIwMjYwOTIzMTEwNC0yMDI2MDkyMzE0MjctWmVyby0xLV42OC44NV82OC44NV8wLjAwXzAuMDBfMTM3LjcwXkFZNE5EQ19BUTZeXkFRNjFNRVhDVU4yMDAyMDI2MDkyM15VU0ReNjguODVeNjguODVeMC4wMF4xfDF8MjAyNjA4MjUwNTMzMjN8MHwxNzg3NjA3MjAzOTg0ODZiYTY2ZDZ8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMzoxNTo0OHw=.PhtEniGLF3/eVf0UFq0e6M8Xw/EK65C1CyL+MZOOgvg=",
+        "fid": "8rCOZq697h_91QWJwrdOjMCPZUokACZjiCjG6-E_HAJAKMr4tdueN9hdb239v6gV",
+        "currency": "USD",
+        "adultPrice": 60.85,
+        "adultTax": 8,
+        "childPrice": 60.85,
+        "childTax": 8,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43483",
+            "depAirport": "TLC",
+            "arrAirport": "CUN",
+            "depTime": "202609231104",
+            "arrTime": "202609231427",
+            "duration": 143,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIxOS44M18yMTkuODNfMC4wMF8wLjAwXzQzOS42Nl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5OTFUtWTQzMjk3LS1USUotMjAyNjA5MjMyMjM2LTIwMjYwOTI0MDA1Ni1CYXNpYy0xLSNUSUotWTQzMDgwLS1DVU4tMjAyNjA5MjQwNjU4LTIwMjYwOTI0MTMyMS1CYXNpYy0xLV4yMTkuODNfMjE5LjgzXzAuMDBfMC4wMF80MzkuNjZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yMTkuODNeMjE5LjgzXjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.+tS0ECrCIyps8lQfZjWInZIfLk89s+3JZX9LksYyHBQ=",
+        "fid": "odB7XaBZkkl2tXmBu1kQauACNt9lTZY_ztow5tH5s_cgj2G3gV5SFriSEiJGWEtVeFJJsoqVdx-vbeC3L7m3e3SzPlYoEo58",
+        "currency": "USD",
+        "adultPrice": 203.27,
+        "adultTax": 16.56,
+        "childPrice": 203.27,
+        "childTax": 16.56,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43297",
+            "depAirport": "NLU",
+            "arrAirport": "TIJ",
+            "depTime": "202609232236",
+            "arrTime": "202609240056",
+            "duration": 200,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43080",
+            "depAirport": "TIJ",
+            "arrAirport": "CUN",
+            "depTime": "202609240658",
+            "arrTime": "202609241321",
+            "duration": 263,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEzMy4wMl8xMzMuMDJfMC4wMF8wLjAwXzI2Ni4wNF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQ1NjE3LS1NVFktMjAyNjA5MjMwODE1LTIwMjYwOTIzMDk1MC1CYXNpYy0xLSNNVFktWTQ1NTg4LS1DVU4tMjAyNjA5MjMxNTM1LTIwMjYwOTIzMTg1OS1CYXNpYy0xLV4xMzMuMDJfMTMzLjAyXzAuMDBfMC4wMF8yNjYuMDReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMzMuMDJeMTMzLjAyXjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.yEF5K0lC1n64NowtD2uOtTLQGfK4GYm7wZ6MU5o95s4=",
+        "fid": "NCxzCxrfXDE8cOg9qT_DTM1g1zyU3DiZ6gXz6WBJyY2_CqcmvS_DmjYGs7zkBdHDtTNpoSR_oyDH3kY6pVMiSUPDOAMtNavl",
+        "currency": "USD",
+        "adultPrice": 113.6,
+        "adultTax": 19.42,
+        "childPrice": 113.6,
+        "childTax": 19.42,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y45617",
+            "depAirport": "MEX",
+            "arrAirport": "MTY",
+            "depTime": "202609230815",
+            "arrTime": "202609230950",
+            "duration": 95,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y45588",
+            "depAirport": "MTY",
+            "arrAirport": "CUN",
+            "depTime": "202609231535",
+            "arrTime": "202609231859",
+            "duration": 144,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE1Ny4xMV8xNTcuMTFfMC4wMF8wLjAwXzMxNC4yMl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQyNDAtLU1UWS0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzM1LVplcm8tMS0jTVRZLVk0NTU4Ni0tQ1VOLTIwMjYwOTIzMTAyMC0yMDI2MDkyMzEzNDQtWmVyby0xLV4xNTcuMTFfMTU3LjExXzAuMDBfMC4wMF8zMTQuMjJeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNTcuMTFeMTU3LjExXjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.zEECq+Ez+dJ+XxQjizn5KFGCIMj7BSMqIqAYI942qFc=",
+        "fid": "CBtpUwIorx1E703FoWtW8MApMT_74Vb-nwdie3id6G3tsf0QB781G9A--zxdWBlQ6s4B75ZgmypLIXBn6oNnRrZ18FD_IhS5",
+        "currency": "USD",
+        "adultPrice": 125,
+        "adultTax": 32.11,
+        "childPrice": 125,
+        "childTax": 32.11,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4240",
+            "depAirport": "MEX",
+            "arrAirport": "MTY",
+            "depTime": "202609230600",
+            "arrTime": "202609230735",
+            "duration": 95,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y45586",
+            "depAirport": "MTY",
+            "arrAirport": "CUN",
+            "depTime": "202609231020",
+            "arrTime": "202609231344",
+            "duration": 144,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDg2LjgyXzg2LjgyXzAuMDBfMC4wMF8xNzMuNjRfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MTAwLS1DVU4tMjAyNjA5MjMwNjQ1LTIwMjYwOTIzMTAwMy1aZXJvLTEtXjg2LjgyXzg2LjgyXzAuMDBfMC4wMF8xNzMuNjReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF44Ni44Ml44Ni44Ml4wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.O+BmwQwO+Q+UhFpr39vcBPpjw1dA7iqUGk3K/7nhWc4=",
+        "fid": "XA5Bgx_KRw2bqjoMjiJ3BHY498tWfbOsjKeGI9rZNEo2BKP0zVfo3w..",
+        "currency": "USD",
+        "adultPrice": 50.81,
+        "adultTax": 36.01,
+        "childPrice": 50.81,
+        "childTax": 36.01,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4100",
+            "depAirport": "MEX",
+            "arrAirport": "CUN",
+            "depTime": "202609230645",
+            "arrTime": "202609231003",
+            "duration": 138,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIzNS45MF8yMzUuOTBfMC4wMF8wLjAwXzQ3MS44MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxODgtLVRJSi0yMDI2MDkyMzIxNDUtMjAyNjA5MjQwMDE4LUJhc2ljLTEtI1RJSi1ZNDMwODAtLUNVTi0yMDI2MDkyNDA2NTgtMjAyNjA5MjQxMzIxLUJhc2ljLTEtXjIzNS45MF8yMzUuOTBfMC4wMF8wLjAwXzQ3MS44MF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjIzNS45MF4yMzUuOTBeMC4wMF4xfDF8MjAyNjA4MjUwNTMzMjN8MHwxNzg3NjA3MjAzOTg0ODZiYTY2ZDZ8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMzoxNTo0OHw=.PSQStOaNoZI+ZhYrLNRnrICrLgD5ERRChFU9kBoYmuQ=",
+        "fid": "m7xCxkryZCJAe_vRF3XHzFZWESw8OFcbUh_Y-3q6_Hq_U1wj9FbhcXx0KCGSVREY1fwNkAADPyqjXEtQtHUs4rUvbL0oiyDT",
+        "currency": "USD",
+        "adultPrice": 203.67,
+        "adultTax": 32.23,
+        "childPrice": 203.67,
+        "childTax": 32.23,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4188",
+            "depAirport": "MEX",
+            "arrAirport": "TIJ",
+            "depTime": "202609232145",
+            "arrTime": "202609240018",
+            "duration": 213,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43080",
+            "depAirport": "TIJ",
+            "arrAirport": "CUN",
+            "depTime": "202609240658",
+            "arrTime": "202609241321",
+            "duration": 263,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDU0Mi41Nl81NDIuNTZfMC4wMF8wLjAwXzEwODUuMTJfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MjQ4LS1NVFktMjAyNjA5MjMyMTAwLTIwMjYwOTIzMjIzNS1aZXJvLTEtI01UWS1ZNDU1ODQtLUNVTi0yMDI2MDkyNDA2MDAtMjAyNjA5MjQwOTI0LVplcm8tMS1eNTQyLjU2XzU0Mi41Nl8wLjAwXzAuMDBfMTA4NS4xMl5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjU0Mi41Nl41NDIuNTZeMC4wMF4xfDF8MjAyNjA4MjUwNTMzMjN8MHwxNzg3NjA3MjAzOTg0ODZiYTY2ZDZ8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMzoxNTo0OHw=.3xD+wUavacKt3UB+9+v64KLi7Pz0hrWoRwkDgFp8Cfw=",
+        "fid": "bsKjxV2IfPcyi5wBtadmOEJe2fhb3Oa8nwdie3id6G05so8h0RzYqNA--zxdWBlQt95hY8feUrdtyUvoDyTONZZdYOjICswa",
+        "currency": "USD",
+        "adultPrice": 514.03,
+        "adultTax": 28.53,
+        "childPrice": 514.03,
+        "childTax": 28.53,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4248",
+            "depAirport": "MEX",
+            "arrAirport": "MTY",
+            "depTime": "202609232100",
+            "arrTime": "202609232235",
+            "duration": 95,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y45584",
+            "depAirport": "MTY",
+            "arrAirport": "CUN",
+            "depTime": "202609240600",
+            "arrTime": "202609240924",
+            "duration": 144,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE3Mi4xMF8xNzIuMTBfMC4wMF8wLjAwXzM0NC4yMF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDAtLUdETC0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzE4LVplcm8tMS0jR0RMLVk0MTA1MC0tQ1VOLTIwMjYwOTIzMTE0NC0yMDI2MDkyMzE1MjgtWmVyby0xLV4xNzIuMTBfMTcyLjEwXzAuMDBfMC4wMF8zNDQuMjBeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xNzIuMTBeMTcyLjEwXjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.H08KA3e8G0kpAW6IGrIKxFLErBTU0X1Nx1lYt1ucfQo=",
+        "fid": "-m_DCAbVIzMhxhbvfYLs53lq1n3hc4o4_Yl6AQTmwUpAOflMxYaT13IgD_dxK5t_3NQSUVGMY6c_wiM7eEcSVZZyQ4-y35eu",
+        "currency": "USD",
+        "adultPrice": 138.88,
+        "adultTax": 33.22,
+        "childPrice": 138.88,
+        "childTax": 33.22,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4140",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609230600",
+            "arrTime": "202609230718",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 4,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41050",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231144",
+            "arrTime": "202609231528",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 4,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwMy41OF8xMDMuNThfMC4wMF8wLjAwXzIwNy4xNl9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQyNDAtLU1UWS0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzM1LVplcm8tMS0jTVRZLVk0NTU4OC0tQ1VOLTIwMjYwOTIzMTUzNS0yMDI2MDkyMzE4NTktWmVyby0xLV4xMDMuNThfMTAzLjU4XzAuMDBfMC4wMF8yMDcuMTZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMDMuNTheMTAzLjU4XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.LDoK4fstWmY7J0GuNA9MsyjkvsU64bb6TWsYK5kdJ5E=",
+        "fid": "vPpbpO_jaIUhxCvsRFNjhMApMT_74Vb-nwdie3id6G3tsf0QB781G9A--zxdWBlQBXnAF09cQtlLXAkFI_Rxqm_EP58_nLao",
+        "currency": "USD",
+        "adultPrice": 65.18,
+        "adultTax": 38.4,
+        "childPrice": 65.18,
+        "childTax": 38.4,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4240",
+            "depAirport": "MEX",
+            "arrAirport": "MTY",
+            "depTime": "202609230600",
+            "arrTime": "202609230735",
+            "duration": 95,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y45588",
+            "depAirport": "MTY",
+            "arrAirport": "CUN",
+            "depTime": "202609231535",
+            "arrTime": "202609231859",
+            "duration": 144,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDg1LjE4Xzg1LjE4XzAuMDBfMC4wMF8xNzAuMzZfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MTEwLS1DVU4tMjAyNjA5MjMyMDQ1LTIwMjYwOTIzMjM1OC1aZXJvLTEtXjg1LjE4Xzg1LjE4XzAuMDBfMC4wMF8xNzAuMzZeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF44NS4xOF44NS4xOF4wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.0IyCT8fQ1rwWYFCNFNE69P7+KgZMGPdQaZMc7BMT2Tw=",
+        "fid": "9U1N-fZMp9f1EtTIDldI6qwoDt_zRbyh9q4U5E-Z20UJSN9yyt9W5A..",
+        "currency": "USD",
+        "adultPrice": 60.17,
+        "adultTax": 25.01,
+        "childPrice": 60.17,
+        "childTax": 25.01,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4110",
+            "depAirport": "MEX",
+            "arrAirport": "CUN",
+            "depTime": "202609232045",
+            "arrTime": "202609232358",
+            "duration": 133,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE1Mi4yMF8xNTIuMjBfMC4wMF8wLjAwXzMwNC40MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNDAtLUdETC0yMDI2MDkyMzA2MDAtMjAyNjA5MjMwNzE4LUJhc2ljLTEtI0dETC1ZNDEwNDgtLUNVTi0yMDI2MDkyMzA4MjAtMjAyNjA5MjMxMjA0LUJhc2ljLTEtXjE1Mi4yMF8xNTIuMjBfMC4wMF8wLjAwXzMwNC40MF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjE1Mi4yMF4xNTIuMjBeMC4wMF4xfDF8MjAyNjA4MjUwNTMzMjN8MHwxNzg3NjA3MjAzOTg0ODZiYTY2ZDZ8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOC0yNCAyMzoxNTo0OHw=.XJ8o2BaEYTF+GVWIoA/DVGR53MtT4/eC5P4GObK5n5g=",
+        "fid": "9GyHXLV4xf18kzkry-lLyXlq1n3hc4o4_Yl6AQTmwUpAOflMxYaT13IgD_dxK5t_bJhoKuZebslpEE_sor7qtZHzEAWsDA72",
+        "currency": "USD",
+        "adultPrice": 126.43,
+        "adultTax": 25.77,
+        "childPrice": 126.43,
+        "childTax": 25.77,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4140",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609230600",
+            "arrTime": "202609230718",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41048",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609230820",
+            "arrTime": "202609231204",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDk5Ljk3Xzk5Ljk3XzAuMDBfMC4wMF8xOTkuOTRfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MjQ2LS1NVFktMjAyNjA5MjMxMTA1LTIwMjYwOTIzMTI0MC1aZXJvLTEtI01UWS1ZNDU1ODgtLUNVTi0yMDI2MDkyMzE1MzUtMjAyNjA5MjMxODU5LVplcm8tMS1eOTkuOTdfOTkuOTdfMC4wMF8wLjAwXzE5OS45NF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjk5Ljk3Xjk5Ljk3XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.XnlxEhOdZ/64F6W0FABMQjn28j6yR/9syJpqgIfjL08=",
+        "fid": "NN0nSSYF-tE-R6kHzxH1aH1zTULX1HW7703KFo0Z5HqswiHWoaC2vVt-gROh53iEnXBd6PUTrZNEY1LOdvioWKTlNvdoac7d",
+        "currency": "USD",
+        "adultPrice": 71.08,
+        "adultTax": 28.89,
+        "childPrice": 71.08,
+        "childTax": 28.89,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4246",
+            "depAirport": "MEX",
+            "arrAirport": "MTY",
+            "depTime": "202609231105",
+            "arrTime": "202609231240",
+            "duration": 95,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y45588",
+            "depAirport": "MTY",
+            "arrAirport": "CUN",
+            "depTime": "202609231535",
+            "arrTime": "202609231859",
+            "duration": 144,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDU5LjEyXzU5LjEyXzAuMDBfMC4wMF8xMTguMjRfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MTA0LS1DVU4tMjAyNjA5MjMxNzQ1LTIwMjYwOTIzMjEwMy1aZXJvLTEtXjU5LjEyXzU5LjEyXzAuMDBfMC4wMF8xMTguMjReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF41OS4xMl41OS4xMl4wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.WMgB7/qCN2Stzof9sYrQW2oyxMiLx6NeiTJ7L0GPDTc=",
+        "fid": "evk64zZAHFCYBRQ6nadqb7sRc1c4AJfW8pXq8mW1Z4eoM8JP6SI6zw..",
+        "currency": "USD",
+        "adultPrice": 26.65,
+        "adultTax": 32.47,
+        "childPrice": 26.65,
+        "childTax": 32.47,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4104",
+            "depAirport": "MEX",
+            "arrAirport": "CUN",
+            "depTime": "202609231745",
+            "arrTime": "202609232103",
+            "duration": 138,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 5,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 999.24,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIyNy4xOV8yMjcuMTlfMC4wMF8wLjAwXzQ1NC4zOF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxNTItLUdETC0yMDI2MDkyMzEwMDAtMjAyNjA5MjMxMTE4LVplcm8tMS0jR0RMLVk0MTA0Ni0tQ1VOLTIwMjYwOTIzMTQzMC0yMDI2MDkyMzE4MTQtWmVyby0xLV4yMjcuMTlfMjI3LjE5XzAuMDBfMC4wMF80NTQuMzheQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4yMjcuMTleMjI3LjE5XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.EjOJU/If3WGAVqoW9XjAkajvkPWNspa8Dfi/d7/DLfo=",
+        "fid": "VoiL6IGv7l6EAcHGsV0ujOVC4R1kboPz_Yl6AQTmwUov-tsnRP4tuXIgD_dxK5t_ggmL5Sx6IK8KTdGrhcoUaKQGRjub3mIH",
+        "currency": "USD",
+        "adultPrice": 196.36,
+        "adultTax": 30.83,
+        "childPrice": 196.36,
+        "childTax": 30.83,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4152",
+            "depAirport": "MEX",
+            "arrAirport": "GDL",
+            "depTime": "202609231000",
+            "arrTime": "202609231118",
+            "duration": 78,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41046",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231430",
+            "arrTime": "202609231814",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEzNi4yMF8xMzYuMjBfMC4wMF8wLjAwXzI3Mi40MF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5NRVgtWTQxODAtLVRJSi0yMDI2MDkyMzA1MzAtMjAyNjA5MjMwODAzLVplcm8tMS0jVElKLVk0MzA4Mi0tQ1VOLTIwMjYwOTIzMTAwNS0yMDI2MDkyMzE2MjgtWmVyby0xLV4xMzYuMjBfMTM2LjIwXzAuMDBfMC4wMF8yNzIuNDBeQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMzYuMjBeMTM2LjIwXjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.2h9J5x5fNdBECeDIs+sO/Sp41KA2ycuwsCd57aDJfHk=",
+        "fid": "2mxQhfnVO518n4_tmlcI-FaVucp5xUGmUh_Y-3q6_HoKIZBLwoCIDIke6GYC76dxKaBj5ZywhmnTtK5Q5oUmarfPNSlKajAW",
+        "currency": "USD",
+        "adultPrice": 102.18,
+        "adultTax": 34.02,
+        "childPrice": 102.18,
+        "childTax": 34.02,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4180",
+            "depAirport": "MEX",
+            "arrAirport": "TIJ",
+            "depTime": "202609230530",
+            "arrTime": "202609230803",
+            "duration": 213,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43082",
+            "depAirport": "TIJ",
+            "arrAirport": "CUN",
+            "depTime": "202609231005",
+            "arrTime": "202609231628",
+            "duration": 263,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDk5Ljk3Xzk5Ljk3XzAuMDBfMC4wMF8xOTkuOTRfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0MTAyLS1DVU4tMjAyNjA5MjMxMTEwLTIwMjYwOTIzMTQyOC1aZXJvLTEtXjk5Ljk3Xzk5Ljk3XzAuMDBfMC4wMF8xOTkuOTReQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF45OS45N145OS45N14wLjAwXjF8MXwyMDI2MDgyNTA1MzMyM3wwfDE3ODc2MDcyMDM5ODQ4NmJhNjZkNnx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXwyMDI2LTA4LTI0IDIzOjE1OjQ4fA==.cOcBizVj0/S6XvTejP90drs7wkz/+OMXVI0RvHD6xiQ=",
+        "fid": "NN0nSSYF-tE-R6kHzxH1aIMrxQ_kuD42VQTAQDFCqF-U46Zhdwgqtw..",
+        "currency": "USD",
+        "adultPrice": 66.6,
+        "adultTax": 33.37,
+        "childPrice": 66.6,
+        "childTax": 33.37,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4102",
+            "depAirport": "MEX",
+            "arrAirport": "CUN",
+            "depTime": "202609231110",
+            "arrTime": "202609231428",
+            "duration": 138,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 5,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEyMy4zN18xMjMuMzdfMTIuNjRfMC4wMF8yNTkuMzhfVVNEfE1FWF9DVU5fMV8yMDI2MDkyM19fMV8wXzBeTUVYLVk0OTAwLS1HVUEtMjAyNjA5MjMxODU1LTIwMjYwOTIzMjA1MS1aZXJvLTEtI0dVQS1ZNDM5MzEtLUNVTi0yMDI2MDkyNDEzMjAtMjAyNjA5MjQxNjA5LVplcm8tMS1eMTIzLjM3XzEyMy4zN18xMi42NF8wLjAwXzI1OS4zOF5BWTRORENfQVE2Xl5BUTYxTUVYQ1VOMjAwMjAyNjA5MjNeVVNEXjEyMy4zN14xMjMuMzdeMTIuNjReMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.eUva6pZK1STQopfSg8GX8Zy7s4fxvG0hV9UcE55Rwbw=",
+        "fid": "vQ9MbwQYSvancE4xerSKgcsVeH80pOS1ttmId8IbJtBQXHsLyro7FF0GwaTPhd3Qb2M6N6eieoCjtSykInR_8xAyujkwPsAH",
+        "currency": "USD",
+        "adultPrice": 97.64,
+        "adultTax": 25.73,
+        "childPrice": 97.64,
+        "childTax": 25.73,
+        "infantPrice": 0,
+        "infantTax": 12.64,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y4900",
+            "depAirport": "MEX",
+            "arrAirport": "GUA",
+            "depTime": "202609231855",
+            "arrTime": "202609232051",
+            "duration": 116,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y43931",
+            "depAirport": "GUA",
+            "arrAirport": "CUN",
+            "depTime": "202609241320",
+            "arrTime": "202609241609",
+            "duration": 109,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Zero",
+            "seatCount": 9,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      },
+      {
+        "routingIdentifier": "TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDEwNy45OV8xMDcuOTlfMC4wMF8wLjAwXzIxNS45OF9VU0R8TUVYX0NVTl8xXzIwMjYwOTIzX18xXzBfMF5OTFUtWTQxMjkxLS1HREwtMjAyNjA5MjMwNjMwLTIwMjYwOTIzMDc0NC1CYXNpYy0xLSNHREwtWTQxMDUwLS1DVU4tMjAyNjA5MjMxMTQ0LTIwMjYwOTIzMTUyOC1CYXNpYy0xLV4xMDcuOTlfMTA3Ljk5XzAuMDBfMC4wMF8yMTUuOTheQVk0TkRDX0FRNl5eQVE2MU1FWENVTjIwMDIwMjYwOTIzXlVTRF4xMDcuOTleMTA3Ljk5XjAuMDBeMXwxfDIwMjYwODI1MDUzMzIzfDB8MTc4NzYwNzIwMzk4NDg2YmE2NmQ2fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDgtMjQgMjM6MTU6NDh8.UumCsl+j7/3/soButYaLKojVVnLoEUFY51Zm39heebc=",
+        "fid": "A9-SeitKuWbZ7PEcZ1bAVMXrn9gDf6IYkc0a-yQsGmoUJCpaA69FG3gFM9F4bWwpOhunzHdX7gYz9gujtoqyKqUQOZgOmzN3",
+        "currency": "USD",
+        "adultPrice": 94.94,
+        "adultTax": 13.05,
+        "childPrice": 94.94,
+        "childTax": 13.05,
+        "infantPrice": 0,
+        "infantTax": 0,
+        "expireTime": "2026-08-24T21:34:23Z",
+        "refreshTime": "2026-08-24T15:15:48Z",
+        "fromSegments": [
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41291",
+            "depAirport": "NLU",
+            "arrAirport": "GDL",
+            "depTime": "202609230630",
+            "arrTime": "202609230744",
+            "duration": 74,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 4,
+            "segmentIndex": 1
+          },
+          {
+            "carrier": "Y4",
+            "operatingCarrier": "",
+            "flightNumber": "Y41050",
+            "depAirport": "GDL",
+            "arrAirport": "CUN",
+            "depTime": "202609231144",
+            "arrTime": "202609231528",
+            "duration": 164,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Basic",
+            "seatCount": 4,
+            "segmentIndex": 2
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false,
+        "rule": {
+          "changesRules": [
+            {
+              "changesFee": 0,
+              "changesStatus": "T",
+              "currency": "USD",
+              "revNoshow": "T",
+              "revNoshowFee": 0,
+              "ruleDetailList": [
+                {
+                  "amount": 850,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 525600,
+                  "endMinute": 21600
+                },
+                {
+                  "amount": 1100,
+                  "currency": "MXN",
+                  "status": "H",
+                  "startMinute": 21600,
+                  "endMinute": 240
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 240,
+                  "endMinute": 0
+                },
+                {
+                  "amount": 0,
+                  "currency": "USD",
+                  "status": "T",
+                  "startMinute": 0,
+                  "endMinute": -525600
+                }
+              ]
+            }
+          ],
+          "refundRules": [
+            {
+              "refundFee": 0,
+              "refundStatus": "T",
+              "refundMethod": null,
+              "currency": "USD",
+              "refNoshow": "T",
+              "refNoshowFee": 0,
+              "ruleDetailList": []
+            }
+          ],
+          "baggageElements": [
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 10,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "45*35*20cm",
+              "baggageType": "CabinBaggageUnderSeat",
+              "passengerType": 2,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 1
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 0,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 1,
+              "baggageWeight": 15,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 1,
+              "segmentNo": 2
+            },
+            {
+              "baggagePiece": 0,
+              "baggageWeight": 0,
+              "baggageSize": "L+W+H<=158cm",
+              "baggageType": "StandardCheckInBaggage",
+              "passengerType": 2,
+              "segmentNo": 2
+            }
+          ],
+          "hasBaggage": 1
+        }
+      }
+    ]
+  }
+}

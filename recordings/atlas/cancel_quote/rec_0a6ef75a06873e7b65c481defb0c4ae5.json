@@ -1,0 +1,22 @@
+{
+  "id": "rec_0a6ef75a06873e7b65c481defb0c4ae5",
+  "providerId": "atlas",
+  "operation": "cancel_quote",
+  "recordedAt": "2026-08-24T21:45:25.330Z",
+  "sanitized": true,
+  "raw": {
+    "status": 803,
+    "msg": "Void already submitted for this passenger or segment. Query void status instead.",
+    "orderNo": null,
+    "isVoidable": false,
+    "voidOfferId": "q_55237ed5cd424a4785daa7cacd14198e",
+    "voidMethod": null,
+    "fastConfirmation": null,
+    "expectedConfirmationDate": null,
+    "expectedRefundDate": null,
+    "voidTickets": null,
+    "voidFareAmount": null,
+    "serviceFee": null,
+    "voidWindow": null
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "rec_a7265d54cb4082cb4814422998c3bd60",
+  "providerId": "atlas",
+  "operation": "cancel_status",
+  "recordedAt": "2026-08-24T21:44:31.904Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "voidOrders": [
+      {
+        "orderNo": "TESTA20260825054121298",
+        "voidCode": "202608-0042",
+        "voidStatus": 0,
+        "voidOfferId": "q_6861e978f21b479b8016bc6d4c1f7be2",
+        "voidMethod": "CashBackToOriginalPayment",
+        "cancelReason": "",
+        "expectedConfirmationDate": "20260825",
+        "expectedRefundDate": null,
+        "voidFareAmount": {
+          "currency": "USD",
+          "originalFareAmount": 71.54,
+          "estimatedRefundAmount": 71.54
+        }
+      }
+    ]
+  }
+}
