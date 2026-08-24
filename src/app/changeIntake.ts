@@ -142,46 +142,56 @@ async function interpretViaModel(
   client: ModelStudioClient,
   input: ChangeIntakeInput,
 ): Promise<ChangeIntakeResult> {
-  const modelOutputSchema = z.strictObject({
-    intentKind: z.enum([
-      'ADJUST_TRIP_WINDOW',
-      'CHANGE_TRANSPORT_SCHEDULE',
-      'CHANGE_STAY',
-      'CANCEL_BOOKING',
-      'ADJUST_OBJECTIVE',
-      'OTHER',
-    ]),
-    urgency: z.enum(['HARD_INSTRUCTION', 'SOFT_PREFERENCE']),
-    target: z.strictObject({
-      arriveBy: IsoDateTimeSchema.optional(),
-      departAfter: IsoDateTimeSchema.optional(),
-      preferredStayProximityRef: z
-        .strictObject({
-          entityType: z.literal('PLACE'),
-          id: EntityIdSchema,
-        })
-        .optional(),
-      transport: z
-        .strictObject({
-          preferDirect: z.boolean().optional(),
-          earliestDeparture: IsoDateTimeSchema.optional(),
-          latestDeparture: IsoDateTimeSchema.optional(),
-        })
-        .optional(),
-      objectiveEffects: z
-        .array(
-          z.strictObject({
-            objectiveId: EntityIdSchema,
-            effect: z.enum(['WAIVE', 'REPRIORITY']),
-            newHardness: z.enum(['HARD', 'SOFT']).optional(),
-            reason: z.string().optional(),
-          }),
-        )
-        .default([]),
+  // The prompt's two output shapes are BOTH strict-valid: a bare
+  // clarification object (ambiguity fail-closed) or the full structured
+  // interpretation. A single strict object requiring intentKind would reject
+  // every honest clarification — turning designed uncertainty into a schema
+  // error instead of a clarification request.
+  const modelOutputSchema = z.union([
+    z.strictObject({
+      clarificationNeeded: z.string().min(1),
     }),
-    fundingDeclaration: z.enum(['EVENT_FUNDED', 'TRAVELLER_FUNDED', 'SPLIT', 'UNKNOWN']).optional(),
-    clarificationNeeded: z.string().optional(),
-  });
+    z.strictObject({
+      intentKind: z.enum([
+        'ADJUST_TRIP_WINDOW',
+        'CHANGE_TRANSPORT_SCHEDULE',
+        'CHANGE_STAY',
+        'CANCEL_BOOKING',
+        'ADJUST_OBJECTIVE',
+        'OTHER',
+      ]),
+      urgency: z.enum(['HARD_INSTRUCTION', 'SOFT_PREFERENCE']),
+      target: z.strictObject({
+        arriveBy: IsoDateTimeSchema.optional(),
+        departAfter: IsoDateTimeSchema.optional(),
+        preferredStayProximityRef: z
+          .strictObject({
+            entityType: z.literal('PLACE'),
+            id: EntityIdSchema,
+          })
+          .optional(),
+        transport: z
+          .strictObject({
+            preferDirect: z.boolean().optional(),
+            earliestDeparture: IsoDateTimeSchema.optional(),
+            latestDeparture: IsoDateTimeSchema.optional(),
+          })
+          .optional(),
+        objectiveEffects: z
+          .array(
+            z.strictObject({
+              objectiveId: EntityIdSchema,
+              effect: z.enum(['WAIVE', 'REPRIORITY']),
+              newHardness: z.enum(['HARD', 'SOFT']).optional(),
+              reason: z.string().optional(),
+            }),
+          )
+          .default([]),
+      }),
+      fundingDeclaration: z.enum(['EVENT_FUNDED', 'TRAVELLER_FUNDED', 'SPLIT', 'UNKNOWN']).optional(),
+      clarificationNeeded: z.string().optional(),
+    }),
+  ]);
 
   const task: ModelTask<z.infer<typeof modelOutputSchema>> = {
     id: 'change_intake_nl',
@@ -208,6 +218,8 @@ async function interpretViaModel(
   }
 
   const modelOutput = result.value;
+  // A clarification (bare shape or flagged on the full shape) is designed
+  // ambiguity fail-closed: structured uncertainty, never an invented proposal.
   if (modelOutput.clarificationNeeded) {
     return {
       ok: false,
@@ -221,6 +233,23 @@ async function interpretViaModel(
       ],
       provenance: 'MODEL',
       clarificationNeeded: modelOutput.clarificationNeeded,
+    };
+  }
+  if (!('intentKind' in modelOutput)) {
+    // Structurally unreachable (the union admits only the two shapes above);
+    // kept as a fail-closed backstop rather than a cast.
+    return {
+      ok: false,
+      uncertainties: [
+        {
+          id: `unc-schema-${Date.now()}`,
+          statement: 'model output carried neither a clarification nor an interpretation',
+          aboutRefs: [],
+          severity: 'HIGH',
+        },
+      ],
+      provenance: 'MODEL',
+      clarificationNeeded: 'Model output did not produce a valid ChangeRequest; please rephrase.',
     };
   }
 

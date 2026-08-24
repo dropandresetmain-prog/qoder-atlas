@@ -1,0 +1,116 @@
+{
+  "probe": "wave3r-mission3-model-studio-live",
+  "generatedAt": "2026-08-24T21:55:09.797Z",
+  "endpoint": "dashscope-intl.aliyuncs.com",
+  "model": "qwen-flash",
+  "mode": "LIVE",
+  "note": "LLM output is proposal only; no state mutation, no provider action.",
+  "steps": [
+    {
+      "step": "model_studio.config",
+      "timestamp": "2026-08-24T21:55:04.946Z",
+      "result": {
+        "endpoint": "dashscope-intl.aliyuncs.com",
+        "model": "qwen-flash",
+        "mode": "LIVE",
+        "configured": true
+      }
+    },
+    {
+      "step": "model_studio.extraction_rule_set",
+      "timestamp": "2026-08-24T21:55:06.898Z",
+      "result": {
+        "ok": true,
+        "summary": {
+          "fields": [
+            "kind",
+            "name",
+            "rules"
+          ],
+          "kindPresent": true,
+          "namePresent": true,
+          "rulesCount": 4
+        }
+      }
+    },
+    {
+      "step": "model_studio.extraction_anchor_event",
+      "timestamp": "2026-08-24T21:55:08.635Z",
+      "result": {
+        "ok": true,
+        "summary": {
+          "fields": [
+            "name",
+            "kind",
+            "venue",
+            "startsAt",
+            "endsAt",
+            "organiserName",
+            "engagements"
+          ],
+          "namePresent": true,
+          "kindPresent": true,
+          "venueFields": [
+            "name",
+            "timezone"
+          ],
+          "startsAtPresent": true,
+          "endsAtPresent": true,
+          "organiserNamePresent": true,
+          "engagementsCount": 1
+        }
+      }
+    },
+    {
+      "step": "model_studio.change_request_clear",
+      "timestamp": "2026-08-24T21:55:09.285Z",
+      "result": {
+        "ok": true,
+        "provenance": "MODEL",
+        "intentKind": "ADJUST_TRIP_WINDOW",
+        "urgency": "HARD_INSTRUCTION",
+        "target": {
+          "arriveBy": "2026-09-30T18:00:00+08:00",
+          "objectiveEffects": []
+        }
+      }
+    },
+    {
+      "step": "model_studio.change_request_ambiguous",
+      "timestamp": "2026-08-24T21:55:09.615Z",
+      "result": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "ok": false,
+            "provenance": "MODEL",
+            "mode": "MODEL_CLARIFICATION",
+            "clarificationNeeded": "The traveller has not specified what aspect of the trip needs changing or any details about their intent.",
+            "uncertaintyStatements": [
+              "model requests clarification: The traveller has not specified what aspect of the trip needs changing or any details about their intent."
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "step": "model_studio.strict_validation_fail_closed",
+      "timestamp": "2026-08-24T21:55:09.796Z",
+      "result": {
+        "ok": false,
+        "category": "INVALID_OUTPUT",
+        "code": "model_output_schema_rejected"
+      }
+    },
+    {
+      "step": "model_studio.verdict",
+      "timestamp": "2026-08-24T21:55:09.796Z",
+      "result": {
+        "extraction": "PASS",
+        "changeRequestClear": "PASS",
+        "changeRequestAmbiguousFailClosed": "PASS",
+        "strictValidationFailClosed": "PASS"
+      }
+    }
+  ]
+}

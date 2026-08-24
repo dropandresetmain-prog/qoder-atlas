@@ -31,6 +31,12 @@ import {
   type ChangeIntakeDeps,
 } from '../src/app/changeIntake.ts';
 import { ChangeRequestSchema, type ChangeRequest } from '../src/contracts/changeRequest.ts';
+import {
+  ModelStudioClient,
+  type CompletionRequest,
+  type CompletionResponse,
+  type ModelTransport,
+} from '../src/intelligence/client.ts';
 import type { ProgrammeImportDraft } from '../src/contracts/programmeIntake.ts';
 import type { AnchorEvent, Organisation, Place } from '../src/domain/entities.ts';
 
@@ -344,4 +350,87 @@ test('dr5: proposeThenResolve helper integrates intake and resolver', async () =
   // The resolver should have processed the departAfter target.
   assert.ok(resolution.implications.length > 0 || resolution.uncertainties.length > 0,
     'resolver should have produced implications or uncertainties for the stay extension');
+});
+
+// ---------------------------------------------------------------------------
+// Model-path contract pins (Mission 3): the intake schema admits BOTH prompt
+// output shapes — a bare clarification object and the full interpretation.
+// ScriptedModelTransport is REPLAY-mode, so a LIVE-mode scripted transport is
+// used to exercise the model path without credentials.
+// ---------------------------------------------------------------------------
+
+class LiveScriptedTransport implements ModelTransport {
+  readonly mode = 'LIVE' as const;
+  private readonly responses: string[];
+
+  constructor(responses: string[]) {
+    this.responses = responses;
+  }
+
+  async complete(_request: CompletionRequest, _timeoutMs: number): Promise<CompletionResponse> {
+    const next = this.responses.shift();
+    if (next === undefined) throw new Error('no scripted response left');
+    return { contentText: next };
+  }
+}
+
+function liveClient(responses: string[]): ModelStudioClient {
+  return new ModelStudioClient({ apiKey: 'test-key', transport: new LiveScriptedTransport(responses) });
+}
+
+test('dr5 model path: bare clarification shape fails closed with the model\'s own question', async () => {
+  const question = 'Which part of the trip should change, and by how much?';
+  const client = liveClient([JSON.stringify({ clarificationNeeded: question })]);
+  assert.equal(client.isConfigured(), true);
+  assert.equal(client.mode, 'LIVE');
+
+  const result = await interpretChangeRequest(
+    { modelClient: client },
+    { travellerId: 'trv-model', tripId: 'trip-model', text: 'change something maybe', at: AT },
+  );
+  // Before the union fix this shape was schema-rejected; it must now be
+  // honoured as designed ambiguity fail-closed, not a call failure.
+  assert.equal(result.ok, false, 'bare clarification must not produce a proposal');
+  assert.equal(result.proposal, undefined);
+  assert.equal(result.provenance, 'MODEL');
+  assert.equal(result.clarificationNeeded, question, 'clarification must carry the model\'s own text');
+  assert.ok(result.uncertainties?.some((u) => u.statement.includes(question)),
+    'uncertainty record must capture the clarification');
+});
+
+test('dr5 model path: full structured shape yields a schema-valid MODEL proposal', async () => {
+  const client = liveClient([
+    JSON.stringify({
+      intentKind: 'ADJUST_TRIP_WINDOW',
+      urgency: 'HARD_INSTRUCTION',
+      target: { arriveBy: '2026-09-30T18:00:00+08:00' },
+    }),
+  ]);
+
+  const result = await interpretChangeRequest(
+    { modelClient: client },
+    { travellerId: 'trv-model', tripId: 'trip-model', text: 'I must arrive by the rehearsal', at: AT },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.provenance, 'MODEL');
+  assert.ok(result.proposal, 'proposal must exist');
+  const validated = ChangeRequestSchema.safeParse(result.proposal);
+  assert.equal(validated.success, true, 'MODEL-derived proposal must validate against ChangeRequestSchema');
+  assert.equal(validated.data.intentKind, 'ADJUST_TRIP_WINDOW');
+  assert.equal(validated.data.urgency, 'HARD_INSTRUCTION');
+  assert.equal(validated.data.target.arriveBy, '2026-09-30T18:00:00+08:00');
+  assert.equal(validated.data.authority, 'INFERRED', 'MODEL output remains a proposal, never authoritative');
+});
+
+test('dr5 model path: schema-violating model output fails closed (never guesses)', async () => {
+  const client = liveClient([JSON.stringify({ intentKind: 'NOT_A_REAL_KIND', urgency: 'HARD_INSTRUCTION' })]);
+
+  const result = await interpretChangeRequest(
+    { modelClient: client },
+    { travellerId: 'trv-model', tripId: 'trip-model', text: 'do the thing', at: AT },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.proposal, undefined);
+  assert.equal(result.provenance, 'MODEL');
+  assert.ok(result.uncertainties?.some((u) => u.statement.includes('model call failed')));
 });
