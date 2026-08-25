@@ -282,21 +282,33 @@ test('planner: no-credential client degrades structurally (application compatibi
 test('planner: cannot request consequential operations (flight.change etc. fail closed)', async () => {
   const { planner } = makePlanner([savedModelOutput('planner-attempts-side-effect.json')]);
   const output = await planner.plan(makeInput());
-  // The read-only operation vocabulary rejects the whole malformed output.
-  assert.deepEqual(output.strategies, []);
+  // Per-request fail-closed: the consequential request is dropped with a
+  // visible uncertainty and never reaches dispatch; the strategy body
+  // survives without it.
+  assert.equal(output.strategies.length, 1);
+  assert.deepEqual(output.strategies[0]!.toolRequests, []);
   assert.deepEqual(output.toolRequests, []);
-  assert.ok(output.uncertainties.some((u) => u.statement.includes('INVALID_OUTPUT')));
+  assert.ok(
+    output.uncertainties.some((u) => u.statement.includes('outside the read-only operation vocabulary')),
+  );
   const serialized = JSON.stringify(output);
   assert.ok(!serialized.includes('flight.change'), 'consequential operation must not leak through');
 });
 
-test('planner: capability/operation mismatch is dropped with visible uncertainty, not rerouted', async () => {
+test('planner: mislabelled capability is normalized onto the frozen family of a valid operation', async () => {
+  // The safety boundary is the closed read-only operation vocabulary; the
+  // capability family is derived deterministically from the operation
+  // (TOOL_OPERATION_FAMILY is 1:1), so a mislabelled or lowercase family
+  // claim is normalized, never rerouted to a different operation.
   const mismatch = JSON.stringify({
     strategies: [
       {
-        summary: 'strategy with a mismatched request',
+        summary: 'strategy with a mislabelled request',
         candidateOperations: [],
-        toolRequests: [{ capability: 'HOTEL', operation: 'flight.search', parameters: {}, purpose: 'wrong family' }],
+        toolRequests: [
+          { capability: 'HOTEL', operation: 'flight.search', parameters: {}, purpose: 'wrong family' },
+          { capability: 'routing', operation: 'routing.context', parameters: {}, purpose: 'lowercase alias' },
+        ],
         assumptions: [],
         uncertainties: [],
         expectedOutcomes: [],
@@ -309,8 +321,12 @@ test('planner: capability/operation mismatch is dropped with visible uncertainty
   const { planner } = makePlanner([mismatch]);
   const output = await planner.plan(makeInput());
   assert.equal(output.strategies.length, 1, 'valid strategy body survives');
-  assert.deepEqual(output.strategies[0]!.toolRequests, [], 'mismatched request dropped');
-  assert.ok(output.uncertainties.some((u) => u.statement.includes('discarded invalid planner tool request')));
+  const requests = output.strategies[0]!.toolRequests;
+  assert.equal(requests.length, 2, 'both requests survive normalization');
+  assert.equal(requests[0]!.capability, 'FLIGHT', 'family derived from operation, not model claim');
+  assert.equal(requests[0]!.operation, 'flight.search');
+  assert.equal(requests[1]!.capability, 'ROUTING', 'lowercase alias normalized');
+  assert.equal(requests[1]!.operation, 'routing.context');
 });
 
 test('planner: cannot output ActionIntent (smuggled key rejected, fail closed)', async () => {

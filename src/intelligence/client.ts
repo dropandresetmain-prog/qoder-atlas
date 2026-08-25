@@ -355,14 +355,18 @@ export class ModelStudioClient {
       }
       const validated = task.schema.safeParse(parsed);
       if (!validated.success) {
-        // Schema violation: fail closed. The summary is structural only; it
-        // never echoes raw model content.
+        // Schema violation: fail closed. The summary is structural only
+        // (path + issue code); it never echoes raw model content.
+        const issueSummary = validated.error.issues
+          .slice(0, 8)
+          .map((issue) => `${issue.path.length > 0 ? issue.path.join('.') : '<root>'}:${issue.code}`)
+          .join('; ');
         return {
           ok: false,
           error: {
             category: 'INVALID_OUTPUT',
             code: 'model_output_schema_rejected',
-            message: `model output failed schema validation (${validated.error.issues.length} issue(s))`,
+            message: `model output failed schema validation (${validated.error.issues.length} issue(s): ${issueSummary})`,
           },
           meta: { ...meta, latencyMs: Date.now() - startedAt },
         };

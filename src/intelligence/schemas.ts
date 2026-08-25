@@ -133,22 +133,31 @@ export type RawResearchFindingsModel = z.infer<typeof RawResearchFindingsModelSc
 // deterministically, then mapped onto the frozen F2 PlannerOutput contract)
 // ---------------------------------------------------------------------------
 
-/** The planner asks the orchestrator to fulfil these; ids are assigned here. */
+/**
+ * The planner asks the orchestrator to fulfil these; ids are assigned here.
+ * `capability` is advisory model text: the deterministic mapper derives the
+ * frozen CapabilityFamily from the operation (fail-closed on unknown
+ * operations), so the safety boundary stays on the closed operation enum.
+ */
 export const PlannerToolRequestModelSchema = z.strictObject({
-  capability: CapabilityFamilySchema,
-  operation: ToolOperationSchema,
+  capability: z.string(),
+  // Validated fail-closed by the deterministic mapper against the closed
+  // read-only ToolOperation vocabulary; invalid operations are dropped with
+  // a visible uncertainty rather than voiding the whole model output.
+  operation: z.string(),
   parameters: z.record(z.string(), z.unknown()).default({}),
   purpose: z.string(),
 });
 export type PlannerToolRequestModel = z.infer<typeof PlannerToolRequestModelSchema>;
 
 /**
- * Candidate operations are hypothetical overlay operations only (FR-09). The
- * mutation service validates payloads before any state change; the planner
- * never touches authoritative state.
+ * Candidate operations are hypothetical overlay operations only (FR-09).
+ * Shaped as unknown at the model boundary: each operation is validated
+ * fail-closed against MutationOperationSchema by the deterministic mapper,
+ * so one invalid operation drops its strategy, never the whole plan.
  */
-export const PlannerCandidateOperationModelSchema = MutationOperationSchema;
-export type PlannerCandidateOperationModel = z.infer<typeof PlannerCandidateOperationModelSchema>;
+export const PlannerCandidateOperationModelSchema = z.unknown();
+export type PlannerCandidateOperationModel = unknown;
 
 export const PlannerStrategyModelSchema = z.strictObject({
   summary: z.string(),
