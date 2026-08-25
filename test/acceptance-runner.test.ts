@@ -208,6 +208,104 @@ test('acceptance: new manifest runs without source modifications', async () => {
   assert.equal(result.evidence.steps.length, 2);
 });
 
+/** Shared minimal config for assertion-behavior manifests. */
+function assertionTestConfig(dir: string) {
+  return {
+    environment: 'local',
+    logLevel: 'info',
+    adapterMode: 'REPLAY',
+    httpPort: 0,
+    sqlitePath: ':memory:',
+    recordingsDir: join(dir, 'rec'),
+    fixturesDir: resolve('fixtures'),
+    providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
+  } as const;
+}
+
+function writeAssertionManifest(dir: string, assertBlock: unknown[]): string {
+  const packDir = join(dir, 'pack');
+  mkdirSync(packDir);
+  writeFileSync(join(packDir, 'pack.json'), JSON.stringify({ packId: 'assert', version: '1.0.0' }));
+  const manifestPath = join(dir, 'assert-manifest.json');
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      scenarioId: 'ASSERT-CONTRACT',
+      title: 'Assertion contract proof',
+      mode: 'REPLAY',
+      globalInputPack: { packId: 'northstar-global-programme', version: '1.0.0', path: resolve('fixtures/acceptance/packs/global') },
+      localInputPack: { packId: 'assert', version: '1.0.0', path: './pack' },
+      boundaries: [{ seam: 'http.health', mode: 'REPLAY' }],
+      requiredEnv: [],
+      requiredProviders: [],
+      expect: {},
+      routeParams: [],
+      steps: [
+        {
+          id: 'reset',
+          action: {
+            type: 'http',
+            method: 'POST',
+            path: '/api/runtime/reset',
+            body: { at: '2026-09-01T00:00:00+00:00' },
+            expectStatus: 200,
+          },
+        },
+        {
+          id: 'observe_state',
+          action: {
+            type: 'observe',
+            path: '/api/runtime/state',
+            expectStatus: 200,
+            capture: { firstTripId: 'trips.0.tripId' },
+          },
+          assert: assertBlock,
+        },
+      ],
+    }),
+  );
+  return manifestPath;
+}
+
+test('acceptance: passing semantic assertions complete the run green', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'accept-assert-ok-'));
+  const manifestPath = writeAssertionManifest(dir, [
+    { description: 'state exposes managed trips', path: 'trips', op: 'arrayNotEmpty' },
+    { description: 'at least one trip is present', path: 'trips', op: 'arrayLengthMin', expected: 1 },
+    { description: 'first trip carries an id', path: 'trips.0.tripId', op: 'exists' },
+    { description: 'captured trip id is available as a binding', binding: 'firstTripId', op: 'exists' },
+  ]);
+  const result = await runAcceptanceManifest({
+    manifestPath,
+    evidenceDir: join(dir, 'evidence'),
+    skipPreflight: true,
+    config: assertionTestConfig(dir),
+  });
+  assert.equal(result.evidence.ok, true, result.evidence.error);
+  const observed = result.evidence.steps.find((s) => s.stepId === 'observe_state');
+  assert.equal(observed?.ok, true);
+});
+
+test('acceptance: a broken semantic expectation fails the run with expected/actual context', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'accept-assert-bad-'));
+  const manifestPath = writeAssertionManifest(dir, [
+    { description: 'deliberately wrong expectation', path: 'trips', op: 'arrayLengthMin', expected: 5000 },
+  ]);
+  const result = await runAcceptanceManifest({
+    manifestPath,
+    evidenceDir: join(dir, 'evidence'),
+    skipPreflight: true,
+    config: assertionTestConfig(dir),
+  });
+  assert.equal(result.evidence.ok, false, 'a failed assertion must fail the run');
+  assert.ok(result.evidence.error?.includes('observe_state'), result.evidence.error);
+  assert.ok(result.evidence.error?.includes('arrayLengthMin'), result.evidence.error);
+  assert.ok(result.evidence.error?.includes('expected=5000'), result.evidence.error);
+  assert.ok(result.evidence.error?.includes('actual='), result.evidence.error);
+  const failed = result.evidence.steps.find((s) => s.stepId === 'observe_state');
+  assert.equal(failed?.ok, false);
+});
+
 test('sanitize: redacts secrets and PII while preserving provider shape', () => {
   const raw = {
     orderNo: 'ORD-1',

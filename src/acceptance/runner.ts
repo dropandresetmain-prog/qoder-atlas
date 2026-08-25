@@ -20,6 +20,7 @@ import {
   loadAcceptanceManifest,
   resolveManifestPath,
   resolvePackPath,
+  type Assertion,
   type ManifestStep,
 } from './manifest.ts';
 import { adapterModeFor, isSimulatedExternal, type ScenarioExecutionMode } from './modes.ts';
@@ -276,6 +277,11 @@ async function executeStep(input: {
       }
     }
 
+    // Semantic assertions run after status checks and captures, so a step
+    // that returns the expected status but semantically empty/rejected state
+    // still fails the run.
+    evaluateAssertions(step, http.body, bindings);
+
     const finishedAt = new Date().toISOString();
     const responseSanitized = sanitizeRaw(http.body, secrets);
     const provenance = {
@@ -452,6 +458,139 @@ function applyCaptures(
     }
     bindings[name] = String(value);
   }
+}
+
+/**
+ * Evaluate a step's declarative semantic assertions against its response.
+ * Generic operators only; scenario expectations live in the manifest data.
+ * A failure reports the assertion, expected, actual, step, and response
+ * context so false greens are diagnosable from the evidence alone.
+ */
+function evaluateAssertions(step: ManifestStep, body: unknown, bindings: Bindings): void {
+  for (const [index, assertion] of step.assert.entries()) {
+    const label = `step ${step.id}: assertion ${index + 1}${assertion.description ? ` (${assertion.description})` : ''}`;
+    const subject = resolveAssertionSubject(assertion, body, bindings, label);
+    const expected =
+      typeof assertion.expected === 'string'
+        ? substituteString(assertion.expected, bindings)
+        : assertion.expected;
+    const failure = (actual: unknown): never => {
+      const responseDetail =
+        body === undefined || body === null ? '' : `; response=${JSON.stringify(summarize(body))}`;
+      throw new Error(
+        `${label} failed: ${subject.label} ${assertion.op} expected=${formatValue(expected)} actual=${formatValue(actual)}${responseDetail}`,
+      );
+    };
+
+    switch (assertion.op) {
+      case 'exists':
+        if (!subject.found) failure(undefined);
+        continue;
+      case 'notExists':
+        if (subject.found) failure(subject.value);
+        continue;
+      default:
+        break;
+    }
+    if (!subject.found) failure(undefined);
+    const actual = subject.value;
+
+    switch (assertion.op) {
+      case 'equals':
+        if (!looseEquals(actual, expected)) failure(actual);
+        break;
+      case 'notEquals':
+        if (looseEquals(actual, expected)) failure(actual);
+        break;
+      case 'truthy':
+        if (actual !== true) failure(actual);
+        break;
+      case 'falsy':
+        if (actual !== false) failure(actual);
+        break;
+      case 'arrayNotEmpty':
+        if (!Array.isArray(actual) || actual.length === 0) failure(actual);
+        break;
+      case 'arrayLengthMin': {
+        const min = requireNumber(expected, label);
+        if (!Array.isArray(actual) || actual.length < min) failure(Array.isArray(actual) ? actual.length : actual);
+        break;
+      }
+      case 'arrayLengthMax': {
+        const max = requireNumber(expected, label);
+        if (!Array.isArray(actual) || actual.length > max) failure(Array.isArray(actual) ? actual.length : actual);
+        break;
+      }
+      case 'contains': {
+        if (Array.isArray(actual)) {
+          if (!actual.some((item) => looseEquals(item, expected))) failure(actual);
+        } else if (typeof actual === 'string' && typeof expected === 'string') {
+          if (!actual.includes(expected)) failure(actual);
+        } else {
+          failure(actual);
+        }
+        break;
+      }
+      case 'gte': {
+        const [a, e] = numericPair(actual, expected, label);
+        if (!(a >= e)) failure(actual);
+        break;
+      }
+      case 'lte': {
+        const [a, e] = numericPair(actual, expected, label);
+        if (!(a <= e)) failure(actual);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
+
+function resolveAssertionSubject(
+  assertion: Assertion,
+  body: unknown,
+  bindings: Bindings,
+  label: string,
+): { label: string; value: unknown; found: boolean } {
+  if (assertion.binding !== undefined) {
+    const found = assertion.binding in bindings;
+    return { label: `binding:${assertion.binding}`, value: found ? bindings[assertion.binding] : undefined, found };
+  }
+  if (assertion.path !== undefined) {
+    const value = getPath(body, assertion.path);
+    return { label: `path:${assertion.path}`, value, found: value !== undefined };
+  }
+  return { label: '<response>', value: body, found: body !== undefined };
+}
+
+/** Equality tolerant of string/number representation differences (bindings are strings). */
+function looseEquals(actual: unknown, expected: unknown): boolean {
+  if (JSON.stringify(actual) === JSON.stringify(expected)) return true;
+  if (actual === undefined || actual === null || expected === undefined || expected === null) return false;
+  return String(actual) === String(expected);
+}
+
+function requireNumber(value: unknown, label: string): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (value === undefined || value === null || Number.isNaN(parsed)) {
+    throw new Error(`${label}: operator requires a numeric expected value, got ${formatValue(value)}`);
+  }
+  return parsed;
+}
+
+function numericPair(actual: unknown, expected: unknown, label: string): [number, number] {
+  const a = Number(actual);
+  if (actual === undefined || actual === null || Number.isNaN(a)) {
+    throw new Error(`${label}: subject is not numeric: ${formatValue(actual)}`);
+  }
+  return [a, requireNumber(expected, label)];
+}
+
+function formatValue(value: unknown): string {
+  if (value === undefined) return '<missing>';
+  const text = JSON.stringify(value);
+  return text === undefined ? String(value) : text.length > 400 ? `${text.slice(0, 400)}…` : text;
 }
 
 function getPath(value: unknown, path: string): unknown {

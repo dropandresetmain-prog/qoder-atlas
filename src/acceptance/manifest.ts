@@ -113,6 +113,42 @@ export const ObserveActionSchema = z.strictObject({
 });
 export type ObserveAction = z.infer<typeof ObserveActionSchema>;
 
+const AssertionValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+/**
+ * Generic declarative semantic assertion against a step's response/state.
+ * Scenario meaning lives in the manifest data; the runner only interprets
+ * these operators generically — there is no scenario-specific assertion
+ * code and no general-purpose expression language.
+ */
+export const AssertionSchema = z.strictObject({
+  /** Human-readable expectation; echoed verbatim in failure reports. */
+  description: z.string().optional(),
+  /**
+   * Subject: a dotted path into the step's JSON response (omit to assert the
+   * whole body), OR a previously captured binding name via `binding`.
+   */
+  path: z.string().optional(),
+  binding: z.string().optional(),
+  op: z.enum([
+    'equals',
+    'notEquals',
+    'truthy',
+    'falsy',
+    'exists',
+    'notExists',
+    'arrayNotEmpty',
+    'arrayLengthMin',
+    'arrayLengthMax',
+    'contains',
+    'gte',
+    'lte',
+  ]),
+  /** Expected value where the operator needs one; strings support {{binding}}. */
+  expected: AssertionValueSchema.optional(),
+});
+export type Assertion = z.infer<typeof AssertionSchema>;
+
 export const ManifestStepSchema = z.strictObject({
   id: z.string().min(1),
   description: z.string().optional(),
@@ -123,6 +159,11 @@ export const ManifestStepSchema = z.strictObject({
     SimulatedExternalEventActionSchema,
     ObserveActionSchema,
   ]),
+  /**
+   * Semantic assertions evaluated after status checks and captures. A failed
+   * assertion fails the step (and the run) with expected/actual context.
+   */
+  assert: z.array(AssertionSchema).default([]),
 });
 export type ManifestStep = z.infer<typeof ManifestStepSchema>;
 
