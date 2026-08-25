@@ -124,6 +124,8 @@ Your JSON must match this schema EXACTLY (strict objects, no extra keys):
     "departAfter"?: ISO-8601 timestamp with UTC offset (optional);
     "departureOrigin"?: { "system": "airport-code", "value": string } when the traveller states they fly from a different airport (optional);
     "preferredStayProximityRef"?: { "entityType": "PLACE", "id": string } (optional);
+    "preferredStayPlaceId"?: string ONLY when the traveller literally quotes a property identifier such as "place-hotel-..."; never derive it from a hotel name (optional);
+    "guests"?: positive integer, the number of guests staying, ONLY when the traveller states an explicit count such as "there will be 2 of us staying"; never inferred from a companion mention without a number (optional);
     "transport"?: {
       "preferDirect"?: boolean;
       "earliestDeparture"?: ISO-8601 timestamp with UTC offset;
@@ -144,6 +146,10 @@ Field guidance:
 Worked example — stay extension:
 Traveller text: "Can I stay until Sunday? Please extend my stay until 2026-10-04T12:00:00+08:00. I will pay for the extension myself."
 Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "departAfter": "2026-10-04T12:00:00+08:00", "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
+
+Worked example — hotel switch with occupancy:
+Traveller text: "Can I switch hotels? My partner is joining, so there will be 2 of us staying. I'd like to move to place-hotel-harbourline. I will self-fund the extra cost."
+Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "preferredStayPlaceId": "place-hotel-harbourline", "guests": 2, "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
 
 Never invent timestamps, entity ids, or other details the traveller did not state.`;
 
@@ -180,6 +186,8 @@ async function interpretViaModel(
             id: EntityIdSchema,
           })
           .optional(),
+        preferredStayPlaceId: EntityIdSchema.optional(),
+        guests: z.number().int().positive().optional(),
         transport: z
           .strictObject({
             preferDirect: z.boolean().optional(),
@@ -483,6 +491,32 @@ function matchPatterns(text: string): DeterministicMatch | undefined {
           preferredStayProximityRef: { entityType: 'PLACE', id: parsed.data },
           objectiveEffects: [],
         },
+        fundingDeclaration,
+      };
+    }
+  }
+
+  // Pattern 7: hotel switch ("switch/change/move hotels") with an explicit
+  // occupancy count and/or a literally quoted replacement property id.
+  // Mirrors the departureOrigin discipline: quoted values are carried as
+  // stated; whether they resolve is the planner's question, never a guess.
+  if (/\b(switch|change|move)\s+(?:the\s+|my\s+)?hotels?\b/i.test(text)) {
+    const target: ResolutionTarget = { objectiveEffects: [] };
+    const guestsMatch = text.match(/\b(\d+)\s+(?:of\s+us|guests|people|travellers)\b/i);
+    if (guestsMatch) {
+      const guests = Number(guestsMatch[1]);
+      if (Number.isInteger(guests) && guests > 0) target.guests = guests;
+    }
+    const placeMatch = text.match(/\b(place-[a-z0-9-]+)\b/i);
+    if (placeMatch) {
+      const parsed = EntityIdSchema.safeParse(placeMatch[1]);
+      if (parsed.success) target.preferredStayPlaceId = parsed.data;
+    }
+    if (target.guests !== undefined || target.preferredStayPlaceId !== undefined) {
+      return {
+        intentKind: 'CHANGE_STAY',
+        urgency,
+        target,
         fundingDeclaration,
       };
     }

@@ -1,0 +1,131 @@
+{
+  "scenarioId": "S6-RECORD",
+  "title": "S6 'switch hotels, partner joining' — LIVE NL intake (occupancy/property extraction) + RECORD Nuitée occupancy-aware hotel.search",
+  "mode": "RECORD",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s6",
+    "version": "1.0.0",
+    "path": "../packs/s6"
+  },
+  "boundaries": [
+    {
+      "seam": "traveller.change_request_nl",
+      "mode": "LIVE",
+      "note": "natural-language hotel-switch request interpreted by LIVE Model Studio into the frozen ChangeRequest schema (guests + quoted replacement property), zod-validated"
+    },
+    {
+      "seam": "nuitee.hotel_adapter",
+      "mode": "RECORD",
+      "note": "occupancy-aware hotel.search through the RECORD-mode Nuitée adapter; sanitized recordings persisted"
+    }
+  ],
+  "requiredEnv": [
+    "MODEL_STUDIO_API_KEY",
+    "NUITEE_API_KEY"
+  ],
+  "requiredProviders": [
+    "nuitee",
+    "modelStudio"
+  ],
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-31"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-31"
+    ]
+  },
+  "routeParams": [],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": {
+          "at": "2026-09-22T10:00:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "nl_intake",
+      "description": "Traveller asks in natural language to switch hotels with partner occupancy; LIVE Model Studio extracts CHANGE_STAY with guests and the quoted replacement property",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/traveller/change-request",
+        "body": {
+          "travellerId": "trv-evt-ait-2026-ait-draft-31",
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-31",
+          "text": "Can I switch hotels? My partner is joining, so there will be 2 of us staying. I'd like to move to place-hotel-harbourline. I will self-fund the extra cost.",
+          "at": "2026-09-22T10:05:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the NL hotel-switch request is accepted" },
+        { "path": "provenance", "op": "equals", "expected": "INTERPRETED", "description": "the request came from interpretation, not a pre-structured target" },
+        { "path": "intentKind", "op": "equals", "expected": "CHANGE_STAY", "description": "the model classifies the hotel switch as a stay change" },
+        { "path": "urgency", "op": "equals", "expected": "SOFT_PREFERENCE", "description": "a courteous ask carries preference authority, never binding instruction" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
+        { "path": "implications.0", "op": "contains", "expected": "place-hotel-harbourline", "description": "the quoted replacement property becomes an authoritative stay preference" },
+        { "path": "implications.1", "op": "contains", "expected": "stay occupancy: 2 guest(s) requested", "description": "the partner's occupancy is extracted from the text, not defaulted" },
+        { "path": "implications.2", "op": "contains", "expected": "funding declaration TRAVELLER_FUNDED recorded; no temporal anchor derivable from target", "description": "funding stays honest: with no cost anchor the allocation is deferred to authority, never assumed" },
+        { "path": "uncertainties.0.statement", "op": "contains", "expected": "funding allocation UNKNOWN: no temporal anchor in target", "description": "the missing funding anchor is recorded as UNKNOWN, never converted into certainty" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Planning loop issues the occupancy-aware hotel.search (RECORD Nuitée evidence) for the quoted replacement property's location and records stay-change status honestly",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-22T10:10:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planning loop runs an evidence round and a concluding round" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "hotel.search", "description": "the declared stay change drives a real hotel.search evidence request" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the RECORD Nuitée adapter supplied hotel-market evidence" },
+        { "path": "toolActivity.0.summary", "op": "contains", "expected": "rate(s)", "description": "live hotel-market evidence flows through normalization with property and rate counts" },
+        { "path": "strategies", "op": "arrayLengthMax", "expected": 0, "description": "no replacement strategy is fabricated: without a supported strategy path the planner proposes nothing" },
+        { "path": "uncertainties", "op": "arrayLengthMin", "expected": 3, "description": "every stay-change limitation is recorded as explicit uncertainty" },
+        { "path": "uncertainties.0", "op": "contains", "expected": "hotel replacement strategies are not proposed until hotel.search evidence exists", "description": "the evidence-gated strategy boundary is stated honestly" },
+        { "path": "uncertainties.1", "op": "contains", "expected": "stay property change requested", "description": "the declared property preference is recorded, not silently dropped" },
+        { "path": "uncertainties.2", "op": "contains", "expected": "stay occupancy requested (2 guest(s))", "description": "the partner occupancy is recorded, not defaulted away" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case remains open in PLANNING — stay-change execution is not silently performed" }
+      ]
+    },
+    {
+      "id": "observe_case",
+      "description": "Observe the recovery case after planning",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_after_plan",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-31", "description": "the case belongs to the requesting traveller's trip" }
+      ]
+    }
+  ]
+}
