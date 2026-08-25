@@ -247,6 +247,17 @@ function resolutionPanel(resolution?: CaseResolutionView): string | undefined {
 }
 
 function recoveryActionsPanel(view: CaseDetailView): string | undefined {
+  // Honest end-state: planning has already run and found no automated recovery
+  // path. Say so plainly; never re-offer a planning action that already
+  // completed empty (which would loop with no visible effect).
+  if (view.planningExhausted && view.options.length === 0) {
+    return `
+    <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
+      <p class="callout-title">No safe automated recovery</p>
+      <p>Northstar planned this case but found no recovery action it can take automatically without risking a must-not-miss objective. Nothing has been changed. This case needs a human decision.</p>
+    </div>`;
+  }
+
   // If no options yet and case is DISRUPTED, show "Plan Recovery" button
   if (view.status === 'DISRUPTED' && view.options.length === 0) {
     return `

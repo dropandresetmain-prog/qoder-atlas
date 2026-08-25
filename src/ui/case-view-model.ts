@@ -141,6 +141,13 @@ export interface CaseDetailView {
   /** Mixed-funding evidence (ADR-037); absent when allocation is UNKNOWN. */
   funding?: CaseFundingView;
   uncertainties: string[];
+  /**
+   * True once the planning loop has run for this case but produced no
+   * actionable strategy and the case is still unresolved — the honest "no
+   * automated recovery path" end-state. The view must say so plainly rather
+   * than re-offer a planning action that already completed empty.
+   */
+  planningExhausted?: boolean;
   resolution?: CaseResolutionView;
   updatedAt: IsoDateTime;
 }

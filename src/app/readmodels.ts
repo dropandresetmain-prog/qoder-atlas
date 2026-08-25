@@ -460,6 +460,17 @@ export async function projectCaseDetail(
 
   const isChangeRequest = triggeringSignals.some((s) => s.kind === 'TRAVELLER_INPUT');
 
+  // Honest "no automated recovery path" end-state: the planning loop has run
+  // (the case moved past ASSESSING) yet produced no actionable strategy and
+  // the case remains unresolved. Derived from persisted case status only —
+  // never from scenario content. The view must say so plainly instead of
+  // re-offering a planning action that already completed empty.
+  const planningExhausted =
+    recoveryCase.status !== 'DETECTED' &&
+    recoveryCase.status !== 'ASSESSING' &&
+    recoveryCase.strategies.length === 0 &&
+    !recoveryCase.resolution;
+
   return {
     caseId: recoveryCase.id,
     tripId: trip.id,
@@ -478,6 +489,7 @@ export async function projectCaseDetail(
     actions,
     ...(funding ? { funding } : {}),
     uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
+    ...(planningExhausted ? { planningExhausted: true } : {}),
     ...(recoveryCase.resolution
       ? {
           resolution: {

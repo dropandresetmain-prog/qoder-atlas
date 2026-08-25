@@ -12,6 +12,12 @@ export default tseslint.config(
       'coverage/**',
       'output/**',
       '.qoder/**',
+      // Local agent/review git worktrees are separate checkouts, not part of
+      // this tree's lint scope (mirrors the .gitignore worktree exclusions).
+      '.worktrees/**',
+      '.claude/**',
+      '.codex/**',
+      '.review-worktrees/**',
     ],
   },
   js.configs.recommended,
