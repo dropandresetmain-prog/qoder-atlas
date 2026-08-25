@@ -10,6 +10,7 @@ import { PolicyRuleSchema } from '../src/domain/rules.ts';
 import type { Trip } from '../src/domain/trip.ts';
 import type { TransportLeg } from '../src/domain/elements.ts';
 import {
+  assessRequestedTransportAssociation,
   assessTransportConcentration,
   transportConcentrationParticipants,
   type ConcentrationParticipant,
@@ -170,6 +171,57 @@ test('transport concentration: PolicyRule schema accepts TRANSPORT_CONCENTRATION
   if (parsed.kind === 'TRANSPORT_CONCENTRATION') {
     assert.equal(parsed.criticalImportance, 'REQUIRED');
   }
+});
+
+test('requested association: prospective grouping within threshold is permitted', () => {
+  const rule = concentrationRule({
+    id: 'rule-assoc-1',
+    maxCriticalParticipants: 2,
+    scope: 'BOOKING_REF',
+  });
+  // Distinct bookings today — the association is prospective, so scope does
+  // not restrict the assessment.
+  const participants = [
+    participant({ travellerId: 'trv-a', importance: 'REQUIRED', bookingRef: { system: 'pnr', reference: 'REF-A' } }),
+    participant({ travellerId: 'trv-b', importance: 'REQUIRED', bookingRef: { system: 'pnr', reference: 'REF-B' } }),
+  ];
+  const result = assessRequestedTransportAssociation(rule, participants);
+  assert.equal(result.allowed, true);
+  assert.deepEqual(result.criticalTravellerIds, ['trv-a', 'trv-b']);
+});
+
+test('requested association: grouping beyond threshold is not permitted', () => {
+  const rule = concentrationRule({
+    id: 'rule-assoc-2',
+    maxCriticalParticipants: 2,
+    scope: 'BOOKING_REF',
+  });
+  const participants = [
+    participant({ travellerId: 'trv-a', importance: 'REQUIRED' }),
+    participant({ travellerId: 'trv-b', importance: 'REQUIRED' }),
+    participant({ travellerId: 'trv-c', importance: 'REQUIRED' }),
+    // Non-critical participant does not count against the threshold.
+    participant({ travellerId: 'trv-d', importance: 'PREFERRED' }),
+  ];
+  const result = assessRequestedTransportAssociation(rule, participants);
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.criticalTravellerIds, ['trv-a', 'trv-b', 'trv-c']);
+});
+
+test('requested association: one traveller on several legs counts once', () => {
+  const rule = concentrationRule({
+    id: 'rule-assoc-3',
+    maxCriticalParticipants: 1,
+    scope: 'CARRIER_SERVICE',
+  });
+  const participants = [
+    participant({ travellerId: 'trv-a', importance: 'REQUIRED' }),
+    participant({ travellerId: 'trv-a', importance: 'REQUIRED' }),
+    participant({ travellerId: 'trv-b', importance: 'REQUIRED' }),
+  ];
+  const result = assessRequestedTransportAssociation(rule, participants);
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.criticalTravellerIds, ['trv-a', 'trv-b']);
 });
 
 test('transport concentration: POLICY evaluator wires single-trip assessment', () => {

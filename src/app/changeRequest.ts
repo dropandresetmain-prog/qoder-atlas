@@ -48,6 +48,11 @@ import { CaseService } from '../engine/case.ts';
 import { ImpactEngine } from '../engine/impact.ts';
 import type { RuleSet, PolicyRule } from '../domain/rules.ts';
 import { payerDecisionFor } from '../engine/funding.ts';
+import {
+  assessRequestedTransportAssociation,
+  transportConcentrationParticipants,
+  type TransportConcentrationRule,
+} from '../engine/concentration.ts';
 
 // ---------------------------------------------------------------------------
 // Public surface
@@ -170,7 +175,7 @@ export async function resolveChangeRequest(
   //    a priced strategy exists (ADR-037). The anchor + declaration travel
   //    through the signal payload so the intent stage can recompute the SAME
   //    deterministic payer decision against the real priceDelta.
-  const fundingRules = await collectFundingRules(deps.entities, trip);
+  const fundingRules = await collectPolicyRules(deps.entities, [trip]);
   const costAccruesAt =
     request.target.stayCheckOut ?? request.target.arriveBy ?? request.target.departAfter;
   const fundingDecision = payerDecisionFor(fundingRules, costAccruesAt);
@@ -199,6 +204,19 @@ export async function resolveChangeRequest(
       ...(request.sourceId ? { sourceId: request.sourceId } : {}),
       severity: 'MEDIUM',
     });
+  }
+
+  // 4b. Requested cross-traveller association: the traveller wants to share
+  //     transport/service grouping with named peers. Peer trips resolve
+  //     generically through the trip repository; the candidate grouping is
+  //     assessed against the TRANSPORT_CONCENTRATION rules governing the
+  //     associated trips. A violation becomes an explicit alternative-
+  //     required uncertainty; unknown peers stay UNKNOWN. The resolver only
+  //     records the policy verdict — it never creates a grouping.
+  if ((request.target.travelWithTravellerIds?.length ?? 0) > 0) {
+    const association = await assessTravelAssociation(deps, request, trip);
+    implications.push(...association.implications);
+    uncertainties.push(...association.uncertainties);
   }
 
   // 5. Route through the existing signal -> case pipeline. The frozen
@@ -479,6 +497,14 @@ function deriveImplications(
     implications.push(`stay occupancy: ${target.guests} guest(s) requested`);
   }
 
+  // Requested cross-traveller association: declarative record only; the
+  // concentration-policy verdict against peer trips joins in the resolver.
+  if ((target.travelWithTravellerIds?.length ?? 0) > 0) {
+    implications.push(
+      `travel association requested with ${target.travelWithTravellerIds!.length} peer traveller(s): ${[...target.travelWithTravellerIds!].sort().join(', ')}`,
+    );
+  }
+
   // Objective effects (always possible; authority gates the actual waiver).
   for (const effect of target.objectiveEffects) {
     implications.push(
@@ -506,6 +532,7 @@ function isTargetEmpty(target: ResolutionTarget): boolean {
   if (target.stayPlaceRef) return false;
   if (target.preferredStayPlaceId) return false;
   if (target.guests !== undefined) return false;
+  if ((target.travelWithTravellerIds?.length ?? 0) > 0) return false;
   if (target.transport) {
     if (
       target.transport.preferDirect !== undefined ||
@@ -563,13 +590,16 @@ function describeDelta(earlier: IsoDateTime, later: IsoDateTime): string {
   return `${days}d`;
 }
 
-async function collectFundingRules(
+async function collectPolicyRules(
   entities: EntityStore,
-  trip: Trip,
+  trips: Trip[],
 ): Promise<PolicyRule[]> {
-  const ruleSetIds = new Set<EntityId>(trip.governedByRuleSetIds);
-  for (const element of trip.elements as readonly TripElement[]) {
-    for (const id of element.governedByRuleSetIds) ruleSetIds.add(id);
+  const ruleSetIds = new Set<EntityId>();
+  for (const trip of trips) {
+    for (const id of trip.governedByRuleSetIds) ruleSetIds.add(id);
+    for (const element of trip.elements as readonly TripElement[]) {
+      for (const id of element.governedByRuleSetIds) ruleSetIds.add(id);
+    }
   }
   const rules: PolicyRule[] = [];
   for (const id of [...ruleSetIds].sort()) {
@@ -580,6 +610,82 @@ async function collectFundingRules(
     }
   }
   return rules;
+}
+
+/**
+ * Generic cross-traveller association assessment. The requested grouping is a
+ * PROSPECTIVE single candidate group spanning the subject traveller and the
+ * named peers: would their combined critical transport commitments exceed the
+ * configured TRANSPORT_CONCENTRATION threshold? Peer trips resolve through
+ * the generic trip repository; a peer without a trip stays an explicit
+ * UNKNOWN. No mutation, no provider calls — the verdict is evidence for
+ * downstream operators, never an applied grouping.
+ */
+async function assessTravelAssociation(
+  deps: ChangeRequestDeps,
+  request: ChangeRequest,
+  trip: Trip,
+): Promise<{ implications: string[]; uncertainties: UncertaintyRecord[] }> {
+  const implications: string[] = [];
+  const uncertainties: UncertaintyRecord[] = [];
+  const peerIds = request.target.travelWithTravellerIds ?? [];
+
+  const allTrips = await deps.trips.listTrips();
+  const associationTrips: Trip[] = [trip];
+  const associationTravellerIds: EntityId[] = [request.travellerId];
+  for (const peerId of peerIds) {
+    if (peerId === request.travellerId) continue;
+    associationTravellerIds.push(peerId);
+    const summary = allTrips.find((candidate) => candidate.travellerIds.includes(peerId));
+    const peerTrip = summary ? await deps.trips.getTrip(summary.tripId) : undefined;
+    if (!peerTrip) {
+      uncertainties.push({
+        id: EntityIdSchema.parse(`unc-assoc-peer-${peerId}`),
+        statement: `travel association: no trip exists for peer traveller ${peerId}; the grouping's viability for that traveller is UNKNOWN`,
+        aboutRefs: [{ entityType: 'TRAVELLER', id: peerId }],
+        severity: 'MEDIUM',
+      });
+      continue;
+    }
+    associationTrips.push(peerTrip);
+  }
+
+  const rules = await collectPolicyRules(deps.entities, associationTrips);
+  const concentrationRules = rules.filter(
+    (rule): rule is TransportConcentrationRule => rule.kind === 'TRANSPORT_CONCENTRATION',
+  );
+  if (concentrationRules.length === 0) {
+    implications.push(
+      'travel association: no TRANSPORT_CONCENTRATION rule governs the associated trips; the grouping is recorded without policy assessment',
+    );
+    return { implications, uncertainties };
+  }
+
+  const participants = transportConcentrationParticipants(associationTrips).filter((participant) =>
+    associationTravellerIds.includes(participant.travellerId),
+  );
+
+  concentrationRules.forEach((rule, index) => {
+    const assessment = assessRequestedTransportAssociation(rule, participants);
+    if (assessment.allowed) {
+      implications.push(
+        `transport concentration policy: requested association groups ${assessment.criticalTravellerIds.length} critical traveller(s), within the limit of ${rule.maxCriticalParticipants}; the grouping is permitted`,
+      );
+      return;
+    }
+    implications.push(
+      `transport concentration policy: requested association groups ${assessment.criticalTravellerIds.length} critical traveller(s), exceeding the limit of ${rule.maxCriticalParticipants}; the grouping is NOT permitted`,
+    );
+    uncertainties.push({
+      id: EntityIdSchema.parse(`unc-assoc-${request.id}-${index}`),
+      statement: `requested travel association violates TRANSPORT_CONCENTRATION policy: ${assessment.criticalTravellerIds.length} critical participants exceed the maximum of ${rule.maxCriticalParticipants}; an alternative arrangement is required`,
+      aboutRefs: [{ entityType: 'TRIP', id: request.tripId }],
+      ...(request.sourceId ? { sourceId: request.sourceId } : {}),
+      severity: 'HIGH',
+    });
+  });
+
+  return { implications, uncertainties };
 }
 
 async function findOpenCaseForTrip(

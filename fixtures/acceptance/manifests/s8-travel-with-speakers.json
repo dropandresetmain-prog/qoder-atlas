@@ -16,7 +16,7 @@
     {
       "seam": "traveller.change_request",
       "mode": "REPLAY",
-      "note": "Structured ChangeRequest through resolution HTTP"
+      "note": "Structured ChangeRequest with a cross-traveller association target through resolution HTTP"
     }
   ],
   "requiredEnv": [],
@@ -53,6 +53,7 @@
     },
     {
       "id": "change_request",
+      "description": "Traveller asks to travel with two peer speakers; the requested grouping is assessed against TRANSPORT_CONCENTRATION policy",
       "action": {
         "type": "http",
         "method": "POST",
@@ -65,11 +66,14 @@
             "sourceId": "src-acceptance-manifest",
             "authority": "ASSERTED",
             "issuedAt": "2026-09-19T10:05:00+08:00",
-            "intentKind": "ADJUST_TRIP_WINDOW",
-            "urgency": "HARD_INSTRUCTION",
+            "intentKind": "CHANGE_TRANSPORT_SCHEDULE",
+            "urgency": "SOFT_PREFERENCE",
             "utterance": "Can I travel with the other speakers on the same flight?",
             "target": {
-              "arriveBy": "2026-09-30T08:00:00+08:00"
+              "travelWithTravellerIds": [
+                "trv-evt-ait-2026-ait-draft-10",
+                "trv-evt-ait-2026-ait-draft-11"
+              ]
             }
           },
           "at": "2026-09-19T10:05:00+08:00"
@@ -78,17 +82,73 @@
         "capture": {
           "caseId": "caseId"
         }
-      }
+      },
+      "assert": [
+        {
+          "description": "association request accepted",
+          "path": "accepted",
+          "op": "truthy"
+        },
+        {
+          "description": "peer travellers identified",
+          "path": "implications",
+          "op": "contains",
+          "expected": "travel association requested with 2 peer traveller(s): trv-evt-ait-2026-ait-draft-10, trv-evt-ait-2026-ait-draft-11"
+        },
+        {
+          "description": "candidate grouping evaluated against the configured TRANSPORT_CONCENTRATION policy",
+          "path": "implications",
+          "op": "contains",
+          "expected": "transport concentration policy: requested association groups 3 critical traveller(s), exceeding the limit of 2; the grouping is NOT permitted"
+        },
+        {
+          "description": "violation recorded as an alternative-required uncertainty",
+          "path": "uncertainties",
+          "op": "arrayNotEmpty"
+        },
+        {
+          "description": "violation uncertainty is HIGH severity",
+          "path": "uncertainties.0.severity",
+          "op": "equals",
+          "expected": "HIGH"
+        },
+        {
+          "description": "violation uncertainty names the alternative requirement",
+          "path": "uncertainties.0.statement",
+          "op": "contains",
+          "expected": "an alternative arrangement is required"
+        },
+        {
+          "description": "request opens the case but does not resolve it",
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "ASSESSING"
+        }
+      ]
     },
     {
       "id": "observe_case",
-      "description": "Observe opened recovery case",
+      "description": "Observe opened recovery case still open for alternative planning",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
         "label": "case_after_change_request",
         "expectStatus": 200
-      }
+      },
+      "assert": [
+        {
+          "description": "case remains open for alternative planning (read-model surfaces the change request)",
+          "path": "status",
+          "op": "equals",
+          "expected": "CHANGE_REQUESTED"
+        },
+        {
+          "description": "case is a recovery case on the subject trip",
+          "path": "tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-30"
+        }
+      ]
     }
   ]
 }

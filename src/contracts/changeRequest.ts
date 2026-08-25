@@ -69,6 +69,14 @@ export const ResolutionTargetSchema = z.strictObject({
   preferredStayPlaceId: EntityIdSchema.optional(),
   /** Desired room occupancy; absent = unknown, never inferred. */
   guests: z.number().int().positive().optional(),
+  /**
+   * Requested cross-traveller association: the traveller wants to travel
+   * together with the named peers (shared transport/service grouping).
+   * Declarative desire only — whether the grouping is permitted is decided
+   * downstream by deterministic TRANSPORT_CONCENTRATION policy against peer
+   * trip state; the request itself never creates a grouping.
+   */
+  travelWithTravellerIds: z.array(EntityIdSchema).optional(),
   /** Desired transport attributes, declarative only. */
   transport: z
     .strictObject({

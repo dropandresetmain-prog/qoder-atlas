@@ -708,6 +708,11 @@ export class NorthstarPlanner implements RecoveryPlanner {
           `stay occupancy requested (${target.guests} guest(s)): occupancy-aware hotel search is not supported by this planner yet; the count is recorded, not silently dropped`,
         );
       }
+      if (target.travelWithTravellerIds !== undefined && target.travelWithTravellerIds.length > 0) {
+        uncertaintyStatements.push(
+          `cross-traveller association requested (${target.travelWithTravellerIds.length} peer traveller(s)): shared-transport grouping is assessed by concentration policy at request resolution; the desire is recorded, not silently dropped`,
+        );
+      }
       for (const effect of target.objectiveEffects) {
         uncertaintyStatements.push(
           `objective effect requested for ${effect.objectiveId} (${effect.effect}): objective waivers are authority-gated state changes, never planner-authored; the request is recorded for the authority stage`,

@@ -86,6 +86,28 @@ export function assessTransportConcentration(
 }
 
 /**
+ * Assess a REQUESTED cross-traveller association as one prospective group.
+ * The grouping does not exist yet — the travellers need not share a booking
+ * reference or carrier service — so the rule's grouping scope does not
+ * restrict the question: would joining these participants concentrate more
+ * critical travellers on shared transport than the rule permits? One person
+ * with several legs counts once.
+ */
+export function assessRequestedTransportAssociation(
+  rule: TransportConcentrationRule,
+  participants: ConcentrationParticipant[],
+): { criticalTravellerIds: EntityId[]; allowed: boolean } {
+  const critical = participants.filter(
+    (participant) => participant.importance === rule.criticalImportance,
+  );
+  const criticalTravellerIds = [...new Set(critical.map((participant) => participant.travellerId))].sort();
+  return {
+    criticalTravellerIds,
+    allowed: criticalTravellerIds.length <= rule.maxCriticalParticipants,
+  };
+}
+
+/**
  * Derive concentration participants from one or more trips.
  * Each traveller on a trip that carries an active TRANSPORT_LEG becomes one
  * participant per such leg, using the leg's importance (engagement-level
