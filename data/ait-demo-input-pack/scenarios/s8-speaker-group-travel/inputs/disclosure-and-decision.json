@@ -1,0 +1,38 @@
+{
+  "provenance": "NATIVE_UI",
+  "sourceIds": ["src-syn-ait-policy", "src-syn-ait-roster", "src-sim-airline-mn"],
+  "note": "Native Northstar operator-surface artifact: the disclosure presented to the Wanderpay delegation after the concentration check fired, the travellers' explicit decision, and the operator's recorded reasoning. Provenance is NATIVE_UI because it is produced inside the Northstar UI from policy + programme + inventory inputs; it cites those inputs via sourceIds. This is the clause's required audit trail: explicit instruction outranks the concentration default ONLY after disclosure.",
+  "artifactId": "ait-s8-disclosure-001",
+  "createdAt": "2026-09-12T14:00:00+08:00",
+  "disclosure": {
+    "to": ["ait-draft-10", "ait-draft-11", "ait-draft-30"],
+    "policyBasis": "organiser-policy.json clauses.criticalParticipantTransportConcentration",
+    "flag": "ALL_THREE_ON_ONE_SERVICE_CONCENTRATES_COMMITMENT_CAST",
+    "tradeOffStatement": "Putting all three Wanderpay members on MN218 (30 Sep 06:15) means one disruption of that single service would strand: the only external speaker of the payments keynote (Arjun), and the payments panel's moderator plus two of its three panellists. The afternoon MN220 (14:10) is a viable same-day alternative for everyone, with no fare difference. Splitting the group (Arjun on MN218 to match his Bangkok connection; Siti and Mei Ling on MN220) means no single flight disruption removes the whole payments cast from the programme. Your request to travel together is honoured if you still want it after reading this - but we must tell you the trade-off first.",
+    "operatorProposal": "SPLIT: ait-draft-10 -> MN218; ait-draft-11, ait-draft-30 -> MN220."
+  },
+  "travellerDecision": {
+    "respondedBy": "ait-draft-30",
+    "respondedAt": "2026-09-13T09:50:00+08:00",
+    "channel": "TRAVELLER_CHAT",
+    "literalText": "Thanks for explaining it that way. We talked it over - Arjun and Siti are happy to keep the plan as requested: the three of us will take the morning flight together. We understand the risk if that flight is disrupted and we're fine to accept it.",
+    "consentsRecorded": ["ait-draft-10", "ait-draft-11", "ait-draft-30"],
+    "decision": "TOGETHER_ON_MN218",
+    "note": "Explicit instruction given AFTER disclosure -> outranks the concentration default per the clause. All three consents are recorded, not just the requester's."
+  },
+  "operatorReasoningRecord": {
+    "action": "HONOUR_EXPLICIT_INSTRUCTION",
+    "reasoning": [
+      "Both layouts are deterministically viable; no buffer, fare or seat argument decides between them.",
+      "Concentration flag fired and was disclosed in full, including the specific commitments at risk (payments-keynote external cast; payments-panel moderator + 2/3 panellists).",
+      "All three travellers gave explicit, informed instruction to travel together; per the clause, explicit instruction outranks the default after disclosure.",
+      "The split is therefore NOT applied; the accepted correlated risk is recorded on the group booking for duty-of-care visibility."
+    ],
+    "acceptedRisk": {
+      "recordedAt": "2026-09-13T10:05:00+08:00",
+      "scope": "All three Wanderpay members share MN218 (30 Sep 06:15 KUL->SIN).",
+      "consequenceIfMaterialised": "A single disruption of MN218 affects the whole Wanderpay delegation simultaneously; duty-of-care escalation and programme-impact assessment would cover all three at once.",
+      "note": "Scenario S1 (21 Sep) subsequently retimes MN218 and all three are affected together - the disclosed risk materialised exactly as flagged. The demo narrative relies on this data cross-reference only; no domain logic encodes it."
+    }
+  }
+}

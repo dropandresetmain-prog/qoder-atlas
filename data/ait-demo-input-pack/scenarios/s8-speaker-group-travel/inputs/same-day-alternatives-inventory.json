@@ -1,0 +1,24 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated KUL->SIN inventory snapshot at request time (12 Sep, pre-booking). Deliberate shape: two same-day same-carrier services at the SAME fare, both viable for every group member - so the group-vs-split decision has no cost or timing argument and rests purely on the correlated-risk constraint. Seat counts are the 12 Sep snapshot (they differ from the post-disruption 21 Sep snapshot used in scenario S1). Not a live provider feed; at demo runtime the same shapes arrive via REPLAY.",
+  "observedAt": "2026-09-12T10:35:00+08:00",
+  "routes": [
+    {
+      "origin": "KUL",
+      "destination": "SIN",
+      "services": [
+        { "flightNumber": "MN218", "date": "2026-09-30", "departure": "2026-09-30T06:15:00+08:00", "arrival": "2026-09-30T07:25:00+08:00", "status": "OPERATING", "economySeatsAvailable": 44, "economyFare": { "amount": 98, "currency": "SGD" }, "note": "Morning service; fits Arjun's overnight KUL stay after feeder MN205 (arrives 29 Sep 21:55)." },
+        { "flightNumber": "MN220", "date": "2026-09-30", "departure": "2026-09-30T14:10:00+08:00", "arrival": "2026-09-30T15:20:00+08:00", "status": "OPERATING", "economySeatsAvailable": 15, "economyFare": { "amount": 98, "currency": "SGD" }, "note": "Afternoon service; also viable for all three members (arrives >22h before their 1 Oct commitments)." }
+      ]
+    }
+  ],
+  "viabilitySummary": {
+    "note": "Deterministic per-member check against commitments on 1 Oct (payments-keynote 13:50 REQUIRED; payments-panel 14:00).",
+    "members": [
+      { "draftId": "ait-draft-10", "mn218Arrival": "2026-09-30T07:25:00+08:00", "mn220Arrival": "2026-09-30T15:20:00+08:00", "applicableBuffer": "12h programme-critical (REQUIRED on-stage)", "mn218": "PASSES", "mn220": "PASSES" },
+      { "draftId": "ait-draft-11", "mn218Arrival": "2026-09-30T07:25:00+08:00", "mn220Arrival": "2026-09-30T15:20:00+08:00", "applicableBuffer": "6h standard (PREFERRED)", "mn218": "PASSES", "mn220": "PASSES" },
+      { "draftId": "ait-draft-30", "mn218Arrival": "2026-09-30T07:25:00+08:00", "mn220Arrival": "2026-09-30T15:20:00+08:00", "applicableBuffer": "6h standard (PREFERRED)", "mn218": "PASSES", "mn220": "PASSES" }
+    ]
+  }
+}

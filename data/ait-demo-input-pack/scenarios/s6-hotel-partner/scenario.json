@@ -1,0 +1,33 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "scenarioId": "S6",
+  "catalogueTitle": "\"Can I switch hotels? My partner is joining.\"",
+  "trigger": "TRAVELLER_REQUESTED_CHANGE",
+  "stage": "POST_BOOKING",
+  "tier": "STRETCH_HIGH",
+  "demoRole": "Accommodation modification, cancellation rules, personal/business cost attribution, local routing",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-19T09:15:00+08:00",
+  "note": "Hannah Weiss (ait-draft-31, FRA origin) is the Rhein Hotels CCO and a dual-interview speaker (hospitality-interview, 1 Oct 10:30, REQUIRED/FIXED, alongside ait-draft-22). Her partner (a non-participant - no roster entry, no traveller entity is created for them) is joining for the summit dates, and she asks to move from her Bayview single to a double junior suite at the alternative partner hotel Harbourline, keeping the same nights (30 Sep - 3 Oct check-out; her return MN242 flies 3 Oct 23:45). This is the catalogue shape 'switch hotel because partner is joining': current cancellation terms (free until 27 Sep), replacement rates vs the SGD 320 ceiling, second-occupant/upgrade increment traveller-funded (clauses.companionAndUpgradeIncrement requires an explicit funding declaration), event-vs-personal attribution, venue travel time and morning event buffers (Harbourline->MBS shuttle vs Bayview). Note the schema nuance: rule-ait-hotel-funded-window names place-hotel-bayview only; Harbourline is admissible via clauses.accommodationCeiling preferredPlaces - the pack records this rather than papering over it. Companion ontology is deliberately NOT added (catalogue MVP boundary); the companion is carried as declared cost data only. Simulated seam: room/seat inventory is SIMULATED_EXTERNAL_EVENT; at demo runtime the same shapes arrive via REPLAY.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-31", "impactClass": "REQUEST_FEASIBLE_WITH_INCREMENT", "reason": "Junior suite at Harbourline (SGD 318/night) is under the SGD 320 ceiling; Bayview booking can be released free of charge before 27 Sep 15:00; morning buffers for the 1 Oct 10:30 interview remain satisfied (shuttle 15m expected / 25m conservative vs Bayview's 12m / 20m). Event funds only the business-equivalent single room (SGD 285/night); the double-occupancy increment (SGD 33/night x 3) and the whole companion seat are traveller-funded per the explicit funding declaration." }
+  ],
+  "expectedReasoningHooks": [
+    "Accommodation modification with cancellation reasoning: check the Bayview block terms first (free modification until 27 Sep 15:00; request arrives 19 Sep -> no penalty) before proposing anything.",
+    "Ceiling enforcement against replacement rates: junior suite 318 passes rule-ait-hotel-spend-limit (320); the one-bedroom suite 355 fails it and would need rule-ait-approval-above-hotel - the inventory includes it so the engine must discriminate.",
+    "Second-occupant / upgrade increment: event funds the business-equivalent single (285/night); double-occupancy delta and the companion seat are traveller-funded increments, and clauses.companionAndUpgradeIncrement gates execution on the explicit funding declaration present in the request.",
+    "Funded-window schema nuance: rule-ait-hotel-funded-window appliesTo place-hotel-bayview; Harbourline admissibility comes from clauses.accommodationCeiling preferredPlaces - surface this as a policy-interpretation fact, and the pack lists it as a schema gap rather than hardcoding it.",
+    "Event viability after hotel switch: deterministic morning-buffer check for the 1 Oct 10:30 dual interview using groundTransfers estimates (Harbourline->MBS 15m expected / 25m conservative, sound check 07:30-08:30, speaker-ready 60m lead); the switch must be rejected if buffers fail - here they pass with margin.",
+    "Local routing: arrival transfer re-routes Changi->Harbourline (same covered segment type, same expected duration); departure transfer unchanged (3 Oct, in-window).",
+    "No companion ontology: the partner stays a declared-cost fact on the traveller's request; the pack does not invent a draftId or traveller entity for them."
+  ],
+  "inputs": [
+    { "file": "inputs/traveller-hotel-change-request.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/current-booking.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
+    { "file": "inputs/harbourline-room-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-hotel-partners"] },
+    { "file": "inputs/companion-seat-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
+  ],
+  "referencedDraftIds": ["ait-draft-31"],
+  "referencedCommitmentIds": ["cmt-ait-d1-hospitality-interview"]
+}

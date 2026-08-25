@@ -1,0 +1,35 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "scenarioId": "S8",
+  "catalogueTitle": "\"Can I travel with the other speakers?\"",
+  "trigger": "TRAVELLER_REQUESTED_CHANGE",
+  "stage": "PRE_BOOKING",
+  "tier": "STRETCH_HIGH",
+  "demoRole": "Cross-traveller reasoning, shared programme context, correlated-risk constraints",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-12T10:20:00+08:00",
+  "note": "Mei Ling Goh (ait-draft-30) asks that the Wanderpay delegation - herself, Siti Rahmah (ait-draft-11) and Arjun Rao (ait-draft-10, delegation lead, REQUIRED keynote speaker and moderator) - travel down together on the same KUL->SIN service, after planning floated splitting the group across the morning MN218 and the afternoon MN220. This triggers the policy clause criticalParticipantTransportConcentration: same-delegation travel-together request involving a programme-critical participant. The deterministic check flags that all three on MN218 concentrates the payments-keynote's only external speaker AND the payments-panel moderator + 2 of 3 panellists on one service; a same-day alternative (MN220) exists. Per the clause the operator proposes a split and discloses the trade-off; the travellers then EXPLICITLY instruct togetherness, which outranks the default only because disclosure happened first - the request is honoured with the reasoning and accepted risk recorded. Consistency cross-reference: scenario S1 (21 Sep) later retimes exactly this MN218 service and all three are affected together, demonstrating the flag was prescient; the S1 pack's baseline already encodes the togetherness outcome. Catalogue MVP boundary honoured: the correlated-risk constraint lives as a policy clause + machineHint in data (recorded in organiser-policy.json schemaGaps); no scenario-specific risk logic is added. Simulated seam: flight inventory is SIMULATED_EXTERNAL_EVENT.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-10", "impactClass": "GROUP_REQUEST_HONOURED_WITH_DISCLOSED_RISK", "reason": "Programme-critical (REQUIRED keynote + moderator). Stays on MN218 (his BKK feeder MN205 arrives KUL 21:55 the night before; morning service is the natural fit). Correlated-risk trade-off disclosed; his explicit instruction to travel with the delegation is recorded." },
+    { "draftId": "ait-draft-11", "impactClass": "GROUP_REQUEST_HONOURED_WITH_DISCLOSED_RISK", "reason": "KUL-based panellist (PREFERRED). The split proposal would have put her on MN220 (15:20 arrival still satisfies her 6h buffer with >22h margin); after disclosure she explicitly chooses MN218 with the group." },
+    { "draftId": "ait-draft-30", "impactClass": "GROUP_REQUEST_HONOURED_WITH_DISCLOSED_RISK", "reason": "Requesting traveller; same calculus as ait-draft-11. Her explicit instruction outranks the concentration default only because the trade-off was disclosed first." }
+  ],
+  "expectedReasoningHooks": [
+    "Cross-traveller / group reasoning: match 'the Wanderpay group' to roster drafts 10/11/30 and the SHARED_FLIGHT_GROUP dependency pattern; align three travellers' inventories against one service rather than processing three isolated requests.",
+    "Correlated-risk constraint from data: clauses.criticalParticipantTransportConcentration (trigger SAME_DELEGATION_CRITICAL_TRAVEL_TOGETHER_REQUEST). Deterministic flag: a single disruption of MN218 would strand the payments-keynote's only external speaker and the payments-panel moderator + 2 of 3 panellists; an alternative same-day service (MN220) exists, so the flag fires.",
+    "Clause mechanics: the group request is honoured UNLESS the flag fires; when it fires the operator proposes a split and records reasoning, discloses the trade-off, and the travellers' explicit instruction outranks the default only after disclosure. Here they choose togetherness -> honoured, with accepted risk recorded.",
+    "Arrival viability for both layouts: MN218 (07:25) and MN220 (15:20) both satisfy every member's buffer for their 1 Oct commitments (Arjun's 12h programme-critical buffer, Siti/Mei Ling's 6h standard); the decision is genuinely about correlated risk, not feasibility.",
+    "Inventory/fare alignment: MN218 and MN220 are same-carrier same-route at the same fare (SGD 98) - no fare difference either way, so the split proposal carries no cost argument; seating/baggage for the group is a soft preference, not a constraint.",
+    "Prescience cross-reference (data, not code): scenario S1 retimes MN218 on 21 Sep and all three are affected together - exactly the correlated outcome the flag anticipated. The pack never hardcodes this link; it is a documented expectation for the demo narrative.",
+    "No scenario-specific logic: the constraint is a generic policy clause over delegation/cast/flight facts; nothing in domain logic may branch on 'Wanderpay', 'MN218', or 'S8'."
+  ],
+  "inputs": [
+    { "file": "inputs/traveller-group-request.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/baseline-group-itineraries.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
+    { "file": "inputs/same-day-alternatives-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
+    { "file": "inputs/disclosure-and-decision.json", "provenance": "NATIVE_UI", "sourceIds": ["src-syn-ait-policy", "src-syn-ait-roster", "src-sim-airline-mn"] }
+  ],
+  "referencedDraftIds": ["ait-draft-10", "ait-draft-11", "ait-draft-30"],
+  "referencedCommitmentIds": ["cmt-ait-d1-payments-keynote", "cmt-ait-d1-payments-panel", "cmt-ait-d2-platform-panel"]
+}

@@ -1,0 +1,26 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
+  "note": "Partner-hotel and transfer impact of the requested Sunday extension, computed against the booked baseline. All incremental elements fall to the traveller per rule-ait-funded-window (incrementalPayer TRAVELLER), rule-ait-hotel-funded-window, clauses.personalExtensionFunding and clauses.transferCoverage. Deliberate trap encoded here: night 2026-10-02 (check-out 3 Oct) sits INSIDE the hotel funded window, but the business-equivalent trip checks out 2 Oct - the event never books that night in the baseline, so it is a traveller increment, not an event-covered night.",
+  "asOf": "2026-09-18T11:20:00+08:00",
+  "draftId": "ait-draft-35",
+  "hotelImpact": {
+    "placeId": "place-hotel-bayview",
+    "baselineNights": ["2026-09-30", "2026-10-01"],
+    "extensionNights": [
+      { "night": "2026-10-02", "ratePerNight": { "amount": 285, "currency": "SGD" }, "fundedBy": "TRAVELLER", "reason": "Only exists because of the personal extension; the business-equivalent trip departs 2 Oct. Inside the calendar window but outside the business-equivalent booking." },
+      { "night": "2026-10-03", "ratePerNight": { "amount": 285, "currency": "SGD" }, "fundedBy": "TRAVELLER", "reason": "Outside rule-ait-hotel-funded-window (check-out 3 Oct 11:00) and only exists because of the extension." }
+    ],
+    "extensionTotal": { "amount": 570, "currency": "SGD" },
+    "availability": "CONFIRMED_BY_HOTEL",
+    "note": "Partner block has availability for both extension nights at the block rate."
+  },
+  "transferImpact": {
+    "baselineDepartureTransfer": { "segment": "HOTEL_TO_AIRPORT_DEPARTURE", "date": "2026-10-02", "status": "CANCELLED_IF_EXTENSION_ACCEPTED", "fundedBy": "EVENT_ORGANISATION", "note": "Event-funded 2 Oct transfer lapses; no refund (included in event block arrangement)." },
+    "extensionDepartureTransfer": { "segment": "HOTEL_TO_AIRPORT_DEPARTURE", "date": "2026-10-04", "fundedBy": "TRAVELLER", "estimatedCost": { "amount": 38, "currency": "SGD" }, "reason": "Departure outside the funded window; clauses.transferCoverage funds only in-window arrival/departure transfers." }
+  },
+  "costSplitSummary": {
+    "eventFunded": { "airfare": { "amount": 1150, "currency": "SGD" }, "hotelNights": 2, "transfers": 2, "note": "Business-equivalent in-window trip, unchanged by the extension." },
+    "travellerFunded": { "airfareDelta": { "amount": 148, "currency": "SGD" }, "hotelExtension": { "amount": 570, "currency": "SGD" }, "transfer": { "amount": 38, "currency": "SGD" }, "total": { "amount": 756, "currency": "SGD" } }
+  }
+}

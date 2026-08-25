@@ -1,0 +1,33 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated seat availability on Hannah's exact services for the companion (non-participant). The companion has no programme role, so clauses.cabinRules' business-cabin entitlement does not apply to them; both cabins are offered and the traveller funds whichever is chosen (clauses.companionAndUpgradeIncrement). Deliberate shape: exactly one business seat remains on the inbound, so 'companion in the same cabin' is possible but constrained. Not a live provider feed; at demo runtime the same shapes arrive via REPLAY.",
+  "observedAt": "2026-09-19T09:30:00+08:00",
+  "companionOf": "ait-draft-31",
+  "companionStatus": "NON_PARTICIPANT_NO_ROSTER_ENTRY",
+  "services": [
+    {
+      "flightNumber": "MN243",
+      "origin": "FRA",
+      "destination": "SIN",
+      "departure": "2026-09-29T11:30:00+02:00",
+      "arrival": "2026-09-30T06:10:00+08:00",
+      "businessSeatsAvailable": 1,
+      "businessFare": { "amount": 1160, "currency": "SGD" },
+      "economySeatsAvailable": 14,
+      "economyFare": { "amount": 540, "currency": "SGD" }
+    },
+    {
+      "flightNumber": "MN242",
+      "origin": "SIN",
+      "destination": "FRA",
+      "departure": "2026-10-03T23:45:00+08:00",
+      "arrival": "2026-10-04T06:30:00+02:00",
+      "businessSeatsAvailable": 3,
+      "businessFare": { "amount": 1160, "currency": "SGD" },
+      "economySeatsAvailable": 17,
+      "economyFare": { "amount": 540, "currency": "SGD" }
+    }
+  ],
+  "fundingNote": "Entire companion fare is traveller-funded per the explicit funding declaration; the event never funds a companion seat (clauses.companionAndUpgradeIncrement)."
+}

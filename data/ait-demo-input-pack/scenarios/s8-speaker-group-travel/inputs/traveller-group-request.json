@@ -1,0 +1,16 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages"],
+  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel. This is the scenario trigger (traveller-requested group change). Claims inside are the traveller's own statements; group membership must be reconciled against the roster and the SHARED_FLIGHT_GROUP dependency pattern, not assumed from the message alone.",
+  "messageId": "msg-ait-s8-001",
+  "channel": "TRAVELLER_CHAT",
+  "fromDraftId": "ait-draft-30",
+  "receivedAt": "2026-09-12T10:20:00+08:00",
+  "text": "Hi! I saw the draft travel plan has Siti and me on the afternoon flight while Arjun takes the early one. Can I travel with the other speakers instead? The three of us are the Wanderpay team and we'd really like to travel down together on the same flight - whichever one works for Arjun's connection works for us. We're all there for the payments sessions on Thursday so hopefully either flight is fine timing-wise?",
+  "extractedClaims": [
+    { "claim": "Draft plan splits the Wanderpay group across morning and afternoon KUL->SIN services", "status": "CONFIRMED_BY_PLANNING_STATE", "verificationNeededFrom": "NONE", "note": "Matches the organiser's draft group plan in baseline-group-itineraries.json." },
+    { "claim": "Requests all three Wanderpay members on the same service", "status": "EXPLICIT_REQUEST", "verificationNeededFrom": "NONE" },
+    { "claim": "Whichever service fits Arjun's BKK connection works for the whole group", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_INVENTORY", "note": "Viability of both services must be checked against each member's commitments and buffers, not accepted from the message." },
+    { "claim": "All three attend the payments sessions on Thursday 1 Oct", "status": "CONFIRMED_BY_PROGRAMME", "verificationNeededFrom": "NONE", "note": "Arjun: keynote 13:50 + panel moderator 14:00 (REQUIRED); Siti and Mei Ling: panel panellists 14:00 (PREFERRED)." }
+  ]
+}

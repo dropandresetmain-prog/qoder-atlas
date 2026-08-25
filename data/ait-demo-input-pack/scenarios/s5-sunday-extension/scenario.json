@@ -1,0 +1,32 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "scenarioId": "S5",
+  "catalogueTitle": "\"Can I stay until Sunday?\"",
+  "trigger": "TRAVELLER_REQUESTED_CHANGE",
+  "stage": "POST_BOOKING",
+  "tier": "STRETCH_HIGH",
+  "demoRole": "Business/personal trip boundary, cost attribution, multi-element modification",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-18T11:05:00+08:00",
+  "note": "Jonas Berg (ait-draft-35, AMS origin) is the recovery-fireside speaker (1 Oct 15:30, REQUIRED/FIXED) with no other commitments. His ticketed return is Friday 2 Oct 23:30, straight after the closing party ends. He asks to stay until Sunday (depart 4 Oct) for personal reasons. This is the catalogue shape 'conference ends Friday, traveller extends personally': return-flight change + extra hotel nights + transfer coverage must be split into an event-funded business-equivalent portion and traveller-funded increments (rule-ait-funded-window, rule-ait-hotel-funded-window, clauses.personalExtensionFunding, clauses.businessEquivalentAirfare, clauses.transferCoverage). Deliberate trap: the extra night 2->3 Oct falls INSIDE the hotel funded window, but it only exists because of the personal extension - the business-equivalent trip departs 2 Oct, so both added nights are traveller-funded; the engine must not auto-fund a night 'because the window covers it'. Simulated seam: flight inventory is SIMULATED_EXTERNAL_EVENT; at demo runtime the same shapes arrive via REPLAY.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-35", "impactClass": "REQUEST_FEASIBLE_WITH_INCREMENT", "reason": "Sunday return MN240 (4 Oct 23:30) exists and preserves all commitments (his only one is 1 Oct 15:30, already served). Extension is allowed (rule-ait-change-terms allowed=true): fare delta +SGD 148, two extra hotel nights (2 Oct, 3 Oct) at SGD 285/night, and the 4 Oct airport transfer are traveller-funded increments over the business-equivalent trip; the event-funded portion (flights SGD 1150, nights 30 Sep + 1 Oct) stays intact. Flight change requires HUMAN_AGENT approval (rule-ait-flight-change-approval) plus the traveller's explicit consent to the increments (approvalThresholds (4))." }
+  ],
+  "expectedReasoningHooks": [
+    "Business/personal boundary: decompose one trip into the in-window business-equivalent portion (event-funded) and the personal extension increments (traveller-funded), per clauses.personalExtensionFunding and clauses.businessEquivalentAirfare.",
+    "Funded-window arithmetic: rule-ait-funded-window (incrementalPayer TRAVELLER) and rule-ait-hotel-funded-window (check-out 3 Oct 11:00). The 2->3 Oct night is inside the window but only exists because of the extension; funding follows the business-equivalent trip, not the calendar window alone.",
+    "Multi-element modification: one request mutates flight + hotel + transfers together; transferCoverage clause makes the 4 Oct hotel-to-airport transfer traveller-funded (outside funded window).",
+    "Downstream commitments: the extension breaks nothing (fireside 1 Oct 15:30 already served; 2 Oct closing party is OPTIONAL and is in fact the traveller's stated motive).",
+    "Authority: traveller-initiated FLIGHT_CHANGE is not supplier-disruption rebooking, so the delegated-authority carve-out does not apply -> HUMAN_AGENT per rule-ait-flight-change-approval; traveller's explicit consent required for every traveller-funded increment.",
+    "No silent optimisation: the engine must not decline the extension 'because it costs money' nor book it 'because the traveller asked'; it returns the decomposed cost split for approval."
+  ],
+  "inputs": [
+    { "file": "inputs/traveller-extension-request.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/booked-itinerary.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
+    { "file": "inputs/return-options-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
+    { "file": "inputs/hotel-and-transfer-impact.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] }
+  ],
+  "referencedDraftIds": ["ait-draft-35"],
+  "referencedCommitmentIds": ["cmt-ait-d1-recovery-fireside", "cmt-ait-d2-party"]
+}

@@ -88,12 +88,20 @@
       "contentScope": "Provider-shaped disruption trigger simulated at the external provider boundary. Not a live provider call; must never be presented as LIVE."
     },
     {
+      "id": "src-sim-hotel-partners",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "title": "Simulated partner-hotel availability/rate feed (Bayview Grand / Harbourline Suites)",
+      "url": "file:data/ait-demo-input-pack/scenarios/s6-hotel-partner/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Provider-shaped accommodation inventory simulated at the external provider boundary (room types, rates, availability, cancellation terms). Not a live provider call; must never be presented as LIVE."
+    },
+    {
       "id": "src-syn-traveller-messages",
       "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
       "title": "Synthetic traveller/operator message channels for scenario packs",
       "url": "file:data/ait-demo-input-pack/scenarios/",
       "fetchedAt": "2026-08-25T09:00:00Z",
-      "contentScope": "Literal traveller-authored messages (chat/email shaped) used as ingestion inputs for S2/S4/S5/S7/S8. Fully synthetic; no real person's statements are reproduced."
+      "contentScope": "Literal traveller-authored messages (chat/email shaped) used as ingestion inputs for S2/S4/S5/S6/S7/S8. Fully synthetic; no real person's statements are reproduced."
     }
   ]
 }
