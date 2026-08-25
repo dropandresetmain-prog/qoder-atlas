@@ -149,12 +149,12 @@ Traveller text: "Can I stay until Sunday? Please extend my stay until 2026-10-04
 Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "departAfter": "2026-10-04T12:00:00+08:00", "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
 
 Worked example — hotel switch with occupancy:
-Traveller text: "Can I switch hotels? My partner is joining, so there will be 2 of us staying. I'd like to move to place-hotel-harbourline. I will self-fund the extra cost."
-Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "preferredStayPlaceId": "place-hotel-harbourline", "guests": 2, "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
+Traveller text: "Can I switch hotels? My partner is joining, so there will be 2 of us staying. I'd like to move to place-hotel-riverview. I will self-fund the extra cost."
+Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "preferredStayPlaceId": "place-hotel-riverview", "guests": 2, "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
 
 Worked example — travel with quoted peers:
-Traveller text: "Can I travel with the other speakers on the same flight? My peers trv-evt-ait-2026-ait-draft-10 and trv-evt-ait-2026-ait-draft-11 are also speaking."
-Response: { "intentKind": "CHANGE_TRANSPORT_SCHEDULE", "urgency": "SOFT_PREFERENCE", "target": { "travelWithTravellerIds": ["trv-evt-ait-2026-ait-draft-10", "trv-evt-ait-2026-ait-draft-11"], "objectiveEffects": [] } }
+Traveller text: "Can I travel with the other speakers on the same flight? My peers trv-summit-attendee-10 and trv-summit-attendee-11 are also speaking."
+Response: { "intentKind": "CHANGE_TRANSPORT_SCHEDULE", "urgency": "SOFT_PREFERENCE", "target": { "travelWithTravellerIds": ["trv-summit-attendee-10", "trv-summit-attendee-11"], "objectiveEffects": [] } }
 
 Never invent timestamps, entity ids, or other details the traveller did not state.`;
 
