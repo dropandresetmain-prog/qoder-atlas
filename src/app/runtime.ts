@@ -41,6 +41,7 @@ import type { BookingDossierStore } from './dossierStore.ts';
 import { signalHorizon, liftToHorizon, type RecoveryExecutionService } from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
+import { ResolutionTargetSchema, type ResolutionTarget } from '../contracts/changeRequest.ts';
 import type { ActionIntent } from '../operational/intent.ts';
 import type { Money } from '../domain/common.ts';
 import { describeAllocation } from '../engine/funding.ts';
@@ -187,7 +188,12 @@ export class RuntimeOrchestrator {
       entities: this.deps.entities,
     }).assess(recoveryCase.tripId, signal.id);
 
-    const snapshot = await buildTripSnapshot(this.snapshotDeps(), recoveryCase.tripId, at);
+    const snapshot = await buildTripSnapshot(
+      this.snapshotDeps(),
+      recoveryCase.tripId,
+      at,
+      resolutionTargetFor(signal),
+    );
     const outcome = await runPlanningLoop(
       {
         planner: this.deps.planner,
@@ -372,4 +378,18 @@ export class RuntimeOrchestrator {
 
 function activityToWire(activity: ToolActivity): { operation: string; ok: boolean; summary: string } {
   return { operation: activity.request.operation, ok: activity.result.ok, summary: activity.summary };
+}
+
+/**
+ * The resolution target behind a triggering TRAVELLER_INPUT signal, when it
+ * carries a persisted change request. The planning snapshot needs it so
+ * target-declared evidence (e.g. a substituted departure gateway) is in
+ * scope for the planner; absent/invalid payloads contribute nothing.
+ */
+function resolutionTargetFor(signal: TripSignal): ResolutionTarget | undefined {
+  if (signal.kind !== 'TRAVELLER_INPUT') return undefined;
+  const payload = signal.payload as Record<string, unknown>;
+  if (payload['changeRequestId'] === undefined) return undefined;
+  const parsed = ResolutionTargetSchema.safeParse(payload['target']);
+  return parsed.success ? parsed.data : undefined;
 }

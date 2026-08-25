@@ -417,6 +417,22 @@ export class NorthstarPlanner implements RecoveryPlanner {
           );
           continue;
         }
+        // Return-corridor honesty: substituting the departure origin
+        // invalidates the home assumption any event-departing return leg was
+        // built on. Its terminus becomes an EXPLICIT uncertainty — never
+        // silently re-assumed, and never rebooked on the traveller's behalf.
+        for (const candidate of flightLegs) {
+          if (arrivalLeg && candidate.id === arrivalLeg.id) continue;
+          if (this.airportGatewayFor(input, candidate.data.originPlaceId)?.placeId !== eventGatewayId) continue;
+          if (this.airportGatewayFor(input, candidate.data.destinationPlaceId)?.placeId === declaredGateway.place.id) continue;
+          uncertainties.push(
+            this.uncertainty(
+              `departureOrigin substituted to ${declared.system}:${declared.value}; the return leg departing the event gateway still terminates at the superseded origin and the replacement terminus is unverified — it is not rebooked on assumption`,
+              'MEDIUM',
+            ),
+          );
+          break;
+        }
         const windowStart = input.snapshot.anchorEvent?.window.startsAt;
         const requestedDate =
           arrivalLeg?.data.scheduledDeparture?.value.slice(0, 10) ??

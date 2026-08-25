@@ -10,6 +10,7 @@ import type { EntityId, SourceRecord } from '../domain/common.ts';
 import type { AnchorEvent, Organisation, Place, Traveller } from '../domain/entities.ts';
 import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
+import type { ResolutionTarget } from '../contracts/changeRequest.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { TripSnapshot } from '../operational/snapshot.ts';
 import { TripSnapshotSchema } from '../operational/snapshot.ts';
@@ -29,6 +30,13 @@ export async function buildTripSnapshot(
   deps: SnapshotDependencies,
   tripId: EntityId,
   takenAt: string,
+  /**
+   * Optional resolution target behind the planning turn. Places the target
+   * DECLARES (e.g. a substituted departure gateway) join the snapshot scope
+   * so the planner can resolve them against authoritative evidence instead
+   * of failing closed on an unseen place.
+   */
+  resolutionTarget?: ResolutionTarget,
 ): Promise<TripSnapshot> {
   const trip = await deps.trips.getTrip(tripId);
   if (!trip) throw new Error(`unknown trip ${tripId}`);
@@ -69,6 +77,24 @@ export async function buildTripSnapshot(
   }
 
   const placeIds = collectPlaceIds(trip, anchorEvent, travellers);
+  // Declared-ref scope: an external ref named by the resolution target is
+  // authoritative evidence the planner must be able to see (a declared
+  // departure gateway that the trip never touched yet). Generic ref match
+  // over AIRPORT places; unknown refs contribute nothing — never guessed.
+  if (resolutionTarget) {
+    for (const declared of declaredTargetRefs(resolutionTarget)) {
+      for (const entry of await deps.entities.list('PLACE')) {
+        if (entry.entityType !== 'PLACE' || entry.entity.kind !== 'AIRPORT') continue;
+        if (
+          entry.entity.externalRefs.some(
+            (ref) => ref.system === declared.system && ref.value.trim().toLowerCase() === declared.value.trim().toLowerCase(),
+          )
+        ) {
+          placeIds.add(entry.entity.id);
+        }
+      }
+    }
+  }
   // Gateway closure (G3R-Closure fix C): a referenced place may reach its
   // transport gateway only through the generic servedByPlaceIds association.
   // The snapshot must carry that gateway too — otherwise downstream engines
@@ -142,6 +168,14 @@ function collectPlaceIds(trip: Trip, anchorEvent: AnchorEvent | undefined, trave
     if (traveller.homePlaceId) ids.add(traveller.homePlaceId);
   }
   return ids;
+}
+
+/** External refs a resolution target declares; the snapshot must carry the places they name. */
+function declaredTargetRefs(target: ResolutionTarget): Array<{ system: string; value: string }> {
+  const refs: Array<{ system: string; value: string }> = [];
+  if (target.departureOrigin) refs.push(target.departureOrigin);
+  if (target.stayPlaceRef) refs.push(target.stayPlaceRef);
+  return refs;
 }
 
 /**
