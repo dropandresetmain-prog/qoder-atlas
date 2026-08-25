@@ -109,10 +109,17 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Step 5: Click the "Plan Recovery" button
   const planButton = page.locator('[data-test="plan-recovery-btn"]');
+  // G3R-Closure fix I: synchronize on the ACTUAL form response, then on the
+  // post-decision DOM state — never on network-idle alone (the enhancement
+  // script resolves its fetch BEFORE triggering the reload, so a network-idle
+  // wait can pass while the reload is still in flight — that was the race).
+  const planResponse = page.waitForResponse(
+    (response) => response.url().includes('/api/runtime/plan') && response.request().method() === 'POST',
+    { timeout: 10000 },
+  );
   await planButton.click();
-
-  // Wait for the form submission and page reload (same URL, new content)
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
+  const planResult = await planResponse;
+  assert.equal(planResult.status(), 200, 'plan endpoint accepted the request');
 
   // Wait for the "Begin Strategy" button to appear (indicates planning succeeded and options exist)
   await page.waitForSelector('[data-test="begin-strategy-btn"]', { timeout: 10000 });
@@ -129,12 +136,15 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Step 7: Click the "Begin Strategy" button
   const beginButton = page.locator('[data-test="begin-strategy-btn"]');
+  // G3R-Closure fix I: wait for the actual begin response, then the stable
+  // approval-panel DOM state (the script's reload lands before this resolves).
+  const beginResponse = page.waitForResponse(
+    (response) => response.url().includes('/api/runtime/begin') && response.request().method() === 'POST',
+    { timeout: 10000 },
+  );
   await beginButton.click();
-
-  // Wait for the form submission and page reload (same URL, new content)
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
-  // Wait for the approval panel to appear (indicates begin succeeded)
-  await page.waitForSelector('[data-approval-state="PENDING"]', { timeout: 5000 });
+  await beginResponse;
+  await page.waitForSelector('[data-approval-state="PENDING"]', { timeout: 10000 });
 
   // Step 6: Verify the approval panel now appears
   const afterBeginHtml = await page.content();
@@ -154,14 +164,31 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Step 7: Click the Approve button
   const approveButton = page.locator('button:has-text("Approve")').first();
+  // G3R-Closure fix I: synchronize on the ACTUAL decision response (the
+  // backend has applied the state by the time it answers), then on the
+  // post-decision DOM state. The enhancement script reloads the page once
+  // this fetch resolves; waiting for the progressed-state selector rides
+  // through that reload deterministically instead of racing networkidle.
+  const decisionResponse = page.waitForResponse(
+    (response) => response.url().includes('/traveller-decision') && response.request().method() === 'POST',
+    { timeout: 10000 },
+  );
   await approveButton.click();
+  await decisionResponse;
+  await page.waitForFunction(
+    () => {
+      const html = document.documentElement.innerHTML;
+      return html.includes('RESOLVED') || html.includes('Trip recovered') || html.includes('RECOVERING') || html.includes('In progress');
+    },
+    undefined,
+    { timeout: 10000 },
+  );
 
-  // Wait for the form submission and page reload
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
-
-  // Step 8: Verify state persisted — reload the page and check again
+  // Step 8: Verify state persisted — reload the page and check again.
+  // The decision response above proves the state was already applied before
+  // this reload starts, so there is no approval/reload race left.
   await page.reload();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   const afterApprovalHtml = await page.content();
   // After approval, the case should show RESOLVED or RECOVERING status
