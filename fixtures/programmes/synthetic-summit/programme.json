@@ -32,6 +32,66 @@
             "value": "SYN"
           }
         ]
+      },
+      {
+        "id": "plc-home-nrt",
+        "name": "Synthetic Home Airport NRT",
+        "kind": "AIRPORT",
+        "timezone": "Asia/Tokyo",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "NRT"
+          }
+        ]
+      },
+      {
+        "id": "plc-home-lhr",
+        "name": "Synthetic Home Airport LHR",
+        "kind": "AIRPORT",
+        "timezone": "Europe/London",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "LHR"
+          }
+        ]
+      },
+      {
+        "id": "plc-home-jfk",
+        "name": "Synthetic Home Airport JFK",
+        "kind": "AIRPORT",
+        "timezone": "America/New_York",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "JFK"
+          }
+        ]
+      },
+      {
+        "id": "plc-home-lax",
+        "name": "Synthetic Home Airport LAX",
+        "kind": "AIRPORT",
+        "timezone": "America/Los_Angeles",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "LAX"
+          }
+        ]
+      },
+      {
+        "id": "plc-home-cdg",
+        "name": "Synthetic Home Airport CDG",
+        "kind": "AIRPORT",
+        "timezone": "Europe/Paris",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "CDG"
+          }
+        ]
       }
     ],
     "anchorEvent": {
