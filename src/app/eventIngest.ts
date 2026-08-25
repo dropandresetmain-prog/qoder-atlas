@@ -21,6 +21,7 @@ import type { TripSignal } from '../operational/signal.ts';
 import type { RuntimeOrchestrator } from './runtime.ts';
 import type { ProcessedSignal } from './signalPipeline.ts';
 import type { EventInboxStore } from './eventInboxStore.ts';
+import { hashId } from '../ingest/ids.ts';
 
 export interface EventIngestDeps {
   inbox: EventInboxStore;
@@ -62,9 +63,10 @@ export interface EventIngestOutcome {
 async function correlateOrderRefs(
   trips: TripRepository,
   providerOrderRefs: string[],
-): Promise<{ tripId: EntityId; elementId: EntityId } | undefined> {
-  if (providerOrderRefs.length === 0) return undefined;
+): Promise<Array<{ tripId: EntityId; elementId: EntityId }>> {
+  if (providerOrderRefs.length === 0) return [];
   const refs = new Set(providerOrderRefs);
+  const matches: Array<{ tripId: EntityId; elementId: EntityId }> = [];
   for (const summary of await trips.listTrips()) {
     const trip = await trips.getTrip(summary.tripId);
     if (!trip) continue;
@@ -72,11 +74,11 @@ async function correlateOrderRefs(
       if (element.elementKind !== 'TRANSPORT_LEG') continue;
       const reference = element.data.bookingRef?.reference;
       if (reference !== undefined && refs.has(reference)) {
-        return { tripId: trip.id, elementId: element.id };
+        matches.push({ tripId: trip.id, elementId: element.id });
       }
     }
   }
-  return undefined;
+  return matches;
 }
 
 /**
@@ -129,8 +131,8 @@ export async function ingestProviderEvent(
   }
 
   // 3. Correlate provider order refs to a trip (generic, provider-neutral).
-  const correlation = await correlateOrderRefs(deps.trips, envelope.providerOrderRefs);
-  if (!correlation) {
+  const correlations = await correlateOrderRefs(deps.trips, envelope.providerOrderRefs);
+  if (correlations.length === 0) {
     await deps.inbox.markProcessed(envelope.providerId, envelope.providerEventId, {
       status: 'CORRELATION_FAILED',
     });
@@ -142,28 +144,35 @@ export async function ingestProviderEvent(
     };
   }
 
-  // 4. Feed each ASSERTED-ceiling signal through the SAME generic recovery
-  //    pipeline every other disruption source uses.
+  // 4. Feed every matched element through the SAME generic recovery pipeline
+  //    every other disruption source uses. A provider order/service can cover
+  //    several independent trips; choosing the first match would silently
+  //    hide a programme blast radius. The derived signal id is stable per
+  //    normalized source signal + canonical trip/element, so retries remain
+  //    idempotent without attaching a scenario identity to domain state.
   const results: EventIngestResultItem[] = [];
   for (const rawSignal of signals) {
-    const signal = enforceAssertedCeiling({
-      ...rawSignal,
-      tripId: rawSignal.tripId ?? correlation.tripId,
-      subjectRef: rawSignal.subjectRef ?? { entityType: 'TRIP_ELEMENT', id: correlation.elementId },
-    });
-    const processed = await deps.orchestrator.processDisruption(signal, at);
-    results.push({
-      signalId: signal.id,
-      tripId: processed.tripId,
-      caseId: processed.caseId,
-      caseStatus: processed.caseStatus,
-      processed,
-    });
+    for (const correlation of correlations) {
+      const signal = enforceAssertedCeiling({
+        ...rawSignal,
+        id: hashId('sig-provider-impact', rawSignal.id, correlation.tripId, correlation.elementId),
+        tripId: rawSignal.tripId ?? correlation.tripId,
+        subjectRef: rawSignal.subjectRef ?? { entityType: 'TRIP_ELEMENT', id: correlation.elementId },
+      });
+      const processed = await deps.orchestrator.processDisruption(signal, at);
+      results.push({
+        signalId: signal.id,
+        tripId: processed.tripId,
+        caseId: processed.caseId,
+        caseStatus: processed.caseStatus,
+        processed,
+      });
+    }
   }
 
   await deps.inbox.markProcessed(envelope.providerId, envelope.providerEventId, {
     status: 'ACCEPTED',
-    tripId: correlation.tripId,
+    tripId: correlations[0]!.tripId,
     ...(results[0] ? { signalId: results[0].signalId, caseId: results[0].caseId } : {}),
   });
 

@@ -103,6 +103,47 @@ test('DR-3.1: a documented Atlas-shaped supplier disruption reaches the ordinary
   });
 });
 
+test('provider ingress fans one shared order reference out to every matched canonical trip', async () => {
+  await withServer(async (base, composed) => {
+    const original = await composed.readDeps.snapshot.trips.getTrip('trip_a');
+    assert.ok(original, 'the seeded trip supplies a valid provider-booked transport element');
+
+    // A second canonical trip can legitimately contain a transport element
+    // issued under the same provider order/service reference. This is data,
+    // not a scenario-specific relationship: ingress must process every
+    // matching trip instead of silently picking the first repository row.
+    const secondTripId = 'trip-provider-fanout';
+    await composed.readDeps.snapshot.trips.saveTrip({
+      ...original!,
+      id: secondTripId,
+      travellerIds: ['trv-provider-fanout'],
+      elements: original!.elements.map((element, index) => ({
+        ...element,
+        id: `el-provider-fanout-${index}`,
+        tripId: secondTripId,
+        dependsOn: [],
+      })),
+      objectives: [],
+      relations: [],
+      version: 0,
+      updatedAt: '2026-09-12T06:00:00+00:00',
+    });
+
+    const response = await postJson(
+      base,
+      '/api/events/atlas?at=2026-09-12T06%3A05%3A00%2B00%3A00',
+      atlasEvent({ eventId: 'evt-atlas-shared-order' }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.body['status'], 'ACCEPTED');
+    const results = response.body['results'] as Array<{ tripId: string; signalId: string; caseId: string }>;
+    assert.equal(results.length, 2, 'both matched transport elements enter the normal recovery pipeline');
+    assert.deepEqual(new Set(results.map((result) => result.tripId)), new Set(['trip_a', secondTripId]));
+    assert.equal(new Set(results.map((result) => result.signalId)).size, 2, 'each canonical impact has a distinct signal');
+    assert.equal(new Set(results.map((result) => result.caseId)).size, 2, 'each trip receives its own recovery case');
+  });
+});
+
 test('DR-3.2: raw event is persisted before processing; duplicate delivery produces no duplicate case', async () => {
   await withServer(async (base, composed) => {
     const at = '2026-09-12T06:05:00+00:00';
