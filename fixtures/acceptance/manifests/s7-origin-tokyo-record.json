@@ -1,0 +1,162 @@
+{
+  "scenarioId": "S7-RECORD",
+  "title": "S7 'actually flying from Tokyo, not London' — LIVE NL intake + RECORD replacement corridor + honest authority ceiling",
+  "mode": "RECORD",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s7",
+    "version": "1.0.0",
+    "path": "../packs/s7"
+  },
+  "boundaries": [
+    {
+      "seam": "traveller.change_request_nl",
+      "mode": "LIVE",
+      "note": "natural-language departure-origin correction interpreted by LIVE Model Studio into the frozen ChangeRequest schema (departureOrigin external ref), zod-validated"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "RECORD",
+      "note": "replacement-corridor planning evidence through the RECORD-mode Atlas adapter; sanitized recordings persisted"
+    }
+  ],
+  "requiredEnv": [
+    "MODEL_STUDIO_API_KEY"
+  ],
+  "requiredProviders": [
+    "atlas",
+    "modelStudio"
+  ],
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-38"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-38"
+    ]
+  },
+  "routeParams": [
+    {
+      "origin": "HND",
+      "destination": "SIN",
+      "date": "2026-09-29"
+    }
+  ],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": {
+          "at": "2026-09-18T10:00:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "nl_intake",
+      "description": "Traveller corrects the departure gateway in natural language; LIVE Model Studio extracts the declared origin into the frozen schema",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/traveller/change-request",
+        "body": {
+          "travellerId": "trv-evt-ait-2026-ait-draft-38",
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-38",
+          "text": "Heads up — my plans changed: I am actually flying out of HND to Singapore, not London. The rest of the trip stays the same.",
+          "at": "2026-09-18T10:05:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the NL correction is accepted" },
+        { "path": "provenance", "op": "equals", "expected": "INTERPRETED", "description": "the request came from interpretation, not a pre-structured target" },
+        { "path": "intentKind", "op": "equals", "expected": "CHANGE_TRANSPORT_SCHEDULE", "description": "a declared departure-gateway substitution maps to a transport schedule change" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the correction" },
+        { "path": "implications.0", "op": "contains", "expected": "departureOrigin airport-code:HND declared", "description": "the declared gateway is recorded verbatim — resolution never silently rewrites the traveller's declaration" },
+        { "path": "implications.0", "op": "contains", "expected": "the arrival corridor must be re-planned from the declared gateway", "description": "the old London-origin corridor is obsolete: re-planning from the declared gateway is the recorded consequence" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Planning loop re-searches the arrival corridor FROM the declared Tokyo gateway (RECORD Atlas evidence) on the leg's own departure date and proposes substitution strategies",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-18T10:10:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "bestStrategyId": "bestStrategyId"
+        }
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planner requests replacement-corridor evidence first, then proposes from it" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search on the replacement corridor" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the RECORD Atlas adapter supplied replacement-corridor offers from the declared gateway" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "normalized replacement offers become candidate strategies" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to fly from the declared departure gateway", "description": "the candidate rebooks the existing arrival leg with the substituted origin — the superseded London origin is never re-proposed" },
+        { "path": "strategies.0.feasible", "op": "truthy", "description": "a same-day arrival from the declared gateway satisfies the programme arrival constraints" },
+        { "path": "bestStrategyId", "op": "exists", "description": "a feasible replacement exists, so the engine ranks a best strategy instead of failing closed" },
+        { "path": "uncertainties", "op": "arrayNotEmpty", "description": "the return corridor consequence is recorded, never assumed away" },
+        { "path": "uncertainties.1", "op": "contains", "expected": "the return leg departing the event gateway still terminates at the superseded origin", "description": "explicit uncertainty preserved: the return's replacement terminus is unverified and not rebooked on assumption" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+      ]
+    },
+    {
+      "id": "begin",
+      "description": "The best substitution strategy becomes a money-moving intent; deterministic authority reviews it",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/begin",
+        "body": {
+          "caseId": "{{caseId}}",
+          "strategyId": "{{bestStrategyId}}",
+          "at": "2026-09-18T10:20:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "intentId": "intentId"
+        }
+      },
+      "assert": [
+        { "path": "intentId", "op": "exists", "description": "the strategy was staged as a validated action intent" },
+        { "path": "outcome", "op": "equals", "expected": "BLOCKED", "description": "honest authority ceiling: RECORD fails closed on SGD-limit vs USD-spend incomparability (ADR-045); REPLAY blocks on the curated SGD ceilings" },
+        { "path": "executable", "op": "equals", "expected": false, "description": "a blocked intent is never executable" },
+        { "path": "caseStatus", "op": "equals", "expected": "ESCALATED", "description": "the blocked money-moving intent escalates the case for human review" },
+        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "the blocking spend-ceiling rule is named in the deterministic rule trace in both modes" }
+      ]
+    },
+    {
+      "id": "observe_case",
+      "description": "Observe the recovery case after the authority stage",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_after_begin",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-38", "description": "the case belongs to the requesting traveller's trip" },
+        { "path": "options", "op": "arrayNotEmpty", "description": "the evaluated options remain visible on the case" }
+      ]
+    }
+  ]
+}
