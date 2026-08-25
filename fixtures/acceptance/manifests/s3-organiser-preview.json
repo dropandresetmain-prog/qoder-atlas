@@ -1,0 +1,89 @@
+{
+  "scenarioId": "S3",
+  "title": "Headline speaker needs to leave earlier; organiser previews consequences",
+  "mode": "REPLAY",
+  "globalInputPack": {
+    "packId": "northstar-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "s3-organiser-preview",
+    "version": "1.0.0",
+    "path": "../packs/s3"
+  },
+  "boundaries": [
+    {
+      "seam": "programme.change_preview",
+      "mode": "REPLAY",
+      "note": "Organiser Preview through real programme HTTP surface"
+    },
+    {
+      "seam": "programme.change_commit",
+      "mode": "REPLAY",
+      "note": "Organiser Commit through real programme HTTP surface"
+    }
+  ],
+  "requiredEnv": [],
+  "requiredProviders": [],
+  "expect": {
+    "anchorEventIds": ["evt-w3-demo"],
+    "travellerIds": [],
+    "tripIds": []
+  },
+  "routeParams": [],
+  "steps": [
+    {
+      "id": "reset",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": { "at": "2026-09-01T00:00:00+00:00" },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "organiser_preview",
+      "description": "Organiser Preview (counterfactual, no mutation)",
+      "action": {
+        "type": "ui_action",
+        "kind": "organiser_preview",
+        "params": {
+          "anchorEventId": "evt-w3-demo",
+          "commitmentId": "cmt-evt-w3-demo-opening",
+          "changeKind": "RESCHEDULED",
+          "newStartsAt": "2026-09-08T17:00:00+08:00",
+          "newEndsAt": "2026-09-08T19:00:00+08:00",
+          "at": "2026-09-01T00:00:00+00:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "organiser_commit",
+      "description": "Organiser Commit fan-out",
+      "action": {
+        "type": "ui_action",
+        "kind": "organiser_commit",
+        "params": {
+          "anchorEventId": "evt-w3-demo",
+          "commitmentId": "cmt-evt-w3-demo-opening",
+          "changeKind": "RESCHEDULED",
+          "newStartsAt": "2026-09-08T17:00:00+08:00",
+          "newEndsAt": "2026-09-08T19:00:00+08:00",
+          "at": "2026-09-01T00:05:00+00:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "observe_programme",
+      "action": {
+        "type": "observe",
+        "path": "/api/programme/evt-w3-demo",
+        "expectStatus": 200
+      }
+    }
+  ]
+}

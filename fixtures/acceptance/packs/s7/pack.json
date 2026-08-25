@@ -1,0 +1,15 @@
+{
+  "packId": "s7-origin-tokyo",
+  "version": "1.0.0",
+  "catalogueId": "S7",
+  "trigger": "traveller_change_request",
+  "payload": {
+    "travellerId": "trv-evt-w3-demo-draft-7",
+    "tripId": "trip-trv-evt-w3-demo-draft-7",
+    "text": "I'm actually flying from Tokyo, not London.",
+    "at": "2026-09-04T13:00:00+00:00"
+  },
+  "routeParams": [
+    { "origin": "NRT", "destination": "SIN", "date": "2026-09-07" }
+  ]
+}

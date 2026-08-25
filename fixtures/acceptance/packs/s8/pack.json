@@ -1,0 +1,13 @@
+{
+  "packId": "s8-travel-with-speakers",
+  "version": "1.0.0",
+  "catalogueId": "S8",
+  "trigger": "traveller_change_request",
+  "mvpBoundary": "stretch_may_be_simulated",
+  "payload": {
+    "travellerId": "trv-evt-w3-demo-draft-8",
+    "tripId": "trip-trv-evt-w3-demo-draft-8",
+    "text": "Can I travel with the other speakers on the same inbound routing?",
+    "at": "2026-09-04T14:00:00+00:00"
+  }
+}

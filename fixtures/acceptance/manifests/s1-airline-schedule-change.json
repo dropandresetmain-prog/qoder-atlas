@@ -1,0 +1,84 @@
+{
+  "scenarioId": "S1",
+  "title": "Airline schedule change affects several speakers",
+  "mode": "SIMULATED_EXTERNAL_EVENT",
+  "globalInputPack": {
+    "packId": "northstar-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "s1-airline-schedule-change",
+    "version": "1.0.0",
+    "path": "../packs/s1"
+  },
+  "boundaries": [
+    {
+      "seam": "atlas.event_ingress",
+      "mode": "SIMULATED_EXTERNAL_EVENT",
+      "note": "Atlas cannot generate the callback on demand; ingress is simulated through the real HTTP boundary"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "REPLAY",
+      "note": "Downstream provider execution uses adapter REPLAY unless overridden"
+    }
+  ],
+  "requiredEnv": [],
+  "requiredProviders": [],
+  "expect": {
+    "anchorEventIds": ["evt-w3-demo"],
+    "travellerIds": [],
+    "tripIds": ["trip_a"]
+  },
+  "routeParams": [],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed through HTTP",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": { "at": "2026-09-12T05:00:00+00:00" },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "trigger",
+      "description": "Inject approved simulated supplier cancellation via Atlas ingress",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": { "at": "2026-09-12T06:05:00+00:00" },
+        "body": {
+          "eventId": "evt-accept-s1-0001",
+          "orderNo": "FL-A-1001",
+          "eventType": "FLIGHT_CANCELLATION",
+          "eventStatus": 1,
+          "eventTime": "2026-09-12T06:00:00+00:00",
+          "createTime": "2026-09-12T06:00:00+00:00",
+          "airline": "XX",
+          "pnr": "PNR001",
+          "paxName": "Test Traveller",
+          "paxEmail": "traveller@example.test"
+        },
+        "capture": {
+          "caseId": "results.0.caseId",
+          "tripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "observe_case",
+      "description": "Observe opened recovery case",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_after_simulated_ingress",
+        "expectStatus": 200
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "packId": "s2-missed-connection",
+  "version": "1.0.0",
+  "catalogueId": "S2",
+  "trigger": "traveller_state_report",
+  "payload": {
+    "tripId": "trip_a",
+    "elementId": "el_a_flight_out",
+    "travellerReport": "My connecting flight was delayed and I missed the next leg.",
+    "at": "2026-09-13T07:00:00+09:00"
+  }
+}

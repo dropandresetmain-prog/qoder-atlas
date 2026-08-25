@@ -1,0 +1,18 @@
+{
+  "packId": "s1-airline-schedule-change",
+  "version": "1.0.0",
+  "catalogueId": "S1",
+  "trigger": "supplier_external_event",
+  "payload": {
+    "eventId": "evt-accept-s1-0001",
+    "orderNo": "FL-A-1001",
+    "eventType": "FLIGHT_CANCELLATION",
+    "eventStatus": 1,
+    "eventTime": "2026-09-12T06:00:00+00:00",
+    "createTime": "2026-09-12T06:00:00+00:00",
+    "airline": "XX",
+    "pnr": "PNR001",
+    "paxName": "Test Traveller",
+    "paxEmail": "traveller@example.test"
+  }
+}

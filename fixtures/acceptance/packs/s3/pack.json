@@ -1,0 +1,15 @@
+{
+  "packId": "s3-organiser-preview",
+  "version": "1.0.0",
+  "catalogueId": "S3",
+  "trigger": "organiser_event_change",
+  "payload": {
+    "anchorEventId": "evt-w3-demo",
+    "commitmentId": "cmt-evt-w3-demo-opening",
+    "changeKind": "RESCHEDULED",
+    "newStartsAt": "2026-09-08T17:00:00+08:00",
+    "newEndsAt": "2026-09-08T19:00:00+08:00",
+    "previewAt": "2026-09-01T00:00:00+00:00",
+    "commitAt": "2026-09-01T00:05:00+00:00"
+  }
+}
