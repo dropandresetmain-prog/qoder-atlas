@@ -1,0 +1,218 @@
+{
+  "id": "rec_d0fb198f9fb1a68b100b5efac572738e",
+  "providerId": "atlas",
+  "operation": "verify",
+  "recordedAt": "2026-08-25T21:44:00.287Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "sessionId": "820d6c40-f5b3-42b5-af2f-9647ba37feca",
+    "maxSeats": 9,
+    "priceChange": {
+      "isPriceChange": false,
+      "newAdultPrice": 114.59,
+      "newAdultTax": 33.44,
+      "newChildPrice": 114.59,
+      "newChildTax": 33.44,
+      "newInfantPrice": 132.61,
+      "newInfantTax": 0,
+      "originalAdultPrice": 114.59,
+      "originalAdultTax": 33.44,
+      "originalChildPrice": 114.59,
+      "originalChildTax": 33.44,
+      "originalInfantPrice": 132.61,
+      "originalInfantTax": 0
+    },
+    "bookingRequirement": {
+      "passenger": {
+        "birthday": {
+          "required": true,
+          "type": "string"
+        },
+        "cardIssuePlace": {
+          "required": false,
+          "type": "string"
+        },
+        "cardNum": {
+          "required": false,
+          "type": "string"
+        },
+        "passengerType": {
+          "required": true,
+          "type": "int"
+        },
+        "gender": {
+          "required": true,
+          "type": "string"
+        },
+        "nationality": {
+          "required": false,
+          "type": "string"
+        },
+        "cardExpired": {
+          "required": false,
+          "type": "string"
+        },
+        "name": {
+          "required": true,
+          "type": "string"
+        },
+        "cardType": {
+          "required": false,
+          "type": "string"
+        }
+      }
+    },
+    "routing": {
+      "routingIdentifier": "S1VMX1NJTl8xXzIwMjYwOTMwX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE0OC4wM18xNDguMDNfMTMyLjYxXzAuMDBfNDI4LjY3X1VTRHxLVUxfU0lOXzFfMjAyNjA5MzBfXzFfMF8wXktVTC1PRDgwMy1ULVNJTi0yMDI2MDkzMDEwMzAtMjAyNjA5MzAxMTMwLVN1cGVyIFNhdmVyLTEtXjE0OC4wM18xNDguMDNfMTMyLjYxXzAuMDBfNDI4LjY3XkFPRF9BT0ReXkFPRDFLVUxTSU4yMDAyMDI2MDkzMF5TR0ReNTk3LjIxXjU5Ny4yMV41MzUuMDBeMHwwfDIwMjYwODI2MDU0NDAwfDB8MTc4NzY5NDI0MDAwOWQ0Zjg4YTUwfHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfHw=.my99EG8JybCE36DqMg494v8u3vJUZu+e0WtYkKFm+oc=",
+      "fid": "4peKfZj3_hePmxArIAQRTvWPjTAbLTwDLXYXIL3VH5lKtRJdlEw-rfUYSZPlO2FN",
+      "currency": "USD",
+      "adultPrice": 114.59,
+      "adultTax": 33.44,
+      "childPrice": 114.59,
+      "childTax": 33.44,
+      "infantPrice": 132.61,
+      "infantTax": 0,
+      "expireTime": null,
+      "refreshTime": null,
+      "fromSegments": [
+        {
+          "carrier": "OD",
+          "operatingCarrier": "OD",
+          "flightNumber": "OD803",
+          "depAirport": "KUL",
+          "arrAirport": "SIN",
+          "depTime": "202609301030",
+          "arrTime": "202609301130",
+          "duration": 60,
+          "cabin": "T",
+          "cabinClass": 1,
+          "fareFamily": "Super Saver",
+          "seatCount": 9,
+          "segmentIndex": 1
+        }
+      ],
+      "retSegments": [],
+      "riskSellout": false,
+      "rule": {
+        "changesRules": [
+          {
+            "changesFee": 0,
+            "changesStatus": "T",
+            "currency": "MYR",
+            "revNoshow": "T",
+            "revNoshowFee": 0,
+            "ruleDetailList": [
+              {
+                "amount": 250,
+                "currency": "MYR",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 240
+              },
+              {
+                "amount": 0,
+                "currency": "MYR",
+                "status": "T",
+                "startMinute": 240,
+                "endMinute": 0
+              },
+              {
+                "amount": 0,
+                "currency": "MYR",
+                "status": "T",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "refundRules": [
+          {
+            "refundFee": 0,
+            "refundStatus": "T",
+            "refundMethod": null,
+            "currency": "MYR",
+            "refNoshow": "T",
+            "refNoshowFee": 0,
+            "ruleDetailList": [
+              {
+                "amount": 0,
+                "currency": "MYR",
+                "status": "T",
+                "startMinute": 525600,
+                "endMinute": 4320
+              },
+              {
+                "amount": 0,
+                "currency": "MYR",
+                "status": "T",
+                "startMinute": 4320,
+                "endMinute": 0
+              },
+              {
+                "amount": 0,
+                "currency": "MYR",
+                "status": "T",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "baggageElements": [
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 2,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 2,
+            "segmentNo": 1
+          }
+        ],
+        "hasBaggage": 1
+      }
+    }
+  }
+}

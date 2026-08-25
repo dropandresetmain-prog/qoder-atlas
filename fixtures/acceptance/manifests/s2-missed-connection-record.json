@@ -1,0 +1,171 @@
+{
+  "scenarioId": "S2-RECORD",
+  "title": "S2 missed connection — LIVE planner + LIVE Atlas RECORD proof (honest sandbox truth)",
+  "mode": "RECORD",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s2",
+    "version": "1.0.0",
+    "path": "../packs/s2"
+  },
+  "boundaries": [
+    {
+      "seam": "runtime.missed_flight",
+      "mode": "LIVE",
+      "note": "traveller-state report through the real POST /api/runtime/missed-flight boundary; no external provider involved"
+    },
+    {
+      "seam": "model_studio.recovery_planner",
+      "mode": "LIVE",
+      "note": "Model Studio (qwen-class) recovery planning through the provider-neutral model client; schema-validated, fail-closed"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "RECORD",
+      "note": "LIVE sandbox corridor search/verify through the Atlas adapter; sanitized recordings persisted for REPLAY"
+    }
+  ],
+  "requiredEnv": [
+    "MODEL_STUDIO_API_KEY"
+  ],
+  "requiredProviders": [
+    "atlas",
+    "modelStudio"
+  ],
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-09"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-09"
+    ]
+  },
+  "routeParams": [
+    {
+      "origin": "KUL",
+      "destination": "SIN",
+      "date": "2026-09-29"
+    }
+  ],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": {
+          "at": "2026-09-29T18:00:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "traveller_report",
+      "description": "Traveller reports missed KUL->SIN connection (pack msg-ait-s2-001); explicit elementId because the report lands after the leg's scheduled departure (DR-7 seam)",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/missed-flight",
+        "body": {
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-09",
+          "elementId": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2",
+          "travellerReport": "Hi - stuck in KL. My flight out of Sydney left about five hours late (weather holding) and I missed my connection to Singapore. The airline desk rebooked me on a flight tomorrow morning at 8:10, landing just after 9. I present at the hackathon finals tomorrow afternoon and I am supposed to be at the lab in the morning too. My suitcase went on the morning flight apparently. What do we do?",
+          "at": "2026-09-29T19:40:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
+      },
+      "assert": [
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "the missed-flight report opens a recovery case in the assessing state" },
+        { "path": "missedElementId", "op": "equals", "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "the engine resolves the reported missed KUL->SIN leg as the disruption subject" },
+        { "path": "signalId", "op": "contains", "expected": "sig-missed-flight-el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "the disruption signal is derived from the missed element, not hand-built" },
+        { "path": "severity", "op": "equals", "expected": "MEDIUM", "description": "the impact engine classifies the disruption severity deterministically" },
+        { "path": "directFailureIds", "op": "arrayNotEmpty", "description": "the impact assessment names direct failures" },
+        { "path": "directFailureIds.0", "op": "equals", "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "blast radius: the missed leg itself is the direct failure the downstream propagation starts from" }
+      ]
+    },
+    {
+      "id": "observe_case",
+      "description": "Observe opened recovery case: downstream impact propagated from the missed leg to every dependent engagement",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_after_missed_connection",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-09", "description": "the case belongs to the reporting traveller's trip" },
+        { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "the case reflects a traveller-originated state change awaiting recovery" },
+        { "path": "whatChanged", "op": "equals", "expected": "Traveller reported missing a scheduled flight", "description": "the case carries the deterministic what-changed narrative" },
+        { "path": "affectedItems.0", "op": "equals", "expected": "Transport leg (flight)", "description": "the affected item is the missed transport leg" },
+        { "path": "checks", "op": "arrayLengthMin", "expected": 3, "description": "the missed leg propagates to all three dependent commitments (hackathon lab, finals, awards)" },
+        { "path": "checks.0.id", "op": "contains", "expected": "arrival-before-el-trip-trv-evt-ait-2026-ait-draft-09-eng-1", "description": "the first downstream engagement constraint is evaluated" },
+        { "path": "checks.0.result", "op": "equals", "expected": "FAIL", "description": "with the KUL->SIN leg cancelled, arrival can no longer precede the first commitment" },
+        { "path": "checks.1.result", "op": "equals", "expected": "FAIL", "description": "the second dependent engagement fails the same arrival constraint" },
+        { "path": "checks.2.result", "op": "equals", "expected": "FAIL", "description": "the third dependent engagement fails the same arrival constraint" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "LIVE Model Studio planner gathers corridor evidence through the RECORD-mode Atlas adapter; deterministic viability judges every candidate against the programme arrival constraints. Assertions pin only engine truths, never model wording or live-offer specifics.",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-29T19:50:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 1, "description": "the planning loop completed at least one round against live providers" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "the planner produced at least one candidate recovery strategy" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+      ]
+    },
+    {
+      "id": "observe_trip",
+      "description": "The trip read model reflects the disruption and the engine's viability verdict for the remainder",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-09",
+        "label": "traveller_trip_after_missed_connection",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "the trip carries the traveller-originated disruption state" },
+        { "path": "whatChanged", "op": "equals", "expected": "Traveller reported missing a scheduled flight", "description": "the trip narrative matches the signal's what-changed copy" },
+        { "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE", "description": "downstream impact: with the KUL->SIN leg missed and no executed replacement, the remaining itinerary is deterministically not viable" }
+      ]
+    },
+    {
+      "id": "observe_trip_activity",
+      "description": "The authoritative mutation trail shows the traveller report applied before the signal pipeline assessed impact",
+      "action": {
+        "type": "observe",
+        "path": "/api/wave/trips/trip-trv-evt-ait-2026-ait-draft-09/activity",
+        "label": "trip_activity_after_missed_connection",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "events", "op": "arrayLengthMin", "expected": 4, "description": "the planning, mutation and signal-processing trail is recorded" },
+        { "path": "events.0.action", "op": "equals", "expected": "PLANNING_COMPLETED", "description": "the planning loop's outcome is recorded on the trip trail" },
+        { "path": "events.1.action", "op": "equals", "expected": "MUTATION_APPLIED", "description": "the missed-leg state change was applied to authoritative trip state" },
+        { "path": "events.1.actor", "op": "contains", "expected": "HUMAN:TRAVELLER:trv-evt-ait-2026-ait-draft-09", "description": "the mutation is attributed to the reporting traveller, not the system" },
+        { "path": "events.3.action", "op": "equals", "expected": "SIGNAL_PROCESSED", "description": "the disruption signal was processed through the generic signal pipeline" }
+      ]
+    }
+  ]
+}

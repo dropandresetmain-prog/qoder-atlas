@@ -297,7 +297,9 @@ export function buildPlannerPrompt(input: PlannerInput): PlannerPrompt {
       viability: snapshot.trip.viability,
       elements: snapshot.trip.elements.map((element) => ({
         id: element.id,
-        kind: element.elementKind,
+        // Named exactly as the domain schema field: model-authored
+        // UPSERT_ENTITY payloads must carry `elementKind`, not `kind`.
+        elementKind: element.elementKind,
         importance: element.importance,
         flexibility: element.flexibility,
         reservationState: element.reservationState,
@@ -330,6 +332,13 @@ export function buildPlannerPrompt(input: PlannerInput): PlannerPrompt {
       coordinates: place.coordinates,
       externalRefs: place.externalRefs,
       servedByPlaceIds: place.servedByPlaceIds,
+    })),
+    // Source metadata (no raw payloads): the ids the model may cite when
+    // authoring fact envelopes in candidate operations.
+    sources: snapshot.sourceRecords.map((source) => ({
+      id: source.id,
+      kind: source.kind,
+      authority: source.authority,
     })),
     triggeringSignals: input.triggeringSignals.map((signal) => ({
       id: signal.id,
@@ -389,6 +398,7 @@ Hard rules:
 - Keep uncertainties visible; never convert missing or stale evidence into certainty. When evidence is insufficient, record uncertainty instead of inventing detail.
 - Propose multiple materially different strategies when reasonable, each with assumptions, uncertainties, expected outcomes and rationale.
 - If you cannot yet author grounded candidateOperations because required evidence is missing (e.g. no replacement schedule known), emit the toolRequests that would obtain it and keep strategies empty or minimal — a strategy whose candidateOperations are empty is deterministically infeasible.
+- When changing only specific facts of an existing element (scheduled times, check-in/check-out, occupancy), PREFER one UPSERT_FACT operation per changed fact over a full UPSERT_ENTITY payload; use UPSERT_ENTITY mainly to create a brand-new element. The fact value keeps the provenance envelope, e.g. { "op": "UPSERT_FACT", "target": { "entityType": "TRIP_ELEMENT", "id": "<element id>" }, "factPath": "data.scheduledArrival", "value": { "value": "<ISO datetime>", "sourceId": "<a sourceId visible in the context>", "authority": "CONNECTED", "observedAt": "<ISO datetime>" }, "sourceId": "<a sourceId visible in the context>", "authority": "CONNECTED" }. Reuse only ids that appear in the provided context; never invent ids.
 
 Required output JSON shape (exact top-level keys; every key optional except none — empty arrays are valid):
 {
@@ -419,7 +429,7 @@ Required output JSON shape (exact top-level keys; every key optional except none
 }
 
 candidateOperations use exactly one of these shapes per item:
-- { "op": "UPSERT_ENTITY", "entityType": "TRIP_ELEMENT", "id": "<existing element id when updating, omit when creating>", "data": { <a COMPLETE trip element object: every field shown in the context projection of the element you are changing — id, tripId, elementKind, importance, flexibility, reservationState, status, dependsOn, governedByRuleSetIds, notes (optional), and the elementKind-specific data block. Copy the existing element exactly and change only the affected fields; do not omit fields and do not wrap the element in another object. For a TRANSPORT_LEG the data block is { mode, originPlaceId, destinationPlaceId, scheduledDeparture: { value, sourceId, authority, observedAt }?, scheduledArrival: { value, sourceId, authority, observedAt }?, bookingRef?: { system, reference }, durationEstimate?, carrierRef? }; fact values are ISO datetimes like "2026-09-30T08:10:00+08:00". For a STAY it is { placeId, checkIn: <fact>, checkOut: <fact>, bookingRef?, guests?, policyRuleSetIds }. For an ENGAGEMENT it is { title, placeId?, startsAt: <fact>, endsAt?: <fact>, anchorEventId?, anchorCommitmentId?, participantRole? }. }> }
+- { "op": "UPSERT_ENTITY", "entityType": "TRIP_ELEMENT", "id": "<existing element id when updating, omit when creating>", "data": { <a COMPLETE trip element object: every field shown in the context projection of the element you are changing — id, tripId (the exact trip id string from the context), elementKind, importance, flexibility, reservationState, status, dependsOn, governedByRuleSetIds, notes (optional), and the elementKind-specific data block. Copy the existing element exactly and change only the affected fields; do not omit fields and do not wrap the element in another object. For a TRANSPORT_LEG the data block is { mode, originPlaceId, destinationPlaceId, scheduledDeparture: { value, sourceId, authority, observedAt }?, scheduledArrival: { value, sourceId, authority, observedAt }?, bookingRef?: { system, reference }, durationEstimate?, carrierRef? }; mode is exactly one of FLIGHT, TRAIN, FERRY, PUBLIC_TRANSIT, TAXI_OR_RIDEHAIL, PRIVATE_TRANSFER, CAR_RENTAL, WALKING, OTHER (copy the existing element's mode); fact values are ISO datetimes like "2026-09-30T08:10:00+08:00". For a STAY it is { placeId, checkIn: <fact>, checkOut: <fact>, bookingRef?, guests?, policyRuleSetIds }. For an ENGAGEMENT it is { title, placeId?, startsAt: <fact>, endsAt?: <fact>, anchorEventId?, anchorCommitmentId?, participantRole? }. }> }
 - Other entityType values are exactly: ORGANISATION, TRAVELLER, ANCHOR_EVENT, TRIP, TRIP_ELEMENT, TRIP_OBJECTIVE, PLACE, RULE_SET, CONSTRAINT. No other entityType exists; a strategy with an invalid operation is discarded.
 - { "op": "UPSERT_FACT", "target": { "entityType": "...", "id": "..." }, "factPath": "data.checkIn", "value": <any>, "sourceId": "...", "authority": "AUTHORITATIVE|CONNECTED|ASSERTED|INFERRED" }
 - { "op": "ADD_RELATION", "tripId": "...", "relation": { ... } }

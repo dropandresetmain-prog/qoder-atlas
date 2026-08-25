@@ -300,6 +300,9 @@ export async function composeAppRuntime(
     apiKey: config.providers.modelStudio.apiKey,
     model: config.providers.modelStudio.model,
     baseUrl: config.providers.modelStudio.baseUrl,
+    // Multi-round LIVE planning (evidence gathering + strategy authoring)
+    // routinely exceeds the client's 30s default; bounded retry still applies.
+    timeoutMs: config.providers.modelStudio.timeoutMs ?? 90_000,
   });
   const useLivePlanner = config.adapterMode !== 'REPLAY' && modelClient.isConfigured();
   const basePlanner: RecoveryPlanner = useLivePlanner

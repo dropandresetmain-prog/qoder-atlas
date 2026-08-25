@@ -733,11 +733,13 @@ function harvestStageFields(
 function summarize(value: unknown): unknown {
   if (value === undefined) return undefined;
   const text = JSON.stringify(value);
-  if (text !== undefined && text.length > 4000) {
+  // Generous cap: LIVE/RECORD sweeps need the full plan/execution bodies
+  // (strategies, rejection evidence, tool activity) for honest diagnosis.
+  if (text !== undefined && text.length > 60_000) {
     return {
       truncated: true,
       sha256: createHash('sha256').update(text).digest('hex'),
-      preview: text.slice(0, 500),
+      preview: text.slice(0, 10_000),
     };
   }
   return value;

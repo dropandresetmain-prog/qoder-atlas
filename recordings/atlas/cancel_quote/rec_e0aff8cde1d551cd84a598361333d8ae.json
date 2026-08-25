@@ -1,0 +1,22 @@
+{
+  "id": "rec_e0aff8cde1d551cd84a598361333d8ae",
+  "providerId": "atlas",
+  "operation": "cancel_quote",
+  "recordedAt": "2026-08-25T21:51:05.678Z",
+  "sanitized": true,
+  "raw": {
+    "status": 801,
+    "msg": "Order not found for void. Check the original main ticket order number.",
+    "orderNo": null,
+    "isVoidable": false,
+    "voidOfferId": "q_bae3530ab8904e6188e4183063556065",
+    "voidMethod": null,
+    "fastConfirmation": null,
+    "expectedConfirmationDate": null,
+    "expectedRefundDate": null,
+    "voidTickets": null,
+    "voidFareAmount": null,
+    "serviceFee": null,
+    "voidWindow": null
+  }
+}

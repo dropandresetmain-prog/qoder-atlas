@@ -26,6 +26,7 @@ const ModelStudioConfigSchema = z.object({
   baseUrl: z.string().optional(),
   apiKey: z.string().optional(),
   model: z.string().optional(),
+  timeoutMs: z.coerce.number().int().positive().optional(),
 });
 
 const GoogleRoutesConfigSchema = z.object({
@@ -99,6 +100,7 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
         baseUrl: optional(env.MODEL_STUDIO_BASE_URL),
         apiKey: optional(env.MODEL_STUDIO_API_KEY),
         model: optional(env.MODEL_STUDIO_MODEL),
+        timeoutMs: optional(env.MODEL_STUDIO_TIMEOUT_MS),
       },
       googleRoutes: {
         apiKey: optional(env.GOOGLE_ROUTES_API_KEY),
@@ -152,8 +154,10 @@ export function hasLiveCredentials(
       return Boolean(a.baseUrl && a.clientId && a.clientSecret);
     }
     case 'modelStudio': {
+      // The model defaults to MODEL_STUDIO_DEFAULT_MODEL inside the client,
+      // so the API key alone makes LIVE reachable (mirrors the nuitee rule).
       const m = config.providers.modelStudio;
-      return Boolean(m.apiKey && m.model);
+      return Boolean(m.apiKey);
     }
     case 'googleRoutes':
       return Boolean(config.providers.googleRoutes.apiKey);
