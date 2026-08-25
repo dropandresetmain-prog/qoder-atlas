@@ -1223,6 +1223,10 @@
         "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
         "kind": "HOTEL",
         "timezone": "Asia/Singapore",
+        "coordinates": {
+          "latitude": 1.2789,
+          "longitude": 103.8536
+        },
         "externalRefs": [],
         "servedByPlaceIds": [
           "place-sin-changi"

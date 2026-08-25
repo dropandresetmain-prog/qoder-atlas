@@ -77,6 +77,17 @@ export async function buildTripSnapshot(
   }
 
   const placeIds = collectPlaceIds(trip, anchorEvent, travellers);
+  // Declared-target scope: a place the resolution target DECLARES joins the
+  // snapshot scope so the planner can resolve it against authoritative
+  // evidence instead of failing closed on an unseen place — by direct place
+  // id (a declared replacement stay property) as well as by external ref
+  // below (a substituted departure gateway the trip never touched yet).
+  if (resolutionTarget?.preferredStayPlaceId) {
+    const declaredStayEntry = await deps.entities.get('PLACE', resolutionTarget.preferredStayPlaceId);
+    if (declaredStayEntry && declaredStayEntry.entityType === 'PLACE') {
+      placeIds.add(declaredStayEntry.entity.id);
+    }
+  }
   // Declared-ref scope: an external ref named by the resolution target is
   // authoritative evidence the planner must be able to see (a declared
   // departure gateway that the trip never touched yet). Generic ref match

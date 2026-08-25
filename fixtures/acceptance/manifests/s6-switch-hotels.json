@@ -17,6 +17,11 @@
       "seam": "traveller.change_request",
       "mode": "REPLAY",
       "note": "Structured ChangeRequest through resolution HTTP"
+    },
+    {
+      "seam": "nuitee.hotel.search",
+      "mode": "REPLAY",
+      "note": "Planning evidence from a REPLAY hotel.search recording for the requested replacement property's location"
     }
   ],
   "requiredEnv": [],
@@ -76,7 +81,43 @@
         "capture": {
           "caseId": "caseId"
         }
-      }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the structured stay-change request is accepted" },
+        { "path": "intentKind", "op": "equals", "expected": "CHANGE_STAY", "description": "the request is classified as a stay change" },
+        { "path": "urgency", "op": "equals", "expected": "HARD_INSTRUCTION", "description": "the request carries binding instruction authority" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
+        { "path": "implications.0", "op": "contains", "expected": "place-hotel-harbourline", "description": "the declared replacement property becomes an authoritative stay preference" },
+        { "path": "implications.1", "op": "contains", "expected": "stay occupancy: 2 guest(s) requested", "description": "the partner's occupancy is recorded from the target, not defaulted" },
+        { "path": "implications.2", "op": "contains", "expected": "funding declaration TRAVELLER_FUNDED recorded; no temporal anchor derivable from target", "description": "funding stays honest: with no cost anchor the allocation is deferred to authority, never assumed" },
+        { "path": "uncertainties.0.statement", "op": "contains", "expected": "funding allocation UNKNOWN: no temporal anchor in target", "description": "the missing funding anchor is recorded as UNKNOWN, never converted into certainty" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Planning loop issues the occupancy-aware hotel.search (REPLAY evidence) and records stay-change status honestly",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-22T10:10:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planning loop runs an evidence round and a concluding round" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "hotel.search", "description": "the declared stay change drives a real hotel.search evidence request" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the REPLAY recording for the replacement property's location resolves" },
+        { "path": "toolActivity.0.summary", "op": "contains", "expected": "174 propert", "description": "the recorded Downtown Core market evidence flows through normalization (174 properties, 520 rates)" },
+        { "path": "strategies", "op": "arrayLengthMax", "expected": 0, "description": "no replacement strategy is fabricated: without a supported strategy path the planner proposes nothing" },
+        { "path": "uncertainties", "op": "arrayLengthMin", "expected": 3, "description": "every stay-change limitation is recorded as explicit uncertainty" },
+        { "path": "uncertainties.0", "op": "contains", "expected": "hotel replacement strategies are not proposed until hotel.search evidence exists", "description": "the evidence-gated strategy boundary is stated honestly" },
+        { "path": "uncertainties.1", "op": "contains", "expected": "stay property change requested", "description": "the declared property preference is recorded, not silently dropped" },
+        { "path": "uncertainties.2", "op": "contains", "expected": "stay occupancy requested (2 guest(s))", "description": "the partner occupancy is recorded, not defaulted away" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case remains open in PLANNING — stay-change execution is not silently performed" }
+      ]
     },
     {
       "id": "observe_case",
@@ -84,9 +125,14 @@
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
-        "label": "case_after_change_request",
+        "label": "case_after_plan",
         "expectStatus": 200
-      }
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-31", "description": "the case belongs to the requesting traveller's trip" },
+        { "path": "travellerNames.0", "op": "equals", "expected": "Hannah Weiss", "description": "the case read model resolves the traveller identity from seeded programme state" },
+        { "path": "checks.0.result", "op": "equals", "expected": "PASS", "description": "the deterministic arrival-before-commitment check still passes through the stay change" }
+      ]
     }
   ]
 }
