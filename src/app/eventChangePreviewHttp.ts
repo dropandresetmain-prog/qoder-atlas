@@ -12,6 +12,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
 import {
+  compareEventChangePreviews,
   previewEventChange,
   commitEventChange,
   type EventChangePreviewDeps,
@@ -28,6 +29,16 @@ const ChangeBodySchema = z.strictObject({
   newEndsAt: IsoDateTimeSchema.optional(),
   newPlaceId: EntityIdSchema.optional(),
   at: IsoDateTimeSchema,
+});
+
+const ComparisonBodySchema = z.strictObject({
+  options: z
+    .array(
+      ChangeBodySchema.extend({
+        optionId: z.string().min(1),
+      }),
+    )
+    .min(2),
 });
 
 function invalid(error: z.ZodError): WireResult {
@@ -56,6 +67,7 @@ export function createEventChangePreviewHandlers(
   deps: EventChangePreviewDeps & EventChangeCommitDeps,
 ): {
   preview(anchorEventId: string, body: unknown): Promise<WireResult>;
+  compare(anchorEventId: string, body: unknown): Promise<WireResult>;
   commit(anchorEventId: string, body: unknown): Promise<WireResult>;
 } {
   return {
@@ -72,6 +84,30 @@ export function createEventChangePreviewHandlers(
       }
 
       const result = await previewEventChange(deps, buildInput(anchorEventId, parsed.data));
+      return { status: 200, body: result };
+    },
+
+    async compare(anchorEventId, body) {
+      const parsed = ComparisonBodySchema.safeParse(body);
+      if (!parsed.success) return invalid(parsed.error);
+
+      const anchorEntry = await deps.entities.get('ANCHOR_EVENT', anchorEventId);
+      if (!anchorEntry || anchorEntry.entityType !== 'ANCHOR_EVENT') {
+        return { status: 404, body: { error: 'unknown_anchor_event', anchorEventId } };
+      }
+      for (const option of parsed.data.options) {
+        if (!anchorEntry.entity.commitments.some((commitment) => commitment.id === option.commitmentId)) {
+          return { status: 404, body: { error: 'unknown_commitment', commitmentId: option.commitmentId } };
+        }
+      }
+
+      const result = await compareEventChangePreviews(
+        deps,
+        parsed.data.options.map((option) => ({
+          optionId: option.optionId,
+          input: buildInput(anchorEventId, option),
+        })),
+      );
       return { status: 200, body: result };
     },
 

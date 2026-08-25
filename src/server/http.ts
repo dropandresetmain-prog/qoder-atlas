@@ -126,6 +126,7 @@ export interface TravellerHandlers {
  */
 export interface EventChangePreviewHandlers {
   preview(anchorEventId: string, body: unknown): Promise<{ status: number; body: unknown }>;
+  compare(anchorEventId: string, body: unknown): Promise<{ status: number; body: unknown }>;
   commit(anchorEventId: string, body: unknown): Promise<{ status: number; body: unknown }>;
 }
 
@@ -522,6 +523,11 @@ async function handle(
     // segments[2] here is the dynamic anchorEventId, not a fixed action.
     if (endpoints.eventChangePreview && segments[2] && segments[3] === 'change-preview') {
       const outcome = await endpoints.eventChangePreview.preview(segments[2], parsed);
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (endpoints.eventChangePreview && segments[2] && segments[3] === 'change-preview-compare') {
+      const outcome = await endpoints.eventChangePreview.compare(segments[2], parsed);
       sendJson(res, outcome.status, outcome.body);
       return;
     }

@@ -62,6 +62,20 @@ export interface EventChangePreviewResult {
   unaffected: UnaffectedTripPreview[];
 }
 
+/**
+ * A named, counterfactual programme-change option. The option name is
+ * presentation/orchestration metadata; all operational consequences are
+ * derived by the ordinary preview engine from its proposed change.
+ */
+export interface EventChangePreviewOption {
+  optionId: string;
+  input: EventChangePreviewInput;
+}
+
+export interface EventChangePreviewComparison {
+  options: Array<{ optionId: string; preview: EventChangePreviewResult }>;
+}
+
 export interface EventChangePreviewDeps {
   entities: EntityStore;
   trips: TripRepository;
@@ -160,6 +174,27 @@ export async function previewEventChange(
   }
 
   return { totalTravellers, affected, unaffected };
+}
+
+/**
+ * Compare several hypothetical programme changes without mutating
+ * authoritative state. This is deliberately a thin composition over the
+ * single-option preview: it does not rank options, invent a recovery plan, or
+ * create a second programme engine. Callers receive each option's ordinary
+ * blast radius and may choose one to submit to the existing commit boundary.
+ */
+export async function compareEventChangePreviews(
+  deps: EventChangePreviewDeps,
+  options: EventChangePreviewOption[],
+): Promise<EventChangePreviewComparison> {
+  return {
+    options: await Promise.all(
+      options.map(async (option) => ({
+        optionId: option.optionId,
+        preview: await previewEventChange(deps, option.input),
+      })),
+    ),
+  };
 }
 
 interface LinkedTripEvaluation {

@@ -180,3 +180,34 @@ test('DR-6-HTTP.4: the legacy /api/programme/commitment-change route still works
     assert.equal(res.body['accepted'], true);
   });
 });
+
+test('DR-6-HTTP.5: comparison previews alternatives without mutating programme state', async () => {
+  await withServer(async (base, composed) => {
+    const before = JSON.stringify(tripRows(composed));
+    const res = await postJson(base, `/api/programme/${ANCHOR_EVENT_ID}/change-preview-compare`, {
+      options: [
+        {
+          optionId: 'keep-programme-time',
+          commitmentId: COMMITMENT_ID,
+          changeKind: 'OTHER',
+          at: '2026-09-01T00:00:00+00:00',
+        },
+        {
+          optionId: 'move-programme-time',
+          commitmentId: COMMITMENT_ID,
+          changeKind: 'RESCHEDULED',
+          newStartsAt: '2026-09-08T17:00:00+08:00',
+          newEndsAt: '2026-09-08T19:00:00+08:00',
+          at: '2026-09-01T00:00:00+00:00',
+        },
+      ],
+    });
+
+    assert.equal(res.status, 200);
+    const options = res.body['options'] as Array<{ optionId: string; preview: { affected: unknown[]; unaffected: unknown[] } }>;
+    assert.deepEqual(options.map((option) => option.optionId), ['keep-programme-time', 'move-programme-time']);
+    assert.ok(options.every((option) => Array.isArray(option.preview.affected)));
+    assert.ok(options.every((option) => Array.isArray(option.preview.unaffected)));
+    assert.equal(JSON.stringify(tripRows(composed)), before, 'comparison is counterfactual only');
+  });
+});
