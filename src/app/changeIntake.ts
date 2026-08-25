@@ -126,6 +126,7 @@ Your JSON must match this schema EXACTLY (strict objects, no extra keys):
     "preferredStayProximityRef"?: { "entityType": "PLACE", "id": string } (optional);
     "preferredStayPlaceId"?: string ONLY when the traveller literally quotes a property identifier such as "place-hotel-..."; never derive it from a hotel name (optional);
     "guests"?: positive integer, the number of guests staying, ONLY when the traveller states an explicit count such as "there will be 2 of us staying"; never inferred from a companion mention without a number (optional);
+    "travelWithTravellerIds"?: array of strings, ONLY traveller identifiers the traveller literally quotes such as "trv-..."; never derived from names or roles (optional);
     "transport"?: {
       "preferDirect"?: boolean;
       "earliestDeparture"?: ISO-8601 timestamp with UTC offset;
@@ -150,6 +151,10 @@ Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target":
 Worked example — hotel switch with occupancy:
 Traveller text: "Can I switch hotels? My partner is joining, so there will be 2 of us staying. I'd like to move to place-hotel-harbourline. I will self-fund the extra cost."
 Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "preferredStayPlaceId": "place-hotel-harbourline", "guests": 2, "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
+
+Worked example — travel with quoted peers:
+Traveller text: "Can I travel with the other speakers on the same flight? My peers trv-evt-ait-2026-ait-draft-10 and trv-evt-ait-2026-ait-draft-11 are also speaking."
+Response: { "intentKind": "CHANGE_TRANSPORT_SCHEDULE", "urgency": "SOFT_PREFERENCE", "target": { "travelWithTravellerIds": ["trv-evt-ait-2026-ait-draft-10", "trv-evt-ait-2026-ait-draft-11"], "objectiveEffects": [] } }
 
 Never invent timestamps, entity ids, or other details the traveller did not state.`;
 
@@ -188,6 +193,7 @@ async function interpretViaModel(
           .optional(),
         preferredStayPlaceId: EntityIdSchema.optional(),
         guests: z.number().int().positive().optional(),
+        travelWithTravellerIds: z.array(EntityIdSchema).optional(),
         transport: z
           .strictObject({
             preferDirect: z.boolean().optional(),
@@ -517,6 +523,29 @@ function matchPatterns(text: string): DeterministicMatch | undefined {
         intentKind: 'CHANGE_STAY',
         urgency,
         target,
+        fundingDeclaration,
+      };
+    }
+  }
+
+  // Pattern 8: cross-traveller association ("travel with ...", "same
+  // flight") with literally quoted peer traveller ids. Mirrors the
+  // departureOrigin discipline: quoted ids are carried as stated; whether
+  // they resolve and whether the grouping is permitted is decided by
+  // deterministic TRANSPORT_CONCENTRATION policy downstream, never here.
+  if (/\b(travel|fly)\s+with\b/i.test(text) || /\bsame flight\b/i.test(text)) {
+    const peerIds = [...text.matchAll(/\b(trv-[a-z0-9-]+)\b/gi)]
+      .map((match) => EntityIdSchema.safeParse(match[1]!))
+      .filter((parsed) => parsed.success)
+      .map((parsed) => parsed.data);
+    if (peerIds.length > 0) {
+      return {
+        intentKind: 'CHANGE_TRANSPORT_SCHEDULE',
+        urgency,
+        target: {
+          travelWithTravellerIds: peerIds,
+          objectiveEffects: [],
+        },
         fundingDeclaration,
       };
     }
