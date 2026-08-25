@@ -1,0 +1,11 @@
+{
+  "id": "rec_79ad15c4d11a33a8af385736c69e6029",
+  "providerId": "atlas",
+  "operation": "flight_state_query",
+  "recordedAt": "2026-08-25T18:54:55.393Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null
+  }
+}

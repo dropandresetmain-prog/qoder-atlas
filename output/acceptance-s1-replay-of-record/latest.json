@@ -1,0 +1,1787 @@
+{
+  "schemaVersion": 1,
+  "runId": "run_530728874b484e63",
+  "scenarioId": "S1-RECORD",
+  "gitSha": "bce26059d28f32b52f1cb8b7b9bb1d154053137f",
+  "startedAt": "2026-08-25T18:55:09.059Z",
+  "finishedAt": "2026-08-25T18:55:10.412Z",
+  "durationMs": 1353,
+  "mode": "REPLAY",
+  "resetReseedChecksum": "cd3d2c730f7f661dbe2320c7690da005935346374b1810fc1b0fc3b13aeba9a4",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "hash": "2cc0a6e2eb2dad69efcc303b410aa99c4a013398e26b7596919709461033ed8e"
+  },
+  "localInputPack": {
+    "packId": "ait-s1",
+    "version": "1.0.0",
+    "hash": "451004eb7e1d929fee7617f8077932dea36cf8abb785340fac8aabccfcb17c31"
+  },
+  "inputProvenance": [
+    {
+      "mode": "SIMULATED_EXTERNAL_EVENT",
+      "simulatedExternal": true,
+      "source": "atlas.event_ingress"
+    },
+    {
+      "mode": "RECORD",
+      "simulatedExternal": false,
+      "source": "atlas.flight_state_query"
+    },
+    {
+      "mode": "RECORD",
+      "simulatedExternal": false,
+      "source": "atlas.flight_adapter"
+    }
+  ],
+  "canonicalIds": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-14",
+      "trv-evt-ait-2026-ait-draft-15",
+      "trv-evt-ait-2026-ait-draft-10",
+      "trv-evt-ait-2026-ait-draft-11",
+      "trv-evt-ait-2026-ait-draft-30",
+      "trv-evt-ait-2026-ait-draft-13"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-14",
+      "trip-trv-evt-ait-2026-ait-draft-15",
+      "trip-trv-evt-ait-2026-ait-draft-10",
+      "trip-trv-evt-ait-2026-ait-draft-11",
+      "trip-trv-evt-ait-2026-ait-draft-30",
+      "trip-trv-evt-ait-2026-ait-draft-13"
+    ],
+    "caseIds": [
+      "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+      "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+      "case-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+      "case-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+      "case-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+      "case-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6"
+    ]
+  },
+  "incomingTrigger": {
+    "kind": "SIMULATED_EXTERNAL_EVENT",
+    "path": "/api/events/atlas",
+    "body": {
+      "eventId": "sim-mn-evt-20260921-001-mnsyn14",
+      "orderNo": "MNSYN14",
+      "eventType": "SCHEDULE_CHANGE",
+      "eventStatus": 1,
+      "eventTime": "2026-09-21T09:40:00+08:00",
+      "createTime": "2026-09-21T09:40:00+08:00",
+      "airline": "MN",
+      "depTime": "2026-10-01T06:00:00+08:00",
+      "pnr": "MNSYN14"
+    }
+  },
+  "externalToolCalls": [
+    {
+      "stepId": "reset",
+      "operation": "http:POST:/api/runtime/reset",
+      "requestSummary": {
+        "at": "2026-09-21T09:00:00+08:00"
+      },
+      "responseRef": "step:reset:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "http:POST:/api/runtime/reset"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 842
+    },
+    {
+      "stepId": "notify_mn218_hero",
+      "operation": "simulated_external_event:/api/events/atlas",
+      "requestSummary": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn14",
+        "orderNo": "MNSYN14",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN14"
+      },
+      "responseRef": "step:notify_mn218_hero:response",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 58
+    },
+    {
+      "stepId": "notify_mn218_draft15",
+      "operation": "simulated_external_event:/api/events/atlas",
+      "requestSummary": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn15",
+        "orderNo": "MNSYN15",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN15"
+      },
+      "responseRef": "step:notify_mn218_draft15:response",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 59
+    },
+    {
+      "stepId": "notify_mn218_draft10",
+      "operation": "simulated_external_event:/api/events/atlas",
+      "requestSummary": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn10",
+        "orderNo": "MNSYN10",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN10"
+      },
+      "responseRef": "step:notify_mn218_draft10:response",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 52
+    },
+    {
+      "stepId": "notify_mn218_draft11",
+      "operation": "simulated_external_event:/api/events/atlas",
+      "requestSummary": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn11",
+        "orderNo": "MNSYN11",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN11"
+      },
+      "responseRef": "step:notify_mn218_draft11:response",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 102
+    },
+    {
+      "stepId": "notify_mn218_draft30",
+      "operation": "simulated_external_event:/api/events/atlas",
+      "requestSummary": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn30",
+        "orderNo": "MNSYN30",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN30"
+      },
+      "responseRef": "step:notify_mn218_draft30:response",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 62
+    },
+    {
+      "stepId": "notify_mn204_draft13",
+      "operation": "simulated_external_event:/api/events/atlas",
+      "requestSummary": {
+        "eventId": "sim-mn-evt-20260921-002",
+        "orderNo": "MNSYN13",
+        "eventType": "CANCELLATION",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:55:00+08:00",
+        "createTime": "2026-09-21T09:55:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-09-30T08:35:00+08:00",
+        "pnr": "MNSYN13"
+      },
+      "responseRef": "step:notify_mn204_draft13:response",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 80
+    },
+    {
+      "stepId": "observe_hero_trip",
+      "operation": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-14",
+      "responseRef": "step:observe_hero_trip:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-14"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 8
+    },
+    {
+      "stepId": "observe_draft15_trip",
+      "operation": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-15",
+      "responseRef": "step:observe_draft15_trip:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-15"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 6
+    },
+    {
+      "stepId": "observe_draft10_trip",
+      "operation": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-10",
+      "responseRef": "step:observe_draft10_trip:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-10"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 7
+    },
+    {
+      "stepId": "observe_draft11_trip",
+      "operation": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-11",
+      "responseRef": "step:observe_draft11_trip:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-11"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 4
+    },
+    {
+      "stepId": "observe_draft30_trip",
+      "operation": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-30",
+      "responseRef": "step:observe_draft30_trip:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-30"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 4
+    },
+    {
+      "stepId": "observe_draft13_trip",
+      "operation": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-13",
+      "responseRef": "step:observe_draft13_trip:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-13"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 4
+    },
+    {
+      "stepId": "observe_hero_case",
+      "operation": "observe:/api/cases/{{heroCaseId}}",
+      "responseRef": "step:observe_hero_case:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/cases/{{heroCaseId}}"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 6
+    },
+    {
+      "stepId": "observe_draft15_case",
+      "operation": "observe:/api/cases/{{draft15CaseId}}",
+      "responseRef": "step:observe_draft15_case:response",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/cases/{{draft15CaseId}}"
+      },
+      "ok": true,
+      "status": 200,
+      "latencyMs": 5
+    }
+  ],
+  "sanitizedProviderResponseRefs": [
+    "step:reset:response",
+    "step:notify_mn218_hero:response",
+    "step:notify_mn218_draft15:response",
+    "step:notify_mn218_draft10:response",
+    "step:notify_mn218_draft11:response",
+    "step:notify_mn218_draft30:response",
+    "step:notify_mn204_draft13:response",
+    "step:observe_hero_trip:response",
+    "step:observe_draft15_trip:response",
+    "step:observe_draft10_trip:response",
+    "step:observe_draft11_trip:response",
+    "step:observe_draft30_trip:response",
+    "step:observe_draft13_trip:response",
+    "step:observe_hero_case:response",
+    "step:observe_draft15_case:response"
+  ],
+  "stateTransitions": [
+    {
+      "stepId": "reset",
+      "at": "2026-08-25T18:55:09.942Z",
+      "summary": "http completed",
+      "detail": {
+        "reset": true,
+        "seededScenarios": [
+          "scenario-anchor-event-speaker",
+          "scenario-corporate-tmc"
+        ],
+        "tripIds": [
+          "trip_a",
+          "trip_b",
+          "trip-trv-evt-ait-2026-ait-draft-01",
+          "trip-trv-evt-ait-2026-ait-draft-02",
+          "trip-trv-evt-ait-2026-ait-draft-03",
+          "trip-trv-evt-ait-2026-ait-draft-04",
+          "trip-trv-evt-ait-2026-ait-draft-05",
+          "trip-trv-evt-ait-2026-ait-draft-06",
+          "trip-trv-evt-ait-2026-ait-draft-07",
+          "trip-trv-evt-ait-2026-ait-draft-08",
+          "trip-trv-evt-ait-2026-ait-draft-09",
+          "trip-trv-evt-ait-2026-ait-draft-10",
+          "trip-trv-evt-ait-2026-ait-draft-11",
+          "trip-trv-evt-ait-2026-ait-draft-12",
+          "trip-trv-evt-ait-2026-ait-draft-13",
+          "trip-trv-evt-ait-2026-ait-draft-14",
+          "trip-trv-evt-ait-2026-ait-draft-15",
+          "trip-trv-evt-ait-2026-ait-draft-16",
+          "trip-trv-evt-ait-2026-ait-draft-17",
+          "trip-trv-evt-ait-2026-ait-draft-18",
+          "trip-trv-evt-ait-2026-ait-draft-19",
+          "trip-trv-evt-ait-2026-ait-draft-20",
+          "trip-trv-evt-ait-2026-ait-draft-21",
+          "trip-trv-evt-ait-2026-ait-draft-22",
+          "trip-trv-evt-ait-2026-ait-draft-23",
+          "trip-trv-evt-ait-2026-ait-draft-24",
+          "trip-trv-evt-ait-2026-ait-draft-25",
+          "trip-trv-evt-ait-2026-ait-draft-26",
+          "trip-trv-evt-ait-2026-ait-draft-27",
+          "trip-trv-evt-ait-2026-ait-draft-28",
+          "trip-trv-evt-ait-2026-ait-draft-29",
+          "trip-trv-evt-ait-2026-ait-draft-30",
+          "trip-trv-evt-ait-2026-ait-draft-31",
+          "trip-trv-evt-ait-2026-ait-draft-32",
+          "trip-trv-evt-ait-2026-ait-draft-33",
+          "trip-trv-evt-ait-2026-ait-draft-34",
+          "trip-trv-evt-ait-2026-ait-draft-35",
+          "trip-trv-evt-ait-2026-ait-draft-36",
+          "trip-trv-evt-ait-2026-ait-draft-37",
+          "trip-trv-evt-ait-2026-ait-draft-38",
+          "trip-trv-evt-ait-2026-ait-draft-39",
+          "trip-trv-evt-ait-2026-ait-draft-40",
+          "trip-trv-evt-ait-2026-ait-draft-41",
+          "trip-trv-evt-ait-2026-ait-draft-42",
+          "trip-trv-evt-ait-2026-ait-draft-43",
+          "trip-trv-evt-ait-2026-ait-draft-44",
+          "trip-trv-evt-ait-2026-ait-draft-45",
+          "trip-trv-evt-ait-2026-ait-draft-46",
+          "trip-trv-evt-ait-2026-ait-draft-47",
+          "trip-trv-evt-ait-2026-ait-draft-48",
+          "trip-trv-evt-ait-2026-ait-draft-49",
+          "trip-trv-evt-ait-2026-ait-draft-50",
+          "trip-trv-evt-ait-2026-ait-draft-51",
+          "trip-trv-evt-ait-2026-ait-draft-52",
+          "trip-trv-evt-ait-2026-ait-draft-53",
+          "trip-trv-evt-ait-2026-ait-draft-54",
+          "trip-trv-evt-ait-2026-ait-draft-55",
+          "trip-trv-evt-ait-2026-ait-draft-56",
+          "trip-trv-evt-ait-2026-ait-draft-57",
+          "trip-trv-evt-ait-2026-ait-draft-58",
+          "trip-trv-evt-ait-2026-ait-draft-59",
+          "trip-trv-evt-ait-2026-ait-draft-60",
+          "trip-trv-evt-ait-2026-ait-draft-61",
+          "trip-trv-evt-ait-2026-ait-draft-62",
+          "trip-trv-evt-ait-2026-ait-draft-63",
+          "trip-trv-evt-ait-2026-ait-draft-64",
+          "trip-trv-evt-ait-2026-ait-draft-65",
+          "trip-trv-evt-ait-2026-ait-draft-66",
+          "trip-trv-evt-ait-2026-ait-draft-67"
+        ],
+        "seededProgrammes": [
+          {
+            "anchorEventId": "evt-ait-2026",
+            "promotedCount": 67
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_hero",
+      "at": "2026-08-25T18:55:10.002Z",
+      "summary": "simulated_external_event completed",
+      "detail": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn14",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-160cdbfd59ebf6b5",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-160cdbfd59ebf6b5",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+              "mutationProposalId": "prop-signal-sig-provider-impact-160cdbfd59ebf6b5",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+                "triggeredBySignalId": "sig-provider-impact-160cdbfd59ebf6b5",
+                "assessedAt": "2026-08-25T18:55:09.946Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-14"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-14-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-14-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1555min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft15",
+      "at": "2026-08-25T18:55:10.062Z",
+      "summary": "simulated_external_event completed",
+      "detail": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn15",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-6511b2ccd80445f4",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-6511b2ccd80445f4",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+              "mutationProposalId": "prop-signal-sig-provider-impact-6511b2ccd80445f4",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+                "triggeredBySignalId": "sig-provider-impact-6511b2ccd80445f4",
+                "assessedAt": "2026-08-25T18:55:10.003Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-15"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [
+                  "hard constraint c-trip-trv-evt-ait-2026-ait-draft-15-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-15-eng-1 fails"
+                ],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-15-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-15-eng-1",
+                  "status": "FAIL",
+                  "evidence": "gap 185min < required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft10",
+      "at": "2026-08-25T18:55:10.114Z",
+      "summary": "simulated_external_event completed",
+      "detail": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn10",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-20631a4e58a35e11",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-20631a4e58a35e11",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+              "mutationProposalId": "prop-signal-sig-provider-impact-20631a4e58a35e11",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+                "triggeredBySignalId": "sig-provider-impact-20631a4e58a35e11",
+                "assessedAt": "2026-08-25T18:55:10.063Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-10"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-10-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-10-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1825min >= required 360min"
+                },
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-10-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-10-eng-2",
+                  "status": "PASS",
+                  "evidence": "gap 1835min >= required 360min"
+                },
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-10-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-10-eng-3",
+                  "status": "PASS",
+                  "evidence": "gap 3275min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft11",
+      "at": "2026-08-25T18:55:10.217Z",
+      "summary": "simulated_external_event completed",
+      "detail": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn11",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-98c5160e1d1089d4",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-98c5160e1d1089d4",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+              "mutationProposalId": "prop-signal-sig-provider-impact-98c5160e1d1089d4",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+                "triggeredBySignalId": "sig-provider-impact-98c5160e1d1089d4",
+                "assessedAt": "2026-08-25T18:55:10.118Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-11"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-11-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-11-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1835min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft30",
+      "at": "2026-08-25T18:55:10.279Z",
+      "summary": "simulated_external_event completed",
+      "detail": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn30",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-9d76bc1ee5d53bb3",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-9d76bc1ee5d53bb3",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+              "mutationProposalId": "prop-signal-sig-provider-impact-9d76bc1ee5d53bb3",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+                "triggeredBySignalId": "sig-provider-impact-9d76bc1ee5d53bb3",
+                "assessedAt": "2026-08-25T18:55:10.218Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-30"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-30-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-30-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1835min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn204_draft13",
+      "at": "2026-08-25T18:55:10.359Z",
+      "summary": "simulated_external_event completed",
+      "detail": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-002",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-46c9c576a28bffe6",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-46c9c576a28bffe6",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+                "triggeredBySignalId": "sig-provider-impact-46c9c576a28bffe6",
+                "assessedAt": "2026-08-25T18:55:10.281Z",
+                "severity": "MEDIUM",
+                "directFailures": [],
+                "affectedElements": [
+                  {
+                    "elementId": "el-trip-trv-evt-ait-2026-ait-draft-13-leg-1",
+                    "resultingStatus": "AT_RISK",
+                    "reason": "signal sig-provider-impact-46c9c576a28bffe6 reports cancellation but evidence is ASSERTED"
+                  }
+                ],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-13"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": [
+                  "cancellation of el-trip-trv-evt-ait-2026-ait-draft-13-leg-1 not confirmed (ASSERTED)"
+                ]
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-13-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-13-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 3035min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "observe_hero_trip",
+      "at": "2026-08-25T18:55:10.368Z",
+      "summary": "observe completed",
+      "detail": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:09.946Z"
+      }
+    },
+    {
+      "stepId": "observe_draft15_trip",
+      "at": "2026-08-25T18:55:10.374Z",
+      "summary": "observe completed",
+      "detail": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "NOT_VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.003Z"
+      }
+    },
+    {
+      "stepId": "observe_draft10_trip",
+      "at": "2026-08-25T18:55:10.381Z",
+      "summary": "observe completed",
+      "detail": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.063Z"
+      }
+    },
+    {
+      "stepId": "observe_draft11_trip",
+      "at": "2026-08-25T18:55:10.385Z",
+      "summary": "observe completed",
+      "detail": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.118Z"
+      }
+    },
+    {
+      "stepId": "observe_draft30_trip",
+      "at": "2026-08-25T18:55:10.389Z",
+      "summary": "observe completed",
+      "detail": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.218Z"
+      }
+    },
+    {
+      "stepId": "observe_draft13_trip",
+      "at": "2026-08-25T18:55:10.393Z",
+      "summary": "observe completed",
+      "detail": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight cancellation",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "AT_RISK",
+        "updatedAt": "2026-08-25T18:55:10.281Z"
+      }
+    },
+    {
+      "stepId": "observe_hero_case",
+      "at": "2026-08-25T18:55:10.400Z",
+      "summary": "observe completed",
+      "detail": {
+        "caseId": "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+        "tripLabel": "Sarah Lim",
+        "travellerNames": [
+          "Sarah Lim"
+        ],
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "affectedItems": [],
+        "checks": [
+          {
+            "id": "c-trip-trv-evt-ait-2026-ait-draft-14-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-14-eng-1",
+            "label": "arrival evidence must precede the linked commitment start",
+            "result": "PASS"
+          }
+        ],
+        "options": [],
+        "actions": [],
+        "uncertainties": [],
+        "updatedAt": "2026-08-25T18:55:09.946Z"
+      }
+    },
+    {
+      "stepId": "observe_draft15_case",
+      "at": "2026-08-25T18:55:10.405Z",
+      "summary": "observe completed",
+      "detail": {
+        "caseId": "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+        "tripLabel": "Mei Chen",
+        "travellerNames": [
+          "Mei Chen"
+        ],
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "affectedItems": [],
+        "checks": [
+          {
+            "id": "c-trip-trv-evt-ait-2026-ait-draft-15-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-15-eng-1",
+            "label": "arrival evidence must precede the linked commitment start",
+            "result": "FAIL"
+          }
+        ],
+        "options": [],
+        "actions": [],
+        "uncertainties": [],
+        "updatedAt": "2026-08-25T18:55:10.003Z"
+      }
+    }
+  ],
+  "finalTripViability": {
+    "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+    "status": "DISRUPTED",
+    "whatChanged": "A supplier reported a flight cancellation",
+    "actionsInProgress": [],
+    "inputRequested": [],
+    "remainderViable": "AT_RISK",
+    "updatedAt": "2026-08-25T18:55:10.281Z"
+  },
+  "unresolvedUncertainty": [],
+  "simulatedSeams": [
+    "atlas.event_ingress:SIMULATED_EXTERNAL_EVENT",
+    "simulated_external_event:/api/events/atlas:SIMULATED_EXTERNAL_EVENT"
+  ],
+  "steps": [
+    {
+      "stepId": "reset",
+      "description": "Deterministic reset/reseed",
+      "startedAt": "2026-08-25T18:55:09.100Z",
+      "finishedAt": "2026-08-25T18:55:09.942Z",
+      "ok": true,
+      "actionType": "http",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "http:POST:/api/runtime/reset"
+      },
+      "request": {
+        "at": "2026-09-21T09:00:00+08:00"
+      },
+      "response": {
+        "reset": true,
+        "seededScenarios": [
+          "scenario-anchor-event-speaker",
+          "scenario-corporate-tmc"
+        ],
+        "tripIds": [
+          "trip_a",
+          "trip_b",
+          "trip-trv-evt-ait-2026-ait-draft-01",
+          "trip-trv-evt-ait-2026-ait-draft-02",
+          "trip-trv-evt-ait-2026-ait-draft-03",
+          "trip-trv-evt-ait-2026-ait-draft-04",
+          "trip-trv-evt-ait-2026-ait-draft-05",
+          "trip-trv-evt-ait-2026-ait-draft-06",
+          "trip-trv-evt-ait-2026-ait-draft-07",
+          "trip-trv-evt-ait-2026-ait-draft-08",
+          "trip-trv-evt-ait-2026-ait-draft-09",
+          "trip-trv-evt-ait-2026-ait-draft-10",
+          "trip-trv-evt-ait-2026-ait-draft-11",
+          "trip-trv-evt-ait-2026-ait-draft-12",
+          "trip-trv-evt-ait-2026-ait-draft-13",
+          "trip-trv-evt-ait-2026-ait-draft-14",
+          "trip-trv-evt-ait-2026-ait-draft-15",
+          "trip-trv-evt-ait-2026-ait-draft-16",
+          "trip-trv-evt-ait-2026-ait-draft-17",
+          "trip-trv-evt-ait-2026-ait-draft-18",
+          "trip-trv-evt-ait-2026-ait-draft-19",
+          "trip-trv-evt-ait-2026-ait-draft-20",
+          "trip-trv-evt-ait-2026-ait-draft-21",
+          "trip-trv-evt-ait-2026-ait-draft-22",
+          "trip-trv-evt-ait-2026-ait-draft-23",
+          "trip-trv-evt-ait-2026-ait-draft-24",
+          "trip-trv-evt-ait-2026-ait-draft-25",
+          "trip-trv-evt-ait-2026-ait-draft-26",
+          "trip-trv-evt-ait-2026-ait-draft-27",
+          "trip-trv-evt-ait-2026-ait-draft-28",
+          "trip-trv-evt-ait-2026-ait-draft-29",
+          "trip-trv-evt-ait-2026-ait-draft-30",
+          "trip-trv-evt-ait-2026-ait-draft-31",
+          "trip-trv-evt-ait-2026-ait-draft-32",
+          "trip-trv-evt-ait-2026-ait-draft-33",
+          "trip-trv-evt-ait-2026-ait-draft-34",
+          "trip-trv-evt-ait-2026-ait-draft-35",
+          "trip-trv-evt-ait-2026-ait-draft-36",
+          "trip-trv-evt-ait-2026-ait-draft-37",
+          "trip-trv-evt-ait-2026-ait-draft-38",
+          "trip-trv-evt-ait-2026-ait-draft-39",
+          "trip-trv-evt-ait-2026-ait-draft-40",
+          "trip-trv-evt-ait-2026-ait-draft-41",
+          "trip-trv-evt-ait-2026-ait-draft-42",
+          "trip-trv-evt-ait-2026-ait-draft-43",
+          "trip-trv-evt-ait-2026-ait-draft-44",
+          "trip-trv-evt-ait-2026-ait-draft-45",
+          "trip-trv-evt-ait-2026-ait-draft-46",
+          "trip-trv-evt-ait-2026-ait-draft-47",
+          "trip-trv-evt-ait-2026-ait-draft-48",
+          "trip-trv-evt-ait-2026-ait-draft-49",
+          "trip-trv-evt-ait-2026-ait-draft-50",
+          "trip-trv-evt-ait-2026-ait-draft-51",
+          "trip-trv-evt-ait-2026-ait-draft-52",
+          "trip-trv-evt-ait-2026-ait-draft-53",
+          "trip-trv-evt-ait-2026-ait-draft-54",
+          "trip-trv-evt-ait-2026-ait-draft-55",
+          "trip-trv-evt-ait-2026-ait-draft-56",
+          "trip-trv-evt-ait-2026-ait-draft-57",
+          "trip-trv-evt-ait-2026-ait-draft-58",
+          "trip-trv-evt-ait-2026-ait-draft-59",
+          "trip-trv-evt-ait-2026-ait-draft-60",
+          "trip-trv-evt-ait-2026-ait-draft-61",
+          "trip-trv-evt-ait-2026-ait-draft-62",
+          "trip-trv-evt-ait-2026-ait-draft-63",
+          "trip-trv-evt-ait-2026-ait-draft-64",
+          "trip-trv-evt-ait-2026-ait-draft-65",
+          "trip-trv-evt-ait-2026-ait-draft-66",
+          "trip-trv-evt-ait-2026-ait-draft-67"
+        ],
+        "seededProgrammes": [
+          {
+            "anchorEventId": "evt-ait-2026",
+            "promotedCount": 67
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_hero",
+      "description": "Simulated MN218 schedule-change notification for hero booking MNSYN14; reconciliation read returns the retimed 1 Oct schedule as CONNECTED state",
+      "startedAt": "2026-08-25T18:55:09.943Z",
+      "finishedAt": "2026-08-25T18:55:10.002Z",
+      "ok": true,
+      "actionType": "simulated_external_event",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "request": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn14",
+        "orderNo": "MNSYN14",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN14"
+      },
+      "response": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn14",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-160cdbfd59ebf6b5",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-160cdbfd59ebf6b5",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+              "mutationProposalId": "prop-signal-sig-provider-impact-160cdbfd59ebf6b5",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+                "triggeredBySignalId": "sig-provider-impact-160cdbfd59ebf6b5",
+                "assessedAt": "2026-08-25T18:55:09.946Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-14"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-14-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-14-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1555min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft15",
+      "description": "Same retimed MN218 notification for booking MNSYN15 (Day 0 coach commitment breaks outright)",
+      "startedAt": "2026-08-25T18:55:10.002Z",
+      "finishedAt": "2026-08-25T18:55:10.062Z",
+      "ok": true,
+      "actionType": "simulated_external_event",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "request": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn15",
+        "orderNo": "MNSYN15",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN15"
+      },
+      "response": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn15",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-6511b2ccd80445f4",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-6511b2ccd80445f4",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+              "mutationProposalId": "prop-signal-sig-provider-impact-6511b2ccd80445f4",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+                "triggeredBySignalId": "sig-provider-impact-6511b2ccd80445f4",
+                "assessedAt": "2026-08-25T18:55:10.003Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-15"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [
+                  "hard constraint c-trip-trv-evt-ait-2026-ait-draft-15-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-15-eng-1 fails"
+                ],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-15-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-15-eng-1",
+                  "status": "FAIL",
+                  "evidence": "gap 185min < required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft10",
+      "description": "Retimed MN218 notification for booking MNSYN10 (tight but viable before Day 1 keynote)",
+      "startedAt": "2026-08-25T18:55:10.062Z",
+      "finishedAt": "2026-08-25T18:55:10.114Z",
+      "ok": true,
+      "actionType": "simulated_external_event",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "request": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn10",
+        "orderNo": "MNSYN10",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN10"
+      },
+      "response": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn10",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-20631a4e58a35e11",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-20631a4e58a35e11",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+              "mutationProposalId": "prop-signal-sig-provider-impact-20631a4e58a35e11",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+                "triggeredBySignalId": "sig-provider-impact-20631a4e58a35e11",
+                "assessedAt": "2026-08-25T18:55:10.063Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-10"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-10-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-10-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1825min >= required 360min"
+                },
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-10-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-10-eng-2",
+                  "status": "PASS",
+                  "evidence": "gap 1835min >= required 360min"
+                },
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-10-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-10-eng-3",
+                  "status": "PASS",
+                  "evidence": "gap 3275min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-10-sig-provider-impact-20631a4e58a35e11",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft11",
+      "description": "Retimed MN218 notification for booking MNSYN11 (viable before Day 1 panel)",
+      "startedAt": "2026-08-25T18:55:10.115Z",
+      "finishedAt": "2026-08-25T18:55:10.217Z",
+      "ok": true,
+      "actionType": "simulated_external_event",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "request": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn11",
+        "orderNo": "MNSYN11",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN11"
+      },
+      "response": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn11",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-98c5160e1d1089d4",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-98c5160e1d1089d4",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+              "mutationProposalId": "prop-signal-sig-provider-impact-98c5160e1d1089d4",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+                "triggeredBySignalId": "sig-provider-impact-98c5160e1d1089d4",
+                "assessedAt": "2026-08-25T18:55:10.118Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-11"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-11-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-11-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1835min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-11-sig-provider-impact-98c5160e1d1089d4",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn218_draft30",
+      "description": "Retimed MN218 notification for booking MNSYN30 (viable before Day 1 panel)",
+      "startedAt": "2026-08-25T18:55:10.217Z",
+      "finishedAt": "2026-08-25T18:55:10.279Z",
+      "ok": true,
+      "actionType": "simulated_external_event",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "request": {
+        "eventId": "sim-mn-evt-20260921-001-mnsyn30",
+        "orderNo": "MNSYN30",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "pnr": "MNSYN30"
+      },
+      "response": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-001-mnsyn30",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-9d76bc1ee5d53bb3",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-9d76bc1ee5d53bb3",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+              "mutationProposalId": "prop-signal-sig-provider-impact-9d76bc1ee5d53bb3",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [
+                {
+                  "code": "FACT_OUTRANKED",
+                  "message": "incoming fact for data.scheduledDeparture is outranked by existing evidence (authority CONNECTED observed 2026-08-24T10:00:00+08:00)"
+                }
+              ],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+                "triggeredBySignalId": "sig-provider-impact-9d76bc1ee5d53bb3",
+                "assessedAt": "2026-08-25T18:55:10.218Z",
+                "severity": "LOW",
+                "directFailures": [],
+                "affectedElements": [],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-30"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": []
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-30-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-30-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 1835min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-30-sig-provider-impact-9d76bc1ee5d53bb3",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "notify_mn204_draft13",
+      "description": "Simulated MN204 cancellation notification for booking MNSYN13; reconciliation read confirms the cancellation as CONNECTED state",
+      "startedAt": "2026-08-25T18:55:10.279Z",
+      "finishedAt": "2026-08-25T18:55:10.359Z",
+      "ok": true,
+      "actionType": "simulated_external_event",
+      "provenance": {
+        "mode": "SIMULATED_EXTERNAL_EVENT",
+        "simulatedExternal": true,
+        "source": "simulated_external_event:/api/events/atlas"
+      },
+      "request": {
+        "eventId": "sim-mn-evt-20260921-002",
+        "orderNo": "MNSYN13",
+        "eventType": "CANCELLATION",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:55:00+08:00",
+        "createTime": "2026-09-21T09:55:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-09-30T08:35:00+08:00",
+        "pnr": "MNSYN13"
+      },
+      "response": {
+        "status": "ACCEPTED",
+        "providerId": "atlas",
+        "providerEventId": "sim-mn-evt-20260921-002",
+        "results": [
+          {
+            "signalId": "sig-provider-impact-46c9c576a28bffe6",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+            "caseId": "case-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6",
+            "caseStatus": "ASSESSING",
+            "processed": {
+              "signalId": "sig-provider-impact-46c9c576a28bffe6",
+              "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+              "mutationAccepted": false,
+              "appliedOperationCount": 0,
+              "mutationIssues": [],
+              "tripVersion": 2,
+              "assessment": {
+                "id": "impact-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6",
+                "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+                "triggeredBySignalId": "sig-provider-impact-46c9c576a28bffe6",
+                "assessedAt": "2026-08-25T18:55:10.281Z",
+                "severity": "MEDIUM",
+                "directFailures": [],
+                "affectedElements": [
+                  {
+                    "elementId": "el-trip-trv-evt-ait-2026-ait-draft-13-leg-1",
+                    "resultingStatus": "AT_RISK",
+                    "reason": "signal sig-provider-impact-46c9c576a28bffe6 reports cancellation but evidence is ASSERTED"
+                  }
+                ],
+                "threatenedObjectives": [],
+                "irreversibleLosses": [],
+                "affectedTravellerIds": [
+                  "trv-evt-ait-2026-ait-draft-13"
+                ],
+                "sharedResourceImpacts": [],
+                "policyImplications": [],
+                "insuranceImplications": [
+                  "rule set rs_a_insurance declares insurance coverage (rule_a_cover_delay)"
+                ],
+                "unresolvedUnknowns": [
+                  "cancellation of el-trip-trv-evt-ait-2026-ait-draft-13-leg-1 not confirmed (ASSERTED)"
+                ]
+              },
+              "constraintEvaluations": [
+                {
+                  "constraintId": "c-trip-trv-evt-ait-2026-ait-draft-13-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-13-eng-1",
+                  "status": "PASS",
+                  "evidence": "gap 3035min >= required 360min"
+                }
+              ],
+              "caseId": "case-trip-trv-evt-ait-2026-ait-draft-13-sig-provider-impact-46c9c576a28bffe6",
+              "caseStatus": "ASSESSING"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stepId": "observe_hero_trip",
+      "description": "Hero traveller view: retimed arrival is at-risk/non-viable against her programme-critical commitments",
+      "startedAt": "2026-08-25T18:55:10.359Z",
+      "finishedAt": "2026-08-25T18:55:10.368Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-14"
+      },
+      "response": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:09.946Z"
+      }
+    },
+    {
+      "stepId": "observe_draft15_trip",
+      "description": "Day 0 coach traveller view: commitment broken by the retimed arrival",
+      "startedAt": "2026-08-25T18:55:10.368Z",
+      "finishedAt": "2026-08-25T18:55:10.374Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-15"
+      },
+      "response": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "NOT_VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.003Z"
+      }
+    },
+    {
+      "stepId": "observe_draft10_trip",
+      "description": "Wanderpay keynote traveller view: tight but viable remainder",
+      "startedAt": "2026-08-25T18:55:10.374Z",
+      "finishedAt": "2026-08-25T18:55:10.381Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-10"
+      },
+      "response": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-10",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.063Z"
+      }
+    },
+    {
+      "stepId": "observe_draft11_trip",
+      "description": "Day 1 panel traveller view: viable remainder despite the shared retimed flight",
+      "startedAt": "2026-08-25T18:55:10.381Z",
+      "finishedAt": "2026-08-25T18:55:10.385Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-11"
+      },
+      "response": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-11",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.118Z"
+      }
+    },
+    {
+      "stepId": "observe_draft30_trip",
+      "description": "Third shared-flight traveller view: viable remainder",
+      "startedAt": "2026-08-25T18:55:10.385Z",
+      "finishedAt": "2026-08-25T18:55:10.389Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-30"
+      },
+      "response": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-30",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "VIABLE",
+        "updatedAt": "2026-08-25T18:55:10.218Z"
+      }
+    },
+    {
+      "stepId": "observe_draft13_trip",
+      "description": "Cancelled-flight traveller view: remainder not viable until provider re-proposes",
+      "startedAt": "2026-08-25T18:55:10.390Z",
+      "finishedAt": "2026-08-25T18:55:10.393Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/traveller/trip-trv-evt-ait-2026-ait-draft-13"
+      },
+      "response": {
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-13",
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight cancellation",
+        "actionsInProgress": [],
+        "inputRequested": [],
+        "remainderViable": "AT_RISK",
+        "updatedAt": "2026-08-25T18:55:10.281Z"
+      }
+    },
+    {
+      "stepId": "observe_hero_case",
+      "description": "Hero recovery case: affected element surfaced, objective at risk, not auto-resolved by the airline rebooking",
+      "startedAt": "2026-08-25T18:55:10.393Z",
+      "finishedAt": "2026-08-25T18:55:10.400Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/cases/{{heroCaseId}}"
+      },
+      "response": {
+        "caseId": "case-trip-trv-evt-ait-2026-ait-draft-14-sig-provider-impact-160cdbfd59ebf6b5",
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-14",
+        "tripLabel": "Sarah Lim",
+        "travellerNames": [
+          "Sarah Lim"
+        ],
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "affectedItems": [],
+        "checks": [
+          {
+            "id": "c-trip-trv-evt-ait-2026-ait-draft-14-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-14-eng-1",
+            "label": "arrival evidence must precede the linked commitment start",
+            "result": "PASS"
+          }
+        ],
+        "options": [],
+        "actions": [],
+        "uncertainties": [],
+        "updatedAt": "2026-08-25T18:55:09.946Z"
+      }
+    },
+    {
+      "stepId": "observe_draft15_case",
+      "description": "Day 0 coach recovery case: unresolved; no earlier alternative exists, uncertainty/decision preserved",
+      "startedAt": "2026-08-25T18:55:10.400Z",
+      "finishedAt": "2026-08-25T18:55:10.405Z",
+      "ok": true,
+      "actionType": "observe",
+      "provenance": {
+        "mode": "REPLAY",
+        "simulatedExternal": false,
+        "source": "observe:/api/cases/{{draft15CaseId}}"
+      },
+      "response": {
+        "caseId": "case-trip-trv-evt-ait-2026-ait-draft-15-sig-provider-impact-6511b2ccd80445f4",
+        "tripId": "trip-trv-evt-ait-2026-ait-draft-15",
+        "tripLabel": "Mei Chen",
+        "travellerNames": [
+          "Mei Chen"
+        ],
+        "status": "DISRUPTED",
+        "whatChanged": "A supplier reported a flight schedule change",
+        "affectedItems": [],
+        "checks": [
+          {
+            "id": "c-trip-trv-evt-ait-2026-ait-draft-15-arrival-before-el-trip-trv-evt-ait-2026-ait-draft-15-eng-1",
+            "label": "arrival evidence must precede the linked commitment start",
+            "result": "FAIL"
+          }
+        ],
+        "options": [],
+        "actions": [],
+        "uncertainties": [],
+        "updatedAt": "2026-08-25T18:55:10.003Z"
+      }
+    }
+  ],
+  "ok": true
+}

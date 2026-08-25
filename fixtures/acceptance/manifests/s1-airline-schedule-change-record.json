@@ -1,0 +1,544 @@
+{
+  "scenarioId": "S1-RECORD",
+  "title": "S1 airline schedule change — current-provider RECORD proof (honest sandbox truth)",
+  "mode": "RECORD",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s1",
+    "version": "1.0.0",
+    "path": "../packs/s1"
+  },
+  "boundaries": [
+    {
+      "seam": "atlas.event_ingress",
+      "mode": "SIMULATED_EXTERNAL_EVENT",
+      "note": "approved S1 simulated seam: provider-shaped event into real ingress"
+    },
+    {
+      "seam": "atlas.flight_state_query",
+      "mode": "RECORD",
+      "note": "LIVE sandbox reconciliation read; persisted sanitized recording"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "RECORD",
+      "note": "no transactional operations exercised by S1 observe-only flow"
+    }
+  ],
+  "requiredEnv": [],
+  "requiredProviders": [
+    "atlas"
+  ],
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-14",
+      "trv-evt-ait-2026-ait-draft-15",
+      "trv-evt-ait-2026-ait-draft-10",
+      "trv-evt-ait-2026-ait-draft-11",
+      "trv-evt-ait-2026-ait-draft-30",
+      "trv-evt-ait-2026-ait-draft-13"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-14",
+      "trip-trv-evt-ait-2026-ait-draft-15",
+      "trip-trv-evt-ait-2026-ait-draft-10",
+      "trip-trv-evt-ait-2026-ait-draft-11",
+      "trip-trv-evt-ait-2026-ait-draft-30",
+      "trip-trv-evt-ait-2026-ait-draft-13"
+    ]
+  },
+  "routeParams": [],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": {
+          "at": "2026-09-21T09:00:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "notify_mn218_hero",
+      "description": "Simulated MN218 schedule-change notification for hero booking MNSYN14; reconciliation read returns the retimed 1 Oct schedule as CONNECTED state",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": {
+          "at": "2026-09-21T09:45:00+08:00"
+        },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn14",
+          "orderNo": "MNSYN14",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN14"
+        },
+        "capture": {
+          "heroCaseId": "results.0.caseId",
+          "heroTripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "notify_mn218_hero: ingress accepts the provider-shaped event",
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED"
+        },
+        {
+          "description": "notify_mn218_hero: provider state reconciliation outranks the ASSERTED push (fact precedence intact)",
+          "path": "results.0.processed.mutationAccepted",
+          "op": "falsy"
+        },
+        {
+          "description": "notify_mn218_hero: outrank is evidenced by an explicit FACT_OUTRANKED issue",
+          "path": "results.0.processed.mutationIssues.0.code",
+          "op": "equals",
+          "expected": "FACT_OUTRANKED"
+        },
+        {
+          "description": "notify_mn218_hero: a recovery case exists for the affected trip",
+          "path": "results.0.caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "notify_mn218_draft15",
+      "description": "Same retimed MN218 notification for booking MNSYN15 (Day 0 coach commitment breaks outright)",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": {
+          "at": "2026-09-21T09:46:00+08:00"
+        },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn15",
+          "orderNo": "MNSYN15",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN15"
+        },
+        "capture": {
+          "draft15CaseId": "results.0.caseId",
+          "draft15TripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "notify_mn218_draft15: ingress accepts the provider-shaped event",
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED"
+        },
+        {
+          "description": "notify_mn218_draft15: provider state reconciliation outranks the ASSERTED push (fact precedence intact)",
+          "path": "results.0.processed.mutationAccepted",
+          "op": "falsy"
+        },
+        {
+          "description": "notify_mn218_draft15: outrank is evidenced by an explicit FACT_OUTRANKED issue",
+          "path": "results.0.processed.mutationIssues.0.code",
+          "op": "equals",
+          "expected": "FACT_OUTRANKED"
+        },
+        {
+          "description": "notify_mn218_draft15: a recovery case exists for the affected trip",
+          "path": "results.0.caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "notify_mn218_draft10",
+      "description": "Retimed MN218 notification for booking MNSYN10 (tight but viable before Day 1 keynote)",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": {
+          "at": "2026-09-21T09:47:00+08:00"
+        },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn10",
+          "orderNo": "MNSYN10",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN10"
+        },
+        "capture": {
+          "draft10TripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "notify_mn218_draft10: ingress accepts the provider-shaped event",
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED"
+        },
+        {
+          "description": "notify_mn218_draft10: provider state reconciliation outranks the ASSERTED push (fact precedence intact)",
+          "path": "results.0.processed.mutationAccepted",
+          "op": "falsy"
+        },
+        {
+          "description": "notify_mn218_draft10: outrank is evidenced by an explicit FACT_OUTRANKED issue",
+          "path": "results.0.processed.mutationIssues.0.code",
+          "op": "equals",
+          "expected": "FACT_OUTRANKED"
+        },
+        {
+          "description": "notify_mn218_draft10: a recovery case exists for the affected trip",
+          "path": "results.0.caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "notify_mn218_draft11",
+      "description": "Retimed MN218 notification for booking MNSYN11 (viable before Day 1 panel)",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": {
+          "at": "2026-09-21T09:48:00+08:00"
+        },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn11",
+          "orderNo": "MNSYN11",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN11"
+        },
+        "capture": {
+          "draft11TripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "notify_mn218_draft11: ingress accepts the provider-shaped event",
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED"
+        },
+        {
+          "description": "notify_mn218_draft11: provider state reconciliation outranks the ASSERTED push (fact precedence intact)",
+          "path": "results.0.processed.mutationAccepted",
+          "op": "falsy"
+        },
+        {
+          "description": "notify_mn218_draft11: outrank is evidenced by an explicit FACT_OUTRANKED issue",
+          "path": "results.0.processed.mutationIssues.0.code",
+          "op": "equals",
+          "expected": "FACT_OUTRANKED"
+        },
+        {
+          "description": "notify_mn218_draft11: a recovery case exists for the affected trip",
+          "path": "results.0.caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "notify_mn218_draft30",
+      "description": "Retimed MN218 notification for booking MNSYN30 (viable before Day 1 panel)",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": {
+          "at": "2026-09-21T09:49:00+08:00"
+        },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn30",
+          "orderNo": "MNSYN30",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN30"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "notify_mn218_draft30: ingress accepts the provider-shaped event",
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED"
+        },
+        {
+          "description": "notify_mn218_draft30: provider state reconciliation outranks the ASSERTED push (fact precedence intact)",
+          "path": "results.0.processed.mutationAccepted",
+          "op": "falsy"
+        },
+        {
+          "description": "notify_mn218_draft30: outrank is evidenced by an explicit FACT_OUTRANKED issue",
+          "path": "results.0.processed.mutationIssues.0.code",
+          "op": "equals",
+          "expected": "FACT_OUTRANKED"
+        },
+        {
+          "description": "notify_mn218_draft30: a recovery case exists for the affected trip",
+          "path": "results.0.caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "notify_mn204_draft13",
+      "description": "Simulated MN204 cancellation notification for booking MNSYN13; reconciliation read confirms the cancellation as CONNECTED state",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": {
+          "at": "2026-09-21T09:55:00+08:00"
+        },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-002",
+          "orderNo": "MNSYN13",
+          "eventType": "CANCELLATION",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:55:00+08:00",
+          "createTime": "2026-09-21T09:55:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-09-30T08:35:00+08:00",
+          "pnr": "MNSYN13"
+        },
+        "capture": {
+          "draft13CaseId": "results.0.caseId",
+          "draft13TripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "notify_mn204_draft13: ingress accepts the provider-shaped event",
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED"
+        },
+        {
+          "description": "notify_mn204_draft13: unconfirmed ASSERTED cancellation is not applied (asserted ceiling)",
+          "path": "results.0.processed.mutationAccepted",
+          "op": "falsy"
+        },
+        {
+          "description": "notify_mn204_draft13: the unconfirmed cancellation is preserved as explicit uncertainty",
+          "path": "results.0.processed.assessment.unresolvedUnknowns",
+          "op": "arrayNotEmpty"
+        },
+        {
+          "description": "notify_mn204_draft13: a recovery case exists for the affected trip",
+          "path": "results.0.caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "observe_hero_trip",
+      "description": "Hero traveller view: retimed arrival is at-risk/non-viable against her programme-critical commitments",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-14",
+        "label": "hero_trip_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_hero_trip: trip projection renders",
+          "path": "tripId",
+          "op": "exists"
+        },
+        {
+          "description": "observe_hero_trip: remainder viability honestly evaluated for this trip's dependency graph",
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "VIABLE"
+        }
+      ]
+    },
+    {
+      "id": "observe_draft15_trip",
+      "description": "Day 0 coach traveller view: commitment broken by the retimed arrival",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-15",
+        "label": "draft15_trip_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_draft15_trip: trip projection renders",
+          "path": "tripId",
+          "op": "exists"
+        },
+        {
+          "description": "observe_draft15_trip: remainder viability honestly evaluated for this trip's dependency graph",
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "NOT_VIABLE"
+        }
+      ]
+    },
+    {
+      "id": "observe_draft10_trip",
+      "description": "Wanderpay keynote traveller view: tight but viable remainder",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-10",
+        "label": "draft10_trip_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_draft10_trip: trip projection renders",
+          "path": "tripId",
+          "op": "exists"
+        },
+        {
+          "description": "observe_draft10_trip: remainder viability honestly evaluated for this trip's dependency graph",
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "VIABLE"
+        }
+      ]
+    },
+    {
+      "id": "observe_draft11_trip",
+      "description": "Day 1 panel traveller view: viable remainder despite the shared retimed flight",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-11",
+        "label": "draft11_trip_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_draft11_trip: trip projection renders",
+          "path": "tripId",
+          "op": "exists"
+        },
+        {
+          "description": "observe_draft11_trip: remainder viability honestly evaluated for this trip's dependency graph",
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "VIABLE"
+        }
+      ]
+    },
+    {
+      "id": "observe_draft30_trip",
+      "description": "Third shared-flight traveller view: viable remainder",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-30",
+        "label": "draft30_trip_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_draft30_trip: trip projection renders",
+          "path": "tripId",
+          "op": "exists"
+        },
+        {
+          "description": "observe_draft30_trip: remainder viability honestly evaluated for this trip's dependency graph",
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "VIABLE"
+        }
+      ]
+    },
+    {
+      "id": "observe_draft13_trip",
+      "description": "Cancelled-flight traveller view: remainder not viable until provider re-proposes",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-13",
+        "label": "draft13_trip_after_cancellation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_draft13_trip: trip projection renders",
+          "path": "tripId",
+          "op": "exists"
+        },
+        {
+          "description": "observe_draft13_trip: remainder viability honestly evaluated for this trip's dependency graph",
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "AT_RISK"
+        }
+      ]
+    },
+    {
+      "id": "observe_hero_case",
+      "description": "Hero recovery case: affected element surfaced, objective at risk, not auto-resolved by the airline rebooking",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{heroCaseId}}",
+        "label": "hero_case_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_hero_case: case projection renders",
+          "path": "caseId",
+          "op": "exists"
+        }
+      ]
+    },
+    {
+      "id": "observe_draft15_case",
+      "description": "Day 0 coach recovery case: unresolved; no earlier alternative exists, uncertainty/decision preserved",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{draft15CaseId}}",
+        "label": "draft15_case_after_reconciliation",
+        "expectStatus": 200
+      },
+      "assert": [
+        {
+          "description": "observe_draft15_case: case projection renders",
+          "path": "caseId",
+          "op": "exists"
+        }
+      ]
+    }
+  ]
+}

@@ -19,11 +19,16 @@ import { join } from 'node:path';
 // ---------------------------------------------------------------------------
 
 const secrets = [];
+// Configuration-shaped values (filesystem paths, ports, modes, log levels)
+// are not credentials; treating them as secrets flags benign path references
+// in committed packs/manifests as leaks.
+const NON_SECRET_KEY_PATTERN = /(_PATH|_DIR|_PORT|_MODE|_LEVEL)$/i;
 if (existsSync('.env.local')) {
   const envText = readFileSync('.env.local', 'utf8');
   for (const line of envText.split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.+?)\s*$/);
     if (!m) continue;
+    if (NON_SECRET_KEY_PATTERN.test(m[1])) continue;
     const value = m[2].replace(/^"|"$/g, '');
     if (value.length >= 8) secrets.push({ key: m[1], value });
   }
@@ -83,6 +88,16 @@ const roots = [
   'recordings',
   'output/acceptance',
 ];
+// Every scenario-evidence directory under output/ (acceptance-*) is scanned
+// too — evidence is committed and must be credential-free.
+try {
+  for (const entry of readdirSync('output')) {
+    if (entry.startsWith('acceptance')) {
+      const p = join('output', entry);
+      if (statSync(p).isDirectory() && !roots.includes(p)) roots.push(p);
+    }
+  }
+} catch { /* output absent */ }
 const files = [];
 function walk(dir) {
   for (const entry of readdirSync(dir)) {
