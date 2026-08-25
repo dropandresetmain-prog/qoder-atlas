@@ -201,17 +201,20 @@ const manifests = {
       travellerIds: [trv('ait-draft-04'), trv('ait-draft-20'), trv('ait-draft-02')],
       tripIds: [],
     },
-    boundaries: [{ seam: 'programme.event_change', mode: 'REPLAY', note: 'Mutation-free counterfactual preview through programme HTTP' }],
+    boundaries: [
+      { seam: 'programme.change_preview', mode: 'REPLAY', note: 'Organiser Preview through real programme HTTP surface' },
+      { seam: 'programme.change_commit', mode: 'REPLAY', note: 'Organiser Commit through real programme HTTP surface' },
+    ],
     steps: [
       resetStep('2026-09-22T10:00:00+08:00'),
       {
-        id: 'preview',
-        description: 'Counterfactual: move future-provocation into the 09:50-10:10 Day-1 slot (pack preview-request)',
+        id: 'organiser_preview',
+        description: 'Organiser Preview (counterfactual, no mutation): move future-provocation into the 09:50-10:10 Day-1 slot',
         action: {
-          type: 'http',
-          method: 'POST',
-          path: `/api/programme/${ANCHOR}/change-preview`,
-          body: {
+          type: 'ui_action',
+          kind: 'organiser_preview',
+          params: {
+            anchorEventId: ANCHOR,
             commitmentId: 'cmt-ait-d1-future-provocation',
             changeKind: 'RESCHEDULED',
             newStartsAt: '2026-10-01T09:50:00+08:00',
@@ -222,8 +225,25 @@ const manifests = {
         },
       },
       {
+        id: 'organiser_commit',
+        description: 'Organiser Commit fan-out through the same programme HTTP surface',
+        action: {
+          type: 'ui_action',
+          kind: 'organiser_commit',
+          params: {
+            anchorEventId: ANCHOR,
+            commitmentId: 'cmt-ait-d1-future-provocation',
+            changeKind: 'RESCHEDULED',
+            newStartsAt: '2026-10-01T09:50:00+08:00',
+            newEndsAt: '2026-10-01T10:10:00+08:00',
+            at: '2026-09-22T11:20:00+08:00',
+          },
+          expectStatus: 200,
+        },
+      },
+      {
         id: 'observe_programme',
-        action: { type: 'observe', path: `/api/programme/${ANCHOR}`, label: 'programme_after_preview', expectStatus: 200 },
+        action: { type: 'observe', path: `/api/programme/${ANCHOR}`, label: 'programme_after_commit', expectStatus: 200 },
       },
     ],
   },

@@ -548,7 +548,10 @@ test('DR-1.3: SPEND_LIMIT currency mismatch blocks execution (fail closed)', asy
   // Same-currency spend within the ceiling is NOT blocked by the ceiling.
   const within = await authority.decide(spendIntent('intent_eur_within', 100, 'EUR'), CURRENCY_CONTEXT);
   assert.notEqual(within.outcome, 'BLOCKED');
-  assert.ok(within.ruleTrace.some((entry) => entry.includes('within limit')));
+  assert.ok(
+    within.ruleTrace.some((entry) => /within (per-night |per-trip )?limit/.test(entry)),
+    'the trace records the within-limit evaluation (with its period wording)',
+  );
 });
 
 test('DR-1.3: delegated authority cannot bypass an incomparable hard ceiling', async () => {

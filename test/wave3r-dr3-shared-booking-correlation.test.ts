@@ -17,7 +17,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve, join } from 'node:path';
+import { resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 
 import { AppConfigSchema } from '../src/config/config.ts';
@@ -125,7 +125,7 @@ async function seedSharedPnrTrip(
 
 test('segment evidence narrows one shared-reference booking to the genuinely affected leg', async () => {
   await withServer(async (base, composed) => {
-    const { tripId, legAId, legBId } = await seedSharedPnrTrip(composed);
+    const { tripId, legBId } = await seedSharedPnrTrip(composed);
 
     // The event names the later segment's departure instant explicitly.
     const res = await postJson(

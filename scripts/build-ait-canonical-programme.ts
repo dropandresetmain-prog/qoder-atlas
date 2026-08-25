@@ -39,6 +39,11 @@ import { readdirSync, readFileSync, statSync, mkdirSync, writeFileSync } from 'n
 import { join, relative } from 'node:path';
 
 const PACK_ROOT = 'data/ait-demo-input-pack';
+
+/** Arbitrary JSON document shape at the pack-import boundary (untyped source data). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonDoc = Record<string, any>;
+
 /**
  * Canonical programme output under fixtures/programmes/ so composeAppRuntime
  * boot-seeds this pack as the sole programme world. Rebuild after pack edits:
@@ -46,13 +51,13 @@ const PACK_ROOT = 'data/ait-demo-input-pack';
  */
 const OUT_DIR = 'fixtures/programmes/ait-summit-2026';
 
-function readJson(path: string): any {
+function readJson(path: string): JsonDoc {
   return JSON.parse(readFileSync(join(PACK_ROOT, path), 'utf8'));
 }
 
 /** Every JSON document in the pack with its pack-relative path. */
-function collectPackDocuments(): Array<{ path: string; doc: any }> {
-  const docs: Array<{ path: string; doc: any }> = [];
+function collectPackDocuments(): Array<{ path: string; doc: JsonDoc }> {
+  const docs: Array<{ path: string; doc: JsonDoc }> = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
@@ -112,9 +117,9 @@ function isBookedBaseline(candidate: PackBaseline): boolean {
  *   - a single object carrying `draftId` + itinerary/stay fields;
  *   - a collection `{ itineraries: [...] }` whose members carry the same shape.
  */
-function discoverBaselines(docs: Array<{ path: string; doc: any }>): Map<string, PackBaseline> {
+function discoverBaselines(docs: Array<{ path: string; doc: JsonDoc }>): Map<string, PackBaseline> {
   const byDraft = new Map<string, PackBaseline>();
-  const consider = (candidate: any, source: string): void => {
+  const consider = (candidate: JsonDoc, source: string): void => {
     if (!candidate || typeof candidate !== 'object') return;
     const isItineraryShape =
       typeof candidate.draftId === 'string' &&
@@ -174,7 +179,7 @@ function parseSegmentToken(token: string): { origin: string; destination: string
  * Segment evidence keeps whatever form the source used: structured leg objects
  * (origin/destination/flightNumber) or descriptive tokens.
  */
-function harvestBookingIdentity(docs: Array<{ path: string; doc: any }>): Map<string, HarvestedBookingIdentity> {
+function harvestBookingIdentity(docs: Array<{ path: string; doc: JsonDoc }>): Map<string, HarvestedBookingIdentity> {
   const byDraft = new Map<string, HarvestedBookingIdentity>();
   const addRef = (draftId: string, ref: HarvestedRef, source: string): void => {
     const existing = byDraft.get(draftId) ?? { refs: [], sources: [] };
@@ -328,12 +333,12 @@ const bookingsByDraft = harvestBookingIdentity(packDocuments);
 
 const timezoneByPlaceId = new Map<string, string>(
   (placesDoc.places ?? [])
-    .filter((place: any) => typeof place?.id === 'string' && typeof place?.timezone === 'string')
-    .map((place: any) => [place.id, place.timezone]),
+    .filter((place: JsonDoc) => typeof place?.id === 'string' && typeof place?.timezone === 'string')
+    .map((place: JsonDoc) => [place.id, place.timezone]),
 );
 
 /** One pack leg -> generic declared TRANSPORT_LEG item (booking refs attached later). */
-function legToDeclared(leg: PackLeg & { booking?: HarvestedRef }): any | undefined {
+function legToDeclared(leg: PackLeg & { booking?: HarvestedRef }): JsonDoc | undefined {
   if (!leg.origin || !leg.destination || !leg.departure || !leg.arrival) return undefined;
   return {
     itemKind: 'TRANSPORT_LEG',
@@ -368,7 +373,7 @@ function declaredTravelFor(baseline: PackBaseline | undefined, draftId: string):
   const legs: Array<PackLeg & { booking?: HarvestedRef }> = [
     ...(baseline.inboundItinerary?.segments ?? []),
     ...(baseline.outboundItinerary?.segments ?? []),
-    ...(Array.isArray((baseline as any).segments) ? (baseline as any).segments : []),
+    ...(Array.isArray((baseline as JsonDoc).segments) ? (baseline as JsonDoc).segments : []),
   ];
   legsTotal += legs.length;
   const { warnings } = attachBookingRefs(legs, bookingsByDraft.get(draftId));
@@ -423,11 +428,11 @@ for (const [draftId, identity] of bookingsByDraft) {
 
 // Anchor-event commitments must exist before promotion validates drafts.
 const commitmentIds = new Set<string>(
-  anchorEventDoc.anchorEvent.commitments.map((c: any) => c.id as string),
+  anchorEventDoc.anchorEvent.commitments.map((c: JsonDoc) => c.id as string),
 );
 
 let travellersWithTravel = 0;
-const travellers = roster.importDraft.travellers.map((traveller: any) => {
+const travellers = roster.importDraft.travellers.map((traveller: JsonDoc) => {
   const baseline = baselinesByDraft.get(traveller.draftId);
   const declaredTravel = declaredTravelFor(baseline, traveller.draftId);
   if (declaredTravel.length > 0) travellersWithTravel += 1;

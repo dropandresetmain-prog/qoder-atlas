@@ -4,10 +4,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { EntityId, IsoDateTime } from '../src/domain/common.ts';
+import type { IsoDateTime } from '../src/domain/common.ts';
 import type { PolicyRule } from '../src/domain/rules.ts';
 import type { MutationOperation } from '../src/operational/mutation.ts';
-import type { Trip } from '../src/domain/trip.ts';
 import type { Stay } from '../src/domain/elements.ts';
 import {
   allocateCost,

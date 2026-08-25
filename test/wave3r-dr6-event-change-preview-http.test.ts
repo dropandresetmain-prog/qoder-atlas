@@ -64,8 +64,8 @@ async function withServer(
   }
 }
 
-const ANCHOR_EVENT_ID = 'evt-w3-demo';
-const COMMITMENT_ID = 'cmt-evt-w3-demo-opening';
+const ANCHOR_EVENT_ID = 'evt-ait-2026';
+const COMMITMENT_ID = 'cmt-ait-d1-future-provocation';
 
 function tripRows(composed: Awaited<ReturnType<typeof composeAppRuntime>>): Array<{ id: string; data: string }> {
   return composed.db.prepare('SELECT id, data FROM trips ORDER BY id').all() as Array<{ id: string; data: string }>;
@@ -78,9 +78,9 @@ test('DR-6-HTTP.1: preview mutates nothing — trip state is byte-identical befo
     const res = await postJson(base, `/api/programme/${ANCHOR_EVENT_ID}/change-preview`, {
       commitmentId: COMMITMENT_ID,
       changeKind: 'RESCHEDULED',
-      newStartsAt: '2026-09-08T17:00:00+08:00',
-      newEndsAt: '2026-09-08T19:00:00+08:00',
-      at: '2026-09-01T00:00:00+00:00',
+      newStartsAt: '2026-10-01T09:50:00+08:00',
+      newEndsAt: '2026-10-01T10:10:00+08:00',
+      at: '2026-09-22T11:05:00+08:00',
     });
     assert.equal(res.status, 200);
     assert.ok(typeof res.body['totalTravellers'] === 'number' && (res.body['totalTravellers'] as number) > 0);
@@ -97,7 +97,7 @@ test('DR-6-HTTP.2: unknown anchor event / commitment are structured 404s', async
     const badEvent = await postJson(base, '/api/programme/no-such-event/change-preview', {
       commitmentId: COMMITMENT_ID,
       changeKind: 'RESCHEDULED',
-      at: '2026-09-01T00:00:00+00:00',
+      at: '2026-09-22T11:05:00+08:00',
     });
     assert.equal(badEvent.status, 404);
     assert.equal(badEvent.body['error'], 'unknown_anchor_event');
@@ -105,7 +105,7 @@ test('DR-6-HTTP.2: unknown anchor event / commitment are structured 404s', async
     const badCommitment = await postJson(base, `/api/programme/${ANCHOR_EVENT_ID}/change-preview`, {
       commitmentId: 'cmt-does-not-exist',
       changeKind: 'RESCHEDULED',
-      at: '2026-09-01T00:00:00+00:00',
+      at: '2026-09-22T11:05:00+08:00',
     });
     assert.equal(badCommitment.status, 404);
     assert.equal(badCommitment.body['error'], 'unknown_commitment');
@@ -117,9 +117,9 @@ test('DR-6-HTTP.3: commit actually mutates and fans out; unaffected travellers s
     const preview = await postJson(base, `/api/programme/${ANCHOR_EVENT_ID}/change-preview`, {
       commitmentId: COMMITMENT_ID,
       changeKind: 'RESCHEDULED',
-      newStartsAt: '2026-09-08T17:00:00+08:00',
-      newEndsAt: '2026-09-08T19:00:00+08:00',
-      at: '2026-09-01T00:00:00+00:00',
+      newStartsAt: '2026-10-01T09:50:00+08:00',
+      newEndsAt: '2026-10-01T10:10:00+08:00',
+      at: '2026-09-22T11:05:00+08:00',
     });
     const affectedTripIds = (preview.body['affected'] as Array<{ tripId: string }>).map((a) => a.tripId);
     const unaffectedTripIds = (preview.body['unaffected'] as Array<{ tripId: string }>).map((a) => a.tripId);
@@ -131,9 +131,9 @@ test('DR-6-HTTP.3: commit actually mutates and fans out; unaffected travellers s
     const commit = await postJson(base, `/api/programme/${ANCHOR_EVENT_ID}/change-commit`, {
       commitmentId: COMMITMENT_ID,
       changeKind: 'RESCHEDULED',
-      newStartsAt: '2026-09-08T17:00:00+08:00',
-      newEndsAt: '2026-09-08T19:00:00+08:00',
-      at: '2026-09-01T00:00:00+00:00',
+      newStartsAt: '2026-10-01T09:50:00+08:00',
+      newEndsAt: '2026-10-01T10:10:00+08:00',
+      at: '2026-09-22T11:05:00+08:00',
     });
     assert.equal(commit.status, 200);
     assert.equal(commit.body['accepted'], true);
@@ -163,16 +163,16 @@ test('DR-6-HTTP.4: the legacy /api/programme/commitment-change route still works
       signal: {
         id: 'sig-legacy-commitment-change',
         kind: 'ANCHOR_COMMITMENT_CHANGE',
-        occurredAt: '2026-09-05T10:00:00+00:00',
-        receivedAt: '2026-09-05T10:05:00+00:00',
+        occurredAt: '2026-09-22T10:00:00+08:00',
+        receivedAt: '2026-09-22T10:05:00+08:00',
         sourceId: `src-${ANCHOR_EVENT_ID}`,
         authority: 'AUTHORITATIVE',
         payload: {
           anchorEventId: ANCHOR_EVENT_ID,
           commitmentId: COMMITMENT_ID,
           changeKind: 'RESCHEDULED',
-          newStartsAt: '2026-09-08T10:00:00+08:00',
-          newEndsAt: '2026-09-08T12:00:00+08:00',
+          newStartsAt: '2026-10-01T09:50:00+08:00',
+          newEndsAt: '2026-10-01T10:10:00+08:00',
         },
       },
     });
@@ -190,15 +190,15 @@ test('DR-6-HTTP.5: comparison previews alternatives without mutating programme s
           optionId: 'keep-programme-time',
           commitmentId: COMMITMENT_ID,
           changeKind: 'OTHER',
-          at: '2026-09-01T00:00:00+00:00',
+          at: '2026-09-22T11:05:00+08:00',
         },
         {
           optionId: 'move-programme-time',
           commitmentId: COMMITMENT_ID,
           changeKind: 'RESCHEDULED',
-          newStartsAt: '2026-09-08T17:00:00+08:00',
-          newEndsAt: '2026-09-08T19:00:00+08:00',
-          at: '2026-09-01T00:00:00+00:00',
+          newStartsAt: '2026-10-01T09:50:00+08:00',
+          newEndsAt: '2026-10-01T10:10:00+08:00',
+          at: '2026-09-22T11:05:00+08:00',
         },
       ],
     });

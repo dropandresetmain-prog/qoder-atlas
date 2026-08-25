@@ -14,9 +14,14 @@
   },
   "boundaries": [
     {
-      "seam": "programme.event_change",
+      "seam": "programme.change_preview",
       "mode": "REPLAY",
-      "note": "Mutation-free counterfactual preview through programme HTTP"
+      "note": "Organiser Preview through real programme HTTP surface"
+    },
+    {
+      "seam": "programme.change_commit",
+      "mode": "REPLAY",
+      "note": "Organiser Commit through real programme HTTP surface"
     }
   ],
   "requiredEnv": [],
@@ -48,13 +53,13 @@
       }
     },
     {
-      "id": "preview",
-      "description": "Counterfactual: move future-provocation into the 09:50-10:10 Day-1 slot (pack preview-request)",
+      "id": "organiser_preview",
+      "description": "Organiser Preview (counterfactual, no mutation): move future-provocation into the 09:50-10:10 Day-1 slot",
       "action": {
-        "type": "http",
-        "method": "POST",
-        "path": "/api/programme/evt-ait-2026/change-preview",
-        "body": {
+        "type": "ui_action",
+        "kind": "organiser_preview",
+        "params": {
+          "anchorEventId": "evt-ait-2026",
           "commitmentId": "cmt-ait-d1-future-provocation",
           "changeKind": "RESCHEDULED",
           "newStartsAt": "2026-10-01T09:50:00+08:00",
@@ -65,11 +70,28 @@
       }
     },
     {
+      "id": "organiser_commit",
+      "description": "Organiser Commit fan-out through the same programme HTTP surface",
+      "action": {
+        "type": "ui_action",
+        "kind": "organiser_commit",
+        "params": {
+          "anchorEventId": "evt-ait-2026",
+          "commitmentId": "cmt-ait-d1-future-provocation",
+          "changeKind": "RESCHEDULED",
+          "newStartsAt": "2026-10-01T09:50:00+08:00",
+          "newEndsAt": "2026-10-01T10:10:00+08:00",
+          "at": "2026-09-22T11:20:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
       "id": "observe_programme",
       "action": {
         "type": "observe",
         "path": "/api/programme/evt-ait-2026",
-        "label": "programme_after_preview",
+        "label": "programme_after_commit",
         "expectStatus": 200
       }
     }
