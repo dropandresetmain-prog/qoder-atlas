@@ -32,7 +32,7 @@ implementation plan.
 
 ## Tiering summary
 
-### Tier A — MVP executable
+### LIVE-readiness scope — In Progress
 
 | ID | Scenario |
 |----|----------|
@@ -45,18 +45,18 @@ implementation plan.
 These are intended to run through natural Northstar product/application
 boundaries and the same generalized state/recovery/authority engine.
 
-### High-Priority Stretch
-
 | ID | Scenario |
 |----|----------|
 | S5 | "Can I stay until Sunday?" |
 | S6 | "Can I switch hotels? My partner is joining." |
 | S8 | "Can I travel with the other speakers?" |
 
-These remain important product scenarios. For MVP/G3R they may be represented
-using clearly disclosed SIMULATED scenario material where needed. They should
-be revisited after the generalized Tier-A vertical loop and code-freeze
-blockers are secure.
+All eight scenarios are now required to become runnable through the same
+generalized Northstar application path. This supersedes the historical
+Tier-A/Stretch execution split, but does not alter the catalogue's product
+narratives. The only approved simulated external seams are recorded in
+`docs/LIVE_SCENARIO_READINESS.md`; an internal capability gap is not a
+simulation seam.
 
 ---
 

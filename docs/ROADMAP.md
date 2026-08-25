@@ -25,20 +25,16 @@ The final product scenario set is frozen at 8 scenarios; `docs/SCENARIOS.md` is
 the source of truth for scenario business narratives, capability claims,
 implementation priority and demo intent.
 
-- **Planned MVP executable / G3R closure scope:** S1 (airline schedule change
-  across several speakers), S2 (missed connection), S3 (event-side preview),
-  S4 (arrive Thursday morning), S7 (London → Tokyo origin change). These run
-  through the natural product/application boundaries and the same generalized
-  state/recovery/authority engine.
-- **High-Priority Stretch:** S5 (stay until Sunday), S6 (switch hotel — partner
-  joining), S8 (travel with the other speakers). For MVP/G3R these may be
-  represented using clearly disclosed SIMULATED scenario material; they are
-  not required to be fully executable for G3R.
-- **Reason for the split:** protect the generalized vertical loop and avoid
-  premature ontology expansion (no companion/occupancy/multi-payer or
-  scenario-specific risk ontology for MVP closure).
-- **Revisit condition:** after G3R closure / core stabilisation, if schedule
-  permits.
+- **AiT LIVE Scenario Backend Readiness — In Progress:** all S1–S8 are now
+  required to become runnable through natural product/application boundaries
+  and the same generalized state/recovery/authority engine. S5, S6 and S8
+  are promoted from their historical G3R Stretch status for this work package;
+  the explicit simulation boundary is limited to S1 forced supplier facts,
+  S2 physical missed-connection/provider-reprotection facts when a sandbox
+  cannot generate them, and unsupported Atlas refund execution.
+- **Execution record:** `docs/LIVE_SCENARIO_READINESS.md` defines the bounded
+  work packages, anti-hardcoding obligations, and readiness gate. It forbids
+  scenario-specific ontology or source branching.
 
 ID disambiguation: the "S1..S8" labels in the post-NS-G3 stretch pull list in
 the Northstar scope record below (Hotelbeds Transfers, immigration, etc.) are a

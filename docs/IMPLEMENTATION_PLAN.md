@@ -8,6 +8,14 @@
 
 This is the single active implementation plan for the hackathon build. Qoder Quest Specs and Agent-mode prompts are bounded execution contracts derived from this plan. They may add implementation detail but must not silently redefine product scope, architecture, shared contracts, or acceptance criteria.
 
+**Current integration work package:** AiT LIVE Scenario Backend Readiness is
+active on `wave3r/live-scenario-readiness` from checkpoint
+`70447bd3f01d1f3219141216a2b822f2c3edc5d1`. Its bounded execution tracker,
+scope supersession for scenario S5/S6/S8, and readiness gate live in
+[`docs/LIVE_SCENARIO_READINESS.md`](LIVE_SCENARIO_READINESS.md). It does not
+reopen accepted architecture; it closes generic capability gaps needed for
+the frozen S1–S8 catalogue.
+
 Read with:
 - `docs/PRODUCT_SPEC.md` — product requirements (`FR-*`, `NFR-*`)
 - `docs/ARCHITECTURE.md` — logical architecture and invariants
