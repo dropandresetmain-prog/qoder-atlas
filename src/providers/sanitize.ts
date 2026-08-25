@@ -20,6 +20,7 @@ export function sanitizeRaw(raw: unknown, secrets: ReadonlyArray<string> = []): 
 
 export function containsAnySecret(value: unknown, secrets: ReadonlyArray<string>): boolean {
   const text = JSON.stringify(value);
+  if (text === undefined) return false;
   return secrets.some((secret) => secret.length > 0 && text.includes(secret));
 }
 
@@ -32,11 +33,15 @@ export function containsUnsafeMaterial(value: unknown, secrets: ReadonlyArray<st
 function redactSecretSubstrings(raw: unknown, secrets: ReadonlyArray<string>): unknown {
   const nonEmpty = secrets.filter((secret) => secret.length > 0);
   if (nonEmpty.length === 0) return raw;
-  let text = JSON.stringify(raw);
+  const text = JSON.stringify(raw);
+  // JSON.stringify(undefined) is undefined (e.g. a GET step has no request
+  // body); nothing to redact in a non-serializable value.
+  if (text === undefined) return raw;
+  let redacted = text;
   for (const secret of nonEmpty) {
-    text = text.split(secret).join(REDACTED);
+    redacted = redacted.split(secret).join(REDACTED);
   }
-  return JSON.parse(text) as unknown;
+  return JSON.parse(redacted) as unknown;
 }
 
 function redactSensitiveTree(value: unknown): unknown {

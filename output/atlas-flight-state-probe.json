@@ -1,0 +1,123 @@
+{
+  "probe": "atlas-flight-state-readonly",
+  "generatedAt": "2026-08-25T18:42:02.049Z",
+  "host": "sandbox.atriptech.com",
+  "operation": "flight_state_query",
+  "endpoint": "POST /event/getPageList.do",
+  "orderReferences": [
+    "MNSYN10",
+    "MNSYN11",
+    "MNSYN13",
+    "MNSYN14",
+    "MNSYN15",
+    "MNSYN30",
+    "TESTA20260825054121298"
+  ],
+  "results": [
+    {
+      "orderReference": "MNSYN10",
+      "at": "2026-08-25T18:42:01.412Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:01.412Z",
+          "latencyMs": 348
+        }
+      }
+    },
+    {
+      "orderReference": "MNSYN11",
+      "at": "2026-08-25T18:42:01.770Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:01.770Z",
+          "latencyMs": 94
+        }
+      }
+    },
+    {
+      "orderReference": "MNSYN13",
+      "at": "2026-08-25T18:42:01.864Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:01.864Z",
+          "latencyMs": 24
+        }
+      }
+    },
+    {
+      "orderReference": "MNSYN14",
+      "at": "2026-08-25T18:42:01.889Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:01.889Z",
+          "latencyMs": 25
+        }
+      }
+    },
+    {
+      "orderReference": "MNSYN15",
+      "at": "2026-08-25T18:42:01.915Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:01.915Z",
+          "latencyMs": 48
+        }
+      }
+    },
+    {
+      "orderReference": "MNSYN30",
+      "at": "2026-08-25T18:42:01.990Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:01.990Z",
+          "latencyMs": 28
+        }
+      }
+    },
+    {
+      "orderReference": "TESTA20260825054121298",
+      "at": "2026-08-25T18:42:02.019Z",
+      "ok": true,
+      "detail": {
+        "stateCount": 0,
+        "states": [],
+        "meta": {
+          "providerId": "atlas",
+          "mode": "LIVE",
+          "requestedAt": "2026-08-25T18:42:02.019Z",
+          "latencyMs": 29
+        }
+      }
+    }
+  ]
+}

@@ -206,6 +206,13 @@ test('C1: sanitization redacts secrets and keeps provider shape', () => {
   assert.deepEqual(keyOnly.list, ['shh', 'ok']);
 });
 
+test('C1: sanitization tolerates non-serializable input (e.g. absent request body)', () => {
+  // GET-style steps have no request payload; JSON.stringify(undefined) is
+  // undefined and must not crash secret redaction when secrets are configured.
+  assert.equal(sanitizeRaw(undefined, ['shh']), undefined);
+  assert.equal(containsAnySecret(undefined, ['shh']), false);
+});
+
 test('C1: read-only store refuses RECORD writes with a structured error', async () => {
   const store = new FileRecordingStore({ readDirs: [] });
   const adapter = makeAdapter('RECORD', async () => ({ value: 'x' }));
