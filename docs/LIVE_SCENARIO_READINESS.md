@@ -39,6 +39,35 @@ readiness evidence, never as a replacement for missing internal behaviour.
   a single dated allocation; cross-traveller travel association; and a
   configured programme transport-concentration constraint.
 
+## Incremental evidence
+
+- S1 provider ingress now fans a single normalized provider event to every
+  canonical transport element whose booking reference matches, with stable
+  per-impact signal identities and separate cases.
+- S2 accepts an explicitly identified, post-departure missed connection at
+  the ordinary HTTP boundary. Automatic matching remains safely restricted to
+  upcoming flights.
+- S3 can compare multiple named, counterfactual event-change options through
+  a mutation-free HTTP surface; committing a selected option still uses the
+  existing fan-out path.
+- S4/S7 already traverse the shared ChangeRequest planner: window requests
+  select transport legs by corridor direction and declared airport-origin
+  substitution re-plans from known Place evidence. Existing focused tests
+  prove both directions and explicit uncertainty for unresolved evidence.
+- S5 has existing generic funding-window allocation for later return travel:
+  costs outside the funded window deterministically attribute to the rule's
+  incremental payer and remain authority-gated. It does **not** yet prove
+  additional accommodation nights, so it is not complete.
+
+## Provider preflight status
+
+**Blocked — credentials absent (25 Aug 2026).** The isolated environment has
+no `ATLAS_CLIENT_ID`, `ATLAS_CLIENT_SECRET`, or `NUITEE_API_KEY`; `.env.example`
+contains only empty placeholders. No Atlas/Nuitée LIVE or RECORD call was
+made, no date was changed, and no Model Studio or Google Routes LIVE call was
+made. A credentialed sandbox preflight remains required before readiness can
+be declared.
+
 ## Work packages and acceptance
 
 1. **LSR-0 — contract and canonical programme foundation.** Define one
@@ -67,6 +96,7 @@ readiness evidence, never as a replacement for missing internal behaviour.
 | Act Now | S5/S6/S8 lack required generic ontology/contracts. | Implement the smallest reusable representations; deferral makes the required scenarios non-runnable. |
 | Act Now | Existing documentation still calls S5/S6/S8 Stretch. | This tracker and the linked SSOT updates supersede that historical scope split for this branch. |
 | Investigate Now | Initial 30 Sep–2 Oct 2026 provider inventory. | Probe Atlas/Nuitée only after scenario requests are data-complete; lack of inventory may require a documented date recommendation, not a silent fixture change. |
+| Investigate Now | Credentialed Atlas/Nuitée preflight is unavailable in this worktree. | Supply sandbox credentials in the execution environment; without them route/hotel inventory and servicing evidence cannot be refreshed. |
 | Park for Later | Production accounting and arbitrary city geocoding. | Explicitly excluded; neither is needed for the generic acceptance concepts. |
 | Ignore / Accept Risk | Global `npm` launcher is missing its roaming installation. | Direct Node invocation is a safe bounded recovery. Do not alter project scripts for a host-level defect. |
 
