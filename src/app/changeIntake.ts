@@ -137,6 +137,14 @@ Your JSON must match this schema EXACTLY (strict objects, no extra keys):
 If the traveller's text is ambiguous or you cannot determine the intent with confidence, respond with:
 { "clarificationNeeded": "string describing what is unclear" }
 
+Field guidance:
+- "arriveBy" bounds the OUTBOUND arrival at the destination ("can I arrive by <time>?").
+- "departAfter" bounds the RETURN departure leaving the destination ("can I stay until <date>?", "extend my stay until <date>", "fly home after <time>"). A stay extension moves the trip END, so it is a departAfter, never an arriveBy.
+
+Worked example — stay extension:
+Traveller text: "Can I stay until Sunday? Please extend my stay until 2026-10-04T12:00:00+08:00. I will pay for the extension myself."
+Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "departAfter": "2026-10-04T12:00:00+08:00", "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
+
 Never invent timestamps, entity ids, or other details the traveller did not state.`;
 
 async function interpretViaModel(

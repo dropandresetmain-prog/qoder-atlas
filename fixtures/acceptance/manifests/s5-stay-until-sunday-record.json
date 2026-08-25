@@ -1,0 +1,163 @@
+{
+  "scenarioId": "S5-RECORD",
+  "title": "S5 'can I stay until Sunday?' — LIVE NL intake + RECORD return-corridor evidence through the honest authority ceiling",
+  "mode": "RECORD",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s5",
+    "version": "1.0.0",
+    "path": "../packs/s5"
+  },
+  "boundaries": [
+    {
+      "seam": "traveller.change_request_nl",
+      "mode": "LIVE",
+      "note": "natural-language stay-extension request interpreted by LIVE Model Studio into the frozen ChangeRequest schema; zod-validated, fail-closed on ambiguity"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "RECORD",
+      "note": "return-corridor planning evidence through the RECORD-mode Atlas adapter; sanitized recordings persisted"
+    }
+  ],
+  "requiredEnv": [
+    "MODEL_STUDIO_API_KEY"
+  ],
+  "requiredProviders": [
+    "atlas",
+    "modelStudio"
+  ],
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-35"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-35"
+    ]
+  },
+  "routeParams": [
+    {
+      "origin": "SIN",
+      "destination": "AMS",
+      "date": "2026-10-04"
+    }
+  ],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": {
+          "at": "2026-09-25T10:00:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "nl_intake",
+      "description": "Traveller asks in natural language to stay until Sunday; LIVE Model Studio extracts the stay extension into the frozen ChangeRequest schema",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/traveller/change-request",
+        "body": {
+          "travellerId": "trv-evt-ait-2026-ait-draft-35",
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-35",
+          "text": "Can I stay until Sunday? Please extend my stay until 2026-10-04T12:00:00+08:00; my return flight home should depart on Sunday afternoon, after that time. I will pay for the extension myself.",
+          "at": "2026-09-25T10:05:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the NL stay-extension request is accepted" },
+        { "path": "provenance", "op": "equals", "expected": "INTERPRETED", "description": "the request came from interpretation, not a pre-structured target" },
+        { "path": "intentKind", "op": "equals", "expected": "CHANGE_STAY", "description": "the model maps a stay extension to a stay change, not an arrival bound" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
+        { "path": "implications.0", "op": "contains", "expected": "departAfter 2026-10-04T12:00:00+08:00 is 37h later than current latest departure", "description": "the return-leg window delta is derived from authoritative trip state" },
+        { "path": "implications.1", "op": "contains", "expected": "incremental payer TRAVELLER per rule(s) rule-ait-funded-window", "description": "the extension accrues outside the event-funded window: deterministic payer decision before pricing" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Planning re-searches the return corridor for the requested departure date (RECORD Atlas evidence) and records the stay extension honestly",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-25T10:10:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "bestStrategyId": "bestStrategyId"
+        }
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 1, "description": "the planning loop completed against recorded return-corridor evidence" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search on the return corridor" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the RECORD Atlas adapter supplied return-corridor offers" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "corridor offers become candidate rebook strategies" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to depart later", "description": "the candidate rebooks the existing return leg to a later departure" },
+        { "path": "strategies.0.feasible", "op": "truthy", "description": "a Sunday return inside the trip window is deterministically feasible" },
+        { "path": "bestStrategyId", "op": "exists", "description": "feasible candidates are ranked into a best strategy" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+      ]
+    },
+    {
+      "id": "begin",
+      "description": "Strategy becomes a money-moving intent; deterministic authority reviews gross spend and mixed funding allocates the priced cost against the funded window",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/begin",
+        "body": {
+          "caseId": "{{caseId}}",
+          "strategyId": "{{bestStrategyId}}",
+          "at": "2026-09-25T10:20:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "intentId": "intentId"
+        }
+      },
+      "assert": [
+        { "path": "intentId", "op": "exists", "description": "the strategy was staged as a validated action intent" },
+        { "path": "funding.allocation.incrementalPayer", "op": "equals", "expected": "TRAVELLER", "description": "mixed funding: the extension accrues outside the funded window, so the traveller pays the increment deterministically" },
+        { "path": "funding.allocation.derivedFromRuleIds.0", "op": "equals", "expected": "rule-ait-funded-window", "description": "the allocation cites the governing policy rule" },
+        { "path": "funding.summary", "op": "contains", "expected": "payable by the traveller", "description": "the traveller-funded incremental amount is surfaced as a deterministic summary" },
+        { "path": "outcome", "op": "equals", "expected": "BLOCKED", "description": "honest authority ceiling: RECORD fails closed on SGD-limit vs USD-spend incomparability (ADR-045); REPLAY blocks on the curated SGD ceilings" },
+        { "path": "executable", "op": "equals", "expected": false, "description": "a blocked intent is never executable" },
+        { "path": "caseStatus", "op": "equals", "expected": "ESCALATED", "description": "the blocked money-moving intent escalates the case for human review" },
+        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "the blocking spend-ceiling rule is named in the deterministic rule trace in both modes" }
+      ]
+    },
+    {
+      "id": "observe_case",
+      "description": "Observe the recovery case after the authority stage",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_after_begin",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-35", "description": "the case belongs to the requesting traveller's trip" },
+        { "path": "options", "op": "arrayNotEmpty", "description": "the evaluated options remain visible on the case" }
+      ]
+    }
+  ]
+}
