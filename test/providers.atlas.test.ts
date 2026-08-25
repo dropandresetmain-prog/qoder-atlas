@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { FileRecordingStore, containsAnySecret } from '../src/providers/index.ts';
+import { FileRecordingStore, containsAnySecret, recordingIdFor } from '../src/providers/index.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { atlasScheduleToIso, normalizeSearch, normalizeVerify } from '../src/providers/atlas/normalize.ts';
 import type { FlightSearchQuery } from '../src/contracts/capabilities.ts';
@@ -48,8 +48,22 @@ function loadOnlyRecording(operation: string): { id: string; raw: Record<string,
   return recording;
 }
 
+/**
+ * The curated Lane C search recording, identified by the deterministic
+ * REPLAY identity of the MNL→CEB query — the search directory also holds
+ * acceptance-scenario recordings, so directory uniqueness no longer
+ * identifies the curated evidence.
+ */
+function loadCuratedSearchRecording(): { id: string; raw: Record<string, unknown> } {
+  const id = recordingIdFor('atlas', 'search', SEARCH_QUERY);
+  const file = join(FIXTURES, 'atlas', 'search', `${id}.json`);
+  assert.ok(existsSync(file), `expected curated Lane C search recording ${id}`);
+  const recording = JSON.parse(readFileSync(file, 'utf8')) as { id: string; raw: Record<string, unknown> };
+  return recording;
+}
+
 const VERIFY_OFFER_ID = (
-  (loadOnlyRecording('search').raw.routings as Array<{ routingIdentifier: string }>)[0]!
+  (loadCuratedSearchRecording().raw.routings as Array<{ routingIdentifier: string }>)[0]!
     .routingIdentifier
 );
 
@@ -60,7 +74,7 @@ test('C2: REPLAY search normalizes curated recording through the real normalizer
   assert.equal(result.meta.mode, 'REPLAY');
   assert.ok(result.meta.recordingId);
 
-  const rawRoutings = loadOnlyRecording('search').raw.routings as Array<{
+  const rawRoutings = loadCuratedSearchRecording().raw.routings as Array<{
     routingIdentifier: string;
     currency: string;
     adultPrice: number;
@@ -189,7 +203,7 @@ test('C2: PRICE_CHANGED verify computes updated price and delta from passenger c
 });
 
 test('C2: LIVE/REPLAY equivalence — identical raw payload yields identical normalized output', async () => {
-  const fixtureRaw = loadOnlyRecording('search').raw;
+  const fixtureRaw = loadCuratedSearchRecording().raw;
   const writeDir = mkdtempSync(join(tmpdir(), 'atlas-rec-'));
   const store = new FileRecordingStore({ readDirs: [writeDir], writeDir });
 
@@ -222,7 +236,7 @@ test('C2: LIVE/REPLAY equivalence — identical raw payload yields identical nor
 });
 
 test('C2: RECORD sanitizes credentials out of persisted recordings', async () => {
-  const fixtureRaw = loadOnlyRecording('search').raw;
+  const fixtureRaw = loadCuratedSearchRecording().raw;
   const injectedSecret = 'super-secret-client-secret';
   const rawWithSecret = { ...fixtureRaw, msg: `token ${injectedSecret}` };
   const writeDir = mkdtempSync(join(tmpdir(), 'atlas-rec-'));
