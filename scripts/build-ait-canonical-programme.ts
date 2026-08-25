@@ -40,15 +40,11 @@ import { join, relative } from 'node:path';
 
 const PACK_ROOT = 'data/ait-demo-input-pack';
 /**
- * Output lives OUTSIDE fixtures/programmes/ so composeAppRuntime's boot
- * auto-seed (which scans every programmes/* directory) does not co-seed this
- * bundle alongside the legacy synthetic-summit rehearsal fixture. Shared
- * airport-code place refs would otherwise make fail-closed place resolution
- * ambiguous. Canonical cutover (replacing the legacy fixture) is a later
- * milestone; until then harnesses seed this path explicitly via
- * seedProgrammeBundle.
+ * Canonical programme output under fixtures/programmes/ so composeAppRuntime
+ * boot-seeds this pack as the sole programme world. Rebuild after pack edits:
+ *   node --experimental-strip-types scripts/build-ait-canonical-programme.ts
  */
-const OUT_DIR = 'fixtures/ait-canonical/ait-summit-2026';
+const OUT_DIR = 'fixtures/programmes/ait-summit-2026';
 
 function readJson(path: string): any {
   return JSON.parse(readFileSync(join(PACK_ROOT, path), 'utf8'));

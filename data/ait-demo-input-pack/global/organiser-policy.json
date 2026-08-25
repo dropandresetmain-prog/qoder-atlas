@@ -40,7 +40,8 @@
           "sourceId": "src-syn-ait-policy",
           "description": "Per-traveller event-funded airfare ceiling (round trip, incl. taxes). Above this, fare requires organiser approval or a documented exception.",
           "appliesTo": [],
-          "maxAmount": { "amount": 1200, "currency": "SGD" }
+          "maxAmount": { "amount": 1200, "currency": "SGD" },
+          "period": "TRIP"
         },
         {
           "id": "rule-ait-hotel-spend-limit",
@@ -48,7 +49,8 @@
           "sourceId": "src-syn-ait-policy",
           "description": "Nightly accommodation ceiling per room, event-funded nights.",
           "appliesTo": [],
-          "maxAmount": { "amount": 320, "currency": "SGD" }
+          "maxAmount": { "amount": 320, "currency": "SGD" },
+          "period": "NIGHT"
         },
         {
           "id": "rule-ait-approval-above-airfare",
@@ -113,6 +115,16 @@
           "appliesTo": [],
           "consequence": "REPORT_TO_ORGANISER",
           "fee": { "amount": 0, "currency": "SGD" }
+        },
+        {
+          "id": "rule-ait-transport-concentration",
+          "kind": "TRANSPORT_CONCENTRATION",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Do not place more than two REQUIRED (programme-critical) participants on the same booking/service when alternatives exist. Threshold and importance are data; grouping uses booking references.",
+          "appliesTo": [],
+          "maxCriticalParticipants": 2,
+          "criticalImportance": "REQUIRED",
+          "scope": "BOOKING_REF"
         }
       ]
     }
@@ -186,11 +198,11 @@
     }
   },
   "schemaGaps": [
-    { "gap": "No PolicyRule kind expresses cabin-class rules; encoded as clause + machineHint.", "clause": "cabinRules" },
-    { "gap": "SPEND_LIMIT carries no recurrence semantics (per-trip vs per-night); nightly ceiling disambiguated via description and clauses.accommodationCeiling.", "clause": "accommodationCeiling" },
-    { "gap": "No PolicyRule kind expresses delegated/pre-approved operator authority; encoded as clause + machineHint.", "clause": "delegatedAuthority" },
-    { "gap": "MIN_BUFFER has no importance-dependent variants; the 12-hour programme-critical buffer is encoded in clauses.arrivalBuffer machineHint.", "clause": "arrivalBuffer" },
-    { "gap": "No PolicyRule kind expresses transport concentration/correlated-risk rules; encoded as clause + machineHint for S8.", "clause": "criticalParticipantTransportConcentration" },
-    { "gap": "No PolicyRule kind expresses occupancy, companion/upgrade funding increments, or rehearsal/rest windows; encoded as clauses + machineHints.", "clause": "standardOccupancy/companionAndUpgradeIncrement/rehearsalAndRestRules" }
+    { "gap": "No PolicyRule kind expresses cabin-class rules; encoded as clause + machineHint.", "clause": "cabinRules", "triage": "Park for Later — booking facts suffice for S1–S8 without cabin viability rejection." },
+    { "gap": "SPEND_LIMIT now carries optional period TRIP|NIGHT (Act Now closed for ontology); nightly vs trip ceilings use period on the rule.", "clause": "accommodationCeiling", "triage": "Act Now — closed: period field on SPEND_LIMIT." },
+    { "gap": "No PolicyRule kind expresses delegated/pre-approved operator authority; encoded as clause + machineHint.", "clause": "delegatedAuthority", "triage": "Park for Later — APPROVAL_REQUIRED + principals cover S5 human approval; operation-conditioned delegation Investigate for S1 LIVE." },
+    { "gap": "MIN_BUFFER has no importance-dependent variants; the 12-hour programme-critical buffer remains in clauses.arrivalBuffer machineHint pending constraint-param wiring.", "clause": "arrivalBuffer", "triage": "Park for Later — prefer constraint minBufferMinutes from importance at promotion, not a new rule kind." },
+    { "gap": "TRANSPORT_CONCENTRATION PolicyRule kind added; clause retained for disclosure narrative.", "clause": "criticalParticipantTransportConcentration", "triage": "Act Now — closed: rule-ait-transport-concentration in ruleSets." },
+    { "gap": "Occupancy guests exist on Stay; companion/upgrade and rehearsal/rest remain clauses only.", "clause": "standardOccupancy/companionAndUpgradeIncrement/rehearsalAndRestRules", "triage": "Occupancy Act Now closed (Stay.guests); companion/rehearsal Park for Later." }
   ]
 }

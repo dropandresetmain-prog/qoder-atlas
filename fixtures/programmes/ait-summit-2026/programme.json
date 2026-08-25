@@ -1498,7 +1498,8 @@
             "maxAmount": {
               "amount": 1200,
               "currency": "SGD"
-            }
+            },
+            "period": "TRIP"
           },
           {
             "id": "rule-ait-hotel-spend-limit",
@@ -1509,7 +1510,8 @@
             "maxAmount": {
               "amount": 320,
               "currency": "SGD"
-            }
+            },
+            "period": "NIGHT"
           },
           {
             "id": "rule-ait-approval-above-airfare",
@@ -1599,6 +1601,16 @@
               "amount": 0,
               "currency": "SGD"
             }
+          },
+          {
+            "id": "rule-ait-transport-concentration",
+            "kind": "TRANSPORT_CONCENTRATION",
+            "sourceId": "src-syn-ait-policy",
+            "description": "Do not place more than two REQUIRED (programme-critical) participants on the same booking/service when alternatives exist. Threshold and importance are data; grouping uses booking references.",
+            "appliesTo": [],
+            "maxCriticalParticipants": 2,
+            "criticalImportance": "REQUIRED",
+            "scope": "BOOKING_REF"
           }
         ]
       }

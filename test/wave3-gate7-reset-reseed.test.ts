@@ -94,6 +94,7 @@ test('Wave 3 Gate 7: boot seed, deterministic reset/reseed at programme scale, n
     assert.equal(execute.body['caseStatus'], 'RESOLVED');
 
     // Fan-out residue: a commitment change opens cases across the programme.
+    // Use a real commitment id from the boot-seeded programme (AiT opening).
     const fanOut = await postJson(base, '/api/programme/commitment-change', {
       signal: {
         id: `sig-${programmeEventId}-gate7`,
@@ -104,10 +105,10 @@ test('Wave 3 Gate 7: boot seed, deterministic reset/reseed at programme scale, n
         authority: 'AUTHORITATIVE',
         payload: {
           anchorEventId: programmeEventId,
-          commitmentId: `cmt-${programmeEventId}-opening`,
+          commitmentId: 'cmt-ait-d0-opening',
           changeKind: 'RESCHEDULED',
-          newStartsAt: '2026-09-08T10:00:00+08:00',
-          newEndsAt: '2026-09-08T12:00:00+08:00',
+          newStartsAt: '2026-09-30T10:00:00+08:00',
+          newEndsAt: '2026-09-30T11:00:00+08:00',
         },
       },
     });

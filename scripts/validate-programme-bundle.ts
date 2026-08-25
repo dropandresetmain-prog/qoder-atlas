@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { ProgrammeBundleSchema } from '../src/app/programmeSeed.ts';
 
-const path = process.argv[2] ?? 'fixtures/ait-canonical/ait-summit-2026/programme.json';
+const path = process.argv[2] ?? 'fixtures/programmes/ait-summit-2026/programme.json';
 const parsed = ProgrammeBundleSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')));
 if (!parsed.success) {
   console.error(`bundle INVALID: ${path}`);

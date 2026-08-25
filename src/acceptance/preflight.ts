@@ -4,7 +4,7 @@
  * Answers structural readiness questions only. Does not encode scenario
  * business truth (expected outcomes, viability, authority decisions).
  */
-import { accessSync, constants, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { loadConfig, hasLiveCredentials, type AppConfig } from '../config/config.ts';
 import {
@@ -132,7 +132,17 @@ export function runPreflight(options: PreflightOptions): PreflightReport {
   });
 
   // Canonical programme loaded (fixture presence — structural).
-  const programmePath = join(cwd, config.fixturesDir, 'programmes', 'synthetic-summit', 'programme.json');
+  // Prefer the sole programmes/* bundle (AiT cutover); fall back only if the
+  // directory is empty so historical checkouts still diagnose clearly.
+  const programmesRoot = join(cwd, config.fixturesDir, 'programmes');
+  let programmePath = join(programmesRoot, 'ait-summit-2026', 'programme.json');
+  if (!existsSync(programmePath) && existsSync(programmesRoot)) {
+    const dirs = readdirSync(programmesRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+    if (dirs[0]) programmePath = join(programmesRoot, dirs[0], 'programme.json');
+  }
   let programme: { context?: { anchorEvent?: { id?: string } }; importDraft?: { travellers?: Array<{ draftId?: string }> } } | undefined;
   if (existsSync(programmePath)) {
     try {
@@ -140,7 +150,7 @@ export function runPreflight(options: PreflightOptions): PreflightReport {
       checks.push({
         id: 'canonical_programme_loaded',
         ok: Boolean(programme?.context?.anchorEvent?.id),
-        detail: `programme fixture present (${programme?.context?.anchorEvent?.id ?? 'no anchor'})`,
+        detail: `programme fixture present (${programme?.context?.anchorEvent?.id ?? 'no anchor'}) at ${programmePath}`,
       });
     } catch (error) {
       checks.push({
@@ -165,13 +175,15 @@ export function runPreflight(options: PreflightOptions): PreflightReport {
     const anchorId = programme?.context?.anchorEvent?.id;
     const missing: string[] = [];
     for (const travellerId of manifest.expect.travellerIds) {
-      // Programme travellers use draftId "draft-N"; runtime ids look like
-      // trv-{anchor}-draft-N. Preflight only checks structural presence.
-      const draftSuffix = travellerId.match(/(draft-\d+)$/)?.[1];
+      // Runtime ids look like trv-{anchor}-{draftId}. Accept full draftId,
+      // runtime id, or a trailing draft token (legacy draft-N and ait-draft-N).
+      const draftSuffix = travellerId.match(/(?:^|-)((?:ait-)?draft-[\w-]+)$/)?.[1];
       const ok =
         draftIds.has(travellerId) ||
         (draftSuffix !== undefined && draftIds.has(draftSuffix)) ||
-        (anchorId !== undefined && travellerId === `trv-${anchorId}-${draftSuffix ?? ''}`);
+        (anchorId !== undefined &&
+          draftSuffix !== undefined &&
+          travellerId === `trv-${anchorId}-${draftSuffix}`);
       if (!ok) missing.push(travellerId);
     }
     checks.push({

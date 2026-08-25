@@ -31,7 +31,7 @@ import {
 import { SqlMutationService } from '../src/engine/mutation.ts';
 import { ProgrammeService } from '../src/app/programme.ts';
 
-const BUNDLE_DIR = resolve('fixtures/ait-canonical/ait-summit-2026');
+const BUNDLE_DIR = resolve('fixtures/programmes/ait-summit-2026');
 
 test('AiT canonical bundle validates against ProgrammeBundleSchema', () => {
   assert.ok(existsSync(join(BUNDLE_DIR, 'programme.json')), 'canonical bundle must exist (run build-ait-canonical-programme.ts)');
@@ -44,9 +44,8 @@ test('AiT canonical bundle validates against ProgrammeBundleSchema', () => {
 });
 
 test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking refs', async () => {
-  // Empty in-memory DB — seed ONLY the AiT bundle through the validated path.
-  // Do not use composeAppRuntime here: that auto-seeds synthetic-summit and
-  // would co-exist with shared airport-code place refs.
+  // Empty in-memory DB — seed ONLY the AiT bundle through the validated path
+  // so this proof stays independent of other scenario fixtures.
   const db = openDatabase(':memory:');
   try {
     const trips = new SqliteTripRepository(db);
@@ -66,8 +65,6 @@ test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking
     assert.ok(anchor && anchor.entityType === 'ANCHOR_EVENT', 'AnchorEvent loaded');
     assert.ok(anchor.entity.commitments.length > 0, 'programme commitments present');
 
-    // Arrangement counts from authoritative Traveller entities (promotion
-    // materializes the draft declaration; never inferred from home location).
     const travellers = (await entities.list('TRAVELLER'))
       .filter((entry) => entry.entityType === 'TRAVELLER')
       .map((entry) => entry.entity)
@@ -78,8 +75,6 @@ test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking
     assert.equal(northstar, 42);
     assert.equal(selfOther, 25);
 
-    // Declared travel must have become real elements with booking identity
-    // where the pack supplied it.
     let transportLegs = 0;
     let stays = 0;
     let legsWithBookingRef = 0;
@@ -101,9 +96,6 @@ test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking
     }
     assert.ok(transportLegs >= 16, `expected >=16 declared transport legs, got ${transportLegs}`);
     assert.ok(stays >= 4, `expected >=4 declared stays, got ${stays}`);
-    // Pack harvests PNRs for S1/S2-named travellers only (data-driven, not
-    // scenario-switched). At least the harvested refs (MNSYN09 + MNSYN10..15)
-    // must land on materialized legs.
     assert.ok(legsWithBookingRef >= 10, `expected >=10 legs carrying booking refs, got ${legsWithBookingRef}`);
     for (const expected of ['MNSYN09', 'MNSYN10', 'MNSYN11', 'MNSYN13', 'MNSYN14', 'MNSYN15', 'MNSYN30']) {
       assert.ok(bookingRefs.has(expected), `harvested PNR ${expected} must appear on a promoted leg`);
@@ -113,10 +105,7 @@ test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking
   }
 });
 
-test('AiT seed is reachable from composed ProgrammeService without scenario logic', async () => {
-  // Composition boots the legacy programme; the AiT bundle is seeded on the
-  // SAME service instance via the shared seedProgrammeBundle entry point —
-  // proving the intake path is content-free.
+test('compose boot-seeds the AiT programme as the sole programmes/* bundle', async () => {
   const composed = await composeAppRuntime(
     AppConfigSchema.parse({
       environment: 'local',
@@ -127,13 +116,10 @@ test('AiT seed is reachable from composed ProgrammeService without scenario logi
     }),
   );
   try {
-    assert.ok(composed.programmeService, 'compose exposes the shared ProgrammeService');
-    // Second seed into the same runtime: places may collide on airport-code
-    // refs with the boot-seeded synthetic-summit. The AiT seed therefore uses
-    // a fresh empty DB above for the primary proof; here we only assert the
-    // service is the same object the HTTP handlers use (identity, not content).
-    assert.equal(typeof composed.programmeService.intakeImportDraft, 'function');
-    assert.equal(typeof composed.programmeService.applyProgrammeContext, 'function');
+    assert.equal(composed.seededProgrammes.length, 1);
+    assert.equal(composed.seededProgrammes[0]!.anchorEventId, 'evt-ait-2026');
+    assert.equal(composed.seededProgrammes[0]!.promotedCount, 67);
+    assert.ok(composed.programmeService);
   } finally {
     composed.db.close();
   }
