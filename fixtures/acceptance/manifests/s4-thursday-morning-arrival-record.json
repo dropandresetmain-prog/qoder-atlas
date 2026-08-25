@@ -1,0 +1,138 @@
+{
+  "scenarioId": "S4-RECORD",
+  "title": "S4 'can I arrive Thursday morning?' — LIVE Model Studio NL extraction + LIVE planning against RECORD Atlas evidence (honest sandbox truth)",
+  "mode": "RECORD",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s4",
+    "version": "1.0.0",
+    "path": "../packs/s4"
+  },
+  "boundaries": [
+    {
+      "seam": "traveller.change_request_nl",
+      "mode": "LIVE",
+      "note": "natural-language traveller request interpreted by LIVE Model Studio into the frozen ChangeRequest schema; zod-validated, fail-closed on ambiguity"
+    },
+    {
+      "seam": "model_studio.recovery_planner",
+      "mode": "LIVE",
+      "note": "Model Studio planning for the change-request case through the provider-neutral model client"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "RECORD",
+      "note": "planner-requested corridor evidence goes through the RECORD-mode Atlas adapter; sanitized recordings persisted"
+    }
+  ],
+  "requiredEnv": [
+    "MODEL_STUDIO_API_KEY"
+  ],
+  "requiredProviders": [
+    "atlas",
+    "modelStudio"
+  ],
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-34"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-34"
+    ]
+  },
+  "routeParams": [
+    {
+      "origin": "CNX",
+      "destination": "SIN",
+      "date": "2026-10-01"
+    }
+  ],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Deterministic reset/reseed",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": {
+          "at": "2026-09-20T10:00:00+08:00"
+        },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "nl_intake",
+      "description": "Traveller asks in natural language for a Thursday-morning arrival; LIVE Model Studio extracts the request into the frozen ChangeRequest schema (schema validation is deterministic; the model never mutates state)",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/traveller/change-request",
+        "body": {
+          "travellerId": "trv-evt-ait-2026-ait-draft-34",
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-34",
+          "text": "Hi! I have things to wrap up in Chiang Mai on Wednesday. Can I arrive by 2026-10-01T09:00:00+08:00 instead? My first session is the search chat on Thursday afternoon.",
+          "at": "2026-09-20T10:05:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the NL request is accepted" },
+        { "path": "provenance", "op": "equals", "expected": "INTERPRETED", "description": "the request came from interpretation, not a pre-structured target" },
+        { "path": "intentKind", "op": "equals", "expected": "ADJUST_TRIP_WINDOW", "description": "the model maps arrive-by text to a trip-window adjustment" },
+        { "path": "urgency", "op": "equals", "expected": "SOFT_PREFERENCE", "description": "no binding language: the model keeps the request a preference, not an instruction" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
+        { "path": "implications", "op": "arrayNotEmpty", "description": "the resolver records implications derived from policy evidence" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "LIVE Model Studio planning: the model requests corridor evidence (RECORD-mode Atlas), then authors arrival candidates; deterministic viability judges every candidate against the programme arrival constraints",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-20T10:10:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 1, "description": "the planning loop completed against live model + recorded corridor evidence" },
+        { "path": "toolActivity", "op": "arrayNotEmpty", "description": "an evidence round actually ran" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the RECORD Atlas adapter supplied corridor offers" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "the planner proposes arrival candidates from the corridor offers" },
+        { "path": "strategies.0.feasible", "op": "falsy", "description": "a Thursday-morning arrival deterministically violates the programme arrival buffer: available offers can still be rejected" },
+        { "path": "strategies.0.rejectionEvidence", "op": "arrayNotEmpty", "description": "the rejection carries deterministic evidence" },
+        { "path": "bestStrategyId", "op": "notExists", "description": "hard-infeasible candidates can never win: no best strategy is ranked" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+      ]
+    },
+    {
+      "id": "observe_case",
+      "description": "Observe the recovery case after planning: policy/authority outcome is the honest ceiling — nothing viable, nothing to approve or execute",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_after_planning",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-34", "description": "the case belongs to the requesting traveller's trip" },
+        { "path": "options", "op": "arrayNotEmpty", "description": "the evaluated options remain visible on the case" }
+      ]
+    }
+  ]
+}
