@@ -199,7 +199,7 @@ async function executeStep(input: {
               )
             : undefined,
         });
-        assertStatus(http.status, action.expectStatus, step.id);
+        assertStatus(http.status, action.expectStatus, step.id, http.body);
         applyCaptures(action.capture, http.body, bindings);
         break;
       }
@@ -217,7 +217,7 @@ async function executeStep(input: {
           path: '/api/traveller/change-request',
           body: requestPayload,
         });
-        assertStatus(http.status, action.expectStatus, step.id);
+        assertStatus(http.status, action.expectStatus, step.id, http.body);
         applyCaptures(action.capture, http.body, bindings);
         break;
       }
@@ -231,7 +231,7 @@ async function executeStep(input: {
           path: resolved.path,
           body: resolved.body,
         });
-        assertStatus(http.status, action.expectStatus, step.id);
+        assertStatus(http.status, action.expectStatus, step.id, http.body);
         applyCaptures(action.capture, http.body, bindings);
         break;
       }
@@ -249,7 +249,7 @@ async function executeStep(input: {
               )
             : undefined,
         });
-        assertStatus(http.status, action.expectStatus, step.id);
+        assertStatus(http.status, action.expectStatus, step.id, http.body);
         applyCaptures(action.capture, http.body, bindings);
         if (!builder.current().incomingTrigger) {
           builder.setIncomingTrigger({
@@ -266,7 +266,7 @@ async function executeStep(input: {
           method: 'GET',
           path: substituteString(action.path, bindings),
         });
-        assertStatus(http.status, action.expectStatus, step.id);
+        assertStatus(http.status, action.expectStatus, step.id, http.body);
         applyCaptures(action.capture, http.body, bindings);
         break;
       }
@@ -428,9 +428,14 @@ async function invokeHttp(
   return { status: response.status, body, latencyMs: Math.round(performance.now() - started) };
 }
 
-function assertStatus(actual: number, expected: number, stepId: string): void {
+function assertStatus(actual: number, expected: number, stepId: string, body?: unknown): void {
   if (actual !== expected) {
-    throw new Error(`step ${stepId}: expected HTTP ${expected}, got ${actual}`);
+    // Carry the response body into the failure message: engine rejections
+    // (4xx) explain themselves there, and evidence for failed steps otherwise
+    // records only the error string.
+    const detail =
+      body === undefined || body === null ? '' : `; response=${JSON.stringify(summarize(body))}`;
+    throw new Error(`step ${stepId}: expected HTTP ${expected}, got ${actual}${detail}`);
   }
 }
 

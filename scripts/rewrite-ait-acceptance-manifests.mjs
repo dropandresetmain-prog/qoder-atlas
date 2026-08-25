@@ -172,13 +172,14 @@ const manifests = {
       resetStep('2026-09-29T18:00:00+08:00'),
       {
         id: 'traveller_report',
-        description: 'Traveller reports missed KUL->SIN connection (pack msg-ait-s2-001)',
+        description: 'Traveller reports missed KUL->SIN connection (pack msg-ait-s2-001); explicit elementId because the report lands after the leg\'s scheduled departure (DR-7 seam)',
         action: {
           type: 'http',
           method: 'POST',
           path: '/api/runtime/missed-flight',
           body: {
             tripId: trip('ait-draft-09'),
+            elementId: 'el-' + trip('ait-draft-09') + '-leg-2',
             travellerReport:
               'Hi - stuck in KL. My flight out of Sydney left about five hours late (weather holding) and I missed my connection to Singapore. The airline desk rebooked me on a flight tomorrow morning at 8:10, landing just after 9. I present at the hackathon finals tomorrow afternoon and I am supposed to be at the lab in the morning too. My suitcase went on the morning flight apparently. What do we do?',
             at: '2026-09-29T19:40:00+08:00',

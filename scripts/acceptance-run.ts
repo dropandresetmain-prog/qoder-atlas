@@ -61,4 +61,15 @@ process.stdout.write(
   ) + '\n',
 );
 
-process.exit(result.evidence.ok ? 0 : 1);
+// Exit-code discipline without racing libuv teardown: a hard process.exit(0)
+// here can fire while the undici fetch pool / closed server handles are still
+// draining, which on Windows trips the UV_HANDLE_CLOSING assertion and turns
+// a successful run into a crash exit code. Instead: close the global fetch
+// dispatcher so keep-alive sockets release, then let top-level module
+// completion terminate Node naturally. Only a failed run forces an immediate
+// non-zero exit.
+const globalDispatcher = (
+  globalThis as Record<PropertyKey, { close(): Promise<void> } | undefined>
+)[Symbol.for('undici.globalDispatcher.1')];
+if (globalDispatcher) await globalDispatcher.close();
+if (!result.evidence.ok) process.exit(1);
