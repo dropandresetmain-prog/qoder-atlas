@@ -1,0 +1,44 @@
+{
+  "provenance": "NATIVE_UI",
+  "sourceIds": ["src-repo-scenarios", "src-syn-ait-event"],
+  "note": "Pack-authored expectation of the counterfactual preview the engine must compute for preview-request act-ait-s3-preview-001. This is the demo's expected overlay output; authoritative event state remains unchanged until commit. Facts derive from programme.json roleAssignments and the scenario's baseline travel facts below.",
+  "previewId": "prv-ait-s3-001",
+  "committedToAuthoritativeState": false,
+  "blastRadius": [
+    {
+      "draftId": "ait-draft-04",
+      "displayName": "Grace Nakamura",
+      "engagement": "cmt-ait-d1-future-provocation (SPEAKER, REQUIRED/FIXED)",
+      "outcome": "BECOMES_VIABLE",
+      "detail": "New slot 09:50-10:10; on-stage readiness satisfied (arrived 29 Sep); can leave venue ~10:20, landside Changi ~10:45, well inside check-in for the 13:30 outbound. Departure transfer must be re-dispatched from 19:15 to 10:15."
+    },
+    {
+      "draftId": "ait-draft-20",
+      "displayName": "Lucas Ferreira",
+      "engagement": "cmt-ait-d1-marketplace-chat (SPEAKER, REQUIRED/FIXED)",
+      "outcome": "BECOMES_DISRUPTED",
+      "detail": "New slot 12:10-12:30 collides with his booked same-day return MN231 SIN->SGN departing 12:30 (he was scheduled to present 09:50-10:10 and go straight to the airport). Recovery requires rebooking onto MN233 (18:10) with fare delta ~SGD 95; traveller-initiated consequence of an organiser change -> organiser approval + funding decision required, not auto-executable."
+    },
+    {
+      "draftId": "ait-draft-02",
+      "displayName": "Daniel Ong",
+      "engagement": "cmt-ait-d1-marketplace-chat (INTERVIEWER, REQUIRED/FIXED)",
+      "outcome": "REMAINS_VIABLE",
+      "detail": "Local participant; morning sequencing changes (marketplace moves after his founder-fireside-b duties on Day 0 only); no arrival/outbound/transfer impact."
+    }
+  ],
+  "collateralEffects": [
+    "Day 1 lunch start shifts 12:20 -> 12:30 (10 minutes trimmed); no commitment depends on lunch.",
+    "Grace's departure transfer (hotel -> airport) invalidated at 19:15; new dispatch needed at 10:15.",
+    "Lucas's departure transfer (venue -> airport, 10:30) invalidated; new dispatch would follow the rebooked 18:10 service.",
+    "No hotel night changes for any affected traveller."
+  ],
+  "strategyComparison": [
+    { "strategy": "PROGRAMME_SWAP_ONLY", "eventSpend": { "amount": 0, "currency": "SGD" }, "sideEffects": ["Lucas Ferreira disrupted; rebook ~SGD 95 needs approval and a funding decision", "Grace viable on the 13:30 outbound at current fare"] },
+    { "strategy": "REBOOK_GRACE_OUTBOUND", "eventSpend": { "amount": 180, "currency": "SGD" }, "sideEffects": ["Programme untouched", "Grace takes MN232 13:30 with fare delta ~SGD 180; above-threshold spend not implied — within airfare ceiling, needs standard change approval (HUMAN_AGENT per rule-ait-flight-change-approval)"] },
+    { "strategy": "LEAVE_UNCHANGED", "eventSpend": { "amount": 0, "currency": "SGD" }, "sideEffects": ["Grace misses her external Tokyo commitment (explicit traveller-stated consequence)"] }
+  ],
+  "unknowns": [
+    "Lucas's own preference between the 18:10 rebook and staying on his original plan by skipping the displaced slot — must be asked, not assumed."
+  ]
+}

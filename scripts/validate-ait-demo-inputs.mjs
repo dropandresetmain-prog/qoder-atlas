@@ -14,7 +14,9 @@
  *     AnchorEventSchema and places.json against PlaceSchema (repo contracts,
  *     read-only).
  *  5. Every anchorCommitmentId referenced by a draft exists in anchor-event.json.
- *  6. Every scenario pack s1..s8 exists and declares provenance + sourceIds.
+ *  6. Every scenario pack s1..s8 exists, declares provenance + sourceIds, and
+ *     every listed input file exists, parses, carries a taxonomy provenance
+ *     label and non-empty sourceIds.
  *  7. Role assignments in programme.json reference known drafts and commitments.
  *  8. organiser-policy.json ruleSets parse against RuleSetSchema (src/domain/rules.ts).
  *  9. programme-importance.json entries resolve to known drafts/commitments with
@@ -231,6 +233,23 @@ for (const s of scenarios) {
   const doc = parsed.get(scenarioFile);
   if (!Array.isArray(doc.sourceIds) || doc.sourceIds.length === 0) {
     problems.push(`scenarios/${s}/scenario.json: missing sourceIds`);
+  }
+  for (const input of doc.inputs ?? []) {
+    const inputFile = join(PACK, 'scenarios', s, input.file);
+    if (!parsed.has(inputFile)) {
+      problems.push(`scenarios/${s}: listed input missing on disk: ${input.file}`);
+      continue;
+    }
+    const inputDoc = parsed.get(inputFile);
+    if (typeof inputDoc?.provenance !== 'string' || !TAXONOMY.has(inputDoc.provenance)) {
+      problems.push(`scenarios/${s}/${input.file}: bad or missing provenance label`);
+    }
+    if (!Array.isArray(inputDoc?.sourceIds) || inputDoc.sourceIds.length === 0) {
+      problems.push(`scenarios/${s}/${input.file}: missing sourceIds`);
+    }
+    if (input.provenance && input.provenance !== inputDoc?.provenance) {
+      problems.push(`scenarios/${s}/${input.file}: manifest provenance '${input.provenance}' != file provenance '${inputDoc?.provenance}'`);
+    }
   }
 }
 

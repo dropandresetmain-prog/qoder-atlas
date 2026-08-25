@@ -1,0 +1,25 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated post-disruption service inventory snapshot (what a provider search would return after the schedule change/cancellation). Deliberate shape: exactly ONE same-day KUL->SIN alternative exists (MN220, 30 Sep afternoon) and NO earlier 30 Sep KUL->SIN service exists, so Mei Chen has no flight-side recovery and the engine must surface UNKNOWN/organiser decision instead of inventing one.",
+  "observedAt": "2026-09-21T10:05:00+08:00",
+  "routes": [
+    {
+      "origin": "KUL",
+      "destination": "SIN",
+      "services": [
+        { "flightNumber": "MN218", "date": "2026-10-01", "departure": "2026-10-01T06:00:00+08:00", "arrival": "2026-10-01T07:10:00+08:00", "status": "RETIMED_SERVICE", "economySeatsAvailable": 41, "economyFare": { "amount": 0, "currency": "SGD", "note": "Re-protection seat; no fare difference." } },
+        { "flightNumber": "MN220", "date": "2026-09-30", "departure": "2026-09-30T14:10:00+08:00", "arrival": "2026-09-30T15:20:00+08:00", "status": "OPERATING", "economySeatsAvailable": 12, "economyFare": { "amount": 98, "currency": "SGD", "note": "Within the SGD 1200 airfare ceiling; same-carrier change." } }
+      ],
+      "noEarlierServiceOn30Sep": true
+    },
+    {
+      "origin": "MNL",
+      "destination": "SIN",
+      "services": [
+        { "flightNumber": "MN208", "date": "2026-10-01", "departure": "2026-10-01T08:35:00+08:00", "arrival": "2026-10-01T11:55:00+08:00", "status": "OPERATING", "economySeatsAvailable": 23, "economyFare": { "amount": 0, "currency": "SGD", "note": "Airline re-proposal for cancelled MN204; no fare difference." } },
+        { "flightNumber": "MN210", "date": "2026-10-02", "departure": "2026-10-02T07:05:00+08:00", "arrival": "2026-10-02T10:25:00+08:00", "status": "OPERATING", "economySeatsAvailable": 17, "economyFare": { "amount": 132, "currency": "SGD" } }
+      ]
+    }
+  ]
+}

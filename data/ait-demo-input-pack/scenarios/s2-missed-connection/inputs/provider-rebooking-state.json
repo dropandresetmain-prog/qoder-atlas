@@ -1,0 +1,42 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated provider PNR state after the involuntary reroute, as a provider-order lookup would return it. Confirms the traveller's report and shows the airline's own recovery: next-morning MN228. Simulated at the external provider boundary; never presented as LIVE.",
+  "observedAt": "2026-09-29T19:55:00+08:00",
+  "pnr": "MNSYN09",
+  "passenger": { "draftId": "ait-draft-09" },
+  "segments": [
+    {
+      "flightNumber": "MN216",
+      "origin": "SYD",
+      "destination": "KUL",
+      "scheduledDeparture": "2026-09-29T08:20:00+10:00",
+      "actualDeparture": "2026-09-29T13:35:00+10:00",
+      "actualArrival": "2026-09-29T19:20:00+08:00",
+      "status": "FLOWN_LATE",
+      "delayReason": "ATC flow restrictions at SYD"
+    },
+    {
+      "flightNumber": "MN226",
+      "origin": "KUL",
+      "destination": "SIN",
+      "scheduledDeparture": "2026-09-29T16:40:00+08:00",
+      "status": "MISSED_CONNECTION",
+      "note": "Passenger did not board; connection lost due to late inbound MN216."
+    },
+    {
+      "flightNumber": "MN228",
+      "origin": "KUL",
+      "destination": "SIN",
+      "scheduledDeparture": "2026-09-30T08:10:00+08:00",
+      "scheduledArrival": "2026-09-30T09:20:00+08:00",
+      "status": "REBOOKED_INVOLUNTARY",
+      "fareDifference": "NONE"
+    }
+  ],
+  "baggage": {
+    "checkedBags": 1,
+    "routing": "Loaded onto MN228 of 30 Sep; expected delivery at SIN baggage belt on 30 Sep morning.",
+    "status": "ROUTED_WITH_REBOOKING"
+  }
+}

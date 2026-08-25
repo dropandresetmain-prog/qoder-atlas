@@ -1,0 +1,31 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "scenarioId": "S2",
+  "catalogueTitle": "Traveller misses a connection; airline recovery is not good enough",
+  "trigger": "TRAVELLER_STATE_REPORT",
+  "stage": "DURING_TRAVEL",
+  "tier": "TIER_A",
+  "demoRole": "Traveller disruption hero / supporting hero",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-29T19:40:00+08:00",
+  "note": "Chloe Martin (ait-draft-09, SYD origin, hackathon finalist: lab + finals on 30 Sep, awards on 2 Oct) reports mid-travel that her SYD departure left hours late, she missed her KUL connection, and the airline moved her to a next-morning flight. Northstar reconciles the report against the expected trip state and determines the airline's replacement arrival (30 Sep 09:20) leaves only ~2h before the hackathon lab and risks the hotel no-show, rest and finalist prep — recovery not good enough. A same-evening alternative (MN224, landside 21:40 on 29 Sep) exists but its arrival shift exceeds the 3h delegated-authority bound, so HUMAN_AGENT approval is required. Simulated seam: airline state artifacts are SIMULATED_EXTERNAL_EVENT; the traveller message is TRAVELLER_SUPPLIED_SYNTHETIC; nothing here is LIVE.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-09", "impactClass": "MISCONNECTED_PROVIDER_RECOVERY_INSUFFICIENT", "reason": "Airline rebooking lands 2026-09-30T09:20+08:00: ~1h55m before the hackathon lab (11:15) and ~5h50m before the REQUIRED/FIXED hackathon finals (15:10); hotel night of 29 Sep risks no-show release; no rest window; finalist prep uncompressed but unbuffered." }
+  ],
+  "expectedReasoningHooks": [
+    "Conversational ingestion: extract factual claims (missed connection, airline rebook, tomorrow-morning arrival, finals commitment) from a natural traveller message without treating them as authoritative provider state.",
+    "Reconciliation: compare the traveller's report with expected trip state (baseline itinerary) and the provider's involuntary-reroute record; missing evidence stays UNKNOWN, never fabricated.",
+    "Downstream invalidation by the airline replacement: hotel no-show cutoff (29 Sep 18:00), pre-booked airport transfer for 29 Sep 17:50 arrival, required rest before a REQUIRED/FIXED on-stage commitment, badge pickup window.",
+    "Deterministic rejection of the provider recovery: arrival 30 Sep 09:20 fails the 12h programme-critical buffer (finalist = REQUIRED/FIXED) and leaves no margin for immigration/baggage variance.",
+    "Recovery with authority: MN224 (29 Sep 20:30 -> 21:40, 3 seats) restores a viable arrival; arrival shift vs baseline is 3h50m, exceeding the delegatedAuthority 3h bound -> HUMAN_AGENT per rule-ait-flight-change-approval; supplier-caused, so no cost to the traveller."
+  ],
+  "inputs": [
+    { "file": "inputs/traveller-report-message.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/baseline-itinerary.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
+    { "file": "inputs/provider-rebooking-state.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
+    { "file": "inputs/recovery-options-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
+  ],
+  "referencedDraftIds": ["ait-draft-09"],
+  "referencedCommitmentIds": ["cmt-ait-d0-hackathon-lab", "cmt-ait-d0-hackathon-finals", "cmt-ait-d2-hack-awards"]
+}

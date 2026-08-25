@@ -1,0 +1,17 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated KUL->SIN service inventory at the moment of recovery planning (29 Sep evening). Deliberate shape: exactly one same-evening alternative exists (MN224, 3 seats) and it restores a viable arrival; the airline's own rebooking (MN228 next morning) is present but insufficient against the programme-critical commitments.",
+  "observedAt": "2026-09-29T20:05:00+08:00",
+  "routes": [
+    {
+      "origin": "KUL",
+      "destination": "SIN",
+      "services": [
+        { "flightNumber": "MN224", "date": "2026-09-29", "departure": "2026-09-29T20:30:00+08:00", "arrival": "2026-09-29T21:40:00+08:00", "status": "OPERATING", "economySeatsAvailable": 3, "economyFare": { "amount": 112, "currency": "SGD", "note": "Supplier-caused misconnect: rebooking at no cost to the traveller per airline duty of care." } },
+        { "flightNumber": "MN228", "date": "2026-09-30", "departure": "2026-09-30T08:10:00+08:00", "arrival": "2026-09-30T09:20:00+08:00", "status": "OPERATING", "economySeatsAvailable": 19, "economyFare": { "amount": 0, "currency": "SGD", "note": "Current involuntary rebooking; no fare difference." } }
+      ],
+      "noOtherServiceOn29Sep": true
+    }
+  ]
+}

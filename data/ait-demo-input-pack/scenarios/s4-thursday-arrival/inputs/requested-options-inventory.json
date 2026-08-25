@@ -1,0 +1,17 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated CNX->SIN inbound inventory at planning time. Deliberate shape: the Thursday-morning option Ethan asks for is the CHEAPEST fare (SGD 168) and the Wednesday-morning option is mid-priced — both must still fail deterministic viability for different reasons (commitment collision vs 12h programme-critical buffer).",
+  "observedAt": "2026-09-08T14:30:00+08:00",
+  "routes": [
+    {
+      "origin": "CNX",
+      "destination": "SIN",
+      "services": [
+        { "flightNumber": "MN236", "date": "2026-09-29", "departure": "2026-09-29T14:15:00+07:00", "arrival": "2026-09-29T19:35:00+08:00", "status": "OPERATING", "economySeatsAvailable": 16, "economyFare": { "amount": 205, "currency": "SGD", "note": "Currently proposed itinerary (via BKK)." } },
+        { "flightNumber": "MN237", "date": "2026-09-30", "departure": "2026-09-30T06:20:00+07:00", "arrival": "2026-09-30T10:40:00+08:00", "status": "OPERATING", "economySeatsAvailable": 8, "economyFare": { "amount": 189, "currency": "SGD", "note": "Wednesday-morning compromise candidate." } },
+        { "flightNumber": "MN238", "date": "2026-10-01", "departure": "2026-10-01T06:20:00+07:00", "arrival": "2026-10-01T10:40:00+08:00", "status": "OPERATING", "economySeatsAvailable": 21, "economyFare": { "amount": 168, "currency": "SGD", "note": "Ethan's requested Thursday-morning flight; cheapest of the three." } }
+      ]
+    }
+  ]
+}

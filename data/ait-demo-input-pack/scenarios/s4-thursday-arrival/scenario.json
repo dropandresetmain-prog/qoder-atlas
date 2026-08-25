@@ -1,0 +1,30 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "scenarioId": "S4",
+  "catalogueTitle": "\"Can I arrive Thursday morning instead?\"",
+  "trigger": "TRAVELLER_REQUESTED_CHANGE",
+  "stage": "PRE_BOOKING",
+  "tier": "TIER_A",
+  "demoRole": "Traveller preference / constrained optimisation",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-08T14:20:00+08:00",
+  "note": "Ethan Yap (ait-draft-34, CNX origin) is a hackathon finalist: lab + finals on 30 Sep (REQUIRED/FIXED on stage), search-chat speaker 1 Oct, People's Choice finalist returning for awards 2 Oct. The proposed (unticketed) itinerary lands him Tuesday 29 Sep evening, policy-compliant. He asks to arrive Thursday morning (1 Oct) instead. The requested flight is cheaper (SGD 168 vs 205) and more convenient — and must still be rejected: both 30 Sep commitments predate the arrival, and even the Wednesday-morning compromise fails the 12h programme-critical buffer before the 15:10 finals. This is the catalogue shape 'a cheaper or more convenient flight may be rejected because it creates insufficient event buffer' — expressed through commitments + deterministic buffer rules, never hardcoded. Simulated seam: flight inventory is SIMULATED_EXTERNAL_EVENT; the traveller message is TRAVELLER_SUPPLIED_SYNTHETIC.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-34", "impactClass": "REQUEST_DECLINED_TRIP_PRESERVED", "reason": "Thursday 1 Oct arrival postdates his REQUIRED/FIXED 30 Sep hackathon finals and lab; Wednesday 30 Sep 10:40 arrival still fails the 12h programme-critical buffer (7h10m before the 15:10 finals). The Tuesday-evening proposal stands." }
+  ],
+  "expectedReasoningHooks": [
+    "Traveller preference interpretation: extract the requested arrival (Thursday morning) and the soft personal reason without treating either as an instruction that overrides commitments.",
+    "Event-purpose-aware planning: the itinerary must serve the engagements (hackathon-lab 11:15, hackathon-finals 15:10 on 30 Sep; search-chat 1 Oct 14:30; awards 2 Oct), not just 'get to Singapore'.",
+    "Deterministic viability: Thursday option rejected by commitment timing; Wednesday option rejected by rule-ait-arrival-min-buffer + clauses.arrivalBuffer (12h programme-critical; 7h10m < 12h). Explicit instructions (his request) are considered but cannot override the REQUIRED/FIXED engagements they collide with.",
+    "Constrained optimisation output: keep the proposed Tuesday itinerary; surface that the cheaper fare is declined for event-buffer reasons, with the arithmetic shown.",
+    "No partial compliance trap: the engine must not silently book the cheaper Thursday flight 'since it saves SGD 37'."
+  ],
+  "inputs": [
+    { "file": "inputs/traveller-request-message.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/proposed-itinerary.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
+    { "file": "inputs/requested-options-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
+  ],
+  "referencedDraftIds": ["ait-draft-34"],
+  "referencedCommitmentIds": ["cmt-ait-d0-hackathon-lab", "cmt-ait-d0-hackathon-finals", "cmt-ait-d1-search-chat", "cmt-ait-d2-hack-awards"]
+}
