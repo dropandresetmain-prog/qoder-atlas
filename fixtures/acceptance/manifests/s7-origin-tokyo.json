@@ -1,65 +1,97 @@
 {
   "scenarioId": "S7",
-  "title": "I'm actually flying from Tokyo, not London.",
+  "title": "I am actually flying from Tokyo, not London.",
   "mode": "REPLAY",
   "globalInputPack": {
-    "packId": "northstar-global-programme",
+    "packId": "ait-global-programme",
     "version": "1.0.0",
     "path": "../packs/global"
   },
   "localInputPack": {
-    "packId": "s7-origin-tokyo",
+    "packId": "ait-s7",
     "version": "1.0.0",
     "path": "../packs/s7"
   },
   "boundaries": [
     {
       "seam": "traveller.change_request",
-      "mode": "REPLAY"
-    },
-    {
-      "seam": "atlas.flight_adapter",
-      "mode": "REPLAY"
+      "mode": "REPLAY",
+      "note": "Structured ChangeRequest through resolution HTTP"
     }
   ],
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-w3-demo"],
-    "travellerIds": ["trv-evt-w3-demo-draft-7"],
-    "tripIds": ["trip-trv-evt-w3-demo-draft-7"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-38"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-38"
+    ]
   },
   "routeParams": [
-    { "origin": "NRT", "destination": "SIN", "date": "2026-09-07" }
+    {
+      "origin": "HND",
+      "destination": "SIN",
+      "date": "2026-09-29"
+    }
   ],
   "steps": [
     {
       "id": "reset",
+      "description": "Deterministic reset/reseed",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-04T12:00:00+00:00" },
+        "body": {
+          "at": "2026-09-18T10:00:00+08:00"
+        },
         "expectStatus": 200
       }
     },
     {
-      "id": "traveller_request",
+      "id": "change_request",
       "action": {
-        "type": "traveller_message",
-        "travellerId": "trv-evt-w3-demo-draft-7",
-        "tripId": "trip-trv-evt-w3-demo-draft-7",
-        "text": "I'm actually flying from Tokyo, not London.",
-        "at": "2026-09-04T13:00:00+00:00",
-        "capture": { "caseId": "caseId" },
-        "expectStatus": 200
+        "type": "http",
+        "method": "POST",
+        "path": "/api/resolution/change-request",
+        "body": {
+          "request": {
+            "id": "cr-ait-s7-001",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-38",
+            "travellerId": "trv-evt-ait-2026-ait-draft-38",
+            "sourceId": "src-acceptance-manifest",
+            "authority": "ASSERTED",
+            "issuedAt": "2026-09-18T10:05:00+08:00",
+            "intentKind": "CHANGE_TRANSPORT_SCHEDULE",
+            "urgency": "HARD_INSTRUCTION",
+            "utterance": "I am actually flying from Tokyo, not London.",
+            "target": {
+              "departureOrigin": {
+                "system": "airport-code",
+                "value": "HND"
+              }
+            }
+          },
+          "at": "2026-09-18T10:05:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
       }
     },
     {
       "id": "observe_case",
+      "description": "Observe opened recovery case",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
+        "label": "case_after_change_request",
         "expectStatus": 200
       }
     }

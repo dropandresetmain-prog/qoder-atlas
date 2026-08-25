@@ -1,12 +1,18 @@
 {
-  "packId": "s4-thursday-morning-arrival",
+  "packId": "ait-s4",
   "version": "1.0.0",
-  "catalogueId": "S4",
-  "trigger": "traveller_change_request",
-  "payload": {
-    "travellerId": "trv-evt-w3-demo-draft-2",
-    "tripId": "trip-trv-evt-w3-demo-draft-2",
-    "text": "Can I arrive Thursday morning instead of Wednesday evening?",
-    "at": "2026-09-04T10:00:00+00:00"
+  "scenarioId": "S4",
+  "description": "Local acceptance pack for S4; facts live in data/ait-demo-input-pack",
+  "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-34"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-34"
+    ]
   }
 }

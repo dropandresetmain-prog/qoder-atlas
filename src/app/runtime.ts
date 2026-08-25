@@ -301,6 +301,14 @@ export class RuntimeOrchestrator {
     withTransaction(this.deps.db, () => {
       const tables = ['audit', 'source_contents', 'sources', 'signals', 'cases', 'trips', 'entities', 'preferences'];
       if (this.deps.dossiers) tables.push('booking_dossiers');
+      // Application-owned ingress dedup state (lazily created by the event
+      // inbox store): reset must forget previously-delivered provider events
+      // too, otherwise a deterministic rerun of the same acceptance manifest
+      // is rejected as a duplicate delivery instead of re-executing.
+      const inboxTable = this.deps.db
+        .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'provider_event_inbox'`)
+        .get();
+      if (inboxTable) tables.push('provider_event_inbox');
       for (const table of tables) {
         this.deps.db.exec(`DELETE FROM ${table}`);
       }

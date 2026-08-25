@@ -1,14 +1,14 @@
 {
   "scenarioId": "S2",
-  "title": "Traveller misses a connection; airline recovery is not good enough",
+  "title": "Missed connection after late inbound",
   "mode": "REPLAY",
   "globalInputPack": {
-    "packId": "northstar-global-programme",
+    "packId": "ait-global-programme",
     "version": "1.0.0",
     "path": "../packs/global"
   },
   "localInputPack": {
-    "packId": "s2-missed-connection",
+    "packId": "ait-s2",
     "version": "1.0.0",
     "path": "../packs/s2"
   },
@@ -20,50 +20,63 @@
     },
     {
       "seam": "atlas.flight_adapter",
-      "mode": "REPLAY"
+      "mode": "REPLAY",
+      "note": "Provider reprotection state stays REPLAY"
     }
   ],
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-w3-demo"],
-    "travellerIds": [],
-    "tripIds": ["trip_a"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-09"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-09"
+    ]
   },
   "routeParams": [],
   "steps": [
     {
       "id": "reset",
+      "description": "Deterministic reset/reseed",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-13T06:00:00+09:00" },
+        "body": {
+          "at": "2026-09-29T18:00:00+08:00"
+        },
         "expectStatus": 200
       }
     },
     {
-      "id": "trigger",
-      "description": "Traveller reports missed connection",
+      "id": "traveller_report",
+      "description": "Traveller reports missed KUL->SIN connection (pack msg-ait-s2-001)",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/missed-flight",
         "body": {
-          "tripId": "trip_a",
-          "elementId": "el_a_flight_out",
-          "travellerReport": "My connecting flight was delayed and I missed the next leg.",
-          "at": "2026-09-13T07:00:00+09:00"
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-09",
+          "travellerReport": "Hi - stuck in KL. My flight out of Sydney left about five hours late (weather holding) and I missed my connection to Singapore. The airline desk rebooked me on a flight tomorrow morning at 8:10, landing just after 9. I present at the hackathon finals tomorrow afternoon and I am supposed to be at the lab in the morning too. My suitcase went on the morning flight apparently. What do we do?",
+          "at": "2026-09-29T19:40:00+08:00"
         },
-        "capture": { "caseId": "caseId" },
-        "expectStatus": 200
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
       }
     },
     {
       "id": "observe_case",
+      "description": "Observe opened recovery case",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
+        "label": "case_after_missed_connection",
         "expectStatus": 200
       }
     }

@@ -1,13 +1,18 @@
 {
-  "packId": "s6-switch-hotels",
+  "packId": "ait-s6",
   "version": "1.0.0",
-  "catalogueId": "S6",
-  "trigger": "traveller_change_request",
-  "mvpBoundary": "stretch_may_be_simulated",
-  "payload": {
-    "travellerId": "trv-evt-w3-demo-draft-6",
-    "tripId": "trip-trv-evt-w3-demo-draft-6",
-    "text": "Can I switch hotels? My partner is joining and we need a different room.",
-    "at": "2026-09-04T12:00:00+00:00"
+  "scenarioId": "S6",
+  "description": "Local acceptance pack for S6; facts live in data/ait-demo-input-pack",
+  "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-31"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-31"
+    ]
   }
 }

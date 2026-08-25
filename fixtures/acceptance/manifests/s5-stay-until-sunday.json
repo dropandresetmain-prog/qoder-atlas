@@ -3,12 +3,12 @@
   "title": "Can I stay until Sunday?",
   "mode": "REPLAY",
   "globalInputPack": {
-    "packId": "northstar-global-programme",
+    "packId": "ait-global-programme",
     "version": "1.0.0",
     "path": "../packs/global"
   },
   "localInputPack": {
-    "packId": "s5-stay-until-sunday",
+    "packId": "ait-s5",
     "version": "1.0.0",
     "path": "../packs/s5"
   },
@@ -16,48 +16,75 @@
     {
       "seam": "traveller.change_request",
       "mode": "REPLAY",
-      "note": "Stretch scenario — natural traveller text through product boundary"
+      "note": "Structured ChangeRequest through resolution HTTP"
     }
   ],
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-w3-demo"],
-    "travellerIds": ["trv-evt-w3-demo-draft-5"],
-    "tripIds": ["trip-trv-evt-w3-demo-draft-5"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-35"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-35"
+    ]
   },
   "routeParams": [],
   "steps": [
     {
       "id": "reset",
+      "description": "Deterministic reset/reseed",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-04T10:00:00+00:00" },
+        "body": {
+          "at": "2026-09-25T10:00:00+08:00"
+        },
         "expectStatus": 200
       }
     },
     {
-      "id": "traveller_request",
+      "id": "change_request",
       "action": {
-        "type": "ui_action",
-        "kind": "traveller_text",
-        "params": {
-          "travellerId": "trv-evt-w3-demo-draft-5",
-          "tripId": "trip-trv-evt-w3-demo-draft-5",
-          "text": "Can I stay until Sunday? I would like to extend personally after the conference.",
-          "at": "2026-09-04T11:00:00+00:00"
+        "type": "http",
+        "method": "POST",
+        "path": "/api/resolution/change-request",
+        "body": {
+          "request": {
+            "id": "cr-ait-s5-001",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-35",
+            "travellerId": "trv-evt-ait-2026-ait-draft-35",
+            "sourceId": "src-acceptance-manifest",
+            "authority": "ASSERTED",
+            "issuedAt": "2026-09-25T10:05:00+08:00",
+            "intentKind": "ADJUST_TRIP_WINDOW",
+            "urgency": "HARD_INSTRUCTION",
+            "utterance": "Can I stay until Sunday?",
+            "target": {
+              "departAfter": "2026-10-04T12:00:00+08:00",
+              "stayCheckOut": "2026-10-04T11:00:00+08:00"
+            },
+            "fundingDeclaration": "TRAVELLER_FUNDED"
+          },
+          "at": "2026-09-25T10:05:00+08:00"
         },
-        "capture": { "caseId": "caseId" },
-        "expectStatus": 200
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
       }
     },
     {
       "id": "observe_case",
+      "description": "Observe opened recovery case",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
+        "label": "case_after_change_request",
         "expectStatus": 200
       }
     }

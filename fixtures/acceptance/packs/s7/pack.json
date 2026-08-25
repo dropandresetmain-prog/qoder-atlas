@@ -1,15 +1,18 @@
 {
-  "packId": "s7-origin-tokyo",
+  "packId": "ait-s7",
   "version": "1.0.0",
-  "catalogueId": "S7",
-  "trigger": "traveller_change_request",
-  "payload": {
-    "travellerId": "trv-evt-w3-demo-draft-7",
-    "tripId": "trip-trv-evt-w3-demo-draft-7",
-    "text": "I'm actually flying from Tokyo, not London.",
-    "at": "2026-09-04T13:00:00+00:00"
-  },
-  "routeParams": [
-    { "origin": "NRT", "destination": "SIN", "date": "2026-09-07" }
-  ]
+  "scenarioId": "S7",
+  "description": "Local acceptance pack for S7; facts live in data/ait-demo-input-pack",
+  "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-38"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-38"
+    ]
+  }
 }

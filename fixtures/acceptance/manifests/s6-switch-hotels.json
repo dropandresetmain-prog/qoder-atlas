@@ -3,12 +3,12 @@
   "title": "Can I switch hotels? My partner is joining.",
   "mode": "REPLAY",
   "globalInputPack": {
-    "packId": "northstar-global-programme",
+    "packId": "ait-global-programme",
     "version": "1.0.0",
     "path": "../packs/global"
   },
   "localInputPack": {
-    "packId": "s6-switch-hotels",
+    "packId": "ait-s6",
     "version": "1.0.0",
     "path": "../packs/s6"
   },
@@ -16,49 +16,75 @@
     {
       "seam": "traveller.change_request",
       "mode": "REPLAY",
-      "note": "Stretch scenario — hotel switch requested via traveller text"
-    },
-    {
-      "seam": "nuitee.hotel_adapter",
-      "mode": "REPLAY"
+      "note": "Structured ChangeRequest through resolution HTTP"
     }
   ],
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-w3-demo"],
-    "travellerIds": ["trv-evt-w3-demo-draft-6"],
-    "tripIds": ["trip-trv-evt-w3-demo-draft-6"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-31"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-31"
+    ]
   },
   "routeParams": [],
   "steps": [
     {
       "id": "reset",
+      "description": "Deterministic reset/reseed",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-04T11:00:00+00:00" },
+        "body": {
+          "at": "2026-09-22T10:00:00+08:00"
+        },
         "expectStatus": 200
       }
     },
     {
-      "id": "traveller_request",
+      "id": "change_request",
       "action": {
-        "type": "traveller_message",
-        "travellerId": "trv-evt-w3-demo-draft-6",
-        "tripId": "trip-trv-evt-w3-demo-draft-6",
-        "text": "Can I switch hotels? My partner is joining and we need a different room.",
-        "at": "2026-09-04T12:00:00+00:00",
-        "capture": { "caseId": "caseId" },
-        "expectStatus": 200
+        "type": "http",
+        "method": "POST",
+        "path": "/api/resolution/change-request",
+        "body": {
+          "request": {
+            "id": "cr-ait-s6-001",
+            "tripId": "trip-trv-evt-ait-2026-ait-draft-31",
+            "travellerId": "trv-evt-ait-2026-ait-draft-31",
+            "sourceId": "src-acceptance-manifest",
+            "authority": "ASSERTED",
+            "issuedAt": "2026-09-22T10:05:00+08:00",
+            "intentKind": "CHANGE_STAY",
+            "urgency": "HARD_INSTRUCTION",
+            "utterance": "Can I switch hotels? My partner is joining.",
+            "target": {
+              "preferredStayPlaceId": "place-hotel-harbourline",
+              "guests": 2
+            },
+            "fundingDeclaration": "TRAVELLER_FUNDED"
+          },
+          "at": "2026-09-22T10:05:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "caseId": "caseId"
+        }
       }
     },
     {
       "id": "observe_case",
+      "description": "Observe opened recovery case",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
+        "label": "case_after_change_request",
         "expectStatus": 200
       }
     }

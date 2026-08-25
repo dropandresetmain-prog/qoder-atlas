@@ -1,18 +1,22 @@
 {
-  "packId": "s1-airline-schedule-change",
+  "packId": "ait-s1",
   "version": "1.0.0",
-  "catalogueId": "S1",
-  "trigger": "supplier_external_event",
-  "payload": {
-    "eventId": "evt-accept-s1-0001",
-    "orderNo": "FL-A-1001",
-    "eventType": "FLIGHT_CANCELLATION",
-    "eventStatus": 1,
-    "eventTime": "2026-09-12T06:00:00+00:00",
-    "createTime": "2026-09-12T06:00:00+00:00",
-    "airline": "XX",
-    "pnr": "PNR001",
-    "paxName": "Test Traveller",
-    "paxEmail": "traveller@example.test"
+  "scenarioId": "S1",
+  "description": "Local acceptance pack for S1; facts live in data/ait-demo-input-pack",
+  "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-14",
+      "trv-evt-ait-2026-ait-draft-15",
+      "trv-evt-ait-2026-ait-draft-13"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-14",
+      "trip-trv-evt-ait-2026-ait-draft-15",
+      "trip-trv-evt-ait-2026-ait-draft-13"
+    ]
   }
 }

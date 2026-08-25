@@ -1,78 +1,65 @@
 {
   "scenarioId": "S3",
-  "title": "Headline speaker needs to leave earlier; organiser previews consequences",
+  "title": "Organiser event-side preview",
   "mode": "REPLAY",
   "globalInputPack": {
-    "packId": "northstar-global-programme",
+    "packId": "ait-global-programme",
     "version": "1.0.0",
     "path": "../packs/global"
   },
   "localInputPack": {
-    "packId": "s3-organiser-preview",
+    "packId": "ait-s3",
     "version": "1.0.0",
     "path": "../packs/s3"
   },
   "boundaries": [
     {
-      "seam": "programme.change_preview",
+      "seam": "programme.event_change",
       "mode": "REPLAY",
-      "note": "Organiser Preview through real programme HTTP surface"
-    },
-    {
-      "seam": "programme.change_commit",
-      "mode": "REPLAY",
-      "note": "Organiser Commit through real programme HTTP surface"
+      "note": "Mutation-free counterfactual preview through programme HTTP"
     }
   ],
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-w3-demo"],
-    "travellerIds": [],
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-04",
+      "trv-evt-ait-2026-ait-draft-20",
+      "trv-evt-ait-2026-ait-draft-02"
+    ],
     "tripIds": []
   },
   "routeParams": [],
   "steps": [
     {
       "id": "reset",
+      "description": "Deterministic reset/reseed",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-01T00:00:00+00:00" },
-        "expectStatus": 200
-      }
-    },
-    {
-      "id": "organiser_preview",
-      "description": "Organiser Preview (counterfactual, no mutation)",
-      "action": {
-        "type": "ui_action",
-        "kind": "organiser_preview",
-        "params": {
-          "anchorEventId": "evt-w3-demo",
-          "commitmentId": "cmt-evt-w3-demo-opening",
-          "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-09-08T17:00:00+08:00",
-          "newEndsAt": "2026-09-08T19:00:00+08:00",
-          "at": "2026-09-01T00:00:00+00:00"
+        "body": {
+          "at": "2026-09-22T10:00:00+08:00"
         },
         "expectStatus": 200
       }
     },
     {
-      "id": "organiser_commit",
-      "description": "Organiser Commit fan-out",
+      "id": "preview",
+      "description": "Counterfactual: move future-provocation into the 09:50-10:10 Day-1 slot (pack preview-request)",
       "action": {
-        "type": "ui_action",
-        "kind": "organiser_commit",
-        "params": {
-          "anchorEventId": "evt-w3-demo",
-          "commitmentId": "cmt-evt-w3-demo-opening",
+        "type": "http",
+        "method": "POST",
+        "path": "/api/programme/evt-ait-2026/change-preview",
+        "body": {
+          "commitmentId": "cmt-ait-d1-future-provocation",
           "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-09-08T17:00:00+08:00",
-          "newEndsAt": "2026-09-08T19:00:00+08:00",
-          "at": "2026-09-01T00:05:00+00:00"
+          "newStartsAt": "2026-10-01T09:50:00+08:00",
+          "newEndsAt": "2026-10-01T10:10:00+08:00",
+          "at": "2026-09-22T11:05:00+08:00"
         },
         "expectStatus": 200
       }
@@ -81,7 +68,8 @@
       "id": "observe_programme",
       "action": {
         "type": "observe",
-        "path": "/api/programme/evt-w3-demo",
+        "path": "/api/programme/evt-ait-2026",
+        "label": "programme_after_preview",
         "expectStatus": 200
       }
     }

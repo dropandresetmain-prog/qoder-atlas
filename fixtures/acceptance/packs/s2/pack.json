@@ -1,12 +1,18 @@
 {
-  "packId": "s2-missed-connection",
+  "packId": "ait-s2",
   "version": "1.0.0",
-  "catalogueId": "S2",
-  "trigger": "traveller_state_report",
-  "payload": {
-    "tripId": "trip_a",
-    "elementId": "el_a_flight_out",
-    "travellerReport": "My connecting flight was delayed and I missed the next leg.",
-    "at": "2026-09-13T07:00:00+09:00"
+  "scenarioId": "S2",
+  "description": "Local acceptance pack for S2; facts live in data/ait-demo-input-pack",
+  "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
+  "expect": {
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-09"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-09"
+    ]
   }
 }
