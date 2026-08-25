@@ -469,7 +469,7 @@ function applyCaptures(
 function evaluateAssertions(step: ManifestStep, body: unknown, bindings: Bindings): void {
   for (const [index, assertion] of step.assert.entries()) {
     const label = `step ${step.id}: assertion ${index + 1}${assertion.description ? ` (${assertion.description})` : ''}`;
-    const subject = resolveAssertionSubject(assertion, body, bindings, label);
+    const subject = resolveAssertionSubject(assertion, body, bindings);
     const expected =
       typeof assertion.expected === 'string'
         ? substituteString(assertion.expected, bindings)
@@ -551,7 +551,6 @@ function resolveAssertionSubject(
   assertion: Assertion,
   body: unknown,
   bindings: Bindings,
-  label: string,
 ): { label: string; value: unknown; found: boolean } {
   if (assertion.binding !== undefined) {
     const found = assertion.binding in bindings;
