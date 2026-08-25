@@ -32,9 +32,10 @@ import { ATLAS_PROVIDER_ID } from './adapter.ts';
  * Atlas documents no enum for `eventType` (only the incident-list record
  * shape). Classify by keyword rather than guessing an exhaustive vocabulary;
  * an unrecognized shape degrades to OTHER, never a crash or a fabricated
- * category.
+ * category. Shared with the reconciliation read (stateReader.ts) so push
+ * events and provider-state reads interpret eventType identically.
  */
-function classifyCategory(eventType: string): ProviderEventCategory {
+export function classifyAtlasEventCategory(eventType: string): ProviderEventCategory {
   const upper = eventType.toUpperCase();
   if (upper.includes('CANCEL')) return 'FLIGHT_CANCELLATION';
   if (upper.includes('DELAY')) return 'FLIGHT_DELAY';
@@ -88,7 +89,7 @@ export class AtlasFlightEventNormalizer implements ExternalFlightEventNormalizer
     }
 
     const event = parsed.data;
-    const category = classifyCategory(event.eventType);
+    const category = classifyAtlasEventCategory(event.eventType);
     const occurredAt = toIsoOrUndefined(event.eventTime) ?? toIsoOrUndefined(event.createTime);
     const receivedAt = requestedAt;
     const providerOrderRefs = [event.orderNo, ...(event.pnr ? [event.pnr] : [])];

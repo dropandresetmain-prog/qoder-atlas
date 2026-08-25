@@ -71,6 +71,7 @@ import { createUploadIntakeHandlers } from './uploadIntakeHttp.ts';
 import { SqliteEventInboxStore } from './eventInboxStore.ts';
 import { createEventIngestHandlers } from './eventIngestHttp.ts';
 import { AtlasFlightEventNormalizer } from '../providers/atlas/eventNormalizer.ts';
+import { AtlasFlightStateReader } from '../providers/atlas/stateReader.ts';
 import { loadScenario, listScenarioDirs } from '../scenarios/loader.ts';
 import type { ScenarioSpec } from '../scenarios/spec.ts';
 import type { DemoSurface } from '../server/http.ts';
@@ -452,6 +453,20 @@ export async function composeAppRuntime(
       normalizer: new AtlasFlightEventNormalizer(),
       trips,
       orchestrator,
+      // DR-3 reconciliation: an ASSERTED push event is reconciled against the
+      // provider's own current-state read through the shared REPLAY/LIVE
+      // adapter path; the reconciled CONNECTED state legitimately outranks
+      // the push (authority ladder untouched).
+      reconciliation: {
+        reader: new AtlasFlightStateReader({
+          mode: config.adapterMode,
+          store: recordingStore,
+          baseUrl: config.providers.atlas.baseUrl,
+          clientId: config.providers.atlas.clientId,
+          clientSecret: config.providers.atlas.clientSecret,
+        }),
+        sources,
+      },
     }),
     traveller: createChangeIntakeHandlers({
       modelClient,

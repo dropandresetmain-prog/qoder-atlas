@@ -1,0 +1,26 @@
+{
+  "id": "rec_61a8c1ec175d8969edb7b50abce7c7c1",
+  "providerId": "atlas",
+  "operation": "flight_state_query",
+  "recordedAt": "2026-09-21T01:40:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "data": [
+      {
+        "eventId": "atlas-inc-mnsyn10-sched-001",
+        "orderNo": "MNSYN10",
+        "eventType": "SCHEDULE_CHANGE",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:40:00+08:00",
+        "createTime": "2026-09-21T09:40:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-10-01T06:00:00+08:00",
+        "arrTime": "2026-10-01T07:10:00+08:00",
+        "flightNo": "MN218",
+        "pnr": "MNSYN10",
+        "notified": true
+      }
+    ]
+  }
+}

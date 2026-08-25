@@ -110,7 +110,14 @@ function emitFlightStateSignal(
       authority: env.source.authority,
       ...(env.context.tripId ? { tripId: env.context.tripId } : {}),
       summary: `Provider flight state: ${state.status}`,
-      payload: { ...state },
+      payload: {
+        ...state,
+        // Deterministic mapping into the generic schedule vocabulary the
+        // signal pipeline consumes: a retimed provider state asserts new
+        // departure/arrival facts for the affected transport element.
+        ...(state.newDeparture ? { scheduledDeparture: state.newDeparture } : {}),
+        ...(state.newArrival ? { scheduledArrival: state.newArrival } : {}),
+      },
     }),
   );
 }

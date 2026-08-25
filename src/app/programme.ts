@@ -12,7 +12,7 @@
  * missing and is recorded as an issue/uncertainty on the promotion outcome
  * and in the audit trail.
  */
-import type { EntityId, IsoDateTime, UncertaintyRecord } from '../domain/common.ts';
+import { instantMillis, type EntityId, type IsoDateTime, type UncertaintyRecord } from '../domain/common.ts';
 import {
   AnchorCommitmentChangePayloadSchema,
   type AnchorCommitmentChangePayload,
@@ -25,7 +25,7 @@ import type {
   Place,
   Traveller,
 } from '../domain/entities.ts';
-import type { RuleSet } from '../domain/rules.ts';
+import type { PolicyRule, RuleSet } from '../domain/rules.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { Engagement, Stay, TransportLeg, TransportMode, TripElement } from '../domain/elements.ts';
 import type { Constraint } from '../domain/constraints.ts';
@@ -149,8 +149,9 @@ export class ProgrammeService {
     const commitmentById = new Map((anchorEvent?.commitments ?? []).map((commitment) => [commitment.id, commitment]));
 
     const outcomes: PromotionOutcome[] = [];
+    const places = await this.listPlaces();
     for (const traveller of draft.travellers) {
-      outcomes.push(await this.promoteOne({ draft, traveller, at: input.at, commitmentById, governingRuleSetIds }));
+      outcomes.push(await this.promoteOne({ draft, traveller, at: input.at, commitmentById, governingRuleSetIds, anchorEvent, places }));
     }
 
     await this.deps.audit.append({
@@ -188,6 +189,8 @@ export class ProgrammeService {
     at: IsoDateTime;
     commitmentById: Map<EntityId, AnchorEvent['commitments'][number]>;
     governingRuleSetIds: EntityId[];
+    anchorEvent: AnchorEvent | undefined;
+    places: Place[];
   }): Promise<PromotionOutcome> {
     const { draft, traveller, at } = input;
     const issues: string[] = [];
@@ -379,12 +382,20 @@ export class ProgrammeService {
 
       // Judgeability (REV-2 WP-R2): every commitment-linked engagement gains
       // a deterministic TEMPORAL HARD constraint binding arrival evidence to
-      // the commitment start. Arrival evidence arrives later via recovery
-      // proposals, so the constraint references the trip's shared arrival
-      // slot — a promotion-known element id the planner fills. Until some
-      // evidence fills it the constraint stays HARD UNKNOWN, so no candidate
-      // ignoring the arrival requirement can ever be feasible.
-      const arrivalSlotId = `el-${resolvedTripId}-arrival`;
+      // the commitment start. When the draft declares travel arriving at the
+      // event's transport gateway, that declared leg IS the arrival evidence;
+      // a trip without arrival evidence keeps referencing the trip's shared
+      // arrival slot — a promotion-known element id the planner fills. Until
+      // some evidence exists the constraint stays HARD UNKNOWN, so no
+      // candidate ignoring the arrival requirement can ever be feasible.
+      const arrivalEvidenceId = this.arrivalEvidenceSubjectId(
+        input.anchorEvent,
+        engagements,
+        declaredElements.elements,
+        input.places,
+      );
+      const arrivalSubjectId = arrivalEvidenceId ?? `el-${resolvedTripId}-arrival`;
+      const arrivalBuffer = await this.arrivalBufferFromRules(input.governingRuleSetIds);
       for (const engagement of engagements) {
         const constraint: Constraint = {
           id: `c-${resolvedTripId}-arrival-before-${engagement.id}`,
@@ -394,12 +405,19 @@ export class ProgrammeService {
           status: 'UNKNOWN',
           description: 'arrival evidence must precede the linked commitment start',
           refs: [
-            { entityType: 'TRIP_ELEMENT', id: arrivalSlotId },
+            { entityType: 'TRIP_ELEMENT', id: arrivalSubjectId },
             { entityType: 'TRIP_ELEMENT', id: engagement.id },
           ],
-          // Programme intake carries no arrival-buffer evidence: the
-          // minBufferMinutes parameter is deliberately ABSENT (evaluator
-          // default zero applies), recorded as a decision — never fabricated.
+          // Arrival-buffer evidence comes from governing MIN_BUFFER policy
+          // rules when present; absent policy stays a recorded absence
+          // (evaluator default zero applies), never a fabricated default.
+          ...(arrivalBuffer
+            ? {
+                derivedFromRuleId: arrivalBuffer.ruleId,
+                ruleSetId: arrivalBuffer.ruleSetId,
+                parameters: { minBufferMinutes: arrivalBuffer.minutes },
+              }
+            : {}),
           sourceId: draft.sourceId,
         };
         operations.push({ op: 'UPSERT_CONSTRAINT', constraint });
@@ -410,7 +428,9 @@ export class ProgrammeService {
         'recorded decision: objective hardness SOFT — intake carries no binding-strength evidence (ADR-034); reprioritisation remains an approval-gated state change',
       );
       issues.push(
-        'recorded decision: arrival-buffer parameter absent — programme intake carries no buffer evidence; zero buffer is a recorded absence, not a fabricated default',
+        arrivalBuffer
+          ? `recorded decision: arrival buffer ${arrivalBuffer.minutes}min derived from governing MIN_BUFFER rule ${arrivalBuffer.ruleId}`
+          : 'recorded decision: arrival-buffer parameter absent — no governing MIN_BUFFER rule; zero buffer is a recorded absence, not a fabricated default',
       );
       if (input.governingRuleSetIds.length === 0) {
         issues.push(
@@ -671,6 +691,97 @@ export class ProgrammeService {
     for (const summary of await this.deps.trips.listTrips()) {
       const trip = await this.deps.trips.getTrip(summary.tripId);
       if (trip?.travellerIds.includes(travellerId)) return trip.id;
+    }
+    return undefined;
+  }
+
+  private async listPlaces(): Promise<Place[]> {
+    return (await this.deps.entities.list('PLACE'))
+      .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
+      .map((entry) => entry.entity);
+  }
+
+  /**
+   * Generic transport-gateway resolution (same semantics as the planner):
+   * a place resolves to the place bearing its airport-code ref — itself, or
+   * a serving gateway reached through servedByPlaceIds. Absent evidence
+   * resolves to undefined; never guessed. Depth-bounded against cycles.
+   */
+  private airportGatewayPlaceId(
+    placeId: EntityId | undefined,
+    places: Place[],
+    depth = 0,
+  ): EntityId | undefined {
+    if (!placeId || depth > 1) return undefined;
+    const place = places.find((candidate) => candidate.id === placeId);
+    if (!place) return undefined;
+    if (place.externalRefs.some((ref) => ref.system === 'airport-code' && ref.value.length > 0)) {
+      return place.id;
+    }
+    for (const gatewayId of place.servedByPlaceIds ?? []) {
+      const gateway = this.airportGatewayPlaceId(gatewayId, places, depth + 1);
+      if (gateway) return gateway;
+    }
+    return undefined;
+  }
+
+  /**
+   * Arrival-evidence subject for the arrival-before constraints: the declared
+   * transport leg arriving at the event's transport gateway (the latest
+   * scheduled arrival wins; element id order breaks ties deterministically).
+   * A trip without such a leg keeps the shared planner-filled arrival slot.
+   */
+  private arrivalEvidenceSubjectId(
+    anchorEvent: AnchorEvent | undefined,
+    engagements: Engagement[],
+    declaredElements: TripElement[],
+    places: Place[],
+  ): EntityId | undefined {
+    const eventPlaceId = anchorEvent?.placeId ?? engagements[0]?.data.placeId;
+    const eventGatewayId = this.airportGatewayPlaceId(eventPlaceId, places);
+    if (!eventGatewayId) return undefined;
+    const arrivals = declaredElements.filter(
+      (element): element is TransportLeg =>
+        element.elementKind === 'TRANSPORT_LEG' &&
+        this.airportGatewayPlaceId(element.data.destinationPlaceId, places) === eventGatewayId,
+    );
+    if (arrivals.length === 0) return undefined;
+    const arrivalInstantOf = (leg: TransportLeg): number =>
+      leg.data.scheduledArrival ? instantMillis(leg.data.scheduledArrival.value) : Number.NEGATIVE_INFINITY;
+    arrivals.sort((a, b) => arrivalInstantOf(a) - arrivalInstantOf(b) || a.id.localeCompare(b.id));
+    return arrivals[arrivals.length - 1]?.id;
+  }
+
+  /**
+   * Arrival-buffer parameter from governing MIN_BUFFER policy rules: only
+   * programme-wide rules (empty appliesTo — no element-level evidence exists
+   * at intake) bind; the first rule in deterministic (rule set, rule) order
+   * wins. The declared minimum binds; an absent minimum falls back to the
+   * expected duration. No qualifying rule leaves the parameter absent.
+   */
+  private async arrivalBufferFromRules(
+    governingRuleSetIds: EntityId[],
+  ): Promise<{ minutes: number; ruleId: EntityId; ruleSetId: EntityId } | undefined> {
+    if (governingRuleSetIds.length === 0) return undefined;
+    const ruleSets = (await this.deps.entities.list('RULE_SET'))
+      .filter((entry): entry is { entityType: 'RULE_SET'; entity: RuleSet } => entry.entityType === 'RULE_SET')
+      .map((entry) => entry.entity)
+      .filter((ruleSet) => governingRuleSetIds.includes(ruleSet.id))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    for (const ruleSet of ruleSets) {
+      const candidates = ruleSet.rules
+        .filter((rule): rule is Extract<PolicyRule, { kind: 'MIN_BUFFER' }> =>
+          rule.kind === 'MIN_BUFFER' && rule.appliesTo.length === 0,
+        )
+        .sort((a, b) => a.id.localeCompare(b.id));
+      const rule = candidates[0];
+      if (rule) {
+        return {
+          minutes: rule.buffer.minimumMinutes ?? rule.buffer.expectedMinutes,
+          ruleId: rule.id,
+          ruleSetId: ruleSet.id,
+        };
+      }
     }
     return undefined;
   }

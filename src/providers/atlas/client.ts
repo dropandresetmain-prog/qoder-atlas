@@ -12,7 +12,7 @@
  */
 import { capabilityFailure } from '../runner.ts';
 
-export const ATLAS_READ_ONLY_ENDPOINTS = ['/search.do', '/verify.do'] as const;
+export const ATLAS_READ_ONLY_ENDPOINTS = ['/search.do', '/verify.do', '/event/getPageList.do'] as const;
 export type AtlasReadOnlyEndpoint = (typeof ATLAS_READ_ONLY_ENDPOINTS)[number];
 
 /** Consequential order-lifecycle endpoints (adapter-private wire names). */

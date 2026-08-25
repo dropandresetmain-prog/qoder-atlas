@@ -1,0 +1,26 @@
+{
+  "id": "rec_5f81ddd9260942bfccbb6bb3accfce38",
+  "providerId": "atlas",
+  "operation": "flight_state_query",
+  "recordedAt": "2026-09-21T01:40:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "data": [
+      {
+        "eventId": "atlas-inc-mnsyn13-cxl-001",
+        "orderNo": "MNSYN13",
+        "eventType": "CANCELLATION",
+        "eventStatus": 1,
+        "eventTime": "2026-09-21T09:55:00+08:00",
+        "createTime": "2026-09-21T09:55:00+08:00",
+        "airline": "MN",
+        "depTime": "2026-09-30T08:35:00+08:00",
+        "flightNo": "MN204",
+        "pnr": "MNSYN13",
+        "confirmedResult": "CANCELLED_BY_AIRLINE",
+        "notified": true
+      }
+    ]
+  }
+}
