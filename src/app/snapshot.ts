@@ -69,6 +69,24 @@ export async function buildTripSnapshot(
   }
 
   const placeIds = collectPlaceIds(trip, anchorEvent, travellers);
+  // Gateway closure (G3R-Closure fix C): a referenced place may reach its
+  // transport gateway only through the generic servedByPlaceIds association.
+  // The snapshot must carry that gateway too — otherwise downstream engines
+  // see the venue but not the airport serving it and degrade to uncertainty.
+  // Bounded walk (depth 2) over authoritative Place evidence; no guessing.
+  for (let depth = 0; depth < 2; depth += 1) {
+    const expanded: EntityId[] = [];
+    for (const placeId of placeIds) {
+      const entry = await deps.entities.get('PLACE', placeId);
+      if (entry && entry.entityType === 'PLACE') {
+        for (const gatewayId of entry.entity.servedByPlaceIds ?? []) {
+          if (!placeIds.has(gatewayId)) expanded.push(gatewayId);
+        }
+      }
+    }
+    for (const gatewayId of expanded) placeIds.add(gatewayId);
+    if (expanded.length === 0) break;
+  }
   const places: Place[] = [];
   for (const placeId of [...placeIds].sort()) {
     const entry = await deps.entities.get('PLACE', placeId);
