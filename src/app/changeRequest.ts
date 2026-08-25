@@ -397,6 +397,18 @@ function deriveImplications(
     }
   }
 
+  // Departure-gateway substitution (fix D/S7): the traveller declares a
+  // different origin airport. The implication records the declaration against
+  // the current corridor; route derivation stays with the planner/evidence.
+  if (target.departureOrigin) {
+    const hasTransportLeg = trip.elements.some((element) => element.elementKind === 'TRANSPORT_LEG');
+    implications.push(
+      hasTransportLeg
+        ? `departureOrigin ${target.departureOrigin.system}:${target.departureOrigin.value} declared; the arrival corridor must be re-planned from the declared gateway`
+        : `departureOrigin ${target.departureOrigin.system}:${target.departureOrigin.value} declared; no transport leg exists yet — the corridor will be planned from the declared gateway`,
+    );
+  }
+
   // Transport preferences (A2 territory: preferDirect, earliest/latest).
   if (target.transport) {
     if (target.transport.preferDirect !== undefined) {
@@ -449,6 +461,7 @@ function deriveImplications(
 
 function isTargetEmpty(target: ResolutionTarget): boolean {
   if (target.arriveBy || target.departAfter) return false;
+  if (target.departureOrigin) return false;
   if (target.preferredStayProximityRef) return false;
   if (target.transport) {
     if (

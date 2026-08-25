@@ -51,6 +51,14 @@ export const ResolutionTargetSchema = z.strictObject({
   /** Desired trip-window shift; absence = keep current. */
   arriveBy: IsoDateTimeSchema.optional(),
   departAfter: IsoDateTimeSchema.optional(),
+  /**
+   * Declared departure-gateway substitution ("I am actually flying from X"):
+   * the traveller states a different origin airport for the arrival corridor.
+   * A generic external ref (system + value), never a parsed city name; the
+   * planner re-plans the corridor from this gateway using ordinary evidence,
+   * and an unresolvable value stays an explicit uncertainty — never guessed.
+   */
+  departureOrigin: z.strictObject({ system: z.string(), value: z.string() }).optional(),
   /** Reference place the stay should be near (e.g. venue Place id). */
   preferredStayProximityRef: EntityRefSchema.optional(),
   /** Desired transport attributes, declarative only. */

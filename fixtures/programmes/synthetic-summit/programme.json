@@ -92,6 +92,18 @@
             "value": "CDG"
           }
         ]
+      },
+      {
+        "id": "plc-home-hnd",
+        "name": "Synthetic Home Airport HND",
+        "kind": "AIRPORT",
+        "timezone": "Asia/Tokyo",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "HND"
+          }
+        ]
       }
     ],
     "anchorEvent": {

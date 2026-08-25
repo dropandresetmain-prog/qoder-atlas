@@ -82,7 +82,7 @@ interface WindowShiftTrigger {
   uncertaintyStatements: string[];
 }
 
-type WindowDimension = 'arriveBy' | 'departAfter';
+type WindowDimension = 'arriveBy' | 'departAfter' | 'departureOrigin';
 
 export class NorthstarPlanner implements RecoveryPlanner {
   private readonly inner: RecoveryPlanner;
@@ -305,6 +305,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
     const dimensions: WindowDimension[] = [
       ...(target.arriveBy !== undefined ? (['arriveBy'] as const) : []),
       ...(target.departAfter !== undefined ? (['departAfter'] as const) : []),
+      ...(target.departureOrigin !== undefined ? (['departureOrigin'] as const) : []),
     ];
     const eventPlaceId =
       input.snapshot.anchorEvent?.placeId ??
@@ -345,8 +346,87 @@ export class NorthstarPlanner implements RecoveryPlanner {
     // another's (a two-dimension change proposes each dimension's leg from
     // ITS OWN search result).
     const toolRequests: ToolRequest[] = [];
-    const selected: Array<{ dimension: WindowDimension; leg: TransportLeg; toolRequestId: string }> = [];
+    const selected: Array<{
+      dimension: WindowDimension;
+      leg: TransportLeg;
+      toolRequestId: string;
+      /** departureOrigin: the declared gateway place replaces the leg's origin. */
+      substitutedOriginPlaceId?: EntityId;
+    }> = [];
     for (const dimension of dimensions) {
+      // Origin substitution (fix D/S7): the traveller declared a different
+      // departure gateway. Re-search the arrival corridor FROM the declared
+      // gateway on the leg's own departure date; the resolved gateway place
+      // replaces the leg's origin in the proposed strategy. The declared ref
+      // must resolve against programme Place evidence — an unresolvable
+      // value stays uncertainty, never a guessed route.
+      if (dimension === 'departureOrigin') {
+        const declared = target.departureOrigin;
+        if (!declared) continue;
+        const declaredGateway = this.placeByExternalRef(input, declared);
+        if (!declaredGateway) {
+          uncertainties.push(
+            this.uncertainty(
+              `departureOrigin ${declared.system}:${declared.value} resolves to no known place in programme evidence; no route fabricated from it`,
+              'MEDIUM',
+            ),
+          );
+          continue;
+        }
+        const arrivalLeg = legFor('arriveBy');
+        const destinationGateway = this.airportGatewayFor(
+          input,
+          arrivalLeg ? arrivalLeg.data.destinationPlaceId : eventPlaceId,
+        );
+        if (!destinationGateway) {
+          uncertainties.push(
+            this.uncertainty(
+              'departureOrigin requested but no event gateway evidence exists; cannot derive the replacement corridor',
+              'MEDIUM',
+            ),
+          );
+          continue;
+        }
+        const windowStart = input.snapshot.anchorEvent?.window.startsAt;
+        const requestedDate =
+          arrivalLeg?.data.scheduledDeparture?.value.slice(0, 10) ??
+          (windowStart ? previousLocalDate(windowStart) : undefined);
+        if (!requestedDate) {
+          uncertainties.push(
+            this.uncertainty(
+              'departureOrigin requested but no departure-date evidence exists (no arrival leg, no event window); cannot schedule a search',
+              'MEDIUM',
+            ),
+          );
+          continue;
+        }
+        if (!arrivalLeg) {
+          // No existing leg: evidence request only, like the corridor branch.
+          toolRequests.push(
+            this.searchRequest(
+              { system: 'airport-code', value: declaredGateway.ref.value },
+              destinationGateway.ref,
+              requestedDate,
+              declaredGateway.place.id,
+              destinationGateway.placeId,
+            ),
+          );
+          continue;
+        }
+        const toolRequestId = `tool-ws-${dimension}`;
+        toolRequests.push(
+          this.searchRequest(
+            { system: 'airport-code', value: declaredGateway.ref.value },
+            destinationGateway.ref,
+            requestedDate,
+            declaredGateway.place.id,
+            destinationGateway.placeId,
+            toolRequestId,
+          ),
+        );
+        selected.push({ dimension, leg: arrivalLeg, toolRequestId, substitutedOriginPlaceId: declaredGateway.place.id });
+        continue;
+      }
       const requested = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
       const requestedDate = requested?.slice(0, 10);
       if (!requested || !requestedDate) continue;
@@ -452,14 +532,19 @@ export class NorthstarPlanner implements RecoveryPlanner {
       observedAt: input.snapshot.takenAt,
     });
     const strategies: RecoveryStrategy[] = scopedEvidence
-      .flatMap(({ dimension, leg, evidence }) =>
+      .flatMap(({ dimension, leg, evidence, substitutedOriginPlaceId }) =>
         evidence
           ? [...evidence.offers]
               .sort((a, b) => a.totalPrice.amount - b.totalPrice.amount || a.offerId.localeCompare(b.offerId))
               .map((offer): RecoveryStrategy => {
                 const first = offer.segments[0];
                 const last = offer.segments[offer.segments.length - 1];
-                const windowEvidence = dimension === 'arriveBy' ? target.arriveBy : target.departAfter;
+                const windowEvidence =
+                  dimension === 'arriveBy'
+                    ? target.arriveBy
+                    : dimension === 'departAfter'
+                      ? target.departAfter
+                      : `${target.departureOrigin?.system}:${target.departureOrigin?.value}`;
                 const candidateOperations: MutationOperation[] = [
                   {
                     op: 'UPSERT_ENTITY',
@@ -470,6 +555,10 @@ export class NorthstarPlanner implements RecoveryPlanner {
                       status: 'UNKNOWN',
                       data: {
                         ...leg.data,
+                        // Origin substitution (fix D/S7): the strategy leg
+                        // departs from the traveller-declared gateway, never
+                        // from the superseded home gateway.
+                        ...(substitutedOriginPlaceId ? { originPlaceId: substitutedOriginPlaceId } : {}),
                         ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
                         ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
                         bookingRef: { system: 'flight-provider', reference: offer.offerId },
@@ -479,7 +568,12 @@ export class NorthstarPlanner implements RecoveryPlanner {
                 ];
                 // DR-8: read verbatim as the user-facing option title
                 // downstream (readmodels.ts) — no raw leg/offer ids in it.
-                const windowPhrase = dimension === 'arriveBy' ? 'arrive earlier' : 'depart later';
+                const windowPhrase =
+                  dimension === 'arriveBy'
+                    ? 'arrive earlier'
+                    : dimension === 'departAfter'
+                      ? 'depart later'
+                      : 'fly from the declared departure gateway';
                 return {
                   id: this.idFactory('strat'),
                   caseId: input.caseId,
@@ -584,7 +678,11 @@ export class NorthstarPlanner implements RecoveryPlanner {
       }
       return {
         target,
-        actionable: target.arriveBy !== undefined || target.departAfter !== undefined,
+        // A declared departure-gateway substitution (fix D/S7) is itself an
+        // actionable window dimension: it re-plans the arrival corridor from
+        // the stated gateway even when no arriveBy/departAfter is requested.
+        actionable:
+          target.arriveBy !== undefined || target.departAfter !== undefined || target.departureOrigin !== undefined,
         uncertaintyStatements,
       };
     }
@@ -599,6 +697,28 @@ export class NorthstarPlanner implements RecoveryPlanner {
   private placeById(input: PlannerInput, placeId: EntityId | undefined): Place | undefined {
     if (!placeId) return undefined;
     return input.snapshot.places.find((place) => place.id === placeId);
+  }
+
+  /**
+   * Resolve a declared external ref (system + value) against snapshot place
+   * evidence. Used by origin substitution (fix D/S7): the traveller's
+   * declared gateway must name a known place; otherwise resolution fails
+   * closed with explicit uncertainty — the value is never guessed.
+   */
+  private placeByExternalRef(
+    input: PlannerInput,
+    ref: { system: string; value: string },
+  ): { place: Place; ref: { system: string; value: string } } | undefined {
+    const wanted = ref.value.trim().toLowerCase();
+    if (wanted === '') return undefined;
+    for (const place of input.snapshot.places) {
+      const match = place.externalRefs.find(
+        (candidate) =>
+          candidate.system === ref.system && candidate.value.trim().toLowerCase() === wanted,
+      );
+      if (match) return { place, ref: match };
+    }
+    return undefined;
   }
 
   /**

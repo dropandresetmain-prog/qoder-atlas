@@ -122,6 +122,7 @@ Your JSON must match this schema EXACTLY (strict objects, no extra keys):
   "target": {
     "arriveBy"?: ISO-8601 timestamp with UTC offset (optional);
     "departAfter"?: ISO-8601 timestamp with UTC offset (optional);
+    "departureOrigin"?: { "system": "airport-code", "value": string } when the traveller states they fly from a different airport (optional);
     "preferredStayProximityRef"?: { "entityType": "PLACE", "id": string } (optional);
     "transport"?: {
       "preferDirect"?: boolean;
@@ -164,6 +165,7 @@ async function interpretViaModel(
       target: z.strictObject({
         arriveBy: IsoDateTimeSchema.optional(),
         departAfter: IsoDateTimeSchema.optional(),
+        departureOrigin: z.strictObject({ system: z.string(), value: z.string() }).optional(),
         preferredStayProximityRef: z
           .strictObject({
             entityType: z.literal('PLACE'),
@@ -441,6 +443,23 @@ function matchPatterns(text: string): DeterministicMatch | undefined {
         fundingDeclaration,
       };
     }
+  }
+
+  // Pattern 6b: declared departure-gateway substitution ("I'm actually flying
+  // from HND", "flying out of NRT"). Generic: any 3-letter airport code the
+  // traveller states; whether it resolves to a known gateway is the planner's
+  // evidence question, never the interpreter's guess.
+  const originMatch = text.match(/\b(?:flying|departing|leaving)\s+(?:out\s+of\s+|from\s+)?([A-Za-z]{3})\b/i);
+  if (originMatch) {
+    return {
+      intentKind: 'CHANGE_TRANSPORT_SCHEDULE',
+      urgency,
+      target: {
+        departureOrigin: { system: 'airport-code', value: originMatch[1]!.toUpperCase() },
+        objectiveEffects: [],
+      },
+      fundingDeclaration,
+    };
   }
 
   // Pattern 6: Closer to a place (stay proximity).
