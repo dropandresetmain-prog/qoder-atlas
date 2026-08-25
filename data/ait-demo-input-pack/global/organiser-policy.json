@@ -1,0 +1,196 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-policy"],
+  "policyOwnerId": "org-ait-organiser",
+  "effectiveFrom": "2026-08-25T00:00:00+08:00",
+  "note": "Synthetic organiser travel policy for AiT 2026. All values are data. Where a policy element maps onto an existing repo PolicyRule kind (src/domain/rules.ts), it is encoded in ruleSets and validates against RuleSetSchema; elements the current ontology cannot express are recorded as human-readable clauses with machineHints and listed in schemaGaps for the primary integrator.",
+  "ruleSets": [
+    {
+      "id": "rs-ait-event-funding",
+      "kind": "EVENT",
+      "name": "AiT 2026 event-funded travel window",
+      "ownerOrganisationId": "org-ait-organiser",
+      "sourceId": "src-syn-ait-policy",
+      "rules": [
+        {
+          "id": "rule-ait-funded-window",
+          "kind": "FUNDED_WINDOW",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Event funds travel whose cost accrues between the arrival eve (29 Sep) and the departure morning after the close (3 Oct). Earlier arrivals (e.g. S4 Thursday request) and later stays (e.g. S5 Sunday extension) are funded only for the inside portion; incremental cost falls to the traveller per their own funding declaration (ADR-037).",
+          "appliesTo": [],
+          "windowStart": "2026-09-29T00:00:00+08:00",
+          "windowEnd": "2026-10-03T23:59:00+08:00",
+          "coveredBy": "EVENT_ORGANISATION",
+          "incrementalPayer": "TRAVELLER"
+        },
+        {
+          "id": "rule-ait-hotel-funded-window",
+          "kind": "FUNDED_WINDOW",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Event-funded accommodation window: check-in 29 Sep, check-out 3 Oct (4 nights), at the event partner hotel block. Nights outside this window are traveller-funded.",
+          "appliesTo": ["place-hotel-bayview"],
+          "windowStart": "2026-09-29T15:00:00+08:00",
+          "windowEnd": "2026-10-03T11:00:00+08:00",
+          "coveredBy": "EVENT_ORGANISATION",
+          "incrementalPayer": "TRAVELLER"
+        },
+        {
+          "id": "rule-ait-airfare-spend-limit",
+          "kind": "SPEND_LIMIT",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Per-traveller event-funded airfare ceiling (round trip, incl. taxes). Above this, fare requires organiser approval or a documented exception.",
+          "appliesTo": [],
+          "maxAmount": { "amount": 1200, "currency": "SGD" }
+        },
+        {
+          "id": "rule-ait-hotel-spend-limit",
+          "kind": "SPEND_LIMIT",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Nightly accommodation ceiling per room, event-funded nights.",
+          "appliesTo": [],
+          "maxAmount": { "amount": 320, "currency": "SGD" }
+        },
+        {
+          "id": "rule-ait-approval-above-airfare",
+          "kind": "APPROVAL_ABOVE_SPEND",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Any airfare above the ceiling needs organiser approval.",
+          "appliesTo": [],
+          "threshold": { "amount": 1200, "currency": "SGD" },
+          "approver": "ORGANISATION_APPROVER"
+        },
+        {
+          "id": "rule-ait-approval-above-hotel",
+          "kind": "APPROVAL_ABOVE_SPEND",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Any nightly rate above the accommodation ceiling needs organiser approval.",
+          "appliesTo": [],
+          "threshold": { "amount": 320, "currency": "SGD" },
+          "approver": "ORGANISATION_APPROVER"
+        },
+        {
+          "id": "rule-ait-flight-change-approval",
+          "kind": "APPROVAL_REQUIRED",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Flight itinerary changes always require human approval, except rebooking triggered by a verified supplier disruption with no fare increase, which is pre-approved within delegated authority (see clause delegatedAuthority).",
+          "appliesTo": [],
+          "approver": "HUMAN_AGENT",
+          "operations": ["FLIGHT_CHANGE", "FLIGHT_CANCEL"]
+        },
+        {
+          "id": "rule-ait-arrival-min-buffer",
+          "kind": "MIN_BUFFER",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Required arrival buffer: every managed traveller must be landside in Singapore at least 6 hours before their first programme commitment (programme-critical travellers: 12 hours, see clauses.arrivalBuffer).",
+          "appliesTo": [],
+          "buffer": { "expectedMinutes": 360, "minimumMinutes": 360, "conservativeMinutes": 480, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "HIGH" }
+        },
+        {
+          "id": "rule-ait-change-terms",
+          "kind": "CHANGE_TERMS",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Organiser posture on changes: changes are allowed; supplier change fees are event-funded when the change is caused by a verified supplier disruption, traveller-funded when traveller-initiated for personal reasons; reprice is expected.",
+          "appliesTo": [],
+          "allowed": true,
+          "fee": { "amount": 0, "currency": "SGD" },
+          "repriceExpected": true
+        },
+        {
+          "id": "rule-ait-cancellation-terms",
+          "kind": "CANCELLATION_TERMS",
+          "sourceId": "src-syn-ait-policy",
+          "description": "Cancellation posture: event-blocked fares are refundable until 15 Sep 2026; after that, refunds depend on supplier terms. Supplier-caused cancellations are never charged to the traveller.",
+          "appliesTo": [],
+          "refundable": true,
+          "refundDeadline": "2026-09-15T23:59:00+08:00",
+          "fee": { "amount": 50, "currency": "SGD" }
+        },
+        {
+          "id": "rule-ait-no-show-terms",
+          "kind": "NO_SHOW_TERMS",
+          "sourceId": "src-syn-ait-policy",
+          "description": "No-show on a booked managed segment is reported to the organiser; subsequent segments are protected only on explicit instruction.",
+          "appliesTo": [],
+          "consequence": "REPORT_TO_ORGANISER",
+          "fee": { "amount": 0, "currency": "SGD" }
+        }
+      ]
+    }
+  ],
+  "clauses": {
+    "cabinRules": {
+      "statement": "Economy cabin for all managed travel under 6 hours block time. Business cabin for flights over 6 hours block time for programme-critical participants (importance REQUIRED on any on-stage role) and for any traveller with a documented medical or accessibility reason. No first class under any circumstance.",
+      "machineHint": { "field": "cabinClass", "byBlockTimeHours": [{ "upTo": 6, "cabin": "ECONOMY" }, { "above": 6, "cabin": "BUSINESS", "appliesTo": "PROGRAMME_CRITICAL_OR_ACCESSIBILITY" }], "never": ["FIRST"] }
+    },
+    "fareCeiling": {
+      "statement": "Event-funded airfare ceiling is SGD 1200 round trip per traveller (rule-ait-airfare-spend-limit). Fares above the ceiling are bookable only with organiser approval (rule-ait-approval-above-airfare) or when no cheaper viable option exists that meets the arrival buffer, in which case the cheapest compliant option is booked and flagged.",
+      "machineHint": { "ruleIds": ["rule-ait-airfare-spend-limit", "rule-ait-approval-above-airfare"] }
+    },
+    "approvalThresholds": {
+      "statement": "Approval ladder: (1) spend within funded window and under both ceilings: no approval needed; (2) spend above a ceiling: ORGANISATION_APPROVER; (3) any flight change or cancellation: HUMAN_AGENT, except supplier-disruption rebooking with no fare increase; (4) any incremental traveller-funded cost still requires the traveller's own explicit consent.",
+      "machineHint": { "ruleIds": ["rule-ait-approval-above-airfare", "rule-ait-approval-above-hotel", "rule-ait-flight-change-approval"] }
+    },
+    "delegatedAuthority": {
+      "statement": "The Northstar operator holds delegated authority to execute, without further approval: supplier-disruption rebooking on the same carrier with no fare increase and no date change of arrival beyond 3 hours; hotel room swap within the same partner hotel block; transfer re-dispatch. Anything exceeding these bounds returns to the approval ladder.",
+      "machineHint": { "preApprovedOperations": [{ "operation": "FLIGHT_REBOOK_SAME_CARRIER", "conditions": ["fareDeltaLte", 0, "SGD", "arrivalShiftLteMinutes", 180] }, { "operation": "HOTEL_ROOM_SWAP", "conditions": ["sameHotelBlock"] }, { "operation": "TRANSFER_REDISPATCH", "conditions": [] }] }
+    },
+    "accommodationCeiling": {
+      "statement": "Nightly accommodation ceiling SGD 320 per room (rule-ait-hotel-spend-limit) at the event partner hotel (place-hotel-bayview). Overflow rooms at the alternative partner (place-hotel-harbourline) are acceptable up to the same ceiling.",
+      "machineHint": { "ruleIds": ["rule-ait-hotel-spend-limit"], "preferredPlaces": ["place-hotel-bayview", "place-hotel-harbourline"] }
+    },
+    "eventFundedHotelWindow": {
+      "statement": "Event funds accommodation from check-in 29 Sep 2026 to check-out 3 Oct 2026 (4 nights) (rule-ait-hotel-funded-window). Extensions, e.g. a Sunday 4 Oct extension request, are traveller-funded from the first extra night; the event keeps the original covered nights intact.",
+      "machineHint": { "ruleIds": ["rule-ait-hotel-funded-window"] }
+    },
+    "standardOccupancy": {
+      "statement": "Standard occupancy is single occupancy for all managed participants. Room sharing is only arranged on explicit mutual request of both travellers.",
+      "machineHint": { "defaultOccupancy": "SINGLE", "sharing": "ON_MUTUAL_EXPLICIT_REQUEST" }
+    },
+    "companionAndUpgradeIncrement": {
+      "statement": "Companion travel and cabin upgrades are permitted only as traveller-funded increments over the business-equivalent baseline. The event never funds a companion seat or a cabin upgrade; the traveller's explicit funding declaration is required before any such action proceeds.",
+      "machineHint": { "companionFundedBy": "TRAVELLER", "upgradeFundedBy": "TRAVELLER", "requiresExplicitFundingDeclaration": true }
+    },
+    "personalExtensionFunding": {
+      "statement": "Personal extensions before or after the funded window are allowed. Incremental airfare difference, extra hotel nights, and extra transfers are traveller-funded (FUNDED_WINDOW incrementalPayer TRAVELLER). The event-funded portion is always the business-equivalent in-window trip.",
+      "machineHint": { "ruleIds": ["rule-ait-funded-window", "rule-ait-hotel-funded-window"] }
+    },
+    "businessEquivalentAirfare": {
+      "statement": "When a traveller combines personal travel with the event trip (origin change, extension, companion), the event funds no more than the business-equivalent fare: the price of the trip the traveller would otherwise have taken under this policy. Any delta is traveller-funded; any saving accrues to the event.",
+      "machineHint": { "capDefinition": "IN_WINDOW_POLICY_COMPLIANT_ITINERARY_FARE", "deltaPaidBy": "TRAVELLER", "savingAccruesTo": "EVENT_ORGANISATION" }
+    },
+    "transferCoverage": {
+      "statement": "Event-funded ground transfers cover: airport-to-hotel on arrival day within the funded window, hotel-to-airport on departure day within the funded window, and hotel-to-venue shuttle on each event morning for programme-critical participants. Transfers outside the window (e.g. extension days) are traveller-funded. Accessible vehicles are provided on request at event cost.",
+      "machineHint": { "coveredSegments": ["AIRPORT_TO_HOTEL_ARRIVAL", "HOTEL_TO_AIRPORT_DEPARTURE", "HOTEL_TO_VENUE_MORNING_PROGRAMME_CRITICAL"], "accessibleVehicleFundedBy": "EVENT_ORGANISATION" }
+    },
+    "arrivalBuffer": {
+      "statement": "Required arrival buffer: all managed travellers landside in Singapore at least 6 hours before their first commitment (rule-ait-arrival-min-buffer). Programme-critical participants (any REQUIRED on-stage engagement) must arrive at least 12 hours before their first commitment and land no later than 23:00 local on the day before, to protect rehearsal and rest windows.",
+      "machineHint": { "ruleIds": ["rule-ait-arrival-min-buffer"], "programmeCriticalBufferMinutes": 720, "latestLandingLocalTimeBeforeCriticalDay": "23:00" }
+    },
+    "rehearsalAndRestRules": {
+      "statement": "Rehearsal/rest rules by importance. REQUIRED on-stage participants: sound-check window 07:30-08:30 local on their first on-stage day; no scheduled activities after 21:00 local the evening before an on-stage commitment. PREFERRED participants: arrive before 09:00 local on their first engagement day. OPTIONAL attendees: no scheduling constraints beyond the standard arrival buffer.",
+      "machineHint": {
+        "byImportance": [
+          { "importance": "REQUIRED", "soundCheckWindowLocal": "07:30-08:30", "quietHoursBeforeOnStageLocal": "21:00-07:30" },
+          { "importance": "PREFERRED", "arriveBeforeLocal": "09:00" },
+          { "importance": "OPTIONAL", "constraints": [] }
+        ]
+      }
+    },
+    "changeCancellationTreatment": {
+      "statement": "Supplier-caused changes/cancellations: event absorbs fees and fare differences within the airfare ceiling logic; traveller consent still required for any itinerary change. Traveller-initiated personal changes: allowed (rule-ait-change-terms) with reprice; traveller funds the increment. Cancellations: see rule-ait-cancellation-terms; after the refund deadline the traveller bears non-refundable amounts only for traveller-initiated cancellations.",
+      "machineHint": { "ruleIds": ["rule-ait-change-terms", "rule-ait-cancellation-terms", "rule-ait-no-show-terms"] }
+    },
+    "criticalParticipantTransportConcentration": {
+      "statement": "S8 concentration rule: when three or more programme-critical participants from the same delegation request to travel together, Northstar must evaluate correlated-disruption risk: never place ALL programme-critical participants of a single session on the same flight when an alternative same-day option exists; group requests are honoured unless the deterministic concentration check flags that a single disruption would strand an entire commitment's cast, in which case the operator proposes a split and records the reasoning. Travellers are always informed of the trade-off; their explicit instruction outranks the default only after the trade-off is disclosed.",
+      "machineHint": { "trigger": "SAME_DELEGATION_CRITICAL_TRAVEL_TOGETHER_REQUEST", "maxCriticalSharePerFlight": { "scope": "PER_COMMITMENT_CAST", "policy": "NOT_ALL_ON_ONE_FLIGHT_WHEN_ALTERNATIVE_EXISTS" }, "disclosureRequired": true }
+    }
+  },
+  "schemaGaps": [
+    { "gap": "No PolicyRule kind expresses cabin-class rules; encoded as clause + machineHint.", "clause": "cabinRules" },
+    { "gap": "SPEND_LIMIT carries no recurrence semantics (per-trip vs per-night); nightly ceiling disambiguated via description and clauses.accommodationCeiling.", "clause": "accommodationCeiling" },
+    { "gap": "No PolicyRule kind expresses delegated/pre-approved operator authority; encoded as clause + machineHint.", "clause": "delegatedAuthority" },
+    { "gap": "MIN_BUFFER has no importance-dependent variants; the 12-hour programme-critical buffer is encoded in clauses.arrivalBuffer machineHint.", "clause": "arrivalBuffer" },
+    { "gap": "No PolicyRule kind expresses transport concentration/correlated-risk rules; encoded as clause + machineHint for S8.", "clause": "criticalParticipantTransportConcentration" },
+    { "gap": "No PolicyRule kind expresses occupancy, companion/upgrade funding increments, or rehearsal/rest windows; encoded as clauses + machineHints.", "clause": "standardOccupancy/companionAndUpgradeIncrement/rehearsalAndRestRules" }
+  ]
+}

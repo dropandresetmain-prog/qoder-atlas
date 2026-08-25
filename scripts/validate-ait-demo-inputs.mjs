@@ -16,6 +16,9 @@
  *  5. Every anchorCommitmentId referenced by a draft exists in anchor-event.json.
  *  6. Every scenario pack s1..s8 exists and declares provenance + sourceIds.
  *  7. Role assignments in programme.json reference known drafts and commitments.
+ *  8. organiser-policy.json ruleSets parse against RuleSetSchema (src/domain/rules.ts).
+ *  9. programme-importance.json entries resolve to known drafts/commitments with
+ *     importance/flexibility values from the repo enums (src/domain/elements.ts).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -71,15 +74,19 @@ const rosterFile = join(PACK, 'global', 'roster.json');
 const anchorEventFile = join(PACK, 'global', 'anchor-event.json');
 const placesFile = join(PACK, 'global', 'places.json');
 const programmeFile = join(PACK, 'global', 'programme.json');
+const policyFile = join(PACK, 'global', 'organiser-policy.json');
+const importanceFile = join(PACK, 'global', 'programme-importance.json');
 
 // 4a. schema validation of global artifacts (repo schemas, read-only import)
 let schemas;
 try {
-  const [intake, entities] = await Promise.all([
+  const [intake, entities, rules, elements] = await Promise.all([
     import(pathToFileURL(join(ROOT, 'src', 'contracts', 'programmeIntake.ts'))),
     import(pathToFileURL(join(ROOT, 'src', 'domain', 'entities.ts'))),
+    import(pathToFileURL(join(ROOT, 'src', 'domain', 'rules.ts'))),
+    import(pathToFileURL(join(ROOT, 'src', 'domain', 'elements.ts'))),
   ]);
-  schemas = { ...intake, ...entities };
+  schemas = { ...intake, ...entities, ...rules, ...elements };
 } catch (err) {
   problems.push(`contract import failed (run via: node --experimental-strip-types): ${err.message}`);
 }
@@ -163,6 +170,42 @@ if (parsed.has(rosterFile)) {
         if (!commitmentIds.has(session.commitmentId)) {
           problems.push(`programme.json schedule: unknown commitment ${session.commitmentId}`);
         }
+      }
+    }
+  }
+
+  // 9. programme-importance entries resolve with valid repo enum values
+  if (parsed.has(importanceFile) && anchorEvent) {
+    const importance = parsed.get(importanceFile);
+    const commitmentIds = new Set(anchorEvent.commitments.map((c) => c.id));
+    const draftIds = new Set(travellers.map((t) => t.draftId));
+    const entries = [...(importance.entries ?? []), ...(importance.blanketEntries ?? [])];
+    for (const entry of entries) {
+      if (entry.draftId && !draftIds.has(entry.draftId)) {
+        problems.push(`programme-importance.json: unknown draft ${entry.draftId}`);
+      }
+      if (entry.commitmentId && !commitmentIds.has(entry.commitmentId)) {
+        problems.push(`programme-importance.json: unknown commitment ${entry.commitmentId}`);
+      }
+      if (schemas) {
+        if (!schemas.ImportanceSchema.safeParse(entry.importance).success) {
+          problems.push(`programme-importance.json ${entry.draftId}/${entry.commitmentId}: bad importance '${entry.importance}'`);
+        }
+        if (!schemas.FlexibilitySchema.safeParse(entry.flexibility).success) {
+          problems.push(`programme-importance.json ${entry.draftId}/${entry.commitmentId}: bad flexibility '${entry.flexibility}'`);
+        }
+      }
+    }
+  }
+}
+
+// 8. organiser policy ruleSets parse against RuleSetSchema
+if (schemas && parsed.has(policyFile)) {
+  for (const ruleSet of parsed.get(policyFile).ruleSets ?? []) {
+    const result = schemas.RuleSetSchema.safeParse(ruleSet);
+    if (!result.success) {
+      for (const issue of result.error.issues.slice(0, 10)) {
+        problems.push(`organiser-policy.json ${ruleSet.id ?? '?'} RuleSetSchema: ${issue.path.join('.')} — ${issue.message}`);
       }
     }
   }
