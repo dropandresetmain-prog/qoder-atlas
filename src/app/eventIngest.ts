@@ -15,12 +15,14 @@
  * assumptions.
  */
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
+import { instantMillis } from '../domain/common.ts';
 import type { ExternalFlightEventNormalizer } from '../contracts/capabilities.ts';
 import type { TripRepository } from '../contracts/repositories.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import type { RuntimeOrchestrator } from './runtime.ts';
 import type { ProcessedSignal } from './signalPipeline.ts';
 import type { EventInboxStore } from './eventInboxStore.ts';
+import type { Trip } from '../domain/trip.ts';
 import { hashId } from '../ingest/ids.ts';
 
 export interface EventIngestDeps {
@@ -95,6 +97,52 @@ function enforceAssertedCeiling(signal: TripSignal): TripSignal {
 }
 
 /**
+ * Narrow correlated candidate elements within one trip using the provider
+ * event's own segment evidence. Generic semantics:
+ *
+ *   booking/order reference narrows candidate bookings/trips;
+ *   provider event/segment evidence narrows the affected element(s).
+ *
+ * Today the evidence used is the event's stated departure instant compared
+ * against each leg's authoritative scheduled departure (instant comparison,
+ * never string comparison). Exactly one survivor -> SEGMENT_EVIDENCE.
+ * Otherwise the event is genuinely order-level/ambiguous: a deterministic
+ * primary candidate (earliest departure, undated legs last) anchors the
+ * trip-level impact and the ambiguity is recorded — no fabricated precision,
+ * and never extra recovery cases merely because legs share one booking ref.
+ */
+function narrowAffectedElement(
+  candidates: Array<{ elementId: EntityId; departureMs?: number }>,
+  evidence: { departureIso?: string },
+): { elementId: EntityId; resolution: 'SEGMENT_EVIDENCE' | 'ORDER_LEVEL_PRIMARY' } {
+  if (candidates.length === 1) {
+    return { elementId: candidates[0]!.elementId, resolution: 'SEGMENT_EVIDENCE' };
+  }
+  if (evidence.departureIso !== undefined) {
+    const evidenceMs = Date.parse(evidence.departureIso);
+    const survivors = candidates.filter(
+      (candidate) => candidate.departureMs !== undefined && candidate.departureMs === evidenceMs,
+    );
+    if (survivors.length === 1) {
+      return { elementId: survivors[0]!.elementId, resolution: 'SEGMENT_EVIDENCE' };
+    }
+  }
+  const ordered = [...candidates].sort(
+    (a, b) => (a.departureMs ?? Number.POSITIVE_INFINITY) - (b.departureMs ?? Number.POSITIVE_INFINITY),
+  );
+  return { elementId: ordered[0]!.elementId, resolution: 'ORDER_LEVEL_PRIMARY' };
+}
+
+/** Departure instant (epoch ms) of a transport-leg element, when dated. */
+function legDepartureMs(trip: Trip, elementId: EntityId): number | undefined {
+  const element = trip.elements.find((candidate) => candidate.id === elementId);
+  if (element?.elementKind !== 'TRANSPORT_LEG') return undefined;
+  return element.data.scheduledDeparture
+    ? instantMillis(element.data.scheduledDeparture.value)
+    : undefined;
+}
+
+/**
  * Ingest one raw provider-shaped event through the full generic pipeline.
  * Never throws: every failure mode (invalid payload, duplicate delivery,
  * correlation failure) is a structured EventIngestOutcome.
@@ -130,7 +178,9 @@ export async function ingestProviderEvent(
     return { status: 'DUPLICATE', providerId, providerEventId: envelope.providerEventId };
   }
 
-  // 3. Correlate provider order refs to a trip (generic, provider-neutral).
+  // 3. Correlate provider order refs to trips (generic, provider-neutral).
+  //    The booking/order reference narrows candidate TRIPS; which element(s)
+  //    inside a trip are affected is decided per signal by segment evidence.
   const correlations = await correlateOrderRefs(deps.trips, envelope.providerOrderRefs);
   if (correlations.length === 0) {
     await deps.inbox.markProcessed(envelope.providerId, envelope.providerEventId, {
@@ -144,20 +194,53 @@ export async function ingestProviderEvent(
     };
   }
 
-  // 4. Feed every matched element through the SAME generic recovery pipeline
+  // 4. Feed every affected trip through the SAME generic recovery pipeline
   //    every other disruption source uses. A provider order/service can cover
-  //    several independent trips; choosing the first match would silently
-  //    hide a programme blast radius. The derived signal id is stable per
-  //    normalized source signal + canonical trip/element, so retries remain
-  //    idempotent without attaching a scenario identity to domain state.
+  //    several independent trips; every matched trip is processed. Within a
+  //    trip, ONE signal is emitted per provider event — multiple legs sharing
+  //    a real booking reference must not multiply into duplicate recovery
+  //    cases (see narrowAffectedElement). Signal ids are stable per
+  //    normalized source signal + canonical trip, so retries remain
+  //    idempotent without attaching scenario identity to domain state.
+  const correlationsByTrip = new Map<EntityId, Array<{ tripId: EntityId; elementId: EntityId }>>();
+  for (const correlation of correlations) {
+    const existing = correlationsByTrip.get(correlation.tripId) ?? [];
+    existing.push(correlation);
+    correlationsByTrip.set(correlation.tripId, existing);
+  }
+
   const results: EventIngestResultItem[] = [];
   for (const rawSignal of signals) {
-    for (const correlation of correlations) {
+    for (const [tripId, tripCorrelations] of correlationsByTrip) {
+      const trip = await deps.trips.getTrip(tripId);
+      if (!trip) continue;
+      const narrowed = narrowAffectedElement(
+        tripCorrelations.map((correlation) => ({
+          elementId: correlation.elementId,
+          departureMs: legDepartureMs(trip, correlation.elementId),
+        })),
+        {
+          departureIso:
+            typeof rawSignal.payload['scheduledDeparture'] === 'string'
+              ? (rawSignal.payload['scheduledDeparture'] as string)
+              : undefined,
+        },
+      );
       const signal = enforceAssertedCeiling({
         ...rawSignal,
-        id: hashId('sig-provider-impact', rawSignal.id, correlation.tripId, correlation.elementId),
-        tripId: rawSignal.tripId ?? correlation.tripId,
-        subjectRef: rawSignal.subjectRef ?? { entityType: 'TRIP_ELEMENT', id: correlation.elementId },
+        id: hashId('sig-provider-impact', rawSignal.id, tripId),
+        tripId,
+        subjectRef: rawSignal.subjectRef ?? { entityType: 'TRIP_ELEMENT', id: narrowed.elementId },
+        payload: {
+          ...rawSignal.payload,
+          // Evidence transparency: how the affected element was chosen inside
+          // the matched booking. Never interpreted as business truth.
+          correlation: {
+            providerOrderRefs: envelope.providerOrderRefs,
+            candidateElementCount: tripCorrelations.length,
+            resolution: narrowed.resolution,
+          },
+        },
       });
       const processed = await deps.orchestrator.processDisruption(signal, at);
       results.push({

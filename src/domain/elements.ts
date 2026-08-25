@@ -95,6 +95,13 @@ export const StaySchema = TripElementBaseSchema.extend({
     checkIn: FactSchema(IsoDateTimeSchema),
     checkOut: FactSchema(IsoDateTimeSchema),
     bookingRef: BookingRefSchema.optional(),
+    /**
+     * Generic party size staying in the room (occupancy). Absent = unknown/
+     * undeclared, never inferred to 1. Enables generic accommodation-change
+     * reasoning ("more people now need the room") without companion or
+     * relationship semantics.
+     */
+    guests: z.number().int().positive().optional(),
     /** RuleSet ids for hotel/supplier policies (no-show, reception hours...). */
     policyRuleSetIds: z.array(EntityIdSchema).default([]),
   }),

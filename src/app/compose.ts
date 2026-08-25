@@ -101,6 +101,13 @@ export interface ComposedRuntime {
   seededScenarioIds: string[];
   /** Programme bundles seeded during composition (empty when populated). */
   seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }>;
+  /**
+   * The composed ProgrammeService — the SAME validated intake surface the
+   * HTTP programme routes use. Exposed so harnesses/tests can seed programme
+   * bundles through the real path without rewiring repositories; never a
+   * second intake implementation.
+   */
+  programmeService: ProgrammeService;
 }
 
 /**
@@ -479,5 +486,6 @@ export async function composeAppRuntime(
     plannerMode: useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     seededScenarioIds,
     seededProgrammes,
+    programmeService,
   };
 }

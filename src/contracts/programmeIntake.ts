@@ -13,7 +13,7 @@
  * Trip state. A draft alone can never write trip state.
  */
 import { z } from 'zod';
-import { EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
+import { DurationEstimateSchema, EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
 import { TravelArrangementSchema, type TravelArrangement } from '../domain/entities.ts';
 
 export { TravelArrangementSchema, type TravelArrangement };
@@ -45,6 +45,68 @@ export const TravellerIdentityHintSchema = z.strictObject({
 });
 export type TravellerIdentityHint = z.infer<typeof TravellerIdentityHintSchema>;
 
+/** Generic external place reference resolved against programme places. */
+export const ExternalPlaceRefSchema = z.strictObject({ system: z.string(), value: z.string() });
+export type ExternalPlaceRef = z.infer<typeof ExternalPlaceRefSchema>;
+
+const ReservationStateValueSchema = z.enum([
+  'NONE',
+  'HELD',
+  'CONFIRMED',
+  'CHANGED',
+  'CANCELLED',
+  'COMPLETED',
+  'UNKNOWN',
+]);
+
+/**
+ * One declared travel item (ADR-035 extension): a flight/train leg or a stay.
+ * Discriminated by `itemKind`; every field except the discriminator is
+ * optional so sparse bookings are representable. No scenario or provider
+ * semantics — `bookingRef` uses the neutral system/reference pair the event
+ * ingress correlates against.
+ */
+export const DeclaredTravelItemSchema = z.discriminatedUnion('itemKind', [
+  z.strictObject({
+    itemKind: z.literal('TRANSPORT_LEG'),
+    mode: z.string().min(1),
+    originRef: ExternalPlaceRefSchema.optional(),
+    destinationRef: ExternalPlaceRefSchema.optional(),
+    scheduledDeparture: IsoDateTimeSchema.optional(),
+    scheduledArrival: IsoDateTimeSchema.optional(),
+    bookingRef: z.strictObject({ system: z.string(), reference: z.string() }).optional(),
+    carrierRef: z.strictObject({ system: z.string(), value: z.string() }).optional(),
+    durationEstimate: DurationEstimateSchema.optional(),
+    /** Declarative element attributes from the source; defaults apply at promotion. */
+    flexibility: z.enum(['FIXED', 'CHANGEABLE', 'FLEXIBLE']).default('CHANGEABLE'),
+    reservationState: ReservationStateValueSchema.default('CONFIRMED'),
+  }),
+  z.strictObject({
+    itemKind: z.literal('STAY'),
+    stayPlaceRef: ExternalPlaceRefSchema.optional(),
+    checkIn: IsoDateTimeSchema.optional(),
+    checkOut: IsoDateTimeSchema.optional(),
+    bookingRef: z.strictObject({ system: z.string(), reference: z.string() }).optional(),
+    /** Generic occupancy statement (party size); no companion semantics here. */
+    guests: z.number().int().positive().optional(),
+    reservationState: ReservationStateValueSchema.default('CONFIRMED'),
+  }),
+]);
+export type DeclaredTravelItem = z.infer<typeof DeclaredTravelItemSchema>;
+
+/**
+ * Organiser-declared binding strength for one of this traveller's commitments.
+ * Importance lives per traveller on the Engagement (ADR-034) — never on the
+ * shared commitment.
+ */
+export const EngagementImportanceSchema = z.strictObject({
+  commitmentId: EntityIdSchema,
+  role: z.string().optional(),
+  importance: z.enum(['REQUIRED', 'PREFERRED', 'OPTIONAL']),
+  flexibility: z.enum(['FIXED', 'CHANGEABLE', 'FLEXIBLE']),
+});
+export type EngagementImportance = z.infer<typeof EngagementImportanceSchema>;
+
 /**
  * One traveller as supplied by the organiser. Every field except a display
  * name is optional so sparse/messy intake is representable; missing facts
@@ -70,6 +132,23 @@ export const ProgrammeTravellerDraftSchema = z.strictObject({
    * NEVER inferred from homeLocationText, airport codes, or fixture values.
    */
   travelArrangement: TravelArrangementSchema.optional(),
+  /**
+   * Declared booked/arranged transport and accommodation facts for this
+   * traveller, as supplied by the source (organiser roster, confirmation
+   * import). Each entry materializes at promotion as one TRANSPORT_LEG or
+   * STAY element with CONNECTED authority — the draft is evidence, never
+   * authoritative state. Place references use generic external-ref pairs
+   * (system + value), resolved against programme places; an unresolvable ref
+   * stays an explicit issue, never a guessed place.
+   */
+  declaredTravel: z.array(DeclaredTravelItemSchema).optional(),
+  /**
+   * Per-commitment importance/flexibility declarations from the organiser
+   * (e.g. "this traveller HOSTS the opening, REQUIRED"). Applied to the
+   * corresponding promoted Engagement; absent entries keep the intake
+   * default (PREFERRED/CHANGEABLE).
+   */
+  engagementImportance: z.array(EngagementImportanceSchema).optional(),
 });
 export type ProgrammeTravellerDraft = z.infer<typeof ProgrammeTravellerDraftSchema>;
 
@@ -90,6 +169,7 @@ export const ProgrammeImportDraftSchema = z.strictObject({
   unresolvedStatements: z.array(z.string()).default([]),
 });
 export type ProgrammeImportDraft = z.infer<typeof ProgrammeImportDraftSchema>;
+
 
 /**
  * Result of deterministic promotion of one draft. Promotion is the ONLY path

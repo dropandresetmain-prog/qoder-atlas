@@ -16,7 +16,8 @@ import { RuleSetSchema } from '../domain/rules.ts';
 import { ProgrammeImportDraftSchema } from '../contracts/programmeIntake.ts';
 import type { ProgrammeService } from './programme.ts';
 
-const ProgrammeBundleSchema = z.strictObject({
+/** Frozen bundle shape for programme seeding (context + import draft). */
+export const ProgrammeBundleSchema = z.strictObject({
   context: z.strictObject({
     at: IsoDateTimeSchema,
     sourceId: EntityIdSchema,

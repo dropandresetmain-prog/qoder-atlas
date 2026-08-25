@@ -27,7 +27,7 @@ import type {
 } from '../domain/entities.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import type { Trip } from '../domain/trip.ts';
-import type { Engagement } from '../domain/elements.ts';
+import type { Engagement, Stay, TransportLeg, TransportMode, TripElement } from '../domain/elements.ts';
 import type { Constraint } from '../domain/constraints.ts';
 import {
   ProgrammeImportDraftSchema,
@@ -47,6 +47,30 @@ export interface ProgrammeServiceDeps {
   sources: SourceRepository;
   audit: AuditRepository;
 }
+
+/**
+ * Generic open-vocabulary -> frozen-enum mapping for declared transport
+ * modes. Intake accepts free text from any source; only legs whose declared
+ * mode maps onto the domain's TransportMode vocabulary can materialize.
+ * Vocabulary aliases only — no provider or scenario semantics.
+ */
+const TRANSPORT_MODE_BY_NAME = new Map<string, TransportMode>([
+  ['FLIGHT', 'FLIGHT'],
+  ['AIR', 'FLIGHT'],
+  ['PLANE', 'FLIGHT'],
+  ['TRAIN', 'TRAIN'],
+  ['RAIL', 'TRAIN'],
+  ['FERRY', 'FERRY'],
+  ['PUBLIC_TRANSIT', 'PUBLIC_TRANSIT'],
+  ['TAXI', 'TAXI_OR_RIDEHAIL'],
+  ['RIDEHAIL', 'TAXI_OR_RIDEHAIL'],
+  ['TAXI_OR_RIDEHAIL', 'TAXI_OR_RIDEHAIL'],
+  ['PRIVATE_TRANSFER', 'PRIVATE_TRANSFER'],
+  ['TRANSFER', 'PRIVATE_TRANSFER'],
+  ['CAR_RENTAL', 'CAR_RENTAL'],
+  ['WALKING', 'WALKING'],
+  ['WALK', 'WALKING'],
+]);
 
 export interface ProgrammeContextInput {
   at: IsoDateTime;
@@ -256,16 +280,38 @@ export class ProgrammeService {
       { op: 'UPSERT_ENTITY', entityType: 'TRAVELLER', id: travellerId, data: travellerEntity },
     ];
 
+    // Declared travel facts -> trip elements (CONNECTED authority at best:
+    // the draft is organiser/import evidence, never observed provider truth).
+    // Unresolvable place refs stay explicit issues; nothing is guessed.
+    const declaredElements = await this.materializeDeclaredTravel(
+      traveller,
+      resolvedTripId,
+      draft.sourceId,
+      input.at,
+    );
+    issues.push(...declaredElements.issues);
+    if ((traveller.declaredTravel ?? []).length > 0 && declaredElements.elements.length === 0) {
+      issues.push(
+        'declared travel items were present but none could be materialized (unresolvable place refs or modes)',
+      );
+    }
+
     if (!tripId) {
+      // Organiser-declared binding strength per commitment (ADR-034): the
+      // draft's engagementImportance entries override the intake default.
+      const importanceByCommitment = new Map(
+        (traveller.engagementImportance ?? []).map((entry) => [entry.commitmentId, entry]),
+      );
       const engagements: Engagement[] = validCommitmentIds.map((commitmentId, index) => {
         const commitment = input.commitmentById.get(commitmentId);
         if (!commitment) throw new Error('unreachable: commitment validated above');
+        const declared = importanceByCommitment.get(commitmentId);
         return {
           id: `el-${resolvedTripId}-eng-${index + 1}`,
           tripId: resolvedTripId,
           elementKind: 'ENGAGEMENT',
-          importance: 'PREFERRED',
-          flexibility: 'FIXED',
+          importance: declared?.importance ?? 'PREFERRED',
+          flexibility: declared?.flexibility ?? 'CHANGEABLE',
           reservationState: 'NONE',
           status: 'UNKNOWN',
           dependsOn: [],
@@ -291,6 +337,7 @@ export class ProgrammeService {
               : {}),
             anchorEventId: draft.anchorEventId,
             anchorCommitmentId: commitmentId,
+            ...(declared?.role ? { participantRole: declared.role } : {}),
           },
         };
       });
@@ -317,7 +364,7 @@ export class ProgrammeService {
         label: traveller.displayName,
         travellerIds: [travellerId],
         anchorEventId: draft.anchorEventId,
-        elements: engagements,
+        elements: [...engagements, ...declaredElements.elements],
         objectives,
         relations: [],
         // Programme policy applicability is derived from evidence: rule sets
@@ -426,6 +473,161 @@ export class ProgrammeService {
     });
     if (matches.length === 0) return undefined;
     if (matches.length > 1) return 'AMBIGUOUS';
+    return matches[0]?.id;
+  }
+
+  /**
+   * Materialize a draft's declared travel items as trip elements. Each item
+   * becomes exactly one TRANSPORT_LEG or STAY; place refs resolve against
+   * authoritative places by external ref or name (same fail-closed rule as
+   * home-airport resolution). Unresolved refs produce an issue and the item
+   * is skipped — never a guessed Place id. Deterministic ids keep reset
+   * reproducible.
+   */
+  private async materializeDeclaredTravel(
+    traveller: ProgrammeTravellerDraft,
+    tripId: EntityId,
+    sourceId: EntityId,
+    at: IsoDateTime,
+  ): Promise<{ elements: TripElement[]; issues: string[] }> {
+    const elements: TripElement[] = [];
+    const issues: string[] = [];
+    for (const [index, item] of (traveller.declaredTravel ?? []).entries()) {
+      if (item.itemKind === 'TRANSPORT_LEG') {
+        const originPlaceId = item.originRef
+          ? await this.resolvePlaceByRef(item.originRef)
+          : undefined;
+        if (item.originRef && !originPlaceId) {
+          issues.push(`declared transport leg ${index + 1}: origin place ${item.originRef.system}:${item.originRef.value} not found among programme places; leg not created`);
+          continue;
+        }
+        const destinationPlaceId = item.destinationRef
+          ? await this.resolvePlaceByRef(item.destinationRef)
+          : undefined;
+        if (item.destinationRef && !destinationPlaceId) {
+          issues.push(`declared transport leg ${index + 1}: destination place ${item.destinationRef.system}:${item.destinationRef.value} not found among programme places; leg not created`);
+          continue;
+        }
+        if (!originPlaceId || !destinationPlaceId) {
+          issues.push(`declared transport leg ${index + 1}: missing origin/destination place reference; leg not created`);
+          continue;
+        }
+        // The mode vocabulary is open in the intake contract; only legs whose
+        // declared mode maps onto the frozen TransportMode enum can become an
+        // element. An unmappable mode is an explicit issue, not a coercion.
+        const mode = TRANSPORT_MODE_BY_NAME.get(item.mode.toUpperCase());
+        if (!mode) {
+          issues.push(`declared transport leg ${index + 1}: mode "${item.mode}" has no domain mapping; leg not created`);
+          continue;
+        }
+        const leg: TransportLeg = {
+          id: `el-${tripId}-leg-${index + 1}`,
+          tripId,
+          elementKind: 'TRANSPORT_LEG',
+          importance: 'REQUIRED',
+          flexibility: item.flexibility,
+          reservationState: item.reservationState,
+          status: 'UNKNOWN',
+          dependsOn: [],
+          governedByRuleSetIds: [],
+          data: {
+            mode,
+            originPlaceId,
+            destinationPlaceId,
+            ...(item.scheduledDeparture
+              ? {
+                  scheduledDeparture: {
+                    value: item.scheduledDeparture,
+                    sourceId,
+                    authority: 'CONNECTED',
+                    observedAt: at,
+                  },
+                }
+              : {}),
+            ...(item.scheduledArrival
+              ? {
+                  scheduledArrival: {
+                    value: item.scheduledArrival,
+                    sourceId,
+                    authority: 'CONNECTED',
+                    observedAt: at,
+                  },
+                }
+              : {}),
+            ...(item.bookingRef ? { bookingRef: item.bookingRef } : {}),
+            ...(item.carrierRef ? { carrierRef: item.carrierRef } : {}),
+            ...(item.durationEstimate ? { durationEstimate: item.durationEstimate } : {}),
+          },
+        };
+        elements.push(leg);
+      } else {
+        const stayPlaceId = item.stayPlaceRef
+          ? await this.resolvePlaceByRef(item.stayPlaceRef)
+          : undefined;
+        if (item.stayPlaceRef && !stayPlaceId) {
+          issues.push(`declared stay ${index + 1}: place ${item.stayPlaceRef.system}:${item.stayPlaceRef.value} not found among programme places; stay not created`);
+          continue;
+        }
+        if (!stayPlaceId || !item.checkIn || !item.checkOut) {
+          issues.push(`declared stay ${index + 1}: missing place/dates; stay not created`);
+          continue;
+        }
+        const stay: Stay = {
+          id: `el-${tripId}-stay-${index + 1}`,
+          tripId,
+          elementKind: 'STAY',
+          importance: 'REQUIRED',
+          flexibility: 'CHANGEABLE',
+          reservationState: item.reservationState,
+          status: 'UNKNOWN',
+          dependsOn: [],
+          governedByRuleSetIds: [],
+          data: {
+            placeId: stayPlaceId,
+            checkIn: { value: item.checkIn, sourceId, authority: 'CONNECTED', observedAt: at },
+            checkOut: { value: item.checkOut, sourceId, authority: 'CONNECTED', observedAt: at },
+            ...(item.bookingRef ? { bookingRef: item.bookingRef } : {}),
+            ...(item.guests !== undefined ? { guests: item.guests } : {}),
+            policyRuleSetIds: [],
+          },
+        };
+        elements.push(stay);
+      }
+    }
+    return { elements, issues };
+  }
+
+  /**
+   * Resolve a generic external place reference against authoritative places:
+   * exact match on any external ref system/value pair, on the place name
+   * (name/place-name systems), or on the authoritative Place id itself
+   * (id/place-id systems — sources that already use canonical ids).
+   * Ambiguous or absent -> undefined; the caller records an explicit issue.
+   */
+  private async resolvePlaceByRef(ref: { system: string; value: string }): Promise<EntityId | undefined> {
+    const wantedValue = ref.value.trim().toLowerCase();
+    const wantedSystem = ref.system.toLowerCase();
+    const places = (await this.deps.entities.list('PLACE'))
+      .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
+      .map((entry) => entry.entity);
+    const matches = places.filter((place) => {
+      if (
+        place.name &&
+        (wantedSystem === 'name' || wantedSystem === 'place-name') &&
+        place.name.trim().toLowerCase() === wantedValue
+      ) {
+        return true;
+      }
+      if ((wantedSystem === 'id' || wantedSystem === 'place-id') && place.id.toLowerCase() === wantedValue) {
+        return true;
+      }
+      return place.externalRefs.some(
+        (candidate) =>
+          candidate.system.toLowerCase() === wantedSystem &&
+          candidate.value.trim().toLowerCase() === wantedValue,
+      );
+    });
+    if (matches.length !== 1) return undefined;
     return matches[0]?.id;
   }
 
