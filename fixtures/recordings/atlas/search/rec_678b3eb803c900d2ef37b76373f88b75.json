@@ -1,0 +1,65 @@
+{
+  "id": "rec_678b3eb803c900d2ef37b76373f88b75",
+  "providerId": "atlas",
+  "operation": "search",
+  "recordedAt": "2026-08-25T00:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "routings": [
+      {
+        "routingIdentifier": "RTG-SYN-SINAMS-20261004-1430",
+        "currency": "SGD",
+        "adultPrice": 410,
+        "adultTax": 58,
+        "expireTime": "2026-09-20T23:59:59Z",
+        "fromSegments": [
+          {
+            "carrier": "MN",
+            "operatingCarrier": "",
+            "flightNumber": "MN248",
+            "depAirport": "SIN",
+            "arrAirport": "AMS",
+            "depTime": "202610041430",
+            "arrTime": "202610042135",
+            "duration": 785,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Cheapest",
+            "seatCount": 7,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false
+      },
+      {
+        "routingIdentifier": "RTG-SYN-SINAMS-20261004-1915",
+        "currency": "SGD",
+        "adultPrice": 452,
+        "adultTax": 58,
+        "expireTime": "2026-09-20T23:59:59Z",
+        "fromSegments": [
+          {
+            "carrier": "MN",
+            "operatingCarrier": "",
+            "flightNumber": "MN250",
+            "depAirport": "SIN",
+            "arrAirport": "AMS",
+            "depTime": "202610041915",
+            "arrTime": "202610050220",
+            "duration": 785,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Cheapest",
+            "seatCount": 4,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false
+      }
+    ]
+  }
+}

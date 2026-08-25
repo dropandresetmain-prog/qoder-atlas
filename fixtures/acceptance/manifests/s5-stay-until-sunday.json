@@ -17,6 +17,11 @@
       "seam": "traveller.change_request",
       "mode": "REPLAY",
       "note": "Structured ChangeRequest through resolution HTTP"
+    },
+    {
+      "seam": "atlas.flight.search",
+      "mode": "REPLAY",
+      "note": "Planning evidence from a REPLAY flight.search recording for the requested return corridor"
     }
   ],
   "requiredEnv": [],
@@ -32,7 +37,13 @@
       "trip-trv-evt-ait-2026-ait-draft-35"
     ]
   },
-  "routeParams": [],
+  "routeParams": [
+    {
+      "origin": "SIN",
+      "destination": "AMS",
+      "date": "2026-10-04"
+    }
+  ],
   "steps": [
     {
       "id": "reset",
@@ -76,7 +87,75 @@
         "capture": {
           "caseId": "caseId"
         }
-      }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the structured extension request is accepted" },
+        { "path": "urgency", "op": "equals", "expected": "HARD_INSTRUCTION", "description": "the request carries binding instruction authority" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
+        { "path": "implications", "op": "arrayLengthMin", "expected": 3, "description": "both window deltas plus the funding decision are recorded" },
+        { "path": "implications.0", "op": "contains", "expected": "departAfter 2026-10-04T12:00:00+08:00 is 37h later than current latest departure", "description": "the return-leg window delta is derived from authoritative trip state" },
+        { "path": "implications.1", "op": "contains", "expected": "stayCheckOut 2026-10-04T11:00:00+08:00 is 2d later than current check-out", "description": "the stay-extension delta is derived from the confirmed stay" },
+        { "path": "implications.2", "op": "contains", "expected": "incremental payer TRAVELLER per rule(s) rule-ait-funded-window", "description": "the extension accrues outside the event-funded window: deterministic mixed-funding payer decision, amount allocated once priced" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Planning loop re-searches the return corridor for the requested departure date (REPLAY evidence) and records the stay extension honestly",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-25T10:10:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "bestStrategyId": "bestStrategyId"
+        }
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planner requests return-corridor evidence first, then proposes from it" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search on the return corridor" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the REPLAY recording supplied return-corridor offers" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "every normalized corridor offer becomes a candidate rebook strategy" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to depart later", "description": "the candidate rebooks the existing return leg to a later departure" },
+        { "path": "strategies.0.feasible", "op": "truthy", "description": "a Sunday return inside the trip window is deterministically feasible" },
+        { "path": "strategies.0.costImpact.amount", "op": "equals", "expected": 468, "description": "the strategy carries a deterministic gross price from REPLAY evidence" },
+        { "path": "bestStrategyId", "op": "exists", "description": "feasible candidates are ranked into a best strategy" },
+        { "path": "uncertainties", "op": "arrayLengthMin", "expected": 2, "description": "the stay extension is recorded honestly, not silently dropped" },
+        { "path": "uncertainties.1", "op": "contains", "expected": "stayCheckOut requested: stay-date replanning is not supported by this planner yet", "description": "the planner records the unsupported stay replanning as an explicit uncertainty" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+      ]
+    },
+    {
+      "id": "begin",
+      "description": "Strategy becomes a money-moving intent; deterministic authority decides and the real price is allocated against the funded window",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/begin",
+        "body": {
+          "caseId": "{{caseId}}",
+          "strategyId": "{{bestStrategyId}}",
+          "at": "2026-09-25T10:20:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "intentId": "intentId"
+        }
+      },
+      "assert": [
+        { "path": "funding.allocation.incrementalAmount.amount", "op": "equals", "expected": 468, "description": "the priced cost accrues outside the funded window and is allocated in full as incremental" },
+        { "path": "funding.allocation.incrementalPayer", "op": "equals", "expected": "TRAVELLER", "description": "mixed funding: the incremental payer derives deterministically from the funding-window rule" },
+        { "path": "funding.allocation.derivedFromRuleIds.0", "op": "equals", "expected": "rule-ait-funded-window", "description": "the allocation cites the governing policy rule" },
+        { "path": "funding.summary", "op": "contains", "expected": "468 SGD payable by the traveller", "description": "the allocation is surfaced as a human-readable deterministic summary" },
+        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "the per-trip airfare ceiling is evaluated against the gross spend" },
+        { "path": "ruleTrace.1", "op": "contains", "expected": "rule-ait-hotel-spend-limit", "description": "the accommodation ceiling participates in the same deterministic review" },
+        { "path": "outcome", "op": "equals", "expected": "BLOCKED", "description": "the gross spend beyond a declared policy ceiling never executes: authority fails closed" },
+        { "path": "caseStatus", "op": "equals", "expected": "ESCALATED", "description": "a blocked money-moving intent escalates the case for human review" },
+        { "path": "executable", "op": "falsy", "description": "no executor can pick up the intent while authority blocks it" }
+      ]
     },
     {
       "id": "observe_case",
@@ -84,9 +163,12 @@
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
-        "label": "case_after_change_request",
+        "label": "case_after_begin",
         "expectStatus": 200
-      }
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-35", "description": "the case belongs to the requesting traveller's trip" }
+      ]
     }
   ]
 }
