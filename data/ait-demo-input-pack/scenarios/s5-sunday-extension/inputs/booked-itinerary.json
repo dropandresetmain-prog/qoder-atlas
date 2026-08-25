@@ -1,0 +1,36 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
+  "note": "Ticketed baseline for ait-draft-35 as held by the organiser. Cabin is BUSINESS per clauses.cabinRules (block time > 6h AND programme-critical REQUIRED on-stage role); fare is inside the SGD 1200 ceiling so no approval was needed at booking. Hotel nights are the in-window business-equivalent portion: check-in 30 Sep (lands 06:35 that morning; early check-in arranged at the partner block rate), check-out 2 Oct before the airport transfer.",
+  "asOf": "2026-09-18T11:05:00+08:00",
+  "draftId": "ait-draft-35",
+  "status": "TICKETED",
+  "inboundItinerary": {
+    "plan": "AMS -> SIN direct on 29 Sep; landside SIN 30 Sep 06:35, ~33h before the recovery fireside (1 Oct 15:30) - satisfies the 12h programme-critical buffer and the land-by-23:00 convention for the day before his first commitment.",
+    "segments": [
+      { "flightNumber": "MN241", "origin": "AMS", "destination": "SIN", "departure": "2026-09-29T12:00:00+02:00", "arrival": "2026-09-30T06:35:00+08:00", "cabin": "BUSINESS" }
+    ]
+  },
+  "outboundItinerary": {
+    "plan": "Return after the final event day; departs 2 Oct 23:30, shortly after the closing party (18:00-20:30) ends.",
+    "segments": [
+      { "flightNumber": "MN240", "origin": "SIN", "destination": "AMS", "departure": "2026-10-02T23:30:00+08:00", "arrival": "2026-10-03T06:20:00+02:00", "cabin": "BUSINESS" }
+    ]
+  },
+  "roundTripFare": { "amount": 1150, "currency": "SGD", "fundedBy": "EVENT_ORGANISATION", "note": "Business-equivalent in-window fare; under rule-ait-airfare-spend-limit (SGD 1200)." },
+  "hotel": {
+    "placeId": "place-hotel-bayview",
+    "nights": ["2026-09-30", "2026-10-01"],
+    "checkIn": "2026-09-30",
+    "checkOut": "2026-10-02",
+    "ratePerNight": { "amount": 285, "currency": "SGD" },
+    "fundedBy": "EVENT_ORGANISATION",
+    "note": "Inside rule-ait-hotel-funded-window (29 Sep 15:00 -> 3 Oct 11:00). Single occupancy per clauses.standardOccupancy."
+  },
+  "transfers": {
+    "covered": [
+      { "segment": "AIRPORT_TO_HOTEL_ARRIVAL", "date": "2026-09-30", "fundedBy": "EVENT_ORGANISATION" },
+      { "segment": "HOTEL_TO_AIRPORT_DEPARTURE", "date": "2026-10-02", "fundedBy": "EVENT_ORGANISATION" }
+    ]
+  }
+}

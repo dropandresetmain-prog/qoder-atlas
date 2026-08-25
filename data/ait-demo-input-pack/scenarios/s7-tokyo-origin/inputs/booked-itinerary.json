@@ -1,0 +1,39 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
+  "note": "Ticketed baseline for ait-draft-38 as held by the organiser (issued 8 Sep). Cabin is ECONOMY per clauses.cabinRules: long-haul but NOT programme-critical (PREFERRED/CHANGEABLE panellist), so no business entitlement. This booked round trip IS the business-equivalent baseline for clauses.businessEquivalentAirfare: the event funds no more than SGD 1180 for any replacement itinerary.",
+  "asOf": "2026-09-18T16:40:00+08:00",
+  "draftId": "ait-draft-38",
+  "status": "TICKETED",
+  "issuedAt": "2026-09-08T15:00:00+08:00",
+  "inboundItinerary": {
+    "plan": "LHR -> SIN direct on 29 Sep; landside SIN 30 Sep 06:25, ~33h before the distribution debate (1 Oct 15:50).",
+    "segments": [
+      { "flightNumber": "MN245", "origin": "LHR", "destination": "SIN", "departure": "2026-09-29T10:15:00+01:00", "arrival": "2026-09-30T06:25:00+08:00", "cabin": "ECONOMY" }
+    ]
+  },
+  "outboundItinerary": {
+    "plan": "Return after the final event day; departs 2 Oct 23:55.",
+    "segments": [
+      { "flightNumber": "MN244", "origin": "SIN", "destination": "LHR", "departure": "2026-10-02T23:55:00+08:00", "arrival": "2026-10-03T06:40:00+01:00", "cabin": "ECONOMY" }
+    ]
+  },
+  "roundTripFare": { "amount": 1180, "currency": "SGD", "fundedBy": "EVENT_ORGANISATION", "note": "Under rule-ait-airfare-spend-limit (SGD 1200). Business-equivalent cap for any replacement." },
+  "fareTermsSnapshot": {
+    "refundDeadline": "2026-09-15T23:59:00+08:00",
+    "refundStatusAtRequestTime": "PAST_DEADLINE",
+    "carrierChangeTerms": "Reissue to a different origin permitted: change fee SGD 75 + reprice to prevailing fares. Abandoned sector value non-refundable after the refund deadline.",
+    "note": "Per rule-ait-cancellation-terms: after 15 Sep refunds depend on supplier terms. Request arrived 18 Sep -> supplier terms govern."
+  },
+  "hotel": {
+    "placeId": "place-hotel-bayview",
+    "roomType": "STANDARD_SINGLE",
+    "nights": ["2026-09-30", "2026-10-01"],
+    "checkIn": "2026-09-30",
+    "checkOut": "2026-10-02",
+    "ratePerNight": { "amount": 285, "currency": "SGD" },
+    "fundedBy": "EVENT_ORGANISATION",
+    "note": "If the HND origin is accepted, the 30 Sep night becomes unused (he lands 1 Oct 06:00): hold or release per block terms; the 1 Oct night stands."
+  },
+  "transfers": { "covered": [], "note": "Not yet arranged at request time; an origin change re-points the arrival transfer to 1 Oct." }
+}

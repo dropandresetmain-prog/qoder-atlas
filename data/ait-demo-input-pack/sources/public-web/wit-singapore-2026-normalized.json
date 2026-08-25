@@ -1,0 +1,258 @@
+{
+  "id": "wit-singapore-2026:structure-normalization",
+  "provenance": "PUBLIC_WEB",
+  "sourceIds": ["src-pub-wit2026-programme", "src-pub-wit2026-event", "src-pub-webintravel-dates"],
+  "note": "Normalized PUBLIC facts about the upcoming WiT Singapore 2026 event, captured 2026-08-25. Only structural facts are recorded: day layout, session blocks, timing, formats, roles, published speaker names/titles, venues. Session descriptive prose is deliberately NOT copied. This file is a STRUCTURAL TEMPLATE REFERENCE for the synthetic AiT programme; it never contributes travel facts about real persons.",
+  "event": {
+    "name": "WiT Singapore 2026 (Web in Travel)",
+    "editionTheme": "21: A New Beginning",
+    "dates": { "start": "2026-09-30", "end": "2026-10-02" },
+    "timezone": "Asia/Singapore",
+    "timezoneNote": "Official page states: all times shown are Singapore Time (GMT+8); programme correct at time of publishing.",
+    "organiser": "WiT (Web in Travel), a wholly owned subsidiary of Northstar Travel Group, LLC"
+  },
+  "venues": [
+    { "id": "wit-venue-panpac", "name": "Pan Pacific Singapore", "usedFor": "Innovation Day (30 Sep)", "rooms": ["Pacific 2-3, Level 1", "Ocean 3-4, Level 2", "PLUME, Level 1"] },
+    { "id": "wit-venue-mbs", "name": "Marina Bay Sands Expo & Convention Centre", "usedFor": "Main Stage Day One (1 Oct) and Day Two (2 Oct)", "rooms": ["Heliconia Ballroom, Level 3"] }
+  ],
+  "days": [
+    {
+      "date": "2026-09-30",
+      "label": "Innovation Day",
+      "venueId": "wit-venue-panpac",
+      "blocks": [
+        { "block": "The Next Generation Leaders (By Invite Only)", "room": "Pacific 2-3, Level 1", "window": "10:00-13:00" },
+        { "block": "The WiT Bootcamp", "room": "Pacific 2-3, Level 1", "window": "13:00-16:00" },
+        { "block": "The Global Travel Tech Thinktank (By Invite Only)", "room": "Ocean 3-4, Level 2", "window": "17:00-19:00" },
+        { "block": "Opening Cocktails", "room": "PLUME, Level 1", "window": "19:00-21:00" }
+      ],
+      "sessions": [
+        { "id": "wit26-d0-ngl-checkin", "time": "09:30", "title": "Checking In", "format": "LOGISTICS" },
+        { "id": "wit26-d0-ngl-opening", "time": "10:00-10:10", "title": "The Beginning", "format": "OPENING_REMARKS", "cast": [{ "role": "SPEAKER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" }] },
+        { "id": "wit26-d0-ngl-live-wire", "time": "10:10-10:30", "title": "Purpose vs Impact: The Live Wire", "format": "PANEL", "cast": [
+          { "role": "MODERATOR", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "PANELLIST", "name": "Laura Houldsworth", "org": "Booking.com", "title": "Managing Director, Asia Pacific" },
+          { "role": "PANELLIST", "name": "Rajnish Kumar", "org": "ixigo", "title": "Co-founder & Group Co-CEO" },
+          { "role": "PANELLIST", "name": "Alice Goh", "org": "HeyMax", "title": "Head of Commercial" },
+          { "role": "PANELLIST", "name": "Darrell Chan", "org": "Airbnb", "title": "Deputy General Counsel" }] },
+        { "id": "wit26-d0-ngl-breakout", "time": "10:30-11:15", "title": "Coach Breakout: Purpose & Impact Lenses", "format": "BREAKOUT", "cast": [
+          { "role": "COACH", "name": "Marcus Yong", "org": "Klook", "title": "Vice President, Global Marketing" },
+          { "role": "COACH", "name": "Jacinta Lim", "org": "Seek Sophie", "title": "CEO & Co-founder" },
+          { "role": "COACH", "name": "Laura Houldsworth", "org": "Booking.com", "title": "Managing Director, Asia Pacific" }] },
+        { "id": "wit26-d0-ngl-report", "time": "11:15-11:25", "title": "Report Back", "format": "REPORT_BACK" },
+        { "id": "wit26-d0-ngl-hack", "time": "11:25-11:45", "title": "Travel Hack 2045", "format": "INTERACTIVE" },
+        { "id": "wit26-d0-ngl-commitment", "time": "11:45-11:55", "title": "The One Commitment: Where Purpose Meets Impact", "format": "INTERACTIVE" },
+        { "id": "wit26-d0-ngl-ending", "time": "11:55-12:00", "title": "The Ending - But It's Only The Beginning", "format": "CLOSING_REMARKS" },
+        { "id": "wit26-d0-ngl-lunch", "time": "12:00-13:00", "title": "The Next Generation Leaders Networking Lunch", "format": "SOCIAL" },
+        { "id": "wit26-d0-bc-checkin", "time": "12:30", "title": "Checking In (Bootcamp)", "format": "LOGISTICS" },
+        { "id": "wit26-d0-bc-beginning", "time": "13:00-13:10", "title": "The Beginning Of The New Beginning", "format": "OPENING_REMARKS" },
+        { "id": "wit26-d0-bc-shifts", "time": "13:10-13:20", "title": "Travel Turns 21: Five Shifts Defining Its Next Chapter", "format": "RESEARCH_PRESENTATION", "cast": [{ "role": "SPEAKER", "name": "Coney Dongre", "org": "Phocuswright", "title": "Research Manager" }] },
+        { "id": "wit26-d0-bc-investment", "time": "13:20-13:50", "title": "The Secret Life of Travel Tech Investment", "format": "PANEL", "cast": [
+          { "role": "MODERATOR", "name": "Chris Hemmeter", "org": "Thayer Ventures", "title": "Managing Partner" },
+          { "role": "PANELLIST", "name": "Roger Sharp", "org": "North Ridge Partners & WebBeds", "title": "Chair" },
+          { "role": "PANELLIST", "name": "Cara Whitehill", "org": "Travel Tech Insider", "title": "Co-founder" },
+          { "role": "PANELLIST", "name": "William Bao Bean", "org": "Orbit Ventures", "title": "Managing General Partner" },
+          { "role": "PANELLIST", "name": "Nicholas Cocks", "org": "Velocity Ventures", "title": "Partner" }] },
+        { "id": "wit26-d0-bc-fire", "time": "13:50-14:10", "title": "Made in Fire: Hard-Won Lessons for Believers, Builders and Future Founders", "format": "FIRESIDE_INTERVIEW", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Rajnish Kumar", "org": "ixigo", "title": "Co-founder & Group Co-CEO" }] },
+        { "id": "wit26-d0-bc-brothers", "time": "14:10-14:30", "title": "Brothers & Futures: Unlocking Tours, Activities & Attractions in Asia", "format": "FIRESIDE_INTERVIEW", "cast": [
+          { "role": "INTERVIEWER", "name": "Rod Cuthbert", "org": "Tourism Tasmania / Viator", "title": "Board Member, Tourism Tasmania / Founder, former CEO & Chairman, Viator" },
+          { "role": "SPEAKER", "name": "Chan Chee Chong", "org": "GlobalTix", "title": "Co-founder & CEO" },
+          { "role": "SPEAKER", "name": "Chan Chee Kong", "org": "GlobalTix", "title": "Co-founder & COO" }] },
+        { "id": "wit26-d0-bc-reset", "time": "14:30-14:40", "title": "Reset At 21", "format": "KEYNOTE_SHORT", "cast": [{ "role": "SPEAKER", "name": "John Abraham", "org": "RAPIDE", "title": "Founder & Recovery Atelier" }] },
+        { "id": "wit26-d0-bc-prompt", "time": "14:40-15:10", "title": "Prompt Time: The Honest Answers", "format": "STARTUP_PANEL", "cast": [
+          { "role": "PROMPTER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "PANELLIST", "name": "Mickey Beyer-Clausen", "org": "Timeshifter", "title": "CEO" },
+          { "role": "PANELLIST", "name": "Rayner Loi", "org": "Lumitics", "title": "Co-founder & CEO" },
+          { "role": "PANELLIST", "name": "Jeff Pan", "org": "Belli", "title": "CEO & Co-founder" },
+          { "role": "PANELLIST", "name": "Jacinta Lim", "org": "Seek Sophie", "title": "CEO & Co-founder" },
+          { "role": "PANELLIST", "name": "Tushar Khandelwal", "org": "Tour Hero", "title": "Co-founder" }] },
+        { "id": "wit26-d0-bc-hackfinals", "time": "15:10-15:30", "title": "Agentic AI Hackathon Finals: Meet The Top Three", "format": "COMPETITION_FINAL", "dependencyNote": "Winner announced at Main Stage closing on 2 Oct.", "cast": [
+          { "role": "JUDGE", "name": "Timothy O'Neil-Dunne", "org": "T2Impact", "title": "Principal" },
+          { "role": "JUDGE", "name": "Ross Veitch", "org": "Wego", "title": "CEO & Co-founder" },
+          { "role": "JUDGE", "name": "Mary Li", "org": "Atlas", "title": "CEO & Founder" },
+          { "role": "JUDGE", "name": "Rajnish Kumar", "org": "ixigo", "title": "Co-founder & Group Co-CEO" }] },
+        { "id": "wit26-d0-bc-seedup", "time": "15:30-16:00", "title": "Global Startup Pitch Showcase: Meet The Seedup Winners", "format": "PITCH_SHOWCASE", "dependencyNote": "People's Choice winner announced at Main Stage closing on 2 Oct.", "cast": [
+          { "role": "FACILITATOR", "name": "Pete Comeau", "org": "Phocuswright", "title": "Managing Director" },
+          { "role": "DRAGON", "name": "Roger Sharp", "org": "North Ridge Partners & WebBeds", "title": "Chair" },
+          { "role": "DRAGON", "name": "Cara Whitehill", "org": "Thayer Investment Partners", "title": "Venture Partner" },
+          { "role": "DRAGON", "name": "William Bao Bean", "org": "Orbit Ventures", "title": "Managing General Partner" },
+          { "role": "DRAGON", "name": "Chris Hodges", "org": "Expedia Group", "title": "Vice President, Global Connectivity & Partner Solutions" },
+          { "role": "DRAGON", "name": "Lisa Katsouraki", "org": "ennea Capital Partners", "title": "Senior Advisor" }] },
+        { "id": "wit26-d0-bc-wrap", "time": "16:00", "title": "Wrapping It Up", "format": "CLOSING_REMARKS" },
+        { "id": "wit26-d0-coffee", "time": "16:00-16:30", "title": "Networking Coffee Break", "format": "SOCIAL" },
+        { "id": "wit26-d0-thinktank-framing", "time": "17:00-17:05", "title": "The Framing", "format": "OPENING_REMARKS" },
+        { "id": "wit26-d0-thinktank-brief", "time": "17:05-17:50", "title": "The Possibility Brief", "format": "CLOSED_DOOR_CONVERSATIONS", "cast": [
+          { "role": "FEATURED", "name": "Dr. Kuo-Yi Lim", "org": "Monk's Hill Ventures", "title": "Co-founder & Managing Partner" },
+          { "role": "FEATURED", "name": "Tan Bee Leng", "org": "The Ascott Limited", "title": "Chief Commercial Officer" },
+          { "role": "FEATURED", "name": "Timothy O'Neil-Dunne", "org": "T2Impact", "title": "Principal" }] },
+        { "id": "wit26-d0-cocktails", "time": "19:00-21:00", "title": "Opening Cocktails hosted by Pan Pacific Singapore", "format": "SOCIAL" }
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "label": "Day 1: The World As It Is",
+      "venueId": "wit-venue-mbs",
+      "room": "Heliconia Ballroom, Level 3",
+      "acts": ["Act 1: The Asia Moment", "Act 2: The Provocation Moment", "Act 3: The Build", "Act 4: The Reckoning"],
+      "sessions": [
+        { "id": "wit26-d1-checkin", "time": "08:00", "title": "Checking In & Networking", "format": "LOGISTICS" },
+        { "id": "wit26-d1-prelude", "time": "09:00-09:10", "title": "Prelude", "format": "OPENING_REMARKS" },
+        { "id": "wit26-d1-bigquestions", "time": "09:10-09:20", "title": "And So It Begins: The Big Questions", "format": "KEYNOTE", "act": "opening", "cast": [{ "role": "SPEAKER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" }] },
+        { "id": "wit26-d1-aviation-keynote", "time": "09:20-09:50", "title": "A New Beginning: Beyond Low Cost, Beyond Flights, The Sky Is Not The Limit", "format": "HEADLINE_INTERVIEW", "act": "Act 1", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Tony Fernandes", "org": "Capital A Berhad", "title": "CEO" }] },
+        { "id": "wit26-d1-klook-chat", "time": "09:50-10:10", "title": "Coffee Chat: The Hero's Journey of Klook", "format": "COFFEE_CHAT", "act": "Act 1", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Eric Gnock Fah", "org": "Klook", "title": "Co-founder & President" }] },
+        { "id": "wit26-d1-india", "time": "10:10-10:30", "title": "Building for the Next Billion: The India Story", "format": "FIRESIDE_INTERVIEW", "act": "Act 1", "cast": [
+          { "role": "INTERVIEWER", "name": "Fritz Demopoulos", "org": "Queen's Road Capital", "title": "CEO" },
+          { "role": "SPEAKER", "name": "Rajesh Magow", "org": "MakeMyTrip", "title": "Co-founder & Group CEO" }] },
+        { "id": "wit26-d1-hospitality", "time": "10:30-11:00", "title": "Moving Hospitality Forward in the New Era", "format": "DUAL_INTERVIEW", "act": "Act 1", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Hannah Yulo-Luccini", "org": "Hotel 101 Global", "title": "CEO" },
+          { "role": "SPEAKER", "name": "Tan Bee Leng", "org": "The Ascott Limited", "title": "Chief Commercial Officer" }] },
+        { "id": "wit26-d1-coffee1", "time": "11:00-11:30", "title": "Networking Coffee Break", "format": "SOCIAL" },
+        { "id": "wit26-d1-provocation", "time": "11:30-11:40", "title": "What Does a New Beginning Demand From Us: The Thought Provocation", "format": "KEYNOTE_SHORT", "act": "Act 2", "cast": [{ "role": "SPEAKER", "name": "Fritz Demopoulos", "org": "Queen's Road Capital", "title": "CEO" }] },
+        { "id": "wit26-d1-experiences", "time": "11:40-11:50", "title": "The Experiences Provocation: Where To, The Next Beginning?", "format": "KEYNOTE_SHORT", "act": "Act 2", "cast": [{ "role": "SPEAKER", "name": "Rod Cuthbert", "org": "Tourism Tasmania / Viator", "title": "Board Member, Tourism Tasmania / Founder, Former CEO & Chairman, Viator" }] },
+        { "id": "wit26-d1-expedia", "time": "11:50-12:10", "title": "Coffee Chat: One Platform, Every Partner: Expedia's New Beginning", "format": "COFFEE_CHAT", "act": "Act 2", "cast": [
+          { "role": "INTERVIEWER", "name": "Pete Comeau", "org": "Phocuswright", "title": "Managing Director" },
+          { "role": "SPEAKER", "name": "Golan Shaked", "org": "Expedia Group", "title": "Vice President, Hotel Management Partnerships and Air" }] },
+        { "id": "wit26-d1-oag", "time": "12:10-12:20", "title": "The Data of Reckoning: The Industry Provocation", "format": "KEYNOTE_SHORT", "act": "Act 2", "cast": [{ "role": "SPEAKER", "name": "Gemma Timmons", "org": "OAG", "title": "Director of Operations & Chief of Staff" }] },
+        { "id": "wit26-d1-ota-ai", "time": "12:20-12:40", "title": "Coffee Chat: The OTA On The Frontline: The AI Provocation", "format": "COFFEE_CHAT", "act": "Act 2", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Laura Houldsworth", "org": "Booking.com", "title": "Managing Director, Asia Pacific" }] },
+        { "id": "wit26-d1-future2035", "time": "12:40-12:50", "title": "The Future Provocation: The World in 2035 and What That Means", "format": "KEYNOTE_SHORT", "act": "Act 2" },
+        { "id": "wit26-d1-lunch", "time": "12:50-14:00", "title": "Networking Lunch", "format": "SOCIAL" },
+        { "id": "wit26-d1-open-space", "time": "14:00-14:10", "title": "Open Space", "format": "LOGISTICS", "act": "Act 3" },
+        { "id": "wit26-d1-data-winning", "time": "14:00-14:10", "title": "The Starting Line: What the Data Says About Who Wins", "format": "RESEARCH_PRESENTATION", "act": "Act 3", "cast": [{ "role": "SPEAKER", "name": "Pete Comeau", "org": "Phocuswright", "title": "Managing Director" }] },
+        { "id": "wit26-d1-mews", "time": "14:10-14:30", "title": "Founders & Futures: Tackling Hospitality's Biggest Pain Points", "format": "FIRESIDE_INTERVIEW", "act": "Act 3", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Richard Valtr", "org": "Mews", "title": "Founder" }] },
+        { "id": "wit26-d1-payments-moment", "time": "14:30-14:40", "title": "The Payments Moment: The Heart Of Growth", "format": "KEYNOTE_SHORT", "act": "Act 3", "cast": [{ "role": "SPEAKER", "name": "Jay Patel", "org": "Visa", "title": "Senior Director, Global Travel Partnerships" }] },
+        { "id": "wit26-d1-payments-panel", "time": "14:40-15:10", "title": "A New Beginning in Payments: Cross-Border, Agentic Commerce & Fraud", "format": "PANEL", "act": "Act 3", "cast": [
+          { "role": "MODERATOR", "name": "Timothy Hughes", "org": "Agoda", "title": "Vice President, Corporate Development" },
+          { "role": "PANELLIST", "name": "Tania Platt", "org": "Visa", "title": "Global Head, B2B Travel" },
+          { "role": "PANELLIST", "name": "Nazim Ali", "org": "Xendit", "title": "Chief Revenue Officer" },
+          { "role": "PANELLIST", "name": "Caslin Luo", "org": "Checkout.com", "title": "Head of Account Management, Southeast Asia, Australia and New Zealand" }] },
+        { "id": "wit26-d1-skyscanner", "time": "15:10-15:30", "title": "Coffee Chat: Skyscanner's New Beginning: Beyond Flights, Beyond Search", "format": "COFFEE_CHAT", "act": "Act 3", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Bryan Batista", "org": "Skyscanner", "title": "CEO" }] },
+        { "id": "wit26-d1-coffee2", "time": "15:30-16:00", "title": "Networking Coffee Break", "format": "SOCIAL" },
+        { "id": "wit26-d1-anxiety", "time": "16:00-16:10", "title": "Alleviating Anxiety: The Reckoning Behind The Emotion", "format": "RESEARCH_PRESENTATION", "act": "Act 4", "cast": [{ "role": "SPEAKER", "name": "Stephen Joyce", "org": "Protect Group", "title": "Global Strategy Lead - Travel & Tours" }] },
+        { "id": "wit26-d1-ixigo-fire", "time": "16:10-16:30", "title": "Founders & Futures: Disrupting For The Next Fire", "format": "FIRESIDE_INTERVIEW", "act": "Act 4", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Rajnish Kumar", "org": "ixigo", "title": "Co-founder & Group Co-CEO" }] },
+        { "id": "wit26-d1-distribution-debate", "time": "16:30-17:00", "title": "The Debate: What Does A New Beginning In Distribution Look Like In The Agentic Era?", "format": "DEBATE_PANEL", "act": "Act 4", "cast": [
+          { "role": "REFEREE", "name": "Timothy O'Neil-Dunne", "org": "T2Impact", "title": "Principal" },
+          { "role": "REFEREE", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "PANELLIST", "name": "Mike McGearty", "org": "Meili", "title": "CEO & Co-founder" },
+          { "role": "PANELLIST", "name": "Lisa Katsouraki", "org": "ennea Capital Partners", "title": "Senior Advisor" },
+          { "role": "PANELLIST", "name": "Ross Veitch", "org": "Wego", "title": "CEO & Co-founder" },
+          { "role": "PANELLIST", "name": "Kelvin Fu", "org": "AeroHub Solution / Letsfly", "title": "President, AeroHub Solution / Co-founder, Letsfly" },
+          { "role": "PANELLIST", "name": "Mary Li", "org": "Atlas", "title": "CEO & Co-founder" }] },
+        { "id": "wit26-d1-social", "time": "17:00-17:10", "title": "Social: A New Beginning", "format": "KEYNOTE_SHORT", "act": "Act 4", "cast": [{ "role": "SPEAKER", "name": "Morris Sim", "org": "Circos Brand Karma / Montara Hospitality Group", "title": "CEO & Co-founder, Circos Brand Karma; Executive Director, Montara Hospitality Group" }] },
+        { "id": "wit26-d1-full-circle", "time": "17:10-17:40", "title": "Full Circle: Sustaining Hospitality with Heart and Soul", "format": "DUAL_INTERVIEW", "act": "Act 4", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Sokoun Chanpreda", "org": "Shinta Mani Hotels (Cambodia)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Kittisak Pattamasaevi", "org": "Montara Hospitality Group (Thailand)", "title": "CEO" }] },
+        { "id": "wit26-d1-reckoning", "time": "17:40", "title": "The Moment of Reckoning", "format": "CLOSING_REMARKS" }
+      ]
+    },
+    {
+      "date": "2026-10-02",
+      "label": "Day 2: The New Beginning Begins",
+      "venueId": "wit-venue-mbs",
+      "room": "Heliconia Ballroom, Level 3",
+      "acts": ["Act 5: Rewriting the Future: Lenses of Experience", "Act 6: The Growth Map", "Act 7: The Wager - Placing Bets on What's Next"],
+      "sessions": [
+        { "id": "wit26-d2-checkin", "time": "09:00", "title": "Checking In & Networking", "format": "LOGISTICS" },
+        { "id": "wit26-d2-warmup", "time": "10:00-10:10", "title": "Warming Up The Room", "format": "OPENING_REMARKS" },
+        { "id": "wit26-d2-jtb", "time": "10:10-10:30", "title": "Coffee Chat: The Renaissance of Travel", "format": "COFFEE_CHAT", "act": "Act 5", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Eijiro Yamakita", "org": "JTB Corp.", "title": "Chairman" }] },
+        { "id": "wit26-d2-lcc-veteran", "time": "10:30-10:50", "title": "Coffee Chat: Veteran of New Beginnings: What A Low-Cost Pioneer Sees Next", "format": "COFFEE_CHAT", "act": "Act 5", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Barathan Pasupathi", "org": "Jazeera Airways", "title": "CEO" }] },
+        { "id": "wit26-d2-asian-traveller", "time": "10:50-11:00", "title": "The Asian Traveller: Five Truths", "format": "RESEARCH_PRESENTATION", "act": "Act 5", "cast": [{ "role": "SPEAKER", "name": "Laura-Marie Arens", "org": "Google", "title": "Head of Travel Vertical Search APAC" }] },
+        { "id": "wit26-d2-etraveli", "time": "11:00-11:20", "title": "Coffee Chat: The Dirty Work: A Gambling Man's Bet on Flights", "format": "COFFEE_CHAT", "act": "Act 5", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Mathias Hedlund", "org": "Etraveli Group", "title": "CEO" }] },
+        { "id": "wit26-d2-ota-panel", "time": "11:20-11:50", "title": "OTAs: The Next Frontier - Loyalty, Value, Trust", "format": "PANEL", "act": "Act 5", "cast": [
+          { "role": "INTERVIEWER", "name": "Adrian Currie", "org": "Independent", "title": "Industry Veteran" },
+          { "role": "PANELLIST", "name": "Yoshiyuki Takano", "org": "Rakuten Group", "title": "Group Senior Managing Executive Officer, SVP of Commerce & Marketing Company" },
+          { "role": "PANELLIST", "name": "Ru Yi", "org": "Trip.com Group", "title": "Assistant Vice President, International Markets, APAC" },
+          { "role": "PANELLIST", "name": "Nadia Omer", "org": "AirAsia MOVE", "title": "CEO" }] },
+        { "id": "wit26-d2-loyalty", "time": "11:50-12:10", "title": "Disrupt or Defend: Two Takes On Loyalty", "format": "PANEL", "act": "Act 5", "cast": [
+          { "role": "MODERATOR", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "PANELLIST", "name": "Alice Goh", "org": "HeyMax", "title": "Head of Commercial" },
+          { "role": "PANELLIST", "name": "Ricky So", "org": "Pelago by Singapore Airlines", "title": "Chief Commercial Officer" }] },
+        { "id": "wit26-d2-lunch", "time": "12:00-13:00", "title": "Networking Lunch", "format": "SOCIAL" },
+        { "id": "wit26-d2-for-good", "time": "13:10-13:20", "title": "Spotlight: WiT For Good 2026", "format": "CHARITY_SPOTLIGHT", "act": "Act 6", "cast": [{ "role": "FEATURED", "name": "Ram Banzuela", "org": "Young Focus Foundation", "title": "Program Manager" }] },
+        { "id": "wit26-d2-zuzu", "time": "13:20-13:30", "title": "Human + AI: Unlocking Independent Hospitality in South-east Asia", "format": "RESEARCH_PRESENTATION", "act": "Act 6", "cast": [{ "role": "SPEAKER", "name": "Vikram Malhi", "org": "ZUZU Hospitality", "title": "CEO & Founder" }] },
+        { "id": "wit26-d2-spotnana", "time": "13:30-13:50", "title": "Founders & Futures: Rewriting the Corporate Tech Stack for Growth", "format": "FIRESIDE_INTERVIEW", "act": "Act 6", "cast": [
+          { "role": "INTERVIEWER", "name": "Rajnish Kumar", "org": "ixigo", "title": "Co-founder & Group Co-CEO" },
+          { "role": "SPEAKER", "name": "Sarosh Waghmar", "org": "Spotnana", "title": "Founder, Co-Chairman, & Chief Product Officer" }] },
+        { "id": "wit26-d2-social-commerce", "time": "13:50-14:00", "title": "A New Beginning in Social Commerce: Five Key Truths", "format": "RESEARCH_PRESENTATION", "act": "Act 6", "cast": [{ "role": "SPEAKER", "name": "Marcus Yong", "org": "Klook", "title": "Vice President, Global Marketing" }] },
+        { "id": "wit26-d2-platform-plays", "time": "14:00-14:30", "title": "The Platform Plays: The Value of the Outsiders", "format": "PANEL", "act": "Act 6", "cast": [
+          { "role": "MODERATOR", "name": "Timothy Hughes", "org": "Agoda", "title": "Vice President, Corporate Development" },
+          { "role": "PANELLIST", "name": "Eason Zhang", "org": "TikTok", "title": "Head of Apps & Strategic Partnerships, Southeast Asia" },
+          { "role": "PANELLIST", "name": "Adilla Arantika", "org": "Grab", "title": "Regional Senior Manager, Partner Apps" },
+          { "role": "PANELLIST", "name": "Guido Becher", "org": "Rappi", "title": "Global Head of Travel & Loyalty" }] },
+        { "id": "wit26-d2-africa-spotlight", "time": "14:30-17:00", "title": "A WiT Africa Spotlight: Leap, Build, Belong", "format": "REGIONAL_SPOTLIGHT", "act": "Act 6", "note": "Long block containing nested content; a coffee break (15:00-15:30) sits inside it.", "cast": [
+          { "role": "CURATOR", "name": "Stephan Ekbergh", "org": "Travelstart / Innovation City Cape Town", "title": "Chairman, Travelstart / Co-founder, Innovation City Cape Town" },
+          { "role": "SPEAKER", "name": "Adebayo Adedeji", "org": "Wakanow", "title": "Group CEO" },
+          { "role": "SPEAKER", "name": "Ben Peterson", "org": "Purple Elephant Ventures", "title": "CEO & Co-founder" },
+          { "role": "SPEAKER", "name": "Iain Manley", "org": "VoiceMaps", "title": "CEO & Founder" }] },
+        { "id": "wit26-d2-coffee", "time": "15:00-15:30", "title": "Networking Coffee Break", "format": "SOCIAL" },
+        { "id": "wit26-d2-indie", "time": "15:30-15:55", "title": "A WiT Indie Spotlight: Changing the World, One Obsession at a Time", "format": "PANEL", "act": "Act 7", "cast": [
+          { "role": "MODERATOR", "name": "Jacinta Lim", "org": "Seek Sophie", "title": "CEO & Co-founder" },
+          { "role": "PANELLIST", "name": "Andie Ang", "org": "Jane Goodall Institute (Singapore)", "title": "President" },
+          { "role": "PANELLIST", "name": "Clarence Chua", "org": "The Sundowner Nature Experience Centre", "title": "Founder" },
+          { "role": "PANELLIST", "name": "Amanda Currie", "org": "Tinwald Farm New Zealand", "title": "Owner & Farmer" }] },
+        { "id": "wit26-d2-destination", "time": "15:55-16:20", "title": "The New Destination Contract: Local Measures, Dispersal Strategies", "format": "PANEL", "act": "Act 7", "cast": [
+          { "role": "PANELLIST", "name": "Mich Goh", "org": "Airbnb", "title": "Director of Public Policy, Asia Pacific" },
+          { "role": "PANELLIST", "name": "Rod Cuthbert", "org": "Tourism Tasmania / Viator", "title": "Board Member, Tourism Tasmania / Founder, Former CEO & Chairman, Viator" }] },
+        { "id": "wit26-d2-funding-faceoff", "time": "16:20-16:40", "title": "Face Off: The New Funding Contract", "format": "FIRESIDE_DUAL", "act": "Act 7", "cast": [
+          { "role": "SPEAKER", "name": "Roger Sharp", "org": "North Ridge Partners & WebBeds", "title": "Chair" },
+          { "role": "SPEAKER", "name": "Chris Hemmeter", "org": "Thayer Ventures", "title": "Managing Director" }] },
+        { "id": "wit26-d2-scaleup-showcase", "time": "16:40-17:10", "title": "WiT Phocuswright Global Startup Pitch Showcase: Meet The Scaleup Winners", "format": "PITCH_SHOWCASE", "act": "Act 7", "cast": [
+          { "role": "FACILITATOR", "name": "Pete Comeau", "org": "Phocuswright", "title": "Managing Director" },
+          { "role": "DRAGON", "name": "Cara Whitehill", "org": "Thayer Investment Partners", "title": "Venture Partner" },
+          { "role": "DRAGON", "name": "William Bao Bean", "org": "Orbit Ventures", "title": "Managing General Partner" },
+          { "role": "DRAGON", "name": "Roger Sharp", "org": "North Ridge Partners", "title": "Chairman" },
+          { "role": "DRAGON", "name": "Chris Hemmeter", "org": "Thayer Ventures", "title": "Managing Partner" },
+          { "role": "DRAGON", "name": "Tania Platt", "org": "Visa", "title": "Global Head, B2B Travel" }] },
+        { "id": "wit26-d2-agoda", "time": "17:10-17:40", "title": "Coffee Chat: Agoda - A New Beginning", "format": "COFFEE_CHAT", "act": "Act 7", "cast": [
+          { "role": "INTERVIEWER", "name": "Yeoh Siew Hoon", "org": "WiT (Web in Travel)", "title": "Founder" },
+          { "role": "SPEAKER", "name": "Omri Morgenshtern", "org": "Agoda", "title": "CEO" },
+          { "role": "SPEAKER", "name": "Idan Zalzberg", "org": "Agoda", "title": "CTO" }] },
+        { "id": "wit26-d2-great-debate", "time": "17:40-18:00", "title": "The Great WiT Debate: AI Will Do More Harm Than Good to the Travel Industry in the Next Decade", "format": "AUDIENCE_DEBATE", "act": "Act 7", "cast": [
+          { "role": "DEBATER_FOR", "name": "Martin Symes", "org": "Independent", "title": "As himself" },
+          { "role": "DEBATER_AGAINST", "name": "Timothy Hughes", "org": "Agoda", "title": "Vice President, Corporate Development" }] },
+        { "id": "wit26-d2-closing-moment", "time": "18:00", "title": "The New Beginning Begins", "format": "CLOSING_REMARKS" },
+        { "id": "wit26-d2-closing-party", "time": "18:30-20:30", "title": "Closing Party featuring the WiT For Good Charity Auction", "format": "SOCIAL", "room": "Heliconia Ballroom, Level 3" }
+      ]
+    }
+  ],
+  "observedStructurePatterns": {
+    "dayLayout": "One pre-conference innovation/bootcamp day (by-invite rising-leaders block + startup bootcamp block + invite-only thinktank + opening social), then two full main-stage conference days organised into numbered thematic 'Acts'.",
+    "timingPatterns": [
+      "Registration/check-in precedes content by 60-90 minutes (08:00 check-in for 09:00 start; 09:00 check-in for 10:00 start).",
+      "Session slots: 10-minute keynotes/provocations, 20-minute coffee chats/interviews, 30-minute panels, occasional 2.5-hour spotlight blocks.",
+      "Two ~30-minute coffee breaks per main-stage day (approx 11:00 and 15:30); 60-70 minute networking lunch around 12:00-14:00.",
+      "Main-stage day ends ~17:40-18:00 with a signature closing format (debate) followed by an evening social.",
+      "All times Singapore Time (GMT+8)."
+    ],
+    "sessionFormats": ["KEYNOTE", "HEADLINE_INTERVIEW", "COFFEE_CHAT", "FIRESIDE_INTERVIEW", "PANEL", "DEBATE_PANEL", "AUDIENCE_DEBATE", "RESEARCH_PRESENTATION", "KEYNOTE_SHORT", "STARTUP_PANEL", "PITCH_SHOWCASE", "COMPETITION_FINAL", "REGIONAL_SPOTLIGHT", "CHARITY_SPOTLIGHT", "BREAKOUT", "SOCIAL", "LOGISTICS", "OPENING_REMARKS", "CLOSING_REMARKS"],
+    "roleMix": ["HOST/FOUNDER-INTERVIEWER (anchors most headline slots)", "KEYNOTE_SPEAKER", "INTERVIEWER", "MODERATOR", "PANELLIST", "COACH", "JUDGE", "DRAGON (pitch judges)", "FACILITATOR", "CURATOR", "REFEREE", "PROMPTER", "FEATURED", "DEBATER_FOR/AGAINST"],
+    "dependencyPatterns": [
+      "One host/interviewer personality appears across a large share of headline sessions (serial dependency).",
+      "Investor 'dragons' recur across Day 0 bootcamp showcase, Day 1 debate and Day 2 showcase (shared multi-day dependencies).",
+      "Competition/hackathon finals on the pre-conference day resolve with winner announcements at the final main-stage closing (cross-day dependency).",
+      "Panels pair direct competitors and cross-sector players; moderators are drawn from partner organisations.",
+      "Some speakers hold multiple roles across days (panellist one day, interviewer or dragon another day)."
+    ]
+  }
+}

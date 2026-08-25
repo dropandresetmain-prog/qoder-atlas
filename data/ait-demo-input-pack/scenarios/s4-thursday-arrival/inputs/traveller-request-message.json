@@ -1,0 +1,10 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages"],
+  "note": "Literal synthetic traveller message triggering S4. Synthetic; no real person's statements reproduced.",
+  "messageId": "msg-ait-s4-001",
+  "channel": "TRAVELLER_CHAT",
+  "fromDraftId": "ait-draft-34",
+  "receivedAt": "2026-09-08T14:20:00+08:00",
+  "text": "Hi! Saw the draft itinerary - it gets me into Singapore on Tuesday evening the 29th. Can I arrive Thursday morning instead? I've got things to wrap up here in Chiang Mai on Wednesday, and the Thursday morning flight looks quite a bit cheaper too. My first session is the search chat on Thursday afternoon right? Thanks!"
+}

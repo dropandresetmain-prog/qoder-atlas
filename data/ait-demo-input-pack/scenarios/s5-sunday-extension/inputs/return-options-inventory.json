@@ -1,0 +1,17 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated SIN->AMS return inventory at request time. MN240 operates daily. Repricing is round-trip based: moving the return from 2 Oct to 4 Oct reprices the whole ticket to SGD 1298 (delta +148 over the ticketed SGD 1150). Deliberate shape: the extension costs money - the demo must show a traveller-funded increment, not a free change. Not a live provider feed; at demo runtime the same shapes arrive via REPLAY.",
+  "observedAt": "2026-09-18T11:20:00+08:00",
+  "routes": [
+    {
+      "origin": "SIN",
+      "destination": "AMS",
+      "services": [
+        { "flightNumber": "MN240", "date": "2026-10-02", "departure": "2026-10-02T23:30:00+08:00", "arrival": "2026-10-03T06:20:00+02:00", "status": "OPERATING", "businessSeatsAvailable": 6, "note": "Currently ticketed return.", "roundTripReprice": { "amount": 1150, "currency": "SGD", "note": "No change; baseline fare." } },
+        { "flightNumber": "MN240", "date": "2026-10-03", "departure": "2026-10-03T23:30:00+08:00", "arrival": "2026-10-04T06:20:00+02:00", "status": "OPERATING", "businessSeatsAvailable": 8, "roundTripReprice": { "amount": 1242, "currency": "SGD", "note": "Saturday return; delta +92." } },
+        { "flightNumber": "MN240", "date": "2026-10-04", "departure": "2026-10-04T23:30:00+08:00", "arrival": "2026-10-05T06:20:00+02:00", "status": "OPERATING", "businessSeatsAvailable": 9, "roundTripReprice": { "amount": 1298, "currency": "SGD", "note": "Requested Sunday return; delta +148." } }
+      ]
+    }
+  ]
+}

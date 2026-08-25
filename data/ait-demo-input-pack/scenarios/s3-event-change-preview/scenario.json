@@ -1,0 +1,33 @@
+{
+  "provenance": "NATIVE_UI",
+  "sourceIds": ["src-repo-scenarios", "src-syn-ait-event", "src-syn-ait-roster"],
+  "scenarioId": "S3",
+  "catalogueTitle": "Headline speaker needs to leave earlier; organiser previews consequences",
+  "trigger": "ORGANISER_EVENT_SIDE_CHANGE",
+  "stage": "POST_BOOKING",
+  "tier": "TIER_A",
+  "demoRole": "Architectural / enterprise hero",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-22T11:00:00+08:00",
+  "note": "Grace Nakamura (ait-draft-04, NRT origin, Day 1 future-provocation keynote 12:10-12:20) must depart SIN by ~10:30 on 1 Oct for an unavoidable external commitment in Tokyo; her booked outbound leaves 19:45. The organiser asks Northstar to preview moving her commitment earlier so she can take the 13:30 outbound — but the engine must run a counterfactual PREVIEW first, not mutate the event. The preview candidate swaps future-provocation with marketplace-chat (09:50-10:10): Grace becomes viable, interviewer Daniel Ong (ait-draft-02, local) remains viable, but marketplace speaker Lucas Ferreira (ait-draft-20) becomes disrupted because his booked same-day return SIN->SGN departs 12:30 — the displaced 12:10-12:30 slot collides with his outbound, forcing a traveller-funded or approval-bound rebook (~SGD 95). Transfer assumptions also change (Grace's departure transfer brought forward; Lucas's departure transfer invalidated). Simulated seam: no provider calls in S3; the preview artifact is pack-authored NATIVE_UI material describing the counterfactual the engine must reproduce deterministically.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-04", "impactClass": "BECOMES_VIABLE_WITH_PROGRAMME_CHANGE", "reason": "Moved slot 09:50-10:10 lets her leave the venue ~10:20 and make the 13:30 SIN->NRT outbound." },
+    { "draftId": "ait-draft-20", "impactClass": "BECOMES_DISRUPTED", "reason": "Marketplace-chat displaced to 12:10-12:30 collides with his booked same-day return MN231 (SIN->SGN, departs 12:30); recovery requires rebooking onto the 18:10 service with fare delta ~SGD 95 and approval." },
+    { "draftId": "ait-draft-02", "impactClass": "REMAINS_VIABLE", "reason": "Marketplace interviewer is local (Singapore) and free all day; the slot move only changes his morning sequencing." }
+  ],
+  "expectedReasoningHooks": [
+    "Preview-before-commit: the event mutation must exist only in an overlay/counterfactual until the operator explicitly commits; authoritative state is untouched.",
+    "AnchorEvent -> Trip propagation: a commitment time change fans out to every traveller with an engagement bound to the moved commitments (future-provocation, marketplace-chat), including outbound-flight collisions, not just arrival checks.",
+    "Counterfactual blast radius across 3 travellers with differentiated outcomes (viable / disrupted / unchanged); 'before changing the programme, know whose trip you are about to break'.",
+    "Strategy comparison: (a) programme swap only — zero event spend, one other traveller disrupted (Lucas rebook ~SGD 95); (b) rebook Grace's outbound to 13:30 — fare delta ~SGD 180, no programme impact; (c) leave unchanged — Grace misses her external commitment.",
+    "A programme-level change may solve the problem without purchasing travel for Grace, but the preview must expose that it purchases disruption for Lucas; the engine must not silently prefer one strategy."
+  ],
+  "inputs": [
+    { "file": "inputs/organiser-change-request.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/preview-request.json", "provenance": "NATIVE_UI", "sourceIds": ["src-repo-scenarios"] },
+    { "file": "inputs/counterfactual-preview.json", "provenance": "NATIVE_UI", "sourceIds": ["src-repo-scenarios", "src-syn-ait-event"] },
+    { "file": "inputs/outbound-options-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
+  ],
+  "referencedDraftIds": ["ait-draft-04", "ait-draft-20", "ait-draft-02"],
+  "referencedCommitmentIds": ["cmt-ait-d1-future-provocation", "cmt-ait-d1-marketplace-chat"]
+}

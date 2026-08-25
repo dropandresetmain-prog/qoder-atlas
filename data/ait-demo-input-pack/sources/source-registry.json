@@ -1,0 +1,107 @@
+{
+  "id": "ait-demo-input-pack:source-registry",
+  "description": "Provenance registry for every source referenced by the AiT demo input pack. Every input artifact cites one or more source ids from this file.",
+  "provenanceTaxonomy": [
+    "PUBLIC_WEB",
+    "ORGANISER_SUPPLIED_SYNTHETIC",
+    "TRAVELLER_SUPPLIED_SYNTHETIC",
+    "PROVIDER_LIVE",
+    "NATIVE_UI",
+    "SIMULATED_EXTERNAL_EVENT"
+  ],
+  "sources": [
+    {
+      "id": "src-pub-wit2026-programme",
+      "provenance": "PUBLIC_WEB",
+      "title": "WiT Singapore 2026 — full programme (official event site)",
+      "url": "https://www.witevents.com/witsingapore/programme/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "fetchedBy": "northstar demo-input research (public web fetch)",
+      "contentScope": "Three-day programme structure: day layout, session blocks, session timing patterns, session formats, role mix (speaker/interviewer/moderator/panel/coach/judge/dragon/facilitator/curator/referee), speaker names and job titles as published, venue and room names. Session descriptive prose was NOT copied into this pack; only structural facts and short factual titles/times were normalized.",
+      "licenseNote": "Copyright remains with WiT (Web in Travel) / Northstar Travel Group. Used here only as a structural template reference; the synthetic AiT programme derives structure, not prose.",
+      "status": "CONFIRMED_UPCOMING_EVENT"
+    },
+    {
+      "id": "src-pub-wit2026-event",
+      "provenance": "PUBLIC_WEB",
+      "title": "WiT Singapore — event overview page (dates, venue framing)",
+      "url": "https://www.witevents.com/witsingapore/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "fetchedBy": "northstar demo-input research (search-result corroboration)",
+      "contentScope": "Corroborates 2026 edition dates and three-day framing."
+    },
+    {
+      "id": "src-pub-webintravel-dates",
+      "provenance": "PUBLIC_WEB",
+      "title": "Web in Travel homepage — WiT Singapore 30 Sep - 2 Oct 2026",
+      "url": "https://www.webintravel.com/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "fetchedBy": "northstar demo-input research (search-result corroboration)",
+      "contentScope": "Independent corroboration of the 30 Sep - 2 Oct 2026 date window."
+    },
+    {
+      "id": "src-repo-scenarios",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "title": "docs/SCENARIOS.md — frozen Northstar scenario catalogue (S1-S8)",
+      "url": "file:docs/SCENARIOS.md",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Scenario business narratives, triggers, stages, provenance expectations that the S1-S8 input packs must serve."
+    },
+    {
+      "id": "src-repo-atlas-sin-feasibility",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "title": "docs/ROADMAP.md DR-probe record + docs/reality-validation/WAVE3R_CAPABILITY_REALITY_REPORT.md",
+      "url": "file:docs/ROADMAP.md",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Empirical Atlas sandbox evidence that SIN inbound searches return real offers from KUL/BKK/MNL/HKG/CGK/SYD/TYO (carriers TR/VJ/AK/FD/OD/D7), and that KUL->SIN completed the full order/pay/ticket chain. Governs the choice of travel-managed origin cities."
+    },
+    {
+      "id": "src-syn-ait-event",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "title": "Synthetic AiT — AI in Travel Summit 2026 event definition",
+      "url": "file:data/ait-demo-input-pack/global/anchor-event.json",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Synthetic anchor event authored for this pack. Structurally mirrors src-pub-wit2026-programme; contains no real-person travel facts."
+    },
+    {
+      "id": "src-syn-ait-roster",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "title": "Synthetic AiT operational roster (67 participants)",
+      "url": "file:data/ait-demo-input-pack/global/roster.json",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Fully synthetic identities. Role mix and dependency patterns are structurally informed by src-pub-wit2026-programme. No identity corresponds to a real WiT speaker; no private travel facts about real persons are asserted."
+    },
+    {
+      "id": "src-syn-ait-policy",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "title": "Synthetic AiT organiser travel policy",
+      "url": "file:data/ait-demo-input-pack/global/organiser-policy.json",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Coherent synthetic organiser policy sufficient to exercise S1-S8. All values are data, not code."
+    },
+    {
+      "id": "src-sim-airline-mn",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "title": "Simulated carrier 'Meridian Airways' (ICAO-designator MN) schedule-change feed",
+      "url": "file:data/ait-demo-input-pack/scenarios/s1-supplier-disruption/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Provider-shaped disruption trigger simulated at the external provider boundary. Not a live provider call; must never be presented as LIVE."
+    },
+    {
+      "id": "src-sim-hotel-partners",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "title": "Simulated partner-hotel availability/rate feed (Bayview Grand / Harbourline Suites)",
+      "url": "file:data/ait-demo-input-pack/scenarios/s6-hotel-partner/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Provider-shaped accommodation inventory simulated at the external provider boundary (room types, rates, availability, cancellation terms). Not a live provider call; must never be presented as LIVE."
+    },
+    {
+      "id": "src-syn-traveller-messages",
+      "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+      "title": "Synthetic traveller/operator message channels for scenario packs",
+      "url": "file:data/ait-demo-input-pack/scenarios/",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Literal traveller-authored messages (chat/email shaped) used as ingestion inputs for S2/S4/S5/S6/S7/S8. Fully synthetic; no real person's statements are reproduced."
+    }
+  ]
+}

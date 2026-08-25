@@ -1,0 +1,17 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-hotel-partners"],
+  "note": "Simulated Harbourline Suites availability/rate feed at request time for the requested dates (check-in 30 Sep, check-out 3 Oct). Deliberate shape: the junior suite sits just under the SGD 320 nightly ceiling, and the one-bedroom suite sits just above it - the engine must discriminate between 'no approval needed' and 'rule-ait-approval-above-hotel required'. Not a live provider feed; at demo runtime the same shapes arrive via REPLAY.",
+  "observedAt": "2026-09-19T09:30:00+08:00",
+  "placeId": "place-hotel-harbourline",
+  "stay": { "checkIn": "2026-09-30", "checkOut": "2026-10-03", "nights": 3 },
+  "roomTypes": [
+    { "roomType": "STANDARD_DOUBLE", "ratePerNight": { "amount": 298, "currency": "SGD" }, "availability": "AVAILABLE", "doubleOccupancy": true, "note": "Under ceiling; increment over Bayview single = 13/night." },
+    { "roomType": "JUNIOR_SUITE", "ratePerNight": { "amount": 318, "currency": "SGD" }, "availability": "AVAILABLE", "doubleOccupancy": true, "note": "Under the SGD 320 ceiling (rule-ait-hotel-spend-limit); increment over Bayview single = 33/night. Traveller's preferred option." },
+    { "roomType": "ONE_BEDROOM_SUITE", "ratePerNight": { "amount": 355, "currency": "SGD" }, "availability": "AVAILABLE", "doubleOccupancy": true, "note": "ABOVE the SGD 320 ceiling - bookable only with organiser approval per rule-ait-approval-above-hotel." }
+  ],
+  "cancellationTerms": {
+    "policy": "Free cancellation until 48h before check-in; first night charged thereafter.",
+    "note": "Harbourline standard terms for direct bookings."
+  }
+}

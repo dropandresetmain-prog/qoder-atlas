@@ -1,0 +1,83 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
+  "anchorEventId": "evt-ait-2026",
+  "note": "Synthetic operational constraints for running the AiT 2026 demo. All values are data. Transfer estimates mirror the DurationEstimate shape used by src/domain/rules.ts MIN_BUFFER rules, so an integrator can reuse them as-is in deterministic buffer checks.",
+  "demoTimeline": {
+    "now": "2026-08-25T10:00:00+08:00",
+    "note": "Demo 'now' anchor. Chosen so all policy deadlines are still open: cancellation refund deadline (15 Sep) is ahead, booking decisions are in the pre-event window, and the Atlas sandbox KUL->SIN order/pay/ticket chain remains usable. No date adjustment to the event window (30 Sep - 2 Oct 2026) is recommended.",
+    "milestones": [
+      { "id": "m-refund-deadline", "at": "2026-09-15T23:59:00+08:00", "label": "Last day for refundable cancellation of event-blocked fares" },
+      { "id": "m-arrival-eve", "at": "2026-09-29T00:00:00+08:00", "label": "Funded window opens; standard arrival day" },
+      { "id": "m-day0", "at": "2026-09-30T09:00:00+08:00", "label": "Event day 0 (prelude day: check-in, opening, hackathon lab)" },
+      { "id": "m-day1", "at": "2026-10-01T09:00:00+08:00", "label": "Event day 1 (main conference day)" },
+      { "id": "m-day2", "at": "2026-10-02T09:00:00+08:00", "label": "Event day 2 (finals, awards, close, party)" },
+      { "id": "m-departure", "at": "2026-10-03T00:00:00+08:00", "label": "Standard departure day; funded window closes 3 Oct 23:59" }
+    ]
+  },
+  "arrivalDepartureConventions": {
+    "standardArrivalDay": "2026-09-29",
+    "standardDepartureDays": ["2026-10-02", "2026-10-03"],
+    "arrivalBufferStandardMinutes": 360,
+    "arrivalBufferProgrammeCriticalMinutes": 720,
+    "landByLocalTime": "23:00",
+    "note": "Standard managed travellers arrive 29 Sep; programme-critical travellers (importance REQUIRED on any on-stage role) must be landside at least 12 hours before their first commitment (policy clause arrivalBuffer + rule-ait-arrival-min-buffer). Land by 23:00 the evening before the first commitment when the buffer allows it."
+  },
+  "checkInAndBadge": {
+    "hotelCheckInFrom": "15:00",
+    "hotelCheckOutBy": "11:00",
+    "badgePickup": [
+      { "day": "2026-09-29", "window": "16:00-20:00", "location": "place-panpacific", "note": "Welcome desk at partner hotel" },
+      { "day": "2026-09-30", "window": "07:30-09:00", "location": "place-mbs", "note": "Venue registration before day 0 opening" },
+      { "day": "2026-10-01", "window": "07:30-08:45", "location": "place-mbs", "note": "Venue registration before day 1 keynote" }
+    ],
+    "speakerReadyLeadMinutes": 60,
+    "soundCheckWindow": "07:30-08:30",
+    "note": "On-stage cast must be badge-in and stage-ready at least 60 minutes before their session; sound check runs 07:30-08:30 each event morning (policy clause rehearsalAndRestRules)."
+  },
+  "groundTransfers": {
+    "note": "Estimated door-to-door durations used for transfer scheduling. Shapes mirror DurationEstimateSchema (src/domain/common.ts) so deterministic buffer checks can consume them directly.",
+    "estimates": [
+      {
+        "from": "place-sin-changi", "to": "place-mbs",
+        "estimate": { "expectedMinutes": 25, "minimumMinutes": 20, "conservativeMinutes": 40, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "PRIVATE_CAR"
+      },
+      {
+        "from": "place-sin-changi", "to": "place-panpacific",
+        "estimate": { "expectedMinutes": 25, "minimumMinutes": 20, "conservativeMinutes": 40, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "PRIVATE_CAR"
+      },
+      {
+        "from": "place-sin-changi", "to": "place-hotel-bayview",
+        "estimate": { "expectedMinutes": 30, "minimumMinutes": 25, "conservativeMinutes": 45, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "PRIVATE_CAR"
+      },
+      {
+        "from": "place-sin-changi", "to": "place-hotel-harbourline",
+        "estimate": { "expectedMinutes": 30, "minimumMinutes": 25, "conservativeMinutes": 45, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "PRIVATE_CAR"
+      },
+      {
+        "from": "place-hotel-bayview", "to": "place-mbs",
+        "estimate": { "expectedMinutes": 12, "minimumMinutes": 8, "conservativeMinutes": 20, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "SHUTTLE"
+      },
+      {
+        "from": "place-hotel-harbourline", "to": "place-mbs",
+        "estimate": { "expectedMinutes": 15, "minimumMinutes": 10, "conservativeMinutes": 25, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "SHUTTLE"
+      },
+      {
+        "from": "place-panpacific", "to": "place-mbs",
+        "estimate": { "expectedMinutes": 15, "minimumMinutes": 10, "conservativeMinutes": 25, "sourceId": "src-syn-ait-policy", "observedAt": "2026-08-25T09:00:00+00:00", "quality": "MEDIUM" },
+        "mode": "PRIVATE_CAR"
+      }
+    ]
+  },
+  "dutyOfCare": {
+    "opsContact": { "name": "AiT 2026 Traveller Ops Desk", "channel": "ops-desk@ait-summit-synthetic.example", "phone": "+65 6000 0000", "available": "24x7 from 2026-09-28 to 2026-10-04" },
+    "escalation": "Disruptions affecting programme-critical travellers escalate to the organiser duty manager within 30 minutes of observation.",
+    "note": "Synthetic contact details; no real person or channel is referenced."
+  }
+}

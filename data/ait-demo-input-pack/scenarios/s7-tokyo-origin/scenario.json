@@ -1,0 +1,32 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "scenarioId": "S7",
+  "catalogueTitle": "\"I'm actually flying from Tokyo, not London.\"",
+  "trigger": "TRAVELLER_REQUESTED_CHANGE",
+  "stage": "PARTIALLY_BOOKED",
+  "tier": "TIER_A",
+  "demoRole": "Structural trip-change hero / breadth proof",
+  "anchorEventId": "evt-ait-2026",
+  "occurredAt": "2026-09-18T16:40:00+08:00",
+  "note": "Oliver Bennett (ait-draft-38, home LHR) is a distribution-debate panellist (1 Oct 15:50, PREFERRED/CHANGEABLE). Flights are ticketed LHR->SIN->LHR (issued 8 Sep, economy per clauses.cabinRules - he is not programme-critical), hotel booked, transfers not yet arranged. On 18 Sep he says he will already be in Tokyo for work and asks to fly from HND instead. This is NOT a flight change: the trip topology changes. The LHR inbound sector becomes obsolete after the refund deadline (15 Sep) has passed, hotel dates shift (he lands 1 Oct morning instead of 30 Sep morning), and - critically - his return destination is no longer stated: LHR (home) and HND (work continuing) are both plausible, so the engine must ASK/ESCALATE rather than invent the answer. Business-equivalent cap: the event funds no more than the original LHR round trip (SGD 1180); the reissued itinerary is cheaper, so savings accrue to the event, while the traveller-initiated change fee and any non-refundable abandoned-sector value fall to the traveller (clauses.changeCancellationTreatment, clauses.businessEquivalentAirfare). Routine demo runs are expected to use REPLAY recordings of these shapes.",
+  "affectedTravellers": [
+    { "draftId": "ait-draft-38", "impactClass": "FEASIBLE_PENDING_CLARIFICATION", "reason": "A viable HND origin exists: MN247 (30 Sep 23:40 -> 1 Oct 06:00) lands 9h50m before the 15:50 panel, satisfying the 6h standard buffer that applies to a PREFERRED/CHANGEABLE panellist (the 12h programme-critical buffer does not apply to him). The morning alternative MN249 fails the 6h buffer (2h20m) and must be rejected with the arithmetic shown. Final cost split and the return sector cannot be computed until the return destination (LHR vs HND) is confirmed by the traveller - the request must pause on that UNKNOWN instead of assuming either." }
+  ],
+  "expectedReasoningHooks": [
+    "Core message: this is not 'change flight' - the shape of the trip has changed. Obsolete LHR->SIN sector, new HND->SIN sector, hotel-date shift (lands 1 Oct morning, not 30 Sep), transfer assumptions re-derived, arrival objective unchanged (be landside in SIN before the 1 Oct 15:50 panel).",
+    "Uncertainty handling: the message never states where he returns to after the event. LHR (home base) and HND (work trip continuing) are both consistent with what he said. UNKNOWN is a valid state: ask/escalate; never invent the return destination or silently keep MN244.",
+    "Cancellation/change reasoning after the refund deadline: event-block fares were refundable until 15 Sep (rule-ait-cancellation-terms); the request arrives 18 Sep. Carrier terms: reissue to a different origin is permitted with a SGD 75 change fee and reprice; abandoned LHR sector value is non-refundable. Traveller-initiated -> the fee and any abandoned value are traveller-funded (clauses.changeCancellationTreatment).",
+    "Business-equivalent airfare: the event funds no more than the original policy-compliant LHR round trip (SGD 1180). The HND-origin trip reprices cheaper; savings accrue to the event (clauses.businessEquivalentAirfare). The final split is deliberately left open until the return destination is known.",
+    "Deterministic viability by importance tier: Oliver is PREFERRED/CHANGEABLE -> standard 6h buffer (rule-ait-arrival-min-buffer), not the 12h programme-critical buffer. MN247 passes (9h50m), MN249 fails (2h20m), MN251 is infeasible (lands after the panel). Show all three with the arithmetic.",
+    "Hotel/transfer follow-through: releasing or holding the unused 30 Sep night, re-pointing the arrival transfer to 1 Oct, and keeping the in-window departure transfer are downstream consequences the engine must enumerate, not discover later.",
+    "Baggage: he travels from where he already is (Tokyo) - no misrouted-bag hazard, unlike S2; the obsolete London ticket carries no baggage dependency."
+  ],
+  "inputs": [
+    { "file": "inputs/traveller-origin-change-message.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
+    { "file": "inputs/booked-itinerary.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
+    { "file": "inputs/hnd-sin-options-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
+  ],
+  "referencedDraftIds": ["ait-draft-38"],
+  "referencedCommitmentIds": ["cmt-ait-d1-distribution-debate"]
+}

@@ -1,0 +1,320 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": [
+    "src-syn-ait-event",
+    "src-repo-atlas-sin-feasibility"
+  ],
+  "note": "Place context for the synthetic AiT summit. Only trip-relevant locations (ARCHITECTURE.md: not a world geography graph). Gateway set follows the Atlas sandbox feasibility record (src-repo-atlas-sin-feasibility): SIN inbound offers proven from KUL/BKK/MNL/HKG/CGK/SYD/TYO; long-haul gateways used only where a scenario explicitly requires them are flagged atlasSandboxProven=false.",
+  "places": [
+    {
+      "id": "place-sin-changi",
+      "name": "Singapore Changi Airport",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Singapore",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "SIN"
+        }
+      ]
+    },
+    {
+      "id": "place-mbs",
+      "name": "Marina Bay Sands Expo & Convention Centre",
+      "kind": "VENUE",
+      "timezone": "Asia/Singapore",
+      "externalRefs": [],
+      "servedByPlaceIds": [
+        "place-sin-changi"
+      ]
+    },
+    {
+      "id": "place-panpacific",
+      "name": "Pan Pacific Singapore",
+      "kind": "VENUE",
+      "timezone": "Asia/Singapore",
+      "externalRefs": [],
+      "servedByPlaceIds": [
+        "place-sin-changi"
+      ]
+    },
+    {
+      "id": "place-hotel-bayview",
+      "name": "Bayview Grand Hotel (synthetic event partner hotel, Marina Bay)",
+      "kind": "HOTEL",
+      "timezone": "Asia/Singapore",
+      "externalRefs": [],
+      "servedByPlaceIds": [
+        "place-sin-changi"
+      ]
+    },
+    {
+      "id": "place-hotel-harbourline",
+      "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
+      "kind": "HOTEL",
+      "timezone": "Asia/Singapore",
+      "externalRefs": [],
+      "servedByPlaceIds": [
+        "place-sin-changi"
+      ]
+    },
+    {
+      "id": "place-kul",
+      "name": "Kuala Lumpur (KLIA / klia2)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Kuala_Lumpur",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "KUL"
+        }
+      ]
+    },
+    {
+      "id": "place-bkk",
+      "name": "Bangkok (Don Mueang / Suvarnabhumi)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Bangkok",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "BKK"
+        }
+      ]
+    },
+    {
+      "id": "place-cnx",
+      "name": "Chiang Mai International",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Bangkok",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "CNX"
+        }
+      ]
+    },
+    {
+      "id": "place-mnl",
+      "name": "Manila (Ninoy Aquino International)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Manila",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "MNL"
+        }
+      ]
+    },
+    {
+      "id": "place-hkg",
+      "name": "Hong Kong International",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Hong_Kong",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "HKG"
+        }
+      ]
+    },
+    {
+      "id": "place-cgk",
+      "name": "Jakarta (Soekarno-Hatta)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Jakarta",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "CGK"
+        }
+      ]
+    },
+    {
+      "id": "place-syd",
+      "name": "Sydney (Kingsford Smith)",
+      "kind": "AIRPORT",
+      "timezone": "Australia/Sydney",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "SYD"
+        }
+      ]
+    },
+    {
+      "id": "place-hnd",
+      "name": "Tokyo Haneda",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Tokyo",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "HND"
+        }
+      ]
+    },
+    {
+      "id": "place-nrt",
+      "name": "Tokyo Narita",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Tokyo",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "NRT"
+        }
+      ]
+    },
+    {
+      "id": "place-icn",
+      "name": "Seoul Incheon",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Seoul",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "ICN"
+        }
+      ]
+    },
+    {
+      "id": "place-sgn",
+      "name": "Ho Chi Minh City (Tan Son Nhat)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "SGN"
+        }
+      ]
+    },
+    {
+      "id": "place-del",
+      "name": "Delhi (Indira Gandhi International)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Kolkata",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "DEL"
+        }
+      ]
+    },
+    {
+      "id": "place-bom",
+      "name": "Mumbai (Chhatrapati Shivaji Maharaj)",
+      "kind": "AIRPORT",
+      "timezone": "Asia/Kolkata",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "BOM"
+        }
+      ]
+    },
+    {
+      "id": "place-lhr",
+      "name": "London Heathrow",
+      "kind": "AIRPORT",
+      "timezone": "Europe/London",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "LHR"
+        }
+      ]
+    },
+    {
+      "id": "place-cdg",
+      "name": "Paris Charles de Gaulle",
+      "kind": "AIRPORT",
+      "timezone": "Europe/Paris",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "CDG"
+        }
+      ]
+    },
+    {
+      "id": "place-fra",
+      "name": "Frankfurt am Main",
+      "kind": "AIRPORT",
+      "timezone": "Europe/Berlin",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "FRA"
+        }
+      ]
+    },
+    {
+      "id": "place-ams",
+      "name": "Amsterdam Schiphol",
+      "kind": "AIRPORT",
+      "timezone": "Europe/Amsterdam",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "AMS"
+        }
+      ]
+    },
+    {
+      "id": "place-mad",
+      "name": "Madrid Barajas",
+      "kind": "AIRPORT",
+      "timezone": "Europe/Madrid",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "MAD"
+        }
+      ]
+    },
+    {
+      "id": "place-akl",
+      "name": "Auckland",
+      "kind": "AIRPORT",
+      "timezone": "Pacific/Auckland",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "AKL"
+        }
+      ]
+    }
+  ],
+  "gatewayFeasibility": {
+    "note": "Atlas sandbox feasibility per gateway (src-repo-atlas-sin-feasibility). true = SIN inbound offers empirically proven in the sandbox record; false = not proven, present only for roster realism or explicit scenario need.",
+    "flags": {
+      "place-kul": true,
+      "place-bkk": true,
+      "place-cnx": false,
+      "place-mnl": true,
+      "place-hkg": true,
+      "place-cgk": true,
+      "place-syd": true,
+      "place-hnd": true,
+      "place-nrt": true,
+      "place-icn": false,
+      "place-sgn": false,
+      "place-del": false,
+      "place-bom": false,
+      "place-lhr": false,
+      "place-cdg": false,
+      "place-fra": false,
+      "place-ams": false,
+      "place-mad": false,
+      "place-akl": false
+    }
+  },
+  "placeNotes": {
+    "place-cnx": "Regional feeder origin used by one roster member; not separately proven in the Atlas sandbox record.",
+    "place-hnd": "Proven as part of the TYO gateway in the Atlas sandbox record.",
+    "place-nrt": "Proven as part of the TYO gateway in the Atlas sandbox record.",
+    "place-lhr": "Long-haul origin present only because scenario S7 explicitly requires a London origin; flagged not sandbox-proven."
+  }
+}

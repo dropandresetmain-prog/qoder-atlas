@@ -1,0 +1,42 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
+  "note": "Ticketed baseline for ait-draft-31 as held by the organiser. Cabin is BUSINESS per clauses.cabinRules (block time > 6h AND programme-critical REQUIRED on-stage role). Flights are not affected by the request; they are included so the companion-seat request can be matched against the exact services.",
+  "asOf": "2026-09-19T09:15:00+08:00",
+  "draftId": "ait-draft-31",
+  "status": "TICKETED",
+  "inboundItinerary": {
+    "plan": "FRA -> SIN direct on 29 Sep; landside SIN 30 Sep 06:10, ~28h before the hospitality interview (1 Oct 10:30) - satisfies the 12h programme-critical buffer.",
+    "segments": [
+      { "flightNumber": "MN243", "origin": "FRA", "destination": "SIN", "departure": "2026-09-29T11:30:00+02:00", "arrival": "2026-09-30T06:10:00+08:00", "cabin": "BUSINESS" }
+    ]
+  },
+  "outboundItinerary": {
+    "plan": "Return after the final event day; departs 3 Oct 23:45.",
+    "segments": [
+      { "flightNumber": "MN242", "origin": "SIN", "destination": "FRA", "departure": "2026-10-03T23:45:00+08:00", "arrival": "2026-10-04T06:30:00+02:00", "cabin": "BUSINESS" }
+    ]
+  },
+  "roundTripFare": { "amount": 1160, "currency": "SGD", "fundedBy": "EVENT_ORGANISATION", "note": "Under rule-ait-airfare-spend-limit (SGD 1200)." },
+  "hotel": {
+    "placeId": "place-hotel-bayview",
+    "roomType": "STANDARD_SINGLE",
+    "nights": ["2026-09-30", "2026-10-01", "2026-10-02"],
+    "checkIn": "2026-09-30",
+    "checkOut": "2026-10-03",
+    "ratePerNight": { "amount": 285, "currency": "SGD" },
+    "fundedBy": "EVENT_ORGANISATION",
+    "cancellationTerms": {
+      "modificationFreeUntil": "2026-09-27T15:00:00+08:00",
+      "policy": "Free modification or release until 72h before check-in; first night charged thereafter; full stay charged from 29 Sep 23:59.",
+      "note": "Event partner-block terms. Request arrived 19 Sep -> release/switch is free of charge."
+    }
+  },
+  "transfers": {
+    "covered": [
+      { "segment": "AIRPORT_TO_HOTEL_ARRIVAL", "date": "2026-09-30", "to": "place-hotel-bayview", "fundedBy": "EVENT_ORGANISATION" },
+      { "segment": "HOTEL_TO_VENUE_MORNING_PROGRAMME_CRITICAL", "dates": ["2026-10-01"], "from": "place-hotel-bayview", "fundedBy": "EVENT_ORGANISATION" },
+      { "segment": "HOTEL_TO_AIRPORT_DEPARTURE", "date": "2026-10-03", "fundedBy": "EVENT_ORGANISATION" }
+    ]
+  }
+}

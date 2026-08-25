@@ -1,0 +1,10 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages"],
+  "note": "Literal synthetic organiser message that triggers S3. Synthetic; no real person's statements reproduced.",
+  "messageId": "msg-ait-s3-001",
+  "channel": "OPERATOR_CHAT",
+  "from": "org-ait-organiser",
+  "receivedAt": "2026-09-22T11:00:00+08:00",
+  "text": "Grace Nakamura just told us she has an unavoidable board commitment back in Tokyo on the evening of 1 Oct. She needs to be wheels-up from Changi by about 13:30 that day, but her session is the future-provocation at 12:10 and her booked flight leaves 19:45. Can we move her slot earlier so she can take the midday flight? Before we touch the programme, show me what this would do to everyone else."
+}

@@ -1,0 +1,23 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
+  "note": "Proposed (unticketed) itinerary produced by planning before Ethan's request. Policy-compliant: lands Tuesday 29 Sep evening, 12h+ before his first 30 Sep commitments, inside the funded window, under the SGD 1200 airfare ceiling.",
+  "asOf": "2026-09-08T14:00:00+08:00",
+  "draftId": "ait-draft-34",
+  "status": "PROPOSED_NOT_TICKETED",
+  "inboundItinerary": {
+    "plan": "CNX -> BKK -> SIN on 29 Sep; landside SIN 19:35, ~15h40m before the hackathon lab (30 Sep 11:15) and ~19h35m before the hackathon finals (15:10) — satisfies the 12h programme-critical buffer.",
+    "segments": [
+      { "flightNumber": "MN236A", "origin": "CNX", "destination": "BKK", "departure": "2026-09-29T14:15:00+07:00", "arrival": "2026-09-29T15:35:00+07:00" },
+      { "flightNumber": "MN236B", "origin": "BKK", "destination": "SIN", "departure": "2026-09-29T17:10:00+07:00", "arrival": "2026-09-29T19:35:00+08:00" }
+    ],
+    "fare": { "amount": 205, "currency": "SGD" }
+  },
+  "outboundItinerary": {
+    "plan": "Return after the awards (2 Oct) per the cross-day competition announcement dependency: finalists must be on site on Day 2.",
+    "segments": [
+      { "flightNumber": "MN239", "origin": "SIN", "destination": "CNX", "departure": "2026-10-03T10:05:00+08:00", "arrival": "2026-10-03T13:25:00+07:00", "note": "Via BKK." }
+    ],
+    "fare": { "amount": 198, "currency": "SGD" }
+  }
+}

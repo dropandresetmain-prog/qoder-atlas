@@ -1,0 +1,25 @@
+{
+  "provenance": "NATIVE_UI",
+  "sourceIds": ["src-repo-scenarios"],
+  "note": "Native operator action: open a counterfactual preview. This is the product seam under test — the mutation must NOT be applied to authoritative event state at this point; it lives in an overlay until an explicit commit action.",
+  "actionId": "act-ait-s3-preview-001",
+  "surface": "OPERATOR_CASE_PANEL",
+  "actor": "org-ait-organiser",
+  "requestedAt": "2026-09-22T11:05:00+08:00",
+  "action": "PREVIEW_COMMITMENT_TIME_SWAP",
+  "parameters": {
+    "anchorEventId": "evt-ait-2026",
+    "day": "2026-10-01",
+    "swap": [
+      { "commitmentId": "cmt-ait-d1-future-provocation", "fromTime": "12:10-12:20", "toTime": "09:50-10:10" },
+      { "commitmentId": "cmt-ait-d1-marketplace-chat", "fromTime": "09:50-10:10", "toTime": "12:10-12:30" }
+    ],
+    "note": "Durations differ (10m vs 20m): future-provocation takes the 20m slot and marketplace-chat takes 12:10-12:30, trimming lunch start by 10 minutes."
+  },
+  "expectedSystemBehavior": [
+    "Compute the blast radius in an overlay without mutating authoritative state.",
+    "Enumerate every engagement bound to the two commitments and every traveller holding one.",
+    "Check arrival readiness, outbound collisions, transfer assumptions and host sequencing for each.",
+    "Report UNKNOWN where evidence is missing instead of assuming."
+  ]
+}

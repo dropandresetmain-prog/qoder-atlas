@@ -1,0 +1,22 @@
+{
+  "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-traveller-messages"],
+  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel. This is the scenario trigger (traveller-requested change). Claims inside are the traveller's own statements: they must be reconciled against booking state and hotel inventory, not trusted as authoritative. The companion is a non-participant: no roster entry exists for them and none must be invented.",
+  "messageId": "msg-ait-s6-001",
+  "channel": "TRAVELLER_CHAT",
+  "fromDraftId": "ait-draft-31",
+  "receivedAt": "2026-09-19T09:15:00+08:00",
+  "text": "Good morning - change of plans on my side: my partner is coming to Singapore for the summit dates after all, flying with me on the Frankfurt flight. The single at Bayview is a bit tight for two of us, so could we move to a double room or junior suite at the Harbourline instead? Same dates, 30 Sep through 3 Oct. We'll pay the room difference and my partner's flight ourselves - just tell us what the total is and we'll confirm. My interview is Thursday morning at 10:30, so whatever we pick still needs to get me to MBS comfortably in time.",
+  "extractedClaims": [
+    { "claim": "Partner (non-participant) will travel with her on the FRA->SIN flight for the summit dates", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_INVENTORY", "note": "Companion seat availability must be checked; no traveller entity is created for the partner." },
+    { "claim": "Requests room change from Bayview single to double/junior suite at Harbourline, same dates (30 Sep - 3 Oct check-out)", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_INVENTORY" },
+    { "claim": "Volunteers to pay the room difference and the companion's flight", "status": "EXPLICIT_FUNDING_DECLARATION", "verificationNeededFrom": "NONE", "note": "Satisfies the explicit-funding-declaration precondition of clauses.companionAndUpgradeIncrement; the itemised split must still be presented and confirmed before execution." },
+    { "claim": "Has the hospitality interview Thursday 1 Oct 10:30 at MBS and needs reliable morning travel", "status": "CONFIRMED_BY_PROGRAMME", "verificationNeededFrom": "NONE" }
+  ],
+  "fundingDeclaration": {
+    "declaredBy": "ait-draft-31",
+    "scope": ["COMPANION_AIRFARE", "ROOM_DOUBLE_OCCUPANCY_INCREMENT"],
+    "payer": "TRAVELLER",
+    "note": "Event funds only the business-equivalent single room and Hannah's own ticketed travel."
+  }
+}
