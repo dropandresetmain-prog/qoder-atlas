@@ -16,9 +16,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve, join } from 'node:path';
+import type { AddressInfo } from 'node:net';
 
 import { AppConfigSchema } from '../src/config/config.ts';
 import { composeAppRuntime } from '../src/app/compose.ts';
+import { createAppServer } from '../src/server/http.ts';
 import { loadScenario } from '../src/scenarios/loader.ts';
 import { ImpactEngine } from '../src/engine/impact.ts';
 import {
@@ -233,6 +235,34 @@ test('DR-7: missed-flight after departure time throws', async () => {
       /no upcoming FLIGHT TRANSPORT_LEG found/,
     );
   } finally {
+    composed.db.close();
+  }
+});
+
+test('DR-7: an explicit missed connection report is accepted after scheduled departure over HTTP', async () => {
+  const composed = await composeAppRuntime(runtimeConfig);
+  const server = createAppServer(runtimeConfig, composed.endpoints);
+  await new Promise<void>((resolvePromise) => server.listen(0, resolvePromise));
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  try {
+    const response = await fetch(`${base}/api/runtime/missed-flight`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        tripId: 'trip_a',
+        elementId: 'el_a_flight_out',
+        travellerReport: 'My inbound flight landed late and I missed this connection.',
+        at: '2026-09-13T09:00:00+09:00',
+      }),
+    });
+    const body = (await response.json()) as { missedElementId?: string; caseId?: string };
+    assert.equal(response.status, 200);
+    assert.equal(body.missedElementId, 'el_a_flight_out');
+    assert.ok(body.caseId, 'the natural traveller report opens a recovery case');
+  } finally {
+    await new Promise<void>((resolvePromise, reject) =>
+      server.close((error) => (error ? reject(error) : resolvePromise())),
+    );
     composed.db.close();
   }
 });
