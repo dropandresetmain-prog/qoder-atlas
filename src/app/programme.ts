@@ -257,8 +257,9 @@ export class ProgrammeService {
 
     // Home-airport linkage (Northstar initial planning evidence): an exact,
     // unambiguous match between homeLocationText and an authoritative AIRPORT
-    // place (airport-code ref or place name) links the traveller home.
-    // Anything else stays missing — never guessed.
+    // place (airport-code ref — including a declared parenthesized code — or
+    // place name) links the traveller home. Anything else stays missing —
+    // never guessed.
     if (traveller.homeLocationText) {
       const home = await this.resolveHomeAirport(traveller.homeLocationText);
       if (home === 'AMBIGUOUS') {
@@ -476,11 +477,14 @@ export class ProgrammeService {
   /**
    * Match free-form home location text against authoritative AIRPORT places.
    * Exact case-insensitive match on an airport-code external ref or the place
-   * name. Ambiguous matches refuse; no match stays missing (anti-fabrication).
+   * name. A declared airport code in parentheses ("Chiang Mai (CNX)") is
+   * exact evidence too and matches the airport-code ref directly. Ambiguous
+   * matches refuse; no match stays missing (anti-fabrication).
    */
   private async resolveHomeAirport(homeLocationText: string): Promise<EntityId | 'AMBIGUOUS' | undefined> {
     const wanted = homeLocationText.trim().toLowerCase();
     if (wanted === '') return undefined;
+    const declaredCode = homeLocationText.match(/\(([A-Za-z]{3})\)/)?.[1]?.toLowerCase();
     const airports = (await this.deps.entities.list('PLACE'))
       .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
       .map((entry) => entry.entity)
@@ -488,7 +492,10 @@ export class ProgrammeService {
     const matches = airports.filter((place) => {
       if (place.name && place.name.trim().toLowerCase() === wanted) return true;
       return place.externalRefs.some(
-        (ref) => ref.system === 'airport-code' && ref.value.trim().toLowerCase() === wanted,
+        (ref) =>
+          ref.system === 'airport-code' &&
+          (ref.value.trim().toLowerCase() === wanted ||
+            (declaredCode !== undefined && ref.value.trim().toLowerCase() === declaredCode)),
       );
     });
     if (matches.length === 0) return undefined;

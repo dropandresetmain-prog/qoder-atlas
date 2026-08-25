@@ -1,0 +1,65 @@
+{
+  "id": "rec_59f56c1b226487e6392bb03db62ac30c",
+  "providerId": "atlas",
+  "operation": "search",
+  "recordedAt": "2026-08-25T00:00:00.000Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "routings": [
+      {
+        "routingIdentifier": "RTG-SYN-CNXSIN-20261001-0545",
+        "currency": "SGD",
+        "adultPrice": 168,
+        "adultTax": 41,
+        "expireTime": "2026-09-20T23:59:59Z",
+        "fromSegments": [
+          {
+            "carrier": "MN",
+            "operatingCarrier": "",
+            "flightNumber": "MN231",
+            "depAirport": "CNX",
+            "arrAirport": "SIN",
+            "depTime": "202610010545",
+            "arrTime": "202610010845",
+            "duration": 120,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Cheapest",
+            "seatCount": 9,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false
+      },
+      {
+        "routingIdentifier": "RTG-SYN-CNXSIN-20261001-0710",
+        "currency": "SGD",
+        "adultPrice": 214,
+        "adultTax": 41,
+        "expireTime": "2026-09-20T23:59:59Z",
+        "fromSegments": [
+          {
+            "carrier": "MN",
+            "operatingCarrier": "",
+            "flightNumber": "MN233",
+            "depAirport": "CNX",
+            "arrAirport": "SIN",
+            "depTime": "202610010710",
+            "arrTime": "202610011010",
+            "duration": 120,
+            "cabin": "",
+            "cabinClass": 1,
+            "fareFamily": "Cheapest",
+            "seatCount": 7,
+            "segmentIndex": 1
+          }
+        ],
+        "retSegments": [],
+        "riskSellout": false
+      }
+    ]
+  }
+}

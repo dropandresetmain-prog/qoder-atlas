@@ -14,9 +14,14 @@
   },
   "boundaries": [
     {
-      "seam": "traveller.change_request",
+      "seam": "traveller.change_request_nl",
       "mode": "REPLAY",
-      "note": "Structured ChangeRequest through resolution HTTP"
+      "note": "Natural-language traveller request through the deterministic NL intake interpreter"
+    },
+    {
+      "seam": "atlas.flight.search",
+      "mode": "REPLAY",
+      "note": "Planning evidence from a REPLAY flight.search recording for the home/event corridor"
     }
   ],
   "requiredEnv": [],
@@ -54,43 +59,77 @@
       }
     },
     {
-      "id": "change_request",
+      "id": "nl_intake",
+      "description": "Traveller asks in natural language for a Thursday-morning arrival; the deterministic interpreter extracts the arrive-by window",
       "action": {
         "type": "http",
         "method": "POST",
-        "path": "/api/resolution/change-request",
+        "path": "/api/traveller/change-request",
         "body": {
-          "request": {
-            "id": "cr-ait-s4-001",
-            "tripId": "trip-trv-evt-ait-2026-ait-draft-34",
-            "travellerId": "trv-evt-ait-2026-ait-draft-34",
-            "sourceId": "src-acceptance-manifest",
-            "authority": "ASSERTED",
-            "issuedAt": "2026-09-20T10:05:00+08:00",
-            "intentKind": "ADJUST_TRIP_WINDOW",
-            "urgency": "HARD_INSTRUCTION",
-            "utterance": "Can I arrive Thursday morning instead?",
-            "target": {
-              "arriveBy": "2026-10-01T09:00:00+08:00"
-            }
-          },
+          "travellerId": "trv-evt-ait-2026-ait-draft-34",
+          "tripId": "trip-trv-evt-ait-2026-ait-draft-34",
+          "text": "Hi! I have things to wrap up in Chiang Mai on Wednesday. Can I arrive by 2026-10-01T09:00:00+08:00 instead? My first session is the search chat on Thursday afternoon.",
           "at": "2026-09-20T10:05:00+08:00"
         },
         "expectStatus": 200,
         "capture": {
           "caseId": "caseId"
         }
-      }
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "the NL request is accepted" },
+        { "path": "provenance", "op": "equals", "expected": "INTERPRETED", "description": "the request came from interpretation, not a pre-structured target" },
+        { "path": "intentKind", "op": "equals", "expected": "ADJUST_TRIP_WINDOW", "description": "arrive-by text maps to a trip-window adjustment" },
+        { "path": "urgency", "op": "equals", "expected": "SOFT_PREFERENCE", "description": "no binding language: the request stays a preference, not an instruction" },
+        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
+        { "path": "implications", "op": "arrayNotEmpty", "description": "the resolver records an honest implication instead of fabricating one" },
+        { "path": "implications.0", "op": "contains", "expected": "funding payer decision", "description": "the governing funding rule speaks before any window comparison: the payer decision is derived from policy evidence" },
+        { "path": "uncertainties", "op": "arrayNotEmpty", "description": "the missing arrival evidence is recorded as uncertainty" },
+        { "path": "uncertainties.0.statement", "op": "contains", "expected": "no TRANSPORT_LEG", "description": "the trip has no transport leg yet; the window shift is not derivable at intake" },
+        { "path": "uncertainties.1.statement", "op": "contains", "expected": "no derivable implications for the supplied target shape", "description": "with no existing legs there is no arrival delta to compare; absence is recorded, never invented" }
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Planning loop searches the home/event corridor (REPLAY evidence) and judges every candidate against the programme arrival constraints",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-20T10:10:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planner requests corridor evidence first, then proposes from it" },
+        { "path": "toolActivity", "op": "arrayNotEmpty", "description": "a read-only tool round actually ran" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the REPLAY recording supplied corridor offers" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "every normalized corridor offer becomes a candidate strategy" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Book a flight to arrive by the requested time", "description": "the candidate books a new arrival on the home/event corridor, not a rebook of an existing leg" },
+        { "path": "strategies.0.feasible", "op": "falsy", "description": "a Thursday-morning arrival deterministically violates the programme arrival constraints" },
+        { "path": "strategies.0.rejectionEvidence", "op": "arrayNotEmpty", "description": "the rejection carries deterministic constraint evidence" },
+        { "path": "strategies.0.rejectionEvidence.0.kind", "op": "equals", "expected": "CONSTRAINT", "description": "the verdict comes from a HARD constraint evaluation" },
+        { "path": "strategies.0.rejectionEvidence.0.status", "op": "equals", "expected": "FAIL", "description": "the arrival-before-commitment gap is negative: FAIL, not UNKNOWN" },
+        { "path": "strategies.1.feasible", "op": "falsy", "description": "the later Thursday offer fails the same programme constraints" },
+        { "path": "bestStrategyId", "op": "notExists", "description": "hard-infeasible candidates can never win: no best strategy is ranked" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+      ]
     },
     {
       "id": "observe_case",
-      "description": "Observe opened recovery case",
+      "description": "Observe the recovery case after planning",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
-        "label": "case_after_change_request",
+        "label": "case_after_planning",
         "expectStatus": 200
-      }
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-34", "description": "the case belongs to the requesting traveller's trip" }
+      ]
     }
   ]
 }

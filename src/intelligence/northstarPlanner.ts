@@ -117,6 +117,10 @@ export class NorthstarPlanner implements RecoveryPlanner {
   // -------------------------------------------------------------------------
 
   private initialPlanningOutput(input: PlannerInput): PlannerOutput | undefined {
+    // A change-request window target owns the planning turn: initial arrival
+    // planning only speaks for engagement-only trips that carry NO traveller
+    // change request (otherwise the window-shift branch must judge it).
+    if (this.windowShiftTrigger(input.triggeringSignals)) return undefined;
     const elements = input.snapshot.trip.elements;
     const hasEngagement = elements.some((element) => element.elementKind === 'ENGAGEMENT');
     const hasBookedKind = elements.some(
@@ -370,10 +374,14 @@ export class NorthstarPlanner implements RecoveryPlanner {
     const toolRequests: ToolRequest[] = [];
     const selected: Array<{
       dimension: WindowDimension;
-      leg: TransportLeg;
+      /** Absent when the dimension has no existing leg and the strategy adds a shared slot leg instead. */
+      leg?: TransportLeg;
       toolRequestId: string;
       /** departureOrigin: the declared gateway place replaces the leg's origin. */
       substitutedOriginPlaceId?: EntityId;
+      /** No-leg corridor endpoints (arriveBy: home -> event; departAfter: event -> home). */
+      corridorOriginPlaceId?: EntityId;
+      corridorDestinationPlaceId?: EntityId;
     }> = [];
     for (const dimension of dimensions) {
       // Origin substitution (fix D/S7): the traveller declared a different
@@ -485,9 +493,20 @@ export class NorthstarPlanner implements RecoveryPlanner {
         );
         continue;
       }
+      // No existing leg: the dimension-scoped request id keeps round-2
+      // evidence matching honest, and the corridor endpoints let the
+      // strategy builder add the trip's shared arrival/departure slot leg
+      // (the same promotion-known slot the arrival constraints reference).
+      const toolRequestId = `tool-ws-${dimension}`;
       toolRequests.push(
-        this.searchRequest(corridor.originRef, corridor.destinationRef, requestedDate, corridor.originPlaceId, corridor.destinationPlaceId),
+        this.searchRequest(corridor.originRef, corridor.destinationRef, requestedDate, corridor.originPlaceId, corridor.destinationPlaceId, toolRequestId),
       );
+      selected.push({
+        dimension,
+        toolRequestId,
+        corridorOriginPlaceId: corridor.originPlaceId,
+        corridorDestinationPlaceId: corridor.destinationPlaceId,
+      });
     }
     if (selected.length === 0) {
       return {
@@ -554,7 +573,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
       observedAt: input.snapshot.takenAt,
     });
     const strategies: RecoveryStrategy[] = scopedEvidence
-      .flatMap(({ dimension, leg, evidence, substitutedOriginPlaceId }) =>
+      .flatMap(({ dimension, leg, evidence, substitutedOriginPlaceId, corridorOriginPlaceId, corridorDestinationPlaceId }) =>
         evidence
           ? [...evidence.offers]
               .sort((a, b) => a.totalPrice.amount - b.totalPrice.amount || a.offerId.localeCompare(b.offerId))
@@ -567,25 +586,52 @@ export class NorthstarPlanner implements RecoveryPlanner {
                     : dimension === 'departAfter'
                       ? target.departAfter
                       : `${target.departureOrigin?.system}:${target.departureOrigin?.value}`;
+                // With an existing leg the offer rebooks it; without one the
+                // corridor evidence fills the trip's shared slot element —
+                // arriveBy the promotion-known arrival slot the arrival
+                // constraints already reference (REV-2 WP-R2), departAfter
+                // the symmetric departure slot.
+                const slotElementId =
+                  dimension === 'arriveBy' ? `el-${input.snapshot.tripId}-arrival` : `el-${input.snapshot.tripId}-departure`;
                 const candidateOperations: MutationOperation[] = [
                   {
                     op: 'UPSERT_ENTITY',
                     entityType: 'TRIP_ELEMENT',
-                    data: {
-                      ...leg,
-                      reservationState: 'HELD',
-                      status: 'UNKNOWN',
-                      data: {
-                        ...leg.data,
-                        // Origin substitution (fix D/S7): the strategy leg
-                        // departs from the traveller-declared gateway, never
-                        // from the superseded home gateway.
-                        ...(substitutedOriginPlaceId ? { originPlaceId: substitutedOriginPlaceId } : {}),
-                        ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
-                        ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
-                        bookingRef: { system: 'flight-provider', reference: offer.offerId },
-                      },
-                    },
+                    data: leg
+                      ? {
+                          ...leg,
+                          reservationState: 'HELD',
+                          status: 'UNKNOWN',
+                          data: {
+                            ...leg.data,
+                            // Origin substitution (fix D/S7): the strategy leg
+                            // departs from the traveller-declared gateway, never
+                            // from the superseded home gateway.
+                            ...(substitutedOriginPlaceId ? { originPlaceId: substitutedOriginPlaceId } : {}),
+                            ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
+                            ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
+                            bookingRef: { system: 'flight-provider', reference: offer.offerId },
+                          },
+                        }
+                      : {
+                          id: slotElementId,
+                          tripId: input.snapshot.tripId,
+                          elementKind: 'TRANSPORT_LEG',
+                          importance: 'PREFERRED',
+                          flexibility: 'FIXED',
+                          reservationState: 'HELD',
+                          status: 'UNKNOWN',
+                          dependsOn: [],
+                          governedByRuleSetIds: [],
+                          data: {
+                            mode: 'FLIGHT',
+                            originPlaceId: corridorOriginPlaceId,
+                            destinationPlaceId: corridorDestinationPlaceId,
+                            ...(first ? { scheduledDeparture: fact(first.departure) } : {}),
+                            ...(last ? { scheduledArrival: fact(last.arrival) } : {}),
+                            bookingRef: { system: 'flight-provider', reference: offer.offerId },
+                          },
+                        },
                   },
                 ];
                 // DR-8: read verbatim as the user-facing option title
@@ -596,12 +642,15 @@ export class NorthstarPlanner implements RecoveryPlanner {
                     : dimension === 'departAfter'
                       ? 'depart later'
                       : 'fly from the declared departure gateway';
+                const bookPhrase =
+                  dimension === 'arriveBy' ? 'arrive by the requested time' : 'depart after the requested time';
+                const summaryPhrase = leg ? windowPhrase : bookPhrase;
                 return {
                   id: this.idFactory('strat'),
                   caseId: input.caseId,
                   summary: first
-                    ? `Rebook to ${windowPhrase}, departing at ${first.departure.slice(11, 16)}`
-                    : `Rebook to ${windowPhrase}`,
+                    ? `${leg ? 'Rebook' : 'Book a flight'} to ${summaryPhrase}, departing at ${first.departure.slice(11, 16)}`
+                    : `${leg ? 'Rebook' : 'Book a flight'} to ${summaryPhrase}`,
                   candidateOperations,
                   toolRequests: [],
                   assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
