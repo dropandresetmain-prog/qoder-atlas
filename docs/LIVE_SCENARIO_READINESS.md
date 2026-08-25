@@ -1,6 +1,6 @@
 # AiT LIVE Scenario Backend Readiness
 
-**Status:** READY (structural S1–S8 execution on AiT canonical data, REPLAY); LIVE/RECORD provider evidence remains the next milestone, pending credentials
+**Status:** SEMANTIC READY (S1–S8 assert real engine semantics through declarative acceptance, REPLAY); LIVE/RECORD provider evidence remains the next milestone, pending credentials
 **Integration branch:** `wave3r/live-integration`
 **Base checkpoint:** `757243a0b01fd3ebd4b9bc0f4b0d4c95519fa47e` (partial cutover, now completed)
 
@@ -149,3 +149,76 @@ This work package is complete only when each S1–S8 input drives the same
 canonical programme state and natural application paths; 67/42/25 is
 explicit; test/typecheck/lint/build/browser/reset-reseed/secret/anti-hardcoding
 checks pass; and no Model Studio or Google Routes LIVE spend occurred.
+
+## Semantic acceptance closure — evidence (26 Aug 2026)
+
+Independent review returned FIX REQUIRED: all eight manifests were
+structurally green but asserted little engine behavior. Closure had three
+problems, all landed on this branch (`78f9ede` .. `33e2d2a`):
+
+1. **Generic declarative assertions** (`78f9ede`): the runner evaluates a
+   step-level `assert` array with generic operators (`equals`, `truthy`,
+   `falsy`, `exists`, `contains`, `gte`, array-length bounds, binding
+   substitution). Scenario expectations live only in manifest data; failures
+   report step, assertion, expected, actual, and response context.
+2. **S1 real reconciliation** (`9a21093`): schedule-change REPLAY evidence
+   reconciles against provider state; generic arrival-evidence + MIN_BUFFER
+   judgment makes the retimed schedule produce a genuinely divergent impact
+   instead of a silent pass.
+3. **S1–S8 semantic manifests** — one-line proof per scenario:
+   - **S1** retimed MNSYN14/15 schedule lands through provider-state
+     reconciliation and the arrival-before-commitment check judges the new
+     buffer deterministically.
+   - **S2** missed KUL→SIN connection: direct-failure pinned to the missed
+     leg, all three dependent-engagement arrival checks FAIL, both REPLAY
+     rebook options rejected by explicit buffer arithmetic
+     (-20min / 130min vs required 360min), `bestStrategyId` absent,
+     `remainderViable = NOT_VIABLE`.
+   - **S3** preview is counterfactual (67-trip blast radius, one affected by
+     commitment linkage, intermediate observes prove zero mutation) and
+     commit is real fan-out (linked/unlinked 1/66, exactly one traveller
+     DISRUPTED); post-commit re-preview of the same proposal reports zero
+     affected trips — authoritative state already equals the committed
+     window.
+   - **S4** NL intake → corridor planning → deterministic viability through
+     the shared ChangeRequest planner.
+   - **S5** Sunday extension priced 468 SGD from REPLAY; incremental payer
+     TRAVELLER derived from `rule-ait-funded-window`; authority returns
+     honest BLOCKED/ESCALATED against the global hotel-spend cap (fail-closed,
+     no engine workaround).
+   - **S6** declared replacement property joins snapshot scope (new generic
+     `preferredStayPlaceId` seam); occupancy-aware `hotel.search` resolves a
+     REPLAY recording (174 properties / 520 rates); zero fabricated
+     strategies, three honest uncertainties.
+   - **S7** Tokyo origin substitution re-plans from declared Place evidence
+     with explicit return-leg uncertainty.
+   - **S8** cross-traveller association assessed by the
+     TRANSPORT_CONCENTRATION policy at change-request intake.
+
+**Broken-expectation proofs:** every scenario failed the runner when one
+expected value was flipped (e.g. S2 `remainderViable` VIABLE, S3
+`summary.disrupted` 2, S5 payer flip, S6 property count), then restored to
+green — assertions pin real behavior, not constants.
+
+**Final gates on this branch:** `node --test` **622/622**; typecheck, lint,
+build pass; `acceptance:preflight` 8/8; all eight manifests `ok=true` with
+truthful exit codes; `gate:anti-hardcoding` CLEAN; recording/secret scan
+CLEAN. Deterministic reset/reseed is exercised by every acceptance run.
+
+**Triage (semantic closure findings):**
+
+| Classification | Finding |
+|---|---|
+| Park for Later | `rule-ait-hotel-spend-limit` (NIGHT period, `appliesTo: []`) cross-applies to flight spend authority; fixture declares it a global cap and pinned tests agree — revisit if per-domain caps are needed. |
+| Park for Later | `rule-ait-flight-change-approval` names operations `FLIGHT_CHANGE/FLIGHT_CANCEL` that never match engine vocabulary (`flight.change`) — dead rule; wire or remove when flight-change execution lands. |
+| Park for Later | S2 luggage-ahead uncertainty not modeled (no luggage ontology in `src/`). |
+| Park for Later | No read model exposes committed commitment timestamps (S3 uses idempotent re-preview as the witness). |
+| Park for Later | No GET surface exposes element-level reservation state; missed legs are `CANCELLED` in the domain, pinned via activity trail + direct-failure ids. |
+| Ignore / Accept Risk | Delegation ran in a sibling clone with `--permission-mode bypass_permissions` under a strict ownership brief; primary agent owned git and re-verified every artifact in the primary worktree. |
+
+**Verdict: SEMANTIC READY** — each S1–S8 manifest now asserts engine-derived
+semantics (impact propagation, viability arithmetic, funding/authority,
+counterfactual preview, honest uncertainty) through the generic runner, with
+broken-expectation failure proofs and the full non-paid gate green. LIVE/RECORD
+execution remains the next milestone, still gated on sandbox credentials per
+the provider preflight section.

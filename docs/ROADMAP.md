@@ -25,13 +25,7 @@ The final product scenario set is frozen at 8 scenarios; `docs/SCENARIOS.md` is
 the source of truth for scenario business narratives, capability claims,
 implementation priority and demo intent.
 
-- **AiT LIVE Scenario Backend Readiness — In Progress:** all S1–S8 are now
-  required to become runnable through natural product/application boundaries
-  and the same generalized state/recovery/authority engine. S5, S6 and S8
-  are promoted from their historical G3R Stretch status for this work package;
-  the explicit simulation boundary is limited to S1 forced supplier facts,
-  S2 physical missed-connection/provider-reprotection facts when a sandbox
-  cannot generate them, and unsupported Atlas refund execution.
+- **AiT LIVE Scenario Backend Readiness — In Progress (SEMANTIC READY on `wave3r/live-integration`):** all S1–S8 run through natural product/application boundaries and the same generalized state/recovery/authority engine, and every manifest now asserts engine-derived semantics (impact propagation, viability arithmetic, funding/authority, counterfactual preview, honest uncertainty) with broken-expectation failure proofs; S5, S6 and S8 were promoted from their historical G3R Stretch status for this work package; the explicit simulation boundary is limited to S1 forced supplier facts, S2 physical missed-connection/provider-reprotection facts when a sandbox cannot generate them, and unsupported Atlas refund execution. LIVE/RECORD provider evidence remains the next milestone, gated on sandbox credentials.
 - **Execution record:** `docs/LIVE_SCENARIO_READINESS.md` defines the bounded
   work packages, anti-hardcoding obligations, and readiness gate. It forbids
   scenario-specific ontology or source branching.
