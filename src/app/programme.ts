@@ -217,6 +217,15 @@ export class ProgrammeService {
       insuranceRuleSetIds: [],
       loyaltyContext: [],
       ...(traveller.notes.length > 0 ? { communicationPreference: traveller.notes.join('; ') } : {}),
+      // Explicit intake truth (G3R-Closure fix B): who arranges this
+      // traveller's travel is declared, never inferred. On fresh promotion an
+      // absent declaration stays UNSPECIFIED (recorded decision below). On a
+      // LATER_UPDATE the entity is replaced wholesale, so an absent
+      // declaration carries the previously declared value forward — silence
+      // is never evidence of a change.
+      travelArrangement: traveller.travelArrangement
+        ?? existing?.travelArrangement
+        ?? 'UNSPECIFIED',
     };
 
     // Home-airport linkage (Northstar initial planning evidence): an exact,
@@ -373,6 +382,11 @@ export class ProgrammeService {
     }
     if (!traveller.homeLocationText) {
       issues.push('home location not supplied — stays missing until provided');
+    }
+    if (!traveller.travelArrangement) {
+      issues.push(
+        'recorded decision: travel arrangement responsibility not declared — recorded as UNSPECIFIED; never inferred from home location or any incidental value',
+      );
     }
 
     const proposal: MutationProposal = {

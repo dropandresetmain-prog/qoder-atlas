@@ -17,6 +17,7 @@ import type {
 } from '../domain/entities.ts';
 import type {
   EndangeredCommitmentView,
+  ProgrammeArrangementCounts,
   ProgrammeStatusSummary,
   ProgrammeTravellerView,
   ProgrammeView,
@@ -65,6 +66,12 @@ export async function projectProgrammeView(
   const travellers: ProgrammeTravellerView[] = [];
   const unresolvedUncertainties: string[] = [];
   const impactedTripIds: EntityId[] = [];
+  const arrangementCounts: ProgrammeArrangementCounts = {
+    total: 0,
+    northstarArranged: 0,
+    selfOrOtherArranged: 0,
+    unspecified: 0,
+  };
 
   for (const item of await deps.snapshot.trips.listTrips()) {
     const trip = await deps.snapshot.trips.getTrip(item.tripId);
@@ -99,7 +106,27 @@ export async function projectProgrammeView(
     const travellerId = trip.travellerIds[0] ?? 'unknown';
     let travellerName = travellerId;
     const travellerEntry = await deps.snapshot.entities.get('TRAVELLER', travellerId);
-    if (travellerEntry?.entityType === 'TRAVELLER') travellerName = travellerEntry.entity.name;
+    if (travellerEntry?.entityType === 'TRAVELLER') {
+      travellerName = travellerEntry.entity.name;
+      // G3R-Closure fix B: organiser counts derive ONLY from the explicit
+      // intake declaration persisted on the traveller. Absent declaration is
+      // counted as unspecified — never guessed from home location.
+      arrangementCounts.total += 1;
+      switch (travellerEntry.entity.travelArrangement) {
+        case 'NORTHSTAR_ARRANGED':
+          arrangementCounts.northstarArranged += 1;
+          break;
+        case 'SELF_OR_OTHER_ARRANGED':
+          arrangementCounts.selfOrOtherArranged += 1;
+          break;
+        default:
+          arrangementCounts.unspecified += 1;
+          break;
+      }
+    } else {
+      arrangementCounts.total += 1;
+      arrangementCounts.unspecified += 1;
+    }
 
     const assessment = await new ImpactEngine({
       trips: deps.snapshot.trips,
@@ -132,6 +159,7 @@ export async function projectProgrammeView(
     anchorEventId,
     anchorEventName: anchorEvent.name,
     summary,
+    arrangementCounts,
     travellers,
     endangeredCommitments: await endangeredCommitments(deps, anchorEvent, impactedTripIds),
     unresolvedUncertainties,

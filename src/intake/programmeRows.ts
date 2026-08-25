@@ -16,6 +16,7 @@
  * semantics. Scenario-specific reasoning lives downstream of promotion.
  */
 import { EntityIdSchema } from '../domain/common.ts';
+import type { TravelArrangement } from '../domain/entities.ts';
 import type {
   ProgrammeTravellerDraft,
 } from '../contracts/programmeIntake.ts';
@@ -32,6 +33,10 @@ interface NormalizedRow {
   homeLocationText?: string;
   accessibilityStatements: string[];
   notes: string[];
+  /** Explicit arrangement declaration, if the cell parsed to a known value. */
+  travelArrangement?: TravelArrangement;
+  /** Arrangement-cell values that did not parse; preserved as notes. */
+  unrecognizedArrangement: string[];
   /** Values that parsed as EntityId. */
   anchorCommitmentIds: string[];
   /** Values that did not parse as EntityId but were offered in a commitments column. */
@@ -48,7 +53,8 @@ type AliasGroup =
   | 'home'
   | 'accessibility'
   | 'notes'
-  | 'commitments';
+  | 'commitments'
+  | 'travelArrangement';
 
 const ALIASES: Record<string, AliasGroup> = {
   // display name
@@ -99,7 +105,32 @@ const ALIASES: Record<string, AliasGroup> = {
   'commitments': 'commitments',
   'sessions': 'commitments',
   'commitment ids': 'commitments',
+  // travel arrangement (G3R-Closure fix B: explicit organiser declaration)
+  'travel arrangement': 'travelArrangement',
+  'arranged by': 'travelArrangement',
+  'arrangement': 'travelArrangement',
+  'travel arranged by': 'travelArrangement',
+  'arranger': 'travelArrangement',
+  'who arranges': 'travelArrangement',
+  'travel responsibility': 'travelArrangement',
 };
+
+/**
+ * Deterministic mapping of a declared arrangement cell to the enum. Values
+ * outside this table are NOT guessed — they are preserved verbatim as notes
+ * and the field stays absent (UNSPECIFIED downstream).
+ */
+function parseTravelArrangement(value: string): TravelArrangement | undefined {
+  const v = value.trim().toLowerCase();
+  if (v === '') return undefined;
+  if (['northstar', 'northstar arranged', 'arranged', 'yes', 'y', 'we arrange', 'organiser', 'organizer', 'managed'].includes(v)) {
+    return 'NORTHSTAR_ARRANGED';
+  }
+  if (['self', 'self arranged', 'own', 'their own', 'no', 'n', 'third party', 'other', 'local', 'self-arranged'].includes(v)) {
+    return 'SELF_OR_OTHER_ARRANGED';
+  }
+  return undefined;
+}
 
 function normalizeHeader(raw: string): string {
   return raw.trim().toLowerCase().replace(/[._]+/g, ' ').replace(/\s+/g, ' ');
@@ -170,6 +201,7 @@ export function normalizeTravellerRow(
     notes: [],
     anchorCommitmentIds: [],
     badAnchorCommitmentIds: [],
+    unrecognizedArrangement: [],
   };
 
   for (const [rawKey, rawValue] of Object.entries(row)) {
@@ -219,6 +251,13 @@ export function normalizeTravellerRow(
       case 'home':
         acc.homeLocationText = value;
         break;
+      case 'travelArrangement': {
+        const parsed = parseTravelArrangement(value);
+        if (parsed !== undefined) acc.travelArrangement = parsed;
+        // Unrecognized values stay visible; the field remains undeclared.
+        else acc.unrecognizedArrangement.push(value);
+        break;
+      }
       case 'accessibility': {
         for (const s of splitMulti(value, [';'])) {
           acc.accessibilityStatements.push(s);
@@ -271,11 +310,14 @@ export function normalizeTravellerRow(
     identity,
     nationalityCodes: [...acc.nationalityCodes],
     accessibilityStatements: [...acc.accessibilityStatements],
-    notes: [...acc.notes],
+    notes: [...acc.notes, ...acc.unrecognizedArrangement.map((v) => `travel arrangement not recognized: ${v}`)],
     anchorCommitmentIds: [...acc.anchorCommitmentIds],
   };
   if (acc.homeLocationText !== undefined) {
     draft.homeLocationText = acc.homeLocationText;
+  }
+  if (acc.travelArrangement !== undefined) {
+    draft.travelArrangement = acc.travelArrangement;
   }
   return unresolved.length > 0 ? { draft, unresolved: unresolved.join(' | ') } : { draft };
 }

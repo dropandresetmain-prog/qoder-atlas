@@ -246,6 +246,32 @@ function intakeAffordances(): string {
   </section>`;
 }
 
+function arrangementPanel(view: ProgrammeView): string {
+  const counts = view.arrangementCounts;
+  const rows = [
+    { label: 'Travel arranged by us', count: counts.northstarArranged, key: 'northstar-arranged' },
+    { label: 'Travelling on their own arrangements', count: counts.selfOrOtherArranged, key: 'self-or-other-arranged' },
+    { label: 'Not declared yet', count: counts.unspecified, key: 'unspecified' },
+  ]
+    .map(
+      (row) => `
+      <div class="arrangement-row" data-arrangement="${escapeHtml(row.key)}">
+        <span class="tile-label">${escapeHtml(row.label)}</span>
+        <span class="tile-count">${row.count}</span>
+      </div>`,
+    )
+    .join('');
+  return `
+  <section class="section" aria-label="Travel arrangements">
+    <h2>Travel arrangements</h2>
+    <div class="panel" data-ui-section="arrangements">
+      <p class="card-sub">${counts.total} people on this programme</p>
+      ${rows}
+      <p class="footnote">Counts reflect what the organiser declared at intake. Undeclared travellers are shown as "not declared yet" — nothing is guessed.</p>
+    </div>
+  </section>`;
+}
+
 /** Programme body from a loaded view (also used directly by tests). */
 export function renderProgrammeBody(view: ProgrammeView): string {
   return `
@@ -256,6 +282,7 @@ export function renderProgrammeBody(view: ProgrammeView): string {
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
   </div>
   ${summaryTiles(view.summary)}
+  ${arrangementPanel(view)}
   ${endangeredSection(view.endangeredCommitments)}
   ${travellerTable(view.travellers)}
   ${missingInformationPanel(view)}

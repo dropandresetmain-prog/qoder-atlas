@@ -97,6 +97,20 @@ export interface ProgrammeStatusSummary {
   unknown: number;
 }
 
+/**
+ * Organiser-facing travel-arrangement counts (G3R-Closure fix B). Derived
+ * ONLY from the explicit `travelArrangement` declaration each traveller
+ * carried at intake — never from home locations, airport codes, or any other
+ * incidental value. `total = northstarArranged + selfOrOtherArranged +
+ * unspecified` by construction.
+ */
+export interface ProgrammeArrangementCounts {
+  total: number;
+  northstarArranged: number;
+  selfOrOtherArranged: number;
+  unspecified: number;
+}
+
 /** A shared event commitment with evidence of danger, from authoritative state. */
 export interface EndangeredCommitmentView {
   commitmentId: EntityId;
@@ -128,6 +142,8 @@ export interface ProgrammeView {
   anchorEventId: EntityId;
   anchorEventName: string;
   summary: ProgrammeStatusSummary;
+  /** Explicit arrangement responsibility counts for the organiser screen. */
+  arrangementCounts: ProgrammeArrangementCounts;
   travellers: ProgrammeTravellerView[];
   endangeredCommitments: EndangeredCommitmentView[];
   /** Unresolved UNKNOWN evidence across the programme. */

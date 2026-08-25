@@ -14,6 +14,7 @@ const FIXTURES_ROOT = join(process.cwd(), 'fixtures');
 interface ProgrammeTravellerDraftLike {
   draftId: string;
   homeLocationText?: string;
+  travelArrangement?: string;
 }
 
 test('DR-9.1: synthetic-summit programme has 67 speakers', () => {
@@ -23,24 +24,81 @@ test('DR-9.1: synthetic-summit programme has 67 speakers', () => {
   assert.equal(programme.importDraft.travellers.length, 67, 'programme must have exactly 67 speakers');
 });
 
-test('DR-9.2: synthetic-summit programme has 42 travel-required speakers', () => {
+test('DR-9.2: synthetic-summit programme has 42 Northstar-arranged speakers (explicit declaration)', () => {
   const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
   const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
 
-  const travelRequired = programme.importDraft.travellers.filter(
-    (t: ProgrammeTravellerDraftLike) => t.homeLocationText !== 'SYN',
+  const arranged = programme.importDraft.travellers.filter(
+    (t: ProgrammeTravellerDraftLike) => t.travelArrangement === 'NORTHSTAR_ARRANGED',
   );
-  assert.equal(travelRequired.length, 42, 'programme must have exactly 42 travel-required speakers');
+  assert.equal(
+    arranged.length,
+    42,
+    'programme must have exactly 42 explicitly Northstar-arranged speakers (classification must never depend on homeLocationText)',
+  );
 });
 
-test('DR-9.3: synthetic-summit programme has 25 local speakers', () => {
+test('DR-9.3: synthetic-summit programme has 25 self/other-arranged speakers (explicit declaration)', () => {
   const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
   const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
 
   const local = programme.importDraft.travellers.filter(
-    (t: ProgrammeTravellerDraftLike) => t.homeLocationText === 'SYN',
+    (t: ProgrammeTravellerDraftLike) => t.travelArrangement === 'SELF_OR_OTHER_ARRANGED',
   );
-  assert.equal(local.length, 25, 'programme must have exactly 25 local speakers');
+  assert.equal(
+    local.length,
+    25,
+    'programme must have exactly 25 explicitly self/other-arranged speakers (classification must never depend on homeLocationText)',
+  );
+});
+
+test('DR-9.3b: every speaker carries an explicit travelArrangement declaration', () => {
+  const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
+  const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
+
+  for (const traveller of programme.importDraft.travellers) {
+    assert.ok(
+      traveller.travelArrangement === 'NORTHSTAR_ARRANGED' ||
+        traveller.travelArrangement === 'SELF_OR_OTHER_ARRANGED',
+      `traveller ${traveller.draftId} must declare an explicit travelArrangement`,
+    );
+  }
+});
+
+test('DR-9.3c: arrangement classification is independent of home-location fixture values', () => {
+  const programmePath = join(FIXTURES_ROOT, 'programmes/synthetic-summit/programme.json');
+  const programme = JSON.parse(readFileSync(programmePath, 'utf-8'));
+
+  // Anti-fixture-magic proof (G3R-Closure fix B): the classification must be
+  // identical even when every homeLocationText value is replaced with
+  // synthetic values carrying no airport/location meaning at all.
+  const countsFor = (
+    travellers: ProgrammeTravellerDraftLike[],
+  ): { arranged: number; self: number } => ({
+    arranged: travellers.filter((t) => t.travelArrangement === 'NORTHSTAR_ARRANGED').length,
+    self: travellers.filter((t) => t.travelArrangement === 'SELF_OR_OTHER_ARRANGED').length,
+  });
+
+  const baseline = countsFor(programme.importDraft.travellers);
+  const renamed = programme.importDraft.travellers.map((t: ProgrammeTravellerDraftLike, index: number) => ({
+    ...t,
+    homeLocationText: `location-${index}`,
+  }));
+  assert.deepEqual(countsFor(renamed), baseline, 'classification must not shift when home locations change');
+
+  const blanked = programme.importDraft.travellers.map((t: ProgrammeTravellerDraftLike) => ({
+    ...t,
+    homeLocationText: undefined,
+  }));
+  assert.deepEqual(countsFor(blanked), baseline, 'classification must not shift when home locations are removed');
+
+  // And the fixture itself must not rely on any single home-location value:
+  // flipping every value to the same string still leaves counts untouched.
+  const sameHome = programme.importDraft.travellers.map((t: ProgrammeTravellerDraftLike) => ({
+    ...t,
+    homeLocationText: 'X',
+  }));
+  assert.deepEqual(countsFor(sameHome), baseline, 'classification must not shift when all homes equal');
 });
 
 test('DR-9.4: all speakers have valid structure', () => {

@@ -692,3 +692,97 @@ test('nsg1: unknown commitment ids in drafts are rejected honestly', async () =>
   );
   assert.equal(engagements.length, 1); // only the valid commitment linked
 });
+
+test('g3r-b: arrangement classification is explicit intake truth, independent of home locations', async () => {
+  // G3R-Closure fix B: promote two cohorts with deliberately misleading
+  // home locations — an "arranged" traveller whose home text matches the
+  // event airport, and a "self-arranged" traveller whose home text is a
+  // distant city. The authoritative classification and the projected counts
+  // must follow ONLY the declared travelArrangement.
+  const harness = createHarness();
+  const { service } = harness;
+  const context = programmeContext('evt-arr', 'plc-venue', 'plc-airport');
+  await service.applyProgrammeContext({
+    at: AT,
+    sourceId: 'src-evt-arr',
+    organisation: context.organisation,
+    anchorEvent: context.anchorEvent,
+    places: context.places,
+    ruleSets: context.ruleSets,
+  });
+
+  const result = await service.intakeImportDraft({
+    importDraft: {
+      id: 'import-arr',
+      anchorEventId: 'evt-arr',
+      channel: 'BULK_IMPORT',
+      sourceId: 'src-evt-arr',
+      receivedAt: AT,
+      travellers: [
+        {
+          draftId: 'draft-local-but-arranged',
+          displayName: 'Local Yet Arranged',
+          identity: {},
+          // Home text equals the event airport code: a heuristic would call
+          // this person local. The explicit declaration says otherwise.
+          homeLocationText: 'SYN',
+          nationalityCodes: ['SG'],
+          accessibilityStatements: [],
+          notes: [],
+          anchorCommitmentIds: ['cmt-evt-arr-opening'],
+          travelArrangement: 'NORTHSTAR_ARRANGED',
+        },
+        {
+          draftId: 'draft-distant-but-self',
+          displayName: 'Distant Yet Self-Arranged',
+          identity: {},
+          homeLocationText: 'Faraway City',
+          nationalityCodes: ['SG'],
+          accessibilityStatements: [],
+          notes: [],
+          anchorCommitmentIds: ['cmt-evt-arr-opening'],
+          travelArrangement: 'SELF_OR_OTHER_ARRANGED',
+        },
+        {
+          draftId: 'draft-undeclared',
+          displayName: 'Undeclared Traveller',
+          identity: {},
+          nationalityCodes: [],
+          accessibilityStatements: [],
+          notes: [],
+          anchorCommitmentIds: ['cmt-evt-arr-opening'],
+        },
+      ],
+      unresolvedStatements: [],
+    },
+    at: AT,
+  });
+  assert.equal(result.outcomes.filter((o) => o.promoted).length, 3);
+
+  const arranged = await harness.entities.get('TRAVELLER', 'trv-evt-arr-draft-local-but-arranged');
+  assert.ok(arranged?.entityType === 'TRAVELLER');
+  assert.equal(arranged.entity.travelArrangement, 'NORTHSTAR_ARRANGED');
+
+  const self = await harness.entities.get('TRAVELLER', 'trv-evt-arr-draft-distant-but-self');
+  assert.ok(self?.entityType === 'TRAVELLER');
+  assert.equal(self.entity.travelArrangement, 'SELF_OR_OTHER_ARRANGED');
+
+  // Undeclared stays UNSPECIFIED with an honest recorded decision.
+  const undeclared = await harness.entities.get('TRAVELLER', 'trv-evt-arr-draft-undeclared');
+  assert.ok(undeclared?.entityType === 'TRAVELLER');
+  assert.equal(undeclared.entity.travelArrangement, 'UNSPECIFIED');
+  const undeclaredOutcome = result.outcomes.find((o) => o.draftId === 'draft-undeclared');
+  assert.ok(
+    undeclaredOutcome!.issues.some((issue) => issue.includes('travel arrangement responsibility not declared')),
+  );
+
+  // The organiser projection reports explicit counts, never a location guess.
+  const view = await projectProgrammeView(harness.readDeps, 'evt-arr', AT);
+  assert.ok(view);
+  assert.deepEqual(view.arrangementCounts, {
+    total: 3,
+    northstarArranged: 1,
+    selfOrOtherArranged: 1,
+    unspecified: 1,
+  });
+});

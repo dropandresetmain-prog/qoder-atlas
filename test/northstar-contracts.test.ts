@@ -377,6 +377,7 @@ test('programme read model: projection shape covers status rollup and endangered
       resolved: 1,
       unknown: 0,
     },
+    arrangementCounts: { total: 42, northstarArranged: 40, selfOrOtherArranged: 1, unspecified: 1 },
     travellers: [
       {
         tripId: 'trip_1',

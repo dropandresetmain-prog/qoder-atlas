@@ -14,7 +14,7 @@
  * assigned only at promotion).
  */
 import { z } from 'zod';
-import { AnchorEventKindSchema } from '../domain/entities.ts';
+import { AnchorEventKindSchema, TravelArrangementSchema } from '../domain/entities.ts';
 import type { ProgrammeTravellerDraft } from '../contracts/programmeIntake.ts';
 import type { ChatMessage, CompletionRequest, CompletionResponse } from '../intelligence/client.ts';
 import type { IsoDateTime } from '../domain/common.ts';
@@ -36,6 +36,12 @@ const RosterTravellerSchema = z.strictObject({
   accessibilityStatements: z.array(z.string()).optional(),
   notes: z.array(z.string()).optional(),
   commitmentTitles: z.array(z.string()).optional(),
+  /**
+   * Only accepted when the source material explicitly states who arranges
+   * the traveller's travel. Absent = not declared; the model must never
+   * infer this from home location or any incidental value.
+   */
+  travelArrangement: TravelArrangementSchema.optional(),
 });
 
 export const RosterMappingOutputSchema = z.strictObject({
@@ -84,6 +90,7 @@ const ROSTER_SYSTEM_PROMPT = [
   '  - Preserve every explicit statement verbatim. Do not paraphrase names or emails.',
   '  - Mark unknown fields as absent (omit the key). Never invent airports, nationalities, passports, dates, or bookings.',
   '  - "commitmentTitles" holds free-text titles only; never invent commitment ids.',
+  '  - "travelArrangement" is set ONLY when the source explicitly states who arranges the traveller\'s travel: NORTHSTAR_ARRANGED (we/organiser books it), SELF_OR_OTHER_ARRANGED (traveller or third party arranges it). Omit the key otherwise — never infer it from home location or travel necessity.',
   '  - "unresolvedStatements" collects anything you could not cleanly attribute to a single traveller (group statements, ambiguous rows, "and guest" with no name).',
   '  - Do not wrap the JSON in prose, code fences, or commentary.',
 ].join('\n');
@@ -241,6 +248,7 @@ export async function mapRosterWithModel(
       anchorCommitmentIds: [],
     };
     if (home !== undefined) draft.homeLocationText = home;
+    if (traveller.travelArrangement !== undefined) draft.travelArrangement = traveller.travelArrangement;
     drafts.push(draft);
   });
   return { ok: true, drafts, unresolvedStatements: modelUnresolved };

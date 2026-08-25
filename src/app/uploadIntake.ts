@@ -118,7 +118,6 @@ function rosterRecordToDraft(record: RosterRecord, index: number): ProgrammeTrav
 
   const notes: string[] = [];
   if (record.role) notes.push(`role: ${record.role}`);
-  if (record.travelRequired) notes.push('travel required');
 
   const draft: ProgrammeTravellerDraft = {
     draftId,
@@ -128,6 +127,15 @@ function rosterRecordToDraft(record: RosterRecord, index: number): ProgrammeTrav
     accessibilityStatements: [],
     notes,
     anchorCommitmentIds: [],
+    // G3R-Closure fix B: the roster's declared "travel required" column is
+    // explicit organiser evidence of arrangement responsibility — uploading a
+    // roster into Northstar management means rows marked as needing travel
+    // are arranged by Northstar, rows marked as not needing travel arrange
+    // themselves (or are local). This maps a DECLARED column, never a
+    // home-location heuristic.
+    travelArrangement: record.travelRequired
+      ? 'NORTHSTAR_ARRANGED'
+      : 'SELF_OR_OTHER_ARRANGED',
   };
   if (record.homeLocation) draft.homeLocationText = record.homeLocation;
   return draft;

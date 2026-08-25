@@ -451,6 +451,9 @@ export const healthyProgramme: ProgrammeView = {
   anchorEventId: HEALTHY_ANCHOR_EVENT_ID,
   anchorEventName: 'Atlas Innovation Summit 2026',
   summary: summaryFor(HEALTHY_PROGRAMME_SEEDS.map((s) => traveller(s, HEALTHY_ANCHOR_EVENT_ID))),
+  // Presentation-seed value consistent with the seeded traveller rows below
+  // (3 travellers). Only the engine read model computes authoritative counts.
+  arrangementCounts: { total: 3, northstarArranged: 3, selfOrOtherArranged: 0, unspecified: 0 },
   travellers: HEALTHY_PROGRAMME_SEEDS.map((s) => traveller(s, HEALTHY_ANCHOR_EVENT_ID)),
   endangeredCommitments: [],
   unresolvedUncertainties: [
@@ -469,6 +472,7 @@ export const programmeWithEndangeredCommitment: ProgrammeView = {
     traveller({ id: 'a2', name: 'Xander Olufemi', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: ['Transfer is at risk because of the venue change'] }, ENDANGERED_ANCHOR_EVENT_ID),
     traveller({ id: 'a3', name: 'Yael Berenson', status: 'NEEDS_TRAVELLER_INFO', caseCount: 0, decisions: 0, uncertainties: ['New venue address not yet confirmed to the traveller'] }, ENDANGERED_ANCHOR_EVENT_ID),
   ]),
+  arrangementCounts: { total: 3, northstarArranged: 3, selfOrOtherArranged: 0, unspecified: 0 },
   travellers: [
     traveller({ id: 'a1', name: 'Wren Calloway', status: 'DISRUPTED', caseCount: 1, decisions: 0, uncertainties: ['Hotel closed the booking window early'] }, ENDANGERED_ANCHOR_EVENT_ID),
     traveller({ id: 'a2', name: 'Xander Olufemi', status: 'AT_RISK', caseCount: 1, decisions: 0, uncertainties: ['Transfer is at risk because of the venue change'] }, ENDANGERED_ANCHOR_EVENT_ID),

@@ -14,6 +14,9 @@
  */
 import { z } from 'zod';
 import { EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
+import { TravelArrangementSchema, type TravelArrangement } from '../domain/entities.ts';
+
+export { TravelArrangementSchema, type TravelArrangement };
 
 /**
  * How this draft entered the system. Deterministic promotion rules may treat
@@ -61,6 +64,12 @@ export const ProgrammeTravellerDraftSchema = z.strictObject({
   notes: z.array(z.string()).default([]),
   /** Which shared programme items this traveller participates in. */
   anchorCommitmentIds: z.array(EntityIdSchema).default([]),
+  /**
+   * Explicit declaration of who arranges this traveller's travel. Absent =
+   * not declared: promotion records it as UNSPECIFIED uncertainty — it is
+   * NEVER inferred from homeLocationText, airport codes, or fixture values.
+   */
+  travelArrangement: TravelArrangementSchema.optional(),
 });
 export type ProgrammeTravellerDraft = z.infer<typeof ProgrammeTravellerDraftSchema>;
 

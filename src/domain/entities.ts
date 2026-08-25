@@ -65,10 +65,31 @@ export const PassportContextSchema = z.strictObject({
 });
 export type PassportContext = z.infer<typeof PassportContextSchema>;
 
+/**
+ * Who is responsible for arranging this traveller's travel, AS DECLARED BY
+ * THE ORGANISER (or the import adapter) at intake. This is explicit
+ * domain/intake truth: it must never be inferred from home-location text,
+ * airport codes, or any other incidental value.
+ *
+ * - NORTHSTAR_ARRANGED — Northstar books and manages travel for this person.
+ * - SELF_OR_OTHER_ARRANGED — the traveller (or a third party) arranges
+ *   their own travel; includes local travellers who need no travel.
+ * - UNSPECIFIED — not declared; stays explicit uncertainty at promotion and
+ *   is reported as "unspecified" in organiser-facing counts, never guessed.
+ */
+export const TravelArrangementSchema = z.enum([
+  'NORTHSTAR_ARRANGED',
+  'SELF_OR_OTHER_ARRANGED',
+  'UNSPECIFIED',
+]);
+export type TravelArrangement = z.infer<typeof TravelArrangementSchema>;
+
 export const TravellerSchema = z.strictObject({
   id: EntityIdSchema,
   name: z.string(),
   homePlaceId: EntityIdSchema.optional(),
+  /** Explicit intake declaration of who arranges this traveller's travel. */
+  travelArrangement: TravelArrangementSchema.optional(),
   nationalityCodes: FactSchema(z.array(z.string())).optional(),
   passports: FactSchema(z.array(PassportContextSchema)).optional(),
   accessibilityRequirements: z.array(AccessibilityRequirementSchema).default([]),

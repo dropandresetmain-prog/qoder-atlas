@@ -94,7 +94,9 @@ test('dr10: roster CSV + event brief creates valid draft programme bundle', () =
   assert.equal(alice.homeLocationText, 'San Francisco');
   assert.equal(alice.identity.email, 'alice@example.com');
   assert.ok(alice.notes.includes('role: Keynote Speaker'));
-  assert.ok(alice.notes.includes('travel required'));
+  // G3R-Closure fix B: declared "travel required" becomes explicit
+  // arrangement responsibility, not a prose note.
+  assert.equal(alice.travelArrangement, 'NORTHSTAR_ARRANGED');
 
   const bob = bundle.importDraft.travellers[1]!;
   assert.equal(bob.displayName, 'Bob Kumar');
@@ -103,7 +105,7 @@ test('dr10: roster CSV + event brief creates valid draft programme bundle', () =
   const carol = bundle.importDraft.travellers[2]!;
   assert.equal(carol.displayName, 'Carol Wang');
   assert.equal(carol.homeLocationText, 'Seattle');
-  assert.ok(!carol.notes.includes('travel required'));
+  assert.equal(carol.travelArrangement, 'SELF_OR_OTHER_ARRANGED');
 
   // Context populated from event brief.
   assert.ok(bundle.context.organisation);
