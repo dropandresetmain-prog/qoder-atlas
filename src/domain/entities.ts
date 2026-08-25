@@ -197,5 +197,14 @@ export const PlaceSchema = z.strictObject({
   externalRefs: z
     .array(z.strictObject({ system: z.string(), value: z.string() }))
     .default([]),
+  /**
+   * G3R-Closure fix C — generic transport-gateway association: this place is
+   * SERVED BY the listed gateway places (Place -> servedBy -> gateway).
+   * Carries no scenario semantics: an event venue can be served by an
+   * AIRPORT, a hotel by a RAIL_STATION, a city by any of them. Resolution
+   * stays fail-closed — an association whose target lacks the needed
+   * provider-facing ref contributes nothing and is never guessed away.
+   */
+  servedByPlaceIds: z.array(EntityIdSchema).default([]).optional(),
 });
 export type Place = z.infer<typeof PlaceSchema>;

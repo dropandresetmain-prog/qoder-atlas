@@ -131,13 +131,19 @@ export class NorthstarPlanner implements RecoveryPlanner {
 
     // Destination airport: the event venue's airport ref (snapshot places),
     // falling back to the engagement place. Venue-kind places are linked to
-    // their nearest airport through authoritative Place evidence only.
+    // their nearest airport through authoritative Place evidence only —
+    // either the place's own airport-code ref or the generic servedBy
+    // transport-gateway association (fix C).
     const eventPlaceId = input.snapshot.anchorEvent?.placeId ?? engagement.data.placeId;
-    const destinationPlace = this.placeById(input, eventPlaceId);
-    const destinationRef = airportRefFor(destinationPlace);
-    if (!destinationPlace || !destinationRef) {
-      return this.degraded('no event airport evidence: the anchor-event place carries no airport-code ref');
+    const destinationGateway = this.airportGatewayFor(input, eventPlaceId);
+    if (!destinationGateway) {
+      return this.degraded('no event airport evidence: the anchor-event place carries no airport-code ref and declares no serving transport gateway');
     }
+    const destinationPlace = this.placeById(input, destinationGateway.placeId);
+    if (!destinationPlace) {
+      return this.degraded('no event airport evidence: the serving gateway place is not present in snapshot places');
+    }
+    const destinationRef = destinationGateway.ref;
 
     // Origin airport: explicit traveller home-place airport ref. Missing
     // home evidence is never guessed.
@@ -342,12 +348,15 @@ export class NorthstarPlanner implements RecoveryPlanner {
       if (!requested || !requestedDate) continue;
       const leg = legFor(dimension);
       if (leg) {
-        const originRef = airportRefFor(this.placeById(input, leg.data.originPlaceId));
-        const destinationRef = airportRefFor(this.placeById(input, leg.data.destinationPlaceId));
-        if (!originRef || !destinationRef) {
+        // Gateway-aware endpoint resolution (fix C): a leg endpoint without
+        // its own airport ref may resolve through its servedBy transport
+        // gateway; the gateway place becomes the search endpoint.
+        const originGateway = this.airportGatewayFor(input, leg.data.originPlaceId);
+        const destinationGateway = this.airportGatewayFor(input, leg.data.destinationPlaceId);
+        if (!originGateway || !destinationGateway) {
           uncertainties.push(
             this.uncertainty(
-              `${dimension} leg ${leg.id} places carry no airport-code refs; cannot re-search that leg`,
+              `${dimension} leg ${leg.id} places carry no airport-code refs (and no serving gateway resolves one); cannot re-search that leg`,
               'MEDIUM',
             ),
           );
@@ -355,7 +364,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
         }
         const toolRequestId = `tool-ws-${dimension}`;
         toolRequests.push(
-          this.searchRequest(originRef, destinationRef, requestedDate, leg.data.originPlaceId, leg.data.destinationPlaceId, toolRequestId),
+          this.searchRequest(originGateway.ref, destinationGateway.ref, requestedDate, originGateway.placeId, destinationGateway.placeId, toolRequestId),
         );
         selected.push({ dimension, leg, toolRequestId });
         continue;
@@ -505,13 +514,15 @@ export class NorthstarPlanner implements RecoveryPlanner {
     eventPlaceId: EntityId | undefined,
   ): { originRef: { system: string; value: string }; destinationRef: { system: string; value: string }; originPlaceId: EntityId; destinationPlaceId: EntityId } | undefined {
     if (!eventPlaceId) return undefined;
-    const eventPlace = this.placeById(input, eventPlaceId);
-    const eventRef = airportRefFor(eventPlace);
+    // Gateway-aware (fix C): the event side resolves through the place's own
+    // airport ref or its servedBy transport gateway; the gateway place is the
+    // corridor endpoint.
+    const eventGateway = this.airportGatewayFor(input, eventPlaceId);
     const home = this.travellerHomeAirport(input);
-    if (!eventPlace || !eventRef || !home) return undefined;
+    if (!eventGateway || !home) return undefined;
     return dimension === 'arriveBy'
-      ? { originRef: home.ref, destinationRef: eventRef, originPlaceId: home.placeId, destinationPlaceId: eventPlace.id }
-      : { originRef: eventRef, destinationRef: home.ref, originPlaceId: eventPlace.id, destinationPlaceId: home.placeId };
+      ? { originRef: home.ref, destinationRef: eventGateway.ref, originPlaceId: home.placeId, destinationPlaceId: eventGateway.placeId }
+      : { originRef: eventGateway.ref, destinationRef: home.ref, originPlaceId: eventGateway.placeId, destinationPlaceId: home.placeId };
   }
 
   /**
@@ -584,6 +595,35 @@ export class NorthstarPlanner implements RecoveryPlanner {
   private placeById(input: PlannerInput, placeId: EntityId | undefined): Place | undefined {
     if (!placeId) return undefined;
     return input.snapshot.places.find((place) => place.id === placeId);
+  }
+
+  /**
+   * G3R-Closure fix C — gateway-aware airport resolution, fully generic.
+   * A place resolves to an airport code through its OWN externalRefs, or —
+   * when it carries none — through the generic `servedByPlaceIds`
+   * association (Place -> servedBy -> transport gateway). The returned
+   * placeId is the place that actually bears the airport code: a venue with
+   * no own ref resolves to its serving gateway, so search endpoints and
+   * leg endpoints stay honest about which place is the airport. Fail-closed
+   * discipline is unchanged: no own ref and no gateway association (or none
+   * of them carrying a ref) resolves to undefined — never guessed. The depth
+   * bound guards against association cycles without any scenario knowledge.
+   */
+  private airportGatewayFor(
+    input: PlannerInput,
+    placeId: EntityId | undefined,
+    depth = 0,
+  ): { placeId: EntityId; ref: { system: string; value: string } } | undefined {
+    if (!placeId || depth > 1) return undefined;
+    const place = this.placeById(input, placeId);
+    if (!place) return undefined;
+    const direct = airportRefFor(place);
+    if (direct) return { placeId: place.id, ref: direct };
+    for (const gatewayId of place.servedByPlaceIds ?? []) {
+      const gateway = this.airportGatewayFor(input, gatewayId, depth + 1);
+      if (gateway) return gateway;
+    }
+    return undefined;
   }
 
   private flightSearchEvidence(input: PlannerInput): { offers: FlightOffer[] } | undefined {

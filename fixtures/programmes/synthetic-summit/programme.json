@@ -16,7 +16,10 @@
         "name": "Synthetic Summit Venue",
         "kind": "VENUE",
         "timezone": "Asia/Singapore",
-        "externalRefs": []
+        "externalRefs": [],
+        "servedByPlaceIds": [
+          "plc-evt-w3-demo-airport"
+        ]
       },
       {
         "id": "plc-evt-w3-demo-airport",
