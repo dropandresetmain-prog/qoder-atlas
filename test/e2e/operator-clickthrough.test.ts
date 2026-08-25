@@ -175,11 +175,10 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   );
   await approveButton.click();
   await decisionResponse;
+  // String-form in-page function (no DOM-lib reference in the TS source):
+  // resolves once the reloaded page shows a progressed state.
   await page.waitForFunction(
-    () => {
-      const html = document.documentElement.innerHTML;
-      return html.includes('RESOLVED') || html.includes('Trip recovered') || html.includes('RECOVERING') || html.includes('In progress');
-    },
+    'document.documentElement.innerHTML.includes("RESOLVED") || document.documentElement.innerHTML.includes("Trip recovered") || document.documentElement.innerHTML.includes("RECOVERING") || document.documentElement.innerHTML.includes("In progress")',
     undefined,
     { timeout: 10000 },
   );

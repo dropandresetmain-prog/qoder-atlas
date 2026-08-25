@@ -95,6 +95,19 @@ export const OPTION_VERDICT_LABEL: Record<'VIABLE' | 'NOT_VIABLE' | 'UNKNOWN', s
   UNKNOWN: 'Still being checked',
 };
 
+/**
+ * G3R-Closure fix H — deterministic presentation mapping for case
+ * resolution outcomes. The raw engine enums (FULLY_RECOVERED,
+ * RECOVERED_WITH_LOSS, ESCALATED_CLOSED) must never reach user copy; every
+ * screen derives its wording from this map. Raw values stay in machine
+ * state (data-* attributes, audit, debug surfaces) only.
+ */
+export const RESOLUTION_OUTCOME_LABEL: Record<'FULLY_RECOVERED' | 'RECOVERED_WITH_LOSS' | 'ESCALATED_CLOSED', string> = {
+  FULLY_RECOVERED: 'Trip recovered',
+  RECOVERED_WITH_LOSS: 'Trip recovered — with a loss',
+  ESCALATED_CLOSED: 'Closed with direct support',
+};
+
 // ---------------------------------------------------------------------------
 // Northstar programme surface (RV-N10) — labels live next to the others so
 // the same user-facing vocabulary drives every screen.
@@ -191,4 +204,13 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'strategyid',
   'signalid',
   'offerid',
+  // G3R-Closure fix H: raw engine enums and safety-state vocabulary must
+  // never reach organiser/traveller screens. These are the underscore-form
+  // enum literals (lowercased by the gate) — they can never be natural
+  // English, so matching them cannot false-positive on user copy. The raw
+  // uppercase status/check enums (FAIL, UNKNOWN, etc.) are already mapped to
+  // human wording by CHECK_ICONS / STATUS_LABEL and asserted by DR-8.5b.
+  'fully_recovered',
+  'recovered_with_loss',
+  'escalated_closed',
 ];

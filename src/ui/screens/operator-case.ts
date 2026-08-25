@@ -10,7 +10,7 @@
  * Pure function of typed data; malformed views are refused, not guessed.
  */
 import type { ReadModelEnvelope } from '../../contracts/readmodels.ts';
-import { OPTION_VERDICT_LABEL, STATUS_TONE } from '../copy.ts';
+import { OPTION_VERDICT_LABEL, RESOLUTION_OUTCOME_LABEL, STATUS_TONE } from '../copy.ts';
 import { escapeHtml, formatCostDelta, formatInstant, formatMoney } from '../html.ts';
 import {
   errorPanel,
@@ -218,10 +218,13 @@ function actionsSection(actions: readonly ActionProgressView[]): string | undefi
 
 function resolutionPanel(resolution?: CaseResolutionView): string | undefined {
   if (!resolution) return undefined;
+  // G3R-Closure fix H: every visible word comes from the deterministic
+  // presentation map; the raw outcome enum stays in the data-* attribute
+  // (machine state for audit/debug wiring), never in user copy.
   if (resolution.outcome === 'FULLY_RECOVERED') {
     return `
     <div class="resolution is-full" data-outcome="FULLY_RECOVERED">
-      <p class="res-title">Trip recovered</p>
+      <p class="res-title">${escapeHtml(RESOLUTION_OUTCOME_LABEL.FULLY_RECOVERED)}</p>
       <p>${escapeHtml(resolution.summary)}</p>
     </div>`;
   }
@@ -231,14 +234,14 @@ function resolutionPanel(resolution?: CaseResolutionView): string | undefined {
       .join('');
     return `
     <div class="resolution is-loss" data-outcome="RECOVERED_WITH_LOSS">
-      <p class="res-title">Trip recovered — with a loss</p>
+      <p class="res-title">${escapeHtml(RESOLUTION_OUTCOME_LABEL.RECOVERED_WITH_LOSS)}</p>
       <p>${escapeHtml(resolution.summary)}</p>
       ${losses ? `<p><strong>Could not be kept:</strong></p><ul>${losses}</ul>` : ''}
     </div>`;
   }
   return `
   <div class="resolution is-escalated" data-outcome="ESCALATED_CLOSED">
-    <p class="res-title">Closed with direct support</p>
+    <p class="res-title">${escapeHtml(RESOLUTION_OUTCOME_LABEL.ESCALATED_CLOSED)}</p>
     <p>${escapeHtml(resolution.summary)}</p>
   </div>`;
 }
