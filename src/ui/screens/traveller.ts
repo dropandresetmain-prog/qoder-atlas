@@ -4,8 +4,8 @@
  * Answers the traveller journey: am I okay, what changed, what matters,
  * what is being done, what input is needed, and whether the rest of the
  * trip is viable. RECOVERED_WITH_LOSS is shown honestly, never as "all
- * good". Decision buttons are inert markup the integrator (E3) wires to
- * real endpoints; nothing here fabricates a submitted state.
+ * good". Decision and request forms target the existing application seams;
+ * nothing here fabricates a submitted state.
  *
  * An optional TravellerPresentation adds destination photography, the ink
  * commitment card, and rich option cards. Without it, every screen still
@@ -38,21 +38,29 @@ function hero(view: TravellerTripView, presentation?: TravellerPresentation): st
   const image = presentation?.heroImageUrl
     ? `<img src="${escapeHtml(presentation.heroImageUrl)}" alt="${escapeHtml(presentation.heroImageAlt ?? '')}" loading="lazy">`
     : '';
+  const changedButWorking = view.status === 'DISRUPTED' && view.remainderViable === 'VIABLE';
+  const kicker = changedButWorking ? 'Trip checked' : STATUS_LABEL[view.status];
+  const headline = changedButWorking ? 'Your trip changed, but still works' : TRAVELLER_HEADLINE[view.status];
+  const subline = changedButWorking
+    ? 'The updated booking still protects the important parts of your trip.'
+    : TRAVELLER_SUBLINE[view.status];
   return `
   <div class="t-hero" data-status="${escapeHtml(view.status)}">
     ${image}
     <div class="scrim" aria-hidden="true"></div>
     <div class="t-hero-text">
-      <p class="hero-kicker">${escapeHtml(STATUS_LABEL[view.status])}</p>
-      <h1>${escapeHtml(TRAVELLER_HEADLINE[view.status])}</h1>
-      <p>${escapeHtml(TRAVELLER_SUBLINE[view.status])}</p>
+      <p class="hero-kicker">${escapeHtml(kicker)}</p>
+      <h1>${escapeHtml(headline)}</h1>
+      <p>${escapeHtml(subline)}</p>
     </div>
   </div>`;
 }
 
 /** The ink commitment card — the thing that must not be missed. */
-function commitmentCard(presentation?: TravellerPresentation): string {
-  const card = presentation?.commitmentCard;
+function commitmentCard(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  const card = presentation?.commitmentCard ?? (view.whatMattersNow
+    ? { label: 'The reason for the trip', title: view.whatMattersNow }
+    : undefined);
   if (!card) return '';
   const meta = card.meta ? `<p class="cc-meta">${escapeHtml(card.meta)}</p>` : '';
   return `
@@ -60,6 +68,25 @@ function commitmentCard(presentation?: TravellerPresentation): string {
     <p class="cc-label">✦ ${escapeHtml(card.label)}</p>
     <p class="cc-title">${escapeHtml(card.title)}</p>
     ${meta}
+  </div>`;
+}
+
+function requestComposer(view: TravellerTripView): string {
+  if (!view.travellerId) return '';
+  return `
+  <div class="card t-card request-composer" data-ui-section="traveller-request">
+    <p class="composer-kicker">Need something different?</p>
+    <h2>Ask Northstar</h2>
+    <p class="card-sub">Tell us what you would like to change. We will check it against the rest of your trip before anything is altered.</p>
+    <form class="inline-form request-form" method="post" action="/api/traveller/change-request" data-result-target="traveller-request-result">
+      <input type="hidden" name="travellerId" value="${escapeHtml(view.travellerId)}">
+      <input type="hidden" name="tripId" value="${escapeHtml(view.tripId)}">
+      <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+      <label for="traveller-request-text">What would you like us to look into?</label>
+      <textarea id="traveller-request-text" name="text" rows="3" minlength="1" required placeholder="For example: Can I arrive a day earlier?"></textarea>
+      <button type="submit" class="t-btn">Send request</button>
+    </form>
+    <div id="traveller-request-result" class="form-result" role="status" aria-live="polite"></div>
   </div>`;
 }
 
@@ -134,7 +161,7 @@ export function renderTravellerTripBody(view: TravellerTripView, presentation?: 
     <p>${escapeHtml(view.whatChanged)}</p>
   </div>`
     : '';
-  const whatMatters = view.whatMattersNow
+  const whatMatters = view.whatMattersNow && presentation?.commitmentCard
     ? `
   <div class="card t-card">
     <h2>What matters now</h2>
@@ -165,7 +192,7 @@ export function renderTravellerTripBody(view: TravellerTripView, presentation?: 
   return `
 <main class="traveller-shell">
   ${hero(view, presentation)}
-  ${commitmentCard(presentation)}
+  ${commitmentCard(view, presentation)}
   ${whatChanged}
   ${whatMatters}
   ${needsFromYou}
@@ -173,6 +200,7 @@ export function renderTravellerTripBody(view: TravellerTripView, presentation?: 
   ${actions}
   ${resolution}
   ${viabilityBlock(view.remainderViable)}
+  ${requestComposer(view)}
   <p class="t-foot">Updated ${escapeHtml(formatInstant(view.updatedAt))}</p>
 </main>`;
 }

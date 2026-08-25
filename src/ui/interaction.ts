@@ -108,11 +108,13 @@ export function renderFormEnhancementScript(): string {
     var btn = form.querySelector('button[data-confirm]');
     if (btn && btn.dataset.confirm && !confirm(btn.dataset.confirm)) return;
 
-    // Collect hidden inputs into JSON body
+    // Collect the form's product inputs into the JSON body. This includes the
+    // traveller request textarea as well as hidden identifiers.
     var body = {};
-    var inputs = form.querySelectorAll('input[type="hidden"]');
+    var inputs = form.querySelectorAll('input, textarea, select');
     for (var i = 0; i < inputs.length; i++) {
       var input = inputs[i];
+      if (!input.name || input.disabled || input.type === 'submit' || input.type === 'button') continue;
       body[input.name] = input.value;
     }
 
@@ -122,9 +124,18 @@ export function renderFormEnhancementScript(): string {
       body[submitter.name] = submitter.value;
     }
 
-    // Disable button during request
-    var button = form.querySelector('button[type="submit"]');
-    if (button) button.disabled = true;
+    // Reveal the real planning operation while its POST is in flight. The
+    // stages name work performed by that request; no theatrical delay is
+    // introduced and the server response remains the source of truth.
+    var planningProgress = form.parentElement && form.parentElement.querySelector('[data-planning-progress]');
+    if (planningProgress) {
+      form.hidden = true;
+      planningProgress.hidden = false;
+    }
+
+    var resultTarget = form.dataset.resultTarget ? document.getElementById(form.dataset.resultTarget) : null;
+    var buttons = form.querySelectorAll('button[type="submit"]');
+    for (var j = 0; j < buttons.length; j++) buttons[j].disabled = true;
 
     fetch(form.action, {
       method: 'POST',
@@ -138,18 +149,44 @@ export function renderFormEnhancementScript(): string {
     })
     .then(function(result) {
       if (result.ok) {
-        // Success: reload to show updated state
-        window.location.reload();
+        if (planningProgress) planningProgress.dataset.state = 'complete';
+        if (resultTarget) {
+          resultTarget.className = 'form-result is-success';
+          resultTarget.textContent = 'Request received. Northstar is checking it against your trip.';
+          form.reset();
+        } else {
+          // Operator actions need the newly projected case state. The
+          // traveller composer keeps its acknowledgement in place so the
+          // response is readable instead of disappearing during a reload.
+          window.setTimeout(function() { window.location.reload(); }, 160);
+        }
       } else {
-        // Error: show message and re-enable button
-        var msg = result.data.error || result.data.message || 'Request failed';
-        alert('Action failed: ' + msg);
-        if (button) button.disabled = false;
+        var msg = result.data.clarificationNeeded || result.data.error || result.data.message || 'We could not understand that request.';
+        if (resultTarget) {
+          resultTarget.className = 'form-result is-error';
+          resultTarget.textContent = msg;
+        } else {
+          alert('Action failed: ' + msg);
+        }
+        if (planningProgress) {
+          planningProgress.hidden = true;
+          form.hidden = false;
+        }
+        for (var j = 0; j < buttons.length; j++) buttons[j].disabled = false;
       }
     })
     .catch(function(err) {
-      alert('Request failed: ' + err.message);
-      if (button) button.disabled = false;
+      if (resultTarget) {
+        resultTarget.className = 'form-result is-error';
+        resultTarget.textContent = 'The request could not be sent. Your trip has not changed.';
+      } else {
+        alert('Request failed: ' + err.message);
+      }
+      if (planningProgress) {
+        planningProgress.hidden = true;
+        form.hidden = false;
+      }
+      for (var j = 0; j < buttons.length; j++) buttons[j].disabled = false;
     });
   });
 })();

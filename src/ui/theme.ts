@@ -112,6 +112,10 @@ body {
   gap: 24px;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 1px 10px rgba(20, 23, 28, 0.04);
 }
 .topbar .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.1px; display: flex; align-items: baseline; gap: 8px; }
 .topbar .brand .mark { color: var(--watch-f); font-size: 13px; }
@@ -348,6 +352,7 @@ a.chip:hover { border-color: var(--text-faint); }
 
 /* ================= queue + roster rows ================= */
 .queue, .board { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.board { max-height: 680px; overflow-y: auto; scrollbar-gutter: stable; }
 .qrow, .brow {
   display: grid;
   gap: 12px;
@@ -356,6 +361,8 @@ a.chip:hover { border-color: var(--text-faint); }
   border-top: 1px solid var(--line-soft);
   transition: background-color 150ms ease-out;
 }
+a.qrow, a.brow { color: inherit; text-decoration: none; cursor: pointer; }
+a.qrow:focus-visible, a.brow:focus-visible { outline: 2px solid var(--watch-f); outline-offset: -2px; }
 .qrow:first-child, .brow:first-child { border-top: none; }
 .qrow { grid-template-columns: 20px minmax(130px, 0.9fr) minmax(0, 2.2fr) auto; }
 .brow { grid-template-columns: 16px minmax(120px, 0.9fr) minmax(0, 2.2fr) auto; align-items: center; }
@@ -486,6 +493,9 @@ a.chip:hover { border-color: var(--text-faint); }
 
 /* ================= tables ================= */
 .table-wrap { overflow-x: auto; }
+.table-panel { padding: 0; overflow: hidden; }
+.table-scroll { max-height: 660px; overflow: auto; scrollbar-gutter: stable; }
+.table-scroll:focus-visible { outline: 2px solid var(--watch-f); outline-offset: -2px; }
 .traveller-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 560px; }
 .traveller-table th {
   font-family: var(--font-mono);
@@ -497,11 +507,18 @@ a.chip:hover { border-color: var(--text-faint); }
   text-align: left;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
 }
 .traveller-table td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
 .traveller-table tbody tr { transition: background-color 150ms ease-out; }
 .traveller-table tbody tr:hover td { background: var(--surface-2); }
 .traveller-table td { font-variant-numeric: tabular-nums; }
+.traveller-link { color: inherit; font-weight: 650; text-decoration: none; }
+.traveller-link:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.action-indicator { color: var(--alert); margin-left: 6px; }
 
 /* ================= traveller (mobile-first, concierge register) ================= */
 .traveller-shell { max-width: 460px; margin: 0 auto; padding: 20px 16px 56px; }
@@ -638,6 +655,64 @@ button.optcard.opt-miss { box-shadow: inset 3px 0 0 var(--alert-f), var(--shadow
 .choice-note { font-size: 12px; color: var(--text-faint); margin: 4px 0 0; }
 .t-foot { margin-top: 22px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-faint); }
 
+/* ================= product actions + planning transition ================= */
+.btn {
+  appearance: none;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 9px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 150ms ease-out, background-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn:focus-visible { outline: 2px solid var(--watch-f); outline-offset: 2px; }
+.btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-danger { border-color: var(--alert); color: var(--alert); background: var(--alert-bg); }
+.approval-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.planning-kicker, .composer-kicker {
+  margin: 0 0 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.planning-result-title { margin: 0 0 7px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.recovery-actions > p:not(.planning-kicker):not(.planning-result-title):not(.planning-next) { color: var(--text-soft); max-width: 760px; }
+.recovery-actions form { margin-top: 15px; }
+.planning-progress { padding: 4px 0; }
+.planning-progress ol { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; counter-reset: stages; }
+.planning-progress li { counter-increment: stages; border: 1px solid var(--line-soft); border-radius: 10px; padding: 12px; font-size: 12.5px; color: var(--text-soft); background: var(--surface-2); }
+.planning-progress li::before { content: counter(stages, decimal-leading-zero); display: block; margin-bottom: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--active); }
+.planning-skeleton { height: 4px; margin-top: 14px; border-radius: 999px; background: linear-gradient(90deg, var(--active-bg) 20%, var(--ink) 50%, var(--active-bg) 80%); background-size: 220px 100%; animation: ns-shimmer 1.4s linear infinite; }
+.planning-progress[data-state="complete"] .planning-skeleton { background: var(--ok-f); animation: none; }
+.planning-checks { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 10px; }
+.planning-checks li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
+.planning-checks li > span:first-child { color: var(--ok); font-family: var(--font-mono); font-weight: 700; }
+.planning-checks strong, .planning-checks small { display: block; }
+.planning-checks small { margin-top: 2px; color: var(--text-soft); font-size: 12.5px; }
+.planning-next { border-top: 1px solid var(--line-soft); padding-top: 13px; color: var(--text-soft); }
+.funding-panel { border-left: 3px solid var(--watch-f); }
+
+/* ================= traveller request composer ================= */
+.request-composer { padding: 20px; }
+.request-composer h2 { font-family: var(--font-serif); font-size: 21px; margin-bottom: 5px; }
+.request-form { display: grid; gap: 9px; margin-top: 16px; }
+.request-form label { font-size: 12px; font-weight: 650; color: var(--text-soft); }
+.request-form textarea { resize: vertical; min-height: 88px; width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); padding: 12px 13px; font: inherit; line-height: 1.45; }
+.request-form textarea:focus { outline: 2px solid var(--watch-f); outline-offset: 2px; border-color: transparent; background: var(--surface); }
+.form-result { display: none; margin-top: 12px; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; }
+.form-result.is-success { display: block; color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-border); }
+.form-result.is-error { display: block; color: var(--watch); background: var(--watch-bg); border: 1px solid var(--watch-border); }
+
 .footnote { margin-top: 32px; font-size: 12px; color: var(--text-faint); }
 
 /* ================= responsive ================= */
@@ -656,6 +731,9 @@ button.optcard.opt-miss { box-shadow: inset 3px 0 0 var(--alert-f), var(--shadow
   .chain .link + .link { border-left: none; }
   .topbar { padding: 10px 14px; gap: 12px; }
   .readout-ink .big { font-size: 52px; }
+  .topbar .brand small { display: none; }
+  .topbar nav a { padding: 6px 8px; font-size: 12px; }
+  .planning-progress ol { grid-template-columns: 1fr 1fr; }
 }
 
 /* ================= demo banner (dev-only safety strip) ================= */
@@ -667,7 +745,7 @@ button.optcard.opt-miss { box-shadow: inset 3px 0 0 var(--alert-f), var(--shadow
   font-family: var(--font-mono);
   font-size: 11.5px;
   letter-spacing: 0.04em;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   border-bottom: 1px solid;
 }
 .demo-banner.db-replay {
@@ -691,6 +769,10 @@ button.optcard.opt-miss { box-shadow: inset 3px 0 0 var(--alert-f), var(--shadow
   color: inherit;
   text-decoration: underline;
   font-weight: 600;
+}
+@media (max-width: 720px) {
+  .demo-banner { padding: 6px 14px; }
+  .demo-banner .db-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ================= demo control panel (dev-only) ================= */

@@ -269,6 +269,18 @@ test('dashboard renders every status and orders attention first', () => {
   assert.ok(html.includes('Still unclear'), 'uncertainty must be visible');
 });
 
+test('operator rows stay in operator context and neutral rows are not fake links', () => {
+  const activeCaseId = 'case-active-operator';
+  const html = renderOperatorDashboardBody({
+    ...operatorDashboard,
+    trips: operatorDashboard.trips.map((trip, index) =>
+      index === 0 ? { ...trip, activeCaseId } : trip,
+    ),
+  });
+  assert.ok(html.includes(`href="/operator/cases/${activeCaseId}"`));
+  assert.ok(!html.includes('href="/traveller?trip='), 'operator rows must never fall through to traveller UI');
+});
+
 test('switching typed fixture data changes nothing in component code paths', () => {
   const primary = renderOperatorDashboardBody(operatorDashboard);
   const alternate = renderOperatorDashboardBody(operatorDashboardAlt);
@@ -308,6 +320,19 @@ test('case detail tells the full recovery story incl. rejected attractive option
   assert.ok(html.includes('Arrives after the speaking slot'), 'rejection reason must be visible');
   assert.ok(html.includes('data-verdict="VIABLE"'));
   assert.ok(html.includes('Still being checked'), 'UNKNOWN option verdict rendered');
+});
+
+test('planning action exposes truthful in-flight stages before the real response', () => {
+  const disrupted = CASE_FIXTURES.find((fixture) => fixture.id === 'rejected-option')!;
+  const html = renderCaseDetail({
+    state: 'LOADED',
+    data: { ...disrupted.view, options: [], approval: undefined, status: 'DISRUPTED' },
+  });
+  assert.ok(html.includes('data-test="plan-recovery-btn"'));
+  assert.ok(html.includes('data-planning-progress'));
+  assert.ok(html.includes('Checking the changed flight'));
+  assert.ok(html.includes('Comparing recovery options'));
+  assert.ok(html.includes('Checking policy and approval'));
 });
 
 test('approval requirement is explicit with who, why, and amount', () => {
@@ -356,6 +381,23 @@ test('traveller surfaces: disrupted hero, decision buttons, viability', () => {
   assert.ok(awaiting.includes('class="choice-form inline-form"'), 'decision form must be enhancement-intercepted');
   assert.ok(awaiting.includes('name="decision"'), 'choice buttons must post the decision field');
   assert.ok(!awaiting.includes('name="choice"'), 'option labels are display-only, never the wire field');
+});
+
+test('traveller composer uses the existing generic change-request seam', () => {
+  const view = { ...travellerDisruptedEnvelope.data!, travellerId: 'traveller-ui-test' };
+  const html = renderTravellerTrip({ state: 'LOADED', data: view });
+  assert.ok(html.includes('Ask Northstar'));
+  assert.ok(html.includes('action="/api/traveller/change-request"'));
+  assert.ok(html.includes('name="travellerId" value="traveller-ui-test"'));
+  assert.ok(html.includes('name="tripId"'));
+  assert.ok(html.includes('name="text"'));
+});
+
+test('a changed but still viable trip reassures without changing machine status', () => {
+  const view = { ...travellerDisruptedEnvelope.data!, remainderViable: 'VIABLE' as const };
+  const html = renderTravellerTrip({ state: 'LOADED', data: view });
+  assert.ok(html.includes('data-status="DISRUPTED"'));
+  assert.ok(html.includes('Your trip changed, but still works'));
 });
 
 test('mobile traveller page shell carries responsive metadata', () => {

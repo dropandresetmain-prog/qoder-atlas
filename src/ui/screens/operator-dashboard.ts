@@ -129,7 +129,7 @@ function decisionRow({ trip, decision }: PendingDecisionRow, index: number): str
   const amount = decision.amount ? ` · ${escapeHtml(formatMoney(decision.amount))}` : '';
   const when = decision.requestedAt ? formatInstant(decision.requestedAt) : 'timing unconfirmed';
   return `
-  <a href="/operator/cases/${escapeHtml(decision.caseId)}" class="qrow" style="--i:${index}" data-case-id="${escapeHtml(decision.caseId)}" data-test="decision-link">
+  <a href="/operator/cases/${escapeHtml(decision.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(decision.caseId)}" data-test="decision-link">
     <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
     <span class="q-name">${escapeHtml(trip.label ?? trip.tripId)}</span>
     <span class="q-issue">${escapeHtml(decision.description)}${amount}</span>
@@ -159,15 +159,10 @@ function tripRowIssue(trip: OperatorTripView): string {
 function tripRow(trip: OperatorTripView, index: number): string {
   const sub = [trip.travellerNames.join(', '), trip.anchorEventName].filter(Boolean).join(' · ');
   const extras: string[] = [];
-  if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
+  if (trip.systemActivity.length > 0) extras.push(`Latest: ${trip.systemActivity.join(' · ')}`);
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
-  const firstPendingDecision = trip.pendingDecisions[0];
-  const caseLink = firstPendingDecision
-    ? `/operator/cases/${escapeHtml(firstPendingDecision.caseId)}`
-    : `/traveller?trip=${escapeHtml(trip.tripId)}`;
-  return `
-  <a href="${caseLink}" class="brow" style="--i:${index}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}" data-test="trip-link">
+  const content = `
     <span class="b-dot ${FLEET_CELL[trip.status]}" aria-hidden="true"></span>
     <div>
       <div class="b-name">${escapeHtml(trip.label ?? trip.tripId)}</div>
@@ -180,8 +175,11 @@ function tripRow(trip: OperatorTripView, index: number): string {
     <div class="b-right">
       ${statusBadge(trip.status)}
       <div class="b-time">${escapeHtml(formatInstant(trip.updatedAt))}</div>
-    </div>
-  </a>`;
+    </div>`;
+  const rowAttributes = `class="brow" style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}"`;
+  return trip.activeCaseId
+    ? `<a href="/operator/cases/${escapeHtml(trip.activeCaseId)}" ${rowAttributes} data-test="trip-link" aria-label="Open operator case for ${escapeHtml(trip.label ?? trip.tripId)}">${content}</a>`
+    : `<div ${rowAttributes}>${content}</div>`;
 }
 
 /** Dashboard body from a loaded view (also used directly by tests). */

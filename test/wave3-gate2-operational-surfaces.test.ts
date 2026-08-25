@@ -100,7 +100,7 @@ test('Wave 3 Gate 2: approvals queue, activity stream, uncertainties, and provid
     assert.ok(actions.includes('SIGNAL_PROCESSED'), 'the disruption signal is real audit evidence');
     assert.ok(actions.includes('AUTHORITY_DECIDED'), 'the authority decision is real audit evidence');
     const signalEvent = activity.events.find((event) => event.action === 'SIGNAL_PROCESSED')!;
-    assert.equal(signalEvent.summary, 'Disruption recorded and trip state updated');
+    assert.equal(signalEvent.summary, 'Trip change recorded');
     for (const event of activity.events) {
       assert.ok(event.summary.length > 0, 'every event carries user-facing copy (never empty)');
     }

@@ -146,7 +146,7 @@ function optionCard(option: RecoveryOptionView): string {
     ? `<p class="rejection"><strong>Why not:</strong> ${escapeHtml(option.rejectionReason)}</p>`
     : '';
   return `
-  <div class="${classes}" data-option-id="${escapeHtml(option.id)}" data-verdict="${escapeHtml(option.verdict)}">
+  <div class="${classes}" data-option-id="${escapeHtml(option.id)}" data-verdict="${escapeHtml(option.verdict)}" data-test="strategy-option">
     <div class="option-head">
       <h3 class="option-title">${escapeHtml(option.title)}</h3>
       ${recommended}
@@ -253,8 +253,14 @@ function recoveryActionsPanel(view: CaseDetailView): string | undefined {
   if (view.planningExhausted && view.options.length === 0) {
     return `
     <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
-      <p class="callout-title">No safe automated recovery</p>
-      <p>Northstar planned this case but found no recovery action it can take automatically without risking a must-not-miss objective. Nothing has been changed. This case needs a human decision.</p>
+      <p class="planning-kicker">Northstar's review</p>
+      <p class="planning-result-title">No safe automated recovery yet</p>
+      <ul class="planning-checks" aria-label="Planning checks completed">
+        <li><span aria-hidden="true">✓</span><span><strong>Changed booking checked</strong><small>The provider change is reflected in the trip.</small></span></li>
+        <li><span aria-hidden="true">✓</span><span><strong>Rest of the trip checked</strong><small>The failed trip conditions above still need to be protected.</small></span></li>
+        <li><span aria-hidden="true">—</span><span><strong>Recovery inventory compared</strong><small>No candidate was returned for safe deterministic checking.</small></span></li>
+      </ul>
+      <p class="planning-next"><strong>Nothing has been changed.</strong> The trip remains unresolved and needs direct operator support.</p>
     </div>`;
   }
 
@@ -262,13 +268,24 @@ function recoveryActionsPanel(view: CaseDetailView): string | undefined {
   if (view.status === 'DISRUPTED' && view.options.length === 0) {
     return `
     <div class="panel recovery-actions" data-ui-section="recovery-actions">
-      <p class="callout-title">Ready to plan recovery?</p>
-      <p>The system will analyze the disruption and generate recovery options.</p>
+      <p class="planning-kicker">Next step</p>
+      <p class="planning-result-title">Check recovery options</p>
+      <p>Northstar will compare the changed booking with the rest of this trip, then check any candidate against timing, policy and approval.</p>
       <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form">
         <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
         <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-        <button type="submit" class="btn btn-primary" data-test="plan-recovery-btn">Plan Recovery</button>
+        <button type="submit" class="btn btn-primary" data-test="plan-recovery-btn">Plan recovery</button>
       </form>
+      <div class="planning-progress" data-planning-progress hidden role="status" aria-live="polite">
+        <p class="planning-result-title">Checking the whole trip</p>
+        <ol>
+          <li>Checking the changed flight</li>
+          <li>Checking the rest of the trip</li>
+          <li>Comparing recovery options</li>
+          <li>Checking policy and approval</li>
+        </ol>
+        <div class="planning-skeleton" aria-hidden="true"></div>
+      </div>
     </div>`;
   }
 
@@ -280,18 +297,24 @@ function recoveryActionsPanel(view: CaseDetailView): string | undefined {
 
     return `
     <div class="panel recovery-actions" data-ui-section="recovery-actions">
-      <p class="callout-title">Ready to begin recovery?</p>
-      <p>The system has identified a recommended strategy. Click below to begin the recovery flow.</p>
+      <p class="planning-kicker">Recommended option ready</p>
+      <p class="planning-result-title">Begin the checked recovery</p>
+      <p>Northstar has identified the best viable option shown above. Starting it will run the required approval and execution checks.</p>
       <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
         <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
         <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
         <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-        <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin Strategy</button>
+        <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin recovery</button>
       </form>
     </div>`;
   }
 
   return undefined;
+}
+
+function fundingPanel(view: CaseDetailView): string | undefined {
+  if (!view.funding) return undefined;
+  return `<div class="panel funding-panel"><p class="callout-title">How this change is funded</p><p>${escapeHtml(view.funding.summary)}</p></div>`;
 }
 
 /** Case detail body from a loaded, validated view. */
@@ -328,7 +351,8 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     'Options on the table',
     view.options.length > 0 ? view.options.map(optionCard).join('') : undefined,
   )}
-  ${optionalSection('Recovery Actions', recoveryActionsPanel(view))}
+  ${optionalSection('Recovery planning', recoveryActionsPanel(view))}
+  ${optionalSection('Cost and funding', fundingPanel(view))}
   ${optionalSection('Approval', approvalPanel(view.approval, view.caseId))}
   ${optionalSection('What is happening now', actionsSection(view.actions))}
   ${uncertaintyList(view.uncertainties)}

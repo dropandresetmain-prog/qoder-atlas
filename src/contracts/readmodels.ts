@@ -49,6 +49,8 @@ export interface OperatorDecisionRequest {
 
 export interface OperatorTripView {
   tripId: EntityId;
+  /** Open operator case for this trip. Absent when no case is actionable. */
+  activeCaseId?: EntityId;
   label?: string;
   travellerNames: string[];
   anchorEventName?: string;
@@ -163,6 +165,8 @@ export interface TravellerInputRequest {
 
 export interface TravellerTripView {
   tripId: EntityId;
+  /** Present only when this trip has one unambiguous traveller principal. */
+  travellerId?: EntityId;
   status: ReadModelStatus;
   whatChanged?: string;
   whatMattersNow?: string;

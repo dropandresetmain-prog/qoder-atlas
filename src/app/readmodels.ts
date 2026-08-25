@@ -28,6 +28,7 @@ import type {
   CaseCheckResult,
   CaseCheckView,
   CaseDetailView,
+  ChainLinkView,
   RecoveryOptionView,
   ApprovalRequirementView,
   ActionProgressView,
@@ -48,6 +49,7 @@ import {
   presentCandidateRejection,
   presentConstraintLabel,
   presentResolution,
+  presentSignalChange,
   presentUncertainties,
 } from './presentation.ts';
 
@@ -256,7 +258,7 @@ export async function projectOperatorDashboard(
     if (pendingDecisions.length > 0) summary.awaitingDecision += 1;
 
     const auditTrail = await deps.audit.query({ subject: trip.id, limit: 8 });
-    const systemActivity = auditTrail.map((entry) => presentActivity(entry.action));
+    const systemActivity = [...new Set(auditTrail.map((entry) => presentActivity(entry.action)))];
 
     const assessment = await new ImpactEngine({
       trips: deps.snapshot.trips,
@@ -273,11 +275,12 @@ export async function projectOperatorDashboard(
 
     trips.push({
       tripId: trip.id,
+      ...(recoveryCase && recoveryCase.status !== 'RESOLVED' ? { activeCaseId: recoveryCase.id } : {}),
       ...(trip.label ? { label: trip.label } : {}),
       travellerNames,
       ...(anchorEventName ? { anchorEventName } : {}),
       status,
-      ...(lastSignal ? { whatChanged: lastSignal.summary } : {}),
+      ...(lastSignal ? { whatChanged: presentSignalChange(lastSignal) } : {}),
       affectedItems: recoveryCase
         ? recoveryCase.affectedElementIds
             .map((id) => trip.elements.find((element) => element.id === id))
@@ -294,6 +297,73 @@ export async function projectOperatorDashboard(
   }
 
   return { generatedAt, summary, trips };
+}
+
+const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
+  NONE: 'Not booked',
+  HELD: 'Held while options are checked',
+  CONFIRMED: 'Confirmed',
+  CHANGED: 'Changed',
+  CANCELLED: 'Cancelled',
+  COMPLETED: 'Completed',
+  UNKNOWN: 'Unconfirmed',
+};
+
+function chainStateFor(element: TripElement): ChainLinkView['state'] {
+  if (element.status === 'INVALID' || element.reservationState === 'CANCELLED') return 'BROKEN';
+  if (element.status === 'AT_RISK' || element.reservationState === 'CHANGED') return 'AT_RISK';
+  if (element.reservationState === 'HELD') return 'PROPOSED';
+  if (element.status === 'UNKNOWN' || element.reservationState === 'UNKNOWN') return 'UNKNOWN';
+  if (element.elementKind !== 'ENGAGEMENT' && element.reservationState === 'NONE') return 'UNBOOKED';
+  return 'CONFIRMED';
+}
+
+async function placeLabel(deps: ReadModelDependencies, placeId: EntityId): Promise<string> {
+  const entry = await deps.snapshot.entities.get('PLACE', placeId);
+  return entry?.entityType === 'PLACE' ? (entry.entity.name ?? 'Place unconfirmed') : 'Place unconfirmed';
+}
+
+/** Generic authoritative trip chain used by every operator case. */
+async function projectJourneyChain(deps: ReadModelDependencies, trip: Trip): Promise<ChainLinkView[]> {
+  const chain: ChainLinkView[] = [];
+  const orderedElements = [...trip.elements].sort((a, b) => {
+    const order: Record<TripElement['elementKind'], number> = { TRANSPORT_LEG: 0, STAY: 1, ENGAGEMENT: 2 };
+    return order[a.elementKind] - order[b.elementKind];
+  });
+  for (const element of orderedElements) {
+    if (element.elementKind === 'TRANSPORT_LEG') {
+      const origin = await placeLabel(deps, element.data.originPlaceId);
+      const destination = await placeLabel(deps, element.data.destinationPlaceId);
+      const mode = TRANSPORT_MODE_LABEL[element.data.mode];
+      chain.push({
+        id: element.id,
+        kind: mode.charAt(0).toUpperCase() + mode.slice(1),
+        label: `${origin} → ${destination}`,
+        detail: RESERVATION_LABEL[element.reservationState],
+        state: chainStateFor(element),
+      });
+      continue;
+    }
+    if (element.elementKind === 'STAY') {
+      chain.push({
+        id: element.id,
+        kind: 'Stay',
+        label: await placeLabel(deps, element.data.placeId),
+        detail: RESERVATION_LABEL[element.reservationState],
+        state: chainStateFor(element),
+      });
+      continue;
+    }
+    chain.push({
+      id: element.id,
+      kind: 'Commitment',
+      label: element.data.title,
+      detail: element.importance === 'REQUIRED' ? 'Must not be missed' : 'Part of this trip',
+      state: chainStateFor(element),
+      commitment: true,
+    });
+  }
+  return chain;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +529,7 @@ export async function projectCaseDetail(
     .filter((statement): statement is string => Boolean(statement));
 
   const isChangeRequest = triggeringSignals.some((s) => s.kind === 'TRAVELLER_INPUT');
+  const chain = await projectJourneyChain(deps, trip);
 
   // Honest "no automated recovery path" end-state: the planning loop has run
   // (the case moved past ASSESSING) yet produced no actionable strategy and
@@ -477,12 +548,13 @@ export async function projectCaseDetail(
     ...(trip.label ? { tripLabel: trip.label } : {}),
     travellerNames,
     status: statusFromCase(recoveryCase.status, isChangeRequest),
-    ...(triggeringSignals[0] ? { whatChanged: triggeringSignals[0].summary } : {}),
+    ...(triggeringSignals[0] ? { whatChanged: presentSignalChange(triggeringSignals[0]) } : {}),
     affectedItems: recoveryCase.affectedElementIds
       .map((id) => trip.elements.find((element) => element.id === id))
       .filter((element): element is TripElement => Boolean(element))
       .map(describeElement),
     ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
+    ...(chain.length > 0 ? { chain } : {}),
     checks,
     options,
     ...(approval ? { approval } : {}),
@@ -535,6 +607,12 @@ export async function projectTravellerTrip(
     }
   }
   if (!whatMattersNow && recoveryCase?.resolution) whatMattersNow = presentResolution(recoveryCase.resolution);
+  if (!whatMattersNow) {
+    const requiredCommitment = trip.elements.find(
+      (element) => element.elementKind === 'ENGAGEMENT' && element.importance === 'REQUIRED',
+    );
+    if (requiredCommitment?.elementKind === 'ENGAGEMENT') whatMattersNow = requiredCommitment.data.title;
+  }
 
   const actionsInProgress: string[] = [];
   const inputRequested: TravellerInputRequest[] = [];
@@ -582,8 +660,9 @@ export async function projectTravellerTrip(
 
   return {
     tripId,
+    ...(trip.travellerIds.length === 1 ? { travellerId: trip.travellerIds[0] } : {}),
     status,
-    ...(lastSignal ? { whatChanged: lastSignal.summary } : {}),
+    ...(lastSignal ? { whatChanged: presentSignalChange(lastSignal) } : {}),
     ...(whatMattersNow ? { whatMattersNow } : {}),
     actionsInProgress,
     inputRequested,

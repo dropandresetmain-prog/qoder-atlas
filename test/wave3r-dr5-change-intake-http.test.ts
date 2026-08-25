@@ -146,3 +146,36 @@ test('DR-5-HTTP.5: CHANGE_REQUESTED stays distinct from supplier DISRUPTED in th
     assert.equal(spec.trip.id, TRIP_A);
   });
 });
+
+test('DR-5-HTTP.6: REPLAY keeps traveller intake deterministic even when a live model credential exists', async () => {
+  const replayWithCredential = AppConfigSchema.parse({
+    ...runtimeConfig,
+    providers: {
+      ...runtimeConfig.providers,
+      modelStudio: {
+        apiKey: 'configured-but-forbidden-in-replay',
+        model: 'test-model',
+        baseUrl: 'http://127.0.0.1:1',
+      },
+    },
+  });
+  const composed = await composeAppRuntime(replayWithCredential);
+  const server = createAppServer(replayWithCredential, composed.endpoints);
+  await new Promise<void>((resolvePromise) => server.listen(0, '127.0.0.1', resolvePromise));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const res = await postJson(base, '/api/traveller/change-request', {
+      travellerId: TRAVELLER_A,
+      tripId: TRIP_A,
+      text: 'I need to arrive by 2026-09-01T20:00:00+09:00 for the opening session.',
+      at: AT,
+    });
+    assert.equal(res.status, 200, 'the deterministic interpreter handled the request without a model call');
+    assert.equal(res.body['accepted'], true);
+  } finally {
+    await new Promise<void>((resolvePromise, reject) =>
+      server.close((error) => (error ? reject(error) : resolvePromise())),
+    );
+    composed.db.close();
+  }
+});

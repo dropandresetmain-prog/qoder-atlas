@@ -104,6 +104,7 @@ function summaryTiles(summary: ProgrammeStatusSummary): string {
       'unknown',
     ] as ReadonlyArray<keyof Omit<ProgrammeStatusSummary, 'total'>>
   )
+    .filter((key) => summary[key] > 0)
     .map((key) => tile(key, summary[key], PROGRAMME_TILE_LABEL[key], SUMMARY_TILE_TONE[key]))
     .join('');
   return `
@@ -146,15 +147,14 @@ function travellerRow(row: ProgrammeTravellerView): string {
     ? `<ul class="plain-list">${row.uncertainties.map((u) => `<li>${escapeHtml(u)}</li>`).join('')}</ul>`
     : `<p class="empty-note">—</p>`;
   const firstActiveCaseId = row.activeCaseIds[0];
-  const caseLink = firstActiveCaseId
-    ? `/operator/cases/${escapeHtml(firstActiveCaseId)}`
-    : `/traveller?trip=${escapeHtml(row.tripId)}`;
   const actionIndicator = row.decisionsRequired > 0
     ? `<span class="action-indicator" title="${row.decisionsRequired} action${row.decisionsRequired === 1 ? '' : 's'} required">⚡</span>`
     : '';
   return `
     <tr data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}">
-      <td><a href="${caseLink}" class="traveller-link" data-test="programme-traveller-link">${escapeHtml(row.travellerName)}${actionIndicator}</a></td>
+      <td>${firstActiveCaseId
+        ? `<a href="/operator/cases/${escapeHtml(firstActiveCaseId)}" class="traveller-link" data-test="programme-traveller-link">${escapeHtml(row.travellerName)}${actionIndicator}</a>`
+        : `<span class="traveller-name">${escapeHtml(row.travellerName)}</span>`}</td>
       <td>${statusBadge(row.status)}</td>
       <td>${row.activeCaseIds.length}</td>
       <td>${row.decisionsRequired}</td>
@@ -177,11 +177,13 @@ function travellerTable(rows: readonly ProgrammeTravellerView[]): string {
   return `
   <section class="section" aria-label="Travellers">
     <h2>Travellers</h2>
-    <div class="panel" data-ui-section="traveller-table">
+    <div class="panel table-panel" data-ui-section="traveller-table">
+      <div class="table-scroll" tabindex="0" aria-label="Programme traveller roster">
       <table class="traveller-table">
         ${header}
         <tbody>${sorted.map(travellerRow).join('')}</tbody>
       </table>
+      </div>
       <p class="footnote">Ordered by what needs attention first; ties broken by traveller id.</p>
     </div>
   </section>`;

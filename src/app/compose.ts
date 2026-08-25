@@ -171,6 +171,19 @@ export async function composeAppRuntime(
     }
   }
 
+  // Navigation must survive process restarts. `seededProgrammes` only records
+  // work done during this boot, so derive persistent programme destinations
+  // from authoritative trips and order them by programme size.
+  const programmeTripCounts = new Map<EntityId, number>();
+  for (const summary of await trips.listTrips()) {
+    const trip = await trips.getTrip(summary.tripId);
+    if (!trip?.anchorEventId) continue;
+    programmeTripCounts.set(trip.anchorEventId, (programmeTripCounts.get(trip.anchorEventId) ?? 0) + 1);
+  }
+  const programmeEventIds = [...programmeTripCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([eventId]) => eventId);
+
   // Capability wiring: Atlas always present (REPLAY is credential-free);
   // Google Routes contributes only when configured or recorded; Nuitée
   // (liteAPI) replays the curated hotel corpus without credentials and fails
@@ -341,7 +354,7 @@ export async function composeAppRuntime(
   }
   const demo: DemoSurface = {
     scenarioNames: () => [...scenarioSpecs.keys()],
-    programmeEventIds: () => seededProgrammes.map((p) => p.anchorEventId),
+    programmeEventIds: () => [...programmeEventIds],
     plannerMode: () => useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     async reset(at) {
       try {
@@ -469,7 +482,10 @@ export async function composeAppRuntime(
       },
     }),
     traveller: createChangeIntakeHandlers({
-      modelClient,
+      // REPLAY is credential-free end to end. Passing a configured LIVE
+      // client here would let natural-language intake escape the deterministic
+      // boundary even though recovery planning correctly stays local.
+      ...(useLivePlanner ? { modelClient } : {}),
       trips,
       entities,
       signals,

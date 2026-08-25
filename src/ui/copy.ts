@@ -204,6 +204,8 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'strategyid',
   'signalid',
   'offerid',
+  'provider flight state:',
+  'schedule_changed',
   // G3R-Closure fix H: raw engine enums and safety-state vocabulary must
   // never reach organiser/traveller screens. These are the underscore-form
   // enum literals (lowercased by the gate) — they can never be natural

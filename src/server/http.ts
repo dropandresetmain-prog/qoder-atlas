@@ -185,7 +185,14 @@ export interface AppEndpoints {
   demo?: DemoSurface;
 }
 
-const PAGE_LINKS = { dashboard: '/operator', traveller: '/traveller' };
+function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: string; traveller: string } {
+  const eventId = seededProgrammeEventId(endpoints);
+  return {
+    dashboard: '/operator',
+    ...(eventId ? { programme: `/programme?event=${encodeURIComponent(eventId)}` } : {}),
+    traveller: '/traveller',
+  };
+}
 
 /** Build the demo banner options from the current config. */
 function demoBannerOptions(config: AppConfig, endpoints?: AppEndpoints): { demoBanner: { adapterMode: 'LIVE' | 'RECORD' | 'REPLAY'; plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK' } } {
@@ -277,7 +284,7 @@ async function handle(
   if (req.method === 'GET' && url.pathname === '/operator') {
     const view = await endpoints.operatorDashboard(endpoints.now());
     const body = renderOperatorDashboardBody(view);
-    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body));
+    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && segments[0] === 'operator' && segments[1] === 'cases' && segments[2]) {
@@ -286,7 +293,7 @@ async function handle(
     const body = view
       ? renderCaseDetailBody(view)
       : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${segments[2]} is known`, generatedAt: at });
-    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body));
+    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
 
@@ -315,7 +322,7 @@ async function handle(
     sendHtml(
       res,
       outcome.status === 200 ? 200 : outcome.status === 404 ? 404 : 400,
-      renderPage({ title: 'Programme', active: 'dashboard', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body),
+      renderPage({ title: 'Programme', active: 'programme', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body),
     );
     return;
   }
@@ -331,7 +338,7 @@ async function handle(
     sendHtml(
       res,
       view ? 200 : 404,
-      renderPage({ title: 'Your trip', active: 'traveller', surface: 'traveller', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) }, body),
+      renderPage({ title: 'Your trip', active: 'traveller', surface: 'traveller', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body),
     );
     return;
   }
@@ -633,7 +640,7 @@ async function handle(
       res,
       200,
       renderPage(
-        { title: 'Demo controls', active: 'dashboard', links: PAGE_LINKS, ...demoBannerOptions(config, endpoints) },
+        { title: 'Demo controls', active: 'dashboard', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) },
         body,
       ),
     );

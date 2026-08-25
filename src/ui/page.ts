@@ -9,10 +9,11 @@ import { THEME_CSS } from './theme.ts';
 import { escapeHtml } from './html.ts';
 import { renderFormEnhancementScript } from './interaction.ts';
 
-export type NavTarget = 'dashboard' | 'case' | 'traveller';
+export type NavTarget = 'dashboard' | 'programme' | 'case' | 'traveller';
 
 export interface PageLinks {
   dashboard?: string;
+  programme?: string;
   traveller?: string;
 }
 
@@ -36,15 +37,18 @@ export interface PageOptions {
 
 export function renderPage(options: PageOptions, bodyHtml: string): string {
   const dashboardHref = options.links?.dashboard ?? '#';
+  const programmeHref = options.links?.programme;
   const travellerHref = options.links?.traveller ?? '#';
   const isOperator = options.surface !== 'traveller';
   const nav = isOperator
     ? `<nav aria-label="Main">
-        <a href="${escapeHtml(dashboardHref)}" class="${options.active === 'dashboard' ? 'is-active' : ''}">Operations overview</a>
-        <a href="${escapeHtml(travellerHref)}" class="${options.active === 'traveller' ? 'is-active' : ''}">Traveller view</a>
+        <a href="${escapeHtml(dashboardHref)}" class="${options.active === 'dashboard' || options.active === 'case' ? 'is-active' : ''}">Operations</a>
+        ${programmeHref ? `<a href="${escapeHtml(programmeHref)}" class="${options.active === 'programme' ? 'is-active' : ''}">Programme</a>` : ''}
+        <a href="${escapeHtml(travellerHref)}" class="${options.active === 'traveller' ? 'is-active' : ''}">Traveller preview</a>
       </nav>`
     : `<nav aria-label="Main">
         <a href="${escapeHtml(dashboardHref)}">Operator view</a>
+        ${programmeHref ? `<a href="${escapeHtml(programmeHref)}">Programme</a>` : ''}
       </nav>`;
   const banner = options.demoBanner
     ? renderDemoBanner(options.demoBanner)
@@ -58,7 +62,7 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
 <style>${THEME_CSS}</style>
 </head>
 <body class="${isOperator ? 'surface-operator' : 'surface-traveller'}">
-<header class="topbar">
+<header class="topbar" data-surface="${isOperator ? 'operator' : 'traveller'}">
   <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar<small>keeps the whole trip working</small></div>
   ${nav}
 </header>

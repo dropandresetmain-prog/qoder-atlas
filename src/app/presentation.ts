@@ -1,5 +1,6 @@
 /** Deterministic boundary between operational evidence and user-facing copy. */
 import type { Constraint } from '../domain/constraints.ts';
+import type { TripSignal } from '../operational/signal.ts';
 import type { CaseResolution } from '../operational/case.ts';
 import type { CandidateRejectionEvidence } from './planningLoop.ts';
 
@@ -38,8 +39,8 @@ export function presentApprovalReason(): string {
 
 export function presentActivity(action: string): string {
   const copy: Record<string, string> = {
-    SIGNAL_PROCESSED: 'Disruption recorded and trip state updated',
-    MUTATION_APPLIED: 'Authoritative trip state updated',
+    SIGNAL_PROCESSED: 'Trip change recorded',
+    MUTATION_APPLIED: 'Trip details updated',
     PLANNING_COMPLETED: 'Recovery options planned and checked',
     AUTHORITY_DECIDED: 'Approval requirement determined',
     APPROVAL_RECORDED: 'Approval decision recorded',
@@ -60,4 +61,31 @@ export function presentAction(operation: string): string {
     'simulation.provider_action': 'Applying the provider change',
   };
   return copy[operation] ?? 'Applying the travel change';
+}
+
+/**
+ * Provider and engine signal vocabulary is useful audit evidence, not product
+ * copy. Preserve an authored human sentence when one exists; otherwise map
+ * the stable signal kind to a calm, provider-neutral explanation.
+ */
+export function presentSignalChange(signal: TripSignal): string {
+  const summary = signal.summary?.trim();
+  const looksInternal = summary
+    ? /provider\s+(flight|stay)\s+state\s*:|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/i.test(summary)
+    : true;
+  if (summary && !looksInternal) return summary;
+
+  const copy: Record<TripSignal['kind'], string> = {
+    FLIGHT_CANCELLATION: 'The airline cancelled the flight.',
+    FLIGHT_SCHEDULE_CHANGE: 'The airline changed the flight schedule.',
+    FLIGHT_DELAY: 'The airline reported a delay.',
+    BOOKING_STATE_CHANGE: 'The provider changed the booking status.',
+    PROVIDER_EVENT: 'A travel provider reported a change.',
+    WEATHER_EVENT: 'Weather may affect this trip.',
+    TRAVELLER_INPUT: 'The traveller asked for a trip change.',
+    OPERATOR_INPUT: 'The operator reported a trip change.',
+    ANCHOR_COMMITMENT_CHANGE: 'An event commitment changed.',
+    OTHER: 'New information changed this trip.',
+  };
+  return copy[signal.kind];
 }

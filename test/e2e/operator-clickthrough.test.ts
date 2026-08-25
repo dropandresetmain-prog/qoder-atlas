@@ -90,24 +90,23 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   const dashboardHtml = await page.content();
   assert.ok(dashboardHtml.includes('DISRUPTED'), 'dashboard shows DISRUPTED status');
 
-  // Step 3: Navigate directly to the case detail page
-  // (The dashboard trip row doesn't link to cases until there are pending decisions,
-  // which only appear after the begin step. For the test, we navigate directly.)
+  // Step 3: Navigate directly to the case detail page. Dashboard routing is
+  // covered separately; this flow keeps the known case id for later checks.
   await page.goto(`${baseUrl}/operator/cases/${caseId}`);
   await page.waitForLoadState('networkidle');
 
-  // Step 4: Verify the case detail shows the "Plan Recovery" button (no options yet)
+  // Step 4: Verify the case detail shows the planning button (no options yet)
   await page.waitForSelector('[data-test="plan-recovery-btn"]', { timeout: 5000 });
   const caseHtml = await page.content();
-  assert.ok(caseHtml.includes('Ready to plan recovery?'), 'case shows recovery actions panel');
-  assert.ok(caseHtml.includes('Plan Recovery'), 'case shows Plan Recovery button');
+  assert.ok(caseHtml.includes('Check recovery options'), 'case shows recovery actions panel');
+  assert.ok(caseHtml.includes('Plan recovery'), 'case shows Plan recovery button');
 
   // Verify the form targets the real endpoint
   const planForm = page.locator('[data-test="plan-recovery-form"]');
   const planFormAction = await planForm.getAttribute('action');
   assert.ok(planFormAction?.includes('/api/runtime/plan'), `plan form action targets real endpoint: ${planFormAction}`);
 
-  // Step 5: Click the "Plan Recovery" button
+  // Step 5: Click the planning button
   const planButton = page.locator('[data-test="plan-recovery-btn"]');
   // G3R-Closure fix I: synchronize on the ACTUAL form response, then on the
   // post-decision DOM state — never on network-idle alone (the enhancement
@@ -121,20 +120,20 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   const planResult = await planResponse;
   assert.equal(planResult.status(), 200, 'plan endpoint accepted the request');
 
-  // Wait for the "Begin Strategy" button to appear (indicates planning succeeded and options exist)
+  // Wait for the begin-recovery button (planning succeeded and options exist).
   await page.waitForSelector('[data-test="begin-strategy-btn"]', { timeout: 10000 });
 
-  // Step 6: Verify the case now shows options and "Begin Strategy" button
+  // Step 6: Verify the case now shows options and a checked recovery action.
   const afterPlanHtml = await page.content();
-  assert.ok(afterPlanHtml.includes('Ready to begin recovery?'), 'case shows begin strategy panel after planning');
-  assert.ok(afterPlanHtml.includes('Begin Strategy'), 'case shows Begin Strategy button');
+  assert.ok(afterPlanHtml.includes('Begin the checked recovery'), 'case shows begin recovery panel after planning');
+  assert.ok(afterPlanHtml.includes('Begin recovery'), 'case shows Begin recovery button');
 
   // Verify the form targets the real endpoint
   const beginForm = page.locator('[data-test="begin-strategy-form"]');
   const formAction = await beginForm.getAttribute('action');
   assert.ok(formAction?.includes('/api/runtime/begin'), `form action targets real endpoint: ${formAction}`);
 
-  // Step 7: Click the "Begin Strategy" button
+  // Step 7: Click the begin-recovery button.
   const beginButton = page.locator('[data-test="begin-strategy-btn"]');
   // G3R-Closure fix I: wait for the actual begin response, then the stable
   // approval-panel DOM state (the script's reload lands before this resolves).
@@ -328,7 +327,7 @@ test('DR-4: page reload preserves state (browser refresh test)', async () => {
 
   // Verify the same elements are present
   assert.ok(reloadedHtml.includes('data-ui-section="recovery-actions"'), 'recovery-actions panel present after reload');
-  assert.ok(reloadedHtml.includes('Plan Recovery') || reloadedHtml.includes('Begin Strategy'), 'recovery action present after reload');
+  assert.ok(reloadedHtml.includes('Plan recovery') || reloadedHtml.includes('Begin recovery'), 'recovery action present after reload');
 
   await page.close();
 });

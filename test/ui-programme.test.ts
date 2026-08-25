@@ -119,6 +119,15 @@ test('deterministic status ordering puts attention first, resolved last', () => 
   assert.ok(planningAt > 0 && planningAt < readyAt);
 });
 
+test('programme links only active cases and keeps operator context', () => {
+  const html = renderProgrammeBody(healthyProgramme);
+  for (const traveller of healthyProgramme.travellers) {
+    const caseId = traveller.activeCaseIds[0];
+    if (caseId) assert.ok(html.includes(`href="/operator/cases/${caseId}"`));
+  }
+  assert.ok(!html.includes('href="/traveller?trip='));
+});
+
 test('endangered-commitments section is omitted when the list is empty', () => {
   const html = renderProgrammeBody(healthyProgramme);
   assert.ok(!html.includes('data-ui-section="endangered-commitments"'));

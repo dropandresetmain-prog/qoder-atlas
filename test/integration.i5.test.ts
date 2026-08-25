@@ -285,6 +285,7 @@ test('i5: operator dashboard and case detail project real state through the loop
   assert.equal(dashboard.trips.length, 1);
   const tripView = dashboard.trips[0]!;
   assert.equal(tripView.status, 'RECOVERING');
+  assert.equal(tripView.activeCaseId, caseId, 'active operator rows expose their operator-case destination');
   assert.equal(tripView.whatChanged, setup.spec.disruption.signal.summary);
   assert.ok(tripView.affectedItems.length > 0, 'affected items come from the persisted case');
   assert.equal(tripView.travellerResponseStatus, 'AWAITING');
@@ -315,10 +316,13 @@ test('i5: operator dashboard and case detail project real state through the loop
   assert.ok(detail.checks.some((check) => check.result === 'FAIL'), 'disrupted constraint is visible pre-recovery');
   assert.equal(detail.actions.length, 1);
   assert.equal(detail.actions[0]!.state, 'QUEUED');
+  assert.ok(detail.chain && detail.chain.length > 0, 'authoritative trip elements project into the journey chain');
+  assert.equal(detail.chain!.at(-1)!.commitment, true, 'the commitment closes the journey chain');
 
   // Traveller view pre-approval: input requested, remainder not viable yet.
   const travellerView = (await projectTravellerTrip(readDeps, setup.spec.trip.id, NOW))!;
   assert.equal(travellerView.status, 'RECOVERING');
+  assert.equal(travellerView.travellerId, setup.spec.trip.travellerIds[0]);
   assert.equal(travellerView.inputRequested.length, 1);
   assert.deepEqual(travellerView.inputRequested[0]!.options, ['Approve', 'Decline']);
   assert.equal(travellerView.remainderViable, 'NOT_VIABLE');
