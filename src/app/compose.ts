@@ -178,7 +178,14 @@ export async function composeAppRuntime(
     join(config.fixturesDir, 'recordings'),
     config.recordingsDir,
   ];
-  const recordingStore = new FileRecordingStore({ readDirs: recordingReadDirs });
+  // RECORD persists sanitized provider-shaped payloads under recordingsDir so
+  // later REPLAY shares the same normalizer path. LIVE/REPLAY never require a
+  // writable store; writeDir is still set so RECORD does not fail closed on a
+  // read-only store misconfiguration.
+  const recordingStore = new FileRecordingStore({
+    readDirs: recordingReadDirs,
+    writeDir: config.recordingsDir,
+  });
   const flight = new AtlasFlightAdapter({
     mode: config.adapterMode,
     store: recordingStore,

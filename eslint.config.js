@@ -10,6 +10,7 @@ export default tseslint.config(
       'data/**',
       'recordings/**',
       'coverage/**',
+      'output/**',
       '.qoder/**',
     ],
   },

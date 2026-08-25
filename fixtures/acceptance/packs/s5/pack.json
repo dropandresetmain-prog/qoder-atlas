@@ -1,0 +1,13 @@
+{
+  "packId": "s5-stay-until-sunday",
+  "version": "1.0.0",
+  "catalogueId": "S5",
+  "trigger": "traveller_change_request",
+  "mvpBoundary": "stretch_may_be_simulated",
+  "payload": {
+    "travellerId": "trv-evt-w3-demo-draft-5",
+    "tripId": "trip-trv-evt-w3-demo-draft-5",
+    "text": "Can I stay until Sunday? I would like to extend personally after the conference.",
+    "at": "2026-09-04T11:00:00+00:00"
+  }
+}

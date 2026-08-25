@@ -1,0 +1,7 @@
+{
+  "packId": "northstar-global-programme",
+  "version": "1.0.0",
+  "description": "Global input pack: canonical synthetic-summit programme references. Facts live under programmes/synthetic-summit; this pack declares the version boundary for acceptance runs.",
+  "programmeRef": "../../programmes/synthetic-summit",
+  "anchorEventId": "evt-w3-demo"
+}

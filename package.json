@@ -13,7 +13,10 @@
     "dev": "node src/main.ts",
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts",
+    "acceptance:run": "node --experimental-strip-types scripts/acceptance-run.ts",
+    "acceptance:secret-scan": "node scripts/wave3r-recording-secret-scan.mjs"
   },
   "dependencies": {
     "zod": "^4.1.0"

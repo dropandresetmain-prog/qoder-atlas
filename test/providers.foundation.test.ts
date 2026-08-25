@@ -198,7 +198,12 @@ test('C1: sanitization redacts secrets and keeps provider shape', () => {
   assert.deepEqual(sanitized.list, [REDACTED, 'ok']);
   assert.equal(containsAnySecret(sanitized, ['cid-1', 'shh']), false);
   assert.equal(containsAnySecret(raw, ['shh']), true);
-  assert.equal(sanitizeRaw(raw, []), raw, 'no secrets means untouched payload');
+  // Sensitive key names are redacted even without an explicit secrets list
+  // so RECORD corpora stay credential/PII-free by default.
+  const keyOnly = sanitizeRaw(raw, []) as typeof raw;
+  assert.equal(keyOnly.auth.secret, REDACTED);
+  assert.equal(keyOnly.auth.id, 'cid-1');
+  assert.deepEqual(keyOnly.list, ['shh', 'ok']);
 });
 
 test('C1: read-only store refuses RECORD writes with a structured error', async () => {

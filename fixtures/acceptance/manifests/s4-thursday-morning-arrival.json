@@ -1,0 +1,65 @@
+{
+  "scenarioId": "S4",
+  "title": "Can I arrive Thursday morning instead?",
+  "mode": "REPLAY",
+  "globalInputPack": {
+    "packId": "northstar-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "s4-thursday-morning-arrival",
+    "version": "1.0.0",
+    "path": "../packs/s4"
+  },
+  "boundaries": [
+    {
+      "seam": "traveller.change_request",
+      "mode": "REPLAY"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "REPLAY"
+    }
+  ],
+  "requiredEnv": [],
+  "requiredProviders": [],
+  "expect": {
+    "anchorEventIds": ["evt-w3-demo"],
+    "travellerIds": ["trv-evt-w3-demo-draft-2"],
+    "tripIds": ["trip-trv-evt-w3-demo-draft-2"]
+  },
+  "routeParams": [{ "date": "2026-09-10" }],
+  "steps": [
+    {
+      "id": "reset",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": { "at": "2026-09-04T09:00:00+00:00" },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "traveller_request",
+      "action": {
+        "type": "traveller_message",
+        "travellerId": "trv-evt-w3-demo-draft-2",
+        "tripId": "trip-trv-evt-w3-demo-draft-2",
+        "text": "Can I arrive Thursday morning instead of Wednesday evening?",
+        "at": "2026-09-04T10:00:00+00:00",
+        "capture": { "caseId": "caseId" },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "observe_case",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "expectStatus": 200
+      }
+    }
+  ]
+}

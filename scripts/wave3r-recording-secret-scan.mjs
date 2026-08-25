@@ -75,7 +75,14 @@ function valueLooksSecretish(value) {
 // Corpus walk
 // ---------------------------------------------------------------------------
 
-const roots = ['fixtures/recordings', 'fixtures/scenarios', 'test/fixtures/recordings'];
+const roots = [
+  'fixtures/recordings',
+  'fixtures/scenarios',
+  'fixtures/acceptance',
+  'test/fixtures/recordings',
+  'recordings',
+  'output/acceptance',
+];
 const files = [];
 function walk(dir) {
   for (const entry of readdirSync(dir)) {
