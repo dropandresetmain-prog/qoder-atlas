@@ -93,10 +93,14 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
         return this.decision(intent, 'BLOCKED', ruleTrace, conditions);
       }
       if (spend.amount > rule.maxAmount.amount) {
-        ruleTrace.push(`rule ${rule.id}: spend ${spend.amount} exceeds limit ${rule.maxAmount.amount}`);
+        ruleTrace.push(
+          `rule ${rule.id}: spend ${spend.amount} exceeds ${rule.period === 'NIGHT' ? 'per-night' : 'per-trip'} limit ${rule.maxAmount.amount}`,
+        );
         return this.decision(intent, 'BLOCKED', ruleTrace, conditions);
       }
-      ruleTrace.push(`rule ${rule.id}: spend ${spend.amount} within limit ${rule.maxAmount.amount}`);
+      ruleTrace.push(
+        `rule ${rule.id}: spend ${spend.amount} within ${rule.period === 'NIGHT' ? 'per-night' : 'per-trip'} limit ${rule.maxAmount.amount}`,
+      );
     }
 
     // 2. Explicit approval requirements (operation-scoped first).

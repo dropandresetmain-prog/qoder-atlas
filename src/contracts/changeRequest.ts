@@ -61,6 +61,14 @@ export const ResolutionTargetSchema = z.strictObject({
   departureOrigin: z.strictObject({ system: z.string(), value: z.string() }).optional(),
   /** Reference place the stay should be near (e.g. venue Place id). */
   preferredStayProximityRef: EntityRefSchema.optional(),
+  /** Desired stay check-out instant (extension or shortening). */
+  stayCheckOut: IsoDateTimeSchema.optional(),
+  /** Declared replacement property via external ref (system + value). */
+  stayPlaceRef: z.strictObject({ system: z.string(), value: z.string() }).optional(),
+  /** Declared replacement property via authoritative Place id. */
+  preferredStayPlaceId: EntityIdSchema.optional(),
+  /** Desired room occupancy; absent = unknown, never inferred. */
+  guests: z.number().int().positive().optional(),
   /** Desired transport attributes, declarative only. */
   transport: z
     .strictObject({

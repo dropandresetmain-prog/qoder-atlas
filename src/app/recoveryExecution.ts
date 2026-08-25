@@ -42,7 +42,7 @@ import type { AuditRepository, CaseRepository, SignalRepository, TripRepository 
 import type { EntityStore } from '../persistence/entityStore.ts';
 import { CaseService } from '../engine/case.ts';
 import { withApproval } from '../engine/authority.ts';
-import { allocationFromDecision, payerDecisionFor } from '../engine/funding.ts';
+import { allocationFromDecision, fundingAnchorFromCandidateOperations, payerDecisionFor } from '../engine/funding.ts';
 import type { CaseVerifier, VerificationResult } from '../engine/observation.ts';
 import { confirmsCandidateOperations } from '../operational/intent.ts';
 import { principalScopeForTrip } from './snapshot.ts';
@@ -773,21 +773,8 @@ export class RecoveryExecutionService {
     triggeredBySignalIds: EntityId[],
     strategy: RecoveryStrategy,
   ): Promise<IsoDateTime | undefined> {
-    for (const operation of strategy.candidateOperations) {
-      if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') continue;
-      const element = operation.data as Record<string, unknown>;
-      if (element['elementKind'] !== 'TRANSPORT_LEG') continue;
-      const data = element['data'];
-      if (!data || typeof data !== 'object') continue;
-      const departure = (data as Record<string, unknown>)['scheduledDeparture'] as { value?: unknown } | undefined;
-      if (
-        departure &&
-        typeof departure.value === 'string' &&
-        IsoDateTimeSchema.safeParse(departure.value).success
-      ) {
-        return departure.value;
-      }
-    }
+    const fromOperations = fundingAnchorFromCandidateOperations(strategy.candidateOperations);
+    if (fromOperations) return fromOperations;
     if (this.deps.signals) {
       for (const signalId of triggeredBySignalIds) {
         const signal = await this.deps.signals.getSignal(signalId);

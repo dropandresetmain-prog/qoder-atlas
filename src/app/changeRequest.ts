@@ -171,7 +171,8 @@ export async function resolveChangeRequest(
   //    through the signal payload so the intent stage can recompute the SAME
   //    deterministic payer decision against the real priceDelta.
   const fundingRules = await collectFundingRules(deps.entities, trip);
-  const costAccruesAt = request.target.arriveBy ?? request.target.departAfter;
+  const costAccruesAt =
+    request.target.stayCheckOut ?? request.target.arriveBy ?? request.target.departAfter;
   const fundingDecision = payerDecisionFor(fundingRules, costAccruesAt);
   if (fundingDecision) {
     implications.push(
@@ -439,6 +440,45 @@ function deriveImplications(
     });
   }
 
+  if (target.stayCheckOut) {
+    const currentCheckOut = latestStayCheckOut(trip);
+    if (currentCheckOut) {
+      const cmp = compareInstants(currentCheckOut, target.stayCheckOut);
+      if (cmp === 0) {
+        implications.push(`stayCheckOut ${target.stayCheckOut} matches current stay check-out exactly`);
+      } else if (cmp < 0) {
+        implications.push(
+          `stayCheckOut ${target.stayCheckOut} is ${describeDelta(currentCheckOut, target.stayCheckOut)} later than current check-out ${currentCheckOut}`,
+        );
+      } else {
+        implications.push(
+          `stayCheckOut ${target.stayCheckOut} is earlier than current check-out ${currentCheckOut}; the request shortens the stay`,
+        );
+      }
+    } else {
+      uncertainties.push({
+        id: EntityIdSchema.parse(`unc-stay-co-${trip.id}`),
+        statement: 'stayCheckOut requested but trip has no STAY with a known check-out; extension not derivable',
+        aboutRefs: [{ entityType: 'TRIP', id: trip.id }],
+        severity: 'MEDIUM',
+      });
+    }
+  }
+
+  if (target.stayPlaceRef) {
+    implications.push(
+      `stay preference: property ${target.stayPlaceRef.system}:${target.stayPlaceRef.value} declared; replacement search must resolve this ref against programme evidence`,
+    );
+  }
+  if (target.preferredStayPlaceId) {
+    implications.push(
+      `stay preference: property PLACE ${target.preferredStayPlaceId} declared; replacement must target this authoritative place`,
+    );
+  }
+  if (target.guests !== undefined) {
+    implications.push(`stay occupancy: ${target.guests} guest(s) requested`);
+  }
+
   // Objective effects (always possible; authority gates the actual waiver).
   for (const effect of target.objectiveEffects) {
     implications.push(
@@ -460,9 +500,12 @@ function deriveImplications(
 }
 
 function isTargetEmpty(target: ResolutionTarget): boolean {
-  if (target.arriveBy || target.departAfter) return false;
+  if (target.arriveBy || target.departAfter || target.stayCheckOut) return false;
   if (target.departureOrigin) return false;
   if (target.preferredStayProximityRef) return false;
+  if (target.stayPlaceRef) return false;
+  if (target.preferredStayPlaceId) return false;
+  if (target.guests !== undefined) return false;
   if (target.transport) {
     if (
       target.transport.preferDirect !== undefined ||
@@ -494,6 +537,17 @@ function latestDeparture(trip: Trip): IsoDateTime | undefined {
     const departure = element.data.scheduledDeparture?.value;
     if (!departure) continue;
     if (!latest || compareInstants(departure, latest) > 0) latest = departure;
+  }
+  return latest;
+}
+
+function latestStayCheckOut(trip: Trip): IsoDateTime | undefined {
+  let latest: IsoDateTime | undefined;
+  for (const element of trip.elements) {
+    if (element.elementKind !== 'STAY') continue;
+    const checkOut = element.data.checkOut?.value;
+    if (!checkOut) continue;
+    if (!latest || compareInstants(checkOut, latest) > 0) latest = checkOut;
   }
   return latest;
 }

@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts",
     "acceptance:run": "node --experimental-strip-types scripts/acceptance-run.ts",
-    "acceptance:secret-scan": "node scripts/wave3r-recording-secret-scan.mjs"
+    "acceptance:secret-scan": "node scripts/wave3r-recording-secret-scan.mjs",
+    "gate:anti-hardcoding": "node scripts/anti-hardcoding-gate.mjs"
   },
   "dependencies": {
     "zod": "^4.1.0"

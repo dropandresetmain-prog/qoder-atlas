@@ -13,6 +13,11 @@ import {
   IsoDateTimeSchema,
   MoneySchema,
 } from './common.ts';
+import { ImportanceSchema } from './elements.ts';
+
+/** How transport concentration groups participants for correlated-risk checks. */
+export const TransportConcentrationScopeSchema = z.enum(['BOOKING_REF', 'CARRIER_SERVICE']);
+export type TransportConcentrationScope = z.infer<typeof TransportConcentrationScopeSchema>;
 
 export const RuleSetKindSchema = z.enum([
   'SUPPLIER',
@@ -70,6 +75,8 @@ export const PolicyRuleSchema = z.discriminatedUnion('kind', [
     ...RuleBase,
     kind: z.literal('SPEND_LIMIT'),
     maxAmount: MoneySchema,
+    /** Recurrence semantics for the limit; absent means per-trip. */
+    period: z.enum(['TRIP', 'NIGHT']).optional(),
   }),
   z.strictObject({
     ...RuleBase,
@@ -135,6 +142,21 @@ export const PolicyRuleSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     ...RuleBase,
+    /**
+     * Correlated-risk / transport concentration (generic): flag when too many
+     * critical-importance travellers share one booking reference or one
+     * carrier service (carrier + departure). Threshold and scope come from
+     * policy data — never scenario, city, or supplier hardcoding.
+     */
+    kind: z.literal('TRANSPORT_CONCENTRATION'),
+    /** Maximum critical travellers allowed in one concentration group. */
+    maxCriticalParticipants: z.number().int().nonnegative(),
+    /** Importance that counts as critical for this rule; default REQUIRED. */
+    criticalImportance: ImportanceSchema.default('REQUIRED'),
+    scope: TransportConcentrationScopeSchema,
+  }),
+  z.strictObject({
+    ...RuleBase,
     kind: z.literal('OTHER'),
     statement: z.string(),
   }),
@@ -154,6 +176,7 @@ export const PolicyRuleKindSchema = z.enum([
   'INSURANCE_COVERAGE',
   'FUNDED_WINDOW',
   'ENTRY_REQUIREMENT',
+  'TRANSPORT_CONCENTRATION',
   'OTHER',
 ]);
 export type PolicyRuleKind = z.infer<typeof PolicyRuleKindSchema>;

@@ -22,10 +22,11 @@
  *   recorded as the declaration evidence instead of being silently dropped.
  */
 import type { EntityId, IsoDateTime, Money } from '../domain/common.ts';
-import { compareInstants } from '../domain/common.ts';
+import { compareInstants, IsoDateTimeSchema } from '../domain/common.ts';
 import type { PolicyRule, Payer } from '../domain/rules.ts';
 import type { FundingDeclaration } from '../contracts/changeRequest.ts';
 import type { CostAllocation } from '../operational/intent.ts';
+import type { MutationOperation } from '../operational/mutation.ts';
 
 export interface CostAllocationInput {
   /** Rules in governing order (rule-set context order, array order within). */
@@ -96,6 +97,44 @@ export function allocateCost(input: CostAllocationInput): CostAllocation | undef
   const decision = payerDecisionFor(input.rules, input.costAccruesAt);
   if (!decision) return undefined;
   return allocationFromDecision(input.priceDelta, decision);
+}
+
+/**
+ * Derive a funding temporal anchor from candidate element mutations.
+ * Transport departures and stay check-out/check-in are the supported
+ * accrual instants; absent both, undefined keeps allocation UNKNOWN.
+ */
+export function fundingAnchorFromCandidateOperations(
+  operations: readonly MutationOperation[],
+): IsoDateTime | undefined {
+  for (const operation of operations) {
+    if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') continue;
+    const element = operation.data as Record<string, unknown>;
+    const elementKind = element['elementKind'];
+    if (elementKind === 'TRANSPORT_LEG') {
+      const anchor = factInstantFromElementData(element['data'], 'scheduledDeparture');
+      if (anchor) return anchor;
+      continue;
+    }
+    if (elementKind === 'STAY') {
+      const anchor =
+        factInstantFromElementData(element['data'], 'checkOut') ??
+        factInstantFromElementData(element['data'], 'checkIn');
+      if (anchor) return anchor;
+    }
+  }
+  return undefined;
+}
+
+function factInstantFromElementData(
+  data: unknown,
+  field: 'scheduledDeparture' | 'checkOut' | 'checkIn',
+): IsoDateTime | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const fact = (data as Record<string, unknown>)[field] as { value?: unknown } | undefined;
+  if (typeof fact?.value !== 'string') return undefined;
+  const parsed = IsoDateTimeSchema.safeParse(fact.value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function isInFundedWindow(

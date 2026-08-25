@@ -20,6 +20,10 @@ import type { RuleSet, PolicyRule } from '../domain/rules.ts';
 import type { Constraint, ConstraintStatus } from '../domain/constraints.ts';
 import type { Trip, TripObjective } from '../domain/trip.ts';
 import type { ConstraintEvaluation } from '../contracts/services.ts';
+import {
+  assessTransportConcentration,
+  transportConcentrationParticipants,
+} from './concentration.ts';
 
 export interface EvaluationContext {
   trip: Trip;
@@ -374,6 +378,23 @@ function evaluatePolicy(constraint: Constraint, ctx: EvaluationContext): Constra
         ? evaluation(constraint, 'PASS', 'within policy time window')
         : evaluation(constraint, 'FAIL', 'outside policy time window');
     }
+    case 'TRANSPORT_CONCENTRATION': {
+      // Single-trip seam: cross-trip callers use assessTransportConcentration
+      // directly with participants from multiple trips.
+      const assessment = assessTransportConcentration(
+        rule,
+        transportConcentrationParticipants([ctx.trip]),
+      );
+      if (assessment.ok) {
+        return evaluation(constraint, 'PASS', 'transport concentration within threshold');
+      }
+      const first = assessment.violations[0]!;
+      return evaluation(
+        constraint,
+        'FAIL',
+        `transport concentration exceeded: ${first.criticalCount} critical travellers in ${first.groupKey} (max ${first.maxCriticalParticipants})`,
+      );
+    }
     default:
       return evaluation(constraint, 'UNKNOWN', `rule kind ${rule.kind} has no deterministic policy evaluator`);
   }
@@ -393,9 +414,11 @@ function evaluateFinancial(constraint: Constraint, ctx: EvaluationContext): Cons
   if (rule.maxAmount.currency !== currency) {
     return evaluation(constraint, 'UNKNOWN', `currency ${currency} not comparable to limit currency ${rule.maxAmount.currency}`);
   }
+  const period = rule.period ?? 'TRIP';
+  const periodLabel = period === 'NIGHT' ? 'per-night' : 'per-trip';
   return amount <= rule.maxAmount.amount
-    ? evaluation(constraint, 'PASS', `amount ${amount} within limit ${rule.maxAmount.amount}`)
-    : evaluation(constraint, 'FAIL', `amount ${amount} exceeds limit ${rule.maxAmount.amount}`);
+    ? evaluation(constraint, 'PASS', `amount ${amount} within ${periodLabel} limit ${rule.maxAmount.amount} ${currency}`)
+    : evaluation(constraint, 'FAIL', `amount ${amount} exceeds ${periodLabel} limit ${rule.maxAmount.amount} ${currency}`);
 }
 
 /** OBJECTIVE: viability of an objective from its linked elements. */

@@ -98,10 +98,12 @@ const HOTEL_SEARCH_PARAMETERS = z.strictObject({
   }),
   checkInDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   checkOutDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  // Deterministic occupancy defaults: recorded REPLAY queries were keyed
-  // with these present, and a missing occupancy is never a guess at the
-  // provider — it is this documented dispatch default.
-  guests: z.strictObject({ adults: z.number().int().min(1), children: z.number().int().min(0).optional() }).default({ adults: 1 }),
+  // Occupancy is optional: absent guests stay UNKNOWN and are not defaulted
+  // to adults=1. Callers that know Stay.guests (or an explicit count) must
+  // pass it via hotelSearchGuestsFromOccupancy.
+  guests: z
+    .strictObject({ adults: z.number().int().min(1), children: z.number().int().min(0).optional() })
+    .optional(),
   rooms: z.number().int().min(1).default(1),
 });
 
@@ -111,6 +113,15 @@ const HOTEL_QUOTE_PARAMETERS = z.strictObject({
 });
 
 const HOTEL_RETRIEVE_PARAMETERS = z.strictObject({ bookingId: z.string().min(1) });
+
+/**
+ * Map Stay.guests (or an explicit occupancy count) to hotel.search adults.
+ * Absent occupancy stays UNKNOWN — never defaulted to 1 at this boundary.
+ */
+export function hotelSearchGuestsFromOccupancy(guests: number | undefined): { adults: number } | undefined {
+  if (guests === undefined) return undefined;
+  return { adults: guests };
+}
 
 function invalidParameters(detail: string): ToolDispatchResult {
   return {

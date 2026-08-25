@@ -35,8 +35,9 @@ import type { PlannerInput, PlannerOutput, RecoveryPlanner } from '../contracts/
 import type { TripSignal } from '../operational/signal.ts';
 import type { MutationOperation } from '../operational/mutation.ts';
 import type { RecoveryStrategy, ToolRequest } from '../operational/strategy.ts';
-import type { Engagement, TransportLeg } from '../domain/elements.ts';
+import type { Engagement, Stay, TransportLeg } from '../domain/elements.ts';
 import type { Place } from '../domain/entities.ts';
+import { hotelSearchGuestsFromOccupancy } from '../app/dispatch.ts';
 
 function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -307,6 +308,27 @@ export class NorthstarPlanner implements RecoveryPlanner {
       ...(target.departAfter !== undefined ? (['departAfter'] as const) : []),
       ...(target.departureOrigin !== undefined ? (['departureOrigin'] as const) : []),
     ];
+    const hasStayDimensions =
+      target.stayCheckOut !== undefined ||
+      target.stayPlaceRef !== undefined ||
+      target.preferredStayPlaceId !== undefined ||
+      target.guests !== undefined;
+    if (dimensions.length === 0 && hasStayDimensions) {
+      const stayToolRequests = this.stayChangeToolRequests(input, target);
+      return {
+        strategies: [],
+        toolRequests: stayToolRequests,
+        assumptions: [],
+        uncertainties: [
+          this.uncertainty(
+            'stay change dimensions recorded; hotel replacement strategies are not proposed until hotel.search evidence exists',
+            'HIGH',
+          ),
+          ...uncertainties,
+        ],
+        rationale: 'northstar window-shift planner recorded stay change dimensions',
+      };
+    }
     const eventPlaceId =
       input.snapshot.anchorEvent?.placeId ??
       input.snapshot.trip.elements.find(
@@ -671,6 +693,21 @@ export class NorthstarPlanner implements RecoveryPlanner {
           'stay proximity requested: no hotel search capability is composed yet; the proximity preference is recorded, not silently dropped',
         );
       }
+      if (target.stayCheckOut !== undefined) {
+        uncertaintyStatements.push(
+          'stayCheckOut requested: stay-date replanning is not supported by this planner yet; the target check-out is recorded, not silently dropped',
+        );
+      }
+      if (target.stayPlaceRef !== undefined || target.preferredStayPlaceId !== undefined) {
+        uncertaintyStatements.push(
+          'stay property change requested: hotel replacement search is not supported by this planner yet; the property preference is recorded, not silently dropped',
+        );
+      }
+      if (target.guests !== undefined) {
+        uncertaintyStatements.push(
+          `stay occupancy requested (${target.guests} guest(s)): occupancy-aware hotel search is not supported by this planner yet; the count is recorded, not silently dropped`,
+        );
+      }
       for (const effect of target.objectiveEffects) {
         uncertaintyStatements.push(
           `objective effect requested for ${effect.objectiveId} (${effect.effect}): objective waivers are authority-gated state changes, never planner-authored; the request is recorded for the authority stage`,
@@ -682,7 +719,13 @@ export class NorthstarPlanner implements RecoveryPlanner {
         // actionable window dimension: it re-plans the arrival corridor from
         // the stated gateway even when no arriveBy/departAfter is requested.
         actionable:
-          target.arriveBy !== undefined || target.departAfter !== undefined || target.departureOrigin !== undefined,
+          target.arriveBy !== undefined ||
+          target.departAfter !== undefined ||
+          target.departureOrigin !== undefined ||
+          target.stayCheckOut !== undefined ||
+          target.stayPlaceRef !== undefined ||
+          target.preferredStayPlaceId !== undefined ||
+          target.guests !== undefined,
         uncertaintyStatements,
       };
     }
@@ -782,6 +825,47 @@ export class NorthstarPlanner implements RecoveryPlanner {
       },
       purpose: `find flights for ${originPlaceId} -> ${destinationPlaceId} on ${departureDate}`,
     };
+  }
+
+  /**
+   * Read-only hotel.search evidence requests for stay-change targets. Guests
+   * come from the declared target occupancy, else the authoritative stay
+   * element — absent both stays UNKNOWN (no default adults).
+   */
+  private stayChangeToolRequests(input: PlannerInput, target: ResolutionTarget): ToolRequest[] {
+    const stay = input.snapshot.trip.elements.find((element): element is Stay => element.elementKind === 'STAY');
+    if (!stay) return [];
+    const checkIn = stay.data.checkIn?.value.slice(0, 10);
+    const checkOut = (target.stayCheckOut ?? stay.data.checkOut?.value)?.slice(0, 10);
+    if (!checkIn || !checkOut) return [];
+    const place =
+      (target.preferredStayPlaceId ? this.placeById(input, target.preferredStayPlaceId) : undefined) ??
+      this.placeById(input, stay.data.placeId);
+    if (!place) return [];
+    const location =
+      target.stayPlaceRef !== undefined
+        ? { externalRef: target.stayPlaceRef }
+        : place.coordinates
+          ? { coordinates: place.coordinates }
+          : place.externalRefs[0]
+            ? { externalRef: place.externalRefs[0] }
+            : undefined;
+    if (!location) return [];
+    const guests = hotelSearchGuestsFromOccupancy(target.guests ?? stay.data.guests);
+    return [
+      {
+        id: this.idFactory('tool-hotel'),
+        capability: 'HOTEL',
+        operation: 'hotel.search',
+        parameters: {
+          location,
+          checkInDate: checkIn,
+          checkOutDate: checkOut,
+          ...(guests ? { guests } : {}),
+        },
+        purpose: `find replacement stay options near ${place.id}`,
+      },
+    ];
   }
 
   private degraded(reason: string): PlannerOutput {
