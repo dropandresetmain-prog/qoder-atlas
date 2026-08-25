@@ -338,6 +338,42 @@ test('DR-8.5: forbidden-jargon scan — no internal IDs or raw evidence in rende
   }
 });
 
+test('G3R: completed recovery presentation keeps engine traces out of visible text', async () => {
+  const composed = await composeAppRuntime(runtimeConfig);
+  try {
+    const spec = loadScenario(SCENARIO_A_DIR);
+    const disruption = await composed.orchestrator.processDisruption(spec.disruption.signal);
+    const caseId = disruption.caseId;
+    const plan = await composed.orchestrator.plan({ caseId, at: '2026-09-12T18:30:00+09:00' });
+    const begin = await composed.orchestrator.begin({ caseId, strategyId: plan.bestStrategyId!, at: '2026-09-12T18:40:00+09:00' });
+    await composed.orchestrator.decide({
+      caseId,
+      intentId: begin.intentId,
+      decidedBy: { entityType: 'TRAVELLER', id: spec.trip.travellerIds[0]! },
+      verdict: 'APPROVED',
+      at: '2026-09-12T18:50:00+09:00',
+    });
+    await composed.orchestrator.execute({ caseId, intentId: begin.intentId, at: '2026-09-12T18:55:00+09:00' });
+
+    const at = '2026-09-12T19:00:00+09:00';
+    const dashboard = await composed.endpoints.operatorDashboard(at);
+    const detail = await composed.endpoints.caseDetail(caseId, at);
+    const traveller = await composed.endpoints.travellerTrip(spec.trip.id, at);
+    assert.ok(detail && traveller);
+    const caseHtml = renderCaseDetailBody(detail);
+    const visible = visibleText(renderOperatorDashboardBody(dashboard) + caseHtml + renderTravellerTripBody(traveller)).toLowerCase();
+    for (const forbidden of ['hard constraint', 'fails', 'fully_recovered', 'recovered_with_loss', 'escalated_closed', 'viability re-evaluated at']) {
+      assert.ok(!visible.includes(forbidden), `visible text must not expose ${forbidden}`);
+    }
+    assert.ok(!/\bc_[a-z0-9_-]+\b/i.test(visible), 'visible text must not expose constraint identifiers');
+    assert.ok(!/\bunknown\b/.test(visible), 'visible text must not expose raw engine UNKNOWN');
+    assert.ok(visible.includes('your trip is back on track.'), 'structured outcome has plain-language presentation');
+    assert.ok(caseHtml.includes('data-outcome="FULLY_RECOVERED"'), 'machine-readable outcome remains available outside visible text');
+  } finally {
+    composed.db.close();
+  }
+});
+
 test('DR-8.5b: transport mode enum never leaks raw into visible copy (regression)', async () => {
   const composed = await composeAppRuntime(runtimeConfig);
   try {

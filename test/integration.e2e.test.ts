@@ -359,7 +359,7 @@ test('T-E2E: Scenario A recovers through the full generalized vertical loop (REP
   const morning = planning.candidates.find((candidate) => candidate.strategy.summary.includes('morning'))!;
   assert.equal(morning.feasible, false);
   assert.ok(
-    morning.rejectionReasons.some((reason) => reason.includes('c_a_arrive_before_keynote') && reason.includes('FAILS')),
+    morning.rejectionEvidence.some((evidence) => evidence.kind === 'CONSTRAINT' && evidence.constraintId === 'c_a_arrive_before_keynote' && evidence.status === 'FAIL'),
     'engine-owned hard rejection reason',
   );
   assert.equal(planning.rankedFeasibleIds[0], planning.bestStrategyId);

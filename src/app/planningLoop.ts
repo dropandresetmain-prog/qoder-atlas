@@ -36,9 +36,14 @@ export interface PlannedCandidate {
   /** Absent when the strategy proposes no overlay operations to evaluate. */
   viability?: ViabilityResult;
   feasible: boolean;
-  /** Deterministic rejection reasons; empty when feasible. */
-  rejectionReasons: string[];
+  /** Structured deterministic evidence; presentation is a separate boundary. */
+  rejectionEvidence: CandidateRejectionEvidence[];
 }
+
+export type CandidateRejectionEvidence =
+  | { kind: 'NO_CANDIDATE_OPERATIONS' }
+  | { kind: 'OVERLAY_REJECTED'; detail: string }
+  | { kind: 'CONSTRAINT'; constraintId: EntityId; status: 'FAIL' | 'UNKNOWN'; evidence?: string };
 
 export interface PlanningLoopInput {
   caseId: EntityId;
@@ -178,7 +183,7 @@ export async function runPlanningLoop(
       candidateVerdicts: candidates.map((candidate) => ({
         strategyId: candidate.strategy.id,
         feasible: candidate.feasible,
-        rejectionReasons: candidate.rejectionReasons,
+        rejectionEvidence: candidate.rejectionEvidence,
       })),
     },
   });
@@ -207,7 +212,7 @@ export async function evaluateCandidate(
     return {
       strategy,
       feasible: false,
-      rejectionReasons: ['strategy proposes no candidate operations; nothing can be deterministically evaluated'],
+      rejectionEvidence: [{ kind: 'NO_CANDIDATE_OPERATIONS' }],
     };
   }
   let result: ViabilityResult;
@@ -218,23 +223,21 @@ export async function evaluateCandidate(
     return {
       strategy,
       feasible: false,
-      rejectionReasons: [`candidate operations rejected by overlay engine: ${error instanceof Error ? error.message : String(error)}`],
+      rejectionEvidence: [{ kind: 'OVERLAY_REJECTED', detail: error instanceof Error ? error.message : String(error) }],
     };
   }
-  const rejectionReasons: string[] = [];
+  const rejectionEvidence: CandidateRejectionEvidence[] = [];
   for (const constraintId of result.hardFailureIds) {
     const evaluation = result.constraintResults.find((r) => r.constraintId === constraintId);
-    rejectionReasons.push(
-      `hard constraint ${constraintId} FAILS${evaluation?.evidence ? ` (${evaluation.evidence})` : ''}`,
-    );
+    rejectionEvidence.push({ kind: 'CONSTRAINT', constraintId, status: 'FAIL', ...(evaluation?.evidence ? { evidence: evaluation.evidence } : {}) });
   }
   for (const constraintId of result.unknownIds) {
     const evaluation = result.constraintResults.find((r) => r.constraintId === constraintId);
-    rejectionReasons.push(
-      `hard constraint ${constraintId} unresolved (UNKNOWN${evaluation?.evidence ? `: ${evaluation.evidence}` : ''}) — never treated as PASS`,
-    );
+    rejectionEvidence.push({ kind: 'CONSTRAINT', constraintId, status: 'UNKNOWN', evidence:
+      evaluation?.evidence,
+    });
   }
-  return { strategy, viability: result, feasible: result.feasible, rejectionReasons };
+  return { strategy, viability: result, feasible: result.feasible, rejectionEvidence };
 }
 
 function transitionIsLegal(from: CaseStatus, to: CaseStatus): boolean {

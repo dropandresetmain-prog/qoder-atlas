@@ -457,8 +457,8 @@ test('rvn3: candidate with no schedule evidence stays UNKNOWN and is never marke
   assert.equal(outcome.strategies.length, 1);
   assert.equal(outcome.strategies[0]!.feasible, false, 'UNKNOWN hard feasibility must never be reported as true');
   assert.ok(
-    outcome.strategies[0]!.rejectionReasons.length > 0,
-    'rejection reasons from the viability engine are persisted',
+    outcome.strategies[0]!.rejectionEvidence.length > 0,
+    'structured rejection evidence from the viability engine is persisted',
   );
 });
 

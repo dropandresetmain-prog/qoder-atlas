@@ -256,7 +256,7 @@ test('NS-G2: paths 0/A/B/C converge through the same architecture (REPLAY, zero 
     assert.equal(initial.status, 200);
     assert.equal(initial.body['accepted'], true);
     const caseId = initial.body['caseId'] as string;
-    const strategies = initial.body['strategies'] as Array<{ id: string; feasible: boolean; summary: string; rejectionReasons: string[] }>;
+    const strategies = initial.body['strategies'] as Array<{ id: string; feasible: boolean; summary: string; rejectionEvidence: unknown[] }>;
     assert.ok(strategies.length >= 1, 'flight.search evidence yields arrival strategies');
 
     // Anti-vacuity (REV-2): the promoted trip must actually be judgeable. A

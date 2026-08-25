@@ -323,8 +323,8 @@ test('i3: planning loop replays Atlas evidence and rejects the attractive infeas
   const morning = outcome.candidates.find((c) => c.strategy.summary.includes('next-morning'))!;
   assert.equal(morning.feasible, false);
   assert.ok(
-    morning.rejectionReasons.some((reason) => reason.includes('c_a_arrive_before_keynote') && reason.includes('FAILS')),
-    `engine-owned rejection reason expected, got: ${JSON.stringify(morning.rejectionReasons)}`,
+    morning.rejectionEvidence.some((evidence) => evidence.kind === 'CONSTRAINT' && evidence.constraintId === 'c_a_arrive_before_keynote' && evidence.status === 'FAIL'),
+    `engine-owned rejection evidence expected, got: ${JSON.stringify(morning.rejectionEvidence)}`,
   );
   assert.equal(
     outcome.rankedFeasibleIds.includes(morning.strategy.id),
@@ -439,8 +439,8 @@ test('i3: UNKNOWN hard feasibility never becomes PASS', async () => {
   assert.ok(candidate.viability!.unknownIds.includes('c_a_hotel_no_show'));
   assert.equal(candidate.viability!.hardFailureIds.length, 0);
   assert.ok(
-    candidate.rejectionReasons.some((reason) => reason.includes('UNKNOWN') && reason.includes('never treated as PASS')),
-    `UNKNOWN rejection reason expected, got: ${JSON.stringify(candidate.rejectionReasons)}`,
+    candidate.rejectionEvidence.some((evidence) => evidence.kind === 'CONSTRAINT' && evidence.status === 'UNKNOWN'),
+    `UNKNOWN rejection evidence expected, got: ${JSON.stringify(candidate.rejectionEvidence)}`,
   );
   assert.equal(outcome.bestStrategyId, undefined, 'no feasible candidate may be selected');
 });

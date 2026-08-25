@@ -23,6 +23,7 @@ import assert from 'node:assert/strict';
 import {
   AnchorCommitmentSchema,
   AnchorEventSchema,
+  PlaceSchema,
 } from '../src/domain/entities.ts';
 import { EngagementSchema } from '../src/domain/elements.ts';
 import { TripSchema } from '../src/domain/trip.ts';
@@ -58,6 +59,26 @@ import {
 
 const AT = '2026-10-01T12:00:00+08:00';
 const SOURCE = 'src_programme_brief_1';
+
+test('G3R: gateway associations and declarative departure origins remain generic schema data', () => {
+  const place = PlaceSchema.parse({
+    id: 'place_venue',
+    name: 'Conference venue',
+    kind: 'VENUE',
+    servedByPlaceIds: ['place_gateway'],
+  });
+  assert.deepEqual(place.servedByPlaceIds, ['place_gateway']);
+
+  const target = ResolutionTargetSchema.parse({
+    departureOrigin: { system: 'airport-code', value: 'ABC' },
+  });
+  assert.deepEqual(target.departureOrigin, { system: 'airport-code', value: 'ABC' });
+  assert.equal(
+    ResolutionTargetSchema.safeParse({ departureOrigin: { system: 'airport-code', value: 'ABC', route: 'forbidden' } }).success,
+    false,
+    'origin declaration is not a provider-action-shaped route payload',
+  );
+});
 
 // ---------------------------------------------------------------------------
 // A. AnchorCommitment linkage

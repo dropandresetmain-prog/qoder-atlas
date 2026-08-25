@@ -24,6 +24,7 @@ import type { CapabilityDescriptor } from '../contracts/capabilities.ts';
 import { ImpactEngine } from '../engine/impact.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
 import { latestCaseFor } from './readmodels.ts';
+import { presentAction, presentActivity, presentApprovalReason, presentUncertainties } from './presentation.ts';
 
 /** The decision surface that must act on a pending approval. */
 export type ApprovalRequestedFrom = 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT';
@@ -90,37 +91,6 @@ export interface ProviderSurfaceView {
   capabilities: ProviderCapabilityView[];
 }
 
-const ACTION_LABEL: Record<string, string> = {
-  'flight.change': 'Rebooking the flight',
-  'flight.cancel': 'Cancelling the flight',
-  'flight.rebook': 'Rebooking the flight',
-  'flight.search': 'Searching flights',
-  'hotel.modify': 'Updating the hotel stay',
-  'hotel.cancel': 'Cancelling the hotel stay',
-  'hotel.search': 'Searching hotels',
-  'ground.search': 'Searching ground transport',
-  'simulation.provider_action': 'Applying the provider change',
-};
-
-/** Full audit-action vocabulary -> user-facing activity copy. */
-const ACTIVITY_COPY: Record<string, string> = {
-  SIGNAL_PROCESSED: 'Disruption recorded and trip state updated',
-  MUTATION_APPLIED: 'Authoritative trip state updated',
-  PLANNING_COMPLETED: 'Recovery options planned and checked',
-  INITIAL_PLANNING_COMPLETED: 'Initial trip plan completed',
-  AUTHORITY_DECIDED: 'Approval requirement determined',
-  APPROVAL_RECORDED: 'Approval decision recorded',
-  APPROVAL_REJECTED: 'Approval request refused',
-  EXECUTION_COMPLETED: 'Recovery action executed',
-  EXECUTION_REFUSED: 'Action blocked by the authority gate',
-  CASE_VERIFIED: 'Recovery outcome verified against the trip',
-  CHANGE_REQUEST_RESOLVED: 'Traveller change request processed',
-  COMMITMENT_CHANGE_FANOUT: 'Event commitment change sent to affected trips',
-  INTAKE_IMPORT_PROCESSED: 'Programme intake import processed',
-  RUNTIME_RESET: 'Demo environment reset',
-  SCENARIO_SEEDED: 'Scenario seed loaded',
-};
-
 function requestedFromFor(outcome: AuthorityDecision['outcome']): ApprovalRequestedFrom | undefined {
   switch (outcome) {
     case 'REQUIRES_TRAVELLER':
@@ -170,13 +140,12 @@ export async function projectApprovalsQueue(
         decisionId: decision.id,
         requestedFrom,
         requestedAt: decision.decidedAt,
-        action: intent ? ACTION_LABEL[intent.operation] ?? intent.operation : 'Recovery action',
+        action: intent ? presentAction(intent.operation) : 'Recovery action',
         ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
         ...(intent?.costAllocation
           ? { funding: { allocation: intent.costAllocation, summary: describeAllocation(intent.costAllocation) } }
           : {}),
-        reason:
-          decision.ruleTrace[decision.ruleTrace.length - 1] ?? 'Policy requires approval before this change can proceed',
+        reason: presentApprovalReason(),
       });
     }
   }
@@ -199,7 +168,7 @@ export async function projectTripActivity(
   const entries = await deps.audit.query({ subject: tripId, limit });
   const events: ActivityEventView[] = entries.map((entry) => ({
     action: entry.action,
-    summary: ACTIVITY_COPY[entry.action] ?? entry.action,
+    summary: presentActivity(entry.action),
     occurredAt: entry.occurredAt,
     actor: entry.actor,
     ...(entry.subject ? { subject: entry.subject } : {}),
@@ -220,7 +189,7 @@ export async function projectTripUncertainties(
     signals: deps.signals,
     entities: deps.snapshot.entities,
   }).assess(tripId);
-  return { tripId, generatedAt, uncertainties: assessment.unresolvedUnknowns };
+  return { tripId, generatedAt, uncertainties: presentUncertainties(assessment.unresolvedUnknowns) };
 }
 
 /** Truthful adapter provenance per capability — from live descriptors. */

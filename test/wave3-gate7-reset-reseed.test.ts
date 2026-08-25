@@ -149,8 +149,8 @@ test('Wave 3 Gate 7: boot seed, deterministic reset/reseed at programme scale, n
     // candidate SET: same summaries, same feasibility verdicts, same order.
     const strategyShape = (body: Record<string, unknown>) =>
       JSON.stringify(
-        (body['strategies'] as Array<{ summary: string; feasible: boolean; rejectionReasons: string[] }>).map(
-          (strategy) => ({ summary: strategy.summary, feasible: strategy.feasible, rejectionReasons: strategy.rejectionReasons }),
+        (body['strategies'] as Array<{ summary: string; feasible: boolean; rejectionEvidence: unknown[] }>).map(
+          (strategy) => ({ summary: strategy.summary, feasible: strategy.feasible, rejectionEvidence: strategy.rejectionEvidence }),
         ),
       );
     assert.equal(strategyShape(rerunPlan.body), strategyShape(plan.body), 'replay plans an equivalent strategy set');

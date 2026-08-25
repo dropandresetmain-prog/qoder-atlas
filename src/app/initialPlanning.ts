@@ -34,7 +34,7 @@ import type { EntityStore } from '../persistence/entityStore.ts';
 import { CaseService } from '../engine/case.ts';
 import { ImpactEngine } from '../engine/impact.ts';
 import { buildTripSnapshot, type SnapshotDependencies } from './snapshot.ts';
-import { runPlanningLoop, type PlannedCandidate, type PlanningLoopDependencies } from './planningLoop.ts';
+import { runPlanningLoop, type CandidateRejectionEvidence, type PlannedCandidate, type PlanningLoopDependencies } from './planningLoop.ts';
 import type { ToolDispatchCapabilities } from './dispatch.ts';
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ export interface InitialPlanningStrategyView {
   summary: string;
   /** Determined by the injected ViabilityEngine; UNKNOWN hard feasibility never becomes true. */
   feasible: boolean;
-  rejectionReasons: string[];
+  rejectionEvidence: CandidateRejectionEvidence[];
 }
 
 export interface InitialPlanningOutcome {
@@ -212,7 +212,7 @@ export async function startInitialPlanning(
       id: candidate.strategy.id,
       summary: candidate.strategy.summary,
       feasible: candidate.feasible,
-      rejectionReasons: [...candidate.rejectionReasons],
+      rejectionEvidence: [...candidate.rejectionEvidence],
     }),
   );
 
@@ -235,7 +235,7 @@ export async function startInitialPlanning(
       candidateVerdicts: planningOutcome.candidates.map((candidate) => ({
         strategyId: candidate.strategy.id,
         feasible: candidate.feasible,
-        rejectionReasons: candidate.rejectionReasons,
+        rejectionEvidence: candidate.rejectionEvidence,
       })),
     },
   });
@@ -289,6 +289,6 @@ export function strategiesFromOutcome(
     id: strategy.id,
     summary: strategy.summary,
     feasible: false,
-    rejectionReasons: ['strategy persisted without a planning-loop verdict'],
+    rejectionEvidence: [{ kind: 'NO_CANDIDATE_OPERATIONS' }],
   }));
 }

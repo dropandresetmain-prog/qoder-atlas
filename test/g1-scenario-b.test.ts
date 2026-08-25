@@ -406,8 +406,8 @@ test('G1: Scenario B recovers RECOVERED_WITH_LOSS through identical application 
   const noWaiver = planning.candidates.find((candidate) => candidate.strategy.summary.includes('without touching'))!;
   assert.equal(noWaiver.feasible, false);
   assert.ok(
-    noWaiver.rejectionReasons.some(
-      (reason) => reason.includes('c_b_return_buffer') && reason.includes('UNKNOWN'),
+    noWaiver.rejectionEvidence.some(
+      (evidence) => evidence.kind === 'CONSTRAINT' && evidence.constraintId === 'c_b_return_buffer' && evidence.status === 'UNKNOWN',
     ),
     'engine-owned rejection: the unwaived deadline constraint remains UNKNOWN',
   );
@@ -422,7 +422,7 @@ test('G1: Scenario B recovers RECOVERED_WITH_LOSS through identical application 
   for (const candidate of waiverCandidates) {
     assert.equal(candidate.feasible, false, 'waiving the judging objective cannot make a candidate feasible');
     assert.ok(
-      candidate.rejectionReasons.some((reason) => reason.includes('objective obj_b_return')),
+      candidate.rejectionEvidence.some((evidence) => evidence.kind === 'OVERLAY_REJECTED' && evidence.detail.includes('objective obj_b_return')),
       'overlay rejects waiving the judging objective with deterministic evidence',
     );
   }

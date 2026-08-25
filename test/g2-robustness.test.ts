@@ -282,7 +282,7 @@ test('G2-1: delayed arrival breaching the hotel no-show cutoff recovers via same
   const morningCandidate = planning.candidates.find((c) => c.strategy.summary.includes('next-morning'))!;
   assert.equal(morningCandidate.feasible, false);
   assert.ok(
-    morningCandidate.rejectionReasons.some((reason) => reason.includes('c_a_hotel_no_show') && reason.includes('FAILS')),
+    morningCandidate.rejectionEvidence.some((evidence) => evidence.kind === 'CONSTRAINT' && evidence.constraintId === 'c_a_hotel_no_show' && evidence.status === 'FAIL'),
     'no-show breach must be the engine-owned rejection reason',
   );
   const afternoonCandidate = planning.candidates.find((c) => c.strategy.summary.includes('afternoon'))!;
@@ -728,7 +728,7 @@ test('G2-3: hard accessibility requirement rejects the cheaper alternative; acce
   const car = planning.candidates.find((c) => c.strategy.summary.includes('private transfer'))!;
   assert.equal(rail.feasible, false);
   assert.ok(
-    rail.rejectionReasons.some((reason) => reason.includes('c_g3_access') && reason.includes('FAILS')),
+    rail.rejectionEvidence.some((evidence) => evidence.kind === 'CONSTRAINT' && evidence.constraintId === 'c_g3_access' && evidence.status === 'FAIL'),
     'accessibility failure must be the engine-owned rejection reason',
   );
   assert.equal(car.feasible, true);
@@ -942,10 +942,10 @@ test('WP-C1 regression: a planner-authored constraint downgrade never becomes tr
   const maliciousCandidate = planning.candidates.find((c) => c.strategy.summary.includes('rail'))!;
   assert.equal(maliciousCandidate.feasible, false);
   assert.ok(
-    maliciousCandidate.rejectionReasons.some(
-      (reason) => reason.includes('judging criteria') && reason.includes('c_g3b_access'),
+    maliciousCandidate.rejectionEvidence.some(
+      (evidence) => evidence.kind === 'OVERLAY_REJECTED' && evidence.detail.includes('judging criteria') && evidence.detail.includes('c_g3b_access'),
     ),
-    `expected judging-criteria rejection, got: ${JSON.stringify(maliciousCandidate.rejectionReasons)}`,
+    `expected judging-criteria rejection, got: ${JSON.stringify(maliciousCandidate.rejectionEvidence)}`,
   );
   const honestCandidate = planning.candidates.find((c) => c.strategy.summary.includes('transfer'))!;
   assert.equal(honestCandidate.feasible, true);

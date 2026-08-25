@@ -32,7 +32,7 @@ import { ImpactEngine } from '../engine/impact.ts';
 import { listScenarioDirs } from '../scenarios/loader.ts';
 import { buildTripSnapshot, type SnapshotDependencies } from './snapshot.ts';
 import { processSignal, type ProcessedSignal } from './signalPipeline.ts';
-import { runPlanningLoop, type ToolActivity } from './planningLoop.ts';
+import { runPlanningLoop, type CandidateRejectionEvidence, type ToolActivity } from './planningLoop.ts';
 import type { ToolDispatchCapabilities } from './dispatch.ts';
 import { seedScenarioBundle } from './bootstrap.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
@@ -84,7 +84,7 @@ export interface RuntimePlanOutcome {
     id: EntityId;
     summary: string;
     feasible: boolean;
-    rejectionReasons: string[];
+    rejectionEvidence: CandidateRejectionEvidence[];
     costImpact?: Money;
   }>;
   bestStrategyId?: EntityId;
@@ -214,7 +214,7 @@ export class RuntimeOrchestrator {
         id: candidate.strategy.id,
         summary: candidate.strategy.summary,
         feasible: candidate.feasible,
-        rejectionReasons: candidate.rejectionReasons,
+        rejectionEvidence: candidate.rejectionEvidence,
         ...(candidate.strategy.costImpact ? { costImpact: candidate.strategy.costImpact } : {}),
       })),
       bestStrategyId: outcome.bestStrategyId,

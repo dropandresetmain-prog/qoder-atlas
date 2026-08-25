@@ -204,7 +204,6 @@ export class CaseVerifier {
       resolution: {
         outcome,
         resolvedAt: evaluatedAt,
-        summary: `viability re-evaluated at ${evaluatedAt}: ${outcome}`,
         remainingLossRefs,
       },
       hardFailureIds,

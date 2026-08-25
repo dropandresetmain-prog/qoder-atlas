@@ -39,8 +39,17 @@ import { evaluateConstraints, type EvaluationContext } from '../engine/evaluator
 import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, type SnapshotDependencies } from './snapshot.ts';
-import { evaluateCandidate } from './planningLoop.ts';
+import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
 import { describeAllocation } from '../engine/funding.ts';
+import {
+  presentAction,
+  presentActivity,
+  presentApprovalReason,
+  presentCandidateRejection,
+  presentConstraintLabel,
+  presentResolution,
+  presentUncertainties,
+} from './presentation.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -69,25 +78,6 @@ const TRANSPORT_MODE_LABEL: Record<TransportMode, string> = {
 };
 
 /** Generic audit-action -> user-facing activity copy. */
-const ACTIVITY_COPY: Record<string, string> = {
-  SIGNAL_PROCESSED: 'Disruption recorded and trip state updated',
-  MUTATION_APPLIED: 'Authoritative trip state updated',
-  PLANNING_COMPLETED: 'Recovery options planned and checked',
-  AUTHORITY_DECIDED: 'Approval requirement determined',
-  APPROVAL_RECORDED: 'Approval decision recorded',
-  APPROVAL_REJECTED: 'Approval request refused',
-  EXECUTION_COMPLETED: 'Recovery action executed',
-  EXECUTION_REFUSED: 'Action blocked by the authority gate',
-  CASE_VERIFIED: 'Recovery outcome verified against the trip',
-};
-
-const ACTION_LABEL: Record<string, string> = {
-  'flight.change': 'Rebooking the flight',
-  'flight.cancel': 'Cancelling the flight',
-  'hotel.modify': 'Updating the hotel stay',
-  'hotel.cancel': 'Cancelling the hotel stay',
-  'simulation.provider_action': 'Applying the provider change',
-};
 
 function describeElement(element: TripElement): string {
   const label = ELEMENT_KIND_LABEL[element.elementKind];
@@ -257,7 +247,7 @@ export async function projectOperatorDashboard(
         pendingDecisions.push({
           caseId: recoveryCase.id,
           decisionType: 'APPROVAL',
-          description: `Approval needed before ${intent ? ACTION_LABEL[intent.operation] ?? intent.operation : 'the recovery action'} can proceed`,
+          description: `Approval needed before ${intent ? presentAction(intent.operation) : 'the recovery action'} can proceed`,
           ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
           requestedAt: decision.decidedAt,
         });
@@ -266,7 +256,7 @@ export async function projectOperatorDashboard(
     if (pendingDecisions.length > 0) summary.awaitingDecision += 1;
 
     const auditTrail = await deps.audit.query({ subject: trip.id, limit: 8 });
-    const systemActivity = auditTrail.map((entry) => ACTIVITY_COPY[entry.action] ?? entry.action);
+    const systemActivity = auditTrail.map((entry) => presentActivity(entry.action));
 
     const assessment = await new ImpactEngine({
       trips: deps.snapshot.trips,
@@ -296,9 +286,9 @@ export async function projectOperatorDashboard(
         : [],
       systemActivity,
       pendingDecisions,
-      uncertainties: assessment.unresolvedUnknowns,
+      uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
       travellerResponseStatus,
-      ...(recoveryCase?.resolution ? { resolutionSummary: recoveryCase.resolution.summary } : {}),
+      ...(recoveryCase?.resolution ? { resolutionSummary: presentResolution(recoveryCase.resolution) } : {}),
       updatedAt: recoveryCase ? recoveryCase.updatedAt : trip.updatedAt,
     });
   }
@@ -345,7 +335,7 @@ export async function projectCaseDetail(
     const constraint: Constraint | undefined = constraints.find((c) => c.id === evaluation.constraintId);
     return {
       id: evaluation.constraintId,
-      label: constraint?.description ?? evaluation.constraintId,
+      label: presentConstraintLabel(constraint),
       result: evaluation.status as CaseCheckResult,
     };
   });
@@ -359,7 +349,7 @@ export async function projectCaseDetail(
   const planningAudit = await deps.audit.query({ action: 'PLANNING_COMPLETED', subject: trip.id });
   const latestPlanning = planningAudit[planningAudit.length - 1];
   const bestStrategyId = latestPlanning?.payload['bestStrategyId'] as EntityId | undefined;
-  const persistedVerdicts = new Map<string, { feasible: boolean; rejectionReasons: string[] }>();
+  const persistedVerdicts = new Map<string, { feasible: boolean; rejectionEvidence: CandidateRejectionEvidence[] }>();
   const rawVerdicts = latestPlanning?.payload['candidateVerdicts'];
   if (Array.isArray(rawVerdicts)) {
     for (const entry of rawVerdicts) {
@@ -369,11 +359,12 @@ export async function projectCaseDetail(
         typeof (entry as { strategyId?: unknown }).strategyId === 'string' &&
         typeof (entry as { feasible?: unknown }).feasible === 'boolean'
       ) {
-        const verdict = entry as { strategyId: string; feasible: boolean; rejectionReasons?: unknown };
+        const verdict = entry as { strategyId: string; feasible: boolean; rejectionEvidence?: unknown };
         persistedVerdicts.set(verdict.strategyId, {
           feasible: verdict.feasible,
-          rejectionReasons: Array.isArray(verdict.rejectionReasons)
-            ? verdict.rejectionReasons.filter((reason): reason is string => typeof reason === 'string')
+          rejectionEvidence: Array.isArray(verdict.rejectionEvidence)
+            ? verdict.rejectionEvidence.filter((evidence): evidence is CandidateRejectionEvidence =>
+              Boolean(evidence) && typeof evidence === 'object' && typeof (evidence as { kind?: unknown }).kind === 'string')
             : [],
         });
       }
@@ -383,7 +374,7 @@ export async function projectCaseDetail(
   for (const strategy of recoveryCase.strategies) {
     const persisted = persistedVerdicts.get(strategy.id);
     const candidate = persisted
-      ? { feasible: persisted.feasible, rejectionReasons: persisted.rejectionReasons }
+      ? { feasible: persisted.feasible, rejectionEvidence: persisted.rejectionEvidence }
       : await evaluateCandidate(deps.viability, snapshot, strategy);
     const intent = recoveryCase.actionIntents.find((i) => i.strategyId === strategy.id);
     const decision = intent
@@ -392,8 +383,10 @@ export async function projectCaseDetail(
     options.push({
       id: strategy.id,
       title: strategy.summary,
-      verdict: candidate.feasible ? 'VIABLE' : candidate.rejectionReasons.length > 0 ? 'NOT_VIABLE' : 'UNKNOWN',
-      ...(candidate.rejectionReasons.length > 0 ? { rejectionReason: candidate.rejectionReasons.join(' ') } : {}),
+      verdict: candidate.feasible ? 'VIABLE' : candidate.rejectionEvidence.length > 0 ? 'NOT_VIABLE' : 'UNKNOWN',
+      ...(candidate.rejectionEvidence.length > 0
+        ? { rejectionReason: presentCandidateRejection(candidate.rejectionEvidence, snapshot.constraints) }
+        : {}),
       ...(strategy.id === bestStrategyId ? { recommended: true } : {}),
       ...(strategy.costImpact ? { costDelta: strategy.costImpact } : {}),
       ...(decision && decision.outcome !== 'AUTO_APPROVED' ? { requiresApproval: true } : {}),
@@ -432,9 +425,7 @@ export async function projectCaseDetail(
     const intent = intentForDecision(recoveryCase, latestRequiring);
     approval = {
       requestedFrom: latestRequiring.outcome === 'REQUIRES_TRAVELLER' ? 'TRAVELLER' : 'ORGANISATION',
-      reason:
-        latestRequiring.ruleTrace[latestRequiring.ruleTrace.length - 1] ??
-        'Policy requires approval before this change can proceed',
+      reason: presentApprovalReason(),
       ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
       state: latestRequiring.approval
         ? latestRequiring.approval.decision === 'APPROVED'
@@ -458,7 +449,7 @@ export async function projectCaseDetail(
     const simulated = result?.provenance === 'SIMULATED';
     return {
       id: intent.id,
-      label: `${ACTION_LABEL[intent.operation] ?? intent.operation}${simulated ? ' (simulated at provider boundary)' : ''}`,
+      label: `${presentAction(intent.operation)}${simulated ? ' (simulated at provider boundary)' : ''}`,
       state,
     };
   });
@@ -486,12 +477,12 @@ export async function projectCaseDetail(
     ...(approval ? { approval } : {}),
     actions,
     ...(funding ? { funding } : {}),
-    uncertainties: assessment.unresolvedUnknowns,
+    uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
     ...(recoveryCase.resolution
       ? {
           resolution: {
             outcome: recoveryCase.resolution.outcome,
-            summary: recoveryCase.resolution.summary ?? recoveryCase.resolution.outcome,
+            summary: presentResolution(recoveryCase.resolution),
             ...(remainingLosses.length > 0 ? { remainingLosses } : {}),
           },
         }
@@ -531,7 +522,7 @@ export async function projectTravellerTrip(
       break;
     }
   }
-  if (!whatMattersNow && recoveryCase?.resolution) whatMattersNow = recoveryCase.resolution.summary;
+  if (!whatMattersNow && recoveryCase?.resolution) whatMattersNow = presentResolution(recoveryCase.resolution);
 
   const actionsInProgress: string[] = [];
   const inputRequested: TravellerInputRequest[] = [];
@@ -541,7 +532,7 @@ export async function projectTravellerTrip(
       const result = recoveryCase.executionResults.find((r) => r.intentId === intent.id);
       const simulated = result?.provenance === 'SIMULATED';
       actionsInProgress.push(
-        `${ACTION_LABEL[intent.operation] ?? intent.operation}${simulated ? ' (simulated provider response)' : ''}`,
+        `${presentAction(intent.operation)}${simulated ? ' (simulated provider response)' : ''}`,
       );
     }
     for (const decision of pendingApprovalDecisions(recoveryCase)) {
@@ -585,7 +576,7 @@ export async function projectTravellerTrip(
     actionsInProgress,
     inputRequested,
     remainderViable,
-    ...(recoveryCase?.resolution ? { resolutionSummary: recoveryCase.resolution.summary } : {}),
+    ...(recoveryCase?.resolution ? { resolutionSummary: presentResolution(recoveryCase.resolution) } : {}),
     updatedAt: recoveryCase ? recoveryCase.updatedAt : trip.updatedAt,
   };
 }
