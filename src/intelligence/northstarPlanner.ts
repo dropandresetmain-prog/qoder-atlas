@@ -318,16 +318,20 @@ export class NorthstarPlanner implements RecoveryPlanner {
 
     // Direction comes from PLACE evidence, never array order: arriveBy
     // targets the leg arriving AT the event place; departAfter the leg
-    // departing FROM it. When an itinerary leg matches, it outranks the
+    // departing FROM it. Matching is gateway-aware (fix C): a leg endpoint
+    // and the event place compare by their RESOLVED transport gateway, so a
+    // venue whose gateway is a separate airport place still matches legs
+    // ending at that airport. When an itinerary leg matches, it outranks the
     // shared arrival slot (promotion-time constraint subject, REV-2 WP-R2);
     // the slot stays rebookable only when it IS the trip's only flight leg.
+    const eventGatewayId = eventPlaceId ? this.airportGatewayFor(input, eventPlaceId)?.placeId : undefined;
     const legFor = (dimension: WindowDimension): TransportLeg | undefined => {
-      if (!eventPlaceId) return undefined;
-      const matches = flightLegs.filter((element) =>
-        dimension === 'arriveBy'
-          ? element.data.destinationPlaceId === eventPlaceId
-          : element.data.originPlaceId === eventPlaceId,
-      );
+      if (!eventGatewayId) return undefined;
+      const matches = flightLegs.filter((element) => {
+        const endpointPlaceId =
+          dimension === 'arriveBy' ? element.data.destinationPlaceId : element.data.originPlaceId;
+        return this.airportGatewayFor(input, endpointPlaceId)?.placeId === eventGatewayId;
+      });
       if (matches.length === 0) return undefined;
       const itinerary = matches.filter((element) => element.id !== `el-${input.snapshot.tripId}-arrival`);
       return itinerary[0] ?? matches[0];
