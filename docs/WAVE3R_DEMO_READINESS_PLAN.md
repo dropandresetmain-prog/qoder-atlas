@@ -105,6 +105,97 @@ Do not invent a new generalized RECORD abstraction if it is unnecessary.
 
 ## 4. Scenario capability matrix
 
+### 4.1 Final-video scope and revised execution decisions (26 Aug 2026)
+
+This is the active final-video scope and execution order. It supersedes this
+document's earlier scenario-selection guidance, but does not create a new
+milestone or review. `docs/IMPLEMENTATION_PLAN.md` remains the execution SSOT;
+this document remains subordinate to it.
+
+**Final video scenarios:** `S2 -> S1 -> S3 -> S7 -> S5`.
+
+`S6` remains repository capability evidence and a fallback, not primary video
+scope.
+
+#### Provider-reality principle
+
+1. Prove the generic capability first.
+2. Discover real/sandbox provider evidence for that capability.
+3. Design synthetic traveller, event and programme facts around the discovered
+   evidence.
+4. Never design application or domain logic around scenario IDs or demo-specific
+   values.
+
+#### Final scenario intent
+
+**S2 — progressive missed connection and overnight recovery.** Use a Europe or
+Americas origin. A two-leg or three-leg itinerary is acceptable. An incremental
+upstream delay progressively erodes connection viability until a connection is
+impossible; the next viable onward flight requires an overnight stay in the
+transit country. Recovery considers replacement flights, a transit hotel,
+immigration/entry ability, missed-connection insurance coverage, shifted
+Singapore hotel/stay consequences, ground movement and event viability. Event
+constraints must matter without making every recovery impossible. Lock the exact
+origin, hub and route only after targeted Atlas discovery.
+
+**S1 — multi-traveller schedule-change blast radius.** One external airline
+schedule change affects multiple speakers. Some airline reprotections remain
+whole-trip viable; some are automatically recoverable by Northstar; one critical
+traveller has no viable travel solution and is escalated. Its primary purpose is
+the differentiated blast radius across travellers.
+
+**S3 — S1 programme counterfactual and commit.** Continue directly from S1
+without reset. Northstar may propose non-travel programme alternatives, but has
+no autonomous authority to change the programme. The organiser previews
+alternatives with zero authoritative mutation, preferably moving or swapping the
+critical speaker's slot with a local or otherwise non-travel-dependent
+participant, then commits the programme change. Re-evaluate the formerly blocked
+S1 case; its airline rebooking becomes viable. Programme facts are synthetic
+data; logic remains generic.
+
+**S7 — pre-booking origin change.** The traveller requests Tokyo as the origin
+before booking. Supply return intent explicitly so unrelated uncertainty does not
+distract the demonstration. Use real Atlas alternatives where available and an
+FX-normalized policy comparison. The change requires organiser approval and
+demonstrates flight change plus authority.
+
+**S5 — post-booking personal extension.** The existing event-funded hotel
+booking/value establishes the funded baseline. The covered amount is the lower
+of the eligible booked hotel value and applicable policy allowance; any
+incremental personal-extension cost is traveller-funded. The desired outcome is
+automatic Northstar resolution within configured traveller authority. This
+demonstrates hotel capability and mixed funding.
+
+#### Act now — generic work
+
+1. FX/home-currency normalization while preserving ADR-045 fail-closed
+   semantics.
+2. Targeted Atlas route discovery for final demo corridors.
+3. Generic hotel replacement and stay-date replanning gaps G1/G2.
+4. S2 insurance plus authoritative entry/immigration capability audit.
+5. Final Kimi UI implementation concurrently on an isolated branch.
+
+#### Execution order after discovery
+
+1. Lock S2 provider-backed route/facts.
+2. Lock S1 provider-backed corridor and synthetic cohort constraints.
+3. Lock S7.
+4. Lock S5 hotel/return evidence.
+5. Reconcile the synthetic event programme.
+6. Execute S2.
+7. Execute S1.
+8. Continue directly into S3.
+9. Execute S7.
+10. Execute S5.
+11. Integrate final UI.
+12. Full clean rerun.
+13. G3R-R2.
+14. Wave 4 stabilisation.
+15. Final Candidate Review.
+16. Submission.
+
+No new formal milestones or reviews are created by this revision.
+
 > **Superseded for scenario naming/intent:** the current frozen scenario
 > catalogue is `docs/SCENARIOS.md` (8 scenarios, S1–S8; Tier A: S1/S2/S3/S4/S7;
 > High-Priority Stretch: S5/S6/S8). The "S1–S4" family labels below are this
