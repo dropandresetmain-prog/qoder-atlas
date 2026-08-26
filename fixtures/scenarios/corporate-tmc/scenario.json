@@ -71,7 +71,8 @@
         "id": "org_b_employer",
         "name": "Northgate Consulting Group",
         "roles": ["POLICY_OWNER", "APPROVER", "PAYER", "DUTY_OF_CARE"],
-        "contact": "travel-desk@example.com"
+        "contact": "travel-desk@example.com",
+        "homeCurrency": "USD"
       }
     ],
     "travellers": [

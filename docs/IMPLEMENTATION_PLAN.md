@@ -1145,6 +1145,21 @@ Hotel reality: one proper **real hotel API adapter is MINIMUM**. Candidate remai
 > window-shift planning fails closed on shipped fixtures whose event venues
 > carry no airport-code ref (no venue→airport link mechanism exists).
 > Candidate published for NS-G3R review; NOT merged to `main`.
+>
+> Status update (26 Aug 2026): NORTHSTAR FX/home-currency normalization
+> (ADR-052) executed on branch `wave3r/fx-home-currency` from base `786d9cd`
+> (Mission 3 SSOT baseline). Provider quotes may arrive in any currency;
+> organisation policy states a configurable home currency (`Organisation.homeCurrency`,
+> demo fixtures state SGD explicitly — no engine default). Authority compares
+> gross spend against evidenced, effective, trusted FX restatements only and
+> still fails closed on missing/stale/untrusted evidence (ADR-045 preserved);
+> the executor pays the ORIGINAL provider amount frozen at authorisation, so a
+> later FX move can never raise the authorised charge. Application-owned
+> `fx_rates` SQLite store + optional per-scenario `fx-rates.json` seeding via
+> the generic bundle path. Gates: 602/602 tests (incl. new
+> `test/northstar-fx-normalization.test.ts` pinning the required matrix plus an
+> alternate EUR/JPY-home dataset), typecheck/lint/build clean, anti-hardcoding
+> scan clean. Contract delta is additive-only and recorded in ADR-052.
 
 Goal: turn the accepted backend into the judge-facing product.
 

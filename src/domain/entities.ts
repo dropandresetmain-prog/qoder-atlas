@@ -33,6 +33,13 @@ export const OrganisationSchema = z.strictObject({
   name: z.string(),
   roles: z.array(OrganisationRoleSchema).default([]),
   contact: z.string().optional(),
+  /**
+   * Configurable reporting/policy currency for this organisation (ADR-052).
+   * Engine logic never assumes a specific value; organisations without one
+   * simply have no home-currency normalization (spend comparisons stay
+   * same-currency or fail closed exactly as before).
+   */
+  homeCurrency: z.string().regex(/^[A-Z]{3}$/).optional(),
 });
 export type Organisation = z.infer<typeof OrganisationSchema>;
 

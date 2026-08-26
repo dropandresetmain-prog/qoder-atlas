@@ -58,6 +58,7 @@ import {
 } from './index.ts';
 import { createProviderBackedExecutor } from './providerExecution.ts';
 import { SqliteBookingDossierStore, type BookingDossierStore } from './dossierStore.ts';
+import { SqliteFxRateStore, type FxRateStore } from './fxStore.ts';
 import { createFlightDossierResolver, createHotelDossierResolver } from './dossierResolver.ts';
 import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
@@ -90,6 +91,8 @@ export interface ComposedRuntime {
    * identity from model output.
    */
   dossierStore: BookingDossierStore;
+  /** Application-owned FX evidence store (ADR-052). */
+  fxRateStore: FxRateStore;
   /** The wired capability adapters (tool dispatch surface). */
   capabilities: ToolDispatchCapabilities;
   /** Advertised capability descriptors (registry evidence). */
@@ -134,6 +137,7 @@ export async function composeAppRuntime(
   const audit = new SqliteAuditRepository(database);
   const preferences = new SqlitePreferenceStore(database);
   const dossiers = new SqliteBookingDossierStore(database);
+  const fxRates = new SqliteFxRateStore(database);
   const eventInbox = new SqliteEventInboxStore(database);
   const mutations = new SqlMutationService({ db: database, trips, entities });
 
@@ -151,7 +155,7 @@ export async function composeAppRuntime(
       if (!entry.isDirectory()) continue;
       try {
         const outcome = await seedScenarioBundle(
-          { mutations, sources, preferences, audit, dossiers },
+          { mutations, sources, preferences, audit, dossiers, fxRates },
           join(scenariosRoot, entry.name),
         );
         seededScenarioIds.push(outcome.scenarioId);
@@ -258,8 +262,7 @@ export async function composeAppRuntime(
     cases,
     audit,
     authority: new DeterministicAuthorityEngine({ ruleSets: ruleSetSource(entities) }),
-    executor: createRecoveryExecutor({
-      // DR-2.8: provider-backed execution replaces simulation-first for the
+    executor: createRecoveryExecutor({      // DR-2.8: provider-backed execution replaces simulation-first for the
       // operations the wired capabilities actually perform; the simulation
       // boundary remains the fallback for unwired operations (ADR-007) and
       // for REPLAY misses on recordings.
@@ -290,6 +293,8 @@ export async function composeAppRuntime(
     entities,
     // Funding evidence lives on triggering signals (change-request anchors).
     signals,
+    // ADR-052: evidenced FX observations for home-currency normalization.
+    fxRates,
   });
 
   // Planner: LIVE Model Studio only when explicitly NOT in REPLAY mode AND
@@ -339,6 +344,7 @@ export async function composeAppRuntime(
     fixturesDir: config.fixturesDir,
     programmeService: bootProgrammeService,
     dossiers,
+    fxRates,
   });
 
   // Demo-only surface: load scenario specs for human clickaround triggers.
@@ -514,6 +520,7 @@ export async function composeAppRuntime(
     executionService,
     readDeps,
     dossierStore: dossiers,
+    fxRateStore: fxRates,
     capabilities,
     capabilityDescriptors,
     planner,

@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, EntityRefSchema, IsoDateTimeSchema, MoneySchema } from '../domain/common.ts';
 import { PayerSchema } from '../domain/rules.ts';
+import { FxNormalizationRecordSchema } from './fxRecord.ts';
 import { CapabilityFamilySchema } from './strategy.ts';
 
 export const SideEffectLevelSchema = z.enum([
@@ -107,6 +108,22 @@ export const ActionIntentSchema = z.strictObject({
    * A MONEY_MOVING intent without a deterministic gross spend fails closed.
    */
   spendExposure: MoneySchema.optional(),
+  /**
+   * The ORIGINAL provider-currency charge behind `spendExposure` (ADR-052).
+   * Present when the strategy cost was quoted in a non-home currency and was
+   * normalized for policy comparison: authority compares the home-currency
+   * restatement (`fxNormalization.homeSpend`) while the executor's payment
+   * ceiling stays THIS amount — a later FX move can never raise an
+   * already-authorised provider charge. Absent when no normalization applied.
+   */
+  providerSpend: MoneySchema.optional(),
+  /**
+   * Deterministic evidence of HOW `spendExposure` was derived from
+   * `providerSpend` (ADR-052): rate, evidence id, comparison instant and the
+   * normalized home restatement authority evaluated. Absent when same-currency
+   * or unnormalized; never carries an unevidenced conversion.
+   */
+  fxNormalization: FxNormalizationRecordSchema.optional(),
   /** Deterministic payer allocation of `priceDelta` when mixed funding applies. */
   costAllocation: CostAllocationSchema.optional(),
   /** Evidence refs supporting the intent (viability results, quotes...). */

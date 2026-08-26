@@ -82,7 +82,8 @@
         "id": "org_a_organiser",
         "name": "DevSummit 2026 Organising Team",
         "roles": ["EVENT_ORGANISER", "POLICY_OWNER", "APPROVER", "PAYER"],
-        "contact": "speakers@example.org"
+        "contact": "speakers@example.org",
+        "homeCurrency": "SGD"
       }
     ],
     "travellers": [

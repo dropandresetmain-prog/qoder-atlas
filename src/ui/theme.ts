@@ -269,6 +269,7 @@ body {
 }
 .chip.chip-extra { background: var(--watch-bg); color: var(--watch); border-color: var(--watch-border); }
 .chip.chip-saving { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-border); }
+.chip.chip-provider { background: transparent; color: var(--text-faint); }
 a.chip { text-decoration: none; transition: border-color 150ms ease-out; }
 a.chip:hover { border-color: var(--text-faint); }
 

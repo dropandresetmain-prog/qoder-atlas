@@ -1,0 +1,13 @@
+{
+  "rates": [
+    {
+      "id": "fx-usd-sgd-sept",
+      "baseCurrency": "USD",
+      "homeCurrency": "SGD",
+      "rate": 1.35,
+      "sourceId": "src_a_organiser_policy",
+      "authority": "CONNECTED",
+      "observedAt": "2026-09-01T00:00:00+09:00"
+    }
+  ]
+}

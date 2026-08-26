@@ -266,17 +266,22 @@ export function createProviderBackedExecutor(
    * reviewed when it authorised THIS intent. The executor holds no strategy
    * resolver: re-reading mutable strategy state after authority would let a
    * later strategy mutation raise the authorised spend without review.
+   *
+   * ADR-052: when that exposure was restated from a provider currency, the
+   * ceiling is the ORIGINAL provider amount (`providerSpend`), never the
+   * home-currency restatement — an FX move after authorisation can never
+   * raise the charge committed at the provider.
    */
   function ceilingFor(intent: ActionIntent): Money | undefined {
-    return intent.spendExposure;
+    return intent.providerSpend ?? intent.spendExposure;
   }
 
   /**
    * The spend authority actually reviewed against SPEND_LIMIT /
-   * APPROVAL_ABOVE_SPEND (ADR-048) — the intent's gross spendExposure, never
-   * the incremental priceDelta. A consequential payment whose intent carries
-   * no reviewed gross spend is refused: authority cannot have evaluated a
-   * charge it never saw, and the order remains HELD for re-entry.
+   * APPROVAL_ABOVE_SPEND (ADR-048) — for FX-normalized intents the
+   * home-currency restatement is what policy compared; the executor still
+   * refuses to pay anything whose reviewed gross spend is missing entirely
+   * (ADR-052 keeps the original provider amount as the payable ceiling).
    */
   function reviewedSpendFor(intent: ActionIntent): Money | undefined {
     return intent.spendExposure;

@@ -458,7 +458,15 @@ export async function projectCaseDetail(
         ? { rejectionReason: presentCandidateRejection(candidate.rejectionEvidence, snapshot.constraints) }
         : {}),
       ...(strategy.id === bestStrategyId ? { recommended: true } : {}),
-      ...(strategy.costImpact ? { costDelta: strategy.costImpact } : {}),
+      // ADR-052: an FX-normalized intent freezes BOTH the home restatement
+      // (spendExposure) and the original provider charge (providerSpend); the
+      // view shows the restatement as the cost delta and keeps the provider
+      // amount visible. Unnormalized strategies keep the raw costImpact.
+      ...(intent?.providerSpend && intent.spendExposure
+        ? { costDelta: intent.spendExposure, providerCost: intent.providerSpend }
+        : strategy.costImpact
+          ? { costDelta: strategy.costImpact }
+          : {}),
       ...(decision && decision.outcome !== 'AUTO_APPROVED' ? { requiresApproval: true } : {}),
       // Mixed funding (ADR-037): the deterministic allocation persisted on
       // the intent — projected verbatim, never re-derived in the view.

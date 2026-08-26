@@ -14,8 +14,11 @@
  * deterministic outcome resolves the case (FULLY_RECOVERED /
  * RECOVERED_WITH_LOSS) or loops back into assessment/planning.
  */
-import type { EntityId, EntityRef, IsoDateTime } from '../domain/common.ts';
+import type { EntityId, EntityRef, IsoDateTime, Money } from '../domain/common.ts';
 import { instantMillis, IsoDateTimeSchema } from '../domain/common.ts';
+import type { FxRateEvidence } from '../engine/fx.ts';
+import { resolveHomeCurrency, fxNormalizeSpend, isFxNormalizationFailure } from '../engine/fx.ts';
+import type { FxNormalizationRecord } from '../operational/fxRecord.ts';
 import type { TripSnapshot } from '../operational/snapshot.ts';
 import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type {
@@ -38,6 +41,7 @@ import type {
   ObservationService,
   PrincipalRecord,
 } from '../contracts/services.ts';
+import type { FxRateResolver } from '../contracts/services.ts';
 import type { AuditRepository, CaseRepository, SignalRepository, TripRepository } from '../contracts/repositories.ts';
 import type { EntityStore } from '../persistence/entityStore.ts';
 import { CaseService } from '../engine/case.ts';
@@ -141,6 +145,17 @@ function providerParametersFor(strategy: RecoveryStrategy): Record<string, unkno
  * state, so a strategy mutated after authority cannot raise the authorised
  * spend. A MONEY_MOVING intent without a gross spend fails closed upstream
  * in authority; non-money-moving intents leave the exposure absent.
+ *
+ * ADR-052 FX semantics: when the gross spend was quoted in a currency other
+ * than the organisation's home currency AND a normalization succeeds, the
+ * frozen exposure becomes the NORMALIZED home-currency amount authority can
+ * actually compare against policy, and the ORIGINAL provider amount is frozen
+ * alongside it as `providerSpend`. The executor's payment gate then runs on
+ * the provider amount (`providerSpend`), never the restatement: an FX move
+ * after authorisation can never raise the charge committed at the provider.
+ * When no home currency applies or evidence is absent, nothing is added —
+ * the exposure stays in the provider currency and cross-currency comparison
+ * fails closed downstream.
  */
 export function buildActionIntent(input: {
   id: EntityId;
@@ -149,9 +164,16 @@ export function buildActionIntent(input: {
   at: IsoDateTime;
   /** Deterministic payer allocation of priceDelta when mixed funding applies. */
   costAllocation?: ActionIntent['costAllocation'];
+  /**
+   * Pre-computed deterministic normalization of the strategy cost into the
+   * organisation home currency (ADR-052). The runtime resolves it from
+   * authoritative state + evidenced rates BEFORE constructing the intent;
+   * absent => unnormalized (legacy behaviour preserved).
+   */
+  fxNormalization?: { record: FxNormalizationRecord; providerAmount: Money };
 }): ActionIntent {
   const { operation, capability, sideEffectLevel } = consequentialOperationFor(input.strategy.candidateOperations);
-  const grossSpend = input.strategy.costImpact;
+  const grossSpend = input.fxNormalization?.record.homeSpend ?? input.strategy.costImpact;
   return {
     id: input.id,
     caseId: input.caseId,
@@ -162,6 +184,12 @@ export function buildActionIntent(input: {
     sideEffectLevel,
     ...(grossSpend ? { priceDelta: grossSpend } : {}),
     ...(sideEffectLevel === 'MONEY_MOVING' && grossSpend ? { spendExposure: grossSpend } : {}),
+    ...(sideEffectLevel === 'MONEY_MOVING' && input.fxNormalization
+      ? {
+          providerSpend: input.fxNormalization.providerAmount,
+          fxNormalization: input.fxNormalization.record,
+        }
+      : {}),
     ...(input.costAllocation ? { costAllocation: input.costAllocation } : {}),
     evidenceRefs: [],
     expectedResult: input.strategy.summary,
@@ -374,6 +402,12 @@ export interface RecoveryExecutionDependencies {
    * directly without signal history.
    */
   signals?: SignalRepository;
+  /**
+   * Optional FX evidence resolver (ADR-052): evidenced base->home rates for a
+   * currency pair. Present in the composed runtime; absent => no
+   * normalization is attempted and cross-currency comparisons fail closed.
+   */
+  fxRates?: FxRateResolver;
 }
 
 export interface BeginStrategyInput {
@@ -458,18 +492,37 @@ export class RecoveryExecutionService {
       recoveryCase.triggeredBySignalIds,
       input.strategy,
     );
+    // ADR-052: resolve home-currency normalization BEFORE the intent is built,
+    // so the frozen exposure is the amount authority can deterministically
+    // compare and the original provider amount is frozen alongside it. No
+    // normalization when no strategy cost exists, no home currency is
+    // derivable, or evidence resolution fails — those keep legacy semantics
+    // (provider-currency exposure; cross-currency comparison fails closed).
+    const fxNormalization = await this.fxNormalizationFor(input.snapshot, input.strategy.costImpact, at);
     const intent = buildActionIntent({
       id: this.nextIntentId(input.caseId, input.strategy.id, recoveryCase.actionIntents.map((i) => i.id)),
       caseId: input.caseId,
       strategy: input.strategy,
       at,
       ...(costAllocation ? { costAllocation } : {}),
+      ...(fxNormalization ? { fxNormalization } : {}),
     });
+    let fxContext: { homeCurrency: string; fxRates: FxRateEvidence[] } | undefined;
+    if (this.deps.fxRates && fxNormalization) {
+      const providerCurrency = (intent.providerSpend ?? intent.spendExposure)?.currency;
+      if (providerCurrency) {
+        const rates = (await this.deps.fxRates.ratesFor(providerCurrency, fxNormalization.record.homeCurrency)) as FxRateEvidence[];
+        fxContext = { homeCurrency: fxNormalization.record.homeCurrency, fxRates: rates };
+      }
+    }
     const context: AuthorityContext = {
       tripId: input.snapshot.tripId,
       caseId: input.caseId,
       ruleSetIds: input.snapshot.trip.governedByRuleSetIds,
       principals: principalsForSnapshot(input.snapshot),
+      // ADR-052: evidenced rate data for authority comparison of any residual
+      // cross-currency rule amounts. Absent resolver => absent field.
+      ...(fxContext ?? {}),
     };
     const decision = await this.deps.authority.decide(intent, context);
 
@@ -504,6 +557,11 @@ export class RecoveryExecutionService {
         // onto the intent. Authority decisions are auditable against the
         // exact charge the executor may later commit.
         ...(intent.spendExposure ? { reviewedSpendExposure: intent.spendExposure } : {}),
+        // ADR-052: when the exposure was restated from a provider currency,
+        // audit records BOTH sides — the original provider charge and how it
+        // was normalized — so decisions reconcile against actual payments.
+        ...(intent.providerSpend ? { providerSpend: intent.providerSpend } : {}),
+        ...(intent.fxNormalization ? { fxNormalization: intent.fxNormalization } : {}),
         // Mixed-funding evidence (ADR-037): the deterministic allocation of
         // the intent's priceDelta, when one was derivable from FUNDED_WINDOW
         // rules + a cost anchor. Absence means allocation is UNKNOWN.
@@ -732,6 +790,43 @@ export class RecoveryExecutionService {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * ADR-052: deterministic home-currency normalization of a strategy cost.
+   * Home currency comes from the trip's governing ORGANISATION rule-set
+   * owners (alphabetical, disagreement = none); rate evidence comes from the
+   * injected resolver. Any gap (no owner, no currency, no evidence) yields
+   * undefined — legacy provider-currency semantics, never a guess.
+   */
+  private async fxNormalizationFor(
+    snapshot: TripSnapshot,
+    costImpact: Money | undefined,
+    at: IsoDateTime,
+  ): Promise<{ record: FxNormalizationRecord; providerAmount: Money } | undefined> {
+    if (!costImpact || !this.deps.fxRates) return undefined;
+    const homeCurrency = resolveHomeCurrency({
+      organisations: snapshot.organisations.map((organisation) => ({
+        id: organisation.id,
+        ...(organisation.homeCurrency ? { homeCurrency: organisation.homeCurrency } : {}),
+      })),
+      governedByRuleSetIds: snapshot.trip.governedByRuleSetIds,
+      ruleSets: snapshot.ruleSets,
+    });
+    if (!homeCurrency || costImpact.currency === homeCurrency) return undefined;
+    const candidates = (await this.deps.fxRates.ratesFor(costImpact.currency, homeCurrency)) as FxRateEvidence[];
+    const outcome = fxNormalizeSpend({ providerSpend: costImpact, homeCurrency, at, candidates });
+    if (isFxNormalizationFailure(outcome)) return undefined;
+    return {
+      record: {
+        homeCurrency,
+        homeSpend: outcome.homeSpend,
+        rate: outcome.rate!,
+        ...(outcome.fxSourceId ? { fxSourceId: outcome.fxSourceId } : {}),
+        normalizedAt: at,
+      },
+      providerAmount: outcome.providerAmount,
+    };
+  }
 
   /**
    * Authoritative mixed-funding allocation for a strategy (ADR-037).

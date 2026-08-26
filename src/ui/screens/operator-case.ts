@@ -138,7 +138,12 @@ function optionCard(option: RecoveryOptionView): string {
   const cost = option.costDelta
     ? (() => {
         const delta = formatCostDelta(option.costDelta);
-        return `<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-extra'}">${escapeHtml(delta.text)}</span>`;
+        // ADR-052: keep the original provider charge visible beside the
+        // home-currency restatement so the two never blur together.
+        const provider = option.providerCost
+          ? `<span class="chip chip-provider">${escapeHtml(`${formatMoney(option.providerCost)} at provider`)}</span>`
+          : '';
+        return `${provider}<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-extra'}">${escapeHtml(delta.text)}</span>`;
       })()
     : '';
   const approval = option.requiresApproval ? '<span class="chip">Needs approval</span>' : '';

@@ -38,6 +38,7 @@ import { seedScenarioBundle } from './bootstrap.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import type { ProgrammeService } from './programme.ts';
 import type { BookingDossierStore } from './dossierStore.ts';
+import type { FxRateStore } from './fxStore.ts';
 import { signalHorizon, liftToHorizon, type RecoveryExecutionService } from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
@@ -75,6 +76,12 @@ export interface RuntimeDependencies {
    * Absent keeps prior reset semantics (no dossiers seeded).
    */
   dossiers?: BookingDossierStore;
+  /**
+   * Application-owned FX evidence store (ADR-052): reset wipes and reseeds
+   * evidenced rate observations through the same bundle path. Absent keeps
+   * prior reset semantics (no rates seeded).
+   */
+  fxRates?: FxRateStore;
 }
 
 export interface RuntimePlanOutcome {
@@ -307,6 +314,7 @@ export class RuntimeOrchestrator {
     withTransaction(this.deps.db, () => {
       const tables = ['audit', 'source_contents', 'sources', 'signals', 'cases', 'trips', 'entities', 'preferences'];
       if (this.deps.dossiers) tables.push('booking_dossiers');
+      if (this.deps.fxRates) tables.push('fx_rates');
       // Application-owned ingress dedup state (lazily created by the event
       // inbox store): reset must forget previously-delivered provider events
       // too, otherwise a deterministic rerun of the same acceptance manifest
@@ -331,6 +339,7 @@ export class RuntimeOrchestrator {
             preferences: this.deps.preferences,
             audit: this.deps.audit,
             ...(this.deps.dossiers ? { dossiers: this.deps.dossiers } : {}),
+            ...(this.deps.fxRates ? { fxRates: this.deps.fxRates } : {}),
           },
           scenarioDir,
         );

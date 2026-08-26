@@ -93,6 +93,30 @@ export interface AuthorityContext {
   caseId: EntityId;
   ruleSetIds: EntityId[];
   principals: PrincipalRecord[];
+  /**
+   * FX evidence available for home-currency normalization of a non-home
+   * spend (ADR-052). Optional for backwards compatibility; when absent the
+   * authority behaves exactly as before (incomparable currencies fail
+   * closed). Evidence is re-validated by the engine.
+   */
+  fxRates?: unknown[];
+  /**
+   * Organisation-configured home currency for this trip's policy comparison.
+   * Optional: absent means no home currency is derivable, so cross-currency
+   * comparisons keep failing closed (ADR-045).
+   */
+  homeCurrency?: string;
+}
+
+/**
+ * FX evidence resolution seam (ADR-052): all evidenced base->home rate
+ * observations a store holds for one currency pair. Implementations return
+ * raw evidence; staleness/trust/effective-period judgement stays with the
+ * deterministic engine, never the store. Absence of evidence is normal data:
+ * the caller fails closed on it.
+ */
+export interface FxRateResolver {
+  ratesFor(baseCurrency: string, homeCurrency: string): Promise<unknown[]>;
 }
 
 /** Deterministic: identical intent + context always yields identical outcome. */

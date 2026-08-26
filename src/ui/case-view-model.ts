@@ -40,6 +40,13 @@ export interface RecoveryOptionView {
   recommended?: boolean;
   /** Positive = extra cost, negative = saving, versus the original plan. */
   costDelta?: Money;
+  /**
+   * ADR-052: when the cost was quoted in a non-home currency and normalized,
+   * the ORIGINAL provider amount/currency stays visible beside the
+   * home-currency restatement (`costDelta` carries the restatement when the
+   * intent was built through the FX path). Absent => no normalization.
+   */
+  providerCost?: Money;
   requiresApproval?: boolean;
   /**
    * Deterministic payer allocation of this option's cost (ADR-037), present

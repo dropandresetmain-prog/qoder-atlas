@@ -28,6 +28,7 @@ import type {
 import type { MutationService } from '../contracts/services.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import { BookingDossierBundleSchema, type BookingDossierStore } from './dossierStore.ts';
+import { FxRateBundleSchema, type FxRateStore } from './fxStore.ts';
 
 export interface SeedDependencies {
   mutations: MutationService;
@@ -42,6 +43,13 @@ export interface SeedDependencies {
    * apply unchanged.
    */
   dossiers?: BookingDossierStore;
+  /**
+   * Optional application-owned FX evidence store (ADR-052). Scenario bundles
+   * may ship an optional `fx-rates.json` with evidenced rate observations
+   * (provenance + effective period); absent store or file => no rates seeded,
+   * so cross-currency policy comparisons fail closed exactly as before.
+   */
+  fxRates?: FxRateStore;
 }
 
 export interface SeedOutcome {
@@ -52,6 +60,7 @@ export interface SeedOutcome {
   sourceIds: EntityId[];
   preferenceCount: number;
   dossierCount: number;
+  fxRateCount: number;
 }
 
 /** Seed one scenario bundle directory into authoritative persistent state. */
@@ -119,6 +128,19 @@ export async function seedScenarioBundle(
     }
   }
 
+  // 3c. FX rate evidence (application-owned store; market-data evidence, not
+  //     graph state). Every record is schema-validated with provenance and an
+  //     effective period; a bundle citing currencies no organisation uses is
+  //     harmless data — normalization resolves per currency pair at read time.
+  const fxBundle = loadFxRateBundle(scenarioDir);
+  let fxRateCount = 0;
+  if (deps.fxRates && fxBundle) {
+    for (const rate of fxBundle.rates) {
+      await deps.fxRates.save(rate);
+      fxRateCount += 1;
+    }
+  }
+
   // 4. Bootstrap audit entry complementing the mutation-service audit trail.
   await deps.audit.append({
     occurredAt: spec.trip.updatedAt,
@@ -132,6 +154,7 @@ export async function seedScenarioBundle(
       preferenceCount: spec.context.preferences.length,
       appliedOperationCount: outcome.appliedOperationCount,
       dossierCount,
+      fxRateCount,
     },
   });
 
@@ -143,6 +166,7 @@ export async function seedScenarioBundle(
     sourceIds: spec.context.sources.map((source) => source.id),
     preferenceCount: spec.context.preferences.length,
     dossierCount,
+    fxRateCount,
   };
 }
 
@@ -151,6 +175,13 @@ function loadDossierBundle(scenarioDir: string) {
   const path = join(scenarioDir, 'booking-dossiers.json');
   if (!existsSync(path)) return undefined;
   return BookingDossierBundleSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+}
+
+/** Optional `fx-rates.json` beside scenario.json; absent => none. */
+function loadFxRateBundle(scenarioDir: string) {
+  const path = join(scenarioDir, 'fx-rates.json');
+  if (!existsSync(path)) return undefined;
+  return FxRateBundleSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
 }
 
 /**
