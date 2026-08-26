@@ -39,6 +39,7 @@ import type { MutationService, ValidationIssue } from '../contracts/services.ts'
 import type { AuditRepository, CaseRepository, SignalRepository, SourceRepository, TripRepository } from '../contracts/repositories.ts';
 import type { EntityStore } from '../persistence/entityStore.ts';
 import { processSignal, type ProcessedSignal } from './signalPipeline.ts';
+import { reconcileAuthoritativeTripViability } from '../engine/viabilityReconciliation.ts';
 
 export interface ProgrammeServiceDeps {
   mutations: MutationService;
@@ -46,6 +47,12 @@ export interface ProgrammeServiceDeps {
   trips: TripRepository;
   sources: SourceRepository;
   audit: AuditRepository;
+  /**
+   * Optional signal store for post-import viability reconciliation. Absent in
+   * unit harnesses that only exercise intake identity rules — reconciliation
+   * then skips gracefully (trips remain at promotion-time UNKNOWN).
+   */
+  signals?: SignalRepository;
 }
 
 /**
@@ -154,6 +161,33 @@ export class ProgrammeService {
       outcomes.push(await this.promoteOne({ draft, traveller, at: input.at, commitmentById, governingRuleSetIds, anchorEvent, places }));
     }
 
+    // Post-import baseline viability: same deterministic machinery verification
+    // uses. UNKNOWN stays UNKNOWN when hard evidence is genuinely insufficient.
+    const viabilityReconciled: Array<{ tripId: EntityId; previous: string; next: string; insufficientEvidence: boolean }> = [];
+    if (this.deps.signals) {
+      const seen = new Set<EntityId>();
+      for (const outcome of outcomes) {
+        if (!outcome.promoted || !outcome.tripId || seen.has(outcome.tripId)) continue;
+        seen.add(outcome.tripId);
+        const reconciled = await reconcileAuthoritativeTripViability(
+          {
+            trips: this.deps.trips,
+            entities: this.deps.entities,
+            signals: this.deps.signals,
+            mutations: this.deps.mutations,
+          },
+          outcome.tripId,
+          { mode: 'baseline', evaluatedAt: input.at, proposalIdPrefix: 'prop-baseline' },
+        );
+        viabilityReconciled.push({
+          tripId: reconciled.tripId,
+          previous: reconciled.previous,
+          next: reconciled.next,
+          insufficientEvidence: reconciled.insufficientEvidence,
+        });
+      }
+    }
+
     await this.deps.audit.append({
       occurredAt: input.at,
       actor: 'app:programme-intake',
@@ -166,6 +200,7 @@ export class ProgrammeService {
         travellerCount: draft.travellers.length,
         promotedCount: outcomes.filter((outcome) => outcome.promoted).length,
         unresolvedStatements: draft.unresolvedStatements,
+        viabilityReconciled,
         outcomes: outcomes.map((outcome) => ({
           draftId: outcome.draftId,
           promoted: outcome.promoted,

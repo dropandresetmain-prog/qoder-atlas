@@ -40,18 +40,29 @@ export interface HealthView {
 }
 
 /**
- * Demo-only surface: scenario trigger + reset for local clickaround.
- * Never wired in production; only present when the composition loaded
- * scenario fixtures for demo convenience.
+ * Demo-only surface: reset, legacy scenario triggers, and final hero launches
+ * for local/deployed clickaround. Never wired into domain logic.
  */
 export interface DemoSurface {
   scenarioNames(): string[];
   /** Seeded programme event IDs for demo navigation links. */
   programmeEventIds?(): string[];
+  /** Final hero workflow ids launchable from the demo panel. */
+  heroWorkflows?(): Array<{ id: string; title: string; description: string }>;
   /** Which planner is active (for the demo banner display). */
   plannerMode?: () => 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
   reset(at: IsoDateTime): Promise<{ status: number; body: unknown }>;
   triggerScenario(name: string, at: IsoDateTime): Promise<{ status: number; body: unknown }>;
+  /**
+   * Launch a final hero workflow through existing acceptance manifest steps
+   * against the live server base URL. Stops before automated authority
+   * settlement when the catalog declares stop-before step ids.
+   */
+  launchHero?(
+    workflowId: string,
+    at: IsoDateTime,
+    baseUrl: string,
+  ): Promise<{ status: number; body: unknown }>;
 }
 
 export interface TravellerDecisionBody {
@@ -163,7 +174,7 @@ export interface WaveSurfaces {
 /** Application endpoints the HTTP surface projects; wired by the integrator. */
 export interface AppEndpoints {
   now(): IsoDateTime;
-  operatorDashboard(at: IsoDateTime): Promise<OperatorDashboardView>;
+  operatorDashboard(at: IsoDateTime, options?: { anchorEventId?: string }): Promise<OperatorDashboardView>;
   caseDetail(caseId: EntityId, at: IsoDateTime): Promise<CaseDetailView | undefined>;
   travellerTrip(tripId: EntityId, at: IsoDateTime): Promise<TravellerTripView | undefined>;
   firstTripId(): Promise<EntityId | undefined>;
@@ -198,12 +209,17 @@ export interface AppEndpoints {
 function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: string; decisions: string; activity: string; traveller: string } {
   const eventId = seededProgrammeEventId(endpoints);
   return {
-    dashboard: '/operator',
+    dashboard: eventId ? `/operator?event=${encodeURIComponent(eventId)}` : '/operator',
     ...(eventId ? { programme: `/programme?event=${encodeURIComponent(eventId)}` } : {}),
     decisions: '/decisions',
     activity: '/activity',
     traveller: '/traveller',
   };
+}
+
+/** Resolve explicit operator event scope from the query string only. */
+function operatorEventScope(url: URL): string | undefined {
+  return url.searchParams.get('event') ?? undefined;
 }
 
 /** Build the demo banner options from the current config. */
@@ -294,7 +310,11 @@ async function handle(
 
   // --- Operator HTML surfaces -------------------------------------------
   if (req.method === 'GET' && url.pathname === '/operator') {
-    const view = await endpoints.operatorDashboard(endpoints.now());
+    const eventId = operatorEventScope(url);
+    const view = await endpoints.operatorDashboard(
+      endpoints.now(),
+      eventId ? { anchorEventId: eventId } : undefined,
+    );
     const body = renderOperatorDashboardBody(view);
     sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
@@ -310,10 +330,13 @@ async function handle(
   }
   if (req.method === 'GET' && url.pathname === '/decisions') {
     const at = endpoints.now();
+    const eventId = operatorEventScope(url);
     const queue = endpoints.wave ? await endpoints.wave.approvalsQueue(at) : undefined;
     const view = queue
       ? decisionsFromApprovalsQueue(queue)
-      : decisionsFromDashboard(await endpoints.operatorDashboard(at));
+      : decisionsFromDashboard(
+          await endpoints.operatorDashboard(at, eventId ? { anchorEventId: eventId } : undefined),
+        );
     sendHtml(
       res,
       200,
@@ -405,7 +428,15 @@ async function handle(
 
   // --- JSON read models ---------------------------------------------------
   if (req.method === 'GET' && url.pathname === '/api/operator/dashboard') {
-    sendJson(res, 200, await endpoints.operatorDashboard(endpoints.now()));
+    const eventId = operatorEventScope(url);
+    sendJson(
+      res,
+      200,
+      await endpoints.operatorDashboard(
+        endpoints.now(),
+        eventId ? { anchorEventId: eventId } : undefined,
+      ),
+    );
     return;
   }
   if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'cases' && segments[2]) {
@@ -694,6 +725,7 @@ async function handle(
       adapterMode: config.adapterMode,
       plannerMode: endpoints.demo.plannerMode?.() ?? 'DETERMINISTIC_FALLBACK',
       scenarioNames: endpoints.demo.scenarioNames(),
+      heroWorkflows: endpoints.demo.heroWorkflows?.() ?? [],
       programmeEventId,
     });
     sendHtml(
@@ -723,6 +755,21 @@ async function handle(
         return;
       }
       const outcome = await endpoints.demo.triggerScenario(name, endpoints.now());
+      sendJson(res, outcome.status, outcome.body);
+      return;
+    }
+    if (segments[2] === 'launch' && endpoints.demo.launchHero) {
+      const workflowId = url.searchParams.get('workflow') ?? url.searchParams.get('id');
+      if (!workflowId) {
+        sendJson(res, 400, { error: 'missing_workflow_param' });
+        return;
+      }
+      const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0]!.trim();
+      const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? `127.0.0.1:${config.httpPort}`)
+        .split(',')[0]!
+        .trim();
+      const baseUrl = `${proto}://${host}`;
+      const outcome = await endpoints.demo.launchHero(workflowId, endpoints.now(), baseUrl);
       sendJson(res, outcome.status, outcome.body);
       return;
     }

@@ -36,6 +36,7 @@ import { runPlanningLoop, type CandidateRejectionEvidence, type ToolActivity } f
 import type { ToolDispatchCapabilities } from './dispatch.ts';
 import { seedScenarioBundle } from './bootstrap.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
+import { resolveWorldSeedMode, shouldBootSeedScenario } from './worldSeed.ts';
 import type { ProgrammeService } from './programme.ts';
 import type { BookingDossierStore } from './dossierStore.ts';
 import type { FxRateStore } from './fxStore.ts';
@@ -46,6 +47,7 @@ import { ResolutionTargetSchema, type ResolutionTarget } from '../contracts/chan
 import type { ActionIntent } from '../operational/intent.ts';
 import type { Money } from '../domain/common.ts';
 import { describeAllocation } from '../engine/funding.ts';
+import type { AppConfig } from '../config/config.ts';
 
 export interface RuntimeDependencies {
   db: DatabaseSync;
@@ -82,6 +84,12 @@ export interface RuntimeDependencies {
    * prior reset semantics (no rates seeded).
    */
   fxRates?: FxRateStore;
+  /**
+   * World-seed mode for reset/reseed. When omitted, reset seeds every
+   * ScenarioSpec bundle (legacy full behaviour).
+   */
+  worldSeedMode?: AppConfig['worldSeedMode'] | 'full' | 'programme';
+  environment?: AppConfig['environment'];
 }
 
 export interface RuntimePlanOutcome {
@@ -330,7 +338,12 @@ export class RuntimeOrchestrator {
 
     const seededScenarios: string[] = [];
     const tripIds: EntityId[] = [];
+    const worldSeedMode = resolveWorldSeedMode({
+      environment: this.deps.environment ?? 'local',
+      worldSeedMode: this.deps.worldSeedMode,
+    });
     for (const scenarioDir of listScenarioDirs(join(this.deps.fixturesDir, 'scenarios'))) {
+      if (!shouldBootSeedScenario(scenarioDir, worldSeedMode)) continue;
       try {
         const outcome = await seedScenarioBundle(
           {

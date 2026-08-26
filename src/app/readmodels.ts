@@ -213,6 +213,7 @@ function intentForDecision(recoveryCase: RecoveryCase, decision: AuthorityDecisi
 export async function projectOperatorDashboard(
   deps: ReadModelDependencies,
   generatedAt: IsoDateTime,
+  options?: { anchorEventId?: EntityId },
 ): Promise<OperatorDashboardView> {
   const summaries = await deps.snapshot.trips.listTrips();
   const trips: OperatorTripView[] = [];
@@ -221,6 +222,9 @@ export async function projectOperatorDashboard(
   for (const item of summaries) {
     const trip = await deps.snapshot.trips.getTrip(item.tripId);
     if (!trip) continue;
+    // Event-scoped operator projection: when an AnchorEvent is selected,
+    // only that programme's trips appear as ordinary participants.
+    if (options?.anchorEventId && trip.anchorEventId !== options.anchorEventId) continue;
     const recoveryCase = await latestCaseFor(deps.cases, trip.id);
     const status = await statusForTrip(trip, recoveryCase, deps.signals);
     if (status === 'READY') summary.ready += 1;

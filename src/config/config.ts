@@ -44,6 +44,9 @@ const FrankfurterConfigSchema = z.object({
   baseUrl: z.string().optional(),
 });
 
+export const WorldSeedModeSchema = z.enum(['full', 'programme']);
+export type WorldSeedMode = z.infer<typeof WorldSeedModeSchema>;
+
 export const AppConfigSchema = z.object({
   environment: z.enum(['local', 'dev', 'demo']).default('local'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -52,6 +55,12 @@ export const AppConfigSchema = z.object({
   sqlitePath: z.string().default('data/app.sqlite'),
   recordingsDir: z.string().default('recordings'),
   fixturesDir: z.string().default('fixtures'),
+  /**
+   * Boot/reset world composition. `programme` seeds only programme bundles
+   * plus non-harness scenarios; `full` also seeds acceptance-harness scenario
+   * trips. When omitted, `demo` environment defaults to `programme`.
+   */
+  worldSeedMode: WorldSeedModeSchema.optional(),
   providers: z.object({
     atlas: AtlasConfigSchema.prefault({}),
     modelStudio: ModelStudioConfigSchema.prefault({}),
@@ -95,6 +104,7 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
     sqlitePath: optional(env.SQLITE_PATH),
     recordingsDir: optional(env.RECORDINGS_DIR),
     fixturesDir: optional(env.FIXTURES_DIR),
+    worldSeedMode: optional(env.WORLD_SEED_MODE),
     providers: {
       atlas: {
         env: optional(env.ATLAS_ENV),

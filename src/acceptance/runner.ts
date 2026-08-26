@@ -40,6 +40,16 @@ export interface RunnerOptions {
   config?: AppConfig;
   env?: Record<string, string | undefined>;
   secrets?: ReadonlyArray<string>;
+  /**
+   * Demo/manual rehearsal: stop before these step ids (and skip the rest).
+   * Orchestration-only — never interpreted by domain logic.
+   */
+  stopBeforeStepIds?: readonly string[];
+  /**
+   * When true, HTTP status is still enforced but semantic manifest assertions
+   * are skipped (demo launch resilience). Default false for acceptance.
+   */
+  skipAssertions?: boolean;
 }
 
 export interface RunnerResult {
@@ -143,7 +153,20 @@ export async function runAcceptanceManifest(options: RunnerOptions): Promise<Run
   const secrets = options.secrets ?? collectSecrets(config);
 
   try {
+    const stopBefore = new Set(options.stopBeforeStepIds ?? []);
     for (const step of manifest.steps) {
+      if (stopBefore.has(step.id)) {
+        builder.recordStep({
+          stepId: step.id,
+          ...(step.description ? { description: step.description } : {}),
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          ok: true,
+          actionType: step.action.type,
+          error: 'skipped: demo stop-before boundary (manual authority rehearsal)',
+        });
+        break;
+      }
       await executeStep({
         step,
         baseUrl: baseUrl!,
@@ -151,6 +174,7 @@ export async function runAcceptanceManifest(options: RunnerOptions): Promise<Run
         builder,
         secrets,
         mode,
+        skipAssertions: options.skipAssertions === true,
       });
     }
   } catch (error) {
@@ -174,8 +198,9 @@ async function executeStep(input: {
   builder: EvidenceBuilder;
   secrets: ReadonlyArray<string>;
   mode: ScenarioExecutionMode;
+  skipAssertions?: boolean;
 }): Promise<void> {
-  const { step, baseUrl, bindings, builder, secrets, mode } = input;
+  const { step, baseUrl, bindings, builder, secrets, mode, skipAssertions } = input;
   const startedAt = new Date().toISOString();
   const action = step.action;
 
@@ -279,8 +304,11 @@ async function executeStep(input: {
 
     // Semantic assertions run after status checks and captures, so a step
     // that returns the expected status but semantically empty/rejected state
-    // still fails the run.
-    evaluateAssertions(step, http.body, bindings);
+    // still fails the run. Demo launches may skip assertions while still
+    // driving real product endpoints.
+    if (!skipAssertions) {
+      evaluateAssertions(step, http.body, bindings);
+    }
 
     const finishedAt = new Date().toISOString();
     const responseSanitized = sanitizeRaw(http.body, secrets);

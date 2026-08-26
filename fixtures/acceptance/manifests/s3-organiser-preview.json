@@ -76,7 +76,7 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "summary.disrupted", "op": "equals", "expected": 0, "description": "preview leaves disrupted count unchanged" }
+        { "path": "summary.disrupted", "op": "equals", "expected": 3, "description": "preview leaves baseline disrupted count unchanged (truthful post-import viability)" }
       ]
     },
     {

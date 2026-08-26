@@ -9,7 +9,7 @@
  * and capability vocabulary, never scenario content.
  */
 import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import { openDatabase } from '../persistence/database.ts';
@@ -66,6 +66,7 @@ import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
 import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
+import { resolveWorldSeedMode, shouldBootSeedScenario } from './worldSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { projectProgrammeAugmentations } from './programmeReadmodel.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
@@ -79,6 +80,9 @@ import { AtlasFlightStateReader } from '../providers/atlas/stateReader.ts';
 import { loadScenario, listScenarioDirs } from '../scenarios/loader.ts';
 import type { ScenarioSpec } from '../scenarios/spec.ts';
 import type { DemoSurface } from '../server/http.ts';
+import { DEMO_HERO_WORKFLOWS, demoHeroWorkflow, inspectPathsFromExpect } from './demoHeroes.ts';
+import { runAcceptanceManifest } from '../acceptance/runner.ts';
+import { loadAcceptanceManifest, resolveManifestPath } from '../acceptance/manifest.ts';
 
 export interface ComposedRuntime {
   db: DatabaseSync;
@@ -155,15 +159,25 @@ export async function composeAppRuntime(
   const seededProgrammes: Array<{ anchorEventId: EntityId; promotedCount: number }> = [];
   // Programme seeding (boot + reset) runs through the SAME services the HTTP
   // surface uses; constructed once so both paths share one wiring.
-  const bootProgrammeService = new ProgrammeService({ mutations, entities, trips, sources, audit });
+  const bootProgrammeService = new ProgrammeService({
+    mutations,
+    entities,
+    trips,
+    sources,
+    audit,
+    signals,
+  });
   if ((await trips.listTrips()).length === 0) {
     const scenariosRoot = join(config.fixturesDir, 'scenarios');
+    const worldSeedMode = resolveWorldSeedMode(config);
     for (const entry of readdirSync(scenariosRoot, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
+      const scenarioDir = join(scenariosRoot, entry.name);
+      if (!shouldBootSeedScenario(scenarioDir, worldSeedMode)) continue;
       try {
         const outcome = await seedScenarioBundle(
           { mutations, sources, preferences, audit, dossiers, fxRates },
-          join(scenariosRoot, entry.name),
+          scenarioDir,
         );
         seededScenarioIds.push(outcome.scenarioId);
       } catch {
@@ -370,6 +384,8 @@ export async function composeAppRuntime(
     programmeService: bootProgrammeService,
     dossiers,
     fxRates,
+    environment: config.environment,
+    worldSeedMode: config.worldSeedMode,
   });
 
   // Demo-only surface: load scenario specs for human clickaround triggers.
@@ -389,6 +405,12 @@ export async function composeAppRuntime(
   const demo: DemoSurface = {
     scenarioNames: () => [...scenarioSpecs.keys()],
     programmeEventIds: () => [...programmeEventIds],
+    heroWorkflows: () =>
+      DEMO_HERO_WORKFLOWS.map((workflow) => ({
+        id: workflow.id,
+        title: workflow.title,
+        description: workflow.description,
+      })),
     plannerMode: () => useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     async reset(at) {
       try {
@@ -421,16 +443,76 @@ export async function composeAppRuntime(
         return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
       }
     },
+    async launchHero(workflowId, _at, baseUrl) {
+      const workflow = demoHeroWorkflow(workflowId);
+      if (!workflow) {
+        return { status: 404, body: { error: `unknown_hero_workflow: ${workflowId}` } };
+      }
+      try {
+        const cwd = resolve('.');
+        const manifestPath = resolveManifestPath(workflow.manifestPath, cwd);
+        const manifest = loadAcceptanceManifest(manifestPath);
+        const result = await runAcceptanceManifest({
+          manifestPath,
+          cwd,
+          baseUrl,
+          skipPreflight: true,
+          config,
+          stopBeforeStepIds: workflow.stopBeforeStepIds,
+          // Demo launch drives real endpoints; semantic asserts remain in
+          // acceptance CI. Status codes are still enforced by the runner.
+          skipAssertions: true,
+          evidenceDir: join(cwd, 'output', 'demo-hero-launches'),
+        });
+        const failed = result.evidence.steps.filter((step) => !step.ok);
+        const ok = result.evidence.ok && failed.length === 0;
+        return {
+          status: ok ? 200 : 500,
+          body: {
+            workflowId: workflow.id,
+            scenarioId: manifest.scenarioId,
+            title: workflow.title,
+            ok,
+            stoppedBefore: workflow.stopBeforeStepIds,
+            stepsRun: result.evidence.steps.filter((step) => !String(step.error ?? '').startsWith('skipped:')).length,
+            steps: result.evidence.steps.map((step) => ({
+              id: step.stepId,
+              ok: step.ok,
+              ...(step.error ? { error: step.error } : {}),
+            })),
+            inspectPaths: inspectPathsFromExpect(manifest.expect),
+            evidencePath: result.evidencePath,
+          },
+        };
+      } catch (error) {
+        return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
+      }
+    },
   };
 
   const programmeService = bootProgrammeService;
   const now = clock ?? ((): IsoDateTime => new Date().toISOString());
   const endpoints: AppEndpoints = {
     now,
-    operatorDashboard: (at) => projectOperatorDashboard(readDeps, at),
+    operatorDashboard: (at, options) =>
+      projectOperatorDashboard(
+        readDeps,
+        at,
+        options?.anchorEventId ? { anchorEventId: options.anchorEventId } : undefined,
+      ),
     caseDetail: (caseId, at) => projectCaseDetail(readDeps, caseId, at),
     travellerTrip: (tripId, at) => projectTravellerTrip(readDeps, tripId, at),
-    firstTripId: async () => (await trips.listTrips())[0]?.tripId,
+    firstTripId: async () => {
+      const primaryEventId = programmeEventIds[0];
+      const summaries = await trips.listTrips();
+      if (primaryEventId) {
+        for (const summary of summaries) {
+          const trip = await trips.getTrip(summary.tripId);
+          if (trip?.anchorEventId === primaryEventId) return trip.id;
+        }
+      }
+      return summaries[0]?.tripId;
+    },
     travellerDecision: async (caseId, body, at) => {
       const outcome = await settleTravellerDecision(
         { service: executionService, cases, trips },
