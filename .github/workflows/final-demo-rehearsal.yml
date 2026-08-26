@@ -77,13 +77,14 @@ jobs:
           const BASE = 'http://127.0.0.1:8787';
           const HERO_TRIP = 'trip-trv-evt-ait-2026-ait-draft-14';
           const COMMITMENT = 'cmt-ait-d1-headline-interview';
+          const ACTION_AT = '2026-09-21T10:00:00+08:00';
 
           const before = await fetch(`${BASE}/api/traveller/${HERO_TRIP}`).then(r => r.json());
           assert.equal(before.remainderViable, 'NOT_VIABLE', 'S1 must leave Sarah not viable before S3');
 
           const browser = await chromium.launch({ headless: true });
           const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-          await page.goto(`${BASE}/programme?event=evt-ait-2026`);
+          await page.goto(`${BASE}/programme?event=evt-ait-2026&at=${encodeURIComponent(ACTION_AT)}`);
           await page.waitForLoadState('networkidle');
 
           await page.click('[data-programme-change-launch]');
@@ -100,12 +101,12 @@ jobs:
 
           page.on('dialog', dialog => dialog.accept());
           await Promise.all([
-            page.waitForLoadState('networkidle'),
+            page.waitForNavigation({ waitUntil: 'networkidle' }),
             page.click('[data-programme-change-commit]'),
           ]);
 
-          const programmeHtml = await page.content();
-          assert.match(programmeHtml, /15:30/);
+          const committedTime = await page.locator(`[data-timeline-key="${COMMITMENT}"] .t`).textContent();
+          assert.equal(committedTime?.trim(), '15:30', 'committed programme must render Sarah headline at 15:30');
 
           const afterCommit = await fetch(`${BASE}/api/traveller/${HERO_TRIP}`).then(r => r.json());
           assert.equal(afterCommit.remainderViable, 'VIABLE', 'S3 commit must restore Sarah remainder viability');
