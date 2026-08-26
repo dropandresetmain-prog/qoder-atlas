@@ -1,9 +1,12 @@
 name: Final demo rehearsal gates
 
 on:
+  pull_request:
+    branches:
+      - integration/final-demo-candidate
   push:
     branches:
-      - integration/final-demo-rehearsal-fixes
+      - integration/final-demo-candidate
   workflow_dispatch:
 
 permissions:
