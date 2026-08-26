@@ -1,0 +1,42 @@
+{
+  "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-ait-policy"],
+  "note": "Scenario-local INSURANCE_COVERAGE rule expressions for missed-connection and transit accommodation. The canonical programme builder currently harvests ruleSets only from global/organiser-policy.json — these rules are NOT auto-attached until primary applies a shared programme/policy patch or an intake path ingests them. Shape matches src/domain/rules.ts INSURANCE_COVERAGE.",
+  "draftId": "ait-draft-09",
+  "ruleSet": {
+    "id": "rs-s2-transit-insurance",
+    "kind": "INSURANCE",
+    "name": "Synthetic transit / missed-connection cover for S2 traveller",
+    "ownerOrganisationId": "org-ait-organiser",
+    "sourceId": "src-syn-ait-policy",
+    "rules": [
+      {
+        "id": "rule-s2-missed-connection-cover",
+        "kind": "INSURANCE_COVERAGE",
+        "sourceId": "src-syn-ait-policy",
+        "description": "Missed-connection expenses covered when the inbound delay is airline-attributed and the onward ticket was on the same ticketed journey.",
+        "coverageCode": "MISSED_CONNECTION",
+        "covers": true,
+        "conditions": [
+          "airline-attributed inbound delay",
+          "same-ticket connection",
+          "reasonable onward rebooking attempted"
+        ]
+      },
+      {
+        "id": "rule-s2-transit-accommodation-cover",
+        "kind": "INSURANCE_COVERAGE",
+        "sourceId": "src-syn-ait-policy",
+        "description": "Emergency transit accommodation near the connection airport covered for one night when same-night recovery is impossible.",
+        "coverageCode": "TRANSIT_ACCOMMODATION",
+        "covers": true,
+        "conditions": [
+          "same-night onward flight unavailable or unboardable",
+          "overnight required to protect programme-critical arrival",
+          "reasonable cost near connection airport"
+        ],
+        "limit": { "amount": 250, "currency": "USD", "note": "Synthetic per-night ceiling for demo reasoning." }
+      }
+    ]
+  }
+}

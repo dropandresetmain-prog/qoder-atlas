@@ -1,17 +1,61 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
-  "sourceIds": ["src-sim-airline-mn"],
-  "note": "Simulated KUL->SIN service inventory at the moment of recovery planning (29 Sep evening). Deliberate shape: exactly one same-evening alternative exists (MN224, 3 seats) and it restores a viable arrival; the airline's own rebooking (MN228 next morning) is present but insufficient against the programme-critical commitments.",
-  "observedAt": "2026-09-29T20:05:00+08:00",
+  "sourceIds": ["src-sim-airline-zg", "src-wave4r-atlas"],
+  "note": "Narrative inventory mirror of REPLAY Atlas NRT→SIN searches (rec_34518610… for 29 Sep, rec_71d6274a… for 30 Sep). Deliberate shape: same-night TR875 restores a viable morning-of-finals arrival; airline morning TR885 lands after the REQUIRED finals buffer fails; overnight Narita is the remaining path once TR875 is no longer boardable. Executable recovery uses the Atlas REPLAY recordings, not this file.",
+  "observedAt": "2026-09-29T17:30:00+09:00",
   "routes": [
     {
-      "origin": "KUL",
+      "origin": "NRT",
       "destination": "SIN",
       "services": [
-        { "flightNumber": "MN224", "date": "2026-09-29", "departure": "2026-09-29T20:30:00+08:00", "arrival": "2026-09-29T21:40:00+08:00", "status": "OPERATING", "economySeatsAvailable": 3, "economyFare": { "amount": 112, "currency": "SGD", "note": "Supplier-caused misconnect: rebooking at no cost to the traveller per airline duty of care." } },
-        { "flightNumber": "MN228", "date": "2026-09-30", "departure": "2026-09-30T08:10:00+08:00", "arrival": "2026-09-30T09:20:00+08:00", "status": "OPERATING", "economySeatsAvailable": 19, "economyFare": { "amount": 0, "currency": "SGD", "note": "Current involuntary rebooking; no fare difference." } }
-      ],
-      "noOtherServiceOn29Sep": true
+        {
+          "flightNumber": "TR875",
+          "date": "2026-09-29",
+          "departure": "2026-09-29T21:15:00+09:00",
+          "arrival": "2026-09-30T05:20:00+08:00",
+          "status": "OPERATING",
+          "role": "SAME_NIGHT_RECOVERY",
+          "economyFare": { "currency": "USD", "note": "Wave4 REPLAY offer; supplier-caused misconnect: duty-of-care rebooking expected." }
+        },
+        {
+          "flightNumber": "ZG053",
+          "date": "2026-09-29",
+          "departure": "2026-09-29T16:50:00+09:00",
+          "arrival": "2026-09-29T23:00:00+08:00",
+          "status": "MISSED",
+          "role": "BASELINE_CONNECTION"
+        },
+        {
+          "flightNumber": "TR885",
+          "date": "2026-09-30",
+          "departure": "2026-09-30T08:20:00+09:00",
+          "arrival": "2026-09-30T14:35:00+08:00",
+          "status": "OPERATING",
+          "role": "AIRLINE_DEFAULT_MORNING",
+          "economyFare": { "currency": "USD", "note": "Airline involuntary morning recovery; inadequate vs REQUIRED finals buffer." }
+        },
+        {
+          "flightNumber": "TR867",
+          "date": "2026-09-30",
+          "departure": "2026-09-30T12:30:00+09:00",
+          "arrival": "2026-09-30T20:45:00+08:00",
+          "status": "OPERATING",
+          "role": "SLOWER_NEXT_DAY",
+          "note": "Slower next-day alternative; worse than TR885 against programme commitments."
+        }
+      ]
+    }
+  ],
+  "nrtTransitHotels": [
+    {
+      "name": "Hilton Tokyo Narita Airport",
+      "evidence": "output/wave4r-s2-hub-hotels.json",
+      "note": "Nuitée sandbox sample; overnight landside stay when same-night flights are gone."
+    },
+    {
+      "name": "HOTEL MYSTAYS PREMIER Narita",
+      "evidence": "output/wave4r-s2-hub-hotels.json",
+      "note": "Refundable sample rate in Wave4 hub probe."
     }
   ]
 }
