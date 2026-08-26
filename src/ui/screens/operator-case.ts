@@ -1,45 +1,72 @@
 /**
- * E2 — recovery case / trip detail (operator).
+ * E2 — recovery case / trip detail (operator), approved C1–C6 layout.
  *
- * Renders the full recovery narrative from the UI-local CaseDetailView:
- * what changed, what is affected downstream, the critical objective at
- * risk, what was checked, the options compared (including a rejected
- * attractive option with its reason), the approval requirement, current
- * action state, and the final recovered/resolved result.
+ * Two-column workspace: the main column tells the recovery narrative (lead
+ * callout, journey chain as state cards, impact list, staged activity rows,
+ * option cards with honest rejections, approval ask with funding split,
+ * resolution); the sticky rail carries the ink commitment card, projected
+ * case-fact sections, and the standing authority explainer.
  *
  * Pure function of typed data; malformed views are refused, not guessed.
+ * Every optional block renders only when the projection supplies it.
  */
 import type { ReadModelEnvelope } from '../../contracts/readmodels.ts';
-import { OPTION_VERDICT_LABEL, RESOLUTION_OUTCOME_LABEL, STATUS_TONE } from '../copy.ts';
+import {
+  CASE_ACTIVITY_DONE_TITLE,
+  CASE_ACTIVITY_TITLE,
+  CASE_AFFECTED_TITLE,
+  CASE_APPROVAL_TITLE,
+  CASE_AUTHORITY_COPY,
+  CASE_AUTHORITY_TITLE,
+  CASE_BADGE_APPROVAL_NEEDED,
+  CASE_BADGE_HUMAN_DECISION,
+  CASE_BADGE_OPTIONS_READY,
+  CASE_CHECKS_TITLE,
+  CASE_COMMITMENT_AT_STAKE_LABEL,
+  CASE_COMMITMENT_FALLBACK_TITLE,
+  CASE_COMMITMENT_HELD_LABEL,
+  CASE_EXHAUSTED_TITLE,
+  CASE_OPTIONS_ALL_REJECTED_TITLE,
+  CASE_OPTIONS_FORMING_NOTE,
+  CASE_OPTIONS_FORMING_TITLE,
+  CASE_WAITING_DECISION_TITLE,
+  CASE_WHAT_CHANGED_TITLE,
+  OPTION_VERDICT_LABEL,
+  PAYER_LABEL,
+  RESOLUTION_OUTCOME_LABEL,
+  STATUS_LABEL,
+  STATUS_TONE,
+  caseOptionsHeading,
+  type StatusTone,
+} from '../copy.ts';
 import { escapeHtml, formatCostDelta, formatInstant, formatMoney } from '../html.ts';
 import {
+  chainLinkGlyph,
   errorPanel,
-  iconList,
   loadingPanel,
-  optionalSection,
-  statusBadge,
   toneClass,
   uncertaintyList,
-  type IconRow,
 } from '../components.ts';
 import {
   caseDetailViewIssues,
-  type ActionProgressView,
+  type ActionProgressState,
+  type AffectedItemView,
   type ApprovalRequirementView,
   type CaseCheckView,
   type CaseDetailView,
+  type CaseRailSectionView,
   type CaseResolutionView,
   type ChainLinkView,
   type RecoveryOptionView,
 } from '../case-view-model.ts';
 
+/** Approved recovery-progress steps (C2). */
 export const CASE_STEPS = [
-  'Change detected',
-  'Impact reviewed',
-  'Options compared',
-  'Decision & approval',
-  'Plan in motion',
-  'Trip confirmed',
+  'Signal received',
+  'Trip re-checked',
+  'Comparing options',
+  'Policy check',
+  'Proposal',
 ] as const;
 
 /**
@@ -52,21 +79,224 @@ export function deriveStepIndex(view: CaseDetailView): number | undefined {
   if (view.resolution !== undefined || view.status === 'RESOLVED') return CASE_STEPS.length;
   if (view.actions.some((action) => action.state === 'IN_PROGRESS' || action.state === 'DONE')) return 4;
   if (view.approval?.state === 'PENDING') return 3;
-  if (view.options.length > 0) return 3;
-  if (view.affectedItems.length > 0) return 1;
+  if (view.options.length > 0) return 2;
+  if (view.status === 'RECOVERING' || view.status === 'PLANNING') return 2;
+  if (view.affectedItems.length > 0 || (view.affected?.length ?? 0) > 0 || view.checks.length > 0) return 1;
   if (view.whatChanged) return 0;
   return undefined;
 }
 
+/**
+ * The stepper belongs to the in-flight "checking" state (approved C2):
+ * recovery is under way but no option, decision, or resolution exists yet.
+ */
 function stepper(view: CaseDetailView): string {
+  if (view.status !== 'RECOVERING' && view.status !== 'PLANNING') return '';
+  if (view.options.length > 0 || view.approval?.state === 'PENDING' || view.resolution) return '';
   const current = deriveStepIndex(view);
   if (current === undefined) return '';
   const steps = CASE_STEPS.map((label, index) => {
-    const cls = index < current ? 'step is-done' : index === current ? 'step is-current' : 'step';
-    return `<div class="${cls}">${escapeHtml(label)}</div>`;
+    const cls = index < current ? 'step done' : index === current ? 'step current' : 'step';
+    const line = index < CASE_STEPS.length - 1 ? '<span class="s-line"></span>' : '';
+    return `<div class="${cls}"><span class="s-dot"></span><span class="s-label">${escapeHtml(label)}</span>${line}</div>`;
   }).join('');
   return `<div class="stepper" aria-label="Recovery progress">${steps}</div>`;
 }
+
+// ---------------------------------------------------------------------------
+// Page-head badge — derived from case evidence, never asserted (C1–C6).
+// ---------------------------------------------------------------------------
+
+function caseBadge(view: CaseDetailView): { label: string; tone: StatusTone } {
+  if (view.resolution?.outcome === 'ESCALATED_CLOSED') {
+    return { label: CASE_BADGE_HUMAN_DECISION, tone: 'alert' };
+  }
+  if (view.approval?.state === 'PENDING') {
+    return view.approval.requestedFrom === 'ORGANISATION'
+      ? { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' }
+      : { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
+  }
+  if (!view.resolution && view.options.length > 0 && view.status === 'RECOVERING') {
+    return { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
+  }
+  return { label: STATUS_LABEL[view.status], tone: STATUS_TONE[view.status] };
+}
+
+// ---------------------------------------------------------------------------
+// Journey chain — the trip as a chain of dependent components (DESIGN.md §4.2)
+// ---------------------------------------------------------------------------
+
+/** Visual state per link. Green is healthy, grey is missing/unverified. */
+const CHAIN_LINK_STYLE: Record<ChainLinkView['state'], { cls: string; word: string }> = {
+  CONFIRMED: { cls: 'st-confirmed', word: 'Confirmed' },
+  PROPOSED: { cls: 'st-proposed', word: 'Proposed' },
+  BROKEN: { cls: 'st-broken', word: 'Broken' },
+  UNBOOKED: { cls: 'st-unbooked', word: 'Not booked' },
+  UNKNOWN: { cls: 'st-unknown', word: 'Unknown' },
+  AT_RISK: { cls: 'st-atrisk', word: 'At risk' },
+};
+
+function chainLink(link: ChainLinkView): string {
+  const style = CHAIN_LINK_STYLE[link.state];
+  const detail = link.detail ? `<div class="lk-detail">${escapeHtml(link.detail)}</div>` : '';
+  return `
+  <div class="link ${style.cls}${link.commitment ? ' is-commitment' : ''}" data-link-state="${escapeHtml(link.state)}">
+    <div class="lk-kind"><span class="lk-g" aria-hidden="true">${chainLinkGlyph(link)}</span>${escapeHtml(link.kind)}</div>
+    <div class="lk-label">${escapeHtml(link.label)}</div>
+    ${detail}
+    <div class="lk-state">${escapeHtml(style.word)}</div>
+  </div>`;
+}
+
+/** The chain section; omitted entirely when the projection has no chain. */
+function chainSection(chain: readonly ChainLinkView[] | undefined): string {
+  if (!chain || chain.length === 0) return '';
+  return `<div class="chain" role="list" aria-label="The trip as a chain of dependent parts">${chain.map(chainLink).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Lead callout — resolution, waiting-on-decision, exhausted, or what changed.
+// ---------------------------------------------------------------------------
+
+const RESOLUTION_TONE: Record<CaseResolutionView['outcome'], StatusTone> = {
+  FULLY_RECOVERED: 'ok',
+  RECOVERED_WITH_LOSS: 'watch',
+  ESCALATED_CLOSED: 'alert',
+};
+
+function resolutionCallout(resolution: CaseResolutionView): string {
+  // G3R-Closure fix H: every visible word comes from the deterministic
+  // presentation map; the raw outcome enum stays in the data-* attribute
+  // (machine state for audit/debug wiring), never in user copy.
+  const losses = (resolution.remainingLosses ?? [])
+    .map((loss) => `<li>${escapeHtml(loss)}</li>`)
+    .join('');
+  const lossBlock = losses
+    ? `<p><strong>Could not be kept:</strong></p><ul>${losses}</ul>`
+    : '';
+  return `
+  <div class="${toneClass(RESOLUTION_TONE[resolution.outcome], 'callout')}" data-outcome="${escapeHtml(resolution.outcome)}">
+    <h3>${escapeHtml(RESOLUTION_OUTCOME_LABEL[resolution.outcome])}</h3>
+    <p>${escapeHtml(resolution.summary)}</p>
+    ${lossBlock}
+  </div>`;
+}
+
+function leadCallout(view: CaseDetailView): string {
+  if (view.resolution) return resolutionCallout(view.resolution);
+  if (view.approval?.state === 'PENDING') {
+    const amount = view.approval.amount
+      ? ` Amount: <strong>${escapeHtml(formatMoney(view.approval.amount))}</strong>.`
+      : '';
+    const context = view.whatChanged ? `${escapeHtml(view.whatChanged)} ` : '';
+    return `
+    <div class="callout tone-watch">
+      <h3>${escapeHtml(CASE_WAITING_DECISION_TITLE)}</h3>
+      <p>${context}${escapeHtml(view.approval.reason)}${amount}</p>
+    </div>`;
+  }
+  if (view.planningExhausted) {
+    const body = view.whatChanged ? `<p>${escapeHtml(view.whatChanged)}</p>` : '';
+    return `
+    <div class="callout tone-alert">
+      <h3>${escapeHtml(CASE_EXHAUSTED_TITLE)}</h3>
+      ${body}
+    </div>`;
+  }
+  if (view.whatChanged) {
+    return `
+    <div class="${toneClass(STATUS_TONE[view.status], 'callout')}">
+      <h3>${escapeHtml(CASE_WHAT_CHANGED_TITLE)}</h3>
+      <p>${escapeHtml(view.whatChanged)}</p>
+    </div>`;
+  }
+  return '';
+}
+
+// ---------------------------------------------------------------------------
+// Impact — "What this touches" (approved C1). Rich per-item states when the
+// projection supplies them; the plain string list is the honest fallback.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolved cases keep an explicit change record under the resolution callout
+ * (approved C6 "What changed" section).
+ */
+function resolvedChangeSection(view: CaseDetailView): string {
+  if (!view.resolution || !view.whatChanged) return '';
+  return `
+  <section class="section" aria-label="${escapeHtml(CASE_WHAT_CHANGED_TITLE)}">
+    <h2>${escapeHtml(CASE_WHAT_CHANGED_TITLE)}</h2>
+    <div class="panel"><p>${escapeHtml(view.whatChanged)}</p></div>
+  </section>`;
+}
+
+const AFFECTED_ICON: Record<AffectedItemView['state'], { icon: string; iconClass: string }> = {
+  BROKEN: { icon: '✕', iconClass: 'ic-fail' },
+  AT_RISK: { icon: '▲', iconClass: 'ic-watch' },
+  UNKNOWN: { icon: '?', iconClass: 'ic-unknown' },
+  INTACT: { icon: '✓', iconClass: 'ic-pass' },
+};
+
+function affectedSection(view: CaseDetailView): string {
+  const rich = view.affected && view.affected.length > 0;
+  const plain = view.affectedItems.length > 0;
+  // The commitment callout falls back inline only when no structured rail
+  // card exists — otherwise the ink rail card carries it (no duplication).
+  const critical =
+    !view.commitment && view.criticalObjectiveAtRisk
+      ? `<div class="callout tone-alert"><p class="callout-title">${escapeHtml(CASE_COMMITMENT_FALLBACK_TITLE)}</p><p>${escapeHtml(view.criticalObjectiveAtRisk)}</p></div>`
+      : '';
+  if (!rich && !plain) return critical;
+  const list = rich
+    ? `<ul class="icon-list">${view.affected!
+        .map((item) => {
+          const style = AFFECTED_ICON[item.state];
+          const detail = item.detail ? ` — ${escapeHtml(item.detail)}` : '';
+          return `<li><span class="ic ${style.iconClass}" aria-hidden="true">${style.icon}</span><span><strong>${escapeHtml(item.label)}</strong>${detail}</span></li>`;
+        })
+        .join('')}</ul>`
+    : `<ul class="plain-list">${view.affectedItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+  return `
+  <section class="section" aria-label="${escapeHtml(CASE_AFFECTED_TITLE)}">
+    <h2>${escapeHtml(CASE_AFFECTED_TITLE)}</h2>
+    <div class="panel">${list}</div>
+    ${critical}
+  </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Staged activity — "What Northstar is doing right now" (approved C2 rows).
+// ---------------------------------------------------------------------------
+
+const ACTION_ROW: Record<ActionProgressState, { cls: string; icon: string }> = {
+  DONE: { cls: 'done', icon: '✓' },
+  IN_PROGRESS: { cls: 'doing', icon: '⟳' },
+  QUEUED: { cls: 'queued', icon: '○' },
+  FAILED: { cls: 'failed', icon: '✕' },
+};
+
+function activitySection(view: CaseDetailView): string {
+  if (view.actions.length === 0) return '';
+  const rows = view.actions
+    .map((action) => {
+      const style = ACTION_ROW[action.state];
+      const sub = action.detail ? `<span class="c-sub">${escapeHtml(action.detail)}</span>` : '';
+      return `<div class="check-row ${style.cls}"><span class="c-ic">${style.icon}</span><span class="c-t">${escapeHtml(action.label)}</span>${sub}</div>`;
+    })
+    .join('');
+  const allDone = view.actions.every((action) => action.state === 'DONE');
+  const title = allDone ? CASE_ACTIVITY_DONE_TITLE : CASE_ACTIVITY_TITLE;
+  return `
+  <section class="section" aria-label="${escapeHtml(title)}">
+    <h2>${escapeHtml(title)}</h2>
+    <div class="panel">${rows}</div>
+  </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Checks already run (approved C1) — the deterministic evidence list.
+// ---------------------------------------------------------------------------
 
 const CHECK_ICONS: Record<CaseCheckView['result'], { icon: string; iconClass: string }> = {
   PASS: { icon: '✓', iconClass: 'ic-pass' },
@@ -74,55 +304,42 @@ const CHECK_ICONS: Record<CaseCheckView['result'], { icon: string; iconClass: st
   UNKNOWN: { icon: '?', iconClass: 'ic-unknown' },
 };
 
-// ---------------------------------------------------------------------------
-// Journey chain — the trip as a chain of dependent components (DESIGN.md §4.2)
-// ---------------------------------------------------------------------------
-
-/** Visual state per link. Green is healthy, grey is missing/unverified. */
-const CHAIN_LINK_STYLE: Record<ChainLinkView['state'], { cls: string; glyph: string; word: string }> = {
-  CONFIRMED: { cls: 'st-confirmed', glyph: '✓', word: 'Confirmed' },
-  PROPOSED: { cls: 'st-proposed', glyph: '◌', word: 'Proposed' },
-  BROKEN: { cls: 'st-broken', glyph: '✕', word: 'Broken' },
-  UNBOOKED: { cls: 'st-unbooked', glyph: '○', word: 'Not booked' },
-  UNKNOWN: { cls: 'st-unknown', glyph: '?', word: 'Unconfirmed' },
-  AT_RISK: { cls: 'st-atrisk', glyph: '▲', word: 'At risk' },
-};
-
-function chainLink(link: ChainLinkView): string {
-  const style = CHAIN_LINK_STYLE[link.state];
-  const glyph = link.commitment ? '✦' : style.glyph;
-  const detail = link.detail ? `<div class="l-detail">${escapeHtml(link.detail)}</div>` : '';
+function checksSection(checks: readonly CaseCheckView[]): string {
+  if (checks.length === 0) return '';
+  const rows = checks
+    .map((check) => {
+      const style = CHECK_ICONS[check.result];
+      return `<li><span class="ic ${style.iconClass}" aria-hidden="true">${style.icon}</span><span>${escapeHtml(check.label)}</span></li>`;
+    })
+    .join('');
   return `
-  <div class="link ${style.cls}${link.commitment ? ' is-commitment' : ''}" data-link-state="${escapeHtml(link.state)}">
-    <div class="l-kind"><span class="l-glyph" aria-hidden="true">${glyph}</span>${escapeHtml(link.kind)}</div>
-    <div class="l-name">${escapeHtml(link.label)}</div>
-    ${detail}
-    <div class="l-state">${escapeHtml(style.word)}</div>
-  </div>`;
+  <section class="section" aria-label="${escapeHtml(CASE_CHECKS_TITLE)}">
+    <h2>${escapeHtml(CASE_CHECKS_TITLE)}</h2>
+    <div class="panel">
+      <ul class="icon-list">${rows}</ul>
+      <p class="footnote">Checked against the fixed parts of the trip (event times, bookings, and policy limits).</p>
+    </div>
+  </section>`;
 }
 
-/** The chain section; omitted entirely when the projection has no chain. */
-function chainSection(chain: readonly ChainLinkView[] | undefined): string | undefined {
-  if (!chain || chain.length === 0) return undefined;
-  return `<div class="chain" role="list" aria-label="The trip as a chain of dependent parts">${chain.map(chainLink).join('')}</div>`;
-}
+// ---------------------------------------------------------------------------
+// Options (approved C3/C5) — cards with consequence flags and honest "why
+// not" blocks; skeleton placeholder while candidates are still being scored.
+// ---------------------------------------------------------------------------
 
-function checksSection(checks: readonly CaseCheckView[]): string | undefined {
-  if (checks.length === 0) return undefined;
-  const rows: IconRow[] = checks.map((check) => ({
-    ...CHECK_ICONS[check.result],
-    text: check.label,
-  }));
-  return `<div class="panel">${iconList(rows)}
-    <p class="choice-note">Checked against the fixed parts of the trip (event times, bookings, and policy limits).</p>
-  </div>`;
+function optionsFormingSection(view: CaseDetailView): string {
+  if (view.status !== 'RECOVERING' && view.status !== 'PLANNING') return '';
+  if (view.options.length > 0 || view.planningExhausted || view.resolution) return '';
+  return `
+  <section class="section" aria-label="${escapeHtml(CASE_OPTIONS_FORMING_TITLE)}">
+    <h2>${escapeHtml(CASE_OPTIONS_FORMING_TITLE)}</h2>
+    <div class="panel">
+      <div class="skeleton" style="height:64px"></div>
+      <div class="skeleton" style="height:64px;margin-top:10px"></div>
+      <p class="footnote">${escapeHtml(CASE_OPTIONS_FORMING_NOTE)}</p>
+    </div>
+  </section>`;
 }
-
-const VERDICT_TONE: Record<RecoveryOptionView['verdict'], 'ok' | 'alert' | 'neutral'> = {
-  VIABLE: 'ok',
-  NOT_VIABLE: 'alert',
-  UNKNOWN: 'neutral',
-};
 
 function optionCard(option: RecoveryOptionView): string {
   const classes = [
@@ -132,33 +349,60 @@ function optionCard(option: RecoveryOptionView): string {
   ]
     .filter(Boolean)
     .join(' ');
-  const recommended = option.recommended ? '<span class="chip">Recommended</span>' : '';
-  const verdict = `<span class="${toneClass(VERDICT_TONE[option.verdict], 'badge')}">${escapeHtml(OPTION_VERDICT_LABEL[option.verdict])}</span>`;
-  const summary = option.summary ? `<p class="option-summary">${escapeHtml(option.summary)}</p>` : '';
+  const recommended = option.recommended ? '<span class="badge tone-ok">Recommended</span>' : '';
+  // A still-being-checked option says so; viable/rejected verdicts speak
+  // through the card treatment itself (inset colour, why-not block).
+  const checking =
+    option.verdict === 'UNKNOWN'
+      ? `<span class="chip">${escapeHtml(OPTION_VERDICT_LABEL.UNKNOWN)}</span>`
+      : '';
   const cost = option.costDelta
     ? (() => {
         const delta = formatCostDelta(option.costDelta);
-        return `<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-extra'}">${escapeHtml(delta.text)}</span>`;
+        return `<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}">${escapeHtml(delta.text)}</span>`;
       })()
     : '';
-  const approval = option.requiresApproval ? '<span class="chip">Needs approval</span>' : '';
-  const rejection = option.rejectionReason
-    ? `<p class="rejection"><strong>Why not:</strong> ${escapeHtml(option.rejectionReason)}</p>`
+  const approval = option.requiresApproval ? '<span class="chip chip-cost">Needs approval</span>' : '';
+  const body = option.summary ? `<div class="opt-body">${escapeHtml(option.summary)}</div>` : '';
+  const flags =
+    (option.flags?.length ?? 0) > 0
+      ? `<div class="opt-flags">${option.flags!.map((flag) => `<span class="chip">${escapeHtml(flag)}</span>`).join('')}</div>`
+      : '';
+  const whyNot = option.rejectionReason
+    ? `<div class="why-not"><strong>${escapeHtml(OPTION_VERDICT_LABEL.NOT_VIABLE)}.</strong> ${escapeHtml(option.rejectionReason)}</div>`
     : '';
   return `
   <div class="${classes}" data-option-id="${escapeHtml(option.id)}" data-verdict="${escapeHtml(option.verdict)}" data-test="strategy-option">
-    <div class="option-head">
-      <h3 class="option-title">${escapeHtml(option.title)}</h3>
+    <div class="opt-head">
+      <span class="opt-title">${escapeHtml(option.title)}</span>
       ${recommended}
-      ${verdict}
+      ${checking}
+      ${cost}
+      ${approval}
     </div>
-    ${summary}
-    <div class="option-meta">${cost}${approval}</div>
-    ${rejection}
+    ${body}
+    ${flags}
+    ${whyNot}
   </div>`;
 }
 
-const APPROVAL_STATE_TONE: Record<ApprovalRequirementView['state'], 'watch' | 'ok' | 'alert'> = {
+function optionsSection(view: CaseDetailView): string {
+  if (view.options.length === 0) return '';
+  const allRejected = view.options.every((option) => option.verdict === 'NOT_VIABLE');
+  const title = allRejected ? CASE_OPTIONS_ALL_REJECTED_TITLE : caseOptionsHeading(view.options.length);
+  return `
+  <section class="section" aria-label="Recovery options">
+    <h2>${escapeHtml(title)}</h2>
+    ${view.options.map(optionCard).join('')}
+  </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Approval (approved C4) — the ask, the deterministic funding split when the
+// projection carries an allocation, and the wired approve/decline forms.
+// ---------------------------------------------------------------------------
+
+const APPROVAL_STATE_TONE: Record<ApprovalRequirementView['state'], StatusTone> = {
   PENDING: 'watch',
   APPROVED: 'ok',
   DECLINED: 'alert',
@@ -170,152 +414,210 @@ const APPROVAL_STATE_LABEL: Record<ApprovalRequirementView['state'], string> = {
   DECLINED: 'Declined',
 };
 
-function approvalPanel(approval?: ApprovalRequirementView, caseId?: string): string | undefined {
-  if (!approval) return undefined;
+/** Funding split bar; rendered only from a complete deterministic allocation. */
+function fundingSplitBlock(view: CaseDetailView): string {
+  const allocation = view.funding?.allocation;
+  if (
+    !allocation?.coveredAmount ||
+    !allocation.incrementalAmount ||
+    !allocation.coveredBy ||
+    !allocation.incrementalPayer ||
+    allocation.coveredAmount.currency !== allocation.incrementalAmount.currency
+  ) {
+    return '';
+  }
+  const covered = allocation.coveredAmount.amount;
+  const incremental = allocation.incrementalAmount.amount;
+  const total = covered + incremental;
+  if (!(total > 0)) return '';
+  const coveredPct = Math.round((covered / total) * 1000) / 10;
+  const incrementalPct = Math.round((1000 - coveredPct * 10)) / 10;
+  return `
+    <div class="splitbar" aria-label="Funding split">
+      <div class="sp-org" style="width:${coveredPct}%"></div>
+      <div class="sp-trav" style="width:${incrementalPct}%"></div>
+    </div>
+    <div class="split-legend">
+      <span><i style="background:var(--ink)"></i>${escapeHtml(PAYER_LABEL[allocation.coveredBy])} — ${escapeHtml(formatMoney(allocation.coveredAmount))}</span>
+      <span><i style="background:var(--watch-f)"></i>${escapeHtml(PAYER_LABEL[allocation.incrementalPayer])} — ${escapeHtml(formatMoney(allocation.incrementalAmount))}</span>
+    </div>`;
+}
+
+function approvalSection(view: CaseDetailView): string {
+  const approval = view.approval;
+  if (!approval) return '';
   const from = approval.requestedFrom === 'ORGANISATION' ? 'the organisation' : 'the traveller';
-  const amount = approval.amount ? ` Amount: <strong>${escapeHtml(formatMoney(approval.amount))}</strong>.` : '';
+  const amount = approval.amount
+    ? ` Amount: <strong>${escapeHtml(formatMoney(approval.amount))}</strong>.`
+    : '';
 
   let actionForms = '';
-  if (approval.state === 'PENDING' && caseId) {
+  if (approval.state === 'PENDING') {
+    const approveLabel = approval.amount ? `Approve ${formatMoney(approval.amount)}` : 'Approve';
     actionForms = `
-    <div class="approval-actions">
-      <form method="POST" action="/api/cases/${escapeHtml(caseId)}/traveller-decision" class="inline-form">
+    <div class="btn-row">
+      <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
         <input type="hidden" name="decision" value="APPROVED">
-        <button type="submit" class="btn btn-primary">Approve</button>
+        <button type="submit" class="btn btn-primary">${escapeHtml(approveLabel)}</button>
       </form>
-      <form method="POST" action="/api/cases/${escapeHtml(caseId)}/traveller-decision" class="inline-form">
+      <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
         <input type="hidden" name="decision" value="DECLINED">
-        <button type="submit" class="btn btn-danger">Decline</button>
+        <button type="submit" class="btn btn-danger-ghost">Decline</button>
       </form>
     </div>`;
   }
 
   return `
-  <div class="panel callout tone-${APPROVAL_STATE_TONE[approval.state]}" data-approval-state="${escapeHtml(approval.state)}">
-    <p class="callout-title">Approval needed from ${escapeHtml(from)}</p>
-    <p>${escapeHtml(approval.reason)}${amount}
-      <span class="${toneClass(APPROVAL_STATE_TONE[approval.state], 'badge')}">${escapeHtml(APPROVAL_STATE_LABEL[approval.state])}</span>
-    </p>
-    ${actionForms}
-  </div>`;
+  <section class="section" aria-label="${escapeHtml(CASE_APPROVAL_TITLE)}">
+    <h2>${escapeHtml(CASE_APPROVAL_TITLE)}</h2>
+    <div class="panel" data-approval-state="${escapeHtml(approval.state)}">
+      <p class="callout-title">Approval needed from ${escapeHtml(from)}
+        <span class="${toneClass(APPROVAL_STATE_TONE[approval.state], 'badge')}">${escapeHtml(APPROVAL_STATE_LABEL[approval.state])}</span>
+      </p>
+      <p>${escapeHtml(approval.reason)}${amount}</p>
+      ${approval.state === 'PENDING' ? fundingSplitBlock(view) : ''}
+      ${actionForms}
+    </div>
+  </section>`;
 }
 
-const ACTION_ICONS: Record<ActionProgressView['state'], { icon: string; iconClass: string; label: string }> = {
-  QUEUED: { icon: '○', iconClass: 'ic-queue', label: 'Queued' },
-  IN_PROGRESS: { icon: '▶', iconClass: 'ic-progress', label: 'In progress' },
-  DONE: { icon: '✓', iconClass: 'ic-pass', label: 'Done' },
-  FAILED: { icon: '✕', iconClass: 'ic-fail', label: 'Failed' },
-};
+// ---------------------------------------------------------------------------
+// Recovery actions (wired plan/begin forms) and the honest exhausted state.
+// ---------------------------------------------------------------------------
 
-function actionsSection(actions: readonly ActionProgressView[]): string | undefined {
-  if (actions.length === 0) return undefined;
-  const rows: IconRow[] = actions.map((action) => ({
-    ...ACTION_ICONS[action.state],
-    text: `${action.label} — ${ACTION_ICONS[action.state].label}`,
-  }));
-  return `<div class="panel">${iconList(rows)}</div>`;
-}
-
-function resolutionPanel(resolution?: CaseResolutionView): string | undefined {
-  if (!resolution) return undefined;
-  // G3R-Closure fix H: every visible word comes from the deterministic
-  // presentation map; the raw outcome enum stays in the data-* attribute
-  // (machine state for audit/debug wiring), never in user copy.
-  if (resolution.outcome === 'FULLY_RECOVERED') {
-    return `
-    <div class="resolution is-full" data-outcome="FULLY_RECOVERED">
-      <p class="res-title">${escapeHtml(RESOLUTION_OUTCOME_LABEL.FULLY_RECOVERED)}</p>
-      <p>${escapeHtml(resolution.summary)}</p>
-    </div>`;
-  }
-  if (resolution.outcome === 'RECOVERED_WITH_LOSS') {
-    const losses = (resolution.remainingLosses ?? [])
-      .map((loss) => `<li>${escapeHtml(loss)}</li>`)
-      .join('');
-    return `
-    <div class="resolution is-loss" data-outcome="RECOVERED_WITH_LOSS">
-      <p class="res-title">${escapeHtml(RESOLUTION_OUTCOME_LABEL.RECOVERED_WITH_LOSS)}</p>
-      <p>${escapeHtml(resolution.summary)}</p>
-      ${losses ? `<p><strong>Could not be kept:</strong></p><ul>${losses}</ul>` : ''}
-    </div>`;
-  }
-  return `
-  <div class="resolution is-escalated" data-outcome="ESCALATED_CLOSED">
-    <p class="res-title">${escapeHtml(RESOLUTION_OUTCOME_LABEL.ESCALATED_CLOSED)}</p>
-    <p>${escapeHtml(resolution.summary)}</p>
-  </div>`;
-}
-
-function recoveryActionsPanel(view: CaseDetailView): string | undefined {
+function recoveryActionsPanel(view: CaseDetailView): string {
   // Honest end-state: planning has already run and found no automated recovery
   // path. Say so plainly; never re-offer a planning action that already
   // completed empty (which would loop with no visible effect).
   if (view.planningExhausted && view.options.length === 0) {
     return `
-    <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
-      <p class="planning-kicker">Northstar's review</p>
-      <p class="planning-result-title">No safe automated recovery yet</p>
-      <ul class="planning-checks" aria-label="Planning checks completed">
-        <li><span aria-hidden="true">✓</span><span><strong>Changed booking checked</strong><small>The provider change is reflected in the trip.</small></span></li>
-        <li><span aria-hidden="true">✓</span><span><strong>Rest of the trip checked</strong><small>The failed trip conditions above still need to be protected.</small></span></li>
-        <li><span aria-hidden="true">—</span><span><strong>Recovery inventory compared</strong><small>No candidate was returned for safe deterministic checking.</small></span></li>
-      </ul>
-      <p class="planning-next"><strong>Nothing has been changed.</strong> The trip remains unresolved and needs direct operator support.</p>
-    </div>`;
+    <section class="section" aria-label="What happens next">
+      <h2>What happens next</h2>
+      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
+        <ul class="planning-checks" aria-label="Planning checks completed">
+          <li><span aria-hidden="true">✓</span><span><strong>Changed booking checked</strong><small>The provider change is reflected in the trip.</small></span></li>
+          <li><span aria-hidden="true">✓</span><span><strong>Rest of the trip checked</strong><small>The failed trip conditions above still need to be protected.</small></span></li>
+          <li><span aria-hidden="true">—</span><span><strong>Recovery inventory compared</strong><small>No candidate was returned for safe deterministic checking.</small></span></li>
+        </ul>
+        <p class="planning-next"><strong>Nothing has been changed.</strong> The trip remains unresolved and needs direct operator support.</p>
+      </div>
+    </section>`;
   }
 
   // If no options yet and case is DISRUPTED, show "Plan Recovery" button
   if (view.status === 'DISRUPTED' && view.options.length === 0) {
     return `
-    <div class="panel recovery-actions" data-ui-section="recovery-actions">
-      <p class="planning-kicker">Next step</p>
-      <p class="planning-result-title">Check recovery options</p>
-      <p>Northstar will compare the changed booking with the rest of this trip, then check any candidate against timing, policy and approval.</p>
-      <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form">
-        <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
-        <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-        <button type="submit" class="btn btn-primary" data-test="plan-recovery-btn">Plan recovery</button>
-      </form>
-      <div class="planning-progress" data-planning-progress hidden role="status" aria-live="polite">
-        <p class="planning-result-title">Checking the whole trip</p>
-        <ol>
-          <li>Checking the changed flight</li>
-          <li>Checking the rest of the trip</li>
-          <li>Comparing recovery options</li>
-          <li>Checking policy and approval</li>
-        </ol>
-        <div class="planning-skeleton" aria-hidden="true"></div>
+    <section class="section" aria-label="Recovery planning">
+      <h2>Recovery planning</h2>
+      <div class="panel recovery-actions" data-ui-section="recovery-actions">
+        <p class="planning-kicker">Next step</p>
+        <p class="planning-result-title">Check recovery options</p>
+        <p>Northstar will compare the changed booking with the rest of this trip, then check any candidate against timing, policy and approval.</p>
+        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form">
+          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+          <button type="submit" class="btn btn-primary" data-test="plan-recovery-btn">Plan recovery</button>
+        </form>
+        <div class="planning-progress" data-planning-progress hidden role="status" aria-live="polite">
+          <p class="planning-result-title">Checking the whole trip</p>
+          <ol>
+            <li>Checking the changed flight</li>
+            <li>Checking the rest of the trip</li>
+            <li>Comparing recovery options</li>
+            <li>Checking policy and approval</li>
+          </ol>
+          <div class="planning-skeleton" aria-hidden="true"></div>
+        </div>
       </div>
-    </div>`;
+    </section>`;
   }
 
   // If options exist but no approval yet, show "Begin Strategy" button
   // (regardless of status - after planning, status changes to PLANNING/RECOVERING)
   if (view.options.length > 0 && !view.approval) {
-    const recommendedOption = view.options.find(o => o.recommended);
-    if (!recommendedOption) return undefined;
+    const recommendedOption = view.options.find((o) => o.recommended);
+    if (!recommendedOption) return '';
 
     return `
-    <div class="panel recovery-actions" data-ui-section="recovery-actions">
-      <p class="planning-kicker">Recommended option ready</p>
-      <p class="planning-result-title">Begin the checked recovery</p>
-      <p>Northstar has identified the best viable option shown above. Starting it will run the required approval and execution checks.</p>
-      <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
-        <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
-        <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
-        <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-        <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin recovery</button>
-      </form>
-    </div>`;
+    <section class="section" aria-label="Recovery planning">
+      <h2>Recovery planning</h2>
+      <div class="panel recovery-actions" data-ui-section="recovery-actions">
+        <p class="planning-kicker">Recommended option ready</p>
+        <p class="planning-result-title">Begin the checked recovery</p>
+        <p>Northstar has identified the best viable option shown above. Starting it will run the required approval and execution checks.</p>
+        <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
+          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+          <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
+          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+          <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin recovery</button>
+        </form>
+      </div>
+    </section>`;
   }
 
-  return undefined;
+  return '';
 }
 
-function fundingPanel(view: CaseDetailView): string | undefined {
-  if (!view.funding) return undefined;
-  return `<div class="panel funding-panel"><p class="callout-title">How this change is funded</p><p>${escapeHtml(view.funding.summary)}</p></div>`;
+/** Funding summary; the split itself renders inside the pending approval ask. */
+function fundingPanel(view: CaseDetailView): string {
+  if (!view.funding || view.approval?.state === 'PENDING') return '';
+  return `
+  <section class="section" aria-label="Cost and funding">
+    <h2>Cost and funding</h2>
+    <div class="panel funding-panel"><p class="callout-title">How this change is funded</p><p>${escapeHtml(view.funding.summary)}</p>${fundingSplitBlock(view)}</div>
+  </section>`;
 }
+
+// ---------------------------------------------------------------------------
+// Rail (approved C1–C6): ink commitment card, projected case sections, and
+// the standing authority explainer.
+// ---------------------------------------------------------------------------
+
+function commitmentCard(view: CaseDetailView): string {
+  if (!view.commitment) return '';
+  const held =
+    view.resolution?.outcome === 'FULLY_RECOVERED' || view.resolution?.outcome === 'RECOVERED_WITH_LOSS';
+  const label = held ? CASE_COMMITMENT_HELD_LABEL : CASE_COMMITMENT_AT_STAKE_LABEL;
+  const body = view.commitment.body ? `<p class="rc-body">${escapeHtml(view.commitment.body)}</p>` : '';
+  const ifMissed = view.commitment.ifMissed
+    ? `<div class="rc-row"><span class="k">If missed</span><span class="v">${escapeHtml(view.commitment.ifMissed)}</span></div>`
+    : '';
+  return `
+  <div class="rail-card ink">
+    <p class="kv-label">${escapeHtml(label)}</p>
+    <p class="rc-title">${escapeHtml(view.commitment.title)}</p>
+    ${body}
+    ${ifMissed}
+  </div>`;
+}
+
+function railSectionCard(section: CaseRailSectionView): string {
+  const rows = section.rows
+    .map(
+      (row) =>
+        `<div class="rc-row"><span class="k">${escapeHtml(row.label)}</span><span class="v">${escapeHtml(row.value)}</span></div>`,
+    )
+    .join('');
+  const note = section.note ? `<p class="rc-body">${escapeHtml(section.note)}</p>` : '';
+  return `
+  <div class="rail-card">
+    <p class="kv-label">${escapeHtml(section.title)}</p>
+    ${note}
+    ${rows}
+  </div>`;
+}
+
+function authorityCard(): string {
+  return `
+  <div class="rail-card">
+    <p class="kv-label">${escapeHtml(CASE_AUTHORITY_TITLE)}</p>
+    <p class="rc-body">${escapeHtml(CASE_AUTHORITY_COPY)}</p>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Screen assembly
+// ---------------------------------------------------------------------------
 
 /** Case detail body from a loaded, validated view. */
 export function renderCaseDetailBody(view: CaseDetailView): string {
@@ -323,40 +625,38 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   if (issues.length > 0) {
     return `<main class="shell">${errorPanel('This case cannot be displayed yet', issues.join('; '))}</main>`;
   }
-  const tone = STATUS_TONE[view.status];
-  const changed = view.whatChanged
-    ? `<div class="${toneClass(tone, 'callout')}"><p class="callout-title">What changed</p><p>${escapeHtml(view.whatChanged)}</p></div>`
-    : '';
-  const critical = view.criticalObjectiveAtRisk
-    ? `<div class="callout tone-alert"><p class="callout-title">Must not be missed</p><p>${escapeHtml(view.criticalObjectiveAtRisk)}</p></div>`
-    : '';
+  const badge = caseBadge(view);
+  const rail = `
+    <aside class="case-rail">
+      ${commitmentCard(view)}
+      ${(view.railSections ?? []).map(railSectionCard).join('')}
+      ${authorityCard()}
+    </aside>`;
   return `
 <main class="shell">
   <div class="page-head">
-    <h1>${escapeHtml(view.tripLabel ?? view.tripId)}</h1>
+    <h1>${escapeHtml(view.tripLabel ?? (view.travellerNames.join(', ') || view.tripId))} <span class="${toneClass(badge.tone, 'badge')}" role="status" aria-label="Case status: ${escapeHtml(badge.label)}">${escapeHtml(badge.label)}</span></h1>
     <p class="sub">${escapeHtml(view.travellerNames.join(', '))}</p>
-    <p class="meta">${statusBadge(view.status)} &nbsp; Updated ${escapeHtml(formatInstant(view.updatedAt))}</p>
+    <p class="meta"><a href="/operator">← Overview</a> · Updated ${escapeHtml(formatInstant(view.updatedAt))}</p>
   </div>
   ${stepper(view)}
-  ${changed}
-  ${optionalSection('The trip as it stands', chainSection(view.chain))}
-  ${optionalSection(
-    'What is affected',
-    view.affectedItems.length > 0
-      ? `<div class="panel"><ul class="plain-list">${view.affectedItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>${critical}`
-      : critical || undefined,
-  )}
-  ${optionalSection('What we checked', checksSection(view.checks))}
-  ${optionalSection(
-    'Options on the table',
-    view.options.length > 0 ? view.options.map(optionCard).join('') : undefined,
-  )}
-  ${optionalSection('Recovery planning', recoveryActionsPanel(view))}
-  ${optionalSection('Cost and funding', fundingPanel(view))}
-  ${optionalSection('Approval', approvalPanel(view.approval, view.caseId))}
-  ${optionalSection('What is happening now', actionsSection(view.actions))}
-  ${uncertaintyList(view.uncertainties)}
-  ${optionalSection('Result', resolutionPanel(view.resolution))}
+  <div class="case-grid">
+    <div>
+      ${leadCallout(view)}
+      ${chainSection(view.chain)}
+      ${resolvedChangeSection(view)}
+      ${affectedSection(view)}
+      ${activitySection(view)}
+      ${checksSection(view.checks)}
+      ${optionsFormingSection(view)}
+      ${optionsSection(view)}
+      ${recoveryActionsPanel(view)}
+      ${approvalSection(view)}
+      ${fundingPanel(view)}
+      ${uncertaintyList(view.uncertainties)}
+    </div>
+    ${rail}
+  </div>
 </main>`;
 }
 

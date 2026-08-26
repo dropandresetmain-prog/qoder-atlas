@@ -182,6 +182,7 @@ body {
 
 .page-head { margin-bottom: 20px; }
 .page-head h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+.page-head h1 .badge { vertical-align: middle; }
 .page-head .sub { margin: 0; color: var(--text-soft); }
 .page-head .meta {
   margin-top: 8px;
@@ -326,6 +327,7 @@ a.chip:hover { border-color: var(--text-faint); }
 .ic-fail { color: var(--alert); }
 .ic-unknown { color: var(--watch); }
 .ic-queue { color: var(--text-faint); }
+.ic-watch { color: var(--watch); }
 .ic-progress { color: var(--active); }
 
 /* ================= callouts ================= */
@@ -635,6 +637,8 @@ a.qrow:focus-visible, a.brow:focus-visible { outline: 2px solid var(--watch-f); 
 .check-row.doing .c-t { color: var(--text); font-weight: 600; }
 .check-row.queued { color: var(--text-faint); }
 .check-row.queued .c-ic { color: var(--text-faint); }
+.check-row.failed .c-ic { color: var(--alert); }
+.check-row.failed .c-t { color: var(--text); }
 .check-row .c-sub { margin-left: auto; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ================= programme timeline ================= */

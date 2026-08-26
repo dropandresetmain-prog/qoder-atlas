@@ -43,7 +43,7 @@ import {
 } from '../src/ui/state-inventory.ts';
 import { caseDetailViewIssues, type CaseDetailView } from '../src/ui/case-view-model.ts';
 import { renderOperatorDashboard, renderOperatorDashboardBody } from '../src/ui/screens/operator-dashboard.ts';
-import { deriveStepIndex, renderCaseDetail } from '../src/ui/screens/operator-case.ts';
+import { CASE_STEPS, deriveStepIndex, renderCaseDetail } from '../src/ui/screens/operator-case.ts';
 import { renderTravellerTrip } from '../src/ui/screens/traveller.ts';
 import { renderPage } from '../src/ui/page.ts';
 import {
@@ -313,9 +313,9 @@ test('case detail tells the full recovery story incl. rejected attractive option
   assert.ok(rejected);
   const html = renderCaseDetail({ state: 'LOADED', data: rejected.view });
   assert.ok(html.includes('What changed'));
-  assert.ok(html.includes('What is affected'));
+  assert.ok(html.includes('What this touches'));
   assert.ok(html.includes('Must not be missed'), 'critical objective must be called out');
-  assert.ok(html.includes('What we checked'));
+  assert.ok(html.includes('Checks already run'));
   assert.ok(html.includes('data-verdict="NOT_VIABLE"'));
   assert.ok(html.includes('Arrives after the speaking slot'), 'rejection reason must be visible');
   assert.ok(html.includes('data-verdict="VIABLE"'));
@@ -418,7 +418,7 @@ test('recovery progress is derived from evidence, never asserted for UNKNOWN', (
   assert.equal(deriveStepIndex(unknownCase), undefined);
   const resolvedCase = CASE_FIXTURES.find((f) => f.id === 'resolved-fully');
   assert.ok(resolvedCase);
-  assert.equal(deriveStepIndex(resolvedCase.view), 6);
+  assert.equal(deriveStepIndex(resolvedCase.view), CASE_STEPS.length);
   const executing = CASE_FIXTURES.find((f) => f.id === 'actions-in-progress');
   assert.ok(executing);
   assert.equal(deriveStepIndex(executing.view), 4);

@@ -109,6 +109,80 @@ export const RESOLUTION_OUTCOME_LABEL: Record<'FULLY_RECOVERED' | 'RECOVERED_WIT
 };
 
 // ---------------------------------------------------------------------------
+// Case workspace (approved C1–C6) — section headings and fixed copy.
+// ---------------------------------------------------------------------------
+
+/** Lead callout heading above the change summary (C1). */
+export const CASE_WHAT_CHANGED_TITLE = 'What changed';
+
+/** Impact list heading (approved C1 wording). */
+export const CASE_AFFECTED_TITLE = 'What this touches';
+
+/** Checks-list heading (approved C1 wording). */
+export const CASE_CHECKS_TITLE = 'Checks already run';
+
+/** In-flight activity list heading (approved C2 wording). */
+export const CASE_ACTIVITY_TITLE = 'What Northstar is doing right now';
+
+/** Past-tense activity heading once every recorded action is done. */
+export const CASE_ACTIVITY_DONE_TITLE = 'What Northstar did';
+
+/** Skeleton panel heading while options are still being scored (C2). */
+export const CASE_OPTIONS_FORMING_TITLE = 'Options take shape here';
+
+/** Skeleton panel footnote (approved C2 wording). */
+export const CASE_OPTIONS_FORMING_NOTE =
+  'Candidates appear here the moment they are scored — nothing half-checked is ever shown as an option.';
+
+/** Options heading when every candidate was rejected (approved C5 wording). */
+export const CASE_OPTIONS_ALL_REJECTED_TITLE = 'What was considered — and why none of them work';
+
+/** Lead callout heading when planning exhausted every automated path (C5). */
+export const CASE_EXHAUSTED_TITLE = 'No safe automatic fix — Northstar has stopped rather than gamble';
+
+/** Lead callout heading while waiting on an approval decision (C4). */
+export const CASE_WAITING_DECISION_TITLE = 'Waiting on a decision';
+
+/** Count-aware options heading (approved C3 wording pattern). */
+export function caseOptionsHeading(count: number): string {
+  return count === 1 ? 'One way this could go' : `${count} ways this could go`;
+}
+
+/** Approval panel heading (approved C4 wording). */
+export const CASE_APPROVAL_TITLE = 'What you\u2019re approving';
+
+/** Ink rail card label while the commitment is still at stake (C1–C5). */
+export const CASE_COMMITMENT_AT_STAKE_LABEL = 'The commitment at stake';
+
+/** Ink rail card label once the trip is recovered (approved C6 wording). */
+export const CASE_COMMITMENT_HELD_LABEL = 'The commitment that held';
+
+/** Inline fallback heading when no structured commitment card exists. */
+export const CASE_COMMITMENT_FALLBACK_TITLE = 'Must not be missed';
+
+/**
+ * Standing authority explainer (approved rail card, C1–C5). Describes the
+ * authority model generically — the concrete cap figure is case data and
+ * belongs to the projected rail sections, never to fixed copy.
+ */
+export const CASE_AUTHORITY_TITLE = 'Authority';
+export const CASE_AUTHORITY_COPY =
+  'Within the programme\u2019s policy cap, Northstar books automatically with a receipt. Above the cap, the budget owner approves first. Nothing books silently.';
+
+/** Case badge derivations beyond the raw trip status (approved C3/C4/C5). */
+export const CASE_BADGE_OPTIONS_READY = 'Options on the table';
+export const CASE_BADGE_APPROVAL_NEEDED = 'Approval needed';
+export const CASE_BADGE_HUMAN_DECISION = 'Needs a human decision';
+
+/** Payer wording for the funding split legend (approved C4). */
+export const PAYER_LABEL: Record<'EVENT_ORGANISATION' | 'TRAVELLER' | 'ORGANISATION' | 'OTHER', string> = {
+  EVENT_ORGANISATION: 'Programme',
+  ORGANISATION: 'Organisation',
+  TRAVELLER: 'Traveller',
+  OTHER: 'Other',
+};
+
+// ---------------------------------------------------------------------------
 // Northstar programme surface (RV-N10) — labels live next to the others so
 // the same user-facing vocabulary drives every screen.
 // ---------------------------------------------------------------------------
