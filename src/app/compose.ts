@@ -67,6 +67,7 @@ import { createRuntimeHandlers } from './runtimeHttp.ts';
 import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
+import { projectProgrammeAugmentations } from './programmeReadmodel.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
 import { createChangeIntakeHandlers } from './changeIntakeHttp.ts';
 import { createEventChangePreviewHandlers } from './eventChangePreviewHttp.ts';
@@ -481,6 +482,7 @@ export async function composeAppRuntime(
       audit,
       modelClient,
     }),
+    programmeAugmentations: (view) => projectProgrammeAugmentations(readDeps, view),
     resolution: createResolutionHandlers({
       trips,
       entities,

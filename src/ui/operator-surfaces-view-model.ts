@@ -10,6 +10,7 @@
  */
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { OperatorDashboardView, OperatorDecisionRequest } from '../contracts/readmodels.ts';
+import type { ApprovalsQueueView, TripActivityView } from '../app/waveReadmodels.ts';
 import { formatMoney, formatRosterTime, formatShort } from './html.ts';
 
 /** One row on the Decisions "Waiting now" table. */
@@ -86,6 +87,33 @@ export function decisionsFromDashboard(view: OperatorDashboardView): DecisionsPa
   return { generatedAt: view.generatedAt, pending, decided: [] };
 }
 
+/**
+ * Prefer the Wave approval projection when it is available: unlike the
+ * dashboard's legacy summary, it preserves traveller, organisation, and
+ * human-agent authority outcomes from the persisted decision.
+ */
+export function decisionsFromApprovalsQueue(view: ApprovalsQueueView): DecisionsPageView {
+  return {
+    generatedAt: view.generatedAt,
+    pending: view.pending.map((decision) => ({
+      caseId: decision.caseId,
+      travellerName: decision.travellerNames.join(', ') || 'Traveller',
+      decision: `${decision.action} requires a decision`,
+      ...(decision.amount ? { cost: formatMoney(decision.amount) } : {}),
+      waitingOn:
+        decision.requestedFrom === 'TRAVELLER'
+          ? 'Traveller'
+          : decision.requestedFrom === 'ORGANISATION'
+            ? 'Organisation'
+            : 'Human agent',
+      age: formatRosterTime(decision.requestedAt, view.generatedAt),
+    })),
+    // Decided history is not yet a programme-level projection. Leave it
+    // empty rather than reconstructing or inventing approval evidence.
+    decided: [],
+  };
+}
+
 function pendingRowFromTrip(
   travellerName: string,
   decision: OperatorDecisionRequest,
@@ -143,4 +171,32 @@ export function glyphForActivityAction(action: string): { glyph: string; tone: A
 export function activityClock(iso: IsoDateTime): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
   return match ? `${match[4]}:${match[5]}` : formatShort(iso);
+}
+
+/** Compose the existing real per-trip audit projections into one activity feed. */
+export function activityFromTripActivities(
+  generatedAt: IsoDateTime,
+  activities: readonly TripActivityView[],
+): ActivityPageView {
+  const events = activities
+    .flatMap((activity) => activity.events)
+    .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.action.localeCompare(b.action));
+  const byDay = new Map<string, ActivityFeedItemView[]>();
+  for (const event of events) {
+    const day = event.occurredAt.slice(0, 10) || 'Undated';
+    const glyph = glyphForActivityAction(event.action);
+    const items = byDay.get(day) ?? [];
+    items.push({
+      who: event.actor,
+      text: event.summary,
+      ...(event.subject ? { sub: event.subject } : {}),
+      time: activityClock(event.occurredAt),
+      ...glyph,
+    });
+    byDay.set(day, items);
+  }
+  return {
+    generatedAt,
+    days: [...byDay.entries()].map(([label, items]) => ({ label, items })),
+  };
 }

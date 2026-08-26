@@ -829,6 +829,8 @@ export const caseAwaitingOrganisationApproval: CaseDetailView = {
   ],
   approval: {
     requestedFrom: 'ORGANISATION',
+    intentId: 'intent-approval',
+    approver: { entityType: 'ORGANISATION', id: 'org-example' },
     reason: 'The replacement costs more than the travel policy allows.',
     amount: { amount: 320, currency: 'SGD' },
     state: 'PENDING',
@@ -866,6 +868,7 @@ export const caseRecoveringActions: CaseDetailView = {
   ],
   approval: {
     requestedFrom: 'ORGANISATION',
+    intentId: 'intent-executing',
     reason: 'The replacement costs more than the travel policy allows.',
     amount: { amount: 320, currency: 'SGD' },
     state: 'APPROVED',

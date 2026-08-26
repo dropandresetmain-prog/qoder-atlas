@@ -22,6 +22,10 @@ import type {
   ProgrammeTravellerView,
   ProgrammeView,
 } from '../contracts/readmodels.ts';
+import type {
+  ProgrammeAugmentations,
+  ProgrammeTimelineItemView,
+} from '../ui/screens/operator-programme.ts';
 import { ImpactEngine } from '../engine/impact.ts';
 import { latestCaseFor, statusForTrip, statusFromCase, isTravellerChangeRequest, type ReadModelDependencies } from './readmodels.ts';
 
@@ -230,4 +234,46 @@ export function compareEndangered(a: EndangeredCommitmentView, b: EndangeredComm
 /** Chronological commitment ordering for schedule surfaces. */
 export function compareCommitmentTimes(a: { startsAt: { value: IsoDateTime } }, b: { startsAt: { value: IsoDateTime } }): number {
   return compareInstants(a.startsAt.value, b.startsAt.value);
+}
+
+/**
+ * Optional presentation for the approved programme screen, projected from
+ * persisted AnchorEvent commitments and the same programme view the page
+ * already serves. It adds no programme state and does not infer changes.
+ */
+export async function projectProgrammeAugmentations(
+  deps: ReadModelDependencies,
+  view: ProgrammeView,
+): Promise<ProgrammeAugmentations> {
+  const anchorEntry = await deps.snapshot.entities.get('ANCHOR_EVENT', view.anchorEventId);
+  if (!anchorEntry || anchorEntry.entityType !== 'ANCHOR_EVENT') return {};
+
+  const endangeredIds = new Set(view.endangeredCommitments.map((commitment) => commitment.commitmentId));
+  const grouped = new Map<string, ProgrammeTimelineItemView[]>();
+  for (const commitment of [...anchorEntry.entity.commitments].sort(compareCommitmentTimes)) {
+    const instant = commitment.startsAt.value;
+    const day = instant.slice(0, 10);
+    const items = grouped.get(day) ?? [];
+    items.push({
+      key: commitment.id,
+      timeLabel: instant.slice(11, 16),
+      title: commitment.title,
+      tone: endangeredIds.has(commitment.id) ? 'endangered' : 'ok',
+    });
+    grouped.set(day, items);
+  }
+
+  const activeCaseByTraveller = new Map(
+    view.travellers
+      .filter((traveller) => traveller.activeCaseIds[0] !== undefined)
+      .map((traveller) => [traveller.travellerId, traveller.activeCaseIds[0]!]),
+  );
+  return {
+    timeline: [...grouped.entries()].map(([dateLabel, items]) => ({ dateLabel, items })),
+    commitmentHrefFor: (commitment) => {
+      const affectedTravellerId = commitment.affectedTravellerIds.find((id) => activeCaseByTraveller.has(id));
+      const caseId = affectedTravellerId ? activeCaseByTraveller.get(affectedTravellerId) : undefined;
+      return caseId ? { href: `/operator/cases/${encodeURIComponent(caseId)}`, label: 'Open recovery case →' } : undefined;
+    },
+  };
 }

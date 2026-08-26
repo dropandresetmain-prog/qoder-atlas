@@ -11,6 +11,7 @@ import type { AppConfig } from '../config/config.ts';
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { OperatorDashboardView, ProgrammeView, TravellerTripView } from '../contracts/readmodels.ts';
 import type { CaseDetailView } from '../ui/case-view-model.ts';
+import type { ProgrammeAugmentations } from '../ui/screens/operator-programme.ts';
 import type {
   ApprovalsQueueView,
   ProviderSurfaceView,
@@ -21,8 +22,15 @@ import { renderPage } from '../ui/page.ts';
 import { renderOperatorDashboardBody } from '../ui/screens/operator-dashboard.ts';
 import { renderCaseDetailBody, renderCaseDetail } from '../ui/screens/operator-case.ts';
 import { renderProgramme } from '../ui/screens/operator-programme.ts';
+import { renderDecisions } from '../ui/screens/operator-decisions.ts';
+import { renderActivity } from '../ui/screens/operator-activity.ts';
 import { renderTravellerTrip } from '../ui/screens/traveller.ts';
 import { renderDemoPanel } from '../ui/screens/demo-panel.ts';
+import {
+  activityFromTripActivities,
+  decisionsFromApprovalsQueue,
+  decisionsFromDashboard,
+} from '../ui/operator-surfaces-view-model.ts';
 
 export interface HealthView {
   status: 'ok';
@@ -171,6 +179,8 @@ export interface AppEndpoints {
   runtime?: RuntimeHandlers;
   /** Present when the Northstar programme surface is wired. */
   programme?: ProgrammeHandlers;
+  /** Optional persisted AnchorEvent presentation for the served programme UI. */
+  programmeAugmentations?: (view: ProgrammeView) => Promise<ProgrammeAugmentations>;
   /** Present when the Northstar resolution surface is wired. */
   resolution?: ResolutionHandlers;
   /** Present when the DR-3 flight-event ingress is wired. */
@@ -185,11 +195,13 @@ export interface AppEndpoints {
   demo?: DemoSurface;
 }
 
-function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: string; traveller: string } {
+function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: string; decisions: string; activity: string; traveller: string } {
   const eventId = seededProgrammeEventId(endpoints);
   return {
     dashboard: '/operator',
     ...(eventId ? { programme: `/programme?event=${encodeURIComponent(eventId)}` } : {}),
+    decisions: '/decisions',
+    activity: '/activity',
     traveller: '/traveller',
   };
 }
@@ -269,7 +281,7 @@ async function handle(
       adapterMode: config.adapterMode,
       checkpoint: 'C candidate — generalized recovery + runtime disruption/reset flow',
       surfaces: endpoints
-        ? [...['/operator', '/traveller'], ...(endpoints.runtime ? ['/api/runtime/state'] : [])]
+        ? [...['/operator', '/decisions', '/activity', '/traveller'], ...(endpoints.runtime ? ['/api/runtime/state'] : [])]
         : [],
     });
     return;
@@ -296,6 +308,50 @@ async function handle(
     sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
+  if (req.method === 'GET' && url.pathname === '/decisions') {
+    const at = endpoints.now();
+    const queue = endpoints.wave ? await endpoints.wave.approvalsQueue(at) : undefined;
+    const view = queue
+      ? decisionsFromApprovalsQueue(queue)
+      : decisionsFromDashboard(await endpoints.operatorDashboard(at));
+    sendHtml(
+      res,
+      200,
+      renderPage(
+        { title: 'Decisions', active: 'decisions', links: pageLinks(endpoints), decisionCount: view.pending.length, ...demoBannerOptions(config, endpoints) },
+        renderDecisions({ state: 'LOADED', data: view, generatedAt: at }),
+      ),
+    );
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/activity') {
+    const at = endpoints.now();
+    if (!endpoints.wave) {
+      sendHtml(
+        res,
+        200,
+        renderPage(
+          { title: 'Activity', active: 'activity', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) },
+          renderActivity({ state: 'ERROR', errorMessage: 'Activity projection is unavailable.', generatedAt: at }),
+        ),
+      );
+      return;
+    }
+    const dashboard = await endpoints.operatorDashboard(at);
+    const activities = (await Promise.all(
+      dashboard.trips.map((trip) => endpoints.wave!.tripActivity(trip.tripId, at)),
+    )).filter((activity): activity is TripActivityView => activity !== undefined);
+    const view = activityFromTripActivities(at, activities);
+    sendHtml(
+      res,
+      200,
+      renderPage(
+        { title: 'Activity', active: 'activity', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) },
+        renderActivity({ state: 'LOADED', data: view, generatedAt: at }),
+      ),
+    );
+    return;
+  }
 
   // --- Programme HTML surface (Northstar RV-N10) --------------------------
   if (req.method === 'GET' && url.pathname === '/programme') {
@@ -308,9 +364,13 @@ async function handle(
     const outcome = eventId
       ? await endpoints.programme.view({ anchorEventId: eventId, at })
       : { status: 400, body: { error: 'missing_event_param' } };
+    const programmeView = outcome.status === 200 ? outcome.body as ProgrammeView : undefined;
+    const augment = programmeView && endpoints.programmeAugmentations
+      ? await endpoints.programmeAugmentations(programmeView)
+      : undefined;
     const body =
-      outcome.status === 200
-        ? renderProgramme({ state: 'LOADED', data: outcome.body as ProgrammeView, generatedAt: at })
+      programmeView
+        ? renderProgramme({ state: 'LOADED', data: programmeView, generatedAt: at }, augment)
         : renderProgramme({
             state: 'ERROR',
             errorMessage:

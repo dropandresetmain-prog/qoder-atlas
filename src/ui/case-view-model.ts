@@ -11,7 +11,7 @@
  * the integrator (E3/I5) as the application read model the UI expects.
  * Nothing here may be scenario-specific; screens render any conforming view.
  */
-import type { EntityId, IsoDateTime, Money } from '../domain/common.ts';
+import type { EntityId, EntityRef, IsoDateTime, Money } from '../domain/common.ts';
 import type { ReadModelStatus } from '../contracts/readmodels.ts';
 import type { ResolutionOutcome } from '../operational/case.ts';
 import type { CostAllocation } from '../operational/intent.ts';
@@ -62,7 +62,15 @@ export interface RecoveryOptionView {
 }
 
 export interface ApprovalRequirementView {
-  requestedFrom: 'TRAVELLER' | 'ORGANISATION';
+  /** Exact deterministic authority outcome; never collapse human escalation into approval. */
+  requestedFrom: 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT';
+  /** The persisted intent the runtime must decide/execute, when actionable. */
+  intentId?: EntityId;
+  /**
+   * A real in-scope organisation principal for an organisation decision.
+   * Omitted when the authority outcome is traveller or human-agent.
+   */
+  approver?: EntityRef;
   /** Plain-language reason, e.g. policy threshold exceeded. */
   reason: string;
   amount?: Money;

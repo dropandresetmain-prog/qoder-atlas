@@ -115,7 +115,17 @@ export function renderFormEnhancementScript(): string {
     for (var i = 0; i < inputs.length; i++) {
       var input = inputs[i];
       if (!input.name || input.disabled || input.type === 'submit' || input.type === 'button') continue;
-      body[input.name] = input.value;
+      // Dotted names encode a shallow JSON object for typed runtime inputs,
+      // e.g. decidedBy.entityType/id. Existing flat form fields are unchanged.
+      var dot = input.name.indexOf('.');
+      if (dot > 0) {
+        var parent = input.name.slice(0, dot);
+        var child = input.name.slice(dot + 1);
+        if (child && !Object.prototype.hasOwnProperty.call(body, parent)) body[parent] = {};
+        if (child && body[parent] && typeof body[parent] === 'object') body[parent][child] = input.value;
+      } else {
+        body[input.name] = input.value;
+      }
     }
 
     // Also collect any named buttons that were clicked

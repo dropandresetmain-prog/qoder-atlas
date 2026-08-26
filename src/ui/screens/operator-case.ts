@@ -451,13 +451,18 @@ function fundingSplitBlock(view: CaseDetailView): string {
 function approvalSection(view: CaseDetailView): string {
   const approval = view.approval;
   if (!approval) return '';
-  const from = approval.requestedFrom === 'ORGANISATION' ? 'the organisation' : 'the traveller';
+  const from =
+    approval.requestedFrom === 'ORGANISATION'
+      ? 'the organisation'
+      : approval.requestedFrom === 'TRAVELLER'
+        ? 'the traveller'
+        : 'a human agent';
   const amount = approval.amount
     ? ` Amount: <strong>${escapeHtml(formatMoney(approval.amount))}</strong>.`
     : '';
 
   let actionForms = '';
-  if (approval.state === 'PENDING') {
+  if (approval.state === 'PENDING' && approval.requestedFrom === 'TRAVELLER') {
     const approveLabel = approval.amount ? `Approve ${formatMoney(approval.amount)}` : 'Approve';
     actionForms = `
     <div class="btn-row">
@@ -470,6 +475,33 @@ function approvalSection(view: CaseDetailView): string {
         <button type="submit" class="btn btn-danger-ghost">Decline</button>
       </form>
     </div>`;
+  } else if (approval.state === 'PENDING' && approval.requestedFrom === 'ORGANISATION' && approval.approver && approval.intentId) {
+    const approveLabel = approval.amount ? `Approve ${formatMoney(approval.amount)}` : 'Approve';
+    actionForms = `
+    <div class="btn-row">
+      <form method="POST" action="/api/runtime/decide" class="inline-form" data-test="organisation-approve-form">
+        <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+        <input type="hidden" name="intentId" value="${escapeHtml(approval.intentId)}">
+        <input type="hidden" name="decidedBy.entityType" value="${escapeHtml(approval.approver.entityType)}">
+        <input type="hidden" name="decidedBy.id" value="${escapeHtml(approval.approver.id)}">
+        <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+        <input type="hidden" name="verdict" value="APPROVED">
+        <button type="submit" class="btn btn-primary">${escapeHtml(approveLabel)}</button>
+      </form>
+      <form method="POST" action="/api/runtime/decide" class="inline-form" data-test="organisation-decline-form">
+        <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+        <input type="hidden" name="intentId" value="${escapeHtml(approval.intentId)}">
+        <input type="hidden" name="decidedBy.entityType" value="${escapeHtml(approval.approver.entityType)}">
+        <input type="hidden" name="decidedBy.id" value="${escapeHtml(approval.approver.id)}">
+        <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+        <input type="hidden" name="verdict" value="DECLINED">
+        <button type="submit" class="btn btn-danger-ghost">Decline</button>
+      </form>
+    </div>`;
+  } else if (approval.state === 'PENDING' && approval.requestedFrom === 'HUMAN_AGENT') {
+    actionForms = '<p class="footnote">This recovery is escalated for human-agent handling. Northstar will not approve or execute it automatically.</p>';
+  } else if (approval.state === 'PENDING' && approval.requestedFrom === 'ORGANISATION') {
+    actionForms = '<p class="footnote">An in-scope organisation approver is not available in the current read model. Nothing has been approved.</p>';
   }
 
   return `
@@ -555,6 +587,27 @@ function recoveryActionsPanel(view: CaseDetailView): string {
           <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
           <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin recovery</button>
+        </form>
+      </div>
+    </section>`;
+  }
+
+  // Generic organisation approval is intentionally a separate runtime stage:
+  // approval records authority first, then this explicit action runs the
+  // normal execution -> observation -> verification loop.
+  if (view.approval?.state === 'APPROVED' && view.approval.requestedFrom === 'ORGANISATION' && view.approval.intentId) {
+    return `
+    <section class="section" aria-label="Recovery execution">
+      <h2>Recovery execution</h2>
+      <div class="panel recovery-actions" data-ui-section="recovery-actions">
+        <p class="planning-kicker">Approval recorded</p>
+        <p class="planning-result-title">Execute the approved recovery</p>
+        <p>Northstar will now execute, observe the result, and re-check the trip.</p>
+        <form method="POST" action="/api/runtime/execute" class="inline-form" data-test="execute-approved-strategy-form">
+          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+          <input type="hidden" name="intentId" value="${escapeHtml(view.approval.intentId)}">
+          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+          <button type="submit" class="btn btn-primary" data-test="execute-approved-strategy-btn">Execute approved recovery</button>
         </form>
       </div>
     </section>`;
