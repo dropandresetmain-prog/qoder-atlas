@@ -1,0 +1,119 @@
+name: Temporary final UI merge
+
+on:
+  push:
+    branches:
+      - integration/final-demo-candidate
+
+permissions:
+  contents: write
+
+jobs:
+  merge-approved-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out final candidate
+        uses: actions/checkout@v4
+        with:
+          ref: integration/final-demo-candidate
+          fetch-depth: 0
+
+      - name: Merge approved UI and preserve backend FX truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "northstar-integration-bot"
+          git config user.email "northstar-integration-bot@users.noreply.github.com"
+          git fetch origin lane/ui-approved-screens
+
+          set +e
+          git merge --no-ff --no-commit origin/lane/ui-approved-screens
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ] && [ "$merge_status" -ne 1 ]; then
+            echo "Unexpected git merge exit status: $merge_status" >&2
+            exit "$merge_status"
+          fi
+
+          git diff --name-only --diff-filter=U | sort > /tmp/actual-conflicts.txt
+          cat > /tmp/expected-conflicts.txt <<'EOF'
+          src/ui/case-view-model.ts
+          src/ui/screens/operator-case.ts
+          src/ui/theme.ts
+          EOF
+          sort -o /tmp/expected-conflicts.txt /tmp/expected-conflicts.txt
+          diff -u /tmp/expected-conflicts.txt /tmp/actual-conflicts.txt
+
+          git checkout --theirs -- \
+            src/ui/case-view-model.ts \
+            src/ui/screens/operator-case.ts \
+            src/ui/theme.ts
+
+          python - <<'PY'
+          from pathlib import Path
+
+          # 1) Approved UI view-model + backend ADR-052 original-provider amount.
+          path = Path('src/ui/case-view-model.ts')
+          text = path.read_text()
+          needle = """  /** Positive = extra cost, negative = saving, versus the original plan. */
+          costDelta?: Money;
+          requiresApproval?: boolean;
+          """
+          replacement = """  /** Positive = extra cost, negative = saving, versus the original plan. */
+          costDelta?: Money;
+          /**
+           * ADR-052: when the cost was quoted in a non-home currency and normalized,
+           * the ORIGINAL provider amount/currency stays visible beside the
+           * home-currency restatement (`costDelta` carries the restatement when the
+           * intent was built through the FX path). Absent => no normalization.
+           */
+          providerCost?: Money;
+          requiresApproval?: boolean;
+          """
+          if text.count(needle) != 1:
+              raise SystemExit('case-view-model FX insertion point changed')
+          path.write_text(text.replace(needle, replacement))
+
+          # 2) Approved option card + visibly separate provider charge/home restatement.
+          path = Path('src/ui/screens/operator-case.ts')
+          text = path.read_text()
+          needle = """        const delta = formatCostDelta(option.costDelta);
+                  return `<span class=\"chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}\">${escapeHtml(delta.text)}</span>`;
+          """
+          replacement = """        const delta = formatCostDelta(option.costDelta);
+                  // ADR-052: keep the original provider charge visible beside the
+                  // home-currency restatement so the two never blur together.
+                  const provider = option.providerCost
+                    ? `<span class=\"chip chip-provider\">${escapeHtml(`${formatMoney(option.providerCost)} at provider`)}</span>`
+                    : '';
+                  return `${provider}<span class=\"chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}\">${escapeHtml(delta.text)}</span>`;
+          """
+          if text.count(needle) != 1:
+              raise SystemExit('operator-case FX rendering insertion point changed')
+          path.write_text(text.replace(needle, replacement))
+
+          # 3) Keep provider amount visually secondary but distinct.
+          path = Path('src/ui/theme.ts')
+          text = path.read_text()
+          needle = ".chip.chip-cost { background: var(--watch-bg); color: var(--watch); border-color: var(--watch-border); }\n"
+          replacement = needle + ".chip.chip-provider { background: transparent; color: var(--text-faint); }\n"
+          if text.count(needle) != 1:
+              raise SystemExit('theme provider-chip insertion point changed')
+          path.write_text(text.replace(needle, replacement))
+          PY
+
+          git add \
+            src/ui/case-view-model.ts \
+            src/ui/screens/operator-case.ts \
+            src/ui/theme.ts
+
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved merge conflicts remain" >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+
+          git status --short
+          git commit -m "merge(ui): integrate approved screens with final backend and content"
+          git push origin HEAD:integration/final-demo-candidate
