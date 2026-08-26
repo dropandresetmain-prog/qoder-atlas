@@ -26,7 +26,13 @@ import type {
   ProgrammeAugmentations,
   ProgrammeTimelineItemView,
 } from '../ui/screens/operator-programme.ts';
+import type { Place } from '../domain/entities.ts';
 import { ImpactEngine } from '../engine/impact.ts';
+import {
+  formatProgrammeDayLabel,
+  projectTravellerArrivalSummary,
+  projectTravellerRoleLine,
+} from './presentationProjection.ts';
 import { latestCaseFor, statusForTrip, statusFromCase, isTravellerChangeRequest, type ReadModelDependencies } from './readmodels.ts';
 
 /**
@@ -248,19 +254,26 @@ export async function projectProgrammeAugmentations(
   const anchorEntry = await deps.snapshot.entities.get('ANCHOR_EVENT', view.anchorEventId);
   if (!anchorEntry || anchorEntry.entityType !== 'ANCHOR_EVENT') return {};
 
+  const places = new Map<string, Place>();
+  for (const entry of await deps.snapshot.entities.list('PLACE')) {
+    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
+  }
+
   const endangeredIds = new Set(view.endangeredCommitments.map((commitment) => commitment.commitmentId));
   const grouped = new Map<string, ProgrammeTimelineItemView[]>();
   for (const commitment of [...anchorEntry.entity.commitments].sort(compareCommitmentTimes)) {
     const instant = commitment.startsAt.value;
-    const day = instant.slice(0, 10);
-    const items = grouped.get(day) ?? [];
+    const dayKey = instant.slice(0, 10);
+    const venue = commitment.placeId ? places.get(commitment.placeId)?.name : undefined;
+    const items = grouped.get(dayKey) ?? [];
     items.push({
       key: commitment.id,
       timeLabel: instant.slice(11, 16),
       title: commitment.title,
+      ...(venue ? { tag: venue } : {}),
       tone: endangeredIds.has(commitment.id) ? 'endangered' : 'ok',
     });
-    grouped.set(day, items);
+    grouped.set(dayKey, items);
   }
 
   const activeCaseByTraveller = new Map(
@@ -268,8 +281,26 @@ export async function projectProgrammeAugmentations(
       .filter((traveller) => traveller.activeCaseIds[0] !== undefined)
       .map((traveller) => [traveller.travellerId, traveller.activeCaseIds[0]!]),
   );
+
+  const roleByTrip = new Map<string, string | undefined>();
+  const arrivalByTrip = new Map<string, string | undefined>();
+  for (const traveller of view.travellers) {
+    roleByTrip.set(traveller.tripId, await projectTravellerRoleLine(deps, traveller.tripId, traveller.travellerId));
+    arrivalByTrip.set(
+      traveller.tripId,
+      await projectTravellerArrivalSummary(deps, traveller.tripId, traveller.travellerId),
+    );
+  }
+
   return {
-    timeline: [...grouped.entries()].map(([dateLabel, items]) => ({ dateLabel, items })),
+    timeline: [...grouped.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dayKey, items]) => ({
+        dateLabel: formatProgrammeDayLabel(`${dayKey}T12:00:00+00:00`),
+        items,
+      })),
+    roleFor: (traveller) => roleByTrip.get(traveller.tripId),
+    arrivalFor: (traveller) => arrivalByTrip.get(traveller.tripId),
     commitmentHrefFor: (commitment) => {
       const affectedTravellerId = commitment.affectedTravellerIds.find((id) => activeCaseByTraveller.has(id));
       const caseId = affectedTravellerId ? activeCaseByTraveller.get(affectedTravellerId) : undefined;

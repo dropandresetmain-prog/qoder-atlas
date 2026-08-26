@@ -41,6 +41,10 @@ export interface TravellerCommitmentCard {
   title: string;
   /** Mono meta line, e.g. "16 Sep · 09:00 · Main hall". */
   meta?: string;
+  /** Supporting sentence under the title when the projection supplies it. */
+  body?: string;
+  /** Plain-language consequence if the commitment is missed. */
+  ifMissed?: string;
   /** When true, card uses the healthy `.is-ok` treatment. */
   ok?: boolean;
 }

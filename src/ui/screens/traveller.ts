@@ -127,12 +127,16 @@ function commitmentCard(view: TravellerTripView, presentation?: TravellerPresent
         : undefined);
   if (!card) return '';
   const meta = card.meta ? `<p class="cc-meta">${escapeHtml(card.meta)}</p>` : '';
+  const body = card.body ? `<p class="cc-body">${escapeHtml(card.body)}</p>` : '';
+  const ifMissed = card.ifMissed ? `<p class="cc-if-missed">${escapeHtml(card.ifMissed)}</p>` : '';
   const okClass = card.ok ? ' is-ok' : '';
   return `
   <div class="commit-card${okClass}" data-ui-section="commitment">
     <p class="cc-label">${escapeHtml(card.label)}</p>
     <p class="cc-title">${escapeHtml(card.title)}</p>
     ${meta}
+    ${body}
+    ${ifMissed}
   </div>`;
 }
 
