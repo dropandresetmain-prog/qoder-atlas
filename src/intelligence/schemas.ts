@@ -8,8 +8,6 @@
 import { z } from 'zod';
 import { EntityRefSchema } from '../domain/common.ts';
 import { PreferenceOriginKindSchema } from '../domain/preferences.ts';
-import { MutationOperationSchema } from '../operational/mutation.ts';
-import { CapabilityFamilySchema, ToolOperationSchema } from '../operational/strategy.ts';
 
 // ---------------------------------------------------------------------------
 // D2 — interpretation outputs

@@ -247,6 +247,14 @@ test('g1 round 1: switch request emits scoped hotel.search and no strategy', asy
   assert.equal(request.parameters['checkInDate'], '2026-09-29');
   assert.equal(request.parameters['checkOutDate'], '2026-10-02');
   assert.deepEqual(request.parameters['guests'], { adults: 2 });
+  // Round 1 with no prior tool result must state the evidence gate — never
+  // the empty-rates message (null prior !== "searched with empty rates").
+  assert.ok(
+    output.uncertainties.some((u) =>
+      /replacement\/extension options must be searched before any strategy is proposed/.test(u.statement),
+    ),
+  );
+  assert.equal(output.uncertainties.some((u) => /no usable rates/.test(u.statement)), false);
 });
 
 test('g1 round 1: extension request searches to the requested check-out date', async () => {

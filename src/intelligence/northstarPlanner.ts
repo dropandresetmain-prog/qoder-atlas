@@ -1019,7 +1019,12 @@ export class NorthstarPlanner implements RecoveryPlanner {
     // request evidence and stop. With results, enumerate candidate stays.
     const evidence = this.hotelSearchEvidence(input);
     if (!evidence || evidence.rates.length === 0) {
-      const searched = evidence !== undefined;
+      // hotelSearchEvidence returns null when no prior tool-ws-stay result
+      // exists (round 1) and a possibly-empty outcome when a result was
+      // recorded. null must NOT count as "searched" — otherwise the
+      // evidence-gate message collapses into the empty-rates message and
+      // acceptance assertions lose the honest round-1 statement.
+      const searched = evidence !== null && evidence !== undefined;
       return {
         strategies: [],
         toolRequests,

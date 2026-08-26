@@ -92,7 +92,7 @@ test('acceptance: preflight rejects missing required LIVE credentials', () => {
       sqlitePath: ':memory:',
       recordingsDir: join(dir, 'rec'),
       fixturesDir: 'fixtures',
-      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
+      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} },
     },
   });
   assert.equal(report.ok, false);
@@ -113,7 +113,7 @@ test('acceptance: runner executes S1 simulated ingress + observe via HTTP', asyn
       sqlitePath: ':memory:',
       recordingsDir: mkdtempSync(join(tmpdir(), 'accept-s1-rec-')),
       fixturesDir: resolve('fixtures'),
-      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
+      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} },
     },
   });
   assert.equal(result.evidence.ok, true, result.evidence.error);
@@ -140,7 +140,7 @@ test('acceptance: runner executes S3 organiser preview/commit ui_actions', async
       sqlitePath: ':memory:',
       recordingsDir: mkdtempSync(join(tmpdir(), 'accept-s3-rec-')),
       fixturesDir: resolve('fixtures'),
-      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
+      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} },
     },
   });
   assert.equal(result.evidence.ok, true, result.evidence.error);
@@ -200,7 +200,7 @@ test('acceptance: new manifest runs without source modifications', async () => {
       sqlitePath: ':memory:',
       recordingsDir: join(dir, 'rec'),
       fixturesDir: resolve('fixtures'),
-      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
+      providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} },
     },
   });
   assert.equal(result.evidence.ok, true, result.evidence.error);
@@ -218,7 +218,7 @@ function assertionTestConfig(dir: string) {
     sqlitePath: ':memory:',
     recordingsDir: join(dir, 'rec'),
     fixturesDir: resolve('fixtures'),
-    providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
+    providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} },
   } as const;
 }
 
