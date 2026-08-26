@@ -123,13 +123,14 @@ test('deterministic status ordering puts attention first, resolved last', () => 
   assert.ok(planningAt > 0 && planningAt < readyAt);
 });
 
-test('programme links only active cases and keeps operator context', () => {
+test('programme links travellers to trip detail and keeps active cases separately discoverable', () => {
   const html = renderProgrammeBody(healthyProgramme);
   for (const traveller of healthyProgramme.travellers) {
+    assert.match(html, new RegExp(`href="/traveller\\?trip=${traveller.tripId}"`));
     const caseId = traveller.activeCaseIds[0];
-    if (caseId) assert.ok(html.includes(`href="/operator/cases/${caseId}"`));
+    if (caseId) assert.match(html, new RegExp(`href="/operator/cases/${caseId}"`));
   }
-  assert.ok(!html.includes('href="/traveller?trip='));
+  assert.match(html, /data-test="programme-traveller-link"/);
 });
 
 test('endangered-commitments section is omitted when the list is empty', () => {

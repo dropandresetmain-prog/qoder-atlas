@@ -316,15 +316,16 @@ function orderTravellers(rows: readonly ProgrammeTravellerView[]): ProgrammeTrav
 function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentations): string {
   const firstActiveCaseId = row.activeCaseIds[0];
   const name = `<strong>${escapeHtml(row.travellerName)}</strong>`;
-  const nameCell = firstActiveCaseId
-    ? `<a href="/operator/cases/${escapeHtml(firstActiveCaseId)}" class="traveller-link" data-test="programme-traveller-link">${name}</a>`
-    : `<span class="traveller-name">${name}</span>`;
+  const nameCell = `<a href="/traveller?trip=${escapeHtml(row.tripId)}" class="traveller-link" data-test="programme-traveller-link">${name}</a>`;
+  const caseCell = firstActiveCaseId
+    ? `<div><a href="/operator/cases/${escapeHtml(firstActiveCaseId)}" class="case-link" data-test="programme-case-link">Recovery case</a></div>`
+    : '';
   const role = augment.roleFor?.(row) ?? '—';
   const arrival = augment.arrivalFor?.(row) ?? '—';
   const justChanged = augment.justChangedTripIds?.has(row.tripId) ?? false;
   return `
     <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}">
-      <td>${nameCell}</td>
+      <td>${nameCell}${caseCell}</td>
       <td>${escapeHtml(role)}</td>
       <td class="num">${escapeHtml(arrival)}</td>
       <td>${statusBadge(row.status)}</td>

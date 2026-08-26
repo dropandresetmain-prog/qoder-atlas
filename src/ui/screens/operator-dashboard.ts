@@ -188,10 +188,14 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
   if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
-  const content = `
+  const caseLink = trip.activeCaseId
+    ? `<a href="/operator/cases/${escapeHtml(trip.activeCaseId)}" class="b-case-link" data-test="case-link">Recovery case</a>`
+    : '';
+  return `
+  <div class="brow" style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}">
     <span class="b-dot ${FLEET_CELL[trip.status]}" aria-hidden="true"></span>
     <div>
-      <div class="b-name">${escapeHtml(name)}</div>
+      <div class="b-name"><a href="/traveller?trip=${escapeHtml(trip.tripId)}" class="traveller-link" data-test="trip-link">${escapeHtml(name)}</a></div>
       ${roleLine ? `<div class="b-extra">${escapeHtml(roleLine)}</div>` : ''}
       ${miniChain}
     </div>
@@ -200,13 +204,11 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
       ${extraLine}
     </div>
     <div class="b-right">
+      ${caseLink}
       ${statusBadge(trip.status)}
       <div class="b-time">${escapeHtml(formatRosterTime(trip.updatedAt, view.generatedAt))}</div>
-    </div>`;
-  const rowAttributes = `class="brow" style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}"`;
-  return trip.activeCaseId
-    ? `<a href="/operator/cases/${escapeHtml(trip.activeCaseId)}" ${rowAttributes} data-test="trip-link" aria-label="Open operator case for ${escapeHtml(name)}">${content}</a>`
-    : `<div ${rowAttributes}>${content}</div>`;
+    </div>
+  </div>`;
 }
 
 function rosterFootnote(hasMiniChains: boolean): string {

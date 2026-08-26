@@ -105,7 +105,9 @@ test('demo panel and launch endpoint are wired for final heroes', async () => {
     const panel = await fetch(`${base}/demo`);
     assert.equal(panel.status, 200);
     const html = await panel.text();
-    assert.match(html, /Final hero workflows/);
+    assert.match(html, /Final video flows/);
+    assert.match(html, /Scenario rehearsal/);
+    assert.match(html, /data-scenario="S1"/);
     assert.match(html, /data-workflow="s2"/);
     assert.match(html, /data-workflow="s5"/);
     assert.match(html, /data-workflow="s7"/);

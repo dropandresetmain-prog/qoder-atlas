@@ -283,16 +283,19 @@ test('dashboard renders every status and orders attention first', () => {
   assert.ok(html.includes('Still unclear'), 'uncertainty must be visible');
 });
 
-test('operator rows stay in operator context and neutral rows are not fake links', () => {
+test('operator rows link to traveller detail and keep active cases separately discoverable', () => {
   const activeCaseId = 'case-active-operator';
+  const tripId = operatorDashboard.trips[0]!.tripId;
   const html = renderOperatorDashboardBody({
     ...operatorDashboard,
     trips: operatorDashboard.trips.map((trip, index) =>
       index === 0 ? { ...trip, activeCaseId } : trip,
     ),
   });
-  assert.ok(html.includes(`href="/operator/cases/${activeCaseId}"`));
-  assert.ok(!html.includes('href="/traveller?trip='), 'operator rows must never fall through to traveller UI');
+  assert.match(html, new RegExp(`href="/traveller\\?trip=${tripId}"`));
+  assert.match(html, new RegExp(`href="/operator/cases/${activeCaseId}"`));
+  assert.match(html, /data-test="trip-link"/);
+  assert.match(html, /data-test="case-link"/);
 });
 
 test('switching typed fixture data changes nothing in component code paths', () => {

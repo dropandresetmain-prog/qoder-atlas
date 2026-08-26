@@ -52,6 +52,8 @@ export interface DemoSurface {
   programmeEventIds?(): string[];
   /** Final hero workflow ids launchable from the demo panel. */
   heroWorkflows?(): Array<{ id: string; title: string; description: string }>;
+  /** Full S1–S8 acceptance-manifest rehearsals for diagnosis. */
+  scenarioRehearsals?(): Array<{ id: string; title: string; description: string; scenarioId: string }>;
   /** Which planner is active (for the demo banner display). */
   plannerMode?: () => 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
   reset(at: IsoDateTime): Promise<{ status: number; body: unknown }>;
@@ -770,6 +772,7 @@ async function handle(
       adapterMode: config.adapterMode,
       plannerMode: endpoints.demo.plannerMode?.() ?? 'DETERMINISTIC_FALLBACK',
       scenarioNames: endpoints.demo.scenarioNames(),
+      scenarioRehearsals: endpoints.demo.scenarioRehearsals?.() ?? [],
       heroWorkflows: endpoints.demo.heroWorkflows?.() ?? [],
       programmeEventId,
     });
