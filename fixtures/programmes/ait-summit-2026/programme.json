@@ -1214,6 +1214,10 @@
         "name": "Bayview Grand Hotel (synthetic event partner hotel, Marina Bay)",
         "kind": "HOTEL",
         "timezone": "Asia/Singapore",
+        "coordinates": {
+          "latitude": 1.2839,
+          "longitude": 103.8607
+        },
         "externalRefs": [],
         "servedByPlaceIds": [
           "place-sin-changi"
@@ -1224,6 +1228,10 @@
         "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
         "kind": "HOTEL",
         "timezone": "Asia/Singapore",
+        "coordinates": {
+          "latitude": 1.2789,
+          "longitude": 103.8536
+        },
         "externalRefs": [],
         "servedByPlaceIds": [
           "place-sin-changi"
@@ -2134,17 +2142,17 @@
       },
       {
         "draftId": "ait-draft-09",
-        "displayName": "Chloe Martin",
+        "displayName": "Jordan Hale",
         "identity": {
-          "email": "chloe.martin@southernorbit.test",
-          "lastName": "Martin"
+          "email": "jordan.hale@pacificrim.test",
+          "lastName": "Hale"
         },
-        "homeLocationText": "Sydney (SYD)",
+        "homeLocationText": "Los Angeles (LAX)",
         "nationalityCodes": [
-          "AU"
+          "US"
         ],
         "notes": [
-          "Hackathon finalist (Team Waypoint); presents on 30 Sep, returns for awards on 2 Oct"
+          "Hackathon finalist (Team Waypoint); LAX origin ZIPAIR connection demo; presents on 30 Sep, returns for awards on 2 Oct"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -2159,21 +2167,21 @@
             "mode": "FLIGHT",
             "originRef": {
               "system": "airport-code",
-              "value": "SYD"
+              "value": "LAX"
             },
             "destinationRef": {
               "system": "airport-code",
-              "value": "KUL"
+              "value": "NRT"
             },
-            "scheduledDeparture": "2026-09-29T08:20:00+10:00",
-            "scheduledArrival": "2026-09-29T14:05:00+08:00",
+            "scheduledDeparture": "2026-09-28T10:55:00-07:00",
+            "scheduledArrival": "2026-09-29T14:10:00+09:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN216"
+              "value": "ZG023"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN09"
+              "reference": "ZGSYN09"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -2183,21 +2191,21 @@
             "mode": "FLIGHT",
             "originRef": {
               "system": "airport-code",
-              "value": "KUL"
+              "value": "NRT"
             },
             "destinationRef": {
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T16:40:00+08:00",
-            "scheduledArrival": "2026-09-29T17:50:00+08:00",
+            "scheduledDeparture": "2026-09-29T16:50:00+09:00",
+            "scheduledArrival": "2026-09-29T23:00:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN226"
+              "value": "ZG053"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN09"
+              "reference": "ZGSYN09"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"

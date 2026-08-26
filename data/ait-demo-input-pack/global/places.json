@@ -43,6 +43,7 @@
       "name": "Bayview Grand Hotel (synthetic event partner hotel, Marina Bay)",
       "kind": "HOTEL",
       "timezone": "Asia/Singapore",
+      "coordinates": { "latitude": 1.2839, "longitude": 103.8607 },
       "externalRefs": [],
       "servedByPlaceIds": [
         "place-sin-changi"
@@ -53,6 +54,7 @@
       "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
       "kind": "HOTEL",
       "timezone": "Asia/Singapore",
+      "coordinates": { "latitude": 1.2789, "longitude": 103.8536 },
       "externalRefs": [],
       "servedByPlaceIds": [
         "place-sin-changi"
