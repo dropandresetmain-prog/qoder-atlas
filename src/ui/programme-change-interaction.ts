@@ -14,6 +14,11 @@ export function renderProgrammeChangeEnhancementScript(): string {
 
   var params = new URLSearchParams(window.location.search);
   var anchorEventId = params.get('event');
+  // Deterministic demo/replay pages may supply ?at=<ISO instant>. Keep both
+  // preview and commit on that caller-supplied instant rather than silently
+  // switching to the browser wall clock. Normal interactive pages fall back
+  // to the current instant when no replay instant was supplied.
+  var actionAt = params.get('at') || new Date().toISOString();
   var actionRow = document.querySelector('[data-ui-section="programme-actions"]');
   var timelineItems = Array.prototype.slice.call(document.querySelectorAll('[data-timeline-key]'));
   if (!anchorEventId || !actionRow || timelineItems.length === 0) return;
@@ -53,7 +58,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var payload = {
       commitmentId: commitmentId,
       changeKind: changeKind,
-      at: new Date().toISOString()
+      at: actionAt
     };
     if (newStartsAt) payload.newStartsAt = newStartsAt;
     if (newEndsAt) payload.newEndsAt = newEndsAt;
@@ -205,9 +210,8 @@ export function renderProgrammeChangeEnhancementScript(): string {
       if (!lastPreviewPayload) return;
       if (!window.confirm('Commit this programme change and re-check affected trips?')) return;
       commitButton.disabled = true;
-      var payload = Object.assign({}, lastPreviewPayload, { at: new Date().toISOString() });
       result.textContent = 'Committing change and re-checking affected trips…';
-      postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-commit', payload)
+      postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-commit', lastPreviewPayload)
         .then(function(response) {
           if (!response.ok) {
             commitButton.disabled = false;
