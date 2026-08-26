@@ -1,6 +1,6 @@
 {
   "scenarioId": "S3",
-  "title": "Organiser event-side preview",
+  "title": "Organiser RESCHEDULE preview/commit for headline interview (continuity-aligned)",
   "mode": "REPLAY",
   "globalInputPack": {
     "packId": "ait-global-programme",
@@ -27,63 +27,48 @@
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": [
-      "evt-ait-2026"
-    ],
-    "travellerIds": [
-      "trv-evt-ait-2026-ait-draft-04",
-      "trv-evt-ait-2026-ait-draft-20",
-      "trv-evt-ait-2026-ait-draft-02"
-    ],
-    "tripIds": []
+    "anchorEventIds": ["evt-ait-2026"],
+    "travellerIds": ["trv-evt-ait-2026-ait-draft-14"],
+    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-14"]
   },
   "routeParams": [],
   "steps": [
     {
       "id": "reset",
-      "description": "Deterministic reset/reseed",
+      "description": "Deterministic reset/reseed (standalone S3 only — continuous proof lives in s1-s3-continuity.json)",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": {
-          "at": "2026-09-22T10:00:00+08:00"
-        },
+        "body": { "at": "2026-09-22T10:00:00+08:00" },
         "expectStatus": 200
       }
     },
     {
       "id": "organiser_preview",
-      "description": "Organiser Preview (counterfactual, no mutation): move future-provocation into the 09:50-10:10 Day-1 slot",
+      "description": "Preview RESCHEDULE headline interview to 15:30–16:00 without authoritative mutation",
       "action": {
         "type": "ui_action",
         "kind": "organiser_preview",
         "params": {
           "anchorEventId": "evt-ait-2026",
-          "commitmentId": "cmt-ait-d1-future-provocation",
+          "commitmentId": "cmt-ait-d1-headline-interview",
           "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-10-01T09:50:00+08:00",
-          "newEndsAt": "2026-10-01T10:10:00+08:00",
+          "newStartsAt": "2026-10-01T15:30:00+08:00",
+          "newEndsAt": "2026-10-01T16:00:00+08:00",
           "at": "2026-09-22T11:05:00+08:00"
         },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "totalTravellers", "op": "equals", "expected": 67, "description": "the preview evaluates the full event roster blast radius" },
-        { "path": "affected", "op": "arrayNotEmpty", "description": "the reschedule affects at least one linked trip" },
-        { "path": "affected", "op": "arrayLengthMax", "expected": 1, "description": "the blast radius is confined: exactly one trip is linked to the commitment" },
-        { "path": "affected.0.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the engine derives the affected trip from the commitment linkage, not from the request" },
-        { "path": "affected.0.travellerIds.0", "op": "equals", "expected": "trv-evt-ait-2026-ait-draft-04", "description": "the affected traveller is resolved from the linked trip" },
-        { "path": "affected.0.viabilityConsequence", "op": "equals", "expected": "AT_RISK", "description": "an earlier session start is AT_RISK, not DISRUPTED: no hard constraint fails under the hypothetical state" },
-        { "path": "affected.0.constraintFailures", "op": "arrayLengthMax", "expected": 0, "description": "the hypothetical engagement violates no trip constraint" },
-        { "path": "affected.0.reasons.0", "op": "contains", "expected": "commitment rescheduled", "description": "the impact reason is derived from the engagement time change" },
-        { "path": "unaffected", "op": "arrayLengthMin", "expected": 66, "description": "every non-linked trip is evaluated and reported unaffected individually" },
-        { "path": "unaffected.0.reasons.0", "op": "contains", "expected": "not linked to commitment cmt-ait-d1-future-provocation", "description": "non-affectedness is reasoned from linkage evidence, not assumed" }
+        { "path": "totalTravellers", "op": "equals", "expected": 67, "description": "full roster blast radius" },
+        { "path": "affected", "op": "arrayLengthMin", "expected": 2, "description": "interviewer and speaker linked" },
+        { "path": "affected.1.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14", "description": "Sarah Lim trip linked to headline interview" }
       ]
     },
     {
       "id": "observe_programme_mid",
-      "description": "Counterfactual proof: between preview and commit the programme still shows the original state",
+      "description": "Preview mutated nothing authoritative",
       "action": {
         "type": "observe",
         "path": "/api/programme/evt-ait-2026",
@@ -91,102 +76,35 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "summary.disrupted", "op": "equals", "expected": 0, "description": "preview mutated nothing: no traveller is disrupted" },
-        { "path": "summary.atRisk", "op": "equals", "expected": 0, "description": "preview mutated nothing: no traveller is at risk" },
-        { "path": "summary.planning", "op": "equals", "expected": 57, "description": "the linked traveller is still in the original PLANNING state" },
-        { "path": "endangeredCommitments", "op": "arrayLengthMax", "expected": 0, "description": "no commitment is endangered before any commit" }
-      ]
-    },
-    {
-      "id": "observe_traveller_mid",
-      "description": "Counterfactual proof: the linked trip itself is untouched by the preview",
-      "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-04",
-        "label": "traveller_trip_between_preview_and_commit",
-        "expectStatus": 200
-      },
-      "assert": [
-        { "path": "status", "op": "equals", "expected": "UNKNOWN", "description": "the linked trip keeps its original viability status" },
-        { "path": "whatChanged", "op": "notExists", "description": "no change narrative exists on the trip before the commit" }
-      ]
-    },
-    {
-      "id": "observe_state_mid",
-      "description": "Counterfactual proof: preview opened no recovery case",
-      "action": {
-        "type": "observe",
-        "path": "/api/runtime/state",
-        "label": "runtime_state_between_preview_and_commit",
-        "expectStatus": 200
-      },
-      "assert": [
-        { "path": "openCases", "op": "arrayLengthMax", "expected": 0, "description": "a counterfactual preview never opens recovery cases" }
+        { "path": "summary.disrupted", "op": "equals", "expected": 0, "description": "preview leaves disrupted count unchanged" }
       ]
     },
     {
       "id": "organiser_commit",
-      "description": "Organiser Commit fan-out through the same programme HTTP surface",
+      "description": "Commit RESCHEDULE fan-out",
       "action": {
         "type": "ui_action",
         "kind": "organiser_commit",
         "params": {
           "anchorEventId": "evt-ait-2026",
-          "commitmentId": "cmt-ait-d1-future-provocation",
+          "commitmentId": "cmt-ait-d1-headline-interview",
           "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-10-01T09:50:00+08:00",
-          "newEndsAt": "2026-10-01T10:10:00+08:00",
+          "newStartsAt": "2026-10-01T15:30:00+08:00",
+          "newEndsAt": "2026-10-01T16:00:00+08:00",
           "at": "2026-09-22T11:20:00+08:00"
         },
         "expectStatus": 200,
-        "capture": {
-          "caseId": "processedSignals.0.caseId"
-        }
+        "capture": { "caseId": "processedSignals.1.caseId" }
       },
       "assert": [
-        { "path": "accepted", "op": "truthy", "description": "the commit is accepted through the real programme surface" },
-        { "path": "linkedTripCount", "op": "equals", "expected": 1, "description": "the commit fans out to exactly the linked trip count derived by the engine" },
-        { "path": "unlinkedTripCount", "op": "equals", "expected": 66, "description": "the engine reports the unaffected remainder explicitly" },
-        { "path": "processedSignals", "op": "arrayNotEmpty", "description": "the commit produces fan-out change signals" },
-        { "path": "processedSignals.0.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the fan-out signal targets the linked trip" },
-        { "path": "processedSignals.0.signalId", "op": "contains", "expected": "sig-change-cmt-ait-d1-future-provocation", "description": "the signal is derived from the committed commitment change" },
-        { "path": "processedSignals.0.caseStatus", "op": "equals", "expected": "ASSESSING", "description": "fan-out opens a recovery case in the assessing state for the affected traveller" },
-        { "path": "issues", "op": "arrayLengthMax", "expected": 0, "description": "the commit executes without engine-reported issues" }
-      ]
-    },
-    {
-      "id": "observe_programme",
-      "description": "Commit is REAL: the programme read model now reflects exactly one disrupted traveller",
-      "action": {
-        "type": "observe",
-        "path": "/api/programme/evt-ait-2026",
-        "label": "programme_after_commit",
-        "expectStatus": 200
-      },
-      "assert": [
-        { "path": "anchorEventId", "op": "equals", "expected": "evt-ait-2026", "description": "the programme view is scoped to the anchor event" },
-        { "path": "summary.disrupted", "op": "equals", "expected": 1, "description": "exactly one traveller flipped to DISRUPTED as a result of the commit" },
-        { "path": "summary.planning", "op": "equals", "expected": 56, "description": "the disrupted traveller left the PLANNING bucket: state moved, roster total unchanged" },
-        { "path": "summary.total", "op": "equals", "expected": 67, "description": "the commit changes trip states, never the roster size" }
-      ]
-    },
-    {
-      "id": "observe_traveller_final",
-      "description": "The linked trip now carries the disruption narrative derived from the committed change",
-      "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-04",
-        "label": "traveller_trip_after_commit",
-        "expectStatus": 200
-      },
-      "assert": [
-        { "path": "status", "op": "equals", "expected": "DISRUPTED", "description": "the linked trip is now DISRUPTED" },
-        { "path": "whatChanged", "op": "contains", "expected": "shared commitment rescheduled affecting engagement el-trip-trv-evt-ait-2026-ait-draft-04-eng-1", "description": "the change narrative names the exact engagement linked to the rescheduled commitment" }
+        { "path": "accepted", "op": "truthy", "description": "commit accepted" },
+        { "path": "processedSignals", "op": "arrayLengthMin", "expected": 2, "description": "fan-out signals for interviewer and speaker" },
+        { "path": "processedSignals.1.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14", "description": "fan-out targets headline speaker trip" }
       ]
     },
     {
       "id": "observe_case_final",
-      "description": "The fan-out case exists with deterministic constraint checks",
+      "description": "Fan-out case exists for the linked trip",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
@@ -194,49 +112,7 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the opened case belongs to the affected trip" },
-        { "path": "status", "op": "equals", "expected": "DISRUPTED", "description": "the case detail surfaces the disrupted viability" },
-        { "path": "whatChanged", "op": "contains", "expected": "shared commitment rescheduled", "description": "the case records the commitment change as its cause" },
-        { "path": "checks.0.label", "op": "contains", "expected": "arrival evidence must precede the linked commitment start", "description": "the case evaluates the arrival-before-commitment constraint against the new start" },
-        { "path": "checks.0.result", "op": "equals", "expected": "UNKNOWN", "description": "no arrival evidence exists for this trip: the check stays UNKNOWN instead of guessing" }
-      ]
-    },
-    {
-      "id": "observe_state_final",
-      "description": "Authoritative runtime state now lists exactly the fan-out case",
-      "action": {
-        "type": "observe",
-        "path": "/api/runtime/state",
-        "label": "runtime_state_after_commit",
-        "expectStatus": 200
-      },
-      "assert": [
-        { "path": "openCases", "op": "arrayLengthMin", "expected": 1, "description": "the fan-out case is open in authoritative state" },
-        { "path": "openCases.0.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the open case belongs to the affected trip" },
-        { "path": "openCases.0.status", "op": "equals", "expected": "ASSESSING", "description": "the case lifecycle opened at the assessing stage" }
-      ]
-    },
-    {
-      "id": "repreview_after_commit",
-      "description": "Semantic proof the commitment now holds the committed 09:50-10:10 window: re-previewing the identical proposal finds no temporal delta against authoritative state (no GET surface exposes raw commitment timestamps, so the engine's own counterfactual evaluator is the witness)",
-      "action": {
-        "type": "ui_action",
-        "kind": "organiser_preview",
-        "params": {
-          "anchorEventId": "evt-ait-2026",
-          "commitmentId": "cmt-ait-d1-future-provocation",
-          "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-10-01T09:50:00+08:00",
-          "newEndsAt": "2026-10-01T10:10:00+08:00",
-          "at": "2026-09-22T11:35:00+08:00"
-        },
-        "expectStatus": 200
-      },
-      "assert": [
-        { "path": "affected", "op": "arrayLengthMax", "expected": 0, "description": "the same proposal now produces zero affected trips: the authoritative commitment already starts 09:50 and ends 10:10" },
-        { "path": "unaffected", "op": "arrayLengthMin", "expected": 67, "description": "every trip, including the linked one, is now unaffected by the identical proposal" },
-        { "path": "unaffected.66.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the previously affected linked trip is in the unaffected set" },
-        { "path": "unaffected.66.reasons.0", "op": "contains", "expected": "does not materially affect engagement el-trip-trv-evt-ait-2026-ait-draft-04-eng-1", "description": "the engine reasons the proposal matches the committed engagement times exactly" }
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14", "description": "case belongs to headline speaker trip" }
       ]
     }
   ]

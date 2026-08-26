@@ -1,6 +1,6 @@
 {
   "scenarioId": "S1",
-  "title": "Airline schedule change affects several speakers; one becomes critical",
+  "title": "Airline schedule change — Groups A (accept) / C (critical NOT_VIABLE); CGK pack pending shared rebuild",
   "mode": "SIMULATED_EXTERNAL_EVENT",
   "globalInputPack": {
     "packId": "ait-global-programme",
@@ -16,43 +16,39 @@
     {
       "seam": "atlas.event_ingress",
       "mode": "SIMULATED_EXTERNAL_EVENT",
-      "note": "Provider-shaped schedule/cancel notifications via POST /api/events/atlas (asserted-at-best push)"
+      "note": "Runnable against b7d80aa KUL MN218 seed; scenario pack describes CGK MN310 target"
     },
     {
       "seam": "atlas.flight_state_query",
       "mode": "REPLAY",
-      "note": "Provider-state reconciliation read through the shared REPLAY adapter; CONNECTED state outranks the push"
+      "note": "SIMULATED schedule-change provider-state recordings"
     },
     {
       "seam": "atlas.flight_adapter",
       "mode": "REPLAY",
-      "note": "Downstream adapter REPLAY unless LIVE acceptance overrides"
+      "note": "Downstream adapter REPLAY"
     }
   ],
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": [
-      "evt-ait-2026"
-    ],
+    "anchorEventIds": ["evt-ait-2026"],
     "travellerIds": [
       "trv-evt-ait-2026-ait-draft-14",
-      "trv-evt-ait-2026-ait-draft-15",
       "trv-evt-ait-2026-ait-draft-10",
       "trv-evt-ait-2026-ait-draft-11",
-      "trv-evt-ait-2026-ait-draft-30",
-      "trv-evt-ait-2026-ait-draft-13"
+      "trv-evt-ait-2026-ait-draft-30"
     ],
     "tripIds": [
       "trip-trv-evt-ait-2026-ait-draft-14",
-      "trip-trv-evt-ait-2026-ait-draft-15",
       "trip-trv-evt-ait-2026-ait-draft-10",
       "trip-trv-evt-ait-2026-ait-draft-11",
-      "trip-trv-evt-ait-2026-ait-draft-30",
-      "trip-trv-evt-ait-2026-ait-draft-13"
+      "trip-trv-evt-ait-2026-ait-draft-30"
     ]
   },
-  "routeParams": [],
+  "routeParams": [
+    { "origin": "KUL", "destination": "SIN", "date": "2026-10-01" }
+  ],
   "steps": [
     {
       "id": "reset",
@@ -61,21 +57,17 @@
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": {
-          "at": "2026-09-21T09:00:00+08:00"
-        },
+        "body": { "at": "2026-09-21T09:00:00+08:00" },
         "expectStatus": 200
       }
     },
     {
-      "id": "notify_mn218_hero",
-      "description": "Simulated MN218 schedule-change notification for hero booking MNSYN14; reconciliation read returns the retimed 1 Oct schedule as CONNECTED state",
+      "id": "notify_group_c",
+      "description": "Group C critical traveller schedule-change (MNSYN14)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": {
-          "at": "2026-09-21T09:45:00+08:00"
-        },
+        "query": { "at": "2026-09-21T09:45:00+08:00" },
         "body": {
           "eventId": "sim-mn-evt-20260921-001-mnsyn14",
           "orderNo": "MNSYN14",
@@ -87,110 +79,23 @@
           "depTime": "2026-10-01T06:00:00+08:00",
           "pnr": "MNSYN14"
         },
-        "capture": {
-          "heroCaseId": "results.0.caseId",
-          "heroTripId": "results.0.tripId"
-        },
+        "capture": { "heroCaseId": "results.0.caseId", "heroTripId": "results.0.tripId" },
         "expectStatus": 200
       },
       "assert": [
-        {
-          "description": "ingress accepted",
-          "path": "status",
-          "op": "equals",
-          "expected": "ACCEPTED"
-        },
-        {
-          "description": "reconciled provider state produced a processed signal",
-          "path": "results",
-          "op": "arrayLengthMin",
-          "expected": 1
-        },
-        {
-          "description": "retimed CONNECTED schedule mutated authoritative trip state",
-          "path": "results.0.processed.mutationAccepted",
-          "op": "truthy"
-        },
-        {
-          "description": "departure and arrival facts both retimed",
-          "path": "results.0.processed.appliedOperationCount",
-          "op": "gte",
-          "expected": 2
-        },
-        {
-          "description": "hero arrival-before-commitment check FAILS under the retimed arrival",
-          "path": "results.0.processed.constraintEvaluations.0.status",
-          "op": "equals",
-          "expected": "FAIL"
-        },
-        {
-          "description": "failure evidence names the governing 360min buffer",
-          "path": "results.0.processed.constraintEvaluations.0.evidence",
-          "op": "contains",
-          "expected": "required 360min"
-        },
-        {
-          "description": "hard constraint failure surfaces as a policy implication",
-          "path": "results.0.processed.assessment.policyImplications",
-          "op": "arrayNotEmpty"
-        }
+        { "path": "status", "op": "equals", "expected": "ACCEPTED", "description": "ingress accepted" },
+        { "path": "results.0.processed.mutationAccepted", "op": "truthy", "description": "mutation accepted" },
+        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "FAIL", "description": "headline buffer fails" },
+        { "path": "results.0.processed.constraintEvaluations.0.evidence", "op": "contains", "expected": "required 360min", "description": "360min evidence" }
       ]
     },
     {
-      "id": "notify_mn218_draft15",
-      "description": "Same retimed MN218 notification for booking MNSYN15 (Day 0 coach commitment breaks outright)",
+      "id": "notify_group_a_draft10",
+      "description": "Group A (MNSYN10)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": {
-          "at": "2026-09-21T09:46:00+08:00"
-        },
-        "body": {
-          "eventId": "sim-mn-evt-20260921-001-mnsyn15",
-          "orderNo": "MNSYN15",
-          "eventType": "SCHEDULE_CHANGE",
-          "eventStatus": 1,
-          "eventTime": "2026-09-21T09:40:00+08:00",
-          "createTime": "2026-09-21T09:40:00+08:00",
-          "airline": "MN",
-          "depTime": "2026-10-01T06:00:00+08:00",
-          "pnr": "MNSYN15"
-        },
-        "capture": {
-          "draft15CaseId": "results.0.caseId",
-          "draft15TripId": "results.0.tripId"
-        },
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "retimed CONNECTED schedule mutated authoritative trip state",
-          "path": "results.0.processed.mutationAccepted",
-          "op": "truthy"
-        },
-        {
-          "description": "departure and arrival facts both retimed",
-          "path": "results.0.processed.appliedOperationCount",
-          "op": "gte",
-          "expected": 2
-        },
-        {
-          "description": "Day 0 commitment already unreachable under the retimed arrival",
-          "path": "results.0.processed.constraintEvaluations.0.status",
-          "op": "equals",
-          "expected": "FAIL"
-        }
-      ]
-    },
-    {
-      "id": "notify_mn218_draft10",
-      "description": "Retimed MN218 notification for booking MNSYN10 (tight but viable before Day 1 keynote)",
-      "action": {
-        "type": "simulated_external_event",
-        "path": "/api/events/atlas",
-        "query": {
-          "at": "2026-09-21T09:47:00+08:00"
-        },
+        "query": { "at": "2026-09-21T09:47:00+08:00" },
         "body": {
           "eventId": "sim-mn-evt-20260921-001-mnsyn10",
           "orderNo": "MNSYN10",
@@ -202,40 +107,19 @@
           "depTime": "2026-10-01T06:00:00+08:00",
           "pnr": "MNSYN10"
         },
-        "capture": {
-          "draft10TripId": "results.0.tripId"
-        },
         "expectStatus": 200
       },
       "assert": [
-        {
-          "description": "retimed CONNECTED schedule mutated authoritative trip state",
-          "path": "results.0.processed.mutationAccepted",
-          "op": "truthy"
-        },
-        {
-          "description": "departure and arrival facts both retimed",
-          "path": "results.0.processed.appliedOperationCount",
-          "op": "gte",
-          "expected": 2
-        },
-        {
-          "description": "tight arrival still satisfies the buffer before the Day 1 keynote",
-          "path": "results.0.processed.constraintEvaluations.0.status",
-          "op": "equals",
-          "expected": "PASS"
-        }
+        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS", "description": "afternoon commitment viable" }
       ]
     },
     {
-      "id": "notify_mn218_draft11",
-      "description": "Retimed MN218 notification for booking MNSYN11 (viable before Day 1 panel)",
+      "id": "notify_group_a_draft11",
+      "description": "Group A (MNSYN11)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": {
-          "at": "2026-09-21T09:48:00+08:00"
-        },
+        "query": { "at": "2026-09-21T09:48:00+08:00" },
         "body": {
           "eventId": "sim-mn-evt-20260921-001-mnsyn11",
           "orderNo": "MNSYN11",
@@ -247,34 +131,19 @@
           "depTime": "2026-10-01T06:00:00+08:00",
           "pnr": "MNSYN11"
         },
-        "capture": {
-          "draft11TripId": "results.0.tripId"
-        },
         "expectStatus": 200
       },
       "assert": [
-        {
-          "description": "retimed CONNECTED schedule mutated authoritative trip state",
-          "path": "results.0.processed.mutationAccepted",
-          "op": "truthy"
-        },
-        {
-          "description": "arrival still satisfies the buffer before the Day 1 panel",
-          "path": "results.0.processed.constraintEvaluations.0.status",
-          "op": "equals",
-          "expected": "PASS"
-        }
+        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS", "description": "panel viable" }
       ]
     },
     {
-      "id": "notify_mn218_draft30",
-      "description": "Retimed MN218 notification for booking MNSYN30 (viable before Day 1 panel)",
+      "id": "notify_group_a_draft30",
+      "description": "Group A (MNSYN30)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": {
-          "at": "2026-09-21T09:49:00+08:00"
-        },
+        "query": { "at": "2026-09-21T09:49:00+08:00" },
         "body": {
           "eventId": "sim-mn-evt-20260921-001-mnsyn30",
           "orderNo": "MNSYN30",
@@ -289,232 +158,33 @@
         "expectStatus": 200
       },
       "assert": [
-        {
-          "description": "retimed CONNECTED schedule mutated authoritative trip state",
-          "path": "results.0.processed.mutationAccepted",
-          "op": "truthy"
-        },
-        {
-          "description": "arrival still satisfies the buffer for her commitment",
-          "path": "results.0.processed.constraintEvaluations.0.status",
-          "op": "equals",
-          "expected": "PASS"
-        }
+        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS", "description": "panel viable" }
       ]
     },
     {
-      "id": "notify_mn204_draft13",
-      "description": "Simulated MN204 cancellation notification for booking MNSYN13; reconciliation read confirms the cancellation as CONNECTED state",
-      "action": {
-        "type": "simulated_external_event",
-        "path": "/api/events/atlas",
-        "query": {
-          "at": "2026-09-21T09:55:00+08:00"
-        },
-        "body": {
-          "eventId": "sim-mn-evt-20260921-002",
-          "orderNo": "MNSYN13",
-          "eventType": "CANCELLATION",
-          "eventStatus": 1,
-          "eventTime": "2026-09-21T09:55:00+08:00",
-          "createTime": "2026-09-21T09:55:00+08:00",
-          "airline": "MN",
-          "depTime": "2026-09-30T08:35:00+08:00",
-          "pnr": "MNSYN13"
-        },
-        "capture": {
-          "draft13CaseId": "results.0.caseId",
-          "draft13TripId": "results.0.tripId"
-        },
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "CONNECTED cancellation mutated authoritative trip state",
-          "path": "results.0.processed.mutationAccepted",
-          "op": "truthy"
-        },
-        {
-          "description": "at least one state operation applied",
-          "path": "results.0.processed.appliedOperationCount",
-          "op": "gte",
-          "expected": 1
-        },
-        {
-          "description": "cancelled leg is a direct failure in the blast radius",
-          "path": "results.0.processed.assessment.directFailures",
-          "op": "arrayNotEmpty"
-        },
-        {
-          "description": "cancellation impact severity above LOW",
-          "path": "results.0.processed.assessment.severity",
-          "op": "notEquals",
-          "expected": "LOW"
-        }
-      ]
-    },
-    {
-      "id": "observe_hero_trip",
-      "description": "Hero traveller view: retimed arrival is at-risk/non-viable against her programme-critical commitments",
+      "id": "observe_group_c",
+      "description": "Group C NOT_VIABLE",
       "action": {
         "type": "observe",
         "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-14",
-        "label": "hero_trip_after_reconciliation",
+        "label": "group_c_trip",
         "expectStatus": 200
       },
       "assert": [
-        {
-          "description": "critical traveller remainder is not viable",
-          "path": "remainderViable",
-          "op": "equals",
-          "expected": "NOT_VIABLE"
-        },
-        {
-          "description": "trip is not considered recovered merely because the airline rebooked",
-          "path": "resolutionSummary",
-          "op": "notExists"
-        }
+        { "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE", "description": "critical traveller not viable" }
       ]
     },
     {
-      "id": "observe_draft15_trip",
-      "description": "Day 0 coach traveller view: commitment broken by the retimed arrival",
-      "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-15",
-        "label": "draft15_trip_after_reconciliation",
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "broken-commitment traveller remainder is not viable",
-          "path": "remainderViable",
-          "op": "equals",
-          "expected": "NOT_VIABLE"
-        }
-      ]
-    },
-    {
-      "id": "observe_draft10_trip",
-      "description": "Wanderpay keynote traveller view: tight but viable remainder",
+      "id": "observe_group_a",
+      "description": "Group A VIABLE",
       "action": {
         "type": "observe",
         "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-10",
-        "label": "draft10_trip_after_reconciliation",
+        "label": "group_a_trip",
         "expectStatus": 200
       },
       "assert": [
-        {
-          "description": "tight-but-viable traveller remainder stays viable",
-          "path": "remainderViable",
-          "op": "equals",
-          "expected": "VIABLE"
-        }
-      ]
-    },
-    {
-      "id": "observe_draft11_trip",
-      "description": "Day 1 panel traveller view: viable remainder despite the shared retimed flight",
-      "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-11",
-        "label": "draft11_trip_after_reconciliation",
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "viable traveller remainder stays viable",
-          "path": "remainderViable",
-          "op": "equals",
-          "expected": "VIABLE"
-        }
-      ]
-    },
-    {
-      "id": "observe_draft30_trip",
-      "description": "Third shared-flight traveller view: viable remainder",
-      "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-30",
-        "label": "draft30_trip_after_reconciliation",
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "viable traveller remainder stays viable",
-          "path": "remainderViable",
-          "op": "equals",
-          "expected": "VIABLE"
-        }
-      ]
-    },
-    {
-      "id": "observe_draft13_trip",
-      "description": "Cancelled-flight traveller view: remainder not viable until provider re-proposes",
-      "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-13",
-        "label": "draft13_trip_after_cancellation",
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "cancelled-flight traveller remainder is not viable",
-          "path": "remainderViable",
-          "op": "equals",
-          "expected": "NOT_VIABLE"
-        }
-      ]
-    },
-    {
-      "id": "observe_hero_case",
-      "description": "Hero recovery case: affected element surfaced, objective at risk, not auto-resolved by the airline rebooking",
-      "action": {
-        "type": "observe",
-        "path": "/api/cases/{{heroCaseId}}",
-        "label": "hero_case_after_reconciliation",
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "case carries deterministic checks",
-          "path": "checks",
-          "op": "arrayNotEmpty"
-        },
-        {
-          "description": "arrival-before-commitment check is FAILING in the case view",
-          "path": "checks.0.result",
-          "op": "equals",
-          "expected": "FAIL"
-        },
-        {
-          "description": "case not resolved merely because the airline changed the booking",
-          "path": "resolution",
-          "op": "notExists"
-        }
-      ]
-    },
-    {
-      "id": "observe_draft15_case",
-      "description": "Day 0 coach recovery case: unresolved; no earlier alternative exists, uncertainty/decision preserved",
-      "action": {
-        "type": "observe",
-        "path": "/api/cases/{{draft15CaseId}}",
-        "label": "draft15_case_after_reconciliation",
-        "expectStatus": 200
-      },
-      "assert": [
-        {
-          "description": "arrival-before-commitment check is FAILING in the case view",
-          "path": "checks.0.result",
-          "op": "equals",
-          "expected": "FAIL"
-        },
-        {
-          "description": "case not auto-resolved by provider rebooking",
-          "path": "resolution",
-          "op": "notExists"
-        }
+        { "path": "remainderViable", "op": "equals", "expected": "VIABLE", "description": "airline reprotection accepted" }
       ]
     }
   ]

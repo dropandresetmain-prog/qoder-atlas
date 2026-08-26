@@ -1,0 +1,296 @@
+{
+  "scenarioId": "S1-S3-CONTINUITY",
+  "title": "S1 critical trip NOT_VIABLE → S3 RESCHEDULE preview/commit → same trip VIABLE (no mid-flow reset)",
+  "mode": "SIMULATED_EXTERNAL_EVENT",
+  "globalInputPack": {
+    "packId": "ait-global-programme",
+    "version": "1.0.0",
+    "path": "../packs/global"
+  },
+  "localInputPack": {
+    "packId": "ait-s1",
+    "version": "1.0.0",
+    "path": "../packs/s1"
+  },
+  "boundaries": [
+    {
+      "seam": "atlas.event_ingress",
+      "mode": "SIMULATED_EXTERNAL_EVENT",
+      "note": "Provider-shaped schedule-change notifications via POST /api/events/atlas. Runnable against b7d80aa programme seed (KUL MN218 / MNSYN*). Scenario pack inputs describe the CGK MN310 target; shared rebuild required before runtime seed matches CGK."
+    },
+    {
+      "seam": "atlas.flight_state_query",
+      "mode": "REPLAY",
+      "note": "SIMULATED schedule-change provider-state recordings keyed by orderReference"
+    },
+    {
+      "seam": "atlas.flight_adapter",
+      "mode": "REPLAY",
+      "note": "Downstream adapter REPLAY; Group B corridor search uses available recordings when present"
+    },
+    {
+      "seam": "programme.change_preview",
+      "mode": "REPLAY",
+      "note": "Organiser Preview — zero authoritative mutation"
+    },
+    {
+      "seam": "programme.change_commit",
+      "mode": "REPLAY",
+      "note": "Organiser Commit — fans out NEW case for same tripId"
+    }
+  ],
+  "requiredEnv": [],
+  "requiredProviders": [],
+  "expect": {
+    "anchorEventIds": ["evt-ait-2026"],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-14",
+      "trv-evt-ait-2026-ait-draft-10",
+      "trv-evt-ait-2026-ait-draft-11",
+      "trv-evt-ait-2026-ait-draft-30"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-14",
+      "trip-trv-evt-ait-2026-ait-draft-10",
+      "trip-trv-evt-ait-2026-ait-draft-11",
+      "trip-trv-evt-ait-2026-ait-draft-30"
+    ]
+  },
+  "routeParams": [
+    { "origin": "KUL", "destination": "SIN", "date": "2026-10-01" }
+  ],
+  "steps": [
+    {
+      "id": "reset",
+      "description": "Single deterministic reset/reseed at the start of the continuous S1→S3 flow",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/reset",
+        "body": { "at": "2026-09-21T09:00:00+08:00" },
+        "expectStatus": 200
+      }
+    },
+    {
+      "id": "notify_group_c",
+      "description": "Group C: schedule-change for critical headline speaker MNSYN14 — buffer FAILS",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": { "at": "2026-09-21T09:45:00+08:00" },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn14",
+          "orderNo": "MNSYN14",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN14"
+        },
+        "capture": {
+          "heroCaseId": "results.0.caseId",
+          "heroTripId": "results.0.tripId"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "ingress accepted", "path": "status", "op": "equals", "expected": "ACCEPTED" },
+        { "description": "processed signal present", "path": "results", "op": "arrayLengthMin", "expected": 1 },
+        { "description": "schedule mutation accepted", "path": "results.0.processed.mutationAccepted", "op": "truthy" },
+        { "description": "headline arrival buffer FAILS", "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "FAIL" },
+        { "description": "360min buffer evidence", "path": "results.0.processed.constraintEvaluations.0.evidence", "op": "contains", "expected": "required 360min" },
+        { "description": "same tripId for continuity", "path": "results.0.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14" }
+      ]
+    },
+    {
+      "id": "notify_group_a_draft10",
+      "description": "Group A: same retimed service for afternoon keynote — constraint PASSES",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": { "at": "2026-09-21T09:47:00+08:00" },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn10",
+          "orderNo": "MNSYN10",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN10"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "airline reprotection accepted", "path": "results.0.processed.mutationAccepted", "op": "truthy" },
+        { "description": "Group A PASSES", "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS" }
+      ]
+    },
+    {
+      "id": "notify_group_a_draft11",
+      "description": "Group A: panel traveller — PASSES",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": { "at": "2026-09-21T09:48:00+08:00" },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn11",
+          "orderNo": "MNSYN11",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN11"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "Group A PASSES", "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS" }
+      ]
+    },
+    {
+      "id": "notify_group_a_draft30",
+      "description": "Group A: panel traveller — PASSES",
+      "action": {
+        "type": "simulated_external_event",
+        "path": "/api/events/atlas",
+        "query": { "at": "2026-09-21T09:49:00+08:00" },
+        "body": {
+          "eventId": "sim-mn-evt-20260921-001-mnsyn30",
+          "orderNo": "MNSYN30",
+          "eventType": "SCHEDULE_CHANGE",
+          "eventStatus": 1,
+          "eventTime": "2026-09-21T09:40:00+08:00",
+          "createTime": "2026-09-21T09:40:00+08:00",
+          "airline": "MN",
+          "depTime": "2026-10-01T06:00:00+08:00",
+          "pnr": "MNSYN30"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "Group A PASSES", "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS" }
+      ]
+    },
+    {
+      "id": "observe_before_s3",
+      "description": "CRITICAL BEFORE: same S1 trip remainderViable NOT_VIABLE",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-14",
+        "label": "hero_trip_before_s3",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "BEFORE S3: NOT_VIABLE", "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE" }
+      ]
+    },
+    {
+      "id": "observe_group_a",
+      "description": "Group A airline reprotection accepted — VIABLE",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-10",
+        "label": "group_a_trip",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "Group A VIABLE", "path": "remainderViable", "op": "equals", "expected": "VIABLE" }
+      ]
+    },
+    {
+      "id": "s3_preview",
+      "description": "S3 preview RESCHEDULE headline → 15:30–16:00 (no swap API); counterfactual only",
+      "action": {
+        "type": "ui_action",
+        "kind": "organiser_preview",
+        "params": {
+          "anchorEventId": "evt-ait-2026",
+          "commitmentId": "cmt-ait-d1-headline-interview",
+          "changeKind": "RESCHEDULED",
+          "newStartsAt": "2026-10-01T15:30:00+08:00",
+          "newEndsAt": "2026-10-01T16:00:00+08:00",
+          "at": "2026-09-22T11:05:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "headline interview links multiple roles", "path": "affected", "op": "arrayLengthMin", "expected": 2 },
+        { "description": "critical S1 trip is in the preview blast radius", "path": "affected.1.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14" }
+      ]
+    },
+    {
+      "id": "observe_mid_preview",
+      "description": "Preview must not mutate authoritative trip viability",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-14",
+        "label": "hero_trip_between_preview_and_commit",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "still NOT_VIABLE after preview", "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE" }
+      ]
+    },
+    {
+      "id": "s3_commit",
+      "description": "S3 commit RESCHEDULE; opens NEW fan-out case for same tripId",
+      "action": {
+        "type": "ui_action",
+        "kind": "organiser_commit",
+        "params": {
+          "anchorEventId": "evt-ait-2026",
+          "commitmentId": "cmt-ait-d1-headline-interview",
+          "changeKind": "RESCHEDULED",
+          "newStartsAt": "2026-10-01T15:30:00+08:00",
+          "newEndsAt": "2026-10-01T16:00:00+08:00",
+          "at": "2026-09-22T11:20:00+08:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "fanoutCaseId": "processedSignals.1.caseId",
+          "fanoutTripId": "processedSignals.1.tripId"
+        }
+      },
+      "assert": [
+        { "description": "commit accepted", "path": "accepted", "op": "truthy" },
+        { "description": "fan-out includes interviewer and speaker", "path": "processedSignals", "op": "arrayLengthMin", "expected": 2 },
+        { "description": "fan-out signal for same S1 trip", "path": "processedSignals.1.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14" },
+        { "description": "new fan-out case id for critical trip", "path": "processedSignals.1.caseId", "op": "exists" }
+      ]
+    },
+    {
+      "id": "plan_fanout",
+      "description": "Re-plan on fan-out case for the critical S1 trip after programme mutation",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{fanoutCaseId}}",
+          "at": "2026-09-22T11:25:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": []
+    },
+    {
+      "id": "observe_after_s3",
+      "description": "CRITICAL AFTER: same S1 trip remainderViable VIABLE",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-14",
+        "label": "hero_trip_after_s3",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "description": "AFTER S3: same tripId VIABLE", "path": "remainderViable", "op": "equals", "expected": "VIABLE" }
+      ]
+    }
+  ]
+}

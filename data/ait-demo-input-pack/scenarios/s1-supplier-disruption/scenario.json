@@ -2,36 +2,64 @@
   "provenance": "SIMULATED_EXTERNAL_EVENT",
   "sourceIds": ["src-sim-airline-mn", "src-repo-scenarios", "src-syn-ait-roster", "src-syn-ait-event"],
   "scenarioId": "S1",
-  "catalogueTitle": "Airline schedule change affects several speakers; one becomes critical",
+  "catalogueTitle": "CGK→SIN airline schedule change: accept / Atlas-recover / programme-blocked critical",
   "trigger": "SUPPLIER_EVENT",
   "stage": "POST_BOOKING_BEFORE_TRAVEL",
   "tier": "TIER_A",
-  "demoRole": "Main organiser hero",
+  "demoRole": "Main organiser hero — continuous into S3",
   "anchorEventId": "evt-ait-2026",
   "occurredAt": "2026-09-21T09:40:00+08:00",
-  "note": "Simulated carrier Meridian Airways (MN) retimes the shared KUL->SIN inbound MN218 from 30 Sep 06:15 to 1 Oct 06:00 and cancels MNL->SIN service MN204. The airline auto-rebooks everyone onto the retimed/cancelled services' replacements. Northstar must evaluate travellers individually: the provider replacement gets Sarah Lim to SIN but only ~2h10m before her programme-critical headline interview; it breaks Mei Chen's Day 0 coach commitment outright; it leaves the Wanderpay trio viable (Arjun tight, 6h40m before his keynote) since their first commitments are 1 Oct afternoon; and Isabella Santos' cancellation re-proposal still preserves her Day 2 buffer. Simulated seam: every airline artifact in inputs/ is SIMULATED_EXTERNAL_EVENT (src-sim-airline-mn) and must never be presented as LIVE; at demo runtime the same shapes arrive via REPLAY recordings.",
+  "note": "Simulated carrier Meridian Airways (MN) retimes the shared CGK→SIN inbound MN310 from 30 Sep morning to 1 Oct morning. Airline auto-reprotects every ticketed passenger onto the retimed service. Northstar evaluates travellers individually against programme buffers (engine MIN_BUFFER = 360min): Group A (Wanderpay afternoon cohort) stays VIABLE under airline reprotection; Group B (Felix Hartono / ait-draft-03, Day-1 india-fireside 10:10) fails the retimed arrival but has a viable earlier CGK→SIN Atlas/SIMULATED offer that planning can propose; Group C (Sarah Lim / ait-draft-14, Day-1 headline interview 09:20) has no travel-only offer that restores the 360min gap — continuity continues into S3 without reset. Simulated seam: every airline artifact in inputs/ is SIMULATED_EXTERNAL_EVENT (src-sim-airline-mn). Atlas search REPLAY for CGK→SIN may be hand-authored simulated inventory at the provider recording boundary with honest provenance — engine viability is never faked. Roster rehomes for non-CGK drafts are a shared patch (see output/lane-b-s1s3-shared-patch-request.md); ait-draft-03 is already home-CGK.",
   "affectedTravellers": [
-    { "draftId": "ait-draft-14", "impactClass": "MATERIALLY_DISRUPTED", "reason": "Retimed arrival 2026-10-01T07:10+08:00 leaves ~2h10m before the Day 1 headline interview (09:20), violating the 12h programme-critical arrival buffer and the speaker-readiness rules." },
-    { "draftId": "ait-draft-15", "impactClass": "COMMITMENT_BROKEN", "reason": "Retimed arrival 2026-10-01T07:10+08:00 is after her Day 0 coach-breakout (30 Sep 10:30); the provider replacement cannot preserve her only commitment and no earlier alternative service exists in the inventory." },
-    { "draftId": "ait-draft-10", "impactClass": "VIABLE_TIGHT", "reason": "Retimed arrival 2026-10-01T07:10+08:00 leaves 6h40m before the payments keynote (13:50): above the 6h standard buffer, below the 12h programme-critical buffer that applies to him; viable but no slack for immigration/transfer variance." },
-    { "draftId": "ait-draft-11", "impactClass": "VIABLE", "reason": "Retimed arrival leaves 6h50m before the payments panel (1 Oct 14:00); standard 6h buffer satisfied for a PREFERRED/CHANGEABLE panellist role." },
-    { "draftId": "ait-draft-30", "impactClass": "VIABLE", "reason": "Same calculus as ait-draft-11 (payments panel 1 Oct 14:00); standard buffer satisfied." },
-    { "draftId": "ait-draft-13", "impactClass": "RECOVERABLE_BY_PROVIDER", "reason": "MN204 MNL->SIN cancelled; airline re-proposal MN208 (1 Oct) still lands >36h before her Day 2 APAC spotlight (2 Oct 14:30); Northstar validates and accepts with monitoring." }
+    {
+      "draftId": "ait-draft-14",
+      "impactClass": "MATERIALLY_DISRUPTED_NO_TRAVEL_RECOVERY",
+      "group": "C",
+      "reason": "Retimed arrival ~2026-10-01T07:10+08:00 leaves ~130min before the Day 1 headline interview (09:20), failing the 360min buffer. Simulated CGK→SIN inventory has no offer arriving by 03:20 on 1 Oct; travel-only recovery is exhausted. S3 must RESCHEDULE the commitment later (no engagement-swap API)."
+    },
+    {
+      "draftId": "ait-draft-03",
+      "impactClass": "RECOVERABLE_BY_ATLAS_REPLACEMENT",
+      "group": "B",
+      "reason": "Same retimed arrival leaves ~180min before india-fireside (10:10), failing the 360min buffer. An earlier CGK→SIN offer arriving ~03:45 on 1 Oct restores ~385min before 10:10. Planning proposes it; auto-execute only where delegated authority permits (same carrier, fareΔ≤0, arrival shift ≤180min) — otherwise authority escalates honestly."
+    },
+    {
+      "draftId": "ait-draft-10",
+      "impactClass": "VIABLE",
+      "group": "A",
+      "reason": "Retimed arrival leaves ~6h40m before the payments keynote (13:50); standard 360min buffer satisfied."
+    },
+    {
+      "draftId": "ait-draft-11",
+      "impactClass": "VIABLE",
+      "group": "A",
+      "reason": "Retimed arrival leaves ~6h50m before the payments panel (14:00); standard buffer satisfied."
+    },
+    {
+      "draftId": "ait-draft-30",
+      "impactClass": "VIABLE",
+      "group": "A",
+      "reason": "Same calculus as ait-draft-11 (payments panel 14:00)."
+    }
   ],
   "expectedReasoningHooks": [
-    "Programme-wide blast radius across all drafts ticketed on MN218/MN204, not a single-traveller reaction.",
-    "Provider rebooked != trip recovered: Sarah's replacement arrival must be rejected against her REQUIRED/FIXED headline-interview engagement and the 12h buffer (rule-ait-arrival-min-buffer + clauses.arrivalBuffer).",
-    "Hero alternative for Sarah: she is already in KUL on 29 Sep (feeder MN202); rebooking only the KUL->SIN segment onto MN220 (30 Sep 14:10 -> 15:20) restores an 18h buffer. Same carrier, no fare increase.",
-    "Mei Chen has no flight-side recovery: MN218 was the earliest KUL->SIN service and no earlier alternative exists in the inventory; the engine must surface UNKNOWN/organiser decision (e.g. coach reassignment among ait-draft-28/ait-draft-45) rather than invent certainty.",
-    "Authority: supplier-disruption rebooking on the same carrier with no fare increase and arrival shift <= 3h is pre-approved (delegatedAuthority clause); Sarah's cross-day auto-rebook far exceeds it -> HUMAN_AGENT per rule-ait-flight-change-approval.",
-    "SHARED_FLIGHT_GROUP pattern (programme.json): the whole Wanderpay delegation (ait-draft-10/11/30) shares MN218 in the baseline, so the blast radius includes all three even though only Arjun is programme-critical."
+    "Programme-wide blast radius across all drafts ticketed on MN310 CGK→SIN, not a single-traveller reaction.",
+    "Provider rebooked != trip recovered: Sarah's replacement arrival must FAIL against her REQUIRED/FIXED headline engagement and the 360min MIN_BUFFER.",
+    "Group B: airline reprotection insufficient; planner searches the disrupted CGK→SIN corridor; viability engine accepts only offers that restore the buffer for THAT traveller's commitment.",
+    "Group C: no feasible travel-only strategy for the current headline slot; surface organiser programme change (S3 RESCHEDULE) rather than invent certainty.",
+    "Authority: supplier-disruption same-carrier rebook with fareΔ≤0 and arrival shift ≤180min may be pre-approved; larger shifts escalate — never silently auto-mutate past authority.",
+    "Continuous S1→S3: no mid-flow reset; same tripId for Group C must read NOT_VIABLE before S3 commit and VIABLE after programme RESCHEDULE fan-out (plan on fan-out case if required)."
   ],
   "inputs": [
-    { "file": "inputs/airline-schedule-change-mn218.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
-    { "file": "inputs/airline-cancellation-mn204.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
+    { "file": "inputs/airline-schedule-change-mn310.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
     { "file": "inputs/baseline-itineraries.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
     { "file": "inputs/alternative-services-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
   ],
-  "referencedDraftIds": ["ait-draft-14", "ait-draft-15", "ait-draft-10", "ait-draft-11", "ait-draft-30", "ait-draft-13"],
-  "referencedCommitmentIds": ["cmt-ait-d1-headline-interview", "cmt-ait-d0-coach-breakout", "cmt-ait-d1-payments-keynote", "cmt-ait-d1-payments-panel", "cmt-ait-d2-platform-panel", "cmt-ait-d2-apac-spotlight"]
+  "referencedDraftIds": ["ait-draft-14", "ait-draft-03", "ait-draft-10", "ait-draft-11", "ait-draft-30"],
+  "referencedCommitmentIds": [
+    "cmt-ait-d1-headline-interview",
+    "cmt-ait-d1-india-fireside",
+    "cmt-ait-d1-payments-keynote",
+    "cmt-ait-d1-payments-panel"
+  ]
 }

@@ -1,5 +1,5 @@
 {
-  "id": "rec_2dcc7b763337184df6b7612bd06bcc3a",
+  "id": "rec_ff13fd1220f67a3413ac5c3fa58d837a",
   "providerId": "atlas",
   "operation": "flight_state_query",
   "recordedAt": "2026-08-26T12:30:00.000Z",
@@ -9,8 +9,8 @@
     "msg": null,
     "data": [
       {
-        "eventId": "sim-mn-evt-20260921-001-mnsyn11",
-        "orderNo": "MNSYN11",
+        "eventId": "sim-mn-evt-20260921-cgk-001-mnsyn03",
+        "orderNo": "MNSYN03",
         "eventType": "SCHEDULE_CHANGE",
         "eventStatus": 1,
         "eventTime": "2026-09-21T09:40:00+08:00",
@@ -19,7 +19,7 @@
         "flightNo": "MN218",
         "depTime": "2026-10-01T06:00:00+08:00",
         "arrTime": "2026-10-01T07:10:00+08:00",
-        "pnr": "MNSYN11"
+        "pnr": "MNSYN03"
       }
     ]
   }

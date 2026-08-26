@@ -2,17 +2,11 @@
   "packId": "ait-s3",
   "version": "1.0.0",
   "scenarioId": "S3",
-  "description": "Local acceptance pack for S3; facts live in data/ait-demo-input-pack",
+  "description": "Local acceptance pack for S3 RESCHEDULE continuity story; facts live in data/ait-demo-input-pack/scenarios/s3-event-change-preview",
   "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
   "expect": {
-    "anchorEventIds": [
-      "evt-ait-2026"
-    ],
-    "travellerIds": [
-      "trv-evt-ait-2026-ait-draft-04",
-      "trv-evt-ait-2026-ait-draft-20",
-      "trv-evt-ait-2026-ait-draft-02"
-    ],
-    "tripIds": []
+    "anchorEventIds": ["evt-ait-2026"],
+    "travellerIds": ["trv-evt-ait-2026-ait-draft-14"],
+    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-14"]
   }
 }
