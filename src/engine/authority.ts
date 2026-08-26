@@ -110,6 +110,15 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
     );
     for (const rule of rules) {
       if (rule.kind !== 'SPEND_LIMIT' || !spend) continue;
+      // period=NIGHT encodes an accommodation nightly ceiling. Apply it only to
+      // hotel operations so a per-night hotel cap cannot fail-closed a flight
+      // spend that was never meant to be compared against a room rate.
+      if (rule.period === 'NIGHT' && !intent.operation.startsWith('hotel.')) {
+        ruleTrace.push(
+          `rule ${rule.id}: NIGHT spend limit skipped for non-hotel operation ${intent.operation}`,
+        );
+        continue;
+      }
       const comparable = this.comparableAgainst(rule.maxAmount, knownSpendStatements, homeSpend);
       if (comparable === undefined) {
         ruleTrace.push(
@@ -148,6 +157,12 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
       );
       for (const rule of rules) {
         if (rule.kind !== 'APPROVAL_ABOVE_SPEND') continue;
+        if (rule.operations && rule.operations.length > 0 && !rule.operations.includes(intent.operation)) {
+          ruleTrace.push(
+            `rule ${rule.id}: approval threshold operations [${rule.operations.join(',')}] do not include ${intent.operation}; skipped`,
+          );
+          continue;
+        }
         const comparable = this.comparableAgainst(rule.threshold, knownSpendStatements, homeSpend);
         // An incomparable threshold currency fails toward requiring approval
         // (DR-1.3, ADR-045): "cannot verify it is below" never auto-executes.

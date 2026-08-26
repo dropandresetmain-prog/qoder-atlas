@@ -47,7 +47,7 @@
           "id": "rule-ait-hotel-spend-limit",
           "kind": "SPEND_LIMIT",
           "sourceId": "src-syn-ait-policy",
-          "description": "Nightly accommodation ceiling per room, event-funded nights.",
+          "description": "Nightly accommodation ceiling per room, event-funded nights. period=NIGHT scopes this to hotel operations in DeterministicAuthorityEngine.",
           "appliesTo": [],
           "maxAmount": { "amount": 320, "currency": "SGD" },
           "period": "NIGHT"
@@ -59,7 +59,8 @@
           "description": "Any airfare above the ceiling needs organiser approval.",
           "appliesTo": [],
           "threshold": { "amount": 1200, "currency": "SGD" },
-          "approver": "ORGANISATION_APPROVER"
+          "approver": "ORGANISATION_APPROVER",
+          "operations": ["flight.book", "flight.pay", "flight.change", "flight.cancel"]
         },
         {
           "id": "rule-ait-approval-above-hotel",
@@ -68,7 +69,8 @@
           "description": "Any nightly rate above the accommodation ceiling needs organiser approval.",
           "appliesTo": [],
           "threshold": { "amount": 320, "currency": "SGD" },
-          "approver": "ORGANISATION_APPROVER"
+          "approver": "ORGANISATION_APPROVER",
+          "operations": ["hotel.book", "hotel.modify", "hotel.cancel"]
         },
         {
           "id": "rule-ait-flight-change-approval",
@@ -77,7 +79,7 @@
           "description": "Flight itinerary changes always require human approval, except rebooking triggered by a verified supplier disruption with no fare increase, which is pre-approved within delegated authority (see clause delegatedAuthority).",
           "appliesTo": [],
           "approver": "HUMAN_AGENT",
-          "operations": ["FLIGHT_CHANGE", "FLIGHT_CANCEL"]
+          "operations": ["flight.change", "flight.cancel"]
         },
         {
           "id": "rule-ait-arrival-min-buffer",

@@ -10,7 +10,8 @@
         "PAYER",
         "POLICY_OWNER",
         "APPROVER"
-      ]
+      ],
+      "homeCurrency": "SGD"
     },
     "anchorEvent": {
       "id": "evt-ait-2026",
@@ -1223,10 +1224,6 @@
         "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
         "kind": "HOTEL",
         "timezone": "Asia/Singapore",
-        "coordinates": {
-          "latitude": 1.2789,
-          "longitude": 103.8536
-        },
         "externalRefs": [],
         "servedByPlaceIds": [
           "place-sin-changi"
@@ -1389,6 +1386,18 @@
         ]
       },
       {
+        "id": "place-lax",
+        "name": "Los Angeles International",
+        "kind": "AIRPORT",
+        "timezone": "America/Los_Angeles",
+        "externalRefs": [
+          {
+            "system": "airport-code",
+            "value": "LAX"
+          }
+        ]
+      },
+      {
         "id": "place-lhr",
         "name": "London Heathrow",
         "kind": "AIRPORT",
@@ -1509,7 +1518,7 @@
             "id": "rule-ait-hotel-spend-limit",
             "kind": "SPEND_LIMIT",
             "sourceId": "src-syn-ait-policy",
-            "description": "Nightly accommodation ceiling per room, event-funded nights.",
+            "description": "Nightly accommodation ceiling per room, event-funded nights. period=NIGHT scopes this to hotel operations in DeterministicAuthorityEngine.",
             "appliesTo": [],
             "maxAmount": {
               "amount": 320,
@@ -1527,7 +1536,13 @@
               "amount": 1200,
               "currency": "SGD"
             },
-            "approver": "ORGANISATION_APPROVER"
+            "approver": "ORGANISATION_APPROVER",
+            "operations": [
+              "flight.book",
+              "flight.pay",
+              "flight.change",
+              "flight.cancel"
+            ]
           },
           {
             "id": "rule-ait-approval-above-hotel",
@@ -1539,7 +1554,12 @@
               "amount": 320,
               "currency": "SGD"
             },
-            "approver": "ORGANISATION_APPROVER"
+            "approver": "ORGANISATION_APPROVER",
+            "operations": [
+              "hotel.book",
+              "hotel.modify",
+              "hotel.cancel"
+            ]
           },
           {
             "id": "rule-ait-flight-change-approval",
@@ -1549,8 +1569,8 @@
             "appliesTo": [],
             "approver": "HUMAN_AGENT",
             "operations": [
-              "FLIGHT_CHANGE",
-              "FLIGHT_CANCEL"
+              "flight.change",
+              "flight.cancel"
             ]
           },
           {

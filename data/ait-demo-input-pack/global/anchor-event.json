@@ -85,7 +85,8 @@
   "organisation": {
     "id": "org-ait-organiser",
     "name": "AiT Summit Organising Committee (synthetic)",
-    "roles": ["EVENT_ORGANISER", "PAYER", "POLICY_OWNER", "APPROVER"]
+    "roles": ["EVENT_ORGANISER", "PAYER", "POLICY_OWNER", "APPROVER"],
+    "homeCurrency": "SGD"
   },
   "structuralMirror": {
     "mirrorsSourceId": "src-pub-wit2026-programme",

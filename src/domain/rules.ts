@@ -83,6 +83,12 @@ export const PolicyRuleSchema = z.discriminatedUnion('kind', [
     kind: z.literal('APPROVAL_ABOVE_SPEND'),
     threshold: MoneySchema,
     approver: ApproverPrincipalSchema,
+    /**
+     * Optional operation filter (CapabilityOperation vocabulary). When set,
+     * the threshold only binds matching intents — so an accommodation
+     * nightly threshold cannot escalate a flight spend.
+     */
+    operations: z.array(z.string()).optional(),
   }),
   z.strictObject({
     ...RuleBase,
