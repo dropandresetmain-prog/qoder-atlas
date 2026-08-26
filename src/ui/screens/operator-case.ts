@@ -44,6 +44,7 @@ import {
   chainLinkGlyph,
   errorPanel,
   loadingPanel,
+  optionalSection,
   toneClass,
   uncertaintyList,
 } from '../components.ts';
@@ -149,8 +150,8 @@ function chainLink(link: ChainLinkView): string {
 }
 
 /** The chain section; omitted entirely when the projection has no chain. */
-function chainSection(chain: readonly ChainLinkView[] | undefined): string {
-  if (!chain || chain.length === 0) return '';
+function chainSection(chain: readonly ChainLinkView[] | undefined): string | undefined {
+  if (!chain || chain.length === 0) return undefined;
   return `<div class="chain" role="list" aria-label="The trip as a chain of dependent parts">${chain.map(chainLink).join('')}</div>`;
 }
 
@@ -368,6 +369,9 @@ function optionCard(option: RecoveryOptionView): string {
       })()
     : '';
   const approval = option.requiresApproval ? '<span class="chip chip-cost">Needs approval</span>' : '';
+  const allocation = option.costAllocationSummary
+    ? `<span class="chip">${escapeHtml(option.costAllocationSummary)}</span>`
+    : '';
   const body = option.summary ? `<div class="opt-body">${escapeHtml(option.summary)}</div>` : '';
   const flags =
     (option.flags?.length ?? 0) > 0
@@ -383,6 +387,7 @@ function optionCard(option: RecoveryOptionView): string {
       ${recommended}
       ${checking}
       ${cost}
+      ${allocation}
       ${approval}
     </div>
     ${body}
@@ -701,7 +706,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   <div class="case-grid">
     <div>
       ${leadCallout(view)}
-      ${chainSection(view.chain)}
+      ${optionalSection('The trip as it stands', chainSection(view.chain))}
       ${resolvedChangeSection(view)}
       ${affectedSection(view)}
       ${activitySection(view)}

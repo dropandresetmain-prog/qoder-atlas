@@ -130,7 +130,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
     modal.innerHTML =
       '<div class="preview-banner">What-if check · nothing changes until you commit</div>' +
       '<h2>Preview a programme change</h2>' +
-      '<p class="m-sub">Choose a programme commitment and proposed change. Northstar will check the blast radius against the trips already linked to it.</p>' +
+      '<p class="m-sub">Choose a programme commitment and proposed change. Northstar will check how many linked trips would be affected before anything changes.</p>' +
       '<div class="panel" style="margin-top:16px">' +
         '<label class="kv-label" for="programme-change-commitment">Commitment</label>' +
         '<select id="programme-change-commitment" name="commitmentId" style="width:100%;margin:6px 0 14px"></select>' +

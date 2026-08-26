@@ -42,6 +42,8 @@ import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
 import { describeAllocation } from '../engine/funding.ts';
+import { projectCaseChain } from './chain.ts';
+import type { AnchorEvent, Place } from '../domain/entities.ts';
 import {
   presentAction,
   presentActivity,
@@ -474,7 +476,12 @@ export async function projectCaseDetail(
       ...(decision && decision.outcome !== 'AUTO_APPROVED' ? { requiresApproval: true } : {}),
       // Mixed funding (ADR-037): the deterministic allocation persisted on
       // the intent — projected verbatim, never re-derived in the view.
-      ...(intent?.costAllocation ? { costAllocation: intent.costAllocation } : {}),
+      ...(intent?.costAllocation
+        ? {
+            costAllocation: intent.costAllocation,
+            costAllocationSummary: describeAllocation(intent.costAllocation),
+          }
+        : {}),
     });
   }
 
@@ -558,7 +565,16 @@ export async function projectCaseDetail(
     .filter((statement): statement is string => Boolean(statement));
 
   const isChangeRequest = triggeringSignals.some((s) => s.kind === 'TRAVELLER_INPUT');
-  const chain = await projectJourneyChain(deps, trip);
+  const places = new Map<string, Place>();
+  for (const entry of await deps.snapshot.entities.list('PLACE')) {
+    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
+  }
+  let anchorEvent: AnchorEvent | undefined;
+  if (trip.anchorEventId) {
+    const entry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
+    if (entry?.entityType === 'ANCHOR_EVENT') anchorEvent = entry.entity;
+  }
+  const chain = projectCaseChain(trip, recoveryCase, { places, ...(anchorEvent ? { anchorEvent } : {}) });
 
   // Honest "no automated recovery path" end-state: the planning loop has run
   // (the case moved past ASSESSING) yet produced no actionable strategy and
@@ -583,7 +599,7 @@ export async function projectCaseDetail(
       .filter((element): element is TripElement => Boolean(element))
       .map(describeElement),
     ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
-    ...(chain.length > 0 ? { chain } : {}),
+    ...(chain && chain.length > 0 ? { chain } : {}),
     checks,
     options,
     ...(approval ? { approval } : {}),

@@ -6,6 +6,7 @@ export * from './planningLoop.ts';
 export * from './preferenceStore.ts';
 export * from './providerExecution.ts';
 export * from './readmodels.ts';
+export * from './chain.ts';
 export * from './recoveryExecution.ts';
 export * from './signalPipeline.ts';
 export * from './snapshot.ts';

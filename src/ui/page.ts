@@ -144,8 +144,8 @@ function renderDemoBanner(banner: {
       ? 'LIVE mode: external provider APIs may be called. Provider-side state changes are possible.'
       : 'RECORD mode: external provider APIs are called and responses are recorded.';
   const plannerNote = banner.plannerMode === 'MODEL_STUDIO'
-    ? ' AI planner: EXTERNAL AI API (Model Studio).'
-    : ' AI planner: local deterministic (no external calls).';
+    ? ' Recovery suggestions: external AI (Model Studio).'
+    : ' Recovery suggestions: local deterministic (no external calls).';
   const toneClass = isReplay ? 'db-replay' : 'db-live';
   return `<div class="demo-banner ${toneClass}" role="status" aria-label="Demo mode indicator">
   <span class="db-mode">${escapeHtml(modeLabel)}</span>

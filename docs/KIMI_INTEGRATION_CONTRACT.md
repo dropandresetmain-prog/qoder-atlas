@@ -176,3 +176,31 @@ state; `UNKNOWN` must never render as a healthy/green state.
 5. All endpoints above are already wired on `lane/wave3-core-qwen`; shapes are
    TypeScript interfaces in `src/contracts/readmodels.ts` (frozen),
    `src/ui/case-view-model.ts`, and `src/app/waveReadmodels.ts`.
+
+---
+
+## 7. Product convergence seams (integration/wave3-product)
+
+The HTML surfaces (`/operator`, `/operator/cases/:id`, `/programme?event=&at=`,
+`/traveller?trip=`) render the approved UI screens from the read models above
+through one HTTP seam. The four Kimi handoff requirements are satisfied at
+this seam, from authoritative state only:
+
+1. **Chain** — `projectCaseChain` (src/app/chain.ts) projects every trip
+   element into a `chain` link; state comes from reservation state + health
+   + case impact evidence. Nothing unbooked ever renders green.
+2. **TravellerPresentation** — `projectTravellerPresentation`
+   (src/app/travellerPresentation.ts) builds the commitment card from the
+   trip's engagement + anchor commitment + event evidence, and the contact
+   line from the organiser organisation. Hero imagery has no authoritative
+   source, so it is omitted (ink gradient fallback).
+3. **optionDetails keying** — the trip view emits exactly `['Approve',
+   'Decline']` in `inputRequested.options`; the presentation keys its rich
+   details by those exact strings (pending intent's planning verdict,
+   replacement route, funding; decline carries the honest consequence).
+4. **Settle animation** — the server keeps per-surface last-rendered values
+   (src/server/settle.ts). `.just-changed` is injected ONLY into elements
+   whose value actually changed between renders (fleet cell + roster row via
+   `data-fleet-trip` / `data-trip-id`; traveller hero via `data-status`).
+   First render never settles; `POST /api/runtime/reset` clears the memory
+   (reset action only — other runtime actions preserve it).
