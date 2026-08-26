@@ -91,6 +91,10 @@ import {
 } from './demoHeroes.ts';
 import { runAcceptanceManifest } from '../acceptance/runner.ts';
 import { loadAcceptanceManifest, resolveManifestPath } from '../acceptance/manifest.ts';
+import {
+  resolvePopulatedDemoOverviewPath,
+  runPopulatedDemoWorld,
+} from './demoWorld.ts';
 
 export interface ComposedRuntime {
   db: DatabaseSync;
@@ -435,6 +439,29 @@ export async function composeAppRuntime(
         return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
       }
     },
+    async resetPopulatedWorld(baseUrl) {
+      try {
+        const outcome = await runPopulatedDemoWorld({
+          baseUrl,
+          config,
+          enforceAssertions: false,
+        });
+        return {
+          status: outcome.ok ? 200 : 500,
+          redirectTo: resolvePopulatedDemoOverviewPath(),
+          body: {
+            message: outcome.ok ? 'populated demo world ready' : 'populated demo world failed',
+            ...outcome,
+          },
+        };
+      } catch (error) {
+        return {
+          status: 500,
+          redirectTo: resolvePopulatedDemoOverviewPath(),
+          body: { error: error instanceof Error ? error.message : String(error) },
+        };
+      }
+    },
     async triggerScenario(name, at) {
       const spec = scenarioSpecs.get(name);
       if (!spec) {
@@ -528,6 +555,9 @@ export async function composeAppRuntime(
       return {
         chainFor: (trip) => chainByTrip.get(trip.tripId),
         ...(onlyEventId ? { programmeHref: `/programme?event=${encodeURIComponent(onlyEventId)}` } : {}),
+        ...(demo.resetPopulatedWorld
+          ? { demoReset: { action: '/api/demo/reset?redirect=1', label: 'Reset demo' } }
+          : {}),
       };
     },
     caseDetail: (caseId, at) => projectCaseDetail(readDeps, caseId, at),

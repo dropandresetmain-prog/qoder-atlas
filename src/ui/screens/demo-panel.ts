@@ -143,7 +143,17 @@ export function renderDemoPanel(ctx: DemoPanelContext): string {
     if (action === 'reset') {
       fetch('/api/demo/reset', { method: 'POST' })
         .then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b }; }); })
-        .then(function(r) { showResult('result-reset', r.ok, r.ok ? 'Reset complete. ' + JSON.stringify(r.body) : 'Error: ' + JSON.stringify(r.body)); btn.disabled = false; })
+        .then(function(r) {
+          var msg = r.ok ? 'Populated demo world ready.' : 'Error: ' + JSON.stringify(r.body);
+          if (r.ok && r.body && r.body.redirectTo) {
+            msg += ' Opening Overview…';
+            showResult('result-reset', r.ok, msg);
+            window.location.href = r.body.redirectTo;
+          } else {
+            showResult('result-reset', r.ok, msg);
+            btn.disabled = false;
+          }
+        })
         .catch(function(e) { showResult('result-reset', false, 'Request failed: ' + e.message); btn.disabled = false; });
     } else if (action === 'launch' || action === 'rehearse') {
       var id = btn.dataset.workflow;

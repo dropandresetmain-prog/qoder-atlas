@@ -123,7 +123,7 @@ Production demo entry depends on this binding behaviour. R2 work must preserve i
 
 ## R2 — Populated Demo World + Eight-Scenario Clickthrough
 
-**Status:** R2.1 COMPLETE · R2.2 blocked pending explicit acceptance
+**Status:** R2.1 COMPLETE · R2.2 IMPLEMENTED (pending R2.3 rehearsal gate)
 
 R2 is the functional product gate. It supersedes the earlier narrower idea of merely launching all eight scenarios from `/demo`.
 

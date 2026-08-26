@@ -67,6 +67,8 @@ export interface OperatorDashboardAugmentations {
   roleFor?: (trip: OperatorTripView) => string | undefined;
   /** Link target for the roster section's "Full roster" shortcut. */
   programmeHref?: string;
+  /** When set, render a judge-facing Reset demo control (POST → populated Overview). */
+  demoReset?: { action: string; label: string };
 }
 
 function sortByUrgency(trips: readonly OperatorTripView[]): OperatorTripView[] {
@@ -228,12 +230,18 @@ export function renderOperatorDashboardBody(
   const rosterLink = augment.programmeHref
     ? `<a class="h2-link" href="${escapeHtml(augment.programmeHref)}">Full roster on the programme page →</a>`
     : '';
+  const demoReset = augment.demoReset
+    ? `<form class="demo-reset-form" method="post" action="${escapeHtml(augment.demoReset.action)}" data-test="demo-reset-form">
+    <button type="submit" class="demo-reset-btn" data-test="demo-reset-btn">${escapeHtml(augment.demoReset.label)}</button>
+  </form>`
+    : '';
   return `
 <main class="shell">
   <div class="page-head">
     <h1>Operations overview</h1>
     <p class="sub">Every managed trip, ordered by what needs attention first.</p>
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
+    ${demoReset}
   </div>
   <div class="readout">
 ${readoutBlock(view)}

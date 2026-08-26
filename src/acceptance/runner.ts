@@ -46,6 +46,11 @@ export interface RunnerOptions {
    */
   stopBeforeStepIds?: readonly string[];
   /**
+   * Skip these step ids entirely (e.g. per-scenario reset when a shared reset
+   * already ran). Orchestration-only.
+   */
+  skipStepIds?: readonly string[];
+  /**
    * When true, HTTP status is still enforced but semantic manifest assertions
    * are skipped (demo launch resilience). Default false for acceptance.
    */
@@ -154,7 +159,20 @@ export async function runAcceptanceManifest(options: RunnerOptions): Promise<Run
 
   try {
     const stopBefore = new Set(options.stopBeforeStepIds ?? []);
+    const skipSteps = new Set(options.skipStepIds ?? []);
     for (const step of manifest.steps) {
+      if (skipSteps.has(step.id)) {
+        builder.recordStep({
+          stepId: step.id,
+          ...(step.description ? { description: step.description } : {}),
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          ok: true,
+          actionType: step.action.type,
+          error: 'skipped: orchestration boundary (excluded from this run)',
+        });
+        continue;
+      }
       if (stopBefore.has(step.id)) {
         builder.recordStep({
           stepId: step.id,

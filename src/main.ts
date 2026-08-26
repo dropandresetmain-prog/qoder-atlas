@@ -36,6 +36,20 @@ async function main(): Promise<void> {
       `[atlas] AI Trip Recovery Layer started env=${config.environment} mode=${config.adapterMode} ` +
         `schema=v${kvGet(composed.db, 'schema_version')} http=http://${host}:${port}/operator`,
     );
+
+    if (config.environment === 'demo' && composed.endpoints.demo?.resetPopulatedWorld) {
+      const caseRow = composed.db.prepare('SELECT COUNT(*) AS c FROM cases').get() as { c: number };
+      if (caseRow.c === 0) {
+        const baseUrl = `http://127.0.0.1:${port}`;
+        void composed.endpoints.demo.resetPopulatedWorld(baseUrl).then((outcome) => {
+          if (outcome.status !== 200) {
+            console.warn('[atlas] populated demo world bootstrap failed:', outcome.body);
+          } else {
+            console.log('[atlas] populated demo world bootstrapped for default Overview entry');
+          }
+        });
+      }
+    }
   });
 
   const shutdown = (signal: string): void => {

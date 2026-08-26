@@ -56,7 +56,14 @@ export interface DemoSurface {
   scenarioRehearsals?(): Array<{ id: string; title: string; description: string; scenarioId: string }>;
   /** Which planner is active (for the demo banner display). */
   plannerMode?: () => 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
-  reset(at: IsoDateTime): Promise<{ status: number; body: unknown }>;
+  /** Plain runtime reset (diagnostic). */
+  reset(at: IsoDateTime): Promise<{ status: number; body: unknown; redirectTo?: string }>;
+  /**
+   * R2 populated demo world: single reset + scenario prefixes → Overview entry state.
+   */
+  resetPopulatedWorld?(
+    baseUrl: string,
+  ): Promise<{ status: number; body: unknown; redirectTo?: string }>;
   triggerScenario(name: string, at: IsoDateTime): Promise<{ status: number; body: unknown }>;
   /**
    * Launch a final hero workflow through existing acceptance manifest steps
@@ -792,7 +799,20 @@ async function handle(
       return;
     }
     if (segments[2] === 'reset') {
-      const outcome = await endpoints.demo.reset(endpoints.now());
+      const redirect = url.searchParams.get('redirect') === '1';
+      const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0]!.trim();
+      const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? `127.0.0.1:${config.httpPort}`)
+        .split(',')[0]!
+        .trim();
+      const baseUrl = `${proto}://${host}`;
+      const outcome = endpoints.demo.resetPopulatedWorld
+        ? await endpoints.demo.resetPopulatedWorld(baseUrl)
+        : await endpoints.demo.reset(endpoints.now());
+      if (redirect && outcome.redirectTo) {
+        res.writeHead(303, { Location: outcome.redirectTo });
+        res.end();
+        return;
+      }
       sendJson(res, outcome.status, outcome.body);
       return;
     }
