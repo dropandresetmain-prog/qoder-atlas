@@ -123,7 +123,7 @@ Production demo entry depends on this binding behaviour. R2 work must preserve i
 
 ## R2 — Populated Demo World + Eight-Scenario Clickthrough
 
-**Status:** R2.1 COMPLETE · R2.2 IMPLEMENTED (pending R2.3 rehearsal gate)
+**Status:** R2.1 COMPLETE · R2.2 COMPLETE · R2.3 COMPLETE (R2 gate ready for review)
 
 R2 is the functional product gate. It supersedes the earlier narrower idea of merely launching all eight scenarios from `/demo`.
 
@@ -180,6 +180,27 @@ For every scenario prove:
 - Reset restores the populated starting Overview.
 
 Record a compact S1-S8 rehearsal matrix with PASS / FIX REQUIRED and issue triage.
+
+### R2.3 — Eight-scenario operational rehearsal
+
+**Status:** COMPLETE on `lane/r2-populated-demo-world`
+
+From populated Overview entry (`POST /api/demo/reset`), automated rehearsal in `test/integration.r2-rehearsal.test.ts` proves entry visibility, clickthrough surfaces, hero continuations, and reset repeatability.
+
+| Sc | Hero | Entry from Overview | Click surface | Continue → end | Reset restores entry |
+|----|------|---------------------|---------------|----------------|----------------------|
+| S2 | Jordan Hale | PASS — case + organiser approval pending | `/api/cases/{id}`, traveller trip | PASS — decide → execute → `VIABLE` | PASS |
+| S1 | Sarah Lim | PASS — `NOT_VIABLE`, active case | case / traveller trip | *(S3 row)* | PASS |
+| S3 | Sarah Lim (continues S1) | PASS — same Sarah row | programme preview/commit | PASS — preview non-mutating; commit → `VIABLE` | PASS |
+| S4 | Ethan Yap | PASS — active case | case / traveller trip | PASS — `CHANGE_REQUESTED`, all options `NOT_VIABLE` | PASS (implicit in suite) |
+| S5 | Jonas Berg | PASS — active case, traveller approval | case / traveller trip | PASS — decide → execute → `VIABLE` | PASS (implicit) |
+| S6 | Hannah Weiss | PASS — active case | case / traveller trip | PASS — `CHANGE_REQUESTED`, honest open planning | PASS (implicit) |
+| S7 | Oliver Bennett | PASS — active case, organiser approval | case / traveller trip | PASS — decide → execute → resolved | PASS (implicit) |
+| S8 | Mei Ling Goh | PASS — active case (`DISRUPTED`) | case / traveller trip | PASS — policy-blocked intake visible | PASS (implicit) |
+
+**Read-model note:** case `status` labels on the operator case API (`DISRUPTED`, `RECOVERING`, `CHANGE_REQUESTED`) are the authoritative UI labels; they may differ from internal runtime enum names in acceptance manifests while remaining truthful.
+
+**Reset repeatability:** second `POST /api/demo/reset` restores Sarah `NOT_VIABLE` and Jordan awaiting-approval entry (`test/integration.r2-rehearsal.test.ts`).
 
 ### R2 gate
 

@@ -51,6 +51,13 @@ export interface RunnerOptions {
    */
   skipStepIds?: readonly string[];
   /**
+   * Begin execution at this step id (skip earlier steps). Used when continuing
+   * from a pre-staged demo entry state. Orchestration-only.
+   */
+  startAtStepId?: string;
+  /** Pre-seed template bindings (orchestration-only, e.g. continuing from staged entry). */
+  initialBindings?: Record<string, string>;
+  /**
    * When true, HTTP status is still enforced but semantic manifest assertions
    * are skipped (demo launch resilience). Default false for acceptance.
    */
@@ -150,6 +157,7 @@ export async function runAcceptanceManifest(options: RunnerOptions): Promise<Run
   const bindings: Bindings = {
     scenarioId: manifest.scenarioId,
     mode,
+    ...(options.initialBindings ?? {}),
   };
   for (const id of manifest.expect.travellerIds) bindings[`traveller:${id}`] = id;
   for (const id of manifest.expect.tripIds) bindings[`trip:${id}`] = id;
@@ -160,7 +168,24 @@ export async function runAcceptanceManifest(options: RunnerOptions): Promise<Run
   try {
     const stopBefore = new Set(options.stopBeforeStepIds ?? []);
     const skipSteps = new Set(options.skipStepIds ?? []);
+    let started = options.startAtStepId === undefined;
     for (const step of manifest.steps) {
+      if (!started) {
+        if (step.id === options.startAtStepId) {
+          started = true;
+        } else {
+          builder.recordStep({
+            stepId: step.id,
+            ...(step.description ? { description: step.description } : {}),
+            startedAt: new Date().toISOString(),
+            finishedAt: new Date().toISOString(),
+            ok: true,
+            actionType: step.action.type,
+            error: 'skipped: orchestration boundary (before startAtStepId)',
+          });
+          continue;
+        }
+      }
       if (skipSteps.has(step.id)) {
         builder.recordStep({
           stepId: step.id,
