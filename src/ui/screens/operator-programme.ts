@@ -41,7 +41,7 @@ import {
   PROGRAMME_TIMELINE_TITLE,
   type StatusTone,
 } from '../copy.ts';
-import { escapeHtml, formatInstant } from '../html.ts';
+import { escapeHtml, formatInstant, encodeUri } from '../html.ts';
 import {
   bulletList,
   errorPanel,
@@ -318,7 +318,7 @@ function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentatio
   const name = `<strong>${escapeHtml(row.travellerName)}</strong>`;
   const nameCell = `<a href="/traveller?trip=${escapeHtml(row.tripId)}" class="traveller-link" data-test="programme-traveller-link">${name}</a>`;
   const caseCell = firstActiveCaseId
-    ? `<div><a href="/operator/cases/${escapeHtml(firstActiveCaseId)}" class="case-link" data-test="programme-case-link">Recovery case</a></div>`
+    ? `<div><a href="/operator/cases/${encodeUri(firstActiveCaseId)}" class="case-link" data-test="programme-case-link">Recovery case</a></div>`
     : '';
   const role = augment.roleFor?.(row) ?? '—';
   const arrival = augment.arrivalFor?.(row) ?? '—';

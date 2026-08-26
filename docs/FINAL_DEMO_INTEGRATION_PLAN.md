@@ -1,9 +1,12 @@
 # Final Demo Integration & Code-Freeze Plan
 
-**Status:** Active closure execution SSOT (R2.1 entry-state contract frozen)  
+**Status:** Active closure execution SSOT (R2 + R3 integrated on `integration/final-r2-r3`)  
 **Date:** 27 Aug 2026  
 **Branch baseline:** `main` @ `e2cd0b1` (includes R1 merge `5f62389` + Railway deployment hardening `2865a66`, `e2cd0b1`)  
-**R2 lane branch:** `lane/r2-populated-demo-world`  
+**Integration candidate:** `integration/final-r2-r3` (R2 @ `9756729` + R3A @ `1605665` + R3B visual deltas + HTTP projection wiring)  
+**R2 lane branch:** `lane/r2-populated-demo-world` @ `9756729`  
+**R3A lane branch:** `lane/r3-projection-closure` @ `1605665`  
+**R3B visual lane:** `lane/r3-reference-visual-convergence` @ `e31e92c` (visual deltas cherry-picked; not wholesale merge)  
 **Parent execution SSOT:** `docs/IMPLEMENTATION_PLAN.md`  
 **Scope/status SSOT:** `docs/ROADMAP.md`  
 **Scenario SSOT:** `docs/SCENARIOS.md`  
@@ -123,7 +126,7 @@ Production demo entry depends on this binding behaviour. R2 work must preserve i
 
 ## R2 — Populated Demo World + Eight-Scenario Clickthrough
 
-**Status:** R2.1 COMPLETE · R2.2 COMPLETE · R2.3 COMPLETE (R2 gate ready for review)
+**Status:** R2.1 COMPLETE · R2.2 COMPLETE · R2.3 COMPLETE · **R2 ACCEPTED** (integrated @ `9756729`)
 
 R2 is the functional product gate. It supersedes the earlier narrower idea of merely launching all eight scenarios from `/demo`.
 
@@ -220,7 +223,15 @@ R2 PASSES only when:
 
 ## R3 — Approved Kimi Product Parity
 
-**Status:** PLANNED; may begin in parallel after R2.1 contract freeze
+**Status:** R3A COMPLETE · R3B visual revalidated · **R3 INTEGRATED** on `integration/final-r2-r3`
+
+R3A projection closure @ `1605665` integrated: operator/programme/traveller/case/decisions/activity projections, FX-safe presentation.
+
+R3B reference visual convergence @ `e31e92c` deltas ported (not wholesale merge): case URL encoding, Reset demo styling, programme preview pages, visual capture workflow. Fresh live captures on combined candidate in `output/r3b-visual/`.
+
+**Act Now closed in integration:** `/decisions` and `/activity` HTTP routes now prefer `decisionsPage` / `activityPage` from compose (R3A projectors), with honest legacy fallback when unwired.
+
+**Remaining R3 polish (Park for Later):** sparse `decideBy` when evidence absent; E1/E2 full visual pass off filmed entry path.
 
 Goal: make the operational product materially match the approved Kimi screens without redesigning the product.
 
@@ -243,7 +254,7 @@ Main theme/design system is already substantially integrated; do not blindly re-
 
 ## R4 — Hero Rehearsal + Stabilisation
 
-**Status:** PLANNED
+**Status:** PLANNED — **NOT STARTED** (blocked on R2/R3 integration merge to `main`)
 
 Rehearse exact final story:
 

@@ -18,6 +18,11 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
 }
 
+/** Encode dynamic path/query segments for href attributes (not for HTML text). */
+export function encodeUri(value: string): string {
+  return encodeURIComponent(value);
+}
+
 export function formatMoney(money: Money): string {
   return new Intl.NumberFormat('en', {
     style: 'currency',

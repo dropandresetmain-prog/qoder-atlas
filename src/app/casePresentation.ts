@@ -1,9 +1,9 @@
 /**
  * Case detail presentation enrichment (R3A).
  */
-import type { IsoDateTime, Money } from '../domain/common.ts';
+import type { Money } from '../domain/common.ts';
 import type { AnchorEvent, Place } from '../domain/entities.ts';
-import type { Engagement, TripElement } from '../domain/elements.ts';
+import type { Engagement } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import type { AuthorityDecision } from '../operational/intent.ts';
@@ -16,7 +16,6 @@ import type {
   RecoveryOptionView,
 } from '../ui/case-view-model.ts';
 import { describeAllocation } from '../engine/funding.ts';
-import { presentAction } from './presentation.ts';
 import {
   formatCaseOpenedAt,
   formatProgrammeInstant,
@@ -77,7 +76,7 @@ export function enrichCaseDetailView(
     anchorEvent?: AnchorEvent;
   },
 ): CaseDetailView {
-  const { recoveryCase, trip, triggeringSignals, places, anchorEvent } = context;
+  const { recoveryCase, trip, triggeringSignals, places } = context;
   const affected = projectAffectedItemViews(trip, recoveryCase, places);
 
   const engagement = primaryEngagement(trip);

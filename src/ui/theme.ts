@@ -196,6 +196,24 @@ body {
   align-items: center;
   flex-wrap: wrap;
 }
+.demo-reset-form { margin: 10px 0 0; }
+.demo-reset-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+.demo-reset-btn:hover {
+  background: var(--surface-2);
+  border-color: rgba(20, 23, 28, 0.22);
+}
 
 /* section titles: real hierarchy — 17px semibold sans, never the mono label tier */
 .section { margin: 28px 0 12px; }

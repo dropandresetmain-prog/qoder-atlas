@@ -22,7 +22,7 @@ import type {
 } from '../../contracts/readmodels.ts';
 import type { ChainLinkView } from '../case-view-model.ts';
 import { STATUS_LABEL } from '../copy.ts';
-import { escapeHtml, formatInstant, formatMoney, formatRosterTime, formatShort } from '../html.ts';
+import { escapeHtml, formatInstant, formatMoney, formatRosterTime, formatShort, encodeUri } from '../html.ts';
 import { errorPanel, loadingPanel, miniChainRow, statusBadge } from '../components.ts';
 
 /** Urgency ordering for rows and grid cells; deterministic, status-driven only. */
@@ -153,7 +153,7 @@ function decisionRow({ trip, decision }: PendingDecisionRow, index: number): str
   const amount = decision.amount ? ` · ${escapeHtml(formatMoney(decision.amount))}` : '';
   const when = decision.requestedAt ? formatShort(decision.requestedAt) : 'timing unconfirmed';
   return `
-  <a href="/operator/cases/${escapeHtml(decision.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(decision.caseId)}" data-test="decision-link">
+  <a href="/operator/cases/${encodeUri(decision.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(decision.caseId)}" data-test="decision-link">
     <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
     <span class="q-name">${escapeHtml(trip.label ?? trip.tripId)}</span>
     <span class="q-issue">${escapeHtml(decision.description)}${amount}</span>
@@ -191,7 +191,7 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
   const caseLink = trip.activeCaseId
-    ? `<a href="/operator/cases/${escapeHtml(trip.activeCaseId)}" class="b-case-link" data-test="case-link">Recovery case</a>`
+    ? `<a href="/operator/cases/${encodeUri(trip.activeCaseId)}" class="b-case-link" data-test="case-link">Recovery case</a>`
     : '';
   return `
   <div class="brow" style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}">

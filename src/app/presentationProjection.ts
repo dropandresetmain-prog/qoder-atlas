@@ -297,7 +297,7 @@ export function projectTravellerProgress(recoveryCase: RecoveryCase | undefined)
   const queued = recoveryCase.actionIntents.filter(
     (intent) => intent.status !== 'EXECUTED' && intent.status !== 'FAILED' && intent.status !== 'REJECTED',
   ).length;
-  return recoveryCase.actionIntents.map((intent, index, all) => {
+  return recoveryCase.actionIntents.map((intent, index, _all) => {
     const state =
       intent.status === 'EXECUTED'
         ? 'done'

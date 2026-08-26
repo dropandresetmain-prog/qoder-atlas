@@ -71,6 +71,8 @@ import { resolveWorldSeedMode, shouldBootSeedScenario } from './worldSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { projectProgrammeAugmentations } from './programmeReadmodel.ts';
 import { projectOperatorDashboardAugmentations } from './operatorPresentation.ts';
+import { projectDecisionsPage } from './decisionsPresentation.ts';
+import { projectProgrammeActivityPage } from './activityPresentation.ts';
 import { projectTravellerPresentation } from './travellerPresentation.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
 import { createChangeIntakeHandlers } from './changeIntakeHttp.ts';
@@ -578,6 +580,8 @@ export async function composeAppRuntime(
         detail?.criticalObjectiveAtRisk,
       );
     },
+    decisionsPage: (at) => projectDecisionsPage(readDeps, at),
+    activityPage: (at) => projectProgrammeActivityPage(readDeps, at),
     firstTripId: async () => {
       const primaryEventId = programmeEventIds[0];
       const summaries = await trips.listTrips();

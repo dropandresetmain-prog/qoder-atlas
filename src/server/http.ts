@@ -32,6 +32,8 @@ import {
   activityFromTripActivities,
   decisionsFromApprovalsQueue,
   decisionsFromDashboard,
+  type ActivityPageView,
+  type DecisionsPageView,
 } from '../ui/operator-surfaces-view-model.ts';
 import { SettleTracker, addClassToTagsContaining } from './settle.ts';
 
@@ -193,6 +195,10 @@ export interface AppEndpoints {
   travellerTrip(tripId: EntityId, at: IsoDateTime): Promise<TravellerTripView | undefined>;
   /** Optional persisted concierge presentation for the served traveller page. */
   travellerPresentation?: (tripId: EntityId, at: IsoDateTime) => Promise<TravellerPresentation | undefined>;
+  /** Optional R3A decisions page projection (richer than legacy queue mappers). */
+  decisionsPage?: (at: IsoDateTime) => Promise<DecisionsPageView>;
+  /** Optional R3A programme-scale activity projection. */
+  activityPage?: (at: IsoDateTime) => Promise<ActivityPageView>;
   firstTripId(): Promise<EntityId | undefined>;
   travellerDecision(
     caseId: EntityId,
@@ -364,22 +370,28 @@ async function handle(
   }
   if (req.method === 'GET' && segments[0] === 'operator' && segments[1] === 'cases' && segments[2]) {
     const at = endpoints.now();
-    const view = await endpoints.caseDetail(segments[2], at);
+    const caseId = decodeURIComponent(segments[2]);
+    const view = await endpoints.caseDetail(caseId, at);
     const body = view
       ? renderCaseDetailBody(view)
-      : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${segments[2]} is known`, generatedAt: at });
+      : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${caseId} is known`, generatedAt: at });
     sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && url.pathname === '/decisions') {
     const at = endpoints.now();
     const eventId = operatorEventScope(url);
-    const queue = endpoints.wave ? await endpoints.wave.approvalsQueue(at) : undefined;
-    const view = queue
-      ? decisionsFromApprovalsQueue(queue)
-      : decisionsFromDashboard(
-          await endpoints.operatorDashboard(at, eventId ? { anchorEventId: eventId } : undefined),
-        );
+    let view: DecisionsPageView;
+    if (endpoints.decisionsPage) {
+      view = await endpoints.decisionsPage(at);
+    } else {
+      const queue = endpoints.wave ? await endpoints.wave.approvalsQueue(at) : undefined;
+      view = queue
+        ? decisionsFromApprovalsQueue(queue)
+        : decisionsFromDashboard(
+            await endpoints.operatorDashboard(at, eventId ? { anchorEventId: eventId } : undefined),
+          );
+    }
     sendHtml(
       res,
       200,
@@ -392,7 +404,10 @@ async function handle(
   }
   if (req.method === 'GET' && url.pathname === '/activity') {
     const at = endpoints.now();
-    if (!endpoints.wave) {
+    let view: ActivityPageView;
+    if (endpoints.activityPage) {
+      view = await endpoints.activityPage(at);
+    } else if (!endpoints.wave) {
       sendHtml(
         res,
         200,
@@ -402,12 +417,13 @@ async function handle(
         ),
       );
       return;
+    } else {
+      const dashboard = await endpoints.operatorDashboard(at);
+      const activities = (await Promise.all(
+        dashboard.trips.map((trip) => endpoints.wave!.tripActivity(trip.tripId, at)),
+      )).filter((activity): activity is TripActivityView => activity !== undefined);
+      view = activityFromTripActivities(at, activities);
     }
-    const dashboard = await endpoints.operatorDashboard(at);
-    const activities = (await Promise.all(
-      dashboard.trips.map((trip) => endpoints.wave!.tripActivity(trip.tripId, at)),
-    )).filter((activity): activity is TripActivityView => activity !== undefined);
-    const view = activityFromTripActivities(at, activities);
     sendHtml(
       res,
       200,
