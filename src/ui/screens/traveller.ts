@@ -1,15 +1,16 @@
 /**
  * E2 — traveller trip page: mobile-first concierge register (DESIGN.md §1).
  *
- * Answers the traveller journey: am I okay, what changed, what matters,
- * what is being done, what input is needed, and whether the rest of the
- * trip is viable. RECOVERED_WITH_LOSS is shown honestly, never as "all
- * good". Decision and request forms target the existing application seams;
- * nothing here fabricates a submitted state.
+ * Approved T1–T7 surfaces: topbar, hero with kicker tones, itinerary rows,
+ * commitment card, remainder viability, progress check-rows, choice cards,
+ * message thread, and composer. Answers plainly: am I okay, what changed,
+ * what matters, what is Northstar doing, what does it need from me, is the
+ * rest of my trip viable. No internal engine jargon.
  *
- * An optional TravellerPresentation adds destination photography, the ink
- * commitment card, and rich option cards. Without it, every screen still
- * renders completely in plain language — presentation never invents facts.
+ * An optional TravellerPresentation adds destination photography, itinerary,
+ * progress, and thread detail. Without it, every screen still renders
+ * completely from the frozen TravellerTripView — presentation never invents
+ * facts.
  */
 import type {
   ReadModelEnvelope,
@@ -24,79 +25,158 @@ import {
 import { escapeHtml, formatInstant } from '../html.ts';
 import {
   errorPanel,
-  iconList,
   loadingPanel,
   viabilityBlock,
-  type IconRow,
 } from '../components.ts';
 import type {
+  TravellerItineraryRow,
   TravellerOptionDetail,
   TravellerPresentation,
+  TravellerProgressRow,
+  TravellerThreadMessage,
 } from '../traveller-presentation.ts';
+
+const PROGRESS_ICON: Record<TravellerProgressRow['state'], string> = {
+  done: '✓',
+  doing: '⟳',
+  queued: '○',
+  failed: '✕',
+};
+
+const STATE_CLASS: Record<TravellerItineraryRow['stateTone'], string> = {
+  ok: 's-ok',
+  bad: 's-bad',
+  watch: 's-watch',
+  neutral: 's-neutral',
+};
+
+function topbar(presentation?: TravellerPresentation): string {
+  const event = presentation?.eventName
+    ? `<span class="tt-right">${escapeHtml(presentation.eventName)}</span>`
+    : '';
+  return `
+  <div class="t-topbar">
+    <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar</div>
+    ${event}
+  </div>`;
+}
 
 function hero(view: TravellerTripView, presentation?: TravellerPresentation): string {
   const image = presentation?.heroImageUrl
     ? `<img src="${escapeHtml(presentation.heroImageUrl)}" alt="${escapeHtml(presentation.heroImageAlt ?? '')}" loading="lazy">`
     : '';
   const changedButWorking = view.status === 'DISRUPTED' && view.remainderViable === 'VIABLE';
-  const kicker = changedButWorking ? 'Trip checked' : STATUS_LABEL[view.status];
-  const headline = changedButWorking ? 'Your trip changed, but still works' : TRAVELLER_HEADLINE[view.status];
-  const subline = changedButWorking
-    ? 'The updated booking still protects the important parts of your trip.'
-    : TRAVELLER_SUBLINE[view.status];
+  const kicker = presentation?.heroKicker
+    ?? (changedButWorking ? 'Trip checked' : STATUS_LABEL[view.status]);
+  const kickerTone = presentation?.heroKickerTone
+    ?? (changedButWorking || view.status === 'READY' || view.status === 'RESOLVED' ? 'ok' : view.status === 'DISRUPTED' ? 'bad' : undefined);
+  const kickerClass = kickerTone === 'ok' ? 'k-ok' : kickerTone === 'bad' ? 'k-bad' : '';
+  const headline = presentation?.heroHeadline
+    ?? (changedButWorking ? 'Your trip changed, but still works' : TRAVELLER_HEADLINE[view.status]);
+  const subline = presentation?.heroSubline
+    ?? (changedButWorking
+      ? 'The updated booking still protects the important parts of your trip.'
+      : TRAVELLER_SUBLINE[view.status]);
   return `
   <div class="t-hero" data-status="${escapeHtml(view.status)}">
     ${image}
     <div class="scrim" aria-hidden="true"></div>
     <div class="t-hero-text">
-      <p class="hero-kicker">${escapeHtml(kicker)}</p>
+      <p class="hero-kicker${kickerClass ? ` ${kickerClass}` : ''}">${escapeHtml(kicker)}</p>
       <h1>${escapeHtml(headline)}</h1>
       <p>${escapeHtml(subline)}</p>
     </div>
   </div>`;
 }
 
-/** The ink commitment card — the thing that must not be missed. */
+function itineraryRow(row: TravellerItineraryRow): string {
+  const struck = row.struck ? ' struck' : '';
+  const sub = row.sub ? `<div class="i-sub">${escapeHtml(row.sub)}</div>` : '';
+  return `<div class="itin-row${struck}"><span class="i-ic" aria-hidden="true">${escapeHtml(row.icon)}</span><div class="i-main"><div class="i-title">${escapeHtml(row.title)}</div>${sub}</div><span class="i-state ${STATE_CLASS[row.stateTone]}">${escapeHtml(row.stateLabel)}</span></div>`;
+}
+
+function itinerarySection(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  if (presentation?.itinerary && presentation.itinerary.length > 0) {
+    const heading = presentation.itineraryHeading ?? 'Your trip';
+    return `
+  <div class="t-card" data-ui-section="itinerary">
+    <h2>${escapeHtml(heading)}</h2>
+    ${presentation.itinerary.map(itineraryRow).join('')}</div>`;
+  }
+  // Choice-focused surfaces (approved T4) lead with options — do not also
+  // restack whatChanged above them when presentation already owns the story.
+  if (presentation?.optionDetails && Object.keys(presentation.optionDetails).length > 0) {
+    return '';
+  }
+  if (view.whatChanged) {
+    return `
+  <div class="t-card" data-ui-section="what-changed">
+    <h2>What changed</h2>
+    <p>${escapeHtml(view.whatChanged)}</p>
+  </div>`;
+  }
+  return '';
+}
+
 function commitmentCard(view: TravellerTripView, presentation?: TravellerPresentation): string {
-  const card = presentation?.commitmentCard ?? (view.whatMattersNow
-    ? { label: 'The reason for the trip', title: view.whatMattersNow }
-    : undefined);
+  const card = presentation?.commitmentCard
+    ?? (presentation?.optionDetails && Object.keys(presentation.optionDetails).length > 0
+      ? undefined
+      : view.whatMattersNow
+        ? { label: 'The reason for the trip', title: view.whatMattersNow }
+        : undefined);
   if (!card) return '';
   const meta = card.meta ? `<p class="cc-meta">${escapeHtml(card.meta)}</p>` : '';
+  const okClass = card.ok ? ' is-ok' : '';
   return `
-  <div class="commit-card" data-ui-section="commitment">
-    <p class="cc-label">✦ ${escapeHtml(card.label)}</p>
+  <div class="commit-card${okClass}" data-ui-section="commitment">
+    <p class="cc-label">${escapeHtml(card.label)}</p>
     <p class="cc-title">${escapeHtml(card.title)}</p>
     ${meta}
   </div>`;
 }
 
-function requestComposer(view: TravellerTripView): string {
-  if (!view.travellerId) return '';
+function progressRow(row: TravellerProgressRow): string {
+  const detail = row.detail ? `<span class="c-sub">${escapeHtml(row.detail)}</span>` : '<span class="c-sub"></span>';
+  return `<div class="check-row ${row.state}"><span class="c-ic" aria-hidden="true">${PROGRESS_ICON[row.state]}</span><span class="c-t">${escapeHtml(row.text)}</span>${detail}</div>`;
+}
+
+function progressSection(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  if (presentation?.progress && presentation.progress.length > 0) {
+    const heading = presentation.progressHeading ?? 'What Northstar is doing';
+    const note = presentation.progressNote
+      ? `<p style="margin-top:10px">${escapeHtml(presentation.progressNote)}</p>`
+      : '';
+    return `
+  <div class="t-card" data-ui-section="progress">
+    <h2>${escapeHtml(heading)}</h2>
+    ${presentation.progress.map(progressRow).join('')}
+    ${note}
+  </div>`;
+  }
+  if (view.actionsInProgress.length === 0) return '';
+  const rows = view.actionsInProgress.map((action) =>
+    progressRow({ state: 'doing', text: action }),
+  );
   return `
-  <div class="card t-card request-composer" data-ui-section="traveller-request">
-    <p class="composer-kicker">Need something different?</p>
-    <h2>Ask Northstar</h2>
-    <p class="card-sub">Tell us what you would like to change. We will check it against the rest of your trip before anything is altered.</p>
-    <form class="inline-form request-form" method="post" action="/api/traveller/change-request" data-result-target="traveller-request-result">
-      <input type="hidden" name="travellerId" value="${escapeHtml(view.travellerId)}">
-      <input type="hidden" name="tripId" value="${escapeHtml(view.tripId)}">
-      <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-      <label for="traveller-request-text">What would you like us to look into?</label>
-      <textarea id="traveller-request-text" name="text" rows="3" minlength="1" required placeholder="For example: Can I arrive a day earlier?"></textarea>
-      <button type="submit" class="t-btn">Send request</button>
-    </form>
-    <div id="traveller-request-result" class="form-result" role="status" aria-live="polite"></div>
+  <div class="t-card" data-ui-section="progress">
+    <h2>What we are doing</h2>
+    ${rows.join('')}
   </div>`;
 }
 
-/**
- * One choice as a rich option card when presentation detail exists.
- *
- * Choice buttons carry name="decision" with APPROVED/DECLINED values so the
- * progressive enhancement script (interaction.ts) can convert the submission
- * into the JSON body the /traveller-decision endpoint actually expects.
- */
+function optionsSkeleton(presentation?: TravellerPresentation): string {
+  if (!presentation?.optionsSkeleton) return '';
+  const note = presentation.optionsSkeletonNote
+    ?? 'Options appear here the moment they are scored. You will only hear from us when there is a real choice.';
+  return `
+  <div class="t-card" data-ui-section="options-skeleton">
+    <div class="skeleton" style="height:52px"></div>
+    <div class="skeleton" style="height:52px;margin-top:8px"></div>
+    <p style="margin-top:10px">${escapeHtml(note)}</p>
+  </div>`;
+}
+
 function choiceValue(option: string): string {
   return option.toLowerCase() === 'decline' ? 'DECLINED' : 'APPROVED';
 }
@@ -130,97 +210,151 @@ function inputCard(request: TravellerInputRequest, presentation?: TravellerPrese
   const contact = presentation?.contactName
     ? ` Questions? Message ${escapeHtml(presentation.contactName)}.`
     : '';
+  const choiceNote = presentation?.choiceNote
+    ? `<p class="choice-note">${escapeHtml(presentation.choiceNote)}</p>`
+    : '';
   const decided = request.decidedAt
     ? `<p class="choice-note">You answered on ${escapeHtml(formatInstant(request.decidedAt))}. Thank you.</p>`
     : `<form class="choice-form inline-form" data-case-id="${escapeHtml(request.caseId)}" method="post" action="/api/cases/${escapeHtml(request.caseId)}/traveller-decision">
         ${buttons}
         <p class="choice-note">Nothing is booked until you choose. We will check your choice against the rest of your trip first.${contact}</p>
-      </form>`;
+      </form>${choiceNote}`;
   return `
-  <div class="card t-card" data-ui-section="input-requested">
+  <div class="t-card" data-ui-section="input-requested">
     <h2>We need your input</h2>
     <p>${escapeHtml(request.prompt)}</p>
     ${decided}
   </div>`;
 }
 
-function actionRows(view: TravellerTripView): IconRow[] {
-  return view.actionsInProgress.map((action) => ({
-    icon: '▶',
-    iconClass: 'ic-progress',
-    text: action,
-  }));
-}
-
-/** Traveller body from a loaded view. */
-export function renderTravellerTripBody(view: TravellerTripView, presentation?: TravellerPresentation): string {
-  const whatChanged = view.whatChanged
-    ? `
-  <div class="card t-card">
-    <h2>What changed</h2>
-    <p>${escapeHtml(view.whatChanged)}</p>
-  </div>`
-    : '';
-  const whatMatters = view.whatMattersNow && presentation?.commitmentCard
-    ? `
-  <div class="card t-card">
-    <h2>What matters now</h2>
-    <p>${escapeHtml(view.whatMattersNow)}</p>
-  </div>`
-    : '';
-  const actions =
-    view.actionsInProgress.length > 0
-      ? `
-  <div class="card t-card">
-    <h2>What we are doing</h2>
-    ${iconList(actionRows(view))}
-  </div>`
-      : '';
-  const inputs = view.inputRequested.map((request) => inputCard(request, presentation)).join('');
-  // Northstar RV-N10: when the traveller is blocked on intake, surface the
-  // prompts in a single "What we need from you" panel. Choice requests
-  // already carry their prompt inside the decision card, so the aggregate
-  // panel is intake-only — never a duplicate ask.
-  const needsFromYou = renderNeedsFromYouPanel(view);
-  const resolution = view.resolutionSummary
-    ? `
-  <div class="card t-card" data-ui-section="resolution">
-    <h2>Your new plan</h2>
-    <p>${escapeHtml(view.resolutionSummary)}</p>
-  </div>`
-    : '';
-  return `
-<main class="traveller-shell">
-  ${hero(view, presentation)}
-  ${commitmentCard(view, presentation)}
-  ${whatChanged}
-  ${whatMatters}
-  ${needsFromYou}
-  ${inputs}
-  ${actions}
-  ${resolution}
-  ${viabilityBlock(view.remainderViable)}
-  ${requestComposer(view)}
-  <p class="t-foot">Updated ${escapeHtml(formatInstant(view.updatedAt))}</p>
-</main>`;
-}
-
-/**
- * Northstar addition: when the trip is blocked on intake
- * (NEEDS_TRAVELLER_INFO), render a single panel that lists every prompt
- * together so the traveller sees the whole ask in one place. Omitted when
- * the block is a choice — the decision card already carries that prompt.
- */
 function renderNeedsFromYouPanel(view: TravellerTripView): string {
   if (view.status !== 'NEEDS_TRAVELLER_INFO') return '';
+  // Choice requests already carry their prompt inside the decision card.
+  if (view.inputRequested.some((request) => (request.options?.length ?? 0) > 0)) return '';
   const items = view.inputRequested
     .map((request) => `<li>${escapeHtml(request.prompt)}</li>`)
     .join('');
   return `
-  <div class="card t-card" data-ui-section="needs-from-you">
+  <div class="t-card" data-ui-section="needs-from-you">
     <h2>What we need from you</h2>
     <ul class="plain-list">${items || '<li>Nothing right now — we will come back when we do need you.</li>'}</ul>
   </div>`;
+}
+
+function resolutionCard(view: TravellerTripView): string {
+  if (!view.resolutionSummary) return '';
+  return `
+  <div class="t-card" data-ui-section="resolution">
+    <h2>Your new plan</h2>
+    <p>${escapeHtml(view.resolutionSummary)}</p>
+  </div>`;
+}
+
+function viabilitySection(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  if (presentation?.hideViability) return '';
+  if (presentation?.viability) {
+    const detail = presentation.viability.detail ? ` ${escapeHtml(presentation.viability.detail)}` : '';
+    const toneMap = {
+      VIABLE: 'v-ok',
+      AT_RISK: 'v-watch',
+      NOT_VIABLE: 'v-bad',
+      UNKNOWN: 'v-neutral',
+    } as const;
+    return `<div class="viab ${toneMap[view.remainderViable]}" data-viability="${escapeHtml(view.remainderViable)}"><strong>${escapeHtml(presentation.viability.lead)}</strong>${detail}</div>`;
+  }
+  // Healthy ready trips do not need the viability callout when itinerary already answers.
+  if (view.status === 'READY' && view.remainderViable === 'VIABLE' && !view.whatChanged) {
+    return '';
+  }
+  return viabilityBlock(view.remainderViable);
+}
+
+function threadMessage(msg: TravellerThreadMessage): string {
+  const side = msg.from === 'me' ? 'from-me' : 'from-ns';
+  return `
+  <div class="msg ${side}">
+    <div class="m-meta">${escapeHtml(msg.meta)}</div>
+    ${escapeHtml(msg.body)}
+  </div>`;
+}
+
+function threadSection(presentation?: TravellerPresentation): string {
+  if (!presentation?.messages || presentation.messages.length === 0) return '';
+  return `
+  <div class="thread" data-ui-section="thread">
+    ${presentation.messages.map(threadMessage).join('')}
+  </div>`;
+}
+
+/**
+ * Compact composer matching approved T1–T7. When travellerId is known, it is
+ * a real change-request form posting to the existing seam; otherwise a
+ * non-interactive placeholder so the surface still reads as a concierge.
+ */
+function composer(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  const placeholder = presentation?.composerPlaceholder ?? 'Ask Northstar anything…';
+  if (!view.travellerId) {
+    return `
+  <div class="composer" data-ui-section="traveller-request" aria-hidden="true">
+    <span class="c-placeholder">${escapeHtml(placeholder)}</span>
+    <span class="c-send" aria-hidden="true">↑</span>
+  </div>`;
+  }
+  return `
+  <form class="composer inline-form request-form" method="post" action="/api/traveller/change-request" data-result-target="traveller-request-result" data-ui-section="traveller-request">
+    <input type="hidden" name="travellerId" value="${escapeHtml(view.travellerId)}">
+    <input type="hidden" name="tripId" value="${escapeHtml(view.tripId)}">
+    <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+    <label class="sr-only" for="traveller-request-text">Ask Northstar</label>
+    <input id="traveller-request-text" class="c-input" name="text" type="text" minlength="1" required placeholder="${escapeHtml(placeholder)}">
+    <button type="submit" class="c-send" aria-label="Send">↑</button>
+  </form>
+  <div id="traveller-request-result" class="form-result" role="status" aria-live="polite"></div>`;
+}
+
+function footer(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  const name = presentation?.travellerName ? `${escapeHtml(presentation.travellerName)} · ` : '';
+  return `<p class="t-foot">${name}${escapeHtml(formatInstant(view.updatedAt))}<br>Northstar keeps the whole trip working</p>`;
+}
+
+/** Traveller body from a loaded view. */
+export function renderTravellerTripBody(view: TravellerTripView, presentation?: TravellerPresentation): string {
+  // Thread-first surface (T7): messages + composer answer the journey.
+  if (presentation?.messages && presentation.messages.length > 0) {
+    return `
+<main class="traveller-shell">
+  ${topbar(presentation)}
+  ${threadSection(presentation)}
+  ${composer(view, presentation)}
+  ${footer(view, presentation)}
+</main>`;
+  }
+
+  const inputs = view.inputRequested.map((request) => inputCard(request, presentation)).join('');
+
+  // Approved T1/T6 put the ink commitment before the itinerary; T2 puts
+  // "What changed" first so the disruption is the lead story.
+  const changeFirst =
+    view.status === 'DISRUPTED' ||
+    presentation?.itineraryHeading?.toLowerCase() === 'what changed';
+  const itinerary = itinerarySection(view, presentation);
+  const commitment = commitmentCard(view, presentation);
+  const leadBlocks = changeFirst ? `${itinerary}${commitment}` : `${commitment}${itinerary}`;
+
+  return `
+<main class="traveller-shell">
+  ${topbar(presentation)}
+  ${hero(view, presentation)}
+  ${leadBlocks}
+  ${viabilitySection(view, presentation)}
+  ${renderNeedsFromYouPanel(view)}
+  ${inputs}
+  ${progressSection(view, presentation)}
+  ${optionsSkeleton(presentation)}
+  ${resolutionCard(view)}
+  ${composer(view, presentation)}
+  ${footer(view, presentation)}
+</main>`;
 }
 
 /** Full traveller screen from the frozen envelope; honest about loading/error. */
@@ -229,13 +363,13 @@ export function renderTravellerTrip(
   presentation?: TravellerPresentation,
 ): string {
   if (envelope.state === 'LOADING') {
-    return `<main class="traveller-shell">${loadingPanel('Checking your trip', 'We are loading the latest confirmed details.')}</main>`;
+    return `<main class="traveller-shell">${topbar(presentation)}${loadingPanel('Checking your trip', 'We are loading the latest confirmed details.')}</main>`;
   }
   if (envelope.state === 'ERROR') {
-    return `<main class="traveller-shell">${errorPanel('We can\u2019t show your trip right now', envelope.errorMessage)}</main>`;
+    return `<main class="traveller-shell">${topbar(presentation)}${errorPanel('We can\u2019t show your trip right now', envelope.errorMessage)}</main>`;
   }
   if (!envelope.data) {
-    return `<main class="traveller-shell">${errorPanel('We can\u2019t show your trip right now')}</main>`;
+    return `<main class="traveller-shell">${topbar(presentation)}${errorPanel('We can\u2019t show your trip right now')}</main>`;
   }
   return renderTravellerTripBody(envelope.data, presentation);
 }

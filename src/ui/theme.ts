@@ -1219,4 +1219,10 @@ button.optcard:focus-visible { outline: 2px solid var(--watch-f); outline-offset
   padding: 1px 5px;
   border-radius: 4px;
 }
+
+/* Visually hidden but available to assistive tech / form labels. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 `;
