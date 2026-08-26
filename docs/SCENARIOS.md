@@ -20,6 +20,11 @@ implementation plan.
 
 ## Relationship to other documents
 
+- `docs/FINAL_DEMO_CONTENT_SSOT.md` — **final-demo world content** (event
+  identity, venues, programme timings, population, hero cast, baseline
+  flights/hotels, scenario↔person mapping). This catalogue owns *what happens
+  over time*; the content SSOT owns *who/where/when* of the synthetic world.
+  Do not duplicate stable cast/venue facts here — reference the content SSOT.
 - `docs/DEMO.md` — demo principles, provenance label definitions, runtime demo
   path and backup paths. Scenario definitions point here.
 - `docs/PRODUCT_SPEC.md` — product model and requirements. Cases A/B/C remain
@@ -28,7 +33,8 @@ implementation plan.
 - `docs/ROADMAP.md` — capability scope/status, including the MVP vs
   High-Priority Stretch recording of this catalogue.
 - `docs/WAVE3R_DEMO_READINESS_PLAN.md` — its historical S1–S4 scenario families
-  are superseded by this catalogue for scenario naming and intent.
+  are superseded by this catalogue for scenario naming and intent. Final-video
+  order is **S2 → S1 → S3 → S7 → S5**.
 
 ## Tiering summary
 
@@ -123,6 +129,23 @@ Northstar evaluates alternatives across:
 Any exact affected-traveller counts are fixture/demo values, not domain
 invariants.
 
+### Final-demo choreography (S1)
+
+Stable cast, flights, and slots: `docs/FINAL_DEMO_CONTENT_SSOT.md` §5–§7
+(Sarah Lim critical; Wanderpay cohort; CGK→SIN).
+
+| Stage | What happens |
+|-------|----------------|
+| **Initial state** | Post-booking. Multiple CGK→SIN speakers confirmed on shared morning service. Sarah’s hard commitment is Day-1 headline **09:20**. Baseline arrivals clear the 360-minute buffer. |
+| **Trigger** | Simulated airline schedule change / retime enters via the real flight-event ingress (`SIMULATED SOURCE EVENT` disclosed — not LIVE). |
+| **Successive state changes** | Shared inbound retimed; airline auto-rebooks cohort onto a later morning arrival (~07:00 Day 1 class). Blast radius fans out per traveller. |
+| **Provider/AI/tool evidence** | Atlas schedule/search REPLAY for CGK→SIN alternatives; deterministic constraint eval against `MIN_BUFFER` 360; programme commitment graph. |
+| **Deterministic viability** | Differentiated: Wanderpay afternoon speakers remain **VIABLE**; Sarah’s gap to 09:20 fails 360 → **NOT_VIABLE**. Travel-only strategies do not restore the morning slot. |
+| **Authority/decision** | Organiser-facing recovery case; programme-side options may be **proposed** but not auto-committed. |
+| **Surfaces** | Organiser blast-radius / case view; traveller trip view for Sarah. |
+| **Action/observation** | No money-moving auto-act that “fixes” the headline; hand-off into **S3** on the **same trip** (no reset). |
+| **Final state (of S1 alone)** | Critical case remains open / not fully resolved pending programme change. |
+
 ## S2 — Traveller misses a connection; airline recovery is not good enough
 
 - **Trigger:** traveller-state report
@@ -196,6 +219,28 @@ rejects recoveries that do not preserve the trip's actual objectives.
 **Core message:** Northstar reasons about whether what actually happened still
 leaves the trip viable.
 
+### Final-demo choreography (S2) — progressive delay stages
+
+Stable cast and programme: Jordan Hale (`ait-draft-09`); hard finals showcase
+**30 Sep 20:45–21:05**; baseline ZG023/ZG053 — see content SSOT §5.
+
+| Stage id | What happens | Viability intent |
+|----------|--------------|------------------|
+| **initial_state** | In travel. LAX→NRT→SIN confirmed (PNR ZGSYN09). Connection 2h40m. SIN Concorde stay booked (check-in 30 Sep after possible overnight). Finals showcase tomorrow evening. | Baseline **VIABLE** |
+| **trigger / delay_1** | Simulated Atlas schedule/delay notification on ZG023 — delay begins; connection still comfortable. | Still **VIABLE** |
+| **delay_2_tight** | Further delay; NRT connection becomes tight but still theoretically makeable. | **VIABLE_TIGHT** / watch |
+| **zg053_impossible** | Upstream delay makes ZG053 impossible; missed-connection signal; airline may still suggest same-night options. | Onward leg **failed**; recovery search opens |
+| **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 360. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
+| **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight landside at Narita required. | Same-night **NOT_VIABLE** |
+| **overnight_recovery** | Transit hotel (Hilton Narita / MYSTAYS class), JP entry/immigration AUTHORITATIVE research, insurance missed-connection cover where supplied, SIN hotel/no-show consequences. | Planning overnight + morning |
+| **airline_morning** | Airline default reprotection → Scoot **TR867** arrive SIN **20:45** — at/after the 20:45 showcase → deterministic **FAIL** vs 360/commitment. | Airline path **inadequate** |
+| **northstar_morning** | Northstar selects Scoot **TR885** arrive SIN **14:35** → gap to 20:45 = **370 ≥ 360** → **PASS**. | Northstar path **VIABLE** |
+| **authority / surfaces** | Traveller disruption + organiser case; provenance REPLAY/RECORD. | Approval as policy requires |
+| **action / observation** | Permitted recovery actions through provider boundary where supported; observe; authoritative trip update. | |
+| **final_state** | Trip remainder viable for finals showcase; overnight + morning recovery recorded. | **RESOLVED / VIABLE** |
+
+Do **not** treat VietJet VJ823 as a direct NRT→SIN 12:55 hero option (recordings show NRT→SGN connections).
+
 ## S3 — Headline speaker needs to leave earlier; organiser previews consequences
 
 - **Trigger:** organiser event-side change
@@ -255,6 +300,23 @@ A programme-level change may solve the problem without purchasing travel.
 
 **Core message:** Before changing the programme, know whose trip you are about
 to break.
+
+### Final-demo choreography (S1 → S3 continuity)
+
+Same person/trip as S1: Sarah Lim / `ait-draft-14`. Locals Daniel Ong + Elena
+Tan — content SSOT §5. **No runtime reset** between S1 and S3.
+
+| Stage | What happens |
+|-------|----------------|
+| **Initial state** | Continues from S1: Sarah **NOT_VIABLE** against 09:20 headline after airline rebook ~07:00. |
+| **Trigger** | Organiser considers programme-side resolution (availability / slot move), not a new travel purchase. |
+| **Successive state changes** | Counterfactual preview only — zero authoritative mutation until commit. |
+| **Provider/AI/tool evidence** | Programme graph + trip constraints; optional travel alternatives remain visible but secondary. |
+| **Deterministic viability (preview)** | Proposed RESCHEDULE of headline → **15:30–16:00** Day 1: Sarah’s airline arrival clears 360; preview lists blast-radius faces (Elena interviewer; Daniel local CHANGEABLE). |
+| **Authority/decision** | Organiser must explicitly **commit**; Northstar cannot auto-mutate programme. |
+| **Surfaces** | Organiser event-change preview / commit; case view still on Sarah’s trip. |
+| **Action/observation** | Commit → programme state updates → **same trip re-evaluates**. |
+| **Final state** | Sarah **VIABLE**; S1 case can resolve without buying a new flight. |
 
 ## S4 — "Can I arrive Thursday morning instead?"
 
@@ -341,6 +403,23 @@ Potential reasoning includes:
 Do not claim sophisticated multi-payer/cost-splitting execution unless it is
 genuinely implemented.
 
+### Final-demo choreography (S5)
+
+Cast/slot/hotel: Jonas Berg (`ait-draft-35`); fireside **14:30–14:50** Day 1;
+Concorde `lp21d9f` — content SSOT §5.
+
+| Stage | What happens |
+|-------|----------------|
+| **Initial state** | Post-booking. Event-funded hotel through **3 Oct 11:00**. Fireside commitment already satisfied by baseline stay. |
+| **Trigger** | Traveller NL request: stay until Sunday (checkout **4 Oct**). |
+| **Successive state changes** | Stay extension candidate; optional return-flight change parked if not auto-safe. |
+| **Provider/AI/tool evidence** | Nuitée `hotel.search` REPLAY for Concorde/midscale SIN; funding anchors from FUNDED_WINDOW. |
+| **Deterministic viability** | Extension viable; covered baseline = MIN(eligible booked stay, allowance); incremental nights traveller-funded. |
+| **Authority/decision** | Within traveller/self-funded authority → **auto-resolve** (no organiser approval for personal incremental nights). |
+| **Surfaces** | Traveller chat + trip; organiser may observe activity without blocking. |
+| **Action/observation** | Hotel modify/extend through provider boundary where permitted; observe. |
+| **Final state** | Stay through Sunday; funding split recorded; trip viable. |
+
 ## S6 — "Can I switch hotels? My partner is joining."
 
 - **Trigger:** traveller-requested change
@@ -420,6 +499,23 @@ ask/escalate rather than invent the answer.
 
 **Core message:** This is not "change flight." The shape of the trip has
 changed.
+
+### Final-demo choreography (S7)
+
+Cast: Oliver Bennett (`ait-draft-38`) only — content SSOT §5. **Pre-booking**
+(or not-yet-ticketed) lifecycle.
+
+| Stage | What happens |
+|-------|----------------|
+| **Initial state** | Proposed/held trip assumes **LHR→SIN** (+ return LHR). Distribution debate Day 1 afternoon. |
+| **Trigger** | Traveller: already in Tokyo; fly **HND/NRT→SIN** instead. Return intent remains LHR. |
+| **Successive state changes** | London-origin sectors become obsolete; Tokyo-origin alternatives required; hotel/transfer assumptions rechecked. |
+| **Provider/AI/tool evidence** | Atlas HND→SIN REPLAY (e.g. Scoot TR883); FX home-currency path; fare/change rules. |
+| **Deterministic viability** | Tokyo-origin plan can meet debate buffer; uncertainty surfaced if return destination were unclear (here return LHR is explicit). |
+| **Authority/decision** | Structural `flight.change` → **HUMAN_AGENT / organiser approval**. |
+| **Surfaces** | Traveller request + organiser approval. |
+| **Action/observation** | On approval, permitted search/change; observe. |
+| **Final state** | Trip topology is Tokyo-origin inbound with LHR return intent preserved. |
 
 ## S8 — "Can I travel with the other speakers?"
 
@@ -535,41 +631,29 @@ SIMULATED material for MVP/G3R.
 
 ## Demo hierarchy
 
-The following is a **planning decision, not a permanently frozen video
-script**.
+**Final video order (active):** **S2 → S1 → S3 → S7 → S5**.
 
-**Primary heroes**
+| Beat | Role |
+|------|------|
+| S2 | Traveller progressive missed-connection / overnight recovery hero |
+| S1 | Organiser multi-traveller schedule-change blast radius |
+| S3 | Continues S1 — programme counterfactual + commit |
+| S7 | Pre-booking Tokyo-origin structural change |
+| S5 | Post-booking personal Sunday hotel extension |
 
-- S1 — airline disruption across several speakers
-- S3 — event-side preview / programme consequences
+**Repository / fallback (not primary video):** S4, S6, S8, and S6-class breadth.
 
-**Strong breadth / possible third hero**
-
-- S7 — origin change from London to Tokyo
-
-**Supporting executable proof**
-
-- S2 — missed connection
-- S4 — Thursday-morning arrival request
-
-**Stretch breadth**
-
-- S5
-- S6
-- S8
-
-Final video ordering and screen time are decided after G3R acceptance.
+World cast, timings, and hotels: `docs/FINAL_DEMO_CONTENT_SSOT.md`.
 
 ---
 
 ## Status / Next Work
 
-Reflect that:
-- FX implementation is in progress/completing
-- final UI implementation is in progress
-- hotel replacement/stay replanning is in progress
-- provider discovery is substantially complete
-- next step after these lanes land is final scenario-data authoring + end-to-end S2 → S1 → S3 → S7 → S5 execution
+- Final demo content SSOT authored; programme fixture reconciliation in progress
+  on `content/final-demo-world`.
+- Execute end-to-end S2 → S1 → S3 → S7 → S5 against reconciled fixtures.
+- UI integrator consumes clickable Tier A cast + real hotel labels from content
+  SSOT.
 
 Do not create a new formal milestone.
 Do not reopen architecture.

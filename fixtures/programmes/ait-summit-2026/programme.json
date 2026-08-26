@@ -261,20 +261,20 @@
         {
           "id": "cmt-ait-d0-hackathon-finals",
           "anchorEventId": "evt-ait-2026",
-          "title": "Bootcamp - Agentic Travel Hackathon Finals: Meet the Top Three",
+          "title": "Bootcamp - Agentic Travel Hackathon Finals Showcase (Opening Cocktails)",
           "kind": "SESSION",
           "placeId": "place-panpacific",
           "startsAt": {
             "value": "2026-09-30T20:45:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
             "value": "2026-09-30T21:05:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -284,16 +284,16 @@
           "kind": "SESSION",
           "placeId": "place-panpacific",
           "startsAt": {
-            "value": "2026-09-30T15:30:00+08:00",
+            "value": "2026-09-30T15:10:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-09-30T16:00:00+08:00",
+            "value": "2026-09-30T15:50:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -664,16 +664,16 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T14:30:00+08:00",
+            "value": "2026-10-01T15:30:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T14:50:00+08:00",
+            "value": "2026-10-01T15:50:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -721,16 +721,16 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T15:30:00+08:00",
+            "value": "2026-10-01T14:30:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T15:50:00+08:00",
+            "value": "2026-10-01T14:50:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -1211,28 +1211,38 @@
       },
       {
         "id": "place-hotel-bayview",
-        "name": "Bayview Grand Hotel (synthetic event partner hotel, Marina Bay)",
+        "name": "Concorde Hotel Singapore",
         "kind": "HOTEL",
         "timezone": "Asia/Singapore",
         "coordinates": {
-          "latitude": 1.2839,
-          "longitude": 103.8607
+          "latitude": 1.300679,
+          "longitude": 103.84206
         },
-        "externalRefs": [],
+        "externalRefs": [
+          {
+            "system": "nuitee-hotel-id",
+            "value": "lp21d9f"
+          }
+        ],
         "servedByPlaceIds": [
           "place-sin-changi"
         ]
       },
       {
         "id": "place-hotel-harbourline",
-        "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
+        "name": "Hotel Grand Pacific",
         "kind": "HOTEL",
         "timezone": "Asia/Singapore",
         "coordinates": {
-          "latitude": 1.2789,
-          "longitude": 103.8536
+          "latitude": 1.297349,
+          "longitude": 103.852837
         },
-        "externalRefs": [],
+        "externalRefs": [
+          {
+            "system": "nuitee-hotel-id",
+            "value": "lp1e850"
+          }
+        ],
         "servedByPlaceIds": [
           "place-sin-changi"
         ]
@@ -1692,7 +1702,7 @@
           "cmt-ait-d2-closing-debate",
           "cmt-ait-d2-closing"
         ],
-        "travelArrangement": "NORTHSTAR_ARRANGED",
+        "travelArrangement": "SELF_OR_OTHER_ARRANGED",
         "declaredTravel": [],
         "engagementImportance": [
           {
@@ -1823,7 +1833,8 @@
           "SG"
         ],
         "notes": [
-          "Co-host, day-two warm-up host and interviewer"
+          "Co-host, day-two warm-up host and interviewer",
+          "Local co-host; self-arranged. S3 programme-side swap / CHANGEABLE afternoon partner."
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -1834,7 +1845,7 @@
           "cmt-ait-d2-superapp-chat",
           "cmt-ait-d2-corporate-fireside"
         ],
-        "travelArrangement": "NORTHSTAR_ARRANGED",
+        "travelArrangement": "SELF_OR_OTHER_ARRANGED",
         "declaredTravel": [],
         "engagementImportance": [
           {
@@ -1920,6 +1931,16 @@
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
           }
         ],
         "engagementImportance": [
@@ -1962,7 +1983,42 @@
           "cmt-ait-d1-future-provocation"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "NRT"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T16:50:00+09:00",
+            "scheduledArrival": "2026-09-29T23:00:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "ZG053"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN04"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-future-provocation",
@@ -1992,7 +2048,7 @@
           "cmt-ait-d0-hackathon-finals",
           "cmt-ait-d2-hack-awards"
         ],
-        "travelArrangement": "NORTHSTAR_ARRANGED",
+        "travelArrangement": "SELF_OR_OTHER_ARRANGED",
         "declaredTravel": [],
         "engagementImportance": [
           {
@@ -2039,7 +2095,42 @@
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "MNL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T13:15:00+08:00",
+            "scheduledArrival": "2026-09-29T20:00:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "AK583"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "AKSYN06"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-investment-panel",
@@ -2099,7 +2190,42 @@
           "cmt-ait-d0-seedup-showcase"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "HKG"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T11:55:00+08:00",
+            "scheduledArrival": "2026-09-30T07:15:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "AK139"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "AKSYN07"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-investment-panel",
@@ -2137,7 +2263,42 @@
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "HND"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T02:20:00+09:00",
+            "scheduledArrival": "2026-09-29T08:20:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR883"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN08"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-investment-panel",
@@ -2177,7 +2338,7 @@
           "US"
         ],
         "notes": [
-          "Hackathon finalist (Team Waypoint); LAX origin ZIPAIR connection demo; overnight NRT recovery may miss morning lab — evening finals remain required; returns for awards on 2 Oct"
+          "Hackathon finalist (Team Waypoint); LAX ZIPAIR connection hero (S2); overnight NRT recovery may miss morning lab — evening finals 20:45 remain required; awards 2 Oct"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -2306,6 +2467,16 @@
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
           }
         ],
         "engagementImportance": [
@@ -2373,6 +2544,16 @@
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
           }
         ],
         "engagementImportance": [
@@ -2404,7 +2585,66 @@
           "cmt-ait-d0-purpose-panel"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "LHR"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T10:15:00+01:00",
+            "scheduledArrival": "2026-09-30T06:25:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN245"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN12"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "LHR"
+            },
+            "scheduledDeparture": "2026-10-02T23:55:00+08:00",
+            "scheduledArrival": "2026-10-03T06:40:00+01:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN244"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN12"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-purpose-panel",
@@ -2433,7 +2673,42 @@
           "cmt-ait-d2-apac-spotlight"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "MNL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T13:15:00+08:00",
+            "scheduledArrival": "2026-09-29T20:00:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "AK583"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "AKSYN13"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-apac-spotlight",
@@ -2455,7 +2730,7 @@
           "AU"
         ],
         "notes": [
-          "Headline interview speaker, Day 1 09:20 - programme-critical opening slot"
+          "Headline interview speaker, Day 1 09:20 — S1 critical; S3 reschedule target 15:30"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -2485,6 +2760,16 @@
               "reference": "MNSYN14"
             },
             "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
             "reservationState": "CONFIRMED"
           }
         ],
@@ -2516,7 +2801,42 @@
           "cmt-ait-d0-coach-breakout"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "KUL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-30T08:10:00+08:00",
+            "scheduledArrival": "2026-09-30T09:05:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN228"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN15"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-coach-breakout",
@@ -2548,7 +2868,42 @@
           "cmt-ait-d1-trust-research"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "CDG"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T11:00:00+02:00",
+            "scheduledArrival": "2026-09-30T05:55:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN247"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN16"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-state-of-ai",
@@ -2600,7 +2955,42 @@
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "ICN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T23:40:00+09:00",
+            "scheduledArrival": "2026-09-30T04:55:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN258"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN17"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-investment-panel",
@@ -2653,7 +3043,42 @@
           "cmt-ait-d0-founder-fireside-a"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "DEL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T22:10:00+05:30",
+            "scheduledArrival": "2026-09-30T06:05:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN260"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN18"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-founder-fireside-a",
@@ -2682,7 +3107,42 @@
           "cmt-ait-d0-founder-fireside-b"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "CGK"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
+            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN310"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN19"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-founder-fireside-b",
@@ -2711,7 +3171,42 @@
           "cmt-ait-d1-marketplace-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SGN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T07:10:00+07:00",
+            "scheduledArrival": "2026-09-29T10:15:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "VJ813"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN20"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-marketplace-chat",
@@ -2740,7 +3235,42 @@
           "cmt-ait-d1-india-fireside"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "BOM"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T23:15:00+05:30",
+            "scheduledArrival": "2026-09-30T07:20:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN262"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN21"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-india-fireside",
@@ -2769,7 +3299,42 @@
           "cmt-ait-d1-hospitality-interview"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "MAD"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T10:30:00+02:00",
+            "scheduledArrival": "2026-09-30T06:40:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN249"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN22"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-hospitality-interview",
@@ -2798,7 +3363,42 @@
           "cmt-ait-d0-pitch-practice"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "AKL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-28T23:55:00+12:00",
+            "scheduledArrival": "2026-09-29T06:10:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN255"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN23"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-pitch-practice",
@@ -2827,7 +3427,42 @@
           "cmt-ait-d0-thinktank"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "HND"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T02:20:00+09:00",
+            "scheduledArrival": "2026-09-29T08:20:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR883"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN24"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-thinktank",
@@ -2858,7 +3493,66 @@
           "cmt-ait-d2-asian-traveller"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "AMS"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T12:00:00+02:00",
+            "scheduledArrival": "2026-09-30T06:35:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN241"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN25"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "AMS"
+            },
+            "scheduledDeparture": "2026-10-02T23:30:00+08:00",
+            "scheduledArrival": "2026-10-03T06:20:00+02:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN240"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN25"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-data-provocation",
@@ -2893,7 +3587,42 @@
           "cmt-ait-d1-ota-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "ICN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T23:40:00+09:00",
+            "scheduledArrival": "2026-09-30T04:55:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN258"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN26"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-ota-chat",
@@ -2926,7 +3655,66 @@
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "FRA"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T11:40:00+02:00",
+            "scheduledArrival": "2026-09-30T06:10:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN243"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN27"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "FRA"
+            },
+            "scheduledDeparture": "2026-10-02T23:10:00+08:00",
+            "scheduledArrival": "2026-10-03T06:05:00+02:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN242"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN27"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-hackathon-finals",
@@ -2973,7 +3761,42 @@
           "cmt-ait-d0-coach-breakout"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "KUL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-30T08:10:00+08:00",
+            "scheduledArrival": "2026-09-30T09:05:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN228"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN28"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-coach-breakout",
@@ -3002,7 +3825,42 @@
           "cmt-ait-d1-payments-panel"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "DEL"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T22:10:00+05:30",
+            "scheduledArrival": "2026-09-30T06:05:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN260"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN29"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-payments-panel",
@@ -3056,6 +3914,16 @@
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
           }
         ],
         "engagementImportance": [
@@ -3098,11 +3966,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T11:30:00+02:00",
+            "scheduledDeparture": "2026-09-29T11:40:00+02:00",
             "scheduledArrival": "2026-09-30T06:10:00+08:00",
             "carrierRef": {
               "system": "flight-number",
               "value": "MN243"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN31"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -3118,11 +3990,15 @@
               "system": "airport-code",
               "value": "FRA"
             },
-            "scheduledDeparture": "2026-10-03T23:45:00+08:00",
-            "scheduledArrival": "2026-10-04T06:30:00+02:00",
+            "scheduledDeparture": "2026-10-02T23:10:00+08:00",
+            "scheduledArrival": "2026-10-03T06:05:00+02:00",
             "carrierRef": {
               "system": "flight-number",
               "value": "MN242"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN31"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -3133,8 +4009,8 @@
               "system": "place-id",
               "value": "place-hotel-bayview"
             },
-            "checkIn": "2026-09-29T16:00:00.000Z",
-            "checkOut": "2026-10-02T16:00:00.000Z",
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
             "reservationState": "CONFIRMED"
           }
         ],
@@ -3168,7 +4044,42 @@
           "cmt-ait-d0-seedup-showcase"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "MAD"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T10:30:00+02:00",
+            "scheduledArrival": "2026-09-30T06:40:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN249"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN32"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-investment-panel",
@@ -3203,7 +4114,42 @@
           "cmt-ait-d1-build-interview"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "BKK"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T10:55:00+07:00",
+            "scheduledArrival": "2026-09-29T14:25:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR625"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN33"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-build-interview",
@@ -3236,7 +4182,42 @@
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "CNX"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T13:30:00+07:00",
+            "scheduledArrival": "2026-09-29T16:30:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN235"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN34"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-hackathon-lab",
@@ -3276,7 +4257,7 @@
           "SE"
         ],
         "notes": [
-          "Recovery-platform founder; Day 1 fireside speaker"
+          "Recovery-platform founder; Day 1 fireside 14:30 (S5); Concorde stay; Sunday extension is traveller-funded"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -3302,7 +4283,11 @@
               "value": "MN241"
             },
             "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
+            "reservationState": "CONFIRMED",
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN35"
+            }
           },
           {
             "itemKind": "TRANSPORT_LEG",
@@ -3322,7 +4307,11 @@
               "value": "MN240"
             },
             "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
+            "reservationState": "CONFIRMED",
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN35"
+            }
           },
           {
             "itemKind": "STAY",
@@ -3330,8 +4319,8 @@
               "system": "place-id",
               "value": "place-hotel-bayview"
             },
-            "checkIn": "2026-09-29T16:00:00.000Z",
-            "checkOut": "2026-10-01T16:00:00.000Z",
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
             "reservationState": "CONFIRMED"
           }
         ],
@@ -3364,7 +4353,66 @@
           "cmt-ait-d1-distribution-debate"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "LHR"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T10:15:00+01:00",
+            "scheduledArrival": "2026-09-30T06:25:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN245"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN36"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "LHR"
+            },
+            "scheduledDeparture": "2026-10-02T23:55:00+08:00",
+            "scheduledArrival": "2026-10-03T06:40:00+01:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN244"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN36"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-distribution-debate",
@@ -3394,7 +4442,42 @@
           "cmt-ait-d1-distribution-debate"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SYD"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-28T13:00:00+10:00",
+            "scheduledArrival": "2026-09-28T19:30:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR011"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN37"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-distribution-debate",
@@ -3443,7 +4526,11 @@
               "value": "MN245"
             },
             "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
+            "reservationState": "CONFIRMED",
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN38"
+            }
           },
           {
             "itemKind": "TRANSPORT_LEG",
@@ -3463,7 +4550,11 @@
               "value": "MN244"
             },
             "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
+            "reservationState": "CONFIRMED",
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN38"
+            }
           },
           {
             "itemKind": "STAY",
@@ -3471,8 +4562,8 @@
               "system": "place-id",
               "value": "place-hotel-bayview"
             },
-            "checkIn": "2026-09-29T16:00:00.000Z",
-            "checkOut": "2026-10-01T16:00:00.000Z",
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
             "reservationState": "CONFIRMED"
           }
         ],
@@ -3504,7 +4595,42 @@
           "cmt-ait-d1-distribution-debate"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "BOM"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T23:15:00+05:30",
+            "scheduledArrival": "2026-09-30T07:20:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN262"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN39"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-distribution-debate",
@@ -3533,7 +4659,42 @@
           "cmt-ait-d1-distribution-debate"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SGN"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T07:10:00+07:00",
+            "scheduledArrival": "2026-09-29T10:15:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "VJ813"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN40"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-distribution-debate",
@@ -3562,7 +4723,42 @@
           "cmt-ait-d2-jtb-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "HND"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T02:20:00+09:00",
+            "scheduledArrival": "2026-09-29T08:20:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR883"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN41"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-jtb-chat",
@@ -3591,7 +4787,42 @@
           "cmt-ait-d2-lcc-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "HKG"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T11:55:00+08:00",
+            "scheduledArrival": "2026-09-30T07:15:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "AK139"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "AKSYN42"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-lcc-chat",
@@ -4241,24 +5472,59 @@
       },
       {
         "draftId": "ait-draft-65",
-        "displayName": "Valerie Sim",
+        "displayName": "Maya Krishnan",
         "identity": {
-          "email": "valerie.sim@farmandfield.test",
-          "lastName": "Sim"
+          "email": "maya.krishnan@lotusfare.test",
+          "lastName": "Krishnan"
         },
-        "homeLocationText": "Singapore",
+        "homeLocationText": "Bangkok (BKK)",
         "nationalityCodes": [
-          "SG"
+          "TH"
         ],
         "notes": [
-          "Indie spotlight panellist; local"
+          "Product lead, LotusFare; Day-2 indie spotlight panellist; BKK origin Scoot cohort"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
           "cmt-ait-d2-indie-spotlight"
         ],
-        "travelArrangement": "SELF_OR_OTHER_ARRANGED",
-        "declaredTravel": [],
+        "travelArrangement": "NORTHSTAR_ARRANGED",
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "BKK"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T10:55:00+07:00",
+            "scheduledArrival": "2026-09-29T14:25:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR625"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN65"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-indie-spotlight",
@@ -4270,24 +5536,59 @@
       },
       {
         "draftId": "ait-draft-66",
-        "displayName": "Derek Ho",
+        "displayName": "Tom Hughes",
         "identity": {
-          "email": "derek.ho@agentbazaar.test",
-          "lastName": "Ho"
+          "email": "tom.hughes@reefpay.test",
+          "lastName": "Hughes"
         },
-        "homeLocationText": "Singapore",
+        "homeLocationText": "Sydney (SYD)",
         "nationalityCodes": [
-          "SG"
+          "AU"
         ],
         "notes": [
-          "Closing debate panellist; local"
+          "Partnerships, ReefPay; closing debate panellist; SYD origin Scoot cohort"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
           "cmt-ait-d2-closing-debate"
         ],
-        "travelArrangement": "SELF_OR_OTHER_ARRANGED",
-        "declaredTravel": [],
+        "travelArrangement": "NORTHSTAR_ARRANGED",
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "SYD"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-28T13:00:00+10:00",
+            "scheduledArrival": "2026-09-28T19:30:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "TR011"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "TRSYN66"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-harbourline"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-closing-debate",
@@ -4299,17 +5600,17 @@
       },
       {
         "draftId": "ait-draft-67",
-        "displayName": "Fiona Ng",
+        "displayName": "Lea Dubois",
         "identity": {
-          "email": "fiona.ng@humancircuit.test",
-          "lastName": "Ng"
+          "email": "lea.dubois@meridianventures.test",
+          "lastName": "Dubois"
         },
-        "homeLocationText": "Singapore",
+        "homeLocationText": "Hong Kong (HKG)",
         "nationalityCodes": [
-          "SG"
+          "FR"
         ],
         "notes": [
-          "Closing debate panellist; local"
+          "Investor, Meridian Ventures; closing debate panellist; HKG origin"
         ],
         "accessibilityStatements": [
           "Uses a wheelchair; requires step-free venue access and an accessible transfer vehicle between hotel and venue"
@@ -4317,8 +5618,43 @@
         "anchorCommitmentIds": [
           "cmt-ait-d2-closing-debate"
         ],
-        "travelArrangement": "SELF_OR_OTHER_ARRANGED",
-        "declaredTravel": [],
+        "travelArrangement": "NORTHSTAR_ARRANGED",
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "HKG"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T11:55:00+08:00",
+            "scheduledArrival": "2026-09-30T07:15:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "AK139"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "AKSYN67"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
+          {
+            "itemKind": "STAY",
+            "stayPlaceRef": {
+              "system": "place-id",
+              "value": "place-hotel-bayview"
+            },
+            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkOut": "2026-10-03T11:00:00+08:00",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-closing-debate",
