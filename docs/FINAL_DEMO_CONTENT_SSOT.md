@@ -66,6 +66,8 @@ MBS / Pan Pacific / Marina Bay geography belong to the **event/venue** world onl
 | Hilton Tokyo Narita Airport | NRT overnight landside | `output/wave4r-s2-hub-hotels.json` (parent RECORD probe) |
 | HOTEL MYSTAYS PREMIER Narita | NRT alternate | same |
 
+These properties are **known recovery context/provider evidence only** in the final S2 hero. The closed S2 backend path does **not** insert or execute a transit Stay, attach Japanese entry/immigration research, or attach insurance coverage to the recovery strategy. Do not present those checks/actions as completed.
+
 ---
 
 ## 3. Population scale
@@ -153,7 +155,7 @@ Jordan is **not** bound to the morning hackathon lab (removed from `anchorCommit
 | Next-morning recovery | Scoot **TR885** (~08:20→14:35) | 30 Sep 14:35 | **370 min ≥ 360 → PASS** (airline desk *or* Northstar) |
 | Later/slower morning | Scoot **TR867** | 30 Sep 20:45 | **FAIL** if ever offered as default |
 
-With finals at **20:45**, the closed S2 acceptance path treats the next-morning **TR885-class** rebook as the boardable recovery that restores the evening showcase after overnight. “Airline not good enough” in this demo is primarily the **progressive miss + overnight whole-trip problem** (transit hotel, JP entry, insurance, SIN stay consequences)—not a claim that TR885 itself fails the 360 buffer. Keep **TR867** available as an inadequate slower alternative in inventory comparisons.
+With finals at **20:45**, the closed S2 acceptance path treats the next-morning **TR885-class** rebook as the boardable flight recovery that restores event viability after the overnight disruption. “Airline not good enough” in this demo is the **progressive miss + whole-trip viability problem**, not a claim that TR885 itself fails the 360 buffer. The Narita transit-hotel requirement, Japanese entry/immigration context, insurance context, and SIN stay consequences are relevant known context, but the final closed backend path does **not** compose or execute those attachments. Keep **TR867** available as an inadequate slower alternative in inventory comparisons.
 
 Evidence: `fixtures/recordings/atlas/search/rec_b92e556a…` (ZG023), `rec_34518610…` / `rec_71d6274a…` (ZG053, TR875, TR885, TR867), `output/wave4r-s2-nightly-hero-evidence.json`.
 
@@ -217,7 +219,7 @@ Lifecycle: **pre-booking** (or not-yet-ticketed). No overlap with S2/S1/S5 peopl
 | Baseline hotel | **Concorde `lp21d9f`** |
 | Funded window | Event hotel funded through **`2026-10-03T11:00:00+08:00`** |
 | Extension | Checkout **`2026-10-04T11:00:00+08:00`** — incremental nights **traveller-funded** (MIN of eligible booked stay vs allowance) |
-| Authority | Hotel-only extension auto-resolves under traveller/self-funded authority; no organiser approval for incremental personal nights |
+| Authority | `REQUIRES_TRAVELLER`: Jonas approves his own self-funded increment; **no organiser approval** is required; only then does Northstar execute and resolve the hotel extension. |
 
 ---
 
@@ -325,6 +327,9 @@ When editing `programme.json`:
 
 | Gap | Triage | Notes |
 |-----|--------|-------|
+| S2 transit-hotel multi-intent execution | Accept Risk / Park | Closed hero executes next-morning flight recovery only; transit Stay insertion is not composed into the strategy. |
+| S2 Japanese entry/immigration attachment | Accept Risk / Park | Relevant landside context exists, but `research.entry_requirements` is not emitted/attached in the closed S2 path. |
+| S2 insurance attachment | Accept Risk / Park | Insurance context is not wired into this execution path; do not claim it was evaluated. |
 | CGK exact MN310 vs live QG/ID/TR harvest | Act Now for S1 pack; Park for content display | Programme may keep MN310 sandbox ids until S1 lane harvests CGK RECORD |
 | Long-haul real airline names (LHR/AMS/FRA/…) | Accept Risk / Park | Atlas sandbox Meridian used; real long-haul often thin in sandbox |
 | VJ823-as-direct-SIN myth | Closed | Do not use; TR885/TR867 are the morning pair |
@@ -338,5 +343,7 @@ When editing `programme.json`:
 - Clickable hero people: drafts `09`, `14`, `10`, `11`, `30`, `38`, `35`, plus locals `01`, `02` for S3 context.
 - Hotel labels must show **Concorde / Grand Pacific**, not “Bayview Grand” / “Harbourline Suites”.
 - S2 traveller copy: finals are **evening cocktail showcase 20:45**, not “tomorrow afternoon”.
+- S2 UI may show that an overnight near Narita is required/known context, but must **not** claim transit-hotel execution, Japanese entry research, or insurance evaluation completed in the hero backend.
 - S5 fireside is **14:30**, not 15:30; 15:30 is Sarah’s S3 target slot after commit.
+- S5 copy must show **traveller approval of the self-funded increment** before execution; no organiser approval is required.
 - Do not imply MBS hotel stay.
