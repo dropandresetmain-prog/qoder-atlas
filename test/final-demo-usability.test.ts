@@ -143,3 +143,56 @@ test('final demo usability: integrated programme and operator pages expose human
     composed.db.close();
   }
 });
+
+interface DemoLaunchResponse {
+  workflowId: string;
+  scenarioId: string;
+  title: string;
+  ok: boolean;
+  stoppedBefore: string[];
+  stepsRun: number;
+  steps: Array<{ id: string; ok: boolean; error?: string }>;
+  inspectPaths: string[];
+  evidencePath?: string;
+  error?: string;
+}
+
+function programmeReplayConfig(sqlitePath: string) {
+  return AppConfigSchema.parse({
+    environment: 'local',
+    adapterMode: 'REPLAY',
+    sqlitePath,
+    fixturesDir: 'fixtures',
+    worldSeedMode: 'programme',
+    providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {} },
+  });
+}
+
+test('final demo usability: S4 rehearsal executes through the deployed demo launch HTTP path', async () => {
+  const config = programmeReplayConfig(':memory:');
+  const composed = await composeAppRuntime(config);
+  const server = createAppServer(config, composed.endpoints);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const response = await fetch(`${base}/api/demo/launch?workflow=rehearsal-s4`, { method: 'POST' });
+    assert.equal(response.status, 200, 'S4 rehearsal launch must succeed over HTTP');
+    const body = await response.json() as DemoLaunchResponse;
+    assert.equal(body.workflowId, 'rehearsal-s4');
+    assert.equal(body.scenarioId, 'S4');
+    assert.equal(body.ok, true, 'manifest run must complete without failed steps');
+    assert.ok(body.stepsRun > 0, 'at least one manifest step must execute');
+    assert.ok(Array.isArray(body.inspectPaths) && body.inspectPaths.length > 0);
+    assert.ok(body.inspectPaths.includes('/programme?event=evt-ait-2026'));
+    assert.ok(body.inspectPaths.includes('/operator?event=evt-ait-2026'));
+    assert.ok(
+      body.inspectPaths.some((path) => path.startsWith('/traveller?trip=')),
+      'inspect paths must include the affected traveller trip',
+    );
+    assert.ok(body.inspectPaths.includes('/decisions'));
+    assert.deepEqual(body.stoppedBefore, [], 'S4 is a full rehearsal without stop-before authority');
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    composed.db.close();
+  }
+});
