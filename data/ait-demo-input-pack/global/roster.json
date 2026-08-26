@@ -229,7 +229,7 @@
           "email": "arjun.rao@wanderpay.test",
           "lastName": "Rao"
         },
-        "homeLocationText": "Bangkok (BKK)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "IN"
         ],
@@ -251,7 +251,7 @@
           "email": "siti.rahmah@wanderpay.test",
           "lastName": "Rahmah"
         },
-        "homeLocationText": "Kuala Lumpur (KUL)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "MY"
         ],
@@ -310,7 +310,7 @@
           "email": "sarah.lim@coraltreeair.test",
           "lastName": "Lim"
         },
-        "homeLocationText": "Sydney (SYD)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "AU"
         ],
@@ -628,7 +628,7 @@
           "email": "meiling.goh@wanderpay.test",
           "lastName": "Goh"
         },
-        "homeLocationText": "Kuala Lumpur (KUL)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "MY"
         ],

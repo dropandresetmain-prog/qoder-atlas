@@ -1896,7 +1896,32 @@
           "cmt-ait-d2-ota-panel"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [],
+        "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "CGK"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
+            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "MN310"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "MNSYN03"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          }
+        ],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-india-fireside",
@@ -2249,7 +2274,7 @@
           "email": "arjun.rao@wanderpay.test",
           "lastName": "Rao"
         },
-        "homeLocationText": "Bangkok (BKK)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "IN"
         ],
@@ -2270,41 +2295,17 @@
             "mode": "FLIGHT",
             "originRef": {
               "system": "airport-code",
-              "value": "BKK"
-            },
-            "destinationRef": {
-              "system": "airport-code",
-              "value": "KUL"
-            },
-            "scheduledDeparture": "2026-09-29T18:40:00+07:00",
-            "scheduledArrival": "2026-09-29T21:55:00+08:00",
-            "carrierRef": {
-              "system": "flight-number",
-              "value": "MN205"
-            },
-            "bookingRef": {
-              "system": "pnr",
-              "reference": "MNSYN10"
-            },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
-          },
-          {
-            "itemKind": "TRANSPORT_LEG",
-            "mode": "FLIGHT",
-            "originRef": {
-              "system": "airport-code",
-              "value": "KUL"
+              "value": "CGK"
             },
             "destinationRef": {
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T06:15:00+08:00",
+            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
             "scheduledArrival": "2026-09-30T07:25:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN218"
+              "value": "MN310"
             },
             "bookingRef": {
               "system": "pnr",
@@ -2342,7 +2343,7 @@
           "email": "siti.rahmah@wanderpay.test",
           "lastName": "Rahmah"
         },
-        "homeLocationText": "Kuala Lumpur (KUL)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "MY"
         ],
@@ -2361,17 +2362,17 @@
             "mode": "FLIGHT",
             "originRef": {
               "system": "airport-code",
-              "value": "KUL"
+              "value": "CGK"
             },
             "destinationRef": {
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T06:15:00+08:00",
+            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
             "scheduledArrival": "2026-09-30T07:25:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN218"
+              "value": "MN310"
             },
             "bookingRef": {
               "system": "pnr",
@@ -2439,32 +2440,7 @@
           "cmt-ait-d2-apac-spotlight"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [
-          {
-            "itemKind": "TRANSPORT_LEG",
-            "mode": "FLIGHT",
-            "originRef": {
-              "system": "airport-code",
-              "value": "MNL"
-            },
-            "destinationRef": {
-              "system": "airport-code",
-              "value": "SIN"
-            },
-            "scheduledDeparture": "2026-09-30T08:35:00+08:00",
-            "scheduledArrival": "2026-09-30T11:55:00+08:00",
-            "carrierRef": {
-              "system": "flight-number",
-              "value": "MN204"
-            },
-            "bookingRef": {
-              "system": "pnr",
-              "reference": "MNSYN13"
-            },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
-          }
-        ],
+        "declaredTravel": [],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d2-apac-spotlight",
@@ -2481,7 +2457,7 @@
           "email": "sarah.lim@coraltreeair.test",
           "lastName": "Lim"
         },
-        "homeLocationText": "Sydney (SYD)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "AU"
         ],
@@ -2499,41 +2475,17 @@
             "mode": "FLIGHT",
             "originRef": {
               "system": "airport-code",
-              "value": "SYD"
-            },
-            "destinationRef": {
-              "system": "airport-code",
-              "value": "KUL"
-            },
-            "scheduledDeparture": "2026-09-29T10:30:00+10:00",
-            "scheduledArrival": "2026-09-29T16:15:00+08:00",
-            "carrierRef": {
-              "system": "flight-number",
-              "value": "MN202"
-            },
-            "bookingRef": {
-              "system": "pnr",
-              "reference": "MNSYN14"
-            },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
-          },
-          {
-            "itemKind": "TRANSPORT_LEG",
-            "mode": "FLIGHT",
-            "originRef": {
-              "system": "airport-code",
-              "value": "KUL"
+              "value": "CGK"
             },
             "destinationRef": {
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T06:15:00+08:00",
+            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
             "scheduledArrival": "2026-09-30T07:25:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN218"
+              "value": "MN310"
             },
             "bookingRef": {
               "system": "pnr",
@@ -2571,32 +2523,7 @@
           "cmt-ait-d0-coach-breakout"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
-        "declaredTravel": [
-          {
-            "itemKind": "TRANSPORT_LEG",
-            "mode": "FLIGHT",
-            "originRef": {
-              "system": "airport-code",
-              "value": "KUL"
-            },
-            "destinationRef": {
-              "system": "airport-code",
-              "value": "SIN"
-            },
-            "scheduledDeparture": "2026-09-30T06:15:00+08:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
-            "carrierRef": {
-              "system": "flight-number",
-              "value": "MN218"
-            },
-            "bookingRef": {
-              "system": "pnr",
-              "reference": "MNSYN15"
-            },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
-          }
-        ],
+        "declaredTravel": [],
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d0-coach-breakout",
@@ -3099,7 +3026,7 @@
           "email": "meiling.goh@wanderpay.test",
           "lastName": "Goh"
         },
-        "homeLocationText": "Kuala Lumpur (KUL)",
+        "homeLocationText": "Jakarta (CGK)",
         "nationalityCodes": [
           "MY"
         ],
@@ -3118,17 +3045,17 @@
             "mode": "FLIGHT",
             "originRef": {
               "system": "airport-code",
-              "value": "KUL"
+              "value": "CGK"
             },
             "destinationRef": {
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T06:15:00+08:00",
+            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
             "scheduledArrival": "2026-09-30T07:25:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN218"
+              "value": "MN310"
             },
             "bookingRef": {
               "system": "pnr",
