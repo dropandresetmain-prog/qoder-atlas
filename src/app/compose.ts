@@ -59,6 +59,8 @@ import {
 import { createProviderBackedExecutor } from './providerExecution.ts';
 import { SqliteBookingDossierStore, type BookingDossierStore } from './dossierStore.ts';
 import { SqliteFxRateStore, type FxRateStore } from './fxStore.ts';
+import { FrankfurterFxAdapter } from '../providers/frankfurter/adapter.ts';
+import { LayeredFxRateResolver } from './fxResolver.ts';
 import { createFlightDossierResolver, createHotelDossierResolver } from './dossierResolver.ts';
 import { RuntimeOrchestrator } from './runtime.ts';
 import { createRuntimeHandlers } from './runtimeHttp.ts';
@@ -93,6 +95,10 @@ export interface ComposedRuntime {
   dossierStore: BookingDossierStore;
   /** Application-owned FX evidence store (ADR-052). */
   fxRateStore: FxRateStore;
+  /** Frankfurter reference-rate adapter (ADR-052 supplement). */
+  frankfurter: FrankfurterFxAdapter;
+  /** Layered budget-first FX resolution feeding authority (ADR-052). */
+  fxRateResolver: LayeredFxRateResolver;
   /** The wired capability adapters (tool dispatch surface). */
   capabilities: ToolDispatchCapabilities;
   /** Advertised capability descriptors (registry evidence). */
@@ -240,6 +246,22 @@ export async function composeAppRuntime(
     bookingBaseUrl: config.providers.nuitee.bookingBaseUrl,
     apiKey: config.providers.nuitee.apiKey,
   });
+  // ADR-052 supplement: key-less ECB reference rates via Frankfurter, sharing
+  // the same recording store (REPLAY is credential-free and offline). The
+  // adapter only produces evidence; the layered resolver keeps organisation
+  // budget FX first-class and the engine stays the sole judge of staleness.
+  const frankfurter = new FrankfurterFxAdapter({
+    mode: config.adapterMode,
+    store: recordingStore,
+    baseUrl: config.providers.frankfurter?.baseUrl,
+  });
+  const fxRateResolver = new LayeredFxRateResolver({
+    budgetRates: fxRates,
+    external: {
+      quote: (request) => frankfurter.quote(request),
+      todayIsoDate: () => new Date().toISOString().slice(0, 10),
+    },
+  });
   const capabilities: ToolDispatchCapabilities = { flight, flightTransactions, routing, hotel };
   const capabilityDescriptors: CapabilityDescriptor[] = [
     flight.descriptor,
@@ -293,8 +315,10 @@ export async function composeAppRuntime(
     entities,
     // Funding evidence lives on triggering signals (change-request anchors).
     signals,
-    // ADR-052: evidenced FX observations for home-currency normalization.
-    fxRates,
+    // ADR-052: layered FX evidence resolution — organisation budget FX from
+    // the store FIRST, Frankfurter reference rates as supplement; both feed
+    // the same deterministic engine which fails closed on any gap.
+    fxRates: fxRateResolver,
   });
 
   // Planner: LIVE Model Studio only when explicitly NOT in REPLAY mode AND
@@ -521,6 +545,8 @@ export async function composeAppRuntime(
     readDeps,
     dossierStore: dossiers,
     fxRateStore: fxRates,
+    frankfurter,
+    fxRateResolver,
     capabilities,
     capabilityDescriptors,
     planner,

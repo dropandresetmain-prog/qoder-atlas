@@ -39,6 +39,11 @@ const NuiteeConfigSchema = z.object({
   apiKey: z.string().optional(),
 });
 
+const FrankfurterConfigSchema = z.object({
+  // Public key-less ECB reference-rate API; default points at the real host.
+  baseUrl: z.string().optional(),
+});
+
 export const AppConfigSchema = z.object({
   environment: z.enum(['local', 'dev', 'demo']).default('local'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -52,6 +57,7 @@ export const AppConfigSchema = z.object({
     modelStudio: ModelStudioConfigSchema.prefault({}),
     googleRoutes: GoogleRoutesConfigSchema.prefault({}),
     nuitee: NuiteeConfigSchema.prefault({}),
+    frankfurter: FrankfurterConfigSchema.prefault({}),
   }),
 });
 
@@ -109,6 +115,9 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
         searchBaseUrl: optional(env.NUITEE_SEARCH_BASE_URL),
         bookingBaseUrl: optional(env.NUITEE_BOOKING_BASE_URL),
         apiKey: optional(env.NUITEE_API_KEY),
+      },
+      frankfurter: {
+        baseUrl: optional(env.FRANKFURTER_BASE_URL),
       },
     },
   };
