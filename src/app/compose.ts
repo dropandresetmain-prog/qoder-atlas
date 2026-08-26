@@ -45,7 +45,6 @@ import {
   createRecoveryExecutor,
   projectApprovalsQueue,
   projectCaseDetail,
-  projectJourneyChain,
   projectOperatorDashboard,
   projectProviderSurface,
   projectTravellerTrip,
@@ -70,6 +69,7 @@ import { ProgrammeService } from './programme.ts';
 import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { resolveWorldSeedMode, shouldBootSeedScenario } from './worldSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
+import { projectOperatorDashboardAugmentations } from './operatorPresentation.ts';
 import { projectProgrammeAugmentations } from './programmeReadmodel.ts';
 import { projectTravellerPresentation } from './travellerPresentation.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
@@ -543,18 +543,9 @@ export async function composeAppRuntime(
         options?.anchorEventId ? { anchorEventId: options.anchorEventId } : undefined,
       ),
     operatorDashboardAugmentations: async (view) => {
-      const chainByTrip = new Map<string, Awaited<ReturnType<typeof projectJourneyChain>>>();
-      const anchorEventIds = new Set<string>();
-      for (const row of view.trips) {
-        const trip = await trips.getTrip(row.tripId);
-        if (!trip) continue;
-        chainByTrip.set(row.tripId, await projectJourneyChain(readDeps, trip));
-        if (trip.anchorEventId) anchorEventIds.add(trip.anchorEventId);
-      }
-      const onlyEventId = anchorEventIds.size === 1 ? [...anchorEventIds][0] : undefined;
+      const augment = await projectOperatorDashboardAugmentations(readDeps, view);
       return {
-        chainFor: (trip) => chainByTrip.get(trip.tripId),
-        ...(onlyEventId ? { programmeHref: `/programme?event=${encodeURIComponent(onlyEventId)}` } : {}),
+        ...augment,
         ...(demo.resetPopulatedWorld
           ? { demoReset: { action: '/api/demo/reset?redirect=1', label: 'Reset demo' } }
           : {}),

@@ -7,7 +7,7 @@
  */
 import type { ReadModelEnvelope } from '../../contracts/readmodels.ts';
 import type { DecisionsPageView, DecidedDecisionRowView, PendingDecisionRowView } from '../operator-surfaces-view-model.ts';
-import { escapeHtml, formatInstant } from '../html.ts';
+import { escapeHtml, formatInstant, encodeUri } from '../html.ts';
 import { errorPanel, loadingPanel } from '../components.ts';
 
 function pendingRow(row: PendingDecisionRowView): string {
@@ -22,7 +22,7 @@ function pendingRow(row: PendingDecisionRowView): string {
   ${waiting}
   ${decideBy}
   ${age}
-  <td><a href="/operator/cases/${escapeHtml(row.caseId)}" data-test="decision-link">Open case →</a></td>
+  <td><a href="/operator/cases/${encodeUri(row.caseId)}" data-test="decision-link">Open case →</a></td>
 </tr>`;
 }
 
@@ -31,7 +31,7 @@ function decidedRow(row: DecidedDecisionRowView): string {
   const decidedBy = row.decidedBy ? `<td>${escapeHtml(row.decidedBy)}</td>` : '<td>—</td>';
   const when = row.when ? `<td class="num">${escapeHtml(row.when)}</td>` : '<td class="num">—</td>';
   const status = row.caseId
-    ? `<td><a href="/operator/cases/${escapeHtml(row.caseId)}"><span class="badge tone-done">Done</span></a></td>`
+    ? `<td><a href="/operator/cases/${encodeUri(row.caseId)}"><span class="badge tone-done">Done</span></a></td>`
     : `<td><span class="badge tone-done">Done</span></td>`;
   return `<tr${row.caseId ? ` data-case-id="${escapeHtml(row.caseId)}"` : ''}>
   <td><strong>${escapeHtml(row.travellerName)}</strong></td>

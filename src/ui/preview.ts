@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { renderPage, type PageOptions } from './page.ts';
 import { renderOperatorDashboard } from './screens/operator-dashboard.ts';
+import { renderProgramme } from './screens/operator-programme.ts';
 import { renderCaseDetail } from './screens/operator-case.ts';
 import { renderDecisions } from './screens/operator-decisions.ts';
 import { renderActivity } from './screens/operator-activity.ts';
@@ -34,6 +35,10 @@ import {
   operatorDashboardError,
   operatorDashboardLoaded,
   operatorDashboardLoading,
+  healthyProgrammeLoaded,
+  programmeWithEndangeredCommitmentLoaded,
+  programmeLoading,
+  programmeError,
   travellerError,
   travellerLoading,
 } from './fixtures/readmodels.ts';
@@ -45,7 +50,7 @@ const renderAssetsSource = path.join(repoRoot, '..', 'ui-renders', 'docs', 'desi
 
 const LINKS = {
   dashboard: 'operator-dashboard.html',
-  programme: 'operator-dashboard.html',
+  programme: 'operator-programme.html',
   decisions: 'operator-decisions.html',
   activity: 'operator-activity.html',
   traveller: 'traveller-awaiting-input.html',
@@ -86,6 +91,10 @@ function buildPages(): GeneratedPage[] {
     page('operator-dashboard-alt.html', 'Operations overview — alternate dataset', { title: 'Operations overview', active: 'dashboard' }, renderOperatorDashboard({ state: 'LOADED', data: operatorDashboardAlt } satisfies ReadModelEnvelope<typeof operatorDashboardAlt>)),
     page('operator-dashboard-loading.html', 'Operations overview — loading', { title: 'Operations overview', active: 'dashboard' }, renderOperatorDashboard(operatorDashboardLoading)),
     page('operator-dashboard-error.html', 'Operations overview — error', { title: 'Operations overview', active: 'dashboard' }, renderOperatorDashboard(operatorDashboardError)),
+    page('operator-programme.html', 'Programme', { title: 'Programme', active: 'programme' }, renderProgramme(healthyProgrammeLoaded)),
+    page('operator-programme-p2.html', 'Programme — endangered commitments', { title: 'Programme', active: 'programme' }, renderProgramme(programmeWithEndangeredCommitmentLoaded)),
+    page('operator-programme-loading.html', 'Programme — loading', { title: 'Programme', active: 'programme' }, renderProgramme(programmeLoading)),
+    page('operator-programme-error.html', 'Programme — error', { title: 'Programme', active: 'programme' }, renderProgramme(programmeError)),
     page('operator-decisions.html', 'Decisions', { title: 'Decisions', active: 'decisions' }, renderDecisions(decisionsLoaded)),
     page('operator-decisions-loading.html', 'Decisions — loading', { title: 'Decisions', active: 'decisions' }, renderDecisions(decisionsLoading)),
     page('operator-decisions-error.html', 'Decisions — error', { title: 'Decisions', active: 'decisions' }, renderDecisions(decisionsError)),

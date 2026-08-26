@@ -364,10 +364,11 @@ async function handle(
   }
   if (req.method === 'GET' && segments[0] === 'operator' && segments[1] === 'cases' && segments[2]) {
     const at = endpoints.now();
-    const view = await endpoints.caseDetail(segments[2], at);
+    const caseId = decodeURIComponent(segments[2]);
+    const view = await endpoints.caseDetail(caseId, at);
     const body = view
       ? renderCaseDetailBody(view)
-      : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${segments[2]} is known`, generatedAt: at });
+      : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${caseId} is known`, generatedAt: at });
     sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
