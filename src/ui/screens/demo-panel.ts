@@ -12,6 +12,7 @@ export interface DemoPanelContext {
   adapterMode: AppConfig['adapterMode'];
   plannerMode: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
   scenarioNames: string[];
+  scenarioRehearsals?: Array<{ id: string; title: string; description: string; scenarioId: string }>;
   heroWorkflows?: Array<{ id: string; title: string; description: string }>;
   programmeEventId?: string;
 }
@@ -20,6 +21,7 @@ export interface DemoPanelContext {
 export function renderDemoPanel(ctx: DemoPanelContext): string {
   const isReplay = ctx.adapterMode === 'REPLAY';
   const heroes = ctx.heroWorkflows ?? [];
+  const rehearsals = ctx.scenarioRehearsals ?? [];
 
   return `
 <main class="demo-shell">
@@ -48,8 +50,21 @@ export function renderDemoPanel(ctx: DemoPanelContext): string {
   </div>
 
   <div class="demo-section">
-    <h2>Final hero workflows</h2>
-    <p class="demo-sub" style="margin-top:0;">Launches accepted hero manifests through real application endpoints. Authority settlement (traveller / organisation / human-agent) is left for manual rehearsal where required.</p>
+    <h2>Scenario rehearsal</h2>
+    <p class="demo-sub" style="margin-top:0;">Launch each final acceptance scenario through real product endpoints for diagnosis and rehearsal.</p>
+    ${rehearsals.map((rehearsal) => `
+    <div class="demo-card">
+      <h3>${escapeHtml(rehearsal.title)}</h3>
+      <p class="dc-note">${escapeHtml(rehearsal.description)}</p>
+      <div class="dc-meta m-replay">REAL ENGINE PATH — acceptance manifest</div>
+      <button class="demo-btn" data-demo-action="rehearse" data-scenario="${escapeHtml(rehearsal.scenarioId)}" data-workflow="${escapeHtml(rehearsal.id)}">Launch ${escapeHtml(rehearsal.scenarioId)}</button>
+      <div id="result-rehearse-${escapeHtml(rehearsal.scenarioId)}" class="demo-result" style="display:none;"></div>
+    </div>`).join('')}
+  </div>
+
+  <div class="demo-section">
+    <h2>Final video flows</h2>
+    <p class="demo-sub" style="margin-top:0;">Accepted hero manifests for presentation choreography. Authority settlement is left for manual rehearsal where required.</p>
     ${heroes.map((hero) => `
     <div class="demo-card">
       <h3>${escapeHtml(hero.title)}</h3>
@@ -130,9 +145,11 @@ export function renderDemoPanel(ctx: DemoPanelContext): string {
         .then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b }; }); })
         .then(function(r) { showResult('result-reset', r.ok, r.ok ? 'Reset complete. ' + JSON.stringify(r.body) : 'Error: ' + JSON.stringify(r.body)); btn.disabled = false; })
         .catch(function(e) { showResult('result-reset', false, 'Request failed: ' + e.message); btn.disabled = false; });
-    } else if (action === 'launch') {
+    } else if (action === 'launch' || action === 'rehearse') {
       var id = btn.dataset.workflow;
-      var rid = 'result-launch-' + id;
+      var rid = action === 'rehearse'
+        ? 'result-rehearse-' + btn.dataset.scenario
+        : 'result-launch-' + id;
       fetch('/api/demo/launch?workflow=' + encodeURIComponent(id), { method: 'POST' })
         .then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b }; }); })
         .then(function(r) {

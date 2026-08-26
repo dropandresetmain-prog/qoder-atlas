@@ -83,10 +83,15 @@ test('fresh programme-mode seed: 67 AiT trips, baseline viability reconciled, no
   }
 });
 
-test('demo hero catalog exposes S1-S3, S2, S5, S7 with stop-before authority boundaries', () => {
+test('demo hero catalog exposes S2 → S1→S3 → S7 → S5 with stop-before authority boundaries', () => {
   assert.deepEqual(
-    DEMO_HERO_WORKFLOWS.map((w) => w.id).sort(),
-    ['s1-s3', 's2', 's5', 's7'].sort(),
+    DEMO_HERO_WORKFLOWS.map((w) => w.id),
+    ['s2', 's1-s3', 's7', 's5'],
+    'final video order must remain S2 → S1→S3 → S7 → S5',
+  );
+  assert.equal(
+    demoHeroWorkflow('s1-s3')?.manifestPath,
+    'fixtures/acceptance/manifests/s1-s3-continuity.json',
   );
   assert.ok(demoHeroWorkflow('s5')?.stopBeforeStepIds.includes('decide'));
   assert.ok(demoHeroWorkflow('s2')?.stopBeforeStepIds.includes('decide_recovery'));
@@ -105,7 +110,9 @@ test('demo panel and launch endpoint are wired for final heroes', async () => {
     const panel = await fetch(`${base}/demo`);
     assert.equal(panel.status, 200);
     const html = await panel.text();
-    assert.match(html, /Final hero workflows/);
+    assert.match(html, /Final video flows/);
+    assert.match(html, /Scenario rehearsal/);
+    assert.match(html, /data-scenario="S1"/);
     assert.match(html, /data-workflow="s2"/);
     assert.match(html, /data-workflow="s5"/);
     assert.match(html, /data-workflow="s7"/);

@@ -83,7 +83,12 @@ import { AtlasFlightStateReader } from '../providers/atlas/stateReader.ts';
 import { loadScenario, listScenarioDirs } from '../scenarios/loader.ts';
 import type { ScenarioSpec } from '../scenarios/spec.ts';
 import type { DemoSurface } from '../server/http.ts';
-import { DEMO_HERO_WORKFLOWS, demoHeroWorkflow, inspectPathsFromExpect } from './demoHeroes.ts';
+import {
+  DEMO_HERO_WORKFLOWS,
+  DEMO_SCENARIO_REHEARSALS,
+  demoManifestWorkflow,
+  inspectPathsFromExpect,
+} from './demoHeroes.ts';
 import { runAcceptanceManifest } from '../acceptance/runner.ts';
 import { loadAcceptanceManifest, resolveManifestPath } from '../acceptance/manifest.ts';
 
@@ -414,6 +419,13 @@ export async function composeAppRuntime(
         title: workflow.title,
         description: workflow.description,
       })),
+    scenarioRehearsals: () =>
+      DEMO_SCENARIO_REHEARSALS.map((workflow) => ({
+        id: workflow.id,
+        title: workflow.title,
+        description: workflow.description,
+        scenarioId: workflow.scenarioId ?? workflow.id,
+      })),
     plannerMode: () => useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
     async reset(at) {
       try {
@@ -447,7 +459,7 @@ export async function composeAppRuntime(
       }
     },
     async launchHero(workflowId, _at, baseUrl) {
-      const workflow = demoHeroWorkflow(workflowId);
+      const workflow = demoManifestWorkflow(workflowId);
       if (!workflow) {
         return { status: 404, body: { error: `unknown_hero_workflow: ${workflowId}` } };
       }
