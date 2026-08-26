@@ -57,12 +57,12 @@ boundaries and the same generalized state/recovery/authority engine.
 | S6 | "Can I switch hotels? My partner is joining." |
 | S8 | "Can I travel with the other speakers?" |
 
-All eight scenarios are now required to become runnable through the same
-generalized Northstar application path. This supersedes the historical
-Tier-A/Stretch execution split, but does not alter the catalogue's product
-narratives. The only approved simulated external seams are recorded in
-`docs/LIVE_SCENARIO_READINESS.md`; an internal capability gap is not a
-simulation seam.
+All eight scenarios are intended to become runnable through the same
+generalized Northstar application path. The final hero set is **S2, S1, S3,
+S7, S5**; S5 is now proven executable for its **hotel-only personal extension**
+path, while S6/S8 remain breadth/stretch. The only approved simulated external
+seams are recorded in `docs/LIVE_SCENARIO_READINESS.md`; an internal capability
+gap is not a simulation seam.
 
 ---
 
@@ -173,7 +173,7 @@ The disruption should be PROGRESSIVE:
 - further delay eventually eliminates the last sensible same-night option
 - traveller must overnight near Narita
 
-Recovery must consider:
+The **product-level** recovery problem includes:
 - replacement NRT→SIN flight
 - transit hotel
 - authoritative Japanese entry/immigration requirements for overnight landside stay
@@ -181,6 +181,13 @@ Recovery must consider:
 - Singapore hotel/stay consequences
 - ground transfer
 - event commitments
+
+**Final hero execution boundary:** the closed backend proof executes the
+next-morning **flight recovery + event viability** path only. Narita transit-hotel
+insertion, Japanese entry/immigration research attachment, and insurance
+attachment are accepted-risk / parked gaps. Provider evidence/context may be
+shown as known context, but UI/docs must not claim those checks or actions were
+executed by the final S2 backend.
 
 The synthetic event programme should be shaped AFTER provider timing is known:
 - flexible enough that recovery is possible
@@ -207,14 +214,21 @@ such as:
 Northstar compares provider state and alternatives and deterministically
 rejects recoveries that do not preserve the trip's actual objectives.
 
-**Capability proof:**
+**Capability proof (closed hero):**
 
 - conversational/state ingestion;
 - partially executed trips;
 - provider-state reconciliation;
 - downstream invalidation;
-- deterministic viability;
-- recovery.
+- progressive delay / connection-loss propagation;
+- next-morning flight recovery search;
+- deterministic event viability;
+- organiser authority;
+- execution + observation;
+- resolved/viable final trip state.
+
+**Not claimed in the closed hero:** transit-Stay insertion, Japanese entry
+research attachment, or insurance attachment.
 
 **Core message:** Northstar reasons about whether what actually happened still
 leaves the trip viable.
@@ -226,18 +240,18 @@ Stable cast and programme: Jordan Hale (`ait-draft-09`); hard finals showcase
 
 | Stage id | What happens | Viability intent |
 |----------|--------------|------------------|
-| **initial_state** | In travel. LAX→NRT→SIN confirmed (PNR ZGSYN09). Connection 2h40m. SIN Concorde stay booked (check-in 30 Sep after possible overnight). Finals showcase tomorrow evening. | Baseline **VIABLE** |
+| **initial_state** | In travel. LAX→NRT→SIN confirmed (PNR ZGSYN09). Connection 2h40m. SIN Concorde stay booked. Finals showcase next evening. | Baseline **VIABLE** |
 | **trigger / delay_1** | Simulated Atlas schedule/delay notification on ZG023 — delay begins; connection still comfortable. | Still **VIABLE** |
 | **delay_2_tight** | Further delay; NRT connection becomes tight but still theoretically makeable. | **VIABLE_TIGHT** / watch |
 | **zg053_impossible** | Upstream delay makes ZG053 impossible; missed-connection signal; airline may still suggest same-night options. | Onward leg **failed**; recovery search opens |
 | **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 360. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
-| **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight landside at Narita required. | Same-night **NOT_VIABLE** |
-| **overnight_recovery** | Transit hotel (Hilton Narita / MYSTAYS class), JP entry/immigration AUTHORITATIVE research, insurance missed-connection cover where supplied, SIN hotel/no-show consequences. | Planning overnight + morning |
-| **airline_morning** | Airline desk offers Scoot **TR885-class** (~08:20→14:35 mid-afternoon) and/or slower options such as **TR867** (20:45). | TR885 clears 20:45 finals under 360; TR867 does not |
-| **northstar_morning** | Northstar ranks boardable next-morning inventory (TR885 preferred in closed acceptance); coordinates transit hotel, JP entry, insurance, SIN stay. | Northstar path **VIABLE** as whole-trip recovery |
-| **authority / surfaces** | Traveller disruption + organiser case; provenance REPLAY/RECORD. | Approval as policy requires |
-| **action / observation** | Permitted recovery actions through provider boundary where supported; observe; authoritative trip update. | |
-| **final_state** | Trip remainder viable for finals showcase; overnight + morning recovery recorded. | **RESOLVED / VIABLE** |
+| **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight near Narita is required as known trip context. | Same-night **NOT_VIABLE** |
+| **overnight_context** | Narita hotel options and landside-entry/insurance needs are known contextual consequences. **They are not composed/executed/attached in the closed hero path.** | Context only; accepted-risk gaps remain |
+| **airline_morning** | Next-morning inventory includes Scoot **TR885-class** (~08:20→14:35) and slower **TR867** (20:45). | TR885 clears 20:45 finals under 360; TR867 does not |
+| **northstar_morning** | Northstar ranks boardable next-morning flight inventory; TR885-class recovery is selected in the closed acceptance. | Flight + event path **VIABLE** |
+| **authority / surfaces** | Organiser case exposes the proposed flight recovery and policy result; REPLAY/RECORD provenance is preserved. | **Organiser approval required** |
+| **action / observation** | Organiser approves flight change; execute through provider boundary; observe; authoritative trip update. | |
+| **final_state** | Recovered flight arrives SIN 14:35; 370-minute gap clears the 360-minute policy buffer; case **RESOLVED**, trip **VIABLE**. | **RESOLVED / VIABLE** |
 
 Do **not** treat VietJet VJ823 as a direct NRT→SIN 12:55 hero option (recordings show NRT→SGN connections).
 
@@ -359,11 +373,9 @@ which flights still make the trip work.
 
 - **Trigger:** traveller-requested change
 - **Stage:** post-booking
-- **Priority:** High-priority Stretch
-- **MVP boundary:** May be simulated/catalogued; not required to be fully
-  executable for G3R
-- **Provenance:** SIMULATED material is acceptable for MVP/G3R demo
-  representation and must be disclosed as such.
+- **Priority:** Final hero — executable hotel-only extension path
+- **Demo role:** Personal-extension / mixed-funding / traveller-authority hero
+- **Provenance:** Nuitée **REPLAY** through the real hotel normalization/execution path; any unsupported provider boundary remains honestly labelled.
 
 **Post-booking personal extension.**
 
@@ -374,12 +386,17 @@ covered baseline = LOWER OF:
 
 Anything incremental due to the traveller's personal extension is traveller-funded.
 
-Desired demo:
-- hotel/stay extension
-- return travel changed if necessary
-- deterministic funding split
-- within configured traveller/self-funded authority
-- Northstar resolves automatically without organiser approval
+**Closed final-demo scope:**
+- hotel/stay extension only;
+- deterministic funding split;
+- traveller-funded increment;
+- **no organiser approval**;
+- authority result is `REQUIRES_TRAVELLER`;
+- traveller approves their own self-funded increment;
+- only then does Northstar execute → observe → resolve.
+
+A combined automatic hotel + return-flight change is **not** part of the closed
+S5 hero and remains parked.
 
 The conference ends Friday and the traveller wants to extend the trip
 personally.
@@ -393,15 +410,18 @@ Potential reasoning includes:
 - airport-transfer coverage;
 - downstream commitments.
 
-**Capability target:**
+**Capability proof (closed hero):**
 
-- business/personal trip boundary;
-- cost attribution;
-- policy interpretation;
-- multi-element modification.
+- accommodation date replanning;
+- provider-backed hotel search/replacement/extension;
+- business/personal cost attribution;
+- deterministic funding calculation;
+- traveller authority/approval;
+- execution + observation;
+- resolved/viable final trip.
 
-Do not claim sophisticated multi-payer/cost-splitting execution unless it is
-genuinely implemented.
+Do not claim sophisticated multi-payer/cost-splitting execution beyond the
+generic mixed-funding semantics genuinely implemented.
 
 ### Final-demo choreography (S5)
 
@@ -412,13 +432,13 @@ Concorde `lp21d9f` — content SSOT §5.
 |-------|----------------|
 | **Initial state** | Post-booking. Event-funded hotel through **3 Oct 11:00**. Fireside commitment already satisfied by baseline stay. |
 | **Trigger** | Traveller NL request: stay until Sunday (checkout **4 Oct**). |
-| **Successive state changes** | Stay extension candidate; optional return-flight change parked if not auto-safe. |
-| **Provider/AI/tool evidence** | Nuitée `hotel.search` REPLAY for Concorde/midscale SIN; funding anchors from FUNDED_WINDOW. |
+| **Successive state changes** | Stay extension candidate; return-flight change remains parked unless separately proven safe. |
+| **Provider/AI/tool evidence** | Nuitée `hotel.search` REPLAY for Concorde/SIN; generic hotel G1/G2; funding anchors from FUNDED_WINDOW. |
 | **Deterministic viability** | Extension viable; covered baseline = MIN(eligible booked stay, allowance); incremental nights traveller-funded. |
-| **Authority/decision** | Within traveller/self-funded authority → **auto-resolve** (no organiser approval for personal incremental nights). |
+| **Authority/decision** | `REQUIRES_TRAVELLER`: Jonas approves his own self-funded increment. **No organiser approval** is required. |
 | **Surfaces** | Traveller chat + trip; organiser may observe activity without blocking. |
-| **Action/observation** | Hotel modify/extend through provider boundary where permitted; observe. |
-| **Final state** | Stay through Sunday; funding split recorded; trip viable. |
+| **Action/observation** | After traveller approval, hotel extension executes through the provider boundary; observe; state updates. |
+| **Final state** | Case **RESOLVED**; stay through Sunday; funding split recorded; trip **VIABLE**. |
 
 ## S6 — "Can I switch hotels? My partner is joining."
 
@@ -579,14 +599,10 @@ The catalogue collectively covers:
 - uncertainty;
 - execution and observation.
 
-**Not all of this is executable in MVP.** The combined coverage list above is a
-catalogue property, not an MVP capability claim. Current executable coverage is
-limited to what the Tier A scenarios (S1, S2, S3, S4, S7) and the existing
-generalized engine genuinely support today; items exercised only by Stretch
-scenarios (S5, S6, S8) — such as business/personal cost boundaries, programme-
-level correlated-risk reasoning and multi-element accommodation modification —
-are Stretch capability targets, not implemented MVP behavior. Do not claim
-Tier-B/C behavior as implemented when it is not.
+**Not all catalogue breadth is executable in MVP.** Current proven final-hero
+coverage is S2, S1→S3, S7, and the **hotel-only** S5 extension path described
+above. S6/S8 and any broader combined-multi-element variants remain Stretch.
+Do not claim behaviour outside those proven boundaries as implemented.
 
 ## Anti-hardcoding rule
 
@@ -623,11 +639,11 @@ Provenance labels are defined in `docs/DEMO.md` and preserved here unchanged:
 - **SIMULATED** — external-boundary effect with no real provider — disclosed,
   core engine stays real.
 
-Tier-A execution is expected primarily through REPLAY for reliable demo
+Final hero execution is expected primarily through REPLAY for reliable demo
 operation, backed by existing LIVE/SANDBOX integration evidence where
 applicable. Do not imply that a simulated external trigger/action is LIVE.
-High-Priority Stretch scenarios may be represented with clearly disclosed
-SIMULATED material for MVP/G3R.
+Stretch scenarios may be represented with clearly disclosed SIMULATED material
+where appropriate.
 
 ## Demo hierarchy
 
@@ -635,11 +651,11 @@ SIMULATED material for MVP/G3R.
 
 | Beat | Role |
 |------|------|
-| S2 | Traveller progressive missed-connection / overnight recovery hero |
+| S2 | Traveller progressive missed-connection / next-morning flight recovery hero |
 | S1 | Organiser multi-traveller schedule-change blast radius |
 | S3 | Continues S1 — programme counterfactual + commit |
 | S7 | Pre-booking Tokyo-origin structural change |
-| S5 | Post-booking personal Sunday hotel extension |
+| S5 | Post-booking personal Sunday hotel extension + traveller self-funded approval |
 
 **Repository / fallback (not primary video):** S4, S6, S8, and S6-class breadth.
 
@@ -649,11 +665,14 @@ World cast, timings, and hotels: `docs/FINAL_DEMO_CONTENT_SSOT.md`.
 
 ## Status / Next Work
 
-- Final demo content SSOT authored; programme fixture reconciliation in progress
-  on `content/final-demo-world`.
-- Execute end-to-end S2 → S1 → S3 → S7 → S5 against reconciled fixtures.
+- Final demo content SSOT and programme fixture are reconciled on
+  `content/final-demo-world`; S2/S5 demo claims are aligned to proven backend
+  boundaries.
+- Integrate content + final backend + approved UI.
+- Execute browser rehearsal in exact order: S2 → reset → S1 → S3 without reset
+  → reset → S7 → reset → S5.
 - UI integrator consumes clickable Tier A cast + real hotel labels from content
-  SSOT.
+  SSOT and must not fabricate unavailable read-model evidence.
 
 Do not create a new formal milestone.
 Do not reopen architecture.
