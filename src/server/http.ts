@@ -292,6 +292,16 @@ async function handle(
     return;
   }
   if (req.method === 'GET' && url.pathname === '/') {
+    // Human entry: land on the operations overview. API discovery lives at /api.
+    const eventId = endpoints ? seededProgrammeEventId(endpoints) : undefined;
+    const location = eventId
+      ? `/operator?event=${encodeURIComponent(eventId)}`
+      : '/operator';
+    res.writeHead(302, { location });
+    res.end();
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/api') {
     sendJson(res, 200, {
       name: 'AI Trip Recovery / Resolution Layer',
       adapterMode: config.adapterMode,

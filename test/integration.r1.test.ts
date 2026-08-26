@@ -95,10 +95,14 @@ test('R1: credential-free runtime flow completes disruption -> recovery -> reset
   const base = `http://localhost:${(server.address() as AddressInfo).port}`;
 
   try {
-    // Root surface advertises the runtime flow; checkpoint string updated.
-    const root = (await (await fetch(`${base}/`)).json()) as { checkpoint: string; surfaces: string[] };
+    // API discovery advertises the runtime flow; checkpoint string updated.
+    const root = (await (await fetch(`${base}/api`)).json()) as { checkpoint: string; surfaces: string[] };
     assert.match(root.checkpoint, /C candidate/);
     assert.ok(root.surfaces.includes('/api/runtime/state'));
+    // Human entry redirects to the operations overview.
+    const home = await fetch(`${base}/`, { redirect: 'manual' });
+    assert.equal(home.status, 302);
+    assert.match(home.headers.get('location') ?? '', /^\/operator/);
 
     // Runtime state pre-disruption: seeded trips, no open cases.
     const state = (await (await fetch(`${base}/api/runtime/state`)).json()) as {
