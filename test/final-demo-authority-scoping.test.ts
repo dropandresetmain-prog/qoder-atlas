@@ -30,6 +30,7 @@ function flightIntent(spend: { amount: number; currency: string }): ActionIntent
     strategyId: 'strat-1',
     operation: 'flight.change',
     capability: 'FLIGHT',
+    parameters: {},
     sideEffectLevel: 'MONEY_MOVING',
     spendExposure: spend,
     providerSpend: spend,
@@ -46,6 +47,7 @@ function hotelIntent(spend: { amount: number; currency: string }): ActionIntent 
     strategyId: 'strat-1',
     operation: 'hotel.modify',
     capability: 'HOTEL',
+    parameters: {},
     sideEffectLevel: 'MONEY_MOVING',
     spendExposure: spend,
     providerSpend: spend,
@@ -56,6 +58,8 @@ function hotelIntent(spend: { amount: number; currency: string }): ActionIntent 
 }
 
 const ctx: AuthorityContext = {
+  tripId: 'trip-1',
+  caseId: 'case-1',
   ruleSetIds: ['rs-test'],
   principals: [],
   homeCurrency: 'SGD',

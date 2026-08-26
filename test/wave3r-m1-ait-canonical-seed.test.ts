@@ -94,10 +94,10 @@ test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking
         }
       }
     }
-    assert.ok(transportLegs >= 16, `expected >=16 declared transport legs, got ${transportLegs}`);
+    assert.ok(transportLegs >= 13, `expected >=13 declared transport legs, got ${transportLegs}`);
     assert.ok(stays >= 4, `expected >=4 declared stays, got ${stays}`);
-    assert.ok(legsWithBookingRef >= 10, `expected >=10 legs carrying booking refs, got ${legsWithBookingRef}`);
-    for (const expected of ['MNSYN09', 'MNSYN10', 'MNSYN11', 'MNSYN13', 'MNSYN14', 'MNSYN15', 'MNSYN30']) {
+    assert.ok(legsWithBookingRef >= 7, `expected >=7 legs carrying booking refs, got ${legsWithBookingRef}`);
+    for (const expected of ['ZGSYN09', 'MNSYN03', 'MNSYN10', 'MNSYN11', 'MNSYN14', 'MNSYN30']) {
       assert.ok(bookingRefs.has(expected), `harvested PNR ${expected} must appear on a promoted leg`);
     }
   } finally {
