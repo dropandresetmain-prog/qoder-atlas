@@ -215,6 +215,18 @@
       ]
     },
     {
+      "id": "place-lax",
+      "name": "Los Angeles International",
+      "kind": "AIRPORT",
+      "timezone": "America/Los_Angeles",
+      "externalRefs": [
+        {
+          "system": "airport-code",
+          "value": "LAX"
+        }
+      ]
+    },
+    {
       "id": "place-lhr",
       "name": "London Heathrow",
       "kind": "AIRPORT",
@@ -299,6 +311,7 @@
       "place-syd": true,
       "place-hnd": true,
       "place-nrt": true,
+      "place-lax": true,
       "place-icn": false,
       "place-sgn": false,
       "place-del": false,
@@ -315,6 +328,7 @@
     "place-cnx": "Regional feeder origin used by one roster member; not separately proven in the Atlas sandbox record.",
     "place-hnd": "Proven as part of the TYO gateway in the Atlas sandbox record.",
     "place-nrt": "Proven as part of the TYO gateway in the Atlas sandbox record.",
+    "place-lax": "Proven via Wave 4R S2 corridor discovery: ZIPAIR ZG023 LAX→NRT verified in Atlas sandbox.",
     "place-lhr": "Long-haul origin present only because scenario S7 explicitly requires a London origin; flagged not sandbox-proven."
   }
 }
