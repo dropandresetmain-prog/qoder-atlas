@@ -1,8 +1,8 @@
 {
   "packId": "ait-s5",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scenarioId": "S5",
-  "description": "Local acceptance pack for S5; facts live in data/ait-demo-input-pack",
+  "description": "Local acceptance pack for S5 personal Sunday extension; facts live in data/ait-demo-input-pack. Hotel hero beat uses G1/G2 + Downtown Core Nuitée REPLAY evidence; traveller-funded FUNDED_WINDOW incremental allocation.",
   "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
   "expect": {
     "anchorEventIds": [
