@@ -41,6 +41,10 @@ export interface TravellerCommitmentCard {
   title: string;
   /** Mono meta line, e.g. "16 Sep · 09:00 · Main hall". */
   meta?: string;
+  /** Objective statement when known from trip objectives. */
+  body?: string;
+  /** Consequence copy when a hard objective is at risk. */
+  ifMissed?: string;
   /** When true, card uses the healthy `.is-ok` treatment. */
   ok?: boolean;
 }
