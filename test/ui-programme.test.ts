@@ -23,6 +23,8 @@ import { FORBIDDEN_UI_TERMS } from '../src/ui/copy.ts';
 import {
   renderProgramme,
   renderProgrammeBody,
+  renderProgrammeChangePreview,
+  renderProgrammeIntake,
   STATUS_PRIORITY,
 } from '../src/ui/screens/operator-programme.ts';
 import {
@@ -66,13 +68,15 @@ test('envelope ERROR surfaces the error panel with the message', () => {
 test('envelope LOADED renders the programme body', () => {
   const html = renderProgramme(healthyProgrammeLoaded);
   assert.ok(html.includes('Atlas Innovation Summit 2026'));
+  // Approved tile buckets: travellers · on track · watching · in recovery ·
+  // unconfirmed · endangered commitments (P1/P2/E1/E2 vocabulary).
   assert.ok(html.includes('data-summary-key="total"'));
-  assert.ok(html.includes('data-summary-key="ready"'));
-  assert.ok(html.includes('data-summary-key="needsTravellerInfo"'));
-  assert.ok(html.includes('Add one traveller'));
-  assert.ok(html.includes('Bulk import travellers'));
-  assert.ok(html.includes('href="/programme/intake"'));
+  assert.ok(html.includes('data-summary-key="on-track"'));
+  assert.ok(html.includes('data-summary-key="watching"'));
+  assert.ok(html.includes('data-summary-key="unconfirmed"'));
+  assert.ok(html.includes('data-summary-key="endangered-commitments"'));
   assert.ok(html.includes('href="/programme/import"'));
+  assert.ok(html.includes('Import an updated sheet'));
   assertNoJargon(html, 'programme-loaded');
 });
 
@@ -139,7 +143,7 @@ test('endangered-commitments section is rendered with reason and affected count 
   assert.ok(html.includes('Welcome dinner at the riverside venue'));
   assert.ok(html.includes('Original venue closed'));
   assert.ok(html.includes('3 travellers affected'));
-  assert.ok(html.includes('href="/programme/intake"'));
+  assert.ok(html.includes('href="/programme/import"'));
   assertNoJargon(html, 'programme-endangered');
 });
 
@@ -152,12 +156,12 @@ test('missing-information panel lists every NEEDS_TRAVELLER_INFO traveller', () 
   assert.ok(html.includes('Welcome dinner venue capacity not yet confirmed'));
 });
 
-test('intake affordances are link-only and labelled honestly', () => {
+test('footer actions are link-only and labelled honestly', () => {
   const html = renderProgrammeBody(healthyProgramme);
-  assert.ok(html.includes('href="/programme/intake"'));
+  assert.ok(html.includes('data-ui-section="programme-actions"'));
   assert.ok(html.includes('href="/programme/import"'));
-  assert.ok(html.includes('Add one traveller'));
-  assert.ok(html.includes('Bulk import travellers'));
+  assert.ok(html.includes('Import an updated sheet'));
+  assert.ok(html.includes('Export roster'));
   // No fake form actions or scripted submission.
   assert.ok(!html.includes('onsubmit='));
   assert.ok(!html.includes('fetch('));
@@ -244,4 +248,124 @@ test('all programme surface output is jargon-free', () => {
     { id: 'endangered-envelope', html: renderProgramme(programmeWithEndangeredCommitmentLoaded) },
   ];
   for (const screen of screens) assertNoJargon(screen.html, screen.id);
+});
+
+// ---------------------------------------------------------------------------
+// Approved-design augmentations: timeline, case links, preview modal, intake
+// ---------------------------------------------------------------------------
+
+const sampleTimeline = [
+  {
+    dateLabel: 'Wed 1 Oct',
+    items: [
+      { key: 'rehearsal', timeLabel: '09:00', title: 'Keynote rehearsal (closed)', tag: 'Arjun lands 09:25', tone: 'endangered' as const },
+      { key: 'keynote', timeLabel: '10:00', title: 'Keynote', tag: 'Depends on recovery', tone: 'watch' as const },
+      { key: 'thinktank', timeLabel: '11:00', title: 'Thinktank', tone: 'ok' as const },
+    ],
+  },
+];
+
+test('timeline section renders only when the augmentation supplies it', () => {
+  const without = renderProgrammeBody(healthyProgramme);
+  assert.ok(!without.includes('class="timeline"'));
+  const withTimeline = renderProgrammeBody(healthyProgramme, { timeline: sampleTimeline });
+  assert.ok(withTimeline.includes('class="timeline"'));
+  assert.ok(withTimeline.includes('3 commitments · 1 day'));
+  assert.ok(withTimeline.includes('tl-item endangered'));
+  assert.ok(withTimeline.includes('d-watch'));
+  assertNoJargon(withTimeline, 'programme-timeline');
+});
+
+test('endangered commitments render the case link only when the augmentation maps one', () => {
+  const withoutLink = renderProgrammeBody(programmeWithEndangeredCommitment);
+  assert.ok(!withoutLink.includes('Open the case →'), 'no case link without the augmentation');
+  const withLink = renderProgrammeBody(programmeWithEndangeredCommitment, {
+    commitmentHrefFor: (item) => ({ href: `/operator/cases/case-for-${item.commitmentId}`, label: 'Open the case →' }),
+  });
+  assert.ok(withLink.includes('Open the case →'));
+  assert.ok(withLink.includes('href="/operator/cases/case-for-'));
+});
+
+test('committed notice and just-changed markers render from augmentations only', () => {
+  const plain = renderProgrammeBody(healthyProgramme);
+  assert.ok(!plain.includes('data-ui-section="committed-notice"'));
+  assert.ok(!plain.includes('just-changed'));
+  const committed = renderProgrammeBody(healthyProgramme, {
+    timeline: sampleTimeline,
+    committedNotice: { title: 'Session moved — 22 Sep, 10:02', body: 'The session is now later.', footnote: 'Roster and timeline updated.' },
+    justChangedTimelineKeys: new Set(['keynote']),
+    justChangedTripIds: new Set([healthyProgramme.travellers[0]!.tripId]),
+  });
+  assert.ok(committed.includes('data-ui-section="committed-notice"'));
+  assert.ok(committed.includes('Session moved — 22 Sep, 10:02'));
+  assert.ok(committed.includes('tl-item just-changed'));
+  assert.ok(committed.includes('tr class="just-changed"'));
+  assertNoJargon(committed, 'programme-committed');
+});
+
+test('change preview modal renders over an inert backdrop with honest framing', () => {
+  const html = renderProgrammeChangePreview(healthyProgramme, {
+    title: 'Move the welcome dinner?',
+    subtitle: 'A what-if for the programme team.',
+    current: { whenLabel: 'Wed 1 Oct · 14:00–14:20', whereLabel: 'Main hall' },
+    proposed: { whenLabel: 'Wed 1 Oct · 09:50–10:10', whereLabel: 'Main hall — same room' },
+    impacts: [
+      { countLabel: '1', text: 'One traveller lands close to the new time.', badgeLabel: 'At risk', badgeTone: 'watch' },
+      { countLabel: '44', text: 'unaffected — arrivals, stays and commitments all still hold.', badgeLabel: 'No impact', badgeTone: 'ok' },
+    ],
+    alternatives: [
+      { label: 'Keep the 14:00 slot', note: 'no impact — the default' },
+      { label: 'Move to 11:30 instead', note: 'viable for everyone' },
+    ],
+    checksFootnote: 'Checked against all 45 trips. No bookings have been touched.',
+    confirmLabel: 'Confirm the move',
+    cancelLabel: 'Cancel — keep 14:00',
+  });
+  assert.ok(html.includes('aria-hidden="true"'));
+  assert.ok(html.includes('class="modal-scrim"'));
+  assert.ok(html.includes('role="dialog"'));
+  assert.ok(html.includes('Preview · no changes made yet'));
+  assert.ok(html.includes('class="change-compare"'));
+  assert.ok(html.includes('class="impact-row"'));
+  assert.ok(html.includes('class="alt-row"'));
+  // Without hrefs the actions are inert buttons — never fake links.
+  assert.ok(!html.includes('Confirm the move</a>'));
+  assertNoJargon(html, 'programme-preview');
+});
+
+test('intake screen shows the on-file programme honestly', () => {
+  const html = renderProgrammeIntake(healthyProgrammeLoaded, {
+    programmeHref: '/programme',
+    importHref: '/programme/import',
+    sources: [{ label: 'roster.xlsx', note: '45 rows · 12 Sep' }],
+    timeline: sampleTimeline,
+  });
+  assert.ok(html.includes('Programme intake'));
+  assert.ok(html.includes('class="intake-grid"'));
+  assert.ok(html.includes('class="dropzone"'));
+  assert.ok(html.includes('On file — Atlas Innovation Summit 2026'));
+  assert.ok(html.includes('3 commitments across 1 day'));
+  assert.ok(html.includes('45 people'));
+  assert.ok(html.includes('Travel arranged by us'));
+  assert.ok(html.includes('roster.xlsx'));
+  // Upload / manual entry are inert until the integrator wires them.
+  assert.ok(!html.includes('onsubmit='));
+  assert.ok(!html.includes('fetch('));
+  const loading = renderProgrammeIntake(programmeLoading);
+  assert.ok(loading.includes('data-ui-state="loading"'));
+  assertNoJargon(html, 'programme-intake');
+});
+
+test('augmentation content is HTML-escaped like any other data', () => {
+  const hostile = renderProgrammeBody(healthyProgramme, {
+    roleFor: () => '<script>alert(1)</script>',
+    arrivalFor: () => '30 Sep, 09:15',
+    timeline: [
+      { dateLabel: 'Wed 1 Oct', items: [{ key: 'x', timeLabel: '09:00', title: '<b>hostile</b>', tone: 'ok' as const }] },
+    ],
+  });
+  assert.ok(!hostile.includes('<script>alert(1)</script>'));
+  assert.ok(!hostile.includes('<b>hostile</b>'));
+  assert.ok(hostile.includes('&lt;script&gt;'));
+  assert.ok(hostile.includes('&lt;b&gt;hostile&lt;/b&gt;'));
 });

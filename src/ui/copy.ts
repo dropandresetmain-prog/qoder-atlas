@@ -123,59 +123,56 @@ export const PROGRAMME_SUBHEADING =
 /** One-line explanation for the per-status tiles row. */
 export const PROGRAMME_TILES_LEGEND = 'Counts by trip status across the whole programme.';
 
-/** Short label for the endangered-commitments section. */
-export const PROGRAMME_ENDANGERED_TITLE = 'At-risk shared commitments';
+/** Short label for the endangered-commitments section (approved P2 wording). */
+export const PROGRAMME_ENDANGERED_TITLE = 'Endangered commitments';
 
-/** Heading for the programme-level "missing information" panel. */
-export const PROGRAMME_MISSING_INFO_TITLE = 'Missing information';
+/** Heading for the programme-level "missing information" panel (approved P1 wording). */
+export const PROGRAMME_MISSING_INFO_TITLE = 'Missing traveller information';
 
 /** Affordance: single-traveller intake. */
 export const PROGRAMME_INTAKE_ADD_LABEL = 'Add one traveller';
 
-/** Affordance: bulk import of a traveller list. */
-export const PROGRAMME_INTAKE_BULK_LABEL = 'Bulk import travellers';
+/** Affordance: import an updated traveller sheet (approved footer wording). */
+export const PROGRAMME_IMPORT_UPDATED_LABEL = 'Import an updated sheet';
 
-/** Column headers for the programme traveller table. */
+/** Affordance: open the what-if programme-change preview. */
+export const PROGRAMME_CHANGE_PREVIEW_LABEL = 'Preview a programme change';
+
+/** Inert affordances shown on the programme footer until wired by the integrator. */
+export const PROGRAMME_EXPORT_LABEL = 'Export roster';
+export const PROGRAMME_MESSAGE_AFFECTED_LABEL = 'Message affected travellers';
+
+/** Missing-information panel action label (plural-safe for any count). */
+export const PROGRAMME_ASK_TRAVELLERS_LABEL = 'Ask these travellers';
+
+/** Section title for the per-day commitment timeline. */
+export const PROGRAMME_TIMELINE_TITLE = 'Programme timeline';
+
+/** Column headers for the programme traveller table (approved P1/P2 columns). */
 export const PROGRAMME_TABLE_HEADERS = {
   name: 'Traveller',
+  role: 'Role',
+  arrival: 'Arrival',
   status: 'Status',
-  cases: 'Active cases',
-  decisions: 'Decisions needed',
-  uncertainties: 'Still unclear',
 } as const;
 
-/** Tile label keyed by the ProgrammeStatusSummary field. */
-export const PROGRAMME_TILE_LABEL: Record<ProgrammeStatusSummaryTileKeys, string> = {
-  total: 'Total travellers',
-  ready: 'Ready',
-  planning: 'Trip being planned',
-  needsTravellerInfo: 'Needs traveller details',
-  changeRequested: 'Change requested',
-  atRisk: 'At risk',
-  disrupted: 'Needs attention',
-  recovering: 'Recovery under way',
-  awaitingDecision: 'Decisions needed',
-  resolved: 'Recovered',
-  unknown: 'Unconfirmed',
-};
-
 /**
- * Status keys that appear in ProgrammeStatusSummary and have a matching
- * tile label above. Centralised so a future summary field always gets a
- * tile or a deliberate omission, never a missing label.
+ * Tile labels for the approved programme summary buckets. The buckets
+ * aggregate the frozen ProgrammeStatusSummary fields into the designer's
+ * programme-health vocabulary (P1/P2/E1/E2 all use the same six tiles).
  */
-export type ProgrammeStatusSummaryTileKeys =
-  | 'total'
-  | 'ready'
-  | 'planning'
-  | 'needsTravellerInfo'
-  | 'changeRequested'
-  | 'atRisk'
-  | 'disrupted'
-  | 'recovering'
-  | 'awaitingDecision'
-  | 'resolved'
-  | 'unknown';
+export const PROGRAMME_TILE_LABEL = {
+  total: 'Travellers',
+  /** Used when nothing on the programme needs action — the healthy wording. */
+  onTrackCalm: 'Ready',
+  /** Used whenever any trip is disrupted, at risk, recovering, or waiting. */
+  onTrackActive: 'On track',
+  watching: 'Watching',
+  inRecovery: 'In recovery',
+  beingPlanned: 'Being planned',
+  unconfirmed: 'Unconfirmed',
+  endangered: 'Endangered commitments',
+} as const;
 
 /**
  * Internal terms that must never appear in rendered user-facing output.
