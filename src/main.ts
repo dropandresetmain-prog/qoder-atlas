@@ -28,12 +28,13 @@ async function main(): Promise<void> {
     composed.db.close();
     process.exit(1);
   });
-  server.listen(config.httpPort, () => {
+  server.listen(config.httpPort, '0.0.0.0', () => {
     const address = server.address();
     const port = typeof address === 'object' && address !== null ? address.port : config.httpPort;
+    const host = typeof address === 'object' && address !== null ? address.address : '0.0.0.0';
     console.log(
       `[atlas] AI Trip Recovery Layer started env=${config.environment} mode=${config.adapterMode} ` +
-        `schema=v${kvGet(composed.db, 'schema_version')} http=http://localhost:${port}/operator`,
+        `schema=v${kvGet(composed.db, 'schema_version')} http=http://${host}:${port}/operator`,
     );
   });
 
