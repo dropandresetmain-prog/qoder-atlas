@@ -99,7 +99,7 @@ test('final UI wiring: Decisions and Activity are served HTML routes and reachab
   }
 });
 
-test('final UI wiring: the real programme route renders persisted commitment timeline data', async () => {
+test('final UI wiring: the real programme route renders persisted commitments and the real preview/commit control', async () => {
   const config = AppConfigSchema.parse({
     environment: 'local', adapterMode: 'REPLAY', sqlitePath: ':memory:', fixturesDir: 'fixtures',
     providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {} },
@@ -114,6 +114,10 @@ test('final UI wiring: the real programme route renders persisted commitment tim
     const html = await response.text();
     assert.match(html, /aria-label="Programme timeline"/);
     assert.match(html, /Headline Interview: Aviation After Automation/);
+    assert.match(html, /Preview programme change/);
+    assert.match(html, /\/api\/programme\/.*\/change-preview/);
+    assert.match(html, /\/api\/programme\/.*\/change-commit/);
+    assert.match(html, /Preview · no changes made yet/);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     composed.db.close();
