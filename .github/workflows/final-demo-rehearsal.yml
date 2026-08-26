@@ -1,0 +1,128 @@
+name: Final demo rehearsal gates
+
+on:
+  push:
+    branches:
+      - integration/final-demo-rehearsal-fixes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout rehearsal candidate
+        uses: actions/checkout@v4
+
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused final UI wiring test
+        run: node --test test/final-ui-backend-wiring.test.ts
+
+      - name: Full test suite
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Anti-hardcoding gate
+        run: npm run gate:anti-hardcoding
+
+      - name: Install Chromium for browser rehearsal
+        run: npx playwright install --with-deps chromium
+
+      - name: Start REPLAY application
+        env:
+          APP_ENVIRONMENT: demo
+          ADAPTER_MODE: REPLAY
+          HTTP_PORT: '8787'
+          SQLITE_PATH: /tmp/northstar-final-demo.sqlite
+        run: |
+          npm run dev > /tmp/northstar-server.log 2>&1 &
+          echo $! > /tmp/northstar-server.pid
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8787/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/northstar-server.log
+          exit 1
+
+      - name: Browser rehearse S1
+        run: node scripts/ait-s1-browser-smoke.mjs
+
+      - name: Browser rehearse S1 to S3 programme preview and commit
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import assert from 'node:assert/strict';
+
+          const BASE = 'http://127.0.0.1:8787';
+          const HERO_TRIP = 'trip-trv-evt-ait-2026-ait-draft-14';
+          const COMMITMENT = 'cmt-ait-d1-headline-interview';
+
+          const before = await fetch(`${BASE}/api/traveller/${HERO_TRIP}`).then(r => r.json());
+          assert.equal(before.remainderViable, 'NOT_VIABLE', 'S1 must leave Sarah not viable before S3');
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+          await page.goto(`${BASE}/programme?event=evt-ait-2026`);
+          await page.waitForLoadState('networkidle');
+
+          await page.click('[data-programme-change-launch]');
+          await page.selectOption('[name="commitmentId"]', COMMITMENT);
+          await page.selectOption('[name="changeKind"]', 'RESCHEDULED');
+          await page.fill('[name="newStartsAt"]', '2026-10-01T15:30:00+08:00');
+          await page.fill('[name="newEndsAt"]', '2026-10-01T16:00:00+08:00');
+          await page.click('[data-programme-change-preview]');
+          await page.waitForSelector('[data-programme-change-commit]:not([hidden])');
+          await page.waitForFunction(() => document.body.textContent?.includes('Preview · no changes made yet'));
+
+          const afterPreview = await fetch(`${BASE}/api/traveller/${HERO_TRIP}`).then(r => r.json());
+          assert.equal(afterPreview.remainderViable, 'NOT_VIABLE', 'preview must not mutate Sarah trip state');
+
+          page.on('dialog', dialog => dialog.accept());
+          await Promise.all([
+            page.waitForLoadState('networkidle'),
+            page.click('[data-programme-change-commit]'),
+          ]);
+
+          const programmeHtml = await page.content();
+          assert.match(programmeHtml, /15:30/);
+
+          const afterCommit = await fetch(`${BASE}/api/traveller/${HERO_TRIP}`).then(r => r.json());
+          assert.equal(afterCommit.remainderViable, 'VIABLE', 'S3 commit must restore Sarah remainder viability');
+
+          await page.screenshot({ path: 'output/browser-smoke-s1/07-programme-after-s3-commit.png', fullPage: true });
+          await browser.close();
+          console.log('S1 -> S3 BROWSER REHEARSAL PASS');
+          NODE
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/northstar-server.log || true
+
+      - name: Upload browser rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-demo-browser-rehearsal
+          path: output/browser-smoke-s1/
+          if-no-files-found: warn
