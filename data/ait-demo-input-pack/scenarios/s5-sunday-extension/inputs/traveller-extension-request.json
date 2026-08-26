@@ -1,16 +1,16 @@
 {
   "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-traveller-messages"],
-  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel. This is the scenario trigger (traveller-requested change). Claims inside are the traveller's own statements: they must be reconciled against booked state and programme data, not trusted as authoritative.",
+  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel. Final-demo hero beat is the self-funded hotel extension through Sunday; return-flight change is acknowledged but secondary to G1/G2 hotel resolution.",
   "messageId": "msg-ait-s5-001",
   "channel": "TRAVELLER_CHAT",
   "fromDraftId": "ait-draft-35",
   "receivedAt": "2026-09-18T11:05:00+08:00",
-  "text": "Hi! Quick one - my fireside is Thursday afternoon and my flight home leaves Friday just before midnight, basically straight from the closing party. I'd love to stay the weekend: could you move my return to Sunday the 4th instead? I'll cover whatever the extra costs are - flights, hotel nights, transfers, all of it. My only official thing is the fireside itself so nothing should be affected.",
+  "text": "Hi! Quick one - my fireside is Thursday afternoon and my flight home leaves Friday just before midnight, basically straight from the closing party. I'd love to stay the weekend: could you extend my hotel through Sunday the 4th? I'll cover the extra hotel nights myself. If the return needs moving too we can talk about that separately — my only official thing is the fireside itself so nothing should be affected.",
   "extractedClaims": [
     { "claim": "His only programme commitment is the recovery fireside (Thursday 1 Oct afternoon)", "status": "CONFIRMED_BY_PROGRAMME", "verificationNeededFrom": "NONE" },
     { "claim": "Current return departs Friday 2 Oct just before midnight", "status": "CONFIRMED_BY_BOOKING", "verificationNeededFrom": "NONE" },
-    { "claim": "Requests return moved to Sunday 4 Oct", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_INVENTORY" },
-    { "claim": "Volunteers to pay all incremental costs (flights, hotel, transfers)", "status": "EXPLICIT_FUNDING_DECLARATION", "verificationNeededFrom": "NONE", "note": "Traveller-initiated funding declaration; still requires the itemised split to be presented and confirmed before any action (approvalThresholds (4))." }
+    { "claim": "Requests hotel stay extended through Sunday 4 Oct", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_INVENTORY" },
+    { "claim": "Volunteers to pay incremental hotel costs", "status": "EXPLICIT_FUNDING_DECLARATION", "verificationNeededFrom": "NONE", "note": "Traveller-initiated funding declaration; itemised FUNDED_WINDOW split still required before money-moving execution." }
   ]
 }

@@ -9,19 +9,19 @@
   },
   "localInputPack": {
     "packId": "ait-s5",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "path": "../packs/s5"
   },
   "boundaries": [
     {
       "seam": "traveller.change_request",
       "mode": "REPLAY",
-      "note": "Structured ChangeRequest through resolution HTTP"
+      "note": "Structured stay-extension ChangeRequest through resolution HTTP (hotel hero beat)"
     },
     {
-      "seam": "atlas.flight.search",
+      "seam": "nuitee.hotel.search",
       "mode": "REPLAY",
-      "note": "Planning evidence from a REPLAY flight.search recording for the requested return corridor"
+      "note": "G1/G2 hotel.search evidence from curated Nuitée REPLAY for Concorde Hotel Singapore (lp21d9f) Sunday-extension dates"
     }
   ],
   "requiredEnv": [],
@@ -37,13 +37,7 @@
       "trip-trv-evt-ait-2026-ait-draft-35"
     ]
   },
-  "routeParams": [
-    {
-      "origin": "SIN",
-      "destination": "AMS",
-      "date": "2026-10-04"
-    }
-  ],
+  "routeParams": [],
   "steps": [
     {
       "id": "reset",
@@ -60,6 +54,7 @@
     },
     {
       "id": "change_request",
+      "description": "Traveller requests a personal Sunday stay extension and self-funds the incremental cost",
       "action": {
         "type": "http",
         "method": "POST",
@@ -72,12 +67,15 @@
             "sourceId": "src-acceptance-manifest",
             "authority": "ASSERTED",
             "issuedAt": "2026-09-25T10:05:00+08:00",
-            "intentKind": "ADJUST_TRIP_WINDOW",
+            "intentKind": "CHANGE_STAY",
             "urgency": "HARD_INSTRUCTION",
-            "utterance": "Can I stay until Sunday?",
+            "utterance": "Can I stay until Sunday? I'll cover the extra hotel nights myself.",
             "target": {
-              "departAfter": "2026-10-04T12:00:00+08:00",
-              "stayCheckOut": "2026-10-04T11:00:00+08:00"
+              "stayCheckOut": "2026-10-04T11:00:00+08:00",
+              "stayPlaceRef": {
+                "system": "nuitee-hotel-id",
+                "value": "lp21d9f"
+              }
             },
             "fundingDeclaration": "TRAVELLER_FUNDED"
           },
@@ -89,18 +87,18 @@
         }
       },
       "assert": [
-        { "path": "accepted", "op": "truthy", "description": "the structured extension request is accepted" },
+        { "path": "accepted", "op": "truthy", "description": "the structured stay-extension request is accepted" },
+        { "path": "intentKind", "op": "equals", "expected": "CHANGE_STAY", "description": "the request is classified as a stay change (hotel hero beat)" },
         { "path": "urgency", "op": "equals", "expected": "HARD_INSTRUCTION", "description": "the request carries binding instruction authority" },
         { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the request" },
-        { "path": "implications", "op": "arrayLengthMin", "expected": 3, "description": "both window deltas plus the funding decision are recorded" },
-        { "path": "implications.0", "op": "contains", "expected": "departAfter 2026-10-04T12:00:00+08:00 is 37h later than current latest departure", "description": "the return-leg window delta is derived from authoritative trip state" },
-        { "path": "implications.1", "op": "contains", "expected": "stayCheckOut 2026-10-04T11:00:00+08:00 is 2d later than current check-out", "description": "the stay-extension delta is derived from the confirmed stay" },
-        { "path": "implications.2", "op": "contains", "expected": "incremental payer TRAVELLER per rule(s) rule-ait-funded-window", "description": "the extension accrues outside the event-funded window: deterministic mixed-funding payer decision, amount allocated once priced" }
+        { "path": "implications.0", "op": "contains", "expected": "stayCheckOut 2026-10-04T11:00:00+08:00 is 2d later than current check-out", "description": "the stay-extension delta is derived from the confirmed stay" },
+        { "path": "implications.1", "op": "contains", "expected": "nuitee-hotel-id:lp21d9f", "description": "real midscale Nuitée property (Concorde Hotel Singapore) is the declared stay search target" },
+        { "path": "implications.2", "op": "contains", "expected": "incremental payer TRAVELLER per rule(s) rule-ait-funded-window", "description": "FUNDED_WINDOW allocates the personal extension increment to the traveller" }
       ]
     },
     {
       "id": "plan",
-      "description": "Planning loop re-searches the return corridor for the requested departure date (REPLAY evidence) and records the stay extension honestly",
+      "description": "G1/G2 planning issues hotel.search then enumerates replacement/extension stay strategies from REPLAY evidence",
       "action": {
         "type": "http",
         "method": "POST",
@@ -115,22 +113,20 @@
         }
       },
       "assert": [
-        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planner requests return-corridor evidence first, then proposes from it" },
-        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search on the return corridor" },
-        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the REPLAY recording supplied return-corridor offers" },
-        { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "every normalized corridor offer becomes a candidate rebook strategy" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to depart later", "description": "the candidate rebooks the existing return leg to a later departure" },
-        { "path": "strategies.0.feasible", "op": "truthy", "description": "a Sunday return inside the trip window is deterministically feasible" },
-        { "path": "strategies.0.costImpact.amount", "op": "equals", "expected": 468, "description": "the strategy carries a deterministic gross price from REPLAY evidence" },
-        { "path": "bestStrategyId", "op": "exists", "description": "feasible candidates are ranked into a best strategy" },
-        { "path": "uncertainties", "op": "arrayLengthMin", "expected": 2, "description": "the stay extension is recorded honestly, not silently dropped" },
-        { "path": "uncertainties.1", "op": "contains", "expected": "stayCheckOut requested: replacement/extension strategies await hotel.search evidence", "description": "the planner records the stay extension as an explicit evidence-gated uncertainty" },
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "evidence round then strategy round" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "hotel.search", "description": "G1/G2 issues a scoped hotel.search for the stay extension" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "Downtown Core / Marina Bay Nuitée REPLAY evidence resolves" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "candidate replacement/extension stays come from hotel.search evidence" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Switch stay to", "description": "candidates name a real property from provider evidence" },
+        { "path": "strategies.0.feasible", "op": "truthy", "description": "at least one stay extension is deterministically feasible" },
+        { "path": "bestStrategyId", "op": "exists", "description": "feasible hotel candidates are ranked into a best strategy" },
+        { "path": "uncertainties", "op": "arrayLengthMin", "expected": 1, "description": "stay dimensions are recorded as explicit uncertainties until evidence arrives" },
         { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
       ]
     },
     {
       "id": "begin",
-      "description": "Strategy becomes a money-moving intent; deterministic authority decides and the real price is allocated against the funded window",
+      "description": "Hotel extension intent: deterministic FUNDED_WINDOW allocation to the traveller; authority stays within traveller self-funded path (no organiser)",
       "action": {
         "type": "http",
         "method": "POST",
@@ -146,28 +142,69 @@
         }
       },
       "assert": [
-        { "path": "funding.allocation.incrementalAmount.amount", "op": "equals", "expected": 468, "description": "the priced cost accrues outside the funded window and is allocated in full as incremental" },
-        { "path": "funding.allocation.incrementalPayer", "op": "equals", "expected": "TRAVELLER", "description": "mixed funding: the incremental payer derives deterministically from the funding-window rule" },
+        { "path": "intentId", "op": "exists", "description": "the hotel strategy was staged as a validated action intent" },
+        { "path": "funding.allocation.incrementalPayer", "op": "equals", "expected": "TRAVELLER", "description": "personal extension increment is traveller-funded via FUNDED_WINDOW" },
         { "path": "funding.allocation.derivedFromRuleIds.0", "op": "equals", "expected": "rule-ait-funded-window", "description": "the allocation cites the governing policy rule" },
-        { "path": "funding.summary", "op": "contains", "expected": "468 SGD payable by the traveller", "description": "the allocation is surfaced as a human-readable deterministic summary" },
-        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "the per-trip airfare ceiling is evaluated against the gross spend" },
-        { "path": "ruleTrace.1", "op": "contains", "expected": "rule-ait-hotel-spend-limit", "description": "the accommodation ceiling participates in the same deterministic review" },
-        { "path": "outcome", "op": "equals", "expected": "BLOCKED", "description": "the gross spend beyond a declared policy ceiling never executes: authority fails closed" },
-        { "path": "caseStatus", "op": "equals", "expected": "ESCALATED", "description": "a blocked money-moving intent escalates the case for human review" },
-        { "path": "executable", "op": "falsy", "description": "no executor can pick up the intent while authority blocks it" }
+        { "path": "funding.summary", "op": "contains", "expected": "payable by the traveller", "description": "the traveller-funded incremental amount is surfaced" },
+        { "path": "outcome", "op": "equals", "expected": "REQUIRES_TRAVELLER", "description": "traveller self-funded hotel.modify stays on traveller authority — no organiser approval" },
+        { "path": "caseStatus", "op": "equals", "expected": "AWAITING_TRAVELLER", "description": "the case waits on traveller authority, not organiser escalation" }
       ]
     },
     {
-      "id": "observe_case",
-      "description": "Observe opened recovery case",
+      "id": "decide",
+      "description": "Traveller approves the self-funded hotel extension",
       "action": {
-        "type": "observe",
-        "path": "/api/cases/{{caseId}}",
-        "label": "case_after_begin",
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/decide",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{intentId}}",
+          "decidedBy": {
+            "entityType": "TRAVELLER",
+            "id": "trv-evt-ait-2026-ait-draft-35"
+          },
+          "verdict": "APPROVED",
+          "at": "2026-09-25T10:25:00+08:00"
+        },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-35", "description": "the case belongs to the requesting traveller's trip" }
+        { "path": "accepted", "op": "truthy", "description": "the traveller approval is accepted" }
+      ]
+    },
+    {
+      "id": "execute",
+      "description": "Execute the authorised hotel extension at the simulated external boundary; observation resolves the case",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/execute",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{intentId}}",
+          "at": "2026-09-25T10:30:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "executed", "op": "truthy", "description": "authorised execution crosses the provider boundary" },
+        { "path": "caseStatus", "op": "equals", "expected": "RESOLVED", "description": "verification closes the recovery case" },
+        { "path": "resolutionOutcome", "op": "equals", "expected": "FULLY_RECOVERED", "description": "the stay extension recovers the trip without residual loss" }
+      ]
+    },
+    {
+      "id": "observe_trip",
+      "description": "Whole trip remains viable after the traveller-funded hotel extension",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-35",
+        "label": "trip_after_execute",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-35", "description": "observation targets Jonas Berg's trip" },
+        { "path": "remainderViable", "op": "equals", "expected": "VIABLE", "description": "remainder of the trip is deterministically viable after recovery" }
       ]
     }
   ]

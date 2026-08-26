@@ -1,26 +1,29 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
-  "note": "Partner-hotel and transfer impact of the requested Sunday extension, computed against the booked baseline. All incremental elements fall to the traveller per rule-ait-funded-window (incrementalPayer TRAVELLER), rule-ait-hotel-funded-window, clauses.personalExtensionFunding and clauses.transferCoverage. Deliberate trap encoded here: night 2026-10-02 (check-out 3 Oct) sits INSIDE the hotel funded window, but the business-equivalent trip checks out 2 Oct - the event never books that night in the baseline, so it is a traveller increment, not an event-covered night.",
+  "note": "Partner-hotel and transfer impact of the requested Sunday extension. Covered baseline = MIN(eligible value of already-booked event stay, applicable org/event hotel allowance). All incremental nights/transfers for the personal extension fall to the traveller (rule-ait-funded-window incrementalPayer TRAVELLER). Demo hotel evidence at runtime is a real midscale Downtown Core / Marina Bay Nuitée corpus via G1/G2 (preferred search near place-hotel-harbourline coordinates until place-hotel-bayview gains shared coordinates — see shared patch request).",
   "asOf": "2026-09-18T11:20:00+08:00",
   "draftId": "ait-draft-35",
   "hotelImpact": {
     "placeId": "place-hotel-bayview",
     "baselineNights": ["2026-09-30", "2026-10-01"],
+    "baselineEligibleValue": { "amount": 570, "currency": "SGD", "note": "2 nights at SGD 285 block rate — eligible booked event stay value" },
+    "applicableHotelAllowance": { "amount": 640, "currency": "SGD", "note": "2 nights × SGD 320 nightly ceiling (rule-ait-hotel-spend-limit); covered baseline uses MIN(eligible, allowance) = 570" },
+    "coveredBaseline": { "amount": 570, "currency": "SGD", "rule": "MIN(eligible booked stay, applicable allowance)" },
     "extensionNights": [
-      { "night": "2026-10-02", "ratePerNight": { "amount": 285, "currency": "SGD" }, "fundedBy": "TRAVELLER", "reason": "Only exists because of the personal extension; the business-equivalent trip departs 2 Oct. Inside the calendar window but outside the business-equivalent booking." },
-      { "night": "2026-10-03", "ratePerNight": { "amount": 285, "currency": "SGD" }, "fundedBy": "TRAVELLER", "reason": "Outside rule-ait-hotel-funded-window (check-out 3 Oct 11:00) and only exists because of the extension." }
+      { "night": "2026-10-02", "ratePerNight": { "amount": 285, "currency": "SGD" }, "fundedBy": "TRAVELLER", "reason": "Only exists because of the personal extension; the business-equivalent trip departs 2 Oct." },
+      { "night": "2026-10-03", "ratePerNight": { "amount": 285, "currency": "SGD" }, "fundedBy": "TRAVELLER", "reason": "Outside the business-equivalent booking and only exists because of the extension." }
     ],
     "extensionTotal": { "amount": 570, "currency": "SGD" },
-    "availability": "CONFIRMED_BY_HOTEL",
-    "note": "Partner block has availability for both extension nights at the block rate."
+    "availability": "CONFIRMED_BY_PROVIDER_SEARCH",
+    "note": "Runtime availability comes from Nuitée hotel.search REPLAY (Downtown Core / Marina Bay midscale market), not a partner-block assumption."
   },
   "transferImpact": {
     "baselineDepartureTransfer": { "segment": "HOTEL_TO_AIRPORT_DEPARTURE", "date": "2026-10-02", "status": "CANCELLED_IF_EXTENSION_ACCEPTED", "fundedBy": "EVENT_ORGANISATION", "note": "Event-funded 2 Oct transfer lapses; no refund (included in event block arrangement)." },
     "extensionDepartureTransfer": { "segment": "HOTEL_TO_AIRPORT_DEPARTURE", "date": "2026-10-04", "fundedBy": "TRAVELLER", "estimatedCost": { "amount": 38, "currency": "SGD" }, "reason": "Departure outside the funded window; clauses.transferCoverage funds only in-window arrival/departure transfers." }
   },
   "costSplitSummary": {
-    "eventFunded": { "airfare": { "amount": 1150, "currency": "SGD" }, "hotelNights": 2, "transfers": 2, "note": "Business-equivalent in-window trip, unchanged by the extension." },
-    "travellerFunded": { "airfareDelta": { "amount": 148, "currency": "SGD" }, "hotelExtension": { "amount": 570, "currency": "SGD" }, "transfer": { "amount": 38, "currency": "SGD" }, "total": { "amount": 756, "currency": "SGD" } }
+    "eventFunded": { "airfare": { "amount": 1150, "currency": "SGD" }, "hotelCoveredBaseline": { "amount": 570, "currency": "SGD" }, "transfers": 2, "note": "Business-equivalent in-window trip; hotel covered baseline = MIN(eligible booked stay, allowance)." },
+    "travellerFunded": { "hotelExtension": { "amount": 570, "currency": "SGD" }, "transfer": { "amount": 38, "currency": "SGD" }, "total": { "amount": 608, "currency": "SGD" }, "note": "Airfare delta for a Sunday return is catalogue-complete but not part of the hotel auto-resolve hero beat." }
   }
 }
