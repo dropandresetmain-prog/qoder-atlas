@@ -1,8 +1,8 @@
 {
   "packId": "ait-s7",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scenarioId": "S7",
-  "description": "Local acceptance pack for S7; facts live in data/ait-demo-input-pack",
+  "description": "Local acceptance pack for S7 Tokyo-origin change with explicit LHR return + FX/home-currency restatement; facts live in data/ait-demo-input-pack",
   "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
   "expect": {
     "anchorEventIds": [

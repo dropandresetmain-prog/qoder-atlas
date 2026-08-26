@@ -1,17 +1,17 @@
 {
   "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-traveller-messages"],
-  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel. This is the scenario trigger (traveller-requested structural change). Claims inside are the traveller's own statements: they must be reconciled against booked state and programme data, not trusted as authoritative. Note what the message does NOT say: the return destination after the event.",
+  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel. This is the scenario trigger (traveller-requested structural change). Claims inside are the traveller's own statements: they must be reconciled against booked state and programme data, not trusted as authoritative. RETURN INTENT IS EXPLICIT: after the summit he returns to LHR (home). Do not treat return destination as UNKNOWN.",
   "messageId": "msg-ait-s7-001",
   "channel": "TRAVELLER_CHAT",
   "fromDraftId": "ait-draft-38",
   "receivedAt": "2026-09-18T16:40:00+08:00",
-  "text": "Hi - quick update from my side. I'll already be in Tokyo for work and will be flying from HND instead of London. Can you change my trip? My client meetings here wrap up Tuesday evening, so I'm free to fly anytime from Wednesday. The debate is Thursday afternoon if I remember right - happy to land whenever works.",
+  "text": "Hi - quick update from my side. I'll already be in Tokyo for work and will be flying from HND instead of London. Client meetings wrap up Tuesday evening, so I'm free to fly anytime from Wednesday. Please change the outbound to HND→SIN. I will still return to LHR after the summit — keep the London return as planned. The debate is Thursday afternoon if I remember right — happy to land whenever works.",
   "extractedClaims": [
     { "claim": "Will already be in Tokyo for work before the summit", "status": "UNVERIFIED", "verificationNeededFrom": "TRAVELLER", "note": "Self-declared; no independent evidence. Treated as a soft fact that changes the trip origin." },
     { "claim": "Client meetings end Tuesday evening (29 Sep)", "status": "UNVERIFIED", "verificationNeededFrom": "TRAVELLER", "note": "Constrains earliest departure: any HND service from Wednesday 30 Sep onwards is compatible." },
     { "claim": "Requests origin changed from LHR to HND", "status": "EXPLICIT_REQUEST", "verificationNeededFrom": "PROVIDER_INVENTORY" },
     { "claim": "His commitment is the debate Thursday afternoon", "status": "CONFIRMED_BY_PROGRAMME", "verificationNeededFrom": "NONE", "note": "distribution-debate 1 Oct 15:50-16:20; he is PREFERRED/CHANGEABLE panellist." },
-    { "claim": "Return destination after the event", "status": "NOT_STATED", "verificationNeededFrom": "TRAVELLER", "note": "The message never says where he goes after the summit. LHR (home) and HND (work continuing) are both plausible. Must be asked/escalated - never invented." }
+    { "claim": "Return destination after the event is LHR (home)", "status": "EXPLICIT_REQUEST", "verificationNeededFrom": "NONE", "note": "Traveller explicitly keeps the London return. Supersedes older pack notes that treated return as UNKNOWN. Engine still must not silently invent a different terminus or auto-rebook the return without evidence." }
   ]
 }
