@@ -265,13 +265,13 @@
           "kind": "SESSION",
           "placeId": "place-panpacific",
           "startsAt": {
-            "value": "2026-09-30T15:10:00+08:00",
+            "value": "2026-09-30T20:45:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-25T09:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-09-30T15:30:00+08:00",
+            "value": "2026-09-30T21:05:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-25T09:00:00+00:00"
@@ -2177,11 +2177,10 @@
           "US"
         ],
         "notes": [
-          "Hackathon finalist (Team Waypoint); LAX origin ZIPAIR connection demo; presents on 30 Sep, returns for awards on 2 Oct"
+          "Hackathon finalist (Team Waypoint); LAX origin ZIPAIR connection demo; overnight NRT recovery may miss morning lab — evening finals remain required; returns for awards on 2 Oct"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
-          "cmt-ait-d0-hackathon-lab",
           "cmt-ait-d0-hackathon-finals",
           "cmt-ait-d2-hack-awards"
         ],
@@ -2241,18 +2240,12 @@
               "system": "place-id",
               "value": "place-hotel-bayview"
             },
-            "checkIn": "2026-09-29T15:00:00+08:00",
+            "checkIn": "2026-09-30T15:00:00+08:00",
             "checkOut": "2026-10-03T11:00:00+08:00",
             "reservationState": "CONFIRMED"
           }
         ],
         "engagementImportance": [
-          {
-            "commitmentId": "cmt-ait-d0-hackathon-lab",
-            "role": "PARTICIPANT",
-            "importance": "PREFERRED",
-            "flexibility": "CHANGEABLE"
-          },
           {
             "commitmentId": "cmt-ait-d0-hackathon-finals",
             "role": "FINALIST",

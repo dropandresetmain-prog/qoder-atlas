@@ -146,7 +146,7 @@
         "body": {
           "tripId": "trip-trv-evt-ait-2026-ait-draft-09",
           "elementId": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2",
-          "travellerReport": "Hi — stuck at Narita. My LAX flight kept getting delayed and I landed too late for the Zipair connection to Singapore tonight. The airline desk put me on a Scoot flight tomorrow morning around 08:20 that gets in mid-afternoon. I am supposed to be at the hackathon lab in the morning and I present at the finals tomorrow afternoon. My bag is tagged for the morning flight. What do we do — is there anything tonight, or do I need a hotel here?",
+          "travellerReport": "Hi — stuck at Narita. My LAX flight kept getting delayed and I landed too late for the Zipair connection to Singapore tonight. The airline desk put me on a Scoot flight tomorrow morning around 08:20 that gets in mid-afternoon. I present at the hackathon finals tomorrow evening. My bag is tagged for the morning flight. What do we do — is there anything tonight, or do I need a hotel here?",
           "at": "2026-09-29T17:20:00+09:00"
         },
         "expectStatus": 200,
@@ -173,58 +173,126 @@
         { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-09", "description": "case belongs to the reporting traveller trip" },
         { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "case awaits recovery after traveller-originated miss" },
         { "path": "whatChanged", "op": "equals", "expected": "Traveller reported missing a scheduled flight", "description": "deterministic what-changed narrative" },
-        { "path": "checks", "op": "arrayLengthMin", "expected": 3, "description": "missed leg propagates to dependent commitments" },
+        { "path": "checks", "op": "arrayLengthMin", "expected": 2, "description": "missed leg propagates to dependent commitments (finals + awards)" },
         { "path": "checks.0.result", "op": "equals", "expected": "FAIL", "description": "arrival-before-commitment fails without the onward leg" }
       ]
     },
     {
-      "id": "plan_same_night_window",
-      "description": "Stage 4/5: deterministic fallback planner searches NRT→SIN REPLAY inventory; viability judges same-night vs morning-class offers",
+      "id": "plan_overnight_window",
+      "description": "Stage 5: after same-night window closes, planner searches same-day + next-day NRT→SIN REPLAY inventory; past departures are excluded; next-morning recovery can restore evening finals",
       "action": {
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/plan",
         "body": {
           "caseId": "{{caseId}}",
-          "at": "2026-09-29T18:05:00+09:00"
+          "at": "2026-09-29T21:30:00+09:00"
         },
-        "expectStatus": 200
+        "expectStatus": 200,
+        "capture": {
+          "bestStrategyId": "bestStrategyId"
+        }
       },
       "assert": [
         { "path": "rounds", "op": "gte", "expected": 2, "description": "planner requests corridor evidence then proposes" },
         { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "evidence request is flight.search on the failed corridor" },
         { "path": "toolActivity.0.ok", "op": "truthy", "description": "REPLAY recording supplied NRT→SIN offers" },
-        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "normalized corridor offers become candidate strategies" },
+        { "path": "toolActivity", "op": "arrayLengthMin", "expected": 2, "description": "same-day and next-day corridor searches are both requested" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "boardable corridor offers become candidate strategies" },
+        { "path": "bestStrategyId", "op": "exists", "description": "at least one boardable strategy is ranked feasible against evening finals" },
         { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "case advanced through planning" }
       ]
     },
     {
-      "id": "observe_trip_after_plan",
-      "description": "Trip read model reflects disruption; remainder not viable until a recovery is executed",
+      "id": "begin_recovery",
+      "description": "Stage 6: best next-morning strategy becomes a money-moving flight.change intent requiring organiser approval",
       "action": {
-        "type": "observe",
-        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-09",
-        "label": "traveller_trip_after_missed_connection",
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/begin",
+        "body": {
+          "caseId": "{{caseId}}",
+          "strategyId": "{{bestStrategyId}}",
+          "at": "2026-09-29T21:40:00+09:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "intentId": "intentId"
+        }
+      },
+      "assert": [
+        { "path": "intentId", "op": "exists", "description": "the strategy was staged as a validated action intent" },
+        { "path": "outcome", "op": "equals", "expected": "REQUIRES_HUMAN_AGENT", "description": "flight itinerary changes require human/organiser approval" },
+        { "path": "executable", "op": "equals", "expected": false, "description": "approval is required before execution" },
+        { "path": "caseStatus", "op": "equals", "expected": "AWAITING_APPROVAL", "description": "the case waits for organiser approval" }
+      ]
+    },
+    {
+      "id": "decide_recovery",
+      "description": "Stage 7: organiser approves the overnight recovery rebooking",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/decide",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{intentId}}",
+          "decidedBy": { "entityType": "ORGANISATION", "id": "org-ait-organiser" },
+          "verdict": "APPROVED",
+          "note": "S2 organiser approval: accept next-morning NRT→SIN recovery after same-night window closed",
+          "at": "2026-09-29T21:50:00+09:00"
+        },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "trip carries traveller-originated disruption state" },
-        { "path": "whatChanged", "op": "equals", "expected": "Traveller reported missing a scheduled flight", "description": "trip narrative matches signal copy" },
-        { "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE", "description": "without executed replacement the remainder is not viable" }
+        { "path": "accepted", "op": "truthy", "description": "organiser approval is accepted" },
+        { "path": "verdict", "op": "equals", "expected": "APPROVED", "description": "verdict is APPROVED" },
+        { "path": "caseStatus", "op": "equals", "expected": "READY_TO_EXECUTE", "description": "approved intent becomes executable" }
+      ]
+    },
+    {
+      "id": "execute_recovery",
+      "description": "Stage 8: provider execution/simulation at the external boundary; observation verifies whole-trip viability",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/execute",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{intentId}}",
+          "at": "2026-09-29T22:00:00+09:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "executed", "op": "truthy", "description": "the approved intent executed" },
+        { "path": "caseStatus", "op": "equals", "expected": "RESOLVED", "description": "the recovery case resolves after observation/verification" }
+      ]
+    },
+    {
+      "id": "observe_trip_after_recovery",
+      "description": "Trip read model reflects recovered viable remainder after overnight next-morning rebooking",
+      "action": {
+        "type": "observe",
+        "path": "/api/traveller/trip-trv-evt-ait-2026-ait-draft-09",
+        "label": "traveller_trip_after_overnight_recovery",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "remainderViable", "op": "equals", "expected": "VIABLE", "description": "executed next-morning recovery restores whole-trip viability" }
       ]
     },
     {
       "id": "observe_trip_activity",
-      "description": "Mutation trail records planning and the traveller missed-flight mutation",
+      "description": "Mutation trail records planning, authority, execution and the traveller missed-flight mutation",
       "action": {
         "type": "observe",
         "path": "/api/wave/trips/trip-trv-evt-ait-2026-ait-draft-09/activity",
-        "label": "trip_activity_after_missed_connection",
+        "label": "trip_activity_after_overnight_recovery",
         "expectStatus": 200
       },
       "assert": [
-        { "path": "events", "op": "arrayLengthMin", "expected": 4, "description": "planning/mutation/signal trail recorded" },
-        { "path": "events.0.action", "op": "equals", "expected": "PLANNING_COMPLETED", "description": "planning outcome on trip trail" }
+        { "path": "events", "op": "arrayLengthMin", "expected": 4, "description": "planning/authority/execution/mutation trail recorded" }
       ]
     }
   ]
