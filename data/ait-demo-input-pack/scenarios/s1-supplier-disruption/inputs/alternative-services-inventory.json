@@ -1,25 +1,55 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
   "sourceIds": ["src-sim-airline-mn"],
-  "note": "Simulated post-disruption service inventory snapshot (what a provider search would return after the schedule change/cancellation). Deliberate shape: exactly ONE same-day KUL->SIN alternative exists (MN220, 30 Sep afternoon) and NO earlier 30 Sep KUL->SIN service exists, so Mei Chen has no flight-side recovery and the engine must surface UNKNOWN/organiser decision instead of inventing one.",
+  "note": "Simulated post-disruption CGK→SIN service inventory (what a provider search would return after the MN310 retiming). Deliberate shape for honest viability differentiation: (1) retimed MN310 on 1 Oct arrives 07:10 — fails 360min buffer before 09:20 and 10:10; (2) early MN308 on 1 Oct arrives 03:45 — restores buffer for 10:10 (Group B) but NOT for 09:20 (Group C, gap 335min < 360); (3) no earlier overnight that lands by 03:20. Hand-authored Atlas REPLAY recordings for this corridor must mirror these schedules — never invent engine PASS/FAIL.",
   "observedAt": "2026-09-21T10:05:00+08:00",
   "routes": [
     {
-      "origin": "KUL",
+      "origin": "CGK",
       "destination": "SIN",
       "services": [
-        { "flightNumber": "MN218", "date": "2026-10-01", "departure": "2026-10-01T06:00:00+08:00", "arrival": "2026-10-01T07:10:00+08:00", "status": "RETIMED_SERVICE", "economySeatsAvailable": 41, "economyFare": { "amount": 0, "currency": "SGD", "note": "Re-protection seat; no fare difference." } },
-        { "flightNumber": "MN220", "date": "2026-09-30", "departure": "2026-09-30T14:10:00+08:00", "arrival": "2026-09-30T15:20:00+08:00", "status": "OPERATING", "economySeatsAvailable": 12, "economyFare": { "amount": 98, "currency": "SGD", "note": "Within the SGD 1200 airfare ceiling; same-carrier change." } }
+        {
+          "flightNumber": "MN310",
+          "date": "2026-10-01",
+          "departure": "2026-10-01T05:00:00+07:00",
+          "arrival": "2026-10-01T07:10:00+08:00",
+          "status": "RETIMED_SERVICE",
+          "economySeatsAvailable": 41,
+          "economyFare": {
+            "amount": 0,
+            "currency": "SGD",
+            "note": "Re-protection seat; no fare difference."
+          }
+        },
+        {
+          "flightNumber": "MN308",
+          "date": "2026-10-01",
+          "departure": "2026-10-01T01:30:00+07:00",
+          "arrival": "2026-10-01T03:45:00+08:00",
+          "status": "OPERATING",
+          "economySeatsAvailable": 9,
+          "economyFare": {
+            "amount": 0,
+            "currency": "SGD",
+            "note": "Same-carrier disruption replacement; no fare increase (authority-eligible when arrival-shift condition also holds)."
+          }
+        },
+        {
+          "flightNumber": "MN312",
+          "date": "2026-10-01",
+          "departure": "2026-10-01T09:00:00+07:00",
+          "arrival": "2026-10-01T11:15:00+08:00",
+          "status": "OPERATING",
+          "economySeatsAvailable": 18,
+          "economyFare": {
+            "amount": 110,
+            "currency": "SGD",
+            "note": "Later service; cannot restore morning programme buffers."
+          }
+        }
       ],
-      "noEarlierServiceOn30Sep": true
-    },
-    {
-      "origin": "MNL",
-      "destination": "SIN",
-      "services": [
-        { "flightNumber": "MN208", "date": "2026-10-01", "departure": "2026-10-01T08:35:00+08:00", "arrival": "2026-10-01T11:55:00+08:00", "status": "OPERATING", "economySeatsAvailable": 23, "economyFare": { "amount": 0, "currency": "SGD", "note": "Airline re-proposal for cancelled MN204; no fare difference." } },
-        { "flightNumber": "MN210", "date": "2026-10-02", "departure": "2026-10-02T07:05:00+08:00", "arrival": "2026-10-02T10:25:00+08:00", "status": "OPERATING", "economySeatsAvailable": 17, "economyFare": { "amount": 132, "currency": "SGD" } }
-      ]
+      "noOfferArrivingBy": "2026-10-01T03:20:00+08:00",
+      "note": "03:20 is the latest landside time that still yields 360min before the 09:20 headline; inventory deliberately has none."
     }
   ]
 }

@@ -1,10 +1,19 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-traveller-messages"],
-  "note": "Literal synthetic organiser message that triggers S3. Synthetic; no real person's statements reproduced.",
-  "messageId": "msg-ait-s3-001",
-  "channel": "OPERATOR_CHAT",
-  "from": "org-ait-organiser",
-  "receivedAt": "2026-09-22T11:00:00+08:00",
-  "text": "Grace Nakamura just told us she has an unavoidable board commitment back in Tokyo on the evening of 1 Oct. She needs to be wheels-up from Changi by about 13:30 that day, but her session is the future-provocation at 12:10 and her booked flight leaves 19:45. Can we move her slot earlier so she can take the midday flight? Before we touch the programme, show me what this would do to everyone else."
+  "note": "Organiser request after S1 Group C exhaustion: move Sarah Lim's headline interview into the later Day-1 window used by the recovery-fireside slot so the airline-retimed CGK→SIN arrival becomes buffer-viable. Approximate 'swap with later local slot' via RESCHEDULE only.",
+  "requestedAt": "2026-09-22T11:00:00+08:00",
+  "anchorEventId": "evt-ait-2026",
+  "requesterRole": "ORGANISER",
+  "changeKind": "RESCHEDULED",
+  "commitmentId": "cmt-ait-d1-headline-interview",
+  "currentWindow": {
+    "startsAt": "2026-10-01T09:20:00+08:00",
+    "endsAt": "2026-10-01T09:50:00+08:00"
+  },
+  "proposedWindow": {
+    "startsAt": "2026-10-01T15:30:00+08:00",
+    "endsAt": "2026-10-01T16:00:00+08:00"
+  },
+  "rationale": "Travel-only recovery exhausted for the critical inbound; later programme window restores viability without purchasing a new flight."
 }

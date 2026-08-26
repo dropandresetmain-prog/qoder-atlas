@@ -1,0 +1,35 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-mn"],
+  "note": "Simulated supplier schedule-change notice for Meridian Airways MN310 CGK→SIN, shaped like a provider flight-status/rebooking feed. Simulated at the external provider boundary; never presented as LIVE.",
+  "eventId": "sim-mn-evt-20260921-cgk-001",
+  "eventType": "SCHEDULE_CHANGE",
+  "issuedAt": "2026-09-21T09:40:00+08:00",
+  "carrier": { "code": "MN", "name": "Meridian Airways (simulated)" },
+  "flight": {
+    "flightNumber": "MN310",
+    "origin": "CGK",
+    "destination": "SIN",
+    "originalSchedule": {
+      "departure": "2026-09-30T05:15:00+07:00",
+      "arrival": "2026-09-30T07:25:00+08:00"
+    },
+    "newSchedule": {
+      "departure": "2026-10-01T05:00:00+07:00",
+      "arrival": "2026-10-01T07:10:00+08:00"
+    },
+    "reason": "Aircraft rotation constraint following network-wide disruption earlier in September."
+  },
+  "autoRebooking": {
+    "policy": "All ticketed passengers automatically re-protected onto the retimed MN310 of 1 Oct; no action requested from the booking party.",
+    "fareDifference": "NONE",
+    "ticketReissue": "AUTOMATIC"
+  },
+  "ticketedManagedTravellers": [
+    { "draftId": "ait-draft-14", "pnr": "MNSYN14", "segments": ["CGK-SIN MN310"] },
+    { "draftId": "ait-draft-03", "pnr": "MNSYN03", "segments": ["CGK-SIN MN310"] },
+    { "draftId": "ait-draft-10", "pnr": "MNSYN10", "segments": ["CGK-SIN MN310"] },
+    { "draftId": "ait-draft-11", "pnr": "MNSYN11", "segments": ["CGK-SIN MN310"] },
+    { "draftId": "ait-draft-30", "pnr": "MNSYN30", "segments": ["CGK-SIN MN310"] }
+  ]
+}

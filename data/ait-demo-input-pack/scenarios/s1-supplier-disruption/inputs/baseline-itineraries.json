@@ -1,51 +1,72 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
-  "note": "Baseline inbound itineraries as planned by the organiser before the disruption (booking-plan state; the pack does not execute provider bookings). All legs inside the funded window 29 Sep - 3 Oct. Return legs are unaffected by S1 and are omitted. Times are local with explicit offsets (SYD +10:00, BKK +07:00, KUL/MNL/SIN +08:00).",
+  "note": "Baseline inbound itineraries for the CGK→SIN S1 cohort before disruption (booking-plan state). Return legs omitted. Times use explicit offsets (CGK Asia/Jakarta +07:00, SIN +08:00). Drafts 10/11/14/30 require roster homeLocationText rehome to Jakarta (CGK) via shared patch — ait-draft-03 is already CGK.",
   "asOf": "2026-09-21T09:00:00+08:00",
   "itineraries": [
     {
       "draftId": "ait-draft-14",
-      "plan": "SYD -> KUL on 29 Sep, overnight KUL transit hotel (event-funded, inside window), KUL -> SIN early 30 Sep; landside SIN 30 Sep 07:25, ~26h before the Day 1 09:20 headline interview.",
+      "plan": "Direct CGK → SIN early 30 Sep; landside SIN 30 Sep 07:25, ~26h before the Day 1 09:20 headline interview.",
       "segments": [
-        { "flightNumber": "MN202", "origin": "SYD", "destination": "KUL", "departure": "2026-09-29T10:30:00+10:00", "arrival": "2026-09-29T16:15:00+08:00" },
-        { "flightNumber": "MN218", "origin": "KUL", "destination": "SIN", "departure": "2026-09-30T06:15:00+08:00", "arrival": "2026-09-30T07:25:00+08:00" }
+        {
+          "flightNumber": "MN310",
+          "origin": "CGK",
+          "destination": "SIN",
+          "departure": "2026-09-30T05:15:00+07:00",
+          "arrival": "2026-09-30T07:25:00+08:00"
+        }
       ]
     },
     {
-      "draftId": "ait-draft-15",
-      "plan": "Direct KUL -> SIN early 30 Sep; landside SIN 30 Sep 07:25, ~3h before her 10:30 coach-breakout.",
+      "draftId": "ait-draft-03",
+      "plan": "Direct CGK → SIN early 30 Sep with the shared MN310 cohort; landside SIN 30 Sep 07:25, well before Day 1 india-fireside 10:10.",
       "segments": [
-        { "flightNumber": "MN218", "origin": "KUL", "destination": "SIN", "departure": "2026-09-30T06:15:00+08:00", "arrival": "2026-09-30T07:25:00+08:00" }
+        {
+          "flightNumber": "MN310",
+          "origin": "CGK",
+          "destination": "SIN",
+          "departure": "2026-09-30T05:15:00+07:00",
+          "arrival": "2026-09-30T07:25:00+08:00"
+        }
       ]
     },
     {
       "draftId": "ait-draft-10",
-      "plan": "BKK -> KUL feeder on 29 Sep, overnight KUL, then shared KUL -> SIN with the Wanderpay delegation; landside SIN 30 Sep 07:25, >30h before the Day 1 13:50 payments keynote.",
+      "plan": "Direct CGK → SIN with the shared MN310 cohort; landside SIN 30 Sep 07:25, >30h before the Day 1 13:50 payments keynote.",
       "segments": [
-        { "flightNumber": "MN205", "origin": "BKK", "destination": "KUL", "departure": "2026-09-29T18:40:00+07:00", "arrival": "2026-09-29T21:55:00+08:00" },
-        { "flightNumber": "MN218", "origin": "KUL", "destination": "SIN", "departure": "2026-09-30T06:15:00+08:00", "arrival": "2026-09-30T07:25:00+08:00" }
+        {
+          "flightNumber": "MN310",
+          "origin": "CGK",
+          "destination": "SIN",
+          "departure": "2026-09-30T05:15:00+07:00",
+          "arrival": "2026-09-30T07:25:00+08:00"
+        }
       ]
     },
     {
       "draftId": "ait-draft-11",
-      "plan": "Direct KUL -> SIN with the Wanderpay delegation; landside SIN 30 Sep 07:25.",
+      "plan": "Direct CGK → SIN with the shared MN310 cohort; landside SIN 30 Sep 07:25.",
       "segments": [
-        { "flightNumber": "MN218", "origin": "KUL", "destination": "SIN", "departure": "2026-09-30T06:15:00+08:00", "arrival": "2026-09-30T07:25:00+08:00" }
+        {
+          "flightNumber": "MN310",
+          "origin": "CGK",
+          "destination": "SIN",
+          "departure": "2026-09-30T05:15:00+07:00",
+          "arrival": "2026-09-30T07:25:00+08:00"
+        }
       ]
     },
     {
       "draftId": "ait-draft-30",
-      "plan": "Direct KUL -> SIN with the Wanderpay delegation; landside SIN 30 Sep 07:25.",
+      "plan": "Direct CGK → SIN with the shared MN310 cohort; landside SIN 30 Sep 07:25.",
       "segments": [
-        { "flightNumber": "MN218", "origin": "KUL", "destination": "SIN", "departure": "2026-09-30T06:15:00+08:00", "arrival": "2026-09-30T07:25:00+08:00" }
-      ]
-    },
-    {
-      "draftId": "ait-draft-13",
-      "plan": "Direct MNL -> SIN on 30 Sep; landside SIN 30 Sep 11:55, >50h before the Day 2 14:30 APAC spotlight.",
-      "segments": [
-        { "flightNumber": "MN204", "origin": "MNL", "destination": "SIN", "departure": "2026-09-30T08:35:00+08:00", "arrival": "2026-09-30T11:55:00+08:00" }
+        {
+          "flightNumber": "MN310",
+          "origin": "CGK",
+          "destination": "SIN",
+          "departure": "2026-09-30T05:15:00+07:00",
+          "arrival": "2026-09-30T07:25:00+08:00"
+        }
       ]
     }
   ]
