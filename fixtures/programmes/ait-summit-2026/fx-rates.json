@@ -1,0 +1,13 @@
+{
+  "rates": [
+    {
+      "id": "fx-usd-sgd-ait-budget",
+      "baseCurrency": "USD",
+      "homeCurrency": "SGD",
+      "rate": 1.35,
+      "sourceId": "src-syn-ait-event",
+      "authority": "CONNECTED",
+      "observedAt": "2026-09-01T00:00:00+08:00"
+    }
+  ]
+}

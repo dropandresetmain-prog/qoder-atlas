@@ -191,7 +191,7 @@ export async function composeAppRuntime(
       }
     }
     for (const programmeDir of listProgrammeDirs(join(config.fixturesDir, 'programmes'))) {
-      const outcome = await seedProgrammeBundle(bootProgrammeService, programmeDir);
+      const outcome = await seedProgrammeBundle(bootProgrammeService, programmeDir, { fxRates });
       seededProgrammes.push({ anchorEventId: outcome.anchorEventId, promotedCount: outcome.promotedCount });
     }
   }

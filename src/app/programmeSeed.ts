@@ -6,6 +6,9 @@
  * the SAME application services the HTTP surface uses (applyProgrammeContext
  * + intakeImportDraft) — no state surgery, fully deterministic, and the
  * bundle carries all demo facts (production logic stays content-free).
+ *
+ * Optional companion `fx-rates.json` seeds organisation budget FX evidence
+ * through the same application-owned store scenario bundles use (ADR-052).
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -15,6 +18,7 @@ import { OrganisationSchema, AnchorEventSchema, PlaceSchema } from '../domain/en
 import { RuleSetSchema } from '../domain/rules.ts';
 import { ProgrammeImportDraftSchema } from '../contracts/programmeIntake.ts';
 import type { ProgrammeService } from './programme.ts';
+import { FxRateBundleSchema, type FxRateStore } from './fxStore.ts';
 
 /** Frozen bundle shape for programme seeding (context + import draft). */
 export const ProgrammeBundleSchema = z.strictObject({
@@ -36,6 +40,8 @@ export interface ProgrammeSeedOutcome {
   travellerCount: number;
   /** Trip ids created by promotion (deterministic per draft). */
   tripIds: EntityId[];
+  /** FX rates seeded from an optional companion file. */
+  fxRateCount: number;
 }
 
 /** List programme bundle directories under a root (empty when absent). */
@@ -51,6 +57,7 @@ export function listProgrammeDirs(root: string): string[] {
 export async function seedProgrammeBundle(
   service: ProgrammeService,
   bundleDir: string,
+  options?: { fxRates?: FxRateStore },
 ): Promise<ProgrammeSeedOutcome> {
   const bundle = ProgrammeBundleSchema.parse(JSON.parse(readFileSync(join(bundleDir, 'programme.json'), 'utf8')));
 
@@ -65,6 +72,18 @@ export async function seedProgrammeBundle(
     throw new Error(`programme intake seed rejected for ${bundleDir}`);
   }
 
+  let fxRateCount = 0;
+  if (options?.fxRates) {
+    const fxPath = join(bundleDir, 'fx-rates.json');
+    if (existsSync(fxPath)) {
+      const fxBundle = FxRateBundleSchema.parse(JSON.parse(readFileSync(fxPath, 'utf8')));
+      for (const rate of fxBundle.rates) {
+        await options.fxRates.save(rate);
+        fxRateCount += 1;
+      }
+    }
+  }
+
   return {
     anchorEventId: bundle.importDraft.anchorEventId,
     promotedCount: intake.outcomes.filter((outcome) => outcome.promoted).length,
@@ -72,5 +91,6 @@ export async function seedProgrammeBundle(
     tripIds: intake.outcomes
       .map((outcome) => outcome.tripId)
       .filter((tripId): tripId is EntityId => tripId !== undefined),
+    fxRateCount,
   };
 }
