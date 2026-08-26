@@ -236,8 +236,8 @@ test('final-demo content: S2 timing supports intended recovery stages', () => {
 
   const tr885Arr = '2026-09-30T14:35:00+08:00';
   const tr867Arr = '2026-09-30T20:45:00+08:00';
-  assert.ok(minutesBetween(tr885Arr, finals.startsAt.value) >= 360);
-  assert.ok(minutesBetween(tr867Arr, finals.startsAt.value) <= 0);
+  assert.ok(minutesBetween(tr885Arr, finals.startsAt.value) >= 360, 'TR885 clears evening finals');
+  assert.ok(minutesBetween(tr867Arr, finals.startsAt.value) <= 0, 'TR867 does not clear finals start');
 
   assert.equal(
     (jordan.anchorCommitmentIds ?? []).includes('cmt-ait-d0-hackathon-lab'),

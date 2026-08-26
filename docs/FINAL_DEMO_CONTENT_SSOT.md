@@ -144,14 +144,16 @@ Remaining roster: name, company/title, origin, managed/local, baseline flight/ho
 
 Jordan is **not** bound to the morning hackathon lab (removed from `anchorCommitmentIds`) so overnight NRT recovery is not falsely killed by a soft morning session. SIN hotel check-in for Jordan is **`2026-09-30T15:00:00+08:00`** (post-overnight arrival day).
 
-**Why these timings (provider math, Atlas RECORD):**
+**Why these timings (provider math, Atlas RECORD + S2 overnight lane):**
 
 | Option | Flight | Arr SIN | Gap to 20:45 @ 360 buffer |
 |--------|--------|---------|---------------------------|
 | Baseline | ZG053 | 29 Sep 23:00 | Viable (night before) |
 | Same-night recovery | Scoot **TR875** | 30 Sep 05:20 | Viable until progressive delay kills it |
-| Airline default morning | Scoot **TR867** | 30 Sep 20:45 | **FAIL** (arrives at/after commitment start) |
-| Northstar morning | Scoot **TR885** | 30 Sep 14:35 | **370 min ≥ 360 → PASS** |
+| Next-morning recovery | Scoot **TR885** (~08:20→14:35) | 30 Sep 14:35 | **370 min ≥ 360 → PASS** (airline desk *or* Northstar) |
+| Later/slower morning | Scoot **TR867** | 30 Sep 20:45 | **FAIL** if ever offered as default |
+
+With finals at **20:45**, the closed S2 acceptance path treats the next-morning **TR885-class** rebook as the boardable recovery that restores the evening showcase after overnight. “Airline not good enough” in this demo is primarily the **progressive miss + overnight whole-trip problem** (transit hotel, JP entry, insurance, SIN stay consequences)—not a claim that TR885 itself fails the 360 buffer. Keep **TR867** available as an inadequate slower alternative in inventory comparisons.
 
 Evidence: `fixtures/recordings/atlas/search/rec_b92e556a…` (ZG023), `rec_34518610…` / `rec_71d6274a…` (ZG053, TR875, TR885, TR867), `output/wave4r-s2-nightly-hero-evidence.json`.
 

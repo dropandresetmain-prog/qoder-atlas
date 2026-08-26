@@ -233,8 +233,8 @@ Stable cast and programme: Jordan Hale (`ait-draft-09`); hard finals showcase
 | **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 360. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
 | **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight landside at Narita required. | Same-night **NOT_VIABLE** |
 | **overnight_recovery** | Transit hotel (Hilton Narita / MYSTAYS class), JP entry/immigration AUTHORITATIVE research, insurance missed-connection cover where supplied, SIN hotel/no-show consequences. | Planning overnight + morning |
-| **airline_morning** | Airline default reprotection → Scoot **TR867** arrive SIN **20:45** — at/after the 20:45 showcase → deterministic **FAIL** vs 360/commitment. | Airline path **inadequate** |
-| **northstar_morning** | Northstar selects Scoot **TR885** arrive SIN **14:35** → gap to 20:45 = **370 ≥ 360** → **PASS**. | Northstar path **VIABLE** |
+| **airline_morning** | Airline desk offers Scoot **TR885-class** (~08:20→14:35 mid-afternoon) and/or slower options such as **TR867** (20:45). | TR885 clears 20:45 finals under 360; TR867 does not |
+| **northstar_morning** | Northstar ranks boardable next-morning inventory (TR885 preferred in closed acceptance); coordinates transit hotel, JP entry, insurance, SIN stay. | Northstar path **VIABLE** as whole-trip recovery |
 | **authority / surfaces** | Traveller disruption + organiser case; provenance REPLAY/RECORD. | Approval as policy requires |
 | **action / observation** | Permitted recovery actions through provider boundary where supported; observe; authoritative trip update. | |
 | **final_state** | Trip remainder viable for finals showcase; overnight + morning recovery recorded. | **RESOLVED / VIABLE** |
