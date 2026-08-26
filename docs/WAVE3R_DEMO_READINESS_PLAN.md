@@ -11,6 +11,33 @@
 
 ---
 
+## General Demo Data Principles
+
+Provider reality constrains synthetic demo facts.
+
+Do not assume premium travel merely because speakers are externally organised.
+
+For organiser-arranged travel:
+- use realistic provider inventory available under policy/budget
+- LCC/value carriers are acceptable where plausible
+- traveller does not necessarily control airline choice the way they might when self-booking
+
+Hotels:
+- stop implicitly assuming Marina Bay Sands / ultra-luxury accommodation
+- default demo hotel profile should be reputable, professional, comfortable midscale/upper-midscale/business accommodation
+- roughly 4-star/business-travel positioning is appropriate
+- exact property must come from provider evidence where possible
+- do not hardcode a named hotel into generic logic
+- premium/luxury hotels should appear only when scenario/policy data explicitly justifies them
+
+Synthetic traveller identities:
+- names, nationalities and origin airports may vary across cultures/geographies
+- combinations should remain plausible and natural
+- avoid stereotyped, performative or distracting name/origin pairings
+- diversity should feel incidental and believable, not like a generated checklist
+- these are scenario/data choices only, never domain logic
+
+---
 ## 1. Why Wave 3R exists
 
 The generalized recovery engine is substantially implemented and NS-G2 is accepted. The failed NS-G3 candidate exposed that the remaining problem is not broad product discovery. It is the gap between a strong internal engine and a believable human-originated, live-validated, provider-observed product demonstration.
@@ -128,43 +155,92 @@ scope.
 
 #### Final scenario intent
 
-**S2 — progressive missed connection and overnight recovery.** Use a Europe or
-Americas origin. A two-leg or three-leg itinerary is acceptable. An incremental
-upstream delay progressively erodes connection viability until a connection is
-impossible; the next viable onward flight requires an overnight stay in the
-transit country. Recovery considers replacement flights, a transit hotel,
-immigration/entry ability, missed-connection insurance coverage, shifted
-Singapore hotel/stay consequences, ground movement and event viability. Event
-constraints must matter without making every recovery impossible. Lock the exact
-origin, hub and route only after targeted Atlas discovery.
+**S2 — progressive missed connection and overnight recovery.** Use the LAX → NRT → SIN corridor with ZIPAIR baseline evidence.
 
-**S1 — multi-traveller schedule-change blast radius.** One external airline
-schedule change affects multiple speakers. Some airline reprotections remain
-whole-trip viable; some are automatically recoverable by Northstar; one critical
-traveller has no viable travel solution and is escalated. Its primary purpose is
-the differentiated blast radius across travellers.
+Baseline provider evidence:
+- ZIPAIR ZG023 LAX→NRT
+- ZIPAIR ZG053 NRT→SIN
+- genuine 2h40m connection
+- Atlas-backed recovery inventory includes later NRT→SIN options including Scoot services
 
-**S3 — S1 programme counterfactual and commit.** Continue directly from S1
-without reset. Northstar may propose non-travel programme alternatives, but has
-no autonomous authority to change the programme. The organiser previews
-alternatives with zero authoritative mutation, preferably moving or swapping the
-critical speaker's slot with a local or otherwise non-travel-dependent
-participant, then commits the programme change. Re-evaluate the formerly blocked
-S1 case; its airline rebooking becomes viable. Programme facts are synthetic
-data; logic remains generic.
+The disruption should be PROGRESSIVE:
+- upstream delay increases in multiple updates
+- initially connection remains viable
+- then becomes tight
+- then ZG053 becomes impossible
+- Northstar continues recalculating as evidence changes
+- a later same-night recovery may temporarily remain feasible
+- further delay eventually eliminates the last sensible same-night option
+- traveller must overnight near Narita
+
+Recovery must consider:
+- replacement NRT→SIN flight
+- transit hotel
+- authoritative Japanese entry/immigration requirements for overnight landside stay
+- traveller insurance missed-connection / emergency accommodation coverage where supplied
+- Singapore hotel/stay consequences
+- ground transfer
+- event commitments
+
+The synthetic event programme should be shaped AFTER provider timing is known:
+- flexible enough that recovery is possible
+- constrained enough that airline's slower/default reprotection may be inadequate
+- Northstar-selected morning recovery can restore viability
+
+Do not require Atlas to have sold every baseline ancillary/state fact if the capability is independently proven; synthetic booking/programme context is acceptable under the demo truth doctrine.
+
+**S1 — multi-traveller schedule-change blast radius.** Use the CGK→SIN corridor for the S1 regional cohort.
+
+Reason:
+- strong live Atlas inventory/timing diversity
+- believable high-frequency regional organiser travel
+- useful differentiated downstream outcomes
+
+Do not encode any assumption about CGK delays in application logic.
+
+S1 remains:
+- one external airline schedule disruption
+- multiple affected speakers
+- some airline reprotections remain viable
+- some require Northstar travel recovery
+- one critical traveller has no viable travel-only solution
+- Northstar escalates/proposes programme-side alternatives
+
+**S3 — S1 programme counterfactual and commit.** Continue directly from S1 without reset.
+
+Northstar may PROPOSE programme/non-travel recovery options but cannot autonomously mutate the programme.
+
+Preferred resolution:
+- critical traveller's existing airline rebooking does not satisfy current speaking slot
+- Northstar proposes moving/swapping the slot with a later commitment held by a local/non-travel-dependent participant
+- organiser previews impact with zero authoritative mutation
+- organiser approves/commits
+- programme state updates
+- affected S1 case re-runs/re-evaluates
+- previously insufficient airline rebooking becomes viable
+- case resolves
 
 **S7 — pre-booking origin change.** The traveller requests Tokyo as the origin
 before booking. Supply return intent explicitly so unrelated uncertainty does not
-distract the demonstration. Use real Atlas alternatives where available and an
-FX-normalized policy comparison. The change requires organiser approval and
-demonstrates flight change plus authority.
+distract the demonstration. Current HND/NRT→SIN Atlas evidence is acceptable;
+no need to redesign purely for novelty. The change requires organiser approval
+and demonstrates flight change plus authority.
 
-**S5 — post-booking personal extension.** The existing event-funded hotel
-booking/value establishes the funded baseline. The covered amount is the lower
-of the eligible booked hotel value and applicable policy allowance; any
-incremental personal-extension cost is traveller-funded. The desired outcome is
-automatic Northstar resolution within configured traveller authority. This
-demonstrates hotel capability and mixed funding.
+**S5 — post-booking personal extension.**
+
+Funding rule:
+covered baseline = LOWER OF:
+- eligible value of the already-booked event hotel/stay
+- applicable organisation/event hotel allowance
+
+Anything incremental due to the traveller's personal extension is traveller-funded.
+
+Desired demo:
+- hotel/stay extension
+- return travel changed if necessary
+- deterministic funding split
+- within configured traveller/self-funded authority
+- Northstar resolves automatically without organiser approval
 
 #### Act now — generic work
 
@@ -1111,7 +1187,17 @@ Never cut:
 
 ---
 
-## 18. Milestone close protocol
+## Status / Next Work
+
+Reflect that:
+- FX implementation is in progress/completing
+- final UI implementation is in progress
+- hotel replacement/stay replanning is in progress
+- provider discovery is substantially complete
+- next step after these lanes land is final scenario-data authoring + end-to-end S2 → S1 → S3 → S7 → S5 execution
+
+Do not create a new formal milestone.
+Do not reopen architecture.
 
 Before closing each significant package:
 

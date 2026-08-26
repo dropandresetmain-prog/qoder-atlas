@@ -70,6 +70,15 @@ simulation seam.
   LIVE/SANDBOX integration evidence where applicable. A simulated external
   trigger is never presented as LIVE.
 
+**Corridor:** CGK→SIN for the S1 regional cohort.
+
+Reason:
+- strong live Atlas inventory/timing diversity
+- believable high-frequency regional organiser travel
+- useful differentiated downstream outcomes
+
+Do not encode any assumption about CGK delays in application logic.
+
 An airline cancels or materially retimes a service used by multiple inbound
 speakers.
 
@@ -123,6 +132,40 @@ invariants.
 - **Provenance:** REPLAY expected for routine demo runs, backed by existing
   LIVE/SANDBOX integration evidence where applicable.
 
+**Corridor:** LAX → NRT → SIN with ZIPAIR baseline evidence.
+
+Baseline provider evidence:
+- ZIPAIR ZG023 LAX→NRT
+- ZIPAIR ZG053 NRT→SIN
+- genuine 2h40m connection
+- Atlas-backed recovery inventory includes later NRT→SIN options including Scoot services
+
+The disruption should be PROGRESSIVE:
+- upstream delay increases in multiple updates
+- initially connection remains viable
+- then becomes tight
+- then ZG053 becomes impossible
+- Northstar continues recalculating as evidence changes
+- a later same-night recovery may temporarily remain feasible
+- further delay eventually eliminates the last sensible same-night option
+- traveller must overnight near Narita
+
+Recovery must consider:
+- replacement NRT→SIN flight
+- transit hotel
+- authoritative Japanese entry/immigration requirements for overnight landside stay
+- traveller insurance missed-connection / emergency accommodation coverage where supplied
+- Singapore hotel/stay consequences
+- ground transfer
+- event commitments
+
+The synthetic event programme should be shaped AFTER provider timing is known:
+- flexible enough that recovery is possible
+- constrained enough that airline's slower/default reprotection may be inadequate
+- Northstar-selected morning recovery can restore viability
+
+Do not require Atlas to have sold every baseline ancillary/state fact if the capability is independently proven; synthetic booking/programme context is acceptable under the demo truth doctrine.
+
 The traveller reports naturally that their first flight landed late, they
 missed the connection, and the airline has moved them to another flight.
 
@@ -161,6 +204,20 @@ leaves the trip viable.
 - **Demo role:** Architectural / enterprise hero
 - **Provenance:** REPLAY expected for routine demo runs, backed by existing
   LIVE/SANDBOX integration evidence where applicable.
+
+**S1 → S3 Continuity:** S3 continues directly from S1 without reset.
+
+Northstar may PROPOSE programme/non-travel recovery options but cannot autonomously mutate the programme.
+
+Preferred resolution:
+- critical traveller's existing airline rebooking does not satisfy current speaking slot
+- Northstar proposes moving/swapping the slot with a later commitment held by a local/non-travel-dependent participant
+- organiser previews impact with zero authoritative mutation
+- organiser approves/commits
+- programme state updates
+- affected S1 case re-runs/re-evaluates
+- previously insufficient airline rebooking becomes viable
+- case resolves
 
 A headline speaker's availability changes because of another commitment.
 
@@ -246,6 +303,22 @@ which flights still make the trip work.
 - **Provenance:** SIMULATED material is acceptable for MVP/G3R demo
   representation and must be disclosed as such.
 
+**Post-booking personal extension.**
+
+Funding rule:
+covered baseline = LOWER OF:
+- eligible value of the already-booked event hotel/stay
+- applicable organisation/event hotel allowance
+
+Anything incremental due to the traveller's personal extension is traveller-funded.
+
+Desired demo:
+- hotel/stay extension
+- return travel changed if necessary
+- deterministic funding split
+- within configured traveller/self-funded authority
+- Northstar resolves automatically without organiser approval
+
 The conference ends Friday and the traveller wants to extend the trip
 personally.
 
@@ -311,6 +384,8 @@ scenario executable during MVP closure.
 - **Demo role:** Structural trip-change hero / breadth proof
 - **Provenance:** REPLAY expected for routine demo runs, backed by existing
   LIVE/SANDBOX integration evidence where applicable.
+
+Keep Tokyo-origin traveller request. Current HND/NRT→SIN Atlas evidence is acceptable; no need to redesign purely for novelty.
 
 The original trip assumes the traveller will depart from London.
 
@@ -484,3 +559,17 @@ script**.
 - S8
 
 Final video ordering and screen time are decided after G3R acceptance.
+
+---
+
+## Status / Next Work
+
+Reflect that:
+- FX implementation is in progress/completing
+- final UI implementation is in progress
+- hotel replacement/stay replanning is in progress
+- provider discovery is substantially complete
+- next step after these lanes land is final scenario-data authoring + end-to-end S2 → S1 → S3 → S7 → S5 execution
+
+Do not create a new formal milestone.
+Do not reopen architecture.
