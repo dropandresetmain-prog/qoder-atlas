@@ -23,6 +23,11 @@ async function main(): Promise<void> {
   );
 
   const server = createAppServer(config, composed.endpoints);
+  server.on('error', (error) => {
+    console.error('[atlas] failed to start HTTP server:', error);
+    composed.db.close();
+    process.exit(1);
+  });
   server.listen(config.httpPort, () => {
     const address = server.address();
     const port = typeof address === 'object' && address !== null ? address.port : config.httpPort;
@@ -45,4 +50,7 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-void main();
+void main().catch((error: unknown) => {
+  console.error('[atlas] startup failed:', error);
+  process.exit(1);
+});

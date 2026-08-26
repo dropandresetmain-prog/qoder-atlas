@@ -100,7 +100,7 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
     environment: optional(env.APP_ENVIRONMENT),
     logLevel: optional(env.LOG_LEVEL),
     adapterMode: optional(env.ADAPTER_MODE),
-    httpPort: optional(env.HTTP_PORT),
+    httpPort: optional(env.HTTP_PORT) ?? optional(env.PORT),
     sqlitePath: optional(env.SQLITE_PATH),
     recordingsDir: optional(env.RECORDINGS_DIR),
     fixturesDir: optional(env.FIXTURES_DIR),

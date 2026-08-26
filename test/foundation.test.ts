@@ -44,6 +44,16 @@ test('config: env overrides are validated and rejected when invalid', () => {
   }
 });
 
+test('config: PORT is honoured when HTTP_PORT is unset (Railway/container default)', () => {
+  const cwd = emptyCwd();
+  try {
+    const config = loadConfig({ PORT: '34567' }, cwd);
+    assert.equal(config.httpPort, 34567);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test('config: parseEnvFile handles comments, quotes, blank lines', () => {
   const parsed = parseEnvFile(['# comment', '', 'A=1', 'B="two"', "C='three'"].join('\n'));
   assert.deepEqual(parsed, { A: '1', B: 'two', C: 'three' });

@@ -14,7 +14,7 @@ Variable names were frozen during the F0 foundation and are implemented in `src/
 ### Application
 - `APP_ENVIRONMENT` — `local | dev | demo` (default `local`)
 - `LOG_LEVEL` — `debug | info | warn | error` (default `info`)
-- `HTTP_PORT` — application server port (default `8787`)
+- `HTTP_PORT` — application server port (default `8787`; falls back to host `PORT` when unset, e.g. Railway)
 - `ADAPTER_MODE` — `LIVE | RECORD | REPLAY` (default `REPLAY`)
 - `RECORDINGS_DIR` — sanitized provider-shaped recordings (default `recordings`)
 - `FIXTURES_DIR` — scenario fixtures (default `fixtures`)
