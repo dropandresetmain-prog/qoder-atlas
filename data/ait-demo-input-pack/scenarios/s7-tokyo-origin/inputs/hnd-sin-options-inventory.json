@@ -1,30 +1,27 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
   "sourceIds": ["src-sim-airline-mn"],
-  "note": "Simulated HND->SIN inbound inventory plus return candidates at request time. Deliberate shape: only ONE inbound option passes the 6h standard buffer for a PREFERRED/CHANGEABLE panellist (the overnight MN247); the convenient morning flight fails it and the afternoon flight lands after the panel. Return candidates exist for BOTH plausible destinations (LHR: keep ticketed MN244; HND: MN246) because the traveller never stated his return destination - the inventory must not bias the answer. Not a live provider feed; at demo runtime the same shapes arrive via REPLAY.",
+  "note": "Narrative / historical synthetic HND→SIN shapes for pack documentation only. Prefer real Atlas HND/NRT→SIN REPLAY/RECORD evidence at demo runtime (USD provider quotes such as TR883-class HND→SIN). Synthetic MN247/MN249/MN251 remain as the original arithmetic teaching set (overnight passes 6h buffer; morning fails; afternoon infeasible). Return to LHR is EXPLICIT in the traveller request — MN244 is the kept return when confirmed; do not present return-destination UNKNOWN.",
   "observedAt": "2026-09-18T16:55:00+08:00",
+  "preferredProviderEvidence": {
+    "atlasCorridors": ["HND→SIN", "NRT→SIN"],
+    "note": "Existing sanitized Atlas search recordings under recordings/atlas/search (and fixtures/recordings mirror) are the authoritative demo inventory when present."
+  },
   "routes": [
     {
       "origin": "HND",
       "destination": "SIN",
       "services": [
-        { "flightNumber": "MN247", "date": "2026-09-30", "departure": "2026-09-30T23:40:00+09:00", "arrival": "2026-10-01T06:00:00+08:00", "status": "OPERATING", "economySeatsAvailable": 14, "economyFare": { "amount": 340, "currency": "SGD" }, "note": "Overnight service. Lands 9h50m before the 1 Oct 15:50 panel: passes the 6h standard buffer. Departure is after his stated Tuesday-evening meeting end." },
-        { "flightNumber": "MN249", "date": "2026-10-01", "departure": "2026-10-01T07:10:00+09:00", "arrival": "2026-10-01T13:30:00+08:00", "status": "OPERATING", "economySeatsAvailable": 9, "economyFare": { "amount": 325, "currency": "SGD" }, "note": "Morning service. Lands only 2h20m before the panel: FAILS the 6h standard buffer despite being cheaper." },
-        { "flightNumber": "MN251", "date": "2026-10-01", "departure": "2026-10-01T15:20:00+09:00", "arrival": "2026-10-01T21:40:00+08:00", "status": "OPERATING", "economySeatsAvailable": 22, "economyFare": { "amount": 310, "currency": "SGD" }, "note": "Afternoon service. Lands after the panel has ended: infeasible regardless of price." }
+        { "flightNumber": "MN247", "date": "2026-09-30", "departure": "2026-09-30T23:40:00+09:00", "arrival": "2026-10-01T06:00:00+08:00", "status": "OPERATING", "economySeatsAvailable": 14, "economyFare": { "amount": 340, "currency": "SGD" }, "note": "Teaching overnight shape. Lands 9h50m before the 1 Oct 15:50 panel: passes the 6h standard buffer. Prefer Atlas HND→SIN offers when available." },
+        { "flightNumber": "MN249", "date": "2026-10-01", "departure": "2026-10-01T07:10:00+09:00", "arrival": "2026-10-01T13:30:00+08:00", "status": "OPERATING", "economySeatsAvailable": 9, "economyFare": { "amount": 325, "currency": "SGD" }, "note": "Teaching morning shape. Lands only 2h20m before the panel: FAILS the 6h standard buffer." },
+        { "flightNumber": "MN251", "date": "2026-10-01", "departure": "2026-10-01T15:20:00+09:00", "arrival": "2026-10-01T21:40:00+08:00", "status": "OPERATING", "economySeatsAvailable": 22, "economyFare": { "amount": 310, "currency": "SGD" }, "note": "Teaching afternoon shape. Lands after the panel: infeasible regardless of price." }
       ]
     },
     {
       "origin": "SIN",
       "destination": "LHR",
       "services": [
-        { "flightNumber": "MN244", "date": "2026-10-02", "departure": "2026-10-02T23:55:00+08:00", "arrival": "2026-10-03T06:40:00+01:00", "status": "OPERATING", "note": "Already ticketed return. Kept only if the traveller confirms he returns to London." }
-      ]
-    },
-    {
-      "origin": "SIN",
-      "destination": "HND",
-      "services": [
-        { "flightNumber": "MN246", "date": "2026-10-02", "departure": "2026-10-02T23:50:00+08:00", "arrival": "2026-10-03T07:55:00+09:00", "status": "OPERATING", "economySeatsAvailable": 12, "economyFare": { "amount": 355, "currency": "SGD" }, "note": "Candidate return if his work resumes in Tokyo after the event. Presented only when the traveller confirms HND as the return destination." }
+        { "flightNumber": "MN244", "date": "2026-10-02", "departure": "2026-10-02T23:55:00+08:00", "arrival": "2026-10-03T06:40:00+01:00", "status": "OPERATING", "note": "Already ticketed return. Traveller explicitly keeps LHR — retained unless provider evidence forces a change." }
       ]
     }
   ],
@@ -33,6 +30,6 @@
     "changeFee": { "amount": 75, "currency": "SGD" },
     "reprice": true,
     "abandonedSectorRefund": "NONE_AFTER_REFUND_DEADLINE",
-    "note": "Event-block refund deadline (15 Sep) has passed at request time (18 Sep); supplier terms govern the abandoned LHR->SIN sector."
+    "note": "Event-block refund deadline (15 Sep) has passed at request time (18 Sep); supplier terms govern the abandoned LHR→SIN sector."
   }
 }

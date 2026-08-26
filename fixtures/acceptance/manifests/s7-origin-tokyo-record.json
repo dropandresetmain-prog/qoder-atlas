@@ -1,6 +1,6 @@
 {
   "scenarioId": "S7-RECORD",
-  "title": "S7 'actually flying from Tokyo, not London' — LIVE NL intake + RECORD replacement corridor + honest authority ceiling",
+  "title": "S7 Tokyo origin + explicit LHR return — LIVE NL + RECORD Atlas + FX + organiser approval",
   "mode": "RECORD",
   "globalInputPack": {
     "packId": "ait-global-programme",
@@ -9,19 +9,24 @@
   },
   "localInputPack": {
     "packId": "ait-s7",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "path": "../packs/s7"
   },
   "boundaries": [
     {
       "seam": "traveller.change_request_nl",
       "mode": "LIVE",
-      "note": "natural-language departure-origin correction interpreted by LIVE Model Studio into the frozen ChangeRequest schema (departureOrigin external ref), zod-validated"
+      "note": "natural-language Tokyo-origin correction with EXPLICIT LHR return interpreted by LIVE Model Studio into the frozen ChangeRequest schema (departureOrigin), zod-validated"
     },
     {
       "seam": "atlas.flight_adapter",
       "mode": "RECORD",
-      "note": "replacement-corridor planning evidence through the RECORD-mode Atlas adapter; sanitized recordings persisted"
+      "note": "replacement-corridor planning evidence through the RECORD-mode Atlas adapter; sanitized recordings persisted (prefer HND/NRT→SIN)"
+    },
+    {
+      "seam": "fx.home_currency_normalization",
+      "mode": "RECORD",
+      "note": "Layered FX (budget + Frankfurter) restates provider currency into organisation homeCurrency while preserving providerCost"
     }
   ],
   "requiredEnv": [
@@ -65,7 +70,7 @@
     },
     {
       "id": "nl_intake",
-      "description": "Traveller corrects the departure gateway in natural language; LIVE Model Studio extracts the declared origin into the frozen schema",
+      "description": "Traveller corrects origin to Tokyo/HND with explicit LHR return; LIVE Model Studio extracts ChangeRequest",
       "action": {
         "type": "http",
         "method": "POST",
@@ -73,7 +78,7 @@
         "body": {
           "travellerId": "trv-evt-ait-2026-ait-draft-38",
           "tripId": "trip-trv-evt-ait-2026-ait-draft-38",
-          "text": "Heads up — my plans changed: I am actually flying out of HND to Singapore, not London. The rest of the trip stays the same.",
+          "text": "Hi - quick update from my side. I'll already be in Tokyo for work and will be flying from HND instead of London. Client meetings wrap up Tuesday evening, so I'm free to fly anytime from Wednesday. Please change the outbound to HND to Singapore. I will still return to LHR after the summit — keep the London return as planned. The debate is Thursday afternoon if I remember right.",
           "at": "2026-09-18T10:05:00+08:00"
         },
         "expectStatus": 200,
@@ -86,13 +91,13 @@
         { "path": "provenance", "op": "equals", "expected": "INTERPRETED", "description": "the request came from interpretation, not a pre-structured target" },
         { "path": "intentKind", "op": "equals", "expected": "CHANGE_TRANSPORT_SCHEDULE", "description": "a declared departure-gateway substitution maps to a transport schedule change" },
         { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the correction" },
-        { "path": "implications.0", "op": "contains", "expected": "departureOrigin airport-code:HND declared", "description": "the declared gateway is recorded verbatim — resolution never silently rewrites the traveller's declaration" },
-        { "path": "implications.0", "op": "contains", "expected": "the arrival corridor must be re-planned from the declared gateway", "description": "the old London-origin corridor is obsolete: re-planning from the declared gateway is the recorded consequence" }
+        { "path": "implications.0", "op": "contains", "expected": "departureOrigin airport-code:HND declared", "description": "the declared gateway is recorded verbatim" },
+        { "path": "implications.0", "op": "contains", "expected": "the arrival corridor must be re-planned from the declared gateway", "description": "old London origin is superseded for the outbound corridor" }
       ]
     },
     {
       "id": "plan",
-      "description": "Planning loop re-searches the arrival corridor FROM the declared Tokyo gateway (RECORD Atlas evidence) on the leg's own departure date and proposes substitution strategies",
+      "description": "Planning loop searches HND→SIN via RECORD Atlas evidence and ranks viable strategies",
       "action": {
         "type": "http",
         "method": "POST",
@@ -107,21 +112,19 @@
         }
       },
       "assert": [
-        { "path": "rounds", "op": "gte", "expected": 2, "description": "the planner requests replacement-corridor evidence first, then proposes from it" },
-        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search on the replacement corridor" },
-        { "path": "toolActivity.0.ok", "op": "truthy", "description": "the RECORD Atlas adapter supplied replacement-corridor offers from the declared gateway" },
-        { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "normalized replacement offers become candidate strategies" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to fly from the declared departure gateway", "description": "the candidate rebooks the existing arrival leg with the substituted origin — the superseded London origin is never re-proposed" },
-        { "path": "strategies.0.feasible", "op": "truthy", "description": "a same-day arrival from the declared gateway satisfies the programme arrival constraints" },
-        { "path": "bestStrategyId", "op": "exists", "description": "a feasible replacement exists, so the engine ranks a best strategy instead of failing closed" },
-        { "path": "uncertainties", "op": "arrayNotEmpty", "description": "the return corridor consequence is recorded, never assumed away" },
-        { "path": "uncertainties.1", "op": "contains", "expected": "the return leg departing the event gateway still terminates at the superseded origin", "description": "explicit uncertainty preserved: the return's replacement terminus is unverified and not rebooked on assumption" },
-        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
+        { "path": "rounds", "op": "gte", "expected": 2, "description": "evidence round then propose round" },
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "flight search on the replacement corridor" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "RECORD Atlas supplied offers" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "at least one candidate strategy from normalized offers" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to fly from the declared departure gateway", "description": "candidate rebooks from declared gateway" },
+        { "path": "strategies.0.feasible", "op": "truthy", "description": "at least one feasible replacement" },
+        { "path": "bestStrategyId", "op": "exists", "description": "best strategy ranked" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "case advanced through planning" }
       ]
     },
     {
       "id": "begin",
-      "description": "The best substitution strategy becomes a money-moving intent; deterministic authority reviews it",
+      "description": "Stage money-moving intent; FX normalizes provider currency; organiser approval required",
       "action": {
         "type": "http",
         "method": "POST",
@@ -137,16 +140,16 @@
         }
       },
       "assert": [
-        { "path": "intentId", "op": "exists", "description": "the strategy was staged as a validated action intent" },
-        { "path": "outcome", "op": "equals", "expected": "BLOCKED", "description": "honest authority ceiling: RECORD fails closed on SGD-limit vs USD-spend incomparability (ADR-045); REPLAY blocks on the curated SGD ceilings" },
-        { "path": "executable", "op": "equals", "expected": false, "description": "a blocked intent is never executable" },
-        { "path": "caseStatus", "op": "equals", "expected": "ESCALATED", "description": "the blocked money-moving intent escalates the case for human review" },
-        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "the blocking spend-ceiling rule is named in the deterministic rule trace in both modes" }
+        { "path": "intentId", "op": "exists", "description": "intent staged" },
+        { "path": "outcome", "op": "equals", "expected": "REQUIRES_HUMAN_AGENT", "description": "organiser/human approval required for flight change" },
+        { "path": "executable", "op": "equals", "expected": false, "description": "not executable until approved" },
+        { "path": "caseStatus", "op": "equals", "expected": "AWAITING_APPROVAL", "description": "awaiting organiser approval" },
+        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "spend limit evaluated after FX comparability" }
       ]
     },
     {
-      "id": "observe_case",
-      "description": "Observe the recovery case after the authority stage",
+      "id": "observe_after_begin",
+      "description": "Prove FX UI contracts: providerCost (provider currency) + costDelta (home currency)",
       "action": {
         "type": "observe",
         "path": "/api/cases/{{caseId}}",
@@ -154,8 +157,68 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-38", "description": "the case belongs to the requesting traveller's trip" },
-        { "path": "options", "op": "arrayNotEmpty", "description": "the evaluated options remain visible on the case" }
+        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-38", "description": "Oliver's trip" },
+        { "path": "options.0.requiresApproval", "op": "equals", "expected": true, "description": "approval required on the ranked option" },
+        { "path": "options.0.providerCost.currency", "op": "exists", "description": "providerCost present — FX path preserved original provider currency" },
+        { "path": "options.0.costDelta.currency", "op": "equals", "expected": "SGD", "description": "home-currency restatement present as costDelta" },
+        { "path": "approval.state", "op": "equals", "expected": "PENDING", "description": "approval pending" }
+      ]
+    },
+    {
+      "id": "decide",
+      "description": "Organiser approves",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/decide",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{intentId}}",
+          "decidedBy": { "entityType": "ORGANISATION", "id": "org-ait-organiser" },
+          "verdict": "APPROVED",
+          "note": "S7-RECORD organiser approval for Tokyo-origin substitution with explicit LHR return",
+          "at": "2026-09-18T10:30:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "approval accepted" },
+        { "path": "caseStatus", "op": "equals", "expected": "READY_TO_EXECUTE", "description": "ready to execute" }
+      ]
+    },
+    {
+      "id": "execute",
+      "description": "Execute at provider boundary (RECORD/simulation as permitted)",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/execute",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{intentId}}",
+          "at": "2026-09-18T10:40:00+08:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "executed", "op": "truthy", "description": "executed" },
+        { "path": "caseStatus", "op": "equals", "expected": "RESOLVED", "description": "resolved after observation" }
+      ]
+    },
+    {
+      "id": "observe_final",
+      "description": "Final viable updated trip observation",
+      "action": {
+        "type": "observe",
+        "path": "/api/cases/{{caseId}}",
+        "label": "case_final",
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "status", "op": "equals", "expected": "RESOLVED", "description": "case resolved" },
+        { "path": "approval.state", "op": "equals", "expected": "APPROVED", "description": "organiser approval recorded" },
+        { "path": "options.0.providerCost", "op": "exists", "description": "providerCost UI contract intact" },
+        { "path": "options.0.costDelta.currency", "op": "equals", "expected": "SGD", "description": "costDelta home restatement intact" }
       ]
     }
   ]

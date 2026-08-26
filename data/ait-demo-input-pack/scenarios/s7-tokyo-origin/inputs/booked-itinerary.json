@@ -1,7 +1,7 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
-  "note": "Ticketed baseline for ait-draft-38 as held by the organiser (issued 8 Sep). Cabin is ECONOMY per clauses.cabinRules: long-haul but NOT programme-critical (PREFERRED/CHANGEABLE panellist), so no business entitlement. This booked round trip IS the business-equivalent baseline for clauses.businessEquivalentAirfare: the event funds no more than SGD 1180 for any replacement itinerary.",
+  "note": "Ticketed baseline for ait-draft-38 as held by the organiser (issued 8 Sep). Cabin is ECONOMY per clauses.cabinRules: long-haul but NOT programme-critical (PREFERRED/CHANGEABLE panellist), so no business entitlement. This booked round trip IS the business-equivalent baseline for clauses.businessEquivalentAirfare: the event funds no more than SGD 1180 for any replacement itinerary. Traveller later keeps the LHR return explicitly while substituting HND for the outbound origin.",
   "asOf": "2026-09-18T16:40:00+08:00",
   "draftId": "ait-draft-38",
   "status": "TICKETED",
@@ -13,7 +13,7 @@
     ]
   },
   "outboundItinerary": {
-    "plan": "Return after the final event day; departs 2 Oct 23:55.",
+    "plan": "Return after the final event day; departs 2 Oct 23:55 to LHR (home). Traveller confirms this return remains intended after the Tokyo-origin change.",
     "segments": [
       { "flightNumber": "MN244", "origin": "SIN", "destination": "LHR", "departure": "2026-10-02T23:55:00+08:00", "arrival": "2026-10-03T06:40:00+01:00", "cabin": "ECONOMY" }
     ]
@@ -33,7 +33,7 @@
     "checkOut": "2026-10-02",
     "ratePerNight": { "amount": 285, "currency": "SGD" },
     "fundedBy": "EVENT_ORGANISATION",
-    "note": "If the HND origin is accepted, the 30 Sep night becomes unused (he lands 1 Oct 06:00): hold or release per block terms; the 1 Oct night stands."
+    "note": "If the HND origin is accepted and he lands later than 30 Sep, unused early hotel nights may need hold/release per block terms."
   },
-  "transfers": { "covered": [], "note": "Not yet arranged at request time; an origin change re-points the arrival transfer to 1 Oct." }
+  "transfers": { "covered": [], "note": "Not yet arranged at request time; an origin change re-points the arrival transfer to the new landside time." }
 }
