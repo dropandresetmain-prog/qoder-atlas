@@ -49,6 +49,11 @@ export interface RecoveryOptionView {
   providerCost?: Money;
   requiresApproval?: boolean;
   /**
+   * Short plain-language consequence chips (approved C3 card flags), e.g.
+   * "Makes the rehearsal". Projected by the backend; never invented here.
+   */
+  flags?: string[];
+  /**
    * Deterministic payer allocation of this option's cost (ADR-037), present
    * only when FUNDED_WINDOW rules + a cost anchor could decide. Absence
    * means allocation is UNKNOWN — never silently event-funded.
@@ -70,6 +75,41 @@ export interface ActionProgressView {
   id: EntityId;
   label: string;
   state: ActionProgressState;
+  /** Supporting detail (approved C2 row sub-line), e.g. a time or "2 left". */
+  detail?: string;
+}
+
+/**
+ * One downstream item the change touches, with its honest state (approved
+ * C1 "What this touches" list). Rich alternative to `affectedItems`
+ * strings; when absent the screen falls back to the plain list.
+ */
+export interface AffectedItemView {
+  label: string;
+  detail?: string;
+  state: 'BROKEN' | 'AT_RISK' | 'UNKNOWN' | 'INTACT';
+}
+
+/**
+ * The commitment at stake, structured for the ink rail card (approved
+ * C1–C6). Optional: when the projection cannot structure it, the case view
+ * falls back to `criticalObjectiveAtRisk` inline. Never fabricated.
+ */
+export interface CaseCommitmentView {
+  title: string;
+  body?: string;
+  ifMissed?: string;
+}
+
+/**
+ * One generic rail card of label/value rows (approved C1–C6 rail: case
+ * facts, recovery pace, who decides, recovery timeline…). The backend
+ * projects the rows; the UI renders any conforming section.
+ */
+export interface CaseRailSectionView {
+  title: string;
+  rows: ReadonlyArray<{ label: string; value: string }>;
+  note?: string;
 }
 
 export interface CaseResolutionView {
@@ -133,8 +173,18 @@ export interface CaseDetailView {
   whatChanged?: string;
   /** Downstream items affected by the change, user-facing. */
   affectedItems: string[];
+  /**
+   * Rich per-item impact states for the approved "What this touches" list.
+   * When present it replaces `affectedItems`; either may be empty, never
+   * invented.
+   */
+  affected?: AffectedItemView[];
   /** The must-not-miss objective currently threatened, user-facing. */
   criticalObjectiveAtRisk?: string;
+  /** Structured commitment for the ink rail card (approved C1–C6). */
+  commitment?: CaseCommitmentView;
+  /** Generic rail cards (case facts, recovery pace, timeline…). */
+  railSections?: CaseRailSectionView[];
   /**
    * The trip as a chain of dependent components, ordered travel-first to
    * commitment. Optional: when the projection cannot provide it, the case

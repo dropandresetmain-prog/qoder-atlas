@@ -3,6 +3,7 @@
  * frozen-contract data; no scenario branching, no fabricated states.
  */
 import type { ReadModelStatus, RemainderViability } from '../contracts/readmodels.ts';
+import type { ChainLinkState, ChainLinkView } from './case-view-model.ts';
 import {
   STATUS_LABEL,
   STATUS_TONE,
@@ -14,6 +15,52 @@ import { cx, escapeHtml } from './html.ts';
 
 export function toneClass(tone: StatusTone, prefix: string): string {
   return `${prefix} tone-${tone}`;
+}
+
+/**
+ * Approved glyph vocabulary for journey-chain links (docs/DESIGN.md §4.2):
+ * ✓ confirmed · ◌ proposed · ▲ at risk · ✕ broken · ○ not booked ·
+ * ? unconfirmed · ✦ the commitment (never disappears).
+ */
+export const CHAIN_GLYPH: Record<ChainLinkState, string> = {
+  CONFIRMED: '✓',
+  PROPOSED: '◌',
+  BROKEN: '✕',
+  UNBOOKED: '○',
+  UNKNOWN: '?',
+  AT_RISK: '▲',
+};
+
+/** Mini-chain tone class per link state (colour = state only). */
+export const CHAIN_MINI_TONE: Record<ChainLinkState, string> = {
+  CONFIRMED: 'mc-ok',
+  PROPOSED: 'mc-watch',
+  BROKEN: 'mc-alert',
+  UNBOOKED: 'mc-neutral',
+  UNKNOWN: 'mc-neutral',
+  AT_RISK: 'mc-watch',
+};
+
+/** Glyph for one chain link; the commitment link always carries ✦. */
+export function chainLinkGlyph(link: ChainLinkView): string {
+  return link.commitment ? '✦' : CHAIN_GLYPH[link.state];
+}
+
+/**
+ * Mini journey chain for roster rows — flight · transfer · stay · commitment
+ * at a glance. Rendered only when the projection supplies the chain; the
+ * title names the actual link kinds so the legend is never fabricated.
+ */
+export function miniChainRow(links: readonly ChainLinkView[]): string {
+  if (links.length === 0) return '';
+  const parts = links
+    .map(
+      (link) =>
+        `<span class="${CHAIN_MINI_TONE[link.state]}" aria-hidden="true">${chainLinkGlyph(link)}</span>`,
+    )
+    .join('<i class="mc-ln" aria-hidden="true"></i>');
+  const title = links.map((link) => link.kind).join(' · ');
+  return `<div class="mini-chain" title="${escapeHtml(title)}">${parts}</div>`;
 }
 
 /** Status pill used across operator surfaces. */
@@ -78,21 +125,16 @@ export function uncertaintyList(uncertainties: readonly string[]): string {
   </div>`;
 }
 
-/** Remainder-of-trip viability chip + explanation (traveller surface). */
+/** Remainder-of-trip viability block (traveller surface) — the honest one-liner. */
 export function viabilityBlock(viability: RemainderViability): string {
-  const toneMap: Record<RemainderViability, StatusTone> = {
-    VIABLE: 'ok',
-    AT_RISK: 'watch',
-    NOT_VIABLE: 'alert',
-    UNKNOWN: 'neutral',
+  const toneMap: Record<RemainderViability, string> = {
+    VIABLE: 'v-ok',
+    AT_RISK: 'v-watch',
+    NOT_VIABLE: 'v-bad',
+    UNKNOWN: 'v-neutral',
   };
-  const tone = toneMap[viability];
   return `
-  <div class="card t-card" data-viability="${escapeHtml(viability)}">
-    <h2>The rest of your trip</h2>
-    <p><span class="${toneClass(tone, 'badge')}">${escapeHtml(VIABILITY_LABEL[viability])}</span></p>
-    <p class="card-sub">${escapeHtml(VIABILITY_EXPLANATION[viability])}</p>
-  </div>`;
+  <div class="viab ${toneMap[viability]}" data-viability="${escapeHtml(viability)}"><strong>${escapeHtml(VIABILITY_LABEL[viability])}.</strong> ${escapeHtml(VIABILITY_EXPLANATION[viability])}</div>`;
 }
 
 /** Section wrapper with a user-facing heading; omitted entirely when empty. */

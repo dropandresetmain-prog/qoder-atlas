@@ -22,6 +22,8 @@ import type {
 import type { IsoDateTime } from '../../domain/common.ts';
 import type { CaseDetailView } from '../case-view-model.ts';
 import type { TravellerPresentation } from '../traveller-presentation.ts';
+import type { ActivityPageView, DecisionsPageView } from '../operator-surfaces-view-model.ts';
+import { decisionsFromDashboard } from '../operator-surfaces-view-model.ts';
 
 export const UI_FIXTURE_NOW: IsoDateTime = '2026-09-14T09:30:00+08:00';
 
@@ -556,7 +558,7 @@ export const travellerDisrupted: TravellerTripView = {
     'Checking your hotel and transfer against the new arrival time',
   ],
   inputRequested: [],
-  remainderViable: 'UNKNOWN',
+  remainderViable: 'NOT_VIABLE',
   updatedAt: UI_FIXTURE_NOW,
 };
 
@@ -624,6 +626,36 @@ export const travellerResolvedWithLoss: TravellerTripView = {
   updatedAt: '2026-09-14T08:20:00+08:00',
 };
 
+/** T5 — needs one piece of traveller info before planning can finish. */
+export const travellerNeedsInfo: TravellerTripView = {
+  tripId: 'trip-needs-info',
+  travellerId: 'trav-needs-info',
+  status: 'NEEDS_TRAVELLER_INFO',
+  whatMattersNow: 'Where to fly you home after the summit.',
+  actionsInProgress: [],
+  inputRequested: [
+    {
+      caseId: 'case-needs-info',
+      prompt: 'Where should we fly you home on 3 Oct?',
+      options: ['Tokyo Haneda', 'Osaka Kansai', 'Somewhere else'],
+    },
+  ],
+  remainderViable: 'UNKNOWN',
+  updatedAt: UI_FIXTURE_NOW,
+};
+
+/** T7 — conversation thread after recovery (presentation carries messages). */
+export const travellerThread: TravellerTripView = {
+  tripId: 'trip-thread',
+  travellerId: 'trav-thread',
+  status: 'RESOLVED',
+  actionsInProgress: [],
+  inputRequested: [],
+  remainderViable: 'VIABLE',
+  resolutionSummary: 'Replacement flight confirmed. Your car and hotel moved with it.',
+  updatedAt: '2026-09-22T11:20:00+08:00',
+};
+
 export const travellerLoading: ReadModelEnvelope<TravellerTripView> = { state: 'LOADING' };
 
 export const travellerError: ReadModelEnvelope<TravellerTripView> = {
@@ -661,7 +693,34 @@ export const caseWithRejectedOption: CaseDetailView = {
   status: 'RECOVERING',
   whatChanged: 'The flight on 15 September was cancelled by the airline.',
   affectedItems: ['Airport transfer', 'Hotel arrival window', 'Speaking slot on 16 September'],
+  affected: [
+    { label: 'Outbound flight', detail: 'Cancelled by the airline', state: 'BROKEN' },
+    { label: 'Airport transfer', detail: 'Pickup no longer matches any arrival', state: 'BROKEN' },
+    { label: 'Hotel arrival window', detail: 'Check-in against a new arrival is unconfirmed', state: 'UNKNOWN' },
+    { label: 'Speaking slot', detail: '16 Sep 09:00 — this cannot move', state: 'AT_RISK' },
+  ],
   criticalObjectiveAtRisk: 'Speaking slot on 16 September at 09:00 — this cannot move.',
+  commitment: {
+    title: 'Speaking slot on 16 September',
+    body: '09:00 · Main hall — this cannot move.',
+    ifMissed: 'The talk would be missed; the rest of the programme still stands.',
+  },
+  railSections: [
+    {
+      title: 'Case facts',
+      rows: [
+        { label: 'Opened', value: '14 Sep, 08:12' },
+        { label: 'Signal', value: 'Airline schedule feed' },
+      ],
+    },
+    {
+      title: 'Who decides',
+      rows: [
+        { label: 'Next step', value: 'Traveller chooses a flight' },
+        { label: 'Policy cap', value: 'SGD 250' },
+      ],
+    },
+  ],
   chain: [
     { id: 'leg-out', kind: 'Flight', label: 'Flight on 15 September', detail: 'Cancelled by the airline', state: 'BROKEN' },
     { id: 'leg-transfer', kind: 'Transfer', label: 'Airport transfer', detail: 'Pickup no longer matches any arrival', state: 'BROKEN' },
@@ -681,6 +740,7 @@ export const caseWithRejectedOption: CaseDetailView = {
       verdict: 'VIABLE',
       recommended: true,
       costDelta: { amount: 145, currency: 'SGD' },
+      flags: ['Makes the speaking slot', 'Same airline'],
     },
     {
       id: 'opt-cheaper',
@@ -689,6 +749,7 @@ export const caseWithRejectedOption: CaseDetailView = {
       verdict: 'NOT_VIABLE',
       rejectionReason: 'Arrives after the speaking slot on 16 September. The event time cannot move.',
       costDelta: { amount: -210, currency: 'SGD' },
+      flags: ['Misses the speaking slot'],
     },
     {
       id: 'opt-nextday',
@@ -722,6 +783,7 @@ export const caseAwaitingTravellerChoice: CaseDetailView = {
       verdict: 'VIABLE',
       recommended: true,
       costDelta: { amount: 95, currency: 'SGD' },
+      flags: ['Keeps the dinner', 'Recommended'],
     },
     {
       id: 'opt-b',
@@ -729,6 +791,7 @@ export const caseAwaitingTravellerChoice: CaseDetailView = {
       summary: 'Saves money, but the welcome dinner would be missed.',
       verdict: 'VIABLE',
       costDelta: { amount: -60, currency: 'SGD' },
+      flags: ['Misses the dinner'],
     },
   ],
   approval: {
@@ -808,8 +871,8 @@ export const caseRecoveringActions: CaseDetailView = {
     state: 'APPROVED',
   },
   actions: [
-    { id: 'act-flight', label: 'Rebooking the return flight', state: 'IN_PROGRESS' },
-    { id: 'act-transfer', label: 'Updating the airport transfer', state: 'QUEUED' },
+    { id: 'act-flight', label: 'Rebooking the return flight', state: 'IN_PROGRESS', detail: 'Held until 18:00' },
+    { id: 'act-transfer', label: 'Updating the airport transfer', state: 'QUEUED', detail: '2 left' },
     { id: 'act-confirm', label: 'Confirming the new itinerary with the traveller', state: 'QUEUED' },
   ],
   uncertainties: [],
@@ -919,39 +982,269 @@ export const CASE_FIXTURES: readonly NamedFixture<CaseDetailView>[] = [
 ];
 
 export const TRAVELLER_FIXTURES: readonly NamedFixture<TravellerTripView>[] = [
-  { id: 'ready', title: 'Ready', view: travellerReady },
-  { id: 'disrupted', title: 'Disrupted', view: travellerDisrupted },
-  { id: 'recovering', title: 'Recovering', view: travellerRecovering },
-  { id: 'awaiting-input', title: 'Decision needed', view: travellerAwaitingInput },
+  { id: 'ready', title: 'Ready (T1)', view: travellerReady },
+  { id: 'disrupted', title: 'Disrupted (T2)', view: travellerDisrupted },
+  { id: 'recovering', title: 'Checking (T3)', view: travellerRecovering },
+  { id: 'awaiting-input', title: 'Choice needed (T4)', view: travellerAwaitingInput },
+  { id: 'needs-info', title: 'Needs info (T5)', view: travellerNeedsInfo },
   { id: 'unknown', title: 'Uncertain', view: travellerUnknown },
-  { id: 'resolved-fully', title: 'Resolved — fully', view: travellerResolvedFully },
+  { id: 'resolved-fully', title: 'Recovered (T6)', view: travellerResolvedFully },
   { id: 'resolved-with-loss', title: 'Resolved — with loss', view: travellerResolvedWithLoss },
+  { id: 'thread', title: 'Thread (T7)', view: travellerThread },
 ];
 
 // ---------------------------------------------------------------------------
-// Traveller presentations (UI-local props) — photography, commitment card,
-// rich option cards. Keyed by fixture id; option details keyed by the exact
-// option string. Pure presentation: no trip facts live here.
+// Decisions (D1) + Activity feed fixtures
 // ---------------------------------------------------------------------------
+
+export const decisionsPageRich: DecisionsPageView = {
+  generatedAt: UI_FIXTURE_NOW,
+  pending: [
+    {
+      caseId: 'case-choice',
+      travellerName: 'Sam Okafor',
+      decision: 'Pick an arrival — evening (recommended) or morning. Both make the first session.',
+      cost: 'SGD 145 or 210 · within policy (cap 250)',
+      waitingOn: 'Sam (traveller)',
+      decideBy: 'Today — fares move',
+      age: '25m',
+    },
+    {
+      caseId: 'case-approval',
+      travellerName: 'Mia Chen',
+      decision: 'Approve the above-policy replacement fare — the only arrival that makes the connection.',
+      cost: 'SGD 320 (cap 250)',
+      waitingOn: 'Organisation',
+      decideBy: '18:00 — fare hold ends',
+      age: '20m',
+    },
+  ],
+  decided: [
+    {
+      caseId: 'case-resolved',
+      travellerName: 'Emma Fischer',
+      decision: 'Replacement return connection after the reschedule.',
+      cost: 'SGD 180 — within policy',
+      decidedBy: 'Auto-approved (policy)',
+      when: '08:40',
+    },
+    {
+      caseId: 'case-resolved-loss',
+      travellerName: 'Lucas Silva',
+      decision: 'Rebook after the cancellation — traveller picked the evening arrival.',
+      cost: 'SGD 0 — waiver',
+      decidedBy: 'Lucas (traveller)',
+      when: 'Yesterday',
+    },
+  ],
+};
+
+/** Minimal decisions page projected only from frozen dashboard pending rows. */
+export const decisionsPageFromDashboard: DecisionsPageView = decisionsFromDashboard(operatorDashboard);
+
+export const decisionsLoaded: ReadModelEnvelope<DecisionsPageView> = {
+  state: 'LOADED',
+  generatedAt: UI_FIXTURE_NOW,
+  data: decisionsPageRich,
+};
+
+export const decisionsLoading: ReadModelEnvelope<DecisionsPageView> = { state: 'LOADING' };
+
+export const decisionsError: ReadModelEnvelope<DecisionsPageView> = {
+  state: 'ERROR',
+  errorMessage: 'The decisions service did not respond. Nothing about the trips has changed.',
+};
+
+export const activityPageRich: ActivityPageView = {
+  generatedAt: UI_FIXTURE_NOW,
+  days: [
+    {
+      label: 'Today · Sun 14 Sep',
+      items: [
+        {
+          who: 'Northstar',
+          text: 'compared 3 replacement arrivals for Sam Okafor',
+          sub: 'Earlier flight recommended · keeps the first session with slack',
+          time: '09:02',
+          glyph: '◆',
+          tone: 'work',
+        },
+        {
+          who: 'Approval requested',
+          text: "Mia Chen's replacement fare, SGD 320.00",
+          sub: 'Above the SGD 250 policy cap · waiting on the organisation · fare held until 18:00',
+          time: '09:10',
+          glyph: '?',
+          tone: 'ask',
+        },
+        {
+          who: 'Choice sent to Sam Okafor',
+          text: 'two workable arrivals',
+          sub: 'Traveller decides · both within policy',
+          time: '09:05',
+          glyph: '?',
+          tone: 'ask',
+        },
+        {
+          who: 'Emma Fischer',
+          text: 'replacement return connection confirmed',
+          sub: 'Re-checking the transfer window against the new arrival',
+          time: '08:55',
+          glyph: '✓',
+          tone: 'done',
+        },
+        {
+          who: 'Signal',
+          text: 'outbound flight cancelled (Alex Reyes)',
+          sub: 'Airline schedule feed · verified against the airline',
+          time: '08:12',
+          glyph: '!',
+          tone: 'signal',
+        },
+        {
+          who: 'Noah Park',
+          text: 'flight status still unconfirmed',
+          sub: 'Provider returned no data · retrying · never guessed',
+          time: '07:15',
+          glyph: 'i',
+          tone: 'info',
+        },
+      ],
+    },
+    {
+      label: 'Yesterday · Sat 13 Sep',
+      items: [
+        {
+          who: 'Lucas Silva',
+          text: 'whole trip recovered',
+          sub: 'Replacement flight confirmed · transfer re-timed · hotel notified',
+          time: '18:34',
+          glyph: '✓',
+          tone: 'done',
+        },
+        {
+          who: 'Programme synced',
+          text: '45 travellers · commitments linked',
+          sub: 'Roster import · warnings carried, none guessed',
+          time: '15:20',
+          glyph: 'i',
+          tone: 'info',
+        },
+      ],
+    },
+  ],
+};
+
+export const activityLoaded: ReadModelEnvelope<ActivityPageView> = {
+  state: 'LOADED',
+  generatedAt: UI_FIXTURE_NOW,
+  data: activityPageRich,
+};
+
+export const activityLoading: ReadModelEnvelope<ActivityPageView> = { state: 'LOADING' };
+
+export const activityError: ReadModelEnvelope<ActivityPageView> = {
+  state: 'ERROR',
+  errorMessage: 'The activity feed did not respond. Nothing about the trips has changed.',
+};
+
+// ---------------------------------------------------------------------------
+// Traveller presentations (UI-local props) — photography, commitment card,
+// itinerary, progress, thread. Keyed by fixture id; option details keyed by
+// the exact option string. Pure presentation: no trip facts live only here.
+// ---------------------------------------------------------------------------
+
+const SUMMIT_EVENT = 'Innovation Summit 2026';
+const HERO = {
+  heroImageUrl: 'assets/sg-dusk.png',
+  heroImageAlt: 'The destination city at dusk',
+} as const;
 
 const SUMMIT_COMMITMENT: TravellerPresentation['commitmentCard'] = {
   label: 'The reason for the trip',
   title: 'Your talk at Innovation Summit 2026',
   meta: '16 Sep · 09:00 · Main hall',
+  ok: true,
 };
 
 export const TRAVELLER_PRESENTATIONS: Record<string, TravellerPresentation> = {
-  disrupted: {
-    heroImageUrl: 'assets/sg-dusk.png',
-    heroImageAlt: 'The destination city at dusk',
+  ready: {
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Jordan Lee',
+    heroKicker: 'All set',
+    heroKickerTone: 'ok',
+    heroHeadline: 'You are all set.',
+    heroSubline: 'Everything is booked and confirmed.',
     commitmentCard: SUMMIT_COMMITMENT,
+    itineraryHeading: 'Your trip',
+    itinerary: [
+      { icon: '✈', title: 'Outbound flight', sub: 'Arrives the evening before', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '→', title: 'Airport transfer', sub: 'Pickup at arrivals', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '⌂', title: 'Hotel stay', sub: '2 nights', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '★', title: 'Your talk', sub: '16 Sep · 09:00 · Main hall', stateLabel: 'Set', stateTone: 'ok' },
+    ],
+    hideViability: true,
+  },
+  disrupted: {
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Alex Reyes',
+    heroKicker: 'Plan change',
+    heroKickerTone: 'bad',
+    heroHeadline: 'Your airline moved your arrival.',
+    heroSubline: 'Northstar is already on it.',
+    commitmentCard: {
+      label: 'At risk',
+      title: 'Your talk at Innovation Summit 2026',
+      meta: '16 Sep · 09:00 · Main hall',
+    },
+    itineraryHeading: 'What changed',
+    itinerary: [
+      { icon: '✈', title: 'Original outbound flight', sub: 'Arrives the evening before', stateLabel: 'Moved', stateTone: 'neutral', struck: true },
+      { icon: '✈', title: 'Updated outbound flight', sub: 'Now arrives after your talk starts', stateLabel: 'Late', stateTone: 'bad' },
+    ],
+    progressHeading: 'What Northstar is doing',
+    progress: [
+      { state: 'done', text: 'Confirmed the change with the airline', detail: '09:12' },
+      { state: 'doing', text: 'Comparing ways to get you there in time' },
+      { state: 'queued', text: 'Checking costs against your programme' },
+    ],
+    progressNote: 'Nothing needed from you yet.',
+    viability: {
+      lead: 'As it stands, you would miss the talk.',
+      detail: 'We will not leave it like this — alternatives are being checked now.',
+    },
     contactName: 'the events team',
   },
+  recovering: {
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Priya Nair',
+    heroKicker: 'Working on it',
+    heroHeadline: 'We are checking your options.',
+    heroSubline: 'Two things matter: you make the session, and you never get a half-checked answer.',
+    progressHeading: 'Where things are',
+    progress: [
+      { state: 'done', text: 'Confirmed the change with the airline', detail: '09:12' },
+      { state: 'done', text: 'Checked the rest of your trip — car, hotel, session', detail: '09:14' },
+      { state: 'doing', text: 'Comparing ways to get you there in time', detail: '2 left' },
+      { state: 'queued', text: 'Checking costs against your programme' },
+    ],
+    optionsSkeleton: true,
+    optionsSkeletonNote: 'Options appear here the moment they are scored. You will only hear from us when there is a real choice.',
+    hideViability: true,
+  },
   'awaiting-input': {
-    heroImageUrl: 'assets/sg-dusk.png',
-    heroImageAlt: 'The destination city at dusk',
-    commitmentCard: SUMMIT_COMMITMENT,
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Sam Okafor',
+    heroKicker: 'Your call',
+    heroHeadline: 'Two ways to still make the first session.',
+    heroSubline: 'Both work. Pick what suits you — we handle the rest.',
+    hideViability: true,
     contactName: 'the events team',
+    choiceNote: 'Both fares are within your programme travel policy. A cheaper option landed too late; we did not bother you with it.',
     optionDetails: {
       'Earlier flight — arrive with time to spare': {
         commitmentEffect: 'keeps',
@@ -967,10 +1260,106 @@ export const TRAVELLER_PRESENTATIONS: Record<string, TravellerPresentation> = {
       },
     },
   },
+  'needs-info': {
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Daniel Ong',
+    heroKicker: 'One question',
+    heroHeadline: 'Where to after the summit?',
+    heroSubline: 'Your new start is all set — we just do not book guesses.',
+    itineraryHeading: 'What we know',
+    itinerary: [
+      { icon: '✈', title: 'Outbound · new starting point', sub: 'Confirmed', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '⌂', title: 'Hotel stay', sub: 'Through the summit', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '✈', title: 'Return', sub: 'We know the day — not the city', stateLabel: 'Unconfirmed', stateTone: 'neutral' },
+    ],
+    hideViability: true,
+    composerPlaceholder: 'Type a city…',
+    choiceNote: 'Not an error — your outbound is fine. This is simply the one thing we do not know.',
+    optionDetails: {
+      'Tokyo Haneda': { commitmentEffect: 'keeps', note: 'Back where the trip now starts.' },
+      'Osaka Kansai': { commitmentEffect: 'keeps', note: 'We can price both and send the difference.' },
+      'Somewhere else': { commitmentEffect: 'unknown', note: 'Tell us below — any city works.' },
+    },
+  },
   'resolved-fully': {
-    heroImageUrl: 'assets/sg-dusk.png',
-    heroImageAlt: 'The destination city at dusk',
-    commitmentCard: SUMMIT_COMMITMENT,
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Emma Fischer',
+    heroKicker: 'All set — again',
+    heroKickerTone: 'ok',
+    heroHeadline: 'You are all set.',
+    heroSubline: 'New flight confirmed. Your talk is safe.',
+    commitmentCard: {
+      label: 'Still on',
+      title: 'Your talk at Innovation Summit 2026',
+      meta: '16 Sep · 09:00 · Main hall',
+      ok: true,
+    },
+    itineraryHeading: 'Your updated trip',
+    itinerary: [
+      { icon: '✈', title: 'Replacement outbound', sub: 'Arrives the evening before', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '→', title: 'Airport transfer', sub: 'Re-timed to the new arrival', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '⌂', title: 'Hotel stay', sub: 'Late arrival noted', stateLabel: 'Confirmed', stateTone: 'ok' },
+      { icon: '★', title: 'Your talk', sub: '16 Sep · 09:00 · Main hall', stateLabel: 'Set', stateTone: 'ok' },
+    ],
+    viability: {
+      lead: 'You will land with time before your talk.',
+      detail: 'Sleep well the night before.',
+    },
     contactName: 'the events team',
+  },
+  'resolved-with-loss': {
+    ...HERO,
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Lucas Silva',
+    heroKicker: 'Recovered — with a loss',
+    heroKickerTone: 'ok',
+    heroHeadline: 'You make the main event.',
+    heroSubline: 'The welcome dinner could not be kept — no option preserved both.',
+    commitmentCard: {
+      label: 'Kept',
+      title: 'Main event',
+      meta: 'You arrive in time',
+      ok: true,
+    },
+    contactName: 'the events team',
+  },
+  thread: {
+    eventName: SUMMIT_EVENT,
+    travellerName: 'Alex Reyes',
+    composerPlaceholder: 'Ask Northstar anything…',
+    messages: [
+      {
+        from: 'ns',
+        meta: 'Northstar · 09:02',
+        body: 'Heads up — your airline moved your arrival. That lands after your talk starts. I am already looking at alternatives; you do not need to do anything yet.',
+      },
+      {
+        from: 'ns',
+        meta: 'Northstar · 09:05',
+        body: 'Two options get you there in time. The evening flight leaves you rested; the morning flight is tighter. Both are covered. My pick is the evening one.',
+      },
+      {
+        from: 'me',
+        meta: 'You · 09:41',
+        body: 'Evening. Do not love an early alarm before a talk.',
+      },
+      {
+        from: 'ns',
+        meta: 'Northstar · 09:42',
+        body: 'Done — evening arrival confirmed. Your car and hotel moved with it. Talk safe.',
+      },
+      {
+        from: 'me',
+        meta: 'You · 11:20',
+        body: 'You are a lifesaver.',
+      },
+      {
+        from: 'ns',
+        meta: 'Northstar · 11:20',
+        body: 'Just doing my job. See you at soundcheck.',
+      },
+    ],
   },
 };

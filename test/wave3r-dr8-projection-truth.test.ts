@@ -328,7 +328,10 @@ test('DR-8.5: forbidden-jargon scan — no internal IDs or raw evidence in rende
 
     // Verify that user-facing copy is present and clean.
     assert.ok(dashboardHtml.includes('Operations overview'), 'dashboard has user-facing heading');
-    assert.ok(caseHtml.includes('What changed'), 'case detail has user-facing section');
+    // At this state (RECOVERING, approval PENDING) the approved C4 design
+    // leads with the waiting-for-decision callout; 'What changed' is the
+    // resolved-case section heading (see renderCaseDetailBody).
+    assert.ok(caseHtml.includes('Waiting on a decision'), 'case detail has user-facing section');
     // renderTravellerTripBody() renders the body only (no page <h1>); "What
     // changed" is the traveller-facing section populated once a disruption
     // has been recorded against this trip.

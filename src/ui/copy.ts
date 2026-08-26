@@ -109,6 +109,80 @@ export const RESOLUTION_OUTCOME_LABEL: Record<'FULLY_RECOVERED' | 'RECOVERED_WIT
 };
 
 // ---------------------------------------------------------------------------
+// Case workspace (approved C1–C6) — section headings and fixed copy.
+// ---------------------------------------------------------------------------
+
+/** Lead callout heading above the change summary (C1). */
+export const CASE_WHAT_CHANGED_TITLE = 'What changed';
+
+/** Impact list heading (approved C1 wording). */
+export const CASE_AFFECTED_TITLE = 'What this touches';
+
+/** Checks-list heading (approved C1 wording). */
+export const CASE_CHECKS_TITLE = 'Checks already run';
+
+/** In-flight activity list heading (approved C2 wording). */
+export const CASE_ACTIVITY_TITLE = 'What Northstar is doing right now';
+
+/** Past-tense activity heading once every recorded action is done. */
+export const CASE_ACTIVITY_DONE_TITLE = 'What Northstar did';
+
+/** Skeleton panel heading while options are still being scored (C2). */
+export const CASE_OPTIONS_FORMING_TITLE = 'Options take shape here';
+
+/** Skeleton panel footnote (approved C2 wording). */
+export const CASE_OPTIONS_FORMING_NOTE =
+  'Candidates appear here the moment they are scored — nothing half-checked is ever shown as an option.';
+
+/** Options heading when every candidate was rejected (approved C5 wording). */
+export const CASE_OPTIONS_ALL_REJECTED_TITLE = 'What was considered — and why none of them work';
+
+/** Lead callout heading when planning exhausted every automated path (C5). */
+export const CASE_EXHAUSTED_TITLE = 'No safe automatic fix — Northstar has stopped rather than gamble';
+
+/** Lead callout heading while waiting on an approval decision (C4). */
+export const CASE_WAITING_DECISION_TITLE = 'Waiting on a decision';
+
+/** Count-aware options heading (approved C3 wording pattern). */
+export function caseOptionsHeading(count: number): string {
+  return count === 1 ? 'One way this could go' : `${count} ways this could go`;
+}
+
+/** Approval panel heading (approved C4 wording). */
+export const CASE_APPROVAL_TITLE = 'What you\u2019re approving';
+
+/** Ink rail card label while the commitment is still at stake (C1–C5). */
+export const CASE_COMMITMENT_AT_STAKE_LABEL = 'The commitment at stake';
+
+/** Ink rail card label once the trip is recovered (approved C6 wording). */
+export const CASE_COMMITMENT_HELD_LABEL = 'The commitment that held';
+
+/** Inline fallback heading when no structured commitment card exists. */
+export const CASE_COMMITMENT_FALLBACK_TITLE = 'Must not be missed';
+
+/**
+ * Standing authority explainer (approved rail card, C1–C5). Describes the
+ * authority model generically — the concrete cap figure is case data and
+ * belongs to the projected rail sections, never to fixed copy.
+ */
+export const CASE_AUTHORITY_TITLE = 'Authority';
+export const CASE_AUTHORITY_COPY =
+  'Within the programme\u2019s policy cap, Northstar books automatically with a receipt. Above the cap, the budget owner approves first. Nothing books silently.';
+
+/** Case badge derivations beyond the raw trip status (approved C3/C4/C5). */
+export const CASE_BADGE_OPTIONS_READY = 'Options on the table';
+export const CASE_BADGE_APPROVAL_NEEDED = 'Approval needed';
+export const CASE_BADGE_HUMAN_DECISION = 'Needs a human decision';
+
+/** Payer wording for the funding split legend (approved C4). */
+export const PAYER_LABEL: Record<'EVENT_ORGANISATION' | 'TRAVELLER' | 'ORGANISATION' | 'OTHER', string> = {
+  EVENT_ORGANISATION: 'Programme',
+  ORGANISATION: 'Organisation',
+  TRAVELLER: 'Traveller',
+  OTHER: 'Other',
+};
+
+// ---------------------------------------------------------------------------
 // Northstar programme surface (RV-N10) — labels live next to the others so
 // the same user-facing vocabulary drives every screen.
 // ---------------------------------------------------------------------------
@@ -123,59 +197,56 @@ export const PROGRAMME_SUBHEADING =
 /** One-line explanation for the per-status tiles row. */
 export const PROGRAMME_TILES_LEGEND = 'Counts by trip status across the whole programme.';
 
-/** Short label for the endangered-commitments section. */
-export const PROGRAMME_ENDANGERED_TITLE = 'At-risk shared commitments';
+/** Short label for the endangered-commitments section (approved P2 wording). */
+export const PROGRAMME_ENDANGERED_TITLE = 'Endangered commitments';
 
-/** Heading for the programme-level "missing information" panel. */
-export const PROGRAMME_MISSING_INFO_TITLE = 'Missing information';
+/** Heading for the programme-level "missing information" panel (approved P1 wording). */
+export const PROGRAMME_MISSING_INFO_TITLE = 'Missing traveller information';
 
 /** Affordance: single-traveller intake. */
 export const PROGRAMME_INTAKE_ADD_LABEL = 'Add one traveller';
 
-/** Affordance: bulk import of a traveller list. */
-export const PROGRAMME_INTAKE_BULK_LABEL = 'Bulk import travellers';
+/** Affordance: import an updated traveller sheet (approved footer wording). */
+export const PROGRAMME_IMPORT_UPDATED_LABEL = 'Import an updated sheet';
 
-/** Column headers for the programme traveller table. */
+/** Affordance: open the what-if programme-change preview. */
+export const PROGRAMME_CHANGE_PREVIEW_LABEL = 'Preview a programme change';
+
+/** Inert affordances shown on the programme footer until wired by the integrator. */
+export const PROGRAMME_EXPORT_LABEL = 'Export roster';
+export const PROGRAMME_MESSAGE_AFFECTED_LABEL = 'Message affected travellers';
+
+/** Missing-information panel action label (plural-safe for any count). */
+export const PROGRAMME_ASK_TRAVELLERS_LABEL = 'Ask these travellers';
+
+/** Section title for the per-day commitment timeline. */
+export const PROGRAMME_TIMELINE_TITLE = 'Programme timeline';
+
+/** Column headers for the programme traveller table (approved P1/P2 columns). */
 export const PROGRAMME_TABLE_HEADERS = {
   name: 'Traveller',
+  role: 'Role',
+  arrival: 'Arrival',
   status: 'Status',
-  cases: 'Active cases',
-  decisions: 'Decisions needed',
-  uncertainties: 'Still unclear',
 } as const;
 
-/** Tile label keyed by the ProgrammeStatusSummary field. */
-export const PROGRAMME_TILE_LABEL: Record<ProgrammeStatusSummaryTileKeys, string> = {
-  total: 'Total travellers',
-  ready: 'Ready',
-  planning: 'Trip being planned',
-  needsTravellerInfo: 'Needs traveller details',
-  changeRequested: 'Change requested',
-  atRisk: 'At risk',
-  disrupted: 'Needs attention',
-  recovering: 'Recovery under way',
-  awaitingDecision: 'Decisions needed',
-  resolved: 'Recovered',
-  unknown: 'Unconfirmed',
-};
-
 /**
- * Status keys that appear in ProgrammeStatusSummary and have a matching
- * tile label above. Centralised so a future summary field always gets a
- * tile or a deliberate omission, never a missing label.
+ * Tile labels for the approved programme summary buckets. The buckets
+ * aggregate the frozen ProgrammeStatusSummary fields into the designer's
+ * programme-health vocabulary (P1/P2/E1/E2 all use the same six tiles).
  */
-export type ProgrammeStatusSummaryTileKeys =
-  | 'total'
-  | 'ready'
-  | 'planning'
-  | 'needsTravellerInfo'
-  | 'changeRequested'
-  | 'atRisk'
-  | 'disrupted'
-  | 'recovering'
-  | 'awaitingDecision'
-  | 'resolved'
-  | 'unknown';
+export const PROGRAMME_TILE_LABEL = {
+  total: 'Travellers',
+  /** Used when nothing on the programme needs action — the healthy wording. */
+  onTrackCalm: 'Ready',
+  /** Used whenever any trip is disrupted, at risk, recovering, or waiting. */
+  onTrackActive: 'On track',
+  watching: 'Watching',
+  inRecovery: 'In recovery',
+  beingPlanned: 'Being planned',
+  unconfirmed: 'Unconfirmed',
+  endangered: 'Endangered commitments',
+} as const;
 
 /**
  * Internal terms that must never appear in rendered user-facing output.
