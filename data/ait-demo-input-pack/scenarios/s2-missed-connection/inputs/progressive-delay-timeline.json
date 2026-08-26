@@ -1,0 +1,63 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": ["src-sim-airline-zg", "src-wave4r-atlas"],
+  "note": "Authoritative progressive disruption timeline for acceptance manifests. Provider-locked baseline ZG023/ZG053. REPLAY limitation: flight_state_query recordings are keyed only by orderReference, so a single CONNECTED reconciliation snapshot is used for the retimed inbound; earlier stages are represented as distinct simulated push notifications that reconcile to that snapshot (architecture cannot evolve multi-version provider state under one order hash without a shared contract change). Connection loss itself is applied via the generic missed-flight boundary on the onward leg (seeded legs have empty dependsOn — upstream delay alone does not auto-cancel the connection).",
+  "pnr": "ZGSYN09",
+  "orderNo": "ZGSYN09",
+  "flightNo": "ZG023",
+  "airline": "ZG",
+  "baseline": {
+    "departure": "2026-09-28T10:55:00-07:00",
+    "arrival": "2026-09-29T14:10:00+09:00",
+    "connectionDeparture": "2026-09-29T16:50:00+09:00",
+    "connectionMinutes": 160
+  },
+  "stages": [
+    {
+      "id": "delay_begins_connection_viable",
+      "at": "2026-09-28T12:30:00-07:00",
+      "eventId": "sim-zg-evt-s2-delay-01",
+      "eventType": "SCHEDULE_CHANGE",
+      "depTime": "2026-09-28T12:10:00-07:00",
+      "arrTime": "2026-09-29T15:25:00+09:00",
+      "connectionRemainingMinutes": 85,
+      "narrative": "Delay begins; ~85min remains before ZG053 — still viable for a short international connection."
+    },
+    {
+      "id": "delay_increases_connection_at_risk",
+      "at": "2026-09-28T15:00:00-07:00",
+      "eventId": "sim-zg-evt-s2-delay-02",
+      "eventType": "DELAY",
+      "depTime": "2026-09-28T13:25:00-07:00",
+      "arrTime": "2026-09-29T16:20:00+09:00",
+      "connectionRemainingMinutes": 30,
+      "narrative": "Delay increases; connection at risk under MCT pressure."
+    },
+    {
+      "id": "zg053_impossible",
+      "at": "2026-09-29T12:00:00+09:00",
+      "eventId": "sim-zg-evt-s2-delay-03",
+      "eventType": "SCHEDULE_CHANGE",
+      "depTime": "2026-09-28T14:40:00-07:00",
+      "arrTime": "2026-09-29T17:55:00+09:00",
+      "connectionRemainingMinutes": -65,
+      "narrative": "ZG023 arrives after ZG053 departure — baseline connection is impossible.",
+      "reconcileSnapshot": true
+    },
+    {
+      "id": "same_night_still_viable",
+      "at": "2026-09-29T18:05:00+09:00",
+      "narrative": "After missed-connection report, NRT→SIN REPLAY inventory still includes TR875 21:15→05:20 — same-night recovery can restore finals viability."
+    },
+    {
+      "id": "same_night_window_closing",
+      "at": "2026-09-29T21:00:00+09:00",
+      "narrative": "Further delay / clock advance eliminates sensible same-night boarding; overnight Narita becomes necessary. Executable REPLAY cannot swap the orderReference-keyed state recording mid-run; overnight is asserted via planning time + traveller report + inventory roles."
+    },
+    {
+      "id": "overnight_narita_necessary",
+      "at": "2026-09-29T21:30:00+09:00",
+      "narrative": "Overnight transit hotel + JP entry/insurance + morning TR885-class path. Morning airline recovery remains inadequate for REQUIRED finals under the 360min buffer."
+    }
+  ]
+}

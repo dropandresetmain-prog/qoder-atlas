@@ -1,28 +1,40 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
-  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
-  "note": "Expected trip state for ait-draft-09 before the disruption: inbound itinerary, hotel stay and pre-booked transfer, all inside the funded window. Booking-plan state; the pack does not execute provider bookings.",
-  "asOf": "2026-09-29T10:00:00+08:00",
+  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy", "src-wave4r-atlas"],
+  "note": "Expected trip state for ait-draft-09 before disruption: LAX→NRT→SIN ZIPAIR connection with SIN partner hotel. Provider-locked ZG023/ZG053 timings. Booking-plan state; the pack does not execute provider bookings. Traveller display identity remains Chloe Martin in frozen roster until primary applies the Jordan Hale / LAX home patch.",
+  "asOf": "2026-09-28T08:00:00-07:00",
   "draftId": "ait-draft-09",
   "inboundItinerary": {
-    "plan": "SYD -> KUL -> SIN on 29 Sep; landside SIN 17:50, comfortable before Day 0 (lab 11:15, finals 15:10) and inside the programme-critical 12h buffer.",
+    "plan": "LAX -> NRT -> SIN; landside SIN 23:00 on 29 Sep — inside the evening-before-critical-day window and the 360min buffer before Day 0 finals (15:10 on 30 Sep).",
     "segments": [
-      { "flightNumber": "MN216", "origin": "SYD", "destination": "KUL", "departure": "2026-09-29T08:20:00+10:00", "arrival": "2026-09-29T14:05:00+08:00" },
-      { "flightNumber": "MN226", "origin": "KUL", "destination": "SIN", "departure": "2026-09-29T16:40:00+08:00", "arrival": "2026-09-29T17:50:00+08:00" }
+      {
+        "flightNumber": "ZG023",
+        "origin": "LAX",
+        "destination": "NRT",
+        "departure": "2026-09-28T10:55:00-07:00",
+        "arrival": "2026-09-29T14:10:00+09:00"
+      },
+      {
+        "flightNumber": "ZG053",
+        "origin": "NRT",
+        "destination": "SIN",
+        "departure": "2026-09-29T16:50:00+09:00",
+        "arrival": "2026-09-29T23:00:00+08:00"
+      }
     ]
   },
   "hotelStay": {
     "placeId": "place-hotel-bayview",
     "checkIn": "2026-09-29T15:00:00+08:00",
     "checkOut": "2026-10-03T11:00:00+08:00",
-    "noShowCutoff": "2026-09-29T18:00:00+08:00",
-    "note": "Room releases at the no-show cutoff unless late arrival is guaranteed."
+    "noShowCutoff": "2026-09-30T00:00:00+08:00",
+    "note": "Baseline assumes same-night ZG053 arrival; late/no-show risk rises if the traveller is forced overnight at NRT. Room release uses a generous cutoff so the overnight story is about programme viability, not an artificial hotel cancellation hardcode."
   },
   "arrivalTransfer": {
     "mode": "PRIVATE_TRANSFER",
     "pickup": "place-sin-changi",
     "dropoff": "place-hotel-bayview",
-    "scheduledFor": "2026-09-29T18:10:00+08:00",
-    "note": "Dispatch keyed to the baseline MN226 arrival; must be re-dispatched on any arrival change (TRANSFER_REDISPATCH is pre-approved under delegatedAuthority)."
+    "scheduledFor": "2026-09-29T23:30:00+08:00",
+    "note": "Dispatch keyed to baseline ZG053 arrival; must be re-dispatched on any arrival change (TRANSFER_REDISPATCH is pre-approved under delegatedAuthority)."
   }
 }

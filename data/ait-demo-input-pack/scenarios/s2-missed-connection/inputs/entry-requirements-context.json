@@ -1,0 +1,37 @@
+{
+  "provenance": "RESEARCH_SUPPLIED_SYNTHETIC",
+  "sourceIds": ["src-syn-entry-research"],
+  "note": "Scenario-local entry/immigration context for an overnight landside stay in Japan during a missed NRT connection. Intended to be consumed via research.entry_requirements / ENTRY_REQUIREMENT rules when the stretch research path is wired. Not auto-attached by the programme builder today — primary may promote into programme context or leave UNKNOWN. Does not invent Timatic LIVE results.",
+  "draftId": "ait-draft-09",
+  "destination": {
+    "countryCode": "JP",
+    "airportCodes": ["NRT"],
+    "purpose": "AIRSIDE_TO_LANDSIDE_TRANSIT_OVERNIGHT"
+  },
+  "assumedNationality": {
+    "codes": ["US"],
+    "note": "Requested roster nationality for Jordan Hale (LAX origin). Frozen roster may still show AU until shared patch is applied — treat nationality evidence as UNKNOWN if roster disagrees."
+  },
+  "findings": [
+    {
+      "id": "entry-s2-jp-short-transit",
+      "kind": "ENTRY_REQUIREMENT",
+      "authorityClaim": "ASSERTED",
+      "summary": "US passport holders typically qualify for short visa-free landside stays in Japan when passport validity and return/onward evidence are in order; exact admissibility remains UNKNOWN without authoritative Timatic/research confirmation at decision time.",
+      "requirements": [
+        "valid passport",
+        "onward ticket evidence",
+        "landing purpose consistent with temporary transit/overnight"
+      ],
+      "status": "UNKNOWN_NEEDS_AUTHORITATIVE_SOURCE"
+    }
+  ],
+  "toolHint": {
+    "operation": "research.entry_requirements",
+    "parameters": {
+      "nationality": "US",
+      "destinationCountry": "JP",
+      "travelDate": "2026-09-29"
+    }
+  }
+}

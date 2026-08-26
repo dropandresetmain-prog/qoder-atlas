@@ -1,18 +1,17 @@
 {
   "packId": "ait-s2",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scenarioId": "S2",
-  "description": "Local acceptance pack for S2; facts live in data/ait-demo-input-pack",
+  "description": "Local acceptance pack for S2 LAX→NRT→SIN progressive missed-connection; facts live in data/ait-demo-input-pack/scenarios/s2-missed-connection. Programme harvest of declaredTravel/PNR requires primary rebuild after shared patch.",
   "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
   "expect": {
-    "anchorEventIds": [
-      "evt-ait-2026"
-    ],
-    "travellerIds": [
-      "trv-evt-ait-2026-ait-draft-09"
-    ],
-    "tripIds": [
-      "trip-trv-evt-ait-2026-ait-draft-09"
-    ]
+    "anchorEventIds": ["evt-ait-2026"],
+    "travellerIds": ["trv-evt-ait-2026-ait-draft-09"],
+    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-09"]
+  },
+  "corridor": {
+    "baseline": "LAX→NRT→SIN",
+    "flights": ["ZG023", "ZG053"],
+    "pnr": "ZGSYN09"
   }
 }

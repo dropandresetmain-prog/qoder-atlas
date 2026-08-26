@@ -1,42 +1,45 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
-  "sourceIds": ["src-sim-airline-mn"],
-  "note": "Simulated provider PNR state after the involuntary reroute, as a provider-order lookup would return it. Confirms the traveller's report and shows the airline's own recovery: next-morning MN228. Simulated at the external provider boundary; never presented as LIVE.",
-  "observedAt": "2026-09-29T19:55:00+08:00",
-  "pnr": "MNSYN09",
+  "sourceIds": ["src-sim-airline-zg"],
+  "note": "Simulated provider PNR state after progressive inbound delay forces a missed NRT→SIN connection. Confirms the traveller report and shows the airline's own recovery: next-morning TR885-class. Simulated at the external provider boundary; never presented as LIVE. Flight numbers/timings are provider-locked from Wave4 RECORD evidence.",
+  "observedAt": "2026-09-29T17:25:00+09:00",
+  "pnr": "ZGSYN09",
+  "orderNo": "ZGSYN09",
   "passenger": { "draftId": "ait-draft-09" },
   "segments": [
     {
-      "flightNumber": "MN216",
-      "origin": "SYD",
-      "destination": "KUL",
-      "scheduledDeparture": "2026-09-29T08:20:00+10:00",
-      "actualDeparture": "2026-09-29T13:35:00+10:00",
-      "actualArrival": "2026-09-29T19:20:00+08:00",
+      "flightNumber": "ZG023",
+      "origin": "LAX",
+      "destination": "NRT",
+      "scheduledDeparture": "2026-09-28T10:55:00-07:00",
+      "scheduledArrival": "2026-09-29T14:10:00+09:00",
+      "actualDeparture": "2026-09-28T14:40:00-07:00",
+      "actualArrival": "2026-09-29T17:55:00+09:00",
       "status": "FLOWN_LATE",
-      "delayReason": "ATC flow restrictions at SYD"
+      "delayReason": "Upstream ATC / flow restrictions at LAX; progressive delay updates preceded the final arrival."
     },
     {
-      "flightNumber": "MN226",
-      "origin": "KUL",
+      "flightNumber": "ZG053",
+      "origin": "NRT",
       "destination": "SIN",
-      "scheduledDeparture": "2026-09-29T16:40:00+08:00",
+      "scheduledDeparture": "2026-09-29T16:50:00+09:00",
       "status": "MISSED_CONNECTION",
-      "note": "Passenger did not board; connection lost due to late inbound MN216."
+      "note": "Passenger did not board; minimum connection lost after late ZG023 arrival."
     },
     {
-      "flightNumber": "MN228",
-      "origin": "KUL",
+      "flightNumber": "TR885",
+      "origin": "NRT",
       "destination": "SIN",
-      "scheduledDeparture": "2026-09-30T08:10:00+08:00",
-      "scheduledArrival": "2026-09-30T09:20:00+08:00",
+      "scheduledDeparture": "2026-09-30T08:20:00+09:00",
+      "scheduledArrival": "2026-09-30T14:35:00+08:00",
       "status": "REBOOKED_INVOLUNTARY",
-      "fareDifference": "NONE"
+      "fareDifference": "NONE",
+      "note": "Airline-default morning recovery from Wave4 NRT→SIN inventory (TR885-class)."
     }
   ],
   "baggage": {
     "checkedBags": 1,
-    "routing": "Loaded onto MN228 of 30 Sep; expected delivery at SIN baggage belt on 30 Sep morning.",
+    "routing": "Held for morning TR885-class; expected delivery at SIN baggage belt on 30 Sep afternoon.",
     "status": "ROUTED_WITH_REBOOKING"
   }
 }
