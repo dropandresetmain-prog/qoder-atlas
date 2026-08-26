@@ -54,6 +54,7 @@ import {
   presentSignalChange,
   presentUncertainties,
 } from './presentation.ts';
+import { enrichCaseDetailView } from './casePresentation.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -587,37 +588,40 @@ export async function projectCaseDetail(
     recoveryCase.strategies.length === 0 &&
     !recoveryCase.resolution;
 
-  return {
-    caseId: recoveryCase.id,
-    tripId: trip.id,
-    ...(trip.label ? { tripLabel: trip.label } : {}),
-    travellerNames,
-    status: statusFromCase(recoveryCase.status, isChangeRequest),
-    ...(triggeringSignals[0] ? { whatChanged: presentSignalChange(triggeringSignals[0]) } : {}),
-    affectedItems: recoveryCase.affectedElementIds
-      .map((id) => trip.elements.find((element) => element.id === id))
-      .filter((element): element is TripElement => Boolean(element))
-      .map(describeElement),
-    ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
-    ...(chain && chain.length > 0 ? { chain } : {}),
-    checks,
-    options,
-    ...(approval ? { approval } : {}),
-    actions,
-    ...(funding ? { funding } : {}),
-    uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
-    ...(planningExhausted ? { planningExhausted: true } : {}),
-    ...(recoveryCase.resolution
-      ? {
-          resolution: {
-            outcome: recoveryCase.resolution.outcome,
-            summary: presentResolution(recoveryCase.resolution),
-            ...(remainingLosses.length > 0 ? { remainingLosses } : {}),
-          },
-        }
-      : {}),
-    updatedAt: recoveryCase.updatedAt,
-  };
+  return enrichCaseDetailView(
+    {
+      caseId: recoveryCase.id,
+      tripId: trip.id,
+      ...(trip.label ? { tripLabel: trip.label } : {}),
+      travellerNames,
+      status: statusFromCase(recoveryCase.status, isChangeRequest),
+      ...(triggeringSignals[0] ? { whatChanged: presentSignalChange(triggeringSignals[0]) } : {}),
+      affectedItems: recoveryCase.affectedElementIds
+        .map((id) => trip.elements.find((element) => element.id === id))
+        .filter((element): element is TripElement => Boolean(element))
+        .map(describeElement),
+      ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
+      ...(chain && chain.length > 0 ? { chain } : {}),
+      checks,
+      options,
+      ...(approval ? { approval } : {}),
+      actions,
+      ...(funding ? { funding } : {}),
+      uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
+      ...(planningExhausted ? { planningExhausted: true } : {}),
+      ...(recoveryCase.resolution
+        ? {
+            resolution: {
+              outcome: recoveryCase.resolution.outcome,
+              summary: presentResolution(recoveryCase.resolution),
+              ...(remainingLosses.length > 0 ? { remainingLosses } : {}),
+            },
+          }
+        : {}),
+      updatedAt: recoveryCase.updatedAt,
+    },
+    { recoveryCase, trip, triggeringSignals, places, anchorEvent },
+  );
 }
 
 // ---------------------------------------------------------------------------

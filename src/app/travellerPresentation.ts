@@ -17,20 +17,20 @@ import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import { describeAllocation } from '../engine/funding.ts';
 import type { TravellerOptionDetail, TravellerPresentation } from '../ui/traveller-presentation.ts';
+import {
+  formatProgrammeInstant,
+  projectTravellerItinerary,
+  projectTravellerProgress,
+  projectTravellerThreadMessages,
+} from './presentationProjection.ts';
+import type { TripSignal } from '../operational/signal.ts';
 
 export interface PresentationDeps {
   entities: EntityStore;
   /** Persisted deterministic planning verdicts, keyed by strategy id. */
   verdictFor: (strategyId: string) => { feasible: boolean } | undefined;
   bestStrategyId?: string;
-}
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function shortInstant(iso: IsoDateTime): string | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
-  if (!match) return undefined;
-  return `${Number(match[3])} ${MONTHS[Number(match[2]) - 1] ?? match[2]} · ${match[4]}:${match[5]}`;
+  signals?: readonly TripSignal[];
 }
 
 function clock(iso: IsoDateTime): string | undefined {
@@ -106,15 +106,20 @@ function projectOptionDetails(
   const funding = intent?.costAllocation
     ? `Funding: ${describeAllocation(intent.costAllocation)}.`
     : '';
+  const costLines: string[] = [];
+  if (intent?.providerSpend) {
+    costLines.push(`Provider charge ${intent.providerSpend.amount} ${intent.providerSpend.currency}.`);
+  }
+  const policyAmount = intent?.spendExposure ?? intent?.priceDelta;
+  if (policyAmount) {
+    costLines.push(`Policy restatement ${policyAmount.amount} ${policyAmount.currency}.`);
+  }
   const approve: TravellerOptionDetail = {
     commitmentEffect: verdict?.feasible ? 'keeps' : 'unknown',
     ...(route ? { route } : {}),
-    ...(intent?.priceDelta || funding
+    ...(costLines.length > 0 || funding
       ? {
-          note: [
-            intent?.priceDelta ? `Extra cost ${intent.priceDelta.amount} ${intent.priceDelta.currency}.` : '',
-            funding,
-          ].filter(Boolean).join(' '),
+          note: [...costLines, funding].filter(Boolean).join(' '),
         }
       : {}),
     ...(strategy && deps.bestStrategyId === strategy.id ? { flag: 'Recommended' } : {}),
@@ -153,13 +158,21 @@ export async function projectTravellerPresentation(
       ? event?.commitments.find((candidate) => candidate.id === engagement.data.anchorCommitmentId)
       : undefined;
     const place = await entityOf<Place>(deps.entities, 'PLACE', engagement.data.placeId ?? event?.placeId);
-    const meta = [shortInstant(engagement.data.startsAt.value), placeLabel(place)].filter(Boolean).join(' · ');
+    const meta = [formatProgrammeInstant(engagement.data.startsAt.value), placeLabel(place)].filter(Boolean).join(' · ');
+    const hardObjective = trip.objectives.find((objective) => objective.hardness === 'HARD');
     commitmentCard = {
       label: 'The reason for the trip',
       title: commitment?.title ?? engagement.data.title,
       ...(meta ? { meta } : {}),
+      ...(hardObjective ? { body: hardObjective.statement } : {}),
+      ...(criticalObjectiveAtRisk ? { ifMissed: criticalObjectiveAtRisk } : {}),
+      ok: engagement.status === 'VALID' && trip.viability === 'VIABLE' && !recoveryCase,
     };
   }
+
+  const itinerary = projectTravellerItinerary(trip, places, recoveryCase, event);
+  const progress = projectTravellerProgress(recoveryCase);
+  const thread = projectTravellerThreadMessages(deps.signals ?? [], recoveryCase, undefined);
 
   const traveller = await entityOf<Traveller>(deps.entities, 'TRAVELLER', trip.travellerIds[0]);
   let contactName: string | undefined;
@@ -173,11 +186,41 @@ export async function projectTravellerPresentation(
   }
 
   const optionDetails = projectOptionDetails(recoveryCase, deps, places, criticalObjectiveAtRisk);
-  if (!event && !traveller && !commitmentCard && !contactName && !optionDetails) return undefined;
+  if (
+    !event &&
+    !traveller &&
+    !commitmentCard &&
+    !contactName &&
+    !optionDetails &&
+    itinerary.length === 0 &&
+    progress.length === 0 &&
+    thread.length === 0
+  ) {
+    return undefined;
+  }
   return {
     ...(event ? { eventName: event.name } : {}),
     ...(traveller ? { travellerName: traveller.name } : {}),
     ...(commitmentCard ? { commitmentCard } : {}),
+    ...(itinerary.length > 0
+      ? {
+          itineraryHeading: recoveryCase ? 'What changed' : 'Your trip',
+          itinerary,
+        }
+      : {}),
+    ...(progress.length > 0
+      ? {
+          progressHeading: 'What Northstar is doing',
+          progress,
+          ...(recoveryCase &&
+          recoveryCase.authorityDecisions.every(
+            (decision) => decision.outcome !== 'REQUIRES_TRAVELLER' || decision.approval !== undefined,
+          )
+            ? { progressNote: 'Nothing needed from you yet.' }
+            : {}),
+        }
+      : {}),
+    ...(thread.length > 0 ? { threadHeading: 'Messages', thread } : {}),
     ...(optionDetails ? { optionDetails } : {}),
     ...(contactName ? { contactName } : {}),
   };

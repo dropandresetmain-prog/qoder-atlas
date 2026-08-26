@@ -45,7 +45,6 @@ import {
   createRecoveryExecutor,
   projectApprovalsQueue,
   projectCaseDetail,
-  projectJourneyChain,
   projectOperatorDashboard,
   projectProviderSurface,
   projectTravellerTrip,
@@ -71,6 +70,7 @@ import { listProgrammeDirs, seedProgrammeBundle } from './programmeSeed.ts';
 import { resolveWorldSeedMode, shouldBootSeedScenario } from './worldSeed.ts';
 import { createProgrammeHandlers } from './programmeHttp.ts';
 import { projectProgrammeAugmentations } from './programmeReadmodel.ts';
+import { projectOperatorDashboardAugmentations } from './operatorPresentation.ts';
 import { projectTravellerPresentation } from './travellerPresentation.ts';
 import { createResolutionHandlers } from './resolutionHttp.ts';
 import { createChangeIntakeHandlers } from './changeIntakeHttp.ts';
@@ -543,18 +543,9 @@ export async function composeAppRuntime(
         options?.anchorEventId ? { anchorEventId: options.anchorEventId } : undefined,
       ),
     operatorDashboardAugmentations: async (view) => {
-      const chainByTrip = new Map<string, Awaited<ReturnType<typeof projectJourneyChain>>>();
-      const anchorEventIds = new Set<string>();
-      for (const row of view.trips) {
-        const trip = await trips.getTrip(row.tripId);
-        if (!trip) continue;
-        chainByTrip.set(row.tripId, await projectJourneyChain(readDeps, trip));
-        if (trip.anchorEventId) anchorEventIds.add(trip.anchorEventId);
-      }
-      const onlyEventId = anchorEventIds.size === 1 ? [...anchorEventIds][0] : undefined;
+      const augment = await projectOperatorDashboardAugmentations(readDeps, view);
       return {
-        chainFor: (trip) => chainByTrip.get(trip.tripId),
-        ...(onlyEventId ? { programmeHref: `/programme?event=${encodeURIComponent(onlyEventId)}` } : {}),
+        ...augment,
         ...(demo.resetPopulatedWorld
           ? { demoReset: { action: '/api/demo/reset?redirect=1', label: 'Reset demo' } }
           : {}),
@@ -567,9 +558,11 @@ export async function composeAppRuntime(
       if (!trip) return undefined;
       const recoveryCase = await latestCaseFor(cases, tripId);
       const detail = recoveryCase ? await projectCaseDetail(readDeps, recoveryCase.id, at) : undefined;
+      const tripSignals = await signals.listSignalsForTrip(tripId);
       return projectTravellerPresentation(
         {
           entities,
+          signals: tripSignals,
           verdictFor: (strategyId) => {
             const option = detail?.options.find((candidate) => candidate.id === strategyId);
             return option && option.verdict !== 'UNKNOWN'
