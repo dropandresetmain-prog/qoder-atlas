@@ -251,6 +251,22 @@ Desired demo:
 4. S2 insurance plus authoritative entry/immigration capability audit.
 5. Final Kimi UI implementation concurrently on an isolated branch.
 
+> **Status (26 Aug 2026, worktree `hotel-g1g2`):** item 3 (G1/G2) is
+> implemented generically in `NorthstarPlanner`: stay-change targets now emit a
+> scoped `hotel.search` evidence request (`tool-ws-stay`) and round 2 enumerates
+> candidate replacement/extension strategies from that evidence (cheapest rate
+> per distinct property, capped), reusing the incumbent Stay element id for
+> overlay replace semantics; unknown properties get a derived PLACE upsert keyed
+> by provider externalRef; funding anchors flow from candidate stay dates into
+> the existing FUNDED_WINDOW allocation. Item 4 (S2 audit) is complete with the
+> finding that NO architecture gap exists: missed-connection insurance coverage,
+> transit-hotel reimbursement limits, and authoritative entry results are all
+> expressible through existing contracts (`INSURANCE_COVERAGE` rules with
+> `maxPayout`, `ENTRY_REQUIREMENT` rules gated on AUTHORITATIVE provenance via
+> `interpretResearchFindings`, `research.entry_requirements` tool operation).
+> The remaining S2 work is scenario data + execution (route-scout lane owns the
+> country/route choice), not ontology change.
+
 #### Execution order after discovery
 
 1. Lock S2 provider-backed route/facts.

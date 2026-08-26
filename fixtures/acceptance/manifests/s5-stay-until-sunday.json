@@ -124,7 +124,7 @@
         { "path": "strategies.0.costImpact.amount", "op": "equals", "expected": 468, "description": "the strategy carries a deterministic gross price from REPLAY evidence" },
         { "path": "bestStrategyId", "op": "exists", "description": "feasible candidates are ranked into a best strategy" },
         { "path": "uncertainties", "op": "arrayLengthMin", "expected": 2, "description": "the stay extension is recorded honestly, not silently dropped" },
-        { "path": "uncertainties.1", "op": "contains", "expected": "stayCheckOut requested: stay-date replanning is not supported by this planner yet", "description": "the planner records the unsupported stay replanning as an explicit uncertainty" },
+        { "path": "uncertainties.1", "op": "contains", "expected": "stayCheckOut requested: replacement/extension strategies await hotel.search evidence", "description": "the planner records the stay extension as an explicit evidence-gated uncertainty" },
         { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
       ]
     },

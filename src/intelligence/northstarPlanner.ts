@@ -37,7 +37,54 @@ import type { MutationOperation } from '../operational/mutation.ts';
 import type { RecoveryStrategy, ToolRequest } from '../operational/strategy.ts';
 import type { Engagement, Stay, TransportLeg } from '../domain/elements.ts';
 import type { Place } from '../domain/entities.ts';
+import type { HotelPropertyView, HotelRateView } from '../contracts/capabilities.ts';
 import { hotelSearchGuestsFromOccupancy } from '../app/dispatch.ts';
+
+/** Provider-neutral booking-ref system marking a candidate hotel rate handle. */
+const HOTEL_RATE_REF_SYSTEM = 'hotel-provider';
+/** Presentation bound: cheapest rate per distinct property, capped. */
+const MAX_HOTEL_STRATEGIES = 3;
+
+/** Normalized hotel.search evidence the stay-replacement planner consumes. */
+interface HotelSearchEvidence {
+  properties: HotelPropertyView[];
+  rates: HotelRateView[];
+}
+
+/** Structural guards: only well-formed provider views become candidates. */
+function isHotelPropertyView(value: unknown): value is HotelPropertyView {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return typeof record['propertyId'] === 'string' && record['propertyId'].length > 0;
+}
+
+function isHotelRateView(value: unknown): value is HotelRateView {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  const price = record['totalPrice'] as Record<string, unknown> | undefined;
+  return (
+    typeof record['rateId'] === 'string' &&
+    record['rateId'].length > 0 &&
+    typeof record['propertyId'] === 'string' &&
+    record['propertyId'].length > 0 &&
+    price !== undefined &&
+    typeof price === 'object' &&
+    typeof price['amount'] === 'number' &&
+    typeof price['currency'] === 'string'
+  );
+}
+
+/**
+ * Deterministic place id for a search-derived property: derived purely from
+ * the property's provider externalRef — no scenario or name knowledge.
+ */
+function derivedPlaceIdFor(property: HotelPropertyView): EntityId {
+  const primary = property.externalRefs?.[0];
+  return `place-hotel-${primary ? `${primary.system}-${primary.value}` : property.propertyId}`.replace(
+    /[^A-Za-z0-9_.:-]/g,
+    '-',
+  );
+}
 
 function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -318,21 +365,16 @@ export class NorthstarPlanner implements RecoveryPlanner {
       target.preferredStayPlaceId !== undefined ||
       target.guests !== undefined;
     if (dimensions.length === 0 && hasStayDimensions) {
-      const stayToolRequests = this.stayChangeToolRequests(input, target);
-      return {
-        strategies: [],
-        toolRequests: stayToolRequests,
-        assumptions: [],
-        uncertainties: [
-          this.uncertainty(
-            'stay change dimensions recorded; hotel replacement strategies are not proposed until hotel.search evidence exists',
-            'HIGH',
-          ),
-          ...uncertainties,
-        ],
-        rationale: 'northstar window-shift planner recorded stay change dimensions',
-      };
+      // Stay-only target owns the whole turn.
+      return this.stayChangeOutput(input, target, uncertainties);
     }
+    // Mixed targets (stay + window dimensions) run BOTH evidence tracks: the
+    // flight path below proposes leg replacements, the stay track proposes
+    // replacement/extension stays. Each strategy stays one coherent
+    // provider-executable option — they are alternatives ranked together,
+    // never a silently half-executed combined mutation.
+    const stayTrack = hasStayDimensions ? this.stayChangeOutput(input, target, []) : undefined;
+
     const eventPlaceId =
       input.snapshot.anchorEvent?.placeId ??
       input.snapshot.trip.elements.find(
@@ -525,6 +567,16 @@ export class NorthstarPlanner implements RecoveryPlanner {
       });
     }
     if (selected.length === 0) {
+      if (stayTrack) {
+        // No flight dimension produced a search: the stay track alone owns
+        // this turn's output.
+        return {
+          ...stayTrack,
+          toolRequests: [...toolRequests, ...stayTrack.toolRequests],
+          uncertainties: [...uncertainties, ...stayTrack.uncertainties],
+          rationale: `${stayTrack.rationale} (no rebookable leg for the window dimensions)`,
+        };
+      }
       return {
         strategies: [],
         toolRequests,
@@ -557,6 +609,22 @@ export class NorthstarPlanner implements RecoveryPlanner {
     };
     const scopedEvidence = selected.map((entry) => ({ ...entry, evidence: evidenceForDimension(entry.toolRequestId) }));
     if (!scopedEvidence.some((entry) => entry.evidence)) {
+      if (stayTrack && stayTrack.strategies.length > 0) {
+        return {
+          strategies: stayTrack.strategies,
+          toolRequests: [...toolRequests, ...stayTrack.toolRequests],
+          assumptions: [
+            ...stayTrack.assumptions,
+            'flight replacement awaits flight.search evidence; only the stay track proposed this round',
+          ],
+          uncertainties: [
+            this.uncertainty('change-request resolution active: awaiting flight.search evidence', 'MEDIUM'),
+            ...uncertainties,
+            ...stayTrack.uncertainties,
+          ],
+          rationale: 'northstar window-shift planner proposes stay replacements while flight evidence is pending',
+        };
+      }
       return {
         strategies: [],
         toolRequests,
@@ -679,11 +747,16 @@ export class NorthstarPlanner implements RecoveryPlanner {
           : [],
       );
     return {
-      strategies,
-      toolRequests,
-      assumptions: ['window-shift strategies are enumerated from flight.search evidence; viability owns feasibility'],
-      uncertainties,
-      rationale: 'northstar window-shift planner enumerates replacement offers; viability owns feasibility',
+      strategies: [...strategies, ...(stayTrack?.strategies ?? [])],
+      toolRequests: [...toolRequests, ...(stayTrack?.toolRequests ?? [])],
+      assumptions: [
+        'window-shift strategies are enumerated from flight.search evidence; viability owns feasibility',
+        ...(stayTrack?.assumptions ?? []),
+      ],
+      uncertainties: [...uncertainties, ...(stayTrack?.uncertainties ?? [])],
+      rationale: stayTrack
+        ? 'northstar window-shift planner enumerates replacement offers and replacement stays from evidence; viability owns feasibility'
+        : 'northstar window-shift planner enumerates replacement offers; viability owns feasibility',
     };
   }
 
@@ -760,17 +833,17 @@ export class NorthstarPlanner implements RecoveryPlanner {
       }
       if (target.stayCheckOut !== undefined) {
         uncertaintyStatements.push(
-          'stayCheckOut requested: stay-date replanning is not supported by this planner yet; the target check-out is recorded, not silently dropped',
+          'stayCheckOut requested: replacement/extension strategies await hotel.search evidence; the target check-out is recorded, not silently dropped',
         );
       }
       if (target.stayPlaceRef !== undefined || target.preferredStayPlaceId !== undefined) {
         uncertaintyStatements.push(
-          'stay property change requested: hotel replacement search is not supported by this planner yet; the property preference is recorded, not silently dropped',
+          'stay property change requested: replacement options come from hotel.search evidence; the property preference is recorded, not silently dropped',
         );
       }
       if (target.guests !== undefined) {
         uncertaintyStatements.push(
-          `stay occupancy requested (${target.guests} guest(s)): occupancy-aware hotel search is not supported by this planner yet; the count is recorded, not silently dropped`,
+          `stay occupancy requested (${target.guests} guest(s)): occupancy is wired into the evidence search and candidate rates; the count is recorded, not silently dropped`,
         );
       }
       if (target.travelWithTravellerIds !== undefined && target.travelWithTravellerIds.length > 0) {
@@ -898,12 +971,86 @@ export class NorthstarPlanner implements RecoveryPlanner {
   }
 
   /**
+   * Stay-track planning output for a stay-change target: evidence request on
+   * the first pass, replacement/extension strategies once scoped hotel.search
+   * evidence exists. `prefixUncertainties` carries the caller's recorded
+   * uncertainty context (the full set for stay-only turns).
+   */
+  private stayChangeOutput(
+    input: PlannerInput,
+    target: ResolutionTarget,
+    prefixUncertainties: UncertaintyRecord[],
+  ): PlannerOutput {
+    const stay = this.stayFor(input);
+    if (!stay) {
+      return {
+        strategies: [],
+        toolRequests: [],
+        assumptions: [],
+        uncertainties: [
+          this.uncertainty(
+            'stay change requested but the trip carries no booked Stay element; nothing to reconsider',
+            'HIGH',
+          ),
+          ...prefixUncertainties,
+        ],
+        rationale: 'northstar window-shift planner failed closed: no stay evidence to replan',
+      };
+    }
+    const toolRequests = this.stayChangeToolRequests(input, target);
+    if (toolRequests.length === 0) {
+      // No search could be derived (missing dates/place/location): fail
+      // closed with the specific reason instead of fabricating candidates.
+      return {
+        strategies: [],
+        toolRequests: [],
+        assumptions: [],
+        uncertainties: [
+          this.uncertainty(
+            'stay change requested but check-in/check-out dates or a resolvable place/location are missing; no search derivable',
+            'HIGH',
+          ),
+          ...prefixUncertainties,
+        ],
+        rationale: 'northstar window-shift planner failed closed: stay-change search underivable',
+      };
+    }
+    // Evidence gate: without scoped hotel.search results this is round 1 —
+    // request evidence and stop. With results, enumerate candidate stays.
+    const evidence = this.hotelSearchEvidence(input);
+    if (!evidence || evidence.rates.length === 0) {
+      const searched = evidence !== undefined;
+      return {
+        strategies: [],
+        toolRequests,
+        assumptions: [],
+        uncertainties: [
+          searched
+            ? this.uncertainty(
+                'hotel.search returned no usable rates; no replacement stay fabricated from empty evidence',
+                'MEDIUM',
+              )
+            : this.uncertainty(
+                'stay change active: replacement/extension options must be searched before any strategy is proposed',
+                'MEDIUM',
+              ),
+          ...prefixUncertainties,
+        ],
+        rationale: searched
+          ? 'northstar window-shift planner found no hotel rates; no strategy fabricated'
+          : 'northstar window-shift planner requests stay-change evidence before proposing',
+      };
+    }
+    return this.stayReplacementOutput(input, target, stay, evidence, prefixUncertainties);
+  }
+
+  /**
    * Read-only hotel.search evidence requests for stay-change targets. Guests
    * come from the declared target occupancy, else the authoritative stay
    * element — absent both stays UNKNOWN (no default adults).
    */
   private stayChangeToolRequests(input: PlannerInput, target: ResolutionTarget): ToolRequest[] {
-    const stay = input.snapshot.trip.elements.find((element): element is Stay => element.elementKind === 'STAY');
+    const stay = this.stayFor(input);
     if (!stay) return [];
     const checkIn = stay.data.checkIn?.value.slice(0, 10);
     const checkOut = (target.stayCheckOut ?? stay.data.checkOut?.value)?.slice(0, 10);
@@ -924,7 +1071,9 @@ export class NorthstarPlanner implements RecoveryPlanner {
     const guests = hotelSearchGuestsFromOccupancy(target.guests ?? stay.data.guests);
     return [
       {
-        id: this.idFactory('tool-hotel'),
+        // Deterministic scoped id (same discipline as tool-ws-*): round 2
+        // matches ITS OWN evidence by request id, never another search's.
+        id: 'tool-ws-stay',
         capability: 'HOTEL',
         operation: 'hotel.search',
         parameters: {
@@ -936,6 +1085,197 @@ export class NorthstarPlanner implements RecoveryPlanner {
         purpose: `find replacement stay options near ${place.id}`,
       },
     ];
+  }
+
+  /** The trip's booked stay, when one exists. */
+  private stayFor(input: PlannerInput): Stay | undefined {
+    return input.snapshot.trip.elements.find((element): element is Stay => element.elementKind === 'STAY');
+  }
+
+  /**
+   * Scoped hotel.search evidence from the planning loop's prior round,
+   * matched by the deterministic request id. A recorded result that carries
+   * no usable rates returns an EMPTY outcome (honest "searched, nothing
+   * found"), never a fallthrough to unrelated evidence.
+   */
+  private hotelSearchEvidence(input: PlannerInput): HotelSearchEvidence | undefined | null {
+    for (let index = input.priorToolResults.length - 1; index >= 0; index -= 1) {
+      const result = input.priorToolResults[index];
+      if (!result || result.toolRequestId !== 'tool-ws-stay') continue;
+      const data = result.data as Record<string, unknown>;
+      const properties = Array.isArray(data['properties']) ? (data['properties'] as unknown[]) : [];
+      const rates = Array.isArray(data['rates']) ? (data['rates'] as unknown[]) : [];
+      const outcome: HotelSearchEvidence = {
+        properties: properties.filter(isHotelPropertyView),
+        rates: rates.filter(isHotelRateView),
+      };
+      return outcome;
+    }
+    return null;
+  }
+
+  /**
+   * Enumerate candidate replacement/extension strategies from hotel.search
+   * evidence. Generic discipline:
+   * - cheapest rate per DISTINCT property; properties capped for reviewable
+   *   options (rank order is cheapest-first);
+   * - each strategy UPSERTs the incumbent Stay element id (overlay replace
+   *   semantics): new dates/place/bookingRef at HELD/UNKNOWN, occupancy from
+   *   the declared target else unchanged;
+   * - a property unknown to programme Place evidence gets a derived PLACE
+   *   upsert keyed by its provider externalRef — no scenario knowledge;
+   * - funding anchor flows from the candidate check-out/check-in fact via
+   *   fundingAnchorFromCandidateOperations; costImpact is the rate's gross.
+   */
+  private stayReplacementOutput(
+    input: PlannerInput,
+    target: ResolutionTarget,
+    stay: Stay,
+    evidence: HotelSearchEvidence,
+    uncertainties: UncertaintyRecord[],
+  ): PlannerOutput {
+    const sourceId = input.triggeringSignals[0]?.sourceId ?? 'src:northstar-change';
+    const observedAt = input.snapshot.takenAt;
+    const propertyById = new Map(evidence.properties.map((property) => [property.propertyId, property]));
+    const cheapestByProperty = new Map<string, HotelRateView & { property?: HotelPropertyView }>();
+    for (const rate of evidence.rates) {
+      if (!propertyById.has(rate.propertyId)) continue;
+      const incumbent = cheapestByProperty.get(rate.propertyId);
+      if (!incumbent || rate.totalPrice.amount < incumbent.totalPrice.amount) {
+        cheapestByProperty.set(rate.propertyId, rate);
+      } else if (
+        rate.totalPrice.amount === incumbent.totalPrice.amount &&
+        rate.rateId.localeCompare(incumbent.rateId) < 0
+      ) {
+        cheapestByProperty.set(rate.propertyId, rate);
+      }
+    }
+    const selected = [...cheapestByProperty.values()]
+      .sort(
+        (a, b) =>
+          a.totalPrice.amount - b.totalPrice.amount ||
+          a.rateId.localeCompare(b.rateId),
+      )
+      .slice(0, MAX_HOTEL_STRATEGIES);
+
+    const strategies: RecoveryStrategy[] = selected.map((rate) => {
+      const property = propertyById.get(rate.propertyId)!;
+      // Place resolution: reuse a programme-known place only when provider
+      // externalRef EVIDENCE ties the searched property to it; otherwise the
+      // candidate introduces a derived place keyed by the provider ref. No
+      // name guessing, no scenario knowledge.
+      const knownPlace =
+        input.snapshot.places.find((place) =>
+          place.externalRefs.some(
+            (ref) =>
+              property.externalRefs?.some(
+                (candidate) => candidate.system === ref.system && candidate.value === ref.value,
+              ) ?? false,
+          ),
+        );
+      const placeId = knownPlace ? knownPlace.id : derivedPlaceIdFor(property);
+      const placeOperations = knownPlace
+        ? []
+        : [
+            {
+              op: 'UPSERT_ENTITY' as const,
+              entityType: 'PLACE' as const,
+              data: {
+                id: placeId,
+                name: property.name,
+                kind: 'HOTEL' as const,
+                ...(property.coordinates ? { coordinates: property.coordinates } : {}),
+                externalRefs: property.externalRefs ?? [],
+                servedByPlaceIds: [],
+              },
+            },
+          ];
+      // Facts NOT changed by the request carry their incumbent evidence
+      // verbatim; a requested check-out keeps ASSERTED provenance — a
+      // traveller declaration is never upgraded to provider certainty
+      // before execution observes it.
+      const requestedCheckOut = target.stayCheckOut;
+      const requestedGuests = target.guests ?? stay.data.guests;
+      const candidateOperations: MutationOperation[] = [
+        ...placeOperations,
+        {
+          op: 'UPSERT_ENTITY' as const,
+          entityType: 'TRIP_ELEMENT' as const,
+          data: {
+            id: stay.id,
+            tripId: stay.tripId,
+            elementKind: 'STAY',
+            importance: stay.importance,
+            flexibility: stay.flexibility,
+            reservationState: 'HELD',
+            status: 'UNKNOWN',
+            dependsOn: stay.dependsOn,
+            governedByRuleSetIds: stay.governedByRuleSetIds,
+            data: {
+              placeId,
+              checkIn: stay.data.checkIn,
+              ...(requestedCheckOut !== undefined
+                ? {
+                    checkOut: {
+                      value: requestedCheckOut,
+                      sourceId,
+                      authority: 'ASSERTED' as const,
+                      observedAt,
+                    },
+                  }
+                : stay.data.checkOut !== undefined
+                  ? { checkOut: stay.data.checkOut }
+                  : {}),
+              bookingRef: { system: HOTEL_RATE_REF_SYSTEM, reference: rate.rateId },
+              ...(requestedGuests !== undefined ? { guests: requestedGuests } : {}),
+              policyRuleSetIds: stay.data.policyRuleSetIds,
+            },
+          },
+        },
+      ];
+      const nightsPhrase =
+        requestedCheckOut && requestedCheckOut.slice(0, 10) !== stay.data.checkIn.value.slice(0, 10)
+          ? ` through ${requestedCheckOut.slice(0, 10)}`
+          : '';
+      const summary = `Switch stay to ${property.name}${nightsPhrase} — ${Math.round(rate.totalPrice.amount)} ${rate.totalPrice.currency}`;
+      return {
+        id: this.idFactory('strat'),
+        caseId: input.caseId,
+        summary,
+        candidateOperations,
+        toolRequests: [],
+        assumptions: [
+          'the quoted rate is CONNECTED evidence until execution observation confirms it',
+          'the displaced stay cancels only after the replacement observes CONFIRMED (executor-owned sequencing)',
+        ],
+        uncertainties: rate.refundable
+          ? []
+          : [
+              {
+                id: this.idFactory('unc'),
+                statement: `rate ${rate.rateId} is non-refundable per provider evidence`,
+                aboutRefs: [],
+                severity: 'MEDIUM' as const,
+              },
+            ],
+        expectedOutcomes: [
+          `the trip's accommodation satisfies the requested change with a chargeable replacement (${rate.refundable ? 'refundable' : 'non-refundable'} rate)`,
+        ],
+        costImpact: rate.totalPrice,
+        createdAt: this.instant(input),
+      };
+    });
+
+    return {
+      strategies,
+      toolRequests: [],
+      assumptions: [
+        'replacement stays are enumerated from hotel.search evidence; viability owns feasibility',
+        'funding allocation derives deterministically from the candidate stay check-out/check-in anchor',
+      ],
+      uncertainties,
+      rationale: 'northstar window-shift planner enumerates replacement stays from hotel.search evidence; viability owns feasibility',
+    };
   }
 
   private degraded(reason: string): PlannerOutput {
