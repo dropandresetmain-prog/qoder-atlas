@@ -14,6 +14,7 @@
 import { THEME_CSS } from './theme.ts';
 import { escapeHtml } from './html.ts';
 import { renderFormEnhancementScript } from './interaction.ts';
+import { renderProgrammeChangeEnhancementScript } from './programme-change-interaction.ts';
 
 export type NavTarget = 'dashboard' | 'programme' | 'case' | 'decisions' | 'activity' | 'traveller';
 
@@ -55,6 +56,9 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
     ? renderDemoBanner(options.demoBanner)
     : '';
   const chrome = isOperator ? renderOperatorTopbar(options) : '';
+  const programmeChangeScript = isOperator && options.active === 'programme'
+    ? renderProgrammeChangeEnhancementScript()
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -67,6 +71,7 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
 ${chrome}
 ${banner}
 ${bodyHtml}
+${programmeChangeScript}
 ${renderFormEnhancementScript()}
 </body>
 </html>`;
