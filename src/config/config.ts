@@ -100,7 +100,8 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
     environment: optional(env.APP_ENVIRONMENT),
     logLevel: optional(env.LOG_LEVEL),
     adapterMode: optional(env.ADAPTER_MODE),
-    httpPort: optional(env.HTTP_PORT) ?? optional(env.PORT),
+    // Host PORT (Railway, etc.) wins over HTTP_PORT so the proxy health check matches.
+    httpPort: optional(env.PORT) ?? optional(env.HTTP_PORT),
     sqlitePath: optional(env.SQLITE_PATH),
     recordingsDir: optional(env.RECORDINGS_DIR),
     fixturesDir: optional(env.FIXTURES_DIR),

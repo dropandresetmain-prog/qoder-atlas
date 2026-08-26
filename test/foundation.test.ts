@@ -54,6 +54,16 @@ test('config: PORT is honoured when HTTP_PORT is unset (Railway/container defaul
   }
 });
 
+test('config: PORT wins over HTTP_PORT when both are set (Railway proxy contract)', () => {
+  const cwd = emptyCwd();
+  try {
+    const config = loadConfig({ PORT: '8080', HTTP_PORT: '8787' }, cwd);
+    assert.equal(config.httpPort, 8080);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test('config: parseEnvFile handles comments, quotes, blank lines', () => {
   const parsed = parseEnvFile(['# comment', '', 'A=1', 'B="two"', "C='three'"].join('\n'));
   assert.deepEqual(parsed, { A: '1', B: 'two', C: 'three' });
