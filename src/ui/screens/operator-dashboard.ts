@@ -108,7 +108,7 @@ function fleetGrid(view: OperatorDashboardView): string {
   const cells = sorted
     .map((trip, i) => {
       const label = `${trip.label ?? trip.tripId} — ${STATUS_LABEL[trip.status]}`;
-      return `<i class="${FLEET_CELL[trip.status]}" style="--i:${i}" data-fleet-status="${escapeHtml(trip.status)}" title="${escapeHtml(label)}"></i>`;
+      return `<i class="${FLEET_CELL[trip.status]}" style="--i:${i}" data-fleet-trip="${escapeHtml(trip.tripId)}" data-fleet-status="${escapeHtml(trip.status)}" title="${escapeHtml(label)}"></i>`;
     })
     .join('');
   return `

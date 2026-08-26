@@ -99,7 +99,7 @@ test('final UI wiring: Decisions and Activity are served HTML routes and reachab
   }
 });
 
-test('final UI wiring: the real programme route renders persisted commitment timeline data', async () => {
+test('final UI wiring: programme preview control, Overview chains, and traveller presentation use live projections', async () => {
   const config = AppConfigSchema.parse({
     environment: 'local', adapterMode: 'REPLAY', sqlitePath: ':memory:', fixturesDir: 'fixtures',
     providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {} },
@@ -109,11 +109,30 @@ test('final UI wiring: the real programme route renders persisted commitment tim
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const base = `http://localhost:${(server.address() as AddressInfo).port}`;
   try {
-    const response = await fetch(`${base}/programme?event=evt-ait-2026`);
+    const response = await fetch(`${base}/programme?event=evt-ait-2026&at=${encodeURIComponent(NOW)}`);
     assert.equal(response.status, 200);
     const html = await response.text();
     assert.match(html, /aria-label="Programme timeline"/);
     assert.match(html, /Headline Interview: Aviation After Automation/);
+    assert.match(html, /Preview programme change/);
+    assert.match(html, /params\.get\('at'\)/);
+    assert.match(html, /\/change-preview/);
+    assert.match(html, /\/change-commit/);
+    assert.match(html, /data-programme-change-commit hidden/);
+
+    const overview = await (await fetch(`${base}/operator?event=evt-ait-2026`)).text();
+    assert.match(overview, /class="mini-chain"/);
+    assert.match(overview, /data-fleet-trip=/);
+
+    const dashboard = await composed.endpoints.operatorDashboard(NOW, { anchorEventId: 'evt-ait-2026' });
+    const tripId = dashboard.trips[0]?.tripId;
+    const eventName = dashboard.trips[0]?.anchorEventName;
+    assert.ok(tripId, 'the seeded programme exposes a traveller trip');
+    assert.ok(eventName, 'the seeded trip retains its programme name');
+    const traveller = await (await fetch(`${base}/traveller?trip=${encodeURIComponent(tripId)}`)).text();
+    assert.ok(traveller.includes(`<span class="tt-right">${eventName}</span>`));
+    assert.match(traveller, /data-ui-section="commitment"/);
+    assert.match(traveller, /The reason for the trip/);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     composed.db.close();

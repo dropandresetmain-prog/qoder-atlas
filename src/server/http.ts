@@ -12,6 +12,8 @@ import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { OperatorDashboardView, ProgrammeView, TravellerTripView } from '../contracts/readmodels.ts';
 import type { CaseDetailView } from '../ui/case-view-model.ts';
 import type { ProgrammeAugmentations } from '../ui/screens/operator-programme.ts';
+import type { OperatorDashboardAugmentations } from '../ui/screens/operator-dashboard.ts';
+import type { TravellerPresentation } from '../ui/traveller-presentation.ts';
 import type {
   ApprovalsQueueView,
   ProviderSurfaceView,
@@ -31,6 +33,7 @@ import {
   decisionsFromApprovalsQueue,
   decisionsFromDashboard,
 } from '../ui/operator-surfaces-view-model.ts';
+import { SettleTracker, addClassToTagsContaining } from './settle.ts';
 
 export interface HealthView {
   status: 'ok';
@@ -175,8 +178,12 @@ export interface WaveSurfaces {
 export interface AppEndpoints {
   now(): IsoDateTime;
   operatorDashboard(at: IsoDateTime, options?: { anchorEventId?: string }): Promise<OperatorDashboardView>;
+  /** Optional persisted chain/role presentation for the served Overview. */
+  operatorDashboardAugmentations?: (view: OperatorDashboardView) => Promise<OperatorDashboardAugmentations>;
   caseDetail(caseId: EntityId, at: IsoDateTime): Promise<CaseDetailView | undefined>;
   travellerTrip(tripId: EntityId, at: IsoDateTime): Promise<TravellerTripView | undefined>;
+  /** Optional persisted concierge presentation for the served traveller page. */
+  travellerPresentation?: (tripId: EntityId, at: IsoDateTime) => Promise<TravellerPresentation | undefined>;
   firstTripId(): Promise<EntityId | undefined>;
   travellerDecision(
     caseId: EntityId,
@@ -265,8 +272,9 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 export function createAppServer(config: AppConfig, endpoints?: AppEndpoints): Server {
+  const settle = new SettleTracker();
   return createServer((req: IncomingMessage, res: ServerResponse) => {
-    void handle(config, endpoints, req, res).catch((error) => {
+    void handle(config, endpoints, settle, req, res).catch((error) => {
       sendJson(res, 500, { error: 'internal', message: error instanceof Error ? error.message : String(error) });
     });
   });
@@ -275,6 +283,7 @@ export function createAppServer(config: AppConfig, endpoints?: AppEndpoints): Se
 async function handle(
   config: AppConfig,
   endpoints: AppEndpoints | undefined,
+  settle: SettleTracker,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -325,7 +334,22 @@ async function handle(
       endpoints.now(),
       eventId ? { anchorEventId: eventId } : undefined,
     );
-    const body = renderOperatorDashboardBody(view);
+    const augment = endpoints.operatorDashboardAugmentations
+      ? await endpoints.operatorDashboardAugmentations(view)
+      : undefined;
+    let body = renderOperatorDashboardBody(view, augment);
+    const surfaceKey = eventId ?? 'all';
+    const statusByTrip = new Map(view.trips.map((trip) => [trip.tripId, trip.status]));
+    const changedKeys = settle.diffAndRecord(new Map(
+      view.trips.map((trip) => [`operator:${surfaceKey}:trip:${trip.tripId}`, trip.status]),
+    ));
+    for (const key of changedKeys) {
+      const prefix = `operator:${surfaceKey}:trip:`;
+      const tripId = key.startsWith(prefix) ? key.slice(prefix.length) : undefined;
+      if (!tripId || !statusByTrip.has(tripId)) continue;
+      body = addClassToTagsContaining(body, `data-fleet-trip="${tripId}"`, 'just-changed');
+      body = addClassToTagsContaining(body, `data-trip-id="${tripId}"`, 'just-changed');
+    }
     sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
     return;
   }
@@ -425,9 +449,19 @@ async function handle(
     const at = endpoints.now();
     const tripId = url.searchParams.get('trip') ?? (await endpoints.firstTripId());
     const view = tripId ? await endpoints.travellerTrip(tripId, at) : undefined;
-    const body = renderTravellerTrip(
+    const presentation = view && tripId && endpoints.travellerPresentation
+      ? await endpoints.travellerPresentation(tripId, at)
+      : undefined;
+    let body = renderTravellerTrip(
       view ? { state: 'LOADED', data: view, generatedAt: at } : { state: 'ERROR', errorMessage: 'No trip is being managed yet', generatedAt: at },
+      presentation,
     );
+    if (view && tripId) {
+      const changed = settle.diffAndRecord(new Map([[`traveller:${tripId}:status`, view.status]]));
+      if (changed.length > 0) {
+        body = addClassToTagsContaining(body, `data-status="${view.status}"`, 'just-changed');
+      }
+    }
     sendHtml(
       res,
       view ? 200 : 404,
@@ -576,6 +610,7 @@ async function handle(
       case 'execute':
       case 'reset': {
         const outcome = await handlers[action](parsed);
+        if (action === 'reset' && outcome.status === 200) settle.reset();
         sendJson(res, outcome.status, outcome.body);
         return;
       }

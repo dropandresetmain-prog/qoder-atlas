@@ -328,7 +328,7 @@ async function placeLabel(deps: ReadModelDependencies, placeId: EntityId): Promi
 }
 
 /** Generic authoritative trip chain used by every operator case. */
-async function projectJourneyChain(deps: ReadModelDependencies, trip: Trip): Promise<ChainLinkView[]> {
+export async function projectJourneyChain(deps: ReadModelDependencies, trip: Trip): Promise<ChainLinkView[]> {
   const chain: ChainLinkView[] = [];
   const orderedElements = [...trip.elements].sort((a, b) => {
     const order: Record<TripElement['elementKind'], number> = { TRANSPORT_LEG: 0, STAY: 1, ENGAGEMENT: 2 };

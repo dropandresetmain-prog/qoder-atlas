@@ -40,6 +40,7 @@ import type { IsoDateTime } from '../src/domain/common.ts';
 import type { MutationOperation } from '../src/operational/mutation.ts';
 import { caseDetailViewIssues } from '../src/ui/case-view-model.ts';
 import { createAppServer, type AppEndpoints } from '../src/server/http.ts';
+import { projectTravellerPresentation } from '../src/app/travellerPresentation.ts';
 import {
   buildTimezoneResolver,
   buildTripSnapshot,
@@ -372,6 +373,27 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     operatorDashboard: (at) => projectOperatorDashboard(readDeps, at),
     caseDetail: (id, at) => projectCaseDetail(readDeps, id, at),
     travellerTrip: (tripId, at) => projectTravellerTrip(readDeps, tripId, at),
+    travellerPresentation: async (tripId, at) => {
+      const trip = await harness.trips.getTrip(tripId);
+      const recoveryCase = await harness.cases.getCase(caseId);
+      if (!trip || !recoveryCase) return undefined;
+      const detail = await projectCaseDetail(readDeps, recoveryCase.id, at);
+      return projectTravellerPresentation(
+        {
+          entities: harness.entities,
+          verdictFor: (strategyId) => {
+            const option = detail?.options.find((candidate) => candidate.id === strategyId);
+            return option && option.verdict !== 'UNKNOWN'
+              ? { feasible: option.verdict === 'VIABLE' }
+              : undefined;
+          },
+          bestStrategyId: planning.bestStrategyId,
+        },
+        trip,
+        recoveryCase,
+        detail?.criticalObjectiveAtRisk,
+      );
+    },
     firstTripId: async () => (await harness.trips.listTrips())[0]?.tripId,
     travellerDecision: async (id, body, at) => {
       const outcome = await settleTravellerDecision(
@@ -419,7 +441,11 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     const travellerRes = await fetch(`${base}/traveller`);
     assert.equal(travellerRes.status, 200);
     const travellerHtml = await travellerRes.text();
-    assert.match(travellerHtml, /Outbound flight cancelled by carrier/);
+    assert.match(travellerHtml, /We need your input/);
+    assert.match(travellerHtml, /data-ui-section="commitment"/);
+    assert.match(travellerHtml, /class="optcard/);
+    assert.match(travellerHtml, /value="APPROVED"/);
+    assert.match(travellerHtml, /opt-route|opt-note/);
 
     // JSON read models expose the same projections.
     const caseJson = (await (await fetch(`${base}/api/cases/${caseId}`)).json()) as {
@@ -461,6 +487,9 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
       trips: Array<{ status: string }>;
     };
     assert.equal(afterDashboard.trips[0]!.status, 'RESOLVED');
+    const settledDashboardHtml = await (await fetch(`${base}/operator`)).text();
+    assert.match(settledDashboardHtml, /class="just-changed [^"]*"[^>]*data-fleet-trip=/);
+    assert.doesNotMatch(await (await fetch(`${base}/operator`)).text(), /class="just-changed/);
     const afterTraveller = (await (await fetch(`${base}/api/traveller/${setup.spec.trip.id}`)).json()) as {
       remainderViable: string;
       resolutionSummary?: string;
