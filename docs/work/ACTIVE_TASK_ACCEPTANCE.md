@@ -14,8 +14,9 @@ This is an independent acceptance of the named hero-presentation candidate. It d
 | Base | `final/hero-integration` @ `18fefc8` |
 | Contracts | `docs/DEMO_SCREEN_CHOREOGRAPHY.md`, `docs/DEMO_FINAL_IMPLEMENTATION_RECONCILIATION.md` |
 | Runtime | Live UI at `http://127.0.0.1:8787/operator?event=evt-ait-2026` after `POST /api/demo/reset` |
-| Method | Real Chrome clickthrough by a computer-use browser agent, then independent visual review of those screenshots. Playwright HTML capture was used only as a secondary locator aid, never as the acceptance gate. |
-| Screenshot pack | `output/hero-acceptance/browser/` |
+| Method | Two real Chrome clickthroughs by a computer-use browser agent, then independent visual review of those screenshots (not the walker writeups). Playwright HTML capture was never the acceptance gate. |
+| Screenshot pack (pass 1) | `output/hero-acceptance/browser/` |
+| Screenshot pack (pass 2, this request) | `output/hero-acceptance/live/` |
 
 Prior `ACTIVE_TASK_PRESENTATION.md` 19/19 capture checks and `hero-lifecycle-rehearsal` PASS are **not** accepted as proof. Those tests passed on this SHA while the live judge UI still fails Act Now items below.
 
@@ -23,7 +24,7 @@ Prior `ACTIVE_TASK_PRESENTATION.md` 19/19 capture checks and `hero-lifecycle-reh
 
 ## Verdict
 
-**FIX REQUIRED.** Jordan/Oliver/Sarah/Jonas can be driven to a resolved Case and Overview Confirmed/green, but the judge-facing choreography is not closed. Failed checklist IDs are listed in §Failed IDs. Do not certify `FINAL HERO ACCEPTANCE CANDIDATE`.
+**FIX REQUIRED.** A second live Chrome pass on the same SHA (fresh demo reset, no Playwright) reproduced the must-fix IDs. Jordan/Oliver/Sarah/Jonas can still be driven to a resolved Case and Overview Confirmed/green, but the judge-facing choreography is not closed. Do not certify `FINAL HERO ACCEPTANCE CANDIDATE`.
 
 What already works (not sufficient for acceptance):
 
@@ -198,8 +199,49 @@ These results prove engine/lifecycle wiring. They do **not** close REC-2-trip-st
 
 - Product code: **not modified**.
 - This file is the acceptance record.
-- Browser evidence: `output/hero-acceptance/browser/*.png`.
+- Browser evidence: `output/hero-acceptance/browser/*.png` (pass 1) and `output/hero-acceptance/live/*.png` (pass 2). Walker notes under `live/*.md` are **not** SSOT.
 
 ## Next dependent action
 
 Return the presentation/lifecycle/hero-truth owners to the **FIX REQUIRED** IDs above on `2a24f6b` (or a successor SHA of this candidate). Independent acceptance should re-run **only** the failed checklist IDs in a live browser. Do not treat another test-suite green as closure.
+
+---
+
+## Second live Chrome pass (same SHA, fresh reset)
+
+Clicked in Chrome by a Composer computer-use agent. Independently reviewed from the PNGs in `output/hero-acceptance/live/`, not from `FINAL-REPORT.md`.
+
+Same-world order, no reset between paths: Overview/Programme → Jordan Approve→Execute → Sarah preview/commit → Oliver Approve→Execute → Jonas traveller Approve.
+
+### Confirmed again from the pixels
+
+| ID | Pass-2 evidence |
+|---|---|
+| **REC-2-trip-status** | Jordan entry: LAX→NRT **FLIGHT STATUS PENDING**, NRT→SIN **IMPACTED**, hotel **HOTEL CONFIRMATION PENDING**. Oliver terminal: HND→SIN **CONFIRMED** 02:20, SIN→LHR still **FLIGHT STATUS PENDING**. Jonas operator: AMS flights + Concorde **PENDING**. `J-02-case-entry-top.png`, `O-09-terminal.png`, `V-02-operator.png`. |
+| **REC-2-programme-engagement** | Finals Showcase / Headline / Debate / Fireside remain **DETAILS PENDING** on entry and after recover. Sarah recovered commitment still **DETAILS PENDING** at 16:00. `J-02-case-entry-top.png`, `S-08-after-commit.png`, `O-09-terminal.png`, `V-02-operator.png`. |
+| **REC-5-observe-update-visible** | Execute/commit overlay files are byte-identical to the terminal frames: `J-08-overlay.png`=`J-09-terminal.png`, `S-07-commit-progress.png`=`S-08-after-commit.png`, `O-08-progress.png`=`O-09-terminal.png`, `V-08-progress.png`=`V-07-traveller-after.png`. |
+| **REC-7-shared-incident** | Needs Attention is a flat list. Arjun / Siti / Sarah / Mei Ling each: “The airline changed the flight schedule.” `00-overview.png`. |
+| **REC-7-iso-prefill** | Preview modal New start/end empty; placeholders `e.g. 1 Oct · 15:30 (or full ISO with offset)`. Walker had to type ISO. `S-05-edit-modal.png`. |
+| **REC-7-named-distinct-blast** | Elena and Sarah both **WATCHING** with identical “Programme commitment moves — engagement times would change.” Proposed shows **Reschedule · 16:00**, not Sarah **VIABLE**. After commit, Elena Needs Attention with raw id. `S-06-now-proposed.png`, `S-09-overview.png`. |
+| **REC-9-operator-cannot-approve-jonas** | Operator Case badge **OPTIONS ON THE TABLE**. Primary button **Approve traveller-funded S$731.47** + Decline. `V-02-operator-scroll.png`. |
+| **REC-9-traveller-exact-mutation** | Prompt: “Approve the proposed change (extra cost 731.47 SGD)?” Does not say Sunday / 4 Oct / Concorde. Payable split US$541.83 is on the card. Stay still 3 Oct until after Approve. `V-06-traveller.png`. |
+| **REC-4-contradictory-checks** | After Jordan Approve: two red “No longer meets: timing still works for the commitment.” `J-06-after-approve.png`. |
+| **REC-3-cta-currency** | Labels show US$ payable vs S$ policy, but primary buttons are **Approve as organiser S$122.23** / **S$193.89** / **Approve traveller-funded S$731.47**. `J-04-options.png`, `O-02-case.png`, `V-02-operator-scroll.png`. |
+| **REC-3-options-hidden-until-plan** | Demo reset still lands Jordan/Oliver/Jonas on **OPTIONS ON THE TABLE** with recommended option already visible. `J-02-case-entry-top.png`, `O-02-case.png`, `V-02-operator.png`. |
+| **REC-10-overview-76** | Fleet **67 PARTICIPANTS**; roster footer **Page 1 of 8 · 76 travellers**. `00-overview.png`, `00-overview-roster.png`. |
+| **REC-8-declared-gateway** | Recommended title: “Rebook HND→SIN (direct) to fly from the **declared departure gateway**, departing at 02:20”. `O-02-case-scroll.png`. |
+| **REC-4-raw-ids-iso** | Elena: `el-trip-trv-evt-ait-2026-ait-draft-01-eng-7` (`S-09-overview.png`). Jonas option: “through **2026-10-04**” (`V-04-options.png`). Sarah hero path required ISO typing. |
+
+### What still works (still not enough)
+
+- Jordan: Approve → **Execute approved recovery** → NRT→SIN **CONFIRMED** 08:20→14:35, 370≥360, Overview Confirmed 31/42, reload stays resolved (`J-09-terminal.png`, `J-10-reload.png`, `J-11-overview-confirmed.png`).
+- Sarah, no reset: 130/360 fail → ISO typed 15:30–16:00 → commit → **530 min / 360 viable**, Case resolved, Sarah off Needs Attention (`S-02-case.png`, `S-08-after-commit.png`, `S-09-overview.png`). Proposed/timeline surface **16:00** (end), not 15:30 start.
+- Oliver: Approve → Execute → Tokyo Haneda inbound **CONFIRMED** 02:20; LHR return still present; Overview 33/42 (`O-09-terminal.png`, `O-11-overview.png`). US$163.98 remains 1-stop in walker notes; not re-failed as a fake direct.
+- Jonas: operator Approve **not clicked**; traveller Approve → Concorde **CONFIRMED** 29 Sep 15:00 → **4 Oct 11:00**; Overview 34/42, Jonas gone from Needs Attention (`V-07-traveller-after.png`, `V-12-overview.png`). Dusk hero present. No HUMAN_AGENT copy seen.
+
+### Do not treat as product fails
+
+- **S-10-reopen.png** “case details unavailable”: walker URL is `case-tip-trv-...` (typo) vs the live Case `case-trip-trv-...` in `S-05-edit-modal.png` / `S-08-after-commit.png`.
+- **V-10-terminal.png** / **V-11-reload.png**: walker URL `...-cr-at-s5-001` vs the operator Case `...-cr-ait-s5-001` in `V-02-operator-scroll.png`. Traveller + Overview already show the stay resolved.
+
+Pass 1 reopen via Overview for Jordan/Oliver/Jonas remains the persistence evidence. Pass 2 Jordan reload (`J-10-reload.png`) still holds.
