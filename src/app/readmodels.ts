@@ -42,7 +42,6 @@ import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
-import { describeAllocation } from '../engine/funding.ts';
 import { projectCaseChain } from './chain.ts';
 import {
   countOtherCommitments,
@@ -55,6 +54,7 @@ import type { AnchorEvent, Place } from '../domain/entities.ts';
 import {
   presentAction,
   presentActivity,
+  presentAllocationSummary,
   presentApprovalReason,
   presentCandidateRejection,
   presentCheckLabel,
@@ -63,6 +63,8 @@ import {
   presentUncertainties,
 } from './presentation.ts';
 import { enrichCaseDetailView } from './casePresentation.ts';
+import { projectOptionPresentation } from './optionPresentation.ts';
+import { formatMoney } from '../ui/html.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -70,6 +72,15 @@ export interface ReadModelDependencies {
   cases: CaseRepository;
   audit: AuditRepository;
   viability: ViabilityEngine;
+}
+
+/** Rewrite bare `542 USD` / `122.23 SGD` fragments in strategy titles to US$/S$. */
+function presentStrategyTitle(summary: string): string {
+  return summary.replace(
+    /(\d+(?:\.\d+)?)\s*(USD|SGD)\b/gi,
+    (_match, amount: string, currency: string) =>
+      formatMoney({ amount: Number(amount), currency: currency.toUpperCase() as 'USD' | 'SGD' }),
+  );
 }
 
 const ELEMENT_KIND_LABEL: Record<TripElement['elementKind'], string> = {
@@ -466,10 +477,32 @@ export async function projectCaseDetail(
     const constraint: Constraint | undefined = constraints.find((c) => c.id === evaluation.constraintId);
     return {
       id: evaluation.constraintId,
-      label: presentCheckLabel(constraint, evaluation.status as CaseCheckResult),
+      label: presentCheckLabel(constraint, evaluation.status as CaseCheckResult, evaluation.evidence),
       result: evaluation.status as CaseCheckResult,
     };
   });
+
+  const requiredBufferMinutes = constraints
+    .map((constraint) => {
+      const raw = constraint.parameters?.['minBufferMinutes'];
+      return typeof raw === 'number' ? raw : undefined;
+    })
+    .find((value): value is number => value !== undefined);
+
+  // Critical objective currently threatened (HARD first).
+  let criticalObjectiveAtRisk: string | undefined;
+  for (const threatened of assessment.threatenedObjectives) {
+    const objective = trip.objectives.find((o) => o.id === threatened.objectiveId);
+    if (objective?.hardness === 'HARD') {
+      criticalObjectiveAtRisk = objective.statement;
+      break;
+    }
+  }
+
+  const places = new Map<string, Place>();
+  for (const entry of await deps.snapshot.entities.list('PLACE')) {
+    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
+  }
 
   // Options: planning-time deterministic verdicts first (persisted in the
   // PLANNING_COMPLETED audit entry). Re-deriving overlays against current
@@ -502,29 +535,54 @@ export async function projectCaseDetail(
     }
   }
   const options: RecoveryOptionView[] = [];
+  const recoveryEngagement = selectRecoveryCommitment(trip, recoveryCase);
   for (const strategy of recoveryCase.strategies) {
     const persisted = persistedVerdicts.get(strategy.id);
     const candidate = persisted
-      ? { feasible: persisted.feasible, rejectionEvidence: persisted.rejectionEvidence }
+      ? { feasible: persisted.feasible, rejectionEvidence: persisted.rejectionEvidence, viability: undefined as undefined }
       : await evaluateCandidate(deps.viability, snapshot, strategy);
     const intent = recoveryCase.actionIntents.find((i) => i.strategyId === strategy.id);
     const decision = intent
       ? recoveryCase.authorityDecisions.find((d) => d.intentId === intent.id)
       : undefined;
+    const recommended = strategy.id === bestStrategyId;
+    const presentation = projectOptionPresentation({
+      strategy,
+      feasible: candidate.feasible,
+      recommended,
+      rejectionEvidence: candidate.rejectionEvidence,
+      ...(candidate.viability ? { viability: candidate.viability } : {}),
+      ...(intent ? { intent } : {}),
+      ...(decision ? { decision } : {}),
+      ...(recoveryEngagement ? { engagement: recoveryEngagement } : {}),
+      places,
+      ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
+      ...(candidate.viability?.softTradeoffs ? { softTradeoffs: candidate.viability.softTradeoffs } : {}),
+      searchProvenance: 'REPLAY',
+      ...(requiredBufferMinutes !== undefined ? { requiredBufferMinutes } : {}),
+    });
     options.push({
       id: strategy.id,
-      title: strategy.summary,
+      title: presentStrategyTitle(strategy.summary),
       verdict: candidate.feasible ? 'VIABLE' : candidate.rejectionEvidence.length > 0 ? 'NOT_VIABLE' : 'UNKNOWN',
       ...(candidate.rejectionEvidence.length > 0
         ? { rejectionReason: presentCandidateRejection(candidate.rejectionEvidence, snapshot.constraints) }
         : {}),
-      ...(strategy.id === bestStrategyId
+      ...(recommended
         ? {
             recommended: true,
             whyRecommended:
+              presentation.whyRecommended ??
               'Recommended because it keeps the whole trip viable with the fewest soft tradeoffs among workable options.',
           }
         : {}),
+      ...(presentation.summary ? { summary: presentation.summary } : {}),
+      ...(presentation.pros ? { pros: presentation.pros } : {}),
+      ...(presentation.cons ? { cons: presentation.cons } : {}),
+      ...(presentation.commitmentEffect ? { commitmentEffect: presentation.commitmentEffect } : {}),
+      ...(presentation.authorityLabel ? { authorityLabel: presentation.authorityLabel } : {}),
+      ...(presentation.provenanceLabel ? { provenanceLabel: presentation.provenanceLabel } : {}),
+      ...(presentation.flags ? { flags: presentation.flags } : {}),
       // ADR-052: an FX-normalized intent freezes BOTH the home restatement
       // (spendExposure) and the original provider charge (providerSpend); the
       // view shows the restatement as the cost delta and keeps the provider
@@ -540,7 +598,7 @@ export async function projectCaseDetail(
       ...(intent?.costAllocation
         ? {
             costAllocation: intent.costAllocation,
-            costAllocationSummary: describeAllocation(intent.costAllocation),
+            costAllocationSummary: presentAllocationSummary(intent.costAllocation),
           }
         : {}),
     });
@@ -553,19 +611,9 @@ export async function projectCaseDetail(
     fundingIntent?.costAllocation && fundingIntent.priceDelta
       ? {
           allocation: fundingIntent.costAllocation,
-          summary: describeAllocation(fundingIntent.costAllocation),
+          summary: presentAllocationSummary(fundingIntent.costAllocation) ?? 'Funding allocation still unresolved',
         }
       : undefined;
-
-  // Critical objective currently threatened (HARD first).
-  let criticalObjectiveAtRisk: string | undefined;
-  for (const threatened of assessment.threatenedObjectives) {
-    const objective = trip.objectives.find((o) => o.id === threatened.objectiveId);
-    if (objective?.hardness === 'HARD') {
-      criticalObjectiveAtRisk = objective.statement;
-      break;
-    }
-  }
 
   // Approval requirement from the latest authority decision needing one.
   let approval: ApprovalRequirementView | undefined;
@@ -629,10 +677,6 @@ export async function projectCaseDetail(
     .filter((statement): statement is string => Boolean(statement));
 
   const isChangeRequest = triggeringSignals.some((s) => s.kind === 'TRAVELLER_INPUT');
-  const places = new Map<string, Place>();
-  for (const entry of await deps.snapshot.entities.list('PLACE')) {
-    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
-  }
   let anchorEvent: AnchorEvent | undefined;
   if (trip.anchorEventId) {
     const entry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
@@ -771,7 +815,7 @@ export async function projectTravellerTrip(
       // Mixed funding (ADR-037): when a deterministic allocation exists the
       // traveller is told who pays — the prompt is evidence, not a guess.
       const fundingNote = intent?.costAllocation
-        ? ` Funding: ${describeAllocation(intent.costAllocation)}.`
+        ? ` Funding: ${presentAllocationSummary(intent.costAllocation)}.`
         : intent?.priceDelta
           ? ' Funding: who pays has not been determined yet.'
           : '';

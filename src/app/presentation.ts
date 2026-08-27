@@ -2,7 +2,9 @@
 import type { Constraint } from '../domain/constraints.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import type { CaseResolution } from '../operational/case.ts';
+import type { CostAllocation } from '../operational/intent.ts';
 import type { CandidateRejectionEvidence } from './planningLoop.ts';
+import { formatMoney } from '../ui/html.ts';
 
 export function presentCandidateRejection(evidence: readonly CandidateRejectionEvidence[], constraints: readonly Constraint[]): string | undefined {
   const first = evidence[0];
@@ -47,6 +49,22 @@ export function presentConstraintLabel(constraint: Constraint | undefined): stri
   }
 }
 
+/**
+ * Parse evaluator evidence such as `gap 370min >= required 360min` into
+ * judge-facing copy: `370 min available / 360 min required — viable`.
+ */
+export function presentBufferEvidence(evidence: string | undefined): string | undefined {
+  if (!evidence) return undefined;
+  const match = /gap\s+(-?\d+)\s*min\s*(>=|<)\s*required\s+(\d+)\s*min/i.exec(evidence);
+  if (!match) return undefined;
+  const available = Number(match[1]);
+  const comparator = match[2];
+  const required = Number(match[3]);
+  if (!Number.isFinite(available) || !Number.isFinite(required)) return undefined;
+  const verdict = comparator === '>=' ? 'viable' : 'not enough time';
+  return `${available} min available / ${required} min required — ${verdict}`;
+}
+
 const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
   PASS: 'Still meets',
   FAIL: 'No longer meets',
@@ -54,7 +72,14 @@ const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
 };
 
 /** Plain-language check row for operator case view. */
-export function presentCheckLabel(constraint: Constraint | undefined, result: 'PASS' | 'FAIL' | 'UNKNOWN'): string {
+export function presentCheckLabel(
+  constraint: Constraint | undefined,
+  result: 'PASS' | 'FAIL' | 'UNKNOWN',
+  evidence?: string,
+): string {
+  const buffer = presentBufferEvidence(evidence);
+  if (buffer) return buffer;
+
   const base = presentConstraintLabel(constraint);
   if (result === 'PASS') {
     if (base.includes('Arrival')) return 'Arrival still leaves enough time before the commitment';
@@ -71,7 +96,35 @@ export function presentCheckLabel(constraint: Constraint | undefined, result: 'P
 }
 
 export function presentApprovalReason(): string {
-  return 'This change needs approval before it can proceed.';
+  return 'This change needs organisation or traveller approval before it can proceed.';
+}
+
+/**
+ * Judge-facing funding summary: keep describeAllocation semantics but use
+ * US$/S$ money convention instead of bare `90.54 USD` fragments.
+ */
+export function presentAllocationSummary(allocation: CostAllocation | undefined): string | undefined {
+  if (!allocation) return undefined;
+  if (allocation.coveredAmount && allocation.coveredBy) {
+    return `${formatMoney(allocation.coveredAmount)} covered by ${payerPhrase(allocation.coveredBy)}`;
+  }
+  if (allocation.incrementalAmount && allocation.incrementalPayer) {
+    return `${formatMoney(allocation.incrementalAmount)} payable by ${payerPhrase(allocation.incrementalPayer)}`;
+  }
+  return 'Funding allocation still unresolved';
+}
+
+function payerPhrase(payer: CostAllocation['coveredBy'] | CostAllocation['incrementalPayer']): string {
+  switch (payer) {
+    case 'EVENT_ORGANISATION':
+      return 'the event organisation';
+    case 'ORGANISATION':
+      return 'the organisation';
+    case 'TRAVELLER':
+      return 'the traveller';
+    default:
+      return 'another payer';
+  }
 }
 
 const SIGNAL_KIND_ACTIVITY: Record<string, string> = {

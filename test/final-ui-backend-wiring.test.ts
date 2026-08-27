@@ -18,7 +18,7 @@ import {
 
 const NOW = '2026-10-01T12:00:00+08:00' as const;
 
-test('final UI wiring: organisation approvals use the generic runtime path and human-agent escalation remains manual', () => {
+test('final UI wiring: organisation approvals use the generic runtime path and organiser escalation remains manual', () => {
   const organisationHtml = renderCaseDetailBody(caseAwaitingOrganisationApproval);
   assert.match(organisationHtml, /action="\/api\/runtime\/decide"/);
   assert.match(organisationHtml, /name="intentId" value="intent-approval"/);
@@ -30,11 +30,12 @@ test('final UI wiring: organisation approvals use the generic runtime path and h
     approval: {
       intentId: 'intent-human',
       requestedFrom: 'HUMAN_AGENT',
-      reason: 'This structural request needs human-agent handling.',
+      reason: 'This structural request needs organiser handling.',
       state: 'PENDING',
     },
   });
-  assert.match(humanHtml, /human-agent handling/);
+  assert.match(humanHtml, /Organisation approval required/);
+  assert.match(humanHtml, /organiser handling/);
   assert.doesNotMatch(humanHtml, /\/api\/runtime\/decide/);
   assert.doesNotMatch(humanHtml, /\/api\/runtime\/execute/);
 });
@@ -54,7 +55,7 @@ test('final UI wiring: decisions and activity retain real authority and audit ev
     ],
   });
   assert.equal(decisions.pending[0]!.waitingOn, 'Traveller');
-  assert.equal(decisions.pending[1]!.waitingOn, 'Human agent');
+  assert.equal(decisions.pending[1]!.waitingOn, 'Organiser');
 
   const activity = activityFromTripActivities(NOW, [{
     tripId: 'trip-traveller', generatedAt: NOW,

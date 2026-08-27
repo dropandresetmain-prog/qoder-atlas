@@ -15,8 +15,9 @@ import type {
 import type { Engagement, TransportLeg } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
-import { describeAllocation } from '../engine/funding.ts';
+import { formatMoney, formatPayable, formatPolicyEquivalent } from '../ui/html.ts';
 import type { TravellerOptionDetail, TravellerPresentation } from '../ui/traveller-presentation.ts';
+import { presentAllocationSummary } from './presentation.ts';
 import {
   formatProgrammeInstant,
   projectTravellerItinerary,
@@ -104,15 +105,20 @@ function projectOptionDetails(
   const verdict = strategy ? deps.verdictFor(strategy.id) : undefined;
   const route = proposedRoute(strategy, places);
   const funding = intent?.costAllocation
-    ? `Funding: ${describeAllocation(intent.costAllocation)}.`
+    ? `Funding: ${presentAllocationSummary(intent.costAllocation)}.`
     : '';
   const costLines: string[] = [];
   if (intent?.providerSpend) {
-    costLines.push(`Provider charge ${intent.providerSpend.amount} ${intent.providerSpend.currency}.`);
+    costLines.push(`${formatPayable(intent.providerSpend)}.`);
   }
   const policyAmount = intent?.spendExposure ?? intent?.priceDelta;
-  if (policyAmount) {
-    costLines.push(`Policy restatement ${policyAmount.amount} ${policyAmount.currency}.`);
+  if (policyAmount && intent?.providerSpend) {
+    costLines.push(`${formatPolicyEquivalent(policyAmount)}.`);
+  } else if (policyAmount) {
+    costLines.push(`Policy amount ${formatMoney(policyAmount)}.`);
+  }
+  if (intent?.costAllocation?.incrementalPayer === 'TRAVELLER' && intent.costAllocation.incrementalAmount) {
+    costLines.push(`You pay the personal increment of ${formatMoney(intent.costAllocation.incrementalAmount)}. No flight changes.`);
   }
   const approve: TravellerOptionDetail = {
     commitmentEffect: verdict?.feasible ? 'keeps' : 'unknown',
@@ -202,6 +208,8 @@ export async function projectTravellerPresentation(
     ...(event ? { eventName: event.name } : {}),
     ...(traveller ? { travellerName: traveller.name } : {}),
     ...(commitmentCard ? { commitmentCard } : {}),
+    heroImageUrl: '/assets/sg-dusk.png',
+    heroImageAlt: 'Singapore city skyline at dusk',
     ...(itinerary.length > 0
       ? {
           itineraryHeading: recoveryCase ? 'What changed' : 'Your trip',

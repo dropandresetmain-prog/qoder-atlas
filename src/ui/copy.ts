@@ -167,12 +167,12 @@ export const CASE_COMMITMENT_FALLBACK_TITLE = 'Must not be missed';
  */
 export const CASE_AUTHORITY_TITLE = 'Authority';
 export const CASE_AUTHORITY_COPY =
-  'Within the programme\u2019s policy cap, Northstar books automatically with a receipt. Above the cap, the budget owner approves first. Nothing books silently.';
+  'Money-moving changes need the right principal. Within the programme policy, Northstar can proceed with a receipt; above that, the organising team or traveller must approve first. Nothing books silently.';
 
 /** Case badge derivations beyond the raw trip status (approved C3/C4/C5). */
 export const CASE_BADGE_OPTIONS_READY = 'Options on the table';
 export const CASE_BADGE_APPROVAL_NEEDED = 'Approval needed';
-export const CASE_BADGE_HUMAN_DECISION = 'Needs a human decision';
+export const CASE_BADGE_HUMAN_DECISION = 'Needs organiser decision';
 
 /** Payer wording for the funding split legend (approved C4). */
 export const PAYER_LABEL: Record<'EVENT_ORGANISATION' | 'TRAVELLER' | 'ORGANISATION' | 'OTHER', string> = {
@@ -181,6 +181,29 @@ export const PAYER_LABEL: Record<'EVENT_ORGANISATION' | 'TRAVELLER' | 'ORGANISAT
   TRAVELLER: 'Traveller',
   OTHER: 'Other',
 };
+
+/** Judge-facing principal labels — never expose HUMAN_AGENT enum wording. */
+export const AUTHORITY_PRINCIPAL_LABEL: Record<
+  'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT',
+  string
+> = {
+  TRAVELLER: 'Traveller',
+  ORGANISATION: 'Organisation',
+  HUMAN_AGENT: 'Organiser',
+};
+
+export function authorityNeededLabel(
+  requestedFrom: 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT',
+): string {
+  switch (requestedFrom) {
+    case 'TRAVELLER':
+      return 'Traveller approval required';
+    case 'ORGANISATION':
+      return 'Organisation approval required';
+    case 'HUMAN_AGENT':
+      return 'Organisation approval required';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Northstar programme surface (RV-N10) — labels live next to the others so
@@ -278,6 +301,10 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'place-hotel-',
   'provider flight state:',
   'schedule_changed',
+  // Judge-facing: never expose internal authority enum wording.
+  'human agent',
+  'human_agent',
+  'requires_human_agent',
   // G3R-Closure fix H: raw engine enums and safety-state vocabulary must
   // never reach organiser/traveller screens. These are the underscore-form
   // enum literals (lowercased by the gate) — they can never be natural
