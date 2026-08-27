@@ -104,7 +104,8 @@
         { "path": "toolActivity.0.operation", "op": "equals", "expected": "hotel.search", "description": "G1/G2 issues a scoped hotel.search for the stay extension" },
         { "path": "toolActivity.0.ok", "op": "truthy", "description": "Nuitée REPLAY evidence resolves" },
         { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "candidate replacement/extension stays come from hotel.search evidence" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "Switch stay to", "description": "candidates name a real property from provider evidence" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Extend stay at", "description": "same-property Concorde extension — not an unrelated hotel switch" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Concorde", "description": "hero stay remains Concorde Hotel Singapore" },
         { "path": "bestStrategyId", "op": "exists", "description": "feasible hotel candidates are ranked into a best strategy" },
         { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case advanced through the planning stage" }
       ]

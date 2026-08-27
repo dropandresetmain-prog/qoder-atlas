@@ -123,6 +123,8 @@ Your JSON must match this schema EXACTLY (strict objects, no extra keys):
     "arriveBy"?: ISO-8601 timestamp with UTC offset (optional);
     "departAfter"?: ISO-8601 timestamp with UTC offset (optional);
     "departureOrigin"?: { "system": "airport-code", "value": string } when the traveller states they fly from a different airport (optional);
+    "preserveReturnDestination"?: { "system": "airport-code", "value": string } when the traveller explicitly keeps a return airport such as "still return to LHR" (optional);
+    "stayCheckOut"?: ISO-8601 timestamp with UTC offset when the traveller extends/shortens the stay checkout (optional);
     "preferredStayProximityRef"?: { "entityType": "PLACE", "id": string } (optional);
     "preferredStayPlaceId"?: string ONLY when the traveller literally quotes a property identifier such as "place-hotel-..."; never derive it from a hotel name (optional);
     "guests"?: positive integer, the number of guests staying, ONLY when the traveller states an explicit count such as "there will be 2 of us staying"; never inferred from a companion mention without a number (optional);
@@ -142,11 +144,12 @@ If the traveller's text is ambiguous or you cannot determine the intent with con
 
 Field guidance:
 - "arriveBy" bounds the OUTBOUND arrival at the destination ("can I arrive by <time>?").
-- "departAfter" bounds the RETURN departure leaving the destination ("can I stay until <date>?", "extend my stay until <date>", "fly home after <time>"). A stay extension moves the trip END, so it is a departAfter, never an arriveBy.
+- "departAfter" bounds the RETURN flight departure leaving the destination ("fly home after <time>?").
+- "stayCheckOut" is the hotel checkout instant for stay extensions/shortenings ("extend my stay until <time>?"). Do not map stay extensions to departAfter.
 
 Worked example — stay extension:
 Traveller text: "Can I stay until Sunday? Please extend my stay until 2026-10-04T12:00:00+08:00. I will pay for the extension myself."
-Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "departAfter": "2026-10-04T12:00:00+08:00", "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
+Response: { "intentKind": "CHANGE_STAY", "urgency": "SOFT_PREFERENCE", "target": { "stayCheckOut": "2026-10-04T12:00:00+08:00", "objectiveEffects": [] }, "fundingDeclaration": "TRAVELLER_FUNDED" }
 
 Worked example — hotel switch with occupancy:
 Traveller text: "Can I switch hotels? My partner is joining, so there will be 2 of us staying. I'd like to move to place-hotel-riverview. I will self-fund the extra cost."
@@ -185,6 +188,9 @@ async function interpretViaModel(
         arriveBy: IsoDateTimeSchema.optional(),
         departAfter: IsoDateTimeSchema.optional(),
         departureOrigin: z.strictObject({ system: z.string(), value: z.string() }).optional(),
+        preserveReturnDestination: z.strictObject({ system: z.string(), value: z.string() }).optional(),
+        stayCheckOut: IsoDateTimeSchema.optional(),
+        stayPlaceRef: z.strictObject({ system: z.string(), value: z.string() }).optional(),
         preferredStayProximityRef: z
           .strictObject({
             entityType: z.literal('PLACE'),
@@ -427,19 +433,21 @@ function matchPatterns(text: string): DeterministicMatch | undefined {
     }
   }
 
-  // Pattern 4: Extend stay until specific date.
+  // Pattern 4: Extend stay until specific date — declarative stayCheckOut,
+  // not departAfter (return-flight window). Same property is preserved unless
+  // the traveller also names a different property.
   const extendMatch = text.match(
     /extend\s*(?:my\s*)?stay\s*(?:until|to)\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z))/i,
   );
   if (extendMatch) {
-    const departAfter = extendMatch[1]!;
-    const parsed = IsoDateTimeSchema.safeParse(departAfter);
+    const stayCheckOut = extendMatch[1]!;
+    const parsed = IsoDateTimeSchema.safeParse(stayCheckOut);
     if (parsed.success) {
       return {
         intentKind: 'CHANGE_STAY',
         urgency,
         target: {
-          departAfter: parsed.data,
+          stayCheckOut: parsed.data,
           objectiveEffects: [],
         },
         fundingDeclaration,
@@ -447,19 +455,19 @@ function matchPatterns(text: string): DeterministicMatch | undefined {
     }
   }
 
-  // Pattern 5: Shorten stay until specific date.
+  // Pattern 5: Shorten stay until specific date (also a stayCheckOut change).
   const shortenMatch = text.match(
     /shorten\s*(?:my\s*)?stay\s*(?:until|to)\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z))/i,
   );
   if (shortenMatch) {
-    const departAfter = shortenMatch[1]!;
-    const parsed = IsoDateTimeSchema.safeParse(departAfter);
+    const stayCheckOut = shortenMatch[1]!;
+    const parsed = IsoDateTimeSchema.safeParse(stayCheckOut);
     if (parsed.success) {
       return {
         intentKind: 'CHANGE_STAY',
         urgency,
         target: {
-          departAfter: parsed.data,
+          stayCheckOut: parsed.data,
           objectiveEffects: [],
         },
         fundingDeclaration,
@@ -470,16 +478,25 @@ function matchPatterns(text: string): DeterministicMatch | undefined {
   // Pattern 6b: declared departure-gateway substitution ("I'm actually flying
   // from HND", "flying out of NRT"). Generic: any 3-letter airport code the
   // traveller states; whether it resolves to a known gateway is the planner's
-  // evidence question, never the interpreter's guess.
+  // evidence question, never the interpreter's guess. Optional explicit
+  // "return to XXX" is carried as preserveReturnDestination.
   const originMatch = text.match(/\b(?:flying|departing|leaving)\s+(?:out\s+of\s+|from\s+)?([A-Za-z]{3})\b/i);
   if (originMatch) {
+    const returnMatch = text.match(/\breturn(?:ing)?\s+to\s+([A-Za-z]{3})\b/i);
+    const target: ResolutionTarget = {
+      departureOrigin: { system: 'airport-code', value: originMatch[1]!.toUpperCase() },
+      objectiveEffects: [],
+    };
+    if (returnMatch) {
+      target.preserveReturnDestination = {
+        system: 'airport-code',
+        value: returnMatch[1]!.toUpperCase(),
+      };
+    }
     return {
       intentKind: 'CHANGE_TRANSPORT_SCHEDULE',
       urgency,
-      target: {
-        departureOrigin: { system: 'airport-code', value: originMatch[1]!.toUpperCase() },
-        objectiveEffects: [],
-      },
+      target,
       fundingDeclaration,
     };
   }

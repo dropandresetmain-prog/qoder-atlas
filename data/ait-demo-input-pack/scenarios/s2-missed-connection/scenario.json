@@ -2,29 +2,29 @@
   "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
   "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
   "scenarioId": "S2",
-  "catalogueTitle": "Traveller misses a connection; airline recovery is not good enough",
+  "catalogueTitle": "Traveller misses a connection; airline reprotection is reported, not yet whole-trip recovered",
   "trigger": "TRAVELLER_STATE_REPORT",
   "stage": "DURING_TRAVEL",
   "tier": "TIER_A",
   "demoRole": "Traveller disruption hero / supporting hero",
   "anchorEventId": "evt-ait-2026",
   "occurredAt": "2026-09-29T17:20:00+09:00",
-  "note": "Jordan Hale (ait-draft-09, LAX origin — roster patch requested; draftId unchanged) flies ZIPAIR ZG023 LAX→NRT connecting to ZG053 NRT→SIN with a genuine ~2h40m connection (provider-locked). Progressive Atlas delay/schedule evidence on the inbound eventually makes ZG053 impossible; same-night Scoot TR875-class (21:15→05:20) is the intended Northstar recovery but currently fails the 360min buffer before PREFERRED lab by ~5min (gap 355) — see shared patch §3. Airline-default morning TR885-class (~08:20→14:35 next day) fails REQUIRED finals. Overnight Narita becomes necessary when same-night is unboardable. Simulated seam: SIMULATED_EXTERNAL_EVENT / REPLAY Atlas; traveller message TRAVELLER_SUPPLIED_SYNTHETIC; hotel/entry/insurance are expressible pack facts — overnight hotel auto-strategy and live entry research remain architecture/stretch limits.",
+  "note": "Jordan Hale (ait-draft-09) flies ZIPAIR ZG023 LAX→NRT connecting to ZG053 NRT→SIN with a genuine ~2h40m connection (provider-locked). Progressive Atlas delay/schedule evidence on the inbound eventually makes ZG053 impossible. The airline reports a next-morning TR885-class reprotection (~08:20→14:35). With finals showcase at 20:45, TR885 clears the 360min buffer (370 ≥ 360). TR867 (~20:45 arrival) fails the showcase buffer and remains the slower inventory alternative. Closed hero path: reconcile traveller report + reported reprotection, then Northstar whole-trip viability ranks evidenced TR885-class recovery. Simulated seam: SIMULATED_EXTERNAL_EVENT / REPLAY Atlas; transit hotel / JP entry / insurance remain context only.",
   "affectedTravellers": [
     {
       "draftId": "ait-draft-09",
-      "impactClass": "MISCONNECTED_PROVIDER_RECOVERY_INSUFFICIENT",
-      "reason": "Missed NRT→SIN ZG053 after inbound delay; airline morning TR885-class lands 2026-09-30T14:35+08:00 (~35min before REQUIRED/FIXED finals at 15:10) so fails the 360min arrival buffer; same-night TR875-class (arr ~05:20 on 30 Sep) is 5min short of the 360min buffer before PREFERRED lab (gap 355) under current rules — see shared patch §3."
+      "impactClass": "MISCONNECTED_PROVIDER_RECOVERY_UNVERIFIED",
+      "reason": "Missed NRT→SIN ZG053 after inbound delay; airline reports morning TR885-class (08:20→14:35) which is whole-trip viable against finals showcase 20:45 under 360min buffer once checked. Provider itinerary is not accepted as recovered until Northstar completes those checks."
     }
   ],
   "expectedReasoningHooks": [
     "Progressive provider schedule/delay updates on the inbound leg: connection remains viable, then tight, then ZG053 becomes impossible.",
     "Conversational ingestion: extract missed connection + airline morning rebook claims without treating them as authoritative provider state.",
     "Reconciliation: compare traveller report with expected LAX→NRT→SIN trip state and provider inventory; missing evidence stays UNKNOWN.",
-    "Downstream invalidation: SIN hotel no-show / late arrival, pre-booked transfer, REQUIRED finals buffer, PREFERRED lab.",
-    "Deterministic rejection of airline-default morning recovery when arrival gap fails MIN_BUFFER against REQUIRED finals.",
-    "Same-night replacement search on the failed NRT→SIN corridor (REPLAY Atlas inventory including ZG053/TR875/TR885-class offers).",
-    "Overnight Narita consideration: transit hotel (Nuitée evidence: Hilton Tokyo Narita / HOTEL MYSTAYS PREMIER Narita), JP entry/immigration evidence, insurance missed-connection / transit accommodation coverage, SIN stay consequences, ground movement — expressible as rules/research when supplied; not auto-emitted by the flight-only fallback planner."
+    "Downstream invalidation: SIN hotel late arrival, REQUIRED finals showcase buffer.",
+    "Whole-trip viability of reported TR885-class morning recovery against finals showcase 20:45 (370 ≥ 360 PASS).",
+    "Same-night / next-morning replacement search on the failed NRT→SIN corridor (REPLAY Atlas inventory including TR875/TR885/TR867-class offers).",
+    "TR867-class late arrival fails the showcase buffer and remains a non-viable inventory alternative, not the reported airline reprotection."
   ],
   "inputs": [
     { "file": "inputs/traveller-report-message.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },

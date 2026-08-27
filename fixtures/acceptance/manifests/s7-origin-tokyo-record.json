@@ -116,7 +116,8 @@
         { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "flight search on the replacement corridor" },
         { "path": "toolActivity.0.ok", "op": "truthy", "description": "RECORD Atlas supplied offers" },
         { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "at least one candidate strategy from normalized offers" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to fly from the declared departure gateway", "description": "candidate rebooks from declared gateway" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook", "description": "candidate rebooks from declared gateway" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "fly from the declared departure gateway", "description": "declared gateway substitution is visible in the strategy summary" },
         { "path": "strategies.0.feasible", "op": "truthy", "description": "at least one feasible replacement" },
         { "path": "bestStrategyId", "op": "exists", "description": "best strategy ranked" },
         { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "case advanced through planning" }
