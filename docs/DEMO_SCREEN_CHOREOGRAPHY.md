@@ -592,15 +592,15 @@ Each state below explicitly defines:
 - **Entry condition:** a same-property extension proposal is available and requires the traveller.
 - **Headline:** `Extend Concorde through Sunday`.
 - **Explanation:** `Your event-funded stay remains unchanged through 3 October. You pay only for the personal extension to 4 October.`
-- **Visible recommendation:** existing Concorde extension; current and proposed checkout; provider charge `US$223.94`; `Policy equivalent: S$302.32`; `Jonas pays the provider charge`; `No new organiser-funded cost`; fireside remains satisfied; traveller authority; simulated modification disclosure.
+- **Visible recommendation:** existing Concorde extension; current and proposed checkout; provider charge `US$541.83` (Nuitée REPLAY Concorde same-property rate for the requested window); `Policy equivalent: S$731.47`; `Jonas pays the provider charge`; `No new organiser-funded cost`; fireside remains satisfied; traveller authority; simulated modification disclosure.
 - **Recommended pros:** no hotel move; event commitments remain satisfied; clean separation between business baseline and personal increment.
 - **Recommended cons:** Jonas pays the incremental provider charge; provider modification is simulated in this closed demo.
 - **Why recommended:** `It extends the existing stay without changing the event-funded baseline or disrupting the programme.`
 - **Other options:** maximum two real extension alternatives only if the planner has authoritative evidence. Do not substitute unrelated hotels merely to fill three cards.
-- **Hidden on Traveller:** organiser approval, Begin recovery, ambiguous `$223.94`/`SGD302.32` as two charges.
+- **Hidden on Traveller:** organiser approval, Begin recovery, ambiguous bare `$` amounts as two charges.
 - **Hidden on operator:** ability to approve as Jonas.
 - **Capability:** role-correct authority and comprehensible funding/currency presentation.
-- **Primary CTA:** Traveller: `Approve extension and pay US$223.94`.
+- **Primary CTA:** Traveller: `Approve extension and pay US$541.83`.
 - **Secondary CTA:** `Decline` or `Ask a question`.
 - **Authority:** waiting for Jonas.
 - **Loading after CTA:** V-05.
@@ -627,7 +627,7 @@ Each state below explicitly defines:
 - **Entry condition:** observed stay end is 4 Oct, fireside remains satisfied, trip viable, case resolved.
 - **Headline:** `Concorde extended through Sunday`.
 - **Explanation:** `Jonas's event-funded baseline is unchanged. His personal extension is recorded separately and the fireside remains on track.`
-- **Visible:** same Concorde stay; checkout 4 Oct 11:00; event-funded baseline through 3 Oct; personal increment `US$223.94` with `S$302.32 policy equivalent`; Jonas as payer/approver; fireside PASS; simulation provenance; resolved activity.
+- **Visible:** same Concorde stay; checkout 4 Oct 11:00; event-funded baseline through 3 Oct; personal increment `US$541.83` with `S$731.47 policy equivalent`; Jonas as payer/approver; fireside PASS; simulation provenance; resolved activity.
 - **Hidden:** hotel switch, organiser approval, Resolve/Begin/Approve/Execute, combined return-flight claim.
 - **Capability:** durable accommodation, funding, authority, and commitment state.
 - **Primary CTA:** `Back to trip` or `Back to Overview`.
@@ -888,9 +888,9 @@ Simulation disclosure must remain visible in Activity/history and on the termina
 - [ ] **Correct baseline:** canonical Concorde stay ends 3 Oct 11:00, the fireside is satisfied, and acceptance/runtime evidence no longer drifts to another checkout.
 - [ ] **Extension language:** every screen says extend the existing Concorde stay through Sunday; no primary strategy says switch to Value Hotel, Hotel Sakura, J8, or another property.
 - [ ] **Same-property proposal:** planner/read model returns a genuine same-property extension or the hero stops honestly rather than filling cards with unrelated hotels.
-- [ ] **Funding split:** screen says event-funded baseline unchanged, Jonas pays only the increment, provider charge `US$223.94`, and policy equivalent `S$302.32`.
+- [ ] **Funding split:** screen says event-funded baseline unchanged, Jonas pays only the increment, provider charge `US$541.83`, and policy equivalent `S$731.47`.
 - [ ] **Commitment protection:** fireside remains visibly satisfied before, during, and after the extension; it never appears `Not booked`.
-- [ ] **Traveller authority:** Jonas receives `Approve extension and pay US$223.94` on Traveller; operator only sees `Waiting for Jonas`; no organiser approval is created.
+- [ ] **Traveller authority:** Jonas receives `Approve extension and pay US$541.83` on Traveller; operator only sees `Waiting for Jonas`; no organiser approval is created.
 - [ ] **Execution transition:** traveller approval enters the same generic execution/observation choreography and visibly discloses simulated hotel modification.
 - [ ] **Observed stay:** resolved Traveller/Case shows the same Concorde property and 4 Oct 11:00 checkout with funding and authority history.
 - [ ] **Revisit correctness:** after reload, Overview is Confirmed/green and opens resolved Case history; no stale approval or Resolve CTA returns.

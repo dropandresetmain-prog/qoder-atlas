@@ -40,9 +40,11 @@ export interface EventChangePreviewInput {
 export interface AffectedTripPreview {
   tripId: EntityId;
   travellerIds: EntityId[];
+  /** Display names resolved from Traveller entities when present. */
+  travellerNames: string[];
   reasons: string[];
   /** Derived viability consequence where deterministically derivable. */
-  viabilityConsequence?: 'DISRUPTED' | 'AT_RISK';
+  viabilityConsequence?: 'DISRUPTED' | 'AT_RISK' | 'VIABLE';
   /** Constraint failures that would result from the change. */
   constraintFailures: Array<{ constraintId: EntityId; description: string }>;
   /** Whether the engagement would miss a connecting flight/element. */
@@ -155,10 +157,12 @@ export async function previewEventChange(
 
   for (const { trip, engagement } of linkedTrips) {
     const result = evaluateLinkedTrip(deps, anchorEvent, trip, engagement, input, commitment);
+    const travellerNames = await resolveTravellerNames(deps, trip.travellerIds);
     if (result.affected) {
       affected.push({
         tripId: trip.id,
         travellerIds: [...trip.travellerIds],
+        travellerNames,
         reasons: result.reasons,
         ...(result.viabilityConsequence ? { viabilityConsequence: result.viabilityConsequence } : {}),
         constraintFailures: result.constraintFailures,
@@ -174,6 +178,20 @@ export async function previewEventChange(
   }
 
   return { totalTravellers, affected, unaffected };
+}
+
+async function resolveTravellerNames(
+  deps: EventChangePreviewDeps,
+  travellerIds: readonly EntityId[],
+): Promise<string[]> {
+  const names: string[] = [];
+  for (const travellerId of travellerIds) {
+    const entry = await deps.entities.get('TRAVELLER', travellerId);
+    if (entry?.entityType === 'TRAVELLER' && entry.entity.name.trim().length > 0) {
+      names.push(entry.entity.name);
+    }
+  }
+  return names;
 }
 
 /**
