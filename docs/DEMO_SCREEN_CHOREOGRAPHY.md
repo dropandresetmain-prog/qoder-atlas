@@ -24,10 +24,10 @@ The hero stories must instead land as four distinct proofs:
 
 | Hero | The proof a judge must be able to repeat afterwards | Required authority | Honest external boundary |
 |---|---|---|---|
-| Jordan, S2 | An airline can restore a flight while leaving the trip objective at risk; Northstar tests the event and selects a whole-trip-viable recovery. | Organiser | Search may use REPLAY; ticketing execution is simulated at the provider boundary. |
+| Jordan, S2 | A provider recovery is not accepted until Northstar tests it against the actual trip objective; an inadequate reprotection may require a better whole-trip-viable option only when the labelled external evidence truthfully shows that inadequacy. | Organiser | Search may use REPLAY; ticketing execution is simulated at the provider boundary. |
 | Sarah, S1→S3 | A shared airline change affects travellers differently; when travel cannot save the objective, Northstar safely changes the programme and re-evaluates the same trip. | Organiser commits the programme change | Schedule-change ingress is a labelled simulated external event. Programme preview, commit, propagation, and re-evaluation are real. |
 | Oliver, S7 | A traveller's changed origin invalidates the old topology; Northstar rebuilds the trip while preserving explicit downstream intent. | Organiser | Search uses REPLAY; flight execution is simulated at the provider boundary. |
-| Jonas, S5 | A personal stay extension can preserve event obligations while separating organiser-funded baseline cost from the traveller's incremental cost. | Traveller, not organiser | Hotel search uses recorded provider evidence; modification execution is simulated at the provider boundary. |
+| Jonas, S5 | A personal stay extension can preserve event obligations while separating organiser-funded baseline cost from the traveller's incremental cost. | Traveller, not organiser | Hotel search uses Nuitée REPLAY over recorded provider evidence; modification execution is simulated at the provider boundary. |
 
 ### Contract verdict
 
@@ -110,7 +110,7 @@ Every primary option must carry the following structured fields. Unknown fields 
 - payer and funding basis;
 - effect on each hard commitment and important downstream dependency;
 - authority required and the reason;
-- provenance (`LIVE`, `RECORD`, `REPLAY`, reported/unobserved, or simulated external result).
+- provenance (`LIVE`, `SANDBOX`, `RECORD`, `REPLAY`, `REPORTED / UNOBSERVED`, or `SIMULATED`).
 
 At most three alternatives are expanded. “More options” may expose the remainder but must not compete with the recommendation.
 
@@ -151,7 +151,7 @@ Each state below explicitly defines:
 - **Primary CTA:** none.
 - **Secondary CTA:** `View trip details`.
 - **Authority:** none required.
-- **Transition:** a labelled provider delay event arrives.
+- **Transition:** a labelled simulated provider/schedule observation arrives; later, at the actual miss/reprotection point, Jordan's traveller-state report is reconciled against the observed trip state.
 - **State change:** new observed timing evidence is ingested; the itinerary itself is not yet mutated.
 - **Next/terminal:** J-02; not terminal.
 
@@ -171,13 +171,15 @@ Each state below explicitly defines:
 - **State change:** viability/check results may change from viable to tight; no booking mutation.
 - **Next/terminal:** repeat J-02 for a later observation or advance to J-03; not terminal.
 
+**Ingress truth:** S2's business trigger remains a traveller-state report. The progressive viable → tight → missed timing sequence may be driven by labelled simulated provider/schedule observations, but the missed-connection/reprotection state is reconciled with Jordan's traveller report rather than being presented as a purely provider-originated scenario.
+
 ### J-03 — Provider itinerary is not yet a recovered trip
 
 - **Route/surface:** Case, linked from an Overview `Needs Attention` row and a Traveller alert.
-- **Entry condition:** the NRT→SIN connection is missed or impossible and provider-side replacement information is present.
+- **Entry condition:** the NRT→SIN connection is missed or impossible; Jordan reports the miss and any airline reprotection; provider-side replacement information is then present, reported, or independently evidenced.
 - **Headline:** `The airline restored a flight. Jordan's trip is not recovered yet.`
 - **Explanation:** `A replacement flight is only useful if it still protects the Finals Showcase. Northstar has not accepted the provider itinerary as a whole-trip recovery.`
-- **Visible:** missed NRT→SIN sector; reported provider response as a distinct card; provider-response provenance; showcase time and 360-minute buffer; current whole-trip viability; known uncertainty.
+- **Visible:** missed NRT→SIN sector; traveller report and reported provider response as distinct evidence; provider-response provenance; showcase time and 360-minute buffer; current whole-trip viability; known uncertainty.
 - **Hidden:** “Northstar booked” language, provider confirmation if only reported, organiser approval before a candidate exists, transit-hotel/immigration/insurance execution.
 - **Capability:** distinction between provider recovery and whole-trip recovery.
 - **Primary CTA:** `Protect the Finals Showcase`.
@@ -197,7 +199,7 @@ Each state below explicitly defines:
 - **Explanation:** `Northstar is testing onward flights against Jordan's actual Singapore commitment, not arrival alone.`
 - **Visible progress:** 
   1. `Confirming the missed Narita connection`;
-  2. `Searching recorded NRT→SIN alternatives`;
+  2. `Searching NRT→SIN REPLAY evidence`;
   3. `Comparing Singapore arrival with the 20:45 showcase`;
   4. `Applying the required 360-minute arrival buffer`;
   5. `Checking funding and organiser authority`.
@@ -253,7 +255,7 @@ Each state below explicitly defines:
 - **Entry condition:** approved recovery has not yet been executed.
 - **Headline:** `Applying Jordan's approved recovery`.
 - **Explanation:** `The ticketing boundary is simulated in this closed demo. Northstar still records the result, observes it, and rechecks the real trip graph.`
-- **Visible progress:** `Submitting approved action to the simulated provider boundary` → `Recorded provider-boundary result received` → `Updating the observed onward sector` → `Rechecking showcase timing and downstream stay`.
+- **Visible progress:** `Submitting approved action to the simulated provider boundary` → `Simulated provider-boundary result received` → `Updating the observed onward sector` → `Rechecking showcase timing and downstream stay`.
 - **Visible provenance:** `SIMULATED EXECUTION`; search evidence remains labelled `REPLAY`.
 - **Hidden:** live-ticketed claim, animation unrelated to response state, additional approval controls.
 - **Capability:** execution boundary, observation, authoritative update, re-verification.
@@ -284,9 +286,9 @@ Each state below explicitly defines:
 
 - **Route/surface:** Programme with an Overview cohort summary.
 - **Entry condition:** the shared CGK→SIN speaker arrivals and programme commitments are currently authoritative.
-- **Headline:** `67 managed arrivals aligned to the programme`.
+- **Headline:** `67 participants aligned to the programme — 42 Northstar-managed travellers, 25 local/self-managed participants`.
 - **Explanation:** Sarah's 09:20 headline is visibly distinct from later Wanderpay commitments.
-- **Visible:** programme timeline, Sarah headline at 09:20, later speaker commitments, current arrival cohort, Confirmed counts.
+- **Visible:** programme timeline; population truth `67 total / 42 managed / 25 local or self-managed`; Sarah headline at 09:20; later speaker commitments; current arrival cohort; Confirmed counts.
 - **Hidden:** programme proposal, recovery options, impact warning.
 - **Capability:** shared event/trip graph baseline.
 - **Primary CTA:** none.
@@ -300,7 +302,7 @@ Each state below explicitly defines:
 - **Entry condition:** the S1 simulated external schedule-change events have been received and propagated.
 - **Headline:** `One airline change. Four different trip consequences.`
 - **Explanation:** `The new morning arrival affects a shared cohort, but each traveller is evaluated against their own programme commitment.`
-- **Visible:** `4 itineraries changed`; `3 remain viable`; `Sarah needs action`; Arjun Mehta, Siti Rahman, and Mei Tan shown as viable for later Wanderpay duties; Sarah shown critical for the 09:20 headline; `SIMULATED SOURCE EVENT` provenance.
+- **Visible:** `4 itineraries changed`; `3 remain viable`; `Sarah needs action`; Arjun Rao, Siti Rahmah, and Mei Ling Goh shown as viable for later Wanderpay duties; Sarah shown critical for the 09:20 headline; `SIMULATED SOURCE EVENT` provenance.
 - **Hidden:** four indistinguishable red case rows, recovery cost, programme mutation, anonymous impact IDs.
 - **Capability:** change ingestion, cohort blast-radius propagation, traveller-specific consequence.
 - **Primary CTA:** `Review Sarah's impact`.
@@ -362,11 +364,11 @@ Each state below explicitly defines:
 
 ### S-06 — NOW versus PROPOSED programme preview
 
-- **Route/surface:** Programme, recovered C6-style side-by-side comparison.
+- **Route/surface:** Programme, recovered E1-style Now-versus-Proposed comparison.
 - **Entry condition:** preview response exists and authoritative programme still shows 09:20.
 - **Headline:** `Move Sarah's headline to 15:30?`.
 - **Explanation:** `This is a preview. The current programme and all trip states remain unchanged until the organiser commits.`
-- **Visible NOW:** `09:20–09:40`; Sarah `NOT VIABLE`; current linked consequences.
+- **Visible NOW:** `09:20–09:50`; Sarah `NOT VIABLE`; current linked consequences.
 - **Visible PROPOSED:** `15:30–16:00`; Sarah `VIABLE`; human-readable local dates/times; changed programme item highlighted.
 - **Visible blast radius:** Sarah by name and positive viability consequence; Elena by name and her actual linked consequence; Daniel as local/changeable context only unless he is genuinely returned as affected evidence; `65 unaffected` when that is the current preview result; reason in human language.
 - **Visible alternatives:** at most three real programme strategies. Do not invent a slot-swap API; the hero is a reschedule.
@@ -460,7 +462,7 @@ Each state below explicitly defines:
 - **Entry condition:** operator requests structural replanning.
 - **Headline:** `Rebuilding Oliver's trip from Tokyo`.
 - **Explanation:** `Northstar is removing obsolete inbound travel while preserving the parts Oliver still needs.`
-- **Visible progress:** `Marking London inbound sectors obsolete` → `Preserving the Singapore→LHR return` → `Searching recorded HND/NRT→SIN alternatives` → `Rechecking Singapore arrival against the event` → `Rechecking the existing stay` → `Checking structural-change authority`.
+- **Visible progress:** `Marking London inbound sectors obsolete` → `Preserving the Singapore→LHR return` → `Searching HND/NRT→SIN REPLAY evidence` → `Rechecking Singapore arrival against the event` → `Rechecking the existing stay` → `Checking structural-change authority`.
 - **Resulting consequence:** `Tokyo-origin alternatives found; organiser approval is required for the structural flight change.`
 - **Hidden:** claim that a transfer was checked when no transfer element/evidence exists; applied topology; generic departure-gateway language.
 - **Capability:** structural graph mutation proposal, provider search, downstream dependency reasoning, authority.
@@ -481,7 +483,7 @@ Each state below explicitly defines:
 - **Recommended option:** the actual 02:20 HND→SIN replay offer, provider charge `US$143.62`, home-policy equivalent `S$193.89`, recommendation rationale derived from viability/evidence.
 - **Recommended pros:** starts from Oliver's actual location; satisfies the evidenced Singapore commitment; preserves explicit LHR return.
 - **Recommended cons:** simulated execution boundary; any unknown hotel or arrival detail remains explicit.
-- **Other primary alternative:** actual 02:00 option at `US$163.98`, with its evidenced consequence and clear reason it is not preferred. Show at most one further evidenced option.
+- **Other primary alternatives:** only offers whose normalized REPLAY evidence proves the same direct HND/NRT→SIN topology may be promoted. The `US$163.98` candidate is not locked here as a direct option: surface it only if its normalized route/timing evidence confirms that routing; otherwise keep it in `More options` with full routing or omit it.
 - **Payer:** organisation/event only if current allocation proves it; otherwise show `Funding confirmation required` rather than guessing.
 - **Commitment effect:** actual debate/event timing PASS; hotel `rechecked/preserved` only when evidence supports it; transfer `not represented` rather than falsely checked.
 - **Authority:** organiser required because the change structurally replaces a flight origin.
@@ -499,12 +501,12 @@ Each state below explicitly defines:
 - **Entry condition:** selected structural proposal awaits the organisation principal.
 - **Headline:** `Organiser approval is required to replace the inbound`.
 - **Explanation:** `This changes the trip structure, so Northstar will not execute it under a generic spending-cap rule.`
-- **Visible:** before/after topology; provider/home amounts; payer; explicit LHR return preservation; authority reason; simulation disclosure.
+- **Visible:** before/after topology; provider/home amounts; payer; explicit LHR return preservation; authority reason; simulation disclosure; internal `REQUIRES_HUMAN_AGENT` / human-agent policy outcome translated into the actual user-facing organisation/organiser principal.
 - **Hidden:** Begin recovery, “human agent” ambiguity, traveller approval, automatic-booking copy.
 - **Capability:** structural authority and no-mutation-before-approval.
 - **Primary CTA:** `Approve as organiser`.
 - **Secondary CTA:** `Decline` or `Choose another option`.
-- **Authority:** waiting for organiser.
+- **Authority:** waiting for organiser/organisation; the human-agent policy outcome must not be presented as an unidentified third role.
 - **Loading after CTA:** approval receipt, then O-06.
 - **State change:** decision becomes approved; trip remains unchanged until execution/observation.
 - **Next/terminal:** O-06; not terminal.
@@ -515,7 +517,7 @@ Each state below explicitly defines:
 - **Entry condition:** proposal approved.
 - **Headline:** `Applying Oliver's approved topology`.
 - **Explanation:** `Flight execution is simulated at the provider boundary. Northstar will apply only the observed result and then recheck the trip.`
-- **Visible progress:** `Submitting approved Tokyo-origin change to simulated provider boundary` → `Recorded result received` → `Replacing obsolete inbound in authoritative trip` → `Confirming LHR return remains` → `Rechecking event and stay viability`.
+- **Visible progress:** `Submitting approved Tokyo-origin change to simulated provider boundary` → `Simulated provider-boundary result received` → `Replacing obsolete inbound in authoritative trip` → `Confirming LHR return remains` → `Rechecking event and stay viability`.
 - **Hidden:** live ticketing claim; transfer confirmation without a transfer element; green treatment for unrelated `UNKNOWN` elements.
 - **Capability:** executor boundary, observation, graph update, dependency propagation.
 - **Primary CTA:** `Execute approved recovery` appears only before submission.
@@ -574,13 +576,13 @@ Each state below explicitly defines:
 - **Entry condition:** extension request is being evaluated.
 - **Headline:** `Checking Jonas's extension and personal cost`.
 - **Explanation:** `Northstar is extending the current trip, not replacing its business stay.`
-- **Visible progress:** `Comparing current 3 Oct checkout with requested 4 Oct checkout` → `Searching recorded same-property extension availability` → `Preserving the organiser-funded baseline` → `Calculating Jonas's personal increment` → `Rechecking the fireside and remaining trip` → `Confirming traveller authority`.
+- **Visible progress:** `Comparing current 3 Oct checkout with requested 4 Oct checkout` → `Searching Nuitée REPLAY same-property extension evidence` → `Preserving the organiser-funded baseline` → `Calculating Jonas's personal increment` → `Rechecking the fireside and remaining trip` → `Confirming traveller authority`.
 - **Resulting consequence:** `The business programme remains satisfied. Jonas can approve and pay the incremental extension.`
 - **Hidden:** organiser decision, automatic execution, hotel-switch language, return-flight recovery.
 - **Capability:** accommodation reasoning, funding attribution, commitments, traveller authority.
 - **Primary CTA:** none during progress.
 - **Authority:** calculating; result is traveller authority.
-- **Transition:** evidence-driven; search provenance labelled RECORD/REPLAY as applicable.
+- **Transition:** evidence-driven; search provenance labelled REPLAY for routine closed-demo playback, with RECORD only when a provider interaction is actually being captured.
 - **State change:** extension overlay, cost allocation, and authority requirement are created; existing stay remains authoritative.
 - **Next/terminal:** V-04; not terminal.
 
@@ -611,7 +613,7 @@ Each state below explicitly defines:
 - **Entry condition:** Jonas approved the traveller-funded extension.
 - **Headline:** `Applying Jonas's approved stay extension`.
 - **Explanation:** `The hotel modification is simulated at the provider boundary. Northstar will record the response and recheck the trip.`
-- **Visible progress:** `Submitting approved extension to simulated provider boundary` → `Recorded provider-boundary response received` → `Updating checkout to Sunday, 4 October` → `Rechecking the fireside and whole-trip viability` → `Closing the resolved case`.
+- **Visible progress:** `Submitting approved extension to simulated provider boundary` → `Simulated provider-boundary result received` → `Updating checkout to Sunday, 4 October` → `Rechecking the fireside and whole-trip viability` → `Closing the resolved case`.
 - **Hidden:** live hotel confirmation; organiser action; generic “Confirming provider result” without provenance.
 - **Capability:** execution, observation, authoritative accommodation update, resolution.
 - **Primary CTA:** none after traveller submission.
@@ -668,12 +670,14 @@ TransitionPresentation
     explanation
   authorityOwner?
   externalBoundary?
-    mode: LIVE | RECORD | REPLAY | REPORTED | SIMULATED
+    mode: LIVE | SANDBOX | RECORD | REPLAY | REPORTED | SIMULATED
     label
   nextAction?
 ```
 
 The exact TypeScript shape is an implementation choice. The contract is that progress, completion, provenance, and consequence come from structured product evidence rather than hero IDs, person names, static timers, or CSS state.
+
+Provenance labels are not interchangeable: `LIVE` is a real provider/model call; `SANDBOX` is a provider test environment; `RECORD` captures a live/sandbox interaction; `REPLAY` reuses that provider-shaped response through the same normalizer/engine; `REPORTED` is a statement not yet independently observed; and `SIMULATED` is an explicitly disclosed external-boundary effect without a real provider action.
 
 ### 7.2 Behaviour rules
 
@@ -693,7 +697,7 @@ The exact TypeScript shape is an implementation choice. The contract is that pro
 
 | Hero | Planning/checking phases | Execution/commit phases | Required resulting consequence |
 |---|---|---|---|
-| Jordan | Confirm miss; search onward; compare arrivals with 20:45 showcase; apply 360-minute buffer; check organiser authority. | Submit to simulated ticketing boundary; receive recorded result; observe new sector; recheck showcase and stay. | `One option leaves 370 minutes before the showcase.` |
+| Jordan | Confirm miss; search onward; compare arrivals with 20:45 showcase; apply 360-minute buffer; check organiser authority. | Submit to simulated ticketing boundary; receive simulated boundary result; observe new sector; recheck showcase and stay. | `One option leaves 370 minutes before the showcase.` |
 | Sarah | Propagate shared change; differentiate cohort; test current headline; check evidenced travel alternatives; compute programme counterfactual blast radius. | Commit 15:30 programme time; fan out; re-evaluate same trip; reconcile case state. | `Existing airline itinerary is viable after the programme change; no flight purchase.` |
 | Oliver | Parse new origin/preserved return; identify obsolete inbound; search Tokyo; recheck evidenced commitment and stay; determine structural authority. | Submit simulated structural change; observe Tokyo inbound; preserve LHR return; recheck viability. | `Trip now starts in Tokyo and still returns to London.` |
 | Jonas | Compare current/requested checkout; search same-property extension; separate baseline/increment; recheck fireside; determine traveller authority. | Submit simulated stay modification; observe new checkout; recheck commitments; close case. | `Existing stay extended; Jonas pays only the incremental provider charge.` |
@@ -706,7 +710,7 @@ The exact TypeScript shape is an implementation choice. The contract is that pro
 |---|---|---:|---|---|---|
 | Baseline before each hero event | Traveller, Programme, Overview; manifest/demo launch | Partial | Demo launch often advances through planning/begin before the judge enters. | Add a stateful judge choreography entry that exposes baseline and labelled trigger before impact. | B / C |
 | Shared S1 incident and differentiated cohort | Flat Overview attention queue | No | Four similar disrupted rows; viable Wanderpay travellers look equally bad. | Group one source incident and project `4 changed / 3 viable / Sarah critical` with named outcomes. | B |
-| Progressive S2 viable→tight→missed | Manifest events, no judge-facing sequence | Backend only | Important change-ingestion story runs invisibly. | Present labelled manifest/replay observations through generic Activity/Watching/Case states. | C |
+| Progressive S2 viable→tight→missed | Simulated provider/schedule observations plus traveller-state report in manifest/replay evidence; no judge-facing sequence | Backend only | Important change-ingestion story runs invisibly and can be misdescribed as provider-only ingress. | Present labelled observations through generic Activity/Watching/Case states and reconcile the traveller report at the missed-connection/reprotection point. | C |
 | Traveller request plus trip context | Traveller conversation | Partial | Message presence suppresses itinerary/funding/decision composition. | Compose conversation, trip context, progress, and decision card based on state. | B |
 | Impacted Case | Recovered-style operator Case | Yes | Headline/state can disagree with authoritative pending approval; commitment/chain statuses mislead. | Derive phase from authoritative state and project actual arrival/buffer/commitment semantics. | A/B |
 | Meaningful failed checks | Case checks | Partial | Duplicated/contradictory “No longer meets: timing still works” language. | Project pass/fail consequence from the deterministic check result. | A |
@@ -718,12 +722,13 @@ The exact TypeScript shape is an implementation choice. The contract is that pro
 | Programme commit transition | `Committing…` then fast reload | No | No fan-out/re-evaluation explanation; success is too fleeting. | Use generic commit/progress projection and durable committed notice. | A/B |
 | Sarah post-commit terminal | Sarah Case after commit | Wrong | Underlying trip `VIABLE`, visible Case still `DISRUPTED / Needs Attention` with Resolve CTA. | Reconcile viable fan-out case to terminal and persist programme-change history. | B, Act Now |
 | Oliver topology delta | Old London chain plus generic options | No | Obsolete inbound not shown; Tokyo proposal and preserved return are absent. | Project generic before/after topology from candidate operations and explicit preserved intent. | B |
+| Oliver secondary offer routing | Current normalized S7 evidence clearly proves the US$143.62 recommendation; the `US$163.98` candidate is not authoritative here as a direct HND/NRT→SIN alternative. | Unverified | Presenting `US$163.98` as direct could fabricate topology/timing. | Verify normalized route legs before promotion; otherwise show full connection routing in More options or omit. | Investigate Now |
 | Jonas existing-stay extension | Hotel-switch option cards | Wrong | Replaces Concorde instead of extending it; canonical checkout drift; fireside appears Not booked. | Fix fixture/planning/projection to produce same-property extension and correct baseline. | B, Act Now |
 | Role-correct authority | Case approval forms | Partial | `HUMAN_AGENT` copy conflicts with “Approve as organiser”; operator can approve as Jonas; generic auto-book cap contradicts structural rules. | Project principal/reason; place traveller action on Traveller; operator observes. | A/B |
 | Currency and funding | Provider/home amounts and funding callout | Partial | `$` is ambiguous; home equivalent looks like a second charge; CTA may use the wrong unit. | Standard currency policy: provider payable first, home-policy equivalent second, payer explicit. | A |
 | Approved execution CTA | Case actions | Wrong | Options branch shadows approved Execute for Jordan/Oliver; Begin can coexist with pending approval. | Make CTA lifecycle mutually exclusive and state-derived. | A, Act Now |
 | Execution/observation explanation | Fixed execution overlay | Partial | Hardcoded timing/content; simulation not prominent; Jonas traveller-decision bypasses overlay. | Route all execution seams through structured transition presentation with provenance. | B |
-| Honest provider result | Activity/result projection | Partial | `simulated` can be buried while copy implies provider confirmation. | Keep REPLAY/REPORTED/SIMULATED badges on transition and terminal history. | A |
+| Honest provider result | Activity/result projection | Partial | `simulated` can be buried while copy implies provider confirmation. | Keep LIVE/SANDBOX/RECORD/REPLAY/REPORTED/SIMULATED provenance explicit on transition and terminal history. | A |
 | Resolved Case and Overview | Direct Case URL; Confirmed mapping | Partial | Resolved rows lose case link; current tests do not prove revisit; stale open cases can shadow outcome. | Retain case-history link and reconcile terminal projection across Case/Traveller/Overview. | A/B |
 | Browser rehearsal evidence | Live product rehearsal | Wrong | Terminal regex can match generic page/CSS terms and does not require execute/final topology. | Assert exact authoritative state, execute response, observed data, and reload/reopen UI. | A, Act Now |
 
@@ -740,6 +745,7 @@ Every gap below has both a delivery disposition and the repository-required risk
 | Jonas current checkout in acceptance evidence differs from the canonical 3 Oct fixture. | **Investigate Now** | Funding increment and requested duration cannot be trusted until baseline is correct. | Locate fixture/normalisation/projection drift before implementing the screen. | Correct-looking UI may explain the wrong charge/stay. |
 | Jordan's desired “inadequate airline solution” conflicts with the current reported viable TR885. | **Investigate Now** | Calling TR885 inadequate would be a false capability claim. | Change only a labelled external fixture/presentation event to a genuinely inadequate reprotection, or use the weaker truthful “unverified until checked” story. | Demo either overclaims or fails the requested contrast. |
 | S1 continuity path claims travel recovery is insufficient without demonstrating a pre-commit search. | **Investigate Now** | A judge cannot distinguish evidence from narration. | Wire existing real search/viability evidence or use an explicit REPLAY seam; soften copy until proven. | Northstar appears to jump to changing the programme. |
+| Oliver's `US$163.98` secondary candidate has not been proven here as a direct HND/NRT→SIN option. | **Investigate Now** | A direct-flight label could fabricate route topology. | Verify normalized route legs/times before promotion; otherwise render the full routing under More options or omit. | Demo can misstate Atlas evidence even if the preferred option is correct. |
 | Current option projection omits consequences, pros/cons, payer, and authority reason. | **Act Now** | Options read as a generic supplier list. | Add structured presentation fields and render the shared option contract. | All heroes continue to look like booking search. |
 | Authority copy/action is role-confused. | **Act Now** | Operator can appear to impersonate Jonas, while Oliver sees human-agent/organiser contradictions. | Project the actual principal and reason; compose traveller decision on Traveller; remove universal cap copy. | Trust and policy proof fail. |
 | Currency presentation mixes payable USD and home-equivalent SGD. | **Act Now** | Judge cannot tell cost or payer. | Show explicit provider charge, labelled policy equivalent, and one payer/CTA currency. | Funding story becomes misleading. |
@@ -767,7 +773,7 @@ These are reusable presentation/lifecycle changes with no domain redesign:
 - make organiser/traveller labels match the projected principal;
 - replace universal spend-cap/auto-book copy with the case's actual authority reason;
 - retain a resolved Case/history link from Overview;
-- preserve `REPLAY`, `REPORTED`, and `SIMULATED` provenance on the active and terminal screens;
+- preserve `LIVE`, `SANDBOX`, `RECORD`, `REPLAY`, `REPORTED`, and `SIMULATED` provenance on the active and terminal screens;
 - prefill Sarah's 15:30 proposal and use human-readable Singapore dates/times, leaving advanced raw editing secondary;
 - add structured slots for option pros, cons, payer, commitment effect, and authority reason when projection data is available;
 - add durable transition/result notices instead of a fleeting reload message;
@@ -795,10 +801,10 @@ These are correct generalized capabilities but touch read models, workflow state
 Simulation is permitted only at an external or presentation boundary. Internal ingestion, propagation, planning, viability, authority, programme commit, observation, and state update remain real.
 
 - **S1:** drive the shared airline change as a labelled `SIMULATED SOURCE EVENT`; continue through real per-trip propagation and real programme preview/commit/re-evaluation.
-- **S2:** expose progressive delay/miss notifications from the manifest/replay driver. A traveller-reported airline offer is `REPORTED / UNOBSERVED` until supplier evidence exists. To demonstrate an inadequate provider offer followed by a better Northstar option, change only the external fixture to a genuinely inadequate offer; never relabel the viable TR885 as inadequate.
+- **S2:** expose progressive delay/miss notifications from the manifest/replay driver, then reconcile the missed-connection/reprotection state with Jordan's traveller-state report. A traveller-reported airline offer is `REPORTED / UNOBSERVED` until supplier evidence exists. To demonstrate an inadequate provider offer followed by a better Northstar option, change only the external fixture to a genuinely inadequate offer; never relabel the viable TR885 as inadequate.
 - **S1 travel search:** if real pre-commit search cannot be wired safely, show a bounded `REPLAY` evidence sequence at the search/presentation boundary. Do not fabricate flight execution or imply a paid call.
-- **S2 and S7 execution:** show `SIMULATED PROVIDER EXECUTION`, then show real observation, authoritative update, and deterministic viability.
-- **S5 execution:** show `SIMULATED HOTEL MODIFICATION`, then show real observed checkout projection, funding record, commitment recheck, and resolution.
+- **S2 and S7 execution:** show `SIMULATED PROVIDER EXECUTION`, then show real internal observation, authoritative update, and deterministic viability.
+- **S5 execution:** show `SIMULATED HOTEL MODIFICATION`, then show real internal observation of the simulated boundary result, authoritative checkout projection, funding record, commitment recheck, and resolution.
 - **Optional unavailable dependencies:** describe a transfer, transit hotel, immigration, or insurance item only as unrepresented/unconfirmed context, never as checked or executed.
 
 Simulation disclosure must remain visible in Activity/history and on the terminal result. It must not be hidden in demo-only chrome.
@@ -813,6 +819,7 @@ Simulation disclosure must remain visible in Activity/history and on the termina
 - Do not call the currently reported viable TR885 an inadequate airline solution.
 - Do not add transit-hotel insertion, Japan entry/immigration, insurance execution, or live ticketing claims to Jordan.
 - Do not invent Oliver transfer evidence or suppress unresolved return-intent uncertainty.
+- Do not promote Oliver's `US$163.98` candidate as a direct HND/NRT→SIN option unless normalized evidence proves that routing.
 - Do not recolour `UNKNOWN` itinerary elements as confirmed.
 - Do not turn Jonas's extension into a hotel switch or add the deferred return-flight change.
 - Do not claim a live provider modification for Jordan, Oliver, or Jonas while execution remains simulated.
@@ -830,7 +837,7 @@ Simulation disclosure must remain visible in Activity/history and on the termina
 - [ ] **Currency clarity:** provider payable and home-policy equivalent use unambiguous currency notation and cannot be mistaken for two charges.
 - [ ] **Authority clarity:** UI names the correct principal and reason; structural flight change never inherits generic auto-book-under-cap copy.
 - [ ] **Role-correct action:** organiser screens cannot approve as a traveller; Traveller composes request, trip context, funding, and decision when traveller authority is required.
-- [ ] **Evidence provenance:** `LIVE`, `RECORD`, `REPLAY`, `REPORTED / UNOBSERVED`, and `SIMULATED` remain visible through progress, result, and history.
+- [ ] **Evidence provenance:** `LIVE`, `SANDBOX`, `RECORD`, `REPLAY`, `REPORTED / UNOBSERVED`, and `SIMULATED` remain visible through progress, result, and history.
 - [ ] **Commitment semantics:** programme engagements do not appear `Not booked` merely because they are not supplier reservations; PASS/FAIL/UNKNOWN remains evidence-based.
 - [ ] **Resolved persistence:** resolved Case, Traveller, and Overview agree after reload; Overview retains a link to resolved Case history without reviving actions.
 - [ ] **Exact rehearsal gate:** browser evidence requires the intended CTA sequence, execution/commit receipt, observed authoritative values, terminal status, and reload/reopen state; generic page text cannot satisfy it.
@@ -841,7 +848,8 @@ Simulation disclosure must remain visible in Activity/history and on the termina
 ### Jordan — S2
 
 - [ ] **Baseline and progression:** judge can see viable/tight/missed change states or an honest condensed Activity history before recovery starts.
-- [ ] **Missed connection:** Case explicitly identifies the impossible/missed NRT→SIN connection and separates provider response from Northstar's assessment.
+- [ ] **Ingress truth:** progressive simulated provider/schedule observations may drive viable→tight→missed timing, while Jordan's traveller-state report is reconciled at the missed-connection/reprotection point; the hero is not described as provider-only ingress.
+- [ ] **Missed connection:** Case explicitly identifies the impossible/missed NRT→SIN connection and separates traveller report/provider response from Northstar's assessment.
 - [ ] **Provider truth:** current TR885 is never called inadequate; an inadequate provider-offer story is shown only after a labelled external fixture supplies one truthfully.
 - [ ] **Whole-trip comparison:** recommendation visibly shows 20:45 showcase, 360-minute requirement, 14:35 arrival, and `370 ≥ 360` PASS.
 - [ ] **Option evidence:** actual flight/timing and `US$90.54` provider charge plus `S$122.23` policy equivalent are projected with payer and REPLAY provenance.
@@ -851,11 +859,12 @@ Simulation disclosure must remain visible in Activity/history and on the termina
 
 ### Sarah — S1→S3, no reset
 
-- [ ] **Shared incident:** one schedule-change callout shows four changed travellers, three viable Wanderpay speakers, and Sarah critical, with names and simulated-source provenance.
+- [ ] **Population baseline:** programme/Overview copy keeps `67 total / 42 Northstar-managed / 25 local or self-managed`; it never says 67 managed arrivals.
+- [ ] **Shared incident:** one schedule-change callout shows four changed travellers, three viable Wanderpay speakers — Arjun Rao, Siti Rahmah, Mei Ling Goh — and Sarah critical, with simulated-source provenance.
 - [ ] **Sarah failure:** Case shows actual replacement arrival, 09:20 headline, actual gap, 360-minute requirement, and unambiguous FAIL.
 - [ ] **Travel-first evidence:** UI demonstrates evidenced travel-only failure or labels the bounded REPLAY seam; it never asserts an unperformed search.
 - [ ] **Programme recommendation:** Case explains why moving the programme is better than purchasing another flight and shows no-flight-purchase consequence.
-- [ ] **Mutation-free preview:** NOW 09:20 and PROPOSED 15:30–16:00 appear in human time; cancelling leaves programme and all trips byte-for-byte/semantically unchanged.
+- [ ] **Mutation-free preview:** E1-style NOW `09:20–09:50` and PROPOSED `15:30–16:00` appear in human time; cancelling leaves programme and all trips byte-for-byte/semantically unchanged.
 - [ ] **Named blast radius:** Sarah and Elena show actual counterfactual outcomes; Daniel is labelled local/changeable context unless genuinely linked; unaffected count matches evidence.
 - [ ] **Organiser commit:** programme remains unchanged until explicit organiser Commit; no raw ISO typing is required for the hero path.
 - [ ] **Commit propagation:** progress visibly shows programme update, linked-trip fan-out, and same Sarah trip re-evaluation.
@@ -868,9 +877,9 @@ Simulation disclosure must remain visible in Activity/history and on the termina
 - [ ] **Traveller intent:** message visibly captures Tokyo origin and preserved LHR return; original trip remains unchanged before approval.
 - [ ] **Topology delta:** Case marks London inbound obsolete-if-approved, shows HND/NRT→SIN proposal, and preserves SIN→LHR in NOW/PROPOSED form.
 - [ ] **Evidence-scoped checks:** event and stay consequences use real evidence; transfer is labelled unrepresented rather than falsely checked.
-- [ ] **Option evidence:** recommendation shows actual replay route/timing, `US$143.62`, `S$193.89` equivalent, payer state, pros/cons, commitment effect, and organiser authority; alternative `US$163.98` is clearly differentiated.
+- [ ] **Option evidence:** recommendation shows actual replay route/timing, `US$143.62`, `S$193.89` equivalent, payer state, pros/cons, commitment effect, and organiser authority; the `US$163.98` candidate is shown only after normalized route evidence proves whether it is direct, otherwise with full routing or not at all.
 - [ ] **Return intent:** explicit LHR return is represented as a preserved constraint or surfaced as unresolved; it is never silently dropped.
-- [ ] **Structural authority:** copy says organiser and explains structural change; no generic HUMAN_AGENT ambiguity or automatic-cap promise remains.
+- [ ] **Structural authority:** internal human-agent policy outcome is surfaced as the actual organiser/organisation principal and explains structural change; no generic unidentified HUMAN_AGENT ambiguity or automatic-cap promise remains.
 - [ ] **Execution and observation:** simulated flight execution is disclosed; observed topology update and viability checks are visible.
 - [ ] **Terminal topology:** reload/reopen proves Tokyo inbound plus unchanged LHR return, resolved Case, correct authority/cost history, and no invented transfer confirmation.
 
