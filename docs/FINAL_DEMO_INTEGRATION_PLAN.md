@@ -1,398 +1,588 @@
 # Final Demo Integration & Code-Freeze Plan
 
-**Status:** Active closure execution SSOT (R2 + R3 integrated on `integration/final-r2-r3`)  
+**Status:** Active closure execution SSOT — R3 reopened for recovered-UI direction + final live product acceptance  
 **Date:** 27 Aug 2026  
-**Branch baseline:** `main` @ `e2cd0b1` (includes R1 merge `5f62389` + Railway deployment hardening `2865a66`, `e2cd0b1`)  
-**Integration candidate:** `integration/final-r2-r3` (R2 @ `9756729` + R3A @ `1605665` + R3B visual deltas + HTTP projection wiring)  
-**R2 lane branch:** `lane/r2-populated-demo-world` @ `9756729`  
-**R3A lane branch:** `lane/r3-projection-closure` @ `1605665`  
-**R3B visual lane:** `lane/r3-reference-visual-convergence` @ `e31e92c` (visual deltas cherry-picked; not wholesale merge)  
+**Current product line:** `main` contains the integrated R2/R3 candidate (`a151792`), live-product operability closure (`9700edd`), and Railway early-bind health hardening (`7a168ead`). Later docs-only commits do not redefine the product candidate.  
 **Parent execution SSOT:** `docs/IMPLEMENTATION_PLAN.md`  
+**Parent demo-readiness contract:** `docs/WAVE3R_DEMO_READINESS_PLAN.md`  
 **Scope/status SSOT:** `docs/ROADMAP.md`  
 **Scenario SSOT:** `docs/SCENARIOS.md`  
-**Final demo world/content SSOT:** `docs/FINAL_DEMO_CONTENT_SSOT.md`
+**Final demo world/content SSOT:** `docs/FINAL_DEMO_CONTENT_SSOT.md`  
+**Design charter:** `docs/DESIGN.md`  
+**Historical closure evidence:** `docs/archive/FINAL_DEMO_INTEGRATION_PLAN_PRE_R3C.md`
 
-This document is the **source of truth for the final integration rescue from accepted backend to filmed/submitted product**. It is subordinate to the parent architecture/product SSOTs and does not reopen accepted architecture, ontology, authority, viability, provider contracts, scenario narratives, or final demo content.
+This document is the active **remaining recovery / demo-closure sequence**. It is subordinate to the parent implementation, architecture, product, scenario, and roadmap SSOTs. It does not reopen accepted ontology, deterministic viability, authority, provider-neutral architecture, scenario narratives, or demo-world facts.
 
-If this document conflicts with earlier assumptions about the final human demo flow, this document governs the remaining integration/rehearsal work unless an explicit supersession is recorded.
+If an older closure plan, handoff, screenshot proxy, or generated preview conflicts with this document's remaining execution order, this document governs the recovery sequence. Facts and semantics still come from their dedicated SSOTs above.
 
-## 1. Objective
+---
 
-Finish Northstar as a human-operable, judge-facing product without reopening the generalized recovery engine.
+## 1. Objective and remaining runway
 
-Execution sequence:
+Finish Northstar as a human-operable, judge-facing product; freeze a reliable release candidate; then stop software development and switch to submission production.
 
-`FINAL CONTENT -> UI/BACKEND INTEGRATION -> REHEARSE -> STABILISE -> CODE FREEZE -> VIDEO/SUBMIT`
+Current remaining sequence:
 
-The current problem is integration and demo operation, not broad backend capability discovery.
+`R3C RECOVERED UI AUDIT + HUMAN DIRECTION FREEZE`
+`→ R3D LIVE PRODUCT CONVERGENCE`
+`→ R3E FINAL UI PASS + HUMAN PRODUCTION ACCEPTANCE`
+`→ R4 HERO REHEARSAL + WAVE 4 STABILISATION`
+`→ FINAL CANDIDATE REVIEW`
+`→ R5 FINDINGS CLOSURE + CODE FREEZE`
+`→ SUBMISSION PRODUCTION`
+`→ SUBMIT`
+
+No Stretch pull is planned from this point. Reopen Stretch only for a demonstrated release blocker that cannot be solved inside the accepted generalized product.
+
+---
 
 ## 2. Binding final product/demo state
 
-### 2.1 Default entry experience
+The judge-facing product begins on the populated **Operator Overview**, not `/demo`.
 
-The filmed/judge-facing product **does not begin by launching a scenario from a developer/demo control panel**.
+Canonical programme truth:
 
-The default demo world must open on the **Operator Overview** with the final programme already populated and the scenario situations already in meaningful active states.
+- **67 participants total**;
+- **42 Northstar-managed travellers**;
+- **25 local/self/unmanaged participants**.
 
-From the Overview, a user must be able to:
+The product must make that split understandable without implying all 67 have managed travel.
 
-1. see who is ready, at risk, disrupted, awaiting input/approval, or recovering;
-2. identify the people/cases representing the final scenario catalogue;
-3. click an affected person/case into the appropriate traveller/case/programme surface;
-4. continue that scenario through its remaining decision/action/observation steps to its intended end state;
-5. use a clearly available **Reset demo** action;
-6. after reset, return to the same populated Operator Overview starting state.
+From the Overview a human must be able to:
 
-The reset contract is:
+1. understand who is confirmed, watching, disrupted, recovering, awaiting input/approval, unconfirmed, or local;
+2. identify affected people/cases;
+3. click into the relevant operator Case as the primary operator workflow;
+4. reach Traveller interaction as a secondary surface;
+5. continue a scenario using visible product controls to an explicit terminal result;
+6. reset the demo and return to the same populated starting Overview.
 
-`scenario completed/partially explored -> Reset demo -> authoritative reseed -> redirect/return to /operator?event=evt-ait-2026 -> populated starting Overview`
+Reset contract:
 
-Reset must not require database surgery, process restart, or manual fixture editing.
+`scenario explored/completed -> Reset demo -> authoritative reseed -> populated Operator Overview`
 
-### 2.2 Scenario entry-state principle
+No database surgery, process restart, hidden manual fixture edit, or `/demo` launcher is permitted as the judge-facing completion path.
 
-The overview starting state should show the scenarios **already in progress at useful narrative entry points**, not eight artificial completed cases and not eight raw launcher buttons.
+### Hero sequence
 
-Exact entry states are demo-state orchestration/configuration. They must be produced through normal application/product boundaries or demo-only orchestration that drives those boundaries. Do not scenario-branch inside generic domain/engine logic and do not directly mutate SQLite to manufacture the screen.
+Final filmed/rehearsed order remains:
 
-S1 and S3 are one continuous story on the same trip. Their overview representation may therefore be one active S1 critical case whose clickthrough later enters the S3 programme-counterfactual resolution stage; do not create contradictory simultaneous authoritative states merely to display two labels.
+`S2 -> Reset -> S1 -> S3 (NO RESET between S1 and S3) -> Reset -> S7 -> Reset -> S5`
 
-The `/demo` S1-S8 rehearsal catalogue remains an internal diagnostic/rehearsal surface. It is not the intended primary filmed entry point.
+S1 and S3 remain one continuous Sarah story.
+
+### Scenario terminal-state rule
+
+For human operability, a scenario is complete only when the visible product reaches one of:
+
+- recovered;
+- recovered with loss; or
+- explicitly escalated / handed to human support.
+
+A hidden backend manifest completion or an unexplained open planning state is not sufficient human acceptance.
+
+---
 
 ## 3. Frozen boundaries
 
-### Do not reopen
+Do not reopen without a proven architecture gap:
 
-- ontology/shared domain contracts
-- deterministic viability semantics
-- AuthorityEngine semantics
-- AI -> validation -> deterministic viability -> authority -> executor -> observe -> state update pattern
-- Atlas/Nuitee/provider-neutral architecture
-- accepted scenario narratives in `docs/SCENARIOS.md`
-- final cast/world content in `docs/FINAL_DEMO_CONTENT_SSOT.md`
-- new Stretch/provider integrations unless a proven demo blocker requires one
+- ontology/shared domain contracts;
+- deterministic viability semantics;
+- AuthorityEngine semantics;
+- `AI proposal -> validation -> deterministic viability -> authority -> executor -> observe -> state update`;
+- Atlas/Nuitee/provider-neutral architecture;
+- accepted scenario narratives in `docs/SCENARIOS.md`;
+- final cast/world facts in `docs/FINAL_DEMO_CONTENT_SSOT.md`;
+- new providers or scenario families.
 
-### Anti-hardcoding
-
-Demo-only orchestration may know scenario IDs, manifest paths, staged entry-step IDs, and final demo fixture identities.
-
-Generic application/domain/engine behavior must never branch on scenario IDs, hero names, fixture IDs, suppliers, or routes.
-
-If a requirement cannot be expressed without generic-logic hardcoding, record an architecture gap instead of implementing the branch.
-
-## 4. Milestones and gates
-
-## R0 — Rescue Contract Freeze
-
-**Status:** COMPLETE
-
-Established:
-
-- rescue is integration closure, not architecture restart;
-- final scenario/content SSOTs remain frozen;
-- human-operable acceptance replaces route-exists-only acceptance;
-- critical path uses Cursor/Qoder-style interactive execution rather than unreliable long-horizon cloud ownership.
-
-**Reviewer:** GPT-5.6 Sol / integration lead.
+Demo-only orchestration may know scenario IDs/manifests/fixture identities. Generic application/domain/engine logic must not branch on hero names, scenario IDs, suppliers, routes, dates, or fixture IDs.
 
 ---
 
-## R1 — Demo Usability Closure
+## 4. Accepted history before current recovery
 
-**Status:** FROZEN / MERGED on `main` @ `5f62389237479abfca48b2c14fde338f1ca68969`
+### R0 — Rescue Contract Freeze
+**Status:** COMPLETE.
 
-Implemented/proven (unchanged from acceptance):
+### R1 — Demo Usability Closure
+**Status:** ACCEPTED / MERGED.
 
-- managed traveller links reach `/traveller?trip=<tripId>` without requiring an active case;
-- active recovery cases remain separately discoverable;
-- `/demo` exposes S1–S8 diagnostic rehearsals through final acceptance manifests;
-- final video flows remain S2 → S1/S3 → S7 → S5;
-- S1/S3 continuity and stop-before authority semantics preserved;
-- a real HTTP rehearsal launch (`rehearsal-s4`) is integration-tested and returns usable inspect paths;
-- local manual clickthrough smoke passed;
-- full suite/typecheck/lint/build/anti-hardcoding passed at merge.
+Navigation and diagnostic rehearsal wiring were restored; Railway `PORT` / `0.0.0.0` behavior is protected.
 
-**Post-merge deployment hardening (protected — do not regress):**
+### R2 — Populated Demo World + Eight-Scenario Functional Coverage
+**Status:** ACCEPTED.
 
-- `af1605b` — honour Railway `PORT` when `HTTP_PORT` is unset;
-- `2865a66` — prefer host `PORT` over `HTTP_PORT` on Railway;
-- `e2cd0b1` — bind HTTP server to `0.0.0.0` for Railway proxy.
+Final R2 evidence includes populated-world orchestration and S1–S8 rehearsal through the shared engine. Detailed entry-state contracts and prior R2 evidence are preserved in `docs/archive/FINAL_DEMO_INTEGRATION_PLAN_PRE_R3C.md`.
 
-Production demo entry depends on this binding behaviour. R2 work must preserve it.
+### R3A — Projection/Data Closure
+**Status:** COMPLETE / INTEGRATED.
 
-**Reviewer:** GPT-5.6 Sol independent integration review — accepted and merged.
+Final projection closure `1605665` covers operator/programme/traveller/case/decisions/activity presentation data and FX-safe cost presentation.
 
----
+### Prior R3B visual pass
+**Status:** INVALID AS FINAL VISUAL ACCEPTANCE.
 
-## R2 — Populated Demo World + Eight-Scenario Clickthrough
+The original approved render screenshots were lost during pruning. Later visual agents relied on generated proxies / stale render evidence, so their self-reported parity is not authoritative.
 
-**Status:** R2.1 COMPLETE · R2.2 COMPLETE · R2.3 COMPLETE · **R2 ACCEPTED** (integrated @ `9756729`)
+### Live-product operability closure
+**Status:** IMPLEMENTED CANDIDATE on `9700edd`, not final human UI acceptance.
 
-R2 is the functional product gate. It supersedes the earlier narrower idea of merely launching all eight scenarios from `/demo`.
+The live-product closure added/strengthened human S1–S8 terminal paths, Overview scale/fleet contracts, case actions, programme-change/escalation paths, Decisions/Activity consistency, and browser rehearsal. Railway early-bind health hardening followed at `7a168ead`.
 
-### R2.1 — Freeze scenario entry-state contract
-
-**Status:** COMPLETE (frozen on `lane/r2-populated-demo-world`)
-
-Authoritative detail: **§9** below. Summary acceptance:
-
-- all eight scenarios have explicit, useful Overview entry points;
-- all coexist in one programme without contradictory authoritative state;
-- S1 → S3 is one continuous story (single Sarah click path; no parallel S3-only state);
-- every prefix uses verified manifest step IDs through normal HTTP/application boundaries;
-- no direct SQLite state manufacture;
-- reset semantics defined (§9.1);
-- provenance claims match manifest boundaries;
-- no hidden architecture gap — open items triaged in §9.4.
-
-**Hard stop:** R2.2 must not begin until explicit acceptance: `R2.1 ACCEPTED — CONTINUE`.
-
-### R2.2 — Implement populated overview seed/orchestration
-
-Implement the smallest demo-only/general application orchestration needed so reset/reseed produces the populated starting Overview.
-
-Preferred pattern:
-
-`clean programme seed -> run approved scenario-prefix actions through normal HTTP/application boundaries -> persist resulting authoritative states -> render Overview`
-
-Do not manually patch database rows.
-
-The default `/`/operator demo entry should arrive at the populated programme Overview.
-
-Add a user-visible Reset control that:
-
-- performs deterministic reset/reseed;
-- rebuilds the populated overview entry state;
-- returns/redirects to the Operator Overview.
-
-The diagnostic `/demo` launcher may continue to exist.
-
-### R2.3 — Eight-scenario operational rehearsal
-
-From the populated starting state, exercise S1-S8 through the user-facing product path.
-
-For every scenario prove:
-
-- the relevant state is visible from Overview;
-- the correct person/case/programme item is clickable;
-- the click reaches the correct surface;
-- blast radius / recovery / decision / uncertainty is understandable;
-- required authority interaction can be performed;
-- permitted execution/observation works under the declared LIVE/SANDBOX/REPLAY/SIMULATED boundary;
-- the scenario reaches its intended end state;
-- Reset restores the populated starting Overview.
-
-Record a compact S1-S8 rehearsal matrix with PASS / FIX REQUIRED and issue triage.
-
-### R2.3 — Eight-scenario operational rehearsal
-
-**Status:** COMPLETE on `lane/r2-populated-demo-world`
-
-From populated Overview entry (`POST /api/demo/reset`), automated rehearsal in `test/integration.r2-rehearsal.test.ts` proves entry visibility, clickthrough surfaces, hero continuations, and reset repeatability.
-
-| Sc | Hero | Entry from Overview | Click surface | Continue → end | Reset restores entry |
-|----|------|---------------------|---------------|----------------|----------------------|
-| S2 | Jordan Hale | PASS — case + organiser approval pending | `/api/cases/{id}`, traveller trip | PASS — decide → execute → `VIABLE` | PASS |
-| S1 | Sarah Lim | PASS — `NOT_VIABLE`, active case | case / traveller trip | *(S3 row)* | PASS |
-| S3 | Sarah Lim (continues S1) | PASS — same Sarah row | programme preview/commit | PASS — preview non-mutating; commit → `VIABLE` | PASS |
-| S4 | Ethan Yap | PASS — active case | case / traveller trip | PASS — `CHANGE_REQUESTED`, all options `NOT_VIABLE` | PASS (implicit in suite) |
-| S5 | Jonas Berg | PASS — active case, traveller approval | case / traveller trip | PASS — decide → execute → `VIABLE` | PASS (implicit) |
-| S6 | Hannah Weiss | PASS — active case | case / traveller trip | PASS — `CHANGE_REQUESTED`, honest open planning | PASS (implicit) |
-| S7 | Oliver Bennett | PASS — active case, organiser approval | case / traveller trip | PASS — decide → execute → resolved | PASS (implicit) |
-| S8 | Mei Ling Goh | PASS — active case (`DISRUPTED`) | case / traveller trip | PASS — policy-blocked intake visible | PASS (implicit) |
-
-**Read-model note:** case `status` labels on the operator case API (`DISRUPTED`, `RECOVERING`, `CHANGE_REQUESTED`) are the authoritative UI labels; they may differ from internal runtime enum names in acceptance manifests while remaining truthful.
-
-**Reset repeatability:** second `POST /api/demo/reset` restores Sarah `NOT_VIABLE` and Jordan awaiting-approval entry (`test/integration.r2-rehearsal.test.ts`).
-
-### R2 gate
-
-R2 PASSES only when:
-
-- all eight catalogue scenarios have usable entry points from the populated Overview;
-- S2/S1/S3/S7/S5 hero flows are fully operable;
-- S6/S8 may be less visually polished but must be honest/runnable as claimed;
-- reset reliably returns to the populated Overview;
-- no Act Now functional blocker remains.
-
-**Primary implementer:** Cursor, substantial integration model (Qwen 3.8 Max xHigh if available; otherwise strongest reliable Cursor implementation model).  
-**Reviewer:** GPT-5.6 Sol product/integration gate.  
-**No broad independent architecture review.**
+Do not redo this backend/application work without evidence of a remaining functional defect.
 
 ---
 
-## R3 — Live Product Closure
+# R3C — Recovered UI Audit + Human Visual Direction Freeze
 
-**Status:** **R3 LIVE ACCEPTANCE CANDIDATE** — awaiting human production review (27 Aug 2026).
+**Status:** NEXT / ACT NOW.
 
-Prior R3 technical/visual PASS on `integration/final-r2-r3` was reopened after direct human review of the deployed production product failed live acceptance. Automated/local gates and browser hero rehearsal now pass on branch `rescue/live-product-closure`; human production sign-off is still required before R3 ACCEPTED.
+**Purpose:** determine how materially the recovered design differs from the current product, show the human owner representative side-by-side evidence, and freeze the visual direction **before** another implementation pass.
 
-### R3 live closure acceptance criteria
+This is an evidence/design-direction stage, not a product-code stage.
 
-1. **Human scenario operability (P0):** From populated Overview, operator manually completes S1–S8 to explicit terminal states (recovered, recovered with loss, or escalated/hand to human support) using visible product controls — not `/demo` manifests.
-2. **Population scale:** 67 participants · 42 Northstar-managed · 25 local/self — from authoritative arrangement data, not UI literals.
-3. **Overview:** Managed-travel readout `<confirmed> / 42 Confirmed`; fleet grid exactly 67 cells with distinct Local / Unconfirmed (filled grey) / state colours; roster row → case when active; secondary “Show interaction”; TYPE icons + colour on journey mini-chain; client-side search affordance.
-4. **Case:** Workflow-first hierarchy; visible options + single primary CTA; collapsed commitment chain; plain-language checks; “Trip status” not “The trip as it stands”.
-5. **Programme:** Mutually understandable bucket arithmetic; Confirmed not Ready; case routing for active cases; day-grouped timeline.
-6. **Decisions:** Must match Overview pending-case queue for the selected programme.
-7. **Activity:** Human-facing actor + action + subject projection; reduced noise.
-8. **Global:** Typography ~16–17px body; contrast/surface parity vs approved reference assets; motion charter (hover, stagger, settle).
-9. **Reference comparison:** Original approved Kimi/surrogate ref PNGs vs fresh captures for Overview, Programme, Cases, Decisions, Activity, Traveller, S1→S3 programme preview/commit.
-10. **Verification:** Focused live-product tests + browser hero rehearsal + full gate once at end.
+## R3C.1 Recovered UI candidate pack
 
-**Candidate marker when automated gates pass:** `R3 LIVE ACCEPTANCE CANDIDATE — awaiting human production review` (not R3 ACCEPTED).
+A recovered candidate set currently exists locally under:
+
+`docs/recovered_ui/`
+
+Reported contents:
+
+- 23 static HTML screens;
+- `renders.css`;
+- `UI_IMPLEMENTATION_PLAN_HANDOFF.md`;
+- an AI-generated replacement `assets/sg-dusk.png` because the original hero asset was lost.
+
+The recovered HTML/CSS is the closest surviving expression of the desired UI, but it is **not yet factual/product SSOT**. Static names/counts/times/content inside those HTML files are illustrative. Runtime facts come from application read models and the content/scenario SSOTs.
+
+**First action:** preserve/commit the recovered pack before more pruning. The generated `sg-dusk.png` must be clearly labelled as a replacement, not recovered original material.
+
+Do not use `data/ui-preview` or `output/r3b-visual/ref-*.png` as design authority.
+
+## R3C.2 Code/design-system comparison
+
+Compare recovered HTML + `renders.css` against the current implementation, especially:
+
+- DOM/layout hierarchy;
+- current `src/ui/theme.ts` vs recovered `renders.css`;
+- typography scale and line-height;
+- container widths and page density;
+- background/surface/border treatment;
+- cards, tables, rails and case workspace composition;
+- fleet/state grid;
+- timeline composition;
+- status chips/state colours;
+- traveller shell/composer;
+- hover/focus/motion;
+- responsive behavior.
+
+Classify each major design/component family:
+
+- **SUBSTANTIALLY SAME / INHERITED**;
+- **PARTIALLY DRIFTED**;
+- **MATERIALLY DIFFERENT**;
+- **MISSING**.
+
+The goal is to distinguish styling drift from runtime-data/content problems before changing code.
+
+## R3C.3 Representative side-by-side audit
+
+Do **not** exhaustively compare all 23 variants.
+
+Render and compare representative main page families at the same viewport:
+
+1. Overview;
+2. Programme;
+3. Case — choose the recovered state that best demonstrates options/approval hierarchy and compare to a matching real hero case (prefer S2/Jordan if state-compatible);
+4. Decisions;
+5. Activity;
+6. Traveller — choose the closest disrupted/recovering/decision reference and matching real state;
+7. Programme-change preview/commit — S1→S3.
+
+Optionally add one healthy Traveller state only if it materially changes design direction.
+
+For each pair record:
+
+- exact recovered HTML file;
+- exact current route/state;
+- viewport;
+- hierarchy differences;
+- typography differences;
+- spacing/density differences;
+- colour/surface differences;
+- missing/extra components;
+- interactions/motion differences;
+- runtime content differences that should be ignored.
+
+Produce side-by-side image evidence/contact sheets suitable for human inspection.
+
+## R3C.4 Human gate
+
+The human owner decides, screen family by screen family:
+
+- **Use recovered direction**;
+- **Keep current direction**;
+- **Hybrid**;
+- plus explicit requested changes.
+
+After that decision, create/update:
+
+`docs/UI_VISUAL_DIRECTION.md`
+
+This becomes the authoritative visual-direction contract for R3D/R3E. It must distinguish:
+
+- design/layout decisions;
+- factual/runtime content that remains governed elsewhere;
+- intentional deviations from recovered UI;
+- global typography/colour/motion decisions.
+
+Do not create/freeze `UI_VISUAL_DIRECTION.md` before human review.
+
+### R3C acceptance
+
+R3C passes when:
+
+- recovered source pack is preserved;
+- code-level design drift report exists;
+- representative side-by-side evidence exists;
+- human owner has reviewed the pairs;
+- `docs/UI_VISUAL_DIRECTION.md` records the chosen direction.
+
+No product-code changes are required for R3C acceptance.
 
 ---
 
-## R3 — Approved Kimi Product Parity (prior integration record)
+# R3D — Live Product Convergence
 
-**Status:** R3A COMPLETE · R3B visual revalidated · **R3 INTEGRATED** on `integration/final-r2-r3` *(reopened — see § R3 Live Product Closure above)*
+**Status:** PLANNED — begins only after R3C human direction freeze.
 
-R3A projection closure @ `1605665` integrated: operator/programme/traveller/case/decisions/activity projections, FX-safe presentation.
+**Purpose:** apply the approved visual direction to the already-implemented live product and close any remaining human-operability defects without reopening architecture.
 
-R3B reference visual convergence @ `e31e92c` deltas ported (not wholesale merge): case URL encoding, Reset demo styling, programme preview pages, visual capture workflow. Fresh live captures on combined candidate in `output/r3b-visual/`.
+Start from the current product line including `9700edd` + `7a168ead`. Reuse its browser-operability evidence; do not reimplement working backend flows.
 
-**Act Now closed in integration:** `/decisions` and `/activity` HTTP routes now prefer `decisionsPage` / `activityPage` from compose (R3A projectors), with honest legacy fallback when unwired.
+Priority requirements from human live review include:
 
-**Remaining R3 polish (Park for Later):** sparse `decideBy` when evidence absent; E1/E2 full visual pass off filmed entry path.
+### Overview
 
-Goal: make the operational product materially match the approved Kimi screens without redesigning the product.
+- authoritative 67 / 42 / 25 representation;
+- healthy green vocabulary = **Confirmed**;
+- distinct Local and filled-grey Unconfirmed states;
+- exactly 67 fleet cells with meaningful state colours;
+- readable legend including yellow/brass watch state;
+- fake/client-side search affordance;
+- active-case operator row is primarily clickable to Case;
+- Traveller interaction is secondary (`Show interaction` or frozen equivalent);
+- journey mini-chain uses element-type icons (flight / ground / hotel / commitment) with colour conveying state;
+- larger readable icons;
+- no commitment explosion.
 
-Priorities:
+### Case
 
-1. event identity/topbar and demo-world context;
-2. Programme role + arrival data;
-3. Overview role/company/context and useful journey information;
-4. Traveller itinerary, commitment, recovery progress, thread/messages, decision state;
-5. case/decision information hierarchy;
-6. final spacing/polish only after missing information is wired.
+- workflow-first hierarchy;
+- `Trip status` naming;
+- primary next action impossible to miss;
+- recovery options clearly visible;
+- recommended vs rejected/infeasible hierarchy;
+- plain-language checks/evidence;
+- recovery-relevant commitment projection rather than every engagement;
+- no internal jargon/IDs/traces in normal operator copy.
 
-Main theme/design system is already substantially integrated; do not blindly re-port CSS before diagnosing projection/data gaps.
+### Programme
 
-**Lane A — data/projection wiring:** strong integration model.  
-**Lane B — visual/presentation polish:** Cursor Composer/strong UI model after data contracts freeze.  
-**Review:** human visual acceptance against approved Kimi renders; optional fresh-eye Grok/Kimi critique. No architecture review.
+- arithmetic and arrangement split must make sense;
+- Confirmed vocabulary;
+- names/columns do not bleed;
+- active-case navigation goes to Case;
+- timeline becomes day-grouped and scannable rather than a text wall.
+
+### Decisions
+
+- populated-world pending decisions must agree with Overview scope;
+- decision rows navigate to Case;
+- empty page is unacceptable when authoritative pending decisions exist.
+
+### Activity
+
+- human-facing provider/traveller/Northstar identities where evidence exists;
+- no generic raw `Providers`/system-log feel;
+- reduce duplicate/noisy audit events;
+- preserve provenance truth without implementation jargon.
+
+### Global
+
+- readable typography (rough target body ~16–17px; important tables/rosters ~15–16px; section headings ~18–20px; page H1 ~26–30px);
+- stronger surface separation / fog / borders / state fills consistent with the R3C direction;
+- restore meaningful hover/focus/micro-motion;
+- `prefers-reduced-motion` respected;
+- responsive operator and traveller surfaces remain usable.
+
+### Human scenario operability
+
+Browser-driven product interaction must still prove S1–S8 reach explicit visible terminal recovery/recovery-with-loss/escalation states using product controls. `/demo`, curl, hidden APIs, or manual DB edits cannot be acceptance paths.
+
+R3D ends as:
+
+`R3 LIVE ACCEPTANCE CANDIDATE`
+
+It does **not** self-certify R3 accepted.
 
 ---
 
-## R4 — Hero Rehearsal + Stabilisation
+# R3E — Final UI Pass + Human Production Acceptance
 
-**Status:** PLANNED — **NOT STARTED** (blocked on R2/R3 integration merge to `main`)
+**Status:** PLANNED — after R3D function/content/layout is stable.
+
+**Purpose:** one dedicated final polish pass after the product actually works and the visual direction is frozen.
+
+This is not another broad product implementation cycle.
+
+Audit across the whole product for:
+
+- typography/readability;
+- spacing rhythm and alignment;
+- hierarchy;
+- surface contrast;
+- borders/shadows where appropriate;
+- state-colour consistency;
+- icon sizing;
+- table readability;
+- button hierarchy;
+- hover/focus states;
+- motion and transition washes;
+- empty states;
+- internal-language leakage;
+- responsive desktop/laptop/mobile composition;
+- consistency between Overview / Programme / Case / Decisions / Activity / Traveller / programme-change preview.
+
+Visual acceptance order:
+
+1. `docs/UI_VISUAL_DIRECTION.md` (human-frozen R3C direction);
+2. current live product truth;
+3. `docs/recovered_ui/` as supporting design reference;
+4. `docs/DESIGN.md` general design charter.
+
+Never change factual runtime state merely to match a static recovered HTML example.
+
+### R3E acceptance / R3 gate
+
+After local/browser gates pass, deploy the candidate to Railway.
+
+**The human owner performs final production visual + operability acceptance.**
+
+R3 is accepted only when the human can open production and confirms that:
+
+- the primary pages look coherent and polished;
+- the product is understandable without internal explanation;
+- the hero flows are manually operable;
+- Reset returns to the correct populated Overview;
+- no material UI blocker remains.
+
+Only after that human sign-off may R4 begin.
+
+---
+
+# R4 — Hero Rehearsal + Wave 4 Stabilisation
+
+**Status:** PLANNED — blocked on R3 human acceptance.
+
+R4 is deliberately narrow. No speculative UI redesign and no new product capability.
 
 Rehearse exact final story:
 
 `S2 -> Reset -> S1 -> S3 (NO RESET between S1 and S3) -> Reset -> S7 -> Reset -> S5`
 
-For each segment freeze:
+For every segment freeze:
 
 - starting Overview state;
-- click path;
-- expected visible state transitions;
+- exact click path;
+- visible state transitions;
 - provenance labels;
 - human decision/action;
-- expected end state;
-- reset/fallback procedure.
+- expected terminal state;
+- reset/fallback procedure;
+- recording notes if relevant.
 
-Then execute stabilisation gates from `docs/IMPLEMENTATION_PLAN.md`:
+Stabilisation gates align to `docs/IMPLEMENTATION_PLAN.md` and `docs/WAVE3R_DEMO_READINESS_PLAN.md`:
 
-- deterministic reset/reseed
-- restart/persistence check
-- relevant/full tests
-- typecheck
-- lint
-- build
-- anti-hardcoding
-- provider/model degradation paths
-- recording/secret sanitation
-- deployed smoke
-- documentation truth
+- deterministic reset/reseed;
+- restart/persistence;
+- browser hero rehearsal repeatability;
+- provider/model degradation/fallback behavior;
+- relevant/full tests;
+- typecheck;
+- lint;
+- build;
+- anti-hardcoding/generalisation;
+- secrets/PII/recording sanitation;
+- deployed Railway smoke;
+- README/demo/evidence truth.
 
-Only small release-blocker fixes are allowed here.
-
-**Primary implementer:** Cursor with conservative bounded fixes.  
-**Final independent release reviewer:** Claude Opus 5 High/Max (or documented strongest independent fallback).  
-Final review seeks release blockers, not speculative improvements.
+Only release-blocker fixes are allowed.
 
 ---
 
-## R5 — Freeze + Submission Candidate
+# Gate — Final Candidate Review
 
-**Status:** PLANNED
+**Status:** PLANNED — after R4 stabilisation and before R5 freeze.
 
-After Final Candidate Review findings are triaged:
+Primary independent reviewer: Claude Opus 5 High/Max or documented strongest independent fallback.
 
-- Act Now -> fix before freeze;
-- Investigate Now -> only if potentially demo/release blocking;
-- Park for Later -> explicitly record;
-- Ignore / Accept Risk -> explicitly record rationale.
+Review exact candidate SHA for release blockers, not speculative improvements:
 
-Then:
+- browser clickthrough;
+- 67/42/25 programme coherence;
+- hero choreography;
+- natural/user-facing action boundaries;
+- provider/replay claim truth;
+- state/uncertainty/jargon consistency;
+- deterministic safety/authority;
+- anti-hardcoding/generalisation;
+- replay/reset/restart reliability;
+- tests/typecheck/lint/build;
+- secrets/evidence/docs consistency.
 
-- truth-sync `IMPLEMENTATION_PLAN.md`, `ROADMAP.md`, `DEMO.md` and readiness docs;
+Every finding is triaged:
+
+`Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`
+
+No release gate passes with unresolved Act Now or release-threatening Investigate Now findings.
+
+---
+
+# R5 — Findings Closure + Freeze + Submission Candidate
+
+**Status:** PLANNED.
+
+After Final Candidate Review:
+
+- fix Act Now findings;
+- investigate only release-threatening Investigate Now items;
+- record Park/Accept Risk explicitly;
+- truth-sync `IMPLEMENTATION_PLAN.md`, `ROADMAP.md`, `DEMO.md`, and readiness docs;
 - leave `SCENARIOS.md` / `FINAL_DEMO_CONTENT_SSOT.md` unchanged unless factually necessary;
-- commit/push accepted candidate;
+- commit/push exact accepted candidate;
 - deploy Railway;
-- smoke default populated Overview, one hero clickthrough, and Reset;
-- freeze application code;
-- switch to video/submission work.
+- smoke populated Overview, hero entry/clickthrough, and Reset;
+- record exact final SHA;
+- **freeze application code**.
 
-**Blind judge:** GrokBot or another fresh model sees the product/submission with minimal internal implementation context.
+After R5, normal software development stops. Only a catastrophic release/submission blocker may reopen code.
 
-## 5. Parallelisation plan
+R5 hands the frozen product to submission production; it is not itself the final hackathon submission.
 
-Parallelisation is intentionally delayed until shared demo-state contracts are frozen.
+---
 
-### Before R2.1 completes
+# Submission Production — after R5
 
-**Do not parallelise implementation.**
+This resumes the parent Wave 3R / Implementation Plan cadence: 28–29 Aug are for video, README/evidence, submission packaging; 30 Aug is contingency only.
 
-Reason: populated-overview state, scenario-prefix ownership, reset semantics, and S1/S3 continuity are shared contracts. Parallel work before these are frozen creates collision/rework risk.
+## Submission A — Blind judge / story critique
 
-**R2.1 is now complete (§9).** Parallel lanes may begin after explicit `R2.1 ACCEPTED — CONTINUE`.
+Use GrokBot or another fresh model with minimal implementation context as a hackathon judge.
 
-### After R2.1 passes — parallelisation starts
+Evaluate the frozen product/submission story for:
 
-Run two primary lanes:
+- immediate problem clarity;
+- visible agentic loop;
+- whole-trip resolution differentiation;
+- Atlas importance;
+- Alibaba Model Studio/Qwen contribution;
+- generalisation vs scripted-demo smell;
+- likely judging weaknesses.
 
-**Lane A — Functional demo world / clickthrough**
-- populated overview orchestration
-- reset -> populated overview
-- scenario operational paths
-- runtime/state fixes
+This is not another broad code review. Only catastrophic presentation/release issues may reopen code.
 
-**Lane B — Kimi projection closure**
-- read-model/presentation projection gaps whose contracts are now known
-- role/arrival/context/itinerary/progress/thread data
-- no engine semantics or scenario orchestration changes
+## Submission B — Lock video story
 
-A third bounded presentation lane may begin once Lane B freezes its data envelope:
+Freeze:
 
-**Lane C — visual polish**
-- CSS/layout/copy parity against approved renders
-- no domain/application semantics
+- opening hook;
+- problem statement;
+- demo sequence/cuts;
+- narration/voiceover;
+- proof points;
+- Atlas/Alibaba attribution;
+- closing differentiation.
 
-### Scenario rehearsal parallelism
+Use the R4 choreography as recording truth, but edit for judge comprehension rather than showing every scenario step.
 
-After the populated-world orchestration is stable, scenario investigation may be partitioned across isolated worktrees/SQLite DBs, for example:
+## Submission C — Record demo
 
-- Lane S-A: S1/S3 + S2 (highest-risk disruption/continuity stories)
-- Lane S-B: S4 + S7 (traveller transport changes)
-- Lane S-C: S5 + S6 + S8 (stay/preference/co-travel breadth)
+Record the frozen Railway product from deterministic Reset/populated Overview. Capture multiple clean takes where useful rather than relying on one perfect continuous performance.
 
-Each lane may diagnose and propose bounded fixes. Shared integration decisions and merges remain serialized under the primary integration owner.
+## Submission D — Edit / produce final video
 
-Never run parallel scenario agents against one mutable shared SQLite demo database.
+Trim, narrate, caption, zoom/crop, add restrained callouts/architecture visuals, and export the required final format. No product-code changes for aesthetic convenience.
+
+## Submission E — README + evidence + portal package
+
+Finalise:
+
+- README/product explanation;
+- architecture/agentic-loop diagram;
+- setup/run notes;
+- deployed URL;
+- Atlas usage/evidence;
+- Alibaba Model Studio/Qwen usage;
+- LIVE/RECORD/REPLAY truth;
+- screenshots/GIFs where helpful;
+- scenario summary;
+- judging-criteria mapping;
+- required portal fields/team/project links.
+
+## Submission F — Final sanity + submit
+
+Before submission verify:
+
+- Railway public URL works;
+- default Overview + Reset work;
+- repo visibility/link is correct;
+- README renders;
+- video permissions/link work;
+- no secrets/PII leak;
+- no stale contradictory docs shown to judges;
+- submission claims are truthful;
+- final SHA/deploy is recorded.
+
+Then submit.
+
+### 30 Aug — contingency only
+
+Use only for broken links/uploads, production outage, submission-portal problems, or catastrophic demo regression. Do not add features.
+
+---
+
+## 5. Verification discipline from here
+
+Avoid repeated broad gates.
+
+- **R3C:** evidence/capture only; no full test suite unless required to boot deterministic capture.
+- **R3D:** focused tests while implementing; one full gate at the milestone end.
+- **R3E:** focused UI/browser checks; full repo gate only if behavior/shared code changes.
+- **R4:** one canonical release/stabilisation gate on exact candidate SHA.
+- **Final Candidate Review:** independent review reuses valid evidence and targets release risk.
+- **R5:** targeted finding closure + deployment smoke; do not rerun expensive gates when the exact SHA already has valid evidence unless fixes invalidate them.
+- **Submission production:** no software test cycle unless a catastrophic code reopen occurs.
+
+---
 
 ## 6. Review ownership
 
-- R0: Sol — complete
-- R1: Sol independent integration review — accepted
-- R2: Sol product/integration review
-- R3: human visual review + optional different-family UI critique
-- R4: Claude Opus 5 High/Max Final Candidate Review
-- R5: GrokBot/fresh model blind-judge exercise after release acceptance
+- R0: Sol — complete.
+- R1: Sol integration review — accepted.
+- R2: Sol product/integration gate — accepted.
+- R3C: human owner visual-direction gate; agent produces evidence only.
+- R3D: primary integrator implementation; human-operability evidence required.
+- R3E: human owner final production UI/operability acceptance.
+- R4: conservative stabilisation owner.
+- Final Candidate Review: Claude Opus-class independent reviewer.
+- Post-R5: GrokBot/fresh model blind-judge critique.
 
-Reviews are risk gates, not rituals. Do not add broad reviews after every bounded fix.
+Reviews are risk gates, not rituals.
+
+---
 
 ## 7. Issue triage
 
@@ -403,291 +593,33 @@ Every discovered issue must be classified:
 - **Park for Later**
 - **Ignore / Accept Risk**
 
-No unclassified review dump is accepted.
+Distinguish release/filming blockers from “could be prettier” work.
+
+---
 
 ## 8. Current decision state
 
 ### What we know
 
-- backend semantic acceptance is strong;
-- R1 human navigation and diagnostic rehearsal wiring pass and are merged on `main`;
-- Railway `PORT` / `0.0.0.0` binding is live and protected;
-- final product must begin from a populated operational Overview, not a developer launcher;
-- final-video hero order remains S2 → S1 → S3 → S7 → S5;
-- S1/S3 continuity is one authoritative story;
-- **R2.1 entry-state contract is frozen in §9** — eight scenarios can coexist via ordered prefix orchestration.
+- generalized backend/state/recovery evidence is strong;
+- R2 populated-world orchestration exists;
+- live-product operability work has been implemented on the current product line;
+- the original visual screenshots are gone;
+- a 23-screen recovered HTML/CSS candidate pack exists locally and renders standalone;
+- generated later reference previews are not acceptable visual authority;
+- human live review is the final R3 acceptance authority;
+- code-freeze day is 27 Aug; 28–29 Aug are submission-production days.
 
 ### What we do not know
 
-- whether R2.2 prefix orchestration encounters runtime ordering/case-supersession edge cases in practice (see §9.4);
-- which remaining presentation projections are actually missing once the populated world is rendered;
-- whether any scenario exposes a runtime defect only when continued from the pre-staged Overview state.
+- how materially the recovered HTML/CSS differs from current UI implementation code/design system;
+- which recovered direction the human owner wants to retain vs current product;
+- what final hybrid changes the human owner will choose after side-by-side review.
 
 ### Key assumption
 
-The accepted generalized engine can support the populated demo world through demo-only orchestration of normal product/application boundaries without new domain contracts. Prefix staging uses existing acceptance manifest steps only.
+The recovered HTML/CSS can serve as a design north star without dictating static demo facts or forcing a pixel-perfect recreation.
 
 ### Test next
 
-R2.2: implement single-reset populated-world orchestration per §9.1–§9.3, then R2.3 operational rehearsal matrix.
-
----
-
-## 9. R2.1 frozen entry-state contract (S1–S8)
-
-This section is the binding demo-state SSOT for populated Overview orchestration. Scenario narratives remain in `docs/SCENARIOS.md`; cast/content in `docs/FINAL_DEMO_CONTENT_SSOT.md`; executable steps in `fixtures/acceptance/manifests/*.json`.
-
-### 9.1 Global reset and populated-world orchestration
-
-**Judge-facing default entry:** `/operator?event=evt-ait-2026` (not `/demo`).
-
-**Reset demo control (R2.2):** `POST /api/demo/reset` (or equivalent demo-only endpoint) → single authoritative reseed → run §9.3 prefix pipeline → redirect to populated Overview. Must not require DB surgery, process restart, or manual fixture edits.
-
-**Single reset anchor (all scenarios share one clean seed):**
-
-| Field | Value |
-|-------|-------|
-| Action | `POST /api/runtime/reset` |
-| Body `at` | `2026-09-21T09:00:00+08:00` |
-| Programme | `fixtures/programmes/ait-summit-2026` via normal seed path |
-| Population | 67 participants; 42 managed; final content SSOT |
-
-Individual manifest `reset` steps are **skipped** during populated-world build; only this one reset runs.
-
-**Prefix orchestration pattern:**
-
-`single reset → ordered scenario prefixes (manifest steps only, no per-scenario reset) → persist authoritative state → render Overview`
-
-Demo-only orchestration MAY reference scenario IDs, manifest paths, and step IDs. Generic domain/application/engine code MUST NOT branch on them.
-
-**Canonical prefix order** (minimises cross-scenario interference; R2.2 implements exactly this):
-
-1. **S1** — `s1-airline-schedule-change.json` through `observe_group_a`
-2. **S7** — `s7-origin-tokyo.json` through `begin`
-3. **S4** — `s4-thursday-morning-arrival.json` through `plan`
-4. **S5** — `s5-stay-until-sunday.json` through `begin`
-5. **S6** — `s6-switch-hotels.json` through `plan`
-6. **S8** — `s8-travel-with-speakers.json` through `observe_case` *(after S1 — shares draft-30 with S1 cohort)*
-7. **S2** — `s2-missed-connection.json` through `begin_recovery`
-
-S1 → S3 continuity is **not** pre-staged through S3; the populated world stops at the S1 entry point on Sarah's trip. S3 steps run only after user clickthrough from that state (hero video: no reset between S1 and S3).
-
-**Overview status mix at demo start (intentional diversity):**
-
-| Bucket | Examples |
-|--------|----------|
-| Ready / on track | Majority Tier B/C managed travellers (baseline viable) |
-| Disrupted — awaiting organiser | Jordan Hale (S2), Oliver Bennett (S7) |
-| Critical — not viable | Sarah Lim (S1, hand-off to S3) |
-| Affected — viable | Arjun Rao, Siti Rahmah (S1 cohort) |
-| Preference — planning / blocked | Ethan Yap (S4 infeasible planning), Hannah Weiss (S6) |
-| Awaiting traveller | Jonas Berg (S5 self-funded approval) |
-| Policy blocked | Mei Ling Goh (S8 concentration violation) |
-
-### 9.2 Per-scenario entry-state table
-
-Columns: Overview-visible starting status uses operator-language intent; authoritative fields come from manifest assertions at the prefix stop point.
-
-#### S2 — Jordan Hale (`ait-draft-09`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S2 — missed connection; airline morning recovery inadequate |
-| **Traveller** | Jordan Hale · `trv-evt-ait-2026-ait-draft-09` · `trip-trv-evt-ait-2026-ait-draft-09` |
-| **Overview-visible status** | Disrupted · recovery proposed · **awaiting organiser approval** |
-| **Authoritative state at demo start** | Case `AWAITING_APPROVAL`; best next-morning NRT→SIN strategy staged; trip remainder not yet recovered |
-| **Already happened** | Progressive ZG023 delays (`delay_begins_connection_viable` → `zg053_impossible`); traveller missed-connection report; planning ranked TR885-class recovery; `begin_recovery` returned `REQUIRES_HUMAN_AGENT` |
-| **Not yet happened** | Organiser approve (`decide_recovery`); execute (`execute_recovery`); trip observation → `VIABLE` / case `RESOLVED` |
-| **Click target** | Jordan Hale row → case link / traveller trip |
-| **Click surface** | `/operator/cases/{caseId}` or `/traveller?trip=trip-trv-evt-ait-2026-ait-draft-09` |
-| **Remaining flow** | Organiser approves → execute → observe resolved overnight flight recovery |
-| **Intended final state** | Case `RESOLVED`; trip `remainderViable: VIABLE`; evening finals 20:45 buffer cleared |
-| **Provenance** | `SIMULATED_EXTERNAL_EVENT` ingress; Atlas `REPLAY` search/state; organiser authority on `flight.change` |
-| **Reset expectation** | Full §9.1 pipeline restores this entry state |
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s2-missed-connection.json`  
-**Prefix stop after step:** `begin_recovery`  
-**Prefix steps:** `delay_begins_connection_viable`, `delay_increases_connection_at_risk`, `zg053_impossible`, `traveller_report_missed_connection`, `observe_case_after_miss`, `plan_overnight_window`, `begin_recovery`
-
----
-
-#### S1 (+ S3 continuity) — Sarah Lim (`ait-draft-14`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S1 critical schedule change → continuous S3 programme counterfactual (one story) |
-| **Traveller** | Sarah Lim · `trv-evt-ait-2026-ait-draft-14` · `trip-trv-evt-ait-2026-ait-draft-14` |
-| **Overview-visible status** | **Critical · not viable** for Day-1 headline 09:20 |
-| **Authoritative state at demo start** | Trip `remainderViable: NOT_VIABLE`; airline retime ~07:00 applied; open S1 disruption case; headline buffer FAIL (360 min) |
-| **Already happened** | Simulated schedule-change ingress on MNSYN14; Wanderpay cohort MNSYN10/11/30 notified (blast radius); Sarah constraint FAIL; cohort afternoon speakers PASS |
-| **Not yet happened** | S3 organiser preview (`s3_preview` / `organiser_preview`); commit; fan-out re-plan; Sarah → `VIABLE` |
-| **Click target** | Sarah Lim row (critical) → case / traveller trip |
-| **Click surface** | Case view → programme change preview for `cmt-ait-d1-headline-interview` |
-| **Remaining flow** | Preview RESCHEDULE to 15:30–16:00 → commit → re-plan fan-out case → Sarah viable without new flight |
-| **Intended final state (S1+S3)** | Same trip `VIABLE`; programme headline at 15:30; S1-class disruption resolved via programme-side change |
-| **Provenance** | `SIMULATED_EXTERNAL_EVENT` + Atlas `REPLAY`; programme preview/commit `REPLAY` |
-| **Reset expectation** | Full §9.1 pipeline; **no** S3 prefix pre-staged |
-
-**Supporting Overview faces (same S1 prefix, not separate scenario rows):**
-
-| Traveller | Draft | Overview status | Authoritative |
-|-----------|-------|-----------------|---------------|
-| Arjun Rao | `ait-draft-10` | Affected · viable | Schedule change applied; `VIABLE` |
-| Siti Rahmah | `ait-draft-11` | Affected · viable | Same |
-| Mei Ling Goh | `ait-draft-30` | Affected · viable *(S1)* then policy-blocked *(S8 — see below)* | S1 mutation applied; latest active case is S8 if prefix order followed |
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s1-airline-schedule-change.json`  
-**Prefix stop after step:** `observe_group_a`  
-**Prefix steps:** `notify_group_c`, `notify_group_a_draft10`, `notify_group_a_draft11`, `notify_group_a_draft30`, `observe_group_c`, `observe_group_a`
-
-**S3 continuation steps (post-click, no reset):** from `s1-s3-continuity.json`: `s3_preview`, `observe_mid_preview`, `s3_commit`, `plan_fanout`, `observe_after_s3`
-
----
-
-#### S3 — (continues S1; not a separate Overview entry)
-
-S3 does **not** appear as a separate authoritative starting state on the Overview. Operators discover it by continuing Sarah's critical case into programme preview/commit. Do not create a simultaneous “S3-only” Sarah state.
-
----
-
-#### S4 — Ethan Yap (`ait-draft-34`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S4 — Thursday-morning arrival preference (pre-booking) |
-| **Traveller** | Ethan Yap · `trv-evt-ait-2026-ait-draft-34` · `trip-trv-evt-ait-2026-ait-draft-34` |
-| **Overview-visible status** | Soft preference · **planning — no viable option** |
-| **Authoritative state at demo start** | Case `PLANNING`; NL intake `ADJUST_TRIP_WINDOW`; all corridor strategies `feasible: false`; no `bestStrategyId` |
-| **Already happened** | NL change-request interpreted; funding payer uncertainty recorded; planner searched CNX→SIN REPLAY; hard constraint FAIL on Thursday-morning arrivals |
-| **Not yet happened** | Authority/execution (none expected — honest rejection demo) |
-| **Click target** | Ethan Yap row |
-| **Click surface** | Traveller trip / case — show infeasible strategies and constraint evidence |
-| **Remaining flow** | Operator/traveller understands preference cannot be satisfied; case remains open or closes as rejected (product copy — no fake booking) |
-| **Intended final state** | Demonstrated rejection with deterministic evidence; trip stays pre-booking / no false execution |
-| **Provenance** | NL intake `REPLAY`; Atlas `flight.search` `REPLAY` |
-| **Reset expectation** | Full §9.1 pipeline |
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s4-thursday-morning-arrival.json`  
-**Prefix stop after step:** `plan`  
-**Prefix steps:** `nl_intake`, `plan`
-
----
-
-#### S5 — Jonas Berg (`ait-draft-35`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S5 — stay until Sunday (hotel-only personal extension) |
-| **Traveller** | Jonas Berg · `trv-evt-ait-2026-ait-draft-35` · `trip-trv-evt-ait-2026-ait-draft-35` |
-| **Overview-visible status** | **Awaiting traveller approval** (self-funded extension) |
-| **Authoritative state at demo start** | Case `AWAITING_TRAVELLER`; hotel extension intent staged; `REQUIRES_TRAVELLER`; incremental payer `TRAVELLER` |
-| **Already happened** | Structured `CHANGE_STAY` request (checkout 4 Oct); Nuitée `hotel.search` REPLAY; feasible extension strategy ranked; `begin` completed |
-| **Not yet happened** | Traveller `decide` APPROVED; `execute`; observe `RESOLVED` / trip `VIABLE` |
-| **Click target** | Jonas Berg row |
-| **Click surface** | Traveller trip / case — funding split + approval CTA |
-| **Remaining flow** | Jonas approves self-funded increment → execute hotel.modify → resolved stay |
-| **Intended final state** | Case `RESOLVED`; `resolutionOutcome: FULLY_RECOVERED`; checkout 4 Oct; no organiser approval |
-| **Provenance** | Nuitée `REPLAY`; `FUNDED_WINDOW` deterministic allocation |
-| **Reset expectation** | Full §9.1 pipeline |
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s5-stay-until-sunday.json`  
-**Prefix stop after step:** `begin`  
-**Prefix steps:** `change_request`, `plan`, `begin`
-
----
-
-#### S6 — Hannah Weiss (`ait-draft-31`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S6 — switch hotels; partner joining (breadth/stretch) |
-| **Traveller** | Hannah Weiss · `trv-evt-ait-2026-ait-draft-31` · `trip-trv-evt-ait-2026-ait-draft-31` |
-| **Overview-visible status** | Stay change · **planning with explicit uncertainties** |
-| **Authoritative state at demo start** | Case `PLANNING`; replacement stays enumerated from REPLAY; funding allocation UNKNOWN (no temporal anchor); occupancy 2 guests recorded |
-| **Already happened** | Structured `CHANGE_STAY` to `place-hotel-harbourline`; `hotel.search` REPLAY; candidate strategies listed |
-| **Not yet happened** | `begin`/authority/execute *(not in acceptance manifest — honest planning-only boundary)* |
-| **Click target** | Hannah Weiss row |
-| **Click surface** | Case — uncertainties, hotel candidates, policy/funding honesty |
-| **Remaining flow** | Review planning output; acknowledge stretch boundary (no silent execution claim) |
-| **Intended final state** | Honest open planning case; arrival-before-commitment still PASS |
-| **Provenance** | Nuitée `REPLAY`; no LIVE execution claimed |
-| **Reset expectation** | Full §9.1 pipeline |
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s6-switch-hotels.json`  
-**Prefix stop after step:** `plan`  
-**Prefix steps:** `change_request`, `plan`
-
----
-
-#### S7 — Oliver Bennett (`ait-draft-38`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S7 — Tokyo origin change (HND) with LHR return retained |
-| **Traveller** | Oliver Bennett · `trv-evt-ait-2026-ait-draft-38` · `trip-trv-evt-ait-2026-ait-draft-38` |
-| **Overview-visible status** | Structural change · **awaiting organiser approval** |
-| **Authoritative state at demo start** | Case `AWAITING_APPROVAL`; HND substitution strategy staged; FX restated USD→SGD on options; `REQUIRES_HUMAN_AGENT` |
-| **Already happened** | NL intake `CHANGE_TRANSPORT_SCHEDULE`; HND→SIN REPLAY search; feasible rebook ranked; `begin` completed |
-| **Not yet happened** | Organiser `decide` APPROVED; `execute`; case `RESOLVED` |
-| **Click target** | Oliver Bennett row |
-| **Click surface** | Case — providerCost USD + costDelta SGD + approval |
-| **Remaining flow** | Organiser approves → execute flight change → resolved viable trip |
-| **Intended final state** | Case `RESOLVED`; HND inbound authoritative; LHR return retained |
-| **Provenance** | NL `REPLAY`; Atlas `flight.search` `REPLAY`; FX `REPLAY` |
-| **Reset expectation** | Full §9.1 pipeline |
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s7-origin-tokyo.json`  
-**Prefix stop after step:** `begin`  
-**Prefix steps:** `nl_intake`, `plan`, `begin`
-
----
-
-#### S8 — Mei Ling Goh (`ait-draft-30`)
-
-| Field | Contract |
-|-------|----------|
-| **Scenario** | S8 — travel with other speakers (concentration policy) |
-| **Traveller** | Mei Ling Goh · `trv-evt-ait-2026-ait-draft-30` · `trip-trv-evt-ait-2026-ait-draft-30` |
-| **Overview-visible status** | Preference · **policy blocked — alternative required** |
-| **Authoritative state at demo start** | Case `CHANGE_REQUESTED`; TRANSPORT_CONCENTRATION violation (3 critical > limit 2); HIGH severity uncertainty |
-| **Already happened** | Structured association request with `trv-…-draft-10`, `trv-…-draft-11`; deterministic policy evaluation at intake |
-| **Not yet happened** | Alternative planning/execution *(breadth — case stays open)* |
-| **Click target** | Mei Ling Goh row |
-| **Click surface** | Case — concentration violation + peer association implications |
-| **Remaining flow** | Review policy block; explore alternatives honestly |
-| **Intended final state** | Open/blocked case with truthful policy narrative (stretch breadth) |
-| **Provenance** | Resolution HTTP `REPLAY`; policy-data-driven concentration rule |
-| **Reset expectation** | Full §9.1 pipeline |
-
-**Coexistence note:** S8 prefix runs **after** S1 prefix on the same traveller. Trip carries S1 schedule mutation; **latest** active case surfaces S8 (`latestCaseFor` read model). S1 blast-radius story uses Sarah (`draft-14`) as the critical click target, not Mei Ling.
-
-**Prefix manifest:** `fixtures/acceptance/manifests/s8-travel-with-speakers.json`  
-**Prefix stop after step:** `observe_case`  
-**Prefix steps:** `change_request`, `observe_case`
-
----
-
-### 9.3 R2.2 implementation touchpoints (expected files)
-
-| Area | Likely paths |
-|------|----------------|
-| Demo-world orchestration | `src/app/demoWorld.ts` *(new)*, `src/app/demoOrchestration.ts` *(new)* |
-| Reset / demo HTTP | `src/server/http.ts`, demo reset route |
-| Composition wiring | `src/app/compose.ts` |
-| Default entry | root/`/operator` redirect behaviour |
-| Prefix runner reuse | `src/acceptance/runner.ts` or thin wrapper calling existing step executor |
-| Tests | `test/integration.r2-populated-world.test.ts` *(new)*, extend `test/integration.r1.test.ts` patterns |
-
-Do **not** modify Lane B presentation projections unless a functional blocker is proven during R2.2 integration.
-
-### 9.4 Architecture gaps and issue triage (R2.1)
-
-| ID | Finding | Classification | Notes / R2.2 action |
-|----|---------|----------------|---------------------|
-| G1 | No populated-world orchestration exists yet | **Act Now** (R2.2) | Expected; implement §9.1–§9.3 |
-| G2 | S1 manifest notes CGK target vs current KUL/MN seed (`s1-airline-schedule-change.json` boundaries) | **Investigate Now** | Prefix must use same seed as acceptance proofs; verify programme PNR MNSYN* resolves at runtime before R2 gate |
-| G3 | `latestCaseFor` exposes one active case per trip — S8 after S1 on draft-30 hides S1 case on that trip | **Accept Risk** | By design: Sarah is S1 critical click target; Mei Ling is S8 entry |
-| G4 | S6 manifest stops at planning — no execute path | **Accept Risk** | Stretch scenario; honest planning-only demo |
-| G5 | S2 closed path does not compose transit-hotel / JP entry / insurance | **Accept Risk** | Already in content SSOT §11; do not claim in UI |
-| G6 | Prefix order sensitivity untested in one shared DB | **Investigate Now** | R2.2 must add integration test proving §9.1 order is repeatable |
-| G7 | `/demo` diagnostic launcher coexists with new default entry | **Park for Later** | Keep both; document operator vs developer paths |
+**R3C:** preserve the recovered pack, perform code/design-system diff, render representative recovered/current screen pairs, and present the side-by-side evidence for human direction freeze.
