@@ -95,5 +95,7 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
   assert.match(html, /Organisation approval required/);
   assert.match(html, /Search evidence: REPLAY/);
   assert.doesNotMatch(html, /human agent/i);
-  assert.doesNotMatch(html, /at provider/);
+  assert.doesNotMatch(html, /\$[\d.]+\s+at provider/);
+  assert.match(html, /data-test="option-payable"/);
+  assert.match(html, /data-test="option-pros"/);
 });

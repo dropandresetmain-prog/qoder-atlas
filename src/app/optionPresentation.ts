@@ -5,7 +5,6 @@
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { Place } from '../domain/entities.ts';
 import type { Engagement, TransportLeg } from '../domain/elements.ts';
-import type { Trip } from '../domain/trip.ts';
 import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type { AuthorityDecision, ActionIntent } from '../operational/intent.ts';
 import type { CandidateRejectionEvidence } from './planningLoop.ts';

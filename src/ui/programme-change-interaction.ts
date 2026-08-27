@@ -68,7 +68,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
 
   function formatHumanInstant(iso) {
     if (!iso || typeof iso !== 'string') return iso || '';
-    var match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso.trim());
+    var match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(iso.trim());
     if (!match) return iso;
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var month = months[Number(match[2]) - 1] || match[2];
@@ -77,7 +77,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
 
   function formatClockRange(startIso, endIso) {
     function clock(iso) {
-      var match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(iso || '').trim());
+      var match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(String(iso || '').trim());
       return match ? (match[4] + ':' + match[5]) : '';
     }
     var start = clock(startIso);
@@ -187,7 +187,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
           ? item.reasons.map(function(reason) {
               return String(reason)
                 .replace(/commitment rescheduled/gi, 'Programme commitment moves')
-                .replace(/\b\d{4}-\d{2}-\d{2}T[\d:+.-]+/g, function(iso) { return formatHumanInstant(iso); });
+                .replace(/\\b\\d{4}-\\d{2}-\\d{2}T[\\d:+.-]+/g, function(iso) { return formatHumanInstant(iso); });
             }).join(' · ')
           : 'Affected by the proposed programme change.';
         detail.textContent = reasons;
