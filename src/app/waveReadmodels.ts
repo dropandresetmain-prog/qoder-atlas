@@ -165,14 +165,27 @@ export async function projectTripActivity(
 ): Promise<TripActivityView | undefined> {
   const trip = await deps.snapshot.trips.getTrip(tripId);
   if (!trip) return undefined;
-  const entries = await deps.audit.query({ subject: tripId, limit });
-  const events: ActivityEventView[] = entries.map((entry) => ({
-    action: entry.action,
-    summary: presentActivity(entry.action, entry.payload as Record<string, unknown> | undefined),
-    occurredAt: entry.occurredAt,
-    actor: presentActivityActor(entry.actor, entry.payload as Record<string, unknown> | undefined),
-    ...(entry.subject ? { subject: entry.subject } : {}),
-  }));
+  // Fetch extra raw rows so low-value duplicate noise can be filtered without
+  // starving the feed of meaningful state/action evidence.
+  const entries = await deps.audit.query({ subject: tripId, limit: Math.max(limit * 2, 40) });
+  const seen = new Set<string>();
+  const events: ActivityEventView[] = [];
+  for (const entry of entries) {
+    const summary = presentActivity(entry.action, entry.payload as Record<string, unknown> | undefined);
+    const actor = presentActivityActor(entry.actor, entry.payload as Record<string, unknown> | undefined);
+    // De-emphasize duplicate consecutive identical audit noise.
+    const dedupeKey = `${entry.action}|${summary}|${actor}`;
+    if (seen.has(dedupeKey) && entry.action === 'SIGNAL_PROCESSED') continue;
+    seen.add(dedupeKey);
+    events.push({
+      action: entry.action,
+      summary,
+      occurredAt: entry.occurredAt,
+      actor,
+      ...(entry.subject ? { subject: entry.subject } : {}),
+    });
+    if (events.length >= limit) break;
+  }
   return { tripId, generatedAt, events };
 }
 

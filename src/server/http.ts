@@ -244,7 +244,7 @@ function operatorEventScope(url: URL): string | undefined {
   return url.searchParams.get('event') ?? undefined;
 }
 
-/** Build the demo banner options from the current config. */
+/** Demo diagnostics only — not wired on judge-facing product pages. */
 function demoBannerOptions(config: AppConfig, endpoints?: AppEndpoints): { demoBanner: { adapterMode: 'LIVE' | 'RECORD' | 'REPLAY'; plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK' } } {
   return { demoBanner: { adapterMode: config.adapterMode, plannerMode: endpoints?.demo?.plannerMode?.() } };
 }
@@ -365,7 +365,7 @@ async function handle(
       body = addClassToTagsContaining(body, `data-fleet-trip="${tripId}"`, 'just-changed');
       body = addClassToTagsContaining(body, `data-trip-id="${tripId}"`, 'just-changed');
     }
-    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
+    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && segments[0] === 'operator' && segments[1] === 'cases' && segments[2]) {
@@ -375,7 +375,7 @@ async function handle(
     const body = view
       ? renderCaseDetailBody(view)
       : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${caseId} is known`, generatedAt: at });
-    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body));
+    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && url.pathname === '/decisions') {
@@ -396,7 +396,7 @@ async function handle(
       res,
       200,
       renderPage(
-        { title: 'Decisions', active: 'decisions', links: pageLinks(endpoints), decisionCount: view.pending.length, ...demoBannerOptions(config, endpoints) },
+        { title: 'Decisions', active: 'decisions', links: pageLinks(endpoints), decisionCount: view.pending.length },
         renderDecisions({ state: 'LOADED', data: view, generatedAt: at }),
       ),
     );
@@ -413,7 +413,7 @@ async function handle(
         res,
         200,
         renderPage(
-          { title: 'Activity', active: 'activity', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) },
+          { title: 'Activity', active: 'activity', links: pageLinks(endpoints) },
           renderActivity({ state: 'ERROR', errorMessage: 'Activity projection is unavailable.', generatedAt: at }),
         ),
       );
@@ -429,7 +429,7 @@ async function handle(
       res,
       200,
       renderPage(
-        { title: 'Activity', active: 'activity', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) },
+        { title: 'Activity', active: 'activity', links: pageLinks(endpoints) },
         renderActivity({ state: 'LOADED', data: view, generatedAt: at }),
       ),
     );
@@ -465,7 +465,7 @@ async function handle(
     sendHtml(
       res,
       outcome.status === 200 ? 200 : outcome.status === 404 ? 404 : 400,
-      renderPage({ title: 'Programme', active: 'programme', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body),
+      renderPage({ title: 'Programme', active: 'programme', links: pageLinks(endpoints) }, body),
     );
     return;
   }
@@ -491,7 +491,7 @@ async function handle(
     sendHtml(
       res,
       view ? 200 : 404,
-      renderPage({ title: 'Your trip', active: 'traveller', surface: 'traveller', links: pageLinks(endpoints), ...demoBannerOptions(config, endpoints) }, body),
+      renderPage({ title: 'Your trip', active: 'traveller', surface: 'traveller', links: pageLinks(endpoints) }, body),
     );
     return;
   }

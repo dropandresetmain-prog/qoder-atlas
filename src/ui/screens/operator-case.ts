@@ -40,6 +40,7 @@ import {
   type StatusTone,
 } from '../copy.ts';
 import { escapeHtml, formatCostDelta, formatInstant, formatMoney } from '../html.ts';
+import { CASE_PRIMARY_OPTION_LIMIT } from '../presentationState.ts';
 import {
   chainLinkGlyph,
   errorPanel,
@@ -399,11 +400,43 @@ function optionCard(option: RecoveryOptionView): string {
 function optionsSection(view: CaseDetailView): string {
   if (view.options.length === 0) return '';
   const allRejected = view.options.every((option) => option.verdict === 'NOT_VIABLE');
-  const title = allRejected ? CASE_OPTIONS_ALL_REJECTED_TITLE : caseOptionsHeading(view.options.length);
-  return `
-  <section class="section" aria-label="Recovery options">
-    <h2>${escapeHtml(title)}</h2>
+  if (allRejected) {
+    return `
+  <section class="section" aria-label="Recovery options" data-test="case-options">
+    <h2>${escapeHtml(CASE_OPTIONS_ALL_REJECTED_TITLE)}</h2>
     ${view.options.map(optionCard).join('')}
+  </section>`;
+  }
+
+  // Preserve engine recommendation truth: recommended first, then other
+  // viable/unknown candidates, then rejected. Primary surface shows at most 3.
+  const recommended = view.options.filter((option) => option.recommended);
+  const otherPrimary = view.options.filter(
+    (option) => !option.recommended && option.verdict !== 'NOT_VIABLE',
+  );
+  const rejected = view.options.filter((option) => option.verdict === 'NOT_VIABLE' && !option.recommended);
+  const ranked = [...recommended, ...otherPrimary, ...rejected];
+  const primary = ranked.slice(0, CASE_PRIMARY_OPTION_LIMIT);
+  const more = ranked.slice(CASE_PRIMARY_OPTION_LIMIT);
+  const primaryRecommendedCount = primary.filter((option) => option.recommended).length;
+  const title =
+    primaryRecommendedCount === 1 && primary.length > 1
+      ? 'Recommended next step and alternatives'
+      : caseOptionsHeading(primary.length);
+
+  const moreBlock =
+    more.length > 0
+      ? `<details class="more-options" data-test="more-options">
+    <summary>More options <span class="count">${more.length}</span></summary>
+    <div class="more-options-body">${more.map(optionCard).join('')}</div>
+  </details>`
+      : '';
+
+  return `
+  <section class="section" aria-label="Recovery options" data-test="case-options" data-primary-option-count="${primary.length}">
+    <h2>${escapeHtml(title)}</h2>
+    <div class="primary-options" data-test="primary-options">${primary.map(optionCard).join('')}</div>
+    ${moreBlock}
   </section>`;
 }
 

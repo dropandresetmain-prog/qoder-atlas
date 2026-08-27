@@ -92,16 +92,24 @@ export function presentActivity(action: string, _payload?: Record<string, unknow
 
 /** Human-facing actor label from audit evidence — never generic "Providers". */
 export function presentActivityActor(actor: string, payload?: Record<string, unknown>): string {
+  if (!actor || /^providers?$/i.test(actor.trim())) return 'Travel provider';
   if (actor.startsWith('app:')) return 'Northstar';
   if (actor.includes('organiser') || actor.includes('ait')) return 'AiT organising team';
   if (typeof payload?.['providerId'] === 'string') {
     const id = String(payload['providerId']).toUpperCase();
     if (id.includes('ZIPAIR') || id.includes('ZG')) return 'ZIPAIR';
     if (id.includes('SCOOT') || id.includes('TR')) return 'Scoot';
+    if (id.includes('CONCORDE')) return 'Concorde Hotel Singapore';
     if (id.includes('NUITEE') || id.includes('HOTEL')) return 'Hotel provider';
   }
-  if (typeof payload?.['carrier'] === 'string') return String(payload['carrier']);
+  if (typeof payload?.['carrier'] === 'string' && String(payload['carrier']).trim()) {
+    return String(payload['carrier']);
+  }
+  if (typeof payload?.['hotelName'] === 'string' && String(payload['hotelName']).trim()) {
+    return String(payload['hotelName']);
+  }
   if (actor.toLowerCase().includes('provider')) return 'Travel provider';
+  if (actor.toLowerCase().includes('traveller')) return 'Traveller';
   return actor.replace(/^app:/, '').replace(/-/g, ' ') || 'Northstar';
 }
 
