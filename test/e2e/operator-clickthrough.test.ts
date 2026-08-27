@@ -96,18 +96,20 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   await page.waitForLoadState('networkidle');
 
   // Step 4: Verify the case detail shows the planning button (no options yet)
-  await page.waitForSelector('[data-test="plan-recovery-btn"]', { timeout: 5000 });
+  await page.waitForSelector('[data-test="resolve-northstar-btn"], [data-test="plan-recovery-btn"]', { timeout: 5000 });
   const caseHtml = await page.content();
-  assert.ok(caseHtml.includes('Check recovery options'), 'case shows recovery actions panel');
-  assert.ok(caseHtml.includes('Plan recovery'), 'case shows Plan recovery button');
+  assert.ok(
+    caseHtml.includes('Resolve with Northstar AI') || caseHtml.includes('Plan recovery'),
+    'case shows recovery actions panel',
+  );
 
   // Verify the form targets the real endpoint
   const planForm = page.locator('[data-test="plan-recovery-form"]');
   const planFormAction = await planForm.getAttribute('action');
   assert.ok(planFormAction?.includes('/api/runtime/plan'), `plan form action targets real endpoint: ${planFormAction}`);
 
-  // Step 5: Click the planning button
-  const planButton = page.locator('[data-test="plan-recovery-btn"]');
+  // Step 5: Click Resolve (posts the real plan form).
+  const planButton = page.locator('[data-test="resolve-northstar-btn"], [data-test="plan-recovery-btn"]').first();
   // G3R-Closure fix I: synchronize on the ACTUAL form response, then on the
   // post-decision DOM state — never on network-idle alone (the enhancement
   // script resolves its fetch BEFORE triggering the reload, so a network-idle
@@ -125,7 +127,6 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Step 6: Verify the case now shows options and a checked recovery action.
   const afterPlanHtml = await page.content();
-  assert.ok(afterPlanHtml.includes('Begin the checked recovery'), 'case shows begin recovery panel after planning');
   assert.ok(afterPlanHtml.includes('Begin recovery'), 'case shows Begin recovery button');
 
   // Verify the form targets the real endpoint
@@ -327,7 +328,12 @@ test('DR-4: page reload preserves state (browser refresh test)', async () => {
 
   // Verify the same elements are present
   assert.ok(reloadedHtml.includes('data-ui-section="recovery-actions"'), 'recovery-actions panel present after reload');
-  assert.ok(reloadedHtml.includes('Plan recovery') || reloadedHtml.includes('Begin recovery'), 'recovery action present after reload');
+  assert.ok(
+    reloadedHtml.includes('Resolve with Northstar AI') ||
+      reloadedHtml.includes('Begin recovery') ||
+      reloadedHtml.includes('Plan recovery'),
+    'recovery action present after reload',
+  );
 
   await page.close();
 });

@@ -91,6 +91,18 @@ function linkState(
   affected: ReadonlySet<string>,
   recoveryCase: RecoveryCase | undefined,
 ): ChainLinkState {
+  const caseOpen = Boolean(recoveryCase && recoveryCase.status !== 'RESOLVED');
+  const isAffected = affected.has(element.id);
+
+  // Programme engagements are not supplier reservations. Reservation NONE
+  // must not render as unbooked / not booked.
+  if (element.elementKind === 'ENGAGEMENT') {
+    if (element.status === 'INVALID') return 'BROKEN';
+    if (element.status === 'AT_RISK' || (caseOpen && isAffected)) return 'AT_RISK';
+    if (element.status === 'UNKNOWN') return 'UNKNOWN';
+    return 'CONFIRMED';
+  }
+
   if (element.status === 'INVALID') return 'BROKEN';
   if (element.status === 'AT_RISK') return 'AT_RISK';
   switch (element.reservationState) {
@@ -101,18 +113,14 @@ function linkState(
     case 'UNKNOWN':
       return 'UNKNOWN';
     case 'HELD':
-      return recoveryCase && recoveryCase.status !== 'RESOLVED' && affected.has(element.id)
-        ? 'PROPOSED'
-        : 'AT_RISK';
+      return caseOpen && isAffected ? 'PROPOSED' : 'AT_RISK';
     case 'CONFIRMED':
     case 'CHANGED':
     case 'COMPLETED':
       if (element.status === 'UNKNOWN' && element.reservationState !== 'COMPLETED') {
         return 'UNKNOWN';
       }
-      return affected.has(element.id) && recoveryCase && recoveryCase.status !== 'RESOLVED'
-        ? 'AT_RISK'
-        : 'CONFIRMED';
+      return caseOpen && isAffected ? 'AT_RISK' : 'CONFIRMED';
     default:
       return 'UNKNOWN';
   }

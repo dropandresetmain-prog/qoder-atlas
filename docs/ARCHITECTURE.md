@@ -339,6 +339,8 @@ Potential adapters include Gmail, Booking.com Demand, Expedia Rapid, Timatic, Am
 
 `DETECTED -> ASSESSING -> PLANNING -> READY_TO_EXECUTE | AWAITING_TRAVELLER | AWAITING_APPROVAL | ESCALATED -> EXECUTING -> VERIFYING -> RESOLVED`
 
+`ASSESSING`, `PLANNING`, `READY_TO_EXECUTE`, `AWAITING_TRAVELLER`, and `AWAITING_APPROVAL` may also move directly to `RESOLVED` when a later authorised mutation (for example a programme commit) re-evaluates the same trip as viable without executing a staged travel recovery. `EXECUTING` still observes via `VERIFYING` first.
+
 `VERIFYING` may loop back to ASSESSING/PLANNING if the action did not restore viability or new state appears.
 
 Resolution outcomes include FULLY_RECOVERED and RECOVERED_WITH_LOSS. An API success is not case resolution; observed state and affected constraints/objectives determine resolution.

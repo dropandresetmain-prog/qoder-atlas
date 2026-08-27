@@ -355,7 +355,7 @@ test('normal product pages omit demo banner; demo tooling may keep it', () => {
   assert.match(demo, /class="demo-banner/);
 });
 
-test('case impacted phase hides options until Resolve; strategies selectable', () => {
+test('case options-ready phase shows Begin, not a second Resolve', () => {
   const options = [
     {
       id: 'opt-0',
@@ -413,9 +413,9 @@ test('case impacted phase hides options until Resolve; strategies selectable', (
     ],
   };
   const html = renderCaseDetailBody(view);
-  assert.match(html, /data-case-phase="impacted"/);
-  assert.match(html, /data-test="resolve-northstar-btn"/);
-  assert.match(html, /Resolve with Northstar AI/);
+  assert.match(html, /data-case-phase="options"/);
+  assert.match(html, /data-test="begin-strategy-btn"/);
+  assert.doesNotMatch(html, /data-test="resolve-northstar-btn"/);
   assert.match(html, /data-case-options-panel/);
   assert.match(html, /data-option-selectable="true"/);
   assert.match(html, /data-test="why-recommended"/);
@@ -423,7 +423,7 @@ test('case impacted phase hides options until Resolve; strategies selectable', (
   assert.doesNotMatch(html, />Broken</);
   assert.match(html, /Transfer confirmation pending/);
   assert.doesNotMatch(html, />Unknown</);
-  assert.match(html, /Approved by policy|Begin recovery|Resolve with Northstar AI/);
+  assert.match(html, /Begin recovery/);
 });
 
 test('authority-required case renders human approve; traveller funding is explicit', () => {

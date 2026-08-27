@@ -4,6 +4,10 @@
  * Does not slow the planning/execution engines. Stages are UI-only progress
  * while a real plan/begin/execute request runs (or a short settle when options
  * are already projected). Respects prefers-reduced-motion.
+ *
+ * Workspace phase is server-projected (`data-case-phase`). sessionStorage may
+ * remember a harmless expansion preference but must not resurrect Resolve,
+ * hide Execute, or make a resolved case look open.
  */
 export function renderCaseResolutionEnhancementScript(): string {
   return `<script>
@@ -18,6 +22,10 @@ export function renderCaseResolutionEnhancementScript(): string {
 
   function setPhase(root, phase) {
     if (!root) return;
+    var current = root.getAttribute('data-case-phase');
+    if (current === 'resolved' || current === 'execute' || current === 'executing' || current === 'awaiting_authority') {
+      return;
+    }
     root.setAttribute('data-case-phase', phase);
     root.setAttribute('data-test', 'case-phase-' + phase);
   }
@@ -130,34 +138,28 @@ export function renderCaseResolutionEnhancementScript(): string {
     syncStrategyInputs(root);
   }
 
-  function revealOptions(root) {
-    setPhase(root, 'options');
-    var options = qs('[data-case-options-panel]', root);
-    if (options) options.hidden = false;
-    var resolveCta = qs('[data-resolve-northstar-cta]', root);
-    if (resolveCta) resolveCta.hidden = true;
-    var beginPanel = qs('[data-case-begin-panel]', root);
-    if (beginPanel) beginPanel.hidden = false;
-    var approval = qs('[data-ui-section="primary-approval"]', root);
-    if (approval) approval.hidden = false;
-    syncStrategyInputs(root);
+  function formVerdict(form) {
+    var input = form.querySelector('input[name="verdict"], input[name="decision"]');
+    return input ? String(input.value || '').toUpperCase() : '';
+  }
+
+  function isDeclineForm(form) {
+    return formVerdict(form) === 'DECLINED' || form.getAttribute('data-test') === 'organisation-decline-form';
+  }
+
+  function isExecuteForm(form) {
+    if (isDeclineForm(form)) return false;
+    return form.getAttribute('data-test') === 'begin-strategy-form' ||
+      form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
+      form.getAttribute('action') === '/api/runtime/execute' ||
+      form.getAttribute('action') === '/api/runtime/begin';
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     var root = qs('[data-case-workspace]');
     if (!root) return;
-    var caseId = (qs('[name="caseId"]', root) || {}).value || window.location.pathname;
-    var phaseKey = 'ns-case-phase:' + caseId;
 
     bindOptionSelection(root);
-
-    var params = new URLSearchParams(window.location.search);
-    var storedPhase = null;
-    try { storedPhase = window.sessionStorage.getItem(phaseKey); } catch (e) {}
-    if (params.get('nsResolve') === '1' || params.get('nsPhase') === 'options' || storedPhase === 'options') {
-      revealOptions(root);
-      try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (e) {}
-    }
 
     var resolveBtn = qs('[data-resolve-northstar]', root);
     if (resolveBtn) {
@@ -194,14 +196,11 @@ export function renderCaseResolutionEnhancementScript(): string {
         var stagePromise = runStages(overlay, RESOLVE_MS);
         Promise.all([planPromise, stagePromise])
           .then(function() {
-            try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (e) {}
             if (alreadyHasOptions) {
-              revealOptions(root);
+              setPhase(root, 'options');
               return;
             }
-            var url = new URL(window.location.href);
-            url.searchParams.set('nsResolve', '1');
-            window.location.href = url.toString();
+            window.location.reload();
           })
           .catch(function(err) {
             alert('Resolve failed: ' + (err && err.message ? err.message : String(err)));
@@ -209,32 +208,22 @@ export function renderCaseResolutionEnhancementScript(): string {
       });
     }
 
-    // Execution transition after approve/execute/begin forms.
     document.addEventListener('submit', function(e) {
       var form = e.target;
       if (!form || form.tagName !== 'FORM') return;
       if (!form.classList.contains('inline-form') && !form.classList.contains('action-form')) return;
-      var isExec =
-        form.getAttribute('data-test') === 'begin-strategy-form' ||
-        form.getAttribute('data-test') === 'execute-approved-strategy-btn' ||
-        form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
-        form.getAttribute('action') === '/api/runtime/execute' ||
-        form.getAttribute('action') === '/api/runtime/begin';
-      if (isExec || form.getAttribute('action') === '/api/runtime/decide') {
-        try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (err) {}
-      }
-      if (!isExec) return;
+      if (isDeclineForm(form)) return;
+      if (!isExecuteForm(form)) return;
       syncStrategyInputs(root);
       var overlay = ensureOverlay(
         'ns-execute-overlay',
         'Applying the recovery',
         [
-          'Applying change',
-          'Confirming provider result',
-          'Rechecking downstream trip'
+          'Submitting the approved action',
+          'Observing the provider-boundary result',
+          'Updating the trip and rechecking viability'
         ]
       );
-      // Let the shared form shim own the fetch; we only show choreography.
       runStages(overlay, EXEC_MS);
     }, true);
   });
