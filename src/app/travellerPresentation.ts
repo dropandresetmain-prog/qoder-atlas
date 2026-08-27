@@ -15,9 +15,9 @@ import type {
 import type { Engagement, TransportLeg } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
-import { describeAllocation } from '../engine/funding.ts';
 import { formatMoney, formatPayable, formatPolicyEquivalent } from '../ui/html.ts';
 import type { TravellerOptionDetail, TravellerPresentation } from '../ui/traveller-presentation.ts';
+import { presentAllocationSummary } from './presentation.ts';
 import {
   formatProgrammeInstant,
   projectTravellerItinerary,
@@ -105,7 +105,7 @@ function projectOptionDetails(
   const verdict = strategy ? deps.verdictFor(strategy.id) : undefined;
   const route = proposedRoute(strategy, places);
   const funding = intent?.costAllocation
-    ? `Funding: ${describeAllocation(intent.costAllocation)}.`
+    ? `Funding: ${presentAllocationSummary(intent.costAllocation)}.`
     : '';
   const costLines: string[] = [];
   if (intent?.providerSpend) {

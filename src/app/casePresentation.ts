@@ -17,7 +17,7 @@ import type {
 } from '../ui/case-view-model.ts';
 import { formatMoney } from '../ui/html.ts';
 import { authorityNeededLabel } from '../ui/copy.ts';
-import { describeAllocation } from '../engine/funding.ts';
+import { presentAllocationSummary } from './presentation.ts';
 import {
   formatCaseOpenedAt,
   formatProgrammeInstant,
@@ -174,7 +174,7 @@ export function formatDecisionCost(amount: Money | undefined, fundingSummary: st
 }
 
 export function fundingSummaryForIntent(
-  allocation: Parameters<typeof describeAllocation>[0] | undefined,
+  allocation: Parameters<typeof presentAllocationSummary>[0],
 ): string | undefined {
-  return allocation ? describeAllocation(allocation) : undefined;
+  return presentAllocationSummary(allocation);
 }

@@ -42,7 +42,6 @@ import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
-import { describeAllocation } from '../engine/funding.ts';
 import { projectCaseChain } from './chain.ts';
 import {
   countOtherCommitments,
@@ -55,6 +54,7 @@ import type { AnchorEvent, Place } from '../domain/entities.ts';
 import {
   presentAction,
   presentActivity,
+  presentAllocationSummary,
   presentApprovalReason,
   presentCandidateRejection,
   presentCheckLabel,
@@ -64,6 +64,7 @@ import {
 } from './presentation.ts';
 import { enrichCaseDetailView } from './casePresentation.ts';
 import { projectOptionPresentation } from './optionPresentation.ts';
+import { formatMoney } from '../ui/html.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -71,6 +72,15 @@ export interface ReadModelDependencies {
   cases: CaseRepository;
   audit: AuditRepository;
   viability: ViabilityEngine;
+}
+
+/** Rewrite bare `542 USD` / `122.23 SGD` fragments in strategy titles to US$/S$. */
+function presentStrategyTitle(summary: string): string {
+  return summary.replace(
+    /(\d+(?:\.\d+)?)\s*(USD|SGD)\b/gi,
+    (_match, amount: string, currency: string) =>
+      formatMoney({ amount: Number(amount), currency: currency.toUpperCase() as 'USD' | 'SGD' }),
+  );
 }
 
 const ELEMENT_KIND_LABEL: Record<TripElement['elementKind'], string> = {
@@ -553,7 +563,7 @@ export async function projectCaseDetail(
     });
     options.push({
       id: strategy.id,
-      title: strategy.summary,
+      title: presentStrategyTitle(strategy.summary),
       verdict: candidate.feasible ? 'VIABLE' : candidate.rejectionEvidence.length > 0 ? 'NOT_VIABLE' : 'UNKNOWN',
       ...(candidate.rejectionEvidence.length > 0
         ? { rejectionReason: presentCandidateRejection(candidate.rejectionEvidence, snapshot.constraints) }
@@ -588,7 +598,7 @@ export async function projectCaseDetail(
       ...(intent?.costAllocation
         ? {
             costAllocation: intent.costAllocation,
-            costAllocationSummary: describeAllocation(intent.costAllocation),
+            costAllocationSummary: presentAllocationSummary(intent.costAllocation),
           }
         : {}),
     });
@@ -601,7 +611,7 @@ export async function projectCaseDetail(
     fundingIntent?.costAllocation && fundingIntent.priceDelta
       ? {
           allocation: fundingIntent.costAllocation,
-          summary: describeAllocation(fundingIntent.costAllocation),
+          summary: presentAllocationSummary(fundingIntent.costAllocation) ?? 'Funding allocation still unresolved',
         }
       : undefined;
 
@@ -805,7 +815,7 @@ export async function projectTravellerTrip(
       // Mixed funding (ADR-037): when a deterministic allocation exists the
       // traveller is told who pays — the prompt is evidence, not a guess.
       const fundingNote = intent?.costAllocation
-        ? ` Funding: ${describeAllocation(intent.costAllocation)}.`
+        ? ` Funding: ${presentAllocationSummary(intent.costAllocation)}.`
         : intent?.priceDelta
           ? ' Funding: who pays has not been determined yet.'
           : '';

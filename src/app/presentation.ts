@@ -2,7 +2,9 @@
 import type { Constraint } from '../domain/constraints.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import type { CaseResolution } from '../operational/case.ts';
+import type { CostAllocation } from '../operational/intent.ts';
 import type { CandidateRejectionEvidence } from './planningLoop.ts';
+import { formatMoney } from '../ui/html.ts';
 
 export function presentCandidateRejection(evidence: readonly CandidateRejectionEvidence[], constraints: readonly Constraint[]): string | undefined {
   const first = evidence[0];
@@ -95,6 +97,34 @@ export function presentCheckLabel(
 
 export function presentApprovalReason(): string {
   return 'This change needs organisation or traveller approval before it can proceed.';
+}
+
+/**
+ * Judge-facing funding summary: keep describeAllocation semantics but use
+ * US$/S$ money convention instead of bare `90.54 USD` fragments.
+ */
+export function presentAllocationSummary(allocation: CostAllocation | undefined): string | undefined {
+  if (!allocation) return undefined;
+  if (allocation.coveredAmount && allocation.coveredBy) {
+    return `${formatMoney(allocation.coveredAmount)} covered by ${payerPhrase(allocation.coveredBy)}`;
+  }
+  if (allocation.incrementalAmount && allocation.incrementalPayer) {
+    return `${formatMoney(allocation.incrementalAmount)} payable by ${payerPhrase(allocation.incrementalPayer)}`;
+  }
+  return 'Funding allocation still unresolved';
+}
+
+function payerPhrase(payer: CostAllocation['coveredBy'] | CostAllocation['incrementalPayer']): string {
+  switch (payer) {
+    case 'EVENT_ORGANISATION':
+      return 'the event organisation';
+    case 'ORGANISATION':
+      return 'the organisation';
+    case 'TRAVELLER':
+      return 'the traveller';
+    default:
+      return 'another payer';
+  }
 }
 
 const SIGNAL_KIND_ACTIVITY: Record<string, string> = {
