@@ -37,16 +37,20 @@ import {
   PROGRAMME_SUBHEADING,
   PROGRAMME_TABLE_HEADERS,
   PROGRAMME_TILE_LABEL,
-  PROGRAMME_TILES_LEGEND,
   PROGRAMME_TIMELINE_TITLE,
   type StatusTone,
 } from '../copy.ts';
+import {
+  MANAGED_TRAVEL_LABEL,
+  compareByAttentionThenId,
+  countManagedTravelBuckets,
+  mapManagedTravelPresentation,
+} from '../presentationState.ts';
 import { escapeHtml, formatInstant, encodeUri } from '../html.ts';
 import {
   bulletList,
   errorPanel,
   loadingPanel,
-  statusBadge,
 } from '../components.ts';
 
 /**
@@ -161,56 +165,59 @@ function tile(spec: TileSpec, index: number): string {
 }
 
 /**
- * Aggregate the frozen per-status summary into the approved buckets. A zero
- * count on an alert/watch/active bucket is good news and renders tone-ok —
- * the approved zero-state treatment from the healthy programme render.
+ * Aggregate the frozen per-status summary into the four managed-travel
+ * presentation buckets (+ Local arrangement cohort, endangered callouts).
+ * Zero-count watch/alert buckets render tone-ok — the healthy zero-state.
  */
 function summaryTiles(view: ProgrammeView): string {
-  const summary = view.summary;
   const counts = view.arrangementCounts;
-  const onTrack = summary.ready + summary.resolved;
-  const watching = summary.atRisk + summary.needsTravellerInfo;
-  const inRecovery = summary.recovering + summary.changeRequested;
-  const activeIssues =
-    summary.disrupted +
-    summary.atRisk +
-    summary.needsTravellerInfo +
-    summary.recovering +
-    summary.changeRequested +
-    summary.awaitingDecision +
-    summary.planning;
+  const managedInputs = view.travellers.map((traveller) => ({
+    status: traveller.status,
+    pendingDecisionCount: traveller.decisionsRequired,
+  }));
+  const buckets = countManagedTravelBuckets(managedInputs);
   const scaleBanner = `
-    <p class="programme-scale">${counts.total} participants · ${counts.northstarArranged} travelling · ${counts.selfOrOtherArranged} local</p>`;
+    <p class="programme-scale" data-test="programme-scale">${counts.total} participants · ${counts.northstarArranged} Northstar-managed · ${counts.selfOrOtherArranged} local/self</p>`;
   const specs: TileSpec[] = [
-    { key: 'total', count: counts.northstarArranged, label: 'Managed travel', tone: 'neutral' },
+    { key: 'confirmed', count: buckets.confirmed, label: MANAGED_TRAVEL_LABEL.CONFIRMED, tone: 'ok' },
     {
-      key: 'on-track',
-      count: onTrack,
-      label: activeIssues === 0 ? PROGRAMME_TILE_LABEL.onTrackCalm : PROGRAMME_TILE_LABEL.onTrackActive,
-      tone: 'ok',
+      key: 'needs-attention',
+      count: buckets.needsAttention,
+      label: MANAGED_TRAVEL_LABEL.NEEDS_ATTENTION,
+      tone: buckets.needsAttention > 0 ? 'alert' : 'ok',
+      attention: true,
     },
-    { key: 'watching', count: watching, label: PROGRAMME_TILE_LABEL.watching, tone: watching > 0 ? 'watch' : 'ok' },
-    { key: 'in-recovery', count: inRecovery, label: PROGRAMME_TILE_LABEL.inRecovery, tone: inRecovery > 0 ? 'active' : 'ok' },
-  ];
-  if (summary.awaitingDecision > 0) {
-    specs.push({ key: 'awaiting-decision', count: summary.awaitingDecision, label: 'Awaiting decision', tone: 'watch', attention: true });
-  }
-  if (summary.planning > 0) {
-    specs.push({ key: 'being-planned', count: summary.planning, label: PROGRAMME_TILE_LABEL.beingPlanned, tone: 'active' });
-  }
-  specs.push(
-    { key: 'unconfirmed', count: summary.unknown, label: PROGRAMME_TILE_LABEL.unconfirmed, tone: 'neutral' },
     {
+      key: 'watching',
+      count: buckets.watching,
+      label: MANAGED_TRAVEL_LABEL.WATCHING,
+      tone: buckets.watching > 0 ? 'watch' : 'ok',
+    },
+    {
+      key: 'unconfirmed',
+      count: buckets.unconfirmed,
+      label: MANAGED_TRAVEL_LABEL.UNCONFIRMED,
+      tone: 'neutral',
+    },
+    {
+      key: 'local',
+      count: counts.selfOrOtherArranged,
+      label: 'Local / self-arranged',
+      tone: 'neutral',
+    },
+  ];
+  if (view.endangeredCommitments.length > 0) {
+    specs.push({
       key: 'endangered-commitments',
       count: view.endangeredCommitments.length,
       label: PROGRAMME_TILE_LABEL.endangered,
-      tone: view.endangeredCommitments.length > 0 ? 'alert' : 'ok',
+      tone: 'alert',
       attention: true,
-    },
-  );
+    });
+  }
   return `
   ${scaleBanner}
-  <div class="tiles stagger" role="group" aria-label="${escapeHtml(PROGRAMME_TILES_LEGEND)}">
+  <div class="tiles stagger" role="group" aria-label="Managed travel presentation across the programme" data-test="programme-summary-tiles">
     ${specs.map(tile).join('')}
   </div>`;
 }
@@ -313,11 +320,12 @@ function timelineSection(
 // ---------------------------------------------------------------------------
 
 function orderTravellers(rows: readonly ProgrammeTravellerView[]): ProgrammeTravellerView[] {
-  return [...rows].sort((a, b) => {
-    const diff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
-    if (diff !== 0) return diff;
-    return a.travellerId.localeCompare(b.travellerId);
-  });
+  return [...rows].sort((a, b) =>
+    compareByAttentionThenId(
+      { tripId: a.tripId, status: a.status, pendingDecisionCount: a.decisionsRequired },
+      { tripId: b.tripId, status: b.status, pendingDecisionCount: b.decisionsRequired },
+    ),
+  );
 }
 
 function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentations): string {
@@ -331,12 +339,16 @@ function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentatio
   const role = augment.roleFor?.(row) ?? '—';
   const arrival = augment.arrivalFor?.(row) ?? '—';
   const justChanged = augment.justChangedTripIds?.has(row.tripId) ?? false;
+  const presentation = mapManagedTravelPresentation({
+    status: row.status,
+    pendingDecisionCount: row.decisionsRequired,
+  });
   return `
-    <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}">
-      <td>${nameCell}<div>${interactionCell}</div></td>
+    <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}" data-presentation="${escapeHtml(presentation)}">
+      <td class="traveller-name-cell">${nameCell}<div class="traveller-secondary">${interactionCell}</div></td>
       <td>${escapeHtml(role)}</td>
       <td class="num">${escapeHtml(arrival)}</td>
-      <td>${statusBadge(row.status)}</td>
+      <td><span class="badge tone-${presentation === 'CONFIRMED' ? 'ok' : presentation === 'NEEDS_ATTENTION' ? 'alert' : presentation === 'WATCHING' ? 'watch' : 'neutral'}" data-test="presentation-badge">${escapeHtml(MANAGED_TRAVEL_LABEL[presentation])}</span></td>
     </tr>`;
 }
 

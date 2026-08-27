@@ -431,8 +431,8 @@ a.chip:hover { border-color: var(--text-faint); }
 .dotgrid i.d-watch::before { background: var(--watch-f); }
 .dotgrid i.d-bad::before { background: var(--alert-f); }
 .dotgrid i.d-active::before { background: var(--active-f); }
-.dotgrid i.d-unconfirmed { background: var(--neutral-bg); border: 1px solid var(--neutral-border); }
-.dotgrid i.d-unconfirmed::before { background: var(--neutral-f); inset: 3px; }
+/* Filled grey contribution-cell treatment — same geometry as other fleet cells, no emphasis ring. */
+.dotgrid i.d-unconfirmed::before { background: var(--neutral-f); }
 .dotgrid i.d-local { background: var(--paper-warm); border: 1px solid rgba(150, 103, 15, 0.18); }
 .dotgrid i.d-local::before { background: rgba(150, 103, 15, 0.35); inset: 4px; }
 .dotgrid i.d-empty { border: 1px dashed var(--neutral-border); }
@@ -445,7 +445,7 @@ a.chip:hover { border-color: var(--text-faint); }
 .legend i.l-bad { background: var(--alert-f); }
 .legend i.l-active { background: var(--active-f); }
 .legend i.l-empty { border: 1px dashed var(--neutral-border); }
-.legend i.l-unconfirmed { background: var(--neutral-f); border: 1px solid var(--neutral-border); }
+.legend i.l-unconfirmed { background: var(--neutral-f); }
 .legend i.l-local { background: rgba(150, 103, 15, 0.35); border: 1px solid rgba(150, 103, 15, 0.25); }
 
 .programme-scale { margin: 0 0 12px; font-size: 15px; color: var(--text-soft); }
@@ -498,8 +498,19 @@ a.qrow:focus-visible, a.brow.brow-actionable:focus-visible { outline: 2px solid 
 .roster-search-input {
   width: 100%; max-width: 340px; box-sizing: border-box;
   padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
-  font-size: 15px; background: var(--surface);
+  font: inherit; font-size: 15px; background: var(--surface);
 }
+.roster-pagination {
+  display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap;
+}
+.roster-page-label { font-size: 14px; color: var(--text-soft); }
+.traveller-name-cell { max-width: 220px; overflow: hidden; }
+.traveller-name-cell .traveller-secondary { margin-top: 4px; }
+.traveller-table td, .traveller-table th { overflow-wrap: anywhere; }
+.more-options { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 10px 14px; }
+.more-options > summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+.more-options-body { margin-top: 12px; }
+.primary-options { display: grid; gap: 10px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 .section-primary-action { background: var(--paper-warm); border: 1px solid var(--watch-border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 18px; }
 .btn-sm { font-size: 13px; padding: 5px 10px; }
