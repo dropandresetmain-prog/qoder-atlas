@@ -212,27 +212,16 @@ function attentionPanel(rows: AttentionRow[]): string {
   const sharedBlock =
     shared.length >= 2
       ? (() => {
-          const critical = shared.filter((row) => {
-            const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
-            return presentation === 'NEEDS_ATTENTION' || row.trip.status === 'DISRUPTED';
-          });
-          const viableOrWatching = shared.length - critical.length;
-          const header = `
-  <div class="qrow qrow-group" data-test="shared-incident-group" data-attention-tone="attention">
-    <span class="q-glyph g-bad" aria-hidden="true">✕</span>
-    <span class="q-name">Shared airline change</span>
-    <span class="q-issue">One airline change · ${shared.length} different trip consequences · ${viableOrWatching} still workable · ${critical.length} critical</span>
-    <span class="q-time"></span>
-  </div>`;
           const children = shared
             .map((row, index) => {
               const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
-              const outcome =
-                presentation === 'NEEDS_ATTENTION' || row.trip.status === 'DISRUPTED'
-                  ? 'Critical — travel cannot protect the commitment'
-                  : presentation === 'WATCHING'
-                    ? 'Watching — schedule changed; trip still workable'
-                    : 'Viable after the same airline change';
+              const hardFail =
+                presentation === 'NEEDS_ATTENTION' && row.trip.status === 'DISRUPTED';
+              const outcome = hardFail
+                ? 'Critical — travel cannot protect the commitment'
+                : presentation === 'WATCHING' || row.trip.status === 'AT_RISK'
+                  ? 'Watching — schedule changed; trip still workable'
+                  : 'Viable after the same airline change';
               return attentionRow(
                 {
                   ...row,
@@ -242,6 +231,18 @@ function attentionPanel(rows: AttentionRow[]): string {
               );
             })
             .join('');
+          const criticalCount = shared.filter((row) => {
+            const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
+            return presentation === 'NEEDS_ATTENTION' && row.trip.status === 'DISRUPTED';
+          }).length;
+          const workable = shared.length - criticalCount;
+          const header = `
+  <div class="qrow qrow-group" data-test="shared-incident-group" data-attention-tone="attention">
+    <span class="q-glyph g-bad" aria-hidden="true">✕</span>
+    <span class="q-name">Shared airline change</span>
+    <span class="q-issue">One airline change · ${shared.length} different trip consequences · ${workable} still workable · ${criticalCount} critical</span>
+    <span class="q-time"></span>
+  </div>`;
           return `${header}${children}`;
         })()
       : shared.map((row, index) => attentionRow(row, index)).join('');
