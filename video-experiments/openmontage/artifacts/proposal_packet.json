@@ -1,0 +1,28 @@
+{
+  "pipeline": "animation",
+  "project": "northstar-benchmark",
+  "selected_concept": {
+    "title": "NORTHSTAR dependency reveal benchmark",
+    "duration_seconds": 12,
+    "animation_mode": "code_generated_motion_graphics",
+    "render_runtime": "remotion",
+    "renderer_family": "diagram_led_explainer",
+    "reuse_strategy": "journey_chain_motif + fleet_grid_motif + programme_readout"
+  },
+  "production_plan": {
+    "preflight_engines": {
+      "ffmpeg": true,
+      "remotion": true,
+      "hyperframes": false
+    },
+    "notes": "HyperFrames not present in baron2050/OpenMontage fork; Remotion locked at proposal."
+  },
+  "cost_estimate": {
+    "total_usd": 0,
+    "line_items": []
+  },
+  "approval": {
+    "status": "approved",
+    "approved_at": "2026-08-28"
+  }
+}

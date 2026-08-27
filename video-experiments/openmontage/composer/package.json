@@ -1,0 +1,22 @@
+{
+  "name": "northstar-openmontage-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "render": "node scripts/render-with-system-ffmpeg.mjs",
+    "render:remotion-cli": "npx remotion render src/index.tsx NorthstarBenchmark ../render/benchmark.mp4",
+    "stills": "node scripts/extract-stills.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.441",
+    "@remotion/cli": "^4.0.441",
+    "@remotion/renderer": "^4.0.441",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.441"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0"
+  }
+}

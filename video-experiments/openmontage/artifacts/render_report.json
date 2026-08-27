@@ -1,0 +1,16 @@
+{
+  "pipeline": "animation",
+  "render_runtime": "remotion",
+  "composition_id": "NorthstarBenchmark",
+  "output_path": "video-experiments/openmontage/render/benchmark.mp4",
+  "duration_seconds": 12,
+  "resolution": "1920x1080",
+  "fps": 30,
+  "render_path": "custom: renderFrames + system ffmpeg (Windows ARM64 workaround)",
+  "openmontage_tool_used": false,
+  "notes": "OpenMontage video_compose remotion_render failed on win32-arm64 compositor; frames rendered via @remotion/renderer with system Chrome, stitched with winget ffmpeg.",
+  "validation": {
+    "ffprobe_ok": true,
+    "frame_count": 360
+  }
+}

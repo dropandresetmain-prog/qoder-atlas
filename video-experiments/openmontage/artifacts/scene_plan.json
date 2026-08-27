@@ -1,0 +1,39 @@
+{
+  "duration_seconds": 12,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "scenes": [
+    {
+      "id": "s1-healthy-rebook",
+      "start_seconds": 0,
+      "end_seconds": 2.5,
+      "beat": "Healthy journey chain; flight rebooks; REBOOKED badge",
+      "animation_mode": "remotion_svg",
+      "visual_treatment": "journey_chain_settle"
+    },
+    {
+      "id": "s2-disruption",
+      "start_seconds": 2.5,
+      "end_seconds": 5,
+      "beat": "Downstream propagation; keynote at risk; TRIP NOT RECOVERED",
+      "animation_mode": "remotion_svg",
+      "visual_treatment": "state_propagation"
+    },
+    {
+      "id": "s3-scale-reveal",
+      "start_seconds": 5,
+      "end_seconds": 9,
+      "beat": "Continuous camera pullback to programme scale",
+      "animation_mode": "remotion_camera",
+      "visual_treatment": "scale_reveal_no_crossfade"
+    },
+    {
+      "id": "s4-blast-radius",
+      "start_seconds": 9,
+      "end_seconds": 12,
+      "beat": "Supplier blast radius; mixed traveller outcomes; Live Dependency Graph",
+      "animation_mode": "remotion_svg",
+      "visual_treatment": "blast_radius_land"
+    }
+  ]
+}

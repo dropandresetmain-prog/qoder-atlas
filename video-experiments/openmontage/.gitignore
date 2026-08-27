@@ -1,0 +1,4 @@
+.vendor/
+composer/node_modules/
+projects/
+*.log

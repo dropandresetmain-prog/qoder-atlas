@@ -1,0 +1,16 @@
+{
+  "render_runtime": "remotion",
+  "composition_id": "NorthstarBenchmark",
+  "profile": "youtube_landscape",
+  "cuts": [
+    {
+      "id": "northstar-benchmark",
+      "type": "custom_composition",
+      "source": "composer/src/NorthstarBenchmark.tsx",
+      "in_seconds": 0,
+      "out_seconds": 12
+    }
+  ],
+  "audio": {},
+  "subtitles": { "enabled": false }
+}
