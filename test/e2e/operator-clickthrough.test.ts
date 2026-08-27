@@ -148,7 +148,11 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Step 6: Verify the approval panel now appears
   const afterBeginHtml = await page.content();
-  assert.ok(afterBeginHtml.includes('Approval needed'), 'case shows approval panel after begin');
+  assert.ok(
+    afterBeginHtml.includes('Awaiting approval') || afterBeginHtml.includes('Approval needed') || afterBeginHtml.includes('Waiting for'),
+    'case shows awaiting-approval state after begin',
+  );
+  assert.ok(!/Options on the table/i.test(afterBeginHtml), 'staged approval must not say Options on the table');
   assert.ok(afterBeginHtml.includes('Approve'), 'case shows Approve button');
   assert.ok(afterBeginHtml.includes('Decline'), 'case shows Decline button');
 

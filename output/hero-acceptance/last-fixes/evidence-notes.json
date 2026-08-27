@@ -1,0 +1,50 @@
+[
+  {
+    "shot": "01-s1-shared-incident",
+    "affected": "4",
+    "workable": "3",
+    "critical": "1",
+    "text": "✕ Shared airline change One airline change · 4 different trip consequences · 3 still workable · 1 critical"
+  },
+  {
+    "shot": "02-jordan-awaiting-approval",
+    "phase": "awaiting_authority",
+    "badge": "Awaiting approval",
+    "hasApprove": true,
+    "hasBegin": false,
+    "hasResolve": false
+  },
+  {
+    "shot": "03-oliver-awaiting-approval",
+    "phase": "awaiting_authority",
+    "badge": "Awaiting approval",
+    "hasApprove": true,
+    "hasBegin": false,
+    "hasResolve": false
+  },
+  {
+    "shot": "04-jonas-operator-waiting",
+    "badge": "Waiting for Jonas Berg",
+    "hasTravellerApproveForm": false,
+    "has542": false,
+    "has54183": true
+  },
+  {
+    "overviewJonasIssue": "Approval needed before Updating the hotel stay can proceed · US$541.83",
+    "overviewHas542": false,
+    "overviewHas54183": true,
+    "overviewHasBareSgd": false
+  },
+  {
+    "shot": "05-jonas-traveller-approval",
+    "has54183": true,
+    "has542": false,
+    "hasApprove": true
+  },
+  {
+    "shot": "06-jonas-terminal-revisit",
+    "phase": "resolved",
+    "has54183": true,
+    "has542": false
+  }
+]

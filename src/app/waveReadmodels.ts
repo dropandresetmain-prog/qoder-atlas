@@ -141,7 +141,11 @@ export async function projectApprovalsQueue(
         requestedFrom,
         requestedAt: decision.decidedAt,
         action: intent ? presentAction(intent.operation) : 'Recovery action',
-        ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
+        ...(intent?.providerSpend
+          ? { amount: intent.providerSpend }
+          : intent?.priceDelta
+            ? { amount: intent.priceDelta }
+            : {}),
         ...(intent?.costAllocation
           ? { funding: { allocation: intent.costAllocation, summary: describeAllocation(intent.costAllocation) } }
           : {}),

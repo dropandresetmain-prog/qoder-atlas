@@ -284,6 +284,39 @@ async function currentConstraintEvaluations(deps: ReadModelDependencies, trip: T
   return { constraints, evaluations: evaluateConstraints(constraints, ctx) };
 }
 
+/**
+ * Propagated whole-trip viability from constraint evaluations.
+ * Independent of open-case workflow status (DISRUPTED case ≠ failed commitment).
+ */
+export function deriveRemainderViability(
+  constraints: readonly Constraint[],
+  evaluations: readonly { constraintId: string; status: string }[],
+  tripViability: Trip['viability'],
+): RemainderViability {
+  const hardById = new Map<string, Constraint['hardness']>();
+  for (const constraint of constraints) {
+    hardById.set(constraint.id, constraint.hardness);
+  }
+  if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
+    return 'NOT_VIABLE';
+  }
+  if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
+    return 'UNKNOWN';
+  }
+  if (evaluations.some((e) => e.status === 'FAIL') || tripViability === 'AT_RISK') {
+    return 'AT_RISK';
+  }
+  return 'VIABLE';
+}
+
+/** Provider payable for queues/CTAs — never substitute home-policy restatement. */
+export function intentPayableAmount(intent: {
+  providerSpend?: { amount: number; currency: string };
+  priceDelta?: { amount: number; currency: string };
+}): { amount: number; currency: string } | undefined {
+  return intent.providerSpend ?? intent.priceDelta;
+}
+
 function pendingApprovalDecisions(recoveryCase: RecoveryCase): AuthorityDecision[] {
   return recoveryCase.authorityDecisions.filter(
     (decision) =>
@@ -368,11 +401,12 @@ export async function projectOperatorDashboard(
     if (recoveryCase) {
       for (const decision of pendingApprovalDecisions(recoveryCase)) {
         const intent = intentForDecision(recoveryCase, decision);
+        const payable = intent ? intentPayableAmount(intent) : undefined;
         pendingDecisions.push({
           caseId: recoveryCase.id,
           decisionType: 'APPROVAL',
           description: `Approval needed before ${intent ? presentAction(intent.operation) : 'the recovery action'} can proceed`,
-          ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
+          ...(payable ? { amount: payable } : {}),
           requestedAt: decision.decidedAt,
         });
       }
@@ -387,6 +421,10 @@ export async function projectOperatorDashboard(
       signals: deps.signals,
       entities: deps.snapshot.entities,
     }).assess(trip.id);
+
+    // Traveller-specific consequence for shared-incident differentiation.
+    const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, generatedAt);
+    const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
 
     let travellerResponseStatus: OperatorTripView['travellerResponseStatus'] = 'NOT_REQUIRED';
     if (recoveryCase) {
@@ -407,6 +445,7 @@ export async function projectOperatorDashboard(
       ...(travelArrangement ? { travelArrangement } : {}),
       ...(anchorEventName ? { anchorEventName } : {}),
       status,
+      remainderViable,
       ...(lastSignal ? { whatChanged: presentSignalChange(lastSignal) } : {}),
       affectedItems: recoveryCase
         ? recoveryCase.affectedElementIds
@@ -952,18 +991,7 @@ export async function projectTravellerTrip(
 
   // Remainder viability: deterministic from current constraint evaluations.
   const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, at);
-  const hardById = new Map<string, Constraint['hardness']>();
-  for (const constraint of constraints) {
-    hardById.set(constraint.id, constraint.hardness);
-  }
-  let remainderViable: RemainderViability = 'VIABLE';
-  if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
-    remainderViable = 'NOT_VIABLE';
-  } else if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
-    remainderViable = 'UNKNOWN';
-  } else if (evaluations.some((e) => e.status === 'FAIL') || trip.viability === 'AT_RISK') {
-    remainderViable = 'AT_RISK';
-  }
+  const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
 
   return {
     tripId,

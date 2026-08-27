@@ -171,7 +171,8 @@ export const CASE_AUTHORITY_COPY =
 
 /** Case badge derivations beyond the raw trip status (approved C3/C4/C5). */
 export const CASE_BADGE_OPTIONS_READY = 'Options on the table';
-export const CASE_BADGE_APPROVAL_NEEDED = 'Approval needed';
+/** Staged proposal waiting on the correct principal — not option-picking. */
+export const CASE_BADGE_APPROVAL_NEEDED = 'Awaiting approval';
 export const CASE_BADGE_HUMAN_DECISION = 'Needs organiser decision';
 
 /** Payer wording for the funding split legend (approved C4). */

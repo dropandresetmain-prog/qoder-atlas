@@ -184,7 +184,26 @@ function sanitizeOverviewCopy(text: string): string {
     .trim();
 }
 
-function attentionRow(row: AttentionRow, index: number): string {
+/**
+ * Shared-incident consequence from traveller-specific propagated viability,
+ * not from open-case workflow status (which is DISRUPTED for the whole cohort).
+ */
+function sharedIncidentConsequence(trip: OperatorTripView): {
+  kind: 'critical' | 'workable' | 'watching';
+  label: string;
+} {
+  const viability = trip.remainderViable;
+  if (viability === 'NOT_VIABLE') {
+    return { kind: 'critical', label: 'Critical — travel cannot protect the commitment' };
+  }
+  if (viability === 'AT_RISK' || viability === 'UNKNOWN') {
+    return { kind: 'watching', label: 'Watching — schedule changed; trip still workable' };
+  }
+  // VIABLE or absent evaluation that did not fail hard constraints
+  return { kind: 'workable', label: 'Viable after the same airline change' };
+}
+
+function attentionRow(row: AttentionRow, index: number, outcomeKind?: string): string {
   const glyph = row.tone === 'approval' ? '!' : row.tone === 'traveller' ? '?' : '✕';
   const glyphClass = row.tone === 'approval' ? 'g-bad' : row.tone === 'traveller' ? 'g-warn' : 'g-bad';
   const amount = row.amount ? ` · ${escapeHtml(formatMoney(row.amount))}` : '';
@@ -193,8 +212,9 @@ function attentionRow(row: AttentionRow, index: number): string {
     row.trip.travellerNames.length > 0
       ? row.trip.travellerNames.join(', ')
       : (row.trip.label ?? 'Linked participant');
+  const outcomeAttr = outcomeKind ? ` data-shared-outcome="${escapeHtml(outcomeKind)}"` : '';
   return `
-  <a href="/operator/cases/${encodeUri(row.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(row.caseId)}" data-attention-tone="${escapeHtml(row.tone)}" data-test="decision-link">
+  <a href="/operator/cases/${encodeUri(row.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(row.caseId)}" data-attention-tone="${escapeHtml(row.tone)}" data-test="decision-link"${outcomeAttr}>
     <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
     <span class="q-name">${escapeHtml(name)}</span>
     <span class="q-issue">${escapeHtml(sanitizeOverviewCopy(row.description))}${amount}</span>
@@ -212,32 +232,28 @@ function attentionPanel(rows: AttentionRow[]): string {
   const sharedBlock =
     shared.length >= 2
       ? (() => {
-          const children = shared
-            .map((row, index) => {
-              const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
-              const hardFail =
-                presentation === 'NEEDS_ATTENTION' && row.trip.status === 'DISRUPTED';
-              const outcome = hardFail
-                ? 'Critical — travel cannot protect the commitment'
-                : presentation === 'WATCHING' || row.trip.status === 'AT_RISK'
-                  ? 'Watching — schedule changed; trip still workable'
-                  : 'Viable after the same airline change';
-              return attentionRow(
+          const consequences = shared.map((row) => ({
+            row,
+            consequence: sharedIncidentConsequence(row.trip),
+          }));
+          const criticalCount = consequences.filter((item) => item.consequence.kind === 'critical').length;
+          const workable = consequences.filter(
+            (item) => item.consequence.kind === 'workable' || item.consequence.kind === 'watching',
+          ).length;
+          const children = consequences
+            .map(({ row, consequence }, index) =>
+              attentionRow(
                 {
                   ...row,
-                  description: outcome,
+                  description: consequence.label,
                 },
                 index,
-              );
-            })
+                consequence.kind,
+              ),
+            )
             .join('');
-          const criticalCount = shared.filter((row) => {
-            const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
-            return presentation === 'NEEDS_ATTENTION' && row.trip.status === 'DISRUPTED';
-          }).length;
-          const workable = shared.length - criticalCount;
           const header = `
-  <div class="qrow qrow-group" data-test="shared-incident-group" data-attention-tone="attention">
+  <div class="qrow qrow-group" data-test="shared-incident-group" data-attention-tone="attention" data-shared-affected="${shared.length}" data-shared-workable="${workable}" data-shared-critical="${criticalCount}">
     <span class="q-glyph g-bad" aria-hidden="true">✕</span>
     <span class="q-name">Shared airline change</span>
     <span class="q-issue">One airline change · ${shared.length} different trip consequences · ${workable} still workable · ${criticalCount} critical</span>

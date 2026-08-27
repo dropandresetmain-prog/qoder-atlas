@@ -143,6 +143,8 @@ test('lifecycle: pending approval hides Begin, Resolve, and Execute', () => {
   assert.equal(shouldShowExecuteCta(view), false);
   const html = renderCaseDetailBody(view);
   assert.match(html, /data-case-phase="awaiting_authority"/);
+  assert.match(html, /Awaiting approval/i);
+  assert.doesNotMatch(html, /Options on the table/i);
   assert.match(html, /data-test="organisation-approve-form"/);
   assert.match(html, /Approve as organiser/);
   assert.match(html, /data-test="organisation-decline-form"/);
@@ -150,6 +152,34 @@ test('lifecycle: pending approval hides Begin, Resolve, and Execute', () => {
   assert.doesNotMatch(html, /data-test="resolve-northstar-btn"/);
   assert.doesNotMatch(html, /data-test="begin-strategy-btn"/);
   assert.doesNotMatch(html, /data-test="execute-approved-strategy-btn"/);
+});
+
+test('lifecycle: HUMAN_AGENT pending approval is awaiting authority, not options on the table', () => {
+  const view = baseView({
+    status: 'RECOVERING',
+    options: [
+      viableOption,
+      { id: 'opt-2', title: 'Later arrival', verdict: 'VIABLE' as const, recommended: false },
+    ],
+    approval: {
+      requestedFrom: 'HUMAN_AGENT',
+      intentId: 'int-1',
+      state: 'PENDING',
+      reason: 'Organiser must approve the flight change.',
+      approver: { entityType: 'ORGANISATION', id: 'org-1' },
+    },
+  });
+  assert.equal(selectCaseWorkspacePhase(view), 'awaiting_authority');
+  const html = renderCaseDetailBody(view);
+  assert.match(html, /data-case-phase="awaiting_authority"/);
+  assert.match(html, /Awaiting approval/i);
+  assert.doesNotMatch(html, /Options on the table/i);
+  assert.match(html, /data-options-mode="awaiting_authority"/);
+  assert.match(html, /Selected recovery/);
+  assert.match(html, /data-test="organisation-approve-form"/);
+  assert.match(html, /data-test="organisation-decline-form"/);
+  assert.doesNotMatch(html, /data-test="resolve-northstar-btn"/);
+  assert.doesNotMatch(html, /data-test="begin-strategy-btn"/);
 });
 
 test('lifecycle: organiser approval with remaining options exposes Execute only', () => {
@@ -324,4 +354,48 @@ test('lifecycle: Overview resolved traveller is Confirmed and history-linkable',
   assert.match(html, /data-test="case-history-link"/);
   assert.match(html, /href="\/operator\/cases\/case-resolved"/);
   assert.doesNotMatch(html, /data-test="attention-queue"/);
+});
+
+test('lifecycle: shared airline incident differentiates by remainderViable, not case DISRUPTED', () => {
+  const scheduleChanged = 'The airline changed the flight schedule.';
+  const mkTrip = (
+    id: string,
+    name: string,
+    remainderViable: 'VIABLE' | 'NOT_VIABLE' | 'AT_RISK',
+  ) => ({
+    tripId: id,
+    activeCaseId: `case-${id}`,
+    travellerNames: [name],
+    status: 'DISRUPTED' as const,
+    travelArrangement: 'NORTHSTAR_ARRANGED' as const,
+    whatChanged: scheduleChanged,
+    remainderViable,
+    affectedItems: ['Inbound flight'],
+    systemActivity: [],
+    pendingDecisions: [],
+    uncertainties: [],
+    updatedAt: AT,
+  });
+  const view: OperatorDashboardView = {
+    generatedAt: AT,
+    summary: { ready: 0, atRisk: 0, disrupted: 4, recovering: 0, awaitingDecision: 0, managedConfirmed: 0 },
+    arrangementCounts: { total: 4, northstarArranged: 4, selfOrOtherArranged: 0, unspecified: 0 },
+    trips: [
+      mkTrip('trip-arjun', 'Arjun Rao', 'VIABLE'),
+      mkTrip('trip-siti', 'Siti Rahmah', 'VIABLE'),
+      mkTrip('trip-mei', 'Mei Ling Goh', 'VIABLE'),
+      mkTrip('trip-sarah', 'Sarah Lim', 'NOT_VIABLE'),
+    ],
+  };
+  const html = renderOperatorDashboardBody(view);
+  assert.match(html, /data-test="shared-incident-group"/);
+  assert.match(html, /data-shared-affected="4"/);
+  assert.match(html, /data-shared-workable="3"/);
+  assert.match(html, /data-shared-critical="1"/);
+  assert.match(html, /3 still workable/);
+  assert.match(html, /1 critical/);
+  assert.match(html, /data-shared-outcome="critical"[^>]*>[\s\S]*Sarah Lim|Sarah Lim[\s\S]*data-shared-outcome="critical"/);
+  assert.match(html, /Arjun Rao[\s\S]*Viable after the same airline change|data-shared-outcome="workable"/);
+  assert.doesNotMatch(html, /0 still workable/);
+  assert.doesNotMatch(html, /4 critical/);
 });

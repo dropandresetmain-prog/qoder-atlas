@@ -1333,9 +1333,11 @@ export class NorthstarPlanner implements RecoveryPlanner {
               return ` through ${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]}`;
             })()
           : '';
+      // Exact provider payable — never round (541.83 must not become 542).
+      const payableAmount = Number(rate.totalPrice.amount.toFixed(2));
       const summary = samePropertyExtension
-        ? `Extend stay at ${property.name}${nightsPhrase} — ${Math.round(rate.totalPrice.amount)} ${rate.totalPrice.currency}`
-        : `Switch stay to ${property.name}${nightsPhrase} — ${Math.round(rate.totalPrice.amount)} ${rate.totalPrice.currency}`;
+        ? `Extend stay at ${property.name}${nightsPhrase} — ${payableAmount} ${rate.totalPrice.currency}`
+        : `Switch stay to ${property.name}${nightsPhrase} — ${payableAmount} ${rate.totalPrice.currency}`;
       return {
         id: this.idFactory('strat'),
         caseId: input.caseId,

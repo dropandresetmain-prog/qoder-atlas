@@ -105,7 +105,11 @@ async function approveAndExecuteOrganiser(page: Page): Promise<void> {
   const html = await page.content();
   assert.equal(html.includes('data-test="resolve-northstar-btn"'), false, 'Resolve must be gone once recovery has begun');
   assert.equal(html.includes('data-test="begin-strategy-btn"'), false, 'Begin must be gone once approval is pending');
+  assert.match(html, /data-case-phase="awaiting_authority"/);
+  assert.match(html, /Awaiting approval/i);
+  assert.doesNotMatch(html, /Options on the table/i);
   assert.match(html, /data-test="organisation-approve-form"/);
+  assert.match(html, /data-test="organisation-decline-form"/);
   assert.match(html, /Approve as organiser US\$/i, 'CTA must use provider payable US$');
   assert.doesNotMatch(html, /Approve as organiser S\$/i, 'CTA must not use policy S$ alone');
 
@@ -168,7 +172,24 @@ test('browser: Overview shared incident + 67 participant roster truth', async ()
       assert.doesNotMatch(text, /travellers/i);
       assert.doesNotMatch(text, /\b7[6-9]\b/);
     }
-    assert.match(html, /data-test="shared-incident-group"|One airline change/i);
+    const group = page.locator('[data-test="shared-incident-group"]');
+    await group.waitFor({ state: 'visible', timeout: 15000 });
+    assert.equal(await group.getAttribute('data-shared-affected'), '4');
+    assert.equal(await group.getAttribute('data-shared-workable'), '3');
+    assert.equal(await group.getAttribute('data-shared-critical'), '1');
+    assert.match((await group.textContent()) ?? '', /3 still workable/i);
+    assert.match((await group.textContent()) ?? '', /1 critical/i);
+    const queue = page.locator('[data-test="attention-queue"]');
+    const sarah = queue.locator('[data-shared-outcome="critical"]').filter({ hasText: /Sarah Lim/i });
+    assert.equal(await sarah.count(), 1, 'Sarah must be the critical shared-incident traveller');
+    const workable = queue.locator('[data-shared-outcome="workable"], [data-shared-outcome="watching"]');
+    assert.ok((await workable.count()) >= 3, 'three cohort travellers must remain workable');
+    for (const name of ['Arjun Rao', 'Siti Rahmah', 'Mei Ling Goh']) {
+      const row = queue.locator('a').filter({ hasText: name });
+      assert.ok(await row.count(), `${name} must appear in shared incident`);
+      const outcome = await row.first().getAttribute('data-shared-outcome');
+      assert.ok(outcome === 'workable' || outcome === 'watching', `${name} must not be critical (got ${outcome})`);
+    }
   } finally {
     await page.close();
   }
@@ -291,6 +312,17 @@ test('browser: Jonas terminal reopen does not resurrect Resolve/Approve when alr
   try {
     await resetDemo();
     await gotoOverview(page);
+    const overviewHtml = await page.content();
+    const jonasAttention = page.locator('[data-test="attention-queue"] a').filter({ hasText: /Jonas Berg/i });
+    if (await jonasAttention.count()) {
+      const issue = (await jonasAttention.first().locator('.q-issue').textContent()) ?? '';
+      assert.match(issue, /US\$541\.83/);
+      assert.doesNotMatch(issue, /US\$542\.00/);
+      // Policy/home S$ must not masquerade as the Overview payable amount.
+      assert.doesNotMatch(issue, /S\$731\.47(?!\s*(policy|approx|home|equivalent))/i);
+    }
+    assert.doesNotMatch(overviewHtml, /US\$542\.00/);
+
     await openTravellerCase(page, 'Jonas Berg');
     await page.waitForSelector('[data-test="primary-action-panel"], [data-test="resolve-northstar-btn"], [data-test="waiting-for-traveller"]', { timeout: 20000 });
     const operatorHtml = await page.content();
@@ -298,7 +330,11 @@ test('browser: Jonas terminal reopen does not resurrect Resolve/Approve when alr
     assert.doesNotMatch(operatorHtml, /action="\/api\/cases\/[^"]+\/traveller-decision"/);
     assert.doesNotMatch(operatorHtml, /Approve traveller-funded/i);
     assertCommitmentSemantics(operatorHtml, 'Jonas operator');
-    assert.match(operatorHtml, /US\$541\.83|US\$\d+/);
+    assert.match(operatorHtml, /US\$541\.83/);
+    assert.doesNotMatch(operatorHtml, /US\$542\.00/);
+    if (/policy equivalent|Approx\.\s*S\$/i.test(operatorHtml)) {
+      assert.match(operatorHtml, /Approx\.\s*S\$731\.47\s+policy equivalent|policy equivalent/i);
+    }
 
     // Trip id is on the case workspace URL or data attributes via Overview row.
     await gotoOverview(page);
@@ -313,6 +349,8 @@ test('browser: Jonas terminal reopen does not resurrect Resolve/Approve when alr
 
     const travellerHtml = await page.content();
     assert.match(travellerHtml, /Concorde|4 Oct|11:00|Extend|Approve/i);
+    assert.match(travellerHtml, /US\$541\.83/);
+    assert.doesNotMatch(travellerHtml, /US\$542\.00/);
     assert.doesNotMatch(travellerHtml, /Approve the proposed change \(extra cost/i);
 
     const travellerApprove = page.locator('form[action*="traveller-decision"] button[type="submit"]').filter({ hasText: /Approve/i });
@@ -331,6 +369,8 @@ test('browser: Jonas terminal reopen does not resurrect Resolve/Approve when alr
     }
     const html = await page.content();
     if (/data-test="case-phase-resolved"/.test(html)) {
+      assert.match(html, /US\$541\.83/);
+      assert.doesNotMatch(html, /US\$542\.00/);
       await assertResolvedReloadOverview(page, 'Jonas Berg');
     } else {
       await page.reload();

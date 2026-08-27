@@ -133,9 +133,9 @@ function caseBadge(view: CaseDetailView): { label: string; tone: StatusTone } {
       const who = view.travellerNames[0]?.trim() || 'traveller';
       return { label: `Waiting for ${who}`, tone: 'watch' };
     }
-    return view.approval.requestedFrom === 'ORGANISATION'
-      ? { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' }
-      : { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
+    // ORGANISATION and HUMAN_AGENT are both awaiting-authority — never
+    // "Options on the table" once a proposal is staged for approval.
+    return { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' };
   }
   if (!view.resolution && view.options.length > 0 && view.status === 'RECOVERING') {
     return { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
@@ -513,6 +513,31 @@ function optionsSection(view: CaseDetailView): string {
   <section class="section" aria-label="Recovery options" data-test="case-options">
     <h2>${escapeHtml(CASE_OPTIONS_ALL_REJECTED_TITLE)}</h2>
     ${view.options.map((option) => optionCard(option, 'more')).join('')}
+  </section>
+  </div>`;
+  }
+
+  const phase = selectCaseWorkspacePhase(view);
+  // Awaiting authority: keep the staged/selected recovery visible; collapse alternatives.
+  if (phase === 'awaiting_authority') {
+    const selected =
+      view.options.find((option) => option.recommended) ??
+      view.options.find((option) => option.verdict === 'VIABLE') ??
+      view.options[0]!;
+    const alternatives = view.options.filter((option) => option.id !== selected.id);
+    const moreBlock =
+      alternatives.length > 0
+        ? `<details class="more-options" data-test="more-options">
+    <summary>Other options considered <span class="count">${alternatives.length}</span></summary>
+    <div class="more-options-body">${alternatives.map((option) => optionCard(option, 'more')).join('')}</div>
+  </details>`
+        : '';
+    return `
+  <div data-case-options-panel>
+  <section class="section" aria-label="Selected recovery" data-test="case-options" data-options-mode="awaiting_authority" data-primary-option-count="1">
+    <h2>Selected recovery</h2>
+    <div class="primary-options" data-test="primary-options">${optionCard(selected, 'recommended')}</div>
+    ${moreBlock}
   </section>
   </div>`;
   }
