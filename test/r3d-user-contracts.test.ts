@@ -19,7 +19,7 @@ import { renderCaseDetailBody } from '../src/ui/screens/operator-case.ts';
 import { renderActivityBody } from '../src/ui/screens/operator-activity.ts';
 import { renderTravellerTripBody } from '../src/ui/screens/traveller.ts';
 import { renderPage } from '../src/ui/page.ts';
-import { presentActivityActor } from '../src/app/presentation.ts';
+import { presentActivity, presentActivityActor, sanitizeActivityCopy } from '../src/app/presentation.ts';
 import { earliestUpcomingCommitmentAt } from '../src/app/operatorPresentation.ts';
 import { THEME_CSS } from '../src/ui/theme.ts';
 import { renderProgrammeChangeEnhancementScript } from '../src/ui/programme-change-interaction.ts';
@@ -85,7 +85,8 @@ test('fleet Local cohort is distinct from Unconfirmed filled-grey treatment', ()
     'd-local',
   );
   assert.equal(fleetCellClassFor({ status: 'UNKNOWN' }), 'd-unconfirmed');
-  assert.match(THEME_CSS, /\.dotgrid i\.d-unconfirmed::before \{ background: var\(--neutral-f\); \}/);
+  assert.match(THEME_CSS, /\.dotgrid i\.d-unconfirmed \{ background: var\(--neutral-f\); \}/);
+  assert.match(THEME_CSS, /\.dotgrid i::before \{ content: none; display: none; \}/);
   assert.doesNotMatch(THEME_CSS, /\.dotgrid i\.d-unconfirmed \{[^}]*border:/);
 });
 
@@ -116,6 +117,22 @@ test('fleet ordering uses earliest upcoming commitment with missing last', () =>
   } as unknown as Trip;
   assert.equal(earliestUpcomingCommitmentAt(trip, AT), '2026-09-22T11:00:00+08:00');
   assert.equal(earliestUpcomingCommitmentAt(trip, '2026-09-23T00:00:00+08:00'), undefined);
+});
+
+test('overview attention queue surfaces disrupted open cases without requiring search', () => {
+  const view = overviewFixture();
+  const sarah = view.trips.find((trip) => trip.tripId === 'trip-04');
+  assert.ok(sarah);
+  sarah.status = 'DISRUPTED';
+  sarah.travellerNames = ['Sarah Lim'];
+  sarah.activeCaseId = 'case-sarah';
+  sarah.whatChanged = 'Airline moved the inbound arrival past the headline slot.';
+  sarah.pendingDecisions = [];
+  const html = renderOperatorDashboardBody(view);
+  assert.match(html, /data-test="attention-queue"/);
+  assert.match(html, /Sarah Lim/);
+  assert.match(html, /data-case-id="case-sarah"/);
+  assert.match(html, /Needs attention/);
 });
 
 test('overview contracts: 67/42/25, four labels, fleet, pagination, case-first', () => {
@@ -336,4 +353,202 @@ test('normal product pages omit demo banner; demo tooling may keep it', () => {
     '<main>demo</main>',
   );
   assert.match(demo, /class="demo-banner/);
+});
+
+test('case impacted phase hides options until Resolve; strategies selectable', () => {
+  const options = [
+    {
+      id: 'opt-0',
+      title: 'Evening arrival',
+      summary: 'Protects commitment',
+      verdict: 'VIABLE' as const,
+      recommended: true,
+      whyRecommended: 'Keeps the commitment with the fewest soft tradeoffs.',
+      costDelta: { amount: 302, currency: 'SGD' },
+      costAllocationSummary: '302 SGD payable by the traveller',
+    },
+    {
+      id: 'opt-1',
+      title: 'Morning arrival',
+      summary: 'Tighter buffer',
+      verdict: 'VIABLE' as const,
+      costDelta: { amount: 180, currency: 'SGD' },
+    },
+    {
+      id: 'opt-2',
+      title: 'Saver via hub',
+      summary: 'Misses commitment',
+      verdict: 'NOT_VIABLE' as const,
+      rejectionReason: 'Lands after the commitment starts',
+    },
+  ];
+  const view: CaseDetailView = {
+    caseId: 'case-1',
+    tripId: 'trip-1',
+    travellerNames: ['Jordan'],
+    status: 'DISRUPTED',
+    whatChanged: 'Inbound flight cancelled',
+    affectedItems: ['Arrival'],
+    checks: [],
+    options,
+    actions: [],
+    uncertainties: [],
+    updatedAt: AT,
+    chain: [
+      {
+        id: 'leg-1',
+        kind: 'Flight',
+        label: 'SIN → NRT',
+        state: 'BROKEN',
+        linkType: 'FLIGHT',
+      },
+      {
+        id: 'leg-2',
+        kind: 'Transfer',
+        label: 'Airport car',
+        state: 'UNKNOWN',
+        linkType: 'GROUND',
+        detail: 'Pickup unconfirmed',
+      },
+    ],
+  };
+  const html = renderCaseDetailBody(view);
+  assert.match(html, /data-case-phase="impacted"/);
+  assert.match(html, /data-test="resolve-northstar-btn"/);
+  assert.match(html, /Resolve with Northstar AI/);
+  assert.match(html, /data-case-options-panel/);
+  assert.match(html, /data-option-selectable="true"/);
+  assert.match(html, /data-test="why-recommended"/);
+  assert.match(html, />Impacted</);
+  assert.doesNotMatch(html, />Broken</);
+  assert.match(html, /Transfer confirmation pending/);
+  assert.doesNotMatch(html, />Unknown</);
+  assert.match(html, /Approved by policy|Begin recovery|Resolve with Northstar AI/);
+});
+
+test('authority-required case renders human approve; traveller funding is explicit', () => {
+  const view: CaseDetailView = {
+    caseId: 'case-jonas',
+    tripId: 'trip-jonas',
+    travellerNames: ['Jonas'],
+    status: 'RECOVERING',
+    whatChanged: 'Personal hotel extension requested',
+    affectedItems: ['Stay'],
+    checks: [],
+    options: [
+      {
+        id: 'opt-hotel',
+        title: 'Extend stay one night',
+        verdict: 'VIABLE',
+        recommended: true,
+        whyRecommended: 'Satisfies the extension with whole-trip viability.',
+        costDelta: { amount: 302.32, currency: 'SGD' },
+        costAllocationSummary: '302.32 SGD payable by the traveller',
+      },
+    ],
+    actions: [],
+    uncertainties: [],
+    updatedAt: AT,
+    approval: {
+      requestedFrom: 'TRAVELLER',
+      state: 'PENDING',
+      reason: 'Traveller must confirm the self-funded extension.',
+      amount: { amount: 302.32, currency: 'SGD' },
+    },
+    funding: {
+      allocation: {
+        incrementalAmount: { amount: 302.32, currency: 'SGD' },
+        incrementalPayer: 'TRAVELLER',
+        derivedFromRuleIds: ['rule-ait-funded-window'],
+      },
+      summary: '302.32 SGD payable by the traveller',
+    },
+    chain: [
+      {
+        id: 'stay-1',
+        kind: 'Stay',
+        label: 'Hotel · place-hotel-abc123xyz',
+        state: 'PROPOSED',
+        linkType: 'STAY',
+      },
+    ],
+  };
+  const html = renderCaseDetailBody(view);
+  assert.match(html, /data-test="waiting-decision-block"/);
+  assert.match(html, /data-test="funding-traveller-incremental"/);
+  assert.match(html, /traveller pays|Traveller pays|payable by the traveller|Personal incremental cost/i);
+  assert.match(html, /Approve/);
+  assert.match(html, /Hotel/);
+  assert.doesNotMatch(html, /place-hotel-abc123xyz/);
+});
+
+test('case page script includes Resolve choreography contract', () => {
+  const page = renderPage({ title: 'Recovery case', active: 'case' }, '<main data-case-workspace></main>');
+  assert.match(page, /Resolving with Northstar AI/);
+  assert.match(page, /Checking trip dependencies/);
+  assert.match(page, /ns-resolve/);
+  assert.match(page, /prefers-reduced-motion/);
+});
+
+test('activity copy humanizes audit projection and strips internal ids', () => {
+  assert.equal(
+    presentActivity('SIGNAL_PROCESSED', { kind: 'FLIGHT_CANCELLATION' }),
+    'reported a flight cancellation',
+  );
+  assert.equal(presentActivityActor('app:signal-pipeline'), 'Northstar');
+  assert.equal(presentActivityActor('Providers'), 'Travel provider');
+  assert.equal(
+    presentActivityActor('provider', { providerId: 'NUITEE_HOTEL' }),
+    'Hotel',
+  );
+  assert.equal(sanitizeActivityCopy('Stay at place-hotel-riverview confirmed'), 'Stay at Hotel confirmed');
+  assert.equal(sanitizeActivityCopy('trip-abc123xyz'), undefined);
+
+  const html = renderActivityBody({
+    generatedAt: AT,
+    days: [
+      {
+        label: 'Today · Tue 22 Sep',
+        items: [
+          {
+            who: 'app:recovery-execution',
+            text: 'SIGNAL_PROCESSED',
+            sub: 'trip-leak-01',
+            time: '09:02',
+            tone: 'signal',
+            glyph: '!',
+          },
+          {
+            who: 'Kenji Mori',
+            text: 'replacement return connection confirmed',
+            sub: 'Hotel · place-hotel-abc123xyz',
+            time: '08:55',
+            tone: 'done',
+            glyph: '✓',
+          },
+        ],
+      },
+      {
+        label: 'Yesterday · Mon 21 Sep',
+        items: [
+          {
+            who: 'Northstar',
+            text: 'checked recovery options',
+            time: '18:34',
+            tone: 'work',
+            glyph: '◆',
+          },
+        ],
+      },
+    ],
+  });
+  assert.match(html, /data-activity-day/);
+  assert.ok(((html.match(/data-activity-day/g) ?? []).length) >= 2);
+  assert.match(html, /Kenji Mori/);
+  assert.match(html, /Northstar/);
+  assert.doesNotMatch(html, /app:recovery-execution/);
+  assert.doesNotMatch(html, /SIGNAL_PROCESSED/);
+  assert.doesNotMatch(html, /trip-leak-01/);
+  assert.doesNotMatch(html, /place-hotel-abc123xyz/);
+  assert.match(html, /Hotel/);
 });

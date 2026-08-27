@@ -38,6 +38,8 @@ export interface RecoveryOptionView {
   /** Required when verdict is NOT_VIABLE; plain-language reason. */
   rejectionReason?: string;
   recommended?: boolean;
+  /** Plain-language reason the planner ranked this option first. */
+  whyRecommended?: string;
   /** Positive = extra cost, negative = saving, versus the original plan. */
   costDelta?: Money;
   /**

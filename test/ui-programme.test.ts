@@ -26,6 +26,7 @@ import {
   renderProgrammeChangePreview,
   renderProgrammeIntake,
   STATUS_PRIORITY,
+  dedupeProgrammeTimeline,
 } from '../src/ui/screens/operator-programme.ts';
 import {
   healthyProgramme,
@@ -274,6 +275,36 @@ test('timeline section renders only when the augmentation supplies it', () => {
   assert.ok(withTimeline.includes('tl-item endangered'));
   assert.ok(withTimeline.includes('d-watch'));
   assertNoJargon(withTimeline, 'programme-timeline');
+});
+
+test('timeline deduplicates repeated commitments and surfaces affected travellers once', () => {
+  const duplicateTimeline = [
+    {
+      dateLabel: 'Tue 30 Sep',
+      items: [
+        { key: 'cmt-boot', timeLabel: '14:00', title: 'AiT Bootcamp — Opening Remarks', tone: 'ok' as const, tag: 'Traveller A' },
+        { key: 'cmt-boot', timeLabel: '14:00', title: 'AiT Bootcamp — Opening Remarks', tone: 'ok' as const, tag: 'Traveller B' },
+        { key: 'cmt-boot', timeLabel: '14:00', title: 'AiT Bootcamp — Opening Remarks', tone: 'ok' as const, tag: 'Traveller C' },
+      ],
+    },
+  ];
+  const deduped = dedupeProgrammeTimeline(duplicateTimeline);
+  assert.equal(deduped[0]?.items.length, 1);
+  assert.equal(deduped[0]?.items[0]?.affectedLabels?.length, 3);
+  const html = renderProgrammeBody(healthyProgramme, { timeline: duplicateTimeline });
+  assert.equal((html.match(/data-timeline-key="cmt-boot"/g) ?? []).length, 1);
+  assert.match(html, /3 travellers/);
+  assert.match(html, /class="tl-affected"/);
+  assert.match(html, /Traveller A/);
+});
+
+test('traveller table uses recovered-style fixed columns without scroll bleed', () => {
+  const html = renderProgrammeBody(healthyProgramme);
+  assert.match(html, /data-ui-section="traveller-table"/);
+  assert.match(html, /class="table-wrap"/);
+  assert.match(html, /table-layout:fixed/);
+  assert.match(html, /<colgroup>/);
+  assert.doesNotMatch(html, /class="table-scroll"/);
 });
 
 test('endangered commitments render the case link only when the augmentation maps one', () => {

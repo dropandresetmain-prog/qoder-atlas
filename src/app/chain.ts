@@ -42,10 +42,19 @@ function kindLabel(element: TripElement, places: ReadonlyMap<string, Place>): st
   return TRANSPORT_WORD[leg.data.mode];
 }
 
+function looksLikeInternalPlaceId(value: string): boolean {
+  return /^(place-hotel-|place-|pl_|hotel-id)/i.test(value) || /^[a-z]+-[a-z0-9-]{12,}$/i.test(value);
+}
+
 function placeName(placeId: string | undefined, places: ReadonlyMap<string, Place>): string | undefined {
   if (!placeId) return undefined;
   const place = places.get(placeId);
-  return place?.name ?? place?.externalRefs[0]?.value ?? placeId;
+  const name = place?.name?.trim();
+  if (name && !looksLikeInternalPlaceId(name)) return name;
+  const external = place?.externalRefs[0]?.value?.trim();
+  if (external && !looksLikeInternalPlaceId(external)) return external;
+  // Never leak internal place/hotel identifiers into operator copy.
+  return undefined;
 }
 
 function formatDayTime(iso: IsoDateTime | undefined): string | undefined {

@@ -1,6 +1,6 @@
 # Final Demo Integration & Code-Freeze Plan
 
-**Status:** Active closure execution SSOT — **R3C ACCEPTED; R3D NEXT**  
+**Status:** Active closure execution SSOT — **R3C ACCEPTED; R3D HUMAN ACCEPTANCE FIX REQUIRED**  
 **Date:** 27 Aug 2026  
 **Current product line:** `main` contains the integrated R2/R3 candidate (`a151792`), live-product operability closure (`9700edd`), and Railway early-bind health hardening (`7a168ead`). R3C is evidence/design-direction work only and does not redefine backend semantics.  
 **Parent execution SSOT:** `docs/IMPLEMENTATION_PLAN.md`  
@@ -147,16 +147,18 @@ R3C evidence lives in `docs/ui-audit/`.
 
 # R3D — Live Product Convergence
 
-**Status:** **R3D CONVERGENCE CANDIDATE — R3E NEXT.**
+**Status:** **R3D HUMAN ACCEPTANCE FIX REQUIRED** — do not start R3E.
 
 **Purpose:** apply `docs/UI_VISUAL_DIRECTION.md` to the already-working product and close remaining presentation/human-operability defects without reopening architecture.
 
-`docs/UI_VISUAL_DIRECTION.md` is the visual authority for R3D. Static recovered HTML facts are never copied over authoritative runtime truth.
+`docs/UI_VISUAL_DIRECTION.md` is the visual authority for R3D. Static recovered HTML facts are never copied over authoritative runtime truth. For Overview / Programme / Case / Activity / Traveller / Programme Change, recovered screen composition is the **BASE UI**; production contributes runtime data, business logic, working controls, and owner-approved additions.
 
 **Candidate branch:** `rescue/r3d-live-product-convergence`  
-**Base:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3` (`origin/main`)
+**Base:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3` (`origin/main`)  
+**Prior convergence candidate (failed human review):** `0782f76ce8738e76d71460e918eb4ed8c7b6784e`  
+**Human closure matrix:** `docs/ui-audit/R3D_HUMAN_ACCEPTANCE_CLOSURE.md`
 
-R3D is **not** R3 accepted. R3E (final UI polish + human production acceptance) is next. Do not merge to main or deploy production from this branch until R3E completes.
+R3D is **not** R3 accepted. Human acceptance remediation must close every matrix issue before owner review. Do **not** start R3E, merge to main, or deploy production from this branch until that gate passes.
 
 ## R3D priority outcomes
 

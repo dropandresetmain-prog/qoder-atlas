@@ -6,10 +6,27 @@
  * R3D: paginate ~20 entries per page while preserving day grouping.
  */
 import type { ReadModelEnvelope } from '../../contracts/readmodels.ts';
+import { presentActivityActor, sanitizeActivityCopy } from '../../app/presentation.ts';
 import type { ActivityDayGroupView, ActivityFeedItemView, ActivityPageView } from '../operator-surfaces-view-model.ts';
 import { ACTIVITY_PAGE_SIZE } from '../presentationState.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 import { errorPanel, loadingPanel } from '../components.ts';
+
+function displayActivityWho(who: string): string {
+  const actor = presentActivityActor(who);
+  return sanitizeActivityCopy(actor) ?? actor;
+}
+
+function displayActivityText(text: string): string {
+  const cleaned = sanitizeActivityCopy(text);
+  if (cleaned) return cleaned;
+  if (/^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(text.trim())) return 'recorded trip activity';
+  return text;
+}
+
+function displayActivitySub(sub?: string): string | undefined {
+  return sanitizeActivityCopy(sub);
+}
 
 const TONE_CLASS = {
   signal: 'fg-signal',
@@ -20,11 +37,14 @@ const TONE_CLASS = {
 } as const;
 
 function feedRow(item: ActivityFeedItemView, index: number): string {
-  const sub = item.sub ? `<div class="f-sub">${escapeHtml(item.sub)}</div>` : '';
+  const who = displayActivityWho(item.who);
+  const text = displayActivityText(item.text);
+  const subText = displayActivitySub(item.sub);
+  const sub = subText ? `<div class="f-sub">${escapeHtml(subText)}</div>` : '';
   return `
   <div class="frow" style="--i:${Math.min(index, 20)}" data-ui-feed-tone="${escapeHtml(item.tone)}" data-activity-row>
     <span class="f-glyph ${TONE_CLASS[item.tone]}" aria-hidden="true">${escapeHtml(item.glyph)}</span>
-    <div class="f-text"><span class="f-who">${escapeHtml(item.who)}</span> — ${escapeHtml(item.text)}${sub}</div>
+    <div class="f-text"><span class="f-who">${escapeHtml(who)}</span> — ${escapeHtml(text)}${sub}</div>
     <span class="f-time">${escapeHtml(item.time)}</span>
   </div>`;
 }

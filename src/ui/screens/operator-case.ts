@@ -132,22 +132,44 @@ function caseBadge(view: CaseDetailView): { label: string; tone: StatusTone } {
 const CHAIN_LINK_STYLE: Record<ChainLinkView['state'], { cls: string; word: string }> = {
   CONFIRMED: { cls: 'st-confirmed', word: 'Confirmed' },
   PROPOSED: { cls: 'st-proposed', word: 'Proposed' },
-  BROKEN: { cls: 'st-broken', word: 'Broken' },
+  BROKEN: { cls: 'st-broken', word: 'Impacted' },
   UNBOOKED: { cls: 'st-unbooked', word: 'Not booked' },
-  UNKNOWN: { cls: 'st-unknown', word: 'Unknown' },
+  UNKNOWN: { cls: 'st-unknown', word: 'Details pending' },
   AT_RISK: { cls: 'st-atrisk', word: 'At risk' },
 };
 
+function unknownStateWord(link: ChainLinkView): string {
+  const kind = link.kind.toLowerCase();
+  if (kind.includes('transfer') || kind.includes('taxi') || kind.includes('ground')) {
+    return 'Transfer confirmation pending';
+  }
+  if (kind.includes('stay') || kind.includes('hotel')) return 'Hotel confirmation pending';
+  if (kind.includes('flight')) return 'Flight status pending';
+  if (link.detail && /pending|unconfirmed|unknown|awaiting/i.test(link.detail)) {
+    return link.detail.length < 48 ? link.detail : 'Confirmation pending';
+  }
+  return 'Details pending';
+}
+
 function chainLink(link: ChainLinkView): string {
   const style = CHAIN_LINK_STYLE[link.state];
+  const word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
   const detail = link.detail ? `<div class="lk-detail">${escapeHtml(link.detail)}</div>` : '';
   return `
   <div class="link ${style.cls}${link.commitment ? ' is-commitment' : ''}" data-link-state="${escapeHtml(link.state)}">
     <div class="lk-kind"><span class="lk-g" aria-hidden="true">${chainLinkGlyph(link)}</span>${escapeHtml(link.kind)}</div>
-    <div class="lk-label">${escapeHtml(link.label)}</div>
+    <div class="lk-label">${escapeHtml(sanitizeUserFacingLabel(link.label))}</div>
     ${detail}
-    <div class="lk-state">${escapeHtml(style.word)}</div>
+    <div class="lk-state">${escapeHtml(word)}</div>
   </div>`;
+}
+
+/** Strip internal place/hotel identifiers from labels before render. */
+function sanitizeUserFacingLabel(label: string): string {
+  if (/place-hotel-|place-[a-z0-9-]+/i.test(label)) {
+    return label.replace(/place-hotel-[a-z0-9-]+/gi, 'Hotel').replace(/place-[a-z0-9-]+/gi, 'Place');
+  }
+  return label;
 }
 
 /** The chain section; omitted entirely when the projection has no chain. */
@@ -192,7 +214,7 @@ function leadCallout(view: CaseDetailView): string {
       : '';
     const context = view.whatChanged ? `${escapeHtml(view.whatChanged)} ` : '';
     return `
-    <div class="callout tone-watch">
+    <div class="waiting-decision-block" data-test="waiting-decision-block">
       <h3>${escapeHtml(CASE_WAITING_DECISION_TITLE)}</h3>
       <p>${context}${escapeHtml(view.approval.reason)}${amount}</p>
     </div>`;
@@ -343,7 +365,8 @@ function optionsFormingSection(view: CaseDetailView): string {
   </section>`;
 }
 
-function optionCard(option: RecoveryOptionView): string {
+function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternative' | 'more' = 'more'): string {
+  const selectable = option.verdict !== 'NOT_VIABLE';
   const classes = [
     'option-card',
     option.recommended ? 'is-recommended' : '',
@@ -352,6 +375,10 @@ function optionCard(option: RecoveryOptionView): string {
     .filter(Boolean)
     .join(' ');
   const recommended = option.recommended ? '<span class="badge tone-ok">Recommended</span>' : '';
+  const alternative =
+    role === 'alternative' && !option.recommended
+      ? '<span class="badge tone-watch">Alternative</span>'
+      : '';
   // A still-being-checked option says so; viable/rejected verdicts speak
   // through the card treatment itself (inset colour, why-not block).
   const checking =
@@ -373,25 +400,33 @@ function optionCard(option: RecoveryOptionView): string {
   const allocation = option.costAllocationSummary
     ? `<span class="chip">${escapeHtml(option.costAllocationSummary)}</span>`
     : '';
-  const body = option.summary ? `<div class="opt-body">${escapeHtml(option.summary)}</div>` : '';
+  const body = option.summary
+    ? `<div class="opt-body">${escapeHtml(sanitizeUserFacingLabel(option.summary))}</div>`
+    : '';
   const flags =
     (option.flags?.length ?? 0) > 0
       ? `<div class="opt-flags">${option.flags!.map((flag) => `<span class="chip">${escapeHtml(flag)}</span>`).join('')}</div>`
+      : '';
+  const why =
+    option.recommended && option.whyRecommended
+      ? `<div class="why-recommended" data-test="why-recommended"><strong>Why recommended.</strong> ${escapeHtml(option.whyRecommended)}</div>`
       : '';
   const whyNot = option.rejectionReason
     ? `<div class="why-not"><strong>${escapeHtml(OPTION_VERDICT_LABEL.NOT_VIABLE)}.</strong> ${escapeHtml(option.rejectionReason)}</div>`
     : '';
   return `
-  <div class="${classes}" data-option-id="${escapeHtml(option.id)}" data-verdict="${escapeHtml(option.verdict)}" data-test="strategy-option">
+  <div class="${classes}" data-option-id="${escapeHtml(option.id)}" data-verdict="${escapeHtml(option.verdict)}" data-test="strategy-option" data-option-selectable="${selectable ? 'true' : 'false'}">
     <div class="opt-head">
-      <span class="opt-title">${escapeHtml(option.title)}</span>
+      <span class="opt-title">${escapeHtml(sanitizeUserFacingLabel(option.title))}</span>
       ${recommended}
+      ${alternative}
       ${checking}
       ${cost}
       ${allocation}
       ${approval}
     </div>
     ${body}
+    ${why}
     ${flags}
     ${whyNot}
   </div>`;
@@ -402,10 +437,12 @@ function optionsSection(view: CaseDetailView): string {
   const allRejected = view.options.every((option) => option.verdict === 'NOT_VIABLE');
   if (allRejected) {
     return `
+  <div data-case-options-panel>
   <section class="section" aria-label="Recovery options" data-test="case-options">
     <h2>${escapeHtml(CASE_OPTIONS_ALL_REJECTED_TITLE)}</h2>
-    ${view.options.map(optionCard).join('')}
-  </section>`;
+    ${view.options.map((option) => optionCard(option, 'more')).join('')}
+  </section>
+  </div>`;
   }
 
   // Preserve engine recommendation truth: recommended first, then other
@@ -424,20 +461,32 @@ function optionsSection(view: CaseDetailView): string {
       ? 'Recommended next step and alternatives'
       : caseOptionsHeading(primary.length);
 
+  const primaryCards = primary
+    .map((option, index) => {
+      if (option.recommended) return optionCard(option, 'recommended');
+      if (option.verdict !== 'NOT_VIABLE' && index < CASE_PRIMARY_OPTION_LIMIT) {
+        return optionCard(option, 'alternative');
+      }
+      return optionCard(option, 'more');
+    })
+    .join('');
+
   const moreBlock =
     more.length > 0
       ? `<details class="more-options" data-test="more-options">
     <summary>More options <span class="count">${more.length}</span></summary>
-    <div class="more-options-body">${more.map(optionCard).join('')}</div>
+    <div class="more-options-body">${more.map((option) => optionCard(option, 'more')).join('')}</div>
   </details>`
       : '';
 
   return `
+  <div data-case-options-panel>
   <section class="section" aria-label="Recovery options" data-test="case-options" data-primary-option-count="${primary.length}">
     <h2>${escapeHtml(title)}</h2>
-    <div class="primary-options" data-test="primary-options">${primary.map(optionCard).join('')}</div>
+    <div class="primary-options" data-test="primary-options">${primaryCards}</div>
     ${moreBlock}
-  </section>`;
+  </section>
+  </div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -460,8 +509,35 @@ const APPROVAL_STATE_LABEL: Record<ApprovalRequirementView['state'], string> = {
 /** Funding split bar; rendered only from a complete deterministic allocation. */
 function fundingSplitBlock(view: CaseDetailView): string {
   const allocation = view.funding?.allocation;
+  if (!allocation) return '';
+
+  // Traveller-only incremental (typical personal extension): make payer obvious.
   if (
-    !allocation?.coveredAmount ||
+    allocation.incrementalAmount &&
+    allocation.incrementalPayer &&
+    !allocation.coveredAmount
+  ) {
+    return `
+    <div class="funding-callout" data-test="funding-traveller-incremental">
+      <p><strong>Personal incremental cost</strong> — ${escapeHtml(PAYER_LABEL[allocation.incrementalPayer])} pays ${escapeHtml(formatMoney(allocation.incrementalAmount))}.</p>
+      <p class="footnote">Organisation covers the approved business travel window. This extension sits outside that window, so the traveller funds the increment.</p>
+    </div>`;
+  }
+
+  // Organisation-only covered amount.
+  if (
+    allocation.coveredAmount &&
+    allocation.coveredBy &&
+    !allocation.incrementalAmount
+  ) {
+    return `
+    <div class="funding-callout" data-test="funding-organisation-covered">
+      <p><strong>Organisation-funded</strong> — ${escapeHtml(PAYER_LABEL[allocation.coveredBy])} covers ${escapeHtml(formatMoney(allocation.coveredAmount))}.</p>
+    </div>`;
+  }
+
+  if (
+    !allocation.coveredAmount ||
     !allocation.incrementalAmount ||
     !allocation.coveredBy ||
     !allocation.incrementalPayer ||
@@ -644,37 +720,42 @@ function recoveryActionsInner(view: CaseDetailView): string {
 
   if (view.status === 'DISRUPTED' && view.options.length === 0) {
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions">
-        <p class="planning-kicker">Next step</p>
-        <p class="planning-result-title">Check recovery options</p>
-        <p>Northstar will compare the changed booking with the rest of this trip, then check any candidate against timing, policy and approval.</p>
-        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form">
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-          <button type="submit" class="btn btn-primary" data-test="plan-recovery-btn">Plan recovery</button>
         </form>
-        <div class="planning-progress" data-planning-progress hidden role="status" aria-live="polite">
-          <p class="planning-result-title">Checking the whole trip</p>
-          <ol>
-            <li>Checking the changed flight</li>
-            <li>Checking the rest of the trip</li>
-            <li>Comparing recovery options</li>
-            <li>Checking policy and approval</li>
-          </ol>
-          <div class="planning-skeleton" aria-hidden="true"></div>
-        </div>
       </div>`;
   }
 
-  if (view.options.length > 0 && !view.approval) {
-    const recommendedOption = view.options.find((o) => o.recommended);
+  if (view.options.length > 0 && !view.approval && !view.resolution) {
+    const recommendedOption = view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
     if (!recommendedOption) return '';
 
+    const needsHumanApproval = view.options.some((o) => o.requiresApproval);
+    const autoBanner = !needsHumanApproval
+      ? `<div class="authority-auto-banner" data-test="authority-auto-approved">
+          <strong>Approved by policy</strong>
+          <span>Northstar is authorised to proceed with the selected recovery. No extra human approval is required.</span>
+        </div>`
+      : '';
+
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions">
-        <p class="planning-kicker">Recommended option ready</p>
-        <p class="planning-result-title">Begin the checked recovery</p>
-        <p>Northstar has identified the best viable option shown above. Starting it will run the required approval and execution checks.</p>
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Review what changed and the trip impact first. Resolve to reveal the ranked recovery choices.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+      </div>
+      <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel hidden>
+        ${autoBanner}
+        <p class="planning-kicker">Selected recovery</p>
+        <p class="planning-result-title">Begin <span data-selected-strategy-label>${escapeHtml(sanitizeUserFacingLabel(recommendedOption.title))}</span></p>
+        <p>Starting the selected option runs the required approval and execution checks.</p>
         <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
@@ -770,6 +851,10 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     return `<main class="shell">${errorPanel('This case cannot be displayed yet', issues.join('; '))}</main>`;
   }
   const badge = caseBadge(view);
+  const initialPhase =
+    view.resolution || view.approval?.state === 'PENDING' || view.planningExhausted
+      ? 'options'
+      : 'impacted';
   const rail = `
     <aside class="case-rail">
       ${commitmentCard(view)}
@@ -777,7 +862,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
       ${authorityCard()}
     </aside>`;
   return `
-<main class="shell">
+<main class="shell case-workspace" data-case-workspace data-case-phase="${initialPhase}" data-test="case-phase-${initialPhase}">
   <div class="page-head">
     <h1>${escapeHtml(view.tripLabel ?? (view.travellerNames.join(', ') || view.tripId))} <span class="${toneClass(badge.tone, 'badge')}" role="status" aria-label="Case status: ${escapeHtml(badge.label)}">${escapeHtml(badge.label)}</span></h1>
     <p class="sub">${escapeHtml(view.travellerNames.join(', '))}</p>

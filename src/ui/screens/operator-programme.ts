@@ -36,7 +36,6 @@ import {
   PROGRAMME_MISSING_INFO_TITLE,
   PROGRAMME_SUBHEADING,
   PROGRAMME_TABLE_HEADERS,
-  PROGRAMME_TILE_LABEL,
   PROGRAMME_TIMELINE_TITLE,
   type StatusTone,
 } from '../copy.ts';
@@ -90,6 +89,8 @@ export interface ProgrammeTimelineItemView {
   /** Right-aligned note (venue, owner, or why it is watching). */
   tag?: string;
   tone: ProgrammeTimelineTone;
+  /** Traveller-specific labels merged when duplicate commitment rows collapse (P3). */
+  affectedLabels?: readonly string[];
 }
 
 /** One day column of the programme timeline. */
@@ -207,15 +208,6 @@ function summaryTiles(view: ProgrammeView): string {
       tone: 'neutral',
     },
   ];
-  if (view.endangeredCommitments.length > 0) {
-    specs.push({
-      key: 'endangered-commitments',
-      count: view.endangeredCommitments.length,
-      label: PROGRAMME_TILE_LABEL.endangered,
-      tone: 'alert',
-      attention: true,
-    });
-  }
   return `
   ${scaleBanner}
   <div class="tiles stagger" role="group" aria-label="Managed travel presentation across the programme" data-test="programme-summary-tiles">
@@ -282,6 +274,96 @@ function endangeredSection(view: ProgrammeView, augment: ProgrammeAugmentations)
 // Programme timeline (augmentation; section omitted entirely when absent)
 // ---------------------------------------------------------------------------
 
+const TIMELINE_TONE_RANK: Record<ProgrammeTimelineTone, number> = {
+  ok: 0,
+  watch: 1,
+  endangered: 2,
+};
+
+/** Deterministic commitment identity for timeline dedup (id/key, else title+time slot). */
+function timelineItemIdentity(dayLabel: string, item: ProgrammeTimelineItemView): string {
+  const key = item.key.trim();
+  if (key) return `id:${key}`;
+  return `slot:${dayLabel}|${item.timeLabel}|${item.title}`;
+}
+
+function isAggregateTravellerTag(label: string): boolean {
+  return /^\d+ travellers?$/.test(label.trim());
+}
+
+function timelineAffectedLabels(item: ProgrammeTimelineItemView): string[] {
+  if (item.affectedLabels?.length) {
+    return item.affectedLabels.map((label) => label.trim()).filter(Boolean);
+  }
+  const tag = item.tag?.trim();
+  if (!tag || isAggregateTravellerTag(tag)) return [];
+  return [tag];
+}
+
+function mergeTimelineItems(
+  kept: ProgrammeTimelineItemView,
+  incoming: ProgrammeTimelineItemView,
+): ProgrammeTimelineItemView {
+  const labelSet = new Set(timelineAffectedLabels(kept));
+  for (const label of timelineAffectedLabels(incoming)) labelSet.add(label);
+  const affectedLabels = [...labelSet];
+  const tone =
+    TIMELINE_TONE_RANK[incoming.tone] > TIMELINE_TONE_RANK[kept.tone] ? incoming.tone : kept.tone;
+  const tag =
+    affectedLabels.length === 1
+      ? affectedLabels[0]
+      : affectedLabels.length > 1
+        ? `${affectedLabels.length} travellers`
+        : kept.tag ?? incoming.tag;
+  return {
+    key: kept.key || incoming.key,
+    timeLabel: kept.timeLabel,
+    title: kept.title,
+    tone,
+    ...(tag ? { tag } : {}),
+    ...(affectedLabels.length > 1 ? { affectedLabels } : {}),
+  };
+}
+
+/**
+ * Collapse duplicate programme commitments so each anchor commitment appears
+ * once on the main timeline. Traveller-specific duplicates surface as an
+ * affected count and expandable name list, never repeated rows.
+ */
+export function dedupeProgrammeTimeline(
+  timeline: readonly ProgrammeTimelineDayView[],
+): ProgrammeTimelineDayView[] {
+  const result: ProgrammeTimelineDayView[] = [];
+  for (const day of timeline) {
+    const byIdentity = new Map<string, ProgrammeTimelineItemView>();
+    const order: string[] = [];
+    for (const item of day.items) {
+      const identity = timelineItemIdentity(day.dateLabel, item);
+      const existing = byIdentity.get(identity);
+      if (!existing) {
+        byIdentity.set(identity, { ...item });
+        order.push(identity);
+      } else {
+        byIdentity.set(identity, mergeTimelineItems(existing, item));
+      }
+    }
+    const items = order.map((identity) => byIdentity.get(identity)!);
+    if (items.length > 0) result.push({ dateLabel: day.dateLabel, items });
+  }
+  return result;
+}
+
+function timelineAffectedMarkup(item: ProgrammeTimelineItemView): string {
+  if (!item.affectedLabels || item.affectedLabels.length <= 1) {
+    return item.tag ? `<span class="tag">${escapeHtml(item.tag)}</span>` : '';
+  }
+  const count = item.affectedLabels.length;
+  const list = item.affectedLabels
+    .map((label) => `<li>${escapeHtml(label)}</li>`)
+    .join('');
+  return `<details class="tl-affected"><summary class="tag">${count} ${count === 1 ? 'traveller' : 'travellers'}</summary><ul class="tl-affected-list">${list}</ul></details>`;
+}
+
 function timelineItem(item: ProgrammeTimelineItemView, justChanged: boolean): string {
   const classes = [
     'tl-item',
@@ -289,7 +371,8 @@ function timelineItem(item: ProgrammeTimelineItemView, justChanged: boolean): st
     justChanged ? 'just-changed' : '',
   ].filter(Boolean).join(' ');
   const dotClass = item.tone === 'ok' ? 'd-ok' : item.tone === 'watch' ? 'd-watch' : '';
-  return `<div class="${classes}" data-timeline-key="${escapeHtml(item.key)}"><span class="dot ${dotClass}"></span><span class="t">${escapeHtml(item.timeLabel)}</span><span class="ttl">${escapeHtml(item.title)}</span>${item.tag ? `<span class="tag">${escapeHtml(item.tag)}</span>` : ''}</div>`;
+  const titleCell = `<span class="ttl" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.title)}</span>`;
+  return `<div class="${classes}" data-timeline-key="${escapeHtml(item.key)}"><span class="dot ${dotClass}"></span><span class="t">${escapeHtml(item.timeLabel)}</span>${titleCell}${timelineAffectedMarkup(item)}</div>`;
 }
 
 function timelineSection(
@@ -345,8 +428,8 @@ function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentatio
   const primaryHref = firstActiveCaseId
     ? `/operator/cases/${encodeUri(firstActiveCaseId)}`
     : `/traveller?trip=${encodeUri(row.tripId)}`;
-  const nameCell = `<a href="${escapeHtml(primaryHref)}" class="${firstActiveCaseId ? 'case-link' : 'traveller-link'}" data-test="${firstActiveCaseId ? 'programme-case-link' : 'programme-traveller-link'}"><strong>${name}</strong></a>`;
-  const interactionCell = `<a href="/traveller?trip=${encodeUri(row.tripId)}" class="btn btn-ghost btn-sm" data-test="programme-show-interaction">Show interaction</a>`;
+  const nameCell = `<a href="${escapeHtml(primaryHref)}" class="${firstActiveCaseId ? 'case-link' : 'traveller-link'}" style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-test="${firstActiveCaseId ? 'programme-case-link' : 'programme-traveller-link'}"><strong>${name}</strong></a>`;
+  const interactionCell = `<a href="/traveller?trip=${encodeUri(row.tripId)}" class="traveller-link" style="font-size:12px;font-weight:500;white-space:normal" data-test="programme-show-interaction">Show interaction</a>`;
   const role = augment.roleFor?.(row) ?? '—';
   const arrival = augment.arrivalFor?.(row) ?? '—';
   const justChanged = augment.justChangedTripIds?.has(row.tripId) ?? false;
@@ -364,10 +447,10 @@ function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentatio
       : `<span class="badge tone-${presentation === 'CONFIRMED' ? 'ok' : presentation === 'NEEDS_ATTENTION' ? 'alert' : presentation === 'WATCHING' ? 'watch' : 'neutral'}" data-test="presentation-badge">${escapeHtml(MANAGED_TRAVEL_LABEL[presentation!])}</span>`;
   return `
     <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}" data-presentation="${escapeHtml(presentation ?? 'LOCAL')}">
-      <td class="traveller-name-cell">${nameCell}<div class="traveller-secondary">${interactionCell}</div></td>
-      <td>${escapeHtml(role)}</td>
-      <td class="num">${escapeHtml(arrival)}</td>
-      <td>${statusCell}</td>
+      <td class="traveller-name-cell" style="max-width:0"><div style="min-width:0">${nameCell}<div class="traveller-secondary">${interactionCell}</div></div></td>
+      <td class="role-cell" style="max-width:0;overflow:hidden;text-overflow:ellipsis">${escapeHtml(role)}</td>
+      <td class="num" style="white-space:nowrap">${escapeHtml(arrival)}</td>
+      <td class="status-cell" style="white-space:nowrap">${statusCell}</td>
     </tr>`;
 }
 
@@ -385,9 +468,15 @@ function travellerTable(view: ProgrammeView, augment: ProgrammeAugmentations): s
   return `
   <section class="section" aria-label="Travellers">
     <h2>Travellers <span class="count">${view.travellers.length}</span></h2>
-    <div class="panel table-panel" data-ui-section="traveller-table">
-      <div class="table-scroll" tabindex="0" aria-label="Programme traveller roster">
-      <table class="traveller-table">
+    <div class="panel" data-ui-section="traveller-table">
+      <div class="table-wrap">
+      <table class="traveller-table" style="table-layout:fixed;width:100%">
+        <colgroup>
+          <col style="width:28%">
+          <col style="width:34%">
+          <col style="width:22%">
+          <col style="width:16%">
+        </colgroup>
         ${header}
         <tbody>${sorted.map((row) => travellerRow(row, augment)).join('')}</tbody>
       </table>
@@ -483,7 +572,7 @@ function programmeBody(view: ProgrammeView, augment: ProgrammeAugmentations, ine
   ${augment.committedNotice ? committedNoticeCallout(augment.committedNotice) : ''}
   ${summaryTiles(view)}
   ${endangeredSection(view, augment)}
-  ${timelineSection(augment.timeline ?? [], augment)}
+  ${timelineSection(dedupeProgrammeTimeline(augment.timeline ?? []), augment)}
   ${missingInformationPanel(view)}
   ${travellerTable(view, augment)}
   ${footerActions(view, augment)}
@@ -556,7 +645,7 @@ function intakeOnFileCard(view: ProgrammeView, augment: ProgrammeIntakeAugmentat
   const summary = view.summary;
   const unconfirmed = summary.unknown > 0 ? ` · ${summary.unknown} unconfirmed` : '';
   const facts: string[] = [];
-  const timeline = augment.timeline ?? [];
+  const timeline = dedupeProgrammeTimeline(augment.timeline ?? []);
   if (timeline.length > 0) {
     const itemCount = timeline.reduce((sum, day) => sum + day.items.length, 0);
     facts.push(

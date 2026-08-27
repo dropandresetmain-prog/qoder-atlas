@@ -275,6 +275,7 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'strategyid',
   'signalid',
   'offerid',
+  'place-hotel-',
   'provider flight state:',
   'schedule_changed',
   // G3R-Closure fix H: raw engine enums and safety-state vocabulary must

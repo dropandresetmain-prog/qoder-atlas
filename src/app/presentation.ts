@@ -74,33 +74,101 @@ export function presentApprovalReason(): string {
   return 'This change needs approval before it can proceed.';
 }
 
-export function presentActivity(action: string, _payload?: Record<string, unknown>): string {
+const SIGNAL_KIND_ACTIVITY: Record<string, string> = {
+  FLIGHT_CANCELLATION: 'reported a flight cancellation',
+  FLIGHT_SCHEDULE_CHANGE: 'reported a schedule change',
+  FLIGHT_DELAY: 'reported a flight delay',
+  BOOKING_STATE_CHANGE: 'reported a booking status change',
+  PROVIDER_EVENT: 'reported a provider change',
+  WEATHER_EVENT: 'reported weather that may affect the trip',
+  TRAVELLER_INPUT: 'received a traveller update',
+  OPERATOR_INPUT: 'received an operator update',
+  ANCHOR_COMMITMENT_CHANGE: 'recorded a programme change',
+  OTHER: 'recorded new trip information',
+};
+
+const AUTHORITY_OUTCOME_ACTIVITY: Record<string, string> = {
+  REQUIRES_TRAVELLER: 'sent a choice to the traveller',
+  REQUIRES_APPROVAL: 'requested approval before proceeding',
+  AUTO_APPROVED: 'confirmed the recovery could proceed',
+  BLOCKED: 'blocked the recovery action',
+};
+
+/** Strip internal IDs and engine vocabulary from activity feed copy. */
+export function sanitizeActivityCopy(text: string | undefined): string | undefined {
+  if (!text?.trim()) return undefined;
+  let out = text.trim();
+  out = out.replace(/place-hotel-[a-z0-9-]+/gi, 'Hotel');
+  out = out.replace(/place-[a-z0-9-]+/gi, 'Place');
+  out = out.replace(/\b(?:trip|case|intent|signal|offer|strategy)-[a-z0-9-]+\b/gi, '');
+  out = out.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, '');
+  out = out.replace(/\bproviders?\b/gi, 'Travel provider');
+  out = out.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim();
+  if (!out || /^(trip|case|intent|signal|place)-/i.test(out)) return undefined;
+  return out;
+}
+
+export function presentActivity(action: string, payload?: Record<string, unknown>): string {
+  const upper = action.toUpperCase();
+
+  if (upper === 'SIGNAL_PROCESSED') {
+    const kind = typeof payload?.kind === 'string' ? payload.kind : '';
+    if (kind && SIGNAL_KIND_ACTIVITY[kind]) return SIGNAL_KIND_ACTIVITY[kind];
+    return 'recorded a trip change';
+  }
+
+  if (upper === 'AUTHORITY_DECIDED') {
+    const outcome = typeof payload?.outcome === 'string' ? payload.outcome : '';
+    if (outcome && AUTHORITY_OUTCOME_ACTIVITY[outcome]) return AUTHORITY_OUTCOME_ACTIVITY[outcome];
+    return 'determined what approval was needed';
+  }
+
+  if (upper === 'PLANNING_COMPLETED') {
+    const count = payload?.feasibleCount ?? payload?.strategyCount;
+    if (typeof count === 'number' && count > 0) {
+      return `compared ${count} recovery option${count === 1 ? '' : 's'}`;
+    }
+    return 'checked recovery options';
+  }
+
+  if (upper === 'APPROVAL_RECORDED') {
+    const verdict = payload?.verdict;
+    if (verdict === 'DECLINED') return 'refused the approval request';
+    if (verdict === 'APPROVED') return 'recorded the approval decision';
+    return 'recorded an approval decision';
+  }
+
+  if (upper === 'EXECUTION_COMPLETED') {
+    const operation = typeof payload?.operation === 'string' ? payload.operation : '';
+    if (operation.includes('flight')) return 'confirmed the replacement flight';
+    if (operation.includes('hotel')) return 'confirmed the hotel change';
+    return 'completed the recovery action';
+  }
+
   const copy: Record<string, string> = {
-    SIGNAL_PROCESSED: 'Trip change recorded',
-    MUTATION_APPLIED: 'Trip details updated',
-    PLANNING_COMPLETED: 'Checked recovery options',
-    AUTHORITY_DECIDED: 'Approval requirement determined',
-    APPROVAL_RECORDED: 'Approval decision recorded',
-    APPROVAL_REJECTED: 'Approval request refused',
-    EXECUTION_COMPLETED: 'Recovery action executed',
-    EXECUTION_REFUSED: 'Action blocked by the authority gate',
-    CASE_VERIFIED: 'Rechecked the trip after the booking changed',
-    CASE_ESCALATED: 'Handed the case to human support',
+    MUTATION_APPLIED: 'updated trip details',
+    APPROVAL_REJECTED: 'refused the approval request',
+    EXECUTION_REFUSED: 'blocked the recovery action',
+    CASE_VERIFIED: 'rechecked the trip after the booking changed',
+    CASE_ESCALATED: 'handed the case to human support',
   };
-  return copy[action] ?? 'Trip activity recorded';
+  return copy[upper] ?? 'recorded trip activity';
 }
 
 /** Human-facing actor label from audit evidence — never generic "Providers". */
 export function presentActivityActor(actor: string, payload?: Record<string, unknown>): string {
-  if (!actor || /^providers?$/i.test(actor.trim())) return 'Travel provider';
-  if (actor.startsWith('app:')) return 'Northstar';
-  if (actor.includes('organiser') || actor.includes('ait')) return 'AiT organising team';
+  const trimmed = actor?.trim() ?? '';
+  if (!trimmed) return 'Northstar';
+  // App/system actors are always Northstar — before keyword heuristics.
+  if (trimmed === 'system' || trimmed.startsWith('app:')) return 'Northstar';
+
   if (typeof payload?.['providerId'] === 'string') {
     const id = String(payload['providerId']).toUpperCase();
     if (id.includes('ZIPAIR') || id.includes('ZG')) return 'ZIPAIR';
     if (id.includes('SCOOT') || id.includes('TR')) return 'Scoot';
     if (id.includes('CONCORDE')) return 'Concorde Hotel Singapore';
-    if (id.includes('NUITEE') || id.includes('HOTEL')) return 'Hotel provider';
+    if (id.includes('NUITEE') || id.includes('HOTEL')) return 'Hotel';
+    if (id.includes('ATLAS') || id.includes('FLIGHT') || id.includes('AIR')) return 'Airline';
   }
   if (typeof payload?.['carrier'] === 'string' && String(payload['carrier']).trim()) {
     return String(payload['carrier']);
@@ -108,9 +176,18 @@ export function presentActivityActor(actor: string, payload?: Record<string, unk
   if (typeof payload?.['hotelName'] === 'string' && String(payload['hotelName']).trim()) {
     return String(payload['hotelName']);
   }
-  if (actor.toLowerCase().includes('provider')) return 'Travel provider';
-  if (actor.toLowerCase().includes('traveller')) return 'Traveller';
-  return actor.replace(/^app:/, '').replace(/-/g, ' ') || 'Northstar';
+
+  if (/^providers?$/i.test(trimmed)) return 'Travel provider';
+  if (/^signal$/i.test(trimmed)) return 'Travel provider';
+  if (trimmed.includes('organiser') || trimmed.includes('ait')) return 'AiT organising team';
+  if (trimmed.toLowerCase().includes('hotel')) return 'Hotel';
+  if (trimmed.toLowerCase().includes('airline') || trimmed.toLowerCase().includes('flight')) return 'Airline';
+  if (trimmed.toLowerCase().includes('provider')) return 'Travel provider';
+  if (trimmed.toLowerCase().includes('traveller')) return 'Traveller';
+
+  const humanized = trimmed.replace(/-/g, ' ').trim();
+  if (!humanized || /^(trip|case|intent|signal|place)-/i.test(humanized)) return 'Northstar';
+  return humanized;
 }
 
 export function presentAction(operation: string): string {

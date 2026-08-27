@@ -19,7 +19,7 @@ export function toneClass(tone: StatusTone, prefix: string): string {
 
 /**
  * Approved glyph vocabulary for journey-chain links (docs/DESIGN.md §4.2):
- * ✓ confirmed · ◌ proposed · ▲ at risk · ✕ broken · ○ not booked ·
+ * ✓ confirmed · ◌ proposed · ▲ at risk · ✕ impacted · ○ not booked ·
  * ? unconfirmed · ✦ the commitment (never disappears).
  */
 export const CHAIN_GLYPH: Record<ChainLinkState, string> = {

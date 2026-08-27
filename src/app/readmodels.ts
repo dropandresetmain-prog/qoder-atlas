@@ -362,7 +362,10 @@ function chainStateFor(element: TripElement): ChainLinkView['state'] {
 
 async function placeLabel(deps: ReadModelDependencies, placeId: EntityId): Promise<string> {
   const entry = await deps.snapshot.entities.get('PLACE', placeId);
-  return entry?.entityType === 'PLACE' ? (entry.entity.name ?? 'Place unconfirmed') : 'Place unconfirmed';
+  if (entry?.entityType !== 'PLACE') return 'Hotel';
+  const name = entry.entity.name?.trim();
+  if (name && !/^(place-hotel-|place-)/i.test(name)) return name;
+  return 'Hotel';
 }
 
 /** Generic authoritative trip chain for roster mini-chains and case views. */
@@ -511,7 +514,13 @@ export async function projectCaseDetail(
       ...(candidate.rejectionEvidence.length > 0
         ? { rejectionReason: presentCandidateRejection(candidate.rejectionEvidence, snapshot.constraints) }
         : {}),
-      ...(strategy.id === bestStrategyId ? { recommended: true } : {}),
+      ...(strategy.id === bestStrategyId
+        ? {
+            recommended: true,
+            whyRecommended:
+              'Recommended because it keeps the whole trip viable with the fewest soft tradeoffs among workable options.',
+          }
+        : {}),
       // ADR-052: an FX-normalized intent freezes BOTH the home restatement
       // (spendExposure) and the original provider charge (providerSpend); the
       // view shows the restatement as the cost delta and keeps the provider
