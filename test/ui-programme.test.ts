@@ -68,13 +68,12 @@ test('envelope ERROR surfaces the error panel with the message', () => {
 test('envelope LOADED renders the programme body', () => {
   const html = renderProgramme(healthyProgrammeLoaded);
   assert.ok(html.includes('Atlas Innovation Summit 2026'));
-  // Approved tile buckets: travellers · on track · watching · in recovery ·
-  // unconfirmed · endangered commitments (P1/P2/E1/E2 vocabulary).
-  assert.ok(html.includes('data-summary-key="total"'));
-  assert.ok(html.includes('data-summary-key="on-track"'));
+  // R3D simplified managed-travel presentation buckets + Local cohort.
+  assert.ok(html.includes('data-summary-key="confirmed"'));
+  assert.ok(html.includes('data-summary-key="needs-attention"'));
   assert.ok(html.includes('data-summary-key="watching"'));
   assert.ok(html.includes('data-summary-key="unconfirmed"'));
-  assert.ok(html.includes('data-summary-key="endangered-commitments"'));
+  assert.ok(html.includes('data-summary-key="local"'));
   assert.ok(html.includes('href="/programme/import"'));
   assert.ok(html.includes('Import an updated sheet'));
   assertNoJargon(html, 'programme-loaded');
@@ -82,13 +81,12 @@ test('envelope LOADED renders the programme body', () => {
 
 test('45-traveller scale renders every row with no truncation', () => {
   const html = renderProgrammeBody(healthyProgramme);
-  const rowCount = (html.match(/<tr data-trip-id=/g) ?? []).length;
+  const rowCount = (html.match(/<tr[^>]*data-trip-id=/g) ?? []).length;
   assert.equal(rowCount, 45, 'every traveller row must be rendered');
-  // The summary total tile must match the dataset size, and the table
-  // tbody must include all 45 traveller ids, not just a sample.
-  assert.ok(html.includes('data-summary-key="total"'));
+  // Scale banner and confirmed/local presentation remain coherent.
+  assert.ok(html.includes('data-summary-key="confirmed"'));
   assert.ok(html.includes('45 participants'));
-  assert.ok(html.includes('<div class="tile-count">45</div>'));
+  assert.ok(html.includes('45 Northstar-managed'));
   for (const traveller of healthyProgramme.travellers) {
     assert.ok(
       html.includes(`data-traveller-id="${traveller.travellerId}"`),

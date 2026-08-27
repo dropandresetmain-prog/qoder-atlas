@@ -68,11 +68,15 @@ test('dashboard readout uses managed denominator from arrangement counts', () =>
   };
   const html = renderOperatorDashboardBody(view);
   assert.match(html, /28<span class="unit">\/42<\/span>/);
-  assert.match(html, /42 travelling · 25 local · 67 speakers total/);
+  assert.match(html, /42 Northstar-managed · 25 local\/self · 67 participants/);
   assert.equal((html.match(/class="dotgrid"[\s\S]*?<\/div>/i)?.[0]?.match(/<i /g) ?? []).length, 67);
   assert.match(html, /l-unconfirmed/);
   assert.match(html, /l-local/);
   assert.match(html, /data-test="roster-search"/);
+  assert.match(html, /data-page-size="10"/);
+  assert.match(html, /data-test="roster-pagination"/);
+  assert.doesNotMatch(html, /Recovery under way/);
+  assert.match(html, />Needs Attention</);
 });
 
 test('active-case roster row links to case and offers Show interaction', () => {
