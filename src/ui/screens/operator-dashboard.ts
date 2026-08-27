@@ -170,6 +170,20 @@ function collectAttentionRows(view: OperatorDashboardView): AttentionRow[] {
   return rows;
 }
 
+function sanitizeOverviewCopy(text: string): string {
+  return text
+    .replace(/\bel-trip-[a-z0-9-]+/gi, 'linked engagement')
+    .replace(/\btrip-[a-z0-9-]+/gi, 'trip')
+    .replace(/\b\d{4}-\d{2}-\d{2}T[\d:+.-]+/g, (iso) => {
+      const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
+      if (!match) return iso;
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]} · ${match[4]}:${match[5]}`;
+    })
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function attentionRow(row: AttentionRow, index: number): string {
   const glyph = row.tone === 'approval' ? '!' : row.tone === 'traveller' ? '?' : '✕';
   const glyphClass = row.tone === 'approval' ? 'g-bad' : row.tone === 'traveller' ? 'g-warn' : 'g-bad';
@@ -178,22 +192,66 @@ function attentionRow(row: AttentionRow, index: number): string {
   const name =
     row.trip.travellerNames.length > 0
       ? row.trip.travellerNames.join(', ')
-      : (row.trip.label ?? row.trip.tripId);
+      : (row.trip.label ?? 'Linked participant');
   return `
   <a href="/operator/cases/${encodeUri(row.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(row.caseId)}" data-attention-tone="${escapeHtml(row.tone)}" data-test="decision-link">
     <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
     <span class="q-name">${escapeHtml(name)}</span>
-    <span class="q-issue">${escapeHtml(row.description)}${amount}</span>
+    <span class="q-issue">${escapeHtml(sanitizeOverviewCopy(row.description))}${amount}</span>
     <span class="q-time">${escapeHtml(when)}</span>
   </a>`;
 }
 
 function attentionPanel(rows: AttentionRow[]): string {
   if (rows.length === 0) return '';
+
+  const scheduleChange = /airline changed the flight schedule/i;
+  const shared = rows.filter((row) => scheduleChange.test(row.description));
+  const rest = rows.filter((row) => !scheduleChange.test(row.description));
+
+  const sharedBlock =
+    shared.length >= 2
+      ? (() => {
+          const critical = shared.filter((row) => {
+            const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
+            return presentation === 'NEEDS_ATTENTION' || row.trip.status === 'DISRUPTED';
+          });
+          const viableOrWatching = shared.length - critical.length;
+          const header = `
+  <div class="qrow qrow-group" data-test="shared-incident-group" data-attention-tone="attention">
+    <span class="q-glyph g-bad" aria-hidden="true">✕</span>
+    <span class="q-name">Shared airline change</span>
+    <span class="q-issue">One airline change · ${shared.length} different trip consequences · ${viableOrWatching} still workable · ${critical.length} critical</span>
+    <span class="q-time"></span>
+  </div>`;
+          const children = shared
+            .map((row, index) => {
+              const presentation = mapManagedTravelPresentation(presentationInput(row.trip));
+              const outcome =
+                presentation === 'NEEDS_ATTENTION' || row.trip.status === 'DISRUPTED'
+                  ? 'Critical — travel cannot protect the commitment'
+                  : presentation === 'WATCHING'
+                    ? 'Watching — schedule changed; trip still workable'
+                    : 'Viable after the same airline change';
+              return attentionRow(
+                {
+                  ...row,
+                  description: outcome,
+                },
+                index,
+              );
+            })
+            .join('');
+          return `${header}${children}`;
+        })()
+      : shared.map((row, index) => attentionRow(row, index)).join('');
+
+  const otherRows = rest.map((row, index) => attentionRow(row, index + shared.length)).join('');
+
   return `
   <section class="section" aria-label="Needs attention" data-test="attention-queue">
     <h2>Needs attention <span class="count c-alert">${rows.length}</span></h2>
-    <div class="queue stagger" data-ui-section="pending-decisions">${rows.map(attentionRow).join('')}</div>
+    <div class="queue stagger" data-ui-section="pending-decisions">${sharedBlock}${otherRows}</div>
   </section>`;
 }
 
@@ -206,8 +264,10 @@ function rosterSearchField(): string {
 }
 
 function tripRowIssue(trip: OperatorTripView): string {
-  if (trip.whatChanged) return escapeHtml(trip.whatChanged);
-  if (trip.resolutionSummary) return escapeHtml(trip.resolutionSummary);
+  const raw = trip.whatChanged || trip.resolutionSummary;
+  if (raw) {
+    return escapeHtml(sanitizeOverviewCopy(raw));
+  }
   const bucket = mapManagedTravelPresentation(presentationInput(trip));
   return escapeHtml(MANAGED_TRAVEL_LABEL[bucket]);
 }
@@ -281,6 +341,8 @@ function rosterClientScript(pageSize: number): string {
     if (!board) return;
     var pageSize = ${pageSize};
     var page = 0;
+    var participantTotalAttr = board.getAttribute('data-participant-total');
+    var participantTotal = participantTotalAttr ? Number(participantTotalAttr) : NaN;
 
     function visibleRows() {
       var q = input ? (input.value || '').trim().toLowerCase() : '';
@@ -307,10 +369,17 @@ function rosterClientScript(pageSize: number): string {
       });
       if (pagination) {
         pagination.hidden = matched.length <= pageSize;
-        if (label) label.textContent = 'Page ' + (page + 1) + ' of ' + pages + ' · ' + matched.length + ' travellers';
+        var countLabel = (!qFilter() && Number.isFinite(participantTotal) && participantTotal > 0)
+          ? participantTotal
+          : matched.length;
+        if (label) label.textContent = 'Page ' + (page + 1) + ' of ' + pages + ' · ' + countLabel + ' participants';
         if (prev) prev.disabled = page <= 0;
         if (next) next.disabled = page >= pages - 1;
       }
+    }
+
+    function qFilter() {
+      return input ? (input.value || '').trim().length > 0 : false;
     }
 
     if (input) input.addEventListener('input', function(){ page = 0; render(); });
@@ -349,9 +418,9 @@ ${fleetGrid(view, augment)}
   </div>
   ${attentionPanel(collectAttentionRows(view))}
   <section class="section" aria-label="Trips">
-    <h2>All travellers <span class="count">${view.trips.length}</span>${rosterLink}</h2>
+    <h2>All participants <span class="count">${view.arrangementCounts.total || view.trips.length}</span>${rosterLink}</h2>
     ${rosterSearchField()}
-    <div class="board stagger" id="roster-board" data-test="roster-board" data-page-size="${OVERVIEW_ROSTER_PAGE_SIZE}">${rosterSorted.map((trip, i) => tripRow(trip, i, view, augment)).join('')}</div>
+    <div class="board stagger" id="roster-board" data-test="roster-board" data-page-size="${OVERVIEW_ROSTER_PAGE_SIZE}" data-participant-total="${view.arrangementCounts.total}">${rosterSorted.map((trip, i) => tripRow(trip, i, view, augment)).join('')}</div>
     ${rosterPaginationControls()}
     ${rosterFootnote(hasMiniChains)}
   </section>

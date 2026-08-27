@@ -116,7 +116,7 @@
         { "path": "toolActivity.0.ok", "op": "truthy", "description": "the REPLAY recording supplied replacement-corridor offers from the declared gateway" },
         { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "every normalized replacement offer becomes a candidate strategy" },
         { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook", "description": "the candidate rebooks the existing arrival leg with the substituted origin" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "fly from the declared departure gateway", "description": "the superseded London origin is never re-proposed as current" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "fly from HND", "description": "the superseded London origin is never re-proposed as current" },
         { "path": "strategies.0.summary", "op": "contains", "expected": "direct", "description": "recommended offer projects normalized direct routing, not a flattened connection" },
         { "path": "strategies.0.feasible", "op": "truthy", "description": "a replacement from the declared gateway satisfies programme arrival constraints" },
         { "path": "strategies.0.costImpact.currency", "op": "equals", "expected": "USD", "description": "Atlas provider quotes remain in provider currency (USD) ahead of FX normalization" },

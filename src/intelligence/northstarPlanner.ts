@@ -762,12 +762,16 @@ export class NorthstarPlanner implements RecoveryPlanner {
                   offer.segments.length <= 1
                     ? 'direct'
                     : `${offer.segments.length - 1} stop${offer.segments.length - 1 === 1 ? '' : 's'}`;
+                const originLabel =
+                  first?.origin?.value?.trim() ||
+                  routeLabel.split('→')[0]?.trim() ||
+                  'the new origin';
                 const windowPhrase =
                   dimension === 'arriveBy'
                     ? 'arrive earlier'
                     : dimension === 'departAfter'
                       ? 'depart later'
-                      : 'fly from the declared departure gateway';
+                      : `fly from ${originLabel}`;
                 const bookPhrase =
                   dimension === 'arriveBy' ? 'arrive by the requested time' : 'depart after the requested time';
                 const summaryPhrase = leg ? windowPhrase : bookPhrase;
@@ -1321,7 +1325,13 @@ export class NorthstarPlanner implements RecoveryPlanner {
       ];
       const nightsPhrase =
         requestedCheckOut && requestedCheckOut.slice(0, 10) !== stay.data.checkIn.value.slice(0, 10)
-          ? ` through ${requestedCheckOut.slice(0, 10)}`
+          ? (() => {
+              const day = requestedCheckOut.slice(0, 10);
+              const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+              if (!match) return ` through ${day}`;
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              return ` through ${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]}`;
+            })()
           : '';
       const summary = samePropertyExtension
         ? `Extend stay at ${property.name}${nightsPhrase} — ${Math.round(rate.totalPrice.amount)} ${rate.totalPrice.currency}`

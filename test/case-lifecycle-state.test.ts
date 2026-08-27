@@ -144,7 +144,7 @@ test('lifecycle: pending approval hides Begin, Resolve, and Execute', () => {
   const html = renderCaseDetailBody(view);
   assert.match(html, /data-case-phase="awaiting_authority"/);
   assert.match(html, /data-test="organisation-approve-form"/);
-  assert.match(html, />Approve</);
+  assert.match(html, /Approve as organiser/);
   assert.match(html, /data-test="organisation-decline-form"/);
   assert.match(html, /data-does-not-execute/);
   assert.doesNotMatch(html, /data-test="resolve-northstar-btn"/);

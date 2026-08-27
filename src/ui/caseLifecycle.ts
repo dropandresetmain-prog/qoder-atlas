@@ -77,9 +77,11 @@ export function shouldShowProgrammeChangeCta(view: CaseDetailView): boolean {
   return Boolean(view.programmeChangeAvailable && view.anchorEventId);
 }
 
-/** Hide option picker once a plan is no longer the next action. */
+/** Hide option picker until Begin has staged a selection, or authority is waiting. */
 export function shouldShowOptionsPanel(view: CaseDetailView): boolean {
   if (isCaseResolved(view)) return false;
   const phase = selectCaseWorkspacePhase(view);
-  return phase === 'options' || phase === 'awaiting_authority';
+  // Impact-first: do not leak recommended options while still on the Begin step.
+  if (phase === 'options') return false;
+  return phase === 'awaiting_authority';
 }

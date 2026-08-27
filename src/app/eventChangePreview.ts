@@ -23,6 +23,15 @@ import type { MutationService } from '../contracts/services.ts';
 import { processCommitmentChange, type CommitmentFanOutOutcome } from './programme.ts';
 import { elementStartInstant } from '../engine/evaluators.ts';
 
+function humanStayInstantSafe(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso) ?? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return undefined;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = `${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]}`;
+  return match[4] ? `${day} · ${match[4]}:${match[5]}` : day;
+}
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -151,7 +160,7 @@ export async function previewEventChange(
   for (const trip of unlinkedTrips) {
     unaffected.push({
       tripId: trip.id,
-      reasons: [`trip not linked to commitment ${input.commitmentId}`],
+      reasons: ['Trip is not linked to this programme commitment'],
     });
   }
 
@@ -218,7 +227,7 @@ export async function compareEventChangePreviews(
 interface LinkedTripEvaluation {
   affected: boolean;
   reasons: string[];
-  viabilityConsequence?: 'DISRUPTED' | 'AT_RISK';
+  viabilityConsequence?: 'DISRUPTED' | 'AT_RISK' | 'VIABLE';
   constraintFailures: Array<{ constraintId: EntityId; description: string }>;
   engagementMissesFlight?: boolean;
   approvalConsequence?: string;
@@ -244,7 +253,7 @@ function evaluateLinkedTrip(
   if (input.changeKind === 'CANCELLED') {
     return {
       affected: true,
-      reasons: [`commitment ${input.commitmentId} cancelled — engagement ${engagement.id} can no longer be met`],
+      reasons: ['Programme commitment cancelled — linked engagement can no longer be met'],
       viabilityConsequence: 'DISRUPTED',
       constraintFailures: [],
       engagementMissesFlight: true,
@@ -281,7 +290,7 @@ function evaluateLinkedTrip(
   // RELOCATED: check if place changes.
   if (input.changeKind === 'RELOCATED' && input.newPlaceId) {
     if (input.newPlaceId !== engagement.data.placeId) {
-      reasons.push(`engagement relocated from ${engagement.data.placeId ?? 'unknown'} to ${input.newPlaceId}`);
+      reasons.push('Engagement venue would move under the proposed programme change');
     }
   }
 
@@ -289,14 +298,14 @@ function evaluateLinkedTrip(
   if (!temporalChange && reasons.length === 0 && input.changeKind === 'OTHER') {
     return {
       affected: true,
-      reasons: [`commitment changed (OTHER) — engagement ${engagement.id} affected`],
+      reasons: ['Programme commitment changed — linked engagement is affected'],
       constraintFailures: [],
     };
   }
   if (!temporalChange && reasons.length === 0) {
     return {
       affected: false,
-      reasons: [`commitment change does not materially affect engagement ${engagement.id}`],
+      reasons: ['Programme change does not materially affect this engagement'],
       constraintFailures: [],
     };
   }
@@ -316,7 +325,13 @@ function evaluateLinkedTrip(
     const newStart = hypotheticalEngagement.data.startsAt;
     if (newStart && instantMillis(newStart.value) < instantMillis(legArrival.value)) {
       engagementMissesFlight = true;
-      reasons.push(`new engagement start ${newStart.value} precedes connecting transport arrival ${legArrival.value}`);
+      const arrive = humanStayInstantSafe(legArrival.value);
+      const start = humanStayInstantSafe(newStart.value);
+      reasons.push(
+        start && arrive
+          ? `New start ${start} is before connecting arrival ${arrive}`
+          : 'New engagement start precedes connecting transport arrival',
+      );
     }
   }
 
@@ -334,21 +349,76 @@ function evaluateLinkedTrip(
     const newEnd = hypotheticalEngagement.data.endsAt ?? hypotheticalEngagement.data.startsAt;
     if (newEnd && instantMillis(downstreamStart) < instantMillis(newEnd.value)) {
       engagementMissesFlight = true;
-      reasons.push(`engagement now ends at ${newEnd.value} which is after downstream element ${downstream.id} starts at ${downstreamStart}`);
+      const end = humanStayInstantSafe(newEnd.value);
+      reasons.push(
+        end
+          ? `Engagement would end at ${end}, after a downstream trip element starts`
+          : 'Engagement end overlaps a downstream trip element',
+      );
     }
   }
 
+  // Compare inbound arrival buffer before vs after the proposed start.
+  const REQUIRED_BUFFER_MIN = 360;
+  let timingRestored = false;
+  let bufferStillFails = false;
+  let bufferStillPasses = false;
+  let arrivalGapMinutes: number | undefined;
+  let priorGapMinutes: number | undefined;
+  const commitmentLabel = engagement.data.title?.trim() || 'the programme commitment';
+  for (const element of trip.elements) {
+    if (element.elementKind !== 'TRANSPORT_LEG' || element.data.mode !== 'FLIGHT') continue;
+    const arrival = element.data.scheduledArrival?.value;
+    const currentStart = engagement.data.startsAt.value;
+    const newStart = hypotheticalEngagement.data.startsAt?.value;
+    if (!arrival || !newStart) continue;
+    const gapAfter = Math.round((instantMillis(newStart) - instantMillis(arrival)) / 60_000);
+    const gapBefore = Math.round((instantMillis(currentStart) - instantMillis(arrival)) / 60_000);
+    if (!Number.isFinite(gapAfter)) continue;
+    arrivalGapMinutes = gapAfter;
+    if (Number.isFinite(gapBefore)) priorGapMinutes = gapBefore;
+    if (gapAfter >= REQUIRED_BUFFER_MIN && gapBefore < REQUIRED_BUFFER_MIN) timingRestored = true;
+    else if (gapAfter < REQUIRED_BUFFER_MIN) bufferStillFails = true;
+    else bufferStillPasses = true;
+  }
+
   if (temporalChange) {
-    reasons.push(`commitment rescheduled — engagement times would change`);
+    const start = input.newStartsAt ? humanStayInstantSafe(input.newStartsAt) : undefined;
+    if (timingRestored && arrivalGapMinutes !== undefined) {
+      reasons.push(
+        start
+          ? `Restores viability for ${commitmentLabel}: ${arrivalGapMinutes} min available / ${REQUIRED_BUFFER_MIN} min required at ${start}`
+          : `Restores viability for ${commitmentLabel}: ${arrivalGapMinutes} min available / ${REQUIRED_BUFFER_MIN} min required`,
+      );
+    } else if (bufferStillFails && arrivalGapMinutes !== undefined) {
+      reasons.push(
+        `Buffer still fails for ${commitmentLabel}: ${arrivalGapMinutes} min available / ${REQUIRED_BUFFER_MIN} min required` +
+          (priorGapMinutes !== undefined ? ` (was ${priorGapMinutes} min)` : ''),
+      );
+    } else if (bufferStillPasses && arrivalGapMinutes !== undefined) {
+      reasons.push(
+        `Buffer still passes for ${commitmentLabel} (${arrivalGapMinutes} ≥ ${REQUIRED_BUFFER_MIN} min)` +
+          (start ? ` after move to ${start}` : ''),
+      );
+    } else {
+      reasons.push(
+        start
+          ? `Programme commitment moves to ${start}`
+          : 'Programme commitment moves — engagement times would change',
+      );
+    }
   }
 
   // If we found concrete impact evidence, the trip is affected.
   if (reasons.length > 0 || engagementMissesFlight) {
-    const viabilityConsequence: 'DISRUPTED' | 'AT_RISK' =
-      engagementMissesFlight ? 'DISRUPTED' : 'AT_RISK';
+    const viabilityConsequence: 'DISRUPTED' | 'AT_RISK' | 'VIABLE' = engagementMissesFlight || bufferStillFails
+      ? 'DISRUPTED'
+      : timingRestored || bufferStillPasses
+        ? 'VIABLE'
+        : 'AT_RISK';
     return {
       affected: true,
-      reasons,
+      reasons: [...new Set(reasons)],
       viabilityConsequence,
       constraintFailures,
       engagementMissesFlight: engagementMissesFlight || undefined,
@@ -360,7 +430,7 @@ function evaluateLinkedTrip(
 
   return {
     affected: false,
-    reasons: [`commitment change does not materially affect engagement ${engagement.id}`],
+    reasons: ['Programme change does not materially affect this engagement'],
     constraintFailures: [],
   };
 }

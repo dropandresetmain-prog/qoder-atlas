@@ -962,7 +962,11 @@ export async function prepareCommitmentFanOut(
           authority: signal.authority,
           tripId: trip.id,
           subjectRef: { entityType: 'TRIP_ELEMENT', id: engagement.id },
-          summary: payload.summary ?? `shared commitment ${payload.changeKind.toLowerCase()} affecting engagement ${engagement.id}`,
+          summary:
+            payload.summary ??
+            `Shared programme commitment ${String(payload.changeKind).toLowerCase()} — ${
+              engagement.data.title?.trim() || 'linked engagement'
+            }`,
           payload: {
             commitmentId: payload.commitmentId,
             changeKind: payload.changeKind,

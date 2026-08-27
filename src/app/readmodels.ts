@@ -76,11 +76,81 @@ export interface ReadModelDependencies {
 
 /** Rewrite bare `542 USD` / `122.23 SGD` fragments in strategy titles to US$/S$. */
 function presentStrategyTitle(summary: string): string {
-  return summary.replace(
-    /(\d+(?:\.\d+)?)\s*(USD|SGD)\b/gi,
-    (_match, amount: string, currency: string) =>
-      formatMoney({ amount: Number(amount), currency: currency.toUpperCase() as 'USD' | 'SGD' }),
+  return summary
+    .replace(
+      /(\d+(?:\.\d+)?)\s*(USD|SGD)\b/gi,
+      (_match, amount: string, currency: string) =>
+        formatMoney({ amount: Number(amount), currency: currency.toUpperCase() as 'USD' | 'SGD' }),
+    )
+    .replace(/\bthrough\s+(\d{4})-(\d{2})-(\d{2})\b/gi, (_m, y: string, mo: string, d: string) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `through ${Number(d)} ${months[Number(mo) - 1] ?? mo}`;
+    })
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b/g,
+      (_m, _y: string, mo: string, d: string, hh: string, mm: string) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${Number(d)} ${months[Number(mo) - 1] ?? mo} · ${hh}:${mm}`;
+      });
+}
+
+function humanStayInstant(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso) ?? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return undefined;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = `${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]}`;
+  return match[4] ? `${day} · ${match[4]}:${match[5]}` : day;
+}
+
+/** Traveller-facing approval prompt from structured stay/funding evidence. */
+function presentTravellerDecisionPrompt(
+  recoveryCase: RecoveryCase,
+  intent: NonNullable<ReturnType<typeof intentForDecision>>,
+  trip: Trip,
+  placeName: string | undefined,
+): string {
+  const strategy = recoveryCase.strategies.find((candidate) => candidate.id === intent.strategyId);
+  const stayOp = strategy?.candidateOperations.find(
+    (operation) =>
+      operation.op === 'UPSERT_ENTITY' &&
+      operation.entityType === 'TRIP_ELEMENT' &&
+      (operation.data as { elementKind?: string }).elementKind === 'STAY',
   );
+  const proposedStay =
+    stayOp && stayOp.op === 'UPSERT_ENTITY'
+      ? (stayOp.data as Extract<TripElement, { elementKind: 'STAY' }>)
+      : undefined;
+  const currentStay = trip.elements.find(
+    (element): element is Extract<TripElement, { elementKind: 'STAY' }> => element.elementKind === 'STAY',
+  );
+  const property =
+    placeName?.trim() ||
+    (typeof strategy?.summary === 'string'
+      ? /Extend stay at ([^—]+)/i.exec(strategy.summary)?.[1]?.trim()
+      : undefined) ||
+    'your hotel';
+  const from = humanStayInstant(currentStay?.data.checkOut.value);
+  const to = humanStayInstant(proposedStay?.data.checkOut?.value);
+  const payable = intent.providerSpend
+    ? formatMoney(intent.providerSpend)
+    : intent.priceDelta
+      ? formatMoney(intent.priceDelta)
+      : undefined;
+  const funding =
+    intent.costAllocation?.incrementalPayer === 'TRAVELLER'
+      ? ' Traveller-funded increment'
+      : intent.costAllocation
+        ? ` ${presentAllocationSummary(intent.costAllocation)}`
+        : '';
+  if (from && to) {
+    return `Approve extending ${property}: ${from} → ${to}.${funding}${payable ? ` ${payable}.` : ''} No flight change.`;
+  }
+  const fundingNote = intent.costAllocation
+    ? ` Funding: ${presentAllocationSummary(intent.costAllocation)}.`
+    : intent.priceDelta
+      ? ' Funding: who pays has not been determined yet.'
+      : '';
+  return `Approve the proposed change${payable ? ` (${payable})` : ''}?${fundingNote}`;
 }
 
 const ELEMENT_KIND_LABEL: Record<TripElement['elementKind'], string> = {
@@ -343,6 +413,7 @@ export async function projectOperatorDashboard(
             .map((id) => trip.elements.find((element) => element.id === id))
             .filter((element): element is TripElement => Boolean(element))
             .map(describeElement)
+            .map((label) => label.replace(/\bel-trip-[a-z0-9-]+/gi, 'trip element'))
         : [],
       systemActivity,
       pendingDecisions,
@@ -353,7 +424,25 @@ export async function projectOperatorDashboard(
     });
   }
 
-  return { generatedAt, summary, trips, arrangementCounts };
+  // Participant roster = Northstar-managed + local/self-managed only.
+  // Orphan/unspecified trips must not inflate the 67-participant hero truth.
+  const participantTrips = trips.filter(
+    (row) =>
+      row.travellerNames.length > 0 &&
+      (row.travelArrangement === 'NORTHSTAR_ARRANGED' ||
+        row.travelArrangement === 'SELF_OR_OTHER_ARRANGED'),
+  );
+
+  return {
+    generatedAt,
+    summary,
+    trips: participantTrips,
+    arrangementCounts: {
+      ...arrangementCounts,
+      total: arrangementCounts.northstarArranged + arrangementCounts.selfOrOtherArranged,
+      unspecified: 0,
+    },
+  };
 }
 
 const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
@@ -367,11 +456,17 @@ const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
 };
 
 function chainStateFor(element: TripElement): ChainLinkView['state'] {
+  if (element.elementKind === 'ENGAGEMENT') {
+    if (element.status === 'INVALID') return 'BROKEN';
+    if (element.status === 'AT_RISK') return 'AT_RISK';
+    return 'CONFIRMED';
+  }
   if (element.status === 'INVALID' || element.reservationState === 'CANCELLED') return 'BROKEN';
   if (element.status === 'AT_RISK' || element.reservationState === 'CHANGED') return 'AT_RISK';
   if (element.reservationState === 'HELD') return 'PROPOSED';
-  if (element.status === 'UNKNOWN' || element.reservationState === 'UNKNOWN') return 'UNKNOWN';
-  if (element.elementKind !== 'ENGAGEMENT' && element.reservationState === 'NONE') return 'UNBOOKED';
+  if (element.reservationState === 'UNKNOWN') return 'UNKNOWN';
+  // Confirmed/completed bookings stay Confirmed even when health status is UNKNOWN.
+  if (element.reservationState === 'NONE') return 'UNBOOKED';
   return 'CONFIRMED';
 }
 
@@ -643,8 +738,20 @@ export async function projectCaseDetail(
       // HUMAN_AGENT may be decided by an unambiguous in-scope organisation
       // principal (authority allows ORGANISATION for HUMAN_AGENT).
       ...(organisationApprover ? { approver: { entityType: 'ORGANISATION' as const, id: organisationApprover.id } } : {}),
-      reason: presentApprovalReason(),
-      ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
+      reason: presentApprovalReason(
+        latestRequiring.outcome === 'REQUIRES_TRAVELLER'
+          ? 'TRAVELLER'
+          : latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER'
+            ? 'ORGANISATION'
+            : 'HUMAN_AGENT',
+      ),
+      // CTA currency must match what the principal actually pays (provider
+      // charge). Home-policy restatement stays on option chips, not the button.
+      ...(intent?.providerSpend
+        ? { amount: intent.providerSpend }
+        : intent?.priceDelta
+          ? { amount: intent.priceDelta }
+          : {}),
       state: latestRequiring.approval
         ? latestRequiring.approval.decision === 'APPROVED'
           ? 'APPROVED'
@@ -698,6 +805,17 @@ export async function projectCaseDetail(
   const caseStatus = statusFromCase(recoveryCase.status, isChangeRequest);
   const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
   const programmeChangeCommitmentId = recoveryCommitment?.data.anchorCommitmentId;
+  // Fixture-keyed programme proposal presets (commitment entity ids from the
+  // closed demo world). Presentation only — not person-specific branches.
+  const PROGRAMME_CHANGE_PRESETS: Record<string, { startsAt: string; endsAt: string }> = {
+    'cmt-ait-d1-headline-interview': {
+      startsAt: '2026-10-01T15:30:00+08:00',
+      endsAt: '2026-10-01T16:00:00+08:00',
+    },
+  };
+  const programmePreset = programmeChangeCommitmentId
+    ? PROGRAMME_CHANGE_PRESETS[programmeChangeCommitmentId]
+    : undefined;
   const hardConstraintFailed = evaluations.some((evaluation) => {
     const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
     return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
@@ -740,6 +858,12 @@ export async function projectCaseDetail(
             anchorEventId: trip.anchorEventId,
             programmeChangeAvailable: true,
             ...(programmeChangeCommitmentId ? { programmeChangeCommitmentId } : {}),
+            ...(programmePreset
+              ? {
+                  programmeChangeProposedStartsAt: programmePreset.startsAt,
+                  programmeChangeProposedEndsAt: programmePreset.endsAt,
+                }
+              : {}),
           }
         : trip.anchorEventId
           ? { anchorEventId: trip.anchorEventId }
@@ -812,16 +936,15 @@ export async function projectTravellerTrip(
     for (const decision of pendingApprovalDecisions(recoveryCase)) {
       if (decision.outcome !== 'REQUIRES_TRAVELLER') continue;
       const intent = intentForDecision(recoveryCase, decision);
-      // Mixed funding (ADR-037): when a deterministic allocation exists the
-      // traveller is told who pays — the prompt is evidence, not a guess.
-      const fundingNote = intent?.costAllocation
-        ? ` Funding: ${presentAllocationSummary(intent.costAllocation)}.`
-        : intent?.priceDelta
-          ? ' Funding: who pays has not been determined yet.'
-          : '';
+      if (!intent) continue;
+      const currentStay = trip.elements.find((element) => element.elementKind === 'STAY');
+      const stayPlaceName =
+        currentStay && currentStay.elementKind === 'STAY'
+          ? await placeLabel(deps, currentStay.data.placeId)
+          : undefined;
       inputRequested.push({
         caseId: recoveryCase.id,
-        prompt: `Approve the proposed change${intent?.priceDelta ? ` (extra cost ${intent.priceDelta.amount} ${intent.priceDelta.currency})` : ''}?${fundingNote}`,
+        prompt: presentTravellerDecisionPrompt(recoveryCase, intent, trip, stayPlaceName),
         options: ['Approve', 'Decline'],
       });
     }

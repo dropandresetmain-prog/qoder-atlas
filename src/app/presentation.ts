@@ -88,14 +88,32 @@ export function presentCheckLabel(
     return `${CHECK_RESULT_PREFIX.PASS}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
   }
   if (result === 'FAIL') {
-    if (base.includes('Arrival') || base.includes('buffer')) return 'Original plan no longer meets the required arrival buffer';
-    return `${CHECK_RESULT_PREFIX.FAIL}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
+    if (base.includes('Arrival') || base.includes('buffer')) {
+      return 'Original plan no longer meets the required arrival buffer';
+    }
+    // Never produce contradictory copy like "No longer meets: timing still works".
+    if (base.includes('Timing') || /still works/i.test(base)) {
+      return 'Timing no longer works for the commitment';
+    }
+    if (base.includes('Hotel') || base.includes('stay')) {
+      return 'Hotel booking no longer satisfies the required stay window';
+    }
+    if (base.includes('grouping') || base.includes('policy')) {
+      return 'No longer within the required policy limits';
+    }
+    return `Required condition failed: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
   }
   if (base.includes('transfer') || base.includes('Ground')) return 'Ground transfer timing still unconfirmed';
   return `${CHECK_RESULT_PREFIX.UNKNOWN}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
 }
 
-export function presentApprovalReason(): string {
+export function presentApprovalReason(requestedFrom?: 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT'): string {
+  if (requestedFrom === 'TRAVELLER') {
+    return 'This change needs traveller approval before it can proceed.';
+  }
+  if (requestedFrom === 'ORGANISATION' || requestedFrom === 'HUMAN_AGENT') {
+    return 'This change needs organisation approval before it can proceed.';
+  }
   return 'This change needs organisation or traveller approval before it can proceed.';
 }
 
@@ -153,11 +171,12 @@ export function sanitizeActivityCopy(text: string | undefined): string | undefin
   let out = text.trim();
   out = out.replace(/place-hotel-[a-z0-9-]+/gi, 'Hotel');
   out = out.replace(/place-[a-z0-9-]+/gi, 'Place');
+  out = out.replace(/\bel-trip-[a-z0-9-]+/gi, 'linked engagement');
   out = out.replace(/\b(?:trip|case|intent|signal|offer|strategy)-[a-z0-9-]+\b/gi, '');
   out = out.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, '');
   out = out.replace(/\bproviders?\b/gi, 'Travel provider');
   out = out.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim();
-  if (!out || /^(trip|case|intent|signal|place)-/i.test(out)) return undefined;
+  if (!out || /^(trip|case|intent|signal|place|el-trip)-/i.test(out)) return undefined;
   return out;
 }
 
@@ -262,9 +281,13 @@ export function presentAction(operation: string): string {
 export function presentSignalChange(signal: TripSignal): string {
   const summary = signal.summary?.trim();
   const looksInternal = summary
-    ? /provider\s+(flight|stay)\s+state\s*:|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/i.test(summary)
+    ? /provider\s+(flight|stay)\s+state\s*:|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\bel-trip-|affecting engagement\s+\S+/i.test(
+        summary,
+      )
     : true;
-  if (summary && !looksInternal) return summary;
+  if (summary && !looksInternal) {
+    return sanitizeActivityCopy(summary) ?? summary;
+  }
 
   const copy: Record<TripSignal['kind'], string> = {
     FLIGHT_CANCELLATION: 'The airline cancelled the flight.',
@@ -278,5 +301,9 @@ export function presentSignalChange(signal: TripSignal): string {
     ANCHOR_COMMITMENT_CHANGE: 'An event commitment changed.',
     OTHER: 'New information changed this trip.',
   };
+  if (signal.kind === 'ANCHOR_COMMITMENT_CHANGE' && summary) {
+    const cleaned = sanitizeActivityCopy(summary);
+    if (cleaned) return cleaned;
+  }
   return copy[signal.kind];
 }

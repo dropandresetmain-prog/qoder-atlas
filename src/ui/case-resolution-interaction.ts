@@ -20,7 +20,7 @@ export function renderCaseResolutionEnhancementScript(): string {
   'use strict';
   var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var RESOLVE_MS = REDUCE ? 200 : 3000;
-  var EXEC_MS = REDUCE ? 150 : 1800;
+  var EXEC_MS = REDUCE ? 200 : 2400;
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -59,9 +59,10 @@ export function renderCaseResolutionEnhancementScript(): string {
     { phase: 'authority', label: 'Checking policy and authority' }
   ];
   var DEFAULT_EXECUTION = [
-    { phase: 'execution', label: 'Submitting the approved action at the provider boundary' },
-    { phase: 'observation', label: 'Observing the provider-boundary result' },
-    { phase: 'state_update', label: 'Updating the trip and rechecking viability' }
+    { phase: 'execution', label: 'Executing at the declared provider boundary' },
+    { phase: 'observation', label: 'Observing the provider / programme result' },
+    { phase: 'state_update', label: 'Updating authoritative trip state' },
+    { phase: 'recheck', label: 'Rechecking downstream trip viability' }
   ];
 
   function ensureOverlay(id, title, steps) {
@@ -70,6 +71,7 @@ export function renderCaseResolutionEnhancementScript(): string {
     var scrim = document.createElement('div');
     scrim.id = id;
     scrim.className = 'ns-resolve-scrim';
+    scrim.setAttribute('data-test', 'lifecycle-progress-overlay');
     scrim.setAttribute('role', 'dialog');
     scrim.setAttribute('aria-modal', 'true');
     scrim.setAttribute('aria-label', title);
@@ -195,7 +197,25 @@ export function renderCaseResolutionEnhancementScript(): string {
     return form.getAttribute('data-test') === 'begin-strategy-form' ||
       form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
       form.getAttribute('action') === '/api/runtime/execute' ||
-      form.getAttribute('action') === '/api/runtime/begin';
+      form.getAttribute('action') === '/api/runtime/begin' ||
+      (form.getAttribute('action') || '').indexOf('/traveller-decision') !== -1;
+  }
+
+  function submitFormAsync(form) {
+    var action = form.getAttribute('action') || window.location.href;
+    var method = (form.getAttribute('method') || 'POST').toUpperCase();
+    var body = new URLSearchParams();
+    qsa('input, select, textarea', form).forEach(function(input) {
+      if (!input.name || input.disabled) return;
+      if ((input.type === 'checkbox' || input.type === 'radio') && !input.checked) return;
+      body.append(input.name, input.value);
+    });
+    return fetch(action, {
+      method: method,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json, text/html' },
+      body: body.toString(),
+      redirect: 'follow'
+    });
   }
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -255,13 +275,57 @@ export function renderCaseResolutionEnhancementScript(): string {
       if (!form.classList.contains('inline-form') && !form.classList.contains('action-form')) return;
       if (isDeclineForm(form)) return;
       if (!isExecuteForm(form)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       syncStrategyInputs(root);
+      var isBegin = form.getAttribute('data-test') === 'begin-strategy-form' ||
+        form.getAttribute('action') === '/api/runtime/begin';
+      var isExecuteApproved = form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
+        form.getAttribute('action') === '/api/runtime/execute';
       var overlay = ensureOverlay(
         'ns-execute-overlay',
-        'Executing approved recovery',
-        executionSteps
+        isBegin ? 'Starting recovery' : 'Executing approved recovery',
+        isBegin ? planningSteps.slice(-2).concat(executionSteps.slice(0, 1)) : executionSteps
       );
-      runStages(overlay, EXEC_MS);
+      // JSON body matches the progressive-enhancement contract used elsewhere.
+      var body = {};
+      qsa('input, select, textarea', form).forEach(function(input) {
+        if (!input.name || input.disabled) return;
+        if ((input.type === 'checkbox' || input.type === 'radio') && !input.checked) return;
+        var dot = input.name.indexOf('.');
+        if (dot > 0) {
+          var parent = input.name.slice(0, dot);
+          var child = input.name.slice(dot + 1);
+          if (child && !Object.prototype.hasOwnProperty.call(body, parent)) body[parent] = {};
+          if (child && body[parent] && typeof body[parent] === 'object') body[parent][child] = input.value;
+        } else {
+          body[input.name] = input.value;
+        }
+      });
+      var requestPromise = fetch(form.getAttribute('action') || window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function(r) {
+        return r.json().then(function(data) {
+          if (!r.ok) throw new Error(data.message || data.error || 'Action failed');
+          return data;
+        }).catch(function(err) {
+          if (!r.ok) throw err;
+          return {};
+        });
+      });
+      // Execute path: hold ~2s so observe → state-update steps are visible.
+      var duration = isExecuteApproved ? Math.max(EXEC_MS, 2000) : EXEC_MS;
+      var stagePromise = runStages(overlay, duration);
+      Promise.all([requestPromise, stagePromise])
+        .then(function() {
+          window.location.reload();
+        })
+        .catch(function(err) {
+          alert('Action failed: ' + (err && err.message ? err.message : String(err)));
+          window.location.reload();
+        });
     }, true);
   });
 })();

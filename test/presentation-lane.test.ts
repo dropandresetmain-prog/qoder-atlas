@@ -61,7 +61,7 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
     caseId: 'case-presentation-1',
     tripId: 'trip-presentation-1',
     travellerNames: ['Jordan Lee'],
-    status: 'DISRUPTED',
+    status: 'RECOVERING',
     affectedItems: [],
     checks: [],
     options: [
@@ -84,6 +84,14 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
         flags: ['Arrives 14:35 · commitment 20:45'],
       },
     ],
+    approval: {
+      requestedFrom: 'ORGANISATION',
+      intentId: 'int-1',
+      state: 'PENDING',
+      reason: 'Organisation must approve the flight change.',
+      amount: { amount: 90.54, currency: 'USD' },
+      approver: { entityType: 'ORGANISATION', id: 'org-1' },
+    },
     actions: [],
     uncertainties: [],
     updatedAt: '2026-09-30T10:00:00+08:00',
@@ -94,6 +102,7 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
   assert.match(html, /370 min available \/ 360 min required/);
   assert.match(html, /Organisation approval required/);
   assert.match(html, /Search evidence: REPLAY/);
+  assert.match(html, /Approve as organiser US\$90\.54/);
   assert.doesNotMatch(html, /human agent/i);
   assert.doesNotMatch(html, /\$[\d.]+\s+at provider/);
   assert.match(html, /data-test="option-payable"/);

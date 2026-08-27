@@ -237,6 +237,9 @@ export interface CaseDetailView {
   programmeChangeAvailable?: boolean;
   /** Anchor commitment id for programme-side recovery (when available). */
   programmeChangeCommitmentId?: EntityId;
+  /** Prefill for programme-change modal (ISO); human labels rendered in UI. */
+  programmeChangeProposedStartsAt?: IsoDateTime;
+  programmeChangeProposedEndsAt?: IsoDateTime;
 }
 
 /**

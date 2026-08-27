@@ -129,6 +129,10 @@ function caseBadge(view: CaseDetailView): { label: string; tone: StatusTone } {
     return { label: STATUS_LABEL.RECOVERING, tone: STATUS_TONE.RECOVERING };
   }
   if (view.approval?.state === 'PENDING') {
+    if (view.approval.requestedFrom === 'TRAVELLER') {
+      const who = view.travellerNames[0]?.trim() || 'traveller';
+      return { label: `Waiting for ${who}`, tone: 'watch' };
+    }
     return view.approval.requestedFrom === 'ORGANISATION'
       ? { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' }
       : { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
@@ -171,7 +175,9 @@ function chainLink(link: ChainLinkView): string {
   const isCommitment = Boolean(link.commitment) || link.kind.toLowerCase() === 'commitment';
   let word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
   if (isCommitment) {
-    if (link.state === 'UNBOOKED' || link.state === 'CONFIRMED') word = 'Scheduled';
+    // Programme engagements are not bookings — never "Not booked" / "Details pending".
+    if (link.state === 'UNBOOKED' || link.state === 'CONFIRMED' || link.state === 'UNKNOWN') word = 'Scheduled';
+    else if (link.state === 'PROPOSED') word = 'Preserved';
     else if (link.state === 'AT_RISK') word = 'At risk';
     else if (link.state === 'BROKEN') word = 'Impacted';
   }
@@ -323,10 +329,23 @@ const ACTION_ROW: Record<ActionProgressState, { cls: string; icon: string }> = {
 
 function activitySection(view: CaseDetailView): string {
   if (view.actions.length === 0) return '';
+  const phase = selectCaseWorkspacePhase(view);
+  // Do not leak recommended flight/strategy titles before Begin / authority.
+  const revealRecommendationDetail =
+    phase === 'awaiting_authority' ||
+    phase === 'execute' ||
+    phase === 'executing' ||
+    phase === 'resolved' ||
+    view.approval?.state === 'APPROVED' ||
+    view.approval?.state === 'PENDING';
   const rows = view.actions
     .map((action) => {
       const style = ACTION_ROW[action.state];
-      const sub = action.detail ? `<span class="c-sub">${escapeHtml(action.detail)}</span>` : '';
+      const detail =
+        revealRecommendationDetail || !action.detail
+          ? action.detail
+          : undefined;
+      const sub = detail ? `<span class="c-sub">${escapeHtml(detail)}</span>` : '';
       return `<div class="check-row ${style.cls}"><span class="c-ic">${style.icon}</span><span class="c-t">${escapeHtml(action.label)}</span>${sub}</div>`;
     })
     .join('');
@@ -632,23 +651,16 @@ function approvalSection(view: CaseDetailView): string {
     approval.state === 'PENDING' &&
     approval.requestedFrom === 'TRAVELLER'
   ) {
-    const payerHint =
-      view.funding?.allocation?.incrementalPayer === 'TRAVELLER'
-        ? 'traveller-funded '
-        : '';
-    const approveLabel = approval.amount
-      ? `Approve ${payerHint}${formatMoney(approval.amount)}`.replace(/\s+/g, ' ').trim()
-      : 'Approve';
+    // Operator must not approve on the traveller's behalf. Traveller surface owns Approve.
+    const waitingFor =
+      view.travellerNames?.[0]?.trim() ||
+      view.tripLabel?.trim() ||
+      'the traveller';
     actionForms = `
-    <div class="btn-row">
-      <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
-        <input type="hidden" name="decision" value="APPROVED">
-        <button type="submit" class="btn btn-primary">${escapeHtml(approveLabel)}</button>
-      </form>
-      <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
-        <input type="hidden" name="decision" value="DECLINED">
-        <button type="submit" class="btn btn-danger-ghost" data-does-not-execute>Decline</button>
-      </form>
+    <div class="panel waiting-traveller" data-test="waiting-for-traveller" data-case-cta="awaiting_traveller">
+      <p class="planning-kicker">Traveller decision required</p>
+      <p class="planning-result-title">Waiting for ${escapeHtml(waitingFor)}</p>
+      <p>Northstar will not change the booking until ${escapeHtml(waitingFor)} approves on the traveller surface.</p>
     </div>`;
   } else if (
     approval.state === 'PENDING' &&
@@ -656,8 +668,12 @@ function approvalSection(view: CaseDetailView): string {
     approval.approver &&
     approval.intentId
   ) {
-    const approveLabel = approval.amount
-      ? `Approve as organiser ${formatMoney(approval.amount)}`
+    const payable =
+      view.options.find((option) => option.recommended)?.providerCost ??
+      view.options.find((option) => option.providerCost)?.providerCost ??
+      approval.amount;
+    const approveLabel = payable
+      ? `Approve as organiser ${formatMoney(payable)}`
       : 'Approve as organiser';
     actionForms = `
     <div class="btn-row">
@@ -751,6 +767,12 @@ function programmeChangeButton(view: CaseDetailView): string {
   if (view.programmeChangeCommitmentId) {
     attrs.push(`data-default-commitment-id="${escapeHtml(view.programmeChangeCommitmentId)}"`);
   }
+  if (view.programmeChangeProposedStartsAt) {
+    attrs.push(`data-default-new-starts-at="${escapeHtml(view.programmeChangeProposedStartsAt)}"`);
+  }
+  if (view.programmeChangeProposedEndsAt) {
+    attrs.push(`data-default-new-ends-at="${escapeHtml(view.programmeChangeProposedEndsAt)}"`);
+  }
   return `<button ${attrs.join(' ')}>Preview programme change</button>`;
 }
 
@@ -840,9 +862,9 @@ function recoveryActionsInner(view: CaseDetailView): string {
     return `
       <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel data-case-cta="begin">
         ${autoBanner}
-        <p class="planning-kicker">Selected recovery</p>
-        <p class="planning-result-title">Begin <span data-selected-strategy-label>${escapeHtml(sanitizeUserFacingLabel(recommendedOption.title))}</span></p>
-        <p>Starting the selected option runs the required approval and execution checks.</p>
+        <p class="planning-kicker">Recovery options ready</p>
+        <p class="planning-result-title">Begin the recommended recovery</p>
+        <p>Starting runs the required approval and execution checks. Option details appear after you begin.</p>
         <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">

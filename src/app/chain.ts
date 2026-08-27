@@ -94,12 +94,12 @@ function linkState(
   const caseOpen = Boolean(recoveryCase && recoveryCase.status !== 'RESOLVED');
   const isAffected = affected.has(element.id);
 
-  // Programme engagements are not supplier reservations. Reservation NONE
-  // must not render as unbooked / not booked.
+  // Programme engagements are not supplier reservations. Reservation NONE /
+  // status UNKNOWN must not render as unbooked or "details pending".
   if (element.elementKind === 'ENGAGEMENT') {
     if (element.status === 'INVALID') return 'BROKEN';
     if (element.status === 'AT_RISK' || (caseOpen && isAffected)) return 'AT_RISK';
-    if (element.status === 'UNKNOWN') return 'UNKNOWN';
+    // Preserved / scheduled programme time — not a booking confirmation chip.
     return 'CONFIRMED';
   }
 
@@ -111,18 +111,19 @@ function linkState(
     case 'NONE':
       return 'UNBOOKED';
     case 'UNKNOWN':
-      return 'UNKNOWN';
+      // Only genuinely unverified reservations stay Unknown. Unaffected
+      // known topology after recovery must not paint Pending forever.
+      return caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
     case 'HELD':
       return caseOpen && isAffected ? 'PROPOSED' : 'AT_RISK';
     case 'CONFIRMED':
     case 'CHANGED':
     case 'COMPLETED':
-      if (element.status === 'UNKNOWN' && element.reservationState !== 'COMPLETED') {
-        return 'UNKNOWN';
-      }
+      // Confirmed supplier bookings stay Confirmed unless this element is in
+      // the open case blast radius. Health status UNKNOWN alone is not Pending.
       return caseOpen && isAffected ? 'AT_RISK' : 'CONFIRMED';
     default:
-      return 'UNKNOWN';
+      return caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
   }
 }
 
