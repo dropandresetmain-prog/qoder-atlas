@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NORTHSTAR · HTML/SVG/GSAP Benchmark</title>
+  <link rel="stylesheet" href="scene.css" />
+</head>
+<body>
+<div id="frame">
+  <div id="world-wrap">
+    <div id="world">
+      <svg id="edges" viewBox="0 0 4200 2500" preserveAspectRatio="none"></svg>
+
+      <div id="day1" class="day-ring" style="left:2080px;top:70px">
+        <div class="day-meta"><div class="day-label">DAY 01</div><div class="day-sub">4 commitments</div></div>
+      </div>
+      <div id="day2" class="day-ring" style="left:2080px;top:925px">
+        <div class="day-meta"><div class="day-label">DAY 02</div><div class="day-sub">4 commitments</div></div>
+      </div>
+      <div id="day3" class="day-ring" style="left:2080px;top:1780px">
+        <div class="day-meta"><div class="day-label">DAY 03</div><div class="day-sub">4 commitments</div></div>
+      </div>
+
+      <div id="supplier" class="supplier" style="left:250px;top:110px">
+        <div class="mini-label">Supplier signal · 11:42</div>
+        <div class="supplier-value">AIRLINE CHANGE</div>
+        <div class="supplier-state"></div>
+      </div>
+
+      <div id="journey-title"><strong>TRAVELLER 17</strong> · inbound journey · programme dependency</div>
+      <div id="flight" class="journey-node green" style="left:900px;top:850px">
+        <div class="eyebrow">Flight</div><div class="value">Inbound 08:10</div><div class="meta">CONFIRMED · T−06:40</div><div class="status-dot"></div>
+      </div>
+      <div id="transfer" class="journey-node green" style="left:1220px;top:850px">
+        <div class="eyebrow">Transfer</div><div class="value">Airport → Hotel</div><div class="meta">58 MIN BUFFER</div><div class="status-dot"></div>
+      </div>
+      <div id="hotel" class="journey-node green" style="left:1540px;top:850px">
+        <div class="eyebrow">Hotel</div><div class="value">Early check-in</div><div class="meta">CONFIRMED 10:00</div><div class="status-dot"></div>
+      </div>
+      <div id="keynote" class="journey-node green" style="left:1860px;top:850px;width:248px">
+        <div class="eyebrow">✦ Keynote</div><div class="value">Main stage 13:00</div><div class="meta">MUST ARRIVE BY 12:20</div><div class="status-dot"></div>
+      </div>
+
+      <div id="mini-layer"></div>
+      <div id="commitment-layer"></div>
+    </div>
+  </div>
+
+  <div id="focus-wash"></div>
+  <div id="close-readout">
+    <div class="readout-label">Journey state / latest</div>
+    <div id="rebooked"><span>REBOOKED</span><span class="tick">✓</span></div>
+    <div id="contradiction">TRIP NOT<br/>RECOVERED</div>
+  </div>
+  <div id="wide-hud">
+    <div class="hud-label">Programme state / live</div>
+    <div class="big"><span id="traveller-count">42</span> TRAVELLERS</div>
+    <div class="sub">One shared programme. Different dependencies. Different recovery outcomes.</div>
+  </div>
+  <div id="final-lockup">
+    <div class="overline">Impact mapped selectively</div>
+    <div class="title">LIVE DEPENDENCY GRAPH</div>
+    <div class="rule"></div>
+  </div>
+  <div id="timecode">00:00.000</div>
+  <div id="vignette"></div>
+</div>
+
+<script src="scene.js"></script>
+<script>
+(() => {
+  const q = window.__NORTHSTAR_CAPTURE__ ? new URLSearchParams('?capture=1') : new URLSearchParams(location.search);
+  if (q.has('capture') || q.has('t')) return;
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js';
+  s.onload = () => window.__startNorthstar();
+  s.onerror = () => window.__startNorthstar();
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
