@@ -17,16 +17,23 @@
     "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts",
     "acceptance:run": "node --experimental-strip-types scripts/acceptance-run.ts",
     "acceptance:secret-scan": "node scripts/wave3r-recording-secret-scan.mjs",
-    "gate:anti-hardcoding": "node scripts/anti-hardcoding-gate.mjs"
+    "gate:anti-hardcoding": "node scripts/anti-hardcoding-gate.mjs",
+    "video:remotion:render": "remotion render video-experiments/remotion/src/index.ts NorthstarBenchmark video-experiments/remotion/render/benchmark.mp4 --codec=h264 --crf=18",
+    "video:remotion:still": "remotion still video-experiments/remotion/src/index.ts NorthstarBenchmark",
+    "video:remotion:frames": "node video-experiments/remotion/scripts/render-frames.mjs"
   },
   "dependencies": {
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@remotion/cli": "^4.0.518",
+    "@remotion/media-utils": "^4.0.518",
+    "@remotion/renderer": "^4.0.518",
     "@types/node": "^24.3.0",
     "eslint": "^9.33.0",
     "playwright": "^1.62.1",
+    "remotion": "^4.0.518",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.40.0"
   }

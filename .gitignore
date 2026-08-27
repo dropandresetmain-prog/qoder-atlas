@@ -10,6 +10,7 @@ node_modules/
 .next/
 dist/
 build/
+video-experiments/remotion/render/frames/
 coverage/
 .cache/
 
