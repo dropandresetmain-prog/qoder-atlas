@@ -54,24 +54,31 @@ test('hero-truth: NL origin change extracts preserveReturnDestination LHR', asyn
 });
 
 test('hero-truth: S2 pack no longer calls viable TR885 inadequate', () => {
-  const scenario = readFileSync(
-    resolve('data/ait-demo-input-pack/scenarios/s2-missed-connection/scenario.json'),
-    'utf8',
-  );
-  const inventory = readFileSync(
-    resolve(
-      'data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/recovery-options-inventory.json',
+  const scenario = JSON.parse(
+    readFileSync(
+      resolve('data/ait-demo-input-pack/scenarios/s2-missed-connection/scenario.json'),
+      'utf8',
     ),
-    'utf8',
   );
-  const manifest = readFileSync(
-    resolve('fixtures/acceptance/manifests/s2-missed-connection.json'),
-    'utf8',
+  const inventory = JSON.parse(
+    readFileSync(
+      resolve(
+        'data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/recovery-options-inventory.json',
+      ),
+      'utf8',
+    ),
   );
-  assert.equal(/TR885[\s\S]{0,120}inadequate/i.test(scenario), false);
-  assert.equal(/TR885[\s\S]{0,120}inadequate/i.test(inventory), false);
-  assert.equal(/inadequate/i.test(JSON.parse(manifest).title), false);
-  assert.match(inventory, /TR867[\s\S]*inadequate/i);
+  const manifest = JSON.parse(
+    readFileSync(resolve('fixtures/acceptance/manifests/s2-missed-connection.json'), 'utf8'),
+  );
+  assert.equal(/inadequate/i.test(scenario.note), false);
+  assert.equal(/inadequate/i.test(manifest.title), false);
+  const tr885 = inventory.routes[0].services.find((s: { flightNumber: string }) => s.flightNumber === 'TR885');
+  const tr867 = inventory.routes[0].services.find((s: { flightNumber: string }) => s.flightNumber === 'TR867');
+  assert.ok(tr885);
+  assert.ok(tr867);
+  assert.equal(/inadequate/i.test(JSON.stringify(tr885)), false);
+  assert.match(JSON.stringify(tr867), /inadequate/i);
 });
 
 test('hero-truth: Jonas data-pack checkout matches canonical 3 Oct 11:00', () => {

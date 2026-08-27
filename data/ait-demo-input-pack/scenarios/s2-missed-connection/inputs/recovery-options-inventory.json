@@ -32,7 +32,7 @@
           "arrival": "2026-09-30T14:35:00+08:00",
           "status": "OPERATING",
           "role": "AIRLINE_DEFAULT_MORNING",
-          "economyFare": { "currency": "USD", "note": "Airline involuntary morning recovery; whole-trip viable vs finals showcase 20:45 under 360min buffer (370 ≥ 360). Do not label inadequate." }
+          "economyFare": { "currency": "USD", "note": "Airline involuntary morning recovery; whole-trip viable vs finals showcase 20:45 under 360min buffer (370 ≥ 360)." }
         },
         {
           "flightNumber": "TR867",
