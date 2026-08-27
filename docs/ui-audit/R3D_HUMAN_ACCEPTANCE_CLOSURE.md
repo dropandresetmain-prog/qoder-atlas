@@ -4,7 +4,7 @@
 **Branch:** `rescue/r3d-live-product-convergence`  
 **Base before R3D:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3`  
 **Prior failed candidate:** `0782f76ce8738e76d71460e918eb4ed8c7b6784e`  
-**Final remediation SHA:** `69259ac2b9e4f17d4085dcaa88e1b6258debf74d`  
+**Final remediation SHA:** `9f6ba5a37826dc72b63dbd4381a58b1385d4ef63`  
 **Owner:** primary (Grok 4.6 High)  
 **Date closed for owner review:** 27 Aug 2026  
 
