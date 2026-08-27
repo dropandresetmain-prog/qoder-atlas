@@ -159,6 +159,9 @@ export async function projectProgrammeView(
       decisionsRequired,
       uncertainties: assessment.unresolvedUnknowns,
       updatedAt: recoveryCase ? recoveryCase.updatedAt : trip.updatedAt,
+      ...(travellerEntry?.entityType === 'TRAVELLER' && travellerEntry.entity.travelArrangement
+        ? { travelArrangement: travellerEntry.entity.travelArrangement }
+        : {}),
     });
   }
 

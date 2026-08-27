@@ -62,6 +62,12 @@ async function gotoOverview() {
 }
 
 async function clickTripRow(namePattern) {
+  const search = page.locator('[data-test="roster-search"]');
+  if (await search.count()) {
+    const needle = typeof namePattern === 'string' ? namePattern : 'Jordan';
+    await search.fill(String(needle).replace(/[.*+?^${}()|[\]\\]/g, ' ').trim().split(/\s+/)[0] || '');
+    await page.waitForTimeout(120);
+  }
   const row = page.locator('[data-test="case-row-link"], .brow').filter({ hasText: namePattern }).first();
   await row.click();
   await page.waitForLoadState('networkidle');

@@ -170,16 +170,38 @@ test('programme summary uses simplified buckets without arithmetic contradiction
       unknown: 0,
     },
     arrangementCounts: { total: 67, northstarArranged: 42, selfOrOtherArranged: 25, unspecified: 0 },
-    travellers: Array.from({ length: 42 }, (_, i) => ({
-      tripId: `trip-${i}`,
-      travellerId: `trav-${i}`,
-      travellerName: `Person ${i}`,
-      status: i < 28 ? 'READY' : i < 32 ? 'DISRUPTED' : i < 36 ? 'AT_RISK' : i < 40 ? 'UNKNOWN' : 'RECOVERING',
-      activeCaseIds: i < 3 ? [`case-${i}`] : [],
-      decisionsRequired: 0,
-      uncertainties: [],
-      updatedAt: AT,
-    })),
+    travellers: [
+      ...Array.from({ length: 42 }, (_, i) => ({
+        tripId: `trip-${i}`,
+        travellerId: `trav-${i}`,
+        travellerName: `Person ${i}`,
+        status: (i < 28
+          ? 'READY'
+          : i < 32
+            ? 'DISRUPTED'
+            : i < 36
+              ? 'AT_RISK'
+              : i < 40
+                ? 'UNKNOWN'
+                : 'RECOVERING') as ProgrammeView['travellers'][number]['status'],
+        activeCaseIds: i < 3 ? [`case-${i}`] : [],
+        decisionsRequired: 0,
+        uncertainties: [],
+        updatedAt: AT,
+        travelArrangement: 'NORTHSTAR_ARRANGED' as const,
+      })),
+      ...Array.from({ length: 25 }, (_, i) => ({
+        tripId: `local-${i}`,
+        travellerId: `local-trav-${i}`,
+        travellerName: `Local ${i}`,
+        status: 'READY' as const,
+        activeCaseIds: [] as string[],
+        decisionsRequired: 0,
+        uncertainties: [] as string[],
+        updatedAt: AT,
+        travelArrangement: 'SELF_OR_OTHER_ARRANGED' as const,
+      })),
+    ],
     endangeredCommitments: [],
     unresolvedUncertainties: [],
   };
@@ -197,6 +219,9 @@ test('programme summary uses simplified buckets without arithmetic contradiction
   assert.match(html, /data-summary-key="watching"/);
   assert.match(html, /data-summary-key="unconfirmed"/);
   assert.match(html, /data-summary-key="local"/);
+  // Local READY rows must not inflate Confirmed beyond managed travellers.
+  assert.match(html, /data-summary-key="confirmed"[^>]*>[\s\S]*?<div class="tile-count">28<\/div>/);
+  assert.match(html, /data-summary-key="local"[^>]*>[\s\S]*?<div class="tile-count">25<\/div>/);
   assert.doesNotMatch(html, /data-summary-key="in-recovery"/);
   assert.doesNotMatch(html, /data-summary-key="being-planned"/);
   assert.match(html, /data-test="programme-case-link"/);

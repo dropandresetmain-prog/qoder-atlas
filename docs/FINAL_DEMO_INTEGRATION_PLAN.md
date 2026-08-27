@@ -147,11 +147,16 @@ R3C evidence lives in `docs/ui-audit/`.
 
 # R3D — Live Product Convergence
 
-**Status:** **NEXT / ACT NOW.**
+**Status:** **R3D CONVERGENCE CANDIDATE — R3E NEXT.**
 
 **Purpose:** apply `docs/UI_VISUAL_DIRECTION.md` to the already-working product and close remaining presentation/human-operability defects without reopening architecture.
 
 `docs/UI_VISUAL_DIRECTION.md` is the visual authority for R3D. Static recovered HTML facts are never copied over authoritative runtime truth.
+
+**Candidate branch:** `rescue/r3d-live-product-convergence`  
+**Base:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3` (`origin/main`)
+
+R3D is **not** R3 accepted. R3E (final UI polish + human production acceptance) is next. Do not merge to main or deploy production from this branch until R3E completes.
 
 ## R3D priority outcomes
 
@@ -249,7 +254,7 @@ At R3D end run one relevant full gate:
 
 R3D ends as:
 
-`R3 LIVE ACCEPTANCE CANDIDATE`
+`R3D CONVERGENCE CANDIDATE — R3E NEXT`
 
 It does not self-certify R3 accepted.
 

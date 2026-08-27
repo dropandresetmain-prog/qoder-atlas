@@ -174,6 +174,7 @@ function summaryTiles(view: ProgrammeView): string {
   const managedInputs = view.travellers.map((traveller) => ({
     status: traveller.status,
     pendingDecisionCount: traveller.decisionsRequired,
+    ...(traveller.travelArrangement ? { travelArrangement: traveller.travelArrangement } : {}),
   }));
   const buckets = countManagedTravelBuckets(managedInputs);
   const scaleBanner = `
@@ -322,8 +323,18 @@ function timelineSection(
 function orderTravellers(rows: readonly ProgrammeTravellerView[]): ProgrammeTravellerView[] {
   return [...rows].sort((a, b) =>
     compareByAttentionThenId(
-      { tripId: a.tripId, status: a.status, pendingDecisionCount: a.decisionsRequired },
-      { tripId: b.tripId, status: b.status, pendingDecisionCount: b.decisionsRequired },
+      {
+        tripId: a.tripId,
+        status: a.status,
+        pendingDecisionCount: a.decisionsRequired,
+        ...(a.travelArrangement ? { travelArrangement: a.travelArrangement } : {}),
+      },
+      {
+        tripId: b.tripId,
+        status: b.status,
+        pendingDecisionCount: b.decisionsRequired,
+        ...(b.travelArrangement ? { travelArrangement: b.travelArrangement } : {}),
+      },
     ),
   );
 }
@@ -339,16 +350,24 @@ function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentatio
   const role = augment.roleFor?.(row) ?? '—';
   const arrival = augment.arrivalFor?.(row) ?? '—';
   const justChanged = augment.justChangedTripIds?.has(row.tripId) ?? false;
-  const presentation = mapManagedTravelPresentation({
-    status: row.status,
-    pendingDecisionCount: row.decisionsRequired,
-  });
+  const presentation =
+    row.travelArrangement === 'SELF_OR_OTHER_ARRANGED'
+      ? null
+      : mapManagedTravelPresentation({
+          status: row.status,
+          pendingDecisionCount: row.decisionsRequired,
+          ...(row.travelArrangement ? { travelArrangement: row.travelArrangement } : {}),
+        });
+  const statusCell =
+    row.travelArrangement === 'SELF_OR_OTHER_ARRANGED'
+      ? `<span class="badge tone-neutral" data-test="presentation-badge">Local / self-arranged</span>`
+      : `<span class="badge tone-${presentation === 'CONFIRMED' ? 'ok' : presentation === 'NEEDS_ATTENTION' ? 'alert' : presentation === 'WATCHING' ? 'watch' : 'neutral'}" data-test="presentation-badge">${escapeHtml(MANAGED_TRAVEL_LABEL[presentation!])}</span>`;
   return `
-    <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}" data-presentation="${escapeHtml(presentation)}">
+    <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}" data-presentation="${escapeHtml(presentation ?? 'LOCAL')}">
       <td class="traveller-name-cell">${nameCell}<div class="traveller-secondary">${interactionCell}</div></td>
       <td>${escapeHtml(role)}</td>
       <td class="num">${escapeHtml(arrival)}</td>
-      <td><span class="badge tone-${presentation === 'CONFIRMED' ? 'ok' : presentation === 'NEEDS_ATTENTION' ? 'alert' : presentation === 'WATCHING' ? 'watch' : 'neutral'}" data-test="presentation-badge">${escapeHtml(MANAGED_TRAVEL_LABEL[presentation])}</span></td>
+      <td>${statusCell}</td>
     </tr>`;
 }
 

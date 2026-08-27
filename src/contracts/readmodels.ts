@@ -139,6 +139,8 @@ export interface ProgrammeTravellerView {
   decisionsRequired: number;
   uncertainties: string[];
   updatedAt: IsoDateTime;
+  /** Explicit intake arrangement when known — used for Local cohort presentation. */
+  travelArrangement?: 'NORTHSTAR_ARRANGED' | 'SELF_OR_OTHER_ARRANGED' | 'UNSPECIFIED';
 }
 
 /**
