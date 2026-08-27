@@ -112,12 +112,12 @@ async function approveAndExecuteOrganiser(page: Page): Promise<void> {
 
 async function assertResolvedReloadOverview(page: Page, name: string): Promise<void> {
   let html = await page.content();
-  assert.match(html, /data-case-phase="resolved"/);
+  assert.match(html, /data-test="case-phase-resolved"/);
   assert.deepEqual(forbiddenAfterRecovery(html), [], `terminal CTAs still present: ${forbiddenAfterRecovery(html).join(',')}`);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
   html = await page.content();
-  assert.match(html, /data-case-phase="resolved"/);
+  assert.match(html, /data-test="case-phase-resolved"/);
   assert.deepEqual(forbiddenAfterRecovery(html), [], `reopen resurrected CTAs: ${forbiddenAfterRecovery(html).join(',')}`);
   await gotoOverview(page);
   const row = page.locator('[data-trip-id]').filter({ hasText: name }).first();
@@ -207,7 +207,7 @@ test('browser: Sarah S1→S3 commit converges to resolved Confirmed without a se
       await page.locator('[data-test="case-history-link"]').filter({ hasText: 'Sarah Lim' }).first().click();
       await page.waitForLoadState('domcontentloaded');
       const html = await page.content();
-      assert.match(html, /data-case-phase="resolved"/);
+      assert.match(html, /data-test="case-phase-resolved"/);
       assert.deepEqual(forbiddenAfterRecovery(html), [], `Sarah Resolve resurrected: ${forbiddenAfterRecovery(html).join(',')}`);
     }
   } finally {
@@ -240,14 +240,14 @@ test('browser: Jonas terminal reopen does not resurrect Resolve/Approve when alr
       await page.waitForLoadState('networkidle');
     }
     const html = await page.content();
-    if (/data-case-phase="resolved"/.test(html)) {
+    if (/data-test="case-phase-resolved"/.test(html)) {
       await assertResolvedReloadOverview(page, 'Jonas Berg');
     } else {
       // Planner/fixture ownership is outside this lane; still prove we did not
       // leave a resolved case looking open via sessionStorage.
       await page.reload();
       const reloaded = await page.content();
-      if (/data-case-phase="resolved"/.test(reloaded)) {
+      if (/data-test="case-phase-resolved"/.test(reloaded)) {
         assert.deepEqual(forbiddenAfterRecovery(reloaded), []);
       }
     }

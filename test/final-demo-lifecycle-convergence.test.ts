@@ -152,10 +152,10 @@ test('lifecycle: Jordan approval exposes Execute; observe resolves; reload stays
     assert.equal(executed.body['executed'], true, JSON.stringify(executed.body));
 
     const resolvedHtml = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.match(resolvedHtml, /data-case-phase="resolved"/);
+    assert.match(resolvedHtml, /data-test="case-phase-resolved"/);
     assertNoRecoveryCtas(resolvedHtml, 'Jordan after execute');
     const reloaded = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.match(reloaded, /data-case-phase="resolved"/);
+    assert.match(reloaded, /data-test="case-phase-resolved"/);
     assertNoRecoveryCtas(reloaded, 'Jordan reopen');
 
     const overview = await getHtml(base, `/operator?event=${encodeURIComponent(EVENT())}`);
@@ -191,7 +191,7 @@ test('lifecycle: Decline does not execute Jordan recovery', async () => {
 
     const html = await getHtml(base, `/operator/cases/${caseId}`);
     assert.doesNotMatch(html, /data-test="execute-approved-strategy-btn"/);
-    assert.doesNotMatch(html, /data-case-phase="resolved"/);
+    assert.doesNotMatch(html, /data-test="case-phase-resolved"/);
     const traveller = await getJson(base, `/api/traveller/${HERO_TRIPS.s2}`);
     assert.notEqual(traveller.body['remainderViable'], 'VIABLE');
   } finally {
@@ -230,7 +230,7 @@ test('lifecycle: Oliver approval exposes Execute then terminal Confirmed', async
     });
     assert.equal(executed.status, 200, JSON.stringify(executed.body));
     const resolvedHtml = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.match(resolvedHtml, /data-case-phase="resolved"/);
+    assert.match(resolvedHtml, /data-test="case-phase-resolved"/);
     assertNoRecoveryCtas(resolvedHtml, 'Oliver after execute');
     const dash = await operatorDashboard(base);
     const oliver = tripRow(dash, HERO_TRIPS.s7);
@@ -251,7 +251,7 @@ test('lifecycle: Sarah programme commit resolves the same trip with no second Re
     const before = tripRow(await operatorDashboard(base), HERO_TRIPS.s1);
     assert.ok(before?.activeCaseId, 'Sarah has an open case before commit');
     const beforeHtml = await getHtml(base, `/operator/cases/${before.activeCaseId}`);
-    assert.doesNotMatch(beforeHtml, /data-case-phase="resolved"/);
+    assert.doesNotMatch(beforeHtml, /data-test="case-phase-resolved"/);
 
     await continueManifest(base, 'fixtures/acceptance/manifests/s1-s3-continuity.json', 's3_commit');
 
@@ -264,7 +264,7 @@ test('lifecycle: Sarah programme commit resolves the same trip with no second Re
     assert.ok(sarah?.historyCaseId, 'resolved Sarah remains reopenable from Overview');
 
     const caseHtml = await getHtml(base, `/operator/cases/${sarah.historyCaseId}`);
-    assert.match(caseHtml, /data-case-phase="resolved"/);
+    assert.match(caseHtml, /data-test="case-phase-resolved"/);
     assertNoRecoveryCtas(caseHtml, 'Sarah after programme commit');
     const overview = await getHtml(base, `/operator?event=${encodeURIComponent(EVENT())}`);
     assert.match(overview, new RegExp(`data-trip-id="${HERO_TRIPS.s1}"[^>]*data-presentation="CONFIRMED"`));
