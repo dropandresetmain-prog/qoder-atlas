@@ -2,19 +2,29 @@
 
 **Status:** Active execution SSOT. Checkpoint A accepted (REV-A Complete; closure commit pinned as the accepted fan-out base); **Checkpoint B accepted (REV-B Complete)**; **Checkpoint C accepted (REV-C Complete; accepted SHA `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d` is the demo candidate / baseline)**. A Reality Validation milestone is intentionally added before Final Candidate preparation.  
 **Post-NS-G3 closure path:** the original NS-G3 candidate (Section "WAVE 3 — Integrated Northstar Product → NS-G3 → Stretch pull decision" below) is **NOT ACCEPTED**, superseded by the stricter **Wave 3R Demo Readiness closure** — see `docs/WAVE3R_DEMO_READINESS_PLAN.md` (subordinate to this document; governs Wave 3R execution/work-package detail). RV-N0, NS-G1, NS-G2, and Independent Review 2 remain accepted and are not reopened by Wave 3R.  
-**Product:** AI Trip Recovery / Resolution Layer  
+**Product:** Northstar (hackathon face) — generalized AI Trip Recovery / Resolution Layer  
 **Execution environment:** Qoder by default  
 **Agent-routing authority:** `docs/AGENT_MODEL_SELECTION.md`
 
-This is the single active implementation plan for the hackathon build. Qoder Quest Specs and Agent-mode prompts are bounded execution contracts derived from this plan. They may add implementation detail but must not silently redefine product scope, architecture, shared contracts, or acceptance criteria.
+This is the **parent** execution SSOT for the hackathon build. Qoder Quest Specs and Agent-mode prompts are bounded execution contracts derived from this plan. They may add implementation detail but must not silently redefine product scope, architecture, shared contracts, or acceptance criteria.
 
-**Current integration work package:** AiT LIVE Scenario Backend Readiness is
-active on `wave3r/live-scenario-readiness` from checkpoint
-`70447bd3f01d1f3219141216a2b822f2c3edc5d1`. Its bounded execution tracker,
-scope supersession for scenario S5/S6/S8, and readiness gate live in
-[`docs/LIVE_SCENARIO_READINESS.md`](LIVE_SCENARIO_READINESS.md). It does not
-reopen accepted architecture; it closes generic capability gaps needed for
-the frozen S1–S8 catalogue.
+**Cadence note:** several subordinate plans were spawned after Checkpoint C
+(Northstar waves, Wave 3R, AiT LIVE scenario readiness, Final Demo Integration).
+Capability status lives in [`docs/ROADMAP.md`](ROADMAP.md) (see **Current
+cadence**). Do not assume the paragraph below is still the human-facing tip of
+the repo.
+
+**Current product-closure runway:** [`docs/FINAL_DEMO_INTEGRATION_PLAN.md`](FINAL_DEMO_INTEGRATION_PLAN.md)
+— **R3D accepted; R3E next** (then R4 → Final Candidate → freeze → submit).
+It is subordinate to this document and does not reopen accepted architecture.
+
+**Prior backend readiness package (complete as SEMANTIC READY):** AiT LIVE
+Scenario Backend Readiness — S1–S8 through ordinary product boundaries on
+REPLAY; LIVE/RECORD still credential-gated. Tracker:
+[`docs/LIVE_SCENARIO_READINESS.md`](LIVE_SCENARIO_READINESS.md). Historical
+integration line referenced `wave3r/live-scenario-readiness` /
+`wave3r/live-integration` from checkpoint
+`70447bd3f01d1f3219141216a2b822f2c3edc5d1`.
 
 Read with:
 - `docs/PRODUCT_SPEC.md` — product requirements (`FR-*`, `NFR-*`)

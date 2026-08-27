@@ -76,9 +76,25 @@ Final demo may use recorded/replayed API/model responses for reliability/cost pr
 ## Backup scenario
 Maintain a materially different TMC/corporate scenario through same engine for robustness and backup demo path.
 
-## Current runtime demo path (Checkpoint C candidate)
+## Judge / operator demo path (current)
 
-The demo flow runs through the generic runtime API — no manual database surgery, no optional credentials, every stage carries an explicit instant:
+Human demos enter the populated **Operator Overview**, not `/demo`:
+
+- Start: `npm run dev` (default `http://127.0.0.1:8787`)
+- Entry: `/operator?event=evt-ait-2026`
+- Traveller: `/traveller?trip=<tripId>` from programme/case links
+- After exploring a scenario: **Reset demo** → authoritative reseed → return to Overview
+
+Programme population and hero cast are owned by
+`docs/FINAL_DEMO_CONTENT_SSOT.md`. Closure runway (R3D accepted; R3E next):
+`docs/FINAL_DEMO_INTEGRATION_PLAN.md`. Screen choreography for hero beats:
+`docs/DEMO_SCREEN_CHOREOGRAPHY.md` when present.
+
+## Developer runtime API (historical Checkpoint C path)
+
+The same composed application still exposes a scenario-neutral staged HTTP flow
+used by tests and early demos — no manual database surgery, no optional
+credentials, every stage carries an explicit instant:
 
 ```
 POST /api/runtime/disruption   # TripSignal in -> case opened, impact reported
@@ -109,4 +125,4 @@ Without Model Studio credentials the runtime uses the deterministic fallback pla
 - traveller decision/approval interaction works
 - one rejected candidate demonstrates downstream viability
 - audit/history exists
-- README states which integrations are live-tested, replayed or simulated
+- README (`Northstar`) states which integrations are live-tested, replayed or simulated

@@ -1,6 +1,9 @@
 # Roadmap
 
-This is the source of truth for **product capability scope/status**. `docs/IMPLEMENTATION_PLAN.md` is the source of truth for execution order, work packages, dependencies, and implementation status.
+This is the source of truth for **product capability scope/status**. It is not
+the active day-to-day execution tracker — several subordinate plans have been
+spawned as the hackathon advanced. Use the cadence below so status language
+does not fight the wrong document.
 
 Intentionally excluded work must remain here; do not silently drop it.
 
@@ -13,11 +16,37 @@ Status vocabulary:
 - **Blocked**
 - **Rejected**
 
+## Current cadence (read this first)
+
+Product face: **Northstar** — the AI resolution layer for event travel
+(generalized trip-resolution engine underneath). Public entry:
+[`README.md`](../README.md).
+
+| Doc | Owns | Current tip |
+|---|---|---|
+| **This file (`ROADMAP.md`)** | Capability scope / status, Stretch/Deferred/Rejected | Capability inventory below |
+| [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | Parent execution SSOT (checkpoints, Northstar waves, work-package table) | Historical + parent; see its header for accepted gates |
+| [`WAVE3R_DEMO_READINESS_PLAN.md`](WAVE3R_DEMO_READINESS_PLAN.md) | Stricter post–NS-G3 demo-readiness / live-validation contract | Supersedes the original NS-G3 closure path only |
+| [`LIVE_SCENARIO_READINESS.md`](LIVE_SCENARIO_READINESS.md) | S1–S8 backend readiness through ordinary product boundaries | **SEMANTIC READY** on REPLAY; LIVE/RECORD still credential-gated |
+| [`FINAL_DEMO_INTEGRATION_PLAN.md`](FINAL_DEMO_INTEGRATION_PLAN.md) | **Active product-closure runway** (UI/operability → freeze → submit) | **R3D accepted; R3E next** |
+
+Rough timeline (do not reopen accepted gates from this summary):
+
+1. **Checkpoints A → B → C** — accepted engine foundation / demo-candidate baseline (`3b2f0da…`).
+2. **Reality Validation + Northstar waves** — RV-N0 contract freeze; NS-G1 / NS-G2 accepted; original NS-G3 **not** accepted.
+3. **Wave 3R + AiT scenario readiness** — production-shaped demo/provider honesty; S1–S8 semantic readiness on REPLAY.
+4. **Final demo integration (current)** — live-product UI convergence on `main` (**R3D**); remaining runway **R3E → R4 → Final Candidate → R5 freeze → submit**.
+
+If an older ROADMAP paragraph still sounds like “Reality Validation is the next
+milestone before any product face,” treat that as historical framing for the
+capability gap it describes, not as “what to work on today.” Today’s human-
+facing closure work is governed by `FINAL_DEMO_INTEGRATION_PLAN.md`.
+
 ## Planned MVP
 
 Capability status: the Scenario A vertical recovery loop (ingestion -> persistent trip -> signal/impact -> planner/capabilities/viability -> authority/execution/observation -> real operator/traveller read models) is **Implemented** and Checkpoint B has been **accepted** (REV-B Complete; reviewed candidate `b650031`, merged to `main`). Checkpoint C (generalisation, reliability, demo candidate) is **accepted** (REV-C Complete; accepted SHA `3b2f0dac33d56f0e0df02eaaf2f4583b4f4c3a2d`, merged to `main`): Scenario B runs through the identical application code, four robustness cases pass through the real engine, the hardcoding audit found no scenario content outside `fixtures/`, and the generic runtime disruption/reset flow is reliable and replayable. Execution evidence lives in `docs/IMPLEMENTATION_PLAN.md` Section 4.
 
-Truth boundary: the engine has been proven against **curated/provider-shaped scenarios** (fixture sources, REPLAY provider recordings, scripted/test planner inputs). It has **not yet** been proven against arbitrary externally sourced inputs: arbitrary real booking import end-to-end, arbitrary URL -> assembled Trip end-to-end, selected external integrations through actual provider calls, or real/sandbox search and servicing surfaces beyond the Atlas Search/Verify development proof. Closing that gap is the purpose of the Reality Validation milestone below.
+Truth boundary: the engine has been proven against **curated/provider-shaped scenarios** (fixture sources, REPLAY provider recordings, scripted/test planner inputs). Broader arbitrary external-input proof (any booking import, any URL → Trip, unbounded live servicing) was the Reality Validation milestone’s purpose; programme-scale Northstar execution and final-demo closure have since advanced on top of that baseline. Remaining LIVE/RECORD evidence gaps stay explicit in `LIVE_SCENARIO_READINESS.md` and Stretch/Deferred below — they do not reopen Checkpoint C.
 
 ### Northstar scenario catalogue (frozen — `docs/SCENARIOS.md`)
 
@@ -25,7 +54,7 @@ The final product scenario set is frozen at 8 scenarios; `docs/SCENARIOS.md` is
 the source of truth for scenario business narratives, capability claims,
 implementation priority and demo intent.
 
-- **AiT LIVE Scenario Backend Readiness — In Progress (SEMANTIC READY on `wave3r/live-integration`):** all S1–S8 run through natural product/application boundaries and the same generalized state/recovery/authority engine, and every manifest now asserts engine-derived semantics (impact propagation, viability arithmetic, funding/authority, counterfactual preview, honest uncertainty) with broken-expectation failure proofs; S5, S6 and S8 were promoted from their historical G3R Stretch status for this work package; the explicit simulation boundary is limited to S1 forced supplier facts, S2 physical missed-connection/provider-reprotection facts when a sandbox cannot generate them, and unsupported Atlas refund execution. LIVE/RECORD provider evidence remains the next milestone, gated on sandbox credentials. Final-video selection and execution sequencing are subordinate execution detail in `docs/WAVE3R_DEMO_READINESS_PLAN.md`; S6 is retained as capability evidence/fallback, not primary video scope.
+- **AiT LIVE Scenario Backend Readiness — SEMANTIC READY** (evidence on the live-integration line; see `docs/LIVE_SCENARIO_READINESS.md`): all S1–S8 run through natural product/application boundaries and the same generalized state/recovery/authority engine; manifests assert engine-derived semantics (impact propagation, viability arithmetic, funding/authority, counterfactual preview, honest uncertainty) with broken-expectation failure proofs. S5, S6 and S8 were promoted from their historical G3R Stretch status for that work package. Explicit simulation boundary remains limited to S1 forced supplier facts, S2 physical missed-connection/provider-reprotection facts when a sandbox cannot generate them, and unsupported Atlas refund execution. **LIVE/RECORD provider evidence** remains open and credential-gated — it is not the same thing as “product UI not ready.” Human-facing closure continues under `docs/FINAL_DEMO_INTEGRATION_PLAN.md` (R3D accepted; R3E next). Final-video selection detail: `docs/WAVE3R_DEMO_READINESS_PLAN.md` / `docs/SCENARIOS.md`; S6 is capability evidence/fallback, not primary video scope.
 - **Execution record:** `docs/LIVE_SCENARIO_READINESS.md` defines the bounded
   work packages, anti-hardcoding obligations, and readiness gate. It forbids
   scenario-specific ontology or source branching.
@@ -100,13 +129,15 @@ Promoted from Stretch investigation to Planned MVP by the RV-N0 contract freeze;
 - at least two materially different scenarios through same engine
 - anti-hardcoding scenario substitution test
 
-## Reality Validation — In Progress (active milestone, before Final Candidate preparation)
+## Reality Validation — largely executed; open gaps remain capability/evidence items
 
 **Purpose:** prove that the generalized engine works against externally sourced / provider-produced inputs rather than only curated scenario fixtures.
 
-**Status:** active milestone opened at Checkpoint C closeout. The investigation phase completed (11 reality-validation reports + synthesis decision package on `main`). The **Northstar wave RV-N0..RV-N12** is now the programme-scale execution phase of this milestone: Wave 1 and Wave 2 run as ONE continuous long-horizon mission (Wave 1 → NS-G1 internal integration gate → automatically into Wave 2 → NS-G2 → mandatory Independent Review 2 → human checkpoint → Wave 3 → NS-G3 product checkpoint → Stretch pull decision → Wave 4 → Final Candidate Review); executable contracts are immutable at `NORTHSTAR_CONTRACT_BASE_SHA` and all Wave 1/2 implementation worktrees fan out from `NORTHSTAR_WAVE12_BASE_SHA` on branch `northstar/contract-freeze` (see `docs/IMPLEMENTATION_PLAN.md` Section 13).
+**Status (cadence):** milestone opened at Checkpoint C closeout. Investigation phase completed (11 reality-validation reports + synthesis on `main`). Programme-scale **Northstar wave** execution advanced through RV-N0 (contract freeze), NS-G1, NS-G2, and Independent Review 2. The original NS-G3 product checkpoint was **not** accepted and was superseded by the stricter Wave 3R / demo-readiness path (`docs/WAVE3R_DEMO_READINESS_PLAN.md`), then by AiT scenario semantic readiness and the Final Demo Integration runway. **Do not treat this section as “the active tip of the repo.”** Active human-facing closure is `docs/FINAL_DEMO_INTEGRATION_PLAN.md` (R3D accepted; R3E next). Remaining Reality Validation–shaped work is mostly explicit LIVE/RECORD evidence, Stretch pulls, or Deferred items — not a greenfield milestone restart.
 
-For each external surface the milestone will investigate and decide where to use: real external source content; provider sandbox/test APIs; LIVE read-only APIs where low-risk and economically bounded; RECORD/REPLAY; or external-boundary simulation only where real/sandbox access is not worth the complexity. Every decision ends with an explicit `Adopt | Defer | Reject` and a roadmap/tracker update. No new product integration is authorized by this milestone until its investigations conclude.
+Historical wave framing (retained for evidence navigation): Wave 1 → NS-G1 → Wave 2 → NS-G2 → Review 2 → (original) Wave 3 / NS-G3 → Stretch pull → Wave 4 / Final Candidate. Executable contracts remain immutable at `NORTHSTAR_CONTRACT_BASE_SHA`; see `docs/IMPLEMENTATION_PLAN.md` Section 13.
+
+For each external surface the milestone investigated and decided where to use: real external source content; provider sandbox/test APIs; LIVE read-only APIs where low-risk and economically bounded; RECORD/REPLAY; or external-boundary simulation only where real/sandbox access is not worth the complexity. Decisions end with an explicit `Adopt | Defer | Reject` and a roadmap/tracker update.
 
 ### Investigation areas (high level)
 

@@ -4,6 +4,11 @@
 
 Build the Atlas × Alibaba Cloud hackathon product described in the repository source-of-truth documents without demo-specific hardcoding.
 
+The hackathon product face is **Northstar** — the AI resolution layer for event
+travel — on top of a generalized trip-resolution engine. Public framing:
+`README.md`. Capability scope: `docs/ROADMAP.md`. Active product-closure runway:
+`docs/FINAL_DEMO_INTEGRATION_PLAN.md` (subordinate to `docs/IMPLEMENTATION_PLAN.md`).
+
 The normal orchestration lifecycle is:
 
 `Planner / Architect -> Prompter -> Implementer -> Integrator -> Reviewer when warranted -> Final Candidate`
@@ -16,13 +21,14 @@ Inspect current repository state before changing code. Read the relevant section
 
 1. `docs/PRODUCT_SPEC.md`
 2. `docs/ARCHITECTURE.md`
-3. `docs/IMPLEMENTATION_PLAN.md` — execution SSOT
-4. `docs/ROADMAP.md` — scope/status SSOT
-5. `docs/DECISIONS.md`
-6. `docs/TESTING.md`
-7. `docs/AGENT_MODEL_SELECTION.md`
-8. `.qoder/rules/environment-recovery.md` when terminal/tool execution is involved
-9. task-specific Qoder Spec
+3. `docs/IMPLEMENTATION_PLAN.md` — parent execution SSOT
+4. `docs/ROADMAP.md` — capability scope/status SSOT (read **Current cadence** first)
+5. `docs/FINAL_DEMO_INTEGRATION_PLAN.md` — when working on product-closure / demo UI
+6. `docs/DECISIONS.md`
+7. `docs/TESTING.md`
+8. `docs/AGENT_MODEL_SELECTION.md`
+9. `.qoder/rules/environment-recovery.md` when terminal/tool execution is involved
+10. task-specific Qoder Spec
 
 For Atlas capability questions, consult the authoritative research in `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
 

@@ -2,7 +2,7 @@
   "name": "qoder-atlas",
   "version": "0.1.0",
   "private": true,
-  "description": "AI Trip Recovery / Resolution Layer — Atlas × Alibaba Cloud hackathon build",
+  "description": "Northstar — AI resolution layer for event travel (Atlas × Alibaba Cloud hackathon)",
   "type": "module",
   "engines": {
     "node": ">=24"
