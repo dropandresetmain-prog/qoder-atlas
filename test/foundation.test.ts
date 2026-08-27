@@ -64,6 +64,16 @@ test('config: PORT wins over HTTP_PORT when both are set (Railway proxy contract
   }
 });
 
+test('config: empty or whitespace HTTP_PORT does not override PORT', () => {
+  const cwd = emptyCwd();
+  try {
+    assert.equal(loadConfig({ PORT: '8080', HTTP_PORT: '' }, cwd).httpPort, 8080);
+    assert.equal(loadConfig({ PORT: '8080', HTTP_PORT: '   ' }, cwd).httpPort, 8080);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test('config: parseEnvFile handles comments, quotes, blank lines', () => {
   const parsed = parseEnvFile(['# comment', '', 'A=1', 'B="two"', "C='three'"].join('\n'));
   assert.deepEqual(parsed, { A: '1', B: 'two', C: 'three' });

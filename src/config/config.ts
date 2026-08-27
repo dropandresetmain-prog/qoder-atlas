@@ -94,13 +94,17 @@ export function parseEnvFile(content: string): Record<string, string> {
 }
 
 function mapEnv(env: Record<string, string | undefined>): Record<string, unknown> {
-  const optional = (v: string | undefined): string | undefined =>
-    v === undefined || v === '' ? undefined : v;
+  const optional = (v: string | undefined): string | undefined => {
+    if (v === undefined) return undefined;
+    const trimmed = v.trim();
+    return trimmed === '' ? undefined : trimmed;
+  };
   return {
     environment: optional(env.APP_ENVIRONMENT),
     logLevel: optional(env.LOG_LEVEL),
     adapterMode: optional(env.ADAPTER_MODE),
     // Host PORT (Railway, etc.) wins over HTTP_PORT so the proxy health check matches.
+    // Empty/whitespace HTTP_PORT must not displace PORT or force the local 8787 default.
     httpPort: optional(env.PORT) ?? optional(env.HTTP_PORT),
     sqlitePath: optional(env.SQLITE_PATH),
     recordingsDir: optional(env.RECORDINGS_DIR),
