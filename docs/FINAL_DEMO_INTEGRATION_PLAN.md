@@ -1,6 +1,6 @@
 # Final Demo Integration & Code-Freeze Plan
 
-**Status:** Active closure execution SSOT — **R3C ACCEPTED; R3D HUMAN ACCEPTANCE FIX REQUIRED**  
+**Status:** Active closure execution SSOT — **R3C ACCEPTED; R3D HUMAN ACCEPTANCE CANDIDATE — awaiting owner verification**  
 **Date:** 27 Aug 2026  
 **Current product line:** `main` contains the integrated R2/R3 candidate (`a151792`), live-product operability closure (`9700edd`), and Railway early-bind health hardening (`7a168ead`). R3C is evidence/design-direction work only and does not redefine backend semantics.  
 **Parent execution SSOT:** `docs/IMPLEMENTATION_PLAN.md`  
@@ -147,7 +147,7 @@ R3C evidence lives in `docs/ui-audit/`.
 
 # R3D — Live Product Convergence
 
-**Status:** **R3D HUMAN ACCEPTANCE FIX REQUIRED** — do not start R3E.
+**Status:** **R3D HUMAN ACCEPTANCE CANDIDATE — awaiting owner verification.** Do not start R3E until owner verifies.
 
 **Purpose:** apply `docs/UI_VISUAL_DIRECTION.md` to the already-working product and close remaining presentation/human-operability defects without reopening architecture.
 
@@ -158,7 +158,7 @@ R3C evidence lives in `docs/ui-audit/`.
 **Prior convergence candidate (failed human review):** `0782f76ce8738e76d71460e918eb4ed8c7b6784e`  
 **Human closure matrix:** `docs/ui-audit/R3D_HUMAN_ACCEPTANCE_CLOSURE.md`
 
-R3D is **not** R3 accepted. Human acceptance remediation must close every matrix issue before owner review. Do **not** start R3E, merge to main, or deploy production from this branch until that gate passes.
+R3D is **not** R3 accepted. Do **not** start R3E, merge to main, or deploy production from this branch until owner verification passes.
 
 ## R3D priority outcomes
 
