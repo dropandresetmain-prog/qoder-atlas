@@ -54,7 +54,7 @@ test('final UI wiring: decisions and activity retain real authority and audit ev
     ],
   });
   assert.equal(decisions.pending[0]!.waitingOn, 'Traveller');
-  assert.equal(decisions.pending[1]!.waitingOn, 'Human agent');
+  assert.equal(decisions.pending[1]!.waitingOn, 'Organiser');
 
   const activity = activityFromTripActivities(NOW, [{
     tripId: 'trip-traveller', generatedAt: NOW,

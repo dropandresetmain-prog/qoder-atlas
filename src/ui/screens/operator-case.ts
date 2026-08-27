@@ -36,10 +36,11 @@ import {
   RESOLUTION_OUTCOME_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
+  authorityNeededLabel,
   caseOptionsHeading,
   type StatusTone,
 } from '../copy.ts';
-import { escapeHtml, formatCostDelta, formatInstant, formatMoney } from '../html.ts';
+import { escapeHtml, formatCostDelta, formatInstant, formatMoney, formatPayable, formatPolicyEquivalent } from '../html.ts';
 import { CASE_PRIMARY_OPTION_LIMIT } from '../presentationState.ts';
 import {
   selectCaseWorkspacePhase,
@@ -405,24 +406,52 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     option.verdict === 'UNKNOWN'
       ? `<span class="chip">${escapeHtml(OPTION_VERDICT_LABEL.UNKNOWN)}</span>`
       : '';
-  const cost = option.costDelta
+  const cost = option.providerCost || option.costDelta
     ? (() => {
-        const delta = formatCostDelta(option.costDelta);
-        // ADR-052: keep the original provider charge visible beside the
-        // home-currency restatement so the two never blur together.
-        const provider = option.providerCost
-          ? `<span class="chip" style="background:transparent;color:var(--text-faint)">${escapeHtml(`${formatMoney(option.providerCost)} at provider`)}</span>`
-          : '';
-        return `${provider}<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}">${escapeHtml(delta.text)}</span>`;
+        const chips: string[] = [];
+        if (option.providerCost) {
+          chips.push(
+            `<span class="chip chip-payable" data-test="option-payable">${escapeHtml(formatPayable(option.providerCost))}</span>`,
+          );
+        }
+        if (option.costDelta && option.providerCost) {
+          chips.push(
+            `<span class="chip chip-policy" data-test="option-policy-equivalent">${escapeHtml(formatPolicyEquivalent(option.costDelta))}</span>`,
+          );
+        } else if (option.costDelta) {
+          const delta = formatCostDelta(option.costDelta);
+          chips.push(
+            `<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}">${escapeHtml(delta.text)}</span>`,
+          );
+        }
+        return chips.join('');
       })()
     : '';
-  const approval = option.requiresApproval ? '<span class="chip chip-cost">Needs approval</span>' : '';
+  const approval = option.requiresApproval
+    ? `<span class="chip chip-cost">${escapeHtml(option.authorityLabel ?? 'Needs approval')}</span>`
+    : '';
   const allocation = option.costAllocationSummary
     ? `<span class="chip">${escapeHtml(option.costAllocationSummary)}</span>`
     : '';
   const body = option.summary
     ? `<div class="opt-body">${escapeHtml(sanitizeUserFacingLabel(option.summary))}</div>`
     : '';
+  const pros =
+    (option.pros?.length ?? 0) > 0
+      ? `<ul class="opt-pros" data-test="option-pros">${option.pros!.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '';
+  const cons =
+    (option.cons?.length ?? 0) > 0
+      ? `<ul class="opt-cons" data-test="option-cons">${option.cons!.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '';
+  const commitment =
+    option.commitmentEffect
+      ? `<div class="opt-commitment" data-test="option-commitment"><strong>Commitment.</strong> ${escapeHtml(option.commitmentEffect)}</div>`
+      : '';
+  const provenance =
+    option.provenanceLabel
+      ? `<div class="opt-provenance" data-test="option-provenance">${escapeHtml(option.provenanceLabel)}</div>`
+      : '';
   const flags =
     (option.flags?.length ?? 0) > 0
       ? `<div class="opt-flags">${option.flags!.map((flag) => `<span class="chip">${escapeHtml(flag)}</span>`).join('')}</div>`
@@ -447,7 +476,11 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     </div>
     ${body}
     ${why}
+    ${commitment}
+    ${pros}
+    ${cons}
     ${flags}
+    ${provenance}
     ${whyNot}
   </div>`;
 }
@@ -530,6 +563,7 @@ const APPROVAL_STATE_LABEL: Record<ApprovalRequirementView['state'], string> = {
 function fundingSplitBlock(view: CaseDetailView): string {
   const allocation = view.funding?.allocation;
   if (!allocation) return '';
+  const travellerName = view.travellerNames[0] ?? PAYER_LABEL.TRAVELLER;
 
   // Traveller-only incremental (typical personal extension): make payer obvious.
   if (
@@ -537,10 +571,12 @@ function fundingSplitBlock(view: CaseDetailView): string {
     allocation.incrementalPayer &&
     !allocation.coveredAmount
   ) {
+    const payer =
+      allocation.incrementalPayer === 'TRAVELLER' ? travellerName : PAYER_LABEL[allocation.incrementalPayer];
     return `
     <div class="funding-callout" data-test="funding-traveller-incremental">
-      <p><strong>Personal incremental cost</strong> — ${escapeHtml(PAYER_LABEL[allocation.incrementalPayer])} pays ${escapeHtml(formatMoney(allocation.incrementalAmount))}.</p>
-      <p class="footnote">Organisation covers the approved business travel window. This extension sits outside that window, so the traveller funds the increment.</p>
+      <p><strong>Personal incremental cost</strong> — ${escapeHtml(payer)} pays ${escapeHtml(formatMoney(allocation.incrementalAmount))}.</p>
+      <p class="footnote">The organiser incurs no new cost for this extension. Event-funded baseline stay is unchanged; ${escapeHtml(payer)} pays the personal increment. No flight changes.</p>
     </div>`;
   }
 
@@ -571,6 +607,8 @@ function fundingSplitBlock(view: CaseDetailView): string {
   if (!(total > 0)) return '';
   const coveredPct = Math.round((covered / total) * 1000) / 10;
   const incrementalPct = Math.round((1000 - coveredPct * 10)) / 10;
+  const incrementalPayer =
+    allocation.incrementalPayer === 'TRAVELLER' ? travellerName : PAYER_LABEL[allocation.incrementalPayer];
   return `
     <div class="splitbar" aria-label="Funding split">
       <div class="sp-org" style="width:${coveredPct}%"></div>
@@ -578,19 +616,13 @@ function fundingSplitBlock(view: CaseDetailView): string {
     </div>
     <div class="split-legend">
       <span><i style="background:var(--ink)"></i>${escapeHtml(PAYER_LABEL[allocation.coveredBy])} — ${escapeHtml(formatMoney(allocation.coveredAmount))}</span>
-      <span><i style="background:var(--watch-f)"></i>${escapeHtml(PAYER_LABEL[allocation.incrementalPayer])} — ${escapeHtml(formatMoney(allocation.incrementalAmount))}</span>
+      <span><i style="background:var(--watch-f)"></i>${escapeHtml(incrementalPayer)} — ${escapeHtml(formatMoney(allocation.incrementalAmount))}</span>
     </div>`;
 }
 
 function approvalSection(view: CaseDetailView): string {
   const approval = view.approval;
   if (!approval) return '';
-  const from =
-    approval.requestedFrom === 'ORGANISATION'
-      ? 'the organisation'
-      : approval.requestedFrom === 'TRAVELLER'
-        ? 'the traveller'
-        : 'a human agent';
   const amount = approval.amount
     ? ` Amount: <strong>${escapeHtml(formatMoney(approval.amount))}</strong>.`
     : '';
@@ -625,12 +657,8 @@ function approvalSection(view: CaseDetailView): string {
     approval.intentId
   ) {
     const approveLabel = approval.amount
-      ? approval.requestedFrom === 'HUMAN_AGENT'
-        ? `Approve as organiser ${formatMoney(approval.amount)}`
-        : `Approve ${formatMoney(approval.amount)}`
-      : approval.requestedFrom === 'HUMAN_AGENT'
-        ? 'Approve as organiser'
-        : 'Approve';
+      ? `Approve as organiser ${formatMoney(approval.amount)}`
+      : 'Approve as organiser';
     actionForms = `
     <div class="btn-row">
       <form method="POST" action="/api/runtime/decide" class="inline-form" data-test="organisation-approve-form">
@@ -653,16 +681,16 @@ function approvalSection(view: CaseDetailView): string {
       </form>
     </div>`;
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'HUMAN_AGENT') {
-    actionForms = '<p class="footnote">This recovery needs a human organiser decision, but no single in-scope organisation principal is available in the current read model.</p>';
+    actionForms = `<p class="footnote">${escapeHtml(authorityNeededLabel('HUMAN_AGENT'))}, but no single in-scope organisation principal is available in the current programme.</p>`;
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'ORGANISATION') {
-    actionForms = '<p class="footnote">An in-scope organisation approver is not available in the current read model. Nothing has been approved.</p>';
+    actionForms = '<p class="footnote">An in-scope organisation approver is not available in the current programme. Nothing has been approved.</p>';
   }
 
   return `
   <section class="section" aria-label="${escapeHtml(CASE_APPROVAL_TITLE)}">
     <h2>${escapeHtml(CASE_APPROVAL_TITLE)}</h2>
     <div class="panel" data-approval-state="${escapeHtml(approval.state)}">
-      <p class="callout-title">Approval needed from ${escapeHtml(from)}
+      <p class="callout-title">${escapeHtml(authorityNeededLabel(approval.requestedFrom))}
         <span class="${toneClass(APPROVAL_STATE_TONE[approval.state], 'badge')}">${escapeHtml(APPROVAL_STATE_LABEL[approval.state])}</span>
       </p>
       <p>${escapeHtml(approval.reason)}${amount}</p>

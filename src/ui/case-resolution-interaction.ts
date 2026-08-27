@@ -5,6 +5,11 @@
  * while a real plan/begin/execute request runs (or a short settle when options
  * are already projected). Respects prefers-reduced-motion.
  *
+ * Stages are labelled by lifecycle phase (planning → authority → execution →
+ * observation → state update) from the choreography contract. Content is
+ * driven by structured data attributes on the workspace when present; never
+ * by hero/person ID branches.
+ *
  * Workspace phase is server-projected (`data-case-phase`). sessionStorage may
  * remember a harmless expansion preference but must not resurrect Resolve,
  * hide Execute, or make a resolved case look open.
@@ -30,9 +35,38 @@ export function renderCaseResolutionEnhancementScript(): string {
     root.setAttribute('data-test', 'case-phase-' + phase);
   }
 
+  function parseSteps(raw, fallback) {
+    if (!raw) return fallback;
+    try {
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(function(step) {
+          if (typeof step === 'string') return { phase: 'planning', label: step };
+          return {
+            phase: step.phase || 'planning',
+            label: step.label || String(step)
+          };
+        });
+      }
+    } catch (err) { /* ignore malformed structured steps */ }
+    return fallback;
+  }
+
+  var DEFAULT_PLANNING = [
+    { phase: 'planning', label: 'Checking trip dependencies' },
+    { phase: 'planning', label: 'Searching recovery options' },
+    { phase: 'planning', label: 'Testing whole-trip viability' },
+    { phase: 'authority', label: 'Checking policy and authority' }
+  ];
+  var DEFAULT_EXECUTION = [
+    { phase: 'execution', label: 'Submitting the approved action at the provider boundary' },
+    { phase: 'observation', label: 'Observing the provider-boundary result' },
+    { phase: 'state_update', label: 'Updating the trip and rechecking viability' }
+  ];
+
   function ensureOverlay(id, title, steps) {
     var existing = document.getElementById(id);
-    if (existing) return existing;
+    if (existing) existing.remove();
     var scrim = document.createElement('div');
     scrim.id = id;
     scrim.className = 'ns-resolve-scrim';
@@ -40,13 +74,22 @@ export function renderCaseResolutionEnhancementScript(): string {
     scrim.setAttribute('aria-modal', 'true');
     scrim.setAttribute('aria-label', title);
     scrim.hidden = true;
-    var stepsHtml = steps.map(function(label, i) {
-      return '<li data-step="' + i + '"><span class="ns-resolve-step-mark" aria-hidden="true"></span><span>' + label + '</span></li>';
+    var stepsHtml = steps.map(function(step, i) {
+      var phase = step.phase || 'planning';
+      var label = step.label || String(step);
+      return '<li data-step="' + i + '" data-phase="' + phase + '">' +
+        '<span class="ns-resolve-step-mark" aria-hidden="true"></span>' +
+        '<span class="ns-resolve-step-body">' +
+          '<span class="ns-resolve-phase">' + phase.replace(/_/g, ' ') + '</span>' +
+          '<span class="ns-resolve-step-label">' + label + '</span>' +
+        '</span>' +
+      '</li>';
     }).join('');
     scrim.innerHTML =
       '<div class="ns-resolve-modal">' +
-        '<p class="ns-resolve-kicker">Northstar AI</p>' +
+        '<p class="ns-resolve-kicker">Northstar progress</p>' +
         '<h2 class="ns-resolve-title">' + title + '</h2>' +
+        '<p class="ns-resolve-note">Presentation pacing for readability — not a literal live tool trace.</p>' +
         '<div class="ns-resolve-bar" aria-hidden="true"><i></i></div>' +
         '<ol class="ns-resolve-steps">' + stepsHtml + '</ol>' +
       '</div>';
@@ -161,18 +204,16 @@ export function renderCaseResolutionEnhancementScript(): string {
 
     bindOptionSelection(root);
 
+    var planningSteps = parseSteps(root.getAttribute('data-transition-planning'), DEFAULT_PLANNING);
+    var executionSteps = parseSteps(root.getAttribute('data-transition-execution'), DEFAULT_EXECUTION);
+
     var resolveBtn = qs('[data-resolve-northstar]', root);
     if (resolveBtn) {
       resolveBtn.addEventListener('click', function() {
         var overlay = ensureOverlay(
           'ns-resolve-overlay',
-          'Resolving with Northstar AI',
-          [
-            'Checking trip dependencies',
-            'Searching recovery options',
-            'Testing whole-trip viability',
-            'Checking policy and authority'
-          ]
+          'Planning a recovery',
+          planningSteps
         );
         var planForm = qs('[data-test="plan-recovery-form"]', root);
         var alreadyHasOptions = !!qs('[data-test="case-options"]', root);
@@ -217,12 +258,8 @@ export function renderCaseResolutionEnhancementScript(): string {
       syncStrategyInputs(root);
       var overlay = ensureOverlay(
         'ns-execute-overlay',
-        'Applying the recovery',
-        [
-          'Submitting the approved action',
-          'Observing the provider-boundary result',
-          'Updating the trip and rechecking viability'
-        ]
+        'Executing approved recovery',
+        executionSteps
       );
       runStages(overlay, EXEC_MS);
     }, true);

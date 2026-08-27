@@ -47,6 +47,22 @@ export function presentConstraintLabel(constraint: Constraint | undefined): stri
   }
 }
 
+/**
+ * Parse evaluator evidence such as `gap 370min >= required 360min` into
+ * judge-facing copy: `370 min available / 360 min required — viable`.
+ */
+export function presentBufferEvidence(evidence: string | undefined): string | undefined {
+  if (!evidence) return undefined;
+  const match = /gap\s+(-?\d+)\s*min\s*(>=|<)\s*required\s+(\d+)\s*min/i.exec(evidence);
+  if (!match) return undefined;
+  const available = Number(match[1]);
+  const comparator = match[2];
+  const required = Number(match[3]);
+  if (!Number.isFinite(available) || !Number.isFinite(required)) return undefined;
+  const verdict = comparator === '>=' ? 'viable' : 'not enough time';
+  return `${available} min available / ${required} min required — ${verdict}`;
+}
+
 const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
   PASS: 'Still meets',
   FAIL: 'No longer meets',
@@ -54,7 +70,14 @@ const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
 };
 
 /** Plain-language check row for operator case view. */
-export function presentCheckLabel(constraint: Constraint | undefined, result: 'PASS' | 'FAIL' | 'UNKNOWN'): string {
+export function presentCheckLabel(
+  constraint: Constraint | undefined,
+  result: 'PASS' | 'FAIL' | 'UNKNOWN',
+  evidence?: string,
+): string {
+  const buffer = presentBufferEvidence(evidence);
+  if (buffer) return buffer;
+
   const base = presentConstraintLabel(constraint);
   if (result === 'PASS') {
     if (base.includes('Arrival')) return 'Arrival still leaves enough time before the commitment';
@@ -71,7 +94,7 @@ export function presentCheckLabel(constraint: Constraint | undefined, result: 'P
 }
 
 export function presentApprovalReason(): string {
-  return 'This change needs approval before it can proceed.';
+  return 'This change needs organisation or traveller approval before it can proceed.';
 }
 
 const SIGNAL_KIND_ACTIVITY: Record<string, string> = {

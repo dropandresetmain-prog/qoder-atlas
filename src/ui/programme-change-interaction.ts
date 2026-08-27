@@ -66,13 +66,35 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return 'Other change';
   }
 
+  function formatHumanInstant(iso) {
+    if (!iso || typeof iso !== 'string') return iso || '';
+    var match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso.trim());
+    if (!match) return iso;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var month = months[Number(match[2]) - 1] || match[2];
+    return Number(match[3]) + ' ' + month + ' · ' + match[4] + ':' + match[5];
+  }
+
+  function formatClockRange(startIso, endIso) {
+    function clock(iso) {
+      var match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(iso || '').trim());
+      return match ? (match[4] + ':' + match[5]) : '';
+    }
+    var start = clock(startIso);
+    var end = clock(endIso);
+    if (start && end) return start + '–' + end;
+    if (start) return start;
+    return formatHumanInstant(startIso) || String(startIso || '');
+  }
+
   function formatProposedSide(payload) {
     if (payload.changeKind === 'CANCELLED') return { whenLabel: 'Cancelled', whereLabel: undefined };
-    var when = payload.newStartsAt || 'Time not set';
-    if (payload.newEndsAt) when = when + ' → ' + payload.newEndsAt;
+    var when = payload.newStartsAt
+      ? formatClockRange(payload.newStartsAt, payload.newEndsAt)
+      : 'Time not set';
     return {
       whenLabel: when,
-      whereLabel: payload.newPlaceId ? ('Place ' + payload.newPlaceId) : undefined
+      whereLabel: payload.newPlaceId ? undefined : undefined
     };
   }
 
@@ -152,14 +174,21 @@ export function renderProgrammeChangeEnhancementScript(): string {
         row.className = 'impact-row';
         row.setAttribute('data-test', 'preview-impact-row');
 
+        var names = Array.isArray(item.travellerNames) ? item.travellerNames.filter(Boolean) : [];
         var count = document.createElement('span');
         count.className = 'i-count';
-        count.textContent = String(Array.isArray(item.travellerIds) ? item.travellerIds.length : 1);
+        count.textContent = names.length > 0
+          ? names.join(', ')
+          : String(Array.isArray(item.travellerIds) ? item.travellerIds.length : 1);
         row.appendChild(count);
 
         var detail = document.createElement('span');
         var reasons = Array.isArray(item.reasons) && item.reasons.length
-          ? item.reasons.join(' · ')
+          ? item.reasons.map(function(reason) {
+              return String(reason)
+                .replace(/commitment rescheduled/gi, 'Programme commitment moves')
+                .replace(/\b\d{4}-\d{2}-\d{2}T[\d:+.-]+/g, function(iso) { return formatHumanInstant(iso); });
+            }).join(' · ')
           : 'Affected by the proposed programme change.';
         detail.textContent = reasons;
         row.appendChild(detail);
@@ -284,11 +313,11 @@ export function renderProgrammeChangeEnhancementScript(): string {
             '<option value="OTHER">Other change</option>' +
           '</select>' +
           '<label class="kv-label" for="programme-change-start">New start</label>' +
-          '<input id="programme-change-start" name="newStartsAt" type="text" placeholder="2026-10-01T15:30:00+08:00" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
+          '<input id="programme-change-start" name="newStartsAt" type="text" placeholder="e.g. 1 Oct · 15:30 (or full ISO with offset)" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
           '<label class="kv-label" for="programme-change-end">New end</label>' +
-          '<input id="programme-change-end" name="newEndsAt" type="text" placeholder="2026-10-01T16:00:00+08:00" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
+          '<input id="programme-change-end" name="newEndsAt" type="text" placeholder="e.g. 1 Oct · 16:00 (or full ISO with offset)" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
           '<label class="kv-label" for="programme-change-place">New place (optional)</label>' +
-          '<input id="programme-change-place" name="newPlaceId" type="text" placeholder="Existing place id" style="width:100%;box-sizing:border-box;margin:6px 0 0">' +
+          '<input id="programme-change-place" name="newPlaceId" type="text" placeholder="Leave blank to keep the current venue" style="width:100%;box-sizing:border-box;margin:6px 0 0">' +
         '</div>' +
       '</div>' +
       '<div data-programme-change-result style="margin-top:16px" data-test="programme-change-result"></div>' +

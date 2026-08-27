@@ -15,6 +15,8 @@ import type {
   CaseRailSectionView,
   RecoveryOptionView,
 } from '../ui/case-view-model.ts';
+import { formatMoney } from '../ui/html.ts';
+import { authorityNeededLabel } from '../ui/copy.ts';
 import { describeAllocation } from '../engine/funding.ts';
 import {
   formatCaseOpenedAt,
@@ -32,7 +34,7 @@ function primaryEngagement(trip: Trip, recoveryCase?: RecoveryCase): Engagement 
 
 function policyCapLabel(amount: Money | undefined): string | undefined {
   if (!amount) return undefined;
-  return `${amount.currency} ${amount.amount}`;
+  return formatMoney(amount);
 }
 
 async function approverName(
@@ -49,19 +51,12 @@ async function approverName(
     const entry = await deps.snapshot.entities.get('ORGANISATION', approval.decidedBy.id);
     return entry?.entityType === 'ORGANISATION' ? entry.entity.name : undefined;
   }
-  return 'Human agent';
+  return 'Organiser';
 }
 
 function whoDecidesLabel(approval: ApprovalRequirementView | undefined): string | undefined {
   if (!approval) return undefined;
-  switch (approval.requestedFrom) {
-    case 'TRAVELLER':
-      return 'Traveller chooses next';
-    case 'ORGANISATION':
-      return 'Organisation approval needed';
-    default:
-      return 'Human agent review needed';
-  }
+  return authorityNeededLabel(approval.requestedFrom);
 }
 
 export function enrichCaseDetailView(
@@ -113,6 +108,7 @@ export function enrichCaseDetailView(
   if (whoRows.length > 0) railSections.push({ title: 'Who decides', rows: whoRows });
 
   const options: RecoveryOptionView[] = view.options.map((option) => {
+    if (option.flags && option.flags.length > 0) return option;
     const flags = optionFlagsFromEvidence({
       feasible: option.verdict === 'VIABLE',
       criticalObjectiveAtRisk: view.criticalObjectiveAtRisk,
@@ -153,7 +149,7 @@ export async function waitingOnLabel(
   trip: Trip,
   requestedFrom: 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT',
 ): Promise<string | undefined> {
-  if (requestedFrom === 'HUMAN_AGENT') return 'Human agent';
+  if (requestedFrom === 'HUMAN_AGENT') return 'Organiser';
   if (requestedFrom === 'ORGANISATION') {
     if (trip.anchorEventId) {
       const eventEntry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
@@ -172,8 +168,8 @@ export async function waitingOnLabel(
 
 export function formatDecisionCost(amount: Money | undefined, fundingSummary: string | undefined): string | undefined {
   if (!amount && !fundingSummary) return undefined;
-  if (amount && fundingSummary) return `${amount.currency} ${amount.amount} · ${fundingSummary}`;
-  if (amount) return `${amount.currency} ${amount.amount}`;
+  if (amount && fundingSummary) return `${formatMoney(amount)} · ${fundingSummary}`;
+  if (amount) return formatMoney(amount);
   return fundingSummary;
 }
 
