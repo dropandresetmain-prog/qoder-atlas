@@ -13,12 +13,21 @@ import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import type { ChainLinkState, ChainLinkView } from '../ui/case-view-model.ts';
 import {
+  buildChainPresentationContext,
+  presentationLinkState,
+  recoveryCommitmentIdFor,
+  type ChainPresentationContext,
+} from './chainPresentation.ts';
+import {
   countOtherCommitments,
   isStayElement,
   isTransportLeg,
   selectJourneyTransportAndStay,
   selectRecoveryCommitment,
 } from './chainProjection.ts';
+
+export type { ChainPresentationContext } from './chainPresentation.ts';
+export { buildChainPresentationContext, presentationLinkState } from './chainPresentation.ts';
 
 const TRANSPORT_WORD: Record<TransportLeg['data']['mode'], string> = {
   FLIGHT: 'Flight',
@@ -86,46 +95,6 @@ function engagementLabel(engagement: Engagement, event: AnchorEvent | undefined)
   return event ? `${engagement.data.title} · ${event.name}` : engagement.data.title;
 }
 
-function linkState(
-  element: TripElement,
-  affected: ReadonlySet<string>,
-  recoveryCase: RecoveryCase | undefined,
-): ChainLinkState {
-  const caseOpen = Boolean(recoveryCase && recoveryCase.status !== 'RESOLVED');
-  const isAffected = affected.has(element.id);
-
-  // Programme engagements are not supplier reservations. Reservation NONE /
-  // status UNKNOWN must not render as unbooked or "details pending".
-  if (element.elementKind === 'ENGAGEMENT') {
-    if (element.status === 'INVALID') return 'BROKEN';
-    if (element.status === 'AT_RISK' || (caseOpen && isAffected)) return 'AT_RISK';
-    // Preserved / scheduled programme time — not a booking confirmation chip.
-    return 'CONFIRMED';
-  }
-
-  if (element.status === 'INVALID') return 'BROKEN';
-  if (element.status === 'AT_RISK') return 'AT_RISK';
-  switch (element.reservationState) {
-    case 'CANCELLED':
-      return 'BROKEN';
-    case 'NONE':
-      return 'UNBOOKED';
-    case 'UNKNOWN':
-      // Only genuinely unverified reservations stay Unknown. Unaffected
-      // known topology after recovery must not paint Pending forever.
-      return caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
-    case 'HELD':
-      return caseOpen && isAffected ? 'PROPOSED' : 'AT_RISK';
-    case 'CONFIRMED':
-    case 'CHANGED':
-    case 'COMPLETED':
-      // Confirmed supplier bookings stay Confirmed unless this element is in
-      // the open case blast radius. Health status UNKNOWN alone is not Pending.
-      return caseOpen && isAffected ? 'AT_RISK' : 'CONFIRMED';
-    default:
-      return caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
-  }
-}
 
 function linkDetail(element: TripElement, state: ChainLinkState, places: ReadonlyMap<string, Place>): string | undefined {
   if (element.elementKind === 'TRANSPORT_LEG') {
@@ -151,14 +120,20 @@ export function projectCaseChain(
   context: {
     places: ReadonlyMap<string, Place>;
     anchorEvent?: AnchorEvent;
+    presentation?: ChainPresentationContext;
   },
 ): ChainLinkView[] | undefined {
   if (trip.elements.length === 0) return undefined;
-  const affected = new Set(recoveryCase?.affectedElementIds ?? []);
+  const presentation =
+    context.presentation ??
+    buildChainPresentationContext({
+      recoveryCase,
+      recoveryCommitmentId: recoveryCommitmentIdFor(trip, recoveryCase),
+    });
   const links: ChainLinkView[] = [];
 
   for (const element of selectJourneyTransportAndStay(trip)) {
-    const state = linkState(element, affected, recoveryCase);
+    const state = presentationLinkState(element, presentation);
     const label =
       isTransportLeg(element)
         ? transportLabel(element, context.places)
@@ -181,7 +156,7 @@ export function projectCaseChain(
 
   const commitment = selectRecoveryCommitment(trip, recoveryCase);
   if (commitment) {
-    const state = linkState(commitment, affected, recoveryCase);
+    const state = presentationLinkState(commitment, presentation);
     const others = countOtherCommitments(trip, commitment);
     const detail = linkDetail(commitment, state, context.places);
     const extra =

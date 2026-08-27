@@ -43,6 +43,7 @@ import {
 import { escapeHtml, formatCostDelta, formatInstant, formatMoney, formatPayable, formatPolicyEquivalent } from '../html.ts';
 import { CASE_PRIMARY_OPTION_LIMIT } from '../presentationState.ts';
 import {
+  isProgrammeRecoveryFlow,
   selectCaseWorkspacePhase,
   shouldShowBeginCta,
   shouldShowExecuteCta,
@@ -817,7 +818,7 @@ function recoveryActionsInner(view: CaseDetailView): string {
       <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="executing">
         <p class="planning-kicker">Execution in progress</p>
         <p class="planning-result-title">Applying the approved recovery</p>
-        <p>Northstar is executing at the declared boundary, then observing the result and rechecking the trip.</p>
+        <p>Northstar is applying the approved recovery, checking the supplier result, and rechecking the trip.</p>
       </div>`;
   }
 
@@ -840,12 +841,40 @@ function recoveryActionsInner(view: CaseDetailView): string {
     return '';
   }
 
+  if (isProgrammeRecoveryFlow(view)) {
+    const showRecommendation = view.programmeRecoveryStage === 'programme_recommendation';
+    const travelPanel = `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta data-case-cta="plan" data-programme-travel-panel${showRecommendation ? ' hidden' : ''}>
+        <p class="planning-kicker">Travel alone cannot save this objective</p>
+        <p class="planning-result-title">Find a way to protect the headline</p>
+        <p>Northstar will verify the airline replacement, test it against the current headline, and check whether a programme change can restore viability.</p>
+        <button type="button" class="btn btn-primary" data-programme-travel-analysis data-test="programme-travel-analysis-btn">Check travel and programme options</button>
+      </div>`;
+    const proposedWhen =
+      view.programmeChangeProposedStartsAt && view.programmeChangeProposedEndsAt
+        ? 'the later headline time'
+        : 'a later programme slot';
+    const recommendationPanel = `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="programme" data-programme-recommendation${showRecommendation ? '' : ' hidden'}>
+        <p class="planning-kicker">Programme recovery recommended</p>
+        <p class="planning-result-title">Protect the headline by moving the programme, not buying another flight</p>
+        <p>Northstar can test ${escapeHtml(proposedWhen)} against every linked traveller before the organiser commits anything.</p>
+        ${programmeChangeButton(view)}
+        ${escalationPanel(view)}
+      </div>`;
+    return travelPanel + recommendationPanel;
+  }
+
   if (shouldShowProgrammeChangeCta(view)) {
+    const proposedWhen =
+      view.programmeChangeProposedStartsAt && view.programmeChangeProposedEndsAt
+        ? 'the later headline time'
+        : 'a later programme slot';
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="programme">
-        <p class="planning-kicker">Travel recovery is not enough</p>
-        <p class="planning-result-title">Preview a programme change</p>
-        <p>Reschedule the affected commitment so the current travel plan can still work.</p>
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="programme" data-programme-recommendation>
+        <p class="planning-kicker">Programme recovery recommended</p>
+        <p class="planning-result-title">Protect the headline by moving the programme, not buying another flight</p>
+        <p>Northstar can test ${escapeHtml(proposedWhen)} against every linked traveller before the organiser commits anything.</p>
         ${programmeChangeButton(view)}
         ${escalationPanel(view)}
       </div>`;
@@ -900,12 +929,19 @@ function recoveryActionsInner(view: CaseDetailView): string {
   }
 
   if (shouldShowResolveCta(view)) {
+    const programmeTravel = isProgrammeRecoveryFlow(view);
     return `
       <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta data-case-cta="plan">
-        <p class="planning-kicker">Impacted trip</p>
-        <p class="planning-result-title">Resolve with Northstar AI</p>
-        <p>Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.</p>
-        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+        <p class="planning-kicker">${programmeTravel ? 'Travel alone cannot save this objective' : 'Impacted trip'}</p>
+        <p class="planning-result-title">${programmeTravel ? 'Find a way to protect the headline' : 'Resolve with Northstar AI'}</p>
+        <p>${
+          programmeTravel
+            ? 'Northstar will verify the airline replacement, test it against the current headline, and check whether a programme change can restore viability.'
+            : 'Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.'
+        }</p>
+        <button type="button" class="btn btn-primary" ${
+          programmeTravel ? 'data-programme-travel-analysis data-test="programme-travel-analysis-btn"' : 'data-resolve-northstar data-test="resolve-northstar-btn"'
+        }>${programmeTravel ? 'Check travel and programme options' : 'Resolve with Northstar AI'}</button>
         <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
@@ -985,6 +1021,17 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   }
   const badge = caseBadge(view);
   const initialPhase = selectCaseWorkspacePhase(view);
+  const programmeRecovery = isProgrammeRecoveryFlow(view);
+  const programmeStage = view.programmeRecoveryStage ?? '';
+  const planningSteps = programmeRecovery
+    ? JSON.stringify([
+        'Verifying the airline replacement',
+        'Testing current arrival against the headline',
+        'Checking evidenced travel alternatives',
+        'Headline commitment still fails',
+        'Opening a mutation-free programme counterfactual',
+      ])
+    : '';
   const rail = `
     <aside class="case-rail">
       ${commitmentCard(view)}
@@ -992,7 +1039,9 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
       ${authorityCard()}
     </aside>`;
   return `
-<main class="shell case-workspace" data-case-workspace data-case-phase="${initialPhase}" data-test="case-phase-${initialPhase}">
+<main class="shell case-workspace" data-case-workspace data-case-id="${escapeHtml(view.caseId)}" data-case-phase="${initialPhase}" data-test="case-phase-${initialPhase}"${
+    programmeRecovery ? ` data-programme-recovery="true" data-programme-recovery-stage="${escapeHtml(programmeStage)}"` : ''
+  }${planningSteps ? ` data-transition-planning='${escapeHtml(planningSteps)}'` : ''}>
   <div class="page-head">
     <h1>${escapeHtml(view.tripLabel ?? (view.travellerNames.join(', ') || view.tripId))} <span class="${toneClass(badge.tone, 'badge')}" role="status" aria-label="Case status: ${escapeHtml(badge.label)}">${escapeHtml(badge.label)}</span></h1>
     <p class="sub">${escapeHtml(view.travellerNames.join(', '))}</p>

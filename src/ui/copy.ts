@@ -119,7 +119,7 @@ export const CASE_WHAT_CHANGED_TITLE = 'What changed';
 export const CASE_AFFECTED_TITLE = 'What this touches';
 
 /** Checks-list heading (approved C1 wording). */
-export const CASE_CHECKS_TITLE = 'Checks already run';
+export const CASE_CHECKS_TITLE = 'What we checked';
 
 /** In-flight activity list heading (approved C2 wording). */
 export const CASE_ACTIVITY_TITLE = 'What Northstar is doing right now';

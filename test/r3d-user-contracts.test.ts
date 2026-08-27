@@ -334,7 +334,7 @@ test('traveller choice cards only when a decision is required', () => {
   assert.doesNotMatch(renderTravellerTripBody(withoutChoice), /optcard/);
 });
 
-test('programme-change script renders Now vs Proposed preview contract', () => {
+test('programme-change script renders Now vs Proposed preview contract without native confirm', () => {
   const script = renderProgrammeChangeEnhancementScript();
   assert.match(script, /now-vs-proposed/);
   assert.match(script, /Now/);
@@ -342,6 +342,8 @@ test('programme-change script renders Now vs Proposed preview contract', () => {
   assert.match(script, /change-preview/);
   assert.match(script, /change-commit/);
   assert.match(script, /data-programme-change-back/);
+  assert.match(script, /data-programme-change-confirm/);
+  assert.doesNotMatch(script, /window\.confirm/);
 });
 
 test('normal product pages omit demo banner; demo tooling may keep it', () => {
@@ -484,7 +486,7 @@ test('authority-required case renders human approve; traveller funding is explic
 
 test('case page script includes Resolve choreography contract', () => {
   const page = renderPage({ title: 'Recovery case', active: 'case' }, '<main data-case-workspace></main>');
-  assert.match(page, /Resolving with Northstar AI/);
+  assert.match(page, /Planning a recovery/);
   assert.match(page, /Checking trip dependencies/);
   assert.match(page, /ns-resolve/);
   assert.match(page, /prefers-reduced-motion/);

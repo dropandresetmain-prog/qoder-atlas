@@ -13,17 +13,18 @@ import type {
 import type { IsoDateTime } from '../../domain/common.ts';
 import type { ChainLinkView } from '../case-view-model.ts';
 import {
+  MANAGED_TRAVEL_LABEL,
+  mapManagedTravelPresentation,
   OVERVIEW_ROSTER_PAGE_SIZE,
   compareByAttentionThenId,
   compareByEarliestCommitment,
   countManagedTravelBuckets,
   fleetCellClassFor,
-  mapManagedTravelPresentation,
-  MANAGED_TRAVEL_LABEL,
+  type ManagedTravelPresentation,
   type ManagedTravelPresentationInput,
 } from '../presentationState.ts';
 import { escapeHtml, formatInstant, formatMoney, formatRosterTime, formatShort, encodeUri } from '../html.ts';
-import { errorPanel, loadingPanel, miniChainRow, statusBadge } from '../components.ts';
+import { errorPanel, loadingPanel, miniChainRow } from '../components.ts';
 
 export interface OperatorDashboardAugmentations {
   chainFor?: (trip: OperatorTripView) => readonly ChainLinkView[] | undefined;
@@ -41,6 +42,23 @@ function presentationInput(trip: OperatorTripView): ManagedTravelPresentationInp
     pendingDecisionCount: trip.pendingDecisions.length,
     ...(trip.travellerResponseStatus ? { travellerResponseStatus: trip.travellerResponseStatus } : {}),
   };
+}
+
+const PRESENTATION_TONE: Record<ManagedTravelPresentation, string> = {
+  CONFIRMED: 'ok',
+  NEEDS_ATTENTION: 'alert',
+  WATCHING: 'watch',
+  UNCONFIRMED: 'neutral',
+};
+
+function rosterStatusBadge(trip: OperatorTripView): string {
+  if (trip.travelArrangement === 'SELF_OR_OTHER_ARRANGED') {
+    return '<span class="badge tone-neutral" role="status">Local / self-arranged</span>';
+  }
+  const bucket = mapManagedTravelPresentation(presentationInput(trip));
+  const label = MANAGED_TRAVEL_LABEL[bucket];
+  const tone = PRESENTATION_TONE[bucket];
+  return `<span class="badge tone-${tone}" role="status" aria-label="Trip status: ${escapeHtml(label)}">${escapeHtml(label)}</span>`;
 }
 
 function fleetCellClass(trip: OperatorTripView): string {
@@ -203,9 +221,34 @@ function sharedIncidentConsequence(trip: OperatorTripView): {
   return { kind: 'workable', label: 'Viable after the same airline change' };
 }
 
-function attentionRow(row: AttentionRow, index: number, outcomeKind?: string): string {
-  const glyph = row.tone === 'approval' ? '!' : row.tone === 'traveller' ? '?' : '✕';
-  const glyphClass = row.tone === 'approval' ? 'g-bad' : row.tone === 'traveller' ? 'g-warn' : 'g-bad';
+const SHARED_OUTCOME_PRIORITY: Record<'critical' | 'watching' | 'workable', number> = {
+  critical: 0,
+  watching: 1,
+  workable: 2,
+};
+
+function sharedOutcomeGlyph(outcomeKind: 'critical' | 'workable' | 'watching'): { glyph: string; glyphClass: string } {
+  if (outcomeKind === 'critical') return { glyph: '✕', glyphClass: 'g-bad' };
+  if (outcomeKind === 'watching') return { glyph: '▲', glyphClass: 'g-warn' };
+  return { glyph: '✓', glyphClass: 'g-ok' };
+}
+
+function attentionRow(
+  row: AttentionRow,
+  index: number,
+  outcomeKind?: 'critical' | 'workable' | 'watching',
+  nested = false,
+): string {
+  let glyph: string;
+  let glyphClass: string;
+  if (outcomeKind) {
+    const styled = sharedOutcomeGlyph(outcomeKind);
+    glyph = styled.glyph;
+    glyphClass = styled.glyphClass;
+  } else {
+    glyph = row.tone === 'approval' ? '!' : row.tone === 'traveller' ? '?' : '✕';
+    glyphClass = row.tone === 'approval' ? 'g-bad' : row.tone === 'traveller' ? 'g-warn' : 'g-bad';
+  }
   const amount = row.amount ? ` · ${escapeHtml(formatMoney(row.amount))}` : '';
   const when = row.requestedAt ? formatShort(row.requestedAt) : 'timing unconfirmed';
   const name =
@@ -213,8 +256,9 @@ function attentionRow(row: AttentionRow, index: number, outcomeKind?: string): s
       ? row.trip.travellerNames.join(', ')
       : (row.trip.label ?? 'Linked participant');
   const outcomeAttr = outcomeKind ? ` data-shared-outcome="${escapeHtml(outcomeKind)}"` : '';
+  const nestedClass = nested ? ' qrow-nested' : '';
   return `
-  <a href="/operator/cases/${encodeUri(row.caseId)}" class="qrow" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(row.caseId)}" data-attention-tone="${escapeHtml(row.tone)}" data-test="decision-link"${outcomeAttr}>
+  <a href="/operator/cases/${encodeUri(row.caseId)}" class="qrow${nestedClass}" style="--i:${Math.min(index, 13)}" data-case-id="${escapeHtml(row.caseId)}" data-attention-tone="${escapeHtml(row.tone)}" data-test="decision-link"${outcomeAttr}>
     <span class="q-glyph ${glyphClass}" aria-hidden="true">${glyph}</span>
     <span class="q-name">${escapeHtml(name)}</span>
     <span class="q-issue">${escapeHtml(sanitizeOverviewCopy(row.description))}${amount}</span>
@@ -240,7 +284,19 @@ function attentionPanel(rows: AttentionRow[]): string {
           const workable = consequences.filter(
             (item) => item.consequence.kind === 'workable' || item.consequence.kind === 'watching',
           ).length;
-          const children = consequences
+          const sorted = consequences.sort((a, b) => {
+            const priority =
+              SHARED_OUTCOME_PRIORITY[a.consequence.kind] - SHARED_OUTCOME_PRIORITY[b.consequence.kind];
+            if (priority !== 0) return priority;
+            const aTime = a.row.requestedAt ?? '';
+            const bTime = b.row.requestedAt ?? '';
+            const timeDiff = aTime.localeCompare(bTime);
+            if (timeDiff !== 0) return timeDiff;
+            const aName = a.row.trip.travellerNames[0] ?? a.row.trip.tripId;
+            const bName = b.row.trip.travellerNames[0] ?? b.row.trip.tripId;
+            return aName.localeCompare(bName);
+          });
+          const children = sorted
             .map(({ row, consequence }, index) =>
               attentionRow(
                 {
@@ -249,17 +305,19 @@ function attentionPanel(rows: AttentionRow[]): string {
                 },
                 index,
                 consequence.kind,
+                true,
               ),
             )
             .join('');
           const header = `
-  <div class="qrow qrow-group" data-test="shared-incident-group" data-attention-tone="attention" data-shared-affected="${shared.length}" data-shared-workable="${workable}" data-shared-critical="${criticalCount}">
-    <span class="q-glyph g-bad" aria-hidden="true">✕</span>
+  <div class="qrow qrow-group qrow-callout" role="group" aria-label="Shared airline schedule change" data-test="shared-incident-group" data-attention-tone="callout" data-shared-affected="${shared.length}" data-shared-workable="${workable}" data-shared-critical="${criticalCount}">
+    <span class="q-glyph g-warn" aria-hidden="true">▲</span>
     <span class="q-name">Shared airline change</span>
     <span class="q-issue">One airline change · ${shared.length} different trip consequences · ${workable} still workable · ${criticalCount} critical</span>
     <span class="q-time"></span>
-  </div>`;
-          return `${header}${children}`;
+  </div>
+  <div class="qrow-shared-children">`;
+          return `${header}${children}</div>`;
         })()
       : shared.map((row, index) => attentionRow(row, index)).join('');
 
@@ -322,8 +380,8 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
       ${extraLine}
     </div>
     <div class="b-right">
-      ${showInteraction}
-      ${statusBadge(trip.status)}
+      <div class="b-actions">${showInteraction}</div>
+      <div class="b-status">${rosterStatusBadge(trip)}</div>
       <div class="b-time">${escapeHtml(formatRosterTime(trip.updatedAt, view.generatedAt))}</div>
     </div>
   </${rowTag}>`;

@@ -61,8 +61,10 @@ export function presentBufferEvidence(evidence: string | undefined): string | un
   const comparator = match[2];
   const required = Number(match[3]);
   if (!Number.isFinite(available) || !Number.isFinite(required)) return undefined;
-  const verdict = comparator === '>=' ? 'viable' : 'not enough time';
-  return `${available} min available / ${required} min required — ${verdict}`;
+  if (comparator === '<') {
+    return `Only ${available} minutes remain before the commitment, but ${required} minutes are required.`;
+  }
+  return `Arrival leaves ${available} minutes before the commitment; the ${required}-minute requirement is met.`;
 }
 
 const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
@@ -306,4 +308,33 @@ export function presentSignalChange(signal: TripSignal): string {
     if (cleaned) return cleaned;
   }
   return copy[signal.kind];
+}
+
+/**
+ * Compose operator-facing "what changed" copy from structured case facts.
+ * Generic — uses signal kind, threatened commitment, and failed checks only.
+ */
+export function presentDisruptedCaseSummary(input: {
+  signal?: TripSignal;
+  criticalObjectiveAtRisk?: string;
+  failedCheckLabels?: readonly string[];
+}): string | undefined {
+  const base = input.signal ? presentSignalChange(input.signal) : undefined;
+  const commitment = input.criticalObjectiveAtRisk?.trim();
+  const bufferFail = input.failedCheckLabels?.find((label) =>
+    /minutes remain before the commitment|required arrival buffer|no longer works for the commitment/i.test(label),
+  );
+
+  if (input.signal?.kind === 'FLIGHT_SCHEDULE_CHANGE' && commitment) {
+    const arrivalNote = bufferFail
+      ? ' The new arrival timing no longer leaves enough preparation time.'
+      : ' The new arrival timing threatens the programme commitment.';
+    return `The airline rescheduled the inbound flight.${arrivalNote} ${commitment} is now at risk.`;
+  }
+
+  if (commitment && bufferFail) {
+    return `${base ?? 'This trip changed.'} ${commitment} is now at risk because the required arrival buffer is no longer met.`;
+  }
+
+  return base;
 }

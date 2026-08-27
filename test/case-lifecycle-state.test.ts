@@ -9,12 +9,15 @@ import { renderCaseDetailBody } from '../src/ui/screens/operator-case.ts';
 import { renderOperatorDashboardBody } from '../src/ui/screens/operator-dashboard.ts';
 import {
   executionIsPending,
+  isProgrammeRecoveryFlow,
   selectCaseWorkspacePhase,
   shouldShowBeginCta,
   shouldShowExecuteCta,
+  shouldShowProgrammeChangeCta,
   shouldShowResolveCta,
 } from '../src/ui/caseLifecycle.ts';
 import { projectCaseChain } from '../src/app/chain.ts';
+import { buildChainPresentationContext, presentationLinkState } from '../src/app/chainPresentation.ts';
 import { reconcilePriorOpenCasesIfTripViable } from '../src/app/caseReconciliation.ts';
 import { isLegalCaseTransition } from '../src/operational/case.ts';
 import type { CaseReconciliationDeps } from '../src/app/caseReconciliation.ts';
@@ -248,6 +251,99 @@ test('lifecycle: resolved case never shows recovery CTAs', () => {
   assert.doesNotMatch(html, /data-test="begin-strategy-btn"/);
   assert.doesNotMatch(html, /data-test="execute-approved-strategy-btn"/);
   assert.doesNotMatch(html, /Approve as organiser/);
+});
+
+test('lifecycle: programme recovery shows travel analysis before programme recommendation', () => {
+  const view = baseView({
+    status: 'DISRUPTED',
+    programmeChangeAvailable: true,
+    anchorEventId: 'evt-1',
+    programmeChangeCommitmentId: 'eng-1',
+    programmeRecoveryStage: 'travel_analysis',
+    programmeChangeProposedStartsAt: '2026-10-01T15:30:00+08:00',
+    programmeChangeProposedEndsAt: '2026-10-01T16:00:00+08:00',
+  });
+  assert.equal(isProgrammeRecoveryFlow(view), true);
+  assert.equal(shouldShowResolveCta(view), true);
+  assert.equal(shouldShowProgrammeChangeCta(view), false);
+  const html = renderCaseDetailBody(view);
+  assert.match(html, /data-programme-recovery="true"/);
+  assert.match(html, /data-programme-recovery-stage="travel_analysis"/);
+  assert.match(html, /data-test="programme-travel-analysis-btn"/);
+  assert.match(html, /data-programme-travel-panel/);
+  assert.match(html, /data-programme-recommendation hidden/);
+  assert.doesNotMatch(html, /data-programme-travel-panel hidden/);
+});
+
+test('lifecycle: programme recommendation stage exposes preview CTA only after travel analysis', () => {
+  const view = baseView({
+    status: 'DISRUPTED',
+    programmeChangeAvailable: true,
+    anchorEventId: 'evt-1',
+    programmeChangeCommitmentId: 'eng-1',
+    programmeRecoveryStage: 'programme_recommendation',
+    programmeChangeProposedStartsAt: '2026-10-01T15:30:00+08:00',
+    programmeChangeProposedEndsAt: '2026-10-01T16:00:00+08:00',
+  });
+  assert.equal(shouldShowResolveCta(view), false);
+  assert.equal(shouldShowProgrammeChangeCta(view), true);
+  const html = renderCaseDetailBody(view);
+  assert.match(html, /data-programme-recommendation/);
+  assert.match(html, /data-test="preview-programme-change-btn"/);
+  assert.match(html, /data-programme-travel-panel hidden/);
+});
+
+test('chain presentation: open NOT_VIABLE case marks transport and commitment at risk', () => {
+  const engagement: Engagement = {
+    id: 'eng-1',
+    tripId: 'trip-1',
+    elementKind: 'ENGAGEMENT',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+    reservationState: 'NONE',
+    status: 'VALID',
+    dependsOn: [],
+    governedByRuleSetIds: [],
+    data: {
+      title: 'Headline interview',
+      startsAt: {
+        value: '2026-10-01T09:20:00+08:00',
+        sourceId: 'src-1',
+        authority: 'AUTHORITATIVE',
+        observedAt: AT,
+      },
+      endsAt: {
+        value: '2026-10-01T09:50:00+08:00',
+        sourceId: 'src-1',
+        authority: 'AUTHORITATIVE',
+        observedAt: AT,
+      },
+      placeId: 'place-venue',
+    },
+  };
+  const flight: TransportLeg = {
+    id: 'leg-1',
+    tripId: 'trip-1',
+    elementKind: 'TRANSPORT_LEG',
+    importance: 'REQUIRED',
+    flexibility: 'CHANGEABLE',
+    reservationState: 'CONFIRMED',
+    status: 'VALID',
+    dependsOn: [],
+    governedByRuleSetIds: [],
+    data: {
+      mode: 'FLIGHT',
+      originPlaceId: 'place-nrt',
+      destinationPlaceId: 'place-sin',
+    },
+  };
+  const ctx = buildChainPresentationContext({
+    recoveryCase: { id: 'case-1', tripId: 'trip-1', status: 'PLANNING', affectedElementIds: ['leg-1'] } as RecoveryCase,
+    tripNotViable: true,
+    recoveryCommitmentId: 'eng-1',
+  });
+  assert.equal(presentationLinkState(flight, ctx), 'AT_RISK');
+  assert.equal(presentationLinkState(engagement, ctx), 'AT_RISK');
 });
 
 test('lifecycle: programme engagements are Scheduled, not Not booked', () => {

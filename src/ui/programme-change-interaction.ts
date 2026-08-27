@@ -10,6 +10,8 @@ export function renderProgrammeChangeEnhancementScript(): string {
 (function() {
   'use strict';
 
+  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var PREVIEW_MS = REDUCE ? 200 : 3000;
   var params = new URLSearchParams(window.location.search);
   var actionAt = params.get('at') || new Date().toISOString();
   var actionRow = document.querySelector('[data-ui-section="programme-actions"]');
@@ -21,6 +23,65 @@ export function renderProgrammeChangeEnhancementScript(): string {
       return source.getAttribute('data-anchor-event-id');
     }
     return params.get('event');
+  }
+
+  function previewErrorText(data) {
+    if (!data) return 'Preview could not be completed.';
+    if (typeof data === 'string') return data;
+    if (data.message) return String(data.message);
+    if (data.error) return String(data.error);
+    if (Array.isArray(data.issues) && data.issues.length) return data.issues.join(' · ');
+    return 'Preview could not be completed.';
+  }
+
+  function showStagedOverlay(title, steps, durationMs, done) {
+    var existing = document.querySelector('[data-test="lifecycle-progress-overlay"]');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.setAttribute('data-test', 'lifecycle-progress-overlay');
+    overlay.className = 'ns-resolve-scrim';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', title);
+    var stepsHtml = steps.map(function(step, i) {
+      return '<li data-step="' + i + '"><span class="ns-resolve-step-mark" aria-hidden="true"></span><span class="ns-resolve-step-body"><span class="ns-resolve-step-label">' + step + '</span></span></li>';
+    }).join('');
+    overlay.innerHTML =
+      '<div class="ns-resolve-modal">' +
+        '<p class="ns-resolve-kicker">Northstar progress</p>' +
+        '<h2 class="ns-resolve-title">' + title + '</h2>' +
+        '<div class="ns-resolve-bar" aria-hidden="true"><i></i></div>' +
+        '<ol class="ns-resolve-steps">' + stepsHtml + '</ol>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    var bar = overlay.querySelector('.ns-resolve-bar > i');
+    var stepEls = Array.prototype.slice.call(overlay.querySelectorAll('[data-step]'));
+    var start = Date.now();
+    overlay.hidden = false;
+    document.body.classList.add('ns-resolve-open');
+    function tick() {
+      var elapsed = Date.now() - start;
+      var t = Math.min(1, elapsed / durationMs);
+      if (bar) bar.style.width = Math.round(t * 100) + '%';
+      var idx = Math.min(stepEls.length - 1, Math.floor(t * stepEls.length));
+      stepEls.forEach(function(step, i) {
+        step.classList.toggle('is-done', i < idx);
+        step.classList.toggle('is-active', i === idx);
+      });
+      if (t >= 1) {
+        stepEls.forEach(function(step) {
+          step.classList.add('is-done');
+          step.classList.remove('is-active');
+        });
+        overlay.hidden = true;
+        document.body.classList.remove('ns-resolve-open');
+        overlay.remove();
+        if (done) done();
+        return;
+      }
+      window.requestAnimationFrame(tick);
+    }
+    window.requestAnimationFrame(tick);
   }
 
   function showLifecycleOverlay(steps, done) {
@@ -197,7 +258,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var summary = document.createElement('p');
     summary.className = 'planning-result-title';
     summary.setAttribute('data-test', 'preview-impact-summary');
-    summary.textContent = affected.length + ' trip' + (affected.length === 1 ? '' : 's') + ' affected · ' + unaffected.length + ' unaffected';
+    summary.textContent = affected.length + ' traveller' + (affected.length === 1 ? '' : 's') + ' affected · ' + unaffected.length + ' unaffected';
     target.appendChild(summary);
 
     if (affected.length === 0) {
@@ -304,26 +365,99 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return select.options[select.selectedIndex].textContent || 'Current commitment';
   }
 
+  function hasPrefilledProposal(source) {
+    if (!source) return false;
+    return Boolean(
+      source.getAttribute('data-default-commitment-id') &&
+      source.getAttribute('data-default-new-starts-at')
+    );
+  }
+
+  function syncPreviewButton(modal) {
+    var previewButton = modal.querySelector('[data-programme-change-preview]');
+    var select = modal.querySelector('[name="commitmentId"]');
+    if (!previewButton || !select) return;
+    var ready = Boolean(select.value && select.value.trim());
+    previewButton.disabled = !ready;
+    previewButton.setAttribute('aria-disabled', ready ? 'false' : 'true');
+  }
+
+  function ensureCommitConfirm(modal) {
+    var existing = modal.querySelector('[data-programme-change-confirm]');
+    if (existing) return existing;
+    var panel = document.createElement('div');
+    panel.setAttribute('data-programme-change-confirm', '');
+    panel.setAttribute('data-test', 'programme-change-confirm-panel');
+    panel.hidden = true;
+    panel.className = 'panel';
+    panel.style.marginTop = '16px';
+    panel.innerHTML =
+      '<p class="planning-kicker">Confirm programme change</p>' +
+      '<p class="planning-result-title">Commit this headline move?</p>' +
+      '<p>Northstar will update the programme and re-check every linked traveller. Nothing changes until you confirm.</p>' +
+      '<div class="btn-row" style="margin-top:14px">' +
+        '<button type="button" class="btn btn-primary" data-programme-change-confirm-yes data-test="programme-change-confirm-yes">Commit programme change</button>' +
+        '<button type="button" class="btn btn-ghost" data-programme-change-confirm-no data-test="programme-change-confirm-no">Go back</button>' +
+      '</div>';
+    var result = modal.querySelector('[data-programme-change-result]');
+    if (result && result.parentNode) result.parentNode.insertBefore(panel, result.nextSibling);
+    else modal.appendChild(panel);
+    return panel;
+  }
+
   function setStep(modal, step) {
     var edit = modal.querySelector('[data-programme-change-edit]');
+    var compare = modal.querySelector('[data-programme-change-compare]');
     var previewPane = modal.querySelector('[data-programme-change-result]');
     var previewButton = modal.querySelector('[data-programme-change-preview]');
     var backButton = modal.querySelector('[data-programme-change-back]');
+    var editToggle = modal.querySelector('[data-programme-change-edit-toggle]');
     var commitButton = modal.querySelector('[data-programme-change-commit]');
+    var confirmPanel = modal.querySelector('[data-programme-change-confirm]');
+    if (confirmPanel) confirmPanel.hidden = true;
     if (step === 'edit') {
       if (edit) edit.hidden = false;
+      if (compare) compare.hidden = true;
       if (previewPane) previewPane.replaceChildren();
       if (previewButton) previewButton.hidden = false;
       if (backButton) backButton.hidden = true;
+      if (editToggle) editToggle.hidden = true;
       if (commitButton) commitButton.hidden = true;
       modal.setAttribute('data-programme-change-step', 'edit');
+      syncPreviewButton(modal);
+    } else if (step === 'compare') {
+      if (edit) edit.hidden = true;
+      if (compare) compare.hidden = false;
+      if (previewPane) previewPane.replaceChildren();
+      if (previewButton) previewButton.hidden = false;
+      if (backButton) backButton.hidden = true;
+      if (editToggle) editToggle.hidden = false;
+      if (commitButton) commitButton.hidden = true;
+      modal.setAttribute('data-programme-change-step', 'compare');
+      syncPreviewButton(modal);
     } else {
       if (edit) edit.hidden = true;
+      if (compare) compare.hidden = true;
       if (previewButton) previewButton.hidden = true;
       if (backButton) backButton.hidden = false;
+      if (editToggle) editToggle.hidden = false;
       if (commitButton) commitButton.hidden = false;
       modal.setAttribute('data-programme-change-step', 'preview');
     }
+  }
+
+  function renderPrefilledCompare(modal, payload, nowLabel) {
+    var compare = modal.querySelector('[data-programme-change-compare]');
+    if (!compare) return;
+    compare.replaceChildren();
+    var proposed = formatProposedSide(payload);
+    compare.innerHTML =
+      '<div class="change-compare" data-test="programme-change-compare-draft">' +
+        '<div class="cc-box"><p class="kv-label">Now</p><div class="cc-when">' + (nowLabel || 'Current commitment') + '</div></div>' +
+        '<div class="cc-arrow" aria-hidden="true">→</div>' +
+        '<div class="cc-box to"><p class="kv-label">Proposed</p><div class="cc-when">' + changeKindLabel(payload.changeKind) + ' · ' + proposed.whenLabel + '</div></div>' +
+      '</div>' +
+      '<p class="footnote" style="margin-top:12px">Preview is read-only. The live programme stays unchanged until you commit.</p>';
   }
 
   function openModal(source) {
@@ -335,6 +469,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var defaultCommitmentId = source ? source.getAttribute('data-default-commitment-id') : null;
     var defaultNewStartsAt = source ? source.getAttribute('data-default-new-starts-at') : null;
     var defaultNewEndsAt = source ? source.getAttribute('data-default-new-ends-at') : null;
+    var prefilled = hasPrefilledProposal(source);
 
     var scrim = document.createElement('div');
     scrim.className = 'modal-scrim';
@@ -346,12 +481,16 @@ export function renderProgrammeChangeEnhancementScript(): string {
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', 'Programme change preview');
     modal.setAttribute('data-programme-change-modal', '');
-    modal.setAttribute('data-programme-change-step', 'edit');
+    modal.setAttribute('data-programme-change-step', prefilled ? 'compare' : 'edit');
     modal.innerHTML =
-      '<div class="preview-banner"><span class="pb-dot" aria-hidden="true"></span>What-if check · nothing changes until you commit</div>' +
-      '<h2>Preview a programme change</h2>' +
-      '<p class="m-sub">Edit the proposed change, then preview the Now vs Proposed impact before anything is committed.</p>' +
-      '<div data-programme-change-edit>' +
+      '<div class="preview-banner"><span class="pb-dot" aria-hidden="true"></span>Preview · no changes made yet</div>' +
+      '<h2>' + (prefilled ? 'Move the headline to the proposed time?' : 'Preview a programme change') + '</h2>' +
+      '<p class="m-sub">' + (prefilled
+        ? 'This is a preview. The current programme and all trip states remain unchanged until the organiser commits.'
+        : 'Edit the proposed change, then preview the Now vs Proposed impact before anything is committed.') + '</p>' +
+      '<div data-programme-change-compare' + (prefilled ? '' : ' hidden') + ' style="margin-top:16px"></div>' +
+      '<button type="button" class="btn btn-ghost" data-programme-change-edit-toggle' + (prefilled ? '' : ' hidden') + ' style="margin-top:8px">Adjust proposal</button>' +
+      '<div data-programme-change-edit' + (prefilled ? ' hidden' : '') + '>' +
         '<div class="panel" style="margin-top:16px">' +
           '<label class="kv-label" for="programme-change-commitment">Commitment</label>' +
           '<select id="programme-change-commitment" name="commitmentId" style="width:100%;margin:6px 0 14px"></select>' +
@@ -372,20 +511,20 @@ export function renderProgrammeChangeEnhancementScript(): string {
       '</div>' +
       '<div data-programme-change-result style="margin-top:16px" data-test="programme-change-result"></div>' +
       '<div class="btn-row" style="margin-top:18px">' +
-        '<button type="button" class="btn btn-primary" data-programme-change-preview data-test="programme-change-preview">Preview impact</button>' +
+        '<button type="button" class="btn btn-primary" data-programme-change-preview data-test="programme-change-preview" disabled>Preview impact</button>' +
         '<button type="button" class="btn btn-ghost" data-programme-change-back hidden data-test="programme-change-back">Back</button>' +
-        '<button type="button" class="btn btn-primary" data-programme-change-commit hidden data-test="programme-change-commit">Commit change</button>' +
+        '<button type="button" class="btn btn-primary" data-programme-change-commit hidden data-test="programme-change-commit">Commit programme change</button>' +
         '<button type="button" class="btn btn-ghost" data-programme-change-cancel>Cancel</button>' +
       '</div>' +
-      '<p class="footnote">Preview is read-only. Commit uses the existing programme-change fan-out and re-evaluates affected trips.</p>';
+      '<p class="footnote">No programme mutation until you commit.</p>';
 
     document.body.appendChild(scrim);
     document.body.appendChild(modal);
+    ensureCommitConfirm(modal);
 
     var select = modal.querySelector('[name="commitmentId"]');
     var startInput = modal.querySelector('[name="newStartsAt"]');
     var endInput = modal.querySelector('[name="newEndsAt"]');
-    // Human Singapore times are primary in the fields; ISO is kept in data-* for submit.
     if (defaultNewStartsAt) {
       startInput.value = formatHumanInstant(defaultNewStartsAt);
       startInput.setAttribute('data-iso-value', defaultNewStartsAt);
@@ -395,87 +534,139 @@ export function renderProgrammeChangeEnhancementScript(): string {
       endInput.setAttribute('data-iso-value', defaultNewEndsAt);
     }
 
+    function afterCommitmentsLoaded() {
+      syncPreviewButton(modal);
+      if (prefilled) {
+        var payload = buildPayload(modal);
+        renderPrefilledCompare(modal, payload, selectedCommitmentLabel(modal));
+      }
+    }
+
     var timelineCommitments = commitmentItemsFromTimeline();
     if (timelineCommitments.length > 0) {
       populateCommitmentSelect(select, timelineCommitments, defaultCommitmentId);
+      afterCommitmentsLoaded();
     } else {
       select.innerHTML = '<option value="">Loading commitments…</option>';
       fetchCommitments(anchorEventId).then(function(items) {
         populateCommitmentSelect(select, items, defaultCommitmentId);
+        afterCommitmentsLoaded();
       }).catch(function() {
         select.innerHTML = '<option value="">Could not load commitments</option>';
+        syncPreviewButton(modal);
       });
     }
+    select.addEventListener('change', function() {
+      syncPreviewButton(modal);
+      if (prefilled && modal.getAttribute('data-programme-change-step') !== 'preview') {
+        renderPrefilledCompare(modal, buildPayload(modal), selectedCommitmentLabel(modal));
+      }
+    });
 
     var previewButton = modal.querySelector('[data-programme-change-preview]');
     var commitButton = modal.querySelector('[data-programme-change-commit]');
     var backButton = modal.querySelector('[data-programme-change-back]');
+    var editToggle = modal.querySelector('[data-programme-change-edit-toggle]');
     var cancelButton = modal.querySelector('[data-programme-change-cancel]');
     var result = modal.querySelector('[data-programme-change-result]');
+    var confirmPanel = ensureCommitConfirm(modal);
     var lastPreviewPayload = null;
 
     cancelButton.addEventListener('click', closeModal);
     scrim.addEventListener('click', closeModal);
+    if (editToggle) {
+      editToggle.addEventListener('click', function() {
+        setStep(modal, 'edit');
+      });
+    }
     backButton.addEventListener('click', function() {
       lastPreviewPayload = null;
-      setStep(modal, 'edit');
+      setStep(modal, prefilled ? 'compare' : 'edit');
+    });
+    confirmPanel.querySelector('[data-programme-change-confirm-no]').addEventListener('click', function() {
+      confirmPanel.hidden = true;
     });
 
-    previewButton.addEventListener('click', function() {
+    function runPreview() {
       var payload = buildPayload(modal);
+      if (!payload.commitmentId) {
+        result.textContent = 'Select the programme commitment to preview.';
+        return;
+      }
       if (payload.changeKind === 'RESCHEDULED' && !payload.newStartsAt) {
-        result.textContent = 'Enter the proposed new start time, including its timezone offset.';
+        result.textContent = 'Enter the proposed new start time.';
         return;
       }
       previewButton.disabled = true;
       commitButton.hidden = true;
-      result.textContent = 'Checking affected trips…';
-      postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-preview', payload)
-        .then(function(response) {
-          previewButton.disabled = false;
-          if (!response.ok) {
+      confirmPanel.hidden = true;
+      result.replaceChildren();
+      var previewSteps = [
+        'Checking linked travellers',
+        'Testing the proposed headline time',
+        'Measuring blast radius across the programme'
+      ];
+      showStagedOverlay('Computing programme impact', previewSteps, PREVIEW_MS, function() {
+        postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-preview', payload)
+          .then(function(response) {
+            syncPreviewButton(modal);
+            if (!response.ok) {
+              lastPreviewPayload = null;
+              setStep(modal, prefilled ? 'compare' : 'edit');
+              result.textContent = previewErrorText(response.data);
+              return;
+            }
+            lastPreviewPayload = payload;
+            renderNowProposedCompare(result, response.data, payload, selectedCommitmentLabel(modal));
+            setStep(modal, 'preview');
+          })
+          .catch(function(error) {
+            syncPreviewButton(modal);
             lastPreviewPayload = null;
-            setStep(modal, 'edit');
-            result.textContent = 'Preview failed: ' + JSON.stringify(response.data);
-            return;
-          }
-          lastPreviewPayload = payload;
-          renderNowProposedCompare(result, response.data, payload, selectedCommitmentLabel(modal));
-          setStep(modal, 'preview');
-        })
-        .catch(function(error) {
-          previewButton.disabled = false;
-          lastPreviewPayload = null;
-          setStep(modal, 'edit');
-          result.textContent = 'Preview failed: ' + error.message;
-        });
-    });
+            setStep(modal, prefilled ? 'compare' : 'edit');
+            result.textContent = 'Preview failed: ' + (error && error.message ? error.message : 'unknown error');
+          });
+      });
+    }
 
-    commitButton.addEventListener('click', function() {
+    previewButton.addEventListener('click', runPreview);
+
+    function runCommit() {
       if (!lastPreviewPayload) return;
-      if (!window.confirm('Commit this programme change and re-check affected trips?')) return;
       commitButton.disabled = true;
       result.textContent = 'Committing change and re-checking affected trips…';
       postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-commit', lastPreviewPayload)
         .then(function(response) {
           if (!response.ok) {
             commitButton.disabled = false;
-            result.textContent = 'Commit failed: ' + JSON.stringify(response.data);
+            confirmPanel.hidden = true;
+            result.textContent = 'Commit failed: ' + previewErrorText(response.data);
             return;
           }
           result.textContent = 'Programme updated. Northstar re-checked the affected trips.';
           showLifecycleOverlay([
             'Committing programme change',
             'Updating linked programme dependencies',
-            'Observing programme result',
-            'Updating trip state',
-            'Rechecking downstream viability'
+            'Rechecking affected travellers',
+            'Updating trip records',
+            'Confirming viability'
           ], function() { window.location.reload(); });
         })
         .catch(function(error) {
           commitButton.disabled = false;
-          result.textContent = 'Commit failed: ' + error.message;
+          confirmPanel.hidden = true;
+          result.textContent = 'Commit failed: ' + (error && error.message ? error.message : 'unknown error');
         });
+    }
+
+    commitButton.addEventListener('click', function() {
+      if (!lastPreviewPayload) return;
+      confirmPanel.hidden = false;
+      var yes = confirmPanel.querySelector('[data-programme-change-confirm-yes]');
+      yes.onclick = function() {
+        confirmPanel.hidden = true;
+        runCommit();
+      };
     });
   }
 

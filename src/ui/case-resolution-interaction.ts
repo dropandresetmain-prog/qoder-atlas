@@ -59,10 +59,10 @@ export function renderCaseResolutionEnhancementScript(): string {
     { phase: 'authority', label: 'Checking policy and authority' }
   ];
   var DEFAULT_EXECUTION = [
-    { phase: 'execution', label: 'Executing at the declared provider boundary' },
-    { phase: 'observation', label: 'Observing the provider / programme result' },
-    { phase: 'state_update', label: 'Updating authoritative trip state' },
-    { phase: 'recheck', label: 'Rechecking downstream trip viability' }
+    { phase: 'execution', label: 'Applying the approved change' },
+    { phase: 'observation', label: 'Checking the supplier result' },
+    { phase: 'state_update', label: 'Updating the trip record' },
+    { phase: 'recheck', label: 'Rechecking the rest of the trip' }
   ];
 
   function ensureOverlay(id, title, steps) {
@@ -91,7 +91,6 @@ export function renderCaseResolutionEnhancementScript(): string {
       '<div class="ns-resolve-modal">' +
         '<p class="ns-resolve-kicker">Northstar progress</p>' +
         '<h2 class="ns-resolve-title">' + title + '</h2>' +
-        '<p class="ns-resolve-note">Presentation pacing for readability — not a literal live tool trace.</p>' +
         '<div class="ns-resolve-bar" aria-hidden="true"><i></i></div>' +
         '<ol class="ns-resolve-steps">' + stepsHtml + '</ol>' +
       '</div>';
@@ -218,14 +217,48 @@ export function renderCaseResolutionEnhancementScript(): string {
     });
   }
 
+  function programmeStageKey(caseId) {
+    return 'ns-programme-stage-' + caseId;
+  }
+
+  function revealProgrammeRecommendation(root) {
+    var travel = qs('[data-programme-travel-panel]', root);
+    var rec = qs('[data-programme-recommendation]', root);
+    if (travel) travel.hidden = true;
+    if (rec) rec.hidden = false;
+    root.setAttribute('data-programme-recovery-stage', 'programme_recommendation');
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     var root = qs('[data-case-workspace]');
     if (!root) return;
 
     bindOptionSelection(root);
 
+    var caseId = root.getAttribute('data-case-id');
+    if (caseId && root.getAttribute('data-programme-recovery') === 'true') {
+      if (sessionStorage.getItem(programmeStageKey(caseId)) === 'programme_recommendation') {
+        revealProgrammeRecommendation(root);
+      }
+    }
+
     var planningSteps = parseSteps(root.getAttribute('data-transition-planning'), DEFAULT_PLANNING);
     var executionSteps = parseSteps(root.getAttribute('data-transition-execution'), DEFAULT_EXECUTION);
+
+    var programmeTravelBtn = qs('[data-programme-travel-analysis]', root);
+    if (programmeTravelBtn) {
+      programmeTravelBtn.addEventListener('click', function() {
+        var overlay = ensureOverlay(
+          'ns-programme-travel-overlay',
+          'Testing travel recovery before changing the programme',
+          planningSteps
+        );
+        runStages(overlay, RESOLVE_MS).then(function() {
+          if (caseId) sessionStorage.setItem(programmeStageKey(caseId), 'programme_recommendation');
+          revealProgrammeRecommendation(root);
+        });
+      });
+    }
 
     var resolveBtn = qs('[data-resolve-northstar]', root);
     if (resolveBtn) {

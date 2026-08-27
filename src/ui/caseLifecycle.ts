@@ -35,6 +35,10 @@ export function isCaseResolved(view: CaseDetailView): boolean {
   return Boolean(view.resolution) || view.status === 'RESOLVED';
 }
 
+export function isProgrammeRecoveryFlow(view: CaseDetailView): boolean {
+  return Boolean(view.programmeChangeAvailable && view.anchorEventId && !isCaseResolved(view));
+}
+
 export function selectCaseWorkspacePhase(view: CaseDetailView): CaseWorkspacePhase {
   if (isCaseResolved(view)) return 'resolved';
   const action = matchingAction(view);
@@ -50,16 +54,18 @@ export function selectCaseWorkspacePhase(view: CaseDetailView): CaseWorkspacePha
 export function shouldShowResolveCta(view: CaseDetailView): boolean {
   if (isCaseResolved(view)) return false;
   if (view.approval?.state === 'PENDING' || executionIsPending(view)) return false;
-  if (view.programmeChangeAvailable && view.anchorEventId) return false;
-  if (view.planningExhausted) return false;
+  if (view.planningExhausted && !isProgrammeRecoveryFlow(view)) return false;
   if (view.options.length > 0) return false;
+  if (isProgrammeRecoveryFlow(view)) {
+    return view.programmeRecoveryStage === 'travel_analysis';
+  }
   return view.status === 'DISRUPTED' || view.status === 'CHANGE_REQUESTED';
 }
 
 export function shouldShowBeginCta(view: CaseDetailView): boolean {
   if (isCaseResolved(view)) return false;
   if (view.approval?.state === 'PENDING' || executionIsPending(view)) return false;
-  if (view.programmeChangeAvailable && view.anchorEventId) return false;
+  if (isProgrammeRecoveryFlow(view)) return false;
   if (view.planningExhausted) return false;
   const recommended =
     view.options.find((option) => option.recommended) ??
@@ -74,7 +80,8 @@ export function shouldShowExecuteCta(view: CaseDetailView): boolean {
 export function shouldShowProgrammeChangeCta(view: CaseDetailView): boolean {
   if (isCaseResolved(view)) return false;
   if (view.approval?.state === 'PENDING' || executionIsPending(view)) return false;
-  return Boolean(view.programmeChangeAvailable && view.anchorEventId);
+  if (!view.programmeChangeAvailable || !view.anchorEventId) return false;
+  return view.programmeRecoveryStage === 'programme_recommendation';
 }
 
 /** Hide option picker until Begin has staged a selection, or authority is waiting. */

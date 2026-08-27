@@ -240,6 +240,12 @@ export interface CaseDetailView {
   /** Prefill for programme-change modal (ISO); human labels rendered in UI. */
   programmeChangeProposedStartsAt?: IsoDateTime;
   programmeChangeProposedEndsAt?: IsoDateTime;
+  /**
+   * Programme-recovery presentation stage. Server sets `travel_analysis` when
+   * travel-only recovery is insufficient; client may advance to
+   * `programme_recommendation` after the travel-analysis overlay completes.
+   */
+  programmeRecoveryStage?: 'travel_analysis' | 'programme_recommendation';
 }
 
 /**

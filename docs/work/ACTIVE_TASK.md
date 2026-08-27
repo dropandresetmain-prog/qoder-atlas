@@ -1,86 +1,73 @@
-# ACTIVE_TASK — demo screen choreography recovery
+# ACTIVE_TASK — Sarah S1→S3 production UI stabilisation
 
 ## Goal
 
-Finish/reconcile existing `docs/DEMO_SCREEN_CHOREOGRAPHY.md` without rewriting the Sol draft or changing product code.
+Close integrated production UI gaps for Sarah S1→S3 and shared Overview presentation, using generic components only.
 
 ## Base / branch
 
-- Base SHA: `9a9921cb06c54ee3b7c257947756f3a254cd668a`
-- Branch: `rescue/demo-screen-choreography-recovery`
-- Recovered draft commit: `02f8892613377d8a5ed5992bc39681487ed0118e`
-- Reconciled choreography commit: `5e26e51fadf895c38a5fbe324df34b9ee5f205c0`
+- Base SHA: `4de3bf9a0dc3149eac49ad1c410ad1d94b6dabe5`
+- Branch: `main`
+- Production: https://qoder-atlas-production.up.railway.app
 
-## Reconciliation checklist
+## Root-cause groups
 
-- [x] Read/reconcile `docs/SCENARIOS.md`
-- [x] Read/reconcile `docs/FINAL_DEMO_CONTENT_SSOT.md`
-- [x] Read/reconcile `docs/UI_VISUAL_DIRECTION.md`
-- [x] Read/reconcile `docs/FINAL_DEMO_INTEGRATION_PLAN.md`
-- [x] Verify Jordan S2 choreography and mixed ingress truth
-- [x] Verify Sarah S1→S3 continuous choreography and same-trip `NOT_VIABLE → VIABLE`
-- [x] Verify Oliver S7 topology, FX, authority, and evidence-scoped option wording
-- [x] Verify Jonas S5 hotel-only scope, traveller authority, and funding split
-- [x] Verify capability claims against current UI/application/read-model/execution code
-- [x] Reconcile LIVE / SANDBOX / RECORD / REPLAY / REPORTED / SIMULATED wording
-- [x] Reconcile cast, flights, hotels, programme times, and `67 total / 42 managed / 25 local/self`
-- [x] Reconcile organiser vs traveller authority and funding behaviour
-- [x] Verify current-screen mapping against current UI code
-- [x] Reconcile Generic+Easy / Generic+Nontrivial / Simulate / Do Not Do decisions
-- [x] Reconcile implementation checklist coverage
-- [x] Fix wrong Wanderpay names
-- [x] Fix “67 managed arrivals” wording
-- [x] Fix C6 programme-preview reference to recovered E1 Now/Proposed reference
-- [x] Fix Sarah current headline window to `09:20–09:50`
-- [x] Fix S2 provider-event vs traveller-report ingress wording
-- [x] Gate Oliver `US$163.98` candidate on normalized route evidence instead of calling it a proven direct option
-- [x] Preserve the existing choreography structure; no scenario redesign and no expansion to S4/S6/S8
-- [x] Documentation-only change; no product/domain code modified
+| ID | Scope |
+|----|--------|
+| RC-1 | Overview shared-incident presentation |
+| RC-2 | Overview roster layout |
+| RC-3 | Case narrative copy |
+| RC-4 | Programme-recovery lifecycle S-04→S-06 |
+| RC-5 | Chain/mini-chain viability semantics |
+| RC-6 | Programme preview modal E1 flow |
+| RC-7 | Internal language cleanup |
 
-## Verification evidence
+## Implementation checklist
 
-- S2 manifest proves progressive `SIMULATED_EXTERNAL_EVENT` Atlas-shaped observations **and** later traveller-state missed-flight ingress; current traveller report already names the 08:20 next-morning reprotection, so TR885 must not be called inadequate.
-- S1→S3 continuity manifest proves one reset, Sarah `NOT_VIABLE`, mutation-free 15:30–16:00 preview, explicit organiser commit, fan-out on the same trip ID, then `VIABLE`.
-- S7 manifest proves the preferred HND→SIN option at `US$143.62`, home-policy `S$193.89`, `REQUIRES_HUMAN_AGENT`, organisation approval, execution, and resolution. It does not prove the `US$163.98` candidate as a direct alternative.
-- S5 manifest proves Nuitée REPLAY search, traveller-funded increment, `REQUIRES_TRAVELLER`, traveller approval, simulated external execution, and resolved/VIABLE outcome. It also exposes the current `Switch stay to ...` strategy wording and checkout-baseline drift that must be fixed before the hero is truthful.
-- `src/ui/screens/operator-case.ts` confirms the generic options action branch can shadow the later approved-state `Execute approved recovery` branch.
-- `src/ui/programme-change-interaction.ts` confirms preview and commit call real application APIs, preview is mutation-free, commit propagates/rechecks, and the current success/reload treatment is too fleeting for the intended terminal choreography.
-- `src/ui/case-resolution-interaction.ts` confirms current client-side presentation uses `sessionStorage` plus fixed timers; those cannot be treated as authoritative orchestration evidence.
-- `src/app/demoHeroes.ts` confirms final hero order S2 → S1→S3 → S7 → S5 and correct stop-before-authority rehearsal boundaries.
-- `src/app/providerExecution.ts` confirms deterministic authority is rechecked before provider calls and REPLAY can fall back to the explicit simulation executor; provider success remains execution evidence, not trip recovery.
-- `docs/DEMO.md` confirms provenance definitions: LIVE, SANDBOX, RECORD, REPLAY, SIMULATED; routine demo is REPLAY by default and simulated external actions must be disclosed.
+### Phase 1 — Overview (RC-1, RC-2)
+- [x] Shared incident header: amber callout, non-clickable
+- [x] Child rows nested; sorted critical → watching → workable
+- [x] Outcome glyph/tone from shared outcome
+- [x] Roster issue text wraps; status column stable
 
-## Remaining implementation gaps
+### Phase 2 — State semantics (RC-5)
+- [x] NOT_VIABLE open case: transport/commitment not green when threatened
+- [x] chainPresentation.ts + readmodels async constraint context
+- [ ] Overview mini-chain agrees with case page (verify visually)
 
-These are intentionally **not** fixed in this documentation-only recovery. Full triage and acceptance checks live in `docs/DEMO_SCREEN_CHOREOGRAPHY.md`.
+### Phase 3 — Lifecycle (RC-4)
+- [x] Programme cases show travel-analysis CTA before programme recommendation
+- [x] ~3s overlay choreography via case-resolution-interaction
+- [x] sessionStorage stage advance; recommendation panel client reveal
 
-### Act Now
+### Phase 4 — Programme preview (RC-6)
+- [x] E1-style Now/Proposed when proposal prefilled
+- [x] Preview disabled until commitment loaded; human error text
+- [x] ~3s staged preview processing overlay
+- [x] In-app commit confirmation; no window.confirm
 
-- Approved Jordan/Oliver Case CTA ordering blocks judge-facing Execute.
-- Sarah post-commit UI stays visibly disrupted despite same-trip viability becoming `VIABLE`.
-- Jonas planner/read model currently produces hotel-switch strategies instead of a truthful Concorde extension.
-- Browser rehearsal can false-pass without proving execute/commit, observed authoritative values, terminal state, and revisit correctness.
-- Option consequence/funding/authority presentation, role-correct traveller action, currency clarity, commitment semantics, and evidence-driven progress remain incomplete.
+### Phase 5 — Copy (RC-3, RC-7)
+- [x] presentDisruptedCaseSummary for whatChanged
+- [x] Human checks title; human signal labels
+- [x] Overlay execution labels humanized; pacing disclaimer removed
 
-### Investigate Now
-
-- S2 desired “inadequate airline reprotection” conflicts with the current traveller-reported viable TR885; change only a labelled external fixture if that contrast is kept.
-- S1 continuity currently narrates travel-only insufficiency without a genuine pre-commit search in the continuity path; wire evidence or use a bounded REPLAY presentation and soften claims.
-- Jonas current checkout evidence drifts from canonical `3 Oct 11:00`.
-- Oliver preserved LHR return is not yet projected safely end-to-end.
-- Oliver `US$163.98` route/directness requires normalized evidence before promotion.
-
-### Park / Accept Risk
-
-- Jonas combined hotel + return-flight change remains deferred.
-- Jordan transit hotel, Japan immigration, and insurance execution remain out of the closed hero.
-- Oliver transfer is unrepresented and must stay unclaimed.
-- Live ticketing/hotel modification remains unavailable; disclosed simulated provider execution is acceptable for the closed demo.
+### Acceptance
+- [ ] Focused tests pass
+- [ ] Build/typecheck pass
+- [ ] Local screenshots captured
+- [ ] Railway Sarah S1→S3 path passes Section G checklist
+- [ ] Jordan / Jonas / Oliver spot-check
 
 ## Current checkpoint
 
-Recovery reconciliation is complete. `docs/DEMO_SCREEN_CHOREOGRAPHY.md` is internally reconciled and implementation-ready as a documentation contract. No product code was changed.
+Phases 1–5 implemented in code; running tests and visual/Railway verification.
 
 ## Next action
 
-Use `docs/DEMO_SCREEN_CHOREOGRAPHY.md` as the implementation/rehearsal contract. Do not reopen scenario design from this recovery task.
+Run test suite → local screenshots → commit/push → Railway acceptance.
+
+## Constraints
+
+- No Sarah/demo-specific branches in domain or generic UI
+- Provider booking status ≠ journey viability in presentation
+- sessionStorage only for choreography stage within a case visit

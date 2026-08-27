@@ -263,7 +263,14 @@ test('browser: Sarah S1→S3 commit converges to resolved Confirmed without a se
     await gotoOverview(page);
     const attention = page.locator('[data-test="attention-queue"] a').filter({ hasText: /Sarah Lim/i });
     if (await attention.count()) await attention.first().click();
-    else await openTravellerCase(page, 'Sarah Lim');
+    else     await openTravellerCase(page, 'Sarah Lim');
+    const travelBtn = page.locator('[data-test="programme-travel-analysis-btn"]');
+    if (await travelBtn.count()) {
+      await travelBtn.click();
+      await page.waitForSelector('[data-test="lifecycle-progress-overlay"]', { timeout: 10000 });
+      await page.waitForTimeout(3200);
+      await page.waitForSelector('[data-test="preview-programme-change-btn"]', { timeout: 20000 });
+    }
     await page.waitForSelector('[data-test="preview-programme-change-btn"]', { timeout: 20000 });
     const btn = page.locator('[data-test="preview-programme-change-btn"]');
     assert.equal(await btn.getAttribute('data-default-new-starts-at'), S3_RESCHEDULE.newStartsAt);
@@ -277,14 +284,17 @@ test('browser: Sarah S1→S3 commit converges to resolved Confirmed without a se
     assert.match(endVal, /16:00/);
     assert.doesNotMatch(startVal, /^2026-10-01T/);
     await modal.locator('[data-test="programme-change-preview"], [data-programme-change-preview]').click();
-    await page.waitForSelector('[data-test="now-vs-proposed"]', { timeout: 20000 });
+    await page.waitForSelector('[data-test="lifecycle-progress-overlay"]', { timeout: 10000 });
+    await page.waitForTimeout(3200);
+    await page.waitForSelector('[data-test="programme-change-result"] [data-test="now-vs-proposed"]', { timeout: 20000 });
     const preview = await modal.innerHTML();
     assert.match(preview, /Sarah/i);
     assert.doesNotMatch(preview, /el-trip-/i);
-    page.once('dialog', (d) => d.accept());
-    const overlaySeen = page.waitForSelector('[data-test="lifecycle-progress-overlay"]', { timeout: 10000 });
+    const overlaySeen = page.waitForSelector('[data-test="lifecycle-progress-overlay"]', { timeout: 15000 });
     const commit = page.waitForResponse((r) => r.url().includes('event-change') || r.url().includes('programme') || r.url().includes('commit'), { timeout: 30000 }).catch(() => null);
     await modal.locator('[data-test="programme-change-commit"]').click();
+    await page.waitForSelector('[data-test="programme-change-confirm-panel"]', { timeout: 10000 });
+    await page.locator('[data-test="programme-change-confirm-yes"]').click();
     await commit;
     await overlaySeen;
     await page.waitForTimeout(2800);

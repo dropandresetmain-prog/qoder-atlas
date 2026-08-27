@@ -47,16 +47,16 @@ const PARTICIPANT_ROLE_LABEL: Record<string, string> = {
 };
 
 const SIGNAL_SOURCE_LABEL: Record<TripSignal['kind'], string> = {
-  FLIGHT_CANCELLATION: 'Airline schedule feed',
-  FLIGHT_SCHEDULE_CHANGE: 'Airline schedule feed',
-  FLIGHT_DELAY: 'Airline schedule feed',
-  BOOKING_STATE_CHANGE: 'Provider booking feed',
-  PROVIDER_EVENT: 'Provider event feed',
-  WEATHER_EVENT: 'Weather feed',
+  FLIGHT_CANCELLATION: 'Airline cancellation notice',
+  FLIGHT_SCHEDULE_CHANGE: 'Airline schedule update',
+  FLIGHT_DELAY: 'Airline delay notice',
+  BOOKING_STATE_CHANGE: 'Booking status update',
+  PROVIDER_EVENT: 'Travel provider update',
+  WEATHER_EVENT: 'Weather watch',
   TRAVELLER_INPUT: 'Traveller message',
   OPERATOR_INPUT: 'Operator update',
   ANCHOR_COMMITMENT_CHANGE: 'Programme change',
-  OTHER: 'External signal',
+  OTHER: 'External update',
 };
 
 function wallDateParts(iso: IsoDateTime): { year: number; month: number; day: number } | undefined {

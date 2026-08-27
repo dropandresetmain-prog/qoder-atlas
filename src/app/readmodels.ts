@@ -43,6 +43,7 @@ import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
 import { projectCaseChain } from './chain.ts';
+import { buildChainPresentationContext, presentationLinkState, recoveryCommitmentIdFor } from './chainPresentation.ts';
 import {
   countOtherCommitments,
   isStayElement,
@@ -59,6 +60,7 @@ import {
   presentCandidateRejection,
   presentCheckLabel,
   presentResolution,
+  presentDisruptedCaseSummary,
   presentSignalChange,
   presentUncertainties,
 } from './presentation.ts';
@@ -494,7 +496,11 @@ const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
   UNKNOWN: 'Unconfirmed',
 };
 
-function chainStateFor(element: TripElement): ChainLinkView['state'] {
+function chainStateFor(
+  element: TripElement,
+  presentation?: ReturnType<typeof buildChainPresentationContext>,
+): ChainLinkView['state'] {
+  if (presentation) return presentationLinkState(element, presentation);
   if (element.elementKind === 'ENGAGEMENT') {
     if (element.status === 'INVALID') return 'BROKEN';
     if (element.status === 'AT_RISK') return 'AT_RISK';
@@ -504,7 +510,6 @@ function chainStateFor(element: TripElement): ChainLinkView['state'] {
   if (element.status === 'AT_RISK' || element.reservationState === 'CHANGED') return 'AT_RISK';
   if (element.reservationState === 'HELD') return 'PROPOSED';
   if (element.reservationState === 'UNKNOWN') return 'UNKNOWN';
-  // Confirmed/completed bookings stay Confirmed even when health status is UNKNOWN.
   if (element.reservationState === 'NONE') return 'UNBOOKED';
   return 'CONFIRMED';
 }
@@ -522,7 +527,26 @@ export async function projectJourneyChain(
   deps: ReadModelDependencies,
   trip: Trip,
   recoveryCase?: RecoveryCase,
+  at?: IsoDateTime,
 ): Promise<ChainLinkView[]> {
+  let presentation: ReturnType<typeof buildChainPresentationContext> | undefined;
+  if (recoveryCase) {
+    const when = at ?? recoveryCase.updatedAt;
+    const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, when);
+    const hardConstraintFailed = evaluations.some((evaluation) => {
+      const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
+      return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
+    });
+    const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
+    const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
+    presentation = buildChainPresentationContext({
+      recoveryCase,
+      tripNotViable: remainderViable === 'NOT_VIABLE',
+      hardConstraintFailed,
+      recoveryCommitmentId: recoveryCommitment?.id,
+    });
+  }
+
   const chain: ChainLinkView[] = [];
   for (const element of selectJourneyTransportAndStay(trip)) {
     if (isTransportLeg(element)) {
@@ -534,7 +558,7 @@ export async function projectJourneyChain(
         kind: mode.charAt(0).toUpperCase() + mode.slice(1),
         label: `${origin} → ${destination}`,
         detail: RESERVATION_LABEL[element.reservationState],
-        state: chainStateFor(element),
+        state: chainStateFor(element, presentation),
         linkType: element.data.mode === 'FLIGHT' ? 'FLIGHT' : 'GROUND',
       });
       continue;
@@ -545,7 +569,7 @@ export async function projectJourneyChain(
         kind: 'Stay',
         label: await placeLabel(deps, element.data.placeId),
         detail: RESERVATION_LABEL[element.reservationState],
-        state: chainStateFor(element),
+        state: chainStateFor(element, presentation),
         linkType: 'STAY',
       });
     }
@@ -564,7 +588,7 @@ export async function projectJourneyChain(
           : commitment.importance === 'REQUIRED'
             ? 'Must not be missed'
             : 'Part of this trip',
-      state: chainStateFor(commitment),
+      state: chainStateFor(commitment, presentation),
       commitment: true,
       linkType: 'COMMITMENT',
     });
@@ -828,7 +852,19 @@ export async function projectCaseDetail(
     const entry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
     if (entry?.entityType === 'ANCHOR_EVENT') anchorEvent = entry.entity;
   }
-  const chain = projectCaseChain(trip, recoveryCase, { places, ...(anchorEvent ? { anchorEvent } : {}) });
+  const chain = projectCaseChain(trip, recoveryCase, {
+    places,
+    ...(anchorEvent ? { anchorEvent } : {}),
+    presentation: buildChainPresentationContext({
+      recoveryCase,
+      tripNotViable: deriveRemainderViability(constraints, evaluations, trip.viability) === 'NOT_VIABLE',
+      hardConstraintFailed: evaluations.some((evaluation) => {
+        const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
+        return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
+      }),
+      recoveryCommitmentId: selectRecoveryCommitment(trip, recoveryCase)?.id,
+    }),
+  });
 
   // Honest "no automated recovery path" end-state: the planning loop has run
   // (the case moved past ASSESSING) yet produced no actionable strategy and
@@ -878,7 +914,15 @@ export async function projectCaseDetail(
       ...(trip.label ? { tripLabel: trip.label } : {}),
       travellerNames,
       status: caseStatus,
-      ...(triggeringSignals[0] ? { whatChanged: presentSignalChange(triggeringSignals[0]) } : {}),
+      ...(triggeringSignals[0] || criticalObjectiveAtRisk
+        ? {
+            whatChanged: presentDisruptedCaseSummary({
+              signal: triggeringSignals[0],
+              criticalObjectiveAtRisk,
+              failedCheckLabels: checks.filter((check) => check.result === 'FAIL').map((check) => check.label),
+            }),
+          }
+        : {}),
       affectedItems: recoveryCase.affectedElementIds
         .map((id) => trip.elements.find((element) => element.id === id))
         .filter((element): element is TripElement => Boolean(element))
@@ -896,6 +940,7 @@ export async function projectCaseDetail(
         ? {
             anchorEventId: trip.anchorEventId,
             programmeChangeAvailable: true,
+            programmeRecoveryStage: 'travel_analysis' as const,
             ...(programmeChangeCommitmentId ? { programmeChangeCommitmentId } : {}),
             ...(programmePreset
               ? {
