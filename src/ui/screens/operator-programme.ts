@@ -167,9 +167,10 @@ function tile(spec: TileSpec, index: number): string {
  */
 function summaryTiles(view: ProgrammeView): string {
   const summary = view.summary;
+  const counts = view.arrangementCounts;
   const onTrack = summary.ready + summary.resolved;
   const watching = summary.atRisk + summary.needsTravellerInfo;
-  const inRecovery = summary.recovering + summary.changeRequested + summary.awaitingDecision;
+  const inRecovery = summary.recovering + summary.changeRequested;
   const activeIssues =
     summary.disrupted +
     summary.atRisk +
@@ -178,8 +179,10 @@ function summaryTiles(view: ProgrammeView): string {
     summary.changeRequested +
     summary.awaitingDecision +
     summary.planning;
+  const scaleBanner = `
+    <p class="programme-scale">${counts.total} participants · ${counts.northstarArranged} travelling · ${counts.selfOrOtherArranged} local</p>`;
   const specs: TileSpec[] = [
-    { key: 'total', count: summary.total, label: PROGRAMME_TILE_LABEL.total, tone: 'neutral' },
+    { key: 'total', count: counts.northstarArranged, label: 'Managed travel', tone: 'neutral' },
     {
       key: 'on-track',
       count: onTrack,
@@ -189,6 +192,9 @@ function summaryTiles(view: ProgrammeView): string {
     { key: 'watching', count: watching, label: PROGRAMME_TILE_LABEL.watching, tone: watching > 0 ? 'watch' : 'ok' },
     { key: 'in-recovery', count: inRecovery, label: PROGRAMME_TILE_LABEL.inRecovery, tone: inRecovery > 0 ? 'active' : 'ok' },
   ];
+  if (summary.awaitingDecision > 0) {
+    specs.push({ key: 'awaiting-decision', count: summary.awaitingDecision, label: 'Awaiting decision', tone: 'watch', attention: true });
+  }
   if (summary.planning > 0) {
     specs.push({ key: 'being-planned', count: summary.planning, label: PROGRAMME_TILE_LABEL.beingPlanned, tone: 'active' });
   }
@@ -203,6 +209,7 @@ function summaryTiles(view: ProgrammeView): string {
     },
   );
   return `
+  ${scaleBanner}
   <div class="tiles stagger" role="group" aria-label="${escapeHtml(PROGRAMME_TILES_LEGEND)}">
     ${specs.map(tile).join('')}
   </div>`;
@@ -315,17 +322,18 @@ function orderTravellers(rows: readonly ProgrammeTravellerView[]): ProgrammeTrav
 
 function travellerRow(row: ProgrammeTravellerView, augment: ProgrammeAugmentations): string {
   const firstActiveCaseId = row.activeCaseIds[0];
-  const name = `<strong>${escapeHtml(row.travellerName)}</strong>`;
-  const nameCell = `<a href="/traveller?trip=${escapeHtml(row.tripId)}" class="traveller-link" data-test="programme-traveller-link">${name}</a>`;
-  const caseCell = firstActiveCaseId
-    ? `<div><a href="/operator/cases/${encodeUri(firstActiveCaseId)}" class="case-link" data-test="programme-case-link">Recovery case</a></div>`
-    : '';
+  const name = escapeHtml(row.travellerName);
+  const primaryHref = firstActiveCaseId
+    ? `/operator/cases/${encodeUri(firstActiveCaseId)}`
+    : `/traveller?trip=${encodeUri(row.tripId)}`;
+  const nameCell = `<a href="${escapeHtml(primaryHref)}" class="${firstActiveCaseId ? 'case-link' : 'traveller-link'}" data-test="${firstActiveCaseId ? 'programme-case-link' : 'programme-traveller-link'}"><strong>${name}</strong></a>`;
+  const interactionCell = `<a href="/traveller?trip=${encodeUri(row.tripId)}" class="btn btn-ghost btn-sm" data-test="programme-show-interaction">Show interaction</a>`;
   const role = augment.roleFor?.(row) ?? '—';
   const arrival = augment.arrivalFor?.(row) ?? '—';
   const justChanged = augment.justChangedTripIds?.has(row.tripId) ?? false;
   return `
     <tr${justChanged ? ' class="just-changed"' : ''} data-trip-id="${escapeHtml(row.tripId)}" data-traveller-id="${escapeHtml(row.travellerId)}" data-status="${escapeHtml(row.status)}">
-      <td>${nameCell}${caseCell}</td>
+      <td>${nameCell}<div>${interactionCell}</div></td>
       <td>${escapeHtml(role)}</td>
       <td class="num">${escapeHtml(arrival)}</td>
       <td>${statusBadge(row.status)}</td>

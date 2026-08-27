@@ -295,7 +295,7 @@ test('i5: operator dashboard and case detail project real state through the loop
   assert.deepEqual(tripView.pendingDecisions[0]!.amount, strategy.costImpact);
   assert.equal(dashboard.summary.awaitingDecision, 1);
   assert.ok(
-    tripView.systemActivity.some((line) => line.includes('Recovery options planned')),
+    tripView.systemActivity.some((line) => line.includes('Checked recovery options')),
     'system activity is projected from the real audit trail',
   );
 
@@ -427,7 +427,7 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     assert.equal(dashboardRes.status, 200);
     const dashboardHtml = await dashboardRes.text();
     assert.match(dashboardHtml, /Operations overview/);
-    assert.match(dashboardHtml, /Recovery options planned/);
+    assert.match(dashboardHtml, /Checked recovery options/);
 
     const caseRes = await fetch(`${base}/operator/cases/${caseId}`);
     assert.equal(caseRes.status, 200);

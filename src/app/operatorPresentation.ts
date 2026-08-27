@@ -3,7 +3,8 @@
  */
 import type { OperatorDashboardView } from '../contracts/readmodels.ts';
 import type { OperatorDashboardAugmentations } from '../ui/screens/operator-dashboard.ts';
-import { projectJourneyChain, type ReadModelDependencies } from './readmodels.ts';
+import type { ReadModelDependencies } from './readmodels.ts';
+import { projectJourneyChain, latestCaseFor } from './readmodels.ts';
 import { projectTravellerRoleLine } from './presentationProjection.ts';
 
 export async function projectOperatorDashboardAugmentations(
@@ -17,7 +18,8 @@ export async function projectOperatorDashboardAugmentations(
   for (const row of view.trips) {
     const trip = await deps.snapshot.trips.getTrip(row.tripId);
     if (!trip) continue;
-    chainByTrip.set(row.tripId, await projectJourneyChain(deps, trip));
+    const recoveryCase = await latestCaseFor(deps.cases, row.tripId);
+    chainByTrip.set(row.tripId, await projectJourneyChain(deps, trip, recoveryCase));
     if (trip.anchorEventId) anchorEventIds.add(trip.anchorEventId);
     const travellerId = trip.travellerIds[0];
     if (travellerId) {

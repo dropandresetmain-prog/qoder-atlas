@@ -143,7 +143,7 @@ test('Wave 3 Gate 2: approvals queue, activity stream, uncertainties, and provid
     assert.ok(actionsAfter.includes('EXECUTION_COMPLETED'));
     assert.ok(actionsAfter.includes('CASE_VERIFIED'));
     const verifiedEvent = activityAfter.events.find((event) => event.action === 'CASE_VERIFIED')!;
-    assert.equal(verifiedEvent.summary, 'Recovery outcome verified against the trip');
+    assert.equal(verifiedEvent.summary, 'Rechecked the trip after the booking changed');
   } finally {
     await new Promise<void>((resolvePromise, reject) =>
       server.close((error) => (error ? reject(error) : resolvePromise())),

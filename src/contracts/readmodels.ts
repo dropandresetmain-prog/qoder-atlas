@@ -54,6 +54,8 @@ export interface OperatorTripView {
   label?: string;
   travellerNames: string[];
   anchorEventName?: string;
+  /** Explicit intake travel arrangement when declared on the traveller entity. */
+  travelArrangement?: 'NORTHSTAR_ARRANGED' | 'SELF_OR_OTHER_ARRANGED' | 'UNSPECIFIED';
   status: ReadModelStatus;
   /** What changed, in user-facing language. */
   whatChanged?: string;
@@ -72,12 +74,16 @@ export interface OperatorDashboardSummary {
   disrupted: number;
   recovering: number;
   awaitingDecision: number;
+  /** Managed travellers in confirmed/on-track state (READY + RESOLVED). */
+  managedConfirmed: number;
 }
 
 export interface OperatorDashboardView {
   generatedAt: IsoDateTime;
   summary: OperatorDashboardSummary;
   trips: OperatorTripView[];
+  /** Authoritative arrangement counts for the scoped programme. */
+  arrangementCounts: ProgrammeArrangementCounts;
 }
 
 // ---------------------------------------------------------------------------

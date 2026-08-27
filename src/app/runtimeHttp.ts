@@ -38,6 +38,8 @@ const ExecuteBodySchema = InstantBody.extend({
   intentId: EntityIdSchema,
 });
 
+const EscalateBodySchema = InstantBody.extend({ caseId: EntityIdSchema });
+
 const MissedFlightBodySchema = z.strictObject({
   tripId: EntityIdSchema,
   elementId: EntityIdSchema.optional(),
@@ -114,6 +116,7 @@ export function createRuntimeHandlers(deps: {
   reset(body: unknown): Promise<WireResult>;
   state(): Promise<WireResult>;
   reportMissedFlight(body: unknown): Promise<WireResult>;
+  escalate(body: unknown): Promise<WireResult>;
 } {
   const { orchestrator, trips, mutations } = deps;
   return {
@@ -188,6 +191,9 @@ export function createRuntimeHandlers(deps: {
           threatenedObjectiveIds: result.processed.assessment.threatenedObjectives.map((o) => o.objectiveId),
         };
       });
+    },
+    escalate(body) {
+      return guarded(body, EscalateBodySchema, async (input) => orchestrator.escalate(input));
     },
   };
 }

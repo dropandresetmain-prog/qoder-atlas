@@ -84,7 +84,7 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
 
   // Step 2: Navigate to operator dashboard
   await page.goto(`${baseUrl}/operator`);
-  await page.waitForSelector('[data-test="trip-link"]', { timeout: 5000 });
+  await page.waitForSelector('[data-test="case-row-link"], [data-test="show-interaction"]', { timeout: 5000 });
 
   // Verify dashboard shows disrupted status
   const dashboardHtml = await page.content();

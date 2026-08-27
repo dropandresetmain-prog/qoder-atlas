@@ -580,8 +580,8 @@ export async function composeAppRuntime(
         detail?.criticalObjectiveAtRisk,
       );
     },
-    decisionsPage: (at) => projectDecisionsPage(readDeps, at),
-    activityPage: (at) => projectProgrammeActivityPage(readDeps, at),
+    decisionsPage: (at, options) => projectDecisionsPage(readDeps, at, options),
+    activityPage: (at, options) => projectProgrammeActivityPage(readDeps, at, options),
     firstTripId: async () => {
       const primaryEventId = programmeEventIds[0];
       const summaries = await trips.listTrips();

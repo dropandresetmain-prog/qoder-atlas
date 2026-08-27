@@ -24,7 +24,7 @@ import type { CapabilityDescriptor } from '../contracts/capabilities.ts';
 import { ImpactEngine } from '../engine/impact.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
 import { latestCaseFor } from './readmodels.ts';
-import { presentAction, presentActivity, presentApprovalReason, presentUncertainties } from './presentation.ts';
+import { presentAction, presentActivity, presentActivityActor, presentApprovalReason, presentUncertainties } from './presentation.ts';
 
 /** The decision surface that must act on a pending approval. */
 export type ApprovalRequestedFrom = 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT';
@@ -168,9 +168,9 @@ export async function projectTripActivity(
   const entries = await deps.audit.query({ subject: tripId, limit });
   const events: ActivityEventView[] = entries.map((entry) => ({
     action: entry.action,
-    summary: presentActivity(entry.action),
+    summary: presentActivity(entry.action, entry.payload as Record<string, unknown> | undefined),
     occurredAt: entry.occurredAt,
-    actor: entry.actor,
+    actor: presentActivityActor(entry.actor, entry.payload as Record<string, unknown> | undefined),
     ...(entry.subject ? { subject: entry.subject } : {}),
   }));
   return { tripId, generatedAt, events };

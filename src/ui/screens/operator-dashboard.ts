@@ -1,17 +1,5 @@
 /**
  * E2 — operator dashboard: the opening/demo hero surface.
- *
- * Layout (docs/DESIGN.md + approved O1 render): one ink readout (on-track
- * count with the state subline) + the fleet dot grid (every trip at a
- * glance), then the "Decisions needed" queue, then the roster ordered
- * attention-first with per-row mini journey chains. Colour means state
- * only: a healthy trip is green, grey means unconfirmed/unbooked — never
- * "fine".
- *
- * Pure function of the frozen OperatorDashboardView envelope; no scenario
- * logic, no fabricated freshness. Per-row mini chains and role lines are
- * optional augmentations: rendered only when the projection supplies them
- * (see OperatorDashboardAugmentations), never invented by the screen.
  */
 import type {
   OperatorDashboardView,
@@ -25,7 +13,6 @@ import { STATUS_LABEL } from '../copy.ts';
 import { escapeHtml, formatInstant, formatMoney, formatRosterTime, formatShort, encodeUri } from '../html.ts';
 import { errorPanel, loadingPanel, miniChainRow, statusBadge } from '../components.ts';
 
-/** Urgency ordering for rows and grid cells; deterministic, status-driven only. */
 const STATUS_PRIORITY: Record<ReadModelStatus, number> = {
   DISRUPTED: 0,
   AT_RISK: 1,
@@ -38,11 +25,6 @@ const STATUS_PRIORITY: Record<ReadModelStatus, number> = {
   RESOLVED: 8,
 };
 
-/**
- * Fleet-grid cell class per status. Binding colour logic (DESIGN.md §2.2):
- * green = confirmed/healthy, brass = waiting/watching, vermilion = broken,
- * ink = system working, hollow grey = unknown/unbooked (never "fine").
- */
 const FLEET_CELL: Record<ReadModelStatus, string> = {
   READY: 'd-ok',
   RESOLVED: 'd-ok',
@@ -52,22 +34,13 @@ const FLEET_CELL: Record<ReadModelStatus, string> = {
   DISRUPTED: 'd-bad',
   RECOVERING: 'd-active',
   PLANNING: 'd-active',
-  UNKNOWN: 'd-empty',
+  UNKNOWN: 'd-unconfirmed',
 };
 
-/**
- * Optional, additive dashboard data the frozen read model does not carry
- * yet. Screens render them when present and omit the decoration when not —
- * the gap is reported to the integrator instead of being hardcoded around.
- */
 export interface OperatorDashboardAugmentations {
-  /** Journey chain per trip for the roster mini-chain (flight · transfer · stay · commitment). */
   chainFor?: (trip: OperatorTripView) => readonly ChainLinkView[] | undefined;
-  /** Role/organisation line under the traveller name (e.g. from the intake profile). */
   roleFor?: (trip: OperatorTripView) => string | undefined;
-  /** Link target for the roster section's "Full roster" shortcut. */
   programmeHref?: string;
-  /** When set, render a judge-facing Reset demo control (POST → populated Overview). */
   demoReset?: { action: string; label: string };
 }
 
@@ -78,30 +51,36 @@ function sortByUrgency(trips: readonly OperatorTripView[]): OperatorTripView[] {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Readout: ink block + fleet grid
-// ---------------------------------------------------------------------------
+function fleetCellClass(trip: OperatorTripView): string {
+  if (trip.travelArrangement === 'SELF_OR_OTHER_ARRANGED') return 'd-local';
+  return FLEET_CELL[trip.status];
+}
 
 function readoutBlock(view: OperatorDashboardView): string {
+  const counts = view.arrangementCounts;
+  const managedTotal = counts.northstarArranged;
+  const confirmed = view.summary.managedConfirmed;
   const trips = view.trips;
-  const onTrack = trips.filter((t) => t.status === 'READY' || t.status === 'RESOLVED').length;
-  const attention = trips.filter((t) => t.status === 'DISRUPTED').length;
   const watching = trips.filter((t) => t.status === 'AT_RISK' || t.status === 'NEEDS_TRAVELLER_INFO').length;
+  const attention = trips.filter((t) => t.status === 'DISRUPTED').length;
   const recovering = trips.filter((t) => t.status === 'RECOVERING' || t.status === 'CHANGE_REQUESTED').length;
-  const planning = trips.filter((t) => t.status === 'PLANNING').length;
-  const unknown = trips.filter((t) => t.status === 'UNKNOWN').length;
+  const unconfirmed = trips.filter((t) => t.status === 'UNKNOWN' || t.status === 'PLANNING').length;
+  const awaiting = view.summary.awaitingDecision;
   const segments = [
-    `<span class="seg-bad">${attention} needs attention</span>`,
-    `<span class="seg-warn">${watching} watching</span>`,
-    `<span class="seg-ok">${recovering} in recovery</span>`,
-    planning > 0 ? `<span class="seg-dim">${planning} being planned</span>` : '',
-    `<span class="seg-dim">${unknown} unconfirmed</span>`,
+    attention > 0 ? `<span class="seg-bad">${attention} needs attention</span>` : '',
+    watching > 0 ? `<span class="seg-warn">${watching} watching</span>` : '',
+    recovering > 0 ? `<span class="seg-ok">${recovering} in recovery</span>` : '',
+    awaiting > 0 ? `<span class="seg-warn">${awaiting} awaiting decision</span>` : '',
+    unconfirmed > 0 ? `<span class="seg-dim">${unconfirmed} unconfirmed</span>` : '',
   ].filter(Boolean).join(' · ');
+  const context = `${counts.northstarArranged} travelling · ${counts.selfOrOtherArranged} local · ${counts.total} speakers total`;
   return `
     <div class="readout-ink">
-      <p class="ri-label">On track</p>
-      <div class="big big-settle">${onTrack}<span class="unit">/${trips.length}</span></div>
-      <p class="sub">${segments}</p>
+      <p class="ri-label">Managed travel readiness</p>
+      <div class="big big-settle">${confirmed}<span class="unit">/${managedTotal}</span></div>
+      <p class="ri-confirmed-word">Confirmed</p>
+      <p class="sub ri-scale">${escapeHtml(context)}</p>
+      ${segments ? `<p class="sub">${segments}</p>` : ''}
     </div>`;
 }
 
@@ -110,26 +89,23 @@ function fleetGrid(view: OperatorDashboardView): string {
   const cells = sorted
     .map((trip, i) => {
       const label = `${trip.label ?? trip.tripId} — ${STATUS_LABEL[trip.status]}`;
-      return `<i class="${FLEET_CELL[trip.status]}" style="--i:${i}" data-fleet-trip="${escapeHtml(trip.tripId)}" data-fleet-status="${escapeHtml(trip.status)}" title="${escapeHtml(label)}"></i>`;
+      return `<i class="${fleetCellClass(trip)}" style="--i:${i}" data-fleet-trip="${escapeHtml(trip.tripId)}" data-fleet-status="${escapeHtml(trip.status)}" title="${escapeHtml(label)}"></i>`;
     })
     .join('');
   return `
     <div class="readout-fleet">
-      <div class="fc-head"><span class="fc-title">Fleet · ${view.trips.length} trips</span><span class="fc-live">Live</span></div>
-      <div class="dotgrid" role="img" aria-label="All trips at a glance, ordered by what needs attention first">${cells}</div>
+      <div class="fc-head"><span class="fc-title">Fleet · ${view.trips.length} participants</span><span class="fc-live">Live</span></div>
+      <div class="dotgrid" role="img" aria-label="All participants at a glance, ordered by what needs attention first">${cells}</div>
       <div class="legend">
-        <span><i class="l-ok"></i>Ready / recovered</span>
+        <span><i class="l-ok"></i>Confirmed / recovered</span>
         <span><i class="l-watch"></i>Watching</span>
         <span><i class="l-bad"></i>Needs attention</span>
         <span><i class="l-active"></i>Recovery under way</span>
-        <span><i class="l-empty"></i>Unconfirmed</span>
+        <span><i class="l-unconfirmed"></i>Unconfirmed</span>
+        <span><i class="l-local"></i>Local / self-arranged</span>
       </div>
     </div>`;
 }
-
-// ---------------------------------------------------------------------------
-// Decisions queue
-// ---------------------------------------------------------------------------
 
 interface PendingDecisionRow {
   trip: OperatorTripView;
@@ -170,9 +146,13 @@ function decisionsPanel(rows: PendingDecisionRow[]): string {
   </section>`;
 }
 
-// ---------------------------------------------------------------------------
-// Roster
-// ---------------------------------------------------------------------------
+function rosterSearchField(): string {
+  return `
+  <div class="roster-search">
+    <label class="visually-hidden" for="roster-filter">Search roster</label>
+    <input type="search" id="roster-filter" class="roster-search-input" placeholder="Search travellers…" data-test="roster-search" autocomplete="off">
+  </div>`;
+}
 
 function tripRowIssue(trip: OperatorTripView): string {
   if (trip.whatChanged) return escapeHtml(trip.whatChanged);
@@ -190,14 +170,17 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
   if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
-  const caseLink = trip.activeCaseId
-    ? `<a href="/operator/cases/${encodeUri(trip.activeCaseId)}" class="b-case-link" data-test="case-link">Recovery case</a>`
-    : '';
+  const caseHref = trip.activeCaseId ? `/operator/cases/${encodeUri(trip.activeCaseId)}` : `/traveller?trip=${encodeUri(trip.tripId)}`;
+  const rowTag = trip.activeCaseId ? 'a' : 'div';
+  const rowAttrs = trip.activeCaseId
+    ? `href="${escapeHtml(caseHref)}" class="brow brow-actionable" data-test="case-row-link"`
+    : `class="brow"`;
+  const showInteraction = `<a href="/traveller?trip=${encodeUri(trip.tripId)}" class="btn btn-ghost btn-sm" data-test="show-interaction">Show interaction</a>`;
   return `
-  <div class="brow" style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}">
-    <span class="b-dot ${FLEET_CELL[trip.status]}" aria-hidden="true"></span>
+  <${rowTag} ${rowAttrs} style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}" data-roster-name="${escapeHtml(name.toLowerCase())}">
+    <span class="b-dot ${fleetCellClass(trip)}" aria-hidden="true"></span>
     <div>
-      <div class="b-name"><a href="/traveller?trip=${escapeHtml(trip.tripId)}" class="traveller-link" data-test="trip-link">${escapeHtml(name)}</a></div>
+      <div class="b-name">${escapeHtml(name)}</div>
       ${roleLine ? `<div class="b-extra">${escapeHtml(roleLine)}</div>` : ''}
       ${miniChain}
     </div>
@@ -206,21 +189,20 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
       ${extraLine}
     </div>
     <div class="b-right">
-      ${caseLink}
+      ${showInteraction}
       ${statusBadge(trip.status)}
       <div class="b-time">${escapeHtml(formatRosterTime(trip.updatedAt, view.generatedAt))}</div>
     </div>
-  </div>`;
+  </${rowTag}>`;
 }
 
 function rosterFootnote(hasMiniChains: boolean): string {
   const legend = hasMiniChains
-    ? `<br>Row marks — flight · transfer · stay · ✦ commitment: ✓ confirmed · ◌ proposed · ▲ at risk · ✕ broken · ○ not booked · ? unconfirmed.`
+    ? `<br>Row marks — ✈ flight · ⇄ ground · ⌂ stay · ✦ commitment. Colour shows state: confirmed · proposed · at risk · broken · not booked · unconfirmed.`
     : '';
   return `<p class="footnote">Statuses update when the underlying bookings are confirmed, not when a message is sent.${legend}</p>`;
 }
 
-/** Dashboard body from a loaded view (also used directly by tests). */
 export function renderOperatorDashboardBody(
   view: OperatorDashboardView,
   augment: OperatorDashboardAugmentations = {},
@@ -249,14 +231,28 @@ ${fleetGrid(view)}
   </div>
   ${decisionsPanel(collectPendingDecisions(view))}
   <section class="section" aria-label="Trips">
-    <h2>All trips <span class="count">${view.trips.length}</span>${rosterLink}</h2>
-    <div class="board stagger">${sorted.map((trip, i) => tripRow(trip, i, view, augment)).join('')}</div>
+    <h2>All travellers <span class="count">${view.trips.length}</span>${rosterLink}</h2>
+    ${rosterSearchField()}
+    <div class="board stagger" id="roster-board" data-test="roster-board">${sorted.map((trip, i) => tripRow(trip, i, view, augment)).join('')}</div>
     ${rosterFootnote(hasMiniChains)}
   </section>
+  <script>
+  (function(){
+    var input = document.getElementById('roster-filter');
+    var board = document.getElementById('roster-board');
+    if (!input || !board) return;
+    input.addEventListener('input', function(){
+      var q = (input.value || '').trim().toLowerCase();
+      board.querySelectorAll('[data-roster-name]').forEach(function(row){
+        var name = row.getAttribute('data-roster-name') || '';
+        row.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  })();
+  </script>
 </main>`;
 }
 
-/** Full dashboard screen from the frozen envelope; honest about loading/error. */
 export function renderOperatorDashboard(
   envelope: ReadModelEnvelope<OperatorDashboardView>,
   augment: OperatorDashboardAugmentations = {},

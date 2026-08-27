@@ -41,8 +41,17 @@ export const CHAIN_MINI_TONE: Record<ChainLinkState, string> = {
   AT_RISK: 'mc-watch',
 };
 
-/** Glyph for one chain link; the commitment link always carries ✦. */
+/** TYPE icon per link; colour communicates state via CHAIN_MINI_TONE. */
+export const CHAIN_TYPE_ICON: Record<NonNullable<ChainLinkView['linkType']>, string> = {
+  FLIGHT: '✈',
+  GROUND: '⇄',
+  STAY: '⌂',
+  COMMITMENT: '✦',
+};
+
+/** Glyph for one chain link; uses type icon when available. */
 export function chainLinkGlyph(link: ChainLinkView): string {
+  if (link.linkType) return CHAIN_TYPE_ICON[link.linkType];
   return link.commitment ? '✦' : CHAIN_GLYPH[link.state];
 }
 
@@ -56,7 +65,7 @@ export function miniChainRow(links: readonly ChainLinkView[]): string {
   const parts = links
     .map(
       (link) =>
-        `<span class="${CHAIN_MINI_TONE[link.state]}" aria-hidden="true">${chainLinkGlyph(link)}</span>`,
+        `<span class="mini-chain-link ${CHAIN_MINI_TONE[link.state]}" aria-hidden="true" title="${escapeHtml(link.kind)}">${chainLinkGlyph(link)}</span>`,
     )
     .join('<i class="mc-ln" aria-hidden="true"></i>');
   const title = links.map((link) => link.kind).join(' · ');

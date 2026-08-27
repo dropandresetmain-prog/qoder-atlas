@@ -1,11 +1,8 @@
 /**
- * Thin browser interaction for the operator Programme page.
+ * Browser interaction for programme change preview/commit on operator surfaces.
  *
- * This does not own programme truth or compute consequences. It discovers the
- * commitments already rendered from the authoritative read model, sends the
- * operator's proposal to the existing deterministic preview endpoint, renders
- * that returned blast radius, and exposes commit only after a successful
- * preview. Commit still runs through the existing programme fan-out path.
+ * Works on the Programme page (timeline-driven) and on Case pages (button
+ * carries anchor event + default commitment via data attributes).
  */
 export function renderProgrammeChangeEnhancementScript(): string {
   return `<script>
@@ -13,22 +10,17 @@ export function renderProgrammeChangeEnhancementScript(): string {
   'use strict';
 
   var params = new URLSearchParams(window.location.search);
-  var anchorEventId = params.get('event');
-  // Deterministic demo/replay pages may supply ?at=<ISO instant>. Keep both
-  // preview and commit on that caller-supplied instant rather than silently
-  // switching to the browser wall clock. Normal interactive pages fall back
-  // to the current instant when no replay instant was supplied.
   var actionAt = params.get('at') || new Date().toISOString();
   var actionRow = document.querySelector('[data-ui-section="programme-actions"]');
   var timelineItems = Array.prototype.slice.call(document.querySelectorAll('[data-timeline-key]'));
-  if (!anchorEventId || !actionRow || timelineItems.length === 0) return;
+  var launchButtons = Array.prototype.slice.call(document.querySelectorAll('[data-programme-change-launch]'));
 
-  var launch = document.createElement('button');
-  launch.type = 'button';
-  launch.className = 'btn btn-primary';
-  launch.textContent = 'Preview programme change';
-  launch.setAttribute('data-programme-change-launch', '');
-  actionRow.insertBefore(launch, actionRow.firstChild);
+  function resolveAnchorEventId(source) {
+    if (source && source.getAttribute('data-anchor-event-id')) {
+      return source.getAttribute('data-anchor-event-id');
+    }
+    return params.get('event');
+  }
 
   function closeModal() {
     var modal = document.querySelector('[data-programme-change-modal]');
@@ -114,8 +106,53 @@ export function renderProgrammeChangeEnhancementScript(): string {
     target.appendChild(list);
   }
 
-  launch.addEventListener('click', function() {
+  function populateCommitmentSelect(select, items, defaultId) {
+    select.replaceChildren();
+    items.forEach(function(item) {
+      var option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.label;
+      select.appendChild(option);
+    });
+    if (defaultId) select.value = defaultId;
+  }
+
+  function commitmentItemsFromTimeline() {
+    return timelineItems.map(function(item) {
+      var title = item.querySelector('.ttl');
+      var time = item.querySelector('.t');
+      return {
+        id: item.getAttribute('data-timeline-key') || '',
+        label: (time ? time.textContent + ' · ' : '') + (title ? title.textContent : item.getAttribute('data-timeline-key'))
+      };
+    }).filter(function(item) { return item.id; });
+  }
+
+  function fetchCommitments(anchorEventId) {
+    return fetch('/programme?event=' + encodeURIComponent(anchorEventId))
+      .then(function(response) { return response.text(); })
+      .then(function(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        return Array.prototype.slice.call(doc.querySelectorAll('[data-timeline-key]')).map(function(item) {
+          var title = item.querySelector('.ttl');
+          var time = item.querySelector('.t');
+          return {
+            id: item.getAttribute('data-timeline-key') || '',
+            label: (time ? time.textContent + ' · ' : '') + (title ? title.textContent : item.getAttribute('data-timeline-key'))
+          };
+        }).filter(function(item) { return item.id; });
+      });
+  }
+
+  function openModal(source) {
+    var anchorEventId = resolveAnchorEventId(source);
+    if (!anchorEventId) return;
+
     closeModal();
+
+    var defaultCommitmentId = source ? source.getAttribute('data-default-commitment-id') : null;
+    var defaultNewStartsAt = source ? source.getAttribute('data-default-new-starts-at') : null;
+    var defaultNewEndsAt = source ? source.getAttribute('data-default-new-ends-at') : null;
 
     var scrim = document.createElement('div');
     scrim.className = 'modal-scrim';
@@ -156,18 +193,26 @@ export function renderProgrammeChangeEnhancementScript(): string {
       '</div>' +
       '<p class="footnote">Preview is read-only. Commit uses the existing programme-change fan-out and re-evaluates affected trips.</p>';
 
-    var select = modal.querySelector('[name="commitmentId"]');
-    timelineItems.forEach(function(item) {
-      var option = document.createElement('option');
-      option.value = item.getAttribute('data-timeline-key') || '';
-      var title = item.querySelector('.ttl');
-      var time = item.querySelector('.t');
-      option.textContent = (time ? time.textContent + ' · ' : '') + (title ? title.textContent : option.value);
-      select.appendChild(option);
-    });
-
     document.body.appendChild(scrim);
     document.body.appendChild(modal);
+
+    var select = modal.querySelector('[name="commitmentId"]');
+    var startInput = modal.querySelector('[name="newStartsAt"]');
+    var endInput = modal.querySelector('[name="newEndsAt"]');
+    if (defaultNewStartsAt) startInput.value = defaultNewStartsAt;
+    if (defaultNewEndsAt) endInput.value = defaultNewEndsAt;
+
+    var timelineCommitments = commitmentItemsFromTimeline();
+    if (timelineCommitments.length > 0) {
+      populateCommitmentSelect(select, timelineCommitments, defaultCommitmentId);
+    } else {
+      select.innerHTML = '<option value="">Loading commitments…</option>';
+      fetchCommitments(anchorEventId).then(function(items) {
+        populateCommitmentSelect(select, items, defaultCommitmentId);
+      }).catch(function() {
+        select.innerHTML = '<option value="">Could not load commitments</option>';
+      });
+    }
 
     var previewButton = modal.querySelector('[data-programme-change-preview]');
     var commitButton = modal.querySelector('[data-programme-change-commit]');
@@ -226,6 +271,21 @@ export function renderProgrammeChangeEnhancementScript(): string {
           result.textContent = 'Commit failed: ' + error.message;
         });
     });
+  }
+
+  if (actionRow && timelineItems.length > 0 && resolveAnchorEventId(null)) {
+    var programmeLaunch = document.createElement('button');
+    programmeLaunch.type = 'button';
+    programmeLaunch.className = 'btn btn-primary';
+    programmeLaunch.textContent = 'Preview programme change';
+    programmeLaunch.setAttribute('data-programme-change-launch', '');
+    programmeLaunch.setAttribute('data-anchor-event-id', resolveAnchorEventId(null));
+    actionRow.insertBefore(programmeLaunch, actionRow.firstChild);
+    launchButtons.push(programmeLaunch);
+  }
+
+  launchButtons.forEach(function(button) {
+    button.addEventListener('click', function() { openModal(button); });
   });
 })();
 </script>`;

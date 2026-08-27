@@ -12,7 +12,7 @@ import type { ReadModelStatus, RemainderViability } from '../contracts/readmodel
 export type StatusTone = 'ok' | 'watch' | 'alert' | 'active' | 'done' | 'neutral';
 
 export const STATUS_LABEL: Record<ReadModelStatus, string> = {
-  READY: 'Ready',
+  READY: 'Confirmed',
   PLANNING: 'Trip being planned',
   NEEDS_TRAVELLER_INFO: 'Needs traveller details',
   CHANGE_REQUESTED: 'Change requested',
@@ -238,7 +238,7 @@ export const PROGRAMME_TABLE_HEADERS = {
 export const PROGRAMME_TILE_LABEL = {
   total: 'Travellers',
   /** Used when nothing on the programme needs action — the healthy wording. */
-  onTrackCalm: 'Ready',
+  onTrackCalm: 'Confirmed',
   /** Used whenever any trip is disrupted, at risk, recovering, or waiting. */
   onTrackActive: 'On track',
   watching: 'Watching',

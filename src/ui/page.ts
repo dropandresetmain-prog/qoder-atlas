@@ -56,7 +56,7 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
     ? renderDemoBanner(options.demoBanner)
     : '';
   const chrome = isOperator ? renderOperatorTopbar(options) : '';
-  const programmeChangeScript = isOperator && options.active === 'programme'
+  const programmeChangeScript = isOperator
     ? renderProgrammeChangeEnhancementScript()
     : '';
   return `<!doctype html>

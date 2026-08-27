@@ -429,7 +429,7 @@ test('r3a: activity page groups audit events by day without fabrication', async 
 
   const activity = await projectProgrammeActivityPage(harness.readDeps, AT);
   assert.equal(activity.days.length, 1);
-  assert.ok(activity.days[0]!.items.some((item) => item.text.includes('Recovery options')));
+  assert.ok(activity.days[0]!.items.some((item) => item.text.includes('Checked recovery options')));
 });
 
 test('r3a: option flags and absent fields stay honest across programmes', async () => {

@@ -221,9 +221,32 @@ R2 PASSES only when:
 
 ---
 
-## R3 — Approved Kimi Product Parity
+## R3 — Live Product Closure
 
-**Status:** R3A COMPLETE · R3B visual revalidated · **R3 INTEGRATED** on `integration/final-r2-r3`
+**Status:** **R3 LIVE ACCEPTANCE CANDIDATE** — awaiting human production review (27 Aug 2026).
+
+Prior R3 technical/visual PASS on `integration/final-r2-r3` was reopened after direct human review of the deployed production product failed live acceptance. Automated/local gates and browser hero rehearsal now pass on branch `rescue/live-product-closure`; human production sign-off is still required before R3 ACCEPTED.
+
+### R3 live closure acceptance criteria
+
+1. **Human scenario operability (P0):** From populated Overview, operator manually completes S1–S8 to explicit terminal states (recovered, recovered with loss, or escalated/hand to human support) using visible product controls — not `/demo` manifests.
+2. **Population scale:** 67 participants · 42 Northstar-managed · 25 local/self — from authoritative arrangement data, not UI literals.
+3. **Overview:** Managed-travel readout `<confirmed> / 42 Confirmed`; fleet grid exactly 67 cells with distinct Local / Unconfirmed (filled grey) / state colours; roster row → case when active; secondary “Show interaction”; TYPE icons + colour on journey mini-chain; client-side search affordance.
+4. **Case:** Workflow-first hierarchy; visible options + single primary CTA; collapsed commitment chain; plain-language checks; “Trip status” not “The trip as it stands”.
+5. **Programme:** Mutually understandable bucket arithmetic; Confirmed not Ready; case routing for active cases; day-grouped timeline.
+6. **Decisions:** Must match Overview pending-case queue for the selected programme.
+7. **Activity:** Human-facing actor + action + subject projection; reduced noise.
+8. **Global:** Typography ~16–17px body; contrast/surface parity vs approved reference assets; motion charter (hover, stagger, settle).
+9. **Reference comparison:** Original approved Kimi/surrogate ref PNGs vs fresh captures for Overview, Programme, Cases, Decisions, Activity, Traveller, S1→S3 programme preview/commit.
+10. **Verification:** Focused live-product tests + browser hero rehearsal + full gate once at end.
+
+**Candidate marker when automated gates pass:** `R3 LIVE ACCEPTANCE CANDIDATE — awaiting human production review` (not R3 ACCEPTED).
+
+---
+
+## R3 — Approved Kimi Product Parity (prior integration record)
+
+**Status:** R3A COMPLETE · R3B visual revalidated · **R3 INTEGRATED** on `integration/final-r2-r3` *(reopened — see § R3 Live Product Closure above)*
 
 R3A projection closure @ `1605665` integrated: operator/programme/traveller/case/decisions/activity projections, FX-safe presentation.
 

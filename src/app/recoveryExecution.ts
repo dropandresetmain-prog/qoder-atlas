@@ -922,6 +922,48 @@ export class RecoveryExecutionService {
     while (existing.includes(`${base}-${suffix}`)) suffix += 1;
     return `${base}-${suffix}`;
   }
+
+  /**
+   * Operator hand-off: close an open case as ESCALATED_CLOSED when automated
+   * recovery cannot proceed. Uses only legal case transitions — generic for
+   * any scenario where human support is the honest terminal state.
+   */
+  async handOffToHumanSupport(input: { caseId: EntityId; at: IsoDateTime }): Promise<{ caseStatus: CaseStatus; resolutionOutcome: string }> {
+    let recoveryCase = await this.mustGet(input.caseId);
+    if (recoveryCase.status === 'RESOLVED') {
+      throw new Error(`case ${input.caseId} is already resolved`);
+    }
+    const resolution = {
+      outcome: 'ESCALATED_CLOSED' as const,
+      resolvedAt: input.at,
+      summary: 'Handed to human support by the operator.',
+      remainingLossRefs: [] as EntityId[],
+    };
+
+    if (recoveryCase.status === 'DETECTED') {
+      recoveryCase = await this.moveCase(input.caseId, 'ASSESSING', input.at, {}, recoveryCase);
+    }
+    if (recoveryCase.status !== 'RESOLVED' && isLegalCaseTransition(recoveryCase.status, 'ESCALATED')) {
+      recoveryCase = await this.moveCase(input.caseId, 'ESCALATED', input.at, {}, recoveryCase);
+    }
+    if (recoveryCase.status !== 'RESOLVED' && isLegalCaseTransition(recoveryCase.status, 'RESOLVED')) {
+      recoveryCase = await this.moveCase(input.caseId, 'RESOLVED', input.at, { resolution }, recoveryCase);
+    } else if (recoveryCase.status === 'ESCALATED') {
+      recoveryCase = await this.moveCase(input.caseId, 'RESOLVED', input.at, { resolution }, recoveryCase);
+    }
+    if (recoveryCase.status !== 'RESOLVED') {
+      throw new Error(`cannot hand off case ${input.caseId} from ${recoveryCase.status}`);
+    }
+
+    await this.deps.audit.append({
+      occurredAt: input.at,
+      actor: 'app:recovery-execution',
+      action: 'CASE_ESCALATED',
+      subject: recoveryCase.tripId,
+      payload: { caseId: input.caseId, outcome: resolution.outcome },
+    });
+    return { caseStatus: recoveryCase.status, resolutionOutcome: resolution.outcome };
+  }
 }
 
 // ---------------------------------------------------------------------------

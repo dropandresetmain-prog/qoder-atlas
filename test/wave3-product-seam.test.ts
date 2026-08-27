@@ -117,7 +117,7 @@ test('Wave 3 product convergence: approved UI runs on the real engine through HT
     // flight broken and the commitment intact from authoritative state.
     const casePageDuring = await getHtml(base, `/operator/cases/${caseId}`);
     assert.equal(casePageDuring.status, 200);
-    assert.ok(casePageDuring.html.includes('The trip as it stands'), 'the chain section renders');
+    assert.ok(casePageDuring.html.includes('Trip status'), 'the chain section renders');
     assert.ok(casePageDuring.html.includes('data-link-state="BROKEN"'), 'the cancelled flight renders broken');
     assert.ok(casePageDuring.html.includes('is-commitment'), 'the commitment link carries the ✦ marker');
 

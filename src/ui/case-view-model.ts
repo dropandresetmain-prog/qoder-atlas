@@ -160,6 +160,8 @@ export interface ChainLinkView {
   state: ChainLinkState;
   /** The commitment link carries the ✦ and never disappears. */
   commitment?: boolean;
+  /** Icon family for roster mini-chains: flight, ground, stay, commitment. */
+  linkType?: 'FLIGHT' | 'GROUND' | 'STAY' | 'COMMITMENT';
 }
 
 /**
@@ -217,6 +219,12 @@ export interface CaseDetailView {
   planningExhausted?: boolean;
   resolution?: CaseResolutionView;
   updatedAt: IsoDateTime;
+  /** Anchor event for programme-side recovery when travel-only recovery is insufficient. */
+  anchorEventId?: EntityId;
+  /** When true, surface the programme-change preview/commit affordance. */
+  programmeChangeAvailable?: boolean;
+  /** Anchor commitment id for programme-side recovery (when available). */
+  programmeChangeCommitmentId?: EntityId;
 }
 
 /**

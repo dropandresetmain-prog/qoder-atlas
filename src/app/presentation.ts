@@ -30,26 +30,79 @@ export function presentUncertainties(raw: readonly string[]): string[] {
 }
 
 export function presentConstraintLabel(constraint: Constraint | undefined): string {
-  return constraint?.description ?? 'Required trip condition';
+  if (!constraint) return 'Required trip condition';
+  switch (constraint.kind) {
+    case 'TEMPORAL':
+      return constraint.description?.includes('buffer')
+        ? 'Arrival leaves enough time before the commitment'
+        : 'Timing still works for the commitment';
+    case 'POLICY':
+      return 'Travel grouping stays within policy limits';
+    case 'FINANCIAL':
+      return 'Cost stays within the programme policy';
+    default:
+      return constraint.description?.length && constraint.description.length < 120
+        ? constraint.description
+        : 'Required trip condition';
+  }
+}
+
+const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
+  PASS: 'Still meets',
+  FAIL: 'No longer meets',
+  UNKNOWN: 'Still checking',
+};
+
+/** Plain-language check row for operator case view. */
+export function presentCheckLabel(constraint: Constraint | undefined, result: 'PASS' | 'FAIL' | 'UNKNOWN'): string {
+  const base = presentConstraintLabel(constraint);
+  if (result === 'PASS') {
+    if (base.includes('Arrival')) return 'Arrival still leaves enough time before the commitment';
+    if (base.includes('Timing')) return 'Timing still works for the commitment';
+    if (base.includes('Hotel') || base.includes('stay')) return 'Hotel booking remains valid';
+    return `${CHECK_RESULT_PREFIX.PASS}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
+  }
+  if (result === 'FAIL') {
+    if (base.includes('Arrival') || base.includes('buffer')) return 'Original plan no longer meets the required arrival buffer';
+    return `${CHECK_RESULT_PREFIX.FAIL}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
+  }
+  if (base.includes('transfer') || base.includes('Ground')) return 'Ground transfer timing still unconfirmed';
+  return `${CHECK_RESULT_PREFIX.UNKNOWN}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
 }
 
 export function presentApprovalReason(): string {
   return 'This change needs approval before it can proceed.';
 }
 
-export function presentActivity(action: string): string {
+export function presentActivity(action: string, _payload?: Record<string, unknown>): string {
   const copy: Record<string, string> = {
     SIGNAL_PROCESSED: 'Trip change recorded',
     MUTATION_APPLIED: 'Trip details updated',
-    PLANNING_COMPLETED: 'Recovery options planned and checked',
+    PLANNING_COMPLETED: 'Checked recovery options',
     AUTHORITY_DECIDED: 'Approval requirement determined',
     APPROVAL_RECORDED: 'Approval decision recorded',
     APPROVAL_REJECTED: 'Approval request refused',
     EXECUTION_COMPLETED: 'Recovery action executed',
     EXECUTION_REFUSED: 'Action blocked by the authority gate',
-    CASE_VERIFIED: 'Recovery outcome verified against the trip',
+    CASE_VERIFIED: 'Rechecked the trip after the booking changed',
+    CASE_ESCALATED: 'Handed the case to human support',
   };
   return copy[action] ?? 'Trip activity recorded';
+}
+
+/** Human-facing actor label from audit evidence — never generic "Providers". */
+export function presentActivityActor(actor: string, payload?: Record<string, unknown>): string {
+  if (actor.startsWith('app:')) return 'Northstar';
+  if (actor.includes('organiser') || actor.includes('ait')) return 'AiT organising team';
+  if (typeof payload?.['providerId'] === 'string') {
+    const id = String(payload['providerId']).toUpperCase();
+    if (id.includes('ZIPAIR') || id.includes('ZG')) return 'ZIPAIR';
+    if (id.includes('SCOOT') || id.includes('TR')) return 'Scoot';
+    if (id.includes('NUITEE') || id.includes('HOTEL')) return 'Hotel provider';
+  }
+  if (typeof payload?.['carrier'] === 'string') return String(payload['carrier']);
+  if (actor.toLowerCase().includes('provider')) return 'Travel provider';
+  return actor.replace(/^app:/, '').replace(/-/g, ' ') || 'Northstar';
 }
 
 export function presentAction(operation: string): string {

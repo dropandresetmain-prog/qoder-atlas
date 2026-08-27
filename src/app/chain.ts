@@ -12,6 +12,13 @@ import type { Engagement, Stay, TransportLeg, TripElement } from '../domain/elem
 import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import type { ChainLinkState, ChainLinkView } from '../ui/case-view-model.ts';
+import {
+  countOtherCommitments,
+  isStayElement,
+  isTransportLeg,
+  selectJourneyTransportAndStay,
+  selectRecoveryCommitment,
+} from './chainProjection.ts';
 
 const TRANSPORT_WORD: Record<TransportLeg['data']['mode'], string> = {
   FLIGHT: 'Flight',
@@ -47,14 +54,6 @@ function formatDayTime(iso: IsoDateTime | undefined): string | undefined {
   if (!match) return undefined;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]} · ${match[4]}:${match[5]}`;
-}
-
-function elementMoment(element: TripElement): IsoDateTime | undefined {
-  if (element.elementKind === 'TRANSPORT_LEG') {
-    return element.data.scheduledDeparture?.value ?? element.data.scheduledArrival?.value;
-  }
-  if (element.elementKind === 'STAY') return element.data.checkIn.value;
-  return element.data.startsAt.value;
 }
 
 function transportLabel(leg: TransportLeg, places: ReadonlyMap<string, Place>): string {
@@ -121,7 +120,13 @@ function linkDetail(element: TripElement, state: ChainLinkState, places: Readonl
   return starts ? `${starts} · fixed` : 'Fixed — this cannot move';
 }
 
-/** Case-aware journey chain: travel → stay → commitment, time-ordered within each phase. */
+function linkTypeFor(element: TripElement): ChainLinkView['linkType'] {
+  if (isTransportLeg(element)) return element.data.mode === 'FLIGHT' ? 'FLIGHT' : 'GROUND';
+  if (isStayElement(element)) return 'STAY';
+  return 'COMMITMENT';
+}
+
+/** Case-aware journey chain: travel → stay → one recovery-relevant commitment. */
 export function projectCaseChain(
   trip: Trip,
   recoveryCase: RecoveryCase | undefined,
@@ -132,41 +137,47 @@ export function projectCaseChain(
 ): ChainLinkView[] | undefined {
   if (trip.elements.length === 0) return undefined;
   const affected = new Set(recoveryCase?.affectedElementIds ?? []);
-  const kindOrder: Record<TripElement['elementKind'], number> = { TRANSPORT_LEG: 0, STAY: 1, ENGAGEMENT: 2 };
-  const ordered = [...trip.elements].sort((a, b) => {
-    const kindDiff = kindOrder[a.elementKind] - kindOrder[b.elementKind];
-    if (kindDiff !== 0) return kindDiff;
-    const timeA = elementMoment(a);
-    const timeB = elementMoment(b);
-    if (timeA && timeB) {
-      const diff = timeA.localeCompare(timeB);
-      if (diff !== 0) return diff;
-    } else if (timeA || timeB) {
-      return timeA ? -1 : 1;
-    }
-    return a.id.localeCompare(b.id);
-  });
+  const links: ChainLinkView[] = [];
 
-  return ordered.map((element) => {
+  for (const element of selectJourneyTransportAndStay(trip)) {
     const state = linkState(element, affected, recoveryCase);
-    const commitment = element.elementKind === 'ENGAGEMENT';
     const label =
-      element.elementKind === 'TRANSPORT_LEG'
-        ? transportLabel(element as TransportLeg, context.places)
-        : element.elementKind === 'STAY'
+      isTransportLeg(element)
+        ? transportLabel(element, context.places)
+        : isStayElement(element)
           ? (() => {
               const place = placeName(element.data.placeId, context.places);
               return place ? `Hotel · ${place}` : 'Hotel';
             })()
           : engagementLabel(element as Engagement, context.anchorEvent);
     const detail = linkDetail(element, state, context.places);
-    return {
+    links.push({
       id: element.id,
       kind: kindLabel(element, context.places),
       label,
       ...(detail ? { detail } : {}),
       state,
-      ...(commitment ? { commitment: true } : {}),
-    };
-  });
+      linkType: linkTypeFor(element),
+    });
+  }
+
+  const commitment = selectRecoveryCommitment(trip, recoveryCase);
+  if (commitment) {
+    const state = linkState(commitment, affected, recoveryCase);
+    const others = countOtherCommitments(trip, commitment);
+    const detail = linkDetail(commitment, state, context.places);
+    const extra =
+      others > 0 ? ` · +${others} other programme commitment${others === 1 ? '' : 's'}` : '';
+    links.push({
+      id: commitment.id,
+      kind: 'Commitment',
+      label: engagementLabel(commitment, context.anchorEvent),
+      ...(detail ? { detail: `${detail}${extra}` } : others > 0 ? { detail: `+${others} other programme commitments` } : {}),
+      state,
+      commitment: true,
+      linkType: 'COMMITMENT',
+    });
+  }
+
+  return links.length > 0 ? links : undefined;
 }

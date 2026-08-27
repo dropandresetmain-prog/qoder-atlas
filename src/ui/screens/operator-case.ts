@@ -527,14 +527,69 @@ function approvalSection(view: CaseDetailView): string {
 // Recovery actions (wired plan/begin forms) and the honest exhausted state.
 // ---------------------------------------------------------------------------
 
-function recoveryActionsPanel(view: CaseDetailView): string {
-  // Honest end-state: planning has already run and found no automated recovery
-  // path. Say so plainly; never re-offer a planning action that already
-  // completed empty (which would loop with no visible effect).
+function primaryActionPanel(view: CaseDetailView): string {
+  const actions = recoveryActionsInner(view);
+  const approval =
+    view.approval?.state === 'PENDING' && !view.resolution
+      ? approvalSection(view).replace('<section', '<section data-ui-section="primary-approval"')
+      : '';
+  if (!actions && !approval) return '';
+  return `
+  <section class="section section-primary-action" aria-label="What to do next" data-test="primary-action-panel">
+    <h2>What to do next</h2>
+    ${actions}
+    ${approval}
+  </section>`;
+}
+
+function canEscalate(view: CaseDetailView): boolean {
+  if (view.resolution) return false;
+  if (view.approval?.state === 'PENDING') return false;
+  if (view.status === 'RESOLVED') return false;
+  return (
+    view.planningExhausted === true ||
+    view.status === 'CHANGE_REQUESTED' ||
+    (view.options.length > 0 && view.options.every((option) => option.verdict === 'NOT_VIABLE'))
+  );
+}
+
+function escalationPanel(view: CaseDetailView): string {
+  if (!canEscalate(view)) return '';
+  return `
+    <form method="POST" action="/api/runtime/escalate" class="inline-form" data-test="escalate-form">
+      <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+      <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+      <button type="submit" class="btn btn-secondary" data-test="escalate-btn">Escalate · hand off to human support</button>
+    </form>`;
+}
+
+function programmeChangeButton(view: CaseDetailView): string {
+  const attrs = [
+    'type="button"',
+    'class="btn btn-primary"',
+    'data-programme-change-launch',
+    'data-test="preview-programme-change-btn"',
+    `data-anchor-event-id="${escapeHtml(view.anchorEventId ?? '')}"`,
+  ];
+  if (view.programmeChangeCommitmentId) {
+    attrs.push(`data-default-commitment-id="${escapeHtml(view.programmeChangeCommitmentId)}"`);
+  }
+  return `<button ${attrs.join(' ')}>Preview programme change</button>`;
+}
+
+function recoveryActionsInner(view: CaseDetailView): string {
+  if (view.programmeChangeAvailable && view.anchorEventId) {
+    return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions">
+        <p class="planning-kicker">Travel recovery is not enough</p>
+        <p class="planning-result-title">Preview a programme change</p>
+        <p>Reschedule the affected commitment so the current travel plan can still work.</p>
+        ${programmeChangeButton(view)}
+        ${escalationPanel(view)}
+      </div>`;
+  }
   if (view.planningExhausted && view.options.length === 0) {
     return `
-    <section class="section" aria-label="What happens next">
-      <h2>What happens next</h2>
       <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
         <ul class="planning-checks" aria-label="Planning checks completed">
           <li><span aria-hidden="true">✓</span><span><strong>Changed booking checked</strong><small>The provider change is reflected in the trip.</small></span></li>
@@ -542,15 +597,20 @@ function recoveryActionsPanel(view: CaseDetailView): string {
           <li><span aria-hidden="true">—</span><span><strong>Recovery inventory compared</strong><small>No candidate was returned for safe deterministic checking.</small></span></li>
         </ul>
         <p class="planning-next"><strong>Nothing has been changed.</strong> The trip remains unresolved and needs direct operator support.</p>
-      </div>
-    </section>`;
+        ${escalationPanel(view)}
+      </div>`;
   }
 
-  // If no options yet and case is DISRUPTED, show "Plan Recovery" button
+  if (view.options.length > 0 && view.options.every((option) => option.verdict === 'NOT_VIABLE') && !view.approval) {
+    return `
+      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions">
+        <p>No automated recovery option works for this request. Review the rejected options below or hand the case to human support.</p>
+        ${escalationPanel(view)}
+      </div>`;
+  }
+
   if (view.status === 'DISRUPTED' && view.options.length === 0) {
     return `
-    <section class="section" aria-label="Recovery planning">
-      <h2>Recovery planning</h2>
       <div class="panel recovery-actions" data-ui-section="recovery-actions">
         <p class="planning-kicker">Next step</p>
         <p class="planning-result-title">Check recovery options</p>
@@ -570,19 +630,14 @@ function recoveryActionsPanel(view: CaseDetailView): string {
           </ol>
           <div class="planning-skeleton" aria-hidden="true"></div>
         </div>
-      </div>
-    </section>`;
+      </div>`;
   }
 
-  // If options exist but no approval yet, show "Begin Strategy" button
-  // (regardless of status - after planning, status changes to PLANNING/RECOVERING)
   if (view.options.length > 0 && !view.approval) {
     const recommendedOption = view.options.find((o) => o.recommended);
     if (!recommendedOption) return '';
 
     return `
-    <section class="section" aria-label="Recovery planning">
-      <h2>Recovery planning</h2>
       <div class="panel recovery-actions" data-ui-section="recovery-actions">
         <p class="planning-kicker">Recommended option ready</p>
         <p class="planning-result-title">Begin the checked recovery</p>
@@ -593,17 +648,11 @@ function recoveryActionsPanel(view: CaseDetailView): string {
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
           <button type="submit" class="btn btn-primary" data-test="begin-strategy-btn">Begin recovery</button>
         </form>
-      </div>
-    </section>`;
+      </div>`;
   }
 
-  // Generic organisation approval is intentionally a separate runtime stage:
-  // approval records authority first, then this explicit action runs the
-  // normal execution -> observation -> verification loop.
   if (view.approval?.state === 'APPROVED' && view.approval.requestedFrom === 'ORGANISATION' && view.approval.intentId) {
     return `
-    <section class="section" aria-label="Recovery execution">
-      <h2>Recovery execution</h2>
       <div class="panel recovery-actions" data-ui-section="recovery-actions">
         <p class="planning-kicker">Approval recorded</p>
         <p class="planning-result-title">Execute the approved recovery</p>
@@ -614,8 +663,7 @@ function recoveryActionsPanel(view: CaseDetailView): string {
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
           <button type="submit" class="btn btn-primary" data-test="execute-approved-strategy-btn">Execute approved recovery</button>
         </form>
-      </div>
-    </section>`;
+      </div>`;
   }
 
   return '';
@@ -706,15 +754,15 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   <div class="case-grid">
     <div>
       ${leadCallout(view)}
-      ${optionalSection('The trip as it stands', chainSection(view.chain))}
-      ${resolvedChangeSection(view)}
-      ${affectedSection(view)}
-      ${activitySection(view)}
-      ${checksSection(view.checks)}
+      ${optionalSection('Trip status', chainSection(view.chain))}
+      ${primaryActionPanel(view)}
       ${optionsFormingSection(view)}
       ${optionsSection(view)}
-      ${recoveryActionsPanel(view)}
-      ${approvalSection(view)}
+      ${affectedSection(view)}
+      ${checksSection(view.checks)}
+      ${resolvedChangeSection(view)}
+      ${activitySection(view)}
+      ${view.approval && view.approval.state !== 'PENDING' ? approvalSection(view) : ''}
       ${fundingPanel(view)}
       ${uncertaintyList(view.uncertainties)}
     </div>

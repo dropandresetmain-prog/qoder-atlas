@@ -1,7 +1,7 @@
 /**
  * Decisions page projection (R3A).
  */
-import type { IsoDateTime } from '../domain/common.ts';
+import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { DecidedDecisionRowView, DecisionsPageView, PendingDecisionRowView } from '../ui/operator-surfaces-view-model.ts';
 import { formatRosterTime } from '../ui/html.ts';
 import {
@@ -17,6 +17,7 @@ import { presentAction } from './presentation.ts';
 export async function projectDecisionsPage(
   deps: ReadModelDependencies,
   generatedAt: IsoDateTime,
+  options?: { anchorEventId?: EntityId },
 ): Promise<DecisionsPageView> {
   const queue = await projectApprovalsQueue(deps, generatedAt);
   const pending: PendingDecisionRowView[] = [];
@@ -24,6 +25,7 @@ export async function projectDecisionsPage(
   for (const item of queue.pending) {
     const trip = await deps.snapshot.trips.getTrip(item.tripId);
     if (!trip) continue;
+    if (options?.anchorEventId && trip.anchorEventId !== options.anchorEventId) continue;
     const waitingOn = await waitingOnLabel(deps, trip, item.requestedFrom);
     pending.push({
       caseId: item.caseId,
@@ -41,6 +43,7 @@ export async function projectDecisionsPage(
     if (!recoveryCase) continue;
     const trip = await deps.snapshot.trips.getTrip(summary.tripId);
     if (!trip) continue;
+    if (options?.anchorEventId && trip.anchorEventId !== options.anchorEventId) continue;
     const travellerEntry = trip.travellerIds[0]
       ? await deps.snapshot.entities.get('TRAVELLER', trip.travellerIds[0])
       : undefined;

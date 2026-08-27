@@ -87,6 +87,7 @@ test('45-traveller scale renders every row with no truncation', () => {
   // The summary total tile must match the dataset size, and the table
   // tbody must include all 45 traveller ids, not just a sample.
   assert.ok(html.includes('data-summary-key="total"'));
+  assert.ok(html.includes('45 participants'));
   assert.ok(html.includes('<div class="tile-count">45</div>'));
   for (const traveller of healthyProgramme.travellers) {
     assert.ok(

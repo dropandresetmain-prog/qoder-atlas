@@ -24,12 +24,10 @@ import {
   signalSourceLabel,
 } from './presentationProjection.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
+import { selectRecoveryCommitment } from './chainProjection.ts';
 
-function primaryEngagement(trip: Trip): Engagement | undefined {
-  const engagements = trip.elements.filter(
-    (element): element is Engagement => element.elementKind === 'ENGAGEMENT',
-  );
-  return [...engagements].sort((a, b) => a.data.startsAt.value.localeCompare(b.data.startsAt.value))[0];
+function primaryEngagement(trip: Trip, recoveryCase?: RecoveryCase): Engagement | undefined {
+  return selectRecoveryCommitment(trip, recoveryCase);
 }
 
 function policyCapLabel(amount: Money | undefined): string | undefined {
@@ -79,7 +77,7 @@ export function enrichCaseDetailView(
   const { recoveryCase, trip, triggeringSignals, places } = context;
   const affected = projectAffectedItemViews(trip, recoveryCase, places);
 
-  const engagement = primaryEngagement(trip);
+  const engagement = primaryEngagement(trip, recoveryCase);
   const commitment: CaseCommitmentView | undefined = engagement
     ? {
         title: engagement.data.title,

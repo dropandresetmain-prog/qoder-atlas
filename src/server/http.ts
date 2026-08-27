@@ -106,6 +106,7 @@ export interface RuntimeHandlers {
   reset(body: unknown): Promise<{ status: number; body: unknown }>;
   state(): Promise<{ status: number; body: unknown }>;
   reportMissedFlight(body: unknown): Promise<{ status: number; body: unknown }>;
+  escalate(body: unknown): Promise<{ status: number; body: unknown }>;
 }
 
 /**
@@ -196,9 +197,8 @@ export interface AppEndpoints {
   /** Optional persisted concierge presentation for the served traveller page. */
   travellerPresentation?: (tripId: EntityId, at: IsoDateTime) => Promise<TravellerPresentation | undefined>;
   /** Optional R3A decisions page projection (richer than legacy queue mappers). */
-  decisionsPage?: (at: IsoDateTime) => Promise<DecisionsPageView>;
-  /** Optional R3A programme-scale activity projection. */
-  activityPage?: (at: IsoDateTime) => Promise<ActivityPageView>;
+  decisionsPage?: (at: IsoDateTime, options?: { anchorEventId?: EntityId }) => Promise<DecisionsPageView>;
+  activityPage?: (at: IsoDateTime, options?: { anchorEventId?: EntityId }) => Promise<ActivityPageView>;
   firstTripId(): Promise<EntityId | undefined>;
   travellerDecision(
     caseId: EntityId,
@@ -383,7 +383,7 @@ async function handle(
     const eventId = operatorEventScope(url);
     let view: DecisionsPageView;
     if (endpoints.decisionsPage) {
-      view = await endpoints.decisionsPage(at);
+      view = await endpoints.decisionsPage(at, eventId ? { anchorEventId: eventId } : undefined);
     } else {
       const queue = endpoints.wave ? await endpoints.wave.approvalsQueue(at) : undefined;
       view = queue
@@ -404,9 +404,10 @@ async function handle(
   }
   if (req.method === 'GET' && url.pathname === '/activity') {
     const at = endpoints.now();
+    const eventId = operatorEventScope(url);
     let view: ActivityPageView;
     if (endpoints.activityPage) {
-      view = await endpoints.activityPage(at);
+      view = await endpoints.activityPage(at, eventId ? { anchorEventId: eventId } : undefined);
     } else if (!endpoints.wave) {
       sendHtml(
         res,
@@ -636,6 +637,11 @@ async function handle(
       case 'reset': {
         const outcome = await handlers[action](parsed);
         if (action === 'reset' && outcome.status === 200) settle.reset();
+        sendJson(res, outcome.status, outcome.body);
+        return;
+      }
+      case 'escalate': {
+        const outcome = await handlers.escalate(parsed);
         sendJson(res, outcome.status, outcome.body);
         return;
       }

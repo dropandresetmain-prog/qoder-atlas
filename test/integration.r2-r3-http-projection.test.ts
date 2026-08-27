@@ -118,8 +118,8 @@ test('R3B HTTP: colon-containing case IDs are encoded in links and decoded in ro
     const casePage = await fetch(`${base}${encodedPath}`);
     assert.equal(casePage.status, 200);
     const caseHtml = await casePage.text();
-    assert.match(caseHtml, /Recovery case/);
     assert.match(caseHtml, /Mia Chen/);
+    assert.match(caseHtml, /data-test="primary-action-panel"|What to do next/);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }

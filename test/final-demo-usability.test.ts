@@ -47,10 +47,10 @@ test('final demo usability: operator overview exposes traveller detail for norma
       `trip ${trip.tripId} must link to traveller detail`,
     );
   }
-  assert.match(html, /data-test="trip-link"/);
+  assert.match(html, /data-test="show-interaction"/);
 });
 
-test('final demo usability: operator overview keeps active recovery case separately discoverable', () => {
+test('final demo usability: operator overview keeps active recovery case as primary row target', () => {
   const activeCaseId = 'case-active-operator';
   const tripId = operatorDashboard.trips[0]!.tripId;
   const html = renderOperatorDashboardBody({
@@ -59,9 +59,10 @@ test('final demo usability: operator overview keeps active recovery case separat
       index === 0 ? { ...trip, activeCaseId } : trip,
     ),
   });
-  assert.match(html, new RegExp(`href="/operator/cases/${activeCaseId}"`), 'active case remains linked');
-  assert.match(html, new RegExp(`href="/traveller\\?trip=${tripId}"`), 'traveller link coexists with case link');
-  assert.match(html, /data-test="case-link"/);
+  assert.match(html, new RegExp(`href="/operator/cases/${activeCaseId}"`));
+  assert.match(html, /data-test="case-row-link"/);
+  assert.match(html, new RegExp(`href="/traveller\\?trip=${tripId}"`));
+  assert.match(html, /data-test="show-interaction"/);
 });
 
 test('final demo usability: demo panel renders S1–S8 scenario rehearsal controls from acceptance manifests', () => {
@@ -137,7 +138,7 @@ test('final demo usability: integrated programme and operator pages expose human
 
     const overviewHtml = await (await fetch(`${base}/operator?event=evt-ait-2026&at=${encodeURIComponent(NOW)}`)).text();
     assert.match(overviewHtml, /href="\/traveller\?trip=/);
-    assert.match(overviewHtml, /data-test="trip-link"/);
+    assert.match(overviewHtml, /data-test="show-interaction"/);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     composed.db.close();

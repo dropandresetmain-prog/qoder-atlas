@@ -19,6 +19,7 @@ import type {
   OperatorDashboardView,
   OperatorDecisionRequest,
   OperatorTripView,
+  ProgrammeArrangementCounts,
   ReadModelStatus,
   RemainderViability,
   TravellerInputRequest,
@@ -43,13 +44,20 @@ import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type Snap
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
 import { describeAllocation } from '../engine/funding.ts';
 import { projectCaseChain } from './chain.ts';
+import {
+  countOtherCommitments,
+  isStayElement,
+  isTransportLeg,
+  selectJourneyTransportAndStay,
+  selectRecoveryCommitment,
+} from './chainProjection.ts';
 import type { AnchorEvent, Place } from '../domain/entities.ts';
 import {
   presentAction,
   presentActivity,
   presentApprovalReason,
   presentCandidateRejection,
-  presentConstraintLabel,
+  presentCheckLabel,
   presentResolution,
   presentSignalChange,
   presentUncertainties,
@@ -220,7 +228,13 @@ export async function projectOperatorDashboard(
 ): Promise<OperatorDashboardView> {
   const summaries = await deps.snapshot.trips.listTrips();
   const trips: OperatorTripView[] = [];
-  const summary = { ready: 0, atRisk: 0, disrupted: 0, recovering: 0, awaitingDecision: 0 };
+  const summary = { ready: 0, atRisk: 0, disrupted: 0, recovering: 0, awaitingDecision: 0, managedConfirmed: 0 };
+  const arrangementCounts: ProgrammeArrangementCounts = {
+    total: 0,
+    northstarArranged: 0,
+    selfOrOtherArranged: 0,
+    unspecified: 0,
+  };
 
   for (const item of summaries) {
     const trip = await deps.snapshot.trips.getTrip(item.tripId);
@@ -236,9 +250,29 @@ export async function projectOperatorDashboard(
     else if (status === 'RECOVERING') summary.recovering += 1;
 
     const travellerNames: string[] = [];
+    let travelArrangement: OperatorTripView['travelArrangement'];
     for (const travellerId of trip.travellerIds) {
       const entry = await deps.snapshot.entities.get('TRAVELLER', travellerId);
-      if (entry?.entityType === 'TRAVELLER') travellerNames.push(entry.entity.name);
+      if (entry?.entityType === 'TRAVELLER') {
+        travellerNames.push(entry.entity.name);
+        if (entry.entity.travelArrangement) {
+          travelArrangement = entry.entity.travelArrangement;
+          arrangementCounts.total += 1;
+          if (entry.entity.travelArrangement === 'NORTHSTAR_ARRANGED') {
+            arrangementCounts.northstarArranged += 1;
+            if (status === 'READY' || status === 'RESOLVED') summary.managedConfirmed += 1;
+          } else if (entry.entity.travelArrangement === 'SELF_OR_OTHER_ARRANGED') {
+            arrangementCounts.selfOrOtherArranged += 1;
+          } else {
+            arrangementCounts.unspecified += 1;
+          }
+        }
+      }
+    }
+    if (!travelArrangement && trip.travellerIds.length > 0) {
+      arrangementCounts.total += 1;
+      arrangementCounts.unspecified += 1;
+      travelArrangement = 'UNSPECIFIED';
     }
     let anchorEventName: string | undefined;
     if (trip.anchorEventId) {
@@ -285,6 +319,7 @@ export async function projectOperatorDashboard(
       ...(recoveryCase && recoveryCase.status !== 'RESOLVED' ? { activeCaseId: recoveryCase.id } : {}),
       ...(trip.label ? { label: trip.label } : {}),
       travellerNames,
+      ...(travelArrangement ? { travelArrangement } : {}),
       ...(anchorEventName ? { anchorEventName } : {}),
       status,
       ...(lastSignal ? { whatChanged: presentSignalChange(lastSignal) } : {}),
@@ -303,7 +338,7 @@ export async function projectOperatorDashboard(
     });
   }
 
-  return { generatedAt, summary, trips };
+  return { generatedAt, summary, trips, arrangementCounts };
 }
 
 const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
@@ -330,15 +365,15 @@ async function placeLabel(deps: ReadModelDependencies, placeId: EntityId): Promi
   return entry?.entityType === 'PLACE' ? (entry.entity.name ?? 'Place unconfirmed') : 'Place unconfirmed';
 }
 
-/** Generic authoritative trip chain used by every operator case. */
-export async function projectJourneyChain(deps: ReadModelDependencies, trip: Trip): Promise<ChainLinkView[]> {
+/** Generic authoritative trip chain for roster mini-chains and case views. */
+export async function projectJourneyChain(
+  deps: ReadModelDependencies,
+  trip: Trip,
+  recoveryCase?: RecoveryCase,
+): Promise<ChainLinkView[]> {
   const chain: ChainLinkView[] = [];
-  const orderedElements = [...trip.elements].sort((a, b) => {
-    const order: Record<TripElement['elementKind'], number> = { TRANSPORT_LEG: 0, STAY: 1, ENGAGEMENT: 2 };
-    return order[a.elementKind] - order[b.elementKind];
-  });
-  for (const element of orderedElements) {
-    if (element.elementKind === 'TRANSPORT_LEG') {
+  for (const element of selectJourneyTransportAndStay(trip)) {
+    if (isTransportLeg(element)) {
       const origin = await placeLabel(deps, element.data.originPlaceId);
       const destination = await placeLabel(deps, element.data.destinationPlaceId);
       const mode = TRANSPORT_MODE_LABEL[element.data.mode];
@@ -348,26 +383,38 @@ export async function projectJourneyChain(deps: ReadModelDependencies, trip: Tri
         label: `${origin} → ${destination}`,
         detail: RESERVATION_LABEL[element.reservationState],
         state: chainStateFor(element),
+        linkType: element.data.mode === 'FLIGHT' ? 'FLIGHT' : 'GROUND',
       });
       continue;
     }
-    if (element.elementKind === 'STAY') {
+    if (isStayElement(element)) {
       chain.push({
         id: element.id,
         kind: 'Stay',
         label: await placeLabel(deps, element.data.placeId),
         detail: RESERVATION_LABEL[element.reservationState],
         state: chainStateFor(element),
+        linkType: 'STAY',
       });
-      continue;
     }
+  }
+
+  const commitment = selectRecoveryCommitment(trip, recoveryCase);
+  if (commitment) {
+    const others = countOtherCommitments(trip, commitment);
     chain.push({
-      id: element.id,
+      id: commitment.id,
       kind: 'Commitment',
-      label: element.data.title,
-      detail: element.importance === 'REQUIRED' ? 'Must not be missed' : 'Part of this trip',
-      state: chainStateFor(element),
+      label: commitment.data.title,
+      detail:
+        others > 0
+          ? `${commitment.importance === 'REQUIRED' ? 'Must not be missed' : 'Part of this trip'} · +${others} other programme commitments`
+          : commitment.importance === 'REQUIRED'
+            ? 'Must not be missed'
+            : 'Part of this trip',
+      state: chainStateFor(commitment),
       commitment: true,
+      linkType: 'COMMITMENT',
     });
   }
   return chain;
@@ -412,7 +459,7 @@ export async function projectCaseDetail(
     const constraint: Constraint | undefined = constraints.find((c) => c.id === evaluation.constraintId);
     return {
       id: evaluation.constraintId,
-      label: presentConstraintLabel(constraint),
+      label: presentCheckLabel(constraint, evaluation.status as CaseCheckResult),
       result: evaluation.status as CaseCheckResult,
     };
   });
@@ -588,13 +635,32 @@ export async function projectCaseDetail(
     recoveryCase.strategies.length === 0 &&
     !recoveryCase.resolution;
 
+  const caseStatus = statusFromCase(recoveryCase.status, isChangeRequest);
+  const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
+  const programmeChangeCommitmentId = recoveryCommitment?.data.anchorCommitmentId;
+  const hardConstraintFailed = evaluations.some((evaluation) => {
+    const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
+    return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
+  });
+  const travelRecoveryInsufficient =
+    hardConstraintFailed ||
+    assessment.threatenedObjectives.length > 0 ||
+    Boolean(criticalObjectiveAtRisk) ||
+    planningExhausted ||
+    (options.length === 0 && evaluations.some((evaluation) => evaluation.status === 'FAIL'));
+  const programmeChangeAvailable =
+    Boolean(trip.anchorEventId && programmeChangeCommitmentId) &&
+    recoveryCase.status !== 'RESOLVED' &&
+    caseStatus === 'DISRUPTED' &&
+    travelRecoveryInsufficient;
+
   return enrichCaseDetailView(
     {
       caseId: recoveryCase.id,
       tripId: trip.id,
       ...(trip.label ? { tripLabel: trip.label } : {}),
       travellerNames,
-      status: statusFromCase(recoveryCase.status, isChangeRequest),
+      status: caseStatus,
       ...(triggeringSignals[0] ? { whatChanged: presentSignalChange(triggeringSignals[0]) } : {}),
       affectedItems: recoveryCase.affectedElementIds
         .map((id) => trip.elements.find((element) => element.id === id))
@@ -609,6 +675,15 @@ export async function projectCaseDetail(
       ...(funding ? { funding } : {}),
       uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
       ...(planningExhausted ? { planningExhausted: true } : {}),
+      ...(programmeChangeAvailable
+        ? {
+            anchorEventId: trip.anchorEventId,
+            programmeChangeAvailable: true,
+            ...(programmeChangeCommitmentId ? { programmeChangeCommitmentId } : {}),
+          }
+        : trip.anchorEventId
+          ? { anchorEventId: trip.anchorEventId }
+          : {}),
       ...(recoveryCase.resolution
         ? {
             resolution: {

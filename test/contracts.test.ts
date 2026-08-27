@@ -138,7 +138,8 @@ test('read models: operator + traveller views build from plain projections only'
     generatedAt: AT,
     data: {
       generatedAt: AT,
-      summary: { ready: 1, atRisk: 0, disrupted: 1, recovering: 0, awaitingDecision: 1 },
+      summary: { ready: 1, atRisk: 0, disrupted: 1, recovering: 0, awaitingDecision: 1, managedConfirmed: 0 },
+      arrangementCounts: { total: 1, northstarArranged: 1, selfOrOtherArranged: 0, unspecified: 0 },
       trips: [
         {
           tripId: 'trip_1',

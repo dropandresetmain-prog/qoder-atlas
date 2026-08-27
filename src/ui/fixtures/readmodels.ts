@@ -198,7 +198,8 @@ export const operatorTrips: readonly OperatorTripView[] = [
 
 export const operatorDashboard: OperatorDashboardView = {
   generatedAt: UI_FIXTURE_NOW,
-  summary: { ready: 1, atRisk: 1, disrupted: 1, recovering: 3, awaitingDecision: 2 },
+  summary: { ready: 1, atRisk: 1, disrupted: 1, recovering: 3, awaitingDecision: 2, managedConfirmed: 1 },
+  arrangementCounts: { total: 3, northstarArranged: 3, selfOrOtherArranged: 0, unspecified: 0 },
   trips: [...operatorTrips],
 };
 
@@ -209,7 +210,8 @@ export const operatorDashboard: OperatorDashboardView = {
  */
 export const operatorDashboardAlt: OperatorDashboardView = {
   generatedAt: UI_FIXTURE_NOW,
-  summary: { ready: 1, atRisk: 1, disrupted: 1, recovering: 0, awaitingDecision: 0 },
+  summary: { ready: 1, atRisk: 1, disrupted: 1, recovering: 0, awaitingDecision: 0, managedConfirmed: 1 },
+  arrangementCounts: { total: 1, northstarArranged: 1, selfOrOtherArranged: 0, unspecified: 0 },
   trips: [
     {
       tripId: 'trip-alt-1',
@@ -454,8 +456,8 @@ export const healthyProgramme: ProgrammeView = {
   anchorEventName: 'Atlas Innovation Summit 2026',
   summary: summaryFor(HEALTHY_PROGRAMME_SEEDS.map((s) => traveller(s, HEALTHY_ANCHOR_EVENT_ID))),
   // Presentation-seed value consistent with the seeded traveller rows below
-  // (3 travellers). Only the engine read model computes authoritative counts.
-  arrangementCounts: { total: 3, northstarArranged: 3, selfOrOtherArranged: 0, unspecified: 0 },
+  // (45 travellers). Only the engine read model computes authoritative counts.
+  arrangementCounts: { total: 45, northstarArranged: 45, selfOrOtherArranged: 0, unspecified: 0 },
   travellers: HEALTHY_PROGRAMME_SEEDS.map((s) => traveller(s, HEALTHY_ANCHOR_EVENT_ID)),
   endangeredCommitments: [],
   unresolvedUncertainties: [

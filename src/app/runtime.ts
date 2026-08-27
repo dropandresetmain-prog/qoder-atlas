@@ -311,6 +311,11 @@ export class RuntimeOrchestrator {
     };
   }
 
+  /** Operator terminal action — hand case to human support (ESCALATED_CLOSED). */
+  async escalate(input: { caseId: EntityId; at: IsoDateTime }): Promise<{ caseStatus: string; resolutionOutcome: string }> {
+    return this.deps.execution.handOffToHumanSupport(input);
+  }
+
   /**
    * Deterministic reset/reseed: wipe every logical store in one transaction,
    * then reseed all accepted scenario bundles AND programme bundles through

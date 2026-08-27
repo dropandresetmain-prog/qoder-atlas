@@ -1,7 +1,7 @@
 /**
  * Programme-scale activity feed projection (R3A).
  */
-import type { IsoDateTime } from '../domain/common.ts';
+import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { ActivityDayGroupView, ActivityPageView } from '../ui/operator-surfaces-view-model.ts';
 import { activityClock, glyphForActivityAction } from '../ui/operator-surfaces-view-model.ts';
 import { formatActivityDayLabel } from './presentationProjection.ts';
@@ -11,11 +11,15 @@ import type { ReadModelDependencies } from './readmodels.ts';
 export async function projectProgrammeActivityPage(
   deps: ReadModelDependencies,
   generatedAt: IsoDateTime,
+  options?: { anchorEventId?: EntityId },
 ): Promise<ActivityPageView> {
   const summaries = await deps.snapshot.trips.listTrips();
   const byDay = new Map<string, ActivityDayGroupView['items']>();
 
   for (const summary of summaries) {
+    const trip = await deps.snapshot.trips.getTrip(summary.tripId);
+    if (!trip) continue;
+    if (options?.anchorEventId && trip.anchorEventId !== options.anchorEventId) continue;
     const activity = await projectTripActivity(deps, summary.tripId, generatedAt, 20);
     if (!activity) continue;
     for (const event of activity.events) {

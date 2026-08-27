@@ -283,7 +283,7 @@ test('dashboard renders every status and orders attention first', () => {
   assert.ok(html.includes('Still unclear'), 'uncertainty must be visible');
 });
 
-test('operator rows link to traveller detail and keep active cases separately discoverable', () => {
+test('operator rows link to case when active and expose Show interaction secondary', () => {
   const activeCaseId = 'case-active-operator';
   const tripId = operatorDashboard.trips[0]!.tripId;
   const html = renderOperatorDashboardBody({
@@ -292,10 +292,12 @@ test('operator rows link to traveller detail and keep active cases separately di
       index === 0 ? { ...trip, activeCaseId } : trip,
     ),
   });
-  assert.match(html, new RegExp(`href="/traveller\\?trip=${tripId}"`));
   assert.match(html, new RegExp(`href="/operator/cases/${activeCaseId}"`));
-  assert.match(html, /data-test="trip-link"/);
-  assert.match(html, /data-test="case-link"/);
+  assert.match(html, /data-test="case-row-link"/);
+  assert.match(html, new RegExp(`href="/traveller\\?trip=${tripId}"`));
+  assert.match(html, /data-test="show-interaction"/);
+  assert.doesNotMatch(html, /data-test="trip-link"/);
+  assert.doesNotMatch(html, /Recovery case/);
 });
 
 test('switching typed fixture data changes nothing in component code paths', () => {
@@ -468,7 +470,8 @@ test('dynamic values are HTML-escaped', () => {
         whatChanged: 'a < b & c > d "quoted"',
       },
     ],
-    summary: { ready: 1, atRisk: 0, disrupted: 0, recovering: 0, awaitingDecision: 0 },
+    summary: { ready: 1, atRisk: 0, disrupted: 0, recovering: 0, awaitingDecision: 0, managedConfirmed: 1 },
+    arrangementCounts: { total: 1, northstarArranged: 1, selfOrOtherArranged: 0, unspecified: 0 },
   };
   const html = renderOperatorDashboardBody(hostile);
   assert.ok(!html.includes('<script>alert(1)</script>'));
