@@ -101,8 +101,15 @@ export function enrichCaseDetailView(
   const whoRows: Array<{ label: string; value: string }> = [];
   const nextStep = whoDecidesLabel(view.approval);
   if (nextStep) whoRows.push({ label: 'Next step', value: nextStep });
-  const cap = policyCapLabel(view.approval?.amount);
-  if (cap) whoRows.push({ label: 'Policy cap', value: cap });
+  // approval.amount is the charge under review (often FX home restatement),
+  // not the policy ceiling. Prefer funding allocation copy when present.
+  const fundingLine = view.funding?.summary?.trim();
+  if (fundingLine) {
+    whoRows.push({ label: 'Who pays', value: fundingLine });
+  } else {
+    const amount = policyCapLabel(view.approval?.amount);
+    if (amount) whoRows.push({ label: 'Amount under review', value: amount });
+  }
   if (whoRows.length > 0) railSections.push({ title: 'Who decides', rows: whoRows });
 
   const options: RecoveryOptionView[] = view.options.map((option) => {
