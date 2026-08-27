@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event change preview · Northstar</title>
+<link rel="stylesheet" href="renders.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="mark">✦</span>Northstar<small>keeps the whole trip working</small></div>
+  <span class="event-select"><span class="es-dot"></span>AiT Summit 2026<span class="es-caret">▾</span></span>
+  <nav>
+    <a href="o1-overview.html">Overview</a>
+    <a href="p2-programme-disrupted.html" class="is-active">Programme</a>
+    <a href="d1-decisions.html">Decisions <span class="nav-count">2</span></a>
+    <a href="activity.html">Activity</a>
+  </nav>
+  <div class="tb-right">
+    <span class="replay-pill">Replay · recorded providers</span>
+    <span class="avatar">AK</span>
+  </div>
+</header>
+
+<!-- backdrop: the programme page, dimmed and inert behind the preview -->
+<main class="shell" aria-hidden="true">
+  <div class="page-head">
+    <h1>AiT — AI in Travel Summit 2026</h1>
+    <p class="sub">30 Sep – 2 Oct · Marina Bay Sands, Singapore · 67 travellers · how the programme is holding up as a whole.</p>
+    <p class="meta">Generated 22 Sep 2026, 09:40 UTC+08:00</p>
+  </div>
+  <div class="tiles">
+    <div class="tile"><div class="tile-count">67</div><div class="tile-label">Travellers</div></div>
+    <div class="tile tone-ok"><div class="tile-count">59</div><div class="tile-label">On track</div></div>
+    <div class="tile tone-watch"><div class="tile-count">3</div><div class="tile-label">Watching</div></div>
+    <div class="tile tone-active"><div class="tile-count">2</div><div class="tile-label">In recovery</div></div>
+    <div class="tile tone-neutral"><div class="tile-count">2</div><div class="tile-label">Unconfirmed</div></div>
+    <div class="tile tone-alert is-attention"><div class="tile-count">2</div><div class="tile-label">Endangered commitments</div></div>
+  </div>
+  <section class="section">
+    <h2>Programme timeline <span class="count">9 commitments · 3 days</span></h2>
+    <div class="timeline">
+      <div class="tl-day">
+        <div class="tl-date">Wed 1 Oct</div>
+        <div class="tl-items">
+          <div class="tl-item endangered"><span class="dot"></span><span class="t">09:00</span><span class="ttl">Keynote rehearsal (closed)</span><span class="tag">Arjun lands 09:25</span></div>
+          <div class="tl-item"><span class="dot d-watch"></span><span class="t">10:00</span><span class="ttl">Keynote — Arjun Rao, WanderPay</span><span class="tag">Depends on recovery</span></div>
+          <div class="tl-item"><span class="dot d-ok"></span><span class="t">11:00</span><span class="ttl">The AiT Thinktank (By Invite Only)</span><span class="tag">Kenji Mori hosts</span></div>
+          <div class="tl-item"><span class="dot d-watch"></span><span class="t">14:00</span><span class="ttl">The Future Provocation: Travel in 2035</span><span class="tag">Preview → 09:50</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="modal-scrim"></div>
+
+<div class="modal" role="dialog" aria-modal="true" aria-label="Event change preview">
+  <div class="preview-banner"><span class="pb-dot"></span>Preview · no changes made yet</div>
+  <h2>Move “The Future Provocation: Travel in 2035”?</h2>
+  <p class="m-sub">A what-if for the programme team. Nobody's trip changes unless you confirm.</p>
+
+  <div class="change-compare">
+    <div class="cc-box">
+      <p class="kv-label">Now</p>
+      <div class="cc-when">Wed 1 Oct · 14:00–14:20</div>
+      <div class="cc-where">Melati Ballroom, Marina Bay Sands</div>
+    </div>
+    <div class="cc-arrow">→</div>
+    <div class="cc-box to">
+      <p class="kv-label">Proposed</p>
+      <div class="cc-when">Wed 1 Oct · 09:50–10:10</div>
+      <div class="cc-where">Melati Ballroom — same room</div>
+    </div>
+  </div>
+
+  <p class="kv-label">Who this touches</p>
+  <div class="impact-row">
+    <span class="i-count">1</span>
+    <span><strong>Grace Nakamura</strong> — lands 1 Oct 09:05; the move leaves her 45 minutes to clear immigration and cross town.</span>
+    <span class="badge tone-watch" style="margin-left:auto">At risk</span>
+  </div>
+  <div class="impact-row">
+    <span class="i-count">66</span>
+    <span>unaffected — arrivals, stays and commitments all still hold.</span>
+    <span class="badge tone-ok" style="margin-left:auto">No impact</span>
+  </div>
+
+  <p class="kv-label" style="margin-top:16px">Ways to make it work</p>
+  <div class="alt-row"><span>Keep the 14:00 slot</span><span class="a-note">no impact — the default</span></div>
+  <div class="alt-row"><span>Move to 11:30 instead of 09:50</span><span class="a-note">viable for all 67</span></div>
+  <div class="alt-row"><span>Earlier flight for Grace — arrives 1 Oct 07:10</span><span class="a-note">+SGD 95 · within policy</span></div>
+
+  <p class="footnote" style="margin-top:14px">Checked against all 67 trips: arrival buffers, transfer windows, duty-of-care radius. No bookings have been touched.</p>
+
+  <div class="btn-row">
+    <a class="btn btn-primary" href="e2-after-commit.html">Confirm the move</a>
+    <a class="btn btn-ghost" href="p2-programme-disrupted.html">Cancel — keep 14:00</a>
+  </div>
+  <p class="footnote">Confirming opens a recovery case for Grace automatically and tells her what's happening.</p>
+</div>
+</body>
+</html>
