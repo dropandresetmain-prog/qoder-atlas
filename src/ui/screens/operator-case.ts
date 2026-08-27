@@ -576,8 +576,17 @@ function approvalSection(view: CaseDetailView): string {
     : '';
 
   let actionForms = '';
-  if (approval.state === 'PENDING' && approval.requestedFrom === 'TRAVELLER') {
-    const approveLabel = approval.amount ? `Approve ${formatMoney(approval.amount)}` : 'Approve';
+  if (
+    approval.state === 'PENDING' &&
+    approval.requestedFrom === 'TRAVELLER'
+  ) {
+    const payerHint =
+      view.funding?.allocation?.incrementalPayer === 'TRAVELLER'
+        ? 'traveller-funded '
+        : '';
+    const approveLabel = approval.amount
+      ? `Approve ${payerHint}${formatMoney(approval.amount)}`.replace(/\s+/g, ' ').trim()
+      : 'Approve';
     actionForms = `
     <div class="btn-row">
       <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
@@ -589,8 +598,19 @@ function approvalSection(view: CaseDetailView): string {
         <button type="submit" class="btn btn-danger-ghost">Decline</button>
       </form>
     </div>`;
-  } else if (approval.state === 'PENDING' && approval.requestedFrom === 'ORGANISATION' && approval.approver && approval.intentId) {
-    const approveLabel = approval.amount ? `Approve ${formatMoney(approval.amount)}` : 'Approve';
+  } else if (
+    approval.state === 'PENDING' &&
+    (approval.requestedFrom === 'ORGANISATION' || approval.requestedFrom === 'HUMAN_AGENT') &&
+    approval.approver &&
+    approval.intentId
+  ) {
+    const approveLabel = approval.amount
+      ? approval.requestedFrom === 'HUMAN_AGENT'
+        ? `Approve as organiser ${formatMoney(approval.amount)}`
+        : `Approve ${formatMoney(approval.amount)}`
+      : approval.requestedFrom === 'HUMAN_AGENT'
+        ? 'Approve as organiser'
+        : 'Approve';
     actionForms = `
     <div class="btn-row">
       <form method="POST" action="/api/runtime/decide" class="inline-form" data-test="organisation-approve-form">
@@ -613,7 +633,7 @@ function approvalSection(view: CaseDetailView): string {
       </form>
     </div>`;
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'HUMAN_AGENT') {
-    actionForms = '<p class="footnote">This recovery is escalated for human-agent handling. Northstar will not approve or execute it automatically.</p>';
+    actionForms = '<p class="footnote">This recovery needs a human organiser decision, but no single in-scope organisation principal is available in the current read model.</p>';
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'ORGANISATION') {
     actionForms = '<p class="footnote">An in-scope organisation approver is not available in the current read model. Nothing has been approved.</p>';
   }
@@ -732,17 +752,30 @@ function recoveryActionsInner(view: CaseDetailView): string {
       </div>`;
   }
 
-  if (view.options.length > 0 && !view.approval && !view.resolution) {
-    const recommendedOption = view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
+  if (view.options.length > 0 && !view.resolution) {
+    const recommendedOption =
+      view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
+    if (!recommendedOption && view.approval?.state === 'PENDING') {
+      // Options exist for inspection after Resolve; approval panel carries the ask.
+      return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Review what changed first. Resolve reveals the ranked recovery choices and any approval that is already required.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+      </div>`;
+    }
     if (!recommendedOption) return '';
 
-    const needsHumanApproval = view.options.some((o) => o.requiresApproval);
-    const autoBanner = !needsHumanApproval
-      ? `<div class="authority-auto-banner" data-test="authority-auto-approved">
+    const needsHumanApproval =
+      view.approval?.state === 'PENDING' || view.options.some((o) => o.requiresApproval);
+    const autoBanner =
+      !needsHumanApproval
+        ? `<div class="authority-auto-banner" data-test="authority-auto-approved">
           <strong>Approved by policy</strong>
           <span>Northstar is authorised to proceed with the selected recovery. No extra human approval is required.</span>
         </div>`
-      : '';
+        : '';
 
     return `
       <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
@@ -851,10 +884,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     return `<main class="shell">${errorPanel('This case cannot be displayed yet', issues.join('; '))}</main>`;
   }
   const badge = caseBadge(view);
-  const initialPhase =
-    view.resolution || view.approval?.state === 'PENDING' || view.planningExhausted
-      ? 'options'
-      : 'impacted';
+  const initialPhase = view.resolution ? 'options' : 'impacted';
   const rail = `
     <aside class="case-rail">
       ${commitmentCard(view)}

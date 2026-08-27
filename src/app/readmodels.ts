@@ -575,7 +575,8 @@ export async function projectCaseDetail(
     // organisations. Human-agent outcomes deliberately carry no automatic
     // approver at all.
     const organisations =
-      latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER'
+      latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER' ||
+      latestRequiring.outcome === 'REQUIRES_HUMAN_AGENT'
         ? (await principalScopeForTrip({ trips: deps.snapshot.trips, entities: deps.snapshot.entities }, trip.id)).organisations
         : [];
     const organisationApprover = organisations.length === 1 ? organisations[0] : undefined;
@@ -587,6 +588,8 @@ export async function projectCaseDetail(
             ? 'ORGANISATION'
             : 'HUMAN_AGENT',
       intentId: latestRequiring.intentId,
+      // HUMAN_AGENT may be decided by an unambiguous in-scope organisation
+      // principal (authority allows ORGANISATION for HUMAN_AGENT).
       ...(organisationApprover ? { approver: { entityType: 'ORGANISATION' as const, id: organisationApprover.id } } : {}),
       reason: presentApprovalReason(),
       ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),

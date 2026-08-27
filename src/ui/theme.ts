@@ -543,6 +543,8 @@ a.qrow:focus-visible, a.brow.brow-actionable:focus-visible { outline: 2px solid 
 }
 .authority-auto-banner strong { display: block; margin-bottom: 4px; color: var(--ok); }
 .case-workspace[data-case-phase="impacted"] [data-case-options-panel] { display: none !important; }
+.case-workspace[data-case-phase="impacted"] [data-ui-section="primary-approval"] { display: none !important; }
+.case-workspace[data-case-phase="impacted"] [data-case-begin-panel] { display: none !important; }
 .ns-resolve-scrim {
   position: fixed; inset: 0; z-index: 80; background: rgba(20, 24, 28, 0.48);
   display: flex; align-items: center; justify-content: center; padding: 24px;

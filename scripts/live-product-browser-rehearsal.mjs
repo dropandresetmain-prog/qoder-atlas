@@ -84,11 +84,30 @@ async function caseTerminalState() {
   return 'unknown';
 }
 
+async function resolveAndContinue() {
+  if (await page.locator('[data-test="resolve-northstar-btn"]').count()) {
+    await page.locator('[data-test="resolve-northstar-btn"]').click();
+    await page.waitForTimeout(3200);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    record('resolve-northstar');
+  }
+  if (await page.locator('[data-test="begin-strategy-btn"]').count()) {
+    await page.locator('[data-test="begin-strategy-btn"]').click();
+    await page.waitForLoadState('networkidle');
+    record('begin-strategy');
+  }
+}
+
 async function approveAndExecuteIfPresent() {
   if (await page.locator('[data-test="organisation-approve-form"]').count()) {
     await page.locator('[data-test="organisation-approve-form"] button[type="submit"]').click();
     await page.waitForLoadState('networkidle');
     record('organiser-approve');
+  }
+  if (await page.locator('form[action*="traveller-decision"] button[type="submit"]').filter({ hasText: /Approve/i }).count()) {
+    await page.locator('form[action*="traveller-decision"] button[type="submit"]').filter({ hasText: /Approve/i }).first().click();
+    await page.waitForLoadState('networkidle');
+    record('traveller-approve');
   }
   if (await page.locator('[data-test="execute-approved-strategy-btn"]').count()) {
     await page.locator('[data-test="execute-approved-strategy-btn"]').click();
@@ -102,7 +121,8 @@ async function runJordanS2() {
   await gotoOverview();
   await page.screenshot({ path: `${OUT_DIR}/s2-01-overview.png`, fullPage: true });
   await clickTripRow('Jordan Hale');
-  await page.waitForSelector('[data-test="primary-action-panel"]', { timeout: 15000 });
+  await page.waitForSelector('[data-test="primary-action-panel"], [data-test="resolve-northstar-btn"]', { timeout: 15000 });
+  await resolveAndContinue();
   await approveAndExecuteIfPresent();
   const state = await caseTerminalState();
   if (state !== 'terminal') fail('s2.terminal', { state });
@@ -112,7 +132,14 @@ async function runJordanS2() {
 async function runSarahS1S3() {
   await resetDemo();
   await gotoOverview();
-  await clickTripRow('Sarah Lim');
+  const attention = page.locator('[data-test="attention-queue"]');
+  const sarahAlert = attention.locator('a').filter({ hasText: /Sarah Lim/i });
+  if (await sarahAlert.count()) {
+    record('s1s3.sarah-in-attention');
+    await sarahAlert.first().click();
+  } else {
+    await clickTripRow('Sarah Lim');
+  }
   await page.waitForSelector('[data-test="preview-programme-change-btn"]', { timeout: 15000 });
 
   await page.locator('[data-test="preview-programme-change-btn"]').click();
@@ -125,7 +152,8 @@ async function runSarahS1S3() {
   await modal.locator('[name="newEndsAt"]').fill(S3_RESCHEDULE.newEndsAt);
   page.once('dialog', (d) => d.accept());
   await modal.locator('[data-programme-change-preview]').click();
-  await page.waitForTimeout(1500);
+  await page.waitForSelector('[data-test="now-vs-proposed"]', { timeout: 20000 });
+  record('s1s3.now-vs-proposed');
   await modal.locator('[data-programme-change-commit]').click({ timeout: 10000 });
   await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(800);
@@ -142,7 +170,8 @@ async function runOliverS7() {
   await resetDemo();
   await gotoOverview();
   await clickTripRow('Oliver Bennett');
-  await page.waitForSelector('[data-test="primary-action-panel"]', { timeout: 15000 });
+  await page.waitForSelector('[data-test="primary-action-panel"], [data-test="resolve-northstar-btn"]', { timeout: 15000 });
+  await resolveAndContinue();
   await approveAndExecuteIfPresent();
   const state = await caseTerminalState();
   if (state !== 'terminal') fail('s7.terminal', { state });
@@ -153,8 +182,8 @@ async function runJonasS5() {
   await resetDemo();
   await gotoOverview();
   await clickTripRow('Jonas Berg');
-  await page.waitForSelector('[data-test="primary-action-panel"]', { timeout: 15000 });
-
+  await page.waitForSelector('[data-test="primary-action-panel"], [data-test="resolve-northstar-btn"]', { timeout: 15000 });
+  await resolveAndContinue();
   if (await page.locator('[data-test="plan-recovery-btn"]').count()) {
     await page.locator('[data-test="plan-recovery-btn"]').click();
     await page.waitForLoadState('networkidle');

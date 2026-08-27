@@ -138,18 +138,25 @@ export function renderCaseResolutionEnhancementScript(): string {
     if (resolveCta) resolveCta.hidden = true;
     var beginPanel = qs('[data-case-begin-panel]', root);
     if (beginPanel) beginPanel.hidden = false;
+    var approval = qs('[data-ui-section="primary-approval"]', root);
+    if (approval) approval.hidden = false;
     syncStrategyInputs(root);
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     var root = qs('[data-case-workspace]');
     if (!root) return;
+    var caseId = (qs('[name="caseId"]', root) || {}).value || window.location.pathname;
+    var phaseKey = 'ns-case-phase:' + caseId;
 
     bindOptionSelection(root);
 
     var params = new URLSearchParams(window.location.search);
-    if (params.get('nsResolve') === '1' || params.get('nsPhase') === 'options') {
+    var storedPhase = null;
+    try { storedPhase = window.sessionStorage.getItem(phaseKey); } catch (e) {}
+    if (params.get('nsResolve') === '1' || params.get('nsPhase') === 'options' || storedPhase === 'options') {
       revealOptions(root);
+      try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (e) {}
     }
 
     var resolveBtn = qs('[data-resolve-northstar]', root);
@@ -187,6 +194,7 @@ export function renderCaseResolutionEnhancementScript(): string {
         var stagePromise = runStages(overlay, RESOLVE_MS);
         Promise.all([planPromise, stagePromise])
           .then(function() {
+            try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (e) {}
             if (alreadyHasOptions) {
               revealOptions(root);
               return;
@@ -208,9 +216,13 @@ export function renderCaseResolutionEnhancementScript(): string {
       if (!form.classList.contains('inline-form') && !form.classList.contains('action-form')) return;
       var isExec =
         form.getAttribute('data-test') === 'begin-strategy-form' ||
+        form.getAttribute('data-test') === 'execute-approved-strategy-btn' ||
         form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
         form.getAttribute('action') === '/api/runtime/execute' ||
         form.getAttribute('action') === '/api/runtime/begin';
+      if (isExec || form.getAttribute('action') === '/api/runtime/decide') {
+        try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (err) {}
+      }
       if (!isExec) return;
       syncStrategyInputs(root);
       var overlay = ensureOverlay(
