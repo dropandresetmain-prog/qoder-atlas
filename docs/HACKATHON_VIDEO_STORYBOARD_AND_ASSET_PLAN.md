@@ -1,9 +1,9 @@
 # NORTHSTAR Hackathon Video — Storyboard, Script & Asset Plan
 
-**Status:** Draft for approval  
-**Primary purpose:** Source of truth for the hackathon video story, scene order, timing, asset requirements, and production experiments.  
+**Status:** APPROVED / production baseline  
+**Primary purpose:** Source of truth for the hackathon video story, scene order, timing, communication objectives, asset requirements, and production sequence.  
 **Design authority:** `docs/DESIGN.md` remains authoritative for NORTHSTAR visual language. This document extends that system into motion; it does not create a second design system.  
-**Script status:** Provisional. The scene logic is the current focus; final narration will be refined after visual timing is proven.
+**Script status:** LOCKED for storyboard and asset production. Final voice timing may require only surgical word-level trims; do not reopen story structure without new evidence.
 
 ---
 
@@ -11,87 +11,211 @@
 
 Produce a **< 3 minute** hackathon submission video that makes judges understand, remember, and believe:
 
-1. **A replacement booking is not necessarily a recovered trip.**
-2. **Travel disruption is a dependency problem.**
-3. **NORTHSTAR maintains live connected state, follows the blast radius, and recovers the actual objective of the trip.**
+1. **A travel disruption rarely breaks just one thing.**
+2. **Rebooking the flight is not recovery.**
+3. **NORTHSTAR treats travel as connected state through a Live Dependency Graph.**
+4. **NORTHSTAR reasons across travel, traveller, policy and event context to restore the trip, not merely replace a booking.**
+5. **NORTHSTAR can execute within delegated authority and uses explicit human-in-the-loop decisions when a boundary is crossed.**
 
 This is not a product tour and not a broad technical explainer.
 
-The film should tell one escalating story:
+The film tells one escalating story:
 
-**pain → escalation → connected-state solution → how the resolution loop works → product proof → expansion**
+**disruption → cascade → scale → connected-state resolution → autonomy / human-in-the-loop → product proof → breadth → expansion**
+
+The technical story must be expressed through the product behaviour. Avoid stopping the film for a standalone architecture lecture.
 
 ---
 
-## 2. Runtime structure
+## 2. Runtime structure and approved beat sheet
 
 ### Total target length
-**2:50–2:58**
+**Approximately 2:50–2:55**, always below 3:00.
 
-### Fixed allocation
-- **0:00–1:30** — problem, escalation, NORTHSTAR solution, how it works
-- **1:30–2:30** — actual product demo
-- **2:30–2:40** — Qoder credit
-- **2:40–2:58** — closing / future expansion
+The locked narration is approximately 430 words. Final timing is governed by the chosen AI voice and visual breathing room rather than an arbitrary word target.
 
-### Demo scenario allocation
-- **30s** — **S1 → S3** continuous story
-- **15s** — **S2**
-- **15s** — **S7** *(tentative; replace only if a stronger breadth case emerges)*
+### Beat 1 — Disruption cascade and scale
+**Time:** ~0:00–0:20  
+**Mode:** Generated motion
+
+**Objective**
+- **WHAT:** Make the viewer immediately understand that a travel disruption cascades downstream, and that rebooking one flight does not necessarily recover the trip. Then multiply that problem from one traveller to dozens or hundreds.
+- **HOW:** Begin on one healthy NORTHSTAR journey chain: `flight → transfer → hotel → ✦ commitment`. Change/rebook the flight, then visibly propagate consequences through the downstream chain. Pull the camera back as the one journey multiplies into many travellers with differentiated states from the same supplier change.
+
+**Viewer takeaway:** `REBOOKED` can coexist with `TRIP NOT RECOVERED`.
+
+---
+
+### Beat 2 — NORTHSTAR and the Live Dependency Graph
+**Time:** ~0:20–0:43  
+**Mode:** Generated graph motion
+
+**Objective**
+- **WHAT:** Explain what NORTHSTAR fundamentally sees that a booking-centric system does not: connected state across travel, travellers and the event programme.
+- **HOW:** Continue the same camera move outward. Traveller journey chains connect into an event/programme graph with day nodes and nested commitments. Highlight travel nodes when the narration names flights, transfers and hotels, then programme/traveller nodes when it names constraints and event commitments. Reveal NORTHSTAR as the system maintaining this state, not as a separate overlay.
+
+**Viewer takeaway:** NORTHSTAR sees the trip as a connected system.
+
+---
+
+### Beat 3 — Blast radius and AI resolution reasoning
+**Time:** ~0:43–1:03  
+**Mode:** Generated graph / resolution motion
+
+**Objective**
+- **WHAT:** Show how NORTHSTAR moves from a change to an actual recovery strategy by understanding messy context and exploring whole-trip alternatives.
+- **HOW:** Trigger a change inside the graph and propagate the blast radius only along affected dependencies. Bring traveller requests, flight/hotel updates, policy, insurance and immigration context into the impacted trip. Let recovery branches emerge from the connected state — flight, hotel, programme or combined changes — rather than cutting to a generic pipeline diagram.
+
+**Viewer takeaway:** NORTHSTAR asks both **what else is affected?** and **what has to change for the trip to work again?**
+
+---
+
+### Beat 4 — Qwen + Atlas inside the system
+**Time:** ~1:03–1:09  
+**Mode:** Generated integration motion inside Beat 3
+
+**Objective**
+- **WHAT:** Credit Alibaba Cloud and Atlas while making their roles intelligible rather than interrupting the story with logos.
+- **HOW:** Keep the graph/recovery scene running. Show **Alibaba Cloud Qwen** at the interpretation/reasoning layer as messy context becomes structured recovery possibilities. When a recovery branch requires flights, show **Atlas GDS API** providing search/verification evidence that feeds back into NORTHSTAR.
+
+**Viewer takeaway:** Qwen powers reasoning; Atlas powers flight search and verification within NORTHSTAR's resolution process.
+
+---
+
+### Beat 5 — Autonomy and human-in-the-loop
+**Time:** ~1:09–1:15  
+**Mode:** Generated authority-gate motion
+
+**Objective**
+- **WHAT:** Make NORTHSTAR's operating boundary explicit: it can resolve and execute automatically within delegated authority, while key decisions remain human-in-the-loop.
+- **HOW:** Show one proposed action clearing policy/authority and flowing directly to `EXECUTE`, while a second action reaches an `AUTHORITY BOUNDARY` and stops at an explicit **HUMAN-IN-THE-LOOP** decision. Show the human receiving mapped impact and viable options, not a vague alert.
+
+**Viewer takeaway:** NORTHSTAR is autonomous where permitted and deliberately human-controlled where judgement or authority is required.
+
+---
+
+### Beat 6 — Product transition
+**Time:** ~1:15  
+**Mode:** Generated-to-real transition
+
+**Objective**
+- **WHAT:** Turn the conceptual promise into proof without resetting the viewer's mental model.
+- **HOW:** Push into one affected traveller / programme state in the generated graph and morph that structure into the corresponding real NORTHSTAR operator UI. Avoid a black-card `DEMO` interstitial.
+
+**Viewer takeaway:** The concepts just shown are the behaviour of the real product.
+
+---
+
+### Beat 7 — Sarah / S1 → S3 hero
+**Time:** ~1:15–1:42  
+**Mode:** Real NORTHSTAR product capture
+
+**Objective**
+- **WHAT:** Prove programme-scale blast radius, differentiated traveller recovery, cross-domain recovery and human-in-the-loop programme change. The hero insight is that the best recovery is not always another travel booking.
+- **HOW:** Start at programme level with one shared airline retime affecting several AiT speakers. Show most being handled/recovered automatically while Sarah remains unresolved. Open Sarah: airline rebooked, but she can no longer reach Singapore in time for her keynote. Show NORTHSTAR proposing a programme-side recovery, the organiser previewing downstream impact before any change, then approving/committing. Show programme update, traveller notification and Sarah becoming viable again without buying another flight.
+
+**Viewer takeaway:** NORTHSTAR can recover the objective of the trip, not merely the disrupted booking.
+
+---
+
+### Beat 8 — Jordan / S2 second hero
+**Time:** ~1:42–2:10  
+**Mode:** Real NORTHSTAR product capture
+
+**Objective**
+- **WHAT:** Prove anticipatory resolution during an evolving in-travel disruption and show NORTHSTAR coordinating multiple recovery components into one actionable plan.
+- **HOW:** Show Jordan's first-leg delay increasing over successive updates, with the connection moving `SAFE → AT RISK → IMPOSSIBLE`. NORTHSTAR starts planning before Jordan is simply left stranded. Present one coordinated recovery plan containing the next viable flight, Narita hotel, entry/transit requirements, insurance, Singapore hotel change, event timing and total cost. Show organiser approval, permitted execution and continuing observation until the journey is viable again.
+
+**Viewer takeaway:** NORTHSTAR plans ahead across the whole disrupted journey instead of waiting for each failure to happen independently.
+
+---
+
+### Beat 9 — Traveller-request breadth: Jonas + Oliver
+**Time:** ~2:10–2:22  
+**Mode:** Fast real-product montage or animated real screenshots
+
+**Objective**
+- **WHAT:** Prove that the same resolution engine handles traveller-requested changes, not only supplier disruptions.
+- **HOW:** Use two very short examples rather than full demos. Jonas asks to stay an extra night; briefly expose hotel/funding/policy/authority evaluation. Oliver says he is now flying from Tokyo instead of London; show the origin change propagating into the trip and forcing downstream re-evaluation before a recommendation is made.
+
+**Viewer takeaway:** Different change, same impact-first resolution engine.
+
+---
+
+### Beat 10 — Qoder credit
+**Time:** ~2:22–2:30  
+**Mode:** Real Qoder captures + restrained motion
+
+**Objective**
+- **WHAT:** Give Qoder meaningful build credit and communicate the development method without turning the film into a tooling demo.
+- **HOW:** Start with one workstream, fan it out into bounded parallel lanes such as UI, scenario engine, provider integration and testing, show authentic Qoder/code/test captures, then fan the work back into `INTEGRATE → VERIFY` and a passing result.
+
+**Viewer takeaway:** Qoder enabled parallel implementation with controlled fan-in and verification.
+
+---
+
+### Beat 11 — Expansion and final thesis
+**Time:** ~2:30–2:52/2:55  
+**Mode:** Generated motion + final lockup
+
+**Objective**
+- **WHAT:** Expand NORTHSTAR beyond the AiT summit without making it look like five different future products, then land the central thesis cleanly.
+- **HOW:** Return to the same graph visual language. Pull outward from AiT and change the programme context beneath the same resolution engine: conference → sports event → corporate offsite, then travel-team / TMC operating contexts. Collapse back to one healthy traveller chain and end on the NORTHSTAR lockup with a deliberate pause after the final line.
+
+**Viewer takeaway:** The same resolution engine applies wherever many journeys must converge on a shared objective. **Fixing the booking is not enough; restore the trip.**
 
 ---
 
 ## 3. Story architecture
 
-### A. Personal pain
-A traveller’s flight changes. The airline “fixes” the booking. The trip is still broken.
+### A. Pain
+One disrupted travel element creates downstream consequences.
 
-### B. Multiply the problem
-Now many travellers have different dependencies.
+### B. Scale
+Multiply differentiated dependencies across dozens or hundreds of travellers.
 
-### C. Organiser scale
-Now an event organiser must understand the health of the whole programme.
+### C. NORTHSTAR
+NORTHSTAR maintains a **Live Dependency Graph** spanning travel, traveller constraints and programme commitments.
 
-### D. NORTHSTAR solution
-NORTHSTAR maintains a **Live Dependency Graph** of travellers, trip elements, commitments, objectives, constraints and policies.
+### D. Resolution
+A change propagates through the graph. NORTHSTAR interprets messy context, maps the blast radius and proposes whole-trip recovery strategies.
 
-### E. How it works
+### E. AI + provider evidence
+Alibaba Cloud Qwen powers the reasoning layer; Atlas GDS API provides flight search and verification evidence.
 
-**Signal → state update → blast radius → recovery planning → deterministic viability → authority → execute → observe → state update**
+### F. Authority model
+Within delegated authority, NORTHSTAR can execute automatically. When a decision crosses that boundary, **human-in-the-loop** takes over with mapped impact and viable options.
 
-### F. Proof
-Show the product actually run:
-- S1 → S3
-- S2
-- S7
+### G. Proof
+- **S1 → S3:** shared airline retime → differentiated outcomes → Sarah requires programme-side recovery → counterfactual preview → organiser commit → recovered trip.
+- **S2:** progressive delay → anticipated missed connection → coordinated whole-trip recovery plan → approval → execution / observation.
+- **Jonas + Oliver:** traveller-requested hotel extension and origin substitution as compact breadth proof.
 
-### G. Expansion
-Same engine for:
-- conferences
-- sports tournaments
-- corporate offsites
-- self-managed corporate travel
-- event organisers
-- TMC / travel-agent operations
+### H. Expansion
+Same resolution engine across conferences, sports events, corporate offsites, corporate travel teams and TMCs.
 
 ---
 
 ## 4. Naming / terminology
 
-### Preferred terms
+### Preferred terms in the film
 - **Live Dependency Graph**
-- **Programme Map** *(UI-facing option)*
-- **State & Resolution Engine**
 - **Blast Radius**
-- **Whole-Trip Recovery**
-- **Objective-Aware Recovery**
+- **AI travel resolution layer**
+- **Human-in-the-loop**
+- **Delegated authority**
+- **Recovery plan**
+- **Viable / not viable**
 
-### Avoid
+### Avoid in narration unless strictly necessary
 - “Graph technology”
-- “Ontology” in the video
+- “Ontology”
 - “Agent framework”
 - “Travel chatbot”
 - “AI assistant” as the main label
+- long internal pipeline vocabulary
+
+The internal execution pattern remains architecturally important, but the film should express it through behaviour rather than listing every internal stage.
 
 ---
 
@@ -140,30 +264,25 @@ The theatre should come from **state transitions, ordering, scale, camera, sound
 
 ## 5.3 One strong visual anchor per shot
 
-`DESIGN.md` uses the principle of one ink-dark punctuation object per screen.
-
-Extend that idea to video composition:
-
 Each shot should have **one dominant object or fact** the eye lands on first.
 
 Examples:
-- the replacement flight card in Scene 1;
-- the first broken downstream commitment;
-- the event-health readout at organiser scale;
-- Sarah’s critical dependency chain;
-- the selected recovery strategy;
+- the rebooked flight that still leaves the trip broken;
+- the first downstream commitment that becomes at risk;
+- the programme-level multi-traveller impact;
+- Sarah as the one unresolved traveller;
+- Jordan's coordinated recovery plan;
+- the human-in-the-loop authority gate;
 - the final NORTHSTAR lockup.
 
 Do not make every node equally bright, equally labelled, or equally important.
-
-The viewer should always know where to look.
 
 ## 5.4 Typography follows the product
 
 Use the existing hierarchy rather than generic cinematic typography:
 
-- **mono / tabular numerals** for times, counts, flight numbers, status readouts, timestamps;
-- **sans** for explanation, scene text, names, decisions;
+- **mono / tabular numerals** for times, counts, flight numbers, status readouts and timestamps;
+- **sans** for explanation, scene text, names and decisions;
 - **serif only if deliberately showing a traveller-facing commitment moment**, matching the concierge register.
 
 Use short labels and strong numbers. Avoid paragraphs on screen.
@@ -172,663 +291,510 @@ Examples that fit the system:
 - `67 PARTICIPANTS`
 - `42 MANAGED`
 - `09:20 HEADLINE`
-- `360 MIN REQUIRED`
 - `NOT VIABLE`
+- `HUMAN-IN-THE-LOOP`
+
+Do not surface implementation-only placeholder thresholds as headline film copy when the plain-language consequence is stronger.
 
 ## 5.5 Reuse NORTHSTAR signature components in motion
 
-The film should visually extend components that already exist in the product rather than inventing unrelated infographic objects.
-
 ### Fleet dot grid → programme health field
-The existing fleet dot grid already represents one traveller per cell, sorted by urgency.
-
-For the video, this concept can expand spatially into a programme-scale field or map. A graph is allowed, but it should feel like the **fleet grid unfolding into relationships**, not a random Obsidian hairball.
+The existing fleet dot grid already represents one traveller per cell, sorted by urgency. Use it when transitioning between many travellers and programme-scale state.
 
 ### Journey chain → dependency graph close-up
-The journey chain is already NORTHSTAR’s fastest answer to “is the trip still a trip?”
-
-When the camera focuses on one traveller, preserve this logic:
+Preserve the existing product logic:
 
 `flight — transfer — stay — ✦ commitment`
 
-Then extend it only where useful to show:
-- objective
-- policy / constraint
-- recovery strategy
+Extend it only where useful to show programme links, traveller constraints, policy/context and recovery strategies.
 
-This keeps the graph grounded in an existing product metaphor.
+### Programme graph
+The approved explainer concept may use large floating day nodes containing smaller event/commitment nodes. Traveller chains connect into the relevant programme commitments. The graph must communicate dependency and state, not become a decorative network.
 
 ### Option cards → recovery branches
-When comparing strategies, use the existing option-card logic:
-- route
-- timing
-- cost delta
-- effect on the commitment
-- rejection reason
+When comparing strategies, preserve the existing option-card information hierarchy where useful: route, timing, cost effect, commitment effect and rejection/approval state.
 
-The film can animate these as branches, but their information architecture should remain recognisable.
+## 5.6 Motion charter
 
-## 5.6 Event-level health concept
-
-A central event/programme representation is still useful, but it should be designed as a **NORTHSTAR readout**, not a generic glowing “mother node.”
-
-Candidate treatment:
-- event/programme as the dominant composition anchor;
-- participant health represented around or adjacent to it as small status marks / segments / cells;
-- each status mark maps to one participant;
-- programme counts remain legible as data, not merely colour;
-- disrupted travellers can visually connect back to the programme.
-
-A segmented event-health halo remains an experiment, not a locked component.
-
-Any final treatment must still satisfy the product rule that state is not communicated by colour alone. Counts, glyphs, labels, or explicit status text must remain available.
-
-## 5.7 Motion inherits the NORTHSTAR motion charter
-
-The film can be more authored than the UI, but it should still feel like the same system.
-
-The product motion charter says motion communicates **state change and ordering**, never decoration.
-
-Use these motifs:
+Motion communicates **state change and ordering**, never decoration.
 
 ### Settle
-When a state changes, do not snap it. Let it settle:
-- brief split-flap / data-board feeling;
-- new-state wash;
-- number/status stabilises.
-
-This should become a signature transition throughout the film.
+When a value or state changes, let it settle rather than snap: brief data-board/split-flap feeling, state wash, then stabilisation.
 
 ### Stagger
-When a programme or dependency structure is revealed, assemble it in ordered waves rather than dropping everything on screen at once.
+Reveal programmes and dependency structures in ordered waves.
 
 ### Propagation
-A change can travel along a dependency path, but avoid perpetual pulsing. The pulse exists because a specific state change is propagating.
+A pulse exists only because a specific change is travelling through a dependency path. No perpetual pulsing.
 
 ### Resolved state
-Recovery should feel like information becoming stable again:
-- path settles to green;
-- warning structure reduces;
-- programme readout reconciles;
-- no fireworks or celebratory bounce.
+Recovery should feel like information becoming stable again: paths reconcile, warnings reduce, affected state settles. No celebratory fireworks.
 
-## 5.8 Theatre without violating the design system
+## 5.7 Theatre without violating the design system
 
-The video still needs drama. Get it from:
-
+Get drama from:
 - **scale** — one trip expanding to dozens;
-- **camera** — moving from traveller chain to programme-level system;
-- **reveal order** — hiding downstream consequences until the booking appears “fixed”;
-- **contrast** — one vermilion failure emerging inside an otherwise healthy programme;
-- **counterfactual branches** — showing a strategy fail before the viable path settles;
-- **sound design** — restrained data ticks, state-change impacts, low-frequency transitions;
-- **tempo** — quiet setup → fast propagation → controlled recovery;
-- **morphing existing NORTHSTAR components** into larger explanatory structures.
+- **camera** — traveller chain → programme graph → affected case → product UI;
+- **reveal order** — rebooking appears successful before downstream consequences emerge;
+- **contrast** — one unresolved traveller inside a mostly recovered cohort;
+- **counterfactuals** — previewing a programme change before commit;
+- **sound design** — restrained data ticks, state-change impacts, propagation and resolution;
+- **tempo** — immediate failure → accelerating complexity → controlled recovery.
 
-Avoid theatre based on:
+Avoid:
 - cyberpunk neon;
+- generic glowing AI networks;
 - random particle fields;
-- generic glowing graph networks;
 - sci-fi holograms;
-- looping animation that has no state meaning;
-- stock airport montage as the main storytelling layer.
+- looping decorative animation;
+- stock-airport montage as the storytelling backbone;
+- standalone sponsor-logo interstitials.
 
-## 5.9 Film graph vs product graph
+## 5.8 One continuous explainer world
 
-Do not lock the rendering technology yet.
+The first ~75 seconds should feel like **one camera journey**, not a sequence of infographic slides:
 
-### Explainer graph scenes
-Should be hand-authored / directed with exact timing and camera choreography.
-Candidate tools:
-- Motion Canvas
-- Remotion
-- OpenMontage orchestrating code-generated motion
+**one traveller**  
+→ many travellers  
+→ programme graph  
+→ blast radius  
+→ recovery branches / context  
+→ Qwen + Atlas inside the process  
+→ autonomous action / human-in-the-loop boundary  
+→ push into the real NORTHSTAR UI
 
-### Product graph / Programme Map
-Can be data-driven if added to the app.
-Candidate:
-- `force-graph`
+Where practical, build this as two reusable generated sequences rather than many independent assets:
 
-The visual semantics should match, but the film version does not need to use the live force simulation.
+1. **Journey Cascade**
+2. **Live Dependency Graph / Resolution Engine**
 
 ---
 
-# 6. Scene-by-scene storyboard
+# 6. Shot-by-shot storyboard
 
-## Scene 1 — Personal pain
+## Scene 1 — Journey Cascade
 ### Time
-**0:00–0:12**
+**0:00–0:20**
 
-### Purpose
-Hook the viewer fast.
+### Objective
+- **WHAT:** Establish the central problem immediately: disruption cascades and rebooking alone does not equal recovery; then scale that pain from one traveller to a group.
+- **HOW:** Start on one green journey chain. Change/rebook the flight. Let the flight itself settle as recovered while transfer, hotel and keynote become affected. Hold the contradiction briefly, then pull out as the journey multiplies into many travellers with different outcomes from the same supplier change.
 
-### Visual
-Start with one traveller.
-A flight changes.
-An airline replacement appears.
+### Visual anchors
+`FLIGHT → TRANSFER → HOTEL → ✦ KEYNOTE`
 
-Initially:
-**Replacement found ✓**
+`REBOOKED ✓`
 
-Then consequences appear:
-- transfer broken
-- arrival buffer broken
-- keynote / commitment at risk
+then downstream state changes.
 
-Use a calm NORTHSTAR journey-chain treatment. The replacement can settle to green at the booking level before the downstream journey chain reveals vermilion failure.
+Potential headline:
 
-### Communication point
-A booking can be “fixed” while the trip remains broken.
-
-### On-screen text
-Possible:
-- “Replacement found”
-- “Transfer broken”
-- “Arrival buffer lost”
-- “Keynote at risk”
-
-### Provisional voiceover
-“A flight disruption looks simple. Find another flight, rebook the traveller, problem solved. Except it isn’t. If the new flight breaks the transfer, the arrival buffer, or the commitment that caused the trip to exist, the booking may be fixed — but the trip is still broken.”
-
-### Assets needed
-- traveller card / identity
-- flight card
-- journey-chain elements
-- commitment card / marker
-- state-settle animation
-- dependency reveal
+**REBOOKING THE FLIGHT IS NOT RECOVERY.**
 
 ### Asset type
-**Generated / animated**
+**Generated / animated — Asset A1 Journey Cascade**
 
 ---
 
-## Scene 2 — Multiply the problem
+## Scene 2 — Live Dependency Graph reveal
 ### Time
-**0:12–0:28**
+**0:20–0:43**
 
-### Purpose
-Scale from one person to group complexity.
+### Objective
+- **WHAT:** Make the connected-state concept tangible and show travel connected to the event objective.
+- **HOW:** Continue pulling outward. Traveller chains connect into a programme represented by three large floating day structures with nested event nodes. Reveal different travellers connecting to different commitments. Highlight the relevant node families as the narration names travel, traveller constraints and event programme.
 
-### Visual
-The single journey structure multiplies into several travellers.
-Each has slightly different dependencies.
+### On-screen copy
+**LIVE DEPENDENCY GRAPH**
 
-Some remain green.
-Some change to brass.
-One becomes vermilion.
-
-The reveal should feel like the NORTHSTAR fleet view expanding from compact health marks into connected trip structures.
-
-### Communication point
-Travel disruption is a dependency problem, not just a booking problem.
-
-### On-screen text
-“Different travellers. Different consequences.”
-
-### Provisional voiceover
-“Now multiply that across a group. Different travellers, different flights, different commitments, different constraints. The same disruption can affect each person differently.”
-
-### Assets needed
-- multiple traveller journey structures
-- fleet-health / programme-health transition
-- staggered state changes
+Optional secondary line:
+`TRAVEL ↔ PEOPLE ↔ PROGRAMME`
 
 ### Asset type
-**Generated / animated**
+**Generated / animated — Asset A2 Live Dependency Graph Hero**
 
 ---
 
-## Scene 3 — Organiser scale
+## Scene 3 — Blast radius + resolution reasoning
 ### Time
-**0:28–0:45**
+**0:43–1:03**
 
-### Purpose
-Shift from personal problem to organiser problem.
+### Objective
+- **WHAT:** Explain how NORTHSTAR reasons from a change to whole-trip recovery possibilities.
+- **HOW:** A real change propagates through only the affected graph paths. Attach incoming context to the impacted trip: messy traveller request, flight/hotel updates, policy, insurance, immigration. Recovery branches emerge from the graph — e.g. alternate flight, hotel adjustment, programme change — with unsuitable branches rejected or deprioritised.
 
-### Visual
-Pull outward to:
-**AiT — AI in Travel Summit 2026**
+### On-screen copy
+**BLAST RADIUS**
 
-Show:
-- 67 participants
-- 42 NORTHSTAR-managed travellers
-- 25 local / self-managed
+then, selectively:
 
-The event/programme is the dominant readout. Participant status marks surround or feed into it. A supplier disruption propagates into several travellers, producing differentiated outcomes.
-
-### Communication point
-An organiser needs to understand the health of the whole programme, not one booking at a time.
-
-### On-screen text
-`AiT 2026`  
-`67 PARTICIPANTS`  
-`42 MANAGED`
-
-### Provisional voiceover
-“And now make that an organiser problem. One programme. Dozens of participants. Some managed, some local, all converging on the same event. A single supplier change can ripple through the health of the whole programme.”
-
-### Assets needed
-- programme readout
-- participant health field / graph treatment
-- optional segmented event-health experiment
-- state counts
+**WHAT ELSE IS AFFECTED?**  
+**WHAT HAS TO CHANGE?**
 
 ### Asset type
-**Generated / animated**
+**Generated / animated — continuation of A2**
 
 ---
 
-## Scene 4 — Introduce NORTHSTAR
+## Scene 4 — Qwen + Atlas in context
 ### Time
-**0:45–1:02**
+**1:03–1:09**
 
-### Purpose
-Show what NORTHSTAR actually is.
+### Objective
+- **WHAT:** Explain provider roles without breaking narrative flow.
+- **HOW:** Keep the same scene. Qwen appears at the reasoning/interpretation stage as unstructured context becomes recovery possibilities. A flight-recovery branch calls Atlas for search/verification evidence and returns the result to NORTHSTAR.
 
-### Visual
-NORTHSTAR is revealed as the system maintaining this connected state.
-A real change propagates through dependency paths.
-Affected travellers / commitments settle into their new states.
-
-The graph should emerge from existing journey/fleet components rather than appearing as a generic network overlay.
-
-### Communication point
-NORTHSTAR maintains a Live Dependency Graph and follows the blast radius.
-
-### On-screen text
-“Live Dependency Graph”  
-“Blast Radius”
-
-### Provisional voiceover
-“NORTHSTAR solves this by maintaining live connected state — a dependency graph of travellers, trip elements, commitments, objectives, constraints and policies. When something changes, it doesn’t just see the change. It sees everything the change affects.”
-
-### Assets needed
-- dependency map / journey-chain expansion
-- blast-radius animation
-- changed-state settle
-- NORTHSTAR title / product identity
+### On-screen copy
+Restrained integration labels only:
+- `Alibaba Cloud · Qwen`
+- `Atlas · Flight search + verification`
 
 ### Asset type
-**Generated / animated**
+**Generated / animated — continuation of A2**
 
 ---
 
-## Scene 5 — How NORTHSTAR works
+## Scene 5 — Delegated autonomy + human-in-the-loop
 ### Time
-**1:02–1:22**
+**1:09–1:15**
 
-### Purpose
-Explain the architecture without turning the video into an architecture presentation.
+### Objective
+- **WHAT:** Show exactly where NORTHSTAR acts autonomously and where a human must decide.
+- **HOW:** One low-boundary action clears checks and reaches `EXECUTE`. A programme-level action stops at `AUTHORITY BOUNDARY` and exposes mapped downstream impact plus viable options to an organiser.
 
-### Visual
-The connected state resolves into an ordered process while retaining the NORTHSTAR surface language:
+### On-screen copy
+**HUMAN-IN-THE-LOOP**
 
-**Trip Signal**  
-→ **State Update**  
-→ **Blast Radius**  
-→ **Recovery Planning**  
-→ **Deterministic Viability**  
-→ **Policy & Authority**  
-→ **Execute**  
-→ **Observe**  
-→ back to **State Update**
-
-Alibaba Cloud / Qwen and Atlas appear inside the relevant steps, not as a logo montage.
-
-### Communication point
-AI proposes; deterministic systems govern viability, authority and execution.
-
-### On-screen text
-- “AI proposes”
-- “Deterministic viability”
-- “Policy & authority”
-- “Observe & update”
-
-### Provisional voiceover
-“NORTHSTAR combines strategic use of AI, APIs and deterministic control. Alibaba Cloud’s Qwen helps interpret context and generate recovery strategies. Atlas provides the flight-side search and verification layer. But AI does not directly execute irreversible actions. NORTHSTAR validates each proposal, checks viability, checks authority, executes permitted actions, observes the result, and updates state again.”
-
-### Assets needed
-- animated resolution loop
-- restrained Atlas attribution
-- restrained Alibaba Cloud / Qwen attribution
-- viability / authority state transitions
-- execution → observation → state loop
+Supporting labels:
+`WITHIN AUTHORITY → EXECUTE`  
+`BOUNDARY CROSSED → HUMAN DECISION`
 
 ### Asset type
-**Generated / animated**
+**Generated / animated — continuation of A2**
 
 ---
 
-## Scene 6 — Transition to product
+## Scene 6 — Transition into product
 ### Time
-**1:22–1:30**
+**~1:15**
 
-### Purpose
-Bridge from concept to proof.
-
-### Visual
-The explanatory structure morphs into or matches the real NORTHSTAR UI.
-
-Ideal transition: a familiar NORTHSTAR component from the motion sequence becomes the same component in the real app rather than a hard cut to unrelated browser footage.
-
-### Communication point
-“Let’s see it in action.”
-
-### Provisional voiceover
-“Here’s that recovery loop running in the product.”
-
-### Assets needed
-- matching animation and real UI entry frame
-- transition plate
+### Objective
+- **WHAT:** Convert the conceptual explanation into product proof without a visual reset.
+- **HOW:** Push into one affected traveller/programme state from the generated graph and morph it into the matching NORTHSTAR operator surface.
 
 ### Asset type
 **Generated transition + real UI**
 
 ---
 
-## Scene 7 — Product demo: S1 → S3
+## Scene 7 — Product hero: S1 → S3 / Sarah Lim
 ### Time
-**1:30–2:00**
+**~1:15–1:42**
 
-### Purpose
-Hero proof.
+### Objective
+- **WHAT:** Prove differentiated multi-traveller impact, automatic handling for recoverable cases, cross-domain recovery and human-in-the-loop programme change.
+- **HOW:** Begin on programme impact after one airline retime. Show several affected speakers and most settling back to viable/recovered automatically. Keep Sarah as the unresolved exception. Open her case: airline rebooked, but she cannot reach Singapore in time for her keynote. Show NORTHSTAR proposing a programme-slot move, organiser previewing downstream impact before mutation, then approving. Finish on programme update, traveller notifications and Sarah becoming viable again without another flight purchase.
 
-### Scenario
-Airline retime affects several CGK→SIN speakers.
-Most remain viable.
-Sarah Lim becomes critical.
-Her rebooked arrival fails the required buffer for the 09:20 headline commitment.
-NORTHSTAR then evaluates a programme-side resolution: move the headline slot to 15:30.
-The organiser previews impact, commits, Sarah re-evaluates, and the case resolves without purchasing another flight.
-
-### Communication point
-The best recovery is not always another booking.
-
-### On-screen text
-Possible:
-- “Shared supplier disruption”
-- “Sarah Lim: NOT VIABLE”
-- “Preview programme change”
-- “Commit reschedule”
-- “Case resolved”
-
-### Provisional voiceover
-“In this case, one airline retime affects several inbound speakers. NORTHSTAR recalculates each trip individually. Most remain viable. Sarah Lim, a headline speaker, does not. Her airline rebooking gets her to Singapore, but not in time for her 09:20 commitment. Instead of forcing a new flight purchase, NORTHSTAR previews a programme change. The organiser moves her headline to 15:30, the same trip is re-evaluated, and the case resolves.”
-
-### Product footage needed
-- programme impact / blast-radius view
-- Sarah case view
-- preview mode
-- commit action
-- post-commit resolved state
+### Required product moments
+1. shared supplier change visible at programme level;
+2. multiple affected travellers with differentiated outcomes;
+3. most recover automatically / Sarah remains unresolved;
+4. Sarah's airline replacement visible;
+5. plain-language consequence: cannot make keynote in time;
+6. programme-side recovery proposal;
+7. **preview before change** with downstream impact;
+8. explicit organiser approval / commit;
+9. programme update + traveller notification;
+10. Sarah `VIABLE / RESOLVED`.
 
 ### Asset type
-**Real product capture**, with only restrained framing overlays if needed
+**Real NORTHSTAR product capture**
 
 ---
 
-## Scene 8 — Product demo: S2
+## Scene 8 — Product hero: S2 / Jordan Hale
 ### Time
-**2:00–2:15**
+**~1:42–2:10**
 
-### Purpose
-Show in-travel recovery and execution.
+### Objective
+- **WHAT:** Prove continuous recalculation, anticipatory recovery and coordination of multiple downstream travel consequences into one plan.
+- **HOW:** Show progressive first-leg delay updates and the connection status moving from safe to at risk to impossible. NORTHSTAR begins recovery before Jordan is simply stranded. Present one coordinated plan covering the next viable flight, Narita overnight hotel, entry/transit requirements, insurance, Singapore hotel change, event arrival requirement and total cost. Show organiser approval, execution of permitted actions and continued observation until Jordan is back on a viable path.
 
-### Scenario
-Jordan Hale misses the NRT→SIN connection after progressive delay.
-NORTHSTAR reconciles actual state, evaluates recovery options, rejects an inadequate slower option, selects a viable next-morning option, checks authority, executes, observes, and confirms viability for the 20:45 finals showcase.
-
-### Communication point
-NORTHSTAR recovers the actual downstream objective, not just the onward flight.
-
-### Provisional voiceover
-“In a different case, Jordan is already travelling when a progressive delay causes him to miss his connection. NORTHSTAR reconciles what actually happened, evaluates the onward options, rejects one that still breaks the trip objective, selects a viable recovery, checks authority, executes, observes the result, and confirms the trip is once again viable.”
-
-### Product footage needed
-- Jordan disrupted trip
-- option comparison
-- approval / action
-- resolved viable state
+### Required product moments
+1. baseline LAX → NRT → SIN journey;
+2. progressive delay updates;
+3. `SAFE → AT RISK → IMPOSSIBLE` connection state;
+4. recovery starts proactively;
+5. one coordinated recovery plan rather than unrelated cards;
+6. flight + Narita stay + entry/transit + insurance + Singapore stay consequences + event timing + cost;
+7. organiser approval;
+8. permitted execution;
+9. observation / continuing state updates;
+10. final viable trip.
 
 ### Asset type
-**Real product capture**
+**Real NORTHSTAR product capture**
 
 ---
 
-## Scene 9 — Product demo: S7
+## Scene 9 — Breadth montage: Jonas + Oliver
 ### Time
-**2:15–2:30**
+**~2:10–2:22**
 
-### Purpose
-Show breadth beyond supplier disruption.
-
-### Scenario
-Traveller says:
-“I’m actually flying from Tokyo, not London.”
-
-NORTHSTAR re-evaluates the trip under a changed origin, including downstream implications and policy / authority boundaries.
-
-### Communication point
-Different disruption. Same recovery engine.
-
-### Provisional voiceover
-“And the same engine handles different disruption types entirely. Here, a traveller changes their origin from London to Tokyo. NORTHSTAR doesn’t just patch the field. It re-evaluates the trip, the timings, the options, the policy impact and the required actions.”
-
-### Product footage needed
-- traveller request input
-- recalculated options / impact
-- resulting case or strategy output
+### Objective
+- **WHAT:** Show traveller-requested changes passing through the same impact-first engine.
+- **HOW:** Use two quick examples. Jonas asks for an extra hotel night; show hotel, funding/payer, policy and authority evaluation. Oliver changes origin from London to Tokyo; show the trip topology changing and downstream travel/event assumptions being re-evaluated before recommendation.
 
 ### Asset type
-**Real product capture**
+**Short real UI captures or animated real screenshots**
+
+Do not spend production time on full standalone 15-second demos for either scenario unless later footage proves unusually strong.
 
 ---
 
-## Scene 10 — Qoder credit
+## Scene 10 — Qoder fan-out / fan-in
 ### Time
-**2:30–2:40**
+**~2:22–2:30**
 
-### Purpose
-Credit Qoder cleanly, without derailing the story.
+### Objective
+- **WHAT:** Credit Qoder and demonstrate how it accelerated NORTHSTAR development.
+- **HOW:** Visually fan one task into bounded parallel workstreams, use authentic Qoder / code / test captures inside those lanes, then converge into one integration and verification path.
 
 ### Visual
-Fast montage of authentic development screens:
-- Qoder IDE / Cloud
-- code
-- architecture work
-- tests / integration
-- UI build progression if available
+`ONE PROBLEM`
 
-### Provisional voiceover
-“NORTHSTAR was built extensively with Qoder across architecture, implementation, testing and integration.”
+→ `UI`  
+→ `SCENARIO ENGINE`  
+→ `PROVIDER INTEGRATION`  
+→ `TESTING`
 
-### Assets needed
-- Qoder screenshots or short recordings
-- optional UI progression / Kimi contribution evidence if useful
+then:
+
+`INTEGRATE → VERIFY → PASS`
 
 ### Asset type
-**Real screen capture**
+**Real Qoder captures + generated composition**
 
 ---
 
 ## Scene 11 — Closing / expansion
 ### Time
-**2:40–2:58**
+**~2:30–2:52/2:55**
 
-### Purpose
-Expand the vision beyond the demo and land the thesis.
+### Objective
+- **WHAT:** Generalise the product while landing the core thesis with emotional and visual closure.
+- **HOW:** Return to the graph. Pull out from AiT as the programme context changes into conference, sports event and corporate offsite; then show corporate travel team / TMC operating contexts over the same resolution engine. Collapse back to the original traveller journey chain, now healthy. End on NORTHSTAR and leave 2–3 seconds of breathing room after the final line.
 
-### Visual
-Zoom outward from the conference use case into other contexts:
-- sports tournament
-- corporate offsite
-- concert / group programme
-- self-managed corporate travel
-- travel-agent / TMC operations
+### On-screen close
+**NORTHSTAR**
 
-Keep the same State & Resolution Engine in the middle while the surrounding context changes.
-
-### Communication point
-Same engine, different contexts.
-
-### On-screen text
-“Different trip. Different policy. Same recovery engine.”
-
-Final lockup:
-
-**NORTHSTAR**  
-**Recover the trip, not just the booking.**
-
-### Provisional voiceover
-“The same resolution engine can support conferences, sports events, offsites, self-managed corporate travel, and eventually the operators who manage disruption across many travellers. Different trip. Different policy. Same recovery engine. NORTHSTAR. Recover the trip, not just the booking.”
-
-### Assets needed
-- closing context-expansion animation
-- final NORTHSTAR title lockup
+**YOU HAVE TO RESTORE THE TRIP.**
 
 ### Asset type
 **Generated / animated**
 
 ---
 
-# 7. Provisional full narration script
+# 7. Final narration script — LOCKED
 
-**Status: intentionally not final.** This exists only to test timing against the current storyboard. Rewrite after scene prototypes and real product captures establish actual pacing.
+Use this as the production narration baseline. Do not replace it with older provisional narration elsewhere in the repository.
 
-Target: approximately 390–410 words.
-
-> A flight disruption looks simple. Find another flight, rebook the traveller, problem solved. Except it isn’t. If the new flight breaks the transfer, the arrival buffer, or the commitment that caused the trip to exist, the booking may be fixed — but the trip is still broken.
+> A travel disruption rarely breaks just one thing.
 >
-> Now multiply that across a group. Different travellers, different flights, different commitments, different constraints. The same disruption can affect each person differently.
+> A delayed flight can break the connection, transfer, hotel — even the keynote the traveller was flying in to deliver.
 >
-> And now make that an organiser problem. One programme. Dozens of participants. Some managed, some local, all converging on the same event. A single supplier change can ripple through the health of the whole programme.
+> Rebooking the flight is not recovery.
 >
-> NORTHSTAR solves this by maintaining live connected state — a dependency graph of travellers, trip elements, commitments, objectives, constraints and policies. When something changes, it doesn’t just see the change. It sees everything the change affects.
+> Now multiply that across dozens — or hundreds — of speakers. One supplier change can create a different problem for every traveller.
 >
-> NORTHSTAR combines strategic use of AI, APIs and deterministic control. Alibaba Cloud’s Qwen helps interpret context and generate recovery strategies. Atlas provides the flight-side search and verification layer. But AI does not directly execute irreversible actions. NORTHSTAR validates each proposal, checks viability, checks authority, executes permitted actions, observes the result, and updates state again.
+> That is why NORTHSTAR treats travel as a graph of connected states.
 >
-> Here’s that recovery loop running in the product.
+> NORTHSTAR is an AI travel resolution layer built around a Live Dependency Graph, connecting flights, transfers and hotels with traveller constraints and the event programme.
 >
-> In this case, one airline retime affects several inbound speakers. NORTHSTAR recalculates each trip individually. Most remain viable. Sarah Lim, a headline speaker, does not. Her airline rebooking gets her to Singapore, but not in time for her 09:20 commitment. Instead of forcing a new flight purchase, NORTHSTAR previews a programme change. The organiser moves her headline to 15:30, the same trip is re-evaluated, and the case resolves.
+> When something changes, NORTHSTAR traces the blast radius and asks: what else is affected, and what has to change for the trip to work again?
 >
-> In a different case, Jordan is already travelling when a progressive delay causes him to miss his connection. NORTHSTAR reconciles what actually happened, evaluates the onward options, rejects one that still breaks the trip objective, selects a viable recovery, checks authority, executes, observes the result, and confirms the trip is once again viable.
+> At its core is a proprietary resolution engine that interprets messy traveler requests with AI, along with flight and hotel updates, policies, insurance, and immigration to propose recovery strategies for the impacted trip.
 >
-> And the same engine handles different disruption types entirely. Here, a traveller changes their origin from London to Tokyo. NORTHSTAR doesn’t just patch the field. It re-evaluates the trip, the timings, the options, the policy impact and the required actions.
+> Alibaba Cloud's Qwen AI powers that reasoning layer, Atlas GDS API powers flight search and verification capabilities needed to turn those strategies into reality.
 >
-> NORTHSTAR was built extensively with Qoder across architecture, implementation, testing and integration.
+> Within delegated authority, NORTHSTAR can execute automatically. When a decision crosses that boundary, human-in-the-loop takes over — with the impact mapped and viable options ready.
 >
-> The same resolution engine can support conferences, sports events, offsites, self-managed corporate travel, and eventually the operators who manage disruption across many travellers. Different trip. Different policy. Same recovery engine. NORTHSTAR. Recover the trip, not just the booking.
+> Let's see Northstar in action.
+>
+> One airline retime affects several AiT speakers. Most are recovered automatically.
+>
+> Sarah Lim cannot be.
+>
+> The airline has rebooked her, but she can no longer reach Singapore in time for her keynote.
+>
+> Because NORTHSTAR also sees the programme, it proposes moving Sarah’s speaking slot. The organiser previews who else would be affected before approving.
+>
+> She commits. The programme updates, travellers are notified, and Sarah’s trip becomes viable again — without buying another flight.
+>
+> Jordan’s disruption unfolds differently.
+>
+> His first flight is delayed repeatedly. NORTHSTAR sees his Tokyo connection move from safe, to at risk, to impossible — and starts planning before he becomes stranded.
+>
+> It builds one recovery plan: the next viable flight, a Narita hotel, entry and transit requirements, insurance, the Singapore hotel change, event timing and total cost.
+>
+> The organiser approves, NORTHSTAR executes permitted actions, and keeps tracking the journey until it is viable again.
+>
+> The same engine handles traveller requests. Jonas wants an extra hotel night. Oliver is now flying from Tokyo instead of London. NORTHSTAR evaluates downstream impact, policy and authority before changing anything.
+>
+> We built NORTHSTAR with Qoder using a fan-out, fan-in approach — parallelising bounded work, then integrating and verifying through one controlled path.
+>
+> Today, NORTHSTAR coordinates one summit. The same engine can support conferences, sports events, corporate offsites, travel teams and TMCs.
+>
+> Because fixing the booking isn’t enough.
+>
+> You have to restore the trip.
 
 ---
 
-# 8. Asset production list
+# 8. Asset production manifest
 
-## A. Generated / animated scenes
-1. Scene 1 personal pain / journey-chain failure
-2. Scene 2 multi-traveller escalation
-3. Scene 3 organiser-scale programme health view
-4. Scene 4 Live Dependency Graph / blast-radius sequence
-5. Scene 5 recovery loop / architecture sequence
-6. Scene 6 transition into product
-7. Scene 11 closing expansion
+## A1 — Journey Cascade
+**Priority:** Critical  
+**Covers:** Beat 1  
+**Purpose:** One-trip downstream failure → many differentiated travellers.  
+**Production:** Code-generated motion.
 
-## B. Product screen captures
-1. S1 blast-radius / programme impact screen
-2. Sarah trip / case screen
-3. S3 preview mode
-4. S3 commit + resolved state
-5. S2 disrupted in-travel state
-6. S2 strategy comparison / decision
-7. S2 approval / action / resolved state
-8. S7 changed-origin case and resulting evaluation
+Required pieces:
+- journey chain;
+- rebooked-flight state;
+- downstream propagation;
+- state settle;
+- multi-traveller multiplication;
+- camera pull-out.
 
-## C. Build / Qoder captures
-1. Qoder IDE / Cloud working session
-2. code implementation view
-3. testing / integration evidence
-4. optional UI progression / Kimi contribution evidence
+## A2 — Live Dependency Graph / Resolution Engine
+**Priority:** Critical / highest-value generated asset  
+**Covers:** Beats 2–5  
+**Purpose:** Explain connected state, programme relationships, blast radius, AI context, recovery branches, Qwen / Atlas roles, delegated execution and human-in-the-loop.  
+**Production:** One continuous code-generated motion world where practical.
 
-## D. Branding / typography assets
-1. NORTHSTAR wordmark / title card
-2. section labels using DESIGN.md typography rules
-3. final end-card lockup
+Required pieces:
+- floating programme day structures with nested event nodes;
+- traveller chains linked to commitments;
+- status/state semantics matching `DESIGN.md`;
+- blast-radius propagation;
+- context ingestion;
+- recovery branches;
+- restrained Qwen integration label;
+- restrained Atlas integration label;
+- authority boundary;
+- autonomous execute branch;
+- explicit `HUMAN-IN-THE-LOOP` branch;
+- morph target for transition into real product.
 
-## E. Audio assets
-1. AI voiceover
-2. background score
-3. restrained sound design:
-   - data settle / flip
-   - state-change impact
-   - dependency propagation
-   - approval / resolve confirmation
-   - scene transitions
+## A3 — Sarah / S1 → S3 product capture
+**Priority:** Critical / primary real-product hero
+
+Capture the complete required sequence from Scene 7. Prefer one controlled continuous story, then edit for pace rather than assembling unrelated screenshots.
+
+## A4 — Jordan / S2 product capture
+**Priority:** Critical / secondary real-product hero
+
+Capture the progressive delay state changes and one coordinated recovery plan from Scene 8.
+
+## A5 — Jonas + Oliver breadth montage
+**Priority:** Important, lightweight
+
+Use short product recordings or animated authentic screenshots. Do not overproduce.
+
+## A6 — Qoder fan-out / fan-in
+**Priority:** Required hackathon credit
+
+Required pieces:
+- authentic Qoder IDE / Cloud footage;
+- code / implementation;
+- test / verification evidence;
+- generated fan-out / fan-in composition.
+
+## A7 — Closing expansion
+**Priority:** Important
+
+Reuse the A2 graph language rather than inventing a new campaign aesthetic. Programme context changes while the resolution engine remains constant, then collapse to the healthy journey chain and NORTHSTAR lockup.
+
+## A8 — Audio
+- locked narration rendered with selected AI voice;
+- background score;
+- restrained sound design for state changes, propagation, authority boundary, approval and resolution;
+- captions/subtitles timed to final voice.
 
 ---
 
-# 9. Asset-generation approach by tool
-
-## Motion explainer scenes
-Candidates to test:
-- **Motion Canvas**
-- **Remotion**
-- **OpenMontage** orchestrating code-generated motion
-
-## Final composition
-Candidates:
-- **Remotion**
-- OpenMontage if its production pipeline proves stable enough
-
-## Product footage
-Direct screen recording
-
-## Qoder footage
-Direct screen recording
-
-## Do not depend on
-- NotebookLM as the final visual generator
-- stock-footage-first auto-video tools
-- PowerPoint-like generated video builders
-
----
-
-# 10. Open questions / triage
+# 9. Asset-plan changes from the superseded draft
 
 ## Act Now
-1. Confirm **S7** as the third 15-second scenario.
-2. Decide whether a read-only Programme Map is worth adding to the app before filming.
-3. Confirm final tagline: **Recover the trip, not just the booking.**
-4. Freeze the communication objective of each scene before writing final narration.
+1. Build **A1 Journey Cascade**.
+2. Build **A2 Live Dependency Graph / Resolution Engine** as the central explainer asset.
+3. Capture **Sarah S1 → S3** as the primary product proof.
+4. Capture **Jordan S2** as a full second hero rather than a 15-second supporting beat.
+5. Capture lightweight **Jonas + Oliver** breadth moments.
+6. Build explicit **human-in-the-loop** authority-gate visual.
+7. Build Qoder **fan-out / fan-in** credit.
+8. Reuse graph language for the close.
 
-## Investigate Now
-1. Build a 10–15 second **Motion Canvas** prototype using the DESIGN.md visual system.
-2. Build the same 10–15 second concept in **Remotion**.
-3. Test **OpenMontage** on one 30–45 second section only.
-4. Choose AI voice only after script timing is close to final.
-5. Test multiple programme-health visual treatments; the segmented halo is one option, not the default.
+## Simplify / supersede
+1. **Standalone nine-stage recovery-loop animation** — remove. Express the architecture through the graph and recovery behaviour instead.
+2. **Standalone Qwen animation** — remove. Qwen belongs inside the resolution sequence.
+3. **Standalone Atlas animation** — remove. Atlas belongs inside the flight-recovery branch.
+4. **Standalone 15-second S7 demo** — remove from primary cut. Oliver becomes a breadth beat.
+5. **Standalone 15-second S5 demo** — do not add. Jonas becomes a breadth beat.
+6. **Segmented programme-health halo** — optional experiment only; not a required asset.
+7. **Stock-airport visual layer** — not required.
 
 ## Park for Later
-1. advanced interactive graph behaviour
-2. using graph UI for authoritative operational manipulation
-3. additional breadth scenarios beyond the three demo beats
-
-## Ignore / Accept Risk
-1. NotebookLM as the primary production engine
-2. trying to explain all eight scenarios
-3. turning the film into a full architecture lecture
+- interactive graph manipulation beyond what the film requires;
+- full standalone breadth-scenario demos;
+- decorative AI visualisation;
+- additional scenario coverage beyond what strengthens the <3 minute film.
 
 ---
 
-# 11. Recommended next production sequence
+# 10. Tool / production strategy
 
-1. Approve the **storyboard / scene communication intent**.
-2. Prototype the hardest non-product visual in both Motion Canvas and Remotion.
-3. Select the motion-production path.
-4. Capture the three product demo beats against the approved shot requirements.
-5. Time the real footage.
-6. Rewrite the narration to fit the proven visual timing.
-7. Produce all remaining animated assets.
-8. Assemble, add Qoder footage, sound design, captions, and final close.
-9. Blind-judge the finished cut for comprehension before submission.
+The rendering technology remains an implementation decision, but the **visual contracts above are now frozen**.
 
-Do **not** lock the final motion tool or final graph implementation until the visual prototype comparison is complete.
+### Code-generated motion
+Primary candidates:
+- Motion Canvas
+- Remotion
+- OpenMontage only where it materially improves orchestration
+
+### Final composition
+Prefer a tool that gives frame-accurate control over generated motion, product captures, audio and typography. Remotion remains a strong candidate.
+
+### Product footage
+Direct controlled screen recording of the production NORTHSTAR UI.
+
+### Qoder footage
+Authentic direct screen recordings / screenshots composed into the fan-out / fan-in beat.
+
+### Do not depend on
+- NotebookLM as the final visual generator;
+- stock-footage-first auto-video tools;
+- generic AI-video clips for dependency/state animation;
+- PowerPoint-like generated video builders.
+
+---
+
+# 11. Production sequence
+
+1. **Lock narration and beat objectives** — DONE in this document.
+2. Render the chosen AI voice and measure actual spoken timing.
+3. Adjust only beat timings and surgical word-level trims if needed; do not reopen the story casually.
+4. Prototype **A1 Journey Cascade** and **A2 Live Dependency Graph / Resolution Engine** using the approved visual contract.
+5. Choose the code-motion production path based on prototype quality and speed.
+6. Capture Sarah S1 → S3 against the required product moments.
+7. Capture Jordan S2 against the required product moments.
+8. Capture Jonas + Oliver breadth inserts.
+9. Capture Qoder evidence and build fan-out / fan-in beat.
+10. Build the closing by reusing the A2 graph language.
+11. Assemble, sound-design, caption and tighten to <3:00.
+12. Blind-judge the finished cut for comprehension and claim/visual alignment before submission.
+
+The primary production rule from this point onward is:
+
+**Every asset must serve a locked narration beat and its WHAT/HOW objective. Do not create visually impressive assets that do not advance the story.**
