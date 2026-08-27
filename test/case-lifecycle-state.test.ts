@@ -270,6 +270,7 @@ test('lifecycle: programme engagements are Scheduled, not Not booked', () => {
     elements: [flight, engagement],
     objectives: [],
     relations: [],
+    governedByRuleSetIds: [],
     viability: 'VIABLE',
     updatedAt: AT,
     version: 1,

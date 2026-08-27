@@ -801,8 +801,7 @@ function recoveryActionsInner(view: CaseDetailView): string {
     const recommendedOption =
       view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
     if (!recommendedOption) return '';
-    const needsHumanApproval =
-      view.approval?.state === 'PENDING' || view.options.some((o) => o.requiresApproval);
+    const needsHumanApproval = view.options.some((o) => o.requiresApproval);
     const autoBanner =
       !needsHumanApproval
         ? `<div class="authority-auto-banner" data-test="authority-auto-approved">
