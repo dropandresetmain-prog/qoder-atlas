@@ -75,7 +75,9 @@ Judge-facing presentation convergence: money/copy/options/progress/visual + hero
 
 | Item | SHA / path | Result |
 |------|------------|--------|
-| Presentation commit | `91d3608` + follow-ups | pushed |
+| Final presentation SHA | `4803a76bda8f144b2a455cf31df3bfd1ae862f72` | pushed |
 | Screenshots | `output/hero-presentation/*.png` | 10 shots |
 | Capture checks | `output/hero-presentation/evidence.json` | 19/19 ok |
 | Focused tests | presentation + ui suites | 52 pass |
+| Typecheck / lint / build | on `4803a76` | pass |
+| PR | https://github.com/dropandresetmain-prog/qoder-atlas/pull/8 | draft vs `final/hero-integration` |
