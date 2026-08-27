@@ -120,8 +120,13 @@ async function assertResolvedReloadOverview(page: Page, name: string): Promise<v
   assert.match(html, /data-test="case-phase-resolved"/);
   assert.deepEqual(forbiddenAfterRecovery(html), [], `reopen resurrected CTAs: ${forbiddenAfterRecovery(html).join(',')}`);
   await gotoOverview(page);
+  const search = page.locator('[data-test="roster-search"]');
+  if (await search.count()) {
+    await search.fill(name.split(' ')[0] ?? name);
+    await page.waitForTimeout(150);
+  }
   const row = page.locator('[data-trip-id]').filter({ hasText: name }).first();
-  await row.waitFor({ timeout: 15000 });
+  await row.waitFor({ state: 'visible', timeout: 15000 });
   const presentation = await row.getAttribute('data-presentation');
   assert.equal(presentation, 'CONFIRMED', `${name} Overview presentation is ${presentation}`);
 }
