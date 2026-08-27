@@ -42,12 +42,10 @@ export default tseslint.config(
   },
   {
     // Node-executed helper scripts (.mjs) run outside the TS project.
-    // Some scripts embed browser-evaluated snippets that reference `document`.
     files: ['scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         console: 'readonly',
-        document: 'readonly',
         fetch: 'readonly',
         process: 'readonly',
         setTimeout: 'readonly',

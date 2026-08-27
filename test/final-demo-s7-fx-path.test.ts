@@ -56,7 +56,7 @@ function s7Strategy(costImpact: Money): RecoveryStrategy {
   return {
     id: 'strat-s7-0001',
     caseId: 'case-s7-fx',
-    summary: 'Rebook HND→SIN (direct) to fly from HND, departing at 02:20',
+    summary: 'Rebook to fly from the declared departure gateway, departing at 02:20',
     candidateOperations: [
       {
         op: 'UPSERT_ENTITY',

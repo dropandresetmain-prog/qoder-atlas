@@ -23,36 +23,11 @@ export function encodeUri(value: string): string {
   return encodeURIComponent(value);
 }
 
-/**
- * Judge-facing money convention: `US$90.54` / `S$122.23`.
- * Never emit a bare `$` (ambiguous between USD and local).
- * Detailed breakdowns may still show `USD` / `SGD` beside this primary form.
- */
 export function formatMoney(money: Money): string {
-  const amount = formatMoneyAmount(money.amount);
-  const code = money.currency.toUpperCase();
-  if (code === 'USD') return `US$${amount}`;
-  if (code === 'SGD') return `S$${amount}`;
-  return `${code} ${amount}`;
-}
-
-/** Fixed two-decimal amount without currency symbol. */
-export function formatMoneyAmount(amount: number): string {
-  const abs = Math.abs(amount);
-  return abs.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-/** Provider charge line: `US$90.54 payable`. */
-export function formatPayable(money: Money): string {
-  return `${formatMoney(money)} payable`;
-}
-
-/** Home-policy restatement: `Approx. S$122.23 policy equivalent`. */
-export function formatPolicyEquivalent(money: Money): string {
-  return `Approx. ${formatMoney(money)} policy equivalent`;
+  return new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency: money.currency,
+  }).format(money.amount);
 }
 
 export interface CostDeltaDisplay {

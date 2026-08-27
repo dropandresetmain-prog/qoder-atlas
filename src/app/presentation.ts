@@ -2,9 +2,7 @@
 import type { Constraint } from '../domain/constraints.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import type { CaseResolution } from '../operational/case.ts';
-import type { CostAllocation } from '../operational/intent.ts';
 import type { CandidateRejectionEvidence } from './planningLoop.ts';
-import { formatMoney } from '../ui/html.ts';
 
 export function presentCandidateRejection(evidence: readonly CandidateRejectionEvidence[], constraints: readonly Constraint[]): string | undefined {
   const first = evidence[0];
@@ -49,22 +47,6 @@ export function presentConstraintLabel(constraint: Constraint | undefined): stri
   }
 }
 
-/**
- * Parse evaluator evidence such as `gap 370min >= required 360min` into
- * judge-facing copy: `370 min available / 360 min required — viable`.
- */
-export function presentBufferEvidence(evidence: string | undefined): string | undefined {
-  if (!evidence) return undefined;
-  const match = /gap\s+(-?\d+)\s*min\s*(>=|<)\s*required\s+(\d+)\s*min/i.exec(evidence);
-  if (!match) return undefined;
-  const available = Number(match[1]);
-  const comparator = match[2];
-  const required = Number(match[3]);
-  if (!Number.isFinite(available) || !Number.isFinite(required)) return undefined;
-  const verdict = comparator === '>=' ? 'viable' : 'not enough time';
-  return `${available} min available / ${required} min required — ${verdict}`;
-}
-
 const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
   PASS: 'Still meets',
   FAIL: 'No longer meets',
@@ -72,14 +54,7 @@ const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
 };
 
 /** Plain-language check row for operator case view. */
-export function presentCheckLabel(
-  constraint: Constraint | undefined,
-  result: 'PASS' | 'FAIL' | 'UNKNOWN',
-  evidence?: string,
-): string {
-  const buffer = presentBufferEvidence(evidence);
-  if (buffer) return buffer;
-
+export function presentCheckLabel(constraint: Constraint | undefined, result: 'PASS' | 'FAIL' | 'UNKNOWN'): string {
   const base = presentConstraintLabel(constraint);
   if (result === 'PASS') {
     if (base.includes('Arrival')) return 'Arrival still leaves enough time before the commitment';
@@ -88,61 +63,15 @@ export function presentCheckLabel(
     return `${CHECK_RESULT_PREFIX.PASS}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
   }
   if (result === 'FAIL') {
-    if (base.includes('Arrival') || base.includes('buffer')) {
-      return 'Original plan no longer meets the required arrival buffer';
-    }
-    // Never produce contradictory copy like "No longer meets: timing still works".
-    if (base.includes('Timing') || /still works/i.test(base)) {
-      return 'Timing no longer works for the commitment';
-    }
-    if (base.includes('Hotel') || base.includes('stay')) {
-      return 'Hotel booking no longer satisfies the required stay window';
-    }
-    if (base.includes('grouping') || base.includes('policy')) {
-      return 'No longer within the required policy limits';
-    }
-    return `Required condition failed: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
+    if (base.includes('Arrival') || base.includes('buffer')) return 'Original plan no longer meets the required arrival buffer';
+    return `${CHECK_RESULT_PREFIX.FAIL}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
   }
   if (base.includes('transfer') || base.includes('Ground')) return 'Ground transfer timing still unconfirmed';
   return `${CHECK_RESULT_PREFIX.UNKNOWN}: ${base.charAt(0).toLowerCase()}${base.slice(1)}`;
 }
 
-export function presentApprovalReason(requestedFrom?: 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT'): string {
-  if (requestedFrom === 'TRAVELLER') {
-    return 'This change needs traveller approval before it can proceed.';
-  }
-  if (requestedFrom === 'ORGANISATION' || requestedFrom === 'HUMAN_AGENT') {
-    return 'This change needs organisation approval before it can proceed.';
-  }
-  return 'This change needs organisation or traveller approval before it can proceed.';
-}
-
-/**
- * Judge-facing funding summary: keep describeAllocation semantics but use
- * US$/S$ money convention instead of bare `90.54 USD` fragments.
- */
-export function presentAllocationSummary(allocation: CostAllocation | undefined): string | undefined {
-  if (!allocation) return undefined;
-  if (allocation.coveredAmount && allocation.coveredBy) {
-    return `${formatMoney(allocation.coveredAmount)} covered by ${payerPhrase(allocation.coveredBy)}`;
-  }
-  if (allocation.incrementalAmount && allocation.incrementalPayer) {
-    return `${formatMoney(allocation.incrementalAmount)} payable by ${payerPhrase(allocation.incrementalPayer)}`;
-  }
-  return 'Funding allocation still unresolved';
-}
-
-function payerPhrase(payer: CostAllocation['coveredBy'] | CostAllocation['incrementalPayer']): string {
-  switch (payer) {
-    case 'EVENT_ORGANISATION':
-      return 'the event organisation';
-    case 'ORGANISATION':
-      return 'the organisation';
-    case 'TRAVELLER':
-      return 'the traveller';
-    default:
-      return 'another payer';
-  }
+export function presentApprovalReason(): string {
+  return 'This change needs approval before it can proceed.';
 }
 
 const SIGNAL_KIND_ACTIVITY: Record<string, string> = {
@@ -171,12 +100,11 @@ export function sanitizeActivityCopy(text: string | undefined): string | undefin
   let out = text.trim();
   out = out.replace(/place-hotel-[a-z0-9-]+/gi, 'Hotel');
   out = out.replace(/place-[a-z0-9-]+/gi, 'Place');
-  out = out.replace(/\bel-trip-[a-z0-9-]+/gi, 'linked engagement');
   out = out.replace(/\b(?:trip|case|intent|signal|offer|strategy)-[a-z0-9-]+\b/gi, '');
   out = out.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, '');
   out = out.replace(/\bproviders?\b/gi, 'Travel provider');
   out = out.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim();
-  if (!out || /^(trip|case|intent|signal|place|el-trip)-/i.test(out)) return undefined;
+  if (!out || /^(trip|case|intent|signal|place)-/i.test(out)) return undefined;
   return out;
 }
 
@@ -281,13 +209,9 @@ export function presentAction(operation: string): string {
 export function presentSignalChange(signal: TripSignal): string {
   const summary = signal.summary?.trim();
   const looksInternal = summary
-    ? /provider\s+(flight|stay)\s+state\s*:|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\bel-trip-|affecting engagement\s+\S+/i.test(
-        summary,
-      )
+    ? /provider\s+(flight|stay)\s+state\s*:|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/i.test(summary)
     : true;
-  if (summary && !looksInternal) {
-    return sanitizeActivityCopy(summary) ?? summary;
-  }
+  if (summary && !looksInternal) return summary;
 
   const copy: Record<TripSignal['kind'], string> = {
     FLIGHT_CANCELLATION: 'The airline cancelled the flight.',
@@ -301,9 +225,5 @@ export function presentSignalChange(signal: TripSignal): string {
     ANCHOR_COMMITMENT_CHANGE: 'An event commitment changed.',
     OTHER: 'New information changed this trip.',
   };
-  if (signal.kind === 'ANCHOR_COMMITMENT_CHANGE' && summary) {
-    const cleaned = sanitizeActivityCopy(summary);
-    if (cleaned) return cleaned;
-  }
   return copy[signal.kind];
 }

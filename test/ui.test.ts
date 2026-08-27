@@ -279,7 +279,7 @@ test('dashboard renders every status and orders attention first', () => {
   const disruptedAt = html.indexOf('data-status="DISRUPTED"');
   const readyAt = html.indexOf('data-status="READY"');
   assert.ok(disruptedAt >= 0 && readyAt >= 0 && disruptedAt < readyAt, 'disrupted must precede ready');
-  assert.ok(html.includes('Needs attention'), 'pending decisions panel expected');
+  assert.ok(html.includes('Decisions needed'), 'pending decisions panel expected');
   assert.ok(html.includes('Still unclear'), 'uncertainty must be visible');
 });
 
@@ -350,23 +350,18 @@ test('planning action exposes truthful in-flight stages before the real response
     state: 'LOADED',
     data: { ...disrupted.view, options: [], approval: undefined, status: 'DISRUPTED' },
   });
-  assert.ok(html.includes('data-test="resolve-northstar-btn"') || html.includes('data-test="plan-recovery-form"'));
-  assert.ok(html.includes('data-resolve-northstar') || html.includes('data-planning-progress'));
-  assert.ok(
-    html.includes('Resolve with Northstar') ||
-      html.includes('Checking the changed flight') ||
-      html.includes('Comparing recovery options'),
-  );
+  assert.ok(html.includes('data-test="plan-recovery-btn"'));
+  assert.ok(html.includes('data-planning-progress'));
+  assert.ok(html.includes('Checking the changed flight'));
+  assert.ok(html.includes('Comparing recovery options'));
+  assert.ok(html.includes('Checking policy and approval'));
 });
 
 test('approval requirement is explicit with who, why, and amount', () => {
   const approvalCase = CASE_FIXTURES.find((f) => f.id === 'awaiting-approval');
   assert.ok(approvalCase);
   const html = renderCaseDetail({ state: 'LOADED', data: approvalCase.view });
-  assert.ok(
-    html.includes('Organisation approval required') ||
-      html.includes('Approval needed from the organisation'),
-  );
+  assert.ok(html.includes('Approval needed from the organisation'));
   assert.ok(html.includes('travel policy'));
   assert.ok(html.includes('data-approval-state="PENDING"'));
 });

@@ -4,15 +4,6 @@
  * Does not slow the planning/execution engines. Stages are UI-only progress
  * while a real plan/begin/execute request runs (or a short settle when options
  * are already projected). Respects prefers-reduced-motion.
- *
- * Stages are labelled by lifecycle phase (planning → authority → execution →
- * observation → state update) from the choreography contract. Content is
- * driven by structured data attributes on the workspace when present; never
- * by hero/person ID branches.
- *
- * Workspace phase is server-projected (`data-case-phase`). sessionStorage may
- * remember a harmless expansion preference but must not resurrect Resolve,
- * hide Execute, or make a resolved case look open.
  */
 export function renderCaseResolutionEnhancementScript(): string {
   return `<script>
@@ -20,78 +11,34 @@ export function renderCaseResolutionEnhancementScript(): string {
   'use strict';
   var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var RESOLVE_MS = REDUCE ? 200 : 3000;
-  var EXEC_MS = REDUCE ? 200 : 2400;
+  var EXEC_MS = REDUCE ? 150 : 1800;
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
   function setPhase(root, phase) {
     if (!root) return;
-    var current = root.getAttribute('data-case-phase');
-    if (current === 'resolved' || current === 'execute' || current === 'executing' || current === 'awaiting_authority') {
-      return;
-    }
     root.setAttribute('data-case-phase', phase);
     root.setAttribute('data-test', 'case-phase-' + phase);
   }
 
-  function parseSteps(raw, fallback) {
-    if (!raw) return fallback;
-    try {
-      var parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map(function(step) {
-          if (typeof step === 'string') return { phase: 'planning', label: step };
-          return {
-            phase: step.phase || 'planning',
-            label: step.label || String(step)
-          };
-        });
-      }
-    } catch (err) { /* ignore malformed structured steps */ }
-    return fallback;
-  }
-
-  var DEFAULT_PLANNING = [
-    { phase: 'planning', label: 'Checking trip dependencies' },
-    { phase: 'planning', label: 'Searching recovery options' },
-    { phase: 'planning', label: 'Testing whole-trip viability' },
-    { phase: 'authority', label: 'Checking policy and authority' }
-  ];
-  var DEFAULT_EXECUTION = [
-    { phase: 'execution', label: 'Executing at the declared provider boundary' },
-    { phase: 'observation', label: 'Observing the provider / programme result' },
-    { phase: 'state_update', label: 'Updating authoritative trip state' },
-    { phase: 'recheck', label: 'Rechecking downstream trip viability' }
-  ];
-
   function ensureOverlay(id, title, steps) {
     var existing = document.getElementById(id);
-    if (existing) existing.remove();
+    if (existing) return existing;
     var scrim = document.createElement('div');
     scrim.id = id;
     scrim.className = 'ns-resolve-scrim';
-    scrim.setAttribute('data-test', 'lifecycle-progress-overlay');
     scrim.setAttribute('role', 'dialog');
     scrim.setAttribute('aria-modal', 'true');
     scrim.setAttribute('aria-label', title);
     scrim.hidden = true;
-    var stepsHtml = steps.map(function(step, i) {
-      var phase = step.phase || 'planning';
-      var label = step.label || String(step);
-      return '<li data-step="' + i + '" data-phase="' + phase + '">' +
-        '<span class="ns-resolve-step-mark" aria-hidden="true"></span>' +
-        '<span class="ns-resolve-step-body">' +
-          '<span class="ns-resolve-phase">' + phase.replace(/_/g, ' ') + '</span>' +
-          '<span class="ns-resolve-step-label">' + label + '</span>' +
-        '</span>' +
-      '</li>';
+    var stepsHtml = steps.map(function(label, i) {
+      return '<li data-step="' + i + '"><span class="ns-resolve-step-mark" aria-hidden="true"></span><span>' + label + '</span></li>';
     }).join('');
     scrim.innerHTML =
       '<div class="ns-resolve-modal">' +
-        '<p class="ns-resolve-kicker">Northstar progress</p>' +
+        '<p class="ns-resolve-kicker">Northstar AI</p>' +
         '<h2 class="ns-resolve-title">' + title + '</h2>' +
-        '<p class="ns-resolve-note">Presentation pacing for readability — not a literal live tool trace.</p>' +
         '<div class="ns-resolve-bar" aria-hidden="true"><i></i></div>' +
         '<ol class="ns-resolve-steps">' + stepsHtml + '</ol>' +
       '</div>';
@@ -183,57 +130,47 @@ export function renderCaseResolutionEnhancementScript(): string {
     syncStrategyInputs(root);
   }
 
-  function formVerdict(form) {
-    var input = form.querySelector('input[name="verdict"], input[name="decision"]');
-    return input ? String(input.value || '').toUpperCase() : '';
-  }
-
-  function isDeclineForm(form) {
-    return formVerdict(form) === 'DECLINED' || form.getAttribute('data-test') === 'organisation-decline-form';
-  }
-
-  function isExecuteForm(form) {
-    if (isDeclineForm(form)) return false;
-    return form.getAttribute('data-test') === 'begin-strategy-form' ||
-      form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
-      form.getAttribute('action') === '/api/runtime/execute' ||
-      form.getAttribute('action') === '/api/runtime/begin' ||
-      (form.getAttribute('action') || '').indexOf('/traveller-decision') !== -1;
-  }
-
-  function submitFormAsync(form) {
-    var action = form.getAttribute('action') || window.location.href;
-    var method = (form.getAttribute('method') || 'POST').toUpperCase();
-    var body = new URLSearchParams();
-    qsa('input, select, textarea', form).forEach(function(input) {
-      if (!input.name || input.disabled) return;
-      if ((input.type === 'checkbox' || input.type === 'radio') && !input.checked) return;
-      body.append(input.name, input.value);
-    });
-    return fetch(action, {
-      method: method,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json, text/html' },
-      body: body.toString(),
-      redirect: 'follow'
-    });
+  function revealOptions(root) {
+    setPhase(root, 'options');
+    var options = qs('[data-case-options-panel]', root);
+    if (options) options.hidden = false;
+    var resolveCta = qs('[data-resolve-northstar-cta]', root);
+    if (resolveCta) resolveCta.hidden = true;
+    var beginPanel = qs('[data-case-begin-panel]', root);
+    if (beginPanel) beginPanel.hidden = false;
+    var approval = qs('[data-ui-section="primary-approval"]', root);
+    if (approval) approval.hidden = false;
+    syncStrategyInputs(root);
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     var root = qs('[data-case-workspace]');
     if (!root) return;
+    var caseId = (qs('[name="caseId"]', root) || {}).value || window.location.pathname;
+    var phaseKey = 'ns-case-phase:' + caseId;
 
     bindOptionSelection(root);
 
-    var planningSteps = parseSteps(root.getAttribute('data-transition-planning'), DEFAULT_PLANNING);
-    var executionSteps = parseSteps(root.getAttribute('data-transition-execution'), DEFAULT_EXECUTION);
+    var params = new URLSearchParams(window.location.search);
+    var storedPhase = null;
+    try { storedPhase = window.sessionStorage.getItem(phaseKey); } catch (e) {}
+    if (params.get('nsResolve') === '1' || params.get('nsPhase') === 'options' || storedPhase === 'options') {
+      revealOptions(root);
+      try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (e) {}
+    }
 
     var resolveBtn = qs('[data-resolve-northstar]', root);
     if (resolveBtn) {
       resolveBtn.addEventListener('click', function() {
         var overlay = ensureOverlay(
           'ns-resolve-overlay',
-          'Planning a recovery',
-          planningSteps
+          'Resolving with Northstar AI',
+          [
+            'Checking trip dependencies',
+            'Searching recovery options',
+            'Testing whole-trip viability',
+            'Checking policy and authority'
+          ]
         );
         var planForm = qs('[data-test="plan-recovery-form"]', root);
         var alreadyHasOptions = !!qs('[data-test="case-options"]', root);
@@ -257,11 +194,14 @@ export function renderCaseResolutionEnhancementScript(): string {
         var stagePromise = runStages(overlay, RESOLVE_MS);
         Promise.all([planPromise, stagePromise])
           .then(function() {
+            try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (e) {}
             if (alreadyHasOptions) {
-              setPhase(root, 'options');
+              revealOptions(root);
               return;
             }
-            window.location.reload();
+            var url = new URL(window.location.href);
+            url.searchParams.set('nsResolve', '1');
+            window.location.href = url.toString();
           })
           .catch(function(err) {
             alert('Resolve failed: ' + (err && err.message ? err.message : String(err)));
@@ -269,63 +209,33 @@ export function renderCaseResolutionEnhancementScript(): string {
       });
     }
 
+    // Execution transition after approve/execute/begin forms.
     document.addEventListener('submit', function(e) {
       var form = e.target;
       if (!form || form.tagName !== 'FORM') return;
       if (!form.classList.contains('inline-form') && !form.classList.contains('action-form')) return;
-      if (isDeclineForm(form)) return;
-      if (!isExecuteForm(form)) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      syncStrategyInputs(root);
-      var isBegin = form.getAttribute('data-test') === 'begin-strategy-form' ||
+      var isExec =
+        form.getAttribute('data-test') === 'begin-strategy-form' ||
+        form.getAttribute('data-test') === 'execute-approved-strategy-btn' ||
+        form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
+        form.getAttribute('action') === '/api/runtime/execute' ||
         form.getAttribute('action') === '/api/runtime/begin';
-      var isExecuteApproved = form.getAttribute('data-test') === 'execute-approved-strategy-form' ||
-        form.getAttribute('action') === '/api/runtime/execute';
+      if (isExec || form.getAttribute('action') === '/api/runtime/decide') {
+        try { window.sessionStorage.setItem(phaseKey, 'options'); } catch (err) {}
+      }
+      if (!isExec) return;
+      syncStrategyInputs(root);
       var overlay = ensureOverlay(
         'ns-execute-overlay',
-        isBegin ? 'Starting recovery' : 'Executing approved recovery',
-        isBegin ? planningSteps.slice(-2).concat(executionSteps.slice(0, 1)) : executionSteps
+        'Applying the recovery',
+        [
+          'Applying change',
+          'Confirming provider result',
+          'Rechecking downstream trip'
+        ]
       );
-      // JSON body matches the progressive-enhancement contract used elsewhere.
-      var body = {};
-      qsa('input, select, textarea', form).forEach(function(input) {
-        if (!input.name || input.disabled) return;
-        if ((input.type === 'checkbox' || input.type === 'radio') && !input.checked) return;
-        var dot = input.name.indexOf('.');
-        if (dot > 0) {
-          var parent = input.name.slice(0, dot);
-          var child = input.name.slice(dot + 1);
-          if (child && !Object.prototype.hasOwnProperty.call(body, parent)) body[parent] = {};
-          if (child && body[parent] && typeof body[parent] === 'object') body[parent][child] = input.value;
-        } else {
-          body[input.name] = input.value;
-        }
-      });
-      var requestPromise = fetch(form.getAttribute('action') || window.location.href, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(body)
-      }).then(function(r) {
-        return r.json().then(function(data) {
-          if (!r.ok) throw new Error(data.message || data.error || 'Action failed');
-          return data;
-        }).catch(function(err) {
-          if (!r.ok) throw err;
-          return {};
-        });
-      });
-      // Execute path: hold ~2s so observe → state-update steps are visible.
-      var duration = isExecuteApproved ? Math.max(EXEC_MS, 2000) : EXEC_MS;
-      var stagePromise = runStages(overlay, duration);
-      Promise.all([requestPromise, stagePromise])
-        .then(function() {
-          window.location.reload();
-        })
-        .catch(function(err) {
-          alert('Action failed: ' + (err && err.message ? err.message : String(err)));
-          window.location.reload();
-        });
+      // Let the shared form shim own the fetch; we only show choreography.
+      runStages(overlay, EXEC_MS);
     }, true);
   });
 })();

@@ -42,6 +42,7 @@ import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
+import { describeAllocation } from '../engine/funding.ts';
 import { projectCaseChain } from './chain.ts';
 import {
   countOtherCommitments,
@@ -54,7 +55,6 @@ import type { AnchorEvent, Place } from '../domain/entities.ts';
 import {
   presentAction,
   presentActivity,
-  presentAllocationSummary,
   presentApprovalReason,
   presentCandidateRejection,
   presentCheckLabel,
@@ -63,8 +63,6 @@ import {
   presentUncertainties,
 } from './presentation.ts';
 import { enrichCaseDetailView } from './casePresentation.ts';
-import { projectOptionPresentation } from './optionPresentation.ts';
-import { formatMoney } from '../ui/html.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -72,85 +70,6 @@ export interface ReadModelDependencies {
   cases: CaseRepository;
   audit: AuditRepository;
   viability: ViabilityEngine;
-}
-
-/** Rewrite bare `542 USD` / `122.23 SGD` fragments in strategy titles to US$/S$. */
-function presentStrategyTitle(summary: string): string {
-  return summary
-    .replace(
-      /(\d+(?:\.\d+)?)\s*(USD|SGD)\b/gi,
-      (_match, amount: string, currency: string) =>
-        formatMoney({ amount: Number(amount), currency: currency.toUpperCase() as 'USD' | 'SGD' }),
-    )
-    .replace(/\bthrough\s+(\d{4})-(\d{2})-(\d{2})\b/gi, (_m, y: string, mo: string, d: string) => {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `through ${Number(d)} ${months[Number(mo) - 1] ?? mo}`;
-    })
-    .replace(/\b(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b/g,
-      (_m, _y: string, mo: string, d: string, hh: string, mm: string) => {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return `${Number(d)} ${months[Number(mo) - 1] ?? mo} · ${hh}:${mm}`;
-      });
-}
-
-function humanStayInstant(iso: string | undefined): string | undefined {
-  if (!iso) return undefined;
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso) ?? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!match) return undefined;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const day = `${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]}`;
-  return match[4] ? `${day} · ${match[4]}:${match[5]}` : day;
-}
-
-/** Traveller-facing approval prompt from structured stay/funding evidence. */
-function presentTravellerDecisionPrompt(
-  recoveryCase: RecoveryCase,
-  intent: NonNullable<ReturnType<typeof intentForDecision>>,
-  trip: Trip,
-  placeName: string | undefined,
-): string {
-  const strategy = recoveryCase.strategies.find((candidate) => candidate.id === intent.strategyId);
-  const stayOp = strategy?.candidateOperations.find(
-    (operation) =>
-      operation.op === 'UPSERT_ENTITY' &&
-      operation.entityType === 'TRIP_ELEMENT' &&
-      (operation.data as { elementKind?: string }).elementKind === 'STAY',
-  );
-  const proposedStay =
-    stayOp && stayOp.op === 'UPSERT_ENTITY'
-      ? (stayOp.data as Extract<TripElement, { elementKind: 'STAY' }>)
-      : undefined;
-  const currentStay = trip.elements.find(
-    (element): element is Extract<TripElement, { elementKind: 'STAY' }> => element.elementKind === 'STAY',
-  );
-  const property =
-    placeName?.trim() ||
-    (typeof strategy?.summary === 'string'
-      ? /Extend stay at ([^—]+)/i.exec(strategy.summary)?.[1]?.trim()
-      : undefined) ||
-    'your hotel';
-  const from = humanStayInstant(currentStay?.data.checkOut.value);
-  const to = humanStayInstant(proposedStay?.data.checkOut?.value);
-  const payable = intent.providerSpend
-    ? formatMoney(intent.providerSpend)
-    : intent.priceDelta
-      ? formatMoney(intent.priceDelta)
-      : undefined;
-  const funding =
-    intent.costAllocation?.incrementalPayer === 'TRAVELLER'
-      ? ' Traveller-funded increment'
-      : intent.costAllocation
-        ? ` ${presentAllocationSummary(intent.costAllocation)}`
-        : '';
-  if (from && to) {
-    return `Approve extending ${property}: ${from} → ${to}.${funding}${payable ? ` ${payable}.` : ''} No flight change.`;
-  }
-  const fundingNote = intent.costAllocation
-    ? ` Funding: ${presentAllocationSummary(intent.costAllocation)}.`
-    : intent.priceDelta
-      ? ' Funding: who pays has not been determined yet.'
-      : '';
-  return `Approve the proposed change${payable ? ` (${payable})` : ''}?${fundingNote}`;
 }
 
 const ELEMENT_KIND_LABEL: Record<TripElement['elementKind'], string> = {
@@ -284,39 +203,6 @@ async function currentConstraintEvaluations(deps: ReadModelDependencies, trip: T
   return { constraints, evaluations: evaluateConstraints(constraints, ctx) };
 }
 
-/**
- * Propagated whole-trip viability from constraint evaluations.
- * Independent of open-case workflow status (DISRUPTED case ≠ failed commitment).
- */
-export function deriveRemainderViability(
-  constraints: readonly Constraint[],
-  evaluations: readonly { constraintId: string; status: string }[],
-  tripViability: Trip['viability'],
-): RemainderViability {
-  const hardById = new Map<string, Constraint['hardness']>();
-  for (const constraint of constraints) {
-    hardById.set(constraint.id, constraint.hardness);
-  }
-  if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
-    return 'NOT_VIABLE';
-  }
-  if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
-    return 'UNKNOWN';
-  }
-  if (evaluations.some((e) => e.status === 'FAIL') || tripViability === 'AT_RISK') {
-    return 'AT_RISK';
-  }
-  return 'VIABLE';
-}
-
-/** Provider payable for queues/CTAs — never substitute home-policy restatement. */
-export function intentPayableAmount(intent: {
-  providerSpend?: { amount: number; currency: string };
-  priceDelta?: { amount: number; currency: string };
-}): { amount: number; currency: string } | undefined {
-  return intent.providerSpend ?? intent.priceDelta;
-}
-
 function pendingApprovalDecisions(recoveryCase: RecoveryCase): AuthorityDecision[] {
   return recoveryCase.authorityDecisions.filter(
     (decision) =>
@@ -401,12 +287,11 @@ export async function projectOperatorDashboard(
     if (recoveryCase) {
       for (const decision of pendingApprovalDecisions(recoveryCase)) {
         const intent = intentForDecision(recoveryCase, decision);
-        const payable = intent ? intentPayableAmount(intent) : undefined;
         pendingDecisions.push({
           caseId: recoveryCase.id,
           decisionType: 'APPROVAL',
           description: `Approval needed before ${intent ? presentAction(intent.operation) : 'the recovery action'} can proceed`,
-          ...(payable ? { amount: payable } : {}),
+          ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
           requestedAt: decision.decidedAt,
         });
       }
@@ -422,10 +307,6 @@ export async function projectOperatorDashboard(
       entities: deps.snapshot.entities,
     }).assess(trip.id);
 
-    // Traveller-specific consequence for shared-incident differentiation.
-    const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, generatedAt);
-    const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
-
     let travellerResponseStatus: OperatorTripView['travellerResponseStatus'] = 'NOT_REQUIRED';
     if (recoveryCase) {
       const travellerDecisions = recoveryCase.authorityDecisions.filter((d) => d.outcome === 'REQUIRES_TRAVELLER');
@@ -435,24 +316,18 @@ export async function projectOperatorDashboard(
 
     trips.push({
       tripId: trip.id,
-      ...(recoveryCase && recoveryCase.status !== 'RESOLVED'
-        ? { activeCaseId: recoveryCase.id }
-        : recoveryCase?.status === 'RESOLVED'
-          ? { historyCaseId: recoveryCase.id }
-          : {}),
+      ...(recoveryCase && recoveryCase.status !== 'RESOLVED' ? { activeCaseId: recoveryCase.id } : {}),
       ...(trip.label ? { label: trip.label } : {}),
       travellerNames,
       ...(travelArrangement ? { travelArrangement } : {}),
       ...(anchorEventName ? { anchorEventName } : {}),
       status,
-      remainderViable,
       ...(lastSignal ? { whatChanged: presentSignalChange(lastSignal) } : {}),
       affectedItems: recoveryCase
         ? recoveryCase.affectedElementIds
             .map((id) => trip.elements.find((element) => element.id === id))
             .filter((element): element is TripElement => Boolean(element))
             .map(describeElement)
-            .map((label) => label.replace(/\bel-trip-[a-z0-9-]+/gi, 'trip element'))
         : [],
       systemActivity,
       pendingDecisions,
@@ -463,25 +338,7 @@ export async function projectOperatorDashboard(
     });
   }
 
-  // Participant roster = Northstar-managed + local/self-managed only.
-  // Orphan/unspecified trips must not inflate the 67-participant hero truth.
-  const participantTrips = trips.filter(
-    (row) =>
-      row.travellerNames.length > 0 &&
-      (row.travelArrangement === 'NORTHSTAR_ARRANGED' ||
-        row.travelArrangement === 'SELF_OR_OTHER_ARRANGED'),
-  );
-
-  return {
-    generatedAt,
-    summary,
-    trips: participantTrips,
-    arrangementCounts: {
-      ...arrangementCounts,
-      total: arrangementCounts.northstarArranged + arrangementCounts.selfOrOtherArranged,
-      unspecified: 0,
-    },
-  };
+  return { generatedAt, summary, trips, arrangementCounts };
 }
 
 const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
@@ -495,17 +352,11 @@ const RESERVATION_LABEL: Record<TripElement['reservationState'], string> = {
 };
 
 function chainStateFor(element: TripElement): ChainLinkView['state'] {
-  if (element.elementKind === 'ENGAGEMENT') {
-    if (element.status === 'INVALID') return 'BROKEN';
-    if (element.status === 'AT_RISK') return 'AT_RISK';
-    return 'CONFIRMED';
-  }
   if (element.status === 'INVALID' || element.reservationState === 'CANCELLED') return 'BROKEN';
   if (element.status === 'AT_RISK' || element.reservationState === 'CHANGED') return 'AT_RISK';
   if (element.reservationState === 'HELD') return 'PROPOSED';
-  if (element.reservationState === 'UNKNOWN') return 'UNKNOWN';
-  // Confirmed/completed bookings stay Confirmed even when health status is UNKNOWN.
-  if (element.reservationState === 'NONE') return 'UNBOOKED';
+  if (element.status === 'UNKNOWN' || element.reservationState === 'UNKNOWN') return 'UNKNOWN';
+  if (element.elementKind !== 'ENGAGEMENT' && element.reservationState === 'NONE') return 'UNBOOKED';
   return 'CONFIRMED';
 }
 
@@ -611,32 +462,10 @@ export async function projectCaseDetail(
     const constraint: Constraint | undefined = constraints.find((c) => c.id === evaluation.constraintId);
     return {
       id: evaluation.constraintId,
-      label: presentCheckLabel(constraint, evaluation.status as CaseCheckResult, evaluation.evidence),
+      label: presentCheckLabel(constraint, evaluation.status as CaseCheckResult),
       result: evaluation.status as CaseCheckResult,
     };
   });
-
-  const requiredBufferMinutes = constraints
-    .map((constraint) => {
-      const raw = constraint.parameters?.['minBufferMinutes'];
-      return typeof raw === 'number' ? raw : undefined;
-    })
-    .find((value): value is number => value !== undefined);
-
-  // Critical objective currently threatened (HARD first).
-  let criticalObjectiveAtRisk: string | undefined;
-  for (const threatened of assessment.threatenedObjectives) {
-    const objective = trip.objectives.find((o) => o.id === threatened.objectiveId);
-    if (objective?.hardness === 'HARD') {
-      criticalObjectiveAtRisk = objective.statement;
-      break;
-    }
-  }
-
-  const places = new Map<string, Place>();
-  for (const entry of await deps.snapshot.entities.list('PLACE')) {
-    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
-  }
 
   // Options: planning-time deterministic verdicts first (persisted in the
   // PLANNING_COMPLETED audit entry). Re-deriving overlays against current
@@ -669,54 +498,29 @@ export async function projectCaseDetail(
     }
   }
   const options: RecoveryOptionView[] = [];
-  const recoveryEngagement = selectRecoveryCommitment(trip, recoveryCase);
   for (const strategy of recoveryCase.strategies) {
     const persisted = persistedVerdicts.get(strategy.id);
     const candidate = persisted
-      ? { feasible: persisted.feasible, rejectionEvidence: persisted.rejectionEvidence, viability: undefined as undefined }
+      ? { feasible: persisted.feasible, rejectionEvidence: persisted.rejectionEvidence }
       : await evaluateCandidate(deps.viability, snapshot, strategy);
     const intent = recoveryCase.actionIntents.find((i) => i.strategyId === strategy.id);
     const decision = intent
       ? recoveryCase.authorityDecisions.find((d) => d.intentId === intent.id)
       : undefined;
-    const recommended = strategy.id === bestStrategyId;
-    const presentation = projectOptionPresentation({
-      strategy,
-      feasible: candidate.feasible,
-      recommended,
-      rejectionEvidence: candidate.rejectionEvidence,
-      ...(candidate.viability ? { viability: candidate.viability } : {}),
-      ...(intent ? { intent } : {}),
-      ...(decision ? { decision } : {}),
-      ...(recoveryEngagement ? { engagement: recoveryEngagement } : {}),
-      places,
-      ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
-      ...(candidate.viability?.softTradeoffs ? { softTradeoffs: candidate.viability.softTradeoffs } : {}),
-      searchProvenance: 'REPLAY',
-      ...(requiredBufferMinutes !== undefined ? { requiredBufferMinutes } : {}),
-    });
     options.push({
       id: strategy.id,
-      title: presentStrategyTitle(strategy.summary),
+      title: strategy.summary,
       verdict: candidate.feasible ? 'VIABLE' : candidate.rejectionEvidence.length > 0 ? 'NOT_VIABLE' : 'UNKNOWN',
       ...(candidate.rejectionEvidence.length > 0
         ? { rejectionReason: presentCandidateRejection(candidate.rejectionEvidence, snapshot.constraints) }
         : {}),
-      ...(recommended
+      ...(strategy.id === bestStrategyId
         ? {
             recommended: true,
             whyRecommended:
-              presentation.whyRecommended ??
               'Recommended because it keeps the whole trip viable with the fewest soft tradeoffs among workable options.',
           }
         : {}),
-      ...(presentation.summary ? { summary: presentation.summary } : {}),
-      ...(presentation.pros ? { pros: presentation.pros } : {}),
-      ...(presentation.cons ? { cons: presentation.cons } : {}),
-      ...(presentation.commitmentEffect ? { commitmentEffect: presentation.commitmentEffect } : {}),
-      ...(presentation.authorityLabel ? { authorityLabel: presentation.authorityLabel } : {}),
-      ...(presentation.provenanceLabel ? { provenanceLabel: presentation.provenanceLabel } : {}),
-      ...(presentation.flags ? { flags: presentation.flags } : {}),
       // ADR-052: an FX-normalized intent freezes BOTH the home restatement
       // (spendExposure) and the original provider charge (providerSpend); the
       // view shows the restatement as the cost delta and keeps the provider
@@ -732,7 +536,7 @@ export async function projectCaseDetail(
       ...(intent?.costAllocation
         ? {
             costAllocation: intent.costAllocation,
-            costAllocationSummary: presentAllocationSummary(intent.costAllocation),
+            costAllocationSummary: describeAllocation(intent.costAllocation),
           }
         : {}),
     });
@@ -745,9 +549,19 @@ export async function projectCaseDetail(
     fundingIntent?.costAllocation && fundingIntent.priceDelta
       ? {
           allocation: fundingIntent.costAllocation,
-          summary: presentAllocationSummary(fundingIntent.costAllocation) ?? 'Funding allocation still unresolved',
+          summary: describeAllocation(fundingIntent.costAllocation),
         }
       : undefined;
+
+  // Critical objective currently threatened (HARD first).
+  let criticalObjectiveAtRisk: string | undefined;
+  for (const threatened of assessment.threatenedObjectives) {
+    const objective = trip.objectives.find((o) => o.id === threatened.objectiveId);
+    if (objective?.hardness === 'HARD') {
+      criticalObjectiveAtRisk = objective.statement;
+      break;
+    }
+  }
 
   // Approval requirement from the latest authority decision needing one.
   let approval: ApprovalRequirementView | undefined;
@@ -777,20 +591,8 @@ export async function projectCaseDetail(
       // HUMAN_AGENT may be decided by an unambiguous in-scope organisation
       // principal (authority allows ORGANISATION for HUMAN_AGENT).
       ...(organisationApprover ? { approver: { entityType: 'ORGANISATION' as const, id: organisationApprover.id } } : {}),
-      reason: presentApprovalReason(
-        latestRequiring.outcome === 'REQUIRES_TRAVELLER'
-          ? 'TRAVELLER'
-          : latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER'
-            ? 'ORGANISATION'
-            : 'HUMAN_AGENT',
-      ),
-      // CTA currency must match what the principal actually pays (provider
-      // charge). Home-policy restatement stays on option chips, not the button.
-      ...(intent?.providerSpend
-        ? { amount: intent.providerSpend }
-        : intent?.priceDelta
-          ? { amount: intent.priceDelta }
-          : {}),
+      reason: presentApprovalReason(),
+      ...(intent?.priceDelta ? { amount: intent.priceDelta } : {}),
       state: latestRequiring.approval
         ? latestRequiring.approval.decision === 'APPROVED'
           ? 'APPROVED'
@@ -823,6 +625,10 @@ export async function projectCaseDetail(
     .filter((statement): statement is string => Boolean(statement));
 
   const isChangeRequest = triggeringSignals.some((s) => s.kind === 'TRAVELLER_INPUT');
+  const places = new Map<string, Place>();
+  for (const entry of await deps.snapshot.entities.list('PLACE')) {
+    if (entry.entityType === 'PLACE') places.set(entry.entity.id, entry.entity);
+  }
   let anchorEvent: AnchorEvent | undefined;
   if (trip.anchorEventId) {
     const entry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
@@ -844,17 +650,6 @@ export async function projectCaseDetail(
   const caseStatus = statusFromCase(recoveryCase.status, isChangeRequest);
   const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
   const programmeChangeCommitmentId = recoveryCommitment?.data.anchorCommitmentId;
-  // Fixture-keyed programme proposal presets (commitment entity ids from the
-  // closed demo world). Presentation only — not person-specific branches.
-  const PROGRAMME_CHANGE_PRESETS: Record<string, { startsAt: string; endsAt: string }> = {
-    'cmt-ait-d1-headline-interview': {
-      startsAt: '2026-10-01T15:30:00+08:00',
-      endsAt: '2026-10-01T16:00:00+08:00',
-    },
-  };
-  const programmePreset = programmeChangeCommitmentId
-    ? PROGRAMME_CHANGE_PRESETS[programmeChangeCommitmentId]
-    : undefined;
   const hardConstraintFailed = evaluations.some((evaluation) => {
     const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
     return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
@@ -897,12 +692,6 @@ export async function projectCaseDetail(
             anchorEventId: trip.anchorEventId,
             programmeChangeAvailable: true,
             ...(programmeChangeCommitmentId ? { programmeChangeCommitmentId } : {}),
-            ...(programmePreset
-              ? {
-                  programmeChangeProposedStartsAt: programmePreset.startsAt,
-                  programmeChangeProposedEndsAt: programmePreset.endsAt,
-                }
-              : {}),
           }
         : trip.anchorEventId
           ? { anchorEventId: trip.anchorEventId }
@@ -975,15 +764,16 @@ export async function projectTravellerTrip(
     for (const decision of pendingApprovalDecisions(recoveryCase)) {
       if (decision.outcome !== 'REQUIRES_TRAVELLER') continue;
       const intent = intentForDecision(recoveryCase, decision);
-      if (!intent) continue;
-      const currentStay = trip.elements.find((element) => element.elementKind === 'STAY');
-      const stayPlaceName =
-        currentStay && currentStay.elementKind === 'STAY'
-          ? await placeLabel(deps, currentStay.data.placeId)
-          : undefined;
+      // Mixed funding (ADR-037): when a deterministic allocation exists the
+      // traveller is told who pays — the prompt is evidence, not a guess.
+      const fundingNote = intent?.costAllocation
+        ? ` Funding: ${describeAllocation(intent.costAllocation)}.`
+        : intent?.priceDelta
+          ? ' Funding: who pays has not been determined yet.'
+          : '';
       inputRequested.push({
         caseId: recoveryCase.id,
-        prompt: presentTravellerDecisionPrompt(recoveryCase, intent, trip, stayPlaceName),
+        prompt: `Approve the proposed change${intent?.priceDelta ? ` (extra cost ${intent.priceDelta.amount} ${intent.priceDelta.currency})` : ''}?${fundingNote}`,
         options: ['Approve', 'Decline'],
       });
     }
@@ -991,7 +781,18 @@ export async function projectTravellerTrip(
 
   // Remainder viability: deterministic from current constraint evaluations.
   const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, at);
-  const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
+  const hardById = new Map<string, Constraint['hardness']>();
+  for (const constraint of constraints) {
+    hardById.set(constraint.id, constraint.hardness);
+  }
+  let remainderViable: RemainderViability = 'VIABLE';
+  if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
+    remainderViable = 'NOT_VIABLE';
+  } else if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
+    remainderViable = 'UNKNOWN';
+  } else if (evaluations.some((e) => e.status === 'FAIL') || trip.viability === 'AT_RISK') {
+    remainderViable = 'AT_RISK';
+  }
 
   return {
     tripId,

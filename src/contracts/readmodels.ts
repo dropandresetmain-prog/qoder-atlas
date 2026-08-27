@@ -51,23 +51,12 @@ export interface OperatorTripView {
   tripId: EntityId;
   /** Open operator case for this trip. Absent when no case is actionable. */
   activeCaseId?: EntityId;
-  /**
-   * Latest resolved case for history reopen. Set only when there is no open
-   * case; never used as an attention-queue signal.
-   */
-  historyCaseId?: EntityId;
   label?: string;
   travellerNames: string[];
   anchorEventName?: string;
   /** Explicit intake travel arrangement when declared on the traveller entity. */
   travelArrangement?: 'NORTHSTAR_ARRANGED' | 'SELF_OR_OTHER_ARRANGED' | 'UNSPECIFIED';
   status: ReadModelStatus;
-  /**
-   * Propagated whole-trip viability from current constraint evaluations.
-   * Independent of open-case workflow status — used to differentiate shared
-   * incident consequences (schedule changed for many; only some are not viable).
-   */
-  remainderViable?: RemainderViability;
   /** What changed, in user-facing language. */
   whatChanged?: string;
   affectedItems: string[];

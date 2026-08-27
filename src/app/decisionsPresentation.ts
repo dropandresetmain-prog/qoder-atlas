@@ -58,21 +58,14 @@ export async function projectDecisionsPage(
         caseId: recoveryCase.id,
         travellerName,
         decision: intent ? `${presentAction(intent.operation)} — ${decision.approval.decision.toLowerCase()}` : decision.approval.decision,
-        ...(intent?.providerSpend
+        ...(intent?.priceDelta
           ? {
               cost: formatDecisionCost(
-                intent.providerSpend,
+                intent.priceDelta,
                 fundingSummaryForIntent(intent.costAllocation),
               ),
             }
-          : intent?.priceDelta
-            ? {
-                cost: formatDecisionCost(
-                  intent.priceDelta,
-                  fundingSummaryForIntent(intent.costAllocation),
-                ),
-              }
-            : {}),
+          : {}),
         ...(decidedBy ? { decidedBy } : {}),
         when: formatRosterTime(decision.approval.decidedAt, generatedAt),
       });

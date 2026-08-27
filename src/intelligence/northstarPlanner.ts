@@ -90,19 +90,6 @@ function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Human-readable airport chain from normalized offer segments (no guessing). */
-function formatOfferRoute(offer: FlightOffer): string {
-  if (offer.segments.length === 0) return 'unknown route';
-  const codes: string[] = [];
-  for (const segment of offer.segments) {
-    const origin = segment.origin.value;
-    const destination = segment.destination.value;
-    if (codes.length === 0) codes.push(origin);
-    codes.push(destination);
-  }
-  return codes.join('→');
-}
-
 /**
  * Deterministic id factory (REV-2 WP-R5): a per-prefix sequence. Given the
  * same input sequence the same ids come out, which keeps persisted case
@@ -472,35 +459,17 @@ export class NorthstarPlanner implements RecoveryPlanner {
           );
           continue;
         }
-        // Return-corridor honesty: substituting the departure origin does not
-        // invent a new return terminus. An existing return that still lands at
-        // the superseded home origin (or an explicitly preserved destination)
-        // is PRESERVED. Only a return that neither matches the old home nor a
-        // declared preserveReturnDestination stays an explicit uncertainty —
-        // never silently rebooked on assumption.
-        const supersededOriginPlaceId = arrivalLeg
-          ? this.airportGatewayFor(input, arrivalLeg.data.originPlaceId)?.placeId
-          : undefined;
-        const preservedReturnRef = target.preserveReturnDestination;
+        // Return-corridor honesty: substituting the departure origin
+        // invalidates the home assumption any event-departing return leg was
+        // built on. Its terminus becomes an EXPLICIT uncertainty — never
+        // silently re-assumed, and never rebooked on the traveller's behalf.
         for (const candidate of flightLegs) {
           if (arrivalLeg && candidate.id === arrivalLeg.id) continue;
           if (this.airportGatewayFor(input, candidate.data.originPlaceId)?.placeId !== eventGatewayId) continue;
-          const returnGateway = this.airportGatewayFor(input, candidate.data.destinationPlaceId);
-          if (!returnGateway) continue;
-          if (returnGateway.placeId === declaredGateway.place.id) continue;
-          const matchesSupersededHome =
-            supersededOriginPlaceId !== undefined && returnGateway.placeId === supersededOriginPlaceId;
-          const matchesPreservedRef =
-            preservedReturnRef !== undefined &&
-            returnGateway.ref.system === preservedReturnRef.system &&
-            returnGateway.ref.value.trim().toLowerCase() === preservedReturnRef.value.trim().toLowerCase();
-          if (matchesSupersededHome || matchesPreservedRef) {
-            // Recorded as an assumption on strategies later; skip uncertainty.
-            continue;
-          }
+          if (this.airportGatewayFor(input, candidate.data.destinationPlaceId)?.placeId === declaredGateway.place.id) continue;
           uncertainties.push(
             this.uncertainty(
-              `departureOrigin substituted to ${declared.system}:${declared.value}; the return leg departing the event gateway terminates at ${returnGateway.ref.system}:${returnGateway.ref.value} and that terminus is unverified — it is not rebooked on assumption`,
+              `departureOrigin substituted to ${declared.system}:${declared.value}; the return leg departing the event gateway still terminates at the superseded origin and the replacement terminus is unverified — it is not rebooked on assumption`,
               'MEDIUM',
             ),
           );
@@ -691,12 +660,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
       .flatMap(({ dimension, leg, evidence, substitutedOriginPlaceId, corridorOriginPlaceId, corridorDestinationPlaceId }) =>
         evidence
           ? [...evidence.offers]
-              .sort(
-                (a, b) =>
-                  a.segments.length - b.segments.length ||
-                  a.totalPrice.amount - b.totalPrice.amount ||
-                  a.offerId.localeCompare(b.offerId),
-              )
+              .sort((a, b) => a.totalPrice.amount - b.totalPrice.amount || a.offerId.localeCompare(b.offerId))
               .map((offer): RecoveryStrategy => {
                 const first = offer.segments[0];
                 const last = offer.segments[offer.segments.length - 1];
@@ -755,46 +719,25 @@ export class NorthstarPlanner implements RecoveryPlanner {
                   },
                 ];
                 // DR-8: read verbatim as the user-facing option title
-                // downstream (readmodels.ts) — include normalized route so
-                // connecting offers are never presented as direct.
-                const routeLabel = formatOfferRoute(offer);
-                const stopsLabel =
-                  offer.segments.length <= 1
-                    ? 'direct'
-                    : `${offer.segments.length - 1} stop${offer.segments.length - 1 === 1 ? '' : 's'}`;
-                const originLabel =
-                  first?.origin?.value?.trim() ||
-                  routeLabel.split('→')[0]?.trim() ||
-                  'the new origin';
+                // downstream (readmodels.ts) — no raw leg/offer ids in it.
                 const windowPhrase =
                   dimension === 'arriveBy'
                     ? 'arrive earlier'
                     : dimension === 'departAfter'
                       ? 'depart later'
-                      : `fly from ${originLabel}`;
+                      : 'fly from the declared departure gateway';
                 const bookPhrase =
                   dimension === 'arriveBy' ? 'arrive by the requested time' : 'depart after the requested time';
                 const summaryPhrase = leg ? windowPhrase : bookPhrase;
-                const preserveAssumptions =
-                  dimension === 'departureOrigin' && target.preserveReturnDestination
-                    ? [
-                        `explicit return destination preserved: ${target.preserveReturnDestination.system}:${target.preserveReturnDestination.value}`,
-                      ]
-                    : dimension === 'departureOrigin'
-                      ? ['existing return leg terminus preserved when it matches the superseded home origin']
-                      : [];
                 return {
                   id: this.idFactory('strat'),
                   caseId: input.caseId,
                   summary: first
-                    ? `${leg ? 'Rebook' : 'Book a flight'} ${routeLabel} (${stopsLabel}) to ${summaryPhrase}, departing at ${first.departure.slice(11, 16)}`
+                    ? `${leg ? 'Rebook' : 'Book a flight'} to ${summaryPhrase}, departing at ${first.departure.slice(11, 16)}`
                     : `${leg ? 'Rebook' : 'Book a flight'} to ${summaryPhrase}`,
                   candidateOperations,
                   toolRequests: [],
-                  assumptions: [
-                    'the offer schedule is CONNECTED evidence until execution observation confirms it',
-                    ...preserveAssumptions,
-                  ],
+                  assumptions: ['the offer schedule is CONNECTED evidence until execution observation confirms it'],
                   uncertainties: [],
                   expectedOutcomes: [`the trip window satisfies the traveller request (${dimension} ${windowEvidence})`],
                   costImpact: offer.totalPrice,
@@ -1179,11 +1122,8 @@ export class NorthstarPlanner implements RecoveryPlanner {
   /**
    * Enumerate candidate replacement/extension strategies from hotel.search
    * evidence. Generic discipline:
-   * - date-only / same-property extensions prefer rates whose provider id
-   *   matches the incumbent (or declared same) property — never pad with
-   *   unrelated hotels when the request is an extension;
-   * - explicit property switches keep cheapest rate per DISTINCT property,
-   *   capped for reviewable options (rank order is cheapest-first);
+   * - cheapest rate per DISTINCT property; properties capped for reviewable
+   *   options (rank order is cheapest-first);
    * - each strategy UPSERTs the incumbent Stay element id (overlay replace
    *   semantics): new dates/place/bookingRef at HELD/UNKNOWN, occupancy from
    *   the declared target else unchanged;
@@ -1215,37 +1155,13 @@ export class NorthstarPlanner implements RecoveryPlanner {
         cheapestByProperty.set(rate.propertyId, rate);
       }
     }
-
-    const samePropertyExtension = this.isSamePropertyStayExtension(input, target, stay);
-    const incumbentPropertyIds = samePropertyExtension
-      ? this.incumbentHotelProviderIds(input, stay, target)
-      : [];
-    let rankedRates = [...cheapestByProperty.values()].sort(
-      (a, b) =>
-        a.totalPrice.amount - b.totalPrice.amount ||
-        a.rateId.localeCompare(b.rateId),
-    );
-    if (samePropertyExtension) {
-      const samePropertyRates = rankedRates.filter((rate) => incumbentPropertyIds.includes(rate.propertyId));
-      if (samePropertyRates.length === 0) {
-        return {
-          strategies: [],
-          toolRequests: [],
-          assumptions: [],
-          uncertainties: [
-            this.uncertainty(
-              'same-property stay extension requested but hotel.search evidence has no rate for the incumbent property; no unrelated hotel fabricated',
-              'HIGH',
-            ),
-            ...uncertainties,
-          ],
-          rationale:
-            'northstar window-shift planner failed closed: same-property extension requires incumbent-property rates',
-        };
-      }
-      rankedRates = samePropertyRates;
-    }
-    const selected = rankedRates.slice(0, MAX_HOTEL_STRATEGIES);
+    const selected = [...cheapestByProperty.values()]
+      .sort(
+        (a, b) =>
+          a.totalPrice.amount - b.totalPrice.amount ||
+          a.rateId.localeCompare(b.rateId),
+      )
+      .slice(0, MAX_HOTEL_STRATEGIES);
 
     const strategies: RecoveryStrategy[] = selected.map((rate) => {
       const property = propertyById.get(rate.propertyId)!;
@@ -1261,8 +1177,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
                 (candidate) => candidate.system === ref.system && candidate.value === ref.value,
               ) ?? false,
           ),
-        ) ??
-        (samePropertyExtension ? this.placeById(input, stay.data.placeId) : undefined);
+        );
       const placeId = knownPlace ? knownPlace.id : derivedPlaceIdFor(property);
       const placeOperations = knownPlace
         ? []
@@ -1325,19 +1240,9 @@ export class NorthstarPlanner implements RecoveryPlanner {
       ];
       const nightsPhrase =
         requestedCheckOut && requestedCheckOut.slice(0, 10) !== stay.data.checkIn.value.slice(0, 10)
-          ? (() => {
-              const day = requestedCheckOut.slice(0, 10);
-              const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
-              if (!match) return ` through ${day}`;
-              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-              return ` through ${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]}`;
-            })()
+          ? ` through ${requestedCheckOut.slice(0, 10)}`
           : '';
-      // Exact provider payable — never round (541.83 must not become 542).
-      const payableAmount = Number(rate.totalPrice.amount.toFixed(2));
-      const summary = samePropertyExtension
-        ? `Extend stay at ${property.name}${nightsPhrase} — ${payableAmount} ${rate.totalPrice.currency}`
-        : `Switch stay to ${property.name}${nightsPhrase} — ${payableAmount} ${rate.totalPrice.currency}`;
+      const summary = `Switch stay to ${property.name}${nightsPhrase} — ${Math.round(rate.totalPrice.amount)} ${rate.totalPrice.currency}`;
       return {
         id: this.idFactory('strat'),
         caseId: input.caseId,
@@ -1346,9 +1251,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
         toolRequests: [],
         assumptions: [
           'the quoted rate is CONNECTED evidence until execution observation confirms it',
-          samePropertyExtension
-            ? 'the incumbent stay property is preserved; only requested dates/occupancy change'
-            : 'the displaced stay cancels only after the replacement observes CONFIRMED (executor-owned sequencing)',
+          'the displaced stay cancels only after the replacement observes CONFIRMED (executor-owned sequencing)',
         ],
         uncertainties: rate.refundable
           ? []
@@ -1361,9 +1264,7 @@ export class NorthstarPlanner implements RecoveryPlanner {
               },
             ],
         expectedOutcomes: [
-          samePropertyExtension
-            ? `the trip's accommodation extends at the same property with a chargeable rate (${rate.refundable ? 'refundable' : 'non-refundable'})`
-            : `the trip's accommodation satisfies the requested change with a chargeable replacement (${rate.refundable ? 'refundable' : 'non-refundable'} rate)`,
+          `the trip's accommodation satisfies the requested change with a chargeable replacement (${rate.refundable ? 'refundable' : 'non-refundable'} rate)`,
         ],
         costImpact: rate.totalPrice,
         createdAt: this.instant(input),
@@ -1374,61 +1275,12 @@ export class NorthstarPlanner implements RecoveryPlanner {
       strategies,
       toolRequests: [],
       assumptions: [
-        samePropertyExtension
-          ? 'same-property stay extensions are enumerated from matching hotel.search rates; viability owns feasibility'
-          : 'replacement stays are enumerated from hotel.search evidence; viability owns feasibility',
+        'replacement stays are enumerated from hotel.search evidence; viability owns feasibility',
         'funding allocation derives deterministically from the candidate stay check-out/check-in anchor',
       ],
       uncertainties,
-      rationale: samePropertyExtension
-        ? 'northstar window-shift planner enumerates same-property stay extensions from hotel.search evidence; viability owns feasibility'
-        : 'northstar window-shift planner enumerates replacement stays from hotel.search evidence; viability owns feasibility',
+      rationale: 'northstar window-shift planner enumerates replacement stays from hotel.search evidence; viability owns feasibility',
     };
-  }
-
-  /**
-   * Same-property extension when a check-out change is requested and no
-   * different property is declared. An explicit stayPlaceRef /
-   * preferredStayPlaceId that resolves to the incumbent still counts as
-   * same-property (extend, do not switch).
-   */
-  private isSamePropertyStayExtension(
-    input: PlannerInput,
-    target: ResolutionTarget,
-    stay: Stay,
-  ): boolean {
-    if (target.stayCheckOut === undefined) return false;
-    if (target.preferredStayPlaceId !== undefined && target.preferredStayPlaceId !== stay.data.placeId) {
-      return false;
-    }
-    if (target.stayPlaceRef !== undefined) {
-      const incumbent = this.placeById(input, stay.data.placeId);
-      const matchesIncumbent =
-        incumbent?.externalRefs.some(
-          (ref) =>
-            ref.system === target.stayPlaceRef!.system &&
-            ref.value.trim().toLowerCase() === target.stayPlaceRef!.value.trim().toLowerCase(),
-        ) ?? false;
-      if (!matchesIncumbent) return false;
-    }
-    return true;
-  }
-
-  /** Provider hotel ids that identify the incumbent stay property. */
-  private incumbentHotelProviderIds(
-    input: PlannerInput,
-    stay: Stay,
-    target: ResolutionTarget,
-  ): string[] {
-    const ids = new Set<string>();
-    if (target.stayPlaceRef?.system === 'nuitee-hotel-id') {
-      ids.add(target.stayPlaceRef.value);
-    }
-    const incumbent = this.placeById(input, stay.data.placeId);
-    for (const ref of incumbent?.externalRefs ?? []) {
-      if (ref.system === 'nuitee-hotel-id') ids.add(ref.value);
-    }
-    return [...ids];
   }
 
   private degraded(reason: string): PlannerOutput {

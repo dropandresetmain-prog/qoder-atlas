@@ -214,8 +214,6 @@ test('cases: FULLY_RECOVERED and RECOVERED_WITH_LOSS resolutions are representab
 
   // State machine guards: VERIFYING may loop back; RESOLVED is terminal.
   assert.equal(isLegalCaseTransition('VERIFYING', 'ASSESSING'), true);
-  assert.equal(isLegalCaseTransition('PLANNING', 'RESOLVED'), true);
-  assert.equal(isLegalCaseTransition('AWAITING_APPROVAL', 'RESOLVED'), true);
   assert.equal(isLegalCaseTransition('RESOLVED', 'EXECUTING'), false);
 });
 

@@ -428,12 +428,6 @@ function deriveImplications(
     );
   }
 
-  if (target.preserveReturnDestination) {
-    implications.push(
-      `preserveReturnDestination ${target.preserveReturnDestination.system}:${target.preserveReturnDestination.value} declared; existing return terminus must be preserved`,
-    );
-  }
-
   // Transport preferences (A2 territory: preferDirect, earliest/latest).
   if (target.transport) {
     if (target.transport.preferDirect !== undefined) {
@@ -534,7 +528,6 @@ function deriveImplications(
 function isTargetEmpty(target: ResolutionTarget): boolean {
   if (target.arriveBy || target.departAfter || target.stayCheckOut) return false;
   if (target.departureOrigin) return false;
-  if (target.preserveReturnDestination) return false;
   if (target.preferredStayProximityRef) return false;
   if (target.stayPlaceRef) return false;
   if (target.preferredStayPlaceId) return false;

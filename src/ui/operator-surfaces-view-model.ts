@@ -105,7 +105,7 @@ export function decisionsFromApprovalsQueue(view: ApprovalsQueueView): Decisions
           ? 'Traveller'
           : decision.requestedFrom === 'ORGANISATION'
             ? 'Organisation'
-            : 'Organiser',
+            : 'Human agent',
       age: formatRosterTime(decision.requestedAt, view.generatedAt),
     })),
     // Decided history is not yet a programme-level projection. Leave it

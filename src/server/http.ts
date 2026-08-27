@@ -7,9 +7,6 @@
  * execution lifecycle — it never mutates presentation state only.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { AppConfig } from '../config/config.ts';
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import type { OperatorDashboardView, ProgrammeView, TravellerTripView } from '../contracts/readmodels.ts';
@@ -337,25 +334,6 @@ async function handle(
         ? [...['/operator', '/decisions', '/activity', '/traveller'], ...(endpoints.runtime ? ['/api/runtime/state'] : [])]
         : [],
     });
-    return;
-  }
-
-  // Static presentation assets (traveller hero imagery, etc.).
-  if (req.method === 'GET' && url.pathname === '/assets/sg-dusk.png') {
-    try {
-      const assetPath = path.resolve(
-        path.dirname(fileURLToPath(import.meta.url)),
-        '../../fixtures/ui/sg-dusk.png',
-      );
-      const bytes = await readFile(assetPath);
-      res.writeHead(200, {
-        'content-type': 'image/png',
-        'cache-control': 'public, max-age=86400',
-      });
-      res.end(bytes);
-    } catch {
-      sendJson(res, 404, { error: 'not_found', path: url.pathname });
-    }
     return;
   }
 

@@ -30,7 +30,6 @@ import { evaluateConstraints } from '../engine/evaluators.ts';
 import { buildEvaluationContext } from '../engine/evaluationContext.ts';
 import { CaseService } from '../engine/case.ts';
 import { constraintsForTrip } from './snapshot.ts';
-import { reconcilePriorOpenCasesIfTripViable } from './caseReconciliation.ts';
 
 export interface SignalPipelineDependencies {
   trips: TripRepository;
@@ -123,20 +122,8 @@ export async function processSignal(
   // 5. Recovery case lifecycle: DETECTED -> ASSESSING (frozen transition
   //    table enforced by CaseService). Re-processing an already-open case
   //    for the same signal is a no-op, not a duplicate.
-  //
-  //    If this trip already had an open recovery case and the new signal
-  //    restored viability (authorised programme mutation, etc.), reconcile
-  //    those prior cases instead of opening a second disrupted case.
-  const priorOpen = (await deps.cases.listCasesForTrip(tripId)).filter(
-    (openCase) => openCase.status !== 'RESOLVED',
-  );
-  const restored = await reconcilePriorOpenCasesIfTripViable(deps, {
-    tripId,
-    at: assessment.assessedAt,
-    priorOpen,
-  });
   const caseService = new CaseService({ cases: deps.cases });
-  const caseId = restored.caseId ?? `case-${tripId}-${signal.id}`;
+  const caseId = `case-${tripId}-${signal.id}`;
   const affectedElementIds = [
     ...assessment.directFailures.map((f) => f.elementId),
     ...assessment.affectedElements.map((a) => a.elementId),
@@ -145,7 +132,7 @@ export async function processSignal(
     .filter((evaluation) => evaluation.status === 'FAIL')
     .map((evaluation) => evaluation.constraintId);
   let recoveryCase = await deps.cases.getCase(caseId);
-  if (!restored.reconciled && !recoveryCase) {
+  if (!recoveryCase) {
     recoveryCase = await caseService.open({
       id: caseId,
       tripId,
@@ -155,9 +142,6 @@ export async function processSignal(
       failedConstraintIds,
     });
     recoveryCase = await caseService.transition(caseId, 'ASSESSING', assessment.assessedAt);
-  }
-  if (!recoveryCase) {
-    throw new Error(`recovery case ${caseId} missing after signal ${signal.id}`);
   }
 
   // 6. Audit link: signal -> mutation -> impact -> case, answering both

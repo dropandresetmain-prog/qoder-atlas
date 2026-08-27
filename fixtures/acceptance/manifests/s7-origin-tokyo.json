@@ -89,8 +89,7 @@
         { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "a recovery case opens for the correction" },
         { "path": "implications", "op": "arrayNotEmpty", "description": "the resolver records the substitution against the current corridor" },
         { "path": "implications.0", "op": "contains", "expected": "departureOrigin airport-code:HND declared", "description": "the declared gateway is recorded verbatim — resolution never silently rewrites the traveller's declaration" },
-        { "path": "implications.0", "op": "contains", "expected": "the arrival corridor must be re-planned from the declared gateway", "description": "the old London-origin corridor is obsolete: re-planning from the declared gateway is the recorded consequence" },
-        { "path": "implications.1", "op": "contains", "expected": "preserveReturnDestination airport-code:LHR", "description": "explicit LHR return intent is structured and preserved" }
+        { "path": "implications.0", "op": "contains", "expected": "the arrival corridor must be re-planned from the declared gateway", "description": "the old London-origin corridor is obsolete: re-planning from the declared gateway is the recorded consequence" }
       ]
     },
     {
@@ -115,9 +114,7 @@
         { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "the evidence request is a flight search" },
         { "path": "toolActivity.0.ok", "op": "truthy", "description": "the REPLAY recording supplied replacement-corridor offers from the declared gateway" },
         { "path": "strategies", "op": "arrayLengthMin", "expected": 2, "description": "every normalized replacement offer becomes a candidate strategy" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook", "description": "the candidate rebooks the existing arrival leg with the substituted origin" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "fly from HND", "description": "the superseded London origin is never re-proposed as current" },
-        { "path": "strategies.0.summary", "op": "contains", "expected": "direct", "description": "recommended offer projects normalized direct routing, not a flattened connection" },
+        { "path": "strategies.0.summary", "op": "contains", "expected": "Rebook to fly from the declared departure gateway", "description": "the candidate rebooks the existing arrival leg with the substituted origin — the superseded London origin is never re-proposed" },
         { "path": "strategies.0.feasible", "op": "truthy", "description": "a replacement from the declared gateway satisfies programme arrival constraints" },
         { "path": "strategies.0.costImpact.currency", "op": "equals", "expected": "USD", "description": "Atlas provider quotes remain in provider currency (USD) ahead of FX normalization" },
         { "path": "bestStrategyId", "op": "exists", "description": "a feasible replacement exists, so the engine ranks a best strategy instead of failing closed" },

@@ -91,18 +91,6 @@ function linkState(
   affected: ReadonlySet<string>,
   recoveryCase: RecoveryCase | undefined,
 ): ChainLinkState {
-  const caseOpen = Boolean(recoveryCase && recoveryCase.status !== 'RESOLVED');
-  const isAffected = affected.has(element.id);
-
-  // Programme engagements are not supplier reservations. Reservation NONE /
-  // status UNKNOWN must not render as unbooked or "details pending".
-  if (element.elementKind === 'ENGAGEMENT') {
-    if (element.status === 'INVALID') return 'BROKEN';
-    if (element.status === 'AT_RISK' || (caseOpen && isAffected)) return 'AT_RISK';
-    // Preserved / scheduled programme time — not a booking confirmation chip.
-    return 'CONFIRMED';
-  }
-
   if (element.status === 'INVALID') return 'BROKEN';
   if (element.status === 'AT_RISK') return 'AT_RISK';
   switch (element.reservationState) {
@@ -111,19 +99,22 @@ function linkState(
     case 'NONE':
       return 'UNBOOKED';
     case 'UNKNOWN':
-      // Only genuinely unverified reservations stay Unknown. Unaffected
-      // known topology after recovery must not paint Pending forever.
-      return caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
+      return 'UNKNOWN';
     case 'HELD':
-      return caseOpen && isAffected ? 'PROPOSED' : 'AT_RISK';
+      return recoveryCase && recoveryCase.status !== 'RESOLVED' && affected.has(element.id)
+        ? 'PROPOSED'
+        : 'AT_RISK';
     case 'CONFIRMED':
     case 'CHANGED':
     case 'COMPLETED':
-      // Confirmed supplier bookings stay Confirmed unless this element is in
-      // the open case blast radius. Health status UNKNOWN alone is not Pending.
-      return caseOpen && isAffected ? 'AT_RISK' : 'CONFIRMED';
+      if (element.status === 'UNKNOWN' && element.reservationState !== 'COMPLETED') {
+        return 'UNKNOWN';
+      }
+      return affected.has(element.id) && recoveryCase && recoveryCase.status !== 'RESOLVED'
+        ? 'AT_RISK'
+        : 'CONFIRMED';
     default:
-      return caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
+      return 'UNKNOWN';
   }
 }
 

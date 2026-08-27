@@ -432,7 +432,7 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     const caseRes = await fetch(`${base}/operator/cases/${caseId}`);
     assert.equal(caseRes.status, 200);
     const caseHtml = await caseRes.text();
-    assert.match(caseHtml, /Awaiting approval|Waiting for|Options on the table/);
+    assert.match(caseHtml, /Options on the table/);
     assert.match(caseHtml, /Approval/);
     const missingCase = await fetch(`${base}/operator/cases/case-does-not-exist`);
     assert.equal(missingCase.status, 404);

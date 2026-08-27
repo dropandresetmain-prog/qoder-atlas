@@ -55,16 +55,6 @@ export interface RecoveryOptionView {
    * "Makes the rehearsal". Projected by the backend; never invented here.
    */
   flags?: string[];
-  /** Structured advantages derived from evidence (timing, cost, disruption). */
-  pros?: string[];
-  /** Structured tradeoffs / uncertainties derived from evidence. */
-  cons?: string[];
-  /** Plain-language effect on the hard commitment (keeps / breaks / unknown). */
-  commitmentEffect?: string;
-  /** Who must approve this option, in judge-facing language. */
-  authorityLabel?: string;
-  /** Evidence provenance, e.g. REPLAY search / SIMULATED execution. */
-  provenanceLabel?: string;
   /**
    * Deterministic payer allocation of this option's cost (ADR-037), present
    * only when FUNDED_WINDOW rules + a cost anchor could decide. Absence
@@ -237,9 +227,6 @@ export interface CaseDetailView {
   programmeChangeAvailable?: boolean;
   /** Anchor commitment id for programme-side recovery (when available). */
   programmeChangeCommitmentId?: EntityId;
-  /** Prefill for programme-change modal (ISO); human labels rendered in UI. */
-  programmeChangeProposedStartsAt?: IsoDateTime;
-  programmeChangeProposedEndsAt?: IsoDateTime;
 }
 
 /**

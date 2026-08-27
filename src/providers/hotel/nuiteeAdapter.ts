@@ -285,17 +285,11 @@ export class NuiteeAdapter implements HotelCapability {
   }
 
   async searchHotels(query: HotelSearchQuery): Promise<CapabilityResult<HotelSearchOutcome>> {
-    const requestedHotelIds =
-      query.location.externalRef && query.location.externalRef.system === NUITEE_HOTEL_ID_REF_SYSTEM
-        ? [query.location.externalRef.value]
-        : undefined;
     const adapter: ProviderAdapter<HotelSearchQuery, NuiteeSearchRaw, HotelSearchOutcome> = {
       providerId: NUITEE_PROVIDER_ID,
       mode: this.mode,
       obtainRaw: async (request) => this.fetchSearchRaw(request),
-      // Deterministic mapping: a hotel-id search must not surface unrelated
-      // market properties just because a REPLAY/LIVE basket contains them.
-      normalize: (raw) => filterSearchToRequestedHotels(normalizeSearch(raw), requestedHotelIds),
+      normalize: normalizeSearch,
     };
     return runAdapter(adapter, this.store, query, {
       operation: 'search',
@@ -723,23 +717,6 @@ export function normalizeSearch(raw: NuiteeSearchRaw): HotelSearchOutcome {
     }
   }
   return { properties, rates };
-}
-
-/**
- * When the search query named specific hotel ids, keep only those properties
- * and rates. Contaminated multi-hotel REPLAY baskets otherwise look like a
- * market search and silently promote unrelated hotels.
- */
-export function filterSearchToRequestedHotels(
-  outcome: HotelSearchOutcome,
-  requestedHotelIds: string[] | undefined,
-): HotelSearchOutcome {
-  if (!requestedHotelIds || requestedHotelIds.length === 0) return outcome;
-  const wanted = new Set(requestedHotelIds);
-  return {
-    properties: outcome.properties.filter((property) => wanted.has(property.propertyId)),
-    rates: outcome.rates.filter((rate) => wanted.has(rate.propertyId)),
-  };
 }
 
 export function normalizeQuote(raw: NuiteePrebookRaw): HotelQuoteOutcome {

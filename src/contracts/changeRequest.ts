@@ -59,12 +59,6 @@ export const ResolutionTargetSchema = z.strictObject({
    * and an unresolvable value stays an explicit uncertainty — never guessed.
    */
   departureOrigin: z.strictObject({ system: z.string(), value: z.string() }).optional(),
-  /**
-   * Explicit return-destination preservation ("I will still return to LHR"):
-   * a generic airport external ref. When present, origin substitution must
-   * not treat a matching return leg as an unverified terminus.
-   */
-  preserveReturnDestination: z.strictObject({ system: z.string(), value: z.string() }).optional(),
   /** Reference place the stay should be near (e.g. venue Place id). */
   preferredStayProximityRef: EntityRefSchema.optional(),
   /** Desired stay check-out instant (extension or shortening). */

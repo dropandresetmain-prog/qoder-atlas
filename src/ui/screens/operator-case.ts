@@ -36,20 +36,11 @@ import {
   RESOLUTION_OUTCOME_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
-  authorityNeededLabel,
   caseOptionsHeading,
   type StatusTone,
 } from '../copy.ts';
-import { escapeHtml, formatCostDelta, formatInstant, formatMoney, formatPayable, formatPolicyEquivalent } from '../html.ts';
+import { escapeHtml, formatCostDelta, formatInstant, formatMoney } from '../html.ts';
 import { CASE_PRIMARY_OPTION_LIMIT } from '../presentationState.ts';
-import {
-  selectCaseWorkspacePhase,
-  shouldShowBeginCta,
-  shouldShowExecuteCta,
-  shouldShowOptionsPanel,
-  shouldShowProgrammeChangeCta,
-  shouldShowResolveCta,
-} from '../caseLifecycle.ts';
 import {
   chainLinkGlyph,
   errorPanel,
@@ -122,20 +113,10 @@ function caseBadge(view: CaseDetailView): { label: string; tone: StatusTone } {
   if (view.resolution?.outcome === 'ESCALATED_CLOSED') {
     return { label: CASE_BADGE_HUMAN_DECISION, tone: 'alert' };
   }
-  if (view.resolution || view.status === 'RESOLVED') {
-    return { label: STATUS_LABEL.RESOLVED, tone: STATUS_TONE.RESOLVED };
-  }
-  if (shouldShowExecuteCta(view) || selectCaseWorkspacePhase(view) === 'executing') {
-    return { label: STATUS_LABEL.RECOVERING, tone: STATUS_TONE.RECOVERING };
-  }
   if (view.approval?.state === 'PENDING') {
-    if (view.approval.requestedFrom === 'TRAVELLER') {
-      const who = view.travellerNames[0]?.trim() || 'traveller';
-      return { label: `Waiting for ${who}`, tone: 'watch' };
-    }
-    // ORGANISATION and HUMAN_AGENT are both awaiting-authority — never
-    // "Options on the table" once a proposal is staged for approval.
-    return { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' };
+    return view.approval.requestedFrom === 'ORGANISATION'
+      ? { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' }
+      : { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
   }
   if (!view.resolution && view.options.length > 0 && view.status === 'RECOVERING') {
     return { label: CASE_BADGE_OPTIONS_READY, tone: 'watch' };
@@ -172,15 +153,7 @@ function unknownStateWord(link: ChainLinkView): string {
 
 function chainLink(link: ChainLinkView): string {
   const style = CHAIN_LINK_STYLE[link.state];
-  const isCommitment = Boolean(link.commitment) || link.kind.toLowerCase() === 'commitment';
-  let word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
-  if (isCommitment) {
-    // Programme engagements are not bookings — never "Not booked" / "Details pending".
-    if (link.state === 'UNBOOKED' || link.state === 'CONFIRMED' || link.state === 'UNKNOWN') word = 'Scheduled';
-    else if (link.state === 'PROPOSED') word = 'Preserved';
-    else if (link.state === 'AT_RISK') word = 'At risk';
-    else if (link.state === 'BROKEN') word = 'Impacted';
-  }
+  const word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
   const detail = link.detail ? `<div class="lk-detail">${escapeHtml(link.detail)}</div>` : '';
   return `
   <div class="link ${style.cls}${link.commitment ? ' is-commitment' : ''}" data-link-state="${escapeHtml(link.state)}">
@@ -329,23 +302,10 @@ const ACTION_ROW: Record<ActionProgressState, { cls: string; icon: string }> = {
 
 function activitySection(view: CaseDetailView): string {
   if (view.actions.length === 0) return '';
-  const phase = selectCaseWorkspacePhase(view);
-  // Do not leak recommended flight/strategy titles before Begin / authority.
-  const revealRecommendationDetail =
-    phase === 'awaiting_authority' ||
-    phase === 'execute' ||
-    phase === 'executing' ||
-    phase === 'resolved' ||
-    view.approval?.state === 'APPROVED' ||
-    view.approval?.state === 'PENDING';
   const rows = view.actions
     .map((action) => {
       const style = ACTION_ROW[action.state];
-      const detail =
-        revealRecommendationDetail || !action.detail
-          ? action.detail
-          : undefined;
-      const sub = detail ? `<span class="c-sub">${escapeHtml(detail)}</span>` : '';
+      const sub = action.detail ? `<span class="c-sub">${escapeHtml(action.detail)}</span>` : '';
       return `<div class="check-row ${style.cls}"><span class="c-ic">${style.icon}</span><span class="c-t">${escapeHtml(action.label)}</span>${sub}</div>`;
     })
     .join('');
@@ -425,52 +385,24 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     option.verdict === 'UNKNOWN'
       ? `<span class="chip">${escapeHtml(OPTION_VERDICT_LABEL.UNKNOWN)}</span>`
       : '';
-  const cost = option.providerCost || option.costDelta
+  const cost = option.costDelta
     ? (() => {
-        const chips: string[] = [];
-        if (option.providerCost) {
-          chips.push(
-            `<span class="chip chip-payable" data-test="option-payable">${escapeHtml(formatPayable(option.providerCost))}</span>`,
-          );
-        }
-        if (option.costDelta && option.providerCost) {
-          chips.push(
-            `<span class="chip chip-policy" data-test="option-policy-equivalent">${escapeHtml(formatPolicyEquivalent(option.costDelta))}</span>`,
-          );
-        } else if (option.costDelta) {
-          const delta = formatCostDelta(option.costDelta);
-          chips.push(
-            `<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}">${escapeHtml(delta.text)}</span>`,
-          );
-        }
-        return chips.join('');
+        const delta = formatCostDelta(option.costDelta);
+        // ADR-052: keep the original provider charge visible beside the
+        // home-currency restatement so the two never blur together.
+        const provider = option.providerCost
+          ? `<span class="chip" style="background:transparent;color:var(--text-faint)">${escapeHtml(`${formatMoney(option.providerCost)} at provider`)}</span>`
+          : '';
+        return `${provider}<span class="chip ${delta.kind === 'saving' ? 'chip-saving' : 'chip-cost'}">${escapeHtml(delta.text)}</span>`;
       })()
     : '';
-  const approval = option.requiresApproval
-    ? `<span class="chip chip-cost">${escapeHtml(option.authorityLabel ?? 'Needs approval')}</span>`
-    : '';
+  const approval = option.requiresApproval ? '<span class="chip chip-cost">Needs approval</span>' : '';
   const allocation = option.costAllocationSummary
     ? `<span class="chip">${escapeHtml(option.costAllocationSummary)}</span>`
     : '';
   const body = option.summary
     ? `<div class="opt-body">${escapeHtml(sanitizeUserFacingLabel(option.summary))}</div>`
     : '';
-  const pros =
-    (option.pros?.length ?? 0) > 0
-      ? `<ul class="opt-pros" data-test="option-pros">${option.pros!.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-      : '';
-  const cons =
-    (option.cons?.length ?? 0) > 0
-      ? `<ul class="opt-cons" data-test="option-cons">${option.cons!.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-      : '';
-  const commitment =
-    option.commitmentEffect
-      ? `<div class="opt-commitment" data-test="option-commitment"><strong>Commitment.</strong> ${escapeHtml(option.commitmentEffect)}</div>`
-      : '';
-  const provenance =
-    option.provenanceLabel
-      ? `<div class="opt-provenance" data-test="option-provenance">${escapeHtml(option.provenanceLabel)}</div>`
-      : '';
   const flags =
     (option.flags?.length ?? 0) > 0
       ? `<div class="opt-flags">${option.flags!.map((flag) => `<span class="chip">${escapeHtml(flag)}</span>`).join('')}</div>`
@@ -495,17 +427,13 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     </div>
     ${body}
     ${why}
-    ${commitment}
-    ${pros}
-    ${cons}
     ${flags}
-    ${provenance}
     ${whyNot}
   </div>`;
 }
 
 function optionsSection(view: CaseDetailView): string {
-  if (!shouldShowOptionsPanel(view) || view.options.length === 0) return '';
+  if (view.options.length === 0) return '';
   const allRejected = view.options.every((option) => option.verdict === 'NOT_VIABLE');
   if (allRejected) {
     return `
@@ -513,31 +441,6 @@ function optionsSection(view: CaseDetailView): string {
   <section class="section" aria-label="Recovery options" data-test="case-options">
     <h2>${escapeHtml(CASE_OPTIONS_ALL_REJECTED_TITLE)}</h2>
     ${view.options.map((option) => optionCard(option, 'more')).join('')}
-  </section>
-  </div>`;
-  }
-
-  const phase = selectCaseWorkspacePhase(view);
-  // Awaiting authority: keep the staged/selected recovery visible; collapse alternatives.
-  if (phase === 'awaiting_authority') {
-    const selected =
-      view.options.find((option) => option.recommended) ??
-      view.options.find((option) => option.verdict === 'VIABLE') ??
-      view.options[0]!;
-    const alternatives = view.options.filter((option) => option.id !== selected.id);
-    const moreBlock =
-      alternatives.length > 0
-        ? `<details class="more-options" data-test="more-options">
-    <summary>Other options considered <span class="count">${alternatives.length}</span></summary>
-    <div class="more-options-body">${alternatives.map((option) => optionCard(option, 'more')).join('')}</div>
-  </details>`
-        : '';
-    return `
-  <div data-case-options-panel>
-  <section class="section" aria-label="Selected recovery" data-test="case-options" data-options-mode="awaiting_authority" data-primary-option-count="1">
-    <h2>Selected recovery</h2>
-    <div class="primary-options" data-test="primary-options">${optionCard(selected, 'recommended')}</div>
-    ${moreBlock}
   </section>
   </div>`;
   }
@@ -607,7 +510,6 @@ const APPROVAL_STATE_LABEL: Record<ApprovalRequirementView['state'], string> = {
 function fundingSplitBlock(view: CaseDetailView): string {
   const allocation = view.funding?.allocation;
   if (!allocation) return '';
-  const travellerName = view.travellerNames[0] ?? PAYER_LABEL.TRAVELLER;
 
   // Traveller-only incremental (typical personal extension): make payer obvious.
   if (
@@ -615,12 +517,10 @@ function fundingSplitBlock(view: CaseDetailView): string {
     allocation.incrementalPayer &&
     !allocation.coveredAmount
   ) {
-    const payer =
-      allocation.incrementalPayer === 'TRAVELLER' ? travellerName : PAYER_LABEL[allocation.incrementalPayer];
     return `
     <div class="funding-callout" data-test="funding-traveller-incremental">
-      <p><strong>Personal incremental cost</strong> — ${escapeHtml(payer)} pays ${escapeHtml(formatMoney(allocation.incrementalAmount))}.</p>
-      <p class="footnote">The organiser incurs no new cost for this extension. Event-funded baseline stay is unchanged; ${escapeHtml(payer)} pays the personal increment. No flight changes.</p>
+      <p><strong>Personal incremental cost</strong> — ${escapeHtml(PAYER_LABEL[allocation.incrementalPayer])} pays ${escapeHtml(formatMoney(allocation.incrementalAmount))}.</p>
+      <p class="footnote">Organisation covers the approved business travel window. This extension sits outside that window, so the traveller funds the increment.</p>
     </div>`;
   }
 
@@ -651,8 +551,6 @@ function fundingSplitBlock(view: CaseDetailView): string {
   if (!(total > 0)) return '';
   const coveredPct = Math.round((covered / total) * 1000) / 10;
   const incrementalPct = Math.round((1000 - coveredPct * 10)) / 10;
-  const incrementalPayer =
-    allocation.incrementalPayer === 'TRAVELLER' ? travellerName : PAYER_LABEL[allocation.incrementalPayer];
   return `
     <div class="splitbar" aria-label="Funding split">
       <div class="sp-org" style="width:${coveredPct}%"></div>
@@ -660,13 +558,19 @@ function fundingSplitBlock(view: CaseDetailView): string {
     </div>
     <div class="split-legend">
       <span><i style="background:var(--ink)"></i>${escapeHtml(PAYER_LABEL[allocation.coveredBy])} — ${escapeHtml(formatMoney(allocation.coveredAmount))}</span>
-      <span><i style="background:var(--watch-f)"></i>${escapeHtml(incrementalPayer)} — ${escapeHtml(formatMoney(allocation.incrementalAmount))}</span>
+      <span><i style="background:var(--watch-f)"></i>${escapeHtml(PAYER_LABEL[allocation.incrementalPayer])} — ${escapeHtml(formatMoney(allocation.incrementalAmount))}</span>
     </div>`;
 }
 
 function approvalSection(view: CaseDetailView): string {
   const approval = view.approval;
   if (!approval) return '';
+  const from =
+    approval.requestedFrom === 'ORGANISATION'
+      ? 'the organisation'
+      : approval.requestedFrom === 'TRAVELLER'
+        ? 'the traveller'
+        : 'a human agent';
   const amount = approval.amount
     ? ` Amount: <strong>${escapeHtml(formatMoney(approval.amount))}</strong>.`
     : '';
@@ -676,16 +580,23 @@ function approvalSection(view: CaseDetailView): string {
     approval.state === 'PENDING' &&
     approval.requestedFrom === 'TRAVELLER'
   ) {
-    // Operator must not approve on the traveller's behalf. Traveller surface owns Approve.
-    const waitingFor =
-      view.travellerNames?.[0]?.trim() ||
-      view.tripLabel?.trim() ||
-      'the traveller';
+    const payerHint =
+      view.funding?.allocation?.incrementalPayer === 'TRAVELLER'
+        ? 'traveller-funded '
+        : '';
+    const approveLabel = approval.amount
+      ? `Approve ${payerHint}${formatMoney(approval.amount)}`.replace(/\s+/g, ' ').trim()
+      : 'Approve';
     actionForms = `
-    <div class="panel waiting-traveller" data-test="waiting-for-traveller" data-case-cta="awaiting_traveller">
-      <p class="planning-kicker">Traveller decision required</p>
-      <p class="planning-result-title">Waiting for ${escapeHtml(waitingFor)}</p>
-      <p>Northstar will not change the booking until ${escapeHtml(waitingFor)} approves on the traveller surface.</p>
+    <div class="btn-row">
+      <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
+        <input type="hidden" name="decision" value="APPROVED">
+        <button type="submit" class="btn btn-primary">${escapeHtml(approveLabel)}</button>
+      </form>
+      <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
+        <input type="hidden" name="decision" value="DECLINED">
+        <button type="submit" class="btn btn-danger-ghost">Decline</button>
+      </form>
     </div>`;
   } else if (
     approval.state === 'PENDING' &&
@@ -693,13 +604,13 @@ function approvalSection(view: CaseDetailView): string {
     approval.approver &&
     approval.intentId
   ) {
-    const payable =
-      view.options.find((option) => option.recommended)?.providerCost ??
-      view.options.find((option) => option.providerCost)?.providerCost ??
-      approval.amount;
-    const approveLabel = payable
-      ? `Approve as organiser ${formatMoney(payable)}`
-      : 'Approve as organiser';
+    const approveLabel = approval.amount
+      ? approval.requestedFrom === 'HUMAN_AGENT'
+        ? `Approve as organiser ${formatMoney(approval.amount)}`
+        : `Approve ${formatMoney(approval.amount)}`
+      : approval.requestedFrom === 'HUMAN_AGENT'
+        ? 'Approve as organiser'
+        : 'Approve';
     actionForms = `
     <div class="btn-row">
       <form method="POST" action="/api/runtime/decide" class="inline-form" data-test="organisation-approve-form">
@@ -718,20 +629,20 @@ function approvalSection(view: CaseDetailView): string {
         <input type="hidden" name="decidedBy.id" value="${escapeHtml(approval.approver.id)}">
         <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
         <input type="hidden" name="verdict" value="DECLINED">
-        <button type="submit" class="btn btn-danger-ghost" data-does-not-execute>Decline</button>
+        <button type="submit" class="btn btn-danger-ghost">Decline</button>
       </form>
     </div>`;
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'HUMAN_AGENT') {
-    actionForms = `<p class="footnote">${escapeHtml(authorityNeededLabel('HUMAN_AGENT'))}, but no single in-scope organisation principal is available in the current programme.</p>`;
+    actionForms = '<p class="footnote">This recovery needs a human organiser decision, but no single in-scope organisation principal is available in the current read model.</p>';
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'ORGANISATION') {
-    actionForms = '<p class="footnote">An in-scope organisation approver is not available in the current programme. Nothing has been approved.</p>';
+    actionForms = '<p class="footnote">An in-scope organisation approver is not available in the current read model. Nothing has been approved.</p>';
   }
 
   return `
   <section class="section" aria-label="${escapeHtml(CASE_APPROVAL_TITLE)}">
     <h2>${escapeHtml(CASE_APPROVAL_TITLE)}</h2>
     <div class="panel" data-approval-state="${escapeHtml(approval.state)}">
-      <p class="callout-title">${escapeHtml(authorityNeededLabel(approval.requestedFrom))}
+      <p class="callout-title">Approval needed from ${escapeHtml(from)}
         <span class="${toneClass(APPROVAL_STATE_TONE[approval.state], 'badge')}">${escapeHtml(APPROVAL_STATE_LABEL[approval.state])}</span>
       </p>
       <p>${escapeHtml(approval.reason)}${amount}</p>
@@ -792,57 +703,13 @@ function programmeChangeButton(view: CaseDetailView): string {
   if (view.programmeChangeCommitmentId) {
     attrs.push(`data-default-commitment-id="${escapeHtml(view.programmeChangeCommitmentId)}"`);
   }
-  if (view.programmeChangeProposedStartsAt) {
-    attrs.push(`data-default-new-starts-at="${escapeHtml(view.programmeChangeProposedStartsAt)}"`);
-  }
-  if (view.programmeChangeProposedEndsAt) {
-    attrs.push(`data-default-new-ends-at="${escapeHtml(view.programmeChangeProposedEndsAt)}"`);
-  }
   return `<button ${attrs.join(' ')}>Preview programme change</button>`;
 }
 
 function recoveryActionsInner(view: CaseDetailView): string {
-  if (view.resolution || view.status === 'RESOLVED') {
+  if (view.programmeChangeAvailable && view.anchorEventId) {
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="resolved">
-        <p class="planning-kicker">Trip recovered</p>
-        <p class="planning-result-title">This case is resolved</p>
-        <p>The authoritative trip is up to date. Reopening this case does not restart recovery.</p>
-        <a class="btn btn-primary" href="/operator" data-test="back-to-overview">Back to Overview</a>
-      </div>`;
-  }
-
-  if (selectCaseWorkspacePhase(view) === 'executing') {
-    return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="executing">
-        <p class="planning-kicker">Execution in progress</p>
-        <p class="planning-result-title">Applying the approved recovery</p>
-        <p>Northstar is executing at the declared boundary, then observing the result and rechecking the trip.</p>
-      </div>`;
-  }
-
-  if (shouldShowExecuteCta(view) && view.approval?.intentId) {
-    return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="execute">
-        <p class="planning-kicker">Approval recorded</p>
-        <p class="planning-result-title">Execute the approved recovery</p>
-        <p>Northstar will now execute, observe the result, and re-check the trip.</p>
-        <form method="POST" action="/api/runtime/execute" class="inline-form" data-test="execute-approved-strategy-form">
-          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
-          <input type="hidden" name="intentId" value="${escapeHtml(view.approval.intentId)}">
-          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-          <button type="submit" class="btn btn-primary" data-test="execute-approved-strategy-btn">Execute approved recovery</button>
-        </form>
-      </div>`;
-  }
-
-  if (view.approval?.state === 'PENDING') {
-    return '';
-  }
-
-  if (shouldShowProgrammeChangeCta(view)) {
-    return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="programme">
+      <div class="panel recovery-actions" data-ui-section="recovery-actions">
         <p class="planning-kicker">Travel recovery is not enough</p>
         <p class="planning-result-title">Preview a programme change</p>
         <p>Reschedule the affected commitment so the current travel plan can still work.</p>
@@ -850,10 +717,9 @@ function recoveryActionsInner(view: CaseDetailView): string {
         ${escalationPanel(view)}
       </div>`;
   }
-
   if (view.planningExhausted && view.options.length === 0) {
     return `
-      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note" data-case-cta="exhausted">
+      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
         <ul class="planning-checks" aria-label="Planning checks completed">
           <li><span aria-hidden="true">✓</span><span><strong>Changed booking checked</strong><small>The provider change is reflected in the trip.</small></span></li>
           <li><span aria-hidden="true">✓</span><span><strong>Rest of the trip checked</strong><small>The failed trip conditions above still need to be protected.</small></span></li>
@@ -864,19 +730,45 @@ function recoveryActionsInner(view: CaseDetailView): string {
       </div>`;
   }
 
-  if (view.options.length > 0 && view.options.every((option) => option.verdict === 'NOT_VIABLE')) {
+  if (view.options.length > 0 && view.options.every((option) => option.verdict === 'NOT_VIABLE') && !view.approval) {
     return `
-      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-case-cta="exhausted">
+      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions">
         <p>No automated recovery option works for this request. Review the rejected options below or hand the case to human support.</p>
         ${escalationPanel(view)}
       </div>`;
   }
 
-  if (shouldShowBeginCta(view)) {
+  if (view.status === 'DISRUPTED' && view.options.length === 0) {
+    return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
+          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+        </form>
+      </div>`;
+  }
+
+  if (view.options.length > 0 && !view.resolution) {
     const recommendedOption =
       view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
+    if (!recommendedOption && view.approval?.state === 'PENDING') {
+      // Options exist for inspection after Resolve; approval panel carries the ask.
+      return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Review what changed first. Resolve reveals the ranked recovery choices and any approval that is already required.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+      </div>`;
+    }
     if (!recommendedOption) return '';
-    const needsHumanApproval = view.options.some((o) => o.requiresApproval);
+
+    const needsHumanApproval =
+      view.approval?.state === 'PENDING' || view.options.some((o) => o.requiresApproval);
     const autoBanner =
       !needsHumanApproval
         ? `<div class="authority-auto-banner" data-test="authority-auto-approved">
@@ -884,12 +776,19 @@ function recoveryActionsInner(view: CaseDetailView): string {
           <span>Northstar is authorised to proceed with the selected recovery. No extra human approval is required.</span>
         </div>`
         : '';
+
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel data-case-cta="begin">
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Review what changed and the trip impact first. Resolve to reveal the ranked recovery choices.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+      </div>
+      <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel hidden>
         ${autoBanner}
-        <p class="planning-kicker">Recovery options ready</p>
-        <p class="planning-result-title">Begin the recommended recovery</p>
-        <p>Starting runs the required approval and execution checks. Option details appear after you begin.</p>
+        <p class="planning-kicker">Selected recovery</p>
+        <p class="planning-result-title">Begin <span data-selected-strategy-label>${escapeHtml(sanitizeUserFacingLabel(recommendedOption.title))}</span></p>
+        <p>Starting the selected option runs the required approval and execution checks.</p>
         <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">
@@ -899,16 +798,17 @@ function recoveryActionsInner(view: CaseDetailView): string {
       </div>`;
   }
 
-  if (shouldShowResolveCta(view)) {
+  if (view.approval?.state === 'APPROVED' && view.approval.requestedFrom === 'ORGANISATION' && view.approval.intentId) {
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta data-case-cta="plan">
-        <p class="planning-kicker">Impacted trip</p>
-        <p class="planning-result-title">Resolve with Northstar AI</p>
-        <p>Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.</p>
-        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
-        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
+      <div class="panel recovery-actions" data-ui-section="recovery-actions">
+        <p class="planning-kicker">Approval recorded</p>
+        <p class="planning-result-title">Execute the approved recovery</p>
+        <p>Northstar will now execute, observe the result, and re-check the trip.</p>
+        <form method="POST" action="/api/runtime/execute" class="inline-form" data-test="execute-approved-strategy-form">
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+          <input type="hidden" name="intentId" value="${escapeHtml(view.approval.intentId)}">
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+          <button type="submit" class="btn btn-primary" data-test="execute-approved-strategy-btn">Execute approved recovery</button>
         </form>
       </div>`;
   }
@@ -984,7 +884,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     return `<main class="shell">${errorPanel('This case cannot be displayed yet', issues.join('; '))}</main>`;
   }
   const badge = caseBadge(view);
-  const initialPhase = selectCaseWorkspacePhase(view);
+  const initialPhase = view.resolution ? 'options' : 'impacted';
   const rail = `
     <aside class="case-rail">
       ${commitmentCard(view)}

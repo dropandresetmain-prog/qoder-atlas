@@ -23,32 +23,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return params.get('event');
   }
 
-  function showLifecycleOverlay(steps, done) {
-    var existing = document.querySelector('[data-test="lifecycle-progress-overlay"]');
-    if (existing) existing.remove();
-    var overlay = document.createElement('div');
-    overlay.setAttribute('data-test', 'lifecycle-progress-overlay');
-    overlay.setAttribute('role', 'status');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(12,16,22,0.72);display:flex;align-items:center;justify-content:center;padding:24px;';
-    var panel = document.createElement('div');
-    panel.style.cssText = 'background:#fff;max-width:420px;width:100%;padding:22px 24px;border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,0.28);font:15px/1.45 system-ui,sans-serif;';
-    panel.innerHTML = '<p style="margin:0 0 8px;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#667085;">Progress</p><p data-lifecycle-step style="margin:0;font-size:18px;font-weight:600;color:#101828;"></p>';
-    overlay.appendChild(panel);
-    document.body.appendChild(overlay);
-    var label = panel.querySelector('[data-lifecycle-step]');
-    var i = 0;
-    function tick() {
-      if (i >= steps.length) {
-        window.setTimeout(done, 350);
-        return;
-      }
-      label.textContent = steps[i];
-      i += 1;
-      window.setTimeout(tick, 420);
-    }
-    tick();
-  }
-
   function closeModal() {
     var modal = document.querySelector('[data-programme-change-modal]');
     var scrim = document.querySelector('[data-programme-change-scrim]');
@@ -71,10 +45,8 @@ export function renderProgrammeChangeEnhancementScript(): string {
   function buildPayload(modal) {
     var commitmentId = modal.querySelector('[name="commitmentId"]').value;
     var changeKind = modal.querySelector('[name="changeKind"]').value;
-    var startEl = modal.querySelector('[name="newStartsAt"]');
-    var endEl = modal.querySelector('[name="newEndsAt"]');
-    var newStartsAt = (startEl.getAttribute('data-iso-value') || startEl.value || '').trim();
-    var newEndsAt = (endEl.getAttribute('data-iso-value') || endEl.value || '').trim();
+    var newStartsAt = modal.querySelector('[name="newStartsAt"]').value.trim();
+    var newEndsAt = modal.querySelector('[name="newEndsAt"]').value.trim();
     var newPlaceId = modal.querySelector('[name="newPlaceId"]').value.trim();
     var payload = {
       commitmentId: commitmentId,
@@ -94,54 +66,24 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return 'Other change';
   }
 
-  function formatHumanInstant(iso) {
-    if (!iso || typeof iso !== 'string') return iso || '';
-    var match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(iso.trim());
-    if (!match) return iso;
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var month = months[Number(match[2]) - 1] || match[2];
-    return Number(match[3]) + ' ' + month + ' · ' + match[4] + ':' + match[5];
-  }
-
-  function formatClockRange(startIso, endIso) {
-    function clock(iso) {
-      var match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(String(iso || '').trim());
-      return match ? (match[4] + ':' + match[5]) : '';
-    }
-    var start = clock(startIso);
-    var end = clock(endIso);
-    if (start && end) return start + '–' + end;
-    if (start) return start;
-    return formatHumanInstant(startIso) || String(startIso || '');
-  }
-
   function formatProposedSide(payload) {
     if (payload.changeKind === 'CANCELLED') return { whenLabel: 'Cancelled', whereLabel: undefined };
-    var when = 'Time not set';
-    if (payload.newStartsAt) {
-      var startHuman = formatHumanInstant(payload.newStartsAt);
-      var endMatch = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(String(payload.newEndsAt || '').trim());
-      var endClock = endMatch ? (endMatch[4] + ':' + endMatch[5]) : '';
-      when = startHuman && endClock && startHuman.indexOf(' · ') !== -1
-        ? startHuman + '–' + endClock
-        : formatClockRange(payload.newStartsAt, payload.newEndsAt);
-    }
+    var when = payload.newStartsAt || 'Time not set';
+    if (payload.newEndsAt) when = when + ' → ' + payload.newEndsAt;
     return {
       whenLabel: when,
-      whereLabel: payload.newPlaceId ? undefined : undefined
+      whereLabel: payload.newPlaceId ? ('Place ' + payload.newPlaceId) : undefined
     };
   }
 
   function viabilityLabel(consequence) {
     if (consequence === 'DISRUPTED') return 'Needs Attention';
-    if (consequence === 'VIABLE') return 'Viable';
     if (consequence === 'AT_RISK') return 'Watching';
     return 'Affected';
   }
 
   function viabilityTone(consequence) {
     if (consequence === 'DISRUPTED') return 'alert';
-    if (consequence === 'VIABLE') return 'ok';
     if (consequence === 'AT_RISK') return 'watch';
     return 'watch';
   }
@@ -205,42 +147,21 @@ export function renderProgrammeChangeEnhancementScript(): string {
       none.textContent = 'No linked trip becomes affected under this preview.';
       target.appendChild(none);
     } else {
-      var seenReasons = {};
       affected.forEach(function(item) {
         var row = document.createElement('div');
         row.className = 'impact-row';
         row.setAttribute('data-test', 'preview-impact-row');
 
-        var names = Array.isArray(item.travellerNames) ? item.travellerNames.filter(Boolean) : [];
-        var nameLabel = names.length > 0 ? names.join(', ') : 'Linked participant';
         var count = document.createElement('span');
         count.className = 'i-count';
-        count.textContent = nameLabel;
+        count.textContent = String(Array.isArray(item.travellerIds) ? item.travellerIds.length : 1);
         row.appendChild(count);
 
         var detail = document.createElement('span');
-        var reasonParts = Array.isArray(item.reasons) && item.reasons.length
-          ? item.reasons.map(function(reason) {
-              return String(reason)
-                .replace(/commitment rescheduled/gi, 'Programme commitment moves')
-                .replace(/\\bel-trip-[a-z0-9-]+/gi, 'linked engagement')
-                .replace(/\\b\\d{4}-\\d{2}-\\d{2}T[\\d:+.-]+/g, function(iso) { return formatHumanInstant(iso); });
-            })
-          : ['Affected by the proposed programme change.'];
-        var reasonText = reasonParts.join(' · ');
-        if (seenReasons[reasonText]) {
-          var consequenceHint =
-            item.viabilityConsequence === 'VIABLE'
-              ? 'confirmed viable after the move'
-              : item.viabilityConsequence === 'DISRUPTED'
-                ? 'critical — commitment no longer protected'
-                : item.viabilityConsequence === 'AT_RISK'
-                  ? 'watching — schedule impact remains'
-                  : 'impact differs for this trip';
-          reasonText = nameLabel + ' · ' + consequenceHint + (reasonParts[0] ? ' · ' + reasonParts[0] : '');
-        }
-        seenReasons[reasonText] = true;
-        detail.textContent = reasonText;
+        var reasons = Array.isArray(item.reasons) && item.reasons.length
+          ? item.reasons.join(' · ')
+          : 'Affected by the proposed programme change.';
+        detail.textContent = reasons;
         row.appendChild(detail);
 
         var badge = document.createElement('span');
@@ -363,11 +284,11 @@ export function renderProgrammeChangeEnhancementScript(): string {
             '<option value="OTHER">Other change</option>' +
           '</select>' +
           '<label class="kv-label" for="programme-change-start">New start</label>' +
-          '<input id="programme-change-start" name="newStartsAt" type="text" placeholder="e.g. 1 Oct · 15:30" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
+          '<input id="programme-change-start" name="newStartsAt" type="text" placeholder="2026-10-01T15:30:00+08:00" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
           '<label class="kv-label" for="programme-change-end">New end</label>' +
-          '<input id="programme-change-end" name="newEndsAt" type="text" placeholder="e.g. 1 Oct · 16:00" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
+          '<input id="programme-change-end" name="newEndsAt" type="text" placeholder="2026-10-01T16:00:00+08:00" style="width:100%;box-sizing:border-box;margin:6px 0 14px">' +
           '<label class="kv-label" for="programme-change-place">New place (optional)</label>' +
-          '<input id="programme-change-place" name="newPlaceId" type="text" placeholder="Leave blank to keep the current venue" style="width:100%;box-sizing:border-box;margin:6px 0 0">' +
+          '<input id="programme-change-place" name="newPlaceId" type="text" placeholder="Existing place id" style="width:100%;box-sizing:border-box;margin:6px 0 0">' +
         '</div>' +
       '</div>' +
       '<div data-programme-change-result style="margin-top:16px" data-test="programme-change-result"></div>' +
@@ -385,15 +306,8 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var select = modal.querySelector('[name="commitmentId"]');
     var startInput = modal.querySelector('[name="newStartsAt"]');
     var endInput = modal.querySelector('[name="newEndsAt"]');
-    // Human Singapore times are primary in the fields; ISO is kept in data-* for submit.
-    if (defaultNewStartsAt) {
-      startInput.value = formatHumanInstant(defaultNewStartsAt);
-      startInput.setAttribute('data-iso-value', defaultNewStartsAt);
-    }
-    if (defaultNewEndsAt) {
-      endInput.value = formatHumanInstant(defaultNewEndsAt);
-      endInput.setAttribute('data-iso-value', defaultNewEndsAt);
-    }
+    if (defaultNewStartsAt) startInput.value = defaultNewStartsAt;
+    if (defaultNewEndsAt) endInput.value = defaultNewEndsAt;
 
     var timelineCommitments = commitmentItemsFromTimeline();
     if (timelineCommitments.length > 0) {
@@ -464,13 +378,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
             return;
           }
           result.textContent = 'Programme updated. Northstar re-checked the affected trips.';
-          showLifecycleOverlay([
-            'Committing programme change',
-            'Updating linked programme dependencies',
-            'Observing programme result',
-            'Updating trip state',
-            'Rechecking downstream viability'
-          ], function() { window.location.reload(); });
+          window.setTimeout(function() { window.location.reload(); }, 220);
         })
         .catch(function(error) {
           commitButton.disabled = false;

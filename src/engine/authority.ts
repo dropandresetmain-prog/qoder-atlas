@@ -119,22 +119,6 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
         );
         continue;
       }
-      // Event-funded nightly ceilings do not bind a fully traveller-paid
-      // incremental hotel charge (FUNDED_WINDOW incrementalPayer=TRAVELLER
-      // with no organisation-covered portion). The traveller is the authority
-      // for their own out-of-window spend; blocking here would invent an
-      // organiser veto the policy does not require.
-      if (
-        rule.period === 'NIGHT' &&
-        intent.costAllocation?.incrementalPayer === 'TRAVELLER' &&
-        (intent.costAllocation.coveredAmount === undefined ||
-          intent.costAllocation.coveredAmount.amount === 0)
-      ) {
-        ruleTrace.push(
-          `rule ${rule.id}: NIGHT spend limit skipped for traveller-funded incremental hotel charge with no organisation-covered portion`,
-        );
-        continue;
-      }
       const comparable = this.comparableAgainst(rule.maxAmount, knownSpendStatements, homeSpend);
       if (comparable === undefined) {
         ruleTrace.push(
@@ -176,21 +160,6 @@ export class DeterministicAuthorityEngine implements AuthorityEngine {
         if (rule.operations && rule.operations.length > 0 && !rule.operations.includes(intent.operation)) {
           ruleTrace.push(
             `rule ${rule.id}: approval threshold operations [${rule.operations.join(',')}] do not include ${intent.operation}; skipped`,
-          );
-          continue;
-        }
-        // Organisation hotel approval thresholds do not claim traveller-only
-        // personal increments: FUNDED_WINDOW already assigned the charge to
-        // the traveller, who remains the authority for their own spend.
-        if (
-          rule.approver === 'ORGANISATION_APPROVER' &&
-          intent.operation.startsWith('hotel.') &&
-          intent.costAllocation?.incrementalPayer === 'TRAVELLER' &&
-          (intent.costAllocation.coveredAmount === undefined ||
-            intent.costAllocation.coveredAmount.amount === 0)
-        ) {
-          ruleTrace.push(
-            `rule ${rule.id}: organisation hotel approval threshold skipped for traveller-funded incremental charge with no organisation-covered portion`,
           );
           continue;
         }

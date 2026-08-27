@@ -1,6 +1,6 @@
 {
   "scenarioId": "S2",
-  "title": "LAX→NRT→SIN progressive missed connection; airline morning reprotection reported",
+  "title": "LAX→NRT→SIN progressive missed connection; airline morning recovery inadequate",
   "mode": "SIMULATED_EXTERNAL_EVENT",
   "globalInputPack": {
     "packId": "ait-global-programme",

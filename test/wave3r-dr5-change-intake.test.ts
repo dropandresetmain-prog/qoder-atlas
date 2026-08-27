@@ -192,7 +192,7 @@ test('dr5: four unseen NL phrasings produce schema-valid ChangeRequest proposals
   const validated3 = ChangeRequestSchema.safeParse(extendStay.proposal);
   assert.equal(validated3.success, true, 'proposal must validate against ChangeRequestSchema');
   assert.equal(validated3.data.intentKind, 'CHANGE_STAY');
-  assert.equal(validated3.data.target.stayCheckOut, '2026-09-12T23:59:00+08:00');
+  assert.equal(validated3.data.target.departAfter, '2026-09-12T23:59:00+08:00');
   assert.equal(extendStay.provenance, 'DETERMINISTIC');
 
   // Family 4: Add-on request (closer hotel to venue).
@@ -347,7 +347,7 @@ test('dr5: proposeThenResolve helper integrates intake and resolver', async () =
   assert.ok(resolution);
   assert.equal(resolution.accepted, true);
   assert.equal(resolution.intentKind, 'CHANGE_STAY');
-  // The resolver should have processed the stayCheckOut target.
+  // The resolver should have processed the departAfter target.
   assert.ok(resolution.implications.length > 0 || resolution.uncertainties.length > 0,
     'resolver should have produced implications or uncertainties for the stay extension');
 });
