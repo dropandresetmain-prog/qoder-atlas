@@ -75,8 +75,14 @@ async function openTravellerCase(page: Page, name: string): Promise<void> {
     await search.fill(name.split(' ')[0] ?? name);
     await page.waitForTimeout(150);
   }
-  const row = page.locator('[data-test="case-row-link"], [data-test="case-history-link"], [data-test="decision-link"]').filter({ hasText: name }).first();
-  await row.click();
+  const rosterRow = page.locator('[data-roster-name]').filter({ hasText: new RegExp(name, 'i') });
+  const caseHit = rosterRow.locator('[data-test="case-row-link"], [data-test="case-history-link"]');
+  if (await caseHit.count()) {
+    await caseHit.first().click();
+  } else {
+    const decision = page.locator('[data-test="decision-link"]').filter({ hasText: name }).first();
+    await decision.click();
+  }
   await page.waitForLoadState('domcontentloaded');
 }
 

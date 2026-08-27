@@ -60,11 +60,11 @@ Close integrated production UI gaps for Sarah S1→S3 and shared Overview presen
 
 ## Current checkpoint
 
-Phases 1–5 implemented in code; running tests and visual/Railway verification.
+Committed `3beb0bf`, pushed to `origin/main`. Railway Sarah acceptance PASS.
 
 ## Next action
 
-Run test suite → local screenshots → commit/push → Railway acceptance.
+Investigate Jordan `el-trip-` terminal copy leak (pre-existing regression).
 
 ## Constraints
 

@@ -6,7 +6,7 @@
  * Programme summary/fleet surfaces only. Local/self-arranged travellers are
  * an arrangement cohort, not a fifth workflow status.
  */
-import type { ReadModelStatus } from '../contracts/readmodels.ts';
+import type { ReadModelStatus, RemainderViability } from '../contracts/readmodels.ts';
 import type { IsoDateTime } from '../domain/common.ts';
 
 /** Four managed-travel workflow buckets shown on Overview / Programme. */
@@ -18,6 +18,13 @@ export type ManagedTravelPresentation =
 
 /** Fleet cell presentation: managed buckets plus Local arrangement cohort. */
 export type FleetCellPresentation = ManagedTravelPresentation | 'LOCAL';
+
+/**
+ * Roster row operator-attention projection: managed workflow buckets plus LOCAL
+ * for self-arranged travellers with no operator recovery work. Distinct from
+ * fleet/travel-management colour (always LOCAL for self-arranged).
+ */
+export type RosterAttentionPresentation = ManagedTravelPresentation | 'LOCAL';
 
 export const MANAGED_TRAVEL_LABEL: Record<ManagedTravelPresentation, string> = {
   CONFIRMED: 'Confirmed',
@@ -43,6 +50,14 @@ export interface ManagedTravelPresentationInput {
   pendingDecisionCount?: number;
   /** Traveller response gate when the case is waiting on the traveller. */
   travellerResponseStatus?: 'AWAITING' | 'RESPONDED' | 'NOT_REQUIRED';
+}
+
+/** Inputs for roster attention queue and row presentation attributes. */
+export interface RosterPresentationInput extends ManagedTravelPresentationInput {
+  /** Propagated whole-trip viability; independent of workflow status. */
+  remainderViable?: RemainderViability;
+  /** Open operator case exists (may be fan-out tracking only). */
+  hasActiveCase?: boolean;
 }
 
 /**
@@ -144,6 +159,60 @@ export const ATTENTION_PRIORITY: Record<ManagedTravelPresentation, number> = {
   CONFIRMED: 3,
 };
 
+/** Roster sort priority including the LOCAL travel cohort bucket. */
+export const ROSTER_ATTENTION_PRIORITY: Record<RosterAttentionPresentation, number> = {
+  NEEDS_ATTENTION: 0,
+  WATCHING: 1,
+  UNCONFIRMED: 2,
+  LOCAL: 3,
+  CONFIRMED: 4,
+};
+
+/**
+ * True when the operator must act (approval, traveller input, or managed-travel
+ * recovery). Programme fan-out on a viable local traveller does not qualify.
+ */
+export function requiresOperatorRecoveryAttention(input: RosterPresentationInput): boolean {
+  const pending = input.pendingDecisionCount ?? 0;
+  const awaitingTraveller =
+    input.travellerResponseStatus === 'AWAITING' || input.status === 'NEEDS_TRAVELLER_INFO';
+  if (pending > 0 || awaitingTraveller) return true;
+
+  if (input.travelArrangement === 'SELF_OR_OTHER_ARRANGED') {
+    return false;
+  }
+
+  if (input.status === 'DISRUPTED') return true;
+  if (input.hasActiveCase && input.remainderViable === 'NOT_VIABLE') return true;
+  return mapManagedTravelPresentation(input) === 'NEEDS_ATTENTION';
+}
+
+/**
+ * Operator-facing roster attention state for sorting and data-presentation.
+ * Preserves travel arrangement (badge/dot), programme consequence (WATCHING),
+ * and recovery intervention (NEEDS_ATTENTION) as separate ideas.
+ */
+export function rosterAttentionPresentation(
+  input: RosterPresentationInput,
+): RosterAttentionPresentation {
+  if (requiresOperatorRecoveryAttention(input)) {
+    return mapManagedTravelPresentation(input);
+  }
+
+  if (input.travelArrangement === 'SELF_OR_OTHER_ARRANGED') {
+    const programmeTouched =
+      input.hasActiveCase ||
+      input.remainderViable === 'AT_RISK' ||
+      input.remainderViable === 'UNKNOWN';
+    if (programmeTouched && input.remainderViable !== 'NOT_VIABLE') {
+      return 'WATCHING';
+    }
+    return 'LOCAL';
+  }
+
+  return mapManagedTravelPresentation(input);
+}
+
 export function compareByAttentionThenId(
   a: ManagedTravelPresentationInput & { tripId: string },
   b: ManagedTravelPresentationInput & { tripId: string },
@@ -151,6 +220,16 @@ export function compareByAttentionThenId(
   const aBucket = mapManagedTravelPresentation(a);
   const bBucket = mapManagedTravelPresentation(b);
   const diff = ATTENTION_PRIORITY[aBucket] - ATTENTION_PRIORITY[bBucket];
+  return diff !== 0 ? diff : a.tripId.localeCompare(b.tripId);
+}
+
+export function compareRosterAttentionThenId(
+  a: RosterPresentationInput & { tripId: string },
+  b: RosterPresentationInput & { tripId: string },
+): number {
+  const aBucket = rosterAttentionPresentation(a);
+  const bBucket = rosterAttentionPresentation(b);
+  const diff = ROSTER_ATTENTION_PRIORITY[aBucket] - ROSTER_ATTENTION_PRIORITY[bBucket];
   return diff !== 0 ? diff : a.tripId.localeCompare(b.tripId);
 }
 

@@ -8,6 +8,11 @@ import assert from 'node:assert/strict';
 import { renderCaseDetailBody } from '../src/ui/screens/operator-case.ts';
 import { renderOperatorDashboardBody } from '../src/ui/screens/operator-dashboard.ts';
 import {
+  fleetCellClassFor,
+  requiresOperatorRecoveryAttention,
+  rosterAttentionPresentation,
+} from '../src/ui/presentationState.ts';
+import {
   executionIsPending,
   isProgrammeRecoveryFlow,
   selectCaseWorkspacePhase,
@@ -494,4 +499,108 @@ test('lifecycle: shared airline incident differentiates by remainderViable, not 
   assert.match(html, /Arjun Rao[\s\S]*Viable after the same airline change|data-shared-outcome="workable"/);
   assert.doesNotMatch(html, /0 still workable/);
   assert.doesNotMatch(html, /4 critical/);
+});
+
+test('presentation: local fan-out watching is not operator attention', () => {
+  const input = {
+    status: 'DISRUPTED' as const,
+    travelArrangement: 'SELF_OR_OTHER_ARRANGED' as const,
+    hasActiveCase: true,
+    remainderViable: 'VIABLE' as const,
+  };
+  assert.equal(requiresOperatorRecoveryAttention(input), false);
+  assert.equal(rosterAttentionPresentation(input), 'WATCHING');
+  assert.equal(fleetCellClassFor(input), 'd-local');
+});
+
+test('presentation: local traveller with pending decision still needs attention', () => {
+  const input = {
+    status: 'READY' as const,
+    travelArrangement: 'SELF_OR_OTHER_ARRANGED' as const,
+    pendingDecisionCount: 1,
+  };
+  assert.equal(requiresOperatorRecoveryAttention(input), true);
+  assert.equal(rosterAttentionPresentation(input), 'NEEDS_ATTENTION');
+});
+
+test('presentation: Elena fan-out stays watching and out of attention queue', () => {
+  const view: OperatorDashboardView = {
+    generatedAt: AT,
+    summary: { ready: 0, atRisk: 0, disrupted: 2, recovering: 0, awaitingDecision: 1, managedConfirmed: 0 },
+    arrangementCounts: { total: 2, northstarArranged: 1, selfOrOtherArranged: 1, unspecified: 0 },
+    trips: [
+      {
+        tripId: 'trip-sarah',
+        activeCaseId: 'case-sarah',
+        travellerNames: ['Sarah Lim'],
+        status: 'DISRUPTED',
+        travelArrangement: 'NORTHSTAR_ARRANGED',
+        whatChanged: 'The airline changed the flight schedule.',
+        remainderViable: 'NOT_VIABLE',
+        affectedItems: ['Inbound flight'],
+        systemActivity: [],
+        pendingDecisions: [],
+        uncertainties: [],
+        updatedAt: AT,
+      },
+      {
+        tripId: 'trip-elena',
+        activeCaseId: 'case-elena-fanout',
+        travellerNames: ['Elena Tan'],
+        status: 'DISRUPTED',
+        travelArrangement: 'SELF_OR_OTHER_ARRANGED',
+        whatChanged: 'Summit timing moved — local travel still works but programme overlap needs watching.',
+        remainderViable: 'VIABLE',
+        affectedItems: ['Summit keynote'],
+        systemActivity: ['checked recovery options'],
+        pendingDecisions: [],
+        uncertainties: [],
+        updatedAt: AT,
+      },
+    ],
+  };
+  const html = renderOperatorDashboardBody(view);
+  assert.match(html, /data-trip-id="trip-elena"[^>]*data-presentation="WATCHING"/);
+  assert.match(html, /data-trip-id="trip-elena"[^>]*data-travel-arrangement="SELF_OR_OTHER_ARRANGED"/);
+  assert.match(html, /Elena Tan[\s\S]{0,1200}Local \/ self-arranged/);
+  assert.match(html, /Summit timing moved/);
+  const attentionSection = html.match(/data-test="attention-queue"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.doesNotMatch(attentionSection, /Elena Tan/);
+  assert.match(attentionSection, /Sarah Lim/);
+});
+
+test('presentation: Oliver roster row links to case without nested anchors', () => {
+  const view: OperatorDashboardView = {
+    generatedAt: AT,
+    summary: { ready: 0, atRisk: 0, disrupted: 1, recovering: 0, awaitingDecision: 1, managedConfirmed: 0 },
+    arrangementCounts: { total: 1, northstarArranged: 1, selfOrOtherArranged: 0, unspecified: 0 },
+    trips: [
+      {
+        tripId: 'trip-oliver',
+        activeCaseId: 'case-oliver',
+        travellerNames: ['Oliver Bennett'],
+        status: 'DISRUPTED',
+        travelArrangement: 'NORTHSTAR_ARRANGED',
+        whatChanged: 'Plans changed: flying from HND instead of London.',
+        affectedItems: ['Outbound flight'],
+        systemActivity: ['checked recovery options'],
+        pendingDecisions: [
+          {
+            caseId: 'case-oliver',
+            decisionType: 'APPROVAL',
+            description: 'Approval needed before Rebooking the flight can proceed',
+            requestedAt: AT,
+          },
+        ],
+        uncertainties: [],
+        updatedAt: AT,
+      },
+    ],
+  };
+  const html = renderOperatorDashboardBody(view);
+  assert.match(html, /<a href="\/operator\/cases\/case-oliver" class="brow-case-hit" data-test="case-row-link"[^>]*><\/a>/);
+  assert.match(html, /data-test="decision-link"[^>]*case-oliver|href="\/operator\/cases\/case-oliver"[^>]*data-test="decision-link"/);
+  const oliverRow = html.match(/<div class="brow brow-actionable"[^>]*data-trip-id="trip-oliver"[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? '';
+  assert.match(oliverRow, /class="brow-case-hit"/);
+  assert.doesNotMatch(oliverRow, /<a[^>]*data-test="case-row-link"[^>]*>[\s\S]+<a[^>]*data-test="show-interaction"/);
 });

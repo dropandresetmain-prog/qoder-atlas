@@ -419,8 +419,6 @@ a.chip:hover { border-color: var(--text-faint); }
   overflow: hidden;
 }
 .board { min-width: 0; }
-.brow { grid-template-columns: 16px minmax(140px, 0.85fr) minmax(0, 2.2fr) auto; }
-.brow .b-right { min-width: 0; max-width: 180px; }
 .fc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .fc-title {
   font-family: var(--font-mono); font-size: 11px; font-weight: 600;
@@ -490,11 +488,14 @@ a.chip:hover { border-color: var(--text-faint); }
   margin-left: 10px;
 }
 .qrow-nested { padding-left: 22px; }
-.brow { grid-template-columns: 16px minmax(170px, 0.9fr) minmax(0, 2.2fr) auto; }
-a.qrow, a.brow.brow-actionable { color: inherit; text-decoration: none; cursor: pointer; }
-a.qrow:focus-visible, a.brow.brow-actionable:focus-visible { outline: 2px solid var(--watch-f); outline-offset: -2px; }
+.brow {
+  grid-template-columns: 16px minmax(170px, 0.9fr) minmax(0, 2.2fr) auto;
+  align-items: start;
+}
+a.qrow, .brow.brow-actionable { color: inherit; text-decoration: none; cursor: pointer; }
+a.qrow:focus-visible, .brow.brow-actionable .brow-case-hit:focus-visible { outline: 2px solid var(--watch-f); outline-offset: -2px; }
 .qrow:first-child, .brow:first-child { border-top: 0; }
-.qrow:hover, a.brow.brow-actionable:hover { background: var(--surface-2); transform: translateY(-1px); }
+.qrow:hover, .brow.brow-actionable:hover { background: var(--surface-2); transform: translateY(-1px); }
 .qrow > div, .brow > div { min-width: 0; }
 /* boxed queue glyphs — the state mark is a chip, not loose text */
 .q-glyph {
@@ -511,9 +512,38 @@ a.qrow:focus-visible, a.brow.brow-actionable:focus-visible { outline: 2px solid 
 .b-issue { color: var(--text); font-size: 14.5px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .b-extra { color: var(--text-faint); font-size: 12.5px; margin-top: 2px; min-width: 0; }
 .q-time, .b-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.brow .b-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 0; max-width: 220px; }
-.brow .b-actions { width: 100%; display: flex; justify-content: flex-end; }
-.brow .b-status { width: 100%; display: flex; justify-content: flex-end; }
+.brow .b-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+  max-width: 180px;
+}
+.brow .b-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+.brow .b-meta .badge { flex-shrink: 0; }
+.brow.brow-actionable { position: relative; }
+.brow .brow-case-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+.brow.brow-actionable > :not(.brow-case-hit) {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+.brow.brow-actionable .b-right a {
+  pointer-events: auto;
+}
 .b-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; background: var(--neutral-f); }
 .b-dot.d-ok { background: var(--ok-f); }
 .b-dot.d-watch { background: var(--watch-f); }
@@ -782,7 +812,8 @@ body.ns-resolve-open { overflow: hidden; }
 .impact-row,
 .traveller-table tbody tr,
 .qrow,
-a.brow.brow-actionable {
+a.brow.brow-actionable,
+.brow.brow-actionable {
   transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 .chain .link:hover,
@@ -793,7 +824,8 @@ a.brow.brow-actionable {
 .option-card:focus-visible,
 .btn:focus-visible,
 .qrow:focus-visible,
-a.brow.brow-actionable:focus-visible {
+a.brow.brow-actionable:focus-visible,
+.brow.brow-actionable .brow-case-hit:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -804,6 +836,7 @@ a.brow.brow-actionable:focus-visible {
   .traveller-table tbody tr,
   .qrow,
   a.brow.brow-actionable,
+  .brow.brow-actionable,
   .option-card[data-option-selectable="true"],
   .btn {
     transition: none;

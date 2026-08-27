@@ -16,12 +16,15 @@ import {
   MANAGED_TRAVEL_LABEL,
   mapManagedTravelPresentation,
   OVERVIEW_ROSTER_PAGE_SIZE,
-  compareByAttentionThenId,
   compareByEarliestCommitment,
+  compareRosterAttentionThenId,
   countManagedTravelBuckets,
   fleetCellClassFor,
+  requiresOperatorRecoveryAttention,
+  rosterAttentionPresentation,
   type ManagedTravelPresentation,
   type ManagedTravelPresentationInput,
+  type RosterPresentationInput,
 } from '../presentationState.ts';
 import { escapeHtml, formatInstant, formatMoney, formatRosterTime, formatShort, encodeUri } from '../html.ts';
 import { errorPanel, loadingPanel, miniChainRow } from '../components.ts';
@@ -41,6 +44,14 @@ function presentationInput(trip: OperatorTripView): ManagedTravelPresentationInp
     ...(trip.travelArrangement ? { travelArrangement: trip.travelArrangement } : {}),
     pendingDecisionCount: trip.pendingDecisions.length,
     ...(trip.travellerResponseStatus ? { travellerResponseStatus: trip.travellerResponseStatus } : {}),
+  };
+}
+
+function rosterPresentationInput(trip: OperatorTripView): RosterPresentationInput {
+  return {
+    ...presentationInput(trip),
+    ...(trip.remainderViable ? { remainderViable: trip.remainderViable } : {}),
+    hasActiveCase: Boolean(trip.activeCaseId),
   };
 }
 
@@ -79,9 +90,9 @@ function sortFleetByCommitment(
 
 function sortRosterByAttention(trips: readonly OperatorTripView[]): OperatorTripView[] {
   return [...trips].sort((a, b) =>
-    compareByAttentionThenId(
-      { tripId: a.tripId, ...presentationInput(a) },
-      { tripId: b.tripId, ...presentationInput(b) },
+    compareRosterAttentionThenId(
+      { tripId: a.tripId, ...rosterPresentationInput(a) },
+      { tripId: b.tripId, ...rosterPresentationInput(b) },
     ),
   );
 }
@@ -171,8 +182,7 @@ function collectAttentionRows(view: OperatorDashboardView): AttentionRow[] {
   // exists — otherwise organisers must search to find them.
   for (const trip of sortRosterByAttention(view.trips)) {
     if (!trip.activeCaseId || seenCases.has(trip.activeCaseId)) continue;
-    const presentation = mapManagedTravelPresentation(presentationInput(trip));
-    if (presentation !== 'NEEDS_ATTENTION' && trip.status !== 'DISRUPTED') continue;
+    if (!requiresOperatorRecoveryAttention(rosterPresentationInput(trip))) continue;
     seenCases.add(trip.activeCaseId);
     rows.push({
       trip,
@@ -343,8 +353,11 @@ function tripRowIssue(trip: OperatorTripView): string {
   if (raw) {
     return escapeHtml(sanitizeOverviewCopy(raw));
   }
-  const bucket = mapManagedTravelPresentation(presentationInput(trip));
-  return escapeHtml(MANAGED_TRAVEL_LABEL[bucket]);
+  const attention = rosterAttentionPresentation(rosterPresentationInput(trip));
+  if (attention === 'LOCAL') {
+    return 'Local / self-arranged';
+  }
+  return escapeHtml(MANAGED_TRAVEL_LABEL[attention as ManagedTravelPresentation]);
 }
 
 function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardView, augment: OperatorDashboardAugmentations): string {
@@ -357,34 +370,46 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
   if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
-  const caseId = trip.activeCaseId ?? trip.historyCaseId;
+  const caseId =
+    trip.activeCaseId ?? trip.historyCaseId ?? trip.pendingDecisions[0]?.caseId;
   const caseHref = caseId
     ? `/operator/cases/${encodeUri(caseId)}`
     : `/traveller?trip=${encodeUri(trip.tripId)}`;
-  const rowTag = caseId ? 'a' : 'div';
-  const rowAttrs = caseId
-    ? `href="${escapeHtml(caseHref)}" class="brow brow-actionable" data-test="${trip.activeCaseId ? 'case-row-link' : 'case-history-link'}"`
-    : `class="brow"`;
+  const caseLinkTestId = trip.activeCaseId || trip.pendingDecisions.length > 0
+    ? 'case-row-link'
+    : trip.historyCaseId
+      ? 'case-history-link'
+      : undefined;
   const showInteraction = `<a href="/traveller?trip=${encodeUri(trip.tripId)}" class="btn btn-ghost btn-sm" data-test="show-interaction">Show interaction</a>`;
-  const presentation = mapManagedTravelPresentation(presentationInput(trip));
+  const attentionPresentation = rosterAttentionPresentation(rosterPresentationInput(trip));
+  const travelArrangementAttr = trip.travelArrangement
+    ? ` data-travel-arrangement="${escapeHtml(trip.travelArrangement)}"`
+    : '';
+  const caseHitLink = caseLinkTestId
+    ? `<a href="${escapeHtml(caseHref)}" class="brow-case-hit" data-test="${caseLinkTestId}" aria-label="Open case for ${escapeHtml(name)}"></a>`
+    : '';
+  const rowClass = caseLinkTestId ? 'brow brow-actionable' : 'brow';
   return `
-  <${rowTag} ${rowAttrs} style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}" data-presentation="${escapeHtml(presentation)}" data-roster-name="${escapeHtml(name.toLowerCase())}">
+  <div class="${rowClass}" style="--i:${Math.min(index, 13)}" data-trip-id="${escapeHtml(trip.tripId)}" data-status="${escapeHtml(trip.status)}" data-presentation="${escapeHtml(attentionPresentation)}"${travelArrangementAttr} data-roster-name="${escapeHtml(name.toLowerCase())}">
+    ${caseHitLink}
     <span class="b-dot ${fleetCellClass(trip)}" aria-hidden="true"></span>
-    <div>
+    <div class="b-primary">
       <div class="b-name">${escapeHtml(name)}</div>
       ${roleLine ? `<div class="b-extra">${escapeHtml(roleLine)}</div>` : ''}
       ${miniChain}
     </div>
-    <div>
+    <div class="b-detail">
       <div class="b-issue">${tripRowIssue(trip)}</div>
       ${extraLine}
     </div>
     <div class="b-right">
-      <div class="b-actions">${showInteraction}</div>
-      <div class="b-status">${rosterStatusBadge(trip)}</div>
-      <div class="b-time">${escapeHtml(formatRosterTime(trip.updatedAt, view.generatedAt))}</div>
+      <div class="b-meta">
+        ${rosterStatusBadge(trip)}
+        <div class="b-time">${escapeHtml(formatRosterTime(trip.updatedAt, view.generatedAt))}</div>
+      </div>
+      ${showInteraction}
     </div>
-  </${rowTag}>`;
+  </div>`;
 }
 
 function rosterFootnote(hasMiniChains: boolean): string {
