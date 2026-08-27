@@ -1,14 +1,16 @@
 # R3D Human Acceptance Closure Matrix
 
-**Status:** R3D HUMAN ACCEPTANCE CANDIDATE — awaiting owner verification  
+**Status:** R3D ACCEPTED — gates re-verified on final product candidate  
 **Branch:** `rescue/r3d-live-product-convergence`  
 **Base before R3D:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3`  
 **Prior failed candidate:** `0782f76ce8738e76d71460e918eb4ed8c7b6784e`  
 **Final remediation SHA:** `9f6ba5a37826dc72b63dbd4381a58b1385d4ef63`  
+**Final product candidate SHA:** `a861847a2dd7e9acf82be46efdd21a010a66b47d`  
 **Owner:** primary (Grok 4.6 High)  
 **Date closed for owner review:** 27 Aug 2026  
+**Date accepted / certified:** 27 Aug 2026  
 
-Do not mark R3 accepted. Do not start R3E until owner verifies.
+R3D accepted on the final product candidate. Do not start R3E until merge/deploy closure completes.
 
 | ID | Surface | Human issue | Classification | Root cause | Planned fix | Browser evidence | Status |
 |---|---|---|---|---|---|---|---|
@@ -57,13 +59,22 @@ Do not mark R3 accepted. Do not start R3E until owner verifies.
 
 ## Gate evidence
 
+Certified on final product candidate `a861847a2dd7e9acf82be46efdd21a010a66b47d` (includes post-remediation UI fix beyond Final remediation SHA `9f6ba5a`).
+
+Prior remediation-SHA evidence (retained):
 - `node --experimental-strip-types --test test/r3d-user-contracts.test.ts test/ui-programme.test.ts` → 36 pass
 - `node --experimental-strip-types scripts/live-product-browser-rehearsal.mjs` → LIVE PRODUCT REHEARSAL PASS
 - Screenshots: `output/r3d-human-acceptance/`
 
-## Explicit non-claims
+Final-candidate re-verification (this closeout) on `a861847a2dd7e9acf82be46efdd21a010a66b47d`:
+- `node --experimental-strip-types --test test/r3d-user-contracts.test.ts` → 15/15 pass
+- `node --experimental-strip-types scripts/live-product-browser-rehearsal.mjs` → LIVE PRODUCT REHEARSAL PASS
+- `npm run typecheck` → pass
+- `npm run build` → pass
+- changed-path `eslint` on R3D-touched src/ui/test/scripts → pass
 
+## Explicit claims / non-claims
+
+- R3D ACCEPTED on final product candidate SHA above
 - R3E HAS NOT STARTED
-- NOT MERGED TO MAIN
-- NOT DEPLOYED
-- NOT owner-accepted yet — awaiting verification
+- Merge to `main` and Railway deploy are closeout actions after this certification

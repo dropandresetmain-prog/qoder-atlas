@@ -1,8 +1,8 @@
 # Final Demo Integration & Code-Freeze Plan
 
-**Status:** Active closure execution SSOT — **R3C ACCEPTED; R3D HUMAN ACCEPTANCE CANDIDATE — awaiting owner verification**  
+**Status:** Active closure execution SSOT — **R3D ACCEPTED; R3E NEXT**  
 **Date:** 27 Aug 2026  
-**Current product line:** `main` contains the integrated R2/R3 candidate (`a151792`), live-product operability closure (`9700edd`), and Railway early-bind health hardening (`7a168ead`). R3C is evidence/design-direction work only and does not redefine backend semantics.  
+**Current product line:** `main` is the R3D-accepted live-product convergence candidate (`a861847a2dd7e9acf82be46efdd21a010a66b47d`). Prior line included integrated R2/R3 (`a151792`), live-product operability closure (`9700edd`), and Railway early-bind health hardening (`7a168ead`). R3C remains evidence/design-direction work only and does not redefine backend semantics.  
 **Parent execution SSOT:** `docs/IMPLEMENTATION_PLAN.md`  
 **Parent demo-readiness contract:** `docs/WAVE3R_DEMO_READINESS_PLAN.md`  
 **Scope/status SSOT:** `docs/ROADMAP.md`  
@@ -147,18 +147,20 @@ R3C evidence lives in `docs/ui-audit/`.
 
 # R3D — Live Product Convergence
 
-**Status:** **R3D HUMAN ACCEPTANCE CANDIDATE — awaiting owner verification.** Do not start R3E until owner verifies.
+**Status:** **R3D ACCEPTED** on final product candidate `a861847a2dd7e9acf82be46efdd21a010a66b47d`. **R3E NEXT.** Do not treat this as full R3 accepted; R3E owns final UI polish + human production acceptance.
 
 **Purpose:** apply `docs/UI_VISUAL_DIRECTION.md` to the already-working product and close remaining presentation/human-operability defects without reopening architecture.
 
 `docs/UI_VISUAL_DIRECTION.md` is the visual authority for R3D. Static recovered HTML facts are never copied over authoritative runtime truth. For Overview / Programme / Case / Activity / Traveller / Programme Change, recovered screen composition is the **BASE UI**; production contributes runtime data, business logic, working controls, and owner-approved additions.
 
 **Candidate branch:** `rescue/r3d-live-product-convergence`  
-**Base:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3` (`origin/main`)  
+**Base:** `704c05bbc51c2aefa55210ee26ebfa1a78f6d8c3` (`origin/main` at R3D start)  
 **Prior convergence candidate (failed human review):** `0782f76ce8738e76d71460e918eb4ed8c7b6784e`  
+**Final remediation SHA:** `9f6ba5a37826dc72b63dbd4381a58b1385d4ef63`  
+**Final product candidate SHA:** `a861847a2dd7e9acf82be46efdd21a010a66b47d`  
 **Human closure matrix:** `docs/ui-audit/R3D_HUMAN_ACCEPTANCE_CLOSURE.md`
 
-R3D is **not** R3 accepted. Do **not** start R3E, merge to main, or deploy production from this branch until owner verification passes.
+R3D closeout merges this candidate to `main` and deploys it. R3E has **not** started.
 
 ## R3D priority outcomes
 
@@ -256,9 +258,9 @@ At R3D end run one relevant full gate:
 
 R3D ends as:
 
-`R3D CONVERGENCE CANDIDATE — R3E NEXT`
+`R3D ACCEPTED — R3E NEXT`
 
-It does not self-certify R3 accepted.
+Final-candidate gates re-verified on `a861847a2dd7e9acf82be46efdd21a010a66b47d` before merge/deploy. It does not self-certify full R3 accepted; R3E remains required for final UI polish and human production acceptance.
 
 ---
 
@@ -475,12 +477,13 @@ Release/filming blockers take precedence over speculative polish.
 - current/recovered UI share the same design-system lineage;
 - human visual direction is frozen in `docs/UI_VISUAL_DIRECTION.md`;
 - R3C is complete;
+- R3D is accepted on final product candidate `a861847a2dd7e9acf82be46efdd21a010a66b47d` with re-verified user-contract, rehearsal, typecheck, build, and changed-path lint gates;
 - code-freeze day is 27 Aug; 28–29 Aug are submission-production days.
 
 ### What we do not know
 
-- whether R3D implementation exposes any remaining runtime/projection defect;
-- whether the final converged UI will pass human Railway review without one more polish pass.
+- whether the R3D-deployed production UI will pass final human Railway polish review without R3E changes;
+- whether any residual presentation defects remain after production smoke.
 
 ### Key assumption
 
@@ -488,4 +491,4 @@ The accepted generalized product can satisfy the frozen visual direction through
 
 ### Test next
 
-**R3D Live Product Convergence** against `docs/UI_VISUAL_DIRECTION.md`, preserving existing human-operability semantics and Railway deployment behavior.
+**R3E Final UI Pass + Human Production Acceptance** on the deployed R3D candidate, without reopening architecture or restarting R3D convergence.
