@@ -328,7 +328,12 @@ test('DR-4: page reload preserves state (browser refresh test)', async () => {
 
   // Verify the same elements are present
   assert.ok(reloadedHtml.includes('data-ui-section="recovery-actions"'), 'recovery-actions panel present after reload');
-  assert.ok(reloadedHtml.includes('Plan recovery') || reloadedHtml.includes('Begin recovery'), 'recovery action present after reload');
+  assert.ok(
+    reloadedHtml.includes('Resolve with Northstar AI') ||
+      reloadedHtml.includes('Begin recovery') ||
+      reloadedHtml.includes('Plan recovery'),
+    'recovery action present after reload',
+  );
 
   await page.close();
 });
