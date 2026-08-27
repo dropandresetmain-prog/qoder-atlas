@@ -184,6 +184,24 @@ export class RuntimeOrchestrator {
   async plan(input: { caseId: EntityId; at: IsoDateTime }): Promise<RuntimePlanOutcome> {
     const recoveryCase = await this.deps.cases.getCase(input.caseId);
     if (!recoveryCase) throw new Error(`unknown recovery case ${input.caseId}`);
+    if (recoveryCase.status === 'RESOLVED') {
+      return {
+        caseId: input.caseId,
+        tripId: recoveryCase.tripId,
+        rounds: 0,
+        strategies: recoveryCase.strategies.map((strategy) => ({
+          id: strategy.id,
+          summary: strategy.summary,
+          feasible: true,
+          rejectionEvidence: [],
+          ...(strategy.costImpact ? { costImpact: strategy.costImpact } : {}),
+        })),
+        toolActivity: [],
+        uncertainties: [],
+        rationale: 'Case is already resolved; planning was not restarted.',
+        caseStatus: 'RESOLVED',
+      };
+    }
     const signalId = recoveryCase.triggeredBySignalIds[recoveryCase.triggeredBySignalIds.length - 1];
     const signal = signalId ? await this.deps.signals.getSignal(signalId) : undefined;
     if (!signal) throw new Error(`case ${input.caseId} has no persisted triggering signal`);

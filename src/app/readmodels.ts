@@ -316,7 +316,11 @@ export async function projectOperatorDashboard(
 
     trips.push({
       tripId: trip.id,
-      ...(recoveryCase && recoveryCase.status !== 'RESOLVED' ? { activeCaseId: recoveryCase.id } : {}),
+      ...(recoveryCase && recoveryCase.status !== 'RESOLVED'
+        ? { activeCaseId: recoveryCase.id }
+        : recoveryCase?.status === 'RESOLVED'
+          ? { historyCaseId: recoveryCase.id }
+          : {}),
       ...(trip.label ? { label: trip.label } : {}),
       travellerNames,
       ...(travelArrangement ? { travelArrangement } : {}),

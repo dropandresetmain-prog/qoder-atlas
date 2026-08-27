@@ -97,6 +97,25 @@ export class CaseService {
     return updated;
   }
 
+  /**
+   * Close a case whose trip is now viable without executing a staged recovery
+   * (authorised programme mutation, or equivalent re-evaluation). Walks only
+   * legal transitions; EXECUTING still observes via VERIFYING first.
+   */
+  async resolveWhenViable(caseId: EntityId, at: IsoDateTime, resolution: CaseResolution): Promise<RecoveryCase> {
+    let recoveryCase = await this.mustGet(caseId);
+    if (recoveryCase.status === 'RESOLVED') {
+      return recoveryCase.resolution ? recoveryCase : this.record(caseId, at, { resolution });
+    }
+    if (recoveryCase.status === 'DETECTED') {
+      recoveryCase = await this.transition(caseId, 'ASSESSING', at);
+    }
+    if (recoveryCase.status === 'EXECUTING') {
+      recoveryCase = await this.transition(caseId, 'VERIFYING', at);
+    }
+    return this.transition(caseId, 'RESOLVED', at, { resolution });
+  }
+
   /** Record lifecycle evidence without changing status. */
   async record(caseId: EntityId, at: IsoDateTime, patch: CasePatch): Promise<RecoveryCase> {
     const recoveryCase = await this.mustGet(caseId);

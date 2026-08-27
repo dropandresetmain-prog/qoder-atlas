@@ -42,6 +42,14 @@ import {
 import { escapeHtml, formatCostDelta, formatInstant, formatMoney } from '../html.ts';
 import { CASE_PRIMARY_OPTION_LIMIT } from '../presentationState.ts';
 import {
+  selectCaseWorkspacePhase,
+  shouldShowBeginCta,
+  shouldShowExecuteCta,
+  shouldShowOptionsPanel,
+  shouldShowProgrammeChangeCta,
+  shouldShowResolveCta,
+} from '../caseLifecycle.ts';
+import {
   chainLinkGlyph,
   errorPanel,
   loadingPanel,
@@ -113,6 +121,12 @@ function caseBadge(view: CaseDetailView): { label: string; tone: StatusTone } {
   if (view.resolution?.outcome === 'ESCALATED_CLOSED') {
     return { label: CASE_BADGE_HUMAN_DECISION, tone: 'alert' };
   }
+  if (view.resolution || view.status === 'RESOLVED') {
+    return { label: STATUS_LABEL.RESOLVED, tone: STATUS_TONE.RESOLVED };
+  }
+  if (shouldShowExecuteCta(view) || selectCaseWorkspacePhase(view) === 'executing') {
+    return { label: STATUS_LABEL.RECOVERING, tone: STATUS_TONE.RECOVERING };
+  }
   if (view.approval?.state === 'PENDING') {
     return view.approval.requestedFrom === 'ORGANISATION'
       ? { label: CASE_BADGE_APPROVAL_NEEDED, tone: 'watch' }
@@ -153,7 +167,13 @@ function unknownStateWord(link: ChainLinkView): string {
 
 function chainLink(link: ChainLinkView): string {
   const style = CHAIN_LINK_STYLE[link.state];
-  const word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
+  const isCommitment = Boolean(link.commitment) || link.kind.toLowerCase() === 'commitment';
+  let word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
+  if (isCommitment) {
+    if (link.state === 'UNBOOKED' || link.state === 'CONFIRMED') word = 'Scheduled';
+    else if (link.state === 'AT_RISK') word = 'At risk';
+    else if (link.state === 'BROKEN') word = 'Impacted';
+  }
   const detail = link.detail ? `<div class="lk-detail">${escapeHtml(link.detail)}</div>` : '';
   return `
   <div class="link ${style.cls}${link.commitment ? ' is-commitment' : ''}" data-link-state="${escapeHtml(link.state)}">
@@ -433,7 +453,7 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
 }
 
 function optionsSection(view: CaseDetailView): string {
-  if (view.options.length === 0) return '';
+  if (!shouldShowOptionsPanel(view) || view.options.length === 0) return '';
   const allRejected = view.options.every((option) => option.verdict === 'NOT_VIABLE');
   if (allRejected) {
     return `
@@ -595,7 +615,7 @@ function approvalSection(view: CaseDetailView): string {
       </form>
       <form method="POST" action="/api/cases/${escapeHtml(view.caseId)}/traveller-decision" class="inline-form">
         <input type="hidden" name="decision" value="DECLINED">
-        <button type="submit" class="btn btn-danger-ghost">Decline</button>
+        <button type="submit" class="btn btn-danger-ghost" data-does-not-execute>Decline</button>
       </form>
     </div>`;
   } else if (
@@ -629,7 +649,7 @@ function approvalSection(view: CaseDetailView): string {
         <input type="hidden" name="decidedBy.id" value="${escapeHtml(approval.approver.id)}">
         <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
         <input type="hidden" name="verdict" value="DECLINED">
-        <button type="submit" class="btn btn-danger-ghost">Decline</button>
+        <button type="submit" class="btn btn-danger-ghost" data-does-not-execute>Decline</button>
       </form>
     </div>`;
   } else if (approval.state === 'PENDING' && approval.requestedFrom === 'HUMAN_AGENT') {
@@ -707,9 +727,47 @@ function programmeChangeButton(view: CaseDetailView): string {
 }
 
 function recoveryActionsInner(view: CaseDetailView): string {
-  if (view.programmeChangeAvailable && view.anchorEventId) {
+  if (view.resolution || view.status === 'RESOLVED') {
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions">
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="resolved">
+        <p class="planning-kicker">Trip recovered</p>
+        <p class="planning-result-title">This case is resolved</p>
+        <p>The authoritative trip is up to date. Reopening this case does not restart recovery.</p>
+        <a class="btn btn-primary" href="/operator" data-test="back-to-overview">Back to Overview</a>
+      </div>`;
+  }
+
+  if (selectCaseWorkspacePhase(view) === 'executing') {
+    return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="executing">
+        <p class="planning-kicker">Execution in progress</p>
+        <p class="planning-result-title">Applying the approved recovery</p>
+        <p>Northstar is executing at the declared boundary, then observing the result and rechecking the trip.</p>
+      </div>`;
+  }
+
+  if (shouldShowExecuteCta(view) && view.approval?.intentId) {
+    return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="execute">
+        <p class="planning-kicker">Approval recorded</p>
+        <p class="planning-result-title">Execute the approved recovery</p>
+        <p>Northstar will now execute, observe the result, and re-check the trip.</p>
+        <form method="POST" action="/api/runtime/execute" class="inline-form" data-test="execute-approved-strategy-form">
+          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
+          <input type="hidden" name="intentId" value="${escapeHtml(view.approval.intentId)}">
+          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
+          <button type="submit" class="btn btn-primary" data-test="execute-approved-strategy-btn">Execute approved recovery</button>
+        </form>
+      </div>`;
+  }
+
+  if (view.approval?.state === 'PENDING') {
+    return '';
+  }
+
+  if (shouldShowProgrammeChangeCta(view)) {
+    return `
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-case-cta="programme">
         <p class="planning-kicker">Travel recovery is not enough</p>
         <p class="planning-result-title">Preview a programme change</p>
         <p>Reschedule the affected commitment so the current travel plan can still work.</p>
@@ -717,9 +775,10 @@ function recoveryActionsInner(view: CaseDetailView): string {
         ${escalationPanel(view)}
       </div>`;
   }
+
   if (view.planningExhausted && view.options.length === 0) {
     return `
-      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note">
+      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-test="planning-exhausted-note" data-case-cta="exhausted">
         <ul class="planning-checks" aria-label="Planning checks completed">
           <li><span aria-hidden="true">✓</span><span><strong>Changed booking checked</strong><small>The provider change is reflected in the trip.</small></span></li>
           <li><span aria-hidden="true">✓</span><span><strong>Rest of the trip checked</strong><small>The failed trip conditions above still need to be protected.</small></span></li>
@@ -730,43 +789,18 @@ function recoveryActionsInner(view: CaseDetailView): string {
       </div>`;
   }
 
-  if (view.options.length > 0 && view.options.every((option) => option.verdict === 'NOT_VIABLE') && !view.approval) {
+  if (view.options.length > 0 && view.options.every((option) => option.verdict === 'NOT_VIABLE')) {
     return `
-      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions">
+      <div class="panel recovery-actions is-exhausted" data-ui-section="recovery-actions" data-case-cta="exhausted">
         <p>No automated recovery option works for this request. Review the rejected options below or hand the case to human support.</p>
         ${escalationPanel(view)}
       </div>`;
   }
 
-  if (view.status === 'DISRUPTED' && view.options.length === 0) {
-    return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
-        <p class="planning-kicker">Impacted trip</p>
-        <p class="planning-result-title">Resolve with Northstar AI</p>
-        <p>Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.</p>
-        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
-        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
-          <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
-          <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-        </form>
-      </div>`;
-  }
-
-  if (view.options.length > 0 && !view.resolution) {
+  if (shouldShowBeginCta(view)) {
     const recommendedOption =
       view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
-    if (!recommendedOption && view.approval?.state === 'PENDING') {
-      // Options exist for inspection after Resolve; approval panel carries the ask.
-      return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
-        <p class="planning-kicker">Impacted trip</p>
-        <p class="planning-result-title">Resolve with Northstar AI</p>
-        <p>Review what changed first. Resolve reveals the ranked recovery choices and any approval that is already required.</p>
-        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
-      </div>`;
-    }
     if (!recommendedOption) return '';
-
     const needsHumanApproval =
       view.approval?.state === 'PENDING' || view.options.some((o) => o.requiresApproval);
     const autoBanner =
@@ -776,15 +810,8 @@ function recoveryActionsInner(view: CaseDetailView): string {
           <span>Northstar is authorised to proceed with the selected recovery. No extra human approval is required.</span>
         </div>`
         : '';
-
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta>
-        <p class="planning-kicker">Impacted trip</p>
-        <p class="planning-result-title">Resolve with Northstar AI</p>
-        <p>Review what changed and the trip impact first. Resolve to reveal the ranked recovery choices.</p>
-        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
-      </div>
-      <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel hidden>
+      <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel data-case-cta="begin">
         ${autoBanner}
         <p class="planning-kicker">Selected recovery</p>
         <p class="planning-result-title">Begin <span data-selected-strategy-label>${escapeHtml(sanitizeUserFacingLabel(recommendedOption.title))}</span></p>
@@ -798,17 +825,16 @@ function recoveryActionsInner(view: CaseDetailView): string {
       </div>`;
   }
 
-  if (view.approval?.state === 'APPROVED' && view.approval.requestedFrom === 'ORGANISATION' && view.approval.intentId) {
+  if (shouldShowResolveCta(view)) {
     return `
-      <div class="panel recovery-actions" data-ui-section="recovery-actions">
-        <p class="planning-kicker">Approval recorded</p>
-        <p class="planning-result-title">Execute the approved recovery</p>
-        <p>Northstar will now execute, observe the result, and re-check the trip.</p>
-        <form method="POST" action="/api/runtime/execute" class="inline-form" data-test="execute-approved-strategy-form">
+      <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta data-case-cta="plan">
+        <p class="planning-kicker">Impacted trip</p>
+        <p class="planning-result-title">Resolve with Northstar AI</p>
+        <p>Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.</p>
+        <button type="button" class="btn btn-primary" data-resolve-northstar data-test="resolve-northstar-btn">Resolve with Northstar AI</button>
+        <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
-          <input type="hidden" name="intentId" value="${escapeHtml(view.approval.intentId)}">
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
-          <button type="submit" class="btn btn-primary" data-test="execute-approved-strategy-btn">Execute approved recovery</button>
         </form>
       </div>`;
   }
@@ -884,7 +910,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     return `<main class="shell">${errorPanel('This case cannot be displayed yet', issues.join('; '))}</main>`;
   }
   const badge = caseBadge(view);
-  const initialPhase = view.resolution ? 'options' : 'impacted';
+  const initialPhase = selectCaseWorkspacePhase(view);
   const rail = `
     <aside class="case-rail">
       ${commitmentCard(view)}

@@ -222,10 +222,13 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
   if (trip.systemActivity.length > 0) extras.push(`Working: ${trip.systemActivity.join(' · ')}`);
   if (trip.uncertainties.length > 0) extras.push(`Still unclear: ${trip.uncertainties.join(' · ')}`);
   const extraLine = extras.length > 0 ? `<div class="b-extra">${escapeHtml(extras.join(' — '))}</div>` : '';
-  const caseHref = trip.activeCaseId ? `/operator/cases/${encodeUri(trip.activeCaseId)}` : `/traveller?trip=${encodeUri(trip.tripId)}`;
-  const rowTag = trip.activeCaseId ? 'a' : 'div';
-  const rowAttrs = trip.activeCaseId
-    ? `href="${escapeHtml(caseHref)}" class="brow brow-actionable" data-test="case-row-link"`
+  const caseId = trip.activeCaseId ?? trip.historyCaseId;
+  const caseHref = caseId
+    ? `/operator/cases/${encodeUri(caseId)}`
+    : `/traveller?trip=${encodeUri(trip.tripId)}`;
+  const rowTag = caseId ? 'a' : 'div';
+  const rowAttrs = caseId
+    ? `href="${escapeHtml(caseHref)}" class="brow brow-actionable" data-test="${trip.activeCaseId ? 'case-row-link' : 'case-history-link'}"`
     : `class="brow"`;
   const showInteraction = `<a href="/traveller?trip=${encodeUri(trip.tripId)}" class="btn btn-ghost btn-sm" data-test="show-interaction">Show interaction</a>`;
   const presentation = mapManagedTravelPresentation(presentationInput(trip));

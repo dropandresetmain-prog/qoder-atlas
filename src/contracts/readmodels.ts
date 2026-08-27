@@ -51,6 +51,11 @@ export interface OperatorTripView {
   tripId: EntityId;
   /** Open operator case for this trip. Absent when no case is actionable. */
   activeCaseId?: EntityId;
+  /**
+   * Latest resolved case for history reopen. Set only when there is no open
+   * case; never used as an attention-queue signal.
+   */
+  historyCaseId?: EntityId;
   label?: string;
   travellerNames: string[];
   anchorEventName?: string;
