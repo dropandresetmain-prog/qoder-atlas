@@ -11,11 +11,15 @@ export function presentCandidateRejection(evidence: readonly CandidateRejectionE
   if (!first) return undefined;
   if (first.kind === 'NO_CANDIDATE_OPERATIONS') return 'This option does not include a workable change.';
   if (first.kind === 'OVERLAY_REJECTED') return 'This option could not be checked safely.';
-  if (first.status === 'UNKNOWN') return 'This option cannot be verified against one required trip condition.';
-  const constraint = constraints.find((candidate) => candidate.id === first.constraintId);
-  return constraint?.kind === 'TEMPORAL'
-    ? 'This option does not meet a required timing condition.'
-    : 'This option does not meet one required trip condition.';
+  if (first.kind === 'DIRECT_FAILURE') return 'This option still leaves a broken connection or failed leg.';
+  if (first.kind === 'CONSTRAINT' && first.status === 'UNKNOWN') return 'This option cannot be verified against one required trip condition.';
+  if (first.kind === 'CONSTRAINT') {
+    const constraint = constraints.find((candidate) => candidate.id === first.constraintId);
+    return constraint?.kind === 'TEMPORAL'
+      ? 'This option does not meet a required timing condition.'
+      : 'This option does not meet one required trip condition.';
+  }
+  return undefined;
 }
 
 /** Outcome and recorded losses are authoritative; stored trace text is not presentation copy. */

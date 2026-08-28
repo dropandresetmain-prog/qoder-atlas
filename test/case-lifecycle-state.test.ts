@@ -24,6 +24,7 @@ import {
 import { projectCaseChain } from '../src/app/chain.ts';
 import { buildChainPresentationContext, presentationLinkState } from '../src/app/chainPresentation.ts';
 import { reconcilePriorOpenCasesIfTripViable } from '../src/app/caseReconciliation.ts';
+import { incidentKeyForSignal } from '../src/app/readmodels.ts';
 import { isLegalCaseTransition } from '../src/operational/case.ts';
 import type { CaseReconciliationDeps } from '../src/app/caseReconciliation.ts';
 import { executionGateIssues } from '../src/operational/intent.ts';
@@ -459,6 +460,7 @@ test('lifecycle: Overview resolved traveller is Confirmed and history-linkable',
 
 test('lifecycle: shared airline incident differentiates by remainderViable, not case DISRUPTED', () => {
   const scheduleChanged = 'The airline changed the flight schedule.';
+  const sharedKey = 'flight|FLIGHT_SCHEDULE_CHANGE|MN|MN218|2026-09-21T09:40:00+08:00';
   const mkTrip = (
     id: string,
     name: string,
@@ -471,6 +473,7 @@ test('lifecycle: shared airline incident differentiates by remainderViable, not 
     travelArrangement: 'NORTHSTAR_ARRANGED' as const,
     whatChanged: scheduleChanged,
     remainderViable,
+    incidentKey: sharedKey,
     affectedItems: ['Inbound flight'],
     systemActivity: [],
     pendingDecisions: [],
@@ -680,4 +683,63 @@ test('chain presentation: Sarah NOT_VIABLE does not blanket-amber unrelated conf
   });
   assert.equal(presentationLinkState(affected, ctx), 'AT_RISK');
   assert.equal(presentationLinkState(preserved, ctx), 'CONFIRMED');
+});
+
+test('incident keys: independent airline incidents never share a grouping key', () => {
+  const mn218 = incidentKeyForSignal({
+    id: 'sig-mn',
+    tripId: 'trip-a',
+    kind: 'FLIGHT_SCHEDULE_CHANGE',
+    authority: 'CONNECTED',
+    sourceId: 'src-1',
+    occurredAt: '2026-09-21T09:40:00+08:00',
+    receivedAt: '2026-09-21T09:40:00+08:00',
+    payload: { carrierCode: 'MN', flightNumber: 'MN218' },
+  });
+  const zg023 = incidentKeyForSignal({
+    id: 'sig-zg',
+    tripId: 'trip-b',
+    kind: 'FLIGHT_SCHEDULE_CHANGE',
+    authority: 'CONNECTED',
+    sourceId: 'src-2',
+    occurredAt: '2026-09-29T12:00:00+09:00',
+    receivedAt: '2026-09-29T12:00:00+09:00',
+    payload: { carrierCode: 'ZG', flightNumber: 'ZG023' },
+  });
+  assert.ok(mn218);
+  assert.ok(zg023);
+  assert.notEqual(mn218, zg023);
+});
+
+test('fleet presentation: resolved managed green, watching amber, needs attention red, local explicit', () => {
+  assert.equal(
+    fleetCellClassFor({ status: 'RESOLVED', travelArrangement: 'NORTHSTAR_ARRANGED', presentation: 'CONFIRMED' }),
+    'd-ok',
+  );
+  assert.equal(
+    rosterAttentionPresentation({
+      status: 'DISRUPTED',
+      travelArrangement: 'SELF_OR_OTHER_ARRANGED',
+      hasActiveCase: true,
+      remainderViable: 'VIABLE',
+    }),
+    'WATCHING',
+  );
+  assert.equal(
+    rosterAttentionPresentation({
+      status: 'DISRUPTED',
+      travelArrangement: 'NORTHSTAR_ARRANGED',
+      hasActiveCase: true,
+      remainderViable: 'NOT_VIABLE',
+    }),
+    'NEEDS_ATTENTION',
+  );
+  assert.equal(
+    fleetCellClassFor({
+      status: 'DISRUPTED',
+      travelArrangement: 'SELF_OR_OTHER_ARRANGED',
+      presentation: 'LOCAL',
+    }),
+    'd-local',
+  );
 });

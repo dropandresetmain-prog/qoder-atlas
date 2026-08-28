@@ -17,6 +17,7 @@ import type { TripElement } from '../domain/elements.ts';
 import type { RuleSet } from '../domain/rules.ts';
 import type { Constraint, ConstraintStatus } from '../domain/constraints.ts';
 import type { Trip } from '../domain/trip.ts';
+import type { TripSignal } from '../operational/signal.ts';
 import type {
   ElementImpact,
   ImpactAssessment,
@@ -71,96 +72,12 @@ export class ImpactEngine implements ImpactService {
       evaluations.map((e) => [e.constraintId, e.status]),
     );
 
-    const directFailures: ElementImpact[] = [];
-    const affectedElements: ElementImpact[] = [];
-    const unresolvedUnknowns: string[] = [];
-
-    // 1. Direct failures: cancelled/INVALID elements, plus signal-implied
-    //    failures. Strong signal authority makes the failure INVALID; weaker
-    //    authority keeps it AT_RISK with an unresolved unknown.
-    for (const element of trip.elements) {
-      if (isCancelled(element) || element.status === 'INVALID') {
-        directFailures.push({
-          elementId: element.id,
-          resultingStatus: 'INVALID',
-          reason: element.reservationState === 'CANCELLED' ? 'reservation cancelled' : 'element INVALID',
-        });
-      }
-    }
-    for (const signal of signals) {
-      if (signal.kind !== 'FLIGHT_CANCELLATION') continue;
-      if (signal.subjectRef?.entityType !== 'TRIP_ELEMENT') continue;
-      const subject = trip.elements.find((e) => e.id === signal.subjectRef!.id);
-      if (!subject) continue;
-      if (directFailures.some((f) => f.elementId === subject.id)) continue;
-      // Authoritative post-signal evidence (e.g. an observed rebooking)
-      // outranks the cancellation signal; the signal no longer implies failure.
-      const signalInstant = signal.receivedAt ?? signal.occurredAt;
-      const departureFact =
-        subject.elementKind === 'TRANSPORT_LEG' ? subject.data.scheduledDeparture : undefined;
-      if (
-        departureFact &&
-        departureFact.authority === 'AUTHORITATIVE' &&
-        instantMillis(departureFact.observedAt) >= instantMillis(signalInstant)
-      ) {
-        continue;
-      }
-      if (signal.authority === 'AUTHORITATIVE' || signal.authority === 'CONNECTED') {
-        directFailures.push({
-          elementId: subject.id,
-          resultingStatus: 'INVALID',
-          reason: `signal ${signal.id} reports cancellation (${signal.authority})`,
-        });
-      } else {
-        affectedElements.push({
-          elementId: subject.id,
-          resultingStatus: 'AT_RISK',
-          reason: `signal ${signal.id} reports cancellation but evidence is ${signal.authority}`,
-        });
-        unresolvedUnknowns.push(`cancellation of ${subject.id} not confirmed (${signal.authority})`);
-      }
-    }
-
-    // 1b. Connection feasibility: schedule-driven inbound delay can make an
-    //     onward leg impossible before a historical missed-flight report.
-    const byIdEarly = new Map(trip.elements.map((e) => [e.id, e]));
-    const connectionAssessments = assessConnectionPairs(trip, [...ruleSets.values()]);
-    const connectionFailures = connectionFailureElementIds(connectionAssessments);
-    const policyImplicationsEarly: string[] = [];
-    for (const assessment of connectionAssessments) {
-      if (assessment.viability === 'IMPOSSIBLE') {
-        policyImplicationsEarly.push(
-          `connection ${assessment.upstreamId}→${assessment.downstreamId}: ${assessment.reason}`,
-        );
-      } else if (assessment.viability === 'TIGHT') {
-        policyImplicationsEarly.push(
-          `connection ${assessment.upstreamId}→${assessment.downstreamId} tightening: ${assessment.reason}`,
-        );
-      }
-    }
-    for (const downstreamId of connectionFailures.impossible) {
-      if (directFailures.some((f) => f.elementId === downstreamId)) continue;
-      const element = byIdEarly.get(downstreamId);
-      if (!element || isCancelled(element)) continue;
-      directFailures.push({
-        elementId: downstreamId,
-        resultingStatus: 'INVALID',
-        reason: 'connection buffer exhausted — onward leg is no longer realistically makeable',
-      });
-    }
-    for (const downstreamId of connectionFailures.tight) {
-      if (
-        directFailures.some((f) => f.elementId === downstreamId) ||
-        affectedElements.some((a) => a.elementId === downstreamId)
-      ) {
-        continue;
-      }
-      affectedElements.push({
-        elementId: downstreamId,
-        resultingStatus: 'AT_RISK',
-        reason: 'connection margin is below the required buffer',
-      });
-    }
+    const ruleSetList = [...ruleSets.values()];
+    const elementFailures = assessDirectElementFailures(trip, ruleSetList, signals, assessedAt);
+    const directFailures = elementFailures.directFailures;
+    const affectedElements = elementFailures.affectedElements;
+    const unresolvedUnknowns = elementFailures.unresolvedUnknowns;
+    const policyImplicationsEarly = elementFailures.connectionPolicyImplications;
 
     // 2. Dependency propagation over CONNECTS_TO: INVALID upstream makes
     //    downstream AT_RISK (never blanket INVALID). A hard failure here never
@@ -316,6 +233,112 @@ function resolveRule(constraint: Constraint, ruleSets: Map<string, RuleSet>) {
     : [...ruleSets.values()].flatMap((rs) => rs.rules);
   if (!constraint.derivedFromRuleId) return undefined;
   return pool.find((r) => r.id === constraint.derivedFromRuleId);
+}
+
+export interface DirectElementFailureAssessment {
+  directFailures: ElementImpact[];
+  affectedElements: ElementImpact[];
+  unresolvedUnknowns: string[];
+  connectionPolicyImplications: string[];
+}
+
+/**
+ * Read-only direct-failure assessment for a trip aggregate: element health,
+ * signal-implied cancellations, and connection-feasibility impossibility.
+ * Shared by ImpactEngine.assess and overlay viability so planning rejects
+ * candidates that leave the same connection broken verification would see.
+ */
+export function assessDirectElementFailures(
+  trip: Trip,
+  ruleSets: readonly RuleSet[],
+  signals: readonly TripSignal[],
+  assessedAt: IsoDateTime,
+): DirectElementFailureAssessment {
+  const directFailures: ElementImpact[] = [];
+  const affectedElements: ElementImpact[] = [];
+  const unresolvedUnknowns: string[] = [];
+
+  for (const element of trip.elements) {
+    if (isCancelled(element) || element.status === 'INVALID') {
+      directFailures.push({
+        elementId: element.id,
+        resultingStatus: 'INVALID',
+        reason: element.reservationState === 'CANCELLED' ? 'reservation cancelled' : 'element INVALID',
+      });
+    }
+  }
+  for (const signal of signals) {
+    if (signal.kind !== 'FLIGHT_CANCELLATION') continue;
+    if (signal.subjectRef?.entityType !== 'TRIP_ELEMENT') continue;
+    const subject = trip.elements.find((e) => e.id === signal.subjectRef!.id);
+    if (!subject) continue;
+    if (directFailures.some((f) => f.elementId === subject.id)) continue;
+    const signalInstant = signal.receivedAt ?? signal.occurredAt;
+    const departureFact =
+      subject.elementKind === 'TRANSPORT_LEG' ? subject.data.scheduledDeparture : undefined;
+    if (
+      departureFact &&
+      departureFact.authority === 'AUTHORITATIVE' &&
+      instantMillis(departureFact.observedAt) >= instantMillis(signalInstant)
+    ) {
+      continue;
+    }
+    if (signal.authority === 'AUTHORITATIVE' || signal.authority === 'CONNECTED') {
+      directFailures.push({
+        elementId: subject.id,
+        resultingStatus: 'INVALID',
+        reason: `signal ${signal.id} reports cancellation (${signal.authority})`,
+      });
+    } else {
+      affectedElements.push({
+        elementId: subject.id,
+        resultingStatus: 'AT_RISK',
+        reason: `signal ${signal.id} reports cancellation but evidence is ${signal.authority}`,
+      });
+      unresolvedUnknowns.push(`cancellation of ${subject.id} not confirmed (${signal.authority})`);
+    }
+  }
+
+  const byIdEarly = new Map(trip.elements.map((e) => [e.id, e]));
+  const connectionAssessments = assessConnectionPairs(trip, ruleSets);
+  const connectionFailures = connectionFailureElementIds(connectionAssessments);
+  const connectionPolicyImplications: string[] = [];
+  for (const assessment of connectionAssessments) {
+    if (assessment.viability === 'IMPOSSIBLE') {
+      connectionPolicyImplications.push(
+        `connection ${assessment.upstreamId}→${assessment.downstreamId}: ${assessment.reason}`,
+      );
+    } else if (assessment.viability === 'TIGHT') {
+      connectionPolicyImplications.push(
+        `connection ${assessment.upstreamId}→${assessment.downstreamId} tightening: ${assessment.reason}`,
+      );
+    }
+  }
+  for (const downstreamId of connectionFailures.impossible) {
+    if (directFailures.some((f) => f.elementId === downstreamId)) continue;
+    const element = byIdEarly.get(downstreamId);
+    if (!element || isCancelled(element)) continue;
+    directFailures.push({
+      elementId: downstreamId,
+      resultingStatus: 'INVALID',
+      reason: 'connection buffer exhausted — onward leg is no longer realistically makeable',
+    });
+  }
+  for (const downstreamId of connectionFailures.tight) {
+    if (
+      directFailures.some((f) => f.elementId === downstreamId) ||
+      affectedElements.some((a) => a.elementId === downstreamId)
+    ) {
+      continue;
+    }
+    affectedElements.push({
+      elementId: downstreamId,
+      resultingStatus: 'AT_RISK',
+      reason: 'connection margin is below the required buffer',
+    });
+  }
+
+  return { directFailures, affectedElements, unresolvedUnknowns, connectionPolicyImplications };
 }
 
 /**

@@ -9,6 +9,8 @@ import {
   DEFAULT_CONNECTION_BUFFER_MINUTES,
   discoverConnectionPairs,
 } from '../src/engine/connectionFeasibility.ts';
+import { OverlayViabilityEngine } from '../src/engine/overlay.ts';
+import type { MutationOperation } from '../src/operational/mutation.ts';
 
 const AT = '2026-09-28T12:00:00+00:00';
 
@@ -124,4 +126,87 @@ test('connection feasibility: discovers hub pairs without explicit CONNECTS_TO',
   assert.equal(pairs.length, 1);
   assert.equal(pairs[0]!.upstreamId, 'leg-1');
   assert.equal(pairs[0]!.downstreamId, 'leg-2');
+});
+
+test('overlay viability: same-schedule rebook stays infeasible when connection is impossible', async () => {
+  const legs = [
+    flight('leg-1', 'place-a', 'place-hub', '2026-09-28T08:00:00+00:00', '2026-09-29T17:55:00+00:00'),
+    flight('leg-2', 'place-hub', 'place-b', '2026-09-29T16:50:00+00:00', '2026-09-29T23:00:00+00:00'),
+  ];
+  const trip = tripWith(legs);
+  const snapshot = {
+    tripId: trip.id,
+    takenAt: AT,
+    tripVersion: trip.version,
+    trip,
+    travellers: [],
+    organisations: [],
+    places: [],
+    ruleSets: bufferRules,
+    constraints: [],
+    preferences: [],
+    sourceRecords: [],
+  };
+  const engine = new OverlayViabilityEngine();
+  const sameSchedule: MutationOperation = {
+    op: 'UPSERT_ENTITY',
+    entityType: 'TRIP_ELEMENT',
+    data: {
+      ...legs[1]!,
+      reservationState: 'HELD',
+      status: 'UNKNOWN',
+    },
+  };
+  const result = await engine.evaluateOverlay({ baseSnapshot: snapshot, candidateOperations: [sameSchedule] });
+  assert.equal(result.feasible, false);
+  assert.ok(result.directFailureElementIds.includes('leg-2'));
+});
+
+test('overlay viability: next-day rebook clears impossible connection', async () => {
+  const legs = [
+    flight('leg-1', 'place-a', 'place-hub', '2026-09-28T08:00:00+00:00', '2026-09-29T17:55:00+00:00'),
+    flight('leg-2', 'place-hub', 'place-b', '2026-09-29T16:50:00+00:00', '2026-09-29T23:00:00+00:00'),
+  ];
+  const trip = tripWith(legs);
+  const snapshot = {
+    tripId: trip.id,
+    takenAt: AT,
+    tripVersion: trip.version,
+    trip,
+    travellers: [],
+    organisations: [],
+    places: [],
+    ruleSets: bufferRules,
+    constraints: [],
+    preferences: [],
+    sourceRecords: [],
+  };
+  const engine = new OverlayViabilityEngine();
+  const nextDay: MutationOperation = {
+    op: 'UPSERT_ENTITY',
+    entityType: 'TRIP_ELEMENT',
+    data: {
+      ...legs[1]!,
+      reservationState: 'HELD',
+      status: 'UNKNOWN',
+      data: {
+        ...legs[1]!.data,
+        scheduledDeparture: {
+          value: '2026-09-30T08:20:00+00:00',
+          sourceId: 'src-1',
+          authority: 'CONNECTED',
+          observedAt: AT,
+        },
+        scheduledArrival: {
+          value: '2026-09-30T14:00:00+00:00',
+          sourceId: 'src-1',
+          authority: 'CONNECTED',
+          observedAt: AT,
+        },
+      },
+    },
+  };
+  const result = await engine.evaluateOverlay({ baseSnapshot: snapshot, candidateOperations: [nextDay] });
+  assert.equal(result.feasible, true, JSON.stringify(result.directFailureElementIds));
+  assert.deepEqual(result.directFailureElementIds, []);
 });

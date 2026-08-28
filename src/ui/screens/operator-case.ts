@@ -717,6 +717,9 @@ function approvalSection(view: CaseDetailView): string {
       <p class="planning-kicker">Traveller decision required</p>
       <p class="planning-result-title">Waiting for ${escapeHtml(waitingFor)}</p>
       <p>Northstar will not change the booking until ${escapeHtml(waitingFor)} approves on the traveller surface.</p>
+      <p class="btn-row" style="margin-top:12px">
+        <a href="/traveller?trip=${escapeHtml(view.tripId)}" class="btn btn-ghost btn-sm" data-test="open-traveller-surface">Open traveller view</a>
+      </p>
     </div>`;
   } else if (
     approval.state === 'PENDING' &&

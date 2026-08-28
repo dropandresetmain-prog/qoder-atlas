@@ -17,6 +17,7 @@ import type {
   ExecutionResult,
 } from '../operational/intent.ts';
 import type { MutationOperation, MutationProposal } from '../operational/mutation.ts';
+import type { TripSignal } from '../operational/signal.ts';
 import type { TripSnapshot } from '../operational/snapshot.ts';
 
 export interface ValidationIssue {
@@ -57,6 +58,8 @@ export interface OverlayInput {
   baseSnapshot: TripSnapshot;
   /** Candidate mutations applied to an isolated overlay only (FR-09). */
   candidateOperations: MutationOperation[];
+  /** Disruption signals in scope for direct-failure assessment on the overlay. */
+  triggeringSignals?: TripSignal[];
 }
 
 export interface ConstraintEvaluation {
@@ -72,6 +75,8 @@ export interface ViabilityResult {
   /** Soft tradeoffs remain rankable even when the overlay is feasible. */
   softTradeoffs: string[];
   unknownIds: EntityId[];
+  /** Element-level direct failures (connection impossibility, INVALID legs, …). */
+  directFailureElementIds: EntityId[];
 }
 
 export interface ViabilityEngine {

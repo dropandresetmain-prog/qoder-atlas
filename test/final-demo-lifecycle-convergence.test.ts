@@ -110,66 +110,91 @@ async function pendingAuthority(base: string, tripId: string): Promise<{ caseId:
   return { caseId: row.activeCaseId, intentId: approval.intentId };
 }
 
-test('lifecycle: Jordan approval exposes Execute; observe resolves; reload stays resolved', async () => {
+test('lifecycle: Jordan plan → begin → approve → execute resolves without missed-flight report', async () => {
   const composed = await composeAppRuntime(demoConfig);
   const server = createAppServer(demoConfig, composed.endpoints);
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
     await resetPopulated(base);
-    const { caseId, intentId } = await pendingAuthority(base, HERO_TRIPS.s2);
-    const pendingHtml = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.match(pendingHtml, /data-case-phase="awaiting_authority"/);
-    assert.match(pendingHtml, /data-test="organisation-approve-form"/);
-    assert.match(pendingHtml, /data-test="organisation-decline-form"/);
-    assert.doesNotMatch(pendingHtml, /data-test="resolve-northstar-btn"/);
-    assert.doesNotMatch(pendingHtml, /data-test="begin-strategy-btn"/);
-    assert.doesNotMatch(pendingHtml, /data-test="execute-approved-strategy-btn"/);
+    const row = tripRow(await operatorDashboard(base), HERO_TRIPS.s2);
+    assert.ok(row?.activeCaseId, 'Jordan case at pre-emptive entry');
+    const caseId = row.activeCaseId!;
+
+    const planned = await postJson(base, '/api/runtime/plan', {
+      caseId,
+      at: '2026-09-29T12:40:00+09:00',
+    });
+    assert.equal(planned.status, 200, JSON.stringify(planned.body));
+    assert.ok(planned.body['bestStrategyId'], 'plan must rank a connection-viable best strategy');
+
+    const began = await postJson(base, '/api/runtime/begin', {
+      caseId,
+      strategyId: planned.body['bestStrategyId'],
+      at: '2026-09-29T12:45:00+09:00',
+    });
+    assert.equal(began.status, 200, JSON.stringify(began.body));
+    const intentId = began.body['intentId'] as string;
+    assert.ok(intentId);
 
     const decided = await postJson(base, '/api/runtime/decide', {
       caseId,
       intentId,
       decidedBy: { entityType: 'ORGANISATION', id: 'org-ait-organiser' },
       verdict: 'APPROVED',
-      at: '2026-09-22T12:00:00+08:00',
+      at: '2026-09-29T12:50:00+09:00',
     });
     assert.equal(decided.status, 200, JSON.stringify(decided.body));
     assert.notEqual(decided.body['caseStatus'], 'RESOLVED', 'approval must not resolve the case');
 
-    const approvedHtml = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.match(approvedHtml, /data-case-phase="execute"/);
-    assert.match(approvedHtml, /data-test="execute-approved-strategy-btn"/);
-    assert.doesNotMatch(approvedHtml, /data-test="resolve-northstar-btn"/);
-    assert.doesNotMatch(approvedHtml, /data-test="begin-strategy-btn"/);
-    assert.doesNotMatch(approvedHtml, /data-test="organisation-approve-form"/);
-
     const executed = await postJson(base, '/api/runtime/execute', {
       caseId,
       intentId,
-      at: '2026-09-22T12:05:00+08:00',
+      at: '2026-09-29T13:00:00+09:00',
     });
     assert.equal(executed.status, 200, JSON.stringify(executed.body));
-    assert.equal(executed.body['executed'], true, JSON.stringify(executed.body));
+    assert.equal(executed.body['caseStatus'], 'RESOLVED', JSON.stringify(executed.body));
 
     const resolvedHtml = await getHtml(base, `/operator/cases/${caseId}`);
     assert.match(resolvedHtml, /data-test="case-phase-resolved"/);
     assertNoRecoveryCtas(resolvedHtml, 'Jordan after execute');
-    const reloaded = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.match(reloaded, /data-test="case-phase-resolved"/);
-    assertNoRecoveryCtas(reloaded, 'Jordan reopen');
 
-    const overview = await getHtml(base, `/operator?event=${encodeURIComponent(EVENT())}`);
-    assert.match(overview, new RegExp(`data-trip-id="${HERO_TRIPS.s2}"[^>]*data-presentation="CONFIRMED"`));
+    const traveller = await getJson(base, `/api/traveller/${HERO_TRIPS.s2}`);
+    assert.equal(traveller.body['remainderViable'], 'VIABLE');
+    assert.equal(traveller.body['status'], 'RESOLVED');
+
     const dash = await operatorDashboard(base);
     const jordan = tripRow(dash, HERO_TRIPS.s2);
     assert.equal(jordan?.status, 'RESOLVED');
+    assert.equal(jordan?.remainderViable, 'VIABLE');
     assert.ok(jordan?.historyCaseId);
     assert.equal(jordan?.activeCaseId, undefined);
+
+    const overview = await getHtml(base, `/operator?event=${encodeURIComponent(EVENT())}`);
+    assert.match(overview, new RegExp(`data-trip-id="${HERO_TRIPS.s2}"[^>]*data-presentation="CONFIRMED"`));
+    const reloaded = await getHtml(base, `/operator/cases/${caseId}`);
+    assert.match(reloaded, /data-test="case-phase-resolved"/);
+    assertNoRecoveryCtas(reloaded, 'Jordan reopen');
   } finally {
     await new Promise<void>((done, fail) => server.close((error) => (error ? fail(error) : done())));
     composed.db.close();
   }
 });
+
+async function jordanIntentAfterBegin(base: string): Promise<{ caseId: string; intentId: string }> {
+  const row = tripRow(await operatorDashboard(base), HERO_TRIPS.s2);
+  assert.ok(row?.activeCaseId);
+  const caseId = row.activeCaseId!;
+  const planned = await postJson(base, '/api/runtime/plan', { caseId, at: '2026-09-29T12:40:00+09:00' });
+  assert.equal(planned.status, 200);
+  const began = await postJson(base, '/api/runtime/begin', {
+    caseId,
+    strategyId: planned.body['bestStrategyId'],
+    at: '2026-09-29T12:45:00+09:00',
+  });
+  assert.equal(began.status, 200);
+  return { caseId, intentId: began.body['intentId'] as string };
+}
 
 test('lifecycle: Decline does not execute Jordan recovery', async () => {
   const composed = await composeAppRuntime(demoConfig);
@@ -178,7 +203,7 @@ test('lifecycle: Decline does not execute Jordan recovery', async () => {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
     await resetPopulated(base);
-    const { caseId, intentId } = await pendingAuthority(base, HERO_TRIPS.s2);
+    const { caseId, intentId } = await jordanIntentAfterBegin(base);
     const declined = await postJson(base, '/api/runtime/decide', {
       caseId,
       intentId,

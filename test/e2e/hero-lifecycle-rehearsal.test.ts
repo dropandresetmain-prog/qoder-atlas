@@ -180,8 +180,8 @@ test('browser: Overview shared incident + 67 participant roster truth', async ()
     }
     const group = page.locator('[data-test="shared-incident-group"]');
     await group.waitFor({ state: 'visible', timeout: 15000 });
-    assert.equal(await group.getAttribute('data-shared-affected'), '5');
-    assert.equal(await group.getAttribute('data-shared-workable'), '4');
+    assert.equal(await group.getAttribute('data-shared-affected'), '4');
+    assert.equal(await group.getAttribute('data-shared-workable'), '3');
     assert.equal(await group.getAttribute('data-shared-critical'), '1');
     assert.match((await group.textContent()) ?? '', /3 still workable/i);
     assert.match((await group.textContent()) ?? '', /1 critical/i);
@@ -308,6 +308,15 @@ test('browser: Sarah S1→S3 commit converges to resolved Confirmed without a se
     const row = page.locator('[data-trip-id]').filter({ hasText: 'Sarah Lim' }).first();
     await row.waitFor({ timeout: 15000 });
     assert.equal(await row.getAttribute('data-presentation'), 'CONFIRMED');
+    const elenaRow = page.locator('[data-trip-id]').filter({ hasText: 'Elena Tan' }).first();
+    if (await elenaRow.count()) {
+      const elenaPresentation = await elenaRow.getAttribute('data-presentation');
+      assert.ok(
+        elenaPresentation === 'WATCHING' || elenaPresentation === 'CONFIRMED',
+        `Elena after Sarah commit should be WATCHING or unaffected (got ${elenaPresentation})`,
+      );
+      assert.notEqual(elenaPresentation, '', 'Elena must not have a blank fleet square');
+    }
     if (await page.locator('[data-test="case-history-link"]').filter({ hasText: 'Sarah Lim' }).count()) {
       await page.locator('[data-test="case-history-link"]').filter({ hasText: 'Sarah Lim' }).first().click();
       await page.waitForLoadState('domcontentloaded');
@@ -341,6 +350,8 @@ test('browser: Jonas terminal reopen does not resurrect Resolve/Approve when alr
     await page.waitForSelector('[data-test="primary-action-panel"], [data-test="resolve-northstar-btn"], [data-test="waiting-for-traveller"]', { timeout: 20000 });
     const operatorHtml = await page.content();
     assert.match(operatorHtml, /Waiting for Jonas|data-test="waiting-for-traveller"/i);
+    assert.match(operatorHtml, /data-test="open-traveller-surface"/);
+    assert.match(operatorHtml, /href="\/traveller\?trip=/);
     assert.doesNotMatch(operatorHtml, /action="\/api\/cases\/[^"]+\/traveller-decision"/);
     assert.doesNotMatch(operatorHtml, /Approve traveller-funded/i);
     assertCommitmentSemantics(operatorHtml, 'Jonas operator');

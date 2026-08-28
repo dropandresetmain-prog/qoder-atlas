@@ -54,6 +54,7 @@ import {
   type WorkingState,
 } from './applyOperations.ts';
 import { evaluateConstraints, type EvaluationContext } from './evaluators.ts';
+import { assessDirectElementFailures } from './impact.ts';
 
 function validateCandidate(op: MutationOperation): string[] {
   const issues: string[] = [];
@@ -215,12 +216,28 @@ export class OverlayViabilityEngine implements ViabilityEngine {
       .filter((r) => hardnessById.get(r.constraintId) === 'SOFT' && r.status !== 'PASS')
       .map((r) => `soft constraint ${r.constraintId} is ${r.status}${r.evidence ? ` (${r.evidence})` : ''}`);
 
+    const elementFailures = assessDirectElementFailures(
+      trip,
+      [...ruleSets.values()],
+      // Overlay candidates are recovery hypotheses: pre-recovery signals must
+      // not re-impose failures on elements the candidate replaces. Element
+      // health and connection feasibility on the post-candidate trip are
+      // the honest planning-time viability check.
+      [],
+      snapshot.takenAt,
+    );
+    const directFailureElementIds = elementFailures.directFailures.map((failure) => failure.elementId);
+
     return {
-      feasible: hardFailureIds.length === 0 && unknownIds.length === 0,
+      feasible:
+        hardFailureIds.length === 0 &&
+        unknownIds.length === 0 &&
+        directFailureElementIds.length === 0,
       constraintResults,
       hardFailureIds,
       softTradeoffs,
       unknownIds,
+      directFailureElementIds,
     };
   }
 }

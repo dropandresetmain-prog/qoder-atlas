@@ -43,7 +43,8 @@ export interface PlannedCandidate {
 export type CandidateRejectionEvidence =
   | { kind: 'NO_CANDIDATE_OPERATIONS' }
   | { kind: 'OVERLAY_REJECTED'; detail: string }
-  | { kind: 'CONSTRAINT'; constraintId: EntityId; status: 'FAIL' | 'UNKNOWN'; evidence?: string };
+  | { kind: 'CONSTRAINT'; constraintId: EntityId; status: 'FAIL' | 'UNKNOWN'; evidence?: string }
+  | { kind: 'DIRECT_FAILURE'; elementId: EntityId; reason: string };
 
 export interface PlanningLoopInput {
   caseId: EntityId;
@@ -137,7 +138,9 @@ export async function runPlanningLoop(
   // Deterministic viability for every candidate, on isolated overlays only.
   const candidates: PlannedCandidate[] = [];
   for (const strategy of strategies) {
-    candidates.push(await evaluateCandidate(deps.viability, input.snapshot, strategy));
+    candidates.push(
+      await evaluateCandidate(deps.viability, input.snapshot, strategy, input.triggeringSignals),
+    );
   }
 
   // Ranking: hard-infeasible candidates can never win. Among the feasible,
@@ -207,6 +210,7 @@ export async function evaluateCandidate(
   viability: ViabilityEngine,
   snapshot: TripSnapshot,
   strategy: RecoveryStrategy,
+  triggeringSignals: TripSignal[] = [],
 ): Promise<PlannedCandidate> {
   if (strategy.candidateOperations.length === 0) {
     return {
@@ -217,7 +221,11 @@ export async function evaluateCandidate(
   }
   let result: ViabilityResult;
   try {
-    result = await viability.evaluateOverlay({ baseSnapshot: snapshot, candidateOperations: strategy.candidateOperations });
+    result = await viability.evaluateOverlay({
+      baseSnapshot: snapshot,
+      candidateOperations: strategy.candidateOperations,
+      triggeringSignals,
+    });
   } catch (error) {
     // Overlay rejection is deterministic evidence, not a crash.
     return {
@@ -235,6 +243,13 @@ export async function evaluateCandidate(
     const evaluation = result.constraintResults.find((r) => r.constraintId === constraintId);
     rejectionEvidence.push({ kind: 'CONSTRAINT', constraintId, status: 'UNKNOWN', evidence:
       evaluation?.evidence,
+    });
+  }
+  for (const elementId of result.directFailureElementIds) {
+    rejectionEvidence.push({
+      kind: 'DIRECT_FAILURE',
+      elementId,
+      reason: 'overlay still has a direct element failure after candidate operations',
     });
   }
   return { strategy, viability: result, feasible: result.feasible, rejectionEvidence };
