@@ -18,6 +18,7 @@ import type {
   TravellerTripView,
 } from '../../contracts/readmodels.ts';
 import {
+  CASE_OPTIONS_FORMING_NOTE,
   STATUS_LABEL,
   TRAVELLER_HEADLINE,
   TRAVELLER_SUBLINE,
@@ -28,6 +29,7 @@ import {
   loadingPanel,
   viabilityBlock,
 } from '../components.ts';
+import { ICON_SEND } from '../icons.ts';
 import type {
   TravellerItineraryRow,
   TravellerOptionDetail,
@@ -92,7 +94,9 @@ function hero(view: TravellerTripView, presentation?: TravellerPresentation): st
 function itineraryRow(row: TravellerItineraryRow): string {
   const struck = row.struck ? ' struck' : '';
   const sub = row.sub ? `<div class="i-sub">${escapeHtml(row.sub)}</div>` : '';
-  return `<div class="itin-row${struck}"><span class="i-ic" aria-hidden="true">${escapeHtml(row.icon)}</span><div class="i-main"><div class="i-title">${escapeHtml(row.title)}</div>${sub}</div><span class="i-state ${STATE_CLASS[row.stateTone]}">${escapeHtml(row.stateLabel)}</span></div>`;
+  // Icons come from the shared projection as solid inline SVGs — insert raw
+  // so the state colour can fill them (escaping would render the markup).
+  return `<div class="itin-row${struck}"><span class="i-ic" aria-hidden="true">${row.icon}</span><div class="i-main"><div class="i-title">${escapeHtml(row.title)}</div>${sub}</div><span class="i-state ${STATE_CLASS[row.stateTone]}">${escapeHtml(row.stateLabel)}</span></div>`;
 }
 
 function itinerarySection(view: TravellerTripView, presentation?: TravellerPresentation): string {
@@ -171,8 +175,7 @@ function progressSection(view: TravellerTripView, presentation?: TravellerPresen
 
 function optionsSkeleton(presentation?: TravellerPresentation): string {
   if (!presentation?.optionsSkeleton) return '';
-  const note = presentation.optionsSkeletonNote
-    ?? 'Options appear here the moment they are scored. You will only hear from us when there is a real choice.';
+  const note = presentation.optionsSkeletonNote ?? CASE_OPTIONS_FORMING_NOTE;
   return `
   <div class="t-card" data-ui-section="options-skeleton">
     <div class="skeleton" style="height:52px"></div>
@@ -301,7 +304,7 @@ function composer(view: TravellerTripView, presentation?: TravellerPresentation)
     return `
   <div class="composer" data-ui-section="traveller-request" aria-hidden="true">
     <span class="c-placeholder">${escapeHtml(placeholder)}</span>
-    <span class="c-send" aria-hidden="true">↑</span>
+    <span class="c-send">${ICON_SEND}</span>
   </div>`;
   }
   return `
@@ -311,7 +314,7 @@ function composer(view: TravellerTripView, presentation?: TravellerPresentation)
     <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
     <label class="sr-only" for="traveller-request-text">Ask Northstar</label>
     <input id="traveller-request-text" class="c-input" name="text" type="text" minlength="1" required placeholder="${escapeHtml(placeholder)}">
-    <button type="submit" class="c-send" aria-label="Send">↑</button>
+    <button type="submit" class="c-send" aria-label="Send">${ICON_SEND}</button>
   </form>
   <div id="traveller-request-result" class="form-result" role="status" aria-live="polite"></div>`;
 }

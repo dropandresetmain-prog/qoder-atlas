@@ -4,7 +4,7 @@
  * Proves single-reset prefix orchestration through real HTTP boundaries:
  * - POST /api/demo/reset builds all eight scenario entry states;
  * - Sarah (S1) NOT_VIABLE; Jordan (S2) pre-emptive disruption (not awaiting approval);
- * - reset is repeatable; Overview exposes Reset demo control.
+ * - reset is repeatable; Overview exposes the reset control in the profile menu.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -115,15 +115,15 @@ test('R2: populated demo reset is repeatable on a persisted store', async () => 
   });
 });
 
-test('R2: operator Overview renders Reset demo control and scopes to evt-ait-2026', async () => {
+test('R2: operator Overview renders the profile reset control and scopes to evt-ait-2026', async () => {
   await withServer(demoConfig, async (base) => {
     await postJson(base, '/api/demo/reset');
     const eventId = resolvePopulatedDemoAnchorEventId();
     const overview = await fetch(`${base}/operator?event=${encodeURIComponent(eventId)}`);
     assert.equal(overview.status, 200);
     const html = await overview.text();
-    assert.match(html, /data-test="demo-reset-btn"/);
-    assert.match(html, /Reset demo/);
+    assert.match(html, /data-test="profile-reset-btn"/);
+    assert.match(html, /Reset scenario/);
     assert.match(html, /Sarah Lim|Lim, Sarah|ait-draft-14/i);
   });
 });

@@ -330,8 +330,23 @@ test('loading and error surfaces never fabricate data', () => {
 test('case detail tells the full recovery story incl. rejected attractive option', () => {
   const rejected = CASE_FIXTURES.find((f) => f.id === 'rejected-option');
   assert.ok(rejected);
-  const html = renderCaseDetail({ state: 'LOADED', data: rejected.view });
-  assert.ok(html.includes('What happened') || html.includes('What changed'));
+  // Impact-first contract: options become visible once authority is staged;
+  // the rejected attractive option must stay visible in that surface.
+  const html = renderCaseDetail({
+    state: 'LOADED',
+    data: {
+      ...rejected.view,
+      approval: {
+        requestedFrom: 'ORGANISATION',
+        state: 'PENDING',
+        reason: 'Organisation must approve the recovery.',
+        approver: { entityType: 'ORGANISATION', id: 'org-ait' },
+      },
+    },
+  });
+  assert.ok(
+    html.includes('What happened') || html.includes('What changed') || html.includes('Waiting on a decision'),
+  );
   assert.ok(html.includes('What this affects'));
   assert.ok(
     html.includes('Must not be missed') || html.includes('Speaking slot on 16 September'),

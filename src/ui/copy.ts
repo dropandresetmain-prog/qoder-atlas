@@ -44,7 +44,7 @@ export const STATUS_EXPLANATION: Record<ReadModelStatus, string> = {
   AT_RISK: 'Something may still go wrong; we are watching it closely.',
   DISRUPTED: 'Plans changed and part of this trip no longer works as booked.',
   RECOVERING: 'We are actively working on a replacement plan.',
-  RESOLVED: 'The trip has been rebuilt and confirmed.',
+  RESOLVED: 'The trip is back on track and this case is closed.',
   UNKNOWN: 'There is not enough confirmed information to say yet.',
 };
 
@@ -144,7 +144,7 @@ export const CASE_OPTIONS_FORMING_TITLE = 'Options take shape here';
 
 /** Skeleton panel footnote (approved C2 wording). */
 export const CASE_OPTIONS_FORMING_NOTE =
-  'Candidates appear here the moment they are scored — nothing half-checked is ever shown as an option.';
+  'Workable options will appear here once the checks are complete.';
 
 /** Options heading when every candidate was rejected (approved C5 wording). */
 export const CASE_OPTIONS_ALL_REJECTED_TITLE = 'What was considered — and why none of them work';
@@ -179,7 +179,7 @@ export const CASE_COMMITMENT_FALLBACK_TITLE = 'Must not be missed';
  */
 export const CASE_AUTHORITY_TITLE = 'Authority';
 export const CASE_AUTHORITY_COPY =
-  'Money-moving changes need the right principal. Within the programme policy, Northstar can proceed with a receipt; above that, the organising team or traveller must approve first. Nothing books silently.';
+  'Northstar checks who is allowed to approve each change before anything is applied. Some changes are already authorised by policy; others wait for the organiser or traveller. Every action is recorded.';
 
 /** Case badge derivations beyond the raw trip status (approved C3/C4/C5). */
 export const CASE_BADGE_OPTIONS_READY = 'Options on the table';
@@ -327,4 +327,11 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'fully_recovered',
   'recovered_with_loss',
   'escalated_closed',
+  // Final production pass: internal ranking/provenance vocabulary must stay
+  // out of judge-facing copy as well.
+  'search evidence',
+  'provider boundary',
+  'soft tradeoffs',
+  'evidenced option',
+  'required arrival buffer',
 ];

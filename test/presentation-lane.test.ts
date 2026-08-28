@@ -76,13 +76,13 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
         verdict: 'VIABLE',
         recommended: true,
         whyRecommended:
-          'Recommended because it is the earliest evidenced option that protects the commitment (Arrival leaves enough preparation time before the commitment).',
+          'Recommended because it is the earliest workable option that protects the commitment (Arrival leaves enough preparation time before the commitment).',
         providerCost: { amount: 90.54, currency: 'USD' },
         costDelta: { amount: 122.23, currency: 'SGD' },
         requiresApproval: true,
         authorityLabel: 'Organisation approval required',
         commitmentEffect: 'Finals Showcase remains viable',
-        provenanceLabel: 'Search evidence: REPLAY · Execution: simulated at provider boundary until observed',
+        provenanceLabel: 'Search: recorded provider response · Execution: simulated',
         pros: ['Arrival leaves enough preparation time before the commitment', 'NRT 08:20 → SIN 14:35'],
         cons: [],
         flags: ['Arrives 14:35 · commitment 20:45'],
@@ -105,7 +105,7 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
   assert.match(html, /Approx\. S\$122\.23 policy equivalent/);
   assert.match(html, /Arrival leaves enough preparation time before the commitment/);
   assert.match(html, /Organisation approval required/);
-  assert.match(html, /Search evidence: REPLAY/);
+  assert.match(html, /Search: recorded provider response/);
   assert.match(html, /Approve as organiser US\$90\.54/);
   assert.doesNotMatch(html, /human agent/i);
   assert.doesNotMatch(html, /\$[\d.]+\s+at provider/);

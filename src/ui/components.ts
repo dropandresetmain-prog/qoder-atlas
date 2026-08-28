@@ -12,6 +12,7 @@ import {
   type StatusTone,
 } from './copy.ts';
 import { cx, escapeHtml } from './html.ts';
+import { CHAIN_TYPE_SVG, ICON_COMMITMENT } from './icons.ts';
 
 export function toneClass(tone: StatusTone, prefix: string): string {
   return `${prefix} tone-${tone}`;
@@ -41,18 +42,16 @@ export const CHAIN_MINI_TONE: Record<ChainLinkState, string> = {
   AT_RISK: 'mc-watch',
 };
 
-/** TYPE icon per link; colour communicates state via CHAIN_MINI_TONE. */
-export const CHAIN_TYPE_ICON: Record<NonNullable<ChainLinkView['linkType']>, string> = {
-  FLIGHT: '✈',
-  GROUND: '⇄',
-  STAY: '■',
-  COMMITMENT: '✦',
-};
+/**
+ * TYPE icon per link — solid SVG glyphs shared with the traveller itinerary
+ * and the overview legend; colour communicates state via CHAIN_MINI_TONE.
+ */
+export const CHAIN_TYPE_ICON: Record<NonNullable<ChainLinkView['linkType']>, string> = CHAIN_TYPE_SVG;
 
 /** Glyph for one chain link; uses type icon when available. */
 export function chainLinkGlyph(link: ChainLinkView): string {
   if (link.linkType) return CHAIN_TYPE_ICON[link.linkType];
-  return link.commitment ? '✦' : CHAIN_GLYPH[link.state];
+  return link.commitment ? ICON_COMMITMENT : CHAIN_GLYPH[link.state];
 }
 
 /**

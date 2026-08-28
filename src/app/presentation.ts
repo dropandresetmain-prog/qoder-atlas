@@ -107,7 +107,7 @@ export function presentCheckLabel(
   }
   if (result === 'FAIL') {
     if (base.includes('Arrival') || base.includes('buffer')) {
-      return 'Original plan no longer meets the required arrival buffer';
+      return 'The original arrival no longer leaves enough time before the commitment';
     }
     // Never produce contradictory copy like "No longer meets: timing still works".
     if (base.includes('Timing') || /still works/i.test(base)) {

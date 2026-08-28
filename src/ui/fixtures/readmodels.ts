@@ -1237,7 +1237,7 @@ export const TRAVELLER_PRESENTATIONS: Record<string, TravellerPresentation> = {
       { state: 'queued', text: 'Checking costs against your programme' },
     ],
     optionsSkeleton: true,
-    optionsSkeletonNote: 'Options appear here the moment they are scored. You will only hear from us when there is a real choice.',
+    optionsSkeletonNote: 'Workable options will appear here once the checks are complete. You will only hear from us when there is a real choice.',
     hideViability: true,
   },
   'awaiting-input': {

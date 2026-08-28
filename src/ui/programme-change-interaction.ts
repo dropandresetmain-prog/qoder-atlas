@@ -5,6 +5,11 @@
  * mutation-free Now vs Proposed comparison (recovered E1 pattern). Commit
  * alone runs the deterministic programme mutation/fan-out path.
  */
+import { STEP_ICON_SVG } from './icons.ts';
+
+/** The semantic icon set, embedded as a JS object literal in the page script. */
+const STEP_ICONS_JSON = JSON.stringify(STEP_ICON_SVG);
+
 export function renderProgrammeChangeEnhancementScript(): string {
   return `<script>
 (function() {
@@ -34,6 +39,35 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return 'Preview could not be completed.';
   }
 
+  var STEP_ICONS = ${STEP_ICONS_JSON};
+
+  function stepIcon(phase, label) {
+    var icons = STEP_ICONS;
+    // Explicit phase keys first (travellers / time / impact); then the same
+    // element-topic + lifecycle fallbacks as the case-resolution overlay so
+    // both screens share one visual progress contract.
+    if (phase && icons[phase]) return icons[phase];
+    var text = String(label || '').toLowerCase();
+    if (/flight|airline|onward|inventory|rebook/.test(text)) return icons.flight;
+    if (/connection|depend|transfer|hub/.test(text)) return icons.ground;
+    if (/hotel|stay|overnight/.test(text)) return icons.stay;
+    if (/entry|immigration|transit|visa/.test(text)) return icons.entry;
+    if (/insurance|policy cover/.test(text)) return icons.insurance;
+    if (/programme|headline|commitment|event/.test(text)) return icons.commitment;
+    if (/cost|fund|price/.test(text)) return icons.cost;
+    if (/linked traveller|who is affected|traveller/.test(text)) return icons.travellers;
+    if (/proposed|time|when/.test(text)) return icons.time;
+    if (/knock|impact|affected trip|ripple/.test(text)) return icons.impact;
+    if (/search|finding|option/.test(text)) return icons.search;
+    if (/re-check|recheck|check the trip|viab/.test(text)) return icons.recheck;
+    if (phase === 'authority') return icons.authority;
+    if (phase === 'execution') return icons.execute;
+    if (phase === 'observation') return icons.provider;
+    if (phase === 'state_update') return icons.trip_update;
+    if (phase === 'completion') return icons.complete;
+    return icons.recheck;
+  }
+
   function showStagedOverlay(title, steps, durationMs, done) {
     var existing = document.querySelector('[data-test="lifecycle-progress-overlay"]');
     if (existing) existing.remove();
@@ -44,7 +78,11 @@ export function renderProgrammeChangeEnhancementScript(): string {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', title);
     var stepsHtml = steps.map(function(step, i) {
-      return '<li data-step="' + i + '"><span class="ns-resolve-step-mark" aria-hidden="true"></span><span class="ns-resolve-step-body"><span class="ns-resolve-step-label">' + step + '</span></span></li>';
+      var phase = step.phase || 'planning';
+      var label = step.label || String(step);
+      return '<li data-step="' + i + '" data-phase="' + phase + '">' +
+        '<span class="ns-resolve-step-icon" aria-hidden="true">' + stepIcon(phase, label) + '</span>' +
+        '<span class="ns-resolve-step-body"><span class="ns-resolve-step-label">' + label + '</span></span></li>';
     }).join('');
     overlay.innerHTML =
       '<div class="ns-resolve-modal">' +
@@ -184,9 +222,10 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return { date: text, time: '—' };
   }
 
-  function compareSlotHtml(sideLabel, date, time, venue) {
+  function compareSlotHtml(sideLabel, commitmentTitle, date, time, venue) {
     return '<div class="cc-box' + (sideLabel === 'Proposed' ? ' to' : '') + '" data-test="programme-compare-' + (sideLabel === 'Proposed' ? 'proposed' : 'now') + '">' +
       '<p class="kv-label">' + sideLabel + '</p>' +
+      '<div class="cc-slot"><span class="cc-slot-k">Commitment</span><span class="cc-slot-v">' + (commitmentTitle || '—') + '</span></div>' +
       '<div class="cc-slot"><span class="cc-slot-k">Date</span><span class="cc-slot-v">' + (date || '—') + '</span></div>' +
       '<div class="cc-slot"><span class="cc-slot-k">Time</span><span class="cc-slot-v">' + (time || '—') + '</span></div>' +
       '<div class="cc-slot"><span class="cc-slot-k">Venue</span><span class="cc-slot-v">' + (venue || '—') + '</span></div>' +
@@ -245,9 +284,10 @@ export function renderProgrammeChangeEnhancementScript(): string {
 
   function commitmentMetaFromDom(commitmentId) {
     var item = document.querySelector('[data-timeline-key="' + commitmentId + '"]');
-    if (!item) return { when: '', date: '—', time: '—', venue: '—' };
+    if (!item) return { when: '', title: '', date: '—', time: '—', venue: '—' };
     return {
       when: (item.getAttribute('data-timeline-date') || '') + ' · ' + (item.getAttribute('data-timeline-time') || ''),
+      title: item.getAttribute('data-timeline-title') || '',
       date: item.getAttribute('data-timeline-date') || '—',
       time: item.getAttribute('data-timeline-time') || '—',
       venue: item.getAttribute('data-timeline-venue') || '—',
@@ -256,9 +296,24 @@ export function renderProgrammeChangeEnhancementScript(): string {
 
   function selectedCommitmentMeta(modal) {
     var select = modal ? modal.querySelector('[name="commitmentId"]') : null;
-    var id = select ? select.value : '';
-    if (id) return commitmentMetaFromDom(id);
-    return { when: '', date: '—', time: '—', venue: '—' };
+    if (!select || select.selectedIndex < 0) return { when: '', title: '', date: '—', time: '—', venue: '—' };
+    var option = select.options[select.selectedIndex];
+    var title = option.getAttribute('data-title') || '';
+    var date = option.getAttribute('data-date') || '';
+    var time = option.getAttribute('data-time') || '';
+    var venue = option.getAttribute('data-venue') || '';
+    // Meta carried on the option (works on any surface); fall back to the
+    // timeline items of the current document.
+    if (title || date || time || venue) {
+      return {
+        when: (date || '—') + ' · ' + (time || '—'),
+        title: title,
+        date: date || '—',
+        time: time || '—',
+        venue: venue || '—'
+      };
+    }
+    return commitmentMetaFromDom(select.value);
   }
 
   function renderNowProposedCompare(target, preview, payload, nowLabel, modal) {
@@ -275,12 +330,12 @@ export function renderProgrammeChangeEnhancementScript(): string {
     compare.setAttribute('data-test', 'now-vs-proposed');
 
     var proposed = formatProposedSide(payload);
-    var nowMeta = modal ? selectedCommitmentMeta(modal) : { when: nowLabel, date: '—', time: '—', venue: '—' };
+    var nowMeta = modal ? selectedCommitmentMeta(modal) : { when: nowLabel, title: '', date: '—', time: '—', venue: '—' };
     var nowSplit = splitWhenLabel(nowMeta.when || nowLabel);
     compare.innerHTML =
-      compareSlotHtml('Now', nowMeta.date || nowSplit.date, nowMeta.time || nowSplit.time, nowMeta.venue) +
+      compareSlotHtml('Now', nowMeta.title, nowMeta.date || nowSplit.date, nowMeta.time || nowSplit.time, nowMeta.venue) +
       '<div class="cc-arrow" aria-hidden="true">→</div>' +
-      compareSlotHtml('Proposed', proposed.dateLabel, proposed.timeLabel, proposed.venueLabel);
+      compareSlotHtml('Proposed', nowMeta.title, proposed.dateLabel, proposed.timeLabel, proposed.venueLabel);
     target.appendChild(compare);
 
     var affected = Array.isArray(preview.affected) ? preview.affected : [];
@@ -361,6 +416,10 @@ export function renderProgrammeChangeEnhancementScript(): string {
       var option = document.createElement('option');
       option.value = item.id;
       option.textContent = item.label;
+      option.setAttribute('data-title', item.title || '');
+      option.setAttribute('data-date', item.date || '');
+      option.setAttribute('data-time', item.time || '');
+      option.setAttribute('data-venue', item.venue || '');
       select.appendChild(option);
     });
     if (defaultId) select.value = defaultId;
@@ -372,7 +431,11 @@ export function renderProgrammeChangeEnhancementScript(): string {
       var time = item.querySelector('.t');
       return {
         id: item.getAttribute('data-timeline-key') || '',
-        label: (time ? time.textContent + ' · ' : '') + (title ? title.textContent : item.getAttribute('data-timeline-key'))
+        label: (time ? time.textContent + ' · ' : '') + (title ? title.textContent : item.getAttribute('data-timeline-key')),
+        title: item.getAttribute('data-timeline-title') || (title ? title.textContent : ''),
+        date: item.getAttribute('data-timeline-date') || '',
+        time: item.getAttribute('data-timeline-time') || '',
+        venue: item.getAttribute('data-timeline-venue') || ''
       };
     }).filter(function(item) { return item.id; });
   }
@@ -387,7 +450,11 @@ export function renderProgrammeChangeEnhancementScript(): string {
           var time = item.querySelector('.t');
           return {
             id: item.getAttribute('data-timeline-key') || '',
-            label: (time ? time.textContent + ' · ' : '') + (title ? title.textContent : item.getAttribute('data-timeline-key'))
+            label: (time ? time.textContent + ' · ' : '') + (title ? title.textContent : item.getAttribute('data-timeline-key')),
+            title: item.getAttribute('data-timeline-title') || (title ? title.textContent : ''),
+            date: item.getAttribute('data-timeline-date') || '',
+            time: item.getAttribute('data-timeline-time') || '',
+            venue: item.getAttribute('data-timeline-venue') || ''
           };
         }).filter(function(item) { return item.id; });
       });
@@ -489,9 +556,9 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var nowSplit = splitWhenLabel(nowMeta.when || nowLabel);
     compare.innerHTML =
       '<div class="change-compare" data-test="programme-change-compare-draft">' +
-        compareSlotHtml('Now', nowMeta.date || nowSplit.date, nowMeta.time || nowSplit.time, nowMeta.venue) +
+        compareSlotHtml('Now', nowMeta.title, nowMeta.date || nowSplit.date, nowMeta.time || nowSplit.time, nowMeta.venue) +
         '<div class="cc-arrow" aria-hidden="true">→</div>' +
-        compareSlotHtml('Proposed', proposed.dateLabel, proposed.timeLabel, proposed.venueLabel) +
+        compareSlotHtml('Proposed', nowMeta.title, proposed.dateLabel, proposed.timeLabel, proposed.venueLabel) +
       '</div>' +
       '<p class="footnote" style="margin-top:12px">Preview is read-only. The live programme stays unchanged until you commit.</p>';
   }
@@ -638,9 +705,9 @@ export function renderProgrammeChangeEnhancementScript(): string {
       confirmPanel.hidden = true;
       result.replaceChildren();
       var previewSteps = [
-        'Checking linked travellers',
-        'Testing the proposed headline time',
-        'Checking every linked trip for knock-on effects'
+        { phase: 'travellers', label: 'Checking linked travellers' },
+        { phase: 'time', label: 'Testing the proposed programme time' },
+        { phase: 'impact', label: 'Checking every linked trip for knock-on effects' }
       ];
       showStagedOverlay('Computing programme impact', previewSteps, PREVIEW_MS, function() {
         postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-preview', payload)

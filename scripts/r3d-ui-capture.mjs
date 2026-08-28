@@ -102,7 +102,7 @@ try {
   const overviewHtml = await (await fetch(`${BASE}/operator?event=${EVENT}`)).text();
   const hasBanner = /class="demo-banner/.test(overviewHtml);
   evidence.demoBannerAbsent = !hasBanner;
-  evidence.resetDemoPresent = /data-test="demo-reset-btn"|Reset demo/i.test(overviewHtml);
+  evidence.resetDemoPresent = /data-test="profile-reset-btn"|Reset scenario/i.test(overviewHtml);
   evidence.fleetCount = (overviewHtml.match(/data-fleet-trip=/g) || []).length;
   evidence.pageSize = /data-page-size="10"/.test(overviewHtml);
 

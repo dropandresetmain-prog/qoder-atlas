@@ -217,22 +217,21 @@ export function projectOptionPresentation(input: OptionPresentationInput): Optio
   }
 
   const provenanceParts: string[] = [];
-  if (input.searchProvenance === 'REPLAY') provenanceParts.push('Search evidence: REPLAY');
-  else if (input.searchProvenance === 'LIVE') provenanceParts.push('Search evidence: LIVE');
-  else if (input.searchProvenance === 'RECORD') provenanceParts.push('Search evidence: RECORD');
-  if (input.intent) provenanceParts.push('Execution: simulated at provider boundary until observed');
+  if (input.searchProvenance === 'LIVE') provenanceParts.push('Search: live provider response');
+  else if (input.searchProvenance) provenanceParts.push('Search: recorded provider response');
+  if (input.intent) provenanceParts.push('Execution: simulated');
   const provenanceLabel = provenanceParts.length > 0 ? provenanceParts.join(' · ') : undefined;
 
   let whyRecommended: string | undefined;
   if (input.recommended && input.feasible) {
     if (bufferLabel) {
-      whyRecommended = `Recommended because it is the earliest evidenced option that protects the commitment (${bufferLabel}).`;
+      whyRecommended = `Recommended because it is the earliest workable option that protects the commitment (${bufferLabel}).`;
     } else if (stayCheckout) {
       whyRecommended =
         'Recommended because it extends the existing stay without changing flights or switching hotels.';
     } else {
       whyRecommended =
-        'Recommended because it keeps the whole trip viable with the fewest soft tradeoffs among workable options.';
+        'Recommended because it keeps the whole trip working with the least disruption among workable options.';
     }
   }
 

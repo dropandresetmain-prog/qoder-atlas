@@ -373,7 +373,7 @@ function timelineItem(item: ProgrammeTimelineItemView, dayLabel: string, justCha
   const dotClass = item.tone === 'ok' ? 'd-ok' : item.tone === 'watch' ? 'd-watch' : '';
   const titleCell = `<span class="ttl" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.title)}</span>`;
   const tag = item.tag ? `<span class="tag">${escapeHtml(item.tag)}</span>` : '';
-  return `<div class="${classes}" data-timeline-key="${escapeHtml(item.key)}" data-timeline-date="${escapeHtml(dayLabel)}" data-timeline-time="${escapeHtml(item.timeLabel)}" data-timeline-venue="${escapeHtml(item.tag ?? '')}"><span class="dot ${dotClass}"></span><span class="t">${escapeHtml(item.timeLabel)}</span>${titleCell}${tag}${timelineAffectedMarkup(item)}</div>`;
+  return `<div class="${classes}" data-timeline-key="${escapeHtml(item.key)}" data-timeline-date="${escapeHtml(dayLabel)}" data-timeline-time="${escapeHtml(item.timeLabel)}" data-timeline-venue="${escapeHtml(item.tag ?? '')}" data-timeline-title="${escapeHtml(item.title)}"><span class="dot ${dotClass}"></span><span class="t">${escapeHtml(item.timeLabel)}</span>${titleCell}${tag}${timelineAffectedMarkup(item)}</div>`;
 }
 
 function timelineSection(

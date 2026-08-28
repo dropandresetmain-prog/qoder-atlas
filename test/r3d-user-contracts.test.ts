@@ -246,7 +246,7 @@ test('programme summary uses simplified buckets without arithmetic contradiction
   assert.equal((html.match(/data-timeline-key="c1"/g) ?? []).length, 1);
 });
 
-test('case primary options capped at three with More options disclosure', () => {
+test('case selected recovery stages one recommendation with alternatives disclosure', () => {
   const options = Array.from({ length: 6 }, (_, i) => ({
     id: `opt-${i}`,
     title: `Option ${i}`,
@@ -264,15 +264,25 @@ test('case primary options capped at three with More options disclosure', () => 
     affectedItems: ['Arrival', 'Hotel'],
     checks: [],
     options,
+    approval: {
+      requestedFrom: 'ORGANISATION',
+      state: 'PENDING',
+      reason: 'Organisation must approve the recovery.',
+      approver: { entityType: 'ORGANISATION', id: 'org-1' },
+    },
     actions: [],
     uncertainties: [],
     updatedAt: AT,
   };
   const html = renderCaseDetailBody(view);
-  assert.match(html, /data-primary-option-count="3"/);
+  // Impact-first contract: once authority is staged, exactly one selected
+  // recovery leads; every alternative stays reachable in the disclosure.
   assert.equal(CASE_PRIMARY_OPTION_LIMIT, 3);
+  assert.match(html, /data-options-mode="awaiting_authority"/);
+  assert.match(html, /data-primary-option-count="1"/);
   assert.match(html, /data-test="primary-options"/);
   assert.match(html, /data-test="more-options"/);
+  assert.match(html, /Other options considered/);
   assert.match(html, /Recommended/);
   assert.equal((html.match(/data-test="strategy-option"/g) ?? []).length, 6);
   assert.match(html, /Does not meet arrival buffer/);
@@ -365,7 +375,7 @@ test('case options-ready phase shows Begin, not a second Resolve', () => {
       summary: 'Protects commitment',
       verdict: 'VIABLE' as const,
       recommended: true,
-      whyRecommended: 'Keeps the commitment with the fewest soft tradeoffs.',
+      whyRecommended: 'Keeps the commitment with the least disruption among workable options.',
       costDelta: { amount: 302, currency: 'SGD' },
       costAllocationSummary: '302 SGD payable by the traveller',
     },
@@ -418,9 +428,9 @@ test('case options-ready phase shows Begin, not a second Resolve', () => {
   assert.match(html, /data-case-phase="options"/);
   assert.match(html, /data-test="begin-strategy-btn"/);
   assert.doesNotMatch(html, /data-test="resolve-northstar-btn"/);
-  assert.match(html, /data-case-options-panel/);
-  assert.match(html, /data-option-selectable="true"/);
-  assert.match(html, /data-test="why-recommended"/);
+  // Impact-first contract: option details stay staged behind Begin.
+  assert.doesNotMatch(html, /data-case-options-panel/);
+  assert.match(html, /Recovery options ready/);
   assert.match(html, />Impacted</);
   assert.doesNotMatch(html, />Broken</);
   assert.match(html, /Transfer confirmation pending/);
@@ -479,7 +489,10 @@ test('authority-required case renders human approve; traveller funding is explic
   assert.match(html, /data-test="waiting-decision-block"/);
   assert.match(html, /data-test="funding-traveller-incremental"/);
   assert.match(html, /traveller pays|Traveller pays|payable by the traveller|Personal incremental cost/i);
-  assert.match(html, /Approve/);
+  // Traveller decisions happen on the traveller surface; the operator side
+  // shows the honest wait plus the handoff link (never a fake approve).
+  assert.match(html, /data-test="waiting-for-traveller"/);
+  assert.match(html, /data-test="open-traveller-surface"/);
   assert.match(html, /Hotel/);
   assert.doesNotMatch(html, /place-hotel-abc123xyz/);
 });

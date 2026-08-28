@@ -236,8 +236,7 @@ function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: st
   return {
     dashboard: eventId ? `/operator?event=${encodeURIComponent(eventId)}` : '/operator',
     ...(eventId ? { programme: `/programme?event=${encodeURIComponent(eventId)}` } : {}),
-    decisions: '/decisions',
-    activity: '/activity',
+    decisions: '/decisions',    activity: '/activity',
     traveller: '/traveller',
   };
 }
@@ -245,6 +244,16 @@ function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: st
 /** Resolve explicit operator event scope from the query string only. */
 function operatorEventScope(url: URL): string | undefined {
   return url.searchParams.get('event') ?? undefined;
+}
+
+/**
+ * Shared top-right profile chrome for operator pages: offers the scenario
+ * reset as a secondary control inside the profile menu when the populated
+ * world reset is wired. Judge-facing copy never says "demo".
+ */
+function profileChrome(endpoints: AppEndpoints): { profileResetAction?: string } {
+  if (!endpoints.demo?.resetPopulatedWorld) return {};
+  return { profileResetAction: '/api/demo/reset?redirect=1' };
 }
 
 /** Demo diagnostics only — not wired on judge-facing product pages. */
@@ -387,7 +396,7 @@ async function handle(
       body = addClassToTagsContaining(body, `data-fleet-trip="${tripId}"`, 'just-changed');
       body = addClassToTagsContaining(body, `data-trip-id="${tripId}"`, 'just-changed');
     }
-    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints) }, body));
+    sendHtml(res, 200, renderPage({ title: 'Operations overview', active: 'dashboard', links: pageLinks(endpoints), ...profileChrome(endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && segments[0] === 'operator' && segments[1] === 'cases' && segments[2]) {
@@ -397,7 +406,7 @@ async function handle(
     const body = view
       ? renderCaseDetailBody(view)
       : renderCaseDetail({ state: 'ERROR', errorMessage: `No recovery case ${caseId} is known`, generatedAt: at });
-    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints) }, body));
+    sendHtml(res, view ? 200 : 404, renderPage({ title: 'Recovery case', active: 'case', links: pageLinks(endpoints), ...profileChrome(endpoints) }, body));
     return;
   }
   if (req.method === 'GET' && url.pathname === '/decisions') {
@@ -418,7 +427,7 @@ async function handle(
       res,
       200,
       renderPage(
-        { title: 'Decisions', active: 'decisions', links: pageLinks(endpoints), decisionCount: view.pending.length },
+        { title: 'Decisions', active: 'decisions', links: pageLinks(endpoints), decisionCount: view.pending.length, ...profileChrome(endpoints) },
         renderDecisions({ state: 'LOADED', data: view, generatedAt: at }),
       ),
     );
@@ -435,7 +444,7 @@ async function handle(
         res,
         200,
         renderPage(
-          { title: 'Activity', active: 'activity', links: pageLinks(endpoints) },
+          { title: 'Activity', active: 'activity', links: pageLinks(endpoints), ...profileChrome(endpoints) },
           renderActivity({ state: 'ERROR', errorMessage: 'Activity projection is unavailable.', generatedAt: at }),
         ),
       );
@@ -451,7 +460,7 @@ async function handle(
       res,
       200,
       renderPage(
-        { title: 'Activity', active: 'activity', links: pageLinks(endpoints) },
+        { title: 'Activity', active: 'activity', links: pageLinks(endpoints), ...profileChrome(endpoints) },
         renderActivity({ state: 'LOADED', data: view, generatedAt: at }),
       ),
     );
@@ -487,7 +496,7 @@ async function handle(
     sendHtml(
       res,
       outcome.status === 200 ? 200 : outcome.status === 404 ? 404 : 400,
-      renderPage({ title: 'Programme', active: 'programme', links: pageLinks(endpoints) }, body),
+      renderPage({ title: 'Programme', active: 'programme', links: pageLinks(endpoints), ...profileChrome(endpoints) }, body),
     );
     return;
   }

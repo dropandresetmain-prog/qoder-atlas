@@ -40,6 +40,11 @@ export interface PageOptions {
   /** Operator initials for the shell avatar. Omitted when no identity is known. */
   operatorInitials?: string;
   /**
+   * When present, the top-right profile menu offers this reset action as a
+   * secondary/admin control (never on the primary surface itself).
+   */
+  profileResetAction?: string;
+  /**
    * Development/demo-only safety banner. When present, a clearly marked strip
    * is rendered above the page content showing the adapter mode and a brief
    * explanation of what external calls (if any) the current mode permits.
@@ -78,8 +83,24 @@ ${bodyHtml}
 ${programmeChangeScript}
 ${caseResolutionScript}
 ${renderFormEnhancementScript()}
+${isOperator ? renderProfileMenuScript() : ''}
 </body>
 </html>`;
+}
+
+/** Closes the profile popover when the operator clicks anywhere outside it. */
+function renderProfileMenuScript(): string {
+  return `<script>
+(function() {
+  'use strict';
+  document.addEventListener('click', function(event) {
+    var menus = document.querySelectorAll('.profile-menu[open]');
+    for (var i = 0; i < menus.length; i += 1) {
+      if (!menus[i].contains(event.target)) menus[i].removeAttribute('open');
+    }
+  });
+})();
+</script>`;
 }
 
 /**
@@ -120,8 +141,8 @@ function renderOperatorTopbar(options: PageOptions): string {
       : 'Replay · recorded providers';
     right.push(`<span class="replay-pill${live ? ' rp-live' : ''}">${escapeHtml(label)}</span>`);
   }
-  if (options.operatorInitials) {
-    right.push(`<span class="avatar" aria-hidden="true">${escapeHtml(options.operatorInitials)}</span>`);
+  if (options.operatorInitials || options.profileResetAction) {
+    right.push(renderProfileMenu(options.operatorInitials ?? 'A', options.profileResetAction));
   }
   const tbRight = right.length > 0 ? `<div class="tb-right">${right.join('')}</div>` : '';
   return `<header class="topbar" data-surface="operator">
@@ -130,6 +151,29 @@ function renderOperatorTopbar(options: PageOptions): string {
   ${nav}
   ${tbRight}
 </header>`;
+}
+
+/**
+ * Compact profile menu (approved #12): a clean avatar control in the
+ * top-right that opens a small popover with the coordinator identity and
+ * secondary/admin actions. The reset control lives here — never on the
+ * primary surface — and is worded without internal scenario vocabulary.
+ */
+function renderProfileMenu(initials: string, resetAction: string | undefined): string {
+  const resetForm = resetAction
+    ? `
+      <form class="pm-reset" method="post" action="${escapeHtml(resetAction)}" data-test="profile-reset-form">
+        <button type="submit" class="pm-reset-btn" data-test="profile-reset-btn">Reset scenario</button>
+      </form>`
+    : '';
+  return `<details class="profile-menu" data-test="profile-menu">
+  <summary class="avatar" aria-label="Profile: Anthony, Travel Coordinator" data-test="profile-menu-toggle">${escapeHtml(initials)}</summary>
+  <div class="profile-pop" role="menu" aria-label="Profile">
+    <p class="pm-name">Anthony</p>
+    <p class="pm-role">Travel Coordinator</p>
+    <p class="pm-event">AI In Travel Summit</p>${resetForm}
+  </div>
+</details>`;
 }
 
 /**

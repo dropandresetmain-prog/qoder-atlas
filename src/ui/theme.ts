@@ -176,6 +176,31 @@ body {
   font-family: var(--font-mono); font-size: 10px; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.04em;
 }
+/* Top-right profile menu: compact avatar control with a small popover. */
+.profile-menu { position: relative; }
+.profile-menu summary.avatar { cursor: pointer; list-style: none; user-select: none; transition: filter 150ms ease-out; }
+.profile-menu summary.avatar::-webkit-details-marker { display: none; }
+.profile-menu summary.avatar:hover { filter: brightness(1.3); }
+.profile-menu[open] summary.avatar { outline: 2px solid var(--watch-f); outline-offset: 2px; }
+.profile-menu .profile-pop {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 60;
+  min-width: 220px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow); padding: 13px 15px;
+}
+.profile-pop .pm-name { margin: 0; font-weight: 650; font-size: 14px; }
+.profile-pop .pm-role { margin: 2px 0 0; font-size: 12.5px; color: var(--text-soft); }
+.profile-pop .pm-event {
+  margin: 4px 0 0; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-faint);
+}
+.profile-pop .pm-reset { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line-soft); }
+.profile-pop .pm-reset-btn {
+  appearance: none; font: inherit; font-size: 13px; font-weight: 600;
+  width: 100%; background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; cursor: pointer;
+  transition: background-color 150ms ease-out, border-color 150ms ease-out;
+}
+.profile-pop .pm-reset-btn:hover { background: var(--surface); border-color: rgba(20, 23, 28, 0.32); }
 
 /* ================= page scaffold ================= */
 .shell { max-width: 1180px; margin: 0 auto; padding: 28px 24px 64px; }
@@ -195,24 +220,6 @@ body {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-}
-.demo-reset-form { margin: 10px 0 0; }
-.demo-reset-btn {
-  appearance: none;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 7px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
-}
-.demo-reset-btn:hover {
-  background: var(--surface-2);
-  border-color: rgba(20, 23, 28, 0.22);
 }
 
 /* section titles: real hierarchy — 17px semibold sans, never the mono label tier */
@@ -650,11 +657,16 @@ body.ns-resolve-open { overflow: hidden; }
 /* mini journey chain on overview rows — flight · transfer · stay · commitment at a glance */
 .mini-chain { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 16px; font-weight: 600; line-height: 1; }
 .mini-chain-link { display: inline-flex; align-items: center; justify-content: center; min-width: 1.1em; }
+.mini-chain-link svg { width: 0.95em; height: 0.95em; display: block; }
 .mini-chain .mc-ln { width: 10px; height: 1px; background: var(--neutral-border); display: inline-block; }
 .mini-chain .mc-ok { color: var(--ok); }
 .mini-chain .mc-watch { color: var(--watch); }
 .mini-chain .mc-alert { color: var(--alert); }
 .mini-chain .mc-neutral { color: var(--neutral); }
+/* overview row-marks legend shares the same solid type icons */
+.row-marks-legend { white-space: normal; }
+.row-mark { white-space: nowrap; }
+.row-mark svg { width: 0.9em; height: 0.9em; vertical-align: -0.12em; }
 
 /* ================= journey chain ================= */
 /* each link is its own card — a tinted link must never bleed into its neighbours */
@@ -663,6 +675,7 @@ body.ns-resolve-open { overflow: hidden; }
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: var(--shadow); padding: 14px 16px 12px;
   border-top: 3px solid var(--neutral-border); position: relative; min-width: 0;
+  overflow: hidden;
 }
 .chain .link .lk-kind {
   font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.09em;
@@ -678,7 +691,6 @@ body.ns-resolve-open { overflow: hidden; }
 .chain .link.st-confirmed .lk-state { color: var(--ok); }
 .chain .link.st-proposed {
   border-top-color: var(--watch-f); border-top-style: dashed;
-  background: linear-gradient(var(--watch-bg), var(--watch-bg)) bottom / 100% 40% no-repeat;
 }
 .chain .link.st-proposed .lk-state { color: var(--watch); }
 .chain .link.st-broken { border-top-color: var(--alert-f); }
@@ -697,6 +709,7 @@ body.ns-resolve-open { overflow: hidden; }
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--surface-2); flex: 0 0 auto;
 }
+.chain .link .lk-g svg { width: 17px; height: 17px; display: block; }
 .chain .link.st-confirmed .lk-g { color: var(--ok); }
 .chain .link.st-proposed .lk-g { color: var(--watch); }
 .chain .link.st-broken .lk-g { color: var(--alert); }
@@ -1033,9 +1046,9 @@ a.brow.brow-actionable:focus-visible,
   width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; flex: 0 0 auto; background: var(--surface); border: 1px solid var(--border);
 }
-.ns-resolve-steps li.is-active .ns-resolve-step-icon { background: var(--watch-bg); border-color: var(--watch-border); }
+.ns-resolve-step-icon svg { width: 13px; height: 13px; display: block; }
+.ns-resolve-steps li.is-active .ns-resolve-step-icon { background: var(--watch-bg); border-color: var(--watch-border); color: var(--watch); }
 .ns-resolve-steps li.is-done .ns-resolve-step-icon { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
-.mini-chain-link[data-link-type="STAY"], .mini-chain .mini-chain-link:has(+ .mc-ln) { /* solid stay glyph inherits state colour */ }
 .impact-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); font-size: 13.5px; }
 .impact-row:first-of-type { border-top: 0; }
 .impact-row .i-count { font-family: var(--font-mono); font-size: 18px; font-weight: 600; min-width: 34px; font-variant-numeric: tabular-nums; }
@@ -1204,7 +1217,16 @@ a.brow.brow-actionable:focus-visible,
 
 .itin-row { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
 .itin-row:first-of-type { border-top: 0; }
-.itin-row .i-ic { font-family: var(--font-mono); font-weight: 700; width: 16px; flex: none; }
+.itin-row .i-ic {
+  font-weight: 700; width: 16px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; align-self: flex-start;
+  padding-top: 2px; color: var(--text-faint);
+}
+.itin-row .i-ic svg { width: 14px; height: 14px; display: block; }
+.itin-row:has(.i-state.s-ok) .i-ic { color: var(--ok); }
+.itin-row:has(.i-state.s-bad) .i-ic { color: var(--alert); }
+.itin-row:has(.i-state.s-watch) .i-ic { color: var(--watch); }
+.itin-row:has(.i-state.s-neutral) .i-ic { color: var(--neutral); }
 .itin-row .i-main { min-width: 0; }
 .itin-row .i-title { font-weight: 600; }
 .itin-row .i-sub { font-size: 12.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
@@ -1314,10 +1336,12 @@ button.optcard:focus-visible { outline: 2px solid var(--watch-f); outline-offset
   width: 32px; height: 32px; border-radius: 50%;
   background: var(--ink); color: var(--paper);
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 14px; flex: none; border: 0; cursor: pointer;
+  padding: 0; flex: none; border: 0; cursor: pointer;
   transition: filter 150ms ease-out;
 }
+.composer .c-send svg { width: 15px; height: 15px; display: block; }
 .composer .c-send:hover { filter: brightness(1.25); }
+.composer .c-send:focus-visible { outline: 2px solid var(--watch-f); outline-offset: 2px; }
 .thread { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
 .msg { max-width: 86%; border-radius: 14px; padding: 10px 14px; font-size: 13.5px; line-height: 1.45; }
 .msg .m-meta { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 4px; opacity: 0.65; }

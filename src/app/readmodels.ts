@@ -66,7 +66,7 @@ import {
   presentSignalChange,
   presentUncertainties,
 } from './presentation.ts';
-import { enrichCaseDetailView } from './casePresentation.ts';
+import { enrichCaseDetailView, projectAuditTimeline } from './casePresentation.ts';
 import { projectOptionPresentation } from './optionPresentation.ts';
 import { formatMoney } from '../ui/html.ts';
 import { ResolutionTargetSchema } from '../contracts/changeRequest.ts';
@@ -836,7 +836,7 @@ export async function projectCaseDetail(
             recommended: true,
             whyRecommended:
               presentation.whyRecommended ??
-              'Recommended because it keeps the whole trip viable with the fewest soft tradeoffs among workable options.',
+              'Recommended because it keeps the whole trip working with the least disruption among workable options.',
           }
         : {}),
       ...(presentation.summary ? { summary: presentation.summary } : {}),
@@ -958,7 +958,7 @@ export async function projectCaseDetail(
     const simulated = result?.provenance === 'SIMULATED';
     return {
       id: intent.id,
-      label: `${presentAction(intent.operation)}${simulated ? ' (simulated at provider boundary)' : ''}`,
+      label: `${presentAction(intent.operation)}${simulated ? ' (simulated)' : ''}`,
       state,
     };
   });
@@ -1042,6 +1042,9 @@ export async function projectCaseDetail(
     (pair) => pair.viability === 'IMPOSSIBLE',
   );
   const allTripSignals = await deps.signals.listSignalsForTrip(trip.id);
+  // Progressive travel history (#10): audit rows restore the repeated airline
+  // notifications and recovery milestones that the signal store collapses.
+  const activityTimeline = await projectAuditTimeline(deps, trip.id);
 
   return enrichCaseDetailView(
     {
@@ -1100,7 +1103,7 @@ export async function projectCaseDetail(
         : {}),
       updatedAt: recoveryCase.updatedAt,
     },
-    { recoveryCase, trip, triggeringSignals, allTripSignals, places, anchorEvent,
+    { recoveryCase, trip, triggeringSignals, allTripSignals, activityTimeline, places, anchorEvent,
       ...(connectionImpossible ? { connectionImpossible: true } : {}) },
   );
 }

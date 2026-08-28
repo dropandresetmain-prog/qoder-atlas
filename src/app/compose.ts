@@ -545,13 +545,9 @@ export async function composeAppRuntime(
         options?.anchorEventId ? { anchorEventId: options.anchorEventId } : undefined,
       ),
     operatorDashboardAugmentations: async (view) => {
-      const augment = await projectOperatorDashboardAugmentations(readDeps, view);
-      return {
-        ...augment,
-        ...(demo.resetPopulatedWorld
-          ? { demoReset: { action: '/api/demo/reset?redirect=1', label: 'Reset demo' } }
-          : {}),
-      };
+      // Scenario reset is offered in the shared top-right profile menu
+      // (profileChrome in the HTTP surface), never on the Overview itself.
+      return projectOperatorDashboardAugmentations(readDeps, view);
     },
     caseDetail: (caseId, at) => projectCaseDetail(readDeps, caseId, at),
     travellerTrip: (tripId, at) => projectTravellerTrip(readDeps, tripId, at),

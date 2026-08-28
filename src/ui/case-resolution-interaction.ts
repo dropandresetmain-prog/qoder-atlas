@@ -14,6 +14,11 @@
  * remember a harmless expansion preference but must not resurrect Resolve,
  * hide Execute, or make a resolved case look open.
  */
+import { STEP_ICON_SVG } from './icons.ts';
+
+/** The semantic icon set, embedded as a JS object literal in the page script. */
+const STEP_ICONS_JSON = JSON.stringify(STEP_ICON_SVG);
+
 export function renderCaseResolutionEnhancementScript(): string {
   return `<script>
 (function() {
@@ -66,19 +71,31 @@ export function renderCaseResolutionEnhancementScript(): string {
   ];
 
   function stepIcon(phase, label) {
+    var icons = ${STEP_ICONS_JSON};
     var text = String(label || '').toLowerCase();
-    if (/flight|airline|onward|inventory/.test(text)) return '✈';
-    if (/connection|depend|transfer|hub/.test(text)) return '⇄';
-    if (/hotel|stay|overnight/.test(text)) return '■';
-    if (/entry|immigration|transit|visa/.test(text)) return '◉';
-    if (/insurance|policy cover/.test(text)) return '◈';
-    if (/programme|headline|commitment|event|final/.test(text)) return '✦';
-    if (/cost|fund|price/.test(text)) return '$';
-    if (phase === 'authority') return '◆';
-    if (phase === 'execution') return '⟳';
-    if (phase === 'observation') return '◎';
-    if (phase === 'state_update' || phase === 'recheck') return '✓';
-    return '·';
+    // Element-topic icons first: a hotel step shows the hotel, a flight step
+    // shows the plane — never one rotating glyph for every phase.
+    if (/flight|airline|onward|inventory|rebook/.test(text)) return icons.flight;
+    if (/connection|depend|transfer|hub/.test(text)) return icons.ground;
+    if (/hotel|stay|overnight/.test(text)) return icons.stay;
+    if (/entry|immigration|transit|visa/.test(text)) return icons.entry;
+    if (/insurance|policy cover/.test(text)) return icons.insurance;
+    if (/programme|headline|commitment|event/.test(text)) return icons.commitment;
+    if (/cost|fund|price/.test(text)) return icons.cost;
+    if (/linked traveller|who is affected|traveller/.test(text)) return icons.travellers;
+    if (/proposed|time|when/.test(text)) return icons.time;
+    if (/knock|impact|affected trip|ripple/.test(text)) return icons.impact;
+    if (/search|finding|option/.test(text)) return icons.search;
+    if (/testing|test the whole/.test(text)) return icons.impact;
+    if (/re-check|recheck|check the trip|viab/.test(text)) return icons.recheck;
+    // Lifecycle phase fallbacks: each phase gets its own semantic category.
+    if (phase === 'authority') return icons.authority;
+    if (phase === 'execution') return icons.execute;
+    if (phase === 'observation') return icons.provider;
+    if (phase === 'state_update') return icons.trip_update;
+    if (phase === 'recheck') return icons.recheck;
+    if (phase === 'completion') return icons.complete;
+    return icons.recheck;
   }
 
   function ensureOverlay(id, title, steps) {

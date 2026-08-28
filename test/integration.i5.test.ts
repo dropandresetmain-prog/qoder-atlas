@@ -348,7 +348,7 @@ test('i5: operator dashboard and case detail project real state through the loop
   assert.equal(resolvedDetail.resolution?.outcome, 'FULLY_RECOVERED');
   assert.equal(resolvedDetail.approval?.state, 'APPROVED');
   assert.equal(resolvedDetail.actions[0]!.state, 'DONE');
-  assert.match(resolvedDetail.actions[0]!.label, /simulated at provider boundary/, 'simulation stays honestly labelled');
+  assert.match(resolvedDetail.actions[0]!.label, /\(simulated\)/, 'simulation stays honestly labelled');
   assert.ok(resolvedDetail.checks.every((check) => check.result === 'PASS'), 'post-recovery checks pass');
 
   const resolvedTraveller = (await projectTravellerTrip(readDeps, setup.spec.trip.id, NOW))!;

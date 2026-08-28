@@ -713,7 +713,7 @@ test('incident keys: independent airline incidents never share a grouping key', 
 
 test('fleet presentation: resolved managed green, watching amber, needs attention red, local explicit', () => {
   assert.equal(
-    fleetCellClassFor({ status: 'RESOLVED', travelArrangement: 'NORTHSTAR_ARRANGED', presentation: 'CONFIRMED' }),
+    fleetCellClassFor({ status: 'RESOLVED', travelArrangement: 'NORTHSTAR_ARRANGED' }),
     'd-ok',
   );
   assert.equal(
@@ -738,7 +738,6 @@ test('fleet presentation: resolved managed green, watching amber, needs attentio
     fleetCellClassFor({
       status: 'DISRUPTED',
       travelArrangement: 'SELF_OR_OTHER_ARRANGED',
-      presentation: 'LOCAL',
     }),
     'd-local',
   );
@@ -788,5 +787,7 @@ test('pass2: Jonas traveller handoff surfaces open traveller view link', () => {
 
 test('pass2: solid stay glyph in chain mapping', async () => {
   const { CHAIN_TYPE_ICON } = await import('../src/ui/components.ts');
-  assert.equal(CHAIN_TYPE_ICON.STAY, '■');
+  // The stay glyph is a solid hotel/building SVG (not a square or outline).
+  assert.match(CHAIN_TYPE_ICON.STAY, /<svg/);
+  assert.match(CHAIN_TYPE_ICON.STAY, /currentColor/);
 });

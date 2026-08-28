@@ -59,7 +59,7 @@ function insuranceFinding(rules: readonly PolicyRule[]): string | undefined {
     );
     if (!coversMissed) continue;
     const excess = rule.excess ? `${formatMoney(rule.excess)} excess` : 'policy excess applies';
-    return `Policy covers missed connections and trip delay (${excess}); the traveller submits the claim — Northstar does not file it`;
+    return `Policy covers missed connections and trip delay (${excess}). Claim submission is not automated.`;
   }
   return undefined;
 }
@@ -90,6 +90,18 @@ function formatClock(iso: IsoDateTime | undefined): string | undefined {
   if (!match) return undefined;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${Number(match[3])} ${months[Number(match[2]) - 1] ?? match[2]} · ${match[4]}:${match[5]}`;
+}
+
+/** Judge-facing summary of a transport leg: route, times, flight number. */
+function legSummary(leg: TransportLeg, places: ReadonlyMap<string, Place>): string {
+  const from = placeLabel(places, leg.data.originPlaceId);
+  const to = placeLabel(places, leg.data.destinationPlaceId);
+  const depart = formatClock(leg.data.scheduledDeparture?.value);
+  const arrive = formatClock(leg.data.scheduledArrival?.value);
+  const flightNo = leg.data.carrierRef?.value?.trim();
+  const when = depart && arrive ? `, departing ${depart}, arriving ${arrive}` : '';
+  const carrier = flightNo ? `, flight ${flightNo}` : '';
+  return `${from} → ${to}${when}${carrier}`;
 }
 
 /** Generic operator-facing analysis steps for whole-trip recovery (no fixture branches). */
@@ -132,22 +144,30 @@ export function projectWholeTripRecoveryPlan(input: {
 
   const items: WholeTripPlanItemView[] = [];
   const policyRules = input.ruleSets.flatMap((ruleSet) => ruleSet.rules);
+  const connection = connectionHubAssessment(input.trip, input.ruleSets);
+  const replacementNo = replacement.data.carrierRef?.value?.trim();
   const origin = placeLabel(input.places, replacement.data.originPlaceId);
   const destination = placeLabel(input.places, replacement.data.destinationPlaceId);
   const depart = formatClock(replacement.data.scheduledDeparture?.value);
   const arrive = formatClock(replacement.data.scheduledArrival?.value);
+  const afterCarrier = replacementNo ? `, flight ${replacementNo}` : '';
+  // The leg being replaced: the onward connection that no longer works.
+  // Generic — derived from the failed connection pair, never scenario data.
+  const brokenLeg = input.trip.elements.find(
+    (element): element is TransportLeg => element.id === connection?.downstreamId && isFlight(element),
+  );
 
   items.push({
     id: `plan-flight-${input.strategy.id}`,
     category: 'FLIGHT',
-    title: 'Next available flight',
+    title: 'Replacement onward flight',
     finding: depart && arrive
-      ? `${origin} → ${destination}, departing ${depart}, arriving ${arrive}`
+      ? `${origin} → ${destination}, departing ${depart}, arriving ${arrive}${afterCarrier}`
       : `${origin} → ${destination} replacement that protects downstream commitments`,
     kind: 'EXECUTABLE',
+    ...(brokenLeg ? { before: legSummary(brokenLeg, input.places) } : {}),
   });
 
-  const connection = connectionHubAssessment(input.trip, input.ruleSets);
   const hubElement = input.trip.elements.find(
     (element): element is TransportLeg =>
       element.id === connection?.upstreamId && isFlight(element),
@@ -249,7 +269,7 @@ export function projectWholeTripRecoveryPlan(input: {
   );
   if (hasNonExecutableCost) {
     costNotes.push(
-      'The total covers only what Northstar executes directly; the follow-ups above are priced by their providers',
+      'The total covers only the changes Northstar applies directly; the follow-ups above are priced by their providers',
     );
   }
 

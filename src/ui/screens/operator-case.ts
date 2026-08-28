@@ -448,8 +448,8 @@ function optionsFormingSection(view: CaseDetailView): string {
 function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan']>): string {
   const kindLabel: Record<(typeof plan.items)[number]['kind'], string> = {
     CHECKED: 'Checked',
-    RECOMMENDED: 'Recommended follow-up',
-    EXECUTABLE: 'Northstar executes',
+    RECOMMENDED: 'Recommended / requires confirmation',
+    EXECUTABLE: 'Handled by Northstar',
     MANUAL_FOLLOWUP: 'Provider follow-up',
   };
   const categoryOrder = ['FLIGHT', 'OVERNIGHT', 'HOTEL', 'ENTRY', 'INSURANCE', 'EVENT', 'COST'] as const;
@@ -457,13 +457,19 @@ function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan'
     (a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category),
   );
   const items = sorted
-    .map(
-      (item) => `
+    .map((item) => {
+      // FLIGHT items carrying a `before` render as an explicit Before/After
+      // comparison — the judge sees exactly which booking is being replaced.
+      const body = item.before
+        ? `<p class="whole-trip-before" data-test="whole-trip-before"><strong>Before.</strong> ${escapeHtml(item.before)} — no longer works as booked</p>
+      <p class="whole-trip-after" data-test="whole-trip-after"><strong>After.</strong> ${escapeHtml(item.finding)}</p>`
+        : `<p>${escapeHtml(item.finding)}</p>`;
+      return `
     <div class="whole-trip-item" data-plan-kind="${escapeHtml(item.kind)}" data-plan-category="${escapeHtml(item.category)}" data-test="whole-trip-item">
       <p class="whole-trip-item-title"><strong>${escapeHtml(item.title)}</strong> · ${escapeHtml(kindLabel[item.kind])}</p>
-      <p>${escapeHtml(item.finding)}</p>
-    </div>`,
-    )
+      ${body}
+    </div>`;
+    })
     .join('');
   const knownCost = plan.knownIncrementalCost
     ? `<p class="whole-trip-known-cost" data-test="whole-trip-known-cost"><strong>Known incremental cost:</strong> ${escapeHtml(formatMoney(plan.knownIncrementalCost))}</p>`
@@ -506,13 +512,13 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     ? (() => {
         const chips: string[] = [];
         if (option.providerCost) {
+          // One charge, one chip: the provider amount leads; the home-policy
+          // restatement rides along as a parenthetical, never a second chip.
+          const policyNote = option.costDelta
+            ? ` <span class="chip-policy-note" data-test="option-policy-equivalent">(${escapeHtml(formatPolicyEquivalent(option.costDelta))})</span>`
+            : '';
           chips.push(
-            `<span class="chip chip-payable" data-test="option-payable">${escapeHtml(formatPayable(option.providerCost))}</span>`,
-          );
-        }
-        if (option.costDelta && option.providerCost) {
-          chips.push(
-            `<span class="chip chip-policy" data-test="option-policy-equivalent">${escapeHtml(formatPolicyEquivalent(option.costDelta))}</span>`,
+            `<span class="chip chip-payable" data-test="option-payable">${escapeHtml(formatPayable(option.providerCost))}${policyNote}</span>`,
           );
         } else if (option.costDelta) {
           const delta = formatCostDelta(option.costDelta);
@@ -1102,7 +1108,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
     ? JSON.stringify([
         'Verifying the airline replacement',
         'Testing current arrival against the headline',
-        'Checking evidenced travel alternatives',
+        'Comparing workable travel alternatives',
         'Headline commitment still fails',
         'Testing a possible programme change without touching the programme',
       ])

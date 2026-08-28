@@ -146,51 +146,42 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   await beginResponse;
   await page.waitForSelector('[data-approval-state="PENDING"]', { timeout: 10000 });
 
-  // Step 6: Verify the approval panel now appears
+  // Step 6: Verify the approval panel now appears. Traveller decisions are
+  // owned by the traveller surface; the operator side shows the honest wait.
   const afterBeginHtml = await page.content();
   assert.ok(
     afterBeginHtml.includes('Awaiting approval') || afterBeginHtml.includes('Approval needed') || afterBeginHtml.includes('Waiting for'),
     'case shows awaiting-approval state after begin',
   );
   assert.ok(!/Options on the table/i.test(afterBeginHtml), 'staged approval must not say Options on the table');
-  assert.ok(afterBeginHtml.includes('Approve'), 'case shows Approve button');
-  assert.ok(afterBeginHtml.includes('Decline'), 'case shows Decline button');
+  assert.ok(afterBeginHtml.includes('data-test="waiting-for-traveller"'), 'case shows the honest wait for the traveller');
+  assert.ok(afterBeginHtml.includes('data-test="open-traveller-surface"'), 'case hands the decision off to the traveller surface');
 
-  // Verify approval forms target the real endpoint
-  const approveForm = page.locator('form[action*="/traveller-decision"]').first();
-  const approveFormAction = await approveForm.getAttribute('action');
-  assert.ok(approveFormAction?.includes('/api/cases/'), `approval form action targets real endpoint: ${approveFormAction}`);
-  assert.ok(approveFormAction?.includes('/traveller-decision'), `approval form action includes traveller-decision: ${approveFormAction}`);
+  // Step 7: Approve on the traveller surface, where the decision lives.
+  await page.goto(`${baseUrl}/traveller?trip=${scenarioTripId}`);
+  await page.waitForLoadState('networkidle');
+  const travellerDecisionHtml = await page.content();
+  assert.ok(travellerDecisionHtml.includes('We need your input'), 'traveller surface shows the pending decision');
 
-  // Verify hidden input for decision value
-  const decisionInput = approveForm.locator('input[name="decision"][value="APPROVED"]');
-  await assert.ok(await decisionInput.count() > 0, 'form has hidden decision=APPROVED input');
+  // Verify the decision form targets the real endpoint
+  const decisionForm = page.locator('form[action*="/traveller-decision"]').first();
+  const decisionFormAction = await decisionForm.getAttribute('action');
+  assert.ok(decisionFormAction?.includes('/api/cases/'), `decision form action targets real endpoint: ${decisionFormAction}`);
+  assert.ok(decisionFormAction?.includes('/traveller-decision'), `decision form action includes traveller-decision: ${decisionFormAction}`);
 
-  // Step 7: Click the Approve button
-  const approveButton = page.locator('button:has-text("Approve")').first();
-  // G3R-Closure fix I: synchronize on the ACTUAL decision response (the
-  // backend has applied the state by the time it answers), then on the
-  // post-decision DOM state. The enhancement script reloads the page once
-  // this fetch resolves; waiting for the progressed-state selector rides
-  // through that reload deterministically instead of racing networkidle.
+  const approveButton = page.locator('form[action*="/traveller-decision"] button[name="decision"][value="APPROVED"]').first();
+  // Synchronize on the ACTUAL decision response (the backend has applied the
+  // state by the time it answers), then assert the progressed state on the
+  // case page — riding through the enhancement script's reload.
   const decisionResponse = page.waitForResponse(
     (response) => response.url().includes('/traveller-decision') && response.request().method() === 'POST',
     { timeout: 10000 },
   );
   await approveButton.click();
   await decisionResponse;
-  // String-form in-page function (no DOM-lib reference in the TS source):
-  // resolves once the reloaded page shows a progressed state.
-  await page.waitForFunction(
-    'document.documentElement.innerHTML.includes("RESOLVED") || document.documentElement.innerHTML.includes("Trip recovered") || document.documentElement.innerHTML.includes("RECOVERING") || document.documentElement.innerHTML.includes("In progress")',
-    undefined,
-    { timeout: 10000 },
-  );
 
-  // Step 8: Verify state persisted — reload the page and check again.
-  // The decision response above proves the state was already applied before
-  // this reload starts, so there is no approval/reload race left.
-  await page.reload();
+  // Step 8: Verify state persisted — reopen the case and check it progressed.
+  await page.goto(`${baseUrl}/operator/cases/${caseId}`);
   await page.waitForLoadState('domcontentloaded');
 
   const afterApprovalHtml = await page.content();
@@ -207,12 +198,21 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   const travellerRecovering = travellerHtml.includes('RECOVERING') || travellerHtml.includes('What we are doing');
   assert.ok(travellerResolved || travellerRecovering, `traveller view reflects updated state`);
 
-  // Step 10: Verify dashboard also reflects the updated state
+  // Step 10: Verify the dashboard reflects the updated state. The overview is
+  // the seeded cohort world — other trips legitimately stay DISRUPTED — so
+  // the scoped contract is: the resolved case no longer asks for attention,
+  // and the approval ask this flow just settled is gone from the queue.
   await page.goto(`${baseUrl}/operator`);
   await page.waitForLoadState('networkidle');
   const dashboardAfterHtml = await page.content();
-  const dashboardResolved = dashboardAfterHtml.includes('RESOLVED') || !dashboardAfterHtml.includes('DISRUPTED');
-  assert.ok(dashboardResolved || dashboardAfterHtml.includes('On track'), 'dashboard reflects updated state after recovery');
+  assert.ok(
+    !dashboardAfterHtml.includes(`data-case-id="${caseId}"`),
+    'resolved case no longer appears in the dashboard attention queue',
+  );
+  assert.ok(
+    !dashboardAfterHtml.includes('waiting-for-traveller'),
+    'dashboard no longer carries the settled approval ask',
+  );
 
   await page.close();
 });

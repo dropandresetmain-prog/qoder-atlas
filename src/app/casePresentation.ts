@@ -1,7 +1,8 @@
 /**
  * Case detail presentation enrichment (R3A).
  */
-import type { Money } from '../domain/common.ts';
+import type { Money, EntityId } from '../domain/common.ts';
+import { compareInstants } from '../domain/common.ts';
 import type { AnchorEvent, Place } from '../domain/entities.ts';
 import type { Engagement } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
@@ -14,10 +15,11 @@ import type {
   CaseDetailView,
   CaseRailSectionView,
   RecoveryOptionView,
+  StatusTimelineEntryView,
 } from '../ui/case-view-model.ts';
 import { formatMoney } from '../ui/html.ts';
 import { authorityNeededLabel } from '../ui/copy.ts';
-import { presentAllocationSummary } from './presentation.ts';
+import { presentActivity, presentAllocationSummary } from './presentation.ts';
 import {
   formatCaseOpenedAt,
   formatProgrammeInstant,
@@ -67,6 +69,7 @@ export function enrichCaseDetailView(
     trip: Trip;
     triggeringSignals: TripSignal[];
     allTripSignals?: TripSignal[];
+    activityTimeline?: StatusTimelineEntryView[];
     places: Map<string, Place>;
     anchorEvent?: AnchorEvent;
     connectionImpossible?: boolean;
@@ -74,10 +77,15 @@ export function enrichCaseDetailView(
 ): CaseDetailView {
   const { recoveryCase, trip, triggeringSignals, places } = context;
   const affected = projectAffectedItemViews(trip, recoveryCase, places);
-  const statusTimeline = projectStatusTimeline(
-    context.allTripSignals ?? triggeringSignals,
+  const statusTimeline = mergeStatusTimelines(
+    projectStatusTimeline(
+      context.allTripSignals ?? triggeringSignals,
+      recoveryCase,
+      context.connectionImpossible ? { connectionImpossible: true } : undefined,
+    ),
+    context.activityTimeline ?? [],
     recoveryCase,
-    context.connectionImpossible ? { connectionImpossible: true } : undefined,
+    context.connectionImpossible,
   );
 
   const engagement = primaryEngagement(trip, recoveryCase);
@@ -144,6 +152,121 @@ export function enrichCaseDetailView(
     options,
     actions,
   };
+}
+
+/** Airline-schedule rows projected from audit share this fixed vocabulary. */
+const TIMELINE_SCHEDULE_LABELS = new Set([
+  'The airline reported a delay.',
+  'The airline changed the flight schedule.',
+  'The airline cancelled the flight.',
+]);
+
+/**
+ * Merge the signal-derived timeline with audit-derived activity (#10).
+ * The signal store may collapse repeated provider notifications into one
+ * signal; the audit keeps every processed notification timestamped, so the
+ * merge restores the true unfolding — delays worsening, the connection
+ * tightening, Northstar opening recovery, and each recovery action as it
+ * happened. Entries dedupe on instant+label; nothing is fabricated.
+ */
+function mergeStatusTimelines(
+  signalEntries: readonly StatusTimelineEntryView[],
+  auditEntries: readonly StatusTimelineEntryView[],
+  recoveryCase: RecoveryCase,
+  connectionImpossible: boolean | undefined,
+): StatusTimelineEntryView[] {
+  const seen = new Set<string>();
+  const merged: StatusTimelineEntryView[] = [];
+  const push = (entry: StatusTimelineEntryView): void => {
+    const key = `${entry.at ?? ''}|${entry.label}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(entry);
+  };
+  for (const entry of signalEntries) push(entry);
+  for (const entry of auditEntries) push(entry);
+  if (recoveryCase.status !== 'DETECTED' && recoveryCase.status !== 'RESOLVED') {
+    push({
+      id: `timeline-recovery-${recoveryCase.id}`,
+      at: recoveryCase.openedAt,
+      label: 'Northstar opened recovery',
+      tone: 'watch',
+    });
+  }
+  merged.sort((a, b) =>
+    a.at && b.at ? compareInstants(a.at, b.at) : (a.at ?? '').localeCompare(b.at ?? ''),
+  );
+
+  // Re-derive the approved progressive connection wording across every
+  // schedule row now that audit rows may interleave with signal rows.
+  const scheduleRows = merged.filter((entry) => TIMELINE_SCHEDULE_LABELS.has(entry.label));
+  if (scheduleRows.length > 1) {
+    scheduleRows.forEach((row, index) => {
+      const isLast = index === scheduleRows.length - 1;
+      row.detail =
+        index === 0
+          ? 'Connection still assessed as workable'
+          : isLast && connectionImpossible
+            ? 'Latest timing makes the connection non-viable'
+            : 'Connection margin tightening';
+      if (isLast) row.tone = connectionImpossible ? 'alert' : 'watch';
+    });
+  }
+
+  // The section tells a story; a lone row has nothing to unfold.
+  return merged.length > 1 ? merged : [];
+}
+
+/**
+ * Progressive travel history from the audit trail. Projects only recorded
+ * audit rows: repeated airline notifications (which the signal store may
+ * collapse into one), Northstar's planning/approval/execution milestones.
+ */
+export async function projectAuditTimeline(
+  deps: ReadModelDependencies,
+  tripId: EntityId,
+): Promise<StatusTimelineEntryView[]> {
+  const entries = await deps.audit.query({ subject: tripId, limit: 240 });
+  const rows: StatusTimelineEntryView[] = [];
+  const milestoneActions = new Set([
+    'PLANNING_COMPLETED',
+    'AUTHORITY_DECIDED',
+    'APPROVAL_RECORDED',
+    'EXECUTION_COMPLETED',
+    'CASE_VERIFIED',
+  ]);
+  for (const [index, entry] of entries.entries()) {
+    const payload = entry.payload as Record<string, unknown> | undefined;
+    const action = entry.action.toUpperCase();
+    if (action === 'SIGNAL_PROCESSED') {
+      const kind = typeof payload?.kind === 'string' ? payload.kind : '';
+      const label =
+        kind === 'FLIGHT_DELAY'
+          ? 'The airline reported a delay.'
+          : kind === 'FLIGHT_CANCELLATION'
+            ? 'The airline cancelled the flight.'
+            : kind === 'FLIGHT_SCHEDULE_CHANGE'
+              ? 'The airline changed the flight schedule.'
+              : undefined;
+      if (!label) continue;
+      rows.push({
+        id: `timeline-audit-${index}-${entry.occurredAt}`,
+        at: entry.occurredAt,
+        label,
+        tone: 'neutral',
+      });
+      continue;
+    }
+    if (!milestoneActions.has(action)) continue;
+    const copy = presentActivity(entry.action, payload);
+    rows.push({
+      id: `timeline-audit-${index}-${entry.occurredAt}`,
+      at: entry.occurredAt,
+      label: `Northstar ${copy}`,
+      tone: action === 'PLANNING_COMPLETED' || action === 'AUTHORITY_DECIDED' ? 'watch' : 'ok',
+    });
+  }
+  return rows;
 }
 
 export async function decidedByLabel(

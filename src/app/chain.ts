@@ -93,7 +93,9 @@ function stayDetail(stay: Stay, places: ReadonlyMap<string, Place>): string | un
 }
 
 function engagementLabel(engagement: Engagement, event: AnchorEvent | undefined): string {
-  return event ? `${engagement.data.title} · ${event.name}` : engagement.data.title;
+  // Generic event-prefix treatment: engagement elements are programme
+  // commitments, and the chain must say so without per-scenario wording.
+  return event ? `Event: ${engagement.data.title} · ${event.name}` : `Event: ${engagement.data.title}`;
 }
 
 

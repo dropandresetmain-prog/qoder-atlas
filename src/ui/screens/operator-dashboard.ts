@@ -29,7 +29,7 @@ import {
   type RosterPresentationInput,
 } from '../presentationState.ts';
 import { escapeHtml, formatInstant, formatMoney, formatRosterTime, formatShort, encodeUri } from '../html.ts';
-import { errorPanel, loadingPanel, miniChainRow } from '../components.ts';
+import { CHAIN_TYPE_ICON, errorPanel, loadingPanel, miniChainRow } from '../components.ts';
 
 export interface OperatorDashboardAugmentations {
   chainFor?: (trip: OperatorTripView) => readonly ChainLinkView[] | undefined;
@@ -37,7 +37,6 @@ export interface OperatorDashboardAugmentations {
   /** Earliest upcoming commitment instant for fleet ordering (presentation only). */
   earliestCommitmentAtFor?: (trip: OperatorTripView) => IsoDateTime | undefined;
   programmeHref?: string;
-  demoReset?: { action: string; label: string };
 }
 
 function presentationInput(trip: OperatorTripView): ManagedTravelPresentationInput {
@@ -451,7 +450,7 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
 
 function rosterFootnote(hasMiniChains: boolean): string {
   const legend = hasMiniChains
-    ? `<br>Row marks — ✈ flight · ⇄ ground · ■ stay · ✦ commitment. Colour shows state: confirmed · proposed · at risk · impacted · not booked · unconfirmed.`
+    ? `<br><span class="row-marks-legend">Row marks — <span class="row-mark">${CHAIN_TYPE_ICON.FLIGHT} flight</span> · <span class="row-mark">${CHAIN_TYPE_ICON.GROUND} ground</span> · <span class="row-mark">${CHAIN_TYPE_ICON.STAY} stay</span> · <span class="row-mark">${CHAIN_TYPE_ICON.COMMITMENT} commitment</span>. Colour shows state: confirmed · proposed · at risk · impacted · not booked · unconfirmed.</span>`
     : '';
   return `<p class="footnote">Statuses update when the underlying bookings are confirmed, not when a message is sent.${legend}</p>`;
 }
@@ -536,18 +535,12 @@ export function renderOperatorDashboardBody(
   const rosterLink = augment.programmeHref
     ? `<a class="h2-link" href="${escapeHtml(augment.programmeHref)}">Full roster on the programme page →</a>`
     : '';
-  const demoReset = augment.demoReset
-    ? `<form class="demo-reset-form" method="post" action="${escapeHtml(augment.demoReset.action)}" data-test="demo-reset-form">
-    <button type="submit" class="demo-reset-btn" data-test="demo-reset-btn">${escapeHtml(augment.demoReset.label)}</button>
-  </form>`
-    : '';
   return `
 <main class="shell">
   <div class="page-head">
     <h1>Operations overview</h1>
     <p class="sub">Managed travel readiness across the programme — urgent work stays in the list below.</p>
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
-    ${demoReset}
   </div>
   <div class="readout">
 ${readoutBlock(view)}

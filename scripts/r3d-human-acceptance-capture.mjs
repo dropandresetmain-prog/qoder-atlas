@@ -83,7 +83,7 @@ try {
   await shot(op, 'overview-start');
   const overviewHtml = await op.content();
   evidence.checks.demoBannerAbsent = !/class="demo-banner/.test(overviewHtml);
-  evidence.checks.resetPresent = /data-test="demo-reset-btn"|Reset demo/i.test(overviewHtml);
+  evidence.checks.resetPresent = /data-test="profile-reset-btn"|Reset scenario/i.test(overviewHtml);
   evidence.checks.fleetFilledUnconfirmed = /d-unconfirmed/.test(overviewHtml);
   evidence.checks.attentionQueue = /data-test="attention-queue"/.test(overviewHtml);
   evidence.checks.sarahInAttention = /Sarah Lim/i.test(overviewHtml) && /data-test="attention-queue"[\s\S]{0,4000}Sarah Lim/i.test(overviewHtml);

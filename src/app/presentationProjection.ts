@@ -17,6 +17,7 @@ import type {
   TravellerThreadMessage,
 } from '../ui/traveller-presentation.ts';
 import type { AffectedItemView, StatusTimelineEntryView } from '../ui/case-view-model.ts';
+import { CHAIN_TYPE_ICON } from '../ui/components.ts';
 import { presentAction, presentSignalChange } from './presentation.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
 
@@ -202,9 +203,11 @@ function elementMoment(element: TripElement): IsoDateTime | undefined {
 }
 
 function itineraryIcon(element: TripElement): string {
-  if (element.elementKind === 'TRANSPORT_LEG') return element.data.mode === 'FLIGHT' ? '✈' : '→';
-  if (element.elementKind === 'STAY') return '⌂';
-  return '★';
+  if (element.elementKind === 'TRANSPORT_LEG') {
+    return element.data.mode === 'FLIGHT' ? CHAIN_TYPE_ICON.FLIGHT : CHAIN_TYPE_ICON.GROUND;
+  }
+  if (element.elementKind === 'STAY') return CHAIN_TYPE_ICON.STAY;
+  return CHAIN_TYPE_ICON.COMMITMENT;
 }
 
 function itineraryState(
@@ -295,7 +298,7 @@ export function projectTravellerItinerary(
     const meta = [formatProgrammeInstant(element.data.startsAt.value), place?.name].filter(Boolean).join(' · ');
     return {
       icon: itineraryIcon(element),
-      title: commitment?.title ?? element.data.title,
+      title: `Event: ${commitment?.title ?? element.data.title}`,
       ...(meta ? { sub: meta } : {}),
       ...state,
     };
@@ -334,7 +337,7 @@ export function projectTravellerProgress(recoveryCase: RecoveryCase | undefined)
 function describeElementLabel(element: TripElement, places: ReadonlyMap<string, Place>): string {
   if (element.elementKind === 'TRANSPORT_LEG') return transportTitle(element, places);
   if (element.elementKind === 'STAY') return places.get(element.data.placeId)?.name ?? 'Stay';
-  return element.data.title;
+  return `Event: ${element.data.title}`;
 }
 
 function elementImpactState(element: TripElement, affected: ReadonlySet<string>): AffectedItemView['state'] {

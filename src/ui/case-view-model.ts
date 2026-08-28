@@ -46,6 +46,12 @@ export interface WholeTripPlanItemView {
   title: string;
   finding: string;
   kind: WholeTripPlanItemKind;
+  /**
+   * The bookable fact being replaced (FLIGHT category): the onward leg that
+   * no longer works, phrased for judges. Present makes the Before → After
+   * comparison unmistakable; absent when nothing is being replaced.
+   */
+  before?: string;
 }
 
 export interface WholeTripRecoveryPlanView {
