@@ -1,0 +1,204 @@
+/* Reusable NORTHSTAR journey / dependency primitives for generated motion. */
+.ns-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4200px;
+  height: 2500px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.ns-world-svg {
+  position: absolute;
+  inset: 0;
+  width: 4200px;
+  height: 2500px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ns-dependency-edge {
+  fill: none;
+  stroke: var(--ns-line);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ns-dependency-edge.is-green { stroke: var(--ns-green-f); }
+.ns-dependency-edge.is-brass { stroke: var(--ns-brass-f); stroke-dasharray: 14 12; }
+.ns-dependency-edge.is-red { stroke: var(--ns-red-f); }
+.ns-dependency-edge.is-grey { stroke: var(--ns-grey-f); stroke-dasharray: 3 10; }
+.ns-dependency-edge.is-ink { stroke: rgba(20,23,28,.76); }
+.ns-dependency-edge.is-soft { stroke: rgba(20,23,28,.10); stroke-width: 2.4; }
+
+.ns-propagation-mark {
+  fill: var(--ns-surface);
+  stroke: var(--ns-brass-f);
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 3px 6px rgba(20,23,28,.13));
+}
+
+.ns-journey-node {
+  position: absolute;
+  width: 230px;
+  height: 132px;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.98);
+  border: 1px solid var(--ns-line);
+  box-shadow: 0 22px 58px rgba(20,23,28,.07);
+  overflow: hidden;
+  color: var(--ns-ink);
+}
+.ns-journey-node.is-wide { width: 270px; }
+.ns-journey-node::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 var(--journey-settle, 0px) var(--journey-settle-color, transparent);
+}
+.ns-journey-node .node-kicker {
+  font: 650 12px/1 var(--ns-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(20,23,28,.48);
+}
+.ns-journey-node .node-value {
+  margin-top: 14px;
+  font: 720 24px/1.04 var(--ns-sans);
+  letter-spacing: -.034em;
+  white-space: nowrap;
+}
+.ns-journey-node .node-meta {
+  margin-top: 12px;
+  font: 650 12px/1 var(--ns-mono);
+  letter-spacing: .025em;
+  color: rgba(20,23,28,.48);
+  white-space: nowrap;
+}
+.ns-journey-node .node-state {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ns-grey-f);
+}
+.ns-journey-node.is-green { border-color: rgba(47,107,71,.30); }
+.ns-journey-node.is-green .node-state { background: var(--ns-green-f); }
+.ns-journey-node.is-brass { border-color: rgba(150,103,15,.34); }
+.ns-journey-node.is-brass .node-state { background: var(--ns-brass-f); }
+.ns-journey-node.is-red { border-color: rgba(194,67,26,.42); }
+.ns-journey-node.is-red .node-state { background: var(--ns-red-f); }
+.ns-journey-node.is-grey { border-color: rgba(107,114,128,.26); }
+.ns-journey-node.is-grey .node-state { background: var(--ns-grey-f); }
+.ns-journey-node.is-ink { border-color: var(--ns-ink); }
+.ns-journey-node.is-ink .node-state { background: var(--ns-ink); }
+
+.ns-journey-node.is-brass .node-value,
+.ns-journey-node.is-brass .node-meta { color: var(--ns-brass-t); }
+.ns-journey-node.is-red .node-value,
+.ns-journey-node.is-red .node-meta { color: var(--ns-red-t); }
+.ns-journey-node.is-green .node-meta { color: var(--ns-green-t); }
+
+.ns-journey-heading {
+  position: absolute;
+  font: 650 14px/1 var(--ns-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(20,23,28,.46);
+  white-space: nowrap;
+}
+.ns-journey-heading strong { color: var(--ns-ink); }
+
+.ns-mini-journey {
+  position: absolute;
+  width: 460px;
+  height: 50px;
+  transform-origin: left center;
+}
+.ns-mini-journey .mini-label {
+  position: absolute;
+  left: -70px;
+  top: 17px;
+  width: 54px;
+  text-align: right;
+  font: 700 12px/1 var(--ns-mono);
+  letter-spacing: .07em;
+  color: rgba(20,23,28,.42);
+}
+.ns-mini-node {
+  position: absolute;
+  top: 13px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ns-surface);
+  border: 2px solid var(--ns-green-f);
+  box-shadow: 0 3px 8px rgba(20,23,28,.055);
+}
+.ns-mini-node.is-green { border-color: var(--ns-green-f); }
+.ns-mini-node.is-brass { border-color: var(--ns-brass-f); background:#fffaf1; }
+.ns-mini-node.is-red { border-color: var(--ns-red-f); background:#fff9f7; }
+.ns-mini-node.is-grey { border-color: var(--ns-grey-f); }
+.ns-mini-node.is-ink { border-color: var(--ns-ink); background:var(--ns-ink); }
+.ns-mini-seg {
+  position: absolute;
+  top: 23px;
+  height: 2px;
+  background: var(--ns-green-f);
+  transform-origin: left center;
+}
+.ns-mini-seg.is-brass {
+  background: repeating-linear-gradient(90deg,var(--ns-brass-f) 0 9px,transparent 9px 16px);
+}
+.ns-mini-seg.is-red { background: var(--ns-red-f); }
+.ns-mini-seg.is-grey { background: repeating-linear-gradient(90deg,var(--ns-grey-f) 0 3px,transparent 3px 10px); }
+.ns-mini-result {
+  position: absolute;
+  left: 350px;
+  top: 10px;
+  font: 720 13px/1 var(--ns-mono);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.ns-mini-result.is-green { color: var(--ns-green-t); }
+.ns-mini-result.is-brass { color: var(--ns-brass-t); }
+.ns-mini-result.is-red { color: var(--ns-red-t); }
+.ns-mini-result.is-grey { color: var(--ns-muted); }
+.ns-mini-result.is-ink { color: var(--ns-ink); }
+
+.ns-health-mark {
+  position: absolute;
+  width: 90px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ns-health-mark i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ns-green-f);
+}
+.ns-health-mark .health-glyph {
+  margin-left: 3px;
+  font: 800 11px/1 var(--ns-mono);
+  color: var(--ns-green-t);
+}
+.ns-health-mark.is-green i { background: var(--ns-green-f); }
+.ns-health-mark.is-green .health-glyph { color: var(--ns-green-t); }
+.ns-health-mark.is-brass i { background: var(--ns-brass-f); }
+.ns-health-mark.is-brass .health-glyph { color: var(--ns-brass-t); }
+.ns-health-mark.is-red i { background: var(--ns-red-f); }
+.ns-health-mark.is-red .health-glyph { color: var(--ns-red-t); }
+.ns-health-mark.is-grey i { background: var(--ns-grey-f); }
+.ns-health-mark.is-grey .health-glyph { color: var(--ns-muted); }
+.ns-health-mark.is-ink i { background: var(--ns-ink); }
+.ns-health-mark.is-ink .health-glyph { color: var(--ns-ink); }

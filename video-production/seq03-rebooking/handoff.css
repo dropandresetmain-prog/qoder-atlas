@@ -1,0 +1,69 @@
+#hero-readout {
+  position: absolute;
+  left: 126px;
+  top: 104px;
+  z-index: 80;
+  width: 870px;
+}
+#booking-result {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  color: var(--ns-green-t);
+  font: 760 42px/1 var(--ns-mono);
+  letter-spacing: -.055em;
+}
+#booking-result .tick {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ns-green-f);
+  border-radius: 50%;
+  font: 800 16px/1 var(--ns-sans);
+}
+#trip-result {
+  margin-top: 17px;
+  color: var(--ns-red-t);
+  font: 780 66px/.92 var(--ns-sans);
+  letter-spacing: -.058em;
+  transform-origin: left center;
+}
+#truth-rule {
+  width: 650px;
+  height: 1px;
+  margin-top: 22px;
+  background: var(--ns-line);
+  position: relative;
+  overflow: hidden;
+}
+#truth-rule::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ns-red-f);
+  transform-origin: left center;
+  transform: scaleX(var(--truth-progress, 1));
+}
+#hero-readout .truth-meta {
+  margin-top: 13px;
+  font: 650 11px/1 var(--ns-mono);
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: rgba(20,23,28,.44);
+}
+#northstar-id { left: 48px; top: 38px; }
+#stage-mode { right: 48px; top: 38px; }
+#hero-focus {
+  position: absolute;
+  left: 105px;
+  right: 105px;
+  top: 332px;
+  height: 420px;
+  z-index: 2;
+  border-radius: 42px;
+  background: linear-gradient(90deg, rgba(255,255,255,.0), rgba(255,255,255,.38) 18%, rgba(255,255,255,.38) 82%, rgba(255,255,255,0));
+  opacity: .8;
+  pointer-events: none;
+}
