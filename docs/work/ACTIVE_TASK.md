@@ -7,6 +7,7 @@ Build separately renderable Seq 05, 06, 07, 08, 09, 10 and 15 on `video-system-w
 - Base: `video-production-integration`
 - Base SHA: `a614e4c8dd81541b6ed96c81bf61b9062aae6ae6`
 - Working branch: `video-system-world-production`
+- Implementation commit: `503e0e5bfaf6c19300dbbb209b4d7c4241218374`
 
 ## Checklist
 - [x] Freeze objective-field world/state contract
@@ -23,7 +24,7 @@ Build separately renderable Seq 05, 06, 07, 08, 09, 10 and 15 on `video-system-w
 - [x] Playback checks + 1920×1080 still review
 - [x] Hardcoding review: facts in data, generic primitives in shared
 - [x] SSOT reconciliation
-- [ ] Commit exact paths + push
+- [x] Commit exact paths + push
 
 ## Critical visual constraints
 - Objective field / commitment constellation, not donor pill-day composition.
@@ -36,10 +37,10 @@ Build separately renderable Seq 05, 06, 07, 08, 09, 10 and 15 on `video-system-w
 - Seq 15 quiet healthy journey + thesis, no celebration.
 
 ## Current checkpoint
-Final source/render verification complete. Pending exact-path Git commit + push only.
+COMPLETE. Implementation and acceptance evidence reconciled; source/config/docs committed on the dedicated production branch.
 
 ## Next action
-Create one commit against the frozen base tree containing source/config/docs only, advance `video-system-world-production`, then verify branch diff scope.
+None for this task. Final film editing may consume the generated assets and the Seq 10 decision-surface handoff.
 
 ## Acceptance evidence
 ### Visual QA
