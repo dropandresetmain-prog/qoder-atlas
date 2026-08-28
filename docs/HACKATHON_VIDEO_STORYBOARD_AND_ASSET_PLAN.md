@@ -595,7 +595,66 @@ then:
 
 ---
 
-# 7. Final narration script — LOCKED
+# 7. Production reconciliation — current execution state
+
+**Reconciled:** 2026-08-28
+**Authority:** This section normalises the production identity and current status. It does not alter the approved story or the locked narration below. Approximate timings are editorial guides only until final narration timing is available.
+
+## 7.1 Sequence identity, timing, and ownership
+
+| Sequence | Approx. time | Locked narration beat | Visual mode | Current status | Asset / output owner |
+|---|---:|---|---|---|---|
+| SEQ 01 | ~0:00–0:03 | A travel disruption rarely breaks just one thing. | OpenMontage-directed cinematic hybrid: free stock + Alibaba Wan where useful | DONE | Cinematics |
+| SEQ 02 | ~0:03–0:11 | Delayed flight downstream consequences. | OpenMontage-directed cinematic hybrid: free stock + Alibaba Wan where useful | DONE | Cinematics |
+| SEQ 03 | ~0:11–0:14 | Rebooking the flight is not recovery. | HTML + CSS + SVG + GSAP | DONE / minor user polish possible | `video-production/seq03-rebooking/` |
+| SEQ 04 | ~0:14–0:20 | One traveller → many. | HTML + CSS + SVG + GSAP | DONE / minor user polish possible | `video-production/seq04-scale/` |
+| SEQ 05 | ~0:20–0:26 | Event as connected state. | HTML + CSS + SVG + GSAP | REDESIGN REQUIRED | Fresh HTML-only workstream |
+| SEQ 06 | ~0:26–0:43 | Live Dependency Graph / interconnected system. | HTML + CSS + SVG + GSAP | REDESIGN REQUIRED | Fresh HTML-only workstream |
+| SEQ 07 | ~0:43–0:51 | Blast radius propagation. | HTML + CSS + SVG + GSAP | NOT STARTED | Fresh HTML-only workstream |
+| SEQ 08 | ~0:51–1:03 | Resolution engine: context → recovery strategies. | HTML + CSS + SVG + GSAP | NOT STARTED | Fresh HTML-only workstream |
+| SEQ 09 | ~1:03–1:09 | AI/Qwen + Atlas roles. | HTML + CSS + SVG + GSAP | NOT STARTED | Fresh HTML-only workstream |
+| SEQ 10 | ~1:09–1:15 | Delegated authority + human-in-the-loop. | HTML + CSS + SVG + GSAP | NOT STARTED | Fresh HTML-only workstream |
+| SEQ 11 | ~1:15–1:42 | Sarah real-product hero. | Real NORTHSTAR product capture | USER UI HARDENING / CAPTURE PENDING | Product capture workstream |
+| SEQ 12 | ~1:42–2:10 | Jordan real-product hero. | Real NORTHSTAR product capture | USER UI HARDENING / CAPTURE PENDING | Product capture workstream |
+| SEQ 13 | ~2:10–2:22 | Jonas + Oliver breadth. | Real NORTHSTAR product capture | USER UI HARDENING / CAPTURE PENDING | Product capture workstream |
+| SEQ 14 | ~2:22–2:30 by current default | Qoder fan-out / fan-in. | Standalone HTML/GSAP Qoder animation | DONE | `video-production/seq14-qoder/` |
+| SEQ 15 | ~2:30–2:55 | Expansion + closing thesis. | OpenMontage cinematic expansion, then HTML NORTHSTAR final graph/thesis lockup | Cinematic expansion DONE; final NORTHSTAR lockup NOT STARTED | Cinematics; Fresh HTML-only workstream |
+
+## 7.2 Proven production rules
+
+1. HTML + CSS + SVG + GSAP is the chosen generated-motion stack.
+2. Sequences are separately editable and renderable assets.
+3. They share one reusable production visual system under `video-production/shared/`.
+4. `docs/DESIGN.md` remains the visual authority.
+5. Shared components enforce congruence, while sequence authors retain creative freedom where `docs/DESIGN.md` does not prescribe a solution.
+6. Continuity uses explicit handoff-frame / world-state contracts; do not force the full film into one huge HTML file.
+7. Level-of-detail must reduce information as the camera pulls out. Never leave unreadable microtext on screen.
+
+## 7.3 Seq 05–10 direction and technology framing
+
+The primary communication goal for SEQ 05–06 is **interconnectedness**, not merely “show an event graph.” The viewer must understand that the event/programme has connected structure; journeys have dependent stages; travellers connect to specific programme commitments; many travellers connect to distinct areas of one shared event; traveller constraints affect viability; and NORTHSTAR maintains the whole connected state.
+
+The rejected SEQ 05–06 composition on `demo-videos-html-production` is not approved and must not be integrated as a visual asset. A future workstream may selectively use only generic donor architecture from that branch—such as programme-graph primitives, LOD helpers, connected-programme world representation, graph-state/layout concepts, and a potential SEQ 07 mutation baseline—after an explicit design decision.
+
+SEQ 09 frames AI as the capability. This hackathon build uses Alibaba Cloud Qwen for the AI/reasoning implementation, and Alibaba Cloud sponsorship must receive visible, meaningful credit. Qwen is not a NORTHSTAR-specific architectural dependency; a visual may use an Alibaba Cloud branded AI/Qwen container rather than treating “Qwen” as the architecture. Atlas has a distinct role: flight search and verification evidence.
+
+SEQ 10 remains separate and explicit: one action within delegated authority clears to execute; a second reaches an authority boundary; mapped impact and viable options are already prepared for the human; and an explicit human-in-the-loop decision is shown. Do not bury this in SEQ 08–09.
+
+## 7.4 Qoder, capture, and cinematic evidence
+
+SEQ 14 is complete and standalone. Its default placement remains after product proof. Editorially it may later move between SEQ 10 and “Let’s see Northstar in action” without rebuilding the asset; this reconciliation does not change locked narration order.
+
+Playwright capture is **VALIDATED**: deterministic browser driving at a fixed 1920×1080 viewport produces usable capture. The future enhancements are a giant clearly visible cursor, exact Sarah/Jordan/breadth choreography, and scenario reset/state handling. The harness and lightweight evidence live in `video-production/demo-capture-proof/`; capture binaries are intentionally ignored.
+
+The accepted OpenMontage result is: opening PASS (11-second cinematic sequence, hybrid Wan + real stock) and closing expansion PASS (sports → corporate offsite → travel operations, hybrid Wan + stock). Detailed evidence remains in `video-production/cinematics/CINEMATIC_PRODUCTION_REPORT.md`; rendered local source/output footage may remain ignored.
+
+## 7.5 Next production milestone
+
+The fresh HTML-only workstream owns SEQ 05, SEQ 06, SEQ 07, SEQ 08, SEQ 09, SEQ 10, and the SEQ 15 final NORTHSTAR graph/thesis lockup. SEQ 03–04 are accepted reference assets, not tasks. That workstream must first solve SEQ 05–06 visual direction before implementing the remaining sequence chain.
+
+---
+
+# 8. Final narration script — LOCKED
 
 Use this as the production narration baseline. Do not replace it with older provisional narration elsewhere in the repository.
 
@@ -651,7 +710,7 @@ Use this as the production narration baseline. Do not replace it with older prov
 
 ---
 
-# 8. Asset production manifest
+# 9. Asset production manifest
 
 ## A1 — Journey Cascade
 **Priority:** Critical  
@@ -724,7 +783,7 @@ Reuse the A2 graph language rather than inventing a new campaign aesthetic. Prog
 
 ---
 
-# 9. Asset-plan changes from the superseded draft
+# 10. Asset-plan changes from the superseded draft
 
 ## Act Now
 1. Build **A1 Journey Cascade**.
@@ -753,24 +812,21 @@ Reuse the A2 graph language rather than inventing a new campaign aesthetic. Prog
 
 ---
 
-# 10. Tool / production strategy
+# 11. Tool / production strategy
 
-The rendering technology remains an implementation decision, but the **visual contracts above are now frozen**.
+The visual contracts are frozen. HTML + CSS + SVG + GSAP is the chosen generated-motion stack for SEQ 03–10 and the final SEQ 15 lockup. OpenMontage-directed cinematic hybrid production is used for SEQ 01–02 and the SEQ 15 expansion.
 
 ### Code-generated motion
-Primary candidates:
-- Motion Canvas
-- Remotion
-- OpenMontage only where it materially improves orchestration
+HTML + CSS + SVG + GSAP. Separate editable/renderable sequences use the reusable system in `video-production/shared/`.
 
 ### Final composition
-Prefer a tool that gives frame-accurate control over generated motion, product captures, audio and typography. Remotion remains a strong candidate.
+Use a final compositor with frame-accurate control over the approved assets, product captures, audio, and typography.
 
 ### Product footage
-Direct controlled screen recording of the production NORTHSTAR UI.
+Direct controlled recording of the production NORTHSTAR UI. Playwright-assisted 1920×1080 capture is validated.
 
 ### Qoder footage
-Authentic direct screen recordings / screenshots composed into the fan-out / fan-in beat.
+The completed standalone HTML/GSAP SEQ 14 asset uses authentic Qoder evidence within its fan-out / fan-in composition.
 
 ### Do not depend on
 - NotebookLM as the final visual generator;
@@ -780,18 +836,18 @@ Authentic direct screen recordings / screenshots composed into the fan-out / fan
 
 ---
 
-# 11. Production sequence
+# 12. Production sequence
 
 1. **Lock narration and beat objectives** — DONE in this document.
 2. Render the chosen AI voice and measure actual spoken timing.
 3. Adjust only beat timings and surgical word-level trims if needed; do not reopen the story casually.
 4. Prototype **A1 Journey Cascade** and **A2 Live Dependency Graph / Resolution Engine** using the approved visual contract.
-5. Choose the code-motion production path based on prototype quality and speed.
+5. Keep accepted SEQ 01–04 and SEQ 14 assets as references; do not reopen their completed work in the next HTML milestone.
 6. Capture Sarah S1 → S3 against the required product moments.
 7. Capture Jordan S2 against the required product moments.
-8. Capture Jonas + Oliver breadth inserts.
-9. Capture Qoder evidence and build fan-out / fan-in beat.
-10. Build the closing by reusing the A2 graph language.
+8. Capture Jonas + Oliver breadth inserts using the validated harness where useful.
+9. First establish approved SEQ 05–06 visual direction, then implement the connected HTML sequence chain through SEQ 10.
+10. Build the final SEQ 15 NORTHSTAR graph/thesis lockup after the connected sequence chain.
 11. Assemble, sound-design, caption and tighten to <3:00.
 12. Blind-judge the finished cut for comprehension and claim/visual alignment before submission.
 
