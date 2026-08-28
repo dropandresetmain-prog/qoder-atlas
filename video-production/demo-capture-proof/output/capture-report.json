@@ -1,0 +1,11 @@
+{
+  "baseUrl": "https://qoder-atlas-production.up.railway.app",
+  "viewport": "1920x1080",
+  "recordVideo": "1920x1080",
+  "sequence": [
+    "Open operations overview and wait for stable content",
+    "Open Arjun Rao read-only case",
+    "Pause on journey chain and commitment facts",
+    "Scroll to deterministic viability checks"
+  ]
+}
