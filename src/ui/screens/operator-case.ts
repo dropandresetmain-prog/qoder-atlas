@@ -174,7 +174,7 @@ function unknownStateWord(link: ChainLinkView): string {
 function chainLink(link: ChainLinkView): string {
   const style = CHAIN_LINK_STYLE[link.state];
   const isCommitment = Boolean(link.commitment) || link.kind.toLowerCase() === 'commitment';
-  let word = link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word;
+  let word = link.stateLabel ?? (link.state === 'UNKNOWN' ? unknownStateWord(link) : style.word);
   if (isCommitment) {
     // Programme engagements are not bookings — never "Not booked" / "Details pending".
     if (link.state === 'UNBOOKED' || link.state === 'CONFIRMED' || link.state === 'UNKNOWN') word = 'Scheduled';
@@ -406,6 +406,34 @@ function optionsFormingSection(view: CaseDetailView): string {
   </section>`;
 }
 
+function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan']>): string {
+  const kindLabel: Record<(typeof plan.items)[number]['kind'], string> = {
+    CHECKED: 'Checked',
+    RECOMMENDED: 'Recommended follow-up',
+    EXECUTABLE: 'Executable by Northstar',
+    MANUAL_FOLLOWUP: 'Manual / provider follow-up',
+  };
+  const items = plan.items
+    .map(
+      (item) => `
+    <div class="whole-trip-item" data-plan-kind="${escapeHtml(item.kind)}" data-test="whole-trip-item">
+      <p class="whole-trip-item-title"><strong>${escapeHtml(item.title)}</strong> · ${escapeHtml(kindLabel[item.kind])}</p>
+      <p>${escapeHtml(item.finding)}</p>
+    </div>`,
+    )
+    .join('');
+  const costNotes =
+    (plan.costNotes?.length ?? 0) > 0
+      ? `<ul class="whole-trip-cost-notes">${plan.costNotes!.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>`
+      : '';
+  return `
+    <div class="whole-trip-plan" data-test="whole-trip-plan">
+      <p class="whole-trip-headline"><strong>${escapeHtml(plan.headline)}</strong></p>
+      ${items}
+      ${costNotes}
+    </div>`;
+}
+
 function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternative' | 'more' = 'more'): string {
   const selectable = option.verdict !== 'NOT_VIABLE';
   const classes = [
@@ -483,6 +511,7 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
   const whyNot = option.rejectionReason
     ? `<div class="why-not"><strong>${escapeHtml(OPTION_VERDICT_LABEL.NOT_VIABLE)}.</strong> ${escapeHtml(option.rejectionReason)}</div>`
     : '';
+  const wholeTripPlan = option.wholeTripPlan ? wholeTripPlanBlock(option.wholeTripPlan) : '';
   return `
   <div class="${classes}" data-option-id="${escapeHtml(option.id)}" data-verdict="${escapeHtml(option.verdict)}" data-test="strategy-option" data-option-selectable="${selectable ? 'true' : 'false'}">
     <div class="opt-head">
@@ -494,6 +523,7 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
       ${allocation}
       ${approval}
     </div>
+    ${wholeTripPlan}
     ${body}
     ${why}
     ${commitment}
@@ -1031,7 +1061,9 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
         'Headline commitment still fails',
         'Opening a mutation-free programme counterfactual',
       ])
-    : '';
+    : view.recoveryAnalysisSteps
+      ? JSON.stringify(view.recoveryAnalysisSteps)
+      : '';
   const rail = `
     <aside class="case-rail">
       ${commitmentCard(view)}

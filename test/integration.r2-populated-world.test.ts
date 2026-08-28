@@ -3,7 +3,7 @@
  *
  * Proves single-reset prefix orchestration through real HTTP boundaries:
  * - POST /api/demo/reset builds all eight scenario entry states;
- * - Sarah (S1) NOT_VIABLE; Jordan (S2) awaiting organiser approval;
+ * - Sarah (S1) NOT_VIABLE; Jordan (S2) pre-emptive disruption (not awaiting approval);
  * - reset is repeatable; Overview exposes Reset demo control.
  */
 import test from 'node:test';
@@ -63,7 +63,7 @@ async function withServer(
   }
 }
 
-test('R2: populated demo reset runs all prefixes and lands Sarah NOT_VIABLE + Jordan awaiting approval', async () => {
+test('R2: populated demo reset runs all prefixes and lands Sarah NOT_VIABLE + Jordan pre-emptive disruption', async () => {
   await withServer(demoConfig, async (base) => {
     const reset = await postJson(base, '/api/demo/reset');
     assert.equal(reset.status, 200, JSON.stringify(reset.body));
@@ -77,11 +77,23 @@ test('R2: populated demo reset runs all prefixes and lands Sarah NOT_VIABLE + Jo
     assert.equal(sarah.status, 200);
     assert.equal(sarah.body['remainderViable'], 'NOT_VIABLE');
 
-    const cases = await getJson(base, '/api/wave/approvals');
-    assert.equal(cases.status, 200);
-    const pending = cases.body['pending'] as Array<{ caseId: string; tripId: string; status: string }>;
-    const jordanPending = pending.find((row) => row.tripId === 'trip-trv-evt-ait-2026-ait-draft-09');
-    assert.ok(jordanPending, 'Jordan recovery should await organiser approval');
+    const eventId = resolvePopulatedDemoAnchorEventId();
+    const dashboard = await getJson(base, `/api/operator/dashboard?event=${encodeURIComponent(eventId)}`);
+    assert.equal(dashboard.status, 200);
+    const trips = dashboard.body['trips'] as Array<{ tripId: string; status: string; activeCaseId?: string }>;
+    const jordanRow = trips.find((row) => row.tripId === 'trip-trv-evt-ait-2026-ait-draft-09');
+    assert.ok(jordanRow?.activeCaseId, 'Jordan should have an open pre-emptive recovery case');
+    assert.equal(jordanRow?.status, 'DISRUPTED');
+    const jordanDetail = await getJson(base, `/api/cases/${jordanRow!.activeCaseId}`);
+    assert.equal((jordanDetail.body['options'] as unknown[] | undefined)?.length ?? 0, 0);
+
+    const approvals = await getJson(base, '/api/wave/approvals');
+    assert.equal(approvals.status, 200);
+    const pending = approvals.body['pending'] as Array<{ tripId: string }>;
+    assert.ok(
+      !pending.some((row) => row.tripId === 'trip-trv-evt-ait-2026-ait-draft-09'),
+      'Jordan must not land directly at awaiting approval',
+    );
   });
 });
 

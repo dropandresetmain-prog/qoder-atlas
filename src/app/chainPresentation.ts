@@ -8,6 +8,7 @@ import type { TripElement } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import type { ChainLinkState } from '../ui/case-view-model.ts';
+import type { PendingChangePhase } from './substitutionTargets.ts';
 import { isTransportLeg, selectRecoveryCommitment } from './chainProjection.ts';
 
 export interface ChainPresentationContext {
@@ -19,6 +20,9 @@ export interface ChainPresentationContext {
   /** Engagement id for the recovery-relevant commitment, when known. */
   recoveryCommitmentId?: string;
   affectedElementIds: ReadonlySet<string>;
+  /** Legs targeted for substitution while a change is pending execution. */
+  substitutionTargetIds: ReadonlySet<string>;
+  pendingChangePhase: PendingChangePhase;
 }
 
 export function buildChainPresentationContext(input: {
@@ -26,6 +30,8 @@ export function buildChainPresentationContext(input: {
   tripNotViable?: boolean;
   hardConstraintFailed?: boolean;
   recoveryCommitmentId?: string;
+  substitutionTargetIds?: readonly string[];
+  pendingChangePhase?: PendingChangePhase;
 }): ChainPresentationContext {
   const caseOpen = Boolean(input.recoveryCase && input.recoveryCase.status !== 'RESOLVED');
   return {
@@ -34,6 +40,8 @@ export function buildChainPresentationContext(input: {
     hardConstraintFailed: input.hardConstraintFailed,
     recoveryCommitmentId: input.recoveryCommitmentId,
     affectedElementIds: new Set(input.recoveryCase?.affectedElementIds ?? []),
+    substitutionTargetIds: new Set(input.substitutionTargetIds ?? []),
+    pendingChangePhase: input.pendingChangePhase ?? 'NONE',
   };
 }
 
@@ -49,6 +57,17 @@ function isJourneyTransport(element: TripElement): boolean {
   return isTransportLeg(element);
 }
 
+function isSubstitutionTarget(element: TripElement, ctx: ChainPresentationContext): boolean {
+  return ctx.substitutionTargetIds.has(element.id);
+}
+
+function pendingChangePresentation(element: TripElement, ctx: ChainPresentationContext): ChainLinkState | undefined {
+  if (!ctx.caseOpen || !isSubstitutionTarget(element, ctx)) return undefined;
+  if (ctx.pendingChangePhase === 'APPROVED_AWAITING_EXECUTION') return 'PROPOSED';
+  if (ctx.pendingChangePhase === 'REQUESTED') return 'PROPOSED';
+  return undefined;
+}
+
 /**
  * Derive chain link presentation state from reservation health, case blast
  * radius, and trip-level viability. Generic — no scenario branches.
@@ -57,6 +76,9 @@ export function presentationLinkState(
   element: TripElement,
   ctx: ChainPresentationContext,
 ): ChainLinkState {
+  const pending = pendingChangePresentation(element, ctx);
+  if (pending) return pending;
+
   const isAffected = ctx.affectedElementIds.has(element.id);
   const underThreat = tripRecoveryUnderThreat(ctx);
 
@@ -80,15 +102,28 @@ export function presentationLinkState(
     case 'HELD':
       return ctx.caseOpen && isAffected ? 'PROPOSED' : 'AT_RISK';
     case 'CHANGED':
-      if (ctx.caseOpen && (isAffected || underThreat) && isJourneyTransport(element)) return 'AT_RISK';
+      if (ctx.caseOpen && isAffected && isJourneyTransport(element)) return 'AT_RISK';
       return ctx.caseOpen && isAffected ? 'AT_RISK' : 'CONFIRMED';
     case 'CONFIRMED':
     case 'COMPLETED':
-      if (ctx.caseOpen && underThreat && isJourneyTransport(element)) return 'AT_RISK';
       return ctx.caseOpen && isAffected ? 'AT_RISK' : 'CONFIRMED';
     default:
       return ctx.caseOpen && isAffected ? 'UNKNOWN' : 'CONFIRMED';
   }
+}
+
+export function presentationLinkLabel(
+  state: ChainLinkState,
+  ctx: ChainPresentationContext,
+  element: TripElement,
+): string | undefined {
+  if (!isSubstitutionTarget(element, ctx)) return undefined;
+  if (state !== 'PROPOSED') return undefined;
+  if (ctx.pendingChangePhase === 'APPROVED_AWAITING_EXECUTION') {
+    return 'Approved — awaiting execution';
+  }
+  if (ctx.pendingChangePhase === 'REQUESTED') return 'Change pending';
+  return 'Change pending';
 }
 
 export function recoveryCommitmentIdFor(

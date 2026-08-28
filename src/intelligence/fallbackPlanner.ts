@@ -132,15 +132,33 @@ export class DeterministicFallbackPlanner implements RecoveryPlanner {
     };
   }
 
-  /** The directly-failed FLIGHT transport leg, if any. */
+  /** The directly-failed FLIGHT transport leg whose corridor should be searched. */
   private failedFlightLeg(input: PlannerInput): TransportLeg | undefined {
     const failureIds = new Set<EntityId>(input.impact.directFailures.map((failure) => failure.elementId));
-    return input.snapshot.trip.elements.find(
+    const failedFlights = input.snapshot.trip.elements.filter(
       (element): element is TransportLeg =>
         element.elementKind === 'TRANSPORT_LEG' &&
         element.data.mode === 'FLIGHT' &&
         failureIds.has(element.id),
     );
+    if (failedFlights.length === 0) return undefined;
+    if (failedFlights.length === 1) return failedFlights[0];
+
+    // Connection feasibility can mark both inbound and onward legs as direct
+    // failures. Replacement search must target the onward corridor — the leg
+    // whose origin is another failed flight leg's destination (hub handoff).
+    for (const leg of failedFlights) {
+      const originPlaceId = leg.data.originPlaceId;
+      const inboundFailed = failedFlights.some(
+        (other) => other.id !== leg.id && other.data.destinationPlaceId === originPlaceId,
+      );
+      if (inboundFailed) return leg;
+    }
+
+    // Fallback: latest-departing failed leg (onward segment in typical order).
+    return [...failedFlights].sort((a, b) =>
+      (a.data.scheduledDeparture?.value ?? '').localeCompare(b.data.scheduledDeparture?.value ?? ''),
+    ).at(-1);
   }
 
   /**

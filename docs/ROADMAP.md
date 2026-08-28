@@ -218,6 +218,10 @@ Revisit: target-market/provider requirements.
 Reason: internal recovery/authority pipeline can remain real with provider-boundary simulation.
 Revisit: Booking.com/Expedia/TMC/hotel supplier adapter access.
 
+### Composite multi-provider strategy execution
+Reason: the current MVP can reason across the whole trip and execute validated single-provider actions (e.g. flight rebook), but one-authority-cycle ordered execution of multiple heterogeneous ActionIntents (flight + hotel cancel + insurance claim + ground) requires shared planner/authority/executor/observation contract changes beyond submission stabilisation.
+Revisit: after MVP vertical loop is stable and composite ActionIntent / saga contracts are explicitly designed and approved.
+
 ### Insurance claims automation
 Reason: policy reasoning is useful; claims are a separate regulated/operational workflow.
 Revisit: dedicated insurance integration/product requirement.

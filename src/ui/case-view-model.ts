@@ -29,6 +29,23 @@ export interface CaseCheckView {
 
 export type OptionVerdict = 'VIABLE' | 'NOT_VIABLE' | 'UNKNOWN';
 
+export type WholeTripPlanItemKind = 'CHECKED' | 'RECOMMENDED' | 'EXECUTABLE' | 'MANUAL_FOLLOWUP';
+
+export interface WholeTripPlanItemView {
+  id: EntityId;
+  category: 'FLIGHT' | 'OVERNIGHT' | 'ENTRY' | 'INSURANCE' | 'HOTEL' | 'EVENT' | 'COST';
+  title: string;
+  finding: string;
+  kind: WholeTripPlanItemKind;
+}
+
+export interface WholeTripRecoveryPlanView {
+  headline: string;
+  items: WholeTripPlanItemView[];
+  knownIncrementalCost?: Money;
+  costNotes?: string[];
+}
+
 /** A recovery option as presented to the operator. */
 export interface RecoveryOptionView {
   id: EntityId;
@@ -65,6 +82,11 @@ export interface RecoveryOptionView {
   authorityLabel?: string;
   /** Evidence provenance, e.g. REPLAY search / SIMULATED execution. */
   provenanceLabel?: string;
+  /**
+   * Whole-trip reasoning card: checked context vs executable vs manual follow-up.
+   * Present when the planner staged a transport recovery with downstream consequences.
+   */
+  wholeTripPlan?: WholeTripRecoveryPlanView;
   /**
    * Deterministic payer allocation of this option's cost (ADR-037), present
    * only when FUNDED_WINDOW rules + a cost anchor could decide. Absence
@@ -170,6 +192,8 @@ export interface ChainLinkView {
   /** Supporting detail, e.g. "Cancelled 15 Sep" or "2 nights · check-in 15:00". */
   detail?: string;
   state: ChainLinkState;
+  /** Optional override for link state word (e.g. Change pending). */
+  stateLabel?: string;
   /** The commitment link carries the ✦ and never disappears. */
   commitment?: boolean;
   /** Icon family for roster mini-chains: flight, ground, stay, commitment. */
@@ -246,6 +270,8 @@ export interface CaseDetailView {
    * `programme_recommendation` after the travel-analysis overlay completes.
    */
   programmeRecoveryStage?: 'travel_analysis' | 'programme_recommendation';
+  /** Operator-facing Northstar analysis steps before planning completes. */
+  recoveryAnalysisSteps?: string[];
 }
 
 /**

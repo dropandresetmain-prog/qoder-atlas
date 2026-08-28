@@ -15,6 +15,7 @@ import type { ChainLinkState, ChainLinkView } from '../ui/case-view-model.ts';
 import {
   buildChainPresentationContext,
   presentationLinkState,
+  presentationLinkLabel,
   recoveryCommitmentIdFor,
   type ChainPresentationContext,
 } from './chainPresentation.ts';
@@ -134,6 +135,7 @@ export function projectCaseChain(
 
   for (const element of selectJourneyTransportAndStay(trip)) {
     const state = presentationLinkState(element, presentation);
+    const pendingLabel = presentationLinkLabel(state, presentation, element);
     const label =
       isTransportLeg(element)
         ? transportLabel(element, context.places)
@@ -150,6 +152,7 @@ export function projectCaseChain(
       label,
       ...(detail ? { detail } : {}),
       state,
+      ...(pendingLabel ? { stateLabel: pendingLabel } : {}),
       linkType: linkTypeFor(element),
     });
   }

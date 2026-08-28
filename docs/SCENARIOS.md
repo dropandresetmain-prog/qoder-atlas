@@ -184,10 +184,26 @@ The **product-level** recovery problem includes:
 
 **Final hero execution boundary:** the closed backend proof executes the
 next-morning **flight recovery + event viability** path only. Narita transit-hotel
-insertion, Japanese entry/immigration research attachment, and insurance
-attachment are accepted-risk / parked gaps. Provider evidence/context may be
-shown as known context, but UI/docs must not claim those checks or actions were
-executed by the final S2 backend.
+booking, Singapore hotel cancellation, and insurance claim submission are **not**
+executed in the current demo — Northstar may **check and present** entry,
+insurance, overnight, and stay consequences when deterministic rules/evidence exist,
+but only actions that pass proposal → validation → authority → executor → observe
+update authoritative state.
+
+**Product capability (reasoning):** whole-trip analysis across flight, overnight
+requirement, entry/transit findings, insurance applicability, Singapore stay
+consequence, finals margin, and known executable cost.
+
+**Implemented execution:** single validated flight rebook (simulated at provider
+boundary where configured) plus observation/state re-evaluation.
+
+**Deferred:** composite multi-provider execution in one authority cycle — see
+`docs/ROADMAP.md` § Composite multi-provider strategy execution.
+
+Pre-emptive connection failure: schedule-delay retimes may mark an onward leg
+non-viable through generic CONNECTS_TO / connection-buffer assessment **before**
+an explicit missed-flight POST; the traveller report may reconcile an already-open
+condition rather than creating it.
 
 The synthetic event programme should be shaped AFTER provider timing is known:
 - flexible enough that recovery is possible

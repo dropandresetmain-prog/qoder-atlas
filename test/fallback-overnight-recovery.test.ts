@@ -173,6 +173,61 @@ test('fallback planner excludes offers that already departed before the snapshot
   assert.match(output.strategies[0]?.summary ?? '', /08:20/);
 });
 
+test('fallback planner targets onward corridor when connection marks both legs failed', async () => {
+  const inboundLeg: TransportLeg = {
+    ...failedLeg(),
+    id: 'el-leg-inbound',
+    data: {
+      ...failedLeg().data,
+      originPlaceId: 'place-lax',
+      destinationPlaceId: 'place-nrt',
+      scheduledDeparture: {
+        value: '2026-09-28T14:40:00-07:00',
+        sourceId: 'src-test',
+        authority: 'CONNECTED',
+        observedAt: PLAN_AT,
+      },
+      scheduledArrival: {
+        value: '2026-09-29T17:55:00+09:00',
+        sourceId: 'src-test',
+        authority: 'CONNECTED',
+        observedAt: PLAN_AT,
+      },
+    },
+  };
+  const onwardLeg = failedLeg();
+  const planner = new DeterministicFallbackPlanner({
+    idFactory: (() => {
+      let n = 0;
+      return (prefix: string) => `${prefix}-${++n}`;
+    })(),
+  });
+  const output = await planner.plan(
+    baseInput({
+      snapshot: {
+        ...baseInput().snapshot,
+        trip: {
+          ...baseInput().snapshot.trip,
+          elements: [inboundLeg, onwardLeg],
+        },
+        places: [place('place-lax', 'LAX'), place('place-nrt', 'NRT'), place('place-sin', 'SIN')],
+      } as TripSnapshot,
+      impact: {
+        ...baseInput().impact,
+        directFailures: [
+          { elementId: inboundLeg.id, reason: 'connection exhausted' },
+          { elementId: onwardLeg.id, reason: 'connection exhausted' },
+        ],
+      } as ImpactAssessment,
+    }),
+  );
+  assert.equal(output.toolRequests.length, 2);
+  const origin = output.toolRequests[0]?.parameters['origin'] as { value?: string };
+  const destination = output.toolRequests[0]?.parameters['destination'] as { value?: string };
+  assert.equal(origin?.value, 'NRT');
+  assert.equal(destination?.value, 'SIN');
+});
+
 test('fallback planner fails closed when every offer already departed', async () => {
   const planner = new DeterministicFallbackPlanner({
     idFactory: (() => {

@@ -77,7 +77,7 @@ export const POPULATED_DEMO_PREFIXES: readonly PopulatedDemoPrefix[] = [
   {
     id: 's2',
     manifestPath: 'fixtures/acceptance/manifests/s2-missed-connection.json',
-    throughStepId: 'begin_recovery',
+    throughStepId: 'zg053_impossible_retiming',
   },
 ];
 

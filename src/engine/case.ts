@@ -32,6 +32,7 @@ export interface CasePatch {
   executionResults?: ExecutionResult[];
   affectedElementIds?: EntityId[];
   failedConstraintIds?: EntityId[];
+  triggeredBySignalIds?: EntityId[];
   resolution?: CaseResolution;
 }
 

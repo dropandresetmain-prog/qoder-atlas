@@ -73,6 +73,15 @@ export const PolicyRuleSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     ...RuleBase,
+    /**
+     * Minimum connection time between linked transport legs (CONNECTS_TO or
+     * inferred hub pairs). Distinct from MIN_BUFFER before programme commitments.
+     */
+    kind: z.literal('CONNECTION_BUFFER'),
+    buffer: DurationEstimateSchema,
+  }),
+  z.strictObject({
+    ...RuleBase,
     kind: z.literal('SPEND_LIMIT'),
     maxAmount: MoneySchema,
     /** Recurrence semantics for the limit; absent means per-trip. */
@@ -173,6 +182,7 @@ export const PolicyRuleKindSchema = z.enum([
   'TIME_WINDOW',
   'NO_SHOW_CUTOFF',
   'MIN_BUFFER',
+  'CONNECTION_BUFFER',
   'SPEND_LIMIT',
   'APPROVAL_ABOVE_SPEND',
   'APPROVAL_REQUIRED',

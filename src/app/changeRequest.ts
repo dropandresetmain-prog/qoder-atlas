@@ -53,6 +53,7 @@ import {
   transportConcentrationParticipants,
   type TransportConcentrationRule,
 } from '../engine/concentration.ts';
+import { substitutionTargetsFromChangeTarget } from './substitutionTargets.ts';
 
 // ---------------------------------------------------------------------------
 // Public surface
@@ -269,6 +270,7 @@ export async function resolveChangeRequest(
   const caseService = new CaseService({ cases: deps.cases });
   const caseId = `case-cr-${request.tripId}-${request.id}`;
   const existing = await findOpenCaseForTrip(deps, request.tripId);
+  const substitutionIds = substitutionTargetsFromChangeTarget(trip, request.target);
   let recoveryCase: RecoveryCase | undefined = existing;
   if (!recoveryCase) {
     recoveryCase = await caseService.open({
@@ -277,8 +279,15 @@ export async function resolveChangeRequest(
       openedAt: at,
       caseKind: 'RECOVERY',
       triggeredBySignalIds: [signal.id],
-      affectedElementIds: [],
+      affectedElementIds: substitutionIds,
       failedConstraintIds: [],
+    });
+  } else if (substitutionIds.length > 0) {
+    recoveryCase = await caseService.record(recoveryCase.id, at, {
+      affectedElementIds: [...new Set([...recoveryCase.affectedElementIds, ...substitutionIds])],
+      triggeredBySignalIds: recoveryCase.triggeredBySignalIds.includes(signal.id)
+        ? recoveryCase.triggeredBySignalIds
+        : [...recoveryCase.triggeredBySignalIds, signal.id],
     });
   }
   if (recoveryCase.status === 'DETECTED') {

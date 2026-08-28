@@ -43,7 +43,7 @@ import type { RuleSet } from '../domain/rules.ts';
 import { buildTripSnapshot, constraintsForTrip, principalScopeForTrip, type SnapshotDependencies } from './snapshot.ts';
 import { evaluateCandidate, type CandidateRejectionEvidence } from './planningLoop.ts';
 import { projectCaseChain } from './chain.ts';
-import { buildChainPresentationContext, presentationLinkState, recoveryCommitmentIdFor } from './chainPresentation.ts';
+import { buildChainPresentationContext, presentationLinkState } from './chainPresentation.ts';
 import {
   countOtherCommitments,
   isStayElement,
@@ -67,6 +67,13 @@ import {
 import { enrichCaseDetailView } from './casePresentation.ts';
 import { projectOptionPresentation } from './optionPresentation.ts';
 import { formatMoney } from '../ui/html.ts';
+import { ResolutionTargetSchema } from '../contracts/changeRequest.ts';
+import {
+  pendingChangePhaseForCase,
+  resolveSubstitutionTargetIds,
+} from './substitutionTargets.ts';
+import { projectWholeTripRecoveryPlan, wholeTripAnalysisSteps } from './wholeTripRecoveryPlan.ts';
+import { buildEvaluationContext } from '../engine/evaluationContext.ts';
 
 export interface ReadModelDependencies {
   snapshot: SnapshotDependencies;
@@ -74,6 +81,71 @@ export interface ReadModelDependencies {
   cases: CaseRepository;
   audit: AuditRepository;
   viability: ViabilityEngine;
+}
+
+function changeTargetFromSignal(signal: TripSignal | undefined) {
+  if (!signal || signal.kind !== 'TRAVELLER_INPUT') return undefined;
+  const payload = signal.payload as Record<string, unknown>;
+  if (payload['changeRequestId'] === undefined) return undefined;
+  const parsed = ResolutionTargetSchema.safeParse(payload['target']);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function primaryTriggeringSignal(signals: readonly TripSignal[]): TripSignal | undefined {
+  if (signals.length === 0) return undefined;
+  const missed = signals.find(
+    (signal) =>
+      signal.kind === 'TRAVELLER_INPUT' &&
+      (signal.payload as Record<string, unknown>)['event'] === 'MISSED_FLIGHT',
+  );
+  if (missed) return missed;
+  const changeRequest = signals.find(
+    (signal) =>
+      signal.kind === 'TRAVELLER_INPUT' &&
+      typeof (signal.payload as Record<string, unknown>)['changeRequestId'] === 'string',
+  );
+  if (changeRequest) return changeRequest;
+  return signals[signals.length - 1];
+}
+
+async function chainPresentationForCase(
+  deps: ReadModelDependencies,
+  input: {
+    trip: Trip;
+    recoveryCase: RecoveryCase;
+    at: IsoDateTime;
+    places: ReadonlyMap<string, Place>;
+    bestStrategyId?: EntityId;
+    triggeringSignals: readonly TripSignal[];
+  },
+): Promise<ReturnType<typeof buildChainPresentationContext>> {
+  const { constraints, evaluations } = await currentConstraintEvaluations(deps, input.trip, input.at);
+  const hardConstraintFailed = evaluations.some((evaluation) => {
+    const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
+    return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
+  });
+  const changeTarget = changeTargetFromSignal(
+    input.triggeringSignals.find((signal) => signal.kind === 'TRAVELLER_INPUT'),
+  );
+  const changeRequestCase = input.triggeringSignals.some(
+    (signal) =>
+      signal.kind === 'TRAVELLER_INPUT' &&
+      typeof (signal.payload as Record<string, unknown>)['changeRequestId'] === 'string',
+  );
+  return buildChainPresentationContext({
+    recoveryCase: input.recoveryCase,
+    tripNotViable: deriveRemainderViability(constraints, evaluations, input.trip.viability) === 'NOT_VIABLE',
+    hardConstraintFailed,
+    recoveryCommitmentId: selectRecoveryCommitment(input.trip, input.recoveryCase)?.id,
+    substitutionTargetIds: resolveSubstitutionTargetIds({
+      trip: input.trip,
+      recoveryCase: input.recoveryCase,
+      bestStrategyId: input.bestStrategyId,
+      changeTarget,
+      places: input.places,
+    }),
+    pendingChangePhase: pendingChangePhaseForCase(input.recoveryCase, { changeRequestCase }),
+  });
 }
 
 /** Rewrite bare `542 USD` / `122.23 SGD` fragments in strategy titles to US$/S$. */
@@ -532,18 +604,12 @@ export async function projectJourneyChain(
   let presentation: ReturnType<typeof buildChainPresentationContext> | undefined;
   if (recoveryCase) {
     const when = at ?? recoveryCase.updatedAt;
-    const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, when);
-    const hardConstraintFailed = evaluations.some((evaluation) => {
-      const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
-      return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
-    });
-    const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
-    const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
-    presentation = buildChainPresentationContext({
+    presentation = await chainPresentationForCase(deps, {
+      trip,
       recoveryCase,
-      tripNotViable: remainderViable === 'NOT_VIABLE',
-      hardConstraintFailed,
-      recoveryCommitmentId: recoveryCommitment?.id,
+      at: when,
+      places: new Map(),
+      triggeringSignals: [],
     });
   }
 
@@ -694,6 +760,8 @@ export async function projectCaseDetail(
   }
   const options: RecoveryOptionView[] = [];
   const recoveryEngagement = selectRecoveryCommitment(trip, recoveryCase);
+  const evalContext = await buildEvaluationContext(deps.snapshot.entities, trip, at);
+  const ruleSets = [...evalContext.ruleSets.values()];
   for (const strategy of recoveryCase.strategies) {
     const persisted = persistedVerdicts.get(strategy.id);
     const candidate = persisted
@@ -758,6 +826,22 @@ export async function projectCaseDetail(
             costAllocation: intent.costAllocation,
             costAllocationSummary: presentAllocationSummary(intent.costAllocation),
           }
+        : {}),
+      ...(recommended && candidate.feasible
+        ? (() => {
+            const wholeTripPlan = projectWholeTripRecoveryPlan({
+              trip,
+              strategy,
+              places,
+              ruleSets,
+              travellers: evalContext.travellers,
+              ...(recoveryEngagement ? { engagement: recoveryEngagement } : {}),
+              ...(intent ? { intent } : {}),
+              ...(candidate.viability ? { viability: candidate.viability } : {}),
+              feasible: candidate.feasible,
+            });
+            return wholeTripPlan ? { wholeTripPlan } : {};
+          })()
         : {}),
     });
   }
@@ -852,19 +936,29 @@ export async function projectCaseDetail(
     const entry = await deps.snapshot.entities.get('ANCHOR_EVENT', trip.anchorEventId);
     if (entry?.entityType === 'ANCHOR_EVENT') anchorEvent = entry.entity;
   }
+  const chainPresentation = await chainPresentationForCase(deps, {
+    trip,
+    recoveryCase,
+    at,
+    places,
+    bestStrategyId,
+    triggeringSignals,
+  });
   const chain = projectCaseChain(trip, recoveryCase, {
     places,
     ...(anchorEvent ? { anchorEvent } : {}),
-    presentation: buildChainPresentationContext({
-      recoveryCase,
-      tripNotViable: deriveRemainderViability(constraints, evaluations, trip.viability) === 'NOT_VIABLE',
-      hardConstraintFailed: evaluations.some((evaluation) => {
-        const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
-        return constraint?.hardness === 'HARD' && evaluation.status === 'FAIL';
-      }),
-      recoveryCommitmentId: selectRecoveryCommitment(trip, recoveryCase)?.id,
-    }),
+    presentation: chainPresentation,
   });
+
+  const connectionDisruption =
+    !isChangeRequest &&
+    assessment.directFailures.some((failure) => {
+      const element = trip.elements.find((candidate) => candidate.id === failure.elementId);
+      return element?.elementKind === 'TRANSPORT_LEG';
+    });
+  const recoveryAnalysisSteps = connectionDisruption
+    ? wholeTripAnalysisSteps({ trip, places, ruleSets })
+    : undefined;
 
   // Honest "no automated recovery path" end-state: the planning loop has run
   // (the case moved past ASSESSING) yet produced no actionable strategy and
@@ -914,10 +1008,10 @@ export async function projectCaseDetail(
       ...(trip.label ? { tripLabel: trip.label } : {}),
       travellerNames,
       status: caseStatus,
-      ...(triggeringSignals[0] || criticalObjectiveAtRisk
+      ...(primaryTriggeringSignal(triggeringSignals) || criticalObjectiveAtRisk
         ? {
             whatChanged: presentDisruptedCaseSummary({
-              signal: triggeringSignals[0],
+              signal: primaryTriggeringSignal(triggeringSignals),
               criticalObjectiveAtRisk,
               failedCheckLabels: checks.filter((check) => check.result === 'FAIL').map((check) => check.label),
             }),
@@ -936,6 +1030,7 @@ export async function projectCaseDetail(
       ...(funding ? { funding } : {}),
       uncertainties: presentUncertainties(assessment.unresolvedUnknowns),
       ...(planningExhausted ? { planningExhausted: true } : {}),
+      ...(recoveryAnalysisSteps ? { recoveryAnalysisSteps } : {}),
       ...(programmeChangeAvailable
         ? {
             anchorEventId: trip.anchorEventId,

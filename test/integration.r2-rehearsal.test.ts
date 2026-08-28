@@ -91,6 +91,13 @@ async function continueManifest(
   assert.equal(failed.length, 0, `${manifestPath} from ${startAtStepId}: ${JSON.stringify(failed)}`);
 }
 
+async function caseBinding(base: string, tripId: string): Promise<{ caseId: string }> {
+  const eventId = resolvePopulatedDemoAnchorEventId();
+  const row = tripRow(await operatorDashboard(base, eventId), tripId);
+  assert.ok(row?.activeCaseId, `no active case for ${tripId}`);
+  return { caseId: row.activeCaseId };
+}
+
 async function authorityBindings(base: string, tripId: string): Promise<{ caseId: string; intentId: string }> {
   const eventId = resolvePopulatedDemoAnchorEventId();
   const row = tripRow(await operatorDashboard(base, eventId), tripId);
@@ -119,11 +126,14 @@ test('R2.3: populated Overview entry states for S1–S8', async () => {
 
     const jordanRow = tripRow(view, HERO_TRIPS.s2);
     assert.ok(jordanRow?.activeCaseId, 'S2 Jordan case linkable from Overview');
+    assert.equal(jordanRow?.status, 'DISRUPTED', 'S2 Jordan prefix stops at pre-emptive disruption beat');
+    const jordanDetail = await getJson(base, `/api/cases/${jordanRow!.activeCaseId}`);
+    assert.equal((jordanDetail.body['options'] as unknown[] | undefined)?.length ?? 0, 0, 'S2 Jordan has not been planned yet at demo entry');
     const approvals = await getJson(base, '/api/wave/approvals');
     const jordanPending = (approvals.body['pending'] as Array<{ tripId: string }>).some(
       (row) => row.tripId === HERO_TRIPS.s2,
     );
-    assert.ok(jordanPending, 'S2 Jordan awaits organiser approval');
+    assert.ok(!jordanPending, 'S2 Jordan must not land directly at organiser approval');
 
     const ethan = tripRow(view, HERO_TRIPS.s4);
     assert.ok(ethan?.activeCaseId, 'S4 Ethan case linkable from Overview');
@@ -157,15 +167,6 @@ test('R2.3: continue hero flows from populated entry (S2,S5,S7,S1→S3) and rese
 
   try {
     await resetPopulated(base);
-
-    await continueManifest(
-      base,
-      'fixtures/acceptance/manifests/s2-missed-connection.json',
-      'decide_recovery',
-      await authorityBindings(base, HERO_TRIPS.s2),
-    );
-    const jordanAfter = await getJson(base, `/api/traveller/${HERO_TRIPS.s2}`);
-    assert.equal(jordanAfter.body['remainderViable'], 'VIABLE');
 
     await continueManifest(
       base,
@@ -203,16 +204,32 @@ test('R2.3: continue hero flows from populated entry (S2,S5,S7,S1→S3) and rese
     const sarahFinal = await getJson(base, `/api/traveller/${HERO_TRIPS.s1}`);
     assert.equal(sarahFinal.body['remainderViable'], 'VIABLE');
 
+    // S2 end-to-end uses the full manifest (REPLAY recordings) — populated prefix
+    // intentionally stops at J-03 pre-emptive disruption for judge entry.
+    await continueManifest(
+      base,
+      'fixtures/acceptance/manifests/s2-missed-connection.json',
+      'reset',
+      undefined,
+      ['decide_recovery'],
+    );
+    await continueManifest(
+      base,
+      'fixtures/acceptance/manifests/s2-missed-connection.json',
+      'decide_recovery',
+      await authorityBindings(base, HERO_TRIPS.s2),
+    );
+    const jordanAfter = await getJson(base, `/api/traveller/${HERO_TRIPS.s2}`);
+    assert.equal(jordanAfter.body['remainderViable'], 'VIABLE');
+
     await resetPopulated(base);
     const sarahRestored = await getJson(base, `/api/traveller/${HERO_TRIPS.s1}`);
     assert.equal(sarahRestored.body['remainderViable'], 'NOT_VIABLE');
-    const jordanRestored = await getJson(base, `/api/wave/approvals`);
-    assert.ok(
-      (jordanRestored.body['pending'] as Array<{ tripId: string }>).some(
-        (row) => row.tripId === HERO_TRIPS.s2,
-      ),
-      'reset restores S2 awaiting-approval entry',
-    );
+    const eventId = resolvePopulatedDemoAnchorEventId();
+    const jordanRestored = tripRow(await operatorDashboard(base, eventId), HERO_TRIPS.s2);
+    assert.equal(jordanRestored?.status, 'DISRUPTED', 'reset restores S2 pre-emptive disruption entry');
+    const jordanCase = await getJson(base, `/api/cases/${jordanRestored!.activeCaseId}`);
+    assert.equal((jordanCase.body['options'] as unknown[] | undefined)?.length ?? 0, 0);
   } finally {
     await new Promise<void>((done, fail) => server.close((error) => (error ? fail(error) : done())));
     composed.db.close();

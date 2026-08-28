@@ -136,16 +136,33 @@ export async function processSignal(
     priorOpen,
   });
   const caseService = new CaseService({ cases: deps.cases });
-  const caseId = restored.caseId ?? `case-${tripId}-${signal.id}`;
+  const priorOpenAfterRestore = restored.reconciled
+    ? []
+    : (await deps.cases.listCasesForTrip(tripId)).filter((openCase) => openCase.status !== 'RESOLVED');
+  const existingOpen = priorOpenAfterRestore[0];
+  const caseId = restored.caseId ?? existingOpen?.id ?? `case-${tripId}-${signal.id}`;
   const affectedElementIds = [
-    ...assessment.directFailures.map((f) => f.elementId),
-    ...assessment.affectedElements.map((a) => a.elementId),
+    ...new Set([
+      ...assessment.directFailures.map((f) => f.elementId),
+      ...assessment.affectedElements.map((a) => a.elementId),
+    ]),
   ];
   const failedConstraintIds = constraintEvaluations
     .filter((evaluation) => evaluation.status === 'FAIL')
     .map((evaluation) => evaluation.constraintId);
   let recoveryCase = await deps.cases.getCase(caseId);
-  if (!restored.reconciled && !recoveryCase) {
+  if (!restored.reconciled && recoveryCase) {
+    recoveryCase = await caseService.record(caseId, assessment.assessedAt, {
+      affectedElementIds,
+      failedConstraintIds,
+      triggeredBySignalIds: recoveryCase.triggeredBySignalIds.includes(signal.id)
+        ? recoveryCase.triggeredBySignalIds
+        : [...recoveryCase.triggeredBySignalIds, signal.id],
+    });
+    if (recoveryCase.status === 'DETECTED') {
+      recoveryCase = await caseService.transition(caseId, 'ASSESSING', assessment.assessedAt);
+    }
+  } else if (!restored.reconciled && !recoveryCase) {
     recoveryCase = await caseService.open({
       id: caseId,
       tripId,

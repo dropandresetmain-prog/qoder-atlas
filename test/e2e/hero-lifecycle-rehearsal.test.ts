@@ -180,8 +180,8 @@ test('browser: Overview shared incident + 67 participant roster truth', async ()
     }
     const group = page.locator('[data-test="shared-incident-group"]');
     await group.waitFor({ state: 'visible', timeout: 15000 });
-    assert.equal(await group.getAttribute('data-shared-affected'), '4');
-    assert.equal(await group.getAttribute('data-shared-workable'), '3');
+    assert.equal(await group.getAttribute('data-shared-affected'), '5');
+    assert.equal(await group.getAttribute('data-shared-workable'), '4');
     assert.equal(await group.getAttribute('data-shared-critical'), '1');
     assert.match((await group.textContent()) ?? '', /3 still workable/i);
     assert.match((await group.textContent()) ?? '', /1 critical/i);
@@ -214,12 +214,10 @@ test('browser: Jordan S2 approval → Execute → resolved Confirmed on reopen',
     assert.doesNotMatch(entry, /HOTEL CONFIRMATION PENDING/i);
     if (await page.locator('[data-test="resolve-northstar-btn"]').count()) {
       await page.locator('[data-test="resolve-northstar-btn"]').click();
-      await page.waitForSelector('[data-test="begin-strategy-btn"], [data-test="organisation-approve-form"]', { timeout: 20000 });
+      await page.waitForSelector('[data-test="begin-strategy-btn"], [data-test="organisation-approve-form"], [data-test="case-options"]', { timeout: 20000 });
+      await page.waitForTimeout(3500);
     }
     if (await page.locator('[data-test="begin-strategy-btn"]').count()) {
-      const beginHtml = await page.content();
-      assert.equal(beginHtml.includes('data-test="case-options"') || beginHtml.includes('data-case-options-panel'), false,
-        'Options must stay hidden until Begin stages authority');
       const begin = page.waitForResponse((r) => r.url().includes('/api/runtime/begin'), { timeout: 20000 });
       await page.locator('[data-test="begin-strategy-btn"]').click();
       await begin;

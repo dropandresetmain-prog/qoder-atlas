@@ -31,6 +31,7 @@ import type { TripRepository, SignalRepository } from '../contracts/repositories
 import type { EntityStore } from '../persistence/entityStore.ts';
 import { evaluateConstraints, isCancelled, elementStartInstant } from './evaluators.ts';
 import { buildEvaluationContext } from './evaluationContext.ts';
+import { assessConnectionPairs, connectionFailureElementIds } from './connectionFeasibility.ts';
 
 export interface ImpactEngineDeps {
   trips: TripRepository;
@@ -120,6 +121,47 @@ export class ImpactEngine implements ImpactService {
       }
     }
 
+    // 1b. Connection feasibility: schedule-driven inbound delay can make an
+    //     onward leg impossible before a historical missed-flight report.
+    const byIdEarly = new Map(trip.elements.map((e) => [e.id, e]));
+    const connectionAssessments = assessConnectionPairs(trip, [...ruleSets.values()]);
+    const connectionFailures = connectionFailureElementIds(connectionAssessments);
+    const policyImplicationsEarly: string[] = [];
+    for (const assessment of connectionAssessments) {
+      if (assessment.viability === 'IMPOSSIBLE') {
+        policyImplicationsEarly.push(
+          `connection ${assessment.upstreamId}→${assessment.downstreamId}: ${assessment.reason}`,
+        );
+      } else if (assessment.viability === 'TIGHT') {
+        policyImplicationsEarly.push(
+          `connection ${assessment.upstreamId}→${assessment.downstreamId} tightening: ${assessment.reason}`,
+        );
+      }
+    }
+    for (const downstreamId of connectionFailures.impossible) {
+      if (directFailures.some((f) => f.elementId === downstreamId)) continue;
+      const element = byIdEarly.get(downstreamId);
+      if (!element || isCancelled(element)) continue;
+      directFailures.push({
+        elementId: downstreamId,
+        resultingStatus: 'INVALID',
+        reason: 'connection buffer exhausted — onward leg is no longer realistically makeable',
+      });
+    }
+    for (const downstreamId of connectionFailures.tight) {
+      if (
+        directFailures.some((f) => f.elementId === downstreamId) ||
+        affectedElements.some((a) => a.elementId === downstreamId)
+      ) {
+        continue;
+      }
+      affectedElements.push({
+        elementId: downstreamId,
+        resultingStatus: 'AT_RISK',
+        reason: 'connection margin is below the required buffer',
+      });
+    }
+
     // 2. Dependency propagation over CONNECTS_TO: INVALID upstream makes
     //    downstream AT_RISK (never blanket INVALID). A hard failure here never
     //    stops traversal. DEPENDS_ON feeds objective threats (step 3), not
@@ -205,7 +247,7 @@ export class ImpactEngine implements ImpactService {
     }
 
     // 5. Policy / insurance implications from the rule sets in scope.
-    const policyImplications: string[] = [];
+    const policyImplications: string[] = [...policyImplicationsEarly];
     const insuranceImplications: string[] = [];
     for (const constraint of constraints) {
       const status = statusByConstraint.get(constraint.id);

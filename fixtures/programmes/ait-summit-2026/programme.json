@@ -1655,6 +1655,66 @@
             "scope": "BOOKING_REF"
           }
         ]
+      },
+      {
+        "id": "rs-ait-connection-policy",
+        "kind": "EVENT",
+        "name": "Managed connection buffer",
+        "ownerOrganisationId": "org-ait-organiser",
+        "sourceId": "src-syn-ait-policy",
+        "rules": [
+          {
+            "id": "rule-ait-connection-buffer",
+            "kind": "CONNECTION_BUFFER",
+            "sourceId": "src-syn-ait-policy",
+            "description": "Minimum connection time between consecutive flights on the same managed booking",
+            "appliesTo": [],
+            "buffer": {
+              "minimumMinutes": 90,
+              "expectedMinutes": 90,
+              "sourceId": "src-syn-ait-policy",
+              "observedAt": "2026-08-25T09:00:00+00:00",
+              "quality": "HIGH"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rs-ait-travel-insurance",
+        "kind": "INSURANCE",
+        "name": "Event travel insurance",
+        "ownerOrganisationId": "org-ait-organiser",
+        "sourceId": "src-syn-ait-insurance",
+        "rules": [
+          {
+            "id": "rule-ait-insurance-missed-connection",
+            "kind": "INSURANCE_COVERAGE",
+            "sourceId": "src-syn-ait-insurance",
+            "description": "Covers missed connections and trip delay when rebooking is required",
+            "appliesTo": [],
+            "coveredReasons": ["missed_connection", "trip_delay"],
+            "excess": { "amount": 75, "currency": "USD" },
+            "maxPayout": { "amount": 1500, "currency": "USD" }
+          }
+        ]
+      },
+      {
+        "id": "rs-ait-entry-japan",
+        "kind": "ENTRY",
+        "name": "Japan entry and transit",
+        "ownerOrganisationId": "org-ait-organiser",
+        "sourceId": "src-syn-ait-entry",
+        "rules": [
+          {
+            "id": "rule-ait-jp-transit-us",
+            "kind": "ENTRY_REQUIREMENT",
+            "sourceId": "src-syn-ait-entry",
+            "description": "US nationals in transit without leaving the airport secure area may remain airside without a visa for connections under 24 hours",
+            "appliesTo": [],
+            "requirement": "Airside transit permitted for US passport holders on connections under 24 hours without clearing immigration",
+            "authoritativeSourceId": "src-syn-ait-entry"
+          }
+        ]
       }
     ]
   },

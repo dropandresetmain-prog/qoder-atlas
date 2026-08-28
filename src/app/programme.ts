@@ -26,7 +26,7 @@ import type {
   Traveller,
 } from '../domain/entities.ts';
 import type { PolicyRule, RuleSet } from '../domain/rules.ts';
-import type { Trip } from '../domain/trip.ts';
+import type { Trip, TripRelation } from '../domain/trip.ts';
 import type { Engagement, Stay, TransportLeg, TransportMode, TripElement } from '../domain/elements.ts';
 import type { Constraint } from '../domain/constraints.ts';
 import {
@@ -398,6 +398,8 @@ export class ProgrammeService {
         };
       });
 
+      const tripRelations = buildConnectionRelations(declaredElements.elements);
+
       const tripEntity: Trip = {
         id: resolvedTripId,
         label: traveller.displayName,
@@ -405,7 +407,7 @@ export class ProgrammeService {
         anchorEventId: draft.anchorEventId,
         elements: [...engagements, ...declaredElements.elements],
         objectives,
-        relations: [],
+        relations: tripRelations,
         // Programme policy applicability is derived from evidence: rule sets
         // owned by the event's organiser. Element-level governing stays empty
         // at intake — no rule-set-to-element evidence exists yet.
@@ -1098,4 +1100,30 @@ export function intakeUncertainties(importDraft: ProgrammeImportDraft, outcomes:
     });
   }
   return records;
+}
+
+/** CONNECTS_TO edges for consecutive transport legs sharing a hub place. */
+function buildConnectionRelations(elements: TripElement[]): TripRelation[] {
+  const legs = elements.filter(
+    (element): element is TransportLeg =>
+      element.elementKind === 'TRANSPORT_LEG' && element.data.mode === 'FLIGHT',
+  );
+  const sorted = [...legs].sort((a, b) => {
+    const ad = a.data.scheduledDeparture?.value ?? a.data.scheduledArrival?.value ?? '';
+    const bd = b.data.scheduledDeparture?.value ?? b.data.scheduledArrival?.value ?? '';
+    return ad.localeCompare(bd);
+  });
+  const relations: TripRelation[] = [];
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    const upstream = sorted[index]!;
+    const downstream = sorted[index + 1]!;
+    if (upstream.data.destinationPlaceId !== downstream.data.originPlaceId) continue;
+    relations.push({
+      kind: 'CONNECTS_TO',
+      from: { entityType: 'TRIP_ELEMENT', id: upstream.id },
+      to: { entityType: 'TRIP_ELEMENT', id: downstream.id },
+      meta: { minBufferMinutes: 90 },
+    });
+  }
+  return relations;
 }

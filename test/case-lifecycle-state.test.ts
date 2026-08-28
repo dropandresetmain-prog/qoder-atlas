@@ -604,3 +604,80 @@ test('presentation: Oliver roster row links to case without nested anchors', () 
   assert.match(oliverRow, /class="brow-case-hit"/);
   assert.doesNotMatch(oliverRow, /<a[^>]*data-test="case-row-link"[^>]*>[\s\S]+<a[^>]*data-test="show-interaction"/);
 });
+
+test('chain presentation: substitution target shows PROPOSED pending change while return stays CONFIRMED', () => {
+  const inbound: TransportLeg = {
+    id: 'leg-inbound',
+    tripId: 'trip-oliver',
+    elementKind: 'TRANSPORT_LEG',
+    importance: 'REQUIRED',
+    flexibility: 'CHANGEABLE',
+    reservationState: 'CONFIRMED',
+    status: 'VALID',
+    dependsOn: [],
+    governedByRuleSetIds: [],
+    data: { mode: 'FLIGHT', originPlaceId: 'place-lhr', destinationPlaceId: 'place-sin' },
+  };
+  const returnLeg: TransportLeg = {
+    id: 'leg-return',
+    tripId: 'trip-oliver',
+    elementKind: 'TRANSPORT_LEG',
+    importance: 'REQUIRED',
+    flexibility: 'CHANGEABLE',
+    reservationState: 'CONFIRMED',
+    status: 'VALID',
+    dependsOn: [],
+    governedByRuleSetIds: [],
+    data: { mode: 'FLIGHT', originPlaceId: 'place-sin', destinationPlaceId: 'place-lhr' },
+  };
+  const ctx = buildChainPresentationContext({
+    recoveryCase: {
+      id: 'case-oliver',
+      tripId: 'trip-oliver',
+      status: 'AWAITING_APPROVAL',
+      affectedElementIds: [],
+    } as unknown as RecoveryCase,
+    substitutionTargetIds: ['leg-inbound'],
+    pendingChangePhase: 'REQUESTED',
+  });
+  assert.equal(presentationLinkState(inbound, ctx), 'PROPOSED');
+  assert.equal(presentationLinkState(returnLeg, ctx), 'CONFIRMED');
+});
+
+test('chain presentation: Sarah NOT_VIABLE does not blanket-amber unrelated confirmed legs', () => {
+  const affected: TransportLeg = {
+    id: 'leg-affected',
+    tripId: 'trip-sarah',
+    elementKind: 'TRANSPORT_LEG',
+    importance: 'REQUIRED',
+    flexibility: 'CHANGEABLE',
+    reservationState: 'CONFIRMED',
+    status: 'AT_RISK',
+    dependsOn: [],
+    governedByRuleSetIds: [],
+    data: { mode: 'FLIGHT', originPlaceId: 'place-a', destinationPlaceId: 'place-b' },
+  };
+  const preserved: TransportLeg = {
+    id: 'leg-preserved',
+    tripId: 'trip-sarah',
+    elementKind: 'TRANSPORT_LEG',
+    importance: 'REQUIRED',
+    flexibility: 'CHANGEABLE',
+    reservationState: 'CONFIRMED',
+    status: 'VALID',
+    dependsOn: [],
+    governedByRuleSetIds: [],
+    data: { mode: 'FLIGHT', originPlaceId: 'place-b', destinationPlaceId: 'place-c' },
+  };
+  const ctx = buildChainPresentationContext({
+    recoveryCase: {
+      id: 'case-sarah',
+      tripId: 'trip-sarah',
+      status: 'PLANNING',
+      affectedElementIds: ['leg-affected'],
+    } as RecoveryCase,
+    tripNotViable: true,
+  });
+  assert.equal(presentationLinkState(affected, ctx), 'AT_RISK');
+  assert.equal(presentationLinkState(preserved, ctx), 'CONFIRMED');
+});
