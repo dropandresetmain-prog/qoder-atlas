@@ -33,7 +33,9 @@ Selection bar: real observational footage; horizontal 16:9; at least 1920 x 1080
 
 **Decision: GENERATE WITH RUNWAY.** The free candidates split between a busy airport pickup zone with no premium/connected-transfer signal and staged chauffeur/car-door performances. Neither meets the restrained, premium, interconnected-travel brief. Do not use the staged alternatives as a fallback.
 
-Rejected references: [busy airport pickup zone](https://www.pexels.com/video/28913144/) (real but generic); [chauffeur at office](https://www.pexels.com/video/8344931/) and [car door for boss](https://www.pexels.com/video/8345154/) (staged and not airport-linked).
+1. [Busy airport pickup zone](https://www.pexels.com/video/28913144/) — real, 3840 x 2160, 7s; rejected because it is generic curb traffic rather than a premium transfer waiting for the traveller.
+2. [Chauffeur at office](https://www.pexels.com/video/8344931/) — 3840 x 2160, 44s; rejected as staged and not airport-linked.
+3. [Car door for boss](https://www.pexels.com/video/8345154/) — 2160 x 3840, 31s; rejected as staged, vertical, and not airport-linked.
 
 ## SEQ 02C — Hotel consequence
 
@@ -49,7 +51,10 @@ Rejected references: [busy airport pickup zone](https://www.pexels.com/video/289
 
 1. **A Panning Shot of a Conference Room** — Pexels ID `6951299`; 3840 x 2160; 11s; 25 fps. [Source](https://www.pexels.com/video/6951299/). Local file: `stock/seq02d-event/01-conference-room-microphones-6951299.mp4`. The restrained, prepared microphones and monitors communicate an imminent professional commitment without crowd theatrics.
 
-The apparent stage options did not clear the bar: [floral event stage](https://www.pexels.com/video/36803178/) reads more ceremonial than professional conference; [empty auditorium](https://www.pexels.com/video/31217445/) carries a prominent national flag. Generate a tailored stage shot if a literal lectern/stage is required.
+2. [Floral event stage](https://www.pexels.com/video/36803178/) — 1920 x 1080, 9s; rejected because it reads more ceremonial than professional conference.
+3. [Empty auditorium](https://www.pexels.com/video/31217445/) — 2688 x 1512, 11s; rejected because it carries a prominent national flag.
+
+Generate a tailored stage shot if a literal lectern/stage is required.
 
 ## Closing — Sports event
 
@@ -63,13 +68,17 @@ The apparent stage options did not clear the bar: [floral event stage](https://w
 
 **Decision: GENERATE WITH RUNWAY.** The free results were either generic colleague walks, non-corporate hiking, or staged team-building. They do not credibly establish a professional retreat/offsite in a premium, observational register.
 
-Rejected references: [people outside a building](https://www.pexels.com/video/7652287/); [forest hikers](https://www.pexels.com/video/31984992/); [office colleagues on a street](https://www.pexels.com/video/5311355/).
+1. [People outside a building](https://www.pexels.com/video/7652287/) — 3840 x 2160, 7s; rejected: movement is usable but does not establish a retreat/offsite.
+2. [Forest hikers](https://www.pexels.com/video/31984992/) — 3840 x 2160, 14s; rejected: outdoor activity lacks professional-team context.
+3. [Office colleagues on a street](https://www.pexels.com/video/5311355/) — 1920 x 1080, 12s; rejected: generic corporate-stock treatment.
 
 ## Closing — Travel operations / TMC
 
 **Decision: GENERATE WITH RUNWAY.** No free result showed a premium modern travel-operations setting with multiple journeys/logistics on screens. Courier and generic office shots would falsely imply freight operations or pose-heavy corporate work, rather than TMC coordination.
 
-Rejected references: [city workers handling deliveries](https://www.pexels.com/video/37546344/); [courier delivery office](https://www.pexels.com/video/6169417/); [woman with folders](https://www.pexels.com/video/8061379/).
+1. [City workers handling deliveries](https://www.pexels.com/video/37546344/) — 1080 x 1920, 13s; rejected: vertical and delivery, not travel coordination.
+2. [Courier delivery office](https://www.pexels.com/video/6169417/) — 2160 x 3840, 19s; rejected: vertical freight/warehouse signal conflicts with a TMC.
+3. [Woman with folders](https://www.pexels.com/video/8061379/) — 3840 x 2160, 30s; rejected: generic single-person office stock with no travel-operations evidence.
 
 ## Local inventory
 
