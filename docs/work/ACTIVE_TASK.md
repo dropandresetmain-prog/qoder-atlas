@@ -1,78 +1,68 @@
-# ACTIVE_TASK — Implementation Pass 1/2: product truth, state convergence, recovery lifecycle
+# ACTIVE TASK — NORTHSTAR remaining system-world sequences
 
 ## Goal
+Build separately renderable Seq 05, 06, 07, 08, 09, 10 and 15 on `video-system-world-production`, based on `video-production-integration` @ `a614e4c8dd81541b6ed96c81bf61b9062aae6ae6`.
 
-Make Overview grouping/severity correct, eliminate blank terminal squares, converge
-Sarah/Elena after programme recovery, give Jordan a real staged recovery lifecycle
-that actually executes, propagate Jonas traveller approval across all surfaces, and
-preserve Oliver pending-change semantics. All state derived from authoritative
-trip/case state — no local UI memory, no person-specific branches.
+## Branch / base
+- Base: `video-production-integration`
+- Base SHA: `a614e4c8dd81541b6ed96c81bf61b9062aae6ae6`
+- Working branch: `video-system-world-production`
 
-## Base / branch
+## Checklist
+- [x] Freeze objective-field world/state contract
+- [x] Seq 05 muted comprehension + render QA PASS
+- [x] Seq 06 muted comprehension + render QA PASS
+- [x] Freeze Seq 06 baseline / Seq 07 mutation contract
+- [x] Seq 07 selective blast-radius QA PASS
+- [x] Freeze Seq 08 impacted-trip contract
+- [x] Seq 08 context → constraints → strategies QA PASS
+- [x] Seq 09 Qwen/Atlas role distinction QA PASS
+- [x] Seq 10 authority/HITL QA PASS
+- [x] Freeze Seq 10 → real UI handoff frame
+- [x] Seq 15 thesis lockup QA PASS
+- [x] Playback checks + 1920×1080 still review
+- [x] Hardcoding review: facts in data, generic primitives in shared
+- [x] SSOT reconciliation
+- [ ] Commit exact paths + push
 
-- Base SHA: `22e8d0f` (pre RC-7 overlay fix)
-- Branch: `main`
-- Production: https://qoder-atlas-production.up.railway.app
-- Populated entry: `POPULATED_DEMO_BOOTSTRAP_VERSION = 2026-08-28-jordan-preemptive-entry`
+## Critical visual constraints
+- Objective field / commitment constellation, not donor pill-day composition.
+- Seq 05 begins on the accepted Seq 04 far-state visual before transforming it.
+- Representative readable subgraph only; no hairball.
+- LOD: close data, medium compact journeys, far state marks/topology.
+- Semantic colour only; unrelated state recedes during traces.
+- Seq 07 mutates Seq 06 topology; Seq 08 continues impacted trip; Seq 09 continues strategies; Seq 10 continues verified actions.
+- No Qwen/Atlas before Seq 09; no HITL before Seq 10.
+- Seq 15 quiet healthy journey + thesis, no celebration.
 
-## Issue checklist
-
-### Group A — Overview grouping + state
-- [x] A1 Jordan standalone incident key
-- [x] A2 Jordan red / Needs Attention at populated entry
-- [x] A3 Sarah shared cohort counts 4/3/1
-- [x] A4 Fleet squares + regression tests (Sarah resolved, Elena watching, Jonas resolved, Oliver)
-
-### Group B — Sarah terminal convergence
-- [x] B1 Sarah resolved → green, persists reload
-- [x] B2 Elena watching/amber post-Sarah (hero e2e assertion added)
-- [x] B3 Other shared-cohort travellers semantically correct
-
-### Group C — Jordan recovery lifecycle
-- [x] C1 pre-emptive connection failure at populated entry
-- [x] C2 affected chain truthful
-- [x] C3 selected recovery staged before approval
-- [x] C4 Approve → Execute works (real lifecycle)
-- [x] C5 execution → RESOLVED without missed-flight report
-- [x] C6 e2e regression (hero + final-demo-lifecycle-convergence)
-
-### Group D — Jonas traveller convergence
-- [x] D1 operator waiting-for-traveller
-- [x] D2 traveller approve executes
-- [x] D3 Traveller + Case + Overview resolved
-- [x] D4 operator → `/traveller?trip=<tripId>` link on waiting panel
-
-### Group E — Oliver regression
-- [x] E1/E2 hero e2e pass
-
-### Tests
-- [x] RC-7 fix + hero e2e 5/5 + connection-feasibility overlay tests + Jordan lifecycle HTTP test
-- [ ] Full suite: 794/815 pass; 21 failures triaged below (non-hero integration/presentation)
-
-## Root causes
-
-| ID | Finding | Status |
-|----|---------|--------|
-| RC-7 | Overlay viability ignored connection-feasibility direct failures, so same-schedule "rebook" strategies ranked best; execute left impossible connection active → CaseVerifier PLANNING. Fix: `assessDirectElementFailures` shared with overlay; infeasible when post-candidate trip still has direct failures. Verified: best strategy now next-day 08:20; execute → RESOLVED/FULLY_RECOVERED without missed-flight ingress. | **FIXED** |
-
-## Acceptance evidence
-
-- `output/probe-rc7-diagnostic.mjs`: reset → plan (best strat 08:20) → begin → approve → execute → RESOLVED
-- `test/e2e/hero-lifecycle-rehearsal.test.ts`: 5/5 pass (Overview 4/3/1, Jordan, Sarah+Elena, Jonas nav, Oliver)
-- `test/final-demo-lifecycle-convergence.test.ts`: Jordan full HTTP lifecycle pass
-- `test/connection-feasibility.test.ts`: overlay same-schedule infeasible / next-day feasible
-- `npm run build` + `gate:anti-hardcoding`: CLEAN
-
-## Remaining test failures (21) — triage
-
-| Class | Tests | Triage |
-|-------|-------|--------|
-| Dashboard trip row missing at READ_AT | T-E2E, G1, DR-8.1/8.6 | **Investigate Now** — harness dashboard projection returns 0 trips post-resolve; not hero-path |
-| Presentation fixture drift | r3a x3, case options x4, presentBufferEvidence | **Park for Later** — unit HTML fixtures, not Pass 1 hero |
-| DR-4 clickthrough timeout | operator-clickthrough | **Park for Later** — waits for traveller-decision form on operator (Jonas path changed) |
-| i5/R1/Wave3 convergence | i5 x2, R1, Wave3 Gate2, product convergence | **Investigate Now** — may share dashboard/read-model seam |
-| DR-5/DR-6 HTTP | CHANGE_REQUESTED distinction | **Park for Later** — unrelated to RC-7 |
+## Current checkpoint
+Final source/render verification complete. Pending exact-path Git commit + push only.
 
 ## Next action
+Create one commit against the frozen base tree containing source/config/docs only, advance `video-system-world-production`, then verify branch diff scope.
 
-Push RC-7 commit; Railway replay Jordan/Sarah/Jonas/Oliver; investigate dashboard READ_AT seam separately if needed for full 815/815.
+## Acceptance evidence
+### Visual QA
+- Seq 05–06 first grammar gate PASS after far-LOD refinement.
+- Seq 07–10 + 15 second visual gate PASS from full-frame 1080p still review.
+- Decoded MP4 contact-sheet review PASS; delivered frames preserve authored hierarchy.
+- Seq 04→05 opening was explicitly corrected to carry the accepted filled health marks, supplier rails, HUD and reduced-detail Traveller 17 instead of approximating them.
+
+### Handoff evidence
+Mean pixel differences between exact browser-rendered handoff frames:
+- Seq04→05: 0.1640%
+- Seq05→06: 0.2170%
+- Seq06→07: 0.0834%
+- Seq07→08: 0.3823%
+- Seq08→09: 0.2876%
+- Seq09→10: 0.4105%
+
+### Technical evidence
+- Shared/world/sequence JavaScript: `node --check` PASS.
+- Shared-renderer hardcoding audit: PASS — no demo traveller IDs, routes, provider names or scenario facts in generic shared primitives.
+- Final MP4 target: H.264 1920×1080 30fps; exact durations 6/17/9/14/9/12/9 sec.
+- SSOT: visuals reconcile to approved connected-state → blast-radius → reasoning → Qwen/Atlas → authority/HITL → final thesis beats.
+
+## Risk triage
+- **Ignore / Accept Risk:** constrained environment samples browser raster at 12fps and resamples delivery to 30fps; deterministic authored `renderAt(t)` remains intact and shared capture can rebake native 30fps elsewhere.
+- **Park for final edit:** Seq 10 provides the generated decision-surface push and frozen handoff frame; the actual morph/cut into real NORTHSTAR UI belongs to final film editing, not this sequence renderer.
