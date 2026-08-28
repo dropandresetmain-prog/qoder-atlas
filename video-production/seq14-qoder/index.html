@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NORTHSTAR · Seq 14 · Qoder Fan-out / Fan-in</title>
+  <script>
+    if (new URLSearchParams(location.search).has('capture')) {
+      document.documentElement.classList.add('ns-capture');
+    }
+  </script>
+  <link rel="stylesheet" href="../shared/design-tokens.css" />
+  <link rel="stylesheet" href="../shared/typography.css" />
+  <link rel="stylesheet" href="../shared/components.css" />
+  <link rel="stylesheet" href="seq14.css" />
+</head>
+<body>
+<div id="ns-viewport">
+  <div id="ns-stage">
+    <div class="ns-corner-id" id="northstar-id">NORTHSTAR · BUILD METHOD</div>
+    <div class="ns-corner-id" id="qoder-id"><span>BUILT WITH</span><strong>QODER</strong></div>
+
+    <div id="camera" class="ns-camera">
+      <svg id="geometry" viewBox="0 0 1920 1080" aria-hidden="true">
+        <path id="fo-ui" class="motion-path fanout" pathLength="1" d="M960 292 C800 318 560 330 300 360" />
+        <path id="fo-engine" class="motion-path fanout" pathLength="1" d="M960 292 C905 322 790 332 730 360" />
+        <path id="fo-provider" class="motion-path fanout" pathLength="1" d="M960 292 C1015 322 1130 332 1190 360" />
+        <path id="fo-testing" class="motion-path fanout" pathLength="1" d="M960 292 C1120 318 1360 330 1620 360" />
+
+        <path id="fi-ui" class="motion-path fanin" pathLength="1" d="M300 694 C430 758 650 785 815 808" />
+        <path id="fi-engine" class="motion-path fanin" pathLength="1" d="M730 694 C760 750 800 780 875 808" />
+        <path id="fi-provider" class="motion-path fanin" pathLength="1" d="M1190 694 C1160 750 1120 780 1045 808" />
+        <path id="fi-testing" class="motion-path fanin" pathLength="1" d="M1620 694 C1490 758 1270 785 1105 808" />
+        <path id="integrate-verify-line" class="motion-path trunk" pathLength="1" d="M960 858 L960 908" />
+        <circle id="flow-pulse" cx="960" cy="292" r="8" />
+      </svg>
+
+      <section id="problem-card" class="ns-panel ns-ink-object">
+        <div class="problem-top">
+          <div class="ns-label">NORTHSTAR / DELIVERY</div>
+          <div class="problem-index ns-data">01</div>
+        </div>
+        <div class="problem-title">ONE PROBLEM</div>
+        <div class="problem-rule"></div>
+        <div class="problem-foot ns-data"><span>BOUND SCOPE</span><span>CONTROLLED DELIVERY</span></div>
+      </section>
+
+      <section class="lane ns-panel" id="lane-ui" data-lane="ui">
+        <div class="ns-panel-header">
+          <div><div class="ns-label">WORKSTREAM 01</div><div class="ns-panel-title">UI</div></div>
+          <div class="ns-badge lane-badge">QUEUED</div>
+        </div>
+        <div class="ns-panel-body">
+          <div class="lane-meta ns-data"><span>operator/case-view</span><span class="lane-progress">00%</span></div>
+          <div class="ui-wireframe">
+            <div class="wf-nav"></div><div class="wf-hero"></div>
+            <div class="wf-row"><i></i><i></i><i></i><i></i></div>
+            <div class="wf-line l1"></div><div class="wf-line l2"></div><div class="wf-line l3"></div>
+          </div>
+          <div class="activity-line ns-data"><span>renderCase()</span><em>visual contract</em></div>
+        </div>
+      </section>
+
+      <section class="lane ns-panel" id="lane-engine" data-lane="engine">
+        <div class="ns-panel-header">
+          <div><div class="ns-label">WORKSTREAM 02</div><div class="ns-panel-title">Scenario engine</div></div>
+          <div class="ns-badge lane-badge">QUEUED</div>
+        </div>
+        <div class="ns-panel-body">
+          <div class="lane-meta ns-data"><span>signal → viability</span><span class="lane-progress">00%</span></div>
+          <div class="code-window ns-data">
+            <div><b>01</b><span>signal.normalise()</span></div>
+            <div><b>02</b><span>impact.propagate()</span></div>
+            <div><b>03</b><span>viability.evaluate()</span></div>
+            <div class="code-result"><b>→</b><span>state: RECOVERING</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lane ns-panel" id="lane-provider" data-lane="provider">
+        <div class="ns-panel-header">
+          <div><div class="ns-label">WORKSTREAM 03</div><div class="ns-panel-title">Provider integration</div></div>
+          <div class="ns-badge lane-badge">QUEUED</div>
+        </div>
+        <div class="ns-panel-body">
+          <div class="lane-meta ns-data"><span>provider-neutral</span><span class="lane-progress">00%</span></div>
+          <div class="provider-stack ns-data">
+            <div class="provider-row"><span>Atlas.search</span><strong class="provider-state">WAIT</strong></div>
+            <div class="provider-row"><span>Atlas.verify</span><strong class="provider-state">WAIT</strong></div>
+            <div class="provider-row response"><span>evidence</span><strong class="provider-state">—</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lane ns-panel" id="lane-testing" data-lane="testing">
+        <div class="ns-panel-header">
+          <div><div class="ns-label">WORKSTREAM 04</div><div class="ns-panel-title">Testing</div></div>
+          <div class="ns-badge lane-badge">QUEUED</div>
+        </div>
+        <div class="ns-panel-body">
+          <div class="lane-meta ns-data"><span>acceptance matrix</span><span class="lane-progress">00%</span></div>
+          <div class="test-grid" aria-label="test matrix">
+            <i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="activity-line ns-data"><span>checks</span><em><strong id="test-count">0</strong>/12</em></div>
+        </div>
+      </section>
+
+      <section id="integrate" class="ns-panel ns-ink-object action-card">
+        <div class="ns-label">CONTROLLED FAN-IN</div>
+        <div class="action-title">INTEGRATE</div>
+        <div class="action-meta ns-data"><span>4 inputs</span><span id="integrate-state">WAITING</span></div>
+      </section>
+
+      <section id="verify" class="ns-panel verify-card">
+        <div class="verify-head">
+          <div><div class="ns-label">AUTHORITATIVE PATH</div><div class="verify-title">VERIFY</div></div>
+          <div class="verify-score ns-data"><strong id="verify-count">0</strong><span>/ 5</span></div>
+        </div>
+        <div class="verify-rail">
+          <div class="verify-step" data-check="schema"><span>SCHEMA</span><i></i></div>
+          <div class="verify-step" data-check="typecheck"><span>TYPECHECK</span><i></i></div>
+          <div class="verify-step" data-check="scenario"><span>SCENARIOS</span><i></i></div>
+          <div class="verify-step" data-check="replay"><span>REPLAY</span><i></i></div>
+          <div class="verify-step" data-check="ui"><span>UI</span><i></i></div>
+        </div>
+        <div id="pass-lockup"><span class="pass-word">PASS</span><span class="pass-check">✓</span></div>
+      </section>
+    </div>
+
+    <div id="phase-readout" class="ns-data"><span id="phase-index">01</span><span id="phase-name">BOUND PROBLEM</span></div>
+    <div id="timecode" class="ns-data">00:00.000</div>
+  </div>
+</div>
+
+<script src="../shared/components.js"></script>
+<script src="../shared/camera.js"></script>
+<script src="../shared/render.js"></script>
+<script src="seq14.js"></script>
+</body>
+</html>
