@@ -1,0 +1,5 @@
+# Source footage is downloaded locally for editorial review, not versioned.
+*.mp4
+*.mov
+*.mxf
+*.webm
