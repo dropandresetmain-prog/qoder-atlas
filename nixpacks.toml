@@ -3,3 +3,5 @@ cmds = ["npm run build"]
 
 [start]
 cmd = "node dist/main.js"
+
+# Avoid npm start wrapper so Railway shutdown logs stay clean during redeploys.

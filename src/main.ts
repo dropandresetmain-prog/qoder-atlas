@@ -11,9 +11,10 @@
  */
 import { createServer, type Server } from 'node:http';
 import { loadConfig, type AppConfig } from './config/config.ts';
-import { kvGet } from './persistence/database.ts';
+import { kvGet, kvSet } from './persistence/database.ts';
 import { createAppServer } from './server/http.ts';
 import { composeAppRuntime } from './app/compose.ts';
+import { POPULATED_DEMO_BOOTSTRAP_VERSION } from './app/demoWorld.ts';
 
 function resolveListenPort(config: AppConfig): number {
   // Host PORT must win on Railway; empty HTTP_PORT must never displace it.
@@ -104,12 +105,16 @@ async function main(): Promise<void> {
 
     if (config.environment === 'demo' && composed.endpoints.demo?.resetPopulatedWorld) {
       const caseRow = composed.db.prepare('SELECT COUNT(*) AS c FROM cases').get() as { c: number };
-      if (caseRow.c === 0) {
+      const bootstrapVersion = kvGet(composed.db, 'populated_demo_bootstrap_version');
+      const needsBootstrap =
+        caseRow.c === 0 || bootstrapVersion !== POPULATED_DEMO_BOOTSTRAP_VERSION;
+      if (needsBootstrap) {
         const baseUrl = `http://127.0.0.1:${port}`;
         void composed.endpoints.demo.resetPopulatedWorld(baseUrl).then((outcome) => {
           if (outcome.status !== 200) {
             console.warn('[atlas] populated demo world bootstrap failed:', outcome.body);
           } else {
+            kvSet(composed.db, 'populated_demo_bootstrap_version', POPULATED_DEMO_BOOTSTRAP_VERSION);
             console.log('[atlas] populated demo world bootstrapped for default Overview entry');
           }
         });

@@ -14,6 +14,12 @@ import { loadAcceptanceManifest, resolveManifestPath } from '../acceptance/manif
 /** Single shared reset instant for the populated demo world (§9.1). */
 export const POPULATED_DEMO_RESET_AT: IsoDateTime = '2026-09-21T09:00:00+08:00';
 
+/**
+ * Bump when populated Overview entry choreography changes so Railway's
+ * persisted SQLite re-bootstraps once after deploy (not only on empty DB).
+ */
+export const POPULATED_DEMO_BOOTSTRAP_VERSION = '2026-08-28-jordan-preemptive-entry';
+
 /** Resolve anchor event id from the frozen prefix manifests (no literal fixture ids here). */
 export function resolvePopulatedDemoAnchorEventId(cwd: string = process.cwd()): string {
   const manifestPath = POPULATED_DEMO_PREFIXES[0]!.manifestPath;

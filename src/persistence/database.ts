@@ -103,6 +103,12 @@ export function kvGet(db: DatabaseSync, key: string): string | undefined {
   return row?.value;
 }
 
+export function kvSet(db: DatabaseSync, key: string, value: string): void {
+  db.prepare(
+    'INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).run(key, value);
+}
+
 /**
  * Run `work` inside an IMMEDIATE transaction. Any thrown error rolls the
  * whole unit of work back — authoritative mutations are all-or-nothing.
