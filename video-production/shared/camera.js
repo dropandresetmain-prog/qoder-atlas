@@ -12,7 +12,10 @@
 
   NS.setCamera = function setCamera(el, x = 0, y = 0, scale = 1) {
     if (!el) return;
-    el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+    // Keep transformed text on stable compositor coordinates during slow pushes.
+    const px = Math.round(x * 4) / 4;
+    const py = Math.round(y * 4) / 4;
+    el.style.transform = `translate3d(${px}px, ${py}px, 0) scale(${scale})`;
   };
 
   window.addEventListener('resize', () => NS.fitStage());

@@ -36,7 +36,7 @@
  ];
  NS.OBJECTIVE_FIELD=Object.freeze({
   version:'objective-field-v2',world:{width:7800,height:3600},
-  cameras:{seq04Final:{x:-12,y:-24,scale:.33},programme:{x:-170,y:30,scale:.275},hero37:{x:-1830,y:-520,scale:.56},affected37:{x:-2010,y:-600,scale:.60},strategy37:{x:-1360,y:-300,scale:.46},integration:{x:-1350,y:-120,scale:.43},authority:{x:-1750,y:-720,scale:.54},finalJourney:{x:-2620,y:-840,scale:.80},wideFinal:{x:-170,y:30,scale:.275}},
+  cameras:{seq04Final:{x:-12,y:-24,scale:.33},programme:{x:-2120,y:-286,scale:.52},hero37:{x:-1830,y:-520,scale:.56},affected37:{x:-2400,y:-630,scale:.66},strategy37:{x:-2128,y:-550,scale:.60},integration:{x:-1800,y:-300,scale:.57},authority:{x:-3110,y:-1014,scale:.64},finalJourney:{x:-2620,y:-840,scale:.80},wideFinal:{x:-800,y:0,scale:.34}},
   scaleField:{count:72,heroId:17,cols:[640,1500,2360,3220,4080,4940],rowStart:690,rowStep:215,outcomes},
   seq04Carry:{
    supplier:{title:'AIRLINE RETIME',affected:'12 AFFECTED',scope:'ONE CHANGE',representative:[4,9,31,44]},
@@ -95,7 +95,7 @@
    {id:'strategy-programme',name:'PROGRAMME CHANGE',x:5380,y:1650,time:'12:20',cost:'US$0',objective:'VIABLE',result:'✓ VIABLE · NEEDS AUTHORITY',state:'ok'},
    {id:'strategy-combined',name:'COMBINED RECOVERY',x:5800,y:1900,time:'12:14',cost:'+US$212',objective:'VIABLE',result:'✓ VIABLE · VERIFY FLIGHT',state:'active'}
   ],
-  integrations:{qwen:{id:'qwen',kind:'qwen',provider:'ALIBABA CLOUD · QWEN',role:'AI reasoning implementation',sub:'Messy context → structured constraints → recovery strategy reasoning',x:3600,y:430},atlas:{id:'atlas',kind:'atlas',provider:'ATLAS GDS API',role:'Flight search + verify',sub:'Provider availability, fare and rule evidence returned into NORTHSTAR',x:6250,y:1680},evidence:{id:'atlas-evidence',label:'ATLAS / PROVIDER EVIDENCE',route:'HND → SIN',availability:'AVAILABLE',fare:'US$212 DELTA',rule:'CHANGE PERMITTED',time:'ARR 10:58',x:6200,y:1940}},
+  integrations:{qwen:{id:'qwen',kind:'qwen',provider:'ALIBABA CLOUD · QWEN',role:'AI reasoning implementation',sub:'Messy context → structured constraints → recovery strategy reasoning',x:4000,y:700},atlas:{id:'atlas',kind:'atlas',provider:'ATLAS GDS API',role:'Flight search + verify',sub:'Provider availability, fare and rule evidence returned into NORTHSTAR',x:6150,y:1500},evidence:{id:'atlas-evidence',label:'ATLAS / PROVIDER EVIDENCE',route:'HND → SIN',availability:'AVAILABLE',fare:'US$212 DELTA',rule:'CHANGE PERMITTED',time:'ARR 10:58',x:6150,y:1750}},
   recovery:{version:'seq08-strategies-v1',viableStrategyIds:['strategy-programme','strategy-combined'],atlasStrategyId:'strategy-combined'},
   authority:{rule:{x:5520,y:2210,w:1760},auto:{id:'action-auto',strategyId:'strategy-combined',title:'COMBINED RECOVERY',policy:'✓',authority:'✓',execute:'EXECUTE → OBSERVE → STATE UPDATE',x:5640,y:2300},human:{id:'action-human',strategyId:'strategy-programme',title:'PROGRAMME CHANGE',policy:'✓',authority:'✕ OUTSIDE DELEGATION',execute:'STOP · HUMAN DECISION',x:6200,y:2300},decision:{id:'decision',impact:'PANEL MOVE AFFECTS 3 SPEAKERS / 1 ROOM',x:5640,y:2520,options:[{name:'OPTION A · Move panel +30 min',detail:'US$0 · commitment restored · 3 attendee notifications · recommended'},{name:'OPTION B · Keep programme / buy travel recovery',detail:'+US$212 · traveller arrives 12:14 · no programme impact'}]}},
   seq10Handoff:{version:'seq10-human-decision-v1',camera:{x:-5300,y:-2320,scale:1.05},decisionId:'decision'},

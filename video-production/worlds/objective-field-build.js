@@ -13,6 +13,6 @@
   const constraints=new Map();if(includeConstraints)cfg.constraints.forEach(s=>{const card=NS.constraint(layers.constraint,s);const hero=cfg.heroes.find(h=>h.id===s.hero),stageIndex=hero.stages.findIndex(st=>st.id===s.stage),xs=[0,340,680,1020,1360],tx=hero.x+xs[stageIndex]+125,ty=hero.y+98,sx=s.x+135,sy=s.y+(s.y<hero.y?84:0);const d=`M${sx} ${sy} C${sx} ${NS.lerp(sy,ty,.45)}, ${tx} ${NS.lerp(sy,ty,.72)}, ${tx} ${ty}`;constraints.set(s.id,{spec:s,card,edge:NS.svgPath(svg,`constraint-${s.id}`,d,'ns-edge is-soft')})});
   return{layers,health,dayLabels,commitments,centers,programmeEdges,minis,miniEdges,dockEdges,heroes,constraints};
  };
- NS.setHeroStage=function(model,stageId,tone,meta){if(!model)return;const idx=model.spec.stages.findIndex(s=>s.id===stageId),n=model.nodes[idx];NS.setTone(n,tone);if(meta)n.querySelector('.meta').textContent=meta;const l=model.links[idx];if(l){['green','brass','red','grey','ink'].forEach(t=>l.classList.remove(`is-${t}`));l.classList.add(`is-${tone}`)}};
+ NS.setHeroStage=function(model,stageId,tone,meta){if(!model)return;const idx=model.spec.stages.findIndex(s=>s.id===stageId),n=model.nodes[idx];if(!n)return;NS.setTone(n,tone);const label=n.querySelector('.meta');if(meta&&label&&label.textContent!==meta)label.textContent=meta;const l=model.links[idx];if(l&&l.dataset.nsTone!==tone){['green','brass','red','grey','ink'].forEach(t=>l.classList.remove(`is-${t}`));l.classList.add(`is-${tone}`);l.dataset.nsTone=tone}};
  NS.setCommitmentState=function(map,id,tone){const e=map.get(id);NS.setTone(e,tone)};
 })();

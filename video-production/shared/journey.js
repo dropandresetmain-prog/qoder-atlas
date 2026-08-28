@@ -37,10 +37,15 @@
 
   NS.setJourneyState = function setJourneyState(el, tone, { value, meta } = {}) {
     if (!el) return;
-    ['green','brass','red','grey','ink'].forEach(t => el.classList.remove(`is-${t}`));
-    el.classList.add(`is-${tone}`);
-    if (value != null) el.querySelector('.node-value').textContent = value;
-    if (meta != null) el.querySelector('.node-meta').textContent = meta;
+    if (el.dataset.nsTone !== tone) {
+      ['green','brass','red','grey','ink'].forEach(t => el.classList.remove(`is-${t}`));
+      el.classList.add(`is-${tone}`);
+      el.dataset.nsTone = tone;
+    }
+    const valueNode = el.querySelector('.node-value');
+    const metaNode = el.querySelector('.node-meta');
+    if (value != null && valueNode && valueNode.textContent !== value) valueNode.textContent = value;
+    if (meta != null && metaNode && metaNode.textContent !== meta) metaNode.textContent = meta;
   };
 
   NS.setJourneySettle = function setJourneySettle(el, amount = 0, tone = 'green') {
@@ -52,7 +57,8 @@
 
   NS.setDependencyState = function setDependencyState(el, tone, extra = '') {
     if (!el) return;
-    el.setAttribute('class', `ns-dependency-edge is-${tone}${extra ? ` ${extra}` : ''}`);
+    const className = `ns-dependency-edge is-${tone}${extra ? ` ${extra}` : ''}`;
+    if (el.getAttribute('class') !== className) el.setAttribute('class', className);
   };
 
   NS.createMiniJourney = function createMiniJourney(parent, spec) {
@@ -115,8 +121,13 @@
 
   NS.setHealthMarkState = function setHealthMarkState(el, tone, glyph) {
     if (!el) return;
-    ['green','brass','red','grey','ink'].forEach(t => el.classList.remove(`is-${t}`));
-    el.classList.add(`is-${tone}`);
-    el.querySelector('.health-glyph').textContent = glyph || '';
+    if (el.dataset.nsTone !== tone) {
+      ['green','brass','red','grey','ink'].forEach(t => el.classList.remove(`is-${t}`));
+      el.classList.add(`is-${tone}`);
+      el.dataset.nsTone = tone;
+    }
+    const label = el.querySelector('.health-glyph');
+    const value = glyph || '';
+    if (label && label.textContent !== value) label.textContent = value;
   };
 })();
