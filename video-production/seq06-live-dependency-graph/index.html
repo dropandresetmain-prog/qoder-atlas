@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NORTHSTAR · Seq 06 · Live Dependency Graph</title>
+  <link rel="stylesheet" href="../shared/design-tokens.css" />
+  <link rel="stylesheet" href="../shared/typography.css" />
+  <link rel="stylesheet" href="../shared/components.css" />
+  <link rel="stylesheet" href="../shared/journey.css" />
+  <link rel="stylesheet" href="../shared/programme-graph.css" />
+  <link rel="stylesheet" href="../worlds/connected-programme.css" />
+  <link rel="stylesheet" href="../seq03-rebooking/handoff.css" />
+  <link rel="stylesheet" href="seq06.css" />
+</head>
+<body>
+<div id="ns-viewport">
+  <div id="ns-stage">
+    <div class="ns-corner-id" id="northstar-id">NORTHSTAR · CONNECTED STATE</div>
+    <div class="ns-corner-id" id="stage-mode">PROGRAMME / LIVE</div>
+    <div id="world" class="ns-world ns-connected-world">
+      <svg id="world-svg" class="ns-world-svg" viewBox="0 0 8300 4300" aria-hidden="true"></svg>
+      <div id="world-root-label" class="ns-world-root-label"><strong>EVENT</strong> → DAYS → COMMITMENTS</div>
+    </div>
+    <div id="graph-hud" class="ns-graph-hud"><span>MANY JOURNEYS</span><i></i><strong>ONE SHARED PROGRAMME</strong></div>
+  </div>
+</div>
+<script src="../shared/components.js"></script>
+<script src="../shared/camera.js"></script>
+<script src="../shared/render.js"></script>
+<script src="../shared/journey.js"></script>
+<script src="../shared/lod.js"></script>
+<script src="../shared/programme-graph.js"></script>
+<script src="../seq03-rebooking/handoff.js"></script>
+<script src="../worlds/connected-programme.js"></script>
+<script src="../worlds/connected-programme-build.js"></script>
+<script src="seq06.js"></script>
+</body>
+</html>

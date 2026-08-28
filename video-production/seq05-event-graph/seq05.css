@@ -1,0 +1,14 @@
+#northstar-id { left:48px; top:38px; }
+#stage-mode { right:48px; top:38px; }
+#hero-focus {
+  position:absolute; left:105px; right:105px; top:332px; height:420px; z-index:2;
+  border-radius:42px;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.38) 18%,rgba(255,255,255,.38) 82%,rgba(255,255,255,0));
+  pointer-events:none;
+}
+#graph-hud { opacity:0; }
+#threshold-label { opacity:1; }
+#world-root-label { opacity:0; }
+#programme-frame { opacity:0; }
+.ns-day-territory,.ns-commitment-node { opacity:0; }
+.ns-programme-edge,.ns-traveller-programme-edge { opacity:0; }

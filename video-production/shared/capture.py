@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from pathlib import Path
 import re
+import base64
 
 from playwright.async_api import async_playwright
 
@@ -17,7 +18,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument('--html', required=True)
     p.add_argument('--out', required=True)
     p.add_argument('--duration', required=True, type=float)
-    p.add_argument('--fps', type=int, default=30)
+    p.add_argument('--fps', type=int, default=30, help='Output MP4 fps')
+    p.add_argument('--capture-fps', type=int, default=0, help='Deterministic browser sampling fps; 0 uses output fps')
     p.add_argument('--stills', default='')
     p.add_argument('--stills-dir', default='')
     p.add_argument('--stills-only', action='store_true')
@@ -50,23 +52,23 @@ async def main() -> None:
         if href.startswith(('http://', 'https://')):
             return match.group(0)
         css = (base / href).resolve().read_text(encoding='utf-8')
-        return f'<style data-inline-source="{href}">\n{css}\n</style>'
+        return f'<style data-inline-source=\"{href}\">\n{css}\n</style>'
 
     def inline_js(match):
         src = match.group(1)
         if src.startswith(('http://', 'https://')):
             return ''
         js = (base / src).resolve().read_text(encoding='utf-8')
-        return f'<script data-inline-source="{src}">\n{js}\n</script>'
+        return f'<script data-inline-source=\"{src}\">\n{js}\n</script>'
 
-    source = re.sub(r'<link\s+rel="stylesheet"\s+href="([^"]+)"\s*/?>', inline_css, source)
-    source = re.sub(r'<script\s+src="([^"]+)"\s*></script>', inline_js, source)
-    source = source.replace('<head>', '<head>\n<script>window.__NS_CAPTURE__=true;document.documentElement.classList.add("ns-capture");</script>', 1)
+    source = re.sub(r'<link\s+rel=\"stylesheet\"\s+href=\"([^\"]+)\"\s*/?>', inline_css, source)
+    source = re.sub(r'<script\s+src=\"([^\"]+)\"\s*></script>', inline_js, source)
+    source = source.replace('<head>', '<head>\n<script>window.__NS_CAPTURE__=true;document.documentElement.classList.add(\"ns-capture\");</script>', 1)
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             executable_path='/usr/bin/chromium',
             headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+            args=['--no-sandbox', '--disable-dev-shm-usage']
         )
         page = await browser.new_page(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
         await page.set_content(source, wait_until='load')
@@ -77,27 +79,40 @@ async def main() -> None:
             await page.screenshot(path=str(stills_dir / f'{idx:02d}-{t:05.2f}s.png'), type='png')
 
         if not args.stills_only:
-            total = round(args.duration * args.fps)
+            # The DevTools screenshot path is materially faster than Playwright's
+            # high-level screenshot wrapper on graph-heavy
+            # exact renderAt(timestamp) determinism.
+            cdp = await page.context.new_cdp_session(page)
+            capture_fps = args.capture_fps or args.fps
+            total = round(args.duration * capture_fps)
             for i in range(total):
-                t = i / args.fps
+                t = i / capture_fps
                 await page.evaluate('(t) => window.__NS_RENDER_AT__(t)', t)
-                await page.screenshot(
-                    path=str(frames_dir / f'frame-{i:04d}.jpg'),
-                    type='jpeg',
-                    quality=94,
-                    animations='disabled'
-                )
+                shot = await cdp.send('Page.captureScreenshot', {
+                    'format': 'jpeg',
+                    'quality': 92,
+                    'fromSurface': True,
+                    'captureBeyondViewport': False,
+                })
+                (frames_dir / f'frame-{i:04d}.jpg').write_bytes(base64.b64decode(shot['data']))
         await browser.close()
 
     if not args.stills_only:
-        subprocess.run([
+        capture_fps = args.capture_fps or args.fps
+        cmd = [
             'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
-            '-framerate', str(args.fps),
+            '-framerate', str(capture_fps),
             '-i', str(frames_dir / 'frame-%04d.jpg'),
-            '-c:v', 'libx264', '-preset', 'medium', '-crf', '15',
-            '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-            str(out)
-        ], check=True)
+        ]
+        if capture_fps != args.fps:
+            # Blend-based temporal interpolation keeps the final asset at the
+            # requested delivery fps while browser states remain deterministic.
+            cmd += ['-vf', f'minterpolate=fps={args.fps}:mi_mode=blend']
+        cmd += [
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '15',
+            '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(out)
+        ]
+        subprocess.run(cmd, check=True)
         if not args.keep_frames:
             shutil.rmtree(frames_dir)
 

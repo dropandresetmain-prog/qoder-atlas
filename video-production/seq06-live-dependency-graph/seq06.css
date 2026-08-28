@@ -1,0 +1,15 @@
+#northstar-id { left:48px; top:38px; }
+#stage-mode { right:48px; top:38px; }
+#world-root-label { opacity:.68; }
+#graph-hud { opacity:1; }
+.ns-hero-journey,.ns-constraint-card,.ns-constraint-edge { opacity:0; }
+#system-boundary { opacity:0; }
+#boundary-trace {
+  fill:none;
+  stroke:rgba(20,23,28,.52);
+  stroke-width:4;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;
+  opacity:0;
+}

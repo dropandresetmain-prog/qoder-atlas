@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NORTHSTAR · Seq 05 · Event as Connected State</title>
+  <link rel="stylesheet" href="../shared/design-tokens.css" />
+  <link rel="stylesheet" href="../shared/typography.css" />
+  <link rel="stylesheet" href="../shared/components.css" />
+  <link rel="stylesheet" href="../shared/journey.css" />
+  <link rel="stylesheet" href="../shared/programme-graph.css" />
+  <link rel="stylesheet" href="../worlds/connected-programme.css" />
+  <link rel="stylesheet" href="../seq03-rebooking/handoff.css" />
+  <link rel="stylesheet" href="seq05.css" />
+</head>
+<body>
+<div id="ns-viewport">
+  <div id="ns-stage">
+    <div class="ns-corner-id" id="northstar-id">NORTHSTAR · CONNECTED STATE</div>
+    <div class="ns-corner-id" id="stage-mode">PROGRAMME / LIVE</div>
+    <div id="hero-focus"></div>
+    <div id="world" class="ns-world ns-connected-world">
+      <svg id="world-svg" class="ns-world-svg" viewBox="0 0 8300 4300" aria-hidden="true"></svg>
+      <div id="world-root-label" class="ns-world-root-label"><strong>EVENT</strong> → DAYS → COMMITMENTS</div>
+    </div>
+
+    <section id="scale-hud" class="ns-scale-hud">
+      <div class="ns-label">PROGRAMME ARRIVALS / LIVE</div>
+      <div class="scale-count ns-data">72 TRAVELLERS</div>
+      <div class="scale-sub">One supplier change. Different downstream consequences.</div>
+    </section>
+    <section id="scale-summary" class="ns-panel ns-scale-summary">
+      <div class="summary-row"><span class="summary-glyph green">✓</span><strong>60</strong><span>HEALTHY</span></div>
+      <div class="summary-row"><span class="summary-glyph green">✓</span><strong>5</strong><span>RECOVERED</span></div>
+      <div class="summary-row"><span class="summary-glyph brass">▲</span><strong>4</strong><span>AT RISK</span></div>
+      <div class="summary-row"><span class="summary-glyph red">✕</span><strong>3</strong><span>NOT VIABLE</span></div>
+    </section>
+    <div id="threshold-label" class="ns-graph-hud"><span>PROGRAMME SCALE</span><i></i><strong>CONNECTED TRAVEL STATE</strong></div>
+    <div id="graph-hud" class="ns-graph-hud"><span>MANY JOURNEYS</span><i></i><strong>ONE SHARED PROGRAMME</strong></div>
+  </div>
+</div>
+<script src="../shared/components.js"></script>
+<script src="../shared/camera.js"></script>
+<script src="../shared/render.js"></script>
+<script src="../shared/journey.js"></script>
+<script src="../shared/lod.js"></script>
+<script src="../shared/programme-graph.js"></script>
+<script src="../seq03-rebooking/handoff.js"></script>
+<script src="../worlds/connected-programme.js"></script>
+<script src="../worlds/connected-programme-build.js"></script>
+<script src="seq05.js"></script>
+</body>
+</html>
