@@ -91,6 +91,34 @@ function changeTargetFromSignal(signal: TripSignal | undefined) {
   return parsed.success ? parsed.data : undefined;
 }
 
+/**
+ * Stable source-incident identity from the triggering signal. Travellers hit
+ * by the same real-world event (same flight change at the same instant, same
+ * commitment change, same change request) share a key; independent incidents
+ * stay distinct. Generic — built only from signal kind/payload/instant.
+ */
+export function incidentKeyForSignal(signal: TripSignal | undefined): string | undefined {
+  if (!signal) return undefined;
+  const payload = signal.payload as Record<string, unknown>;
+  const str = (key: string): string | undefined =>
+    typeof payload[key] === 'string' && (payload[key] as string).length > 0 ? (payload[key] as string) : undefined;
+  const carrier = str('carrierCode');
+  const flight = str('flightNumber');
+  if (carrier && flight) {
+    return `flight|${signal.kind}|${carrier}|${flight}|${signal.occurredAt}`;
+  }
+  const commitmentId = str('commitmentId');
+  if (signal.kind === 'ANCHOR_COMMITMENT_CHANGE' && commitmentId) {
+    return `commitment|${commitmentId}|${signal.occurredAt}`;
+  }
+  const changeRequestId = str('changeRequestId');
+  if (signal.kind === 'TRAVELLER_INPUT' && changeRequestId) {
+    return `change-request|${changeRequestId}`;
+  }
+  // Distinct, unattributable incident — never collapse with anything else.
+  return `signal|${signal.id}`;
+}
+
 function primaryTriggeringSignal(signals: readonly TripSignal[]): TripSignal | undefined {
   if (signals.length === 0) return undefined;
   const missed = signals.find(
@@ -374,6 +402,12 @@ export function deriveRemainderViability(
   if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
     return 'NOT_VIABLE';
   }
+  // A trip already reconciled as DISRUPTED carries a direct viability failure
+  // (e.g. an impossible connection) even before a hard constraint re-fails on
+  // this snapshot. It must not present as workable.
+  if (tripViability === 'DISRUPTED') {
+    return 'NOT_VIABLE';
+  }
   if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
     return 'UNKNOWN';
   }
@@ -521,6 +555,7 @@ export async function projectOperatorDashboard(
       status,
       remainderViable,
       ...(lastSignal ? { whatChanged: presentSignalChange(lastSignal) } : {}),
+      ...(lastSignal ? { incidentKey: incidentKeyForSignal(lastSignal) } : {}),
       affectedItems: recoveryCase
         ? recoveryCase.affectedElementIds
             .map((id) => trip.elements.find((element) => element.id === id))

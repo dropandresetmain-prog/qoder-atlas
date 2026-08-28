@@ -102,6 +102,28 @@ export function fleetCellClassFor(input: ManagedTravelPresentationInput): string
   return FLEET_CELL_CLASS[fleetPresentation(input)];
 }
 
+/**
+ * Fleet presentation that keeps self-arranged travellers visible when a shared
+ * programme incident touches them. A self-arranged trip with an active case or
+ * at-risk/unknown viability is WATCHING (amber), not silently LOCAL — but it is
+ * never escalated to red unless a managed-recovery ask exists.
+ */
+export function fleetPresentationForRoster(input: RosterPresentationInput): FleetCellPresentation {
+  if (input.travelArrangement === 'SELF_OR_OTHER_ARRANGED') {
+    const programmeTouched =
+      input.hasActiveCase ||
+      input.remainderViable === 'AT_RISK' ||
+      input.remainderViable === 'UNKNOWN';
+    if (programmeTouched && input.remainderViable !== 'NOT_VIABLE') return 'WATCHING';
+    return 'LOCAL';
+  }
+  return mapManagedTravelPresentation(input);
+}
+
+export function fleetCellClassForRoster(input: RosterPresentationInput): string {
+  return FLEET_CELL_CLASS[fleetPresentationForRoster(input)];
+}
+
 export interface ManagedTravelBucketCounts {
   confirmed: number;
   needsAttention: number;

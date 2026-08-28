@@ -70,6 +70,14 @@ export interface OperatorTripView {
   remainderViable?: RemainderViability;
   /** What changed, in user-facing language. */
   whatChanged?: string;
+  /**
+   * Stable identity of the triggering source incident, derived from the
+   * authoritative signal (kind + flight identity + instant, or commitment /
+   * change-request id). Travellers sharing one real-world incident share the
+   * same key; distinct incidents never collapse together. Used only for
+   * Overview grouping — never person/scenario-specific.
+   */
+  incidentKey?: string;
   affectedItems: string[];
   systemActivity: string[];
   pendingDecisions: OperatorDecisionRequest[];

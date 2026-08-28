@@ -20,6 +20,8 @@ import {
   compareRosterAttentionThenId,
   countManagedTravelBuckets,
   fleetCellClassFor,
+  fleetCellClassForRoster,
+  fleetPresentationForRoster,
   requiresOperatorRecoveryAttention,
   rosterAttentionPresentation,
   type ManagedTravelPresentation,
@@ -73,7 +75,7 @@ function rosterStatusBadge(trip: OperatorTripView): string {
 }
 
 function fleetCellClass(trip: OperatorTripView): string {
-  return fleetCellClassFor(presentationInput(trip));
+  return fleetCellClassForRoster(rosterPresentationInput(trip));
 }
 
 function sortFleetByCommitment(
@@ -129,12 +131,13 @@ function fleetGrid(view: OperatorDashboardView, augment: OperatorDashboardAugmen
   const cells = sorted
     .map((trip, i) => {
       const bucket = fleetCellClass(trip);
-      const presentation =
-        trip.travelArrangement === 'SELF_OR_OTHER_ARRANGED'
+      const presentation = fleetPresentationForRoster(rosterPresentationInput(trip));
+      const presentationLabel =
+        presentation === 'LOCAL'
           ? 'Local / self-arranged'
-          : MANAGED_TRAVEL_LABEL[mapManagedTravelPresentation(presentationInput(trip))];
-      const label = `${trip.label ?? trip.tripId} — ${presentation}`;
-      return `<i class="${bucket}" style="--i:${i}" data-fleet-trip="${escapeHtml(trip.tripId)}" data-fleet-status="${escapeHtml(trip.status)}" data-fleet-presentation="${escapeHtml(trip.travelArrangement === 'SELF_OR_OTHER_ARRANGED' ? 'LOCAL' : mapManagedTravelPresentation(presentationInput(trip)))}" title="${escapeHtml(label)}"></i>`;
+          : MANAGED_TRAVEL_LABEL[presentation];
+      const label = `${trip.label ?? trip.tripId} — ${presentationLabel}`;
+      return `<i class="${bucket}" style="--i:${i}" data-fleet-trip="${escapeHtml(trip.tripId)}" data-fleet-status="${escapeHtml(trip.status)}" data-fleet-presentation="${escapeHtml(presentation)}" title="${escapeHtml(label)}"></i>`;
     })
     .join('');
   return `
@@ -276,62 +279,92 @@ function attentionRow(
   </a>`;
 }
 
-function attentionPanel(rows: AttentionRow[]): string {
-  if (rows.length === 0) return '';
+function sharedGroupLabel(incidentKey: string): string {
+  if (incidentKey.startsWith('flight|') && incidentKey.includes('|FLIGHT_SCHEDULE_CHANGE|')) {
+    return 'Shared airline change';
+  }
+  if (incidentKey.startsWith('commitment|')) return 'Shared programme change';
+  return 'Shared incident';
+}
 
-  const scheduleChange = /airline changed the flight schedule/i;
-  const shared = rows.filter((row) => scheduleChange.test(row.description));
-  const rest = rows.filter((row) => !scheduleChange.test(row.description));
+function sharedGroupIssue(count: number, workable: number, criticalCount: number): string {
+  return `One shared incident · ${count} different trip consequences · ${workable} still workable · ${criticalCount} critical`;
+}
 
-  const sharedBlock =
-    shared.length >= 2
-      ? (() => {
-          const consequences = shared.map((row) => ({
-            row,
-            consequence: sharedIncidentConsequence(row.trip),
-          }));
-          const criticalCount = consequences.filter((item) => item.consequence.kind === 'critical').length;
-          const workable = consequences.filter(
-            (item) => item.consequence.kind === 'workable' || item.consequence.kind === 'watching',
-          ).length;
-          const sorted = consequences.sort((a, b) => {
-            const priority =
-              SHARED_OUTCOME_PRIORITY[a.consequence.kind] - SHARED_OUTCOME_PRIORITY[b.consequence.kind];
-            if (priority !== 0) return priority;
-            const aTime = a.row.requestedAt ?? '';
-            const bTime = b.row.requestedAt ?? '';
-            const timeDiff = aTime.localeCompare(bTime);
-            if (timeDiff !== 0) return timeDiff;
-            const aName = a.row.trip.travellerNames[0] ?? a.row.trip.tripId;
-            const bName = b.row.trip.travellerNames[0] ?? b.row.trip.tripId;
-            return aName.localeCompare(bName);
-          });
-          const children = sorted
-            .map(({ row, consequence }, index) =>
-              attentionRow(
-                {
-                  ...row,
-                  description: consequence.label,
-                },
-                index,
-                consequence.kind,
-                true,
-              ),
-            )
-            .join('');
-          const header = `
-  <div class="qrow qrow-group qrow-callout" role="group" aria-label="Shared airline schedule change" data-test="shared-incident-group" data-attention-tone="callout" data-shared-affected="${shared.length}" data-shared-workable="${workable}" data-shared-critical="${criticalCount}">
+function renderSharedGroup(incidentKey: string, groupRows: AttentionRow[], startIndex: number): string {
+  const consequences = groupRows.map((row) => ({
+    row,
+    consequence: sharedIncidentConsequence(row.trip),
+  }));
+  const criticalCount = consequences.filter((item) => item.consequence.kind === 'critical').length;
+  const workable = consequences.filter(
+    (item) => item.consequence.kind === 'workable' || item.consequence.kind === 'watching',
+  ).length;
+  const sorted = consequences.sort((a, b) => {
+    const priority =
+      SHARED_OUTCOME_PRIORITY[a.consequence.kind] - SHARED_OUTCOME_PRIORITY[b.consequence.kind];
+    if (priority !== 0) return priority;
+    const aTime = a.row.requestedAt ?? '';
+    const bTime = b.row.requestedAt ?? '';
+    const timeDiff = aTime.localeCompare(bTime);
+    if (timeDiff !== 0) return timeDiff;
+    const aName = a.row.trip.travellerNames[0] ?? a.row.trip.tripId;
+    const bName = b.row.trip.travellerNames[0] ?? b.row.trip.tripId;
+    return aName.localeCompare(bName);
+  });
+  const children = sorted
+    .map(({ row, consequence }, index) =>
+      attentionRow(
+        { ...row, description: consequence.label },
+        startIndex + index,
+        consequence.kind,
+        true,
+      ),
+    )
+    .join('');
+  const header = `
+  <div class="qrow qrow-group qrow-callout" role="group" aria-label="${escapeHtml(sharedGroupLabel(incidentKey))}" data-test="shared-incident-group" data-attention-tone="callout" data-shared-affected="${groupRows.length}" data-shared-workable="${workable}" data-shared-critical="${criticalCount}">
     <span class="q-glyph g-warn" aria-hidden="true">▲</span>
-    <span class="q-name">Shared airline change</span>
-    <span class="q-issue">One airline change · ${shared.length} different trip consequences · ${workable} still workable · ${criticalCount} critical</span>
+    <span class="q-name">${escapeHtml(sharedGroupLabel(incidentKey))}</span>
+    <span class="q-issue">${escapeHtml(sharedGroupIssue(groupRows.length, workable, criticalCount))}</span>
     <span class="q-time"></span>
   </div>
   <div class="qrow-shared-children">`;
-          return `${header}${children}</div>`;
-        })()
-      : shared.map((row, index) => attentionRow(row, index)).join('');
+  return `${header}${children}</div>`;
+}
 
-  const otherRows = rest.map((row, index) => attentionRow(row, index + shared.length)).join('');
+function attentionPanel(rows: AttentionRow[]): string {
+  if (rows.length === 0) return '';
+
+  // Group by source-incident identity (read-model incidentKey), never by
+  // description copy. Travellers sharing one real incident collapse into a
+  // single callout; independent incidents stay as standalone rows.
+  const byKey = new Map<string, AttentionRow[]>();
+  for (const row of rows) {
+    const key = row.trip.incidentKey;
+    if (!key) continue;
+    const list = byKey.get(key) ?? [];
+    list.push(row);
+    byKey.set(key, list);
+  }
+  const sharedKeys: string[] = [];
+  for (const [key, list] of byKey) {
+    if (list.length >= 2) sharedKeys.push(key);
+  }
+  const sharedSet = new Set(sharedKeys);
+  const isShared = (row: AttentionRow): boolean =>
+    Boolean(row.trip.incidentKey && sharedSet.has(row.trip.incidentKey));
+
+  let cursor = 0;
+  let sharedBlock = '';
+  for (const key of sharedKeys) {
+    const groupRows = rows.filter((row) => row.trip.incidentKey === key);
+    sharedBlock += renderSharedGroup(key, groupRows, cursor);
+    cursor += groupRows.length;
+  }
+
+  const rest = rows.filter((row) => !isShared(row));
+  const otherRows = rest.map((row, index) => attentionRow(row, index + cursor)).join('');
 
   return `
   <section class="section" aria-label="Needs attention" data-test="attention-queue">

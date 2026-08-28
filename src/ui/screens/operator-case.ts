@@ -935,20 +935,14 @@ function recoveryActionsInner(view: CaseDetailView): string {
     const recommendedOption =
       view.options.find((o) => o.recommended) ?? view.options.find((o) => o.verdict === 'VIABLE');
     if (!recommendedOption) return '';
-    const needsHumanApproval = view.options.some((o) => o.requiresApproval);
-    const autoBanner =
-      !needsHumanApproval
-        ? `<div class="authority-auto-banner" data-test="authority-auto-approved">
-          <strong>Approved by policy</strong>
-          <span>Northstar is authorised to proceed with the selected recovery. No extra human approval is required.</span>
-        </div>`
-        : '';
+    // Truthfulness: the real authority outcome is only known after `begin` runs.
+    // Never assert "no approval required" here — a human-approval case must not
+    // be presented as auto-approved before the check happens.
     return `
       <div class="panel recovery-actions" data-ui-section="recovery-begin" data-case-begin-panel data-case-cta="begin">
-        ${autoBanner}
         <p class="planning-kicker">Recovery options ready</p>
         <p class="planning-result-title">Begin the recommended recovery</p>
-        <p>Starting runs the required approval and execution checks. Option details appear after you begin.</p>
+        <p>Starting stages the selected recovery and runs the required approval and execution checks. Option details appear after you begin.</p>
         <form method="POST" action="/api/runtime/begin" class="inline-form" data-test="begin-strategy-form">
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="strategyId" value="${escapeHtml(recommendedOption.id)}">

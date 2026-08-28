@@ -9,7 +9,7 @@ import type { Trip } from '../domain/trip.ts';
 import type { RecoveryCase } from '../operational/case.ts';
 import type { ChainLinkState } from '../ui/case-view-model.ts';
 import type { PendingChangePhase } from './substitutionTargets.ts';
-import { isTransportLeg, selectRecoveryCommitment } from './chainProjection.ts';
+import { isTransportLeg, isStayElement, selectRecoveryCommitment } from './chainProjection.ts';
 
 export interface ChainPresentationContext {
   caseOpen: boolean;
@@ -91,6 +91,11 @@ export function presentationLinkState(
 
   if (element.status === 'INVALID') return 'BROKEN';
   if (element.status === 'AT_RISK') return 'AT_RISK';
+
+  // A trip whose remainder is not viable puts dependent downstream elements at
+  // risk even while the provider still reports them CONFIRMED — green must
+  // mean genuinely protected, not merely booked.
+  if (underThreat && isStayElement(element)) return 'AT_RISK';
 
   switch (element.reservationState) {
     case 'CANCELLED':
