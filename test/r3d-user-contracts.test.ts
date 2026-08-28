@@ -487,7 +487,7 @@ test('authority-required case renders human approve; traveller funding is explic
 test('case page script includes Resolve choreography contract', () => {
   const page = renderPage({ title: 'Recovery case', active: 'case' }, '<main data-case-workspace></main>');
   assert.match(page, /Planning a recovery/);
-  assert.match(page, /Checking trip dependencies/);
+  assert.match(page, /Re-checking the trip/);
   assert.match(page, /ns-resolve/);
   assert.match(page, /prefers-reduced-motion/);
 });

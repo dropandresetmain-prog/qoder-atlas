@@ -26,10 +26,14 @@ test('formatMoney uses US$ / S$ and never bare $ for USD', () => {
   assert.ok(!formatMoney({ amount: 1, currency: 'USD' }).startsWith('$'));
 });
 
-test('presentBufferEvidence formats gap evidence for diagnostics', () => {
+test('presentBufferEvidence translates gap evidence into consequence copy', () => {
   assert.equal(
     presentBufferEvidence('gap 370min >= required 360min'),
-    '370 min available / 360 min required — viable',
+    'Arrival leaves enough preparation time before the commitment',
+  );
+  assert.equal(
+    presentBufferEvidence('gap 120min < required 360min'),
+    'Arrival does not leave enough preparation time before the commitment',
   );
   assert.equal(
     presentCheckLabel(
@@ -68,18 +72,18 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
       {
         id: 'opt-1',
         title: '08:20 NRT→SIN (direct)',
-        summary: 'Arrival 14:35; commitment 20:45; 370 min available / 360 min required — viable.',
+        summary: 'Arrival 14:35; commitment 20:45; Arrival leaves enough preparation time before the commitment.',
         verdict: 'VIABLE',
         recommended: true,
         whyRecommended:
-          'Recommended because it is the earliest evidenced option that satisfies the required arrival buffer (370 min available / 360 min required — viable).',
+          'Recommended because it is the earliest evidenced option that protects the commitment (Arrival leaves enough preparation time before the commitment).',
         providerCost: { amount: 90.54, currency: 'USD' },
         costDelta: { amount: 122.23, currency: 'SGD' },
         requiresApproval: true,
         authorityLabel: 'Organisation approval required',
         commitmentEffect: 'Finals Showcase remains viable',
         provenanceLabel: 'Search evidence: REPLAY · Execution: simulated at provider boundary until observed',
-        pros: ['370 min available / 360 min required — viable', 'NRT 08:20 → SIN 14:35'],
+        pros: ['Arrival leaves enough preparation time before the commitment', 'NRT 08:20 → SIN 14:35'],
         cons: [],
         flags: ['Arrives 14:35 · commitment 20:45'],
       },
@@ -99,7 +103,7 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
   const html = renderCaseDetail({ state: 'LOADED', data: view, generatedAt: view.updatedAt });
   assert.match(html, /US\$90\.54 payable/);
   assert.match(html, /Approx\. S\$122\.23 policy equivalent/);
-  assert.match(html, /370 min available \/ 360 min required/);
+  assert.match(html, /Arrival leaves enough preparation time before the commitment/);
   assert.match(html, /Organisation approval required/);
   assert.match(html, /Search evidence: REPLAY/);
   assert.match(html, /Approve as organiser US\$90\.54/);

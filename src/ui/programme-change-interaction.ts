@@ -640,7 +640,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
       var previewSteps = [
         'Checking linked travellers',
         'Testing the proposed headline time',
-        'Measuring blast radius across the programme'
+        'Checking every linked trip for knock-on effects'
       ];
       showStagedOverlay('Computing programme impact', previewSteps, PREVIEW_MS, function() {
         postJson('/api/programme/' + encodeURIComponent(anchorEventId) + '/change-preview', payload)

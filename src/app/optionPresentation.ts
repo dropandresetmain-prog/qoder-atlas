@@ -139,7 +139,9 @@ export function projectOptionPresentation(input: OptionPresentationInput): Optio
         const available = minutesBetween(arrival, commitmentStart);
         if (available === undefined) return undefined;
         const ok = available >= input.requiredBufferMinutes;
-        return `${available} min available / ${input.requiredBufferMinutes} min required — ${ok ? 'viable' : 'not enough time'}`;
+        return ok
+          ? 'Arrival leaves enough preparation time before the commitment'
+          : 'Arrival does not leave enough preparation time before the commitment';
       }
       return undefined;
     })();
@@ -158,7 +160,7 @@ export function projectOptionPresentation(input: OptionPresentationInput): Optio
       flags.push(`Arrives ${arrivalClock} · commitment ${commitmentClock}`);
     }
     if (input.feasible && available !== undefined && available >= 0 && !bufferLabel) {
-      pros.push(`${available} min between arrival and commitment`);
+      pros.push('Arrival leaves enough preparation time before the commitment');
     }
   }
 
@@ -224,7 +226,7 @@ export function projectOptionPresentation(input: OptionPresentationInput): Optio
   let whyRecommended: string | undefined;
   if (input.recommended && input.feasible) {
     if (bufferLabel) {
-      whyRecommended = `Recommended because it is the earliest evidenced option that satisfies the required arrival buffer (${bufferLabel}).`;
+      whyRecommended = `Recommended because it is the earliest evidenced option that protects the commitment (${bufferLabel}).`;
     } else if (stayCheckout) {
       whyRecommended =
         'Recommended because it extends the existing stay without changing flights or switching hotels.';

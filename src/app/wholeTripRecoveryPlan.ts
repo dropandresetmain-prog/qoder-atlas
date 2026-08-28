@@ -59,7 +59,7 @@ function insuranceFinding(rules: readonly PolicyRule[]): string | undefined {
     );
     if (!coversMissed) continue;
     const excess = rule.excess ? `${formatMoney(rule.excess)} excess` : 'policy excess applies';
-    return `Policy covers missed connections and trip delay (${excess}); claim submission is not automated in this demo`;
+    return `Policy covers missed connections and trip delay (${excess}); the traveller submits the claim — Northstar does not file it`;
   }
   return undefined;
 }
@@ -106,15 +106,14 @@ export function wholeTripAnalysisSteps(input: {
         element.id === assessment.upstreamId && isFlight(element),
     );
   const hubName = hub ? placeLabel(input.places, hub.data.destinationPlaceId) : 'the connection';
-  return [
-    `Rechecking the ${hubName} connection`,
-    'Looking for onward flights',
-    'Checking whether an overnight stay is required',
-    'Checking entry requirements',
-    'Checking insurance coverage',
-    'Reviewing affected stays',
-    'Rechecking programme arrival margin',
-  ];
+  const hasConnection = Boolean(assessment);
+  const steps = hasConnection
+    ? [`Rechecking the ${hubName} connection`, 'Looking for onward flights']
+    : ['Rechecking the itinerary', 'Looking for workable replacement flights'];
+  if (hasConnection) steps.push('Checking whether an overnight stay is required');
+  steps.push('Checking entry requirements', 'Checking insurance coverage', 'Reviewing affected stays');
+  if (input.trip.anchorEventId) steps.push('Rechecking arrival against the programme commitment');
+  return steps;
 }
 
 export function projectWholeTripRecoveryPlan(input: {
@@ -155,21 +154,20 @@ export function projectWholeTripRecoveryPlan(input: {
   );
   const hubPlaceId = hubElement?.data.destinationPlaceId;
   const hubName = hubPlaceId ? placeLabel(input.places, hubPlaceId) : origin;
-  const inboundArrival = input.trip.elements
-    .filter(isFlight)
-    .map((leg) => leg.data.scheduledArrival?.value)
-    .find(Boolean);
+  const inboundArrival = hubElement?.data.scheduledArrival?.value;
   const replacementDay = calendarDay(replacement.data.scheduledDeparture?.value);
   const inboundDay = calendarDay(inboundArrival);
+  // An overnight follows only from real topology: a failed/missed connection,
+  // or a connection whose inbound and replacement legs land on different days.
   if (
-    connection?.viability === 'IMPOSSIBLE' ||
-    (inboundDay && replacementDay && inboundDay !== replacementDay)
+    connection &&
+    (connection.viability === 'IMPOSSIBLE' || (inboundDay && replacementDay && inboundDay !== replacementDay))
   ) {
     items.push({
       id: `plan-overnight-${input.strategy.id}`,
       category: 'OVERNIGHT',
       title: 'Overnight stay',
-      finding: `Timing requires an overnight stay near ${hubName}; hotel booking is not executed automatically`,
+      finding: `Timing requires an overnight stay near ${hubName}; Northstar does not book the hotel — the organiser or traveller confirms it with the provider`,
       kind: 'RECOMMENDED',
     });
   }
@@ -201,11 +199,15 @@ export function projectWholeTripRecoveryPlan(input: {
     const arrival = replacement.data.scheduledArrival?.value;
     if (!arrival || instantMillis(arrival) <= instantMillis(checkIn)) continue;
     const hotel = placeLabel(input.places, element.data.placeId);
+    const crossesDay =
+      calendarDay(arrival) !== undefined && calendarDay(arrival) !== calendarDay(checkIn);
     items.push({
       id: `plan-hotel-${element.id}`,
       category: 'HOTEL',
       title: 'Affected stay',
-      finding: `First night at ${hotel} is no longer usable as booked; cancellation or change should be requested with the provider`,
+      finding: crossesDay
+        ? `The first night at ${hotel} is no longer usable as booked; the provider must be contacted to change or cancel it`
+        : `The stay at ${hotel} starts before the new arrival; the provider must be contacted to adjust the booking`,
       kind: 'MANUAL_FOLLOWUP',
     });
   }
@@ -235,14 +237,21 @@ export function projectWholeTripRecoveryPlan(input: {
     items.push({
       id: `plan-cost-${input.strategy.id}`,
       category: 'COST',
-      title: 'Known flight cost',
-      finding: `${formatMoney(knownIncrementalCost!)} executable through Northstar for the replacement flight`,
+      title: 'Known cost',
+      finding: `${formatMoney(knownIncrementalCost!)} for the replacement flight, chargeable through Northstar`,
       kind: 'EXECUTABLE',
     });
   } else {
     costNotes.push('Flight cost will be confirmed when inventory is priced');
   }
-  costNotes.push('Overnight hotel and stay-change costs are not included in a single total — confirm with providers');
+  const hasNonExecutableCost = items.some(
+    (item) => item.kind === 'RECOMMENDED' || item.kind === 'MANUAL_FOLLOWUP',
+  );
+  if (hasNonExecutableCost) {
+    costNotes.push(
+      'The total covers only what Northstar executes directly; the follow-ups above are priced by their providers',
+    );
+  }
 
   return {
     headline: 'One recovery plan across the whole trip',

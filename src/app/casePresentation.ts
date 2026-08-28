@@ -98,7 +98,7 @@ export function enrichCaseDetailView(
     { label: 'Opened', value: formatCaseOpenedAt(recoveryCase.openedAt) },
   ];
   const signalLabel = signalSourceLabel(triggeringSignals[0]);
-  if (signalLabel) caseFacts.push({ label: 'Signal', value: signalLabel });
+  if (signalLabel) caseFacts.push({ label: 'Reported by', value: signalLabel });
   railSections.push({ title: 'Case facts', rows: caseFacts });
 
   const whoRows: Array<{ label: string; value: string }> = [];

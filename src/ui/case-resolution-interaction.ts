@@ -53,14 +53,14 @@ export function renderCaseResolutionEnhancementScript(): string {
   }
 
   var DEFAULT_PLANNING = [
-    { phase: 'planning', label: 'Checking trip dependencies' },
+    { phase: 'planning', label: 'Re-checking the trip' },
     { phase: 'planning', label: 'Searching recovery options' },
-    { phase: 'planning', label: 'Testing whole-trip viability' },
-    { phase: 'authority', label: 'Checking policy and authority' }
+    { phase: 'planning', label: 'Testing the whole trip with each option' },
+    { phase: 'authority', label: 'Checking policy and approval' }
   ];
   var DEFAULT_EXECUTION = [
     { phase: 'execution', label: 'Applying the approved change' },
-    { phase: 'observation', label: 'Checking the supplier result' },
+    { phase: 'observation', label: 'Confirming the result with the provider' },
     { phase: 'state_update', label: 'Updating the trip record' },
     { phase: 'recheck', label: 'Rechecking the rest of the trip' }
   ];

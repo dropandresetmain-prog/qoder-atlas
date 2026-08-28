@@ -358,7 +358,9 @@ function evaluateLinkedTrip(
     }
   }
 
-  // Compare inbound arrival buffer before vs after the proposed start.
+  // Compare inbound arrival preparation time before vs after the proposed start.
+  // The minutes feed the verdict; the reasons translate them into consequences
+  // (raw buffer arithmetic stays in machine evidence, not user-facing copy).
   const REQUIRED_BUFFER_MIN = 360;
   let timingRestored = false;
   let bufferStillFails = false;
@@ -387,18 +389,18 @@ function evaluateLinkedTrip(
     if (timingRestored && arrivalGapMinutes !== undefined) {
       reasons.push(
         start
-          ? `Restores viability for ${commitmentLabel}: ${arrivalGapMinutes} min available / ${REQUIRED_BUFFER_MIN} min required at ${start}`
-          : `Restores viability for ${commitmentLabel}: ${arrivalGapMinutes} min available / ${REQUIRED_BUFFER_MIN} min required`,
+          ? `Moving to ${start} restores enough preparation time before ${commitmentLabel}`
+          : `The move restores enough preparation time before ${commitmentLabel}`,
       );
     } else if (bufferStillFails && arrivalGapMinutes !== undefined) {
       reasons.push(
-        `Buffer still fails for ${commitmentLabel}: ${arrivalGapMinutes} min available / ${REQUIRED_BUFFER_MIN} min required` +
-          (priorGapMinutes !== undefined ? ` (was ${priorGapMinutes} min)` : ''),
+        `${commitmentLabel} still does not leave enough preparation time after the flight arrival` +
+          (priorGapMinutes !== undefined ? ' (unchanged from today)' : ''),
       );
     } else if (bufferStillPasses && arrivalGapMinutes !== undefined) {
       reasons.push(
-        `Buffer still passes for ${commitmentLabel} (${arrivalGapMinutes} ≥ ${REQUIRED_BUFFER_MIN} min)` +
-          (start ? ` after move to ${start}` : ''),
+        `${commitmentLabel} still leaves enough preparation time after arrival` +
+          (start ? ` with the move to ${start}` : ''),
       );
     } else {
       reasons.push(

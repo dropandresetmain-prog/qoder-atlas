@@ -1,45 +1,45 @@
 {
-  "base": "http://127.0.0.1:36049",
+  "base": "http://127.0.0.1:34837",
   "shots": [
     {
       "name": "01-overview",
-      "path": "/workspace/output/hero-presentation/01-overview.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/01-overview.png"
     },
     {
       "name": "02-programme",
-      "path": "/workspace/output/hero-presentation/02-programme.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/02-programme.png"
     },
     {
       "name": "03-jordan-case-entry",
-      "path": "/workspace/output/hero-presentation/03-jordan-case-entry.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/03-jordan-case-entry.png"
     },
     {
       "name": "04-jordan-options",
-      "path": "/workspace/output/hero-presentation/04-jordan-options.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/04-jordan-options.png"
     },
     {
       "name": "05-sarah-programme-preview",
-      "path": "/workspace/output/hero-presentation/05-sarah-programme-preview.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/05-sarah-programme-preview.png"
     },
     {
       "name": "06-oliver-case-entry",
-      "path": "/workspace/output/hero-presentation/06-oliver-case-entry.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/06-oliver-case-entry.png"
     },
     {
       "name": "07-oliver-options",
-      "path": "/workspace/output/hero-presentation/07-oliver-options.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/07-oliver-options.png"
     },
     {
       "name": "08-jonas-case-entry",
-      "path": "/workspace/output/hero-presentation/08-jonas-case-entry.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/08-jonas-case-entry.png"
     },
     {
       "name": "09-jonas-options",
-      "path": "/workspace/output/hero-presentation/09-jonas-options.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/09-jonas-options.png"
     },
     {
       "name": "10-traveller-hero",
-      "path": "/workspace/output/hero-presentation/10-traveller-hero.png"
+      "path": "/data/workspace/qoder-atlas/output/hero-presentation/10-traveller-hero.png"
     }
   ],
   "checks": [
@@ -55,7 +55,7 @@
     },
     {
       "check": "jordan-us-currency",
-      "ok": true,
+      "ok": false,
       "detail": "US$ present"
     },
     {
@@ -75,7 +75,7 @@
     },
     {
       "check": "jordan-organiser-authority",
-      "ok": true,
+      "ok": false,
       "detail": ""
     },
     {

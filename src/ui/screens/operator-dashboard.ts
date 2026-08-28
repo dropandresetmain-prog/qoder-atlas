@@ -205,6 +205,9 @@ function sanitizeOverviewCopy(text: string): string {
   return text
     .replace(/\bel-trip-[a-z0-9-]+/gi, 'linked engagement')
     .replace(/\btrip-[a-z0-9-]+/gi, 'trip')
+    .replace(/\s*[—–-]\s*S\d+\s+critical\b/gi, ' — critical')
+    .replace(/\s*[—–-]\s*S\d+\b/g, '')
+    .replace(/\bS\d+\s+critical\b/g, 'critical')
     .replace(/\b\d{4}-\d{2}-\d{2}T[\d:+.-]+/g, (iso) => {
       const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
       if (!match) return iso;
@@ -225,10 +228,10 @@ function sharedIncidentConsequence(trip: OperatorTripView): {
 } {
   const viability = trip.remainderViable;
   if (viability === 'NOT_VIABLE') {
-    return { kind: 'critical', label: 'Critical — travel cannot protect the commitment' };
+    return { kind: 'critical', label: 'Critical — this change alone cannot protect the commitment' };
   }
   if (viability === 'AT_RISK' || viability === 'UNKNOWN') {
-    return { kind: 'watching', label: 'Watching — schedule changed; trip still workable' };
+    return { kind: 'watching', label: 'Watching — the trip still works, but margin is tighter' };
   }
   // VIABLE or absent evaluation that did not fail hard constraints
   return { kind: 'workable', label: 'Viable after the same airline change' };
@@ -288,7 +291,7 @@ function sharedGroupLabel(incidentKey: string): string {
 }
 
 function sharedGroupIssue(count: number, workable: number, criticalCount: number): string {
-  return `One shared incident · ${count} different trip consequences · ${workable} still workable · ${criticalCount} critical`;
+  return `One airline change affects ${count} trips — ${workable} still workable, ${criticalCount} critical`;
 }
 
 function renderSharedGroup(incidentKey: string, groupRows: AttentionRow[], startIndex: number): string {
@@ -397,6 +400,7 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
   const namedTravellers = trip.travellerNames.length > 0 ? trip.travellerNames.join(', ') : undefined;
   const name = namedTravellers ?? trip.label ?? trip.tripId;
   const roleLine = augment.roleFor?.(trip) ?? trip.anchorEventName ?? (namedTravellers ? trip.label : undefined);
+  const cleanRoleLine = roleLine ? sanitizeOverviewCopy(roleLine) : undefined;
   const chain = augment.chainFor?.(trip);
   const miniChain = chain && chain.length > 0 ? miniChainRow(chain) : '';
   const extras: string[] = [];
@@ -428,7 +432,7 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
     <span class="b-dot ${fleetCellClass(trip)}" aria-hidden="true"></span>
     <div class="b-primary">
       <div class="b-name">${escapeHtml(name)}</div>
-      ${roleLine ? `<div class="b-extra">${escapeHtml(roleLine)}</div>` : ''}
+      ${cleanRoleLine ? `<div class="b-extra">${escapeHtml(cleanRoleLine)}</div>` : ''}
       ${miniChain}
     </div>
     <div class="b-detail">

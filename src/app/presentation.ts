@@ -55,7 +55,8 @@ export function presentConstraintLabel(constraint: Constraint | undefined): stri
 
 /**
  * Parse evaluator evidence such as `gap 370min >= required 360min` into
- * judge-facing copy: `370 min available / 360 min required — viable`.
+ * judge-facing consequence copy. Raw minute arithmetic stays in the
+ * machine-readable evidence; screens render the outcome.
  */
 export function presentBufferEvidence(evidence: string | undefined): string | undefined {
   if (!evidence) return undefined;
@@ -65,10 +66,10 @@ export function presentBufferEvidence(evidence: string | undefined): string | un
   const comparator = match[2];
   const required = Number(match[3]);
   if (!Number.isFinite(available) || !Number.isFinite(required)) return undefined;
-  if (comparator === '<') {
-    return `Only ${available} minutes remain before the commitment, but ${required} minutes are required.`;
+  if (comparator === '<' || available < required) {
+    return 'Arrival does not leave enough preparation time before the commitment';
   }
-  return `${available} min available / ${required} min required — viable`;
+  return 'Arrival leaves enough preparation time before the commitment';
 }
 
 const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
@@ -291,6 +292,22 @@ export function presentAction(operation: string): string {
 }
 
 /**
+ * Nominal action label for sentences like "Approval needed before X".
+ * `presentAction` produces gerunds for activity feeds; approval queues need
+ * the plain action so the sentence reads grammatically.
+ */
+export function presentActionNoun(operation: string): string {
+  const copy: Record<string, string> = {
+    'flight.change': 'the flight rebooking',
+    'flight.cancel': 'the flight cancellation',
+    'hotel.modify': 'the hotel stay change',
+    'hotel.cancel': 'the hotel stay cancellation',
+    'simulation.provider_action': 'the provider change',
+  };
+  return copy[operation] ?? 'the travel change';
+}
+
+/**
  * Provider and engine signal vocabulary is useful audit evidence, not product
  * copy. Preserve an authored human sentence when one exists; otherwise map
  * the stable signal kind to a calm, provider-neutral explanation.
@@ -337,7 +354,7 @@ export function presentDisruptedCaseSummary(input: {
   const base = input.signal ? presentSignalChange(input.signal) : undefined;
   const commitment = input.criticalObjectiveAtRisk?.trim();
   const bufferFail = input.failedCheckLabels?.find((label) =>
-    /minutes remain before the commitment|required arrival buffer|no longer works for the commitment/i.test(label),
+    /arrival buffer|preparation time|enough time|no longer works for the commitment|no longer protects/i.test(label),
   );
 
   if (input.signal?.kind === 'FLIGHT_SCHEDULE_CHANGE' && commitment) {
@@ -348,7 +365,7 @@ export function presentDisruptedCaseSummary(input: {
   }
 
   if (commitment && bufferFail) {
-    return `${base ?? 'This trip changed.'} ${commitment} is now at risk because the required arrival buffer is no longer met.`;
+    return `${base ?? 'This trip changed.'} ${commitment} is now at risk because the new timing no longer leaves enough preparation time.`;
   }
 
   return base;

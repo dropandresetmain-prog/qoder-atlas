@@ -55,6 +55,7 @@ import {
 import type { AnchorEvent, Place } from '../domain/entities.ts';
 import {
   presentAction,
+  presentActionNoun,
   presentActivity,
   presentAllocationSummary,
   presentApprovalReason,
@@ -514,7 +515,7 @@ export async function projectOperatorDashboard(
         pendingDecisions.push({
           caseId: recoveryCase.id,
           decisionType: 'APPROVAL',
-          description: `Approval needed before ${intent ? presentAction(intent.operation) : 'the recovery action'} can proceed`,
+          description: `Approval needed before ${intent ? presentActionNoun(intent.operation) : 'the recovery action'} can proceed`,
           ...(payable ? { amount: payable } : {}),
           requestedAt: decision.decidedAt,
         });

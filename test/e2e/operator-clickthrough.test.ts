@@ -99,7 +99,7 @@ test('DR-4: full recovery loop via browser clicks — dashboard → case → app
   await page.waitForSelector('[data-test="resolve-northstar-btn"], [data-test="plan-recovery-btn"]', { timeout: 5000 });
   const caseHtml = await page.content();
   assert.ok(
-    caseHtml.includes('Resolve with Northstar AI') || caseHtml.includes('Plan recovery'),
+    caseHtml.includes('Find a recovery') || caseHtml.includes('Plan recovery'),
     'case shows recovery actions panel',
   );
 
@@ -333,7 +333,7 @@ test('DR-4: page reload preserves state (browser refresh test)', async () => {
   // Verify the same elements are present
   assert.ok(reloadedHtml.includes('data-ui-section="recovery-actions"'), 'recovery-actions panel present after reload');
   assert.ok(
-    reloadedHtml.includes('Resolve with Northstar AI') ||
+    reloadedHtml.includes('Find a recovery') ||
       reloadedHtml.includes('Begin recovery') ||
       reloadedHtml.includes('Plan recovery'),
     'recovery action present after reload',

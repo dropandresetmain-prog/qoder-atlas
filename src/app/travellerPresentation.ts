@@ -134,7 +134,7 @@ function projectOptionDetails(
     commitmentEffect: criticalObjectiveAtRisk ? 'breaks' : 'unknown',
     note: criticalObjectiveAtRisk
       ? `Leaves "${criticalObjectiveAtRisk}" at risk — nothing changes.`
-      : 'Nothing changes; the disruption stays as it is.',
+      : 'Nothing changes; your trip stays as it is now.',
   };
   // These keys deliberately match projectTravellerTrip's persisted input options.
   return { Approve: approve, Decline: decline };

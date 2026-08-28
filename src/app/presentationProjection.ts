@@ -143,9 +143,19 @@ export async function projectTravellerRoleLine(
   const traveller: Traveller = travellerEntry.entity;
 
   const note = traveller.communicationPreference?.split(';')[0]?.trim();
-  if (note) return note;
+  if (note) return sanitizeRoleLine(note);
 
   return primaryEngagementRole(trip);
+}
+
+/** Role descriptor shown on operator surfaces; strips internal scenario tokens. */
+function sanitizeRoleLine(text: string): string {
+  return text
+    .replace(/\s*[—–-]\s*S\d+\s+critical\b/gi, ' — critical')
+    .replace(/\s*[—–-]\s*S\d+\b/g, '')
+    .replace(/\bS\d+\s+critical\b/g, 'critical')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 export async function projectTravellerArrivalSummary(

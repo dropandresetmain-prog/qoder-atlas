@@ -353,7 +353,7 @@ test('planning action exposes truthful in-flight stages before the real response
   assert.ok(html.includes('data-test="resolve-northstar-btn"') || html.includes('data-test="plan-recovery-form"'));
   assert.ok(html.includes('data-resolve-northstar') || html.includes('data-planning-progress'));
   assert.ok(
-    html.includes('Resolve with Northstar') ||
+    html.includes('Find a recovery') ||
       html.includes('Checking the changed flight') ||
       html.includes('Comparing recovery options'),
   );

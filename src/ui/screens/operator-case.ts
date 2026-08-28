@@ -79,11 +79,11 @@ import {
 
 /** Approved recovery-progress steps (C2). */
 export const CASE_STEPS = [
-  'Signal received',
+  'Trip change received',
   'Trip re-checked',
-  'Comparing options',
-  'Policy check',
-  'Proposal',
+  'Recovery options compared',
+  'Policy and approval checked',
+  'Recommendation ready',
 ] as const;
 
 /**
@@ -410,7 +410,7 @@ const CHECK_ICONS: Record<CaseCheckView['result'], { icon: string; iconClass: st
 
 function checksSection(checks: readonly CaseCheckView[]): string {
   if (checks.length === 0) return '';
-  const rows = checks
+  const rows = [...new Map(checks.map((check) => [`${check.result}:${check.label}`, check])).values()]
     .map((check) => {
       const style = CHECK_ICONS[check.result];
       return `<li><span class="ic ${style.iconClass}" aria-hidden="true">${style.icon}</span><span>${escapeHtml(check.label)}</span></li>`;
@@ -449,8 +449,8 @@ function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan'
   const kindLabel: Record<(typeof plan.items)[number]['kind'], string> = {
     CHECKED: 'Checked',
     RECOMMENDED: 'Recommended follow-up',
-    EXECUTABLE: 'Executable by Northstar',
-    MANUAL_FOLLOWUP: 'Manual / provider follow-up',
+    EXECUTABLE: 'Northstar executes',
+    MANUAL_FOLLOWUP: 'Provider follow-up',
   };
   const categoryOrder = ['FLIGHT', 'OVERNIGHT', 'HOTEL', 'ENTRY', 'INSURANCE', 'EVENT', 'COST'] as const;
   const sorted = [...plan.items].sort(
@@ -1008,15 +1008,15 @@ function recoveryActionsInner(view: CaseDetailView): string {
     return `
       <div class="panel recovery-actions" data-ui-section="recovery-actions" data-resolve-northstar-cta data-case-cta="plan">
         <p class="planning-kicker">${programmeTravel ? 'Travel alone cannot save this objective' : 'Impacted trip'}</p>
-        <p class="planning-result-title">${programmeTravel ? 'Find a way to protect the headline' : 'Resolve with Northstar AI'}</p>
+        <p class="planning-result-title">${programmeTravel ? 'Find a way to protect the headline' : 'Find a recovery'}</p>
         <p>${
           programmeTravel
             ? 'Northstar will verify the airline replacement, test it against the current headline, and check whether a programme change can restore viability.'
-            : 'Northstar will check trip dependencies, search recovery options, test whole-trip viability, and confirm policy authority — then present the workable choices.'
+            : 'Northstar will re-check the whole trip against the new reality, compare workable fixes, and tell you who needs to approve what — before anything is booked.'
         }</p>
         <button type="button" class="btn btn-primary" ${
           programmeTravel ? 'data-programme-travel-analysis data-test="programme-travel-analysis-btn"' : 'data-resolve-northstar data-test="resolve-northstar-btn"'
-        }>${programmeTravel ? 'Check travel and programme options' : 'Resolve with Northstar AI'}</button>
+        }>${programmeTravel ? 'Check travel and programme options' : 'Find a recovery'}</button>
         <form method="POST" action="/api/runtime/plan" class="inline-form" data-test="plan-recovery-form" hidden>
           <input type="hidden" name="caseId" value="${escapeHtml(view.caseId)}">
           <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
@@ -1104,7 +1104,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
         'Testing current arrival against the headline',
         'Checking evidenced travel alternatives',
         'Headline commitment still fails',
-        'Opening a mutation-free programme counterfactual',
+        'Testing a possible programme change without touching the programme',
       ])
     : view.recoveryAnalysisSteps
       ? JSON.stringify(view.recoveryAnalysisSteps)
@@ -1121,7 +1121,7 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   }${planningSteps ? ` data-transition-planning='${escapeHtml(planningSteps)}'` : ''}>
   <div class="page-head">
     <h1>${escapeHtml(view.tripLabel ?? (view.travellerNames.join(', ') || view.tripId))} <span class="${toneClass(badge.tone, 'badge')}" role="status" aria-label="Case status: ${escapeHtml(badge.label)}">${escapeHtml(badge.label)}</span></h1>
-    <p class="sub">${escapeHtml(view.travellerNames.join(', '))}</p>
+    ${view.tripLabel?.trim() && view.travellerNames.join(', ') !== view.tripLabel ? `<p class="sub">${escapeHtml(view.travellerNames.join(', '))}</p>` : ''}
     <p class="meta"><a href="/operator">← Overview</a> · Updated ${escapeHtml(formatInstant(view.updatedAt))}</p>
   </div>
   ${stepper(view)}

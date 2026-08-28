@@ -39,6 +39,7 @@ import type { Engagement, Stay, TransportLeg } from '../domain/elements.ts';
 import type { Place } from '../domain/entities.ts';
 import type { HotelPropertyView, HotelRateView } from '../contracts/capabilities.ts';
 import { hotelSearchGuestsFromOccupancy } from '../app/dispatch.ts';
+import { formatMoney } from '../ui/html.ts';
 
 /** Provider-neutral booking-ref system marking a candidate hotel rate handle. */
 const HOTEL_RATE_REF_SYSTEM = 'hotel-provider';
@@ -1335,9 +1336,10 @@ export class NorthstarPlanner implements RecoveryPlanner {
           : '';
       // Exact provider payable — never round (541.83 must not become 542).
       const payableAmount = Number(rate.totalPrice.amount.toFixed(2));
+      const payableLabel = formatMoney({ amount: payableAmount, currency: rate.totalPrice.currency });
       const summary = samePropertyExtension
-        ? `Extend stay at ${property.name}${nightsPhrase} — ${payableAmount} ${rate.totalPrice.currency}`
-        : `Switch stay to ${property.name}${nightsPhrase} — ${payableAmount} ${rate.totalPrice.currency}`;
+        ? `Extend stay at ${property.name}${nightsPhrase} — ${payableLabel}`
+        : `Switch stay to ${property.name}${nightsPhrase} — ${payableLabel}`;
       return {
         id: this.idFactory('strat'),
         caseId: input.caseId,
