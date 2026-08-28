@@ -31,6 +31,10 @@ import {
   CASE_OPTIONS_FORMING_TITLE,
   CASE_WAITING_DECISION_TITLE,
   CASE_WHAT_CHANGED_TITLE,
+  CASE_WHAT_HAPPENED_TITLE,
+  CASE_DOWNSTREAM_IMPACT_TITLE,
+  CASE_STATUS_TIMELINE_TITLE,
+  CASE_SELECTED_RECOVERY_TITLE,
   OPTION_VERDICT_LABEL,
   PAYER_LABEL,
   RESOLUTION_OUTCOME_LABEL,
@@ -70,6 +74,7 @@ import {
   type CaseResolutionView,
   type ChainLinkView,
   type RecoveryOptionView,
+  type StatusTimelineEntryView,
 } from '../case-view-model.ts';
 
 /** Approved recovery-progress steps (C2). */
@@ -257,8 +262,8 @@ function leadCallout(view: CaseDetailView): string {
   }
   if (view.whatChanged) {
     return `
-    <div class="${toneClass(STATUS_TONE[view.status], 'callout')}">
-      <h3>${escapeHtml(CASE_WHAT_CHANGED_TITLE)}</h3>
+    <div class="${toneClass(STATUS_TONE[view.status], 'callout')}" data-test="what-happened-block">
+      <h3>${escapeHtml(CASE_WHAT_HAPPENED_TITLE)}</h3>
       <p>${escapeHtml(view.whatChanged)}</p>
     </div>`;
   }
@@ -266,7 +271,41 @@ function leadCallout(view: CaseDetailView): string {
 }
 
 // ---------------------------------------------------------------------------
-// Impact — "What this touches" (approved C1). Rich per-item states when the
+// Status timeline — progressive evidence when multiple signals exist (Pass 2).
+// ---------------------------------------------------------------------------
+
+const TIMELINE_TONE: Record<NonNullable<StatusTimelineEntryView['tone']>, string> = {
+  neutral: 'tone-neutral',
+  watch: 'tone-watch',
+  alert: 'tone-alert',
+  ok: 'tone-ok',
+};
+
+function statusTimelineSection(view: CaseDetailView): string {
+  const timeline = view.statusTimeline;
+  if (!timeline || timeline.length === 0) return '';
+  const rows = timeline
+    .map((entry) => {
+      const tone = TIMELINE_TONE[entry.tone ?? 'neutral'];
+      const when = entry.at ? `<time class="status-tl-at" datetime="${escapeHtml(entry.at)}">${escapeHtml(formatInstant(entry.at))}</time>` : '';
+      const detail = entry.detail ? `<p class="status-tl-detail">${escapeHtml(entry.detail)}</p>` : '';
+      return `
+      <li class="status-tl-row ${tone}" data-test="status-timeline-entry">
+        ${when}
+        <p class="status-tl-label">${escapeHtml(entry.label)}</p>
+        ${detail}
+      </li>`;
+    })
+    .join('');
+  return `
+  <section class="section" aria-label="${escapeHtml(CASE_STATUS_TIMELINE_TITLE)}" data-test="status-timeline">
+    <h2>${escapeHtml(CASE_STATUS_TIMELINE_TITLE)}</h2>
+    <ol class="status-timeline">${rows}</ol>
+  </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Impact — "What this affects" (Pass 2). Rich per-item states when the
 // projection supplies them; the plain string list is the honest fallback.
 // ---------------------------------------------------------------------------
 
@@ -310,8 +349,8 @@ function affectedSection(view: CaseDetailView): string {
         .join('')}</ul>`
     : `<ul class="plain-list">${view.affectedItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
   return `
-  <section class="section" aria-label="${escapeHtml(CASE_AFFECTED_TITLE)}">
-    <h2>${escapeHtml(CASE_AFFECTED_TITLE)}</h2>
+  <section class="section" aria-label="${escapeHtml(CASE_DOWNSTREAM_IMPACT_TITLE)}" data-test="downstream-impact">
+    <h2>${escapeHtml(CASE_DOWNSTREAM_IMPACT_TITLE)}</h2>
     <div class="panel">${list}</div>
     ${critical}
   </section>`;
@@ -413,15 +452,22 @@ function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan'
     EXECUTABLE: 'Executable by Northstar',
     MANUAL_FOLLOWUP: 'Manual / provider follow-up',
   };
-  const items = plan.items
+  const categoryOrder = ['FLIGHT', 'OVERNIGHT', 'HOTEL', 'ENTRY', 'INSURANCE', 'EVENT', 'COST'] as const;
+  const sorted = [...plan.items].sort(
+    (a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category),
+  );
+  const items = sorted
     .map(
       (item) => `
-    <div class="whole-trip-item" data-plan-kind="${escapeHtml(item.kind)}" data-test="whole-trip-item">
+    <div class="whole-trip-item" data-plan-kind="${escapeHtml(item.kind)}" data-plan-category="${escapeHtml(item.category)}" data-test="whole-trip-item">
       <p class="whole-trip-item-title"><strong>${escapeHtml(item.title)}</strong> · ${escapeHtml(kindLabel[item.kind])}</p>
       <p>${escapeHtml(item.finding)}</p>
     </div>`,
     )
     .join('');
+  const knownCost = plan.knownIncrementalCost
+    ? `<p class="whole-trip-known-cost" data-test="whole-trip-known-cost"><strong>Known incremental cost:</strong> ${escapeHtml(formatMoney(plan.knownIncrementalCost))}</p>`
+    : '';
   const costNotes =
     (plan.costNotes?.length ?? 0) > 0
       ? `<ul class="whole-trip-cost-notes">${plan.costNotes!.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>`
@@ -429,7 +475,9 @@ function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan'
   return `
     <div class="whole-trip-plan" data-test="whole-trip-plan">
       <p class="whole-trip-headline"><strong>${escapeHtml(plan.headline)}</strong></p>
+      <p class="whole-trip-compare-kicker">Before → after across the whole trip</p>
       ${items}
+      ${knownCost}
       ${costNotes}
     </div>`;
 }
@@ -566,7 +614,7 @@ function optionsSection(view: CaseDetailView): string {
     return `
   <div data-case-options-panel>
   <section class="section" aria-label="Selected recovery" data-test="case-options" data-options-mode="awaiting_authority" data-primary-option-count="1">
-    <h2>Selected recovery</h2>
+    <h2>${escapeHtml(CASE_SELECTED_RECOVERY_TITLE)}</h2>
     <div class="primary-options" data-test="primary-options">${optionCard(selected, 'recommended')}</div>
     ${moreBlock}
   </section>
@@ -1080,11 +1128,12 @@ export function renderCaseDetailBody(view: CaseDetailView): string {
   <div class="case-grid">
     <div>
       ${leadCallout(view)}
+      ${statusTimelineSection(view)}
       ${optionalSection('Trip status', chainSection(view.chain))}
-      ${primaryActionPanel(view)}
+      ${affectedSection(view)}
       ${optionsFormingSection(view)}
       ${optionsSection(view)}
-      ${affectedSection(view)}
+      ${primaryActionPanel(view)}
       ${checksSection(view.checks)}
       ${resolvedChangeSection(view)}
       ${activitySection(view)}

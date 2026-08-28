@@ -65,6 +65,22 @@ export function renderCaseResolutionEnhancementScript(): string {
     { phase: 'recheck', label: 'Rechecking the rest of the trip' }
   ];
 
+  function stepIcon(phase, label) {
+    var text = String(label || '').toLowerCase();
+    if (/flight|airline|onward|inventory/.test(text)) return '✈';
+    if (/connection|depend|transfer|hub/.test(text)) return '⇄';
+    if (/hotel|stay|overnight/.test(text)) return '■';
+    if (/entry|immigration|transit|visa/.test(text)) return '◉';
+    if (/insurance|policy cover/.test(text)) return '◈';
+    if (/programme|headline|commitment|event|final/.test(text)) return '✦';
+    if (/cost|fund|price/.test(text)) return '$';
+    if (phase === 'authority') return '◆';
+    if (phase === 'execution') return '⟳';
+    if (phase === 'observation') return '◎';
+    if (phase === 'state_update' || phase === 'recheck') return '✓';
+    return '·';
+  }
+
   function ensureOverlay(id, title, steps) {
     var existing = document.getElementById(id);
     if (existing) existing.remove();
@@ -79,10 +95,10 @@ export function renderCaseResolutionEnhancementScript(): string {
     var stepsHtml = steps.map(function(step, i) {
       var phase = step.phase || 'planning';
       var label = step.label || String(step);
+      var icon = stepIcon(phase, label);
       return '<li data-step="' + i + '" data-phase="' + phase + '">' +
-        '<span class="ns-resolve-step-mark" aria-hidden="true"></span>' +
+        '<span class="ns-resolve-step-icon" aria-hidden="true">' + icon + '</span>' +
         '<span class="ns-resolve-step-body">' +
-          '<span class="ns-resolve-phase">' + phase.replace(/_/g, ' ') + '</span>' +
           '<span class="ns-resolve-step-label">' + label + '</span>' +
         '</span>' +
       '</li>';

@@ -176,9 +176,40 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return formatHumanInstant(startIso) || String(startIso || '');
   }
 
+  function splitWhenLabel(label) {
+    var text = String(label || '').trim();
+    if (!text) return { date: '—', time: '—' };
+    var parts = text.split(' · ');
+    if (parts.length >= 2) return { date: parts[0], time: parts.slice(1).join(' · ') };
+    return { date: text, time: '—' };
+  }
+
+  function compareSlotHtml(sideLabel, date, time, venue) {
+    return '<div class="cc-box' + (sideLabel === 'Proposed' ? ' to' : '') + '" data-test="programme-compare-' + (sideLabel === 'Proposed' ? 'proposed' : 'now') + '">' +
+      '<p class="kv-label">' + sideLabel + '</p>' +
+      '<div class="cc-slot"><span class="cc-slot-k">Date</span><span class="cc-slot-v">' + (date || '—') + '</span></div>' +
+      '<div class="cc-slot"><span class="cc-slot-k">Time</span><span class="cc-slot-v">' + (time || '—') + '</span></div>' +
+      '<div class="cc-slot"><span class="cc-slot-k">Venue</span><span class="cc-slot-v">' + (venue || '—') + '</span></div>' +
+    '</div>';
+  }
+
+  function sanitizeImpactReason(text) {
+    return String(text)
+      .replace(/\\bgap\\s+\\d+\\s*min[^·]*/gi, 'arrival no longer protects the headline')
+      .replace(/\\b\\d+\\s*min(?:ute)?s?\\b/gi, 'timing')
+      .replace(/\\bbuffer\\b/gi, 'margin')
+      .replace(/commitment rescheduled/gi, 'Programme commitment moves')
+      .replace(/\\bel-trip-[a-z0-9-]+/gi, 'linked engagement')
+      .replace(/\\b\\d{4}-\\d{2}-\\d{2}T[\\d:+.-]+/g, function(iso) { return formatHumanInstant(iso); });
+  }
+
   function formatProposedSide(payload) {
-    if (payload.changeKind === 'CANCELLED') return { whenLabel: 'Cancelled', whereLabel: undefined };
+    if (payload.changeKind === 'CANCELLED') {
+      return { whenLabel: 'Cancelled', dateLabel: '—', timeLabel: 'Cancelled', venueLabel: '—' };
+    }
     var when = 'Time not set';
+    var dateLabel = '—';
+    var timeLabel = '—';
     if (payload.newStartsAt) {
       var startHuman = formatHumanInstant(payload.newStartsAt);
       var endMatch = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(String(payload.newEndsAt || '').trim());
@@ -186,10 +217,15 @@ export function renderProgrammeChangeEnhancementScript(): string {
       when = startHuman && endClock && startHuman.indexOf(' · ') !== -1
         ? startHuman + '–' + endClock
         : formatClockRange(payload.newStartsAt, payload.newEndsAt);
+      var split = splitWhenLabel(startHuman);
+      dateLabel = split.date;
+      timeLabel = endClock ? (split.time + '–' + endClock) : split.time;
     }
     return {
       whenLabel: when,
-      whereLabel: payload.newPlaceId ? undefined : undefined
+      dateLabel: dateLabel,
+      timeLabel: timeLabel,
+      venueLabel: payload.newPlaceId ? 'New venue' : 'Unchanged'
     };
   }
 
@@ -207,7 +243,25 @@ export function renderProgrammeChangeEnhancementScript(): string {
     return 'watch';
   }
 
-  function renderNowProposedCompare(target, preview, payload, nowLabel) {
+  function commitmentMetaFromDom(commitmentId) {
+    var item = document.querySelector('[data-timeline-key="' + commitmentId + '"]');
+    if (!item) return { when: '', date: '—', time: '—', venue: '—' };
+    return {
+      when: (item.getAttribute('data-timeline-date') || '') + ' · ' + (item.getAttribute('data-timeline-time') || ''),
+      date: item.getAttribute('data-timeline-date') || '—',
+      time: item.getAttribute('data-timeline-time') || '—',
+      venue: item.getAttribute('data-timeline-venue') || '—',
+    };
+  }
+
+  function selectedCommitmentMeta(modal) {
+    var select = modal ? modal.querySelector('[name="commitmentId"]') : null;
+    var id = select ? select.value : '';
+    if (id) return commitmentMetaFromDom(id);
+    return { when: '', date: '—', time: '—', venue: '—' };
+  }
+
+  function renderNowProposedCompare(target, preview, payload, nowLabel, modal) {
     target.replaceChildren();
 
     var banner = document.createElement('div');
@@ -220,30 +274,13 @@ export function renderProgrammeChangeEnhancementScript(): string {
     compare.className = 'change-compare';
     compare.setAttribute('data-test', 'now-vs-proposed');
 
-    var nowBox = document.createElement('div');
-    nowBox.className = 'cc-box';
-    nowBox.innerHTML = '<p class="kv-label">Now</p><div class="cc-when"></div>';
-    nowBox.querySelector('.cc-when').textContent = nowLabel || 'Current commitment';
-    compare.appendChild(nowBox);
-
-    var arrow = document.createElement('div');
-    arrow.className = 'cc-arrow';
-    arrow.setAttribute('aria-hidden', 'true');
-    arrow.textContent = '→';
-    compare.appendChild(arrow);
-
     var proposed = formatProposedSide(payload);
-    var proposedBox = document.createElement('div');
-    proposedBox.className = 'cc-box to';
-    proposedBox.innerHTML = '<p class="kv-label">Proposed</p><div class="cc-when"></div>';
-    proposedBox.querySelector('.cc-when').textContent = changeKindLabel(payload.changeKind) + ' · ' + proposed.whenLabel;
-    if (proposed.whereLabel) {
-      var where = document.createElement('div');
-      where.className = 'cc-where';
-      where.textContent = proposed.whereLabel;
-      proposedBox.appendChild(where);
-    }
-    compare.appendChild(proposedBox);
+    var nowMeta = modal ? selectedCommitmentMeta(modal) : { when: nowLabel, date: '—', time: '—', venue: '—' };
+    var nowSplit = splitWhenLabel(nowMeta.when || nowLabel);
+    compare.innerHTML =
+      compareSlotHtml('Now', nowMeta.date || nowSplit.date, nowMeta.time || nowSplit.time, nowMeta.venue) +
+      '<div class="cc-arrow" aria-hidden="true">→</div>' +
+      compareSlotHtml('Proposed', proposed.dateLabel, proposed.timeLabel, proposed.venueLabel);
     target.appendChild(compare);
 
     var affected = Array.isArray(preview.affected) ? preview.affected : [];
@@ -282,10 +319,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
         var detail = document.createElement('span');
         var reasonParts = Array.isArray(item.reasons) && item.reasons.length
           ? item.reasons.map(function(reason) {
-              return String(reason)
-                .replace(/commitment rescheduled/gi, 'Programme commitment moves')
-                .replace(/\\bel-trip-[a-z0-9-]+/gi, 'linked engagement')
-                .replace(/\\b\\d{4}-\\d{2}-\\d{2}T[\\d:+.-]+/g, function(iso) { return formatHumanInstant(iso); });
+              return sanitizeImpactReason(reason);
             })
           : ['Affected by the proposed programme change.'];
         var reasonText = reasonParts.join(' · ');
@@ -451,11 +485,13 @@ export function renderProgrammeChangeEnhancementScript(): string {
     if (!compare) return;
     compare.replaceChildren();
     var proposed = formatProposedSide(payload);
+    var nowMeta = selectedCommitmentMeta(modal);
+    var nowSplit = splitWhenLabel(nowMeta.when || nowLabel);
     compare.innerHTML =
       '<div class="change-compare" data-test="programme-change-compare-draft">' +
-        '<div class="cc-box"><p class="kv-label">Now</p><div class="cc-when">' + (nowLabel || 'Current commitment') + '</div></div>' +
+        compareSlotHtml('Now', nowMeta.date || nowSplit.date, nowMeta.time || nowSplit.time, nowMeta.venue) +
         '<div class="cc-arrow" aria-hidden="true">→</div>' +
-        '<div class="cc-box to"><p class="kv-label">Proposed</p><div class="cc-when">' + changeKindLabel(payload.changeKind) + ' · ' + proposed.whenLabel + '</div></div>' +
+        compareSlotHtml('Proposed', proposed.dateLabel, proposed.timeLabel, proposed.venueLabel) +
       '</div>' +
       '<p class="footnote" style="margin-top:12px">Preview is read-only. The live programme stays unchanged until you commit.</p>';
   }
@@ -617,7 +653,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
               return;
             }
             lastPreviewPayload = payload;
-            renderNowProposedCompare(result, response.data, payload, selectedCommitmentLabel(modal));
+            renderNowProposedCompare(result, response.data, payload, selectedCommitmentLabel(modal), modal);
             setStep(modal, 'preview');
           })
           .catch(function(error) {

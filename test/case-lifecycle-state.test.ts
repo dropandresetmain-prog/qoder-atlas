@@ -743,3 +743,50 @@ test('fleet presentation: resolved managed green, watching amber, needs attentio
     'd-local',
   );
 });
+
+test('pass2: case sections order impact before CTA and selected recovery before approval', () => {
+  const view = baseView({
+    status: 'RECOVERING',
+    options: [viableOption],
+    approval: {
+      requestedFrom: 'ORGANISATION',
+      state: 'PENDING',
+      reason: 'Organisation must approve the replacement cost.',
+      intentId: 'intent-1',
+      approver: { entityType: 'ORGANISATION', id: 'org-1' },
+    },
+    statusTimeline: [
+      { id: 'tl-1', label: 'The airline reported a delay.', tone: 'neutral' },
+      { id: 'tl-2', label: 'Northstar opened recovery', tone: 'watch' },
+    ],
+  });
+  const html = renderCaseDetailBody(view);
+  const impactIdx = html.indexOf('data-test="downstream-impact"');
+  const ctaIdx = html.indexOf('data-test="primary-action-panel"');
+  const selectedIdx = html.indexOf('Selected recovery');
+  const approvalIdx = html.indexOf('What you');
+  assert.ok(impactIdx > -1 && ctaIdx > -1 && impactIdx < ctaIdx, 'downstream impact before primary CTA');
+  assert.ok(selectedIdx > -1 && approvalIdx > -1 && selectedIdx < approvalIdx, 'selected recovery before approval');
+  assert.match(html, /data-test="status-timeline"/);
+});
+
+test('pass2: Jonas traveller handoff surfaces open traveller view link', () => {
+  const html = renderCaseDetailBody(
+    baseView({
+      status: 'RECOVERING',
+      travellerNames: ['Jonas'],
+      options: [viableOption],
+      approval: {
+        requestedFrom: 'TRAVELLER',
+        state: 'PENDING',
+        reason: 'Traveller must confirm the extension.',
+      },
+    }),
+  );
+  assert.match(html, /data-test="open-traveller-surface"/);
+});
+
+test('pass2: solid stay glyph in chain mapping', async () => {
+  const { CHAIN_TYPE_ICON } = await import('../src/ui/components.ts');
+  assert.equal(CHAIN_TYPE_ICON.STAY, '■');
+});

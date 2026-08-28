@@ -37,6 +37,7 @@ import type {
 import type { CaseRepository, AuditRepository, SignalRepository } from '../contracts/repositories.ts';
 import type { ViabilityEngine } from '../contracts/services.ts';
 import { ImpactEngine } from '../engine/impact.ts';
+import { assessConnectionPairs } from '../engine/connectionFeasibility.ts';
 import { evaluateConstraints, type EvaluationContext } from '../engine/evaluators.ts';
 import type { Constraint } from '../domain/constraints.ts';
 import type { RuleSet } from '../domain/rules.ts';
@@ -1036,6 +1037,11 @@ export async function projectCaseDetail(
     caseStatus === 'DISRUPTED' &&
     travelRecoveryInsufficient;
 
+  const connectionImpossible = assessConnectionPairs(trip, ruleSets).some(
+    (pair) => pair.viability === 'IMPOSSIBLE',
+  );
+  const allTripSignals = await deps.signals.listSignalsForTrip(trip.id);
+
   return enrichCaseDetailView(
     {
       caseId: recoveryCase.id,
@@ -1093,7 +1099,8 @@ export async function projectCaseDetail(
         : {}),
       updatedAt: recoveryCase.updatedAt,
     },
-    { recoveryCase, trip, triggeringSignals, places, anchorEvent },
+    { recoveryCase, trip, triggeringSignals, allTripSignals, places, anchorEvent,
+      ...(connectionImpossible ? { connectionImpossible: true } : {}) },
   );
 }
 

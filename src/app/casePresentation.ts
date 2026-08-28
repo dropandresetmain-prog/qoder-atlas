@@ -23,6 +23,7 @@ import {
   formatProgrammeInstant,
   optionFlagsFromEvidence,
   projectAffectedItemViews,
+  projectStatusTimeline,
   signalSourceLabel,
 } from './presentationProjection.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
@@ -65,12 +66,19 @@ export function enrichCaseDetailView(
     recoveryCase: RecoveryCase;
     trip: Trip;
     triggeringSignals: TripSignal[];
+    allTripSignals?: TripSignal[];
     places: Map<string, Place>;
     anchorEvent?: AnchorEvent;
+    connectionImpossible?: boolean;
   },
 ): CaseDetailView {
   const { recoveryCase, trip, triggeringSignals, places } = context;
   const affected = projectAffectedItemViews(trip, recoveryCase, places);
+  const statusTimeline = projectStatusTimeline(
+    context.allTripSignals ?? triggeringSignals,
+    recoveryCase,
+    context.connectionImpossible ? { connectionImpossible: true } : undefined,
+  );
 
   const engagement = primaryEngagement(trip, recoveryCase);
   const commitment: CaseCommitmentView | undefined = engagement
@@ -130,6 +138,7 @@ export function enrichCaseDetailView(
   return {
     ...view,
     ...(affected.length > 0 ? { affected } : {}),
+    ...(statusTimeline.length > 0 ? { statusTimeline } : {}),
     ...(commitment ? { commitment } : {}),
     ...(railSections.length > 0 ? { railSections } : {}),
     options,

@@ -68,7 +68,7 @@ export function presentBufferEvidence(evidence: string | undefined): string | un
   if (comparator === '<') {
     return `Only ${available} minutes remain before the commitment, but ${required} minutes are required.`;
   }
-  return `Arrival leaves ${available} minutes before the commitment; the ${required}-minute requirement is met.`;
+  return `${available} min available / ${required} min required — viable`;
 }
 
 const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
@@ -77,13 +77,24 @@ const CHECK_RESULT_PREFIX: Record<'PASS' | 'FAIL' | 'UNKNOWN', string> = {
   UNKNOWN: 'Still checking',
 };
 
+/** Hero-facing consequence copy for buffer/timing evidence — no raw minute arithmetic. */
+function presentBufferConsequence(
+  evidence: string | undefined,
+  result: 'PASS' | 'FAIL' | 'UNKNOWN',
+): string | undefined {
+  if (!evidence || !/gap\s+-?\d+\s*min/i.test(evidence)) return undefined;
+  if (result === 'PASS') return 'Arrival still leaves enough time before the commitment';
+  if (result === 'FAIL') return 'Arrival no longer protects the programme commitment';
+  return 'Still checking arrival timing against the commitment';
+}
+
 /** Plain-language check row for operator case view. */
 export function presentCheckLabel(
   constraint: Constraint | undefined,
   result: 'PASS' | 'FAIL' | 'UNKNOWN',
   evidence?: string,
 ): string {
-  const buffer = presentBufferEvidence(evidence);
+  const buffer = presentBufferConsequence(evidence, result);
   if (buffer) return buffer;
 
   const base = presentConstraintLabel(constraint);

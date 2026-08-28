@@ -26,7 +26,7 @@ test('formatMoney uses US$ / S$ and never bare $ for USD', () => {
   assert.ok(!formatMoney({ amount: 1, currency: 'USD' }).startsWith('$'));
 });
 
-test('presentBufferEvidence formats gap evidence for judges', () => {
+test('presentBufferEvidence formats gap evidence for diagnostics', () => {
   assert.equal(
     presentBufferEvidence('gap 370min >= required 360min'),
     '370 min available / 360 min required — viable',
@@ -45,7 +45,7 @@ test('presentBufferEvidence formats gap evidence for judges', () => {
       'PASS',
       'gap 370min >= required 360min',
     ),
-    '370 min available / 360 min required — viable',
+    'Arrival still leaves enough time before the commitment',
   );
 });
 

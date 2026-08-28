@@ -1014,6 +1014,28 @@ a.brow.brow-actionable:focus-visible,
 .cc-box .kv-label { margin-bottom: 6px; }
 .cc-box .cc-when { font-family: var(--font-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .cc-box .cc-where { font-size: 12.5px; color: var(--text-soft); margin-top: 3px; }
+.cc-slot { display: grid; grid-template-columns: 72px 1fr; gap: 4px 10px; margin-top: 8px; font-size: 13.5px; }
+.cc-slot-k { color: var(--text-faint); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.cc-slot-v { font-weight: 600; font-variant-numeric: tabular-nums; }
+.status-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.status-timeline .status-tl-row {
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface);
+}
+.status-timeline .status-tl-row.tone-watch { border-left: 4px solid var(--watch-f); }
+.status-timeline .status-tl-row.tone-alert { border-left: 4px solid var(--alert-f); }
+.status-timeline .status-tl-row.tone-ok { border-left: 4px solid var(--ok-f); }
+.status-tl-at { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-bottom: 4px; }
+.status-tl-label { margin: 0; font-size: 14.5px; font-weight: 600; }
+.status-tl-detail { margin: 4px 0 0; font-size: 13.5px; color: var(--text-soft); }
+.whole-trip-compare-kicker { margin: 0 0 10px; font-size: 12.5px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); }
+.whole-trip-known-cost { margin-top: 10px; font-size: 14px; }
+.ns-resolve-step-icon {
+  width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex: 0 0 auto; background: var(--surface); border: 1px solid var(--border);
+}
+.ns-resolve-steps li.is-active .ns-resolve-step-icon { background: var(--watch-bg); border-color: var(--watch-border); }
+.ns-resolve-steps li.is-done .ns-resolve-step-icon { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
+.mini-chain-link[data-link-type="STAY"], .mini-chain .mini-chain-link:has(+ .mc-ln) { /* solid stay glyph inherits state colour */ }
 .impact-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); font-size: 13.5px; }
 .impact-row:first-of-type { border-top: 0; }
 .impact-row .i-count { font-family: var(--font-mono); font-size: 18px; font-weight: 600; min-width: 34px; font-variant-numeric: tabular-nums; }

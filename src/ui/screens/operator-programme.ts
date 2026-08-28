@@ -364,7 +364,7 @@ function timelineAffectedMarkup(item: ProgrammeTimelineItemView): string {
   return `<details class="tl-affected"><summary class="tag">${count} ${count === 1 ? 'traveller' : 'travellers'}</summary><ul class="tl-affected-list">${list}</ul></details>`;
 }
 
-function timelineItem(item: ProgrammeTimelineItemView, justChanged: boolean): string {
+function timelineItem(item: ProgrammeTimelineItemView, dayLabel: string, justChanged: boolean): string {
   const classes = [
     'tl-item',
     item.tone === 'endangered' ? 'endangered' : '',
@@ -372,7 +372,8 @@ function timelineItem(item: ProgrammeTimelineItemView, justChanged: boolean): st
   ].filter(Boolean).join(' ');
   const dotClass = item.tone === 'ok' ? 'd-ok' : item.tone === 'watch' ? 'd-watch' : '';
   const titleCell = `<span class="ttl" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.title)}</span>`;
-  return `<div class="${classes}" data-timeline-key="${escapeHtml(item.key)}"><span class="dot ${dotClass}"></span><span class="t">${escapeHtml(item.timeLabel)}</span>${titleCell}${timelineAffectedMarkup(item)}</div>`;
+  const tag = item.tag ? `<span class="tag">${escapeHtml(item.tag)}</span>` : '';
+  return `<div class="${classes}" data-timeline-key="${escapeHtml(item.key)}" data-timeline-date="${escapeHtml(dayLabel)}" data-timeline-time="${escapeHtml(item.timeLabel)}" data-timeline-venue="${escapeHtml(item.tag ?? '')}"><span class="dot ${dotClass}"></span><span class="t">${escapeHtml(item.timeLabel)}</span>${titleCell}${tag}${timelineAffectedMarkup(item)}</div>`;
 }
 
 function timelineSection(
@@ -387,7 +388,7 @@ function timelineSection(
       (day) => `
       <div class="tl-day">
         <div class="tl-date">${escapeHtml(day.dateLabel)}</div>
-        <div class="tl-items">${day.items.map((item) => timelineItem(item, augment.justChangedTimelineKeys?.has(item.key) ?? false)).join('')}</div>
+        <div class="tl-items">${day.items.map((item) => timelineItem(item, day.dateLabel, augment.justChangedTimelineKeys?.has(item.key) ?? false)).join('')}</div>
       </div>`,
     )
     .join('');
@@ -724,6 +725,9 @@ export function renderProgrammeIntake(
 export interface ProgrammeChangeCompareSide {
   whenLabel: string;
   whereLabel?: string;
+  dateLabel?: string;
+  timeLabel?: string;
+  venueLabel?: string;
 }
 
 /** One impact row: who or what the proposed change touches. */
@@ -761,12 +765,23 @@ export interface ProgrammeChangePreviewView {
   confirmFootnote?: string;
 }
 
+function compareSlotRows(side: ProgrammeChangeCompareSide): string {
+  const date = side.dateLabel ?? side.whenLabel.split(' · ')[0] ?? side.whenLabel;
+  const time =
+    side.timeLabel ??
+    (side.whenLabel.includes(' · ') ? side.whenLabel.split(' · ').slice(1).join(' · ') : '—');
+  const venue = side.venueLabel ?? side.whereLabel ?? '—';
+  return `
+      <div class="cc-slot"><span class="cc-slot-k">Date</span><span class="cc-slot-v">${escapeHtml(date)}</span></div>
+      <div class="cc-slot"><span class="cc-slot-k">Time</span><span class="cc-slot-v">${escapeHtml(time)}</span></div>
+      <div class="cc-slot"><span class="cc-slot-k">Venue</span><span class="cc-slot-v">${escapeHtml(venue)}</span></div>`;
+}
+
 function compareBox(label: string, side: ProgrammeChangeCompareSide, proposed: boolean): string {
   return `
-    <div class="cc-box${proposed ? ' to' : ''}">
+    <div class="cc-box${proposed ? ' to' : ''}" data-test="programme-compare-${proposed ? 'proposed' : 'now'}">
       <p class="kv-label">${escapeHtml(label)}</p>
-      <div class="cc-when">${escapeHtml(side.whenLabel)}</div>
-      ${side.whereLabel ? `<div class="cc-where">${escapeHtml(side.whereLabel)}</div>` : ''}
+      ${compareSlotRows(side)}
     </div>`;
 }
 

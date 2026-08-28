@@ -27,6 +27,15 @@ export interface CaseCheckView {
   result: CaseCheckResult;
 }
 
+/** One chronological evidence row for progressive deterioration (Pass 2). */
+export interface StatusTimelineEntryView {
+  id: EntityId;
+  at?: IsoDateTime;
+  label: string;
+  detail?: string;
+  tone?: 'neutral' | 'watch' | 'alert' | 'ok';
+}
+
 export type OptionVerdict = 'VIABLE' | 'NOT_VIABLE' | 'UNKNOWN';
 
 export type WholeTripPlanItemKind = 'CHECKED' | 'RECOMMENDED' | 'EXECUTABLE' | 'MANUAL_FOLLOWUP';
@@ -219,6 +228,11 @@ export interface CaseDetailView {
   status: ReadModelStatus;
   /** What changed, in user-facing language. */
   whatChanged?: string;
+  /**
+   * Chronological evidence/status log when multiple signals or staged
+   * deterioration exist. Never fabricated — projected from trip signals only.
+   */
+  statusTimeline?: StatusTimelineEntryView[];
   /** Downstream items affected by the change, user-facing. */
   affectedItems: string[];
   /**

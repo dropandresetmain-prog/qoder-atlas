@@ -331,13 +331,13 @@ test('case detail tells the full recovery story incl. rejected attractive option
   const rejected = CASE_FIXTURES.find((f) => f.id === 'rejected-option');
   assert.ok(rejected);
   const html = renderCaseDetail({ state: 'LOADED', data: rejected.view });
-  assert.ok(html.includes('What changed'));
-  assert.ok(html.includes('What this touches'));
+  assert.ok(html.includes('What happened') || html.includes('What changed'));
+  assert.ok(html.includes('What this affects'));
   assert.ok(
     html.includes('Must not be missed') || html.includes('Speaking slot on 16 September'),
     'critical objective must be called out (inline fallback or structured commitment)',
   );
-  assert.ok(html.includes('Checks already run'));
+  assert.ok(html.includes('What we checked'));
   assert.ok(html.includes('data-verdict="NOT_VIABLE"'));
   assert.ok(html.includes('Arrives after the speaking slot'), 'rejection reason must be visible');
   assert.ok(html.includes('data-verdict="VIABLE"'));

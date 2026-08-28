@@ -221,8 +221,8 @@ export function projectWholeTripRecoveryPlan(input: {
       category: 'EVENT',
       title: input.engagement.data.title,
       finding: ok
-        ? `${margin} minutes before ${input.engagement.data.title} — finals remain protected`
-        : `Arrival margin before ${input.engagement.data.title} is insufficient`,
+        ? `Arrival still protects ${input.engagement.data.title}`
+        : `Arrival no longer protects ${input.engagement.data.title}`,
       kind: 'CHECKED',
     });
   }

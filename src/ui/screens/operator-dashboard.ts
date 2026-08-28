@@ -447,7 +447,7 @@ function tripRow(trip: OperatorTripView, index: number, view: OperatorDashboardV
 
 function rosterFootnote(hasMiniChains: boolean): string {
   const legend = hasMiniChains
-    ? `<br>Row marks — ✈ flight · ⇄ ground · ⌂ stay · ✦ commitment. Colour shows state: confirmed · proposed · at risk · impacted · not booked · unconfirmed.`
+    ? `<br>Row marks — ✈ flight · ⇄ ground · ■ stay · ✦ commitment. Colour shows state: confirmed · proposed · at risk · impacted · not booked · unconfirmed.`
     : '';
   return `<p class="footnote">Statuses update when the underlying bookings are confirmed, not when a message is sent.${legend}</p>`;
 }

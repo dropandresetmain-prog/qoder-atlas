@@ -112,11 +112,23 @@ export const RESOLUTION_OUTCOME_LABEL: Record<'FULLY_RECOVERED' | 'RECOVERED_WIT
 // Case workspace (approved C1–C6) — section headings and fixed copy.
 // ---------------------------------------------------------------------------
 
-/** Lead callout heading above the change summary (C1). */
+/** External/source fact heading (Pass 2 — distinct from downstream impact). */
+export const CASE_WHAT_HAPPENED_TITLE = 'What happened';
+
+/** Lead callout heading above the change summary (C1); resolved-case section. */
 export const CASE_WHAT_CHANGED_TITLE = 'What changed';
 
-/** Impact list heading (approved C1 wording). */
-export const CASE_AFFECTED_TITLE = 'What this touches';
+/** Downstream consequence heading (Pass 2 — Northstar-computed impact). */
+export const CASE_DOWNSTREAM_IMPACT_TITLE = 'What this affects';
+
+/** Impact list heading (approved C1 wording; alias for downstream impact). */
+export const CASE_AFFECTED_TITLE = CASE_DOWNSTREAM_IMPACT_TITLE;
+
+/** Progressive status/evidence timeline (Pass 2). */
+export const CASE_STATUS_TIMELINE_TITLE = 'How this unfolded';
+
+/** Selected recovery section when a proposal is staged (Pass 2). */
+export const CASE_SELECTED_RECOVERY_TITLE = 'Selected recovery';
 
 /** Checks-list heading (approved C1 wording). */
 export const CASE_CHECKS_TITLE = 'What we checked';

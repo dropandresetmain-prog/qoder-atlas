@@ -1,78 +1,74 @@
-# ACTIVE_TASK — Implementation Pass 1/2: product truth, state convergence, recovery lifecycle
+# ACTIVE_TASK — Pass 2: shared UI structure + visual clarity
 
 ## Goal
 
-Make Overview grouping/severity correct, eliminate blank terminal squares, converge
-Sarah/Elena after programme recovery, give Jordan a real staged recovery lifecycle
-that actually executes, propagate Jonas traveller approval across all surfaces, and
-preserve Oliver pending-change semantics. All state derived from authoritative
-trip/case state — no local UI memory, no person-specific branches.
+Pass 1 frozen at `7622627`. Pass 2 improves information hierarchy, reusable Case
+composition, visual state clarity, loading/analysis presentation, and hero
+consistency — without the final writing pass.
 
 ## Base / branch
 
-- Base SHA: `22e8d0f` (pre RC-7 overlay fix)
+- Pass 1 base: `7622627`
 - Branch: `main`
 - Production: https://qoder-atlas-production.up.railway.app
 - Populated entry: `POPULATED_DEMO_BOOTSTRAP_VERSION = 2026-08-28-jordan-preemptive-entry`
 
-## Issue checklist
+## Pass 1 closure (frozen)
 
-### Group A — Overview grouping + state
-- [x] A1 Jordan standalone incident key
-- [x] A2 Jordan red / Needs Attention at populated entry
-- [x] A3 Sarah shared cohort counts 4/3/1
-- [x] A4 Fleet squares + regression tests (Sarah resolved, Elena watching, Jonas resolved, Oliver)
+| Area | Result |
+|------|--------|
+| Jordan pre-emptive lifecycle | PASS (hero e2e + RC-7) |
+| Sarah programme recovery | PASS |
+| Jonas traveller convergence | PASS |
+| Oliver pending change | PASS |
+| Hero browser e2e | 5/5 |
+| Full suite (pre-Pass 2) | 794/815 |
 
-### Group B — Sarah terminal convergence
-- [x] B1 Sarah resolved → green, persists reload
-- [x] B2 Elena watching/amber post-Sarah (hero e2e assertion added)
-- [x] B3 Other shared-cohort travellers semantically correct
+### Railway Pass 1 spot-check (pre-Pass 2 deploy)
 
-### Group C — Jordan recovery lifecycle
-- [x] C1 pre-emptive connection failure at populated entry
-- [x] C2 affected chain truthful
-- [x] C3 selected recovery staged before approval
-- [x] C4 Approve → Execute works (real lifecycle)
-- [x] C5 execution → RESOLVED without missed-flight report
-- [x] C6 e2e regression (hero + final-demo-lifecycle-convergence)
+- Health: OK
+- Reset: `POST /api/demo/reset` OK
+- Jordan: red/needs attention, case opens, lifecycle path OK
+- Deployed SHA: no `/version` endpoint; health returns `{ status: "ok" }` only
 
-### Group D — Jonas traveller convergence
-- [x] D1 operator waiting-for-traveller
-- [x] D2 traveller approve executes
-- [x] D3 Traveller + Case + Overview resolved
-- [x] D4 operator → `/traveller?trip=<tripId>` link on waiting panel
+## Pass 2 issue groups
 
-### Group E — Oliver regression
-- [x] E1/E2 hero e2e pass
+| Group | Status |
+|-------|--------|
+| 1 Downstream impact block (`What this affects`) before CTA | **DONE** |
+| 2 Progressive status timeline from trip signals | **DONE** |
+| 3 Selected recovery before What to do next | **DONE** |
+| 4 Jordan whole-trip plan ordering + honest costs | **DONE** |
+| 5 Sarah Now/Proposed Date/Time/Venue + no buffer on hero | **DONE** |
+| 6 Oliver/shared card composition (same operator-case renderer) | **DONE** (shared path) |
+| 7 Analysis loading semantic icons | **DONE** |
+| 8 Solid hotel/stay icon `■` | **DONE** |
+| 9 Terminal/watching visuals | **Verified** (no semantic change) |
+| 10 Jonas traveller handoff link | **DONE** |
 
-### Tests
-- [x] RC-7 fix + hero e2e 5/5 + connection-feasibility overlay tests + Jordan lifecycle HTTP test
-- [ ] Full suite: 794/815 pass; 21 failures triaged below (non-hero integration/presentation)
-
-## Root causes
-
-| ID | Finding | Status |
-|----|---------|--------|
-| RC-7 | Overlay viability ignored connection-feasibility direct failures, so same-schedule "rebook" strategies ranked best; execute left impossible connection active → CaseVerifier PLANNING. Fix: `assessDirectElementFailures` shared with overlay; infeasible when post-candidate trip still has direct failures. Verified: best strategy now next-day 08:20; execute → RESOLVED/FULLY_RECOVERED without missed-flight ingress. | **FIXED** |
-
-## Acceptance evidence
-
-- `output/probe-rc7-diagnostic.mjs`: reset → plan (best strat 08:20) → begin → approve → execute → RESOLVED
-- `test/e2e/hero-lifecycle-rehearsal.test.ts`: 5/5 pass (Overview 4/3/1, Jordan, Sarah+Elena, Jonas nav, Oliver)
-- `test/final-demo-lifecycle-convergence.test.ts`: Jordan full HTTP lifecycle pass
-- `test/connection-feasibility.test.ts`: overlay same-schedule infeasible / next-day feasible
-- `npm run build` + `gate:anti-hardcoding`: CLEAN
-
-## Remaining test failures (21) — triage
+## Remaining test failures (20) — classification
 
 | Class | Tests | Triage |
 |-------|-------|--------|
-| Dashboard trip row missing at READ_AT | T-E2E, G1, DR-8.1/8.6 | **Investigate Now** — harness dashboard projection returns 0 trips post-resolve; not hero-path |
-| Presentation fixture drift | r3a x3, case options x4, presentBufferEvidence | **Park for Later** — unit HTML fixtures, not Pass 1 hero |
-| DR-4 clickthrough timeout | operator-clickthrough | **Park for Later** — waits for traveller-decision form on operator (Jonas path changed) |
-| i5/R1/Wave3 convergence | i5 x2, R1, Wave3 Gate2, product convergence | **Investigate Now** — may share dashboard/read-model seam |
-| DR-5/DR-6 HTTP | CHANGE_REQUESTED distinction | **Park for Later** — unrelated to RC-7 |
+| Dashboard trip row missing at READ_AT | T-E2E, G1, DR-8.1/8.2/8.6, i5×2, R1, Wave3 product | **STALE EXPECTATION / FIXTURE DRIFT** — harness dashboard projection returns 0 trips; not hero-path |
+| Presentation fixture drift | r3a×3, r3d case options×3, r3d Jonas Approve | **STALE EXPECTATION / FIXTURE DRIFT** — HTML fixture contracts pre-Pass 2 |
+| DR-4 clickthrough timeout | operator-clickthrough | **OBSOLETE DUPLICATE** — Jonas path uses traveller surface; waits wrong form |
+| DR-5/DR-6 HTTP | change-intake, RELOCATED preview | **UNRELATED / ACCEPTED RISK** |
+| Wave3 Gate2 activity copy | wave3-gate2 | **STALE EXPECTATION** |
+| ui.test rejected-option | ui.test.ts | **STALE EXPECTATION** — NOT_VIABLE in collapsed more-options |
+
+**Act Now:** none (no hero-visible regression found)
+
+## Pass 2 verification
+
+- Hero browser e2e: **5/5 PASS**
+- Focused UI tests: case-lifecycle pass2 + presentation-lane **PASS**
+- Full suite: **798/818** (20 failures, classified above)
+- `npm run build`: **PASS**
+- `gate:anti-hardcoding`: **CLEAN**
+- Local screenshots: `output/pass2-screenshots/` (when populated-world script completes)
+- Railway pre-deploy spot-check: Jordan OK; Sarah `What this affects` awaits Pass 2 deploy
 
 ## Next action
 
-Push RC-7 commit; Railway replay Jordan/Sarah/Jonas/Oliver; investigate dashboard READ_AT seam separately if needed for full 815/815.
+Commit + push Pass 2; confirm Railway deploy; re-run `scripts/pass2-railway-verify.mjs`; final writing pass (separate milestone).

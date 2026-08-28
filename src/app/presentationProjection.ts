@@ -16,7 +16,7 @@ import type {
   TravellerProgressRow,
   TravellerThreadMessage,
 } from '../ui/traveller-presentation.ts';
-import type { AffectedItemView } from '../ui/case-view-model.ts';
+import type { AffectedItemView, StatusTimelineEntryView } from '../ui/case-view-model.ts';
 import { presentAction, presentSignalChange } from './presentation.ts';
 import type { ReadModelDependencies } from './readmodels.ts';
 
@@ -334,7 +334,58 @@ function elementImpactState(element: TripElement, affected: ReadonlySet<string>)
   return 'INTACT';
 }
 
-/** Rich per-item impact rows for case "What this touches". */
+/** Chronological evidence log from trip signals — never fabricated. */
+export function projectStatusTimeline(
+  signals: readonly TripSignal[],
+  recoveryCase?: RecoveryCase,
+  input?: { connectionImpossible?: boolean },
+): StatusTimelineEntryView[] {
+  if (signals.length === 0) return [];
+  const sorted = [...signals].sort((a, b) => compareInstants(a.occurredAt, b.occurredAt));
+  const scheduleKinds = new Set<TripSignal['kind']>(['FLIGHT_SCHEDULE_CHANGE', 'FLIGHT_DELAY', 'FLIGHT_CANCELLATION']);
+  const progressive = sorted.filter((signal) => scheduleKinds.has(signal.kind));
+  const source = progressive.length > 1 ? progressive : sorted.length > 1 ? sorted : [];
+
+  const entries: StatusTimelineEntryView[] = source.map((signal, index) => {
+    const isLast = index === source.length - 1;
+    let detail: string | undefined;
+    if (source.length > 1 && scheduleKinds.has(signal.kind)) {
+      if (index === 0) detail = 'Connection still assessed as workable';
+      else if (!isLast) detail = 'Connection margin tightening';
+      else if (input?.connectionImpossible) detail = 'Latest timing makes the connection non-viable';
+    }
+    const tone: StatusTimelineEntryView['tone'] = isLast
+      ? input?.connectionImpossible
+        ? 'alert'
+        : 'watch'
+      : 'neutral';
+    return {
+      id: `timeline-${signal.id}`,
+      at: signal.occurredAt,
+      label: presentSignalChange(signal),
+      ...(detail ? { detail } : {}),
+      tone,
+    };
+  });
+
+  if (
+    recoveryCase &&
+    recoveryCase.status !== 'DETECTED' &&
+    recoveryCase.status !== 'RESOLVED' &&
+    entries.length > 0
+  ) {
+    entries.push({
+      id: `timeline-recovery-${recoveryCase.id}`,
+      at: recoveryCase.openedAt,
+      label: 'Northstar opened recovery',
+      tone: 'watch',
+    });
+  }
+
+  return entries;
+}
+
+/** Rich per-item impact rows for case "What this affects". */
 export function projectAffectedItemViews(
   trip: Trip,
   recoveryCase: RecoveryCase,

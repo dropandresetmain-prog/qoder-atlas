@@ -45,7 +45,7 @@ export const CHAIN_MINI_TONE: Record<ChainLinkState, string> = {
 export const CHAIN_TYPE_ICON: Record<NonNullable<ChainLinkView['linkType']>, string> = {
   FLIGHT: '✈',
   GROUND: '⇄',
-  STAY: '⌂',
+  STAY: '■',
   COMMITMENT: '✦',
 };
 
