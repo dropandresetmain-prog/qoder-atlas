@@ -772,7 +772,14 @@ export async function projectCaseDetail(
   // and confirmed legs re-colour previously rejected options). Only fall
   // back to live re-evaluation when the planning audit carries no verdict.
   const planningAudit = await deps.audit.query({ action: 'PLANNING_COMPLETED', subject: trip.id });
-  const latestPlanning = planningAudit[planningAudit.length - 1];
+  // Select the LATEST planning audit by occurredAt (the audit query order is
+  // not relied upon). With sequential planning rounds (flight then overnight
+  // hotel) the newest round carries the current bestStrategyId.
+  const latestPlanning = planningAudit.reduce< typeof planningAudit[number] | undefined>(
+    (latest, entry) =>
+      latest === undefined || Date.parse(entry.occurredAt) > Date.parse(latest.occurredAt) ? entry : latest,
+    undefined,
+  );
   const bestStrategyId = latestPlanning?.payload['bestStrategyId'] as EntityId | undefined;
   const persistedVerdicts = new Map<string, { feasible: boolean; rejectionEvidence: CandidateRejectionEvidence[] }>();
   const rawVerdicts = latestPlanning?.payload['candidateVerdicts'];
@@ -874,6 +881,7 @@ export async function projectCaseDetail(
               ...(intent ? { intent } : {}),
               ...(candidate.viability ? { viability: candidate.viability } : {}),
               feasible: candidate.feasible,
+              recoveryCase,
             });
             return wholeTripPlan ? { wholeTripPlan } : {};
           })()
