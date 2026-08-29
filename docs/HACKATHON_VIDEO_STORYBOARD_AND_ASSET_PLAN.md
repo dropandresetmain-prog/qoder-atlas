@@ -32,7 +32,7 @@ The technical story must be expressed through the product behaviour. Avoid stopp
 ### Total target length
 **Approximately 2:50–2:55**, always below 3:00.
 
-The locked narration is approximately 430 words. Final timing is governed by the chosen AI voice and visual breathing room rather than an arbitrary word target.
+The locked narration is approximately 455 words. Final timing is governed by the chosen AI voice and visual breathing room rather than an arbitrary word target.
 
 ### Beat 1 — Disruption cascade and scale
 **Time:** ~0:00–0:20  
@@ -658,27 +658,27 @@ The fresh HTML-only workstream owns SEQ 05, SEQ 06, SEQ 07, SEQ 08, SEQ 09, SEQ 
 
 Use this as the production narration baseline. Do not replace it with older provisional narration elsewhere in the repository.
 
-> A travel disruption rarely breaks just one thing.
+> A flight delay doesn’t stop at the flight.
 >
-> A delayed flight can break the connection, transfer, hotel — even the keynote the traveller was flying in to deliver.
+> It can cost you the connection, transfer, hotel and even that important business meeting or conference.
 >
-> Rebooking the flight is not recovery.
+> Rebooking the flight alone may not recover the trip down the line.
 >
-> Now multiply that across dozens — or hundreds — of speakers. One supplier change can create a different problem for every traveller.
+> Now multiply that across dozens — or hundreds — of travelers, like at a conference. One disruption can ripple across the whole chain of events and travelers, each facing a different problem.
 >
-> That is why NORTHSTAR treats travel as a graph of connected states.
+> Travel isn’t a list of bookings — it’s a network, or graph, of connected dependencies.
 >
-> NORTHSTAR is an AI travel resolution layer built around a Live Dependency Graph, connecting flights, transfers and hotels with traveller constraints and the event programme.
+> Northstar is an AI travel resolution engine built around that graph, the Live Dependency Graph, connecting flights, hotel, traveler constraints and event programmes.
 >
-> When something changes, NORTHSTAR traces the blast radius and asks: what else is affected, and what has to change for the trip to work again?
+> When something changes, NORTHSTAR traces the blast radius — what else is affected, and what now has to change for the trip to still work?
 >
-> At its core is a proprietary resolution engine that interprets messy traveler requests with AI, along with flight and hotel updates, policies, insurance, and immigration to propose recovery strategies for the impacted trip.
+> The Northstar Engine makes sense of the messy context — traveler requests, flight, hotel and event changes, policy, insurance and immigration — and produces viable recovery plans for the whole journey.
 >
-> Alibaba Cloud's Qwen AI powers that reasoning layer, Atlas GDS API powers flight search and verification capabilities needed to turn those strategies into reality.
+> Alibaba Cloud’s frontier AI models power the reasoning while Atlas API powers the flight search and booking capabilities to turn those plans into real options.
 >
-> Within delegated authority, NORTHSTAR can execute automatically. When a decision crosses that boundary, human-in-the-loop takes over — with the impact mapped and viable options ready.
+> Northstar can also automatically recover the journey within approved limits. When human judgement is needed, Northstar flags the decision with viable options and their impact already mapped out.
 >
-> Let's see Northstar in action.
+> Let’s see Northstar in action.
 >
 > One airline retime affects several AiT speakers. Most are recovered automatically.
 >
@@ -694,19 +694,19 @@ Use this as the production narration baseline. Do not replace it with older prov
 >
 > His first flight is delayed repeatedly. NORTHSTAR sees his Tokyo connection move from safe, to at risk, to impossible — and starts planning before he becomes stranded.
 >
-> It builds one recovery plan: the next viable flight, a Narita hotel, entry and transit requirements, insurance, the Singapore hotel change, event timing and total cost.
+> It builds one recovery plan: the next viable flight, a transit hotel in Tokyo, entry and transit requirements, insurance coverage, the Singapore hotel change, event timing and total cost.
 >
 > The organiser approves, NORTHSTAR executes permitted actions, and keeps tracking the journey until it is viable again.
 >
-> The same engine handles traveller requests. Jonas wants an extra hotel night. Oliver is now flying from Tokyo instead of London. NORTHSTAR evaluates downstream impact, policy and authority before changing anything.
+> The same engine handles traveller-led changes too. Jonas wants another hotel night. Oliver changes where he’s flying from. NORTHSTAR works out what else is affected before changing anything.
 >
-> We built NORTHSTAR with Qoder using a fan-out, fan-in approach — parallelising bounded work, then integrating and verifying through one controlled path.
+> We built NORTHSTAR with Qoder using a long-horizon fan-out, fan-in approach — splitting work into parallel streams, then integrating, reviewing and repeating until the system was complete.
 >
-> Today, NORTHSTAR coordinates one summit. The same engine can support conferences, sports events, corporate offsites, travel teams and TMCs.
+> Today, NORTHSTAR coordinates one summit. Tomorrow, the same engine can support conferences, sports events, corporate offsites, travel teams and TMCs.
 >
-> Because fixing the booking isn’t enough.
+> A booking gets you a ticket.
 >
-> You have to restore the trip.
+> NORTHSTAR gets you there.
 
 ---
 
