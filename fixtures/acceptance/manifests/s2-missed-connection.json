@@ -252,7 +252,7 @@
     },
     {
       "id": "execute_recovery",
-      "description": "Stage 8: provider execution/simulation at the external boundary; observation verifies whole-trip viability",
+      "description": "Stage 8: flight rebooking executes, but the required Narita overnight is still unresolved so the case is held open (not yet recovered)",
       "action": {
         "type": "http",
         "method": "POST",
@@ -265,8 +265,94 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "executed", "op": "truthy", "description": "the approved intent executed" },
-        { "path": "caseStatus", "op": "equals", "expected": "RESOLVED", "description": "the recovery case resolves after observation/verification" }
+        { "path": "executed", "op": "truthy", "description": "the approved flight intent executed" },
+        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the case stays open: the required overnight is not yet accommodated" }
+      ]
+    },
+    {
+      "id": "plan_overnight_hotel",
+      "description": "Stage 9: with the flight confirmed but the overnight unresolved, planning proposes hotel-only overnight strategies from hotel.search evidence",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/plan",
+        "body": {
+          "caseId": "{{caseId}}",
+          "at": "2026-09-29T22:10:00+09:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "hotelStrategyId": "bestStrategyId"
+        }
+      },
+      "assert": [
+        { "path": "toolActivity.0.operation", "op": "equals", "expected": "hotel.search", "description": "evidence request is hotel.search near the overnight hub" },
+        { "path": "toolActivity.0.ok", "op": "truthy", "description": "REPLAY recording supplied hub hotel rates" },
+        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "overnight hotel strategies are proposed" },
+        { "path": "bestStrategyId", "op": "exists", "description": "a hotel strategy is ranked feasible" }
+      ]
+    },
+    {
+      "id": "begin_hotel_recovery",
+      "description": "Stage 10: the overnight hotel strategy becomes a money-moving hotel.book intent requiring traveller approval",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/begin",
+        "body": {
+          "caseId": "{{caseId}}",
+          "strategyId": "{{hotelStrategyId}}",
+          "at": "2026-09-29T22:20:00+09:00"
+        },
+        "expectStatus": 200,
+        "capture": {
+          "hotelIntentId": "intentId"
+        }
+      },
+      "assert": [
+        { "path": "intentId", "op": "exists", "description": "the hotel strategy was staged as an action intent" },
+        { "path": "caseStatus", "op": "equals", "expected": "AWAITING_TRAVELLER", "description": "the money-moving hotel booking awaits traveller approval" }
+      ]
+    },
+    {
+      "id": "decide_hotel_recovery",
+      "description": "Stage 11: the traveller approves the overnight hotel booking",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/decide",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{hotelIntentId}}",
+          "decidedBy": { "entityType": "TRAVELLER", "id": "trv-evt-ait-2026-ait-draft-09" },
+          "verdict": "APPROVED",
+          "note": "Approve the Narita overnight hotel for the missed connection",
+          "at": "2026-09-29T22:30:00+09:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "accepted", "op": "truthy", "description": "traveller approval is accepted" },
+        { "path": "caseStatus", "op": "equals", "expected": "READY_TO_EXECUTE", "description": "the approved hotel intent becomes executable" }
+      ]
+    },
+    {
+      "id": "execute_hotel_recovery",
+      "description": "Stage 12: the hotel booking executes through the provider and, once confirmed, the whole trip recovers",
+      "action": {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/runtime/execute",
+        "body": {
+          "caseId": "{{caseId}}",
+          "intentId": "{{hotelIntentId}}",
+          "at": "2026-09-29T22:40:00+09:00"
+        },
+        "expectStatus": 200
+      },
+      "assert": [
+        { "path": "executed", "op": "truthy", "description": "the approved hotel intent executed" },
+        { "path": "caseStatus", "op": "equals", "expected": "RESOLVED", "description": "the recovery case resolves after the overnight is confirmed" }
       ]
     },
     {
