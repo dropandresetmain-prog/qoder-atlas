@@ -1,0 +1,105 @@
+{
+  "id": "rec_a15d50f60bb9f421b3f0273e32d43233",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-08-29T17:13:48.500Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "r8waghscb",
+      "offerId": "3gAWonJzkd4AEaRzcmlk2gEdR1kyRE1OSldNTTNUS05aWUdZMlRFTUJYR0EzR0dOWlZHNFpYWU1KREdJWURFTlJRSEVaVEE3QlNHQVpETU1KUUdBWlhZWkxPTDVLVkc3Q1ZLTjZGS1UyRVBRWVVDTUNEUFEyREtNUlpQUlVWQVoyVkpCNkRDTlpZSEFZREVNWldHSTJURU5SUk9WRVZDWlpER0VaVFFOUlZHVVJURU1CV0dNV1RDTVpZR1kyVEs3Q09LSkRFNDdCU0dBWkRNTUJZR0k0VEFNWlJHTjZETzdDU0dFWlRJTUtDSEUzREdUUlFLVVlFU01SVkhCNkRLTUpVSEEyU0dVU1BFTkhGRVJTT0VNWkRBTVJXRlVZRFFMSlNIRVFEQU1aMkdFWlNHo3ByY8tAgBbMzMzMzaVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SgonJ0pE5SRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqtEZWx1eGUgUGx1c6NvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkpjEzODY1NaNzaWQCo2hpZKdscDIxZDlmo29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0wOS0zMKJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwNGU4MzU2MjFUdWFoeVpQdXV4blRoMWFZTmZGalAyT2NFWFRro2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSnbHAyMWQ5ZqJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWS3UHJvcGVydHkgc2VydmljZSBjaGFyZ2WhYctASb64UeuFH6Fjo1VTRIShacKhZKNUQVihYctARyuFHrhR7KFjo1VTRKJscMCjYmt0Bw==",
+      "hotelId": "lp21d9f",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJKECN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBAVSRCFJVNFOR2JGJKEKTSSKJHVMRKWINNFURCHIVNFIUKOKJLEOVKSKRCU2QSXI5GVOVCDJVNFSR2ZGJKEWN2DJ5FUURCFGQ3UEU2HIFNEITKNIJMUOSJUKRAU2WSSI5HDMRCPG5BVGR2FLJKESTKLINEEKM2EI5KFEUKLKVMUKU2NKJLEQQRWIRFU2SSVJBATEU2HKVJVARKOJBDEKUSTJ5CU2WSEIFGVEV2GKVMUIUKMJJJUQRKRIRAU2WRSI5CVUU2HPQ2TCNBOHA2XY7CSJ56HY7D4IRSWY5LYMUQFA3DVON6DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+              "occupancyNumber": 1,
+              "name": "Deluxe Plus",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 514.85,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 690.42,
+                    "currency": "USD",
+                    "source": "booking.com"
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Property service charge",
+                    "amount": 51.49,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": false,
+                    "description": "TAX",
+                    "amount": 46.34,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 690.42,
+      "isPackageRate": false,
+      "commission": 0,
+      "price": 514.85,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": false,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-09-30",
+      "checkout": "2026-10-03",
+      "sellingPriceToUser": 514.85
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "id": "rec_3095c7ebdbe8201cd23d4e314c2466cb",
+  "providerId": "nuitee",
+  "operation": "search",
+  "recordedAt": "2026-08-29T17:13:45.360Z",
+  "sanitized": true,
+  "raw": {
+    "hotels": [
+      {
+        "id": "lp21d9f",
+        "name": "Concorde Hotel Singapore",
+        "main_photo": "https://static.cupid.travel/hotels/15745507.jpg",
+        "thumbnail": "https://static.cupid.travel/hotels/thumbnail/15745507.jpg",
+        "address": "100 Orchard Road",
+        "country_code": "sg",
+        "city_name": "Singapore",
+        "latitude": 1.300679,
+        "longitude": 103.84206,
+        "rating": 7.9,
+        "stars": 4,
+        "review_count": 824
+      }
+    ],
+    "data": [
+      {
+        "hotelId": "lp21d9f",
+        "roomTypes": [
+          {
+            "roomTypeId": "GIYDMMZNGEZTQNRVGV6E4USGJZ6DEMBSGYYDQMRZGAZTCM34G56FEMJTGQYUEOJWGNHDAVJQJEZDKOD4GUYTIOBV",
+            "offerId": "3gAWonJzkd4AEaRzcmlk2gEdR1kyRE1OSldNTTNUS05aWUdZMlRFTUJYR0EzR0dOWlZHNFpYWU1KREdJWURFTlJRSEVaVEE3QlNHQVpETU1KUUdBWlhZWkxPTDVLVkc3Q1ZLTjZGS1UyRVBRWVVDTUNEUFEyREtNUlpQUlVWQVoyVkpCNkRDTlpZSEFZREVNWldHSTJURU5SUk9WRVZDWlpER0VaVFFOUlZHVVJURU1CV0dNV1RDTVpZR1kyVEs3Q09LSkRFNDdCU0dBWkRNTUJZR0k0VEFNWlJHTjZETzdDU0dFWlRJTUtDSEUzREdUUlFLVVlFU01SVkhCNkRLTUpVSEEyU0dVU1BFTkhGRVJTT0VNWkRBTVJXRlVZRFFMSlNIRVFEQU1aMkdFWlNHo3ByY8tAgBbMzMzMzaVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SgonJ0pE5SRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqtEZWx1eGUgUGx1c6NvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkpjEzODY1NaNzaWQCo2hpZKdscDIxZDlmo29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0wOS0zMKJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwNGU4MzU2MjFUdWFoeVpQdXV4blRoMWFZTmZGalAyT2NFWFRro2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSnbHAyMWQ5ZqJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWS3UHJvcGVydHkgc2VydmljZSBjaGFyZ2WhYctASb64UeuFH6Fjo1VTRIShacKhZKNUQVihYctARyuFHrhR7KFjo1VTRKJscMCjYmt0Bw==",
+            "supplier": "nuitee",
+            "supplierId": 2,
+            "rates": [
+              {
+                "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJKECN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBAVSRCFJVNFOR2JGJKEKTSSKJHVMRKWINNFURCHIVNFIUKOKJLEOVKSKRCU2QSXI5GVOVCDJVNFSR2ZGJKEWN2DJ5FUURCFGQ3UEU2HIFNEITKNIJMUOSJUKRAU2WSSI5HDMRCPG5BVGR2FLJKESTKLINEEKM2EI5KFEUKLKVMUKU2NKJLEQQRWIRFU2SSVJBATEU2HKVJVARKOJBDEKUSTJ5CU2WSEIFGVEV2GKVMUIUKMJJJUQRKRIRAU2WRSI5CVUU2HPQ2TCNBOHA2XY7CSJ56HY7D4IRSWY5LYMUQFA3DVON6DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+                "occupancyNumber": 1,
+                "name": "Deluxe Plus",
+                "maxOccupancy": 1,
+                "adultCount": 1,
+                "childCount": 0,
+                "childrenAges": [],
+                "boardType": "RO",
+                "boardName": "Room Only",
+                "remarks": "",
+                "priceType": "commission",
+                "commission": [
+                  {
+                    "amount": 0,
+                    "currency": "USD"
+                  }
+                ],
+                "retailRate": {
+                  "total": [
+                    {
+                      "amount": 514.85,
+                      "currency": "USD"
+                    }
+                  ],
+                  "suggestedSellingPrice": [
+                    {
+                      "amount": 716.95,
+                      "currency": "USD",
+                      "source": "booking.com"
+                    }
+                  ],
+                  "initialPrice": [
+                    {
+                      "amount": 514.85,
+                      "currency": "USD"
+                    }
+                  ],
+                  "taxesAndFees": [
+                    {
+                      "included": true,
+                      "description": "Property service charge",
+                      "amount": 51.49,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": false,
+                      "description": "TAX",
+                      "amount": 46.34,
+                      "currency": "USD"
+                    }
+                  ]
+                },
+                "cancellationPolicies": {
+                  "cancelPolicyInfos": [],
+                  "hotelRemarks": [],
+                  "refundableTag": "NRFN"
+                },
+                "paymentTypes": [
+                  "NUITEE_PAY"
+                ],
+                "providerCommission": {
+                  "amount": 0,
+                  "currency": ""
+                },
+                "perks": [],
+                "promotions": null
+              }
+            ],
+            "offerRetailRate": {
+              "amount": 514.85,
+              "currency": "USD"
+            },
+            "suggestedSellingPrice": {
+              "amount": 716.95,
+              "currency": "USD",
+              "source": "booking.com"
+            },
+            "offerInitialPrice": {
+              "amount": 514.85,
+              "currency": "USD"
+            },
+            "priceType": "commission",
+            "rateType": "standard",
+            "paymentTypes": [
+              "NUITEE_PAY"
+            ]
+          },
+          {
+            "roomTypeId": "HE2DCLJRGM4DMNJVPRHFERSOPQYTSNRZGEZDGMJRGAYDA7BRPRJDCMZUGF6DKMJUHA3Q",
+            "offerId": "3gAWonJzkd4AEaRzcmlk2gEIR1kyRE1OSldNTTNUS05aWUdZMlRFTUJYR0EzR0dOWlZHNFpYWU1KREdJWURFTlJRSEVaVEE3QlNHQVpETU1KUUdBWlhZWkxPTDVLVkc3Q1ZLTjZGS1UyRVBRWVVDTUNEUFEyREtNUlpQUlVWQVoyVkpCNkRDTlpZSEFZREVNWldHSTJURU5SUk9WRVZDWlpER0VaVFFOUlZHVVJUU05CUkZVWVRHT0JXR1UyWFlUU1NJWkhIWU1KWkdZNFRDTVJUR0VZVEFNQlFQUVlYWVVSUkdNMkRDN0JWR0UyRFFOWkRLSkhTR1RTU0laSENHTUpaR1k0UzJNSlNGVVpUQ0lCUkdBNURBTUJEo3ByY8tAgBb1wo9cKaVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SgonJ0pE5SRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqtEZWx1eGUgUGx1c6NvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkpjEzODY1NaNzaWQCo2hpZKdscDIxZDlmo29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0wOS0zMKJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwNGU4MzU2MjFUdWFoeVpQdXV4blRoMWFZTmZGalAyT2NFWFRro2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSnbHAyMWQ5ZqJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJOEoWnCoWSxVGF4IGFuZCBPdGhlciBGZWWhYctAPHCj1wo9caFjo1VTRIShacKhZLFUYXggYW5kIE90aGVyIEZlZaFhy0A8cKPXCj1xoWOjVVNEhKFpwqFksVRheCBhbmQgT3RoZXIgRmVloWHLQDqo9cKPXCmhY6NVU0SibHDAo2JrdAc=",
+            "supplier": "nuitee",
+            "supplierId": 2,
+            "rates": [
+              {
+                "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJKECN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBAVSRCFJVNFOR2JGJKEKTSSKJHVMRKWINNFURCHIVNFIUKOKJLEOVKSKRJU4QSSIZKVSVCHJ5BFOR2VGJMFSVCTKNEVUSCILFGUUWSHLE2FIQ2NKJKEORKZKRAU2QSRKBIVSWCZKVJFER2NGJCEGN2CKZDUKMSEKFHFURCLJJEFGR2UKNJUSWSIINDU2SS2I5MTIUZSJVFFGRSVLJKEGSKCKJDUCNKEIFGUERD4GUYTILRYG56HYUSPPR6HY7CEMVWHK6DFEBIGY5LTPQYC4MBQPQYC4MBQPR6DALRQGB6DALRQGA",
+                "occupancyNumber": 1,
+                "name": "Deluxe Plus",
+                "maxOccupancy": 1,
+                "adultCount": 1,
+                "childCount": 0,
+                "childrenAges": [],
+                "boardType": "RO",
+                "boardName": "Room Only",
+                "remarks": "",
+                "priceType": "commission",
+                "commission": [
+                  {
+                    "amount": 0,
+                    "currency": "USD"
+                  }
+                ],
+                "retailRate": {
+                  "total": [
+                    {
+                      "amount": 514.87,
+                      "currency": "USD"
+                    }
+                  ],
+                  "suggestedSellingPrice": [
+                    {
+                      "amount": 690.44,
+                      "currency": "USD",
+                      "source": "booking.com"
+                    }
+                  ],
+                  "initialPrice": [
+                    {
+                      "amount": 514.87,
+                      "currency": "USD"
+                    }
+                  ],
+                  "taxesAndFees": [
+                    {
+                      "included": false,
+                      "description": "Tax and Other Fee",
+                      "amount": 28.44,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": false,
+                      "description": "Tax and Other Fee",
+                      "amount": 28.44,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": false,
+                      "description": "Tax and Other Fee",
+                      "amount": 26.66,
+                      "currency": "USD"
+                    }
+                  ]
+                },
+                "cancellationPolicies": {
+                  "cancelPolicyInfos": [],
+                  "hotelRemarks": [],
+                  "refundableTag": "NRFN"
+                },
+                "paymentTypes": [
+                  "NUITEE_PAY"
+                ],
+                "providerCommission": {
+                  "amount": 0,
+                  "currency": ""
+                },
+                "perks": [],
+                "promotions": null
+              }
+            ],
+            "offerRetailRate": {
+              "amount": 514.87,
+              "currency": "USD"
+            },
+            "suggestedSellingPrice": {
+              "amount": 690.44,
+              "currency": "USD",
+              "source": "booking.com"
+            },
+            "offerInitialPrice": {
+              "amount": 514.87,
+              "currency": "USD"
+            },
+            "priceType": "commission",
+            "rateType": "standard",
+            "paymentTypes": [
+              "NUITEE_PAY"
+            ]
+          },
+          {
+            "roomTypeId": "GYZTALJRGM4DMNJVPRHFERSOPQZDAMRWGA4DEOJQGMYTG7BUPRJDCMZQGR6DKMRZGQ4Q",
+            "offerId": "3gAWonJzkd4AEaRzcmlk2gEIR1kyRE1OSldNTTNUS05aWUdZMlRFTUJYR0EzR0dOWlZHNFpYWU1KREdJWURFTlJRSEVaVEE3QlNHQVpETU1KUUdBWlhZWkxPTDVLVkc3Q1ZLTjZGS1UyRVBRWVVDTUNEUFEyREtNUlpQUlVWQVoyVkpCNkRDTlpZSEFZREVNWldHSTJURU5SUk9WRVZDWlpER0VaVFFOUlZHVVJUTU1aUUZVWVRHT0JXR1UyWFlUU1NJWkhIWU1SUUdJM0RBT0JTSEVZREdNSlRQUTJIWVVSUkdNWURJN0JWR0k0VElPSkRLSkhTR1RTU0laSENHTVJRR0kzQzJNQllGVVpEU0lCUUdNNURDTVpEo3ByY8tAgIvrhR64UqVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SgonJ0pE5SRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqtEZWx1eGUgUGx1c6NvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJCicnSkTlJGTqRzaGlkpjEzODY1NaNzaWQCo2hpZKdscDIxZDlmo29jY5GBoWEBo2N1cqNVU0SiZ26iVVOiY2mqMjAyNi0wOS0zMKJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwNGU4MzU2MjFUdWFoeVpQdXV4blRoMWFZTmZGalAyT2NFWFRro2lzaMKjc3Nwq2Jvb2tpbmcuY29to2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSnbHAyMWQ5ZqJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWS3UHJvcGVydHkgc2VydmljZSBjaGFyZ2WhYctASnmZmZmZmqFjo1VTRIShacKhZKNUQVihYctAR9MzMzMzM6Fjo1VTRKJscMCjYmt0Bw==",
+            "supplier": "nuitee",
+            "supplierId": 2,
+            "rates": [
+              {
+                "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJKECN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2WJNHDMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBAVSRCFJVNFOR2JGJKEKTSSKJHVMRKWINNFURCHIVNFIUKOKJLEOVKSKRGU2WSRIZKVSVCHJ5BFOR2VGJMFSVCTKNEVUSCILFGVEUKHJEZUIQKPIJJUQRKZIRDU2SSUKBITESCZKVJFER2NLFCESN2CKZDUSNCUJFHUURCLJJEFGR2UKNJUSWSIINDU2USRI5ETGQZSJVBFSRSVLJCFGSKCKFDU2NKEINGVURD4GUZDSLRUHF6HYUSPPR6HY7CEMVWHK6DFEBIGY5LTPQYC4MBQPQYC4MBQPR6DALRQGB6DALRQGA",
+                "occupancyNumber": 1,
+                "name": "Deluxe Plus",
+                "maxOccupancy": 1,
+                "adultCount": 1,
+                "childCount": 0,
+                "childrenAges": [],
+                "boardType": "RO",
+                "boardName": "Room Only",
+                "remarks": "",
+                "priceType": "commission",
+                "commission": [
+                  {
+                    "amount": 0,
+                    "currency": "USD"
+                  }
+                ],
+                "retailRate": {
+                  "total": [
+                    {
+                      "amount": 529.49,
+                      "currency": "USD"
+                    }
+                  ],
+                  "suggestedSellingPrice": [
+                    {
+                      "amount": 690.45,
+                      "currency": "USD",
+                      "source": "booking.com"
+                    }
+                  ],
+                  "initialPrice": [
+                    {
+                      "amount": 529.49,
+                      "currency": "USD"
+                    }
+                  ],
+                  "taxesAndFees": [
+                    {
+                      "included": true,
+                      "description": "Property service charge",
+                      "amount": 52.95,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": false,
+                      "description": "TAX",
+                      "amount": 47.65,
+                      "currency": "USD"
+                    }
+                  ]
+                },
+                "cancellationPolicies": {
+                  "cancelPolicyInfos": [],
+                  "hotelRemarks": [],
+                  "refundableTag": "NRFN"
+                },
+                "paymentTypes": [
+                  "NUITEE_PAY"
+                ],
+                "providerCommission": {
+                  "amount": 0,
+                  "currency": ""
+                },
+                "perks": [],
+                "promotions": null
+              }
+            ],
+            "offerRetailRate": {
+              "amount": 529.49,
+              "currency": "USD"
+            },
+            "suggestedSellingPrice": {
+              "amount": 690.45,
+              "currency": "USD",
+              "source": "booking.com"
+            },
+            "offerInitialPrice": {
+              "amount": 529.49,
+              "currency": "USD"
+            },
+            "priceType": "commission",
+            "rateType": "standard",
+            "paymentTypes": [
+              "NUITEE_PAY"
+            ]
+          }
+        ],
+        "et": 10800
+      }
+    ],
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

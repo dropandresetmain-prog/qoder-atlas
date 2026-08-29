@@ -1,0 +1,214 @@
+{
+  "id": "rec_ce79ca091b792c171b9234880bc979ab",
+  "providerId": "nuitee",
+  "operation": "retrieve",
+  "recordedAt": "2026-08-29T17:13:44.629Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "Z6m40cM3X",
+      "clientReference": "qoder-atlas-jordan-hotel-evidence",
+      "supplierBookingId": "Z6m40cM3X",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-09-29",
+      "checkout": "2026-09-30",
+      "hotel": {
+        "hotelId": "lp3a92f",
+        "name": "Narita Gateway Hotel"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "",
+            "retailRate": {
+              "total": {
+                "amount": 32.03,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": "booking.com"
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Sales tax",
+                  "amount": 3.2,
+                  "currency": "USD"
+                },
+                {
+                  "included": true,
+                  "description": "Service charge (taxable)",
+                  "amount": 2.36,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-09-26 10:00:00",
+                  "amount": 32.03,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                },
+                {
+                  "cancelTime": "2026-09-28 10:00:00",
+                  "amount": 32.03,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "RO",
+            "boardName": "Room Only",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Northstar",
+          "lastName": "Replay",
+          "childrenAges": [],
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-09-26 10:00:00",
+                "amount": 32.03,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              },
+              {
+                "cancelTime": "2026-09-28 10:00:00",
+                "amount": 32.03,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I42FUVCNJ5FFOTKVGNCE6TSUIRDVSMSUIVGUEWCHJEZUOTKOKRDUOWSTIRCU2QSXJVKTGR2NJZKEMR2KKNCE6TK2K5GVCM2HJVHFIQ2HLE2FITK2JJLUONJWIRBUSWSTI5AVURCNJVBFUR2JGRMFSTKSKFDUSM2EIFHUUVCHII3EOSZTKM3UWVSKLBMVMS2UKBJEWVSHKJCDIR2GIFKECUJTGRDVCMSUIVHUYNCOIZEUOT2WJNEVAUKZKRHU6QSZI5AVURCHJZJFER2VGRCEGT2DIVFVUUSGKNEVUU2HJU2FIU2NJJNEKTK2IRBU4WSZIZKVURCHJ5FFUR2FGRMFSVKTI5FFUNSEIVGUEU2HLFMUIU2NKJLUORKZIRAU2RBUI5DDMRSFJVFFGR2FLFMFSTK2KNDUCWSTI5KVGUCFJZFEKTKUKJCEOSKZIRCU4USOI5ATIUZSJVJFORKBLFKECT2SKFDUCUSRPQZTELRQGN6DEMBSGYWTAOJNGI4CAMJQHIYDAORQGB6FET34PR6HYU3JNZTWYZJAKJXW63JAJZXW4LKTNVXWW2LOM56DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+          "occupancy_number": 1,
+          "amount": 32.03,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Northstar",
+              "lastName": "Replay",
+              "email": "[REDACTED]",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Northstar",
+        "lastName": "Replay",
+        "email": "[REDACTED]",
+        "phone": "[REDACTED]"
+      },
+      "createdAt": "2026-08-29T17:13:44",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-09-26 10:00:00",
+            "amount": 32.03,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          },
+          {
+            "cancelTime": "2026-09-28 10:00:00",
+            "amount": 32.03,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "",
+      "optionalFees": "",
+      "mandatoryFees": "",
+      "knowBeforeYouGo": "",
+      "price": 32.03,
+      "sellingPriceToUser": 32.03,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Northstar",
+      "lastName": "Replay",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "pF0VrYSRC",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_F0uCYApQx6Hdj7o9jIeYB",
+      "sellingPrice": "32.03",
+      "exchangeRate": 0.8581235915416906,
+      "exchangeRateUsd": 1,
+      "email": "[REDACTED]",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-09-26T10:00:00Z",
+      "userId": 383174,
+      "nationality": "US",
+      "holderTitle": "",
+      "hotelId": "lp3a92f",
+      "hotelName": "Narita Gateway Hotel",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 1.28,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "<br/><br/>Please be advised we do not support the invoicing system for prepayment reservation receipts<br/>",
+      "payLaterDeadline": null
+    }
+  }
+}
