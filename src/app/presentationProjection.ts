@@ -5,7 +5,7 @@
  * branching, no fabricated fields.
  */
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
-import { compareInstants } from '../domain/common.ts';
+import { compareInstants, instantMillis } from '../domain/common.ts';
 import type { AnchorEvent, Place, Traveller } from '../domain/entities.ts';
 import type { Engagement, Importance, TransportLeg, TripElement } from '../domain/elements.ts';
 import type { Trip } from '../domain/trip.ts';
@@ -348,25 +348,92 @@ function elementImpactState(element: TripElement, affected: ReadonlySet<string>)
 }
 
 /** Chronological evidence log from trip signals — never fabricated. */
+
+const TIMELINE_SCHEDULE_KINDS = new Set<TripSignal['kind']>([
+  'FLIGHT_SCHEDULE_CHANGE',
+  'FLIGHT_DELAY',
+  'FLIGHT_CANCELLATION',
+]);
+
+function formatDelayMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (rest === 0) return `${hours} h`;
+  return `${hours} h ${rest} min`;
+}
+
+/**
+ * Real flight-state timing detail for a schedule signal, from the signal's
+ * structured payload plus the affected leg's authoritative endpoints.
+ * Delta lines appear only when the payload actually carries a previous
+ * scheduled instant — nothing is inferred or fabricated.
+ */
+function flightTimingDetail(
+  signal: TripSignal,
+  context: { places: ReadonlyMap<string, Place>; trip: Trip } | undefined,
+): string | undefined {
+  if (!TIMELINE_SCHEDULE_KINDS.has(signal.kind)) return undefined;
+  const payload = signal.payload ?? {};
+  const iso = (key: string): IsoDateTime | undefined => {
+    const value = payload[key];
+    return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) ? (value as IsoDateTime) : undefined;
+  };
+  const newArrival = iso('newArrival');
+  const newDeparture = iso('newDeparture');
+  const previousArrival = iso('previousArrival');
+  if (!newArrival && !newDeparture) return undefined;
+
+  const flightNumber = typeof payload['flightNumber'] === 'string' ? payload['flightNumber'].trim() : '';
+  const carrierCode = typeof payload['carrierCode'] === 'string' ? payload['carrierCode'].trim() : '';
+  // The provider flight number often already embeds the carrier code
+  // ("ZG023" for carrier "ZG") — never double-prefix.
+  const flight =
+    flightNumber && carrierCode && flightNumber.toUpperCase().startsWith(carrierCode.toUpperCase())
+      ? flightNumber
+      : [carrierCode, flightNumber].filter(Boolean).join('') || undefined;
+
+  const leg = signal.subjectRef?.id
+    ? context?.trip.elements.find(
+        (element): element is TransportLeg =>
+          element.id === signal.subjectRef?.id && element.elementKind === 'TRANSPORT_LEG',
+      )
+    : undefined;
+  const destination = leg && context ? placeCode(context.places.get(leg.data.destinationPlaceId)) : undefined;
+  const origin = leg && context ? placeCode(context.places.get(leg.data.originPlaceId)) : undefined;
+  const clock = (value: IsoDateTime): string | undefined =>
+    formatProgrammeInstant(value)?.split(' · ')[1] ?? formatProgrammeInstant(value);
+
+  const parts: string[] = [];
+  if (previousArrival && newArrival) {
+    const minutes = Math.round((instantMillis(newArrival) - instantMillis(previousArrival)) / 60_000);
+    if (minutes > 0) parts.push(`Flight delayed by ${formatDelayMinutes(minutes)}.`);
+  }
+  if (newArrival && destination) {
+    parts.push(`New timing: ${flight ?? 'the flight'} arrives in ${destination} at ${clock(newArrival) ?? newArrival}.`);
+  } else if (newDeparture && origin) {
+    parts.push(`New timing: ${flight ?? 'the flight'} departs ${origin} at ${clock(newDeparture) ?? newDeparture}.`);
+  }
+  return parts.length > 0 ? parts.join(' ') : undefined;
+}
+
 export function projectStatusTimeline(
   signals: readonly TripSignal[],
   recoveryCase?: RecoveryCase,
-  input?: { connectionImpossible?: boolean },
+  input?: {
+    connectionImpossible?: boolean;
+    /** Endpoint/airport resolution for flight-timing details. */
+    timing?: { places: ReadonlyMap<string, Place>; trip: Trip };
+  },
 ): StatusTimelineEntryView[] {
   if (signals.length === 0) return [];
   const sorted = [...signals].sort((a, b) => compareInstants(a.occurredAt, b.occurredAt));
-  const scheduleKinds = new Set<TripSignal['kind']>(['FLIGHT_SCHEDULE_CHANGE', 'FLIGHT_DELAY', 'FLIGHT_CANCELLATION']);
-  const progressive = sorted.filter((signal) => scheduleKinds.has(signal.kind));
+  const progressive = sorted.filter((signal) => TIMELINE_SCHEDULE_KINDS.has(signal.kind));
   const source = progressive.length > 1 ? progressive : sorted.length > 1 ? sorted : [];
 
   const entries: StatusTimelineEntryView[] = source.map((signal, index) => {
     const isLast = index === source.length - 1;
-    let detail: string | undefined;
-    if (source.length > 1 && scheduleKinds.has(signal.kind)) {
-      if (index === 0) detail = 'Connection still assessed as workable';
-      else if (!isLast) detail = 'Connection margin tightening';
-      else if (input?.connectionImpossible) detail = 'Latest timing makes the connection non-viable';
-    }
+    const detail = flightTimingDetail(signal, input?.timing);
     const tone: StatusTimelineEntryView['tone'] = isLast
       ? input?.connectionImpossible
         ? 'alert'

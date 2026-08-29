@@ -60,7 +60,7 @@ test('authorityNeededLabel never says human agent', () => {
   assert.ok(FORBIDDEN_UI_TERMS.includes('human agent'));
 });
 
-test('option card renders payable, policy equivalent, pros, commitment, provenance', () => {
+test('option card renders payable, policy equivalent, pros, commitment', () => {
   const view: CaseDetailView = {
     caseId: 'case-presentation-1',
     tripId: 'trip-presentation-1',
@@ -82,7 +82,6 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
         requiresApproval: true,
         authorityLabel: 'Organisation approval required',
         commitmentEffect: 'Finals Showcase remains viable',
-        provenanceLabel: 'Search: recorded provider response · Execution: simulated',
         pros: ['Arrival leaves enough preparation time before the commitment', 'NRT 08:20 → SIN 14:35'],
         cons: [],
         flags: ['Arrives 14:35 · commitment 20:45'],
@@ -105,10 +104,11 @@ test('option card renders payable, policy equivalent, pros, commitment, provenan
   assert.match(html, /Approx\. S\$122\.23 policy equivalent/);
   assert.match(html, /Arrival leaves enough preparation time before the commitment/);
   assert.match(html, /Organisation approval required/);
-  assert.match(html, /Search: recorded provider response/);
   assert.match(html, /Approve as organiser US\$90\.54/);
   assert.doesNotMatch(html, /human agent/i);
   assert.doesNotMatch(html, /\$[\d.]+\s+at provider/);
+  assert.doesNotMatch(html, /recorded provider response/);
+  assert.doesNotMatch(html, /Execution: simulated/);
   assert.match(html, /data-test="option-payable"/);
   assert.match(html, /data-test="option-pros"/);
 });

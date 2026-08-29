@@ -386,11 +386,14 @@ function evaluateLinkedTrip(
 
   if (temporalChange) {
     const start = input.newStartsAt ? humanStayInstantSafe(input.newStartsAt) : undefined;
+    const from = humanStayInstantSafe(engagement.data.startsAt.value);
     if (timingRestored && arrivalGapMinutes !== undefined) {
       reasons.push(
-        start
-          ? `Moving to ${start} restores enough preparation time before ${commitmentLabel}`
-          : `The move restores enough preparation time before ${commitmentLabel}`,
+        start && from && start !== from
+          ? `Moving from ${from} to ${start} restores enough preparation time before ${commitmentLabel}`
+          : start
+            ? `Moving to ${start} restores enough preparation time before ${commitmentLabel}`
+            : `The move restores enough preparation time before ${commitmentLabel}`,
       );
     } else if (bufferStillFails && arrivalGapMinutes !== undefined) {
       reasons.push(
@@ -400,13 +403,15 @@ function evaluateLinkedTrip(
     } else if (bufferStillPasses && arrivalGapMinutes !== undefined) {
       reasons.push(
         `${commitmentLabel} still leaves enough preparation time after arrival` +
-          (start ? ` with the move to ${start}` : ''),
+          (start && from && start !== from ? ` with the move from ${from} to ${start}` : start ? ` with the move to ${start}` : ''),
       );
     } else {
       reasons.push(
-        start
-          ? `Programme commitment moves to ${start}`
-          : 'Programme commitment moves — engagement times would change',
+        start && from && start !== from
+          ? `Programme commitment moves from ${from} to ${start}`
+          : start
+            ? `Programme commitment moves to ${start}`
+            : 'Programme commitment moves — engagement times would change',
       );
     }
   }

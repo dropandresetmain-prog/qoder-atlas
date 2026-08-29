@@ -81,7 +81,10 @@ export function enrichCaseDetailView(
     projectStatusTimeline(
       context.allTripSignals ?? triggeringSignals,
       recoveryCase,
-      context.connectionImpossible ? { connectionImpossible: true } : undefined,
+      {
+        ...(context.connectionImpossible ? { connectionImpossible: true } : {}),
+        timing: { places, trip },
+      },
     ),
     context.activityTimeline ?? [],
     recoveryCase,
@@ -199,16 +202,19 @@ function mergeStatusTimelines(
 
   // Re-derive the approved progressive connection wording across every
   // schedule row now that audit rows may interleave with signal rows.
+  // Timing detail already carried by a signal row is preserved; the
+  // consequence phrase for the moment is appended, never fabricated.
   const scheduleRows = merged.filter((entry) => TIMELINE_SCHEDULE_LABELS.has(entry.label));
   if (scheduleRows.length > 1) {
     scheduleRows.forEach((row, index) => {
       const isLast = index === scheduleRows.length - 1;
-      row.detail =
+      const consequence =
         index === 0
           ? 'Connection still assessed as workable'
           : isLast && connectionImpossible
             ? 'Latest timing makes the connection non-viable'
             : 'Connection margin tightening';
+      row.detail = row.detail ? `${row.detail} ${consequence}` : consequence;
       if (isLast) row.tone = connectionImpossible ? 'alert' : 'watch';
     });
   }

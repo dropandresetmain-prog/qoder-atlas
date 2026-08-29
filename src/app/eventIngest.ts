@@ -185,6 +185,24 @@ function legCarrierRef(trip: Trip, elementId: EntityId): string | undefined {
 }
 
 /**
+ * The affected leg's CURRENT authoritative schedule facts, captured before
+ * an incoming provider state is applied. Persisting them on the signal
+ * payload preserves the real before/after flight-state history downstream
+ * presentation derives from — never fabricated, absent when the leg carries
+ * no dated schedule.
+ */
+function previousScheduleFacts(trip: Trip, elementId: EntityId): { previousDeparture?: string; previousArrival?: string } {
+  const element = trip.elements.find((candidate) => candidate.id === elementId);
+  if (element?.elementKind !== 'TRANSPORT_LEG') return {};
+  const departure = element.data.scheduledDeparture?.value;
+  const arrival = element.data.scheduledArrival?.value;
+  return {
+    ...(departure ? { previousDeparture: departure } : {}),
+    ...(arrival ? { previousArrival: arrival } : {}),
+  };
+}
+
+/**
  * Ingest one raw provider-shaped event through the full generic pipeline.
  * Never throws: every failure mode (invalid payload, duplicate delivery,
  * correlation failure) is a structured EventIngestOutcome.
@@ -310,6 +328,7 @@ export async function ingestProviderEvent(
               subjectRef: signal.subjectRef ?? { entityType: 'TRIP_ELEMENT', id: narrowed.elementId },
               payload: {
                 ...signal.payload,
+                ...previousScheduleFacts(trip, narrowed.elementId),
                 // Evidence transparency: how the affected element was chosen
                 // and that this signal came from a provider read, not a push.
                 correlation: {
@@ -363,6 +382,7 @@ export async function ingestProviderEvent(
         subjectRef: rawSignal.subjectRef ?? { entityType: 'TRIP_ELEMENT', id: narrowed.elementId },
         payload: {
           ...rawSignal.payload,
+          ...previousScheduleFacts(trip, narrowed.elementId),
           // Evidence transparency: how the affected element was chosen inside
           // the matched booking. Never interpreted as business truth.
           correlation: {

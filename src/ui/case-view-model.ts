@@ -52,6 +52,14 @@ export interface WholeTripPlanItemView {
    * comparison unmistakable; absent when nothing is being replaced.
    */
   before?: string;
+  /**
+   * Semantic outcome label derived by the projection from the item's actual
+   * evidence (e.g. "Covered" for an insurance check that found coverage).
+   * Rendered as a shared coloured badge; absent falls back to the kind label.
+   */
+  statusLabel?: string;
+  /** Shared badge tone for statusLabel (ok=green, watch=amber, alert=red). */
+  statusTone?: 'ok' | 'watch' | 'alert' | 'neutral';
 }
 
 export interface WholeTripRecoveryPlanView {
@@ -95,8 +103,6 @@ export interface RecoveryOptionView {
   commitmentEffect?: string;
   /** Who must approve this option, in judge-facing language. */
   authorityLabel?: string;
-  /** Evidence provenance, e.g. REPLAY search / SIMULATED execution. */
-  provenanceLabel?: string;
   /**
    * Whole-trip reasoning card: checked context vs executable vs manual follow-up.
    * Present when the planner staged a transport recovery with downstream consequences.

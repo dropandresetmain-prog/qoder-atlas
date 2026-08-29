@@ -142,11 +142,11 @@ function renderOperatorTopbar(options: PageOptions): string {
     right.push(`<span class="replay-pill${live ? ' rp-live' : ''}">${escapeHtml(label)}</span>`);
   }
   if (options.operatorInitials || options.profileResetAction) {
-    right.push(renderProfileMenu(options.operatorInitials ?? 'A', options.profileResetAction));
+    right.push(renderProfileMenu(options.operatorInitials ?? 'A', options.profileResetAction, options.eventName));
   }
   const tbRight = right.length > 0 ? `<div class="tb-right">${right.join('')}</div>` : '';
   return `<header class="topbar" data-surface="operator">
-  <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar<small>keeps the whole trip working</small></div>
+  <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar<small>AI Travel Resolution Engine</small></div>
   ${eventSelect}
   ${nav}
   ${tbRight}
@@ -154,12 +154,14 @@ function renderOperatorTopbar(options: PageOptions): string {
 }
 
 /**
- * Compact profile menu (approved #12): a clean avatar control in the
- * top-right that opens a small popover with the coordinator identity and
- * secondary/admin actions. The reset control lives here — never on the
- * primary surface — and is worded without internal scenario vocabulary.
+ * Compact profile menu (approved #12): the coordinator identity reads
+ * directly in the top-right as a two-line treatment beside the avatar, and
+ * the popover keeps the secondary/admin actions. The reset control lives
+ * here — never on the primary surface — and is worded without internal
+ * scenario vocabulary.
  */
-function renderProfileMenu(initials: string, resetAction: string | undefined): string {
+function renderProfileMenu(initials: string, resetAction: string | undefined, eventName?: string): string {
+  const roleLine = `Travel Coordinator · ${eventName?.trim() || 'AI In Travel Summit'}`;
   const resetForm = resetAction
     ? `
       <form class="pm-reset" method="post" action="${escapeHtml(resetAction)}" data-test="profile-reset-form">
@@ -167,11 +169,11 @@ function renderProfileMenu(initials: string, resetAction: string | undefined): s
       </form>`
     : '';
   return `<details class="profile-menu" data-test="profile-menu">
-  <summary class="avatar" aria-label="Profile: Anthony, Travel Coordinator" data-test="profile-menu-toggle">${escapeHtml(initials)}</summary>
+  <summary class="profile-toggle" aria-label="Profile: Anthony, Travel Coordinator" data-test="profile-menu-toggle"><span class="avatar-circle">${escapeHtml(initials)}</span><span class="avatar-meta"><span class="am-name">Anthony</span><span class="am-role">${escapeHtml(roleLine)}</span></span></summary>
   <div class="profile-pop" role="menu" aria-label="Profile">
     <p class="pm-name">Anthony</p>
     <p class="pm-role">Travel Coordinator</p>
-    <p class="pm-event">AI In Travel Summit</p>${resetForm}
+    <p class="pm-event">${escapeHtml(eventName?.trim() || 'AI In Travel Summit')}</p>${resetForm}
   </div>
 </details>`;
 }

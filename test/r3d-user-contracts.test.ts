@@ -344,7 +344,7 @@ test('traveller choice cards only when a decision is required', () => {
   assert.doesNotMatch(renderTravellerTripBody(withoutChoice), /optcard/);
 });
 
-test('programme-change script renders Now vs Proposed preview contract without native confirm', () => {
+test('programme-change script renders Now vs Proposed preview contract with one-click commit', () => {
   const script = renderProgrammeChangeEnhancementScript();
   assert.match(script, /now-vs-proposed/);
   assert.match(script, /Now/);
@@ -352,7 +352,10 @@ test('programme-change script renders Now vs Proposed preview contract without n
   assert.match(script, /change-preview/);
   assert.match(script, /change-commit/);
   assert.match(script, /data-programme-change-back/);
-  assert.match(script, /data-programme-change-confirm/);
+  // One-click confirm: the reviewed preview is the decision — commit runs
+  // immediately; there is no second confirmation panel and no native confirm.
+  assert.doesNotMatch(script, /data-programme-change-confirm/);
+  assert.match(script, /commitButton\.addEventListener\('click', runCommit\)/);
   assert.doesNotMatch(script, /window\.confirm/);
 });
 

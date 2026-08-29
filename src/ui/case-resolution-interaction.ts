@@ -24,8 +24,8 @@ export function renderCaseResolutionEnhancementScript(): string {
 (function() {
   'use strict';
   var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var RESOLVE_MS = REDUCE ? 200 : 3000;
-  var EXEC_MS = REDUCE ? 200 : 2400;
+  var RESOLVE_MS = REDUCE ? 200 : 1500;
+  var EXEC_MS = REDUCE ? 200 : 1500;
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }

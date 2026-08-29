@@ -64,6 +64,25 @@ function insuranceFinding(rules: readonly PolicyRule[]): string | undefined {
   return undefined;
 }
 
+type PlanItemStatus = { statusLabel: string; statusTone: 'ok' | 'watch' | 'alert' | 'neutral' };
+
+/**
+ * Entry/transit outcome wording derived only from the authoritative
+ * requirement evidence — "Visa-free" is never asserted unless the rule
+ * itself says so; anything else falls back to the neutral checked label.
+ */
+function entryStatusFromRequirement(requirement: string): PlanItemStatus {
+  const text = requirement.toLowerCase();
+  if (/visa[- ]free/.test(text)) return { statusLabel: 'Visa-free entry', statusTone: 'ok' };
+  if (/transit/.test(text) && /permitted|allowed|exempt/.test(text)) {
+    return { statusLabel: 'Transit allowed', statusTone: 'ok' };
+  }
+  if (/entry/.test(text) && /permitted|allowed|admitted|exempt/.test(text)) {
+    return { statusLabel: 'Entry allowed', statusTone: 'ok' };
+  }
+  return { statusLabel: 'Checked', statusTone: 'neutral' };
+}
+
 function entryFinding(rules: readonly PolicyRule[]): string | undefined {
   for (const rule of rules) {
     if (rule.kind !== 'ENTRY_REQUIREMENT') continue;
@@ -165,6 +184,8 @@ export function projectWholeTripRecoveryPlan(input: {
       ? `${origin} → ${destination}, departing ${depart}, arriving ${arrive}${afterCarrier}`
       : `${origin} → ${destination} replacement that protects downstream commitments`,
     kind: 'EXECUTABLE',
+    statusLabel: 'Handled by Northstar',
+    statusTone: 'ok',
     ...(brokenLeg ? { before: legSummary(brokenLeg, input.places) } : {}),
   });
 
@@ -189,6 +210,8 @@ export function projectWholeTripRecoveryPlan(input: {
       title: 'Overnight stay',
       finding: `Timing requires an overnight stay near ${hubName}; Northstar does not book the hotel — the organiser or traveller confirms it with the provider`,
       kind: 'RECOMMENDED',
+      statusLabel: 'Requires confirmation',
+      statusTone: 'watch',
     });
   }
 
@@ -200,6 +223,7 @@ export function projectWholeTripRecoveryPlan(input: {
       title: 'Entry / transit',
       finding: entry,
       kind: 'CHECKED',
+      ...entryStatusFromRequirement(entry),
     });
   }
 
@@ -211,6 +235,8 @@ export function projectWholeTripRecoveryPlan(input: {
       title: 'Insurance',
       finding: insurance,
       kind: 'CHECKED',
+      statusLabel: 'Covered',
+      statusTone: 'ok',
     });
   }
 
@@ -229,6 +255,8 @@ export function projectWholeTripRecoveryPlan(input: {
         ? `The first night at ${hotel} is no longer usable as booked; the provider must be contacted to change or cancel it`
         : `The stay at ${hotel} starts before the new arrival; the provider must be contacted to adjust the booking`,
       kind: 'MANUAL_FOLLOWUP',
+      statusLabel: 'Provider follow-up',
+      statusTone: 'watch',
     });
   }
 
@@ -246,6 +274,8 @@ export function projectWholeTripRecoveryPlan(input: {
         ? `Arrival still protects ${input.engagement.data.title}`
         : `Arrival no longer protects ${input.engagement.data.title}`,
       kind: 'CHECKED',
+      statusLabel: ok ? 'Protected' : 'No longer protected',
+      statusTone: ok ? 'ok' : 'alert',
     });
   }
 
@@ -260,6 +290,8 @@ export function projectWholeTripRecoveryPlan(input: {
       title: 'Known cost',
       finding: `${formatMoney(knownIncrementalCost!)} for the replacement flight, chargeable through Northstar`,
       kind: 'EXECUTABLE',
+      statusLabel: 'Handled by Northstar',
+      statusTone: 'ok',
     });
   } else {
     costNotes.push('Flight cost will be confirmed when inventory is priced');

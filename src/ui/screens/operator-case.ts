@@ -464,9 +464,12 @@ function wholeTripPlanBlock(plan: NonNullable<RecoveryOptionView['wholeTripPlan'
         ? `<p class="whole-trip-before" data-test="whole-trip-before"><strong>Before.</strong> ${escapeHtml(item.before)} — no longer works as booked</p>
       <p class="whole-trip-after" data-test="whole-trip-after"><strong>After.</strong> ${escapeHtml(item.finding)}</p>`
         : `<p>${escapeHtml(item.finding)}</p>`;
+      const status = item.statusLabel
+        ? `<span class="badge tone-${item.statusTone ?? 'neutral'}" data-test="whole-trip-status">${escapeHtml(item.statusLabel)}</span>`
+        : `<span class="whole-trip-kind">${escapeHtml(kindLabel[item.kind])}</span>`;
       return `
     <div class="whole-trip-item" data-plan-kind="${escapeHtml(item.kind)}" data-plan-category="${escapeHtml(item.category)}" data-test="whole-trip-item">
-      <p class="whole-trip-item-title"><strong>${escapeHtml(item.title)}</strong> · ${escapeHtml(kindLabel[item.kind])}</p>
+      <p class="whole-trip-item-title"><strong>${escapeHtml(item.title)}</strong> ${status}</p>
       ${body}
     </div>`;
     })
@@ -550,10 +553,6 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     option.commitmentEffect
       ? `<div class="opt-commitment" data-test="option-commitment"><strong>Commitment.</strong> ${escapeHtml(option.commitmentEffect)}</div>`
       : '';
-  const provenance =
-    option.provenanceLabel
-      ? `<div class="opt-provenance" data-test="option-provenance">${escapeHtml(option.provenanceLabel)}</div>`
-      : '';
   const flags =
     (option.flags?.length ?? 0) > 0
       ? `<div class="opt-flags">${option.flags!.map((flag) => `<span class="chip">${escapeHtml(flag)}</span>`).join('')}</div>`
@@ -584,7 +583,6 @@ function optionCard(option: RecoveryOptionView, role: 'recommended' | 'alternati
     ${pros}
     ${cons}
     ${flags}
-    ${provenance}
     ${whyNot}
   </div>`;
 }

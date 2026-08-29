@@ -821,7 +821,6 @@ export async function projectCaseDetail(
       places,
       ...(criticalObjectiveAtRisk ? { criticalObjectiveAtRisk } : {}),
       ...(candidate.viability?.softTradeoffs ? { softTradeoffs: candidate.viability.softTradeoffs } : {}),
-      searchProvenance: 'REPLAY',
       ...(requiredBufferMinutes !== undefined ? { requiredBufferMinutes } : {}),
     });
     options.push({
@@ -844,7 +843,6 @@ export async function projectCaseDetail(
       ...(presentation.cons ? { cons: presentation.cons } : {}),
       ...(presentation.commitmentEffect ? { commitmentEffect: presentation.commitmentEffect } : {}),
       ...(presentation.authorityLabel ? { authorityLabel: presentation.authorityLabel } : {}),
-      ...(presentation.provenanceLabel ? { provenanceLabel: presentation.provenanceLabel } : {}),
       ...(presentation.flags ? { flags: presentation.flags } : {}),
       // ADR-052: an FX-normalized intent freezes BOTH the home restatement
       // (spendExposure) and the original provider charge (providerSpend); the

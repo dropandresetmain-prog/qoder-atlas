@@ -296,9 +296,9 @@ test('browser: Sarah S1→S3 commit converges to resolved Confirmed without a se
     assert.doesNotMatch(preview, /el-trip-/i);
     const overlaySeen = page.waitForSelector('[data-test="lifecycle-progress-overlay"]', { timeout: 15000 });
     const commit = page.waitForResponse((r) => r.url().includes('event-change') || r.url().includes('programme') || r.url().includes('commit'), { timeout: 30000 }).catch(() => null);
+    // One-click confirm: the reviewed preview is the decision — commit fires
+    // immediately with no second confirmation panel.
     await modal.locator('[data-test="programme-change-commit"]').click();
-    await page.waitForSelector('[data-test="programme-change-confirm-panel"]', { timeout: 10000 });
-    await page.locator('[data-test="programme-change-confirm-yes"]').click();
     await commit;
     await overlaySeen;
     await page.waitForTimeout(2800);

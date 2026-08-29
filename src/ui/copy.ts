@@ -334,4 +334,9 @@ export const FORBIDDEN_UI_TERMS: readonly string[] = [
   'soft tradeoffs',
   'evidenced option',
   'required arrival buffer',
+  // Final polish pass: provider/execution provenance never renders on hero
+  // surfaces — it stays in state, audit and debug data only.
+  'recorded provider response',
+  'live provider response',
+  'execution: simulated',
 ];

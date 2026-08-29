@@ -176,12 +176,30 @@ body {
   font-family: var(--font-mono); font-size: 10px; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.04em;
 }
-/* Top-right profile menu: compact avatar control with a small popover. */
+/* Top-right profile menu: coordinator identity beside the avatar (two-line),
+   popover keeps the secondary/admin controls. */
 .profile-menu { position: relative; }
-.profile-menu summary.avatar { cursor: pointer; list-style: none; user-select: none; transition: filter 150ms ease-out; }
-.profile-menu summary.avatar::-webkit-details-marker { display: none; }
-.profile-menu summary.avatar:hover { filter: brightness(1.3); }
-.profile-menu[open] summary.avatar { outline: 2px solid var(--watch-f); outline-offset: 2px; }
+.profile-menu summary.profile-toggle {
+  cursor: pointer; list-style: none; user-select: none;
+  display: inline-flex; align-items: center; gap: 9px;
+  background: none; border: 0; padding: 2px 4px; border-radius: 9px;
+  transition: background-color 150ms ease-out;
+}
+.profile-menu summary.profile-toggle .avatar-circle {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.04em;
+}
+.profile-menu summary.profile-toggle .avatar-meta { display: flex; flex-direction: column; line-height: 1.25; text-align: left; }
+.profile-menu summary.profile-toggle .am-name { font-size: 13px; font-weight: 650; color: var(--text); }
+.profile-menu summary.profile-toggle .am-role {
+  font-size: 10.5px; color: var(--text-soft);
+  font-family: var(--font-mono); letter-spacing: 0.03em; white-space: nowrap;
+}
+.profile-menu summary.profile-toggle::-webkit-details-marker { display: none; }
+.profile-menu summary.profile-toggle:hover { background: var(--surface-2); }
+.profile-menu[open] summary.profile-toggle .avatar-circle { outline: 2px solid var(--watch-f); outline-offset: 2px; }
 .profile-menu .profile-pop {
   position: absolute; right: 0; top: calc(100% + 10px); z-index: 60;
   min-width: 220px; background: var(--surface); border: 1px solid var(--border);
@@ -763,8 +781,7 @@ body.ns-resolve-open { overflow: hidden; }
 }
 .option-card .opt-pros { color: var(--ok); }
 .option-card .opt-cons { color: var(--alert); }
-.option-card .opt-commitment,
-.option-card .opt-provenance {
+.option-card .opt-commitment {
   margin-top: 8px;
   font-size: 13px;
   color: var(--text-soft);
@@ -1042,6 +1059,9 @@ a.brow.brow-actionable:focus-visible,
 .status-tl-detail { margin: 4px 0 0; font-size: 13.5px; color: var(--text-soft); }
 .whole-trip-compare-kicker { margin: 0 0 10px; font-size: 12.5px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); }
 .whole-trip-known-cost { margin-top: 10px; font-size: 14px; }
+.whole-trip-item .whole-trip-item-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.whole-trip-item .whole-trip-item-title .badge { vertical-align: middle; }
+.whole-trip-item .whole-trip-kind { font-size: 12px; color: var(--text-soft); }
 .ns-resolve-step-icon {
   width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; flex: 0 0 auto; background: var(--surface); border: 1px solid var(--border);
@@ -1418,6 +1438,8 @@ button.optcard:focus-visible { outline: 2px solid var(--watch-f); outline-offset
   .topbar .brand small { display: none; }
   .topbar nav a { padding: 6px 8px; font-size: 12px; }
   .planning-progress ol { grid-template-columns: 1fr 1fr; }
+  /* The two-line identity collapses to the avatar alone on small screens. */
+  .profile-menu summary.profile-toggle .avatar-meta { display: none; }
 }
 
 /* ================= demo banner (dev-only safety strip) ================= */

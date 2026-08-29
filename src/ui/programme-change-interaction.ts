@@ -16,7 +16,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
   'use strict';
 
   var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var PREVIEW_MS = REDUCE ? 200 : 3000;
+  var PREVIEW_MS = REDUCE ? 200 : 1500;
   var params = new URLSearchParams(window.location.search);
   var actionAt = params.get('at') || new Date().toISOString();
   var actionRow = document.querySelector('[data-ui-section="programme-actions"]');
@@ -483,29 +483,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
     previewButton.setAttribute('aria-disabled', ready ? 'false' : 'true');
   }
 
-  function ensureCommitConfirm(modal) {
-    var existing = modal.querySelector('[data-programme-change-confirm]');
-    if (existing) return existing;
-    var panel = document.createElement('div');
-    panel.setAttribute('data-programme-change-confirm', '');
-    panel.setAttribute('data-test', 'programme-change-confirm-panel');
-    panel.hidden = true;
-    panel.className = 'panel';
-    panel.style.marginTop = '16px';
-    panel.innerHTML =
-      '<p class="planning-kicker">Confirm programme change</p>' +
-      '<p class="planning-result-title">Commit this headline move?</p>' +
-      '<p>Northstar will update the programme and re-check every linked traveller. Nothing changes until you confirm.</p>' +
-      '<div class="btn-row" style="margin-top:14px">' +
-        '<button type="button" class="btn btn-primary" data-programme-change-confirm-yes data-test="programme-change-confirm-yes">Commit programme change</button>' +
-        '<button type="button" class="btn btn-ghost" data-programme-change-confirm-no data-test="programme-change-confirm-no">Go back</button>' +
-      '</div>';
-    var result = modal.querySelector('[data-programme-change-result]');
-    if (result && result.parentNode) result.parentNode.insertBefore(panel, result.nextSibling);
-    else modal.appendChild(panel);
-    return panel;
-  }
-
   function setStep(modal, step) {
     var edit = modal.querySelector('[data-programme-change-edit]');
     var compare = modal.querySelector('[data-programme-change-compare]');
@@ -514,8 +491,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var backButton = modal.querySelector('[data-programme-change-back]');
     var editToggle = modal.querySelector('[data-programme-change-edit-toggle]');
     var commitButton = modal.querySelector('[data-programme-change-commit]');
-    var confirmPanel = modal.querySelector('[data-programme-change-confirm]');
-    if (confirmPanel) confirmPanel.hidden = true;
     if (step === 'edit') {
       if (edit) edit.hidden = false;
       if (compare) compare.hidden = true;
@@ -623,7 +598,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
 
     document.body.appendChild(scrim);
     document.body.appendChild(modal);
-    ensureCommitConfirm(modal);
 
     var select = modal.querySelector('[name="commitmentId"]');
     var startInput = modal.querySelector('[name="newStartsAt"]');
@@ -672,7 +646,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
     var editToggle = modal.querySelector('[data-programme-change-edit-toggle]');
     var cancelButton = modal.querySelector('[data-programme-change-cancel]');
     var result = modal.querySelector('[data-programme-change-result]');
-    var confirmPanel = ensureCommitConfirm(modal);
     var lastPreviewPayload = null;
 
     cancelButton.addEventListener('click', closeModal);
@@ -685,9 +658,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
     backButton.addEventListener('click', function() {
       lastPreviewPayload = null;
       setStep(modal, prefilled ? 'compare' : 'edit');
-    });
-    confirmPanel.querySelector('[data-programme-change-confirm-no]').addEventListener('click', function() {
-      confirmPanel.hidden = true;
     });
 
     function runPreview() {
@@ -702,7 +672,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
       }
       previewButton.disabled = true;
       commitButton.hidden = true;
-      confirmPanel.hidden = true;
       result.replaceChildren();
       var previewSteps = [
         { phase: 'travellers', label: 'Checking linked travellers' },
@@ -742,7 +711,6 @@ export function renderProgrammeChangeEnhancementScript(): string {
         .then(function(response) {
           if (!response.ok) {
             commitButton.disabled = false;
-            confirmPanel.hidden = true;
             result.textContent = 'Commit failed: ' + previewErrorText(response.data);
             return;
           }
@@ -757,20 +725,13 @@ export function renderProgrammeChangeEnhancementScript(): string {
         })
         .catch(function(error) {
           commitButton.disabled = false;
-          confirmPanel.hidden = true;
           result.textContent = 'Commit failed: ' + (error && error.message ? error.message : 'unknown error');
         });
     }
 
-    commitButton.addEventListener('click', function() {
-      if (!lastPreviewPayload) return;
-      confirmPanel.hidden = false;
-      var yes = confirmPanel.querySelector('[data-programme-change-confirm-yes]');
-      yes.onclick = function() {
-        confirmPanel.hidden = true;
-        runCommit();
-      };
-    });
+    // One-click confirm: the reviewed preview is the decision — commit runs
+    // immediately and the real mutation/audit path executes unchanged.
+    commitButton.addEventListener('click', runCommit);
   }
 
   if (actionRow && timelineItems.length > 0 && resolveAnchorEventId(null)) {

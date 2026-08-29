@@ -94,7 +94,6 @@ export interface OptionPresentationInput {
   places: ReadonlyMap<string, Place>;
   criticalObjectiveAtRisk?: string;
   softTradeoffs?: readonly string[];
-  searchProvenance?: 'REPLAY' | 'LIVE' | 'RECORD';
   /** Governing MIN_BUFFER minutes when known from policy/constraints. */
   requiredBufferMinutes?: number;
 }
@@ -104,7 +103,6 @@ export interface OptionPresentationFields {
   cons?: string[];
   commitmentEffect?: string;
   authorityLabel?: string;
-  provenanceLabel?: string;
   whyRecommended?: string;
   summary?: string;
   flags?: string[];
@@ -216,12 +214,6 @@ export function projectOptionPresentation(input: OptionPresentationInput): Optio
     authorityLabel = 'Organisation approval required';
   }
 
-  const provenanceParts: string[] = [];
-  if (input.searchProvenance === 'LIVE') provenanceParts.push('Search: live provider response');
-  else if (input.searchProvenance) provenanceParts.push('Search: recorded provider response');
-  if (input.intent) provenanceParts.push('Execution: simulated');
-  const provenanceLabel = provenanceParts.length > 0 ? provenanceParts.join(' · ') : undefined;
-
   let whyRecommended: string | undefined;
   if (input.recommended && input.feasible) {
     if (bufferLabel) {
@@ -253,7 +245,6 @@ export function projectOptionPresentation(input: OptionPresentationInput): Optio
     ...(cons.length > 0 ? { cons: unique(cons) } : {}),
     ...(commitmentEffect ? { commitmentEffect } : {}),
     ...(authorityLabel ? { authorityLabel } : {}),
-    ...(provenanceLabel ? { provenanceLabel } : {}),
     ...(whyRecommended ? { whyRecommended } : {}),
     ...(summaryParts.length > 0 ? { summary: summaryParts.join(' ') } : {}),
     ...(flags.length > 0 ? { flags: unique(flags) } : {}),
