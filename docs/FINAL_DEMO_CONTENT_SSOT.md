@@ -136,7 +136,7 @@ Remaining roster: name, company/title, origin, managed/local, baseline flight/ho
 | Programme role | Lab PARTICIPANT (soft); **Finals FINALIST REQUIRED/FIXED**; Day-2 Awards FINALIST REQUIRED/FIXED |
 | Baseline flights | **ZIPAIR ZG023** LAX→NRT `2026-09-28T10:55:00-07:00` → `2026-09-29T14:10:00+09:00`; **ZIPAIR ZG053** NRT→SIN `2026-09-29T16:50:00+09:00` → `2026-09-29T23:00:00+08:00`; PNR **ZGSYN09** |
 | Connection | Genuine **2h40m** at NRT |
-| Hotel (SIN) | Concorde (`place-hotel-bayview` / `lp21d9f`) check-in evening 29 Sep → check-out 3 Oct |
+| Hotel (SIN) | Concorde (`place-hotel-bayview` / `lp21d9f`) check-in **30 Sep 15:00** (post-NRT-overnight arrival day) → check-out 3 Oct |
 | Policy | Event `MIN_BUFFER` **360** applies to **hard** finals/awards only; lab must **not** emit a hard 360 arrival-before |
 
 **Hard commitment (programme):**  

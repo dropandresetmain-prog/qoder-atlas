@@ -1,74 +1,107 @@
-# ACTIVE_TASK — Pass 2: shared UI structure + visual clarity
+# ACTIVE_TASK — Final Jordan S2 hotel-execution closure (NORTHSTAR)
 
 ## Goal
 
-Pass 1 frozen at `7622627`. Pass 2 improves information hierarchy, reusable Case
-composition, visual state clarity, loading/analysis presentation, and hero
-consistency — without the final writing pass.
+Jordan's recovery executes BOTH the replacement onward flight AND the required
+Narita overnight through real provider paths, sequentially, in one RecoveryCase.
+"Northstar recovered Jordan's trip, not just his flight."
 
 ## Base / branch
 
-- Pass 1 base: `7622627`
+- Base HEAD: `fca63dc` (== origin/main at start)
 - Branch: `main`
 - Production: https://qoder-atlas-production.up.railway.app
-- Populated entry: `POPULATED_DEMO_BOOTSTRAP_VERSION = 2026-08-28-jordan-preemptive-entry`
+- Completed checkpoints inherited: `6c7c893` (logo), `5d917fc` (hotel.book
+  classification), `fca63dc` (genuine Nuitée evidence: Narita search 18
+  properties/54 rates, quote `pF0VrYSRC`, book `Z6m40cM3X`, CONFIRMED, cleanup).
 
-## Pass 1 closure (frozen)
+## Architecture decision (FROZEN — do not reopen)
 
-| Area | Result |
-|------|--------|
-| Jordan pre-emptive lifecycle | PASS (hero e2e + RC-7) |
-| Sarah programme recovery | PASS |
-| Jonas traveller convergence | PASS |
-| Oliver pending change | PASS |
-| Hero browser e2e | 5/5 |
-| Full suite (pre-Pass 2) | 794/815 |
+Sequential single-action recovery cycles within the SAME RecoveryCase.
+NO plural intent arrays, NO saga contract, NO HTTP-surface changes to arrays.
 
-### Railway Pass 1 spot-check (pre-Pass 2 deploy)
+1. FLIGHT cycle: proposal → authority (REQUIRES_HUMAN_AGENT) → flight.change
+   intent → Atlas executor → observed TICKETED → verifier.
+2. Verifier: flight confirmed BUT required overnight unresolved → case returns
+   to PLANNING (never FULLY_RECOVERED).
+3. HOTEL cycle: plan again → hotel.search evidence round → hotel-only strategy
+   (candidate STAY with `bookingRef {system:'hotel-provider', reference:rateId}`,
+   PLACE upsert for provider property) → authority → `hotel.book` intent →
+   Nuitée executor quote → payment gate → book → retrieve CONFIRMED → observed
+   Stay promoted.
+4. Verifier re-runs → FULLY_RECOVERED.
 
-- Health: OK
-- Reset: `POST /api/demo/reset` OK
-- Jordan: red/needs attention, case opens, lifecycle path OK
-- Deployed SHA: no `/version` endpoint; health returns `{ status: "ok" }` only
+## Resolution gate (Phase 6) — generic derivation
 
-## Pass 2 issue groups
+CaseVerifier detects an unresolved required overnight from trip topology:
+consecutive FLIGHT legs sharing a hub place whose local arrival day < local
+departure day require nights [arrivalDay, departureDay) at the hub; covered
+only by a STAY whose place IS the hub or is `servedBy` the hub and whose
+check-in/out days span the nights. Uncovered => suggestedCaseStatus PLANNING.
+No scenario/traveller/place-id branches anywhere in engine logic.
 
-| Group | Status |
-|-------|--------|
-| 1 Downstream impact block (`What this affects`) before CTA | **DONE** |
-| 2 Progressive status timeline from trip signals | **DONE** |
-| 3 Selected recovery before What to do next | **DONE** |
-| 4 Jordan whole-trip plan ordering + honest costs | **DONE** |
-| 5 Sarah Now/Proposed Date/Time/Venue + no buffer on hero | **DONE** |
-| 6 Oliver/shared card composition (same operator-case renderer) | **DONE** (shared path) |
-| 7 Analysis loading semantic icons | **DONE** |
-| 8 Solid hotel/stay icon `■` | **DONE** |
-| 9 Terminal/watching visuals | **Verified** (no semantic change) |
-| 10 Jonas traveller handoff link | **DONE** |
+## Phase 2 — programme dossier + Narita place
 
-## Remaining test failures (20) — classification
+- `programmeSeed.ts` gains optional `booking-dossiers.json` companion
+  (same BookingDossierBundleSchema as scenario bundles), referential integrity
+  against `trv-{anchorEventId}-{draftId}` derived from importDraft travellers.
+  Wired through compose.ts boot + runtime.reset (dossiers store).
+- Jordan hotel dossier: guestNames `["Jordan Hale"]` (existing conventions;
+  no Traveller ontology change, no name branches in app logic).
+- Narita Gateway Hotel (Nuitée `lp3a936`) added as a PLACE through pack
+  places.json + committed programme.json (additive; survives rebuild path),
+  `servedByPlaceIds: ['place-nrt']`, provider-normalized name/coordinates from
+  the captured search recording.
+- `place-nrt` gains coordinates (35.772, 140.3929 — the recorded search
+  location) so hotel.search location mapping is deterministic and REPLAY-stable.
+- NOTE: committed programme.json carries 156 hand patches beyond the pack —
+  NO full rebuild; additive edits only.
 
-| Class | Tests | Triage |
-|-------|-------|--------|
-| Dashboard trip row missing at READ_AT | T-E2E, G1, DR-8.1/8.2/8.6, i5×2, R1, Wave3 product | **STALE EXPECTATION / FIXTURE DRIFT** — harness dashboard projection returns 0 trips; not hero-path |
-| Presentation fixture drift | r3a×3, r3d case options×3, r3d Jonas Approve | **STALE EXPECTATION / FIXTURE DRIFT** — HTML fixture contracts pre-Pass 2 |
-| DR-4 clickthrough timeout | operator-clickthrough | **OBSOLETE DUPLICATE** — Jonas path uses traveller surface; waits wrong form |
-| DR-5/DR-6 HTTP | change-intake, RELOCATED preview | **UNRELATED / ACCEPTED RISK** |
-| Wave3 Gate2 activity copy | wave3-gate2 | **STALE EXPECTATION** |
-| ui.test rejected-option | ui.test.ts | **STALE EXPECTATION** — NOT_VIABLE in collapsed more-options |
+## Phase 4 — app RECORD chain
 
-**Act Now:** none (no hero-visible regression found)
+Recordings hash = sha256(providerId|operation|canonicalJson(capability query)).
+`executeHotelReplacement` uses `clientReference = intent.id`, so the standalone
+script's book recording cannot satisfy the app's request — the real app must
+record its own quote/book/retrieve in RECORD mode (`ADAPTER_MODE=RECORD`,
+`NUITEE_API_KEY`), driving Jordan through HTTP: plan→begin→decide→execute
+(flight) → plan→begin→decide→execute (hotel). Then cancel the live sandbox
+booking; keep the CONFIRMED evidence recordings for REPLAY.
+Search query must equal the captured shape (coordinates, 2026-09-29→30,
+guests {adults:1}, rooms:1) to stay REPLAY-compatible with the fca63dc search.
 
-## Pass 2 verification
+## SSOT reconciliation (DONE)
 
-- Hero browser e2e: **5/5 PASS**
-- Focused UI tests: case-lifecycle pass2 + presentation-lane **PASS**
-- Full suite: **798/818** (20 failures, classified above)
-- `npm run build`: **PASS**
-- `gate:anti-hardcoding`: **CLEAN**
-- Local screenshots: `output/pass2-screenshots/` (when populated-world script completes)
-- Railway pre-deploy spot-check: Jordan OK; Sarah `What this affects` awaits Pass 2 deploy
+- `data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/baseline-itinerary.json`:
+  SIN hotelStay checkIn reconciled 29 Sep → **30 Sep 15:00** (+08:00);
+  noShowCutoff moved to 2026-10-01T00:00+08:00 (post check-in date).
+- `docs/FINAL_DEMO_CONTENT_SSOT.md` Jordan hotel row now says 30 Sep 15:00.
+- Generated programme.json already carried the authoritative 30 Sep value.
 
-## Next action
+## Tests asserting resolved-after-flight (must be UPDATED with the flow)
 
-Commit + push Pass 2; confirm Railway deploy; re-run `scripts/pass2-railway-verify.mjs`; final writing pass (separate milestone).
+- fixtures/acceptance/manifests/s2-missed-connection.json (execute_recovery
+  asserts RESOLVED; add hotel cycle steps after flight execution)
+- test/integration.r2-rehearsal.test.ts (runs the manifest end-to-end)
+- test/final-demo-lifecycle-convergence.test.ts (Jordan execute → RESOLVED)
+- test/e2e/hero-lifecycle-rehearsal.test.ts (Jordan approve → execute →
+  case-phase-resolved)
+Known baseline: 15 unrelated failures; do not repair unless new regression.
+
+## Workflow
+
+Checkpoint commit per phase; exact-path staging only; push at the end; Railway
+confirm; reset populated world; rehearse Jordan on production REPLAY; capture
+final screenshots. STOP (hard stop) if the only path forward needs plural
+intents/sagas/broad authority rewrite/scenario-specific engine logic.
+
+## Status
+
+- [x] Repo state confirmed; commits inspected; sources read
+- [x] SSOT reconciliation (SIN check-in 30 Sep)
+- [ ] Phase 2: programme hotel dossier + Narita place
+- [ ] Phase 3: generic overnight hotel follow-up (planner + gate)
+- [ ] Phase 4: app RECORD chain
+- [ ] Phase 5: whole-trip plan presentation
+- [ ] Phase 6: resolution gate (implemented with Phase 3)
+- [ ] Tests + gates
+- [ ] Ship: push, Railway, populated world, production rehearsal, screenshots
