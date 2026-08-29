@@ -124,7 +124,7 @@ body {
   z-index: 20;
 }
 .topbar .brand { font-weight: 700; font-size: 15px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
-.topbar .brand .mark { color: var(--watch-f); font-size: 13px; }
+.topbar .brand .mark { width: 24px; height: 24px; flex: none; align-self: center; }
 .topbar .brand small {
   font-weight: 400;
   font-size: 10.5px;

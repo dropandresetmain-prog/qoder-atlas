@@ -349,12 +349,16 @@ async function handle(
     return;
   }
 
-  // Static presentation assets (traveller hero imagery, etc.).
-  if (req.method === 'GET' && url.pathname === '/assets/sg-dusk.png') {
+  // Static presentation assets (brand mark, traveller hero imagery). Only
+  // allowlisted filenames resolve, so the URL can never escape fixtures/ui.
+  const uiAssets: string[] = ['northstar-logo.png', 'sg-dusk.png'];
+  const uiAsset = url.pathname.startsWith('/assets/') ? url.pathname.slice('/assets/'.length) : '';
+  if (req.method === 'GET' && uiAssets.includes(uiAsset)) {
     try {
       const assetPath = path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),
-        '../../fixtures/ui/sg-dusk.png',
+        '../../fixtures/ui',
+        uiAsset,
       );
       const bytes = await readFile(assetPath);
       res.writeHead(200, {

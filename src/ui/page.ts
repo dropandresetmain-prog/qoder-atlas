@@ -146,7 +146,7 @@ function renderOperatorTopbar(options: PageOptions): string {
   }
   const tbRight = right.length > 0 ? `<div class="tb-right">${right.join('')}</div>` : '';
   return `<header class="topbar" data-surface="operator">
-  <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar<small>AI Travel Resolution Engine</small></div>
+  <div class="brand"><img class="mark" src="/assets/northstar-logo.png" alt="" aria-hidden="true" width="128" height="128">Northstar<small>AI Travel Resolution Engine</small></div>
   ${eventSelect}
   ${nav}
   ${tbRight}
