@@ -397,6 +397,7 @@ export class RuntimeOrchestrator {
       for (const programmeDir of listProgrammeDirs(join(this.deps.fixturesDir, 'programmes'))) {
         const outcome = await seedProgrammeBundle(this.deps.programmeService, programmeDir, {
           ...(this.deps.fxRates ? { fxRates: this.deps.fxRates } : {}),
+          ...(this.deps.dossiers ? { dossiers: this.deps.dossiers } : {}),
         });
         seededProgrammes.push({ anchorEventId: outcome.anchorEventId, promotedCount: outcome.promotedCount });
         tripIds.push(...outcome.tripIds);

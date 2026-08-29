@@ -477,10 +477,37 @@ const bundle = {
 
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'programme.json'), `${JSON.stringify(bundle, null, 2)}\n`);
+
+// Booking dossiers (optional): operator-validated provider-facing identity,
+// keyed by roster draftId in the pack. Mechanically mapped to the deterministic
+// promoted traveller id the intake derives — no identity is invented here.
+const DOSSIERS_PATH = 'global/booking-dossiers.json';
+const packDossiers = packDocuments.find((entry) => entry.path === DOSSIERS_PATH)?.doc;
+let dossierCount = 0;
+if (packDossiers?.dossiers) {
+  const anchorEventId = roster.importDraft.anchorEventId as string;
+  const knownDraftIds = new Set<string>(roster.importDraft.travellers.map((t: JsonDoc) => t.draftId as string));
+  const mapEntry = (entry: JsonDoc): JsonDoc => {
+    const draftId = entry.draftId as string;
+    if (!knownDraftIds.has(draftId)) {
+      throw new Error(`booking dossier names unknown draft ${draftId}`);
+    }
+    const { draftId: _draftId, ...rest } = entry;
+    return { travellerId: `trv-${anchorEventId}-${draftId}`, ...rest };
+  };
+  const dossierBundle = {
+    flight: (Array.isArray(packDossiers.dossiers.flight) ? packDossiers.dossiers.flight : []).map(mapEntry),
+    hotel: (Array.isArray(packDossiers.dossiers.hotel) ? packDossiers.dossiers.hotel : []).map(mapEntry),
+  };
+  dossierCount = dossierBundle.flight.length + dossierBundle.hotel.length;
+  writeFileSync(join(OUT_DIR, 'booking-dossiers.json'), `${JSON.stringify(dossierBundle, null, 2)}\n`);
+}
+
 console.log(
   `wrote ${join(OUT_DIR, 'programme.json')}: ${travellers.length} travellers ` +
     `(${travellersWithTravel} with declared travel: ${legsTotal} legs / ${staysTotal} stays; ` +
     `${legsMissingBookingIdentity} legs without booking identity, ` +
     `${stayDatesNormalized} stays normalized from date-only inputs), ` +
-    `${bundle.context.places.length} places, ${bundle.context.ruleSets.length} rule sets`,
+    `${bundle.context.places.length} places, ${bundle.context.ruleSets.length} rule sets` +
+    (dossierCount > 0 ? `, ${dossierCount} booking dossiers` : ''),
 );

@@ -1,0 +1,25 @@
+{
+  "flight": [
+    {
+      "travellerId": "trv-evt-ait-2026-ait-draft-09",
+      "passengers": [
+        {
+          "givenName": "Jordan",
+          "familyName": "Hale",
+          "nationality": "US"
+        }
+      ],
+      "contact": {
+        "name": "Hale/Jordan",
+        "email": "jordan.hale@pacificrim.test"
+      },
+      "paymentRef": "atlas-sandbox-balance"
+    }
+  ],
+  "hotel": [
+    {
+      "travellerId": "trv-evt-ait-2026-ait-draft-09",
+      "guestNames": ["Jordan Hale"]
+    }
+  ]
+}

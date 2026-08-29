@@ -9,6 +9,11 @@
  *
  * Optional companion `fx-rates.json` seeds organisation budget FX evidence
  * through the same application-owned store scenario bundles use (ADR-052).
+ *
+ * Optional companion `booking-dossiers.json` seeds provider-facing booking
+ * identity through the SAME application-owned store scenario bundles use,
+ * with the same referential-integrity rule: every dossier must name a
+ * traveller this bundle promotes (deterministic `trv-{anchorEventId}-{draftId}`).
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,6 +23,7 @@ import { OrganisationSchema, AnchorEventSchema, PlaceSchema } from '../domain/en
 import { RuleSetSchema } from '../domain/rules.ts';
 import { ProgrammeImportDraftSchema } from '../contracts/programmeIntake.ts';
 import type { ProgrammeService } from './programme.ts';
+import { BookingDossierBundleSchema, type BookingDossierStore } from './dossierStore.ts';
 import { FxRateBundleSchema, type FxRateStore } from './fxStore.ts';
 
 /** Frozen bundle shape for programme seeding (context + import draft). */
@@ -42,6 +48,8 @@ export interface ProgrammeSeedOutcome {
   tripIds: EntityId[];
   /** FX rates seeded from an optional companion file. */
   fxRateCount: number;
+  /** Booking dossiers seeded from an optional companion file. */
+  dossierCount: number;
 }
 
 /** List programme bundle directories under a root (empty when absent). */
@@ -57,7 +65,7 @@ export function listProgrammeDirs(root: string): string[] {
 export async function seedProgrammeBundle(
   service: ProgrammeService,
   bundleDir: string,
-  options?: { fxRates?: FxRateStore },
+  options?: { fxRates?: FxRateStore; dossiers?: BookingDossierStore },
 ): Promise<ProgrammeSeedOutcome> {
   const bundle = ProgrammeBundleSchema.parse(JSON.parse(readFileSync(join(bundleDir, 'programme.json'), 'utf8')));
 
@@ -84,6 +92,38 @@ export async function seedProgrammeBundle(
     }
   }
 
+  // Booking dossiers (application-owned store; provider-facing identity, never
+  // part of the frozen entity registry). Same referential-integrity rule the
+  // scenario bootstrap applies: every dossier must name a traveller THIS
+  // bundle actually promoted — the deterministic promoted ids are the only
+  // identity evidence, never display names or scenario keys.
+  let dossierCount = 0;
+  if (options?.dossiers) {
+    const dossierPath = join(bundleDir, 'booking-dossiers.json');
+    if (existsSync(dossierPath)) {
+      const dossierBundle = BookingDossierBundleSchema.parse(JSON.parse(readFileSync(dossierPath, 'utf8')));
+      const knownTravellerIds = new Set<EntityId>(
+        intake.outcomes
+          .map((outcome) => outcome.travellerId)
+          .filter((travellerId): travellerId is EntityId => travellerId !== undefined),
+      );
+      for (const dossier of dossierBundle.flight) {
+        if (!knownTravellerIds.has(dossier.travellerId)) {
+          throw new Error(`programme booking dossier references unknown traveller ${dossier.travellerId}`);
+        }
+        await options.dossiers.saveFlight(dossier);
+        dossierCount += 1;
+      }
+      for (const dossier of dossierBundle.hotel) {
+        if (!knownTravellerIds.has(dossier.travellerId)) {
+          throw new Error(`programme booking dossier references unknown traveller ${dossier.travellerId}`);
+        }
+        await options.dossiers.saveHotel(dossier);
+        dossierCount += 1;
+      }
+    }
+  }
+
   return {
     anchorEventId: bundle.importDraft.anchorEventId,
     promotedCount: intake.outcomes.filter((outcome) => outcome.promoted).length,
@@ -92,5 +132,6 @@ export async function seedProgrammeBundle(
       .map((outcome) => outcome.tripId)
       .filter((tripId): tripId is EntityId => tripId !== undefined),
     fxRateCount,
+    dossierCount,
   };
 }

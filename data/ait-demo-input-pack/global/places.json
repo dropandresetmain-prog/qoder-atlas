@@ -161,11 +161,28 @@
       "name": "Tokyo Narita",
       "kind": "AIRPORT",
       "timezone": "Asia/Tokyo",
+      "coordinates": { "latitude": 35.772, "longitude": 140.3929 },
       "externalRefs": [
         {
           "system": "airport-code",
           "value": "NRT"
         }
+      ]
+    },
+    {
+      "id": "place-hotel-narita-gateway",
+      "name": "Narita Gateway Hotel",
+      "kind": "HOTEL",
+      "timezone": "Asia/Tokyo",
+      "coordinates": { "latitude": 35.78157, "longitude": 140.349451 },
+      "externalRefs": [
+        {
+          "system": "nuitee-hotel-id",
+          "value": "lp3a92f"
+        }
+      ],
+      "servedByPlaceIds": [
+        "place-nrt"
       ]
     },
     {
@@ -330,6 +347,7 @@
     "place-cnx": "Regional feeder origin used by one roster member; not separately proven in the Atlas sandbox record.",
     "place-hnd": "Proven as part of the TYO gateway in the Atlas sandbox record.",
     "place-nrt": "Proven as part of the TYO gateway in the Atlas sandbox record.",
+    "place-hotel-narita-gateway": "Provider-backed NRT transit hotel normalized from genuine Nuitée evidence (search rec_8127a76…, confirmed booking Z6m40cM3X for property lp3a92f).",
     "place-lax": "Proven via Wave 4R S2 corridor discovery: ZIPAIR ZG023 LAX→NRT verified in Atlas sandbox.",
     "place-lhr": "Long-haul origin present only because scenario S7 explicitly requires a London origin; flagged not sandbox-proven."
   }

@@ -1348,11 +1348,28 @@
         "name": "Tokyo Narita",
         "kind": "AIRPORT",
         "timezone": "Asia/Tokyo",
+        "coordinates": { "latitude": 35.772, "longitude": 140.3929 },
         "externalRefs": [
           {
             "system": "airport-code",
             "value": "NRT"
           }
+        ]
+      },
+      {
+        "id": "place-hotel-narita-gateway",
+        "name": "Narita Gateway Hotel",
+        "kind": "HOTEL",
+        "timezone": "Asia/Tokyo",
+        "coordinates": { "latitude": 35.78157, "longitude": 140.349451 },
+        "externalRefs": [
+          {
+            "system": "nuitee-hotel-id",
+            "value": "lp3a92f"
+          }
+        ],
+        "servedByPlaceIds": [
+          "place-nrt"
         ]
       },
       {
