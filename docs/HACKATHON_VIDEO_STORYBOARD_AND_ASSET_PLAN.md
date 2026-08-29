@@ -32,7 +32,7 @@ The technical story must be expressed through the product behaviour. Avoid stopp
 ### Total target length
 **Approximately 2:50–2:55**, always below 3:00.
 
-The locked narration is approximately 455 words. Final timing is governed by the chosen AI voice and visual breathing room rather than an arbitrary word target.
+The locked narration is approximately 465 words. Final timing is governed by the chosen AI voice and visual breathing room rather than an arbitrary word target.
 
 ### Beat 1 — Disruption cascade and scale
 **Time:** ~0:00–0:20  
@@ -162,7 +162,7 @@ The locked narration is approximately 455 words. Final timing is governed by the
 - **WHAT:** Expand NORTHSTAR beyond the AiT summit without making it look like five different future products, then land the central thesis cleanly.
 - **HOW:** Return to the same graph visual language. Pull outward from AiT and change the programme context beneath the same resolution engine: conference → sports event → corporate offsite, then travel-team / TMC operating contexts. Collapse back to one healthy traveller chain and end on the NORTHSTAR lockup with a deliberate pause after the final line.
 
-**Viewer takeaway:** The same resolution engine applies wherever many journeys must converge on a shared objective. **Fixing the booking is not enough; restore the trip.**
+**Viewer takeaway:** Travel is ultimately about getting people where they need to be. **A booking gets you a ticket. NORTHSTAR gets you there.**
 
 ---
 
@@ -586,9 +586,9 @@ then:
 - **HOW:** Return to the graph. Pull out from AiT as the programme context changes into conference, sports event and corporate offsite; then show corporate travel team / TMC operating contexts over the same resolution engine. Collapse back to the original traveller journey chain, now healthy. End on NORTHSTAR and leave 2–3 seconds of breathing room after the final line.
 
 ### On-screen close
-**NORTHSTAR**
+**A BOOKING GETS YOU A TICKET.**
 
-**YOU HAVE TO RESTORE THE TRIP.**
+**NORTHSTAR GETS YOU THERE.**
 
 ### Asset type
 **Generated / animated**
@@ -702,11 +702,11 @@ Use this as the production narration baseline. Do not replace it with older prov
 >
 > We built NORTHSTAR with Qoder using a long-horizon fan-out, fan-in approach — splitting work into parallel streams, then integrating, reviewing and repeating until the system was complete.
 >
-> Today, NORTHSTAR coordinates one summit. Tomorrow, the same engine can support conferences, sports events, corporate offsites, travel teams and TMCs.
+> Today, Northstar coordinates one event. Tomorrow, the same engine can support sports events, corporate offsites, travel teams and TMCs.
 >
-> A booking gets you a ticket.
+> Because travel isn’t really about flights, hotels or bookings. It’s about getting people where they need to be.
 >
-> NORTHSTAR gets you there.
+> A booking gets you a ticket. Northstar gets you there.
 
 ---
 
