@@ -36,13 +36,12 @@ import type { TripSignal } from '../operational/signal.ts';
 import type { MutationOperation } from '../operational/mutation.ts';
 import type { RecoveryStrategy, ToolRequest } from '../operational/strategy.ts';
 import type { Engagement, Stay, TransportLeg } from '../domain/elements.ts';
+import { STAY_RATE_BOOKING_REF_SYSTEM as HOTEL_RATE_REF_SYSTEM } from '../domain/elements.ts';
 import type { Place } from '../domain/entities.ts';
 import type { HotelPropertyView, HotelRateView } from '../contracts/capabilities.ts';
 import { hotelSearchGuestsFromOccupancy } from '../app/dispatch.ts';
 import { formatMoney } from '../ui/html.ts';
 
-/** Provider-neutral booking-ref system marking a candidate hotel rate handle. */
-const HOTEL_RATE_REF_SYSTEM = 'hotel-provider';
 /** Presentation bound: cheapest rate per distinct property, capped. */
 const MAX_HOTEL_STRATEGIES = 3;
 

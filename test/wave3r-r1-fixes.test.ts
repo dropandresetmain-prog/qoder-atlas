@@ -18,6 +18,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { STAY_RATE_BOOKING_REF_SYSTEM } from '../src/domain/elements.ts';
 import { capabilityError, capabilityOk, type CapabilityMeta, type CapabilityResult } from '../src/contracts/envelope.ts';
 import type {
   CapabilityDescriptor,
@@ -373,12 +374,34 @@ function stayUpsert(): MutationOperation {
   };
 }
 
-test('R1-A1: a STAY element replacement classifies MONEY_MOVING, never REVERSIBLE', () => {
+test('R1-A1: a STAY replacement with no quoted rate classifies MONEY_MOVING, never REVERSIBLE', () => {
   const classified = consequentialOperationFor([stayUpsert()]);
   assert.equal(classified.operation, 'hotel.modify');
   assert.equal(classified.capability, 'HOTEL');
   assert.equal(classified.sideEffectLevel, 'MONEY_MOVING');
   assert.notEqual(classified.sideEffectLevel, 'REVERSIBLE', 'a chargeable stay replacement is not reversible');
+});
+
+test('R1-A1: a STAY candidate carrying a quoted provider rate classifies as hotel.book', () => {
+  // The provider act for a NEW stay bought at a quoted rate is a booking.
+  // Classifying it as a modification asks the capability for an in-place
+  // amend it does not offer, so a real stay replacement could never execute.
+  const rated: MutationOperation = {
+    op: 'UPSERT_ENTITY',
+    entityType: 'TRIP_ELEMENT',
+    id: 'el_r1_stay',
+    data: {
+      elementKind: 'STAY',
+      id: 'el_r1_stay',
+      reservationState: 'PROPOSED',
+      status: 'UNKNOWN',
+      data: { bookingRef: { system: STAY_RATE_BOOKING_REF_SYSTEM, reference: 'rate_r1_1' } },
+    },
+  };
+  const classified = consequentialOperationFor([rated]);
+  assert.equal(classified.operation, 'hotel.book');
+  assert.equal(classified.capability, 'HOTEL');
+  assert.equal(classified.sideEffectLevel, 'MONEY_MOVING');
 });
 
 test('R1-A1: the resulting hotel.modify intent is never AUTO_APPROVED under an empty rule set', async () => {

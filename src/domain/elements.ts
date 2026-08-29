@@ -88,6 +88,15 @@ export const TransportLegSchema = TripElementBaseSchema.extend({
 });
 export type TransportLeg = z.infer<typeof TransportLegSchema>;
 
+/**
+ * `bookingRef.system` marking a stay candidate that carries a real, quoted
+ * provider rate. A stay element holding this ref is bookable at that rate,
+ * which is what distinguishes a provider-backed replacement from an
+ * unpriceable hypothesis. Minted by the planner, read by intent derivation
+ * and dossier resolution.
+ */
+export const STAY_RATE_BOOKING_REF_SYSTEM = 'hotel-provider';
+
 export const StaySchema = TripElementBaseSchema.extend({
   elementKind: z.literal('STAY'),
   data: z.strictObject({

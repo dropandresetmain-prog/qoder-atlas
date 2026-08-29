@@ -16,6 +16,7 @@
  */
 import type { EntityId, EntityRef, IsoDateTime, Money } from '../domain/common.ts';
 import { instantMillis, IsoDateTimeSchema } from '../domain/common.ts';
+import { STAY_RATE_BOOKING_REF_SYSTEM } from '../domain/elements.ts';
 import type { FxRateEvidence } from '../engine/fx.ts';
 import { resolveHomeCurrency, fxNormalizeSpend, isFxNormalizationFailure } from '../engine/fx.ts';
 import type { FxNormalizationRecord } from '../operational/fxRecord.ts';
@@ -79,9 +80,10 @@ export function consequentialOperationFor(operations: MutationOperation[]): Cons
     if (operation.op !== 'UPSERT_ENTITY' || operation.entityType !== 'TRIP_ELEMENT') continue;
     const element = operation.data as Record<string, unknown>;
     const elementKind = element['elementKind'];
+    const payload = element['data'];
+    const payloadRecord = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : undefined;
     if (elementKind === 'TRANSPORT_LEG') {
-      const data = element['data'];
-      const mode = data && typeof data === 'object' ? (data as Record<string, unknown>)['mode'] : undefined;
+      const mode = payloadRecord?.['mode'];
       if (mode === 'FLIGHT') {
         // Rebooking a flight moves money at the provider boundary.
         return { operation: 'flight.change', capability: 'FLIGHT', sideEffectLevel: 'MONEY_MOVING' };
@@ -94,8 +96,19 @@ export function consequentialOperationFor(operations: MutationOperation[]): Cons
       // execution was simulated. MONEY_MOVING is the honest classification
       // and, like IRREVERSIBLE, reaches an approval-requiring outcome, so a
       // waiver riding along still demands approval.
+      //
+      // A candidate stay carrying a quoted provider rate is a NEW stay bought
+      // at that rate, so the provider act is a booking. Only a stay amended in
+      // place against its existing provider booking is a modification; a
+      // capability that cannot amend refuses that operation rather than having
+      // it relabelled as something it can perform.
+      const bookingRef = payloadRecord?.['bookingRef'];
+      const rateSystem =
+        bookingRef && typeof bookingRef === 'object'
+          ? (bookingRef as Record<string, unknown>)['system']
+          : undefined;
       return {
-        operation: 'hotel.modify',
+        operation: rateSystem === STAY_RATE_BOOKING_REF_SYSTEM ? 'hotel.book' : 'hotel.modify',
         capability: 'HOTEL',
         sideEffectLevel: 'MONEY_MOVING',
       };

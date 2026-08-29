@@ -13,6 +13,7 @@
 import type { ActionIntent } from '../operational/intent.ts';
 import type { CaseRepository, TripRepository } from '../contracts/repositories.ts';
 import type { EntityId } from '../domain/common.ts';
+import { STAY_RATE_BOOKING_REF_SYSTEM } from '../domain/elements.ts';
 import type { BookingDossierStore } from './dossierStore.ts';
 import type { FlightBookingDossier, HotelReplacementDossier } from './providerExecution.ts';
 
@@ -82,7 +83,9 @@ export function createHotelDossierResolver(deps: DossierResolverDependencies) {
     }
     if (!record) return undefined;
 
-    const replacementRateId = bookingRefsOf(intent)[0]?.reference;
+    const replacementRateId = bookingRefsOf(intent).find(
+      (ref) => ref.system === STAY_RATE_BOOKING_REF_SYSTEM,
+    )?.reference;
     if (!replacementRateId) return undefined;
 
     const recoveryCase = await deps.cases.getCase(intent.caseId);
