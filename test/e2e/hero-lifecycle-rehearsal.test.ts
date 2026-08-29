@@ -107,7 +107,10 @@ function assertCommitmentSemantics(html: string, context: string): void {
   assert.doesNotMatch(html, /NOT BOOKED/i, `${context}: programme NOT BOOKED`);
 }
 
-async function approveAndExecuteOrganiser(page: Page): Promise<void> {
+async function approveAndExecuteOrganiser(
+  page: Page,
+  afterExecuteSelector = '[data-test="case-phase-resolved"], [data-test="back-to-overview"]',
+): Promise<void> {
   const html = await page.content();
   assert.equal(html.includes('data-test="resolve-northstar-btn"'), false, 'Resolve must be gone once recovery has begun');
   assert.equal(html.includes('data-test="begin-strategy-btn"'), false, 'Begin must be gone once approval is pending');
@@ -136,7 +139,7 @@ async function approveAndExecuteOrganiser(page: Page): Promise<void> {
   await exec.click();
   await overlaySeen;
   assert.equal((await execRes).status(), 200);
-  await page.waitForSelector('[data-test="case-phase-resolved"], [data-test="back-to-overview"]', { timeout: 30000 });
+  await page.waitForSelector(afterExecuteSelector, { timeout: 30000 });
 }
 
 async function assertResolvedReloadOverview(page: Page, name: string): Promise<void> {
@@ -223,7 +226,35 @@ test('browser: Jordan S2 approval → Execute → resolved Confirmed on reopen',
       await begin;
       await page.waitForSelector('[data-test="organisation-approve-form"]', { timeout: 20000 });
     }
-    await approveAndExecuteOrganiser(page);
+    // Flight cycle: the gate holds the case open — repairing the flight alone
+    // leaves the forced overnight at the connection hub uncovered.
+    await approveAndExecuteOrganiser(page, '[data-test="resolve-northstar-btn"]');
+    const heldOpen = await page.content();
+    assert.doesNotMatch(heldOpen, /data-test="case-phase-resolved"/, 'flight alone must not resolve the case');
+
+    // Second cycle: plan proposes the overnight hotel, the traveller approves
+    // the money-moving booking on the traveller surface, execution confirms
+    // the stay, and only then the trip is fully recovered.
+    const caseUrl = page.url();
+    const replan = page.waitForResponse((r) => r.url().includes('/api/runtime/plan') && r.request().method() === 'POST', { timeout: 30000 });
+    await page.locator('[data-test="resolve-northstar-btn"]').click();
+    await replan;
+    await page.waitForSelector('[data-test="begin-strategy-btn"]', { timeout: 30000 });
+    const hotelBegin = page.waitForResponse((r) => r.url().includes('/api/runtime/begin') && r.request().method() === 'POST', { timeout: 30000 });
+    await page.locator('[data-test="begin-strategy-btn"]').click();
+    await hotelBegin;
+    await page.waitForSelector('[data-test="waiting-for-traveller"]', { timeout: 30000 });
+    assert.match(await page.content(), /data-test="open-traveller-surface"/);
+
+    await page.locator('[data-test="open-traveller-surface"]').click();
+    await page.waitForLoadState('domcontentloaded');
+    const decision = page.waitForResponse((r) => r.url().includes('/traveller-decision') && r.request().method() === 'POST', { timeout: 30000 });
+    await page.locator('button[name="decision"][value="APPROVED"]').first().click();
+    await decision;
+    await page.waitForLoadState('domcontentloaded');
+
+    await page.goto(caseUrl);
+    await page.waitForSelector('[data-test="case-phase-resolved"]', { timeout: 30000 });
     await assertResolvedReloadOverview(page, 'Jordan Hale');
   } finally {
     await page.close();

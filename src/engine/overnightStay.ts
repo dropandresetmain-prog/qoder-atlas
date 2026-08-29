@@ -44,9 +44,17 @@ function localDay(iso: string): string {
 /**
  * Every overnight a trip's flight topology requires. Same-day connections
  * produce nothing; absent schedule evidence produces nothing (UNKNOWN, never
- * a fabricated requirement).
+ * a fabricated requirement). Evidence precondition: overnights are only
+ * derivable for itineraries that MODEL accommodation (carry at least one
+ * non-cancelled stay). A trip with no stays anywhere carries no
+ * accommodation evidence — demanding hotel coverage there would convert
+ * absence of evidence into guessed certainty.
  */
 export function requiredOvernights(trip: Trip): RequiredOvernight[] {
+  const modelsAccommodation = trip.elements.some(
+    (element) => element.elementKind === 'STAY' && element.reservationState !== 'CANCELLED',
+  );
+  if (!modelsAccommodation) return [];
   const legsById = new Map<EntityId, TransportLeg>(
     trip.elements.filter(isFlightLeg).map((leg) => [leg.id, leg]),
   );

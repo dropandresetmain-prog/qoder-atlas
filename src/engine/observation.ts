@@ -175,19 +175,6 @@ export class CaseVerifier {
         remainingLossRefs: [],
       };
     }
-    // A required overnight is a recovery dependency exactly like a failed
-    // leg: when the trip's flight topology demands a night at a hub and no
-    // stay covers it, repairing the flights alone is not a recovered trip.
-    // The case returns to planning so the accommodation follow-up can be
-    // proposed and executed; success alone never resolves.
-    const placesById = new Map<EntityId, Place>(
-      (await this.entities.list('PLACE'))
-        .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
-        .map((entry) => [entry.entity.id, entry.entity]),
-    );
-    if (unresolvedOvernights(tripRecord, placesById).length > 0) {
-      return { suggestedCaseStatus: 'PLANNING', hardFailureIds, hardUnknownIds, remainingLossRefs: [] };
-    }
     if (hardUnknownIds.length > 0) {
       return { suggestedCaseStatus: 'VERIFYING', hardFailureIds, hardUnknownIds, remainingLossRefs: [] };
     }
@@ -210,6 +197,24 @@ export class CaseVerifier {
       if (objectiveId && !remainingLossRefs.includes(objectiveId)) remainingLossRefs.push(objectiveId);
     }
     const outcome = remainingLossRefs.length > 0 ? 'RECOVERED_WITH_LOSS' : 'FULLY_RECOVERED';
+    // A required overnight is a recovery dependency exactly like a failed leg:
+    // when the trip's flight topology demands a night at a hub and no stay
+    // covers it, repairing the flights alone is not a FULLY recovered trip.
+    // The case returns to planning so the accommodation follow-up can be
+    // proposed and executed. This gate guards the completeness claim of
+    // FULLY_RECOVERED only — a RECOVERED_WITH_LOSS verdict already records
+    // that residual gaps were explicitly accepted, so it is never blocked by
+    // an uncovered night.
+    if (outcome === 'FULLY_RECOVERED') {
+      const placesById = new Map<EntityId, Place>(
+        (await this.entities.list('PLACE'))
+          .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
+          .map((entry) => [entry.entity.id, entry.entity]),
+      );
+      if (unresolvedOvernights(tripRecord, placesById).length > 0) {
+        return { suggestedCaseStatus: 'PLANNING', hardFailureIds, hardUnknownIds, remainingLossRefs: [] };
+      }
+    }
     // DR-1.2: reconciliation happens only on a resolution outcome and through
     // the validated mutation path. The verification result stands regardless
     // of whether the reconciliation proposal is accepted (audit-only refusal).

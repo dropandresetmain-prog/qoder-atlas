@@ -804,9 +804,22 @@ export async function projectCaseDetail(
   }
   const options: RecoveryOptionView[] = [];
   const recoveryEngagement = selectRecoveryCommitment(trip, recoveryCase);
+  // Sequential recovery cycles: when an intent from the current plan round has
+  // EXECUTED and the case is back in PLANNING (the resolution gate keeps the
+  // case open, e.g. for a required overnight the flight repair alone did not
+  // cover), that round's strategies are consumed history, not actionable
+  // candidates. Re-offering them would stage a duplicate of an executed
+  // change. Project no options so the case surface plans the next cycle.
+  const planConsumed =
+    recoveryCase.status === 'PLANNING' &&
+    recoveryCase.actionIntents.some(
+      (intent) =>
+        intent.status === 'EXECUTED' &&
+        recoveryCase.strategies.some((strategy) => strategy.id === intent.strategyId),
+    );
   const evalContext = await buildEvaluationContext(deps.snapshot.entities, trip, at);
   const ruleSets = [...evalContext.ruleSets.values()];
-  for (const strategy of recoveryCase.strategies) {
+  for (const strategy of planConsumed ? [] : recoveryCase.strategies) {
     const persisted = persistedVerdicts.get(strategy.id);
     const candidate = persisted
       ? { feasible: persisted.feasible, rejectionEvidence: persisted.rejectionEvidence, viability: undefined as undefined }
