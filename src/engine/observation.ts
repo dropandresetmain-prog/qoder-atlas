@@ -22,9 +22,11 @@ import type {
 } from '../contracts/services.ts';
 import type { Trip } from '../domain/trip.ts';
 import type { Constraint } from '../domain/constraints.ts';
+import type { Place } from '../domain/entities.ts';
 import { evaluateConstraints } from './evaluators.ts';
 import { ImpactEngine, impactProposal, type ImpactEngineDeps } from './impact.ts';
 import { buildEvaluationContext } from './evaluationContext.ts';
+import { unresolvedOvernights } from './overnightStay.ts';
 
 const ObservedOperationsSchema = z.array(MutationOperationSchema);
 
@@ -172,6 +174,19 @@ export class CaseVerifier {
         hardUnknownIds,
         remainingLossRefs: [],
       };
+    }
+    // A required overnight is a recovery dependency exactly like a failed
+    // leg: when the trip's flight topology demands a night at a hub and no
+    // stay covers it, repairing the flights alone is not a recovered trip.
+    // The case returns to planning so the accommodation follow-up can be
+    // proposed and executed; success alone never resolves.
+    const placesById = new Map<EntityId, Place>(
+      (await this.entities.list('PLACE'))
+        .filter((entry): entry is { entityType: 'PLACE'; entity: Place } => entry.entityType === 'PLACE')
+        .map((entry) => [entry.entity.id, entry.entity]),
+    );
+    if (unresolvedOvernights(tripRecord, placesById).length > 0) {
+      return { suggestedCaseStatus: 'PLANNING', hardFailureIds, hardUnknownIds, remainingLossRefs: [] };
     }
     if (hardUnknownIds.length > 0) {
       return { suggestedCaseStatus: 'VERIFYING', hardFailureIds, hardUnknownIds, remainingLossRefs: [] };

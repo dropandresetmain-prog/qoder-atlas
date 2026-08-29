@@ -124,6 +124,18 @@ export async function buildTripSnapshot(
     for (const gatewayId of expanded) placeIds.add(gatewayId);
     if (expanded.length === 0) break;
   }
+  // Reverse served-by closure: a place SERVED BY an in-scope place (e.g. a
+  // hotel served by a hub airport) joins the snapshot scope, so the planner
+  // can resolve a provider-backed hotel for a required overnight against
+  // authoritative evidence instead of deriving an unlinked place. Generic
+  // servedBy reverse match over authoritative Place evidence; no guessing.
+  for (const entry of await deps.entities.list('PLACE')) {
+    if (entry.entityType !== 'PLACE') continue;
+    if (placeIds.has(entry.entity.id)) continue;
+    if ((entry.entity.servedByPlaceIds ?? []).some((serverId) => placeIds.has(serverId))) {
+      placeIds.add(entry.entity.id);
+    }
+  }
   const places: Place[] = [];
   for (const placeId of [...placeIds].sort()) {
     const entry = await deps.entities.get('PLACE', placeId);
