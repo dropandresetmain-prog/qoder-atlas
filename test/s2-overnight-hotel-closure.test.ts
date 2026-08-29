@@ -4,8 +4,14 @@
  * Proves, against the composed runtime in REPLAY:
  *  - the programme seeds Jordan's hotel booking dossier;
  *  - the Narita Gateway provider place survives seeding;
- *  - the case does NOT resolve after the flight while the overnight is open;
- *  - the case resolves FULLY_RECOVERED after the Narita booking confirms;
+ *  - the ONE organiser approval of the flight recovery deterministically
+ *    covers the internally-sequential Narita hotel action too — no second
+ *    human decision is asked for it;
+ *  - the SAME /api/runtime/execute call that runs the flight rebooking also
+ *    carries the case through the still-required overnight hotel booking to
+ *    FULLY_RECOVERED, internally: flight ActionIntent -> observe -> hotel
+ *    ActionIntent (its own deterministic, envelope-covered AuthorityDecision)
+ *    -> observe -> verify;
  *  - the whole-trip plan shows the Singapore stay as 'No change required'
  *    and the Narita hotel as Confirmed, with separate flight+hotel costs.
  */
@@ -33,14 +39,6 @@ const demoConfig = AppConfigSchema.parse({
   providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
 });
 
-async function postJson(base: string, path: string, body?: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
-  const response = await fetch(`${base}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  return { status: response.status, body: (await response.json()) as Record<string, unknown> };
-}
 async function getJson(base: string, path: string): Promise<{ status: number; body: Record<string, unknown> }> {
   const response = await fetch(`${base}${path}`);
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
@@ -68,46 +66,31 @@ test('Jordan S2 overnight-hotel closure', async () => {
       'Narita Gateway place carries the Nuitée provider ref',
     );
 
-    // 3. Drive the two-stage S2 flow up to the flight execution. The manifest
-    //    asserts the flight executes and the case is held at PLANNING.
-    await runAcceptanceManifest({
-      manifestPath: 'fixtures/acceptance/manifests/s2-missed-connection.json',
-      cwd: CWD,
-      baseUrl: base,
-      skipPreflight: true,
-      config: demoConfig,
-      stopBeforeStepIds: ['plan_overnight_hotel'],
-      skipAssertions: false,
-      evidenceDir: resolve('output', 's2-overnight-closure-test'),
-    });
-
-    // After the flight, the case must NOT be resolved (overnight unresolved).
-    const dashMid = await getJson(base, '/api/operator/dashboard?event=evt-ait-2026');
-    const caseId = (dashMid.body as { trips: Array<{ tripId: string; activeCaseId?: string }> }).trips.find(
-      (t) => t.tripId === TRIP,
-    )?.activeCaseId;
-    assert.ok(caseId, 'Jordan has an active case');
-    const midCase = await getJson(base, `/api/cases/${caseId}`);
-    assert.notEqual(midCase.body.status, 'RESOLVED', 'case is not resolved after the flight alone');
-
-    // 4. Continue the manifest through the hotel cycle to resolution.
+    // 3. Drive the whole S2 flow in ONE pass. The organiser's single approval
+    //    of the flight recovery deterministically covers the internally-
+    //    sequential Narita hotel action too: the manifest's single
+    //    "execute_recovery" step is asserted to resolve FULLY_RECOVERED
+    //    directly — there is no separate plan/begin/decide/execute cycle for
+    //    the hotel visible at the API boundary.
     const full = await runAcceptanceManifest({
       manifestPath: 'fixtures/acceptance/manifests/s2-missed-connection.json',
       cwd: CWD,
       baseUrl: base,
       skipPreflight: true,
       config: demoConfig,
-      startAtStepId: 'plan_overnight_hotel',
-      initialBindings: { caseId },
       skipAssertions: false,
       evidenceDir: resolve('output', 's2-overnight-closure-test'),
     });
     const failed = full.evidence.steps.filter((s) => !s.ok);
-    assert.equal(failed.length, 0, `hotel cycle steps pass: ${JSON.stringify(failed)}`);
+    assert.equal(failed.length, 0, `S2 flow steps pass: ${JSON.stringify(failed)}`);
 
-    // 5. The case resolves FULLY_RECOVERED and the trip is viable.
+    const missedFlightStep = full.evidence.steps.find((s) => s.stepId === 'traveller_report_missed_connection');
+    const caseId = (missedFlightStep?.response as { caseId?: string } | undefined)?.caseId;
+    assert.ok(caseId, 'Jordan has a recovery case');
+
+    // 4. The case resolves FULLY_RECOVERED and the trip is viable.
     const finalCase = await getJson(base, `/api/cases/${caseId}`);
-    assert.equal(finalCase.body.status, 'RESOLVED', 'case resolves after the Narita booking');
+    assert.equal(finalCase.body.status, 'RESOLVED', 'case resolves after the single execute call');
     const trip = await getJson(base, `/api/traveller/${TRIP}`);
     assert.equal(trip.body.remainderViable, 'VIABLE', 'trip is viable after the overnight is covered');
 

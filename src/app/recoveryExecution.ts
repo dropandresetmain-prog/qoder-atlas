@@ -537,7 +537,30 @@ export class RecoveryExecutionService {
       // cross-currency rule amounts. Absent resolver => absent field.
       ...(fxContext ?? {}),
     };
-    const decision = await this.deps.authority.decide(intent, context);
+    let decision = await this.deps.authority.decide(intent, context);
+
+    // I4/PR-10: a case-scoped recovery approval envelope (set when the
+    // organiser first approved this SAME case's origin intent) deterministically
+    // satisfies a later intent's approval requirement without a second human
+    // interaction — the whole-trip plan already disclosed this action before
+    // that approval. Never applies to AUTO_APPROVED (nothing to satisfy) or
+    // BLOCKED (a hard spend-ceiling breach fails closed regardless of any
+    // prior approval): per-intent deterministic authority is never bypassed,
+    // only the redundant re-ask is.
+    const envelope = recoveryCase.recoveryApproval;
+    const envelopeApplies =
+      envelope !== undefined && decision.outcome !== 'AUTO_APPROVED' && decision.outcome !== 'BLOCKED';
+    const rawOutcome = decision.outcome;
+    if (envelopeApplies) {
+      decision = withApproval(
+        decision,
+        envelope.approvedBy,
+        at,
+        'APPROVED',
+        `Covered by the organiser's recovery approval on ${envelope.originIntentId} (${envelope.approvedAt}); ` +
+          'the whole-trip plan disclosed this action before that approval.',
+      );
+    }
 
     await this.caseService.record(input.caseId, at, {
       actionIntents: [...recoveryCase.actionIntents, intent],
@@ -545,7 +568,7 @@ export class RecoveryExecutionService {
     });
 
     const target: CaseStatus =
-      decision.outcome === 'AUTO_APPROVED'
+      decision.outcome === 'AUTO_APPROVED' || envelopeApplies
         ? 'READY_TO_EXECUTE'
         : decision.outcome === 'REQUIRES_TRAVELLER'
           ? 'AWAITING_TRAVELLER'
@@ -582,7 +605,30 @@ export class RecoveryExecutionService {
       },
     });
 
-    return { intent, decision, caseStatus: updated.status, executable: decision.outcome === 'AUTO_APPROVED' };
+    if (envelopeApplies && envelope) {
+      await this.deps.audit.append({
+        occurredAt: at,
+        actor: 'app:recovery-execution',
+        action: 'RECOVERY_ENVELOPE_APPLIED',
+        subject: input.snapshot.tripId,
+        payload: {
+          caseId: input.caseId,
+          intentId: intent.id,
+          operation: intent.operation,
+          rawOutcome,
+          originIntentId: envelope.originIntentId,
+          approvedBy: envelope.approvedBy,
+          approvedAt: envelope.approvedAt,
+        },
+      });
+    }
+
+    return {
+      intent,
+      decision,
+      caseStatus: updated.status,
+      executable: decision.outcome === 'AUTO_APPROVED' || envelopeApplies,
+    };
   }
 
   /**
@@ -661,8 +707,23 @@ export class RecoveryExecutionService {
       return { accepted: true, decision: approved, caseStatus: updated.status };
     }
 
+    // I4/PR-10: the FIRST organiser-decided approval in a case's lifetime
+    // opens the case-scoped recovery approval envelope (never overwritten
+    // afterward) — the organiser's ONE explicit approval of the whole-trip
+    // plan, which a later intent in this SAME case can deterministically
+    // reuse instead of asking again (see envelope reuse in beginStrategy).
+    const opensEnvelope = input.decidedBy.entityType === 'ORGANISATION' && recoveryCase.recoveryApproval === undefined;
     const updated = await this.moveCase(input.caseId, 'READY_TO_EXECUTE', input.decidedAt, {
       authorityDecisions: decisions,
+      ...(opensEnvelope
+        ? {
+            recoveryApproval: {
+              originIntentId: input.intentId,
+              approvedBy: input.decidedBy,
+              approvedAt: input.decidedAt,
+            },
+          }
+        : {}),
     });
     await this.deps.audit.append({
       occurredAt: input.decidedAt,

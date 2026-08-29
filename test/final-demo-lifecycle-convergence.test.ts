@@ -147,6 +147,11 @@ test('lifecycle: Jordan plan → begin → approve → execute resolves without 
     assert.equal(decided.status, 200, JSON.stringify(decided.body));
     assert.notEqual(decided.body['caseStatus'], 'RESOLVED', 'approval must not resolve the case');
 
+    // ONE organiser approval authorises the whole disclosed recovery
+    // (I4/PR-10 demo-contract fix): the SAME execute call runs the flight
+    // rebooking, then — under that SAME recovery approval envelope, no
+    // second human decision — internally plans, stages and executes the
+    // still-required Narita overnight hotel too, and the case resolves.
     const executed = await postJson(base, '/api/runtime/execute', {
       caseId,
       intentId,
@@ -155,46 +160,10 @@ test('lifecycle: Jordan plan → begin → approve → execute resolves without 
     assert.equal(executed.status, 200, JSON.stringify(executed.body));
     assert.equal(
       executed.body['caseStatus'],
-      'PLANNING',
-      `flight alone must not resolve while the hub overnight is uncovered: ${JSON.stringify(executed.body)}`,
+      'RESOLVED',
+      `the ONE approval must carry the internally-sequential Narita hotel booking through to resolution: ${JSON.stringify(executed.body)}`,
     );
-
-    // Sequential hotel cycle within the same case: plan proposes the
-    // overnight hotel, the traveller approves the money-moving booking,
-    // execution confirms the stay, and only then the case resolves.
-    const hotelPlan = await postJson(base, '/api/runtime/plan', {
-      caseId,
-      at: '2026-09-29T13:10:00+09:00',
-    });
-    assert.equal(hotelPlan.status, 200, JSON.stringify(hotelPlan.body));
-    assert.ok(hotelPlan.body['bestStrategyId'], 'overnight follow-up plans a hotel strategy');
-
-    const hotelBegan = await postJson(base, '/api/runtime/begin', {
-      caseId,
-      strategyId: hotelPlan.body['bestStrategyId'],
-      at: '2026-09-29T13:15:00+09:00',
-    });
-    assert.equal(hotelBegan.status, 200, JSON.stringify(hotelBegan.body));
-    const hotelIntentId = hotelBegan.body['intentId'] as string;
-    assert.ok(hotelIntentId);
-
-    const hotelDecided = await postJson(base, '/api/runtime/decide', {
-      caseId,
-      intentId: hotelIntentId,
-      decidedBy: { entityType: 'TRAVELLER', id: 'trv-evt-ait-2026-ait-draft-09' },
-      verdict: 'APPROVED',
-      note: 'Approve the overnight hotel for the missed connection',
-      at: '2026-09-29T13:20:00+09:00',
-    });
-    assert.equal(hotelDecided.status, 200, JSON.stringify(hotelDecided.body));
-
-    const hotelExecuted = await postJson(base, '/api/runtime/execute', {
-      caseId,
-      intentId: hotelIntentId,
-      at: '2026-09-29T13:25:00+09:00',
-    });
-    assert.equal(hotelExecuted.status, 200, JSON.stringify(hotelExecuted.body));
-    assert.equal(hotelExecuted.body['caseStatus'], 'RESOLVED', JSON.stringify(hotelExecuted.body));
+    assert.equal(executed.body['resolutionOutcome'], 'FULLY_RECOVERED', JSON.stringify(executed.body));
 
     const resolvedHtml = await getHtml(base, `/operator/cases/${caseId}`);
     assert.match(resolvedHtml, /data-test="case-phase-resolved"/);

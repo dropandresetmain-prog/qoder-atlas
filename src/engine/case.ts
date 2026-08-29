@@ -13,6 +13,7 @@ import {
   type CaseStatus,
   type RecoveryCase,
   type CaseResolution,
+  type RecoveryApprovalEnvelope,
 } from '../operational/case.ts';
 import type { CaseRepository } from '../contracts/repositories.ts';
 import type { ActionIntent, AuthorityDecision, ExecutionResult } from '../operational/intent.ts';
@@ -34,6 +35,7 @@ export interface CasePatch {
   failedConstraintIds?: EntityId[];
   triggeredBySignalIds?: EntityId[];
   resolution?: CaseResolution;
+  recoveryApproval?: RecoveryApprovalEnvelope;
 }
 
 export interface OpenCaseInput {

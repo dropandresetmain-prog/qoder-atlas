@@ -204,17 +204,40 @@ test('browser: Overview shared incident + 67 participant roster truth', async ()
   }
 });
 
-test('browser: Jordan S2 approval → Execute → resolved Confirmed on reopen', async () => {
+test('browser: Jordan S2 ONE organiser approval → Execute carries the whole recovery to resolved Confirmed', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   try {
     await resetDemo();
     await gotoOverview(page);
+
+    const jordanRow = page.locator('[data-trip-id]').filter({ hasText: 'Jordan Hale' }).first();
+    await jordanRow.waitFor({ timeout: 15000 });
+    const tripId = await jordanRow.getAttribute('data-trip-id');
+    assert.ok(tripId, 'Jordan trip id required to audit the internal recovery chain');
+
     await openTravellerCase(page, 'Jordan Hale');
     await page.waitForSelector('[data-test="organisation-approve-form"], [data-test="resolve-northstar-btn"], [data-test="begin-strategy-btn"]', { timeout: 20000 });
     const entry = await page.content();
     assertCommitmentSemantics(entry, 'Jordan entry');
     assert.doesNotMatch(entry, /FLIGHT STATUS PENDING/i);
     assert.doesNotMatch(entry, /HOTEL CONFIRMATION PENDING/i);
+
+    // Track every runtime interaction the BROWSER actually issues, so the
+    // locked demo contract — organiser approval = 1, traveller approval = 0,
+    // no begin-recovery call after execution starts, no second visible
+    // recovery cycle — is proven from real network traffic, not inferred
+    // from the DOM alone. The Narita hotel plan/begin/execute happen
+    // server-side inside the ONE /api/runtime/execute call and therefore
+    // never appear here at all.
+    type Call = { url: string; method: string; postData: string | null; at: number };
+    const calls: Call[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (req.method() === 'POST' && (url.includes('/api/runtime/') || url.includes('/traveller-decision'))) {
+        calls.push({ url, method: req.method(), postData: req.postData(), at: Date.now() });
+      }
+    });
+
     if (await page.locator('[data-test="resolve-northstar-btn"]').count()) {
       await page.locator('[data-test="resolve-northstar-btn"]').click();
       await page.waitForSelector('[data-test="begin-strategy-btn"], [data-test="organisation-approve-form"], [data-test="case-options"]', { timeout: 20000 });
@@ -226,40 +249,65 @@ test('browser: Jordan S2 approval → Execute → resolved Confirmed on reopen',
       await begin;
       await page.waitForSelector('[data-test="organisation-approve-form"]', { timeout: 20000 });
     }
-    // Flight cycle: the gate holds the case open — repairing the flight alone
-    // leaves the forced overnight at the connection hub uncovered.
-    await approveAndExecuteOrganiser(page, '[data-test="resolve-northstar-btn"]');
-    const heldOpen = await page.content();
-    assert.doesNotMatch(heldOpen, /data-test="case-phase-resolved"/, 'flight alone must not resolve the case');
 
-    // Second cycle: plan proposes the overnight hotel, the traveller approves
-    // the money-moving booking on the traveller surface, execution confirms
-    // the stay, and only then the trip is fully recovered.
-    const caseUrl = page.url();
-    const replan = page.waitForResponse((r) => r.url().includes('/api/runtime/plan') && r.request().method() === 'POST', { timeout: 30000 });
-    await page.locator('[data-test="resolve-northstar-btn"]').click();
-    await replan;
-    await page.waitForSelector('[data-test="begin-strategy-btn"]', { timeout: 30000 });
-    const hotelBegin = page.waitForResponse((r) => r.url().includes('/api/runtime/begin') && r.request().method() === 'POST', { timeout: 30000 });
-    await page.locator('[data-test="begin-strategy-btn"]').click();
-    await hotelBegin;
-    await page.waitForSelector('[data-test="waiting-for-traveller"]', { timeout: 30000 });
-    assert.match(await page.content(), /data-test="open-traveller-surface"/);
+    // ONE organiser approval authorises the whole disclosed whole-trip plan
+    // (flight + Narita overnight + Singapore stay + entry/insurance/finals +
+    // known cost, all shown on this same Selected Recovery card). "Execute
+    // recovery" then runs the complete permitted sequence — the browser
+    // lands directly in the final recovered state.
+    const executeClickedAt = Date.now();
+    await approveAndExecuteOrganiser(page);
+    const resolved = await page.content();
+    assert.match(resolved, /data-test="case-phase-resolved"/, 'the ONE approval must carry the whole recovery — flight AND Narita hotel — to resolution in this same execute click');
+    assert.doesNotMatch(resolved, /data-test="resolve-northstar-btn"/, 'no second Find-a-recovery step for the hotel');
+    assert.doesNotMatch(resolved, /data-test="begin-strategy-btn"/, 'no second Begin-recovery step for the hotel');
+    assert.doesNotMatch(resolved, /data-test="waiting-for-traveller"/, 'no traveller-surface approval detour for the hotel');
 
-    await page.locator('[data-test="open-traveller-surface"]').click();
-    await page.waitForLoadState('domcontentloaded');
-    const decision = page.waitForResponse((r) => r.url().includes('/traveller-decision') && r.request().method() === 'POST', { timeout: 30000 });
-    await page.locator('button[name="decision"][value="APPROVED"]').first().click();
-    await decision;
-    await page.waitForLoadState('domcontentloaded');
-
-    await page.goto(caseUrl);
-    await page.waitForSelector('[data-test="case-phase-resolved"]', { timeout: 30000 });
     await assertResolvedReloadOverview(page, 'Jordan Hale');
+
+    // --- Explicit interaction-count assertions (locked demo contract) ------
+    const organiserApprovals = calls.filter(
+      (c) => c.url.includes('/api/runtime/decide') && (c.postData ?? '').includes('"entityType":"ORGANISATION"'),
+    );
+    const travellerApprovals = calls.filter(
+      (c) =>
+        c.url.includes('/traveller-decision') ||
+        (c.url.includes('/api/runtime/decide') && (c.postData ?? '').includes('"entityType":"TRAVELLER"')),
+    );
+    const beginCalls = calls.filter((c) => c.url.includes('/api/runtime/begin'));
+    const beginCallsAfterExecute = beginCalls.filter((c) => c.at >= executeClickedAt);
+    const resolveCallsAfterExecute = calls.filter(
+      (c) => c.url.includes('/api/runtime/plan') && c.at >= executeClickedAt,
+    );
+
+    assert.equal(organiserApprovals.length, 1, `organiser approval interactions must be exactly 1, saw ${organiserApprovals.length}`);
+    assert.equal(travellerApprovals.length, 0, `traveller approval interactions must be 0, saw ${travellerApprovals.length}`);
+    assert.equal(beginCalls.length, 1, `only the flight's begin-recovery call is browser-visible, saw ${beginCalls.length}`);
+    assert.equal(beginCallsAfterExecute.length, 0, `no begin-recovery interaction may follow execution start, saw ${beginCallsAfterExecute.length}`);
+    assert.equal(resolveCallsAfterExecute.length, 0, 'no second visible Find-a-recovery cycle may follow execution start');
+
+    // --- The Narita hotel action still passed its own deterministic
+    //     authority decision server-side (envelope reuse, never a bypass). --
+    const activity = await getJson(baseUrl, `/api/wave/trips/${tripId}/activity`);
+    assert.equal(activity.status, 200);
+    const events = (activity.body as { events?: Array<{ action: string }> }).events ?? [];
+    assert.ok(
+      events.some((e) => e.action === 'RECOVERY_ENVELOPE_APPLIED'),
+      'the hotel intent reused the organiser recovery-approval envelope, on the record',
+    );
+    const executions = events.filter((e) => e.action === 'EXECUTION_COMPLETED');
+    assert.ok(executions.length >= 2, `expected flight AND hotel EXECUTION_COMPLETED evidence, saw ${executions.length}`);
+    const approvalsRecorded = events.filter((e) => e.action === 'APPROVAL_RECORDED');
+    assert.equal(approvalsRecorded.length, 1, `expected exactly one recorded human APPROVAL_RECORDED, saw ${approvalsRecorded.length}`);
   } finally {
     await page.close();
   }
 });
+
+async function getJson(base: string, path: string): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(`${base}${path}`);
+  return { status: res.status, body: await res.json() };
+}
 
 test('browser: Oliver S7 approval → Execute → resolved Confirmed on reopen', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });

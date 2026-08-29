@@ -40,7 +40,12 @@ import { resolveWorldSeedMode, shouldBootSeedScenario } from './worldSeed.ts';
 import type { ProgrammeService } from './programme.ts';
 import type { BookingDossierStore } from './dossierStore.ts';
 import type { FxRateStore } from './fxStore.ts';
-import { signalHorizon, liftToHorizon, type RecoveryExecutionService } from './recoveryExecution.ts';
+import {
+  signalHorizon,
+  liftToHorizon,
+  type RecoveryExecutionService,
+  type ExecutionStageOutcome,
+} from './recoveryExecution.ts';
 import type { PreferenceStore } from './preferenceStore.ts';
 import type { TripSignal } from '../operational/signal.ts';
 import { ResolutionTargetSchema, type ResolutionTarget } from '../contracts/changeRequest.ts';
@@ -316,9 +321,21 @@ export class RuntimeOrchestrator {
     };
   }
 
-  /** Stage 5 — gate-checked execution -> observation -> verification. */
+  /**
+   * Stage 5 — gate-checked execution -> observation -> verification, then
+   * (I4/PR-10) automatically continue the SAME already-approved recovery
+   * through any further sequential provider action the verifier's PLANNING
+   * hold demands (e.g. the Narita overnight after the flight): plan the
+   * follow-on strategy, stage its intent, and — ONLY when the case's
+   * recovery approval envelope deterministically covers it — execute it too,
+   * without surfacing a second human decision. One organiser click on
+   * "Execute recovery" therefore carries the whole disclosed plan through to
+   * FULLY_RECOVERED/RECOVERED_WITH_LOSS; the browser never sees an
+   * intermediate Begin/Approve step for the covered follow-on action.
+   */
   async execute(input: { caseId: EntityId; intentId: EntityId; at: IsoDateTime }): Promise<RuntimeExecuteOutcome> {
-    const outcome = await this.deps.execution.executeApproved(input);
+    const first = await this.deps.execution.executeApproved(input);
+    const outcome = await this.continueApprovedRecovery(input.caseId, input.at, first);
     return {
       executed: outcome.executed,
       caseStatus: outcome.caseStatus,
@@ -327,6 +344,36 @@ export class RuntimeOrchestrator {
       remainingLossRefs: outcome.verification?.remainingLossRefs ?? [],
       simulated: outcome.result?.provenance === 'SIMULATED',
     };
+  }
+
+  /**
+   * Bounded auto-continuation of an already-approved recovery. Stops (and
+   * surfaces the current state as-is, never guessing) the moment any of the
+   * safety conditions fail: execution didn't succeed, the case reached a
+   * terminal/blocked status, no recovery approval envelope was ever opened
+   * for this case (nothing to reuse), the verifier did not ask for more
+   * planning, planning found no feasible follow-on strategy, or staging that
+   * strategy did NOT come back executable (a genuinely new, envelope-
+   * uncovered decision — the correct, rare case for a fresh human ask). The
+   * round cap only guards against an unexpected planner loop; every real
+   * demo recovery resolves in one or two follow-on rounds.
+   */
+  private async continueApprovedRecovery(
+    caseId: EntityId,
+    at: IsoDateTime,
+    outcome: ExecutionStageOutcome,
+    roundsLeft = 4,
+  ): Promise<ExecutionStageOutcome> {
+    if (!outcome.executed || roundsLeft <= 0) return outcome;
+    if (outcome.caseStatus !== 'PLANNING') return outcome;
+    const recoveryCase = await this.deps.cases.getCase(caseId);
+    if (!recoveryCase?.recoveryApproval) return outcome;
+    const planned = await this.plan({ caseId, at });
+    if (!planned.bestStrategyId) return outcome;
+    const staged = await this.begin({ caseId, strategyId: planned.bestStrategyId, at });
+    if (!staged.executable) return outcome;
+    const next = await this.deps.execution.executeApproved({ caseId, intentId: staged.intentId, at });
+    return this.continueApprovedRecovery(caseId, at, next, roundsLeft - 1);
   }
 
   /** Operator terminal action — hand case to human support (ESCALATED_CLOSED). */

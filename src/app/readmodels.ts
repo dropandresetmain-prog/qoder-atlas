@@ -919,35 +919,40 @@ export async function projectCaseDetail(
   const latestRequiring = requiring[requiring.length - 1];
   if (latestRequiring) {
     const intent = intentForDecision(recoveryCase, latestRequiring);
+    // I4/PR-10: once a decision carries a real approval, WHO actually decided
+    // it (`approval.decidedBy`) is the truthful "requested from" — never the
+    // hypothetical outcome the deterministic ladder would have asked for in
+    // isolation. This keeps the recap honest for a case-scoped recovery
+    // approval envelope, where an ORGANISATION principal's earlier approval
+    // deterministically covers a later intent whose own outcome reads
+    // REQUIRES_TRAVELLER: the page must say organiser, not traveller, once
+    // that is who actually approved it.
+    const requestedFrom: 'TRAVELLER' | 'ORGANISATION' | 'HUMAN_AGENT' = latestRequiring.approval
+      ? latestRequiring.approval.decidedBy.entityType === 'TRAVELLER'
+        ? 'TRAVELLER'
+        : 'ORGANISATION'
+      : latestRequiring.outcome === 'REQUIRES_TRAVELLER'
+        ? 'TRAVELLER'
+        : latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER'
+          ? 'ORGANISATION'
+          : 'HUMAN_AGENT';
     // The authority decision records only a principal TYPE. Expose an
     // organisation identity to the UI only when its authoritative scope is
     // unambiguous; a presentation layer must not pick among several valid
     // organisations. Human-agent outcomes deliberately carry no automatic
     // approver at all.
     const organisations =
-      latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER' ||
-      latestRequiring.outcome === 'REQUIRES_HUMAN_AGENT'
+      requestedFrom === 'ORGANISATION' || requestedFrom === 'HUMAN_AGENT'
         ? (await principalScopeForTrip({ trips: deps.snapshot.trips, entities: deps.snapshot.entities }, trip.id)).organisations
         : [];
     const organisationApprover = organisations.length === 1 ? organisations[0] : undefined;
     approval = {
-      requestedFrom:
-        latestRequiring.outcome === 'REQUIRES_TRAVELLER'
-          ? 'TRAVELLER'
-          : latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER'
-            ? 'ORGANISATION'
-            : 'HUMAN_AGENT',
+      requestedFrom,
       intentId: latestRequiring.intentId,
       // HUMAN_AGENT may be decided by an unambiguous in-scope organisation
       // principal (authority allows ORGANISATION for HUMAN_AGENT).
       ...(organisationApprover ? { approver: { entityType: 'ORGANISATION' as const, id: organisationApprover.id } } : {}),
-      reason: presentApprovalReason(
-        latestRequiring.outcome === 'REQUIRES_TRAVELLER'
-          ? 'TRAVELLER'
-          : latestRequiring.outcome === 'REQUIRES_ORGANISATION_APPROVER'
-            ? 'ORGANISATION'
-            : 'HUMAN_AGENT',
-      ),
+      reason: presentApprovalReason(requestedFrom),
       // CTA currency must match what the principal actually pays (provider
       // charge). Home-policy restatement stays on option chips, not the button.
       ...(intent?.providerSpend

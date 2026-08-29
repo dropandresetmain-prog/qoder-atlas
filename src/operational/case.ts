@@ -4,7 +4,7 @@
  * VERIFYING may loop back to ASSESSING/PLANNING.
  */
 import { z } from 'zod';
-import { EntityIdSchema, IsoDateTimeSchema } from '../domain/common.ts';
+import { EntityIdSchema, EntityRefSchema, IsoDateTimeSchema } from '../domain/common.ts';
 import { AuthorityDecisionSchema, ActionIntentSchema, ExecutionResultSchema } from './intent.ts';
 import { RecoveryStrategySchema } from './strategy.ts';
 
@@ -66,6 +66,27 @@ export const CaseResolutionSchema = z.strictObject({
 });
 export type CaseResolution = z.infer<typeof CaseResolutionSchema>;
 
+/**
+ * A single, case-scoped organiser approval that authorises the WHOLE
+ * recovery, not just the intent it was recorded against (I4/PR-10 demo
+ * contract fix). The presented recovery plan discloses every sequential
+ * provider action Northstar will take (e.g. a replacement flight AND the
+ * overnight hotel that follows it) before the organiser approves once; this
+ * envelope preserves that single approval so a later intent within the SAME
+ * case — a deterministic, policy-checked consequence of the SAME recovery,
+ * never a new discretionary spend — does not surface a second human decision.
+ * Recorded once, from the first ORGANISATION-decided APPROVED verdict in the
+ * case's lifetime; never overwritten. Reuse never bypasses per-intent
+ * deterministic authority (spend ceilings, BLOCKED outcomes): see
+ * `beginStrategy` in recoveryExecution.ts.
+ */
+export const RecoveryApprovalEnvelopeSchema = z.strictObject({
+  originIntentId: EntityIdSchema,
+  approvedBy: EntityRefSchema,
+  approvedAt: IsoDateTimeSchema,
+});
+export type RecoveryApprovalEnvelope = z.infer<typeof RecoveryApprovalEnvelopeSchema>;
+
 export const RecoveryCaseSchema = z.strictObject({
   id: EntityIdSchema,
   tripId: EntityIdSchema,
@@ -82,6 +103,7 @@ export const RecoveryCaseSchema = z.strictObject({
   actionIntents: z.array(ActionIntentSchema).default([]),
   executionResults: z.array(ExecutionResultSchema).default([]),
   resolution: CaseResolutionSchema.optional(),
+  recoveryApproval: RecoveryApprovalEnvelopeSchema.optional(),
   version: z.number().int().nonnegative().default(0),
 });
 export type RecoveryCase = z.infer<typeof RecoveryCaseSchema>;
