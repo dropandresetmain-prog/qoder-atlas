@@ -308,7 +308,7 @@ function composer(view: TravellerTripView, presentation?: TravellerPresentation)
   </div>`;
   }
   return `
-  <form class="composer inline-form request-form" method="post" action="/api/traveller/change-request" data-result-target="traveller-request-result" data-ui-section="traveller-request">
+  <form class="composer inline-form" method="post" action="/api/traveller/change-request" data-result-target="traveller-request-result" data-ui-section="traveller-request">
     <input type="hidden" name="travellerId" value="${escapeHtml(view.travellerId)}">
     <input type="hidden" name="tripId" value="${escapeHtml(view.tripId)}">
     <input type="hidden" name="at" value="${escapeHtml(view.updatedAt)}">
