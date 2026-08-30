@@ -131,18 +131,18 @@ export function runPreflight(options: PreflightOptions): PreflightReport {
       : `local pack missing at ${localPath}`,
   });
 
-  // Canonical programme loaded (fixture presence — structural).
-  // Prefer the sole programmes/* bundle (AiT cutover); fall back only if the
-  // directory is empty so historical checkouts still diagnose clearly.
+  // Canonical programme loaded (fixture presence — structural). Resolve the
+  // same sole programmes/* bundle the boot seeder consumes; no world is named.
   const programmesRoot = join(cwd, config.fixturesDir, 'programmes');
-  let programmePath = join(programmesRoot, 'ait-summit-2026', 'programme.json');
-  if (!existsSync(programmePath) && existsSync(programmesRoot)) {
-    const dirs = readdirSync(programmesRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .sort();
-    if (dirs[0]) programmePath = join(programmesRoot, dirs[0], 'programme.json');
-  }
+  const programmeDirs = existsSync(programmesRoot)
+    ? readdirSync(programmesRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort()
+    : [];
+  const programmePath = programmeDirs[0]
+    ? join(programmesRoot, programmeDirs[0], 'programme.json')
+    : join(programmesRoot, 'programme.json');
   let programme: { context?: { anchorEvent?: { id?: string } }; importDraft?: { travellers?: Array<{ draftId?: string }> } } | undefined;
   if (existsSync(programmePath)) {
     try {
@@ -175,15 +175,15 @@ export function runPreflight(options: PreflightOptions): PreflightReport {
     const anchorId = programme?.context?.anchorEvent?.id;
     const missing: string[] = [];
     for (const travellerId of manifest.expect.travellerIds) {
-      // Runtime ids look like trv-{anchor}-{draftId}. Accept full draftId,
-      // runtime id, or a trailing draft token (legacy draft-N and ait-draft-N).
-      const draftSuffix = travellerId.match(/(?:^|-)((?:ait-)?draft-[\w-]+)$/)?.[1];
-      const ok =
-        draftIds.has(travellerId) ||
-        (draftSuffix !== undefined && draftIds.has(draftSuffix)) ||
-        (anchorId !== undefined &&
-          draftSuffix !== undefined &&
-          travellerId === `trv-${anchorId}-${draftSuffix}`);
+      // Runtime traveller ids are derived from the anchor event and the draft
+      // id, so resolve by comparing against the drafts actually loaded rather
+      // than by assuming any one world's id spelling.
+      const ok = [...draftIds].some(
+        (draftId) =>
+          travellerId === draftId ||
+          travellerId.endsWith(`-${draftId}`) ||
+          (anchorId !== undefined && travellerId === `trv-${anchorId}-${draftId}`),
+      );
       if (!ok) missing.push(travellerId);
     }
     checks.push({
