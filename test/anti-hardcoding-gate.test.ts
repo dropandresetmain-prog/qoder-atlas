@@ -355,15 +355,46 @@ test('every rule actually fires against a planted violation', () => {
   }
 });
 
+test('hero asset: hardcoded world imagery is caught, config-derived lookup is not', () => {
+  const hardcoded = scanSource(
+    'src/server/http.ts',
+    "const uiAssets: string[] = ['northstar-logo.png', 'sg-dusk.png'];\n",
+  );
+  assert.ok(
+    hardcoded.some((f) => f.rule === 'demo-fixture-ref'),
+    'naming a world asset in generic routing must still be a finding',
+  );
+
+  const derived = scanSource(
+    'src/server/http.ts',
+    "const configuredHero = config.uiHeroImage.split('/').pop() ?? '';\n" +
+      "const uiAssets: string[] = ['northstar-logo.png', ...(configuredHero.endsWith('.png') ? [configuredHero] : [])];\n",
+  );
+  assert.deepEqual(derived, [], 'a config-derived allowlist is not demo leakage');
+});
+
 // ---------------------------------------------------------------------------
 // 4. CLI contract
 // ---------------------------------------------------------------------------
 
 test('CLI exits non-zero with a VERDICT line when the tree has findings', () => {
-  const run = spawnSync(process.execPath, [GATE_SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+  const root = mkdtempSync(join(tmpdir(), 'northstar-gate-dirty-'));
+  mkdirSync(join(root, 'src', 'app'), { recursive: true });
+  writeFileSync(
+    join(root, 'src', 'app', 'labels.ts'),
+    "if (id.includes('ZIPAIR')) return 'ZIPAIR';\n" +
+      "const who = 'Jordan Hale';\n",
+  );
+  const run = spawnSync(process.execPath, [GATE_SCRIPT], { cwd: root, encoding: 'utf8' });
   assert.match(run.stdout, /^VERDICT: FINDINGS — \d+ hit\(s\)$/m);
-  assert.equal(run.status, 1);
-  assert.match(run.stdout, /src\/app\/presentation\.ts:\d+ \[tier=app\]/);
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.match(run.stdout, /src[/\\]app[/\\]labels\.ts:\d+ \[tier=app\]/);
+});
+
+test('CLI reports the real repository free of generic-source demo leakage', () => {
+  const run = spawnSync(process.execPath, [GATE_SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+  assert.match(run.stdout, /^VERDICT: CLEAN/m, run.stdout + run.stderr);
+  assert.equal(run.status, 0, run.stdout + run.stderr);
 });
 
 test('CLI exits 0 with VERDICT CLEAN on a clean tree', () => {

@@ -130,6 +130,7 @@ export const RULES = Object.freeze([
       { re: /\bsarah\s+lim\b/iu, label: 'persona: Sarah Lim' },
       { re: /\bjonas\s+berg\b/iu, label: 'persona: Jonas Berg' },
       { re: /\boliver\s+bennett\b/iu, label: 'persona: Oliver Bennett' },
+      { re: /\banthony\b/iu, label: 'demo operator persona: Anthony' },
       { re: /\bait-draft-\d+\b/u, label: 'persona draft id: ait-draft-*' },
     ],
   },
@@ -240,6 +241,8 @@ export const RULES = Object.freeze([
       { re: /\bfixtures\/programmes\b/iu, label: 'demo programme fixture path' },
       { re: /\bfixtures\/acceptance\b/iu, label: 'demo acceptance manifest path' },
       { re: /\bsg-dusk\b/iu, label: 'demo hero asset: sg-dusk' },
+      { re: /\bplace-hotel-riverview\b/iu, label: 'demo place id in prompt examples' },
+      { re: /\btrv-summit-attendee\b/iu, label: 'demo traveller cohort id in prompt examples' },
     ],
   },
 ]);
