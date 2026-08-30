@@ -295,14 +295,24 @@ test('i5: operator dashboard and case detail project real state through the loop
   assert.deepEqual(tripView.pendingDecisions[0]!.amount, strategy.costImpact);
   assert.equal(dashboard.summary.awaitingDecision, 1);
   assert.ok(
-    tripView.systemActivity.some((line) => line.includes('Checked recovery options')),
+    tripView.systemActivity.some((line) => line.includes('checked recovery options')),
     'system activity is projected from the real audit trail',
   );
 
   const detail = (await projectCaseDetail(readDeps, caseId, NOW))!;
   assert.deepEqual(caseDetailViewIssues(detail), [], 'projection must satisfy the UI consistency guard');
   assert.equal(detail.status, 'RECOVERING');
-  assert.equal(detail.whatChanged, setup.spec.disruption.signal.summary);
+  const signalSummary = setup.spec.disruption.signal.summary ?? '';
+  assert.ok(signalSummary.length > 0, 'the scenario supplies the signal summary it is tested against');
+  assert.ok(
+    detail.whatChanged?.startsWith(signalSummary),
+    'case detail leads with the real signal summary, not invented facts',
+  );
+  assert.match(
+    detail.whatChanged ?? '',
+    /is now at risk because the new timing no longer leaves enough preparation time\.$/,
+    'the deterministic consequence is stated as its own sentence',
+  );
   assert.ok(detail.criticalObjectiveAtRisk, 'threatened HARD objective is surfaced');
   assert.equal(detail.options.length, 3);
   const morning = detail.options.find((option) => option.title.includes('morning'))!;
@@ -427,13 +437,14 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     assert.equal(dashboardRes.status, 200);
     const dashboardHtml = await dashboardRes.text();
     assert.match(dashboardHtml, /Operations overview/);
-    assert.match(dashboardHtml, /Checked recovery options/);
+    assert.match(dashboardHtml, /checked recovery options/, 'dashboard renders the lowercase activity fragment');
 
     const caseRes = await fetch(`${base}/operator/cases/${caseId}`);
     assert.equal(caseRes.status, 200);
     const caseHtml = await caseRes.text();
     assert.match(caseHtml, /Awaiting approval|Waiting for|Options on the table/);
-    assert.match(caseHtml, /Approval/);
+    assert.match(caseHtml, /data-ui-section="primary-approval"/, 'the approval requirement is rendered on the case page');
+    assert.match(caseHtml, /approval required/i, 'the case page names who must approve');
     const missingCase = await fetch(`${base}/operator/cases/case-does-not-exist`);
     assert.equal(missingCase.status, 404);
 

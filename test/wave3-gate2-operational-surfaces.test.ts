@@ -100,7 +100,8 @@ test('Wave 3 Gate 2: approvals queue, activity stream, uncertainties, and provid
     assert.ok(actions.includes('SIGNAL_PROCESSED'), 'the disruption signal is real audit evidence');
     assert.ok(actions.includes('AUTHORITY_DECIDED'), 'the authority decision is real audit evidence');
     const signalEvent = activity.events.find((event) => event.action === 'SIGNAL_PROCESSED')!;
-    assert.equal(signalEvent.summary, 'Trip change recorded');
+    assert.equal(signalEvent.summary, 'reported a flight cancellation');
+    assert.ok(signalEvent.actor.length > 0, 'the fragment renders behind a named actor');
     for (const event of activity.events) {
       assert.ok(event.summary.length > 0, 'every event carries user-facing copy (never empty)');
     }
@@ -143,7 +144,7 @@ test('Wave 3 Gate 2: approvals queue, activity stream, uncertainties, and provid
     assert.ok(actionsAfter.includes('EXECUTION_COMPLETED'));
     assert.ok(actionsAfter.includes('CASE_VERIFIED'));
     const verifiedEvent = activityAfter.events.find((event) => event.action === 'CASE_VERIFIED')!;
-    assert.equal(verifiedEvent.summary, 'Rechecked the trip after the booking changed');
+    assert.equal(verifiedEvent.summary, 'rechecked the trip after the booking changed');
   } finally {
     await new Promise<void>((resolvePromise, reject) =>
       server.close((error) => (error ? reject(error) : resolvePromise())),

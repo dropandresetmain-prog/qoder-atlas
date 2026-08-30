@@ -345,8 +345,17 @@ test('r3a: traveller presentation and case enrichment preserve FX distinction', 
     'Make the opening session',
   );
   const approveNote = presentation?.optionDetails?.Approve?.note ?? '';
-  assert.ok(approveNote.includes('Provider charge 89 USD'));
-  assert.ok(approveNote.includes('Policy restatement 120 SGD'));
+  // FX distinction: the provider charge is what is actually payable; the
+  // traveller's home-currency figure is only a restatement for comparison.
+  assert.ok(approveNote.includes('US$89.00 payable'), 'provider charge is the payable amount');
+  assert.ok(
+    approveNote.includes('Approx. S$120.00 policy equivalent'),
+    'home-policy figure is labelled an approximate restatement',
+  );
+  assert.ok(
+    !/S\$120\.00 payable/.test(approveNote),
+    'the home-currency restatement never masquerades as the charge',
+  );
 
   const baseView: CaseDetailView = {
     caseId: recoveryCase.id,
@@ -429,7 +438,8 @@ test('r3a: activity page groups audit events by day without fabrication', async 
 
   const activity = await projectProgrammeActivityPage(harness.readDeps, AT);
   assert.equal(activity.days.length, 1);
-  assert.ok(activity.days[0]!.items.some((item) => item.text.includes('Checked recovery options')));
+  assert.ok(activity.days[0]!.items.some((item) => item.text.includes('checked recovery options')));
+  assert.ok(activity.days[0]!.items.every((item) => item.who.length > 0), 'every fragment renders behind its actor');
 });
 
 test('r3a: option flags and absent fields stay honest across programmes', async () => {

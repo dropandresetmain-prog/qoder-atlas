@@ -365,7 +365,10 @@ export function presentDisruptedCaseSummary(input: {
   }
 
   if (commitment && bufferFail) {
-    return `${base ?? 'This trip changed.'} ${commitment} is now at risk because the new timing no longer leaves enough preparation time.`;
+    // Authored signal summaries are titles without terminal punctuation; the
+    // appended consequence must never read as one run-on sentence.
+    const lead = base && !/[.!?]$/.test(base.trimEnd()) ? `${base.trimEnd()}.` : base;
+    return `${lead ?? 'This trip changed.'} ${commitment} is now at risk because the new timing no longer leaves enough preparation time.`;
   }
 
   return base;

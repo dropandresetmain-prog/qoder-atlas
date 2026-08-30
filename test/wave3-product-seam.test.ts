@@ -164,7 +164,18 @@ test('Wave 3 product convergence: approved UI runs on the real engine through HT
 
     // The case view now shows what a human must do (authority ran at begin).
     const casePageApproval = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.ok(casePageApproval.html.includes('Approval'), 'the approval requirement is visible once authority has run');
+    assert.ok(
+      casePageApproval.html.includes('data-ui-section="primary-approval"'),
+      'the approval requirement is visible once authority has run',
+    );
+    assert.ok(
+      casePageApproval.html.includes('Traveller approval required'),
+      'the approval panel names the principal who must decide',
+    );
+    assert.ok(
+      casePageApproval.html.includes('data-approval-state="PENDING"'),
+      'the approval is presented as still awaiting a decision',
+    );
 
     // Traveller presentation (handoff items 2+3): rich options keyed by the
     // EXACT option strings the input request emits ('Approve'/'Decline').

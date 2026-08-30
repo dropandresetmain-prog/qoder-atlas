@@ -407,7 +407,13 @@ test('DR-6: alternate commitment change (RELOCATED) flows through same code', as
 
     assert.equal(preview.totalTravellers, 2);
     assert.equal(preview.affected.length, 2, 'both relocated trips are affected');
-    assert.ok(preview.affected[0]!.reasons.some((r) => r.includes('relocated')), 'reason mentions relocation');
+    const relocationReason = preview.affected[0]!.reasons.find((reason) => /venue/i.test(reason));
+    assert.ok(relocationReason, 'reason tells the organiser the venue moves');
+    assert.match(relocationReason, /would move/, 'stated as a preview consequence, not an applied fact');
+    assert.ok(
+      !preview.affected[0]!.reasons.some((reason) => /\bplc-|place-[a-z0-9-]/i.test(reason)),
+      'no raw place identifier leaks into preview copy',
+    );
 
     // --- Commit: same RELOCATED change through the same code path. ---------
     const outcome = await commitEventChange(
