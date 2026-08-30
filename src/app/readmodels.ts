@@ -574,19 +574,13 @@ export async function projectOperatorDashboard(
     });
   }
 
-  // Participant roster = Northstar-managed + local/self-managed only.
-  // Orphan/unspecified trips must not inflate the 67-participant hero truth.
-  const participantTrips = trips.filter(
-    (row) =>
-      row.travellerNames.length > 0 &&
-      (row.travelArrangement === 'NORTHSTAR_ARRANGED' ||
-        row.travelArrangement === 'SELF_OR_OTHER_ARRANGED'),
-  );
-
+  // `trips` is the complete operator projection: a trip never disappears just
+  // because its travellers declare no travel arrangement. Arrangement-specific
+  // participant totals are the `arrangementCounts` job below.
   return {
     generatedAt,
     summary,
-    trips: participantTrips,
+    trips,
     arrangementCounts: {
       ...arrangementCounts,
       total: arrangementCounts.northstarArranged + arrangementCounts.selfOrOtherArranged,
