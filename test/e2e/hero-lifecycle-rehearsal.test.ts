@@ -29,6 +29,12 @@ const demoConfig = AppConfigSchema.parse({
   adapterMode: 'REPLAY',
   sqlitePath: ':memory:',
   fixturesDir: resolve('fixtures'),
+  programmeChangePresets: JSON.stringify({
+    [S3_RESCHEDULE.commitmentId]: {
+      startsAt: S3_RESCHEDULE.newStartsAt,
+      endsAt: S3_RESCHEDULE.newEndsAt,
+    },
+  }),
   providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {} },
 });
 

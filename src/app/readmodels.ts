@@ -83,6 +83,8 @@ export interface ReadModelDependencies {
   cases: CaseRepository;
   audit: AuditRepository;
   viability: ViabilityEngine;
+  /** World-supplied proposal defaults keyed by commitment id; empty when unset. */
+  programmeChangePresets?: Record<string, { startsAt: string; endsAt: string }>;
 }
 
 function changeTargetFromSignal(signal: TripSignal | undefined) {
@@ -1050,16 +1052,8 @@ export async function projectCaseDetail(
   const caseStatus = statusFromCase(recoveryCase.status, isChangeRequest);
   const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
   const programmeChangeCommitmentId = recoveryCommitment?.data.anchorCommitmentId;
-  // Fixture-keyed programme proposal presets (commitment entity ids from the
-  // closed demo world). Presentation only — not person-specific branches.
-  const PROGRAMME_CHANGE_PRESETS: Record<string, { startsAt: string; endsAt: string }> = {
-    'cmt-ait-d1-headline-interview': {
-      startsAt: '2026-10-01T15:30:00+08:00',
-      endsAt: '2026-10-01T16:00:00+08:00',
-    },
-  };
   const programmePreset = programmeChangeCommitmentId
-    ? PROGRAMME_CHANGE_PRESETS[programmeChangeCommitmentId]
+    ? deps.programmeChangePresets?.[programmeChangeCommitmentId]
     : undefined;
   const hardConstraintFailed = evaluations.some((evaluation) => {
     const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);

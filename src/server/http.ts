@@ -349,9 +349,14 @@ async function handle(
     return;
   }
 
-  // Static presentation assets (brand mark, traveller hero imagery). Only
-  // allowlisted filenames resolve, so the URL can never escape fixtures/ui.
-  const uiAssets: string[] = ['northstar-logo.png', 'sg-dusk.png'];
+  // Static presentation assets. Only allowlisted filenames resolve, so the URL
+  // can never escape fixtures/ui. The list is derived from configuration rather
+  // than naming any one world's imagery in generic routing.
+  const configuredHero = (config.uiHeroImage ?? '').split('/').pop() ?? '';
+  const uiAssets: string[] = [
+    'northstar-logo.png',
+    ...(configuredHero.endsWith('.png') ? [configuredHero] : []),
+  ];
   const uiAsset = url.pathname.startsWith('/assets/') ? url.pathname.slice('/assets/'.length) : '';
   if (req.method === 'GET' && uiAssets.includes(uiAsset)) {
     try {

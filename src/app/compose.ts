@@ -11,6 +11,7 @@
 import { readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
+import { parseProgrammeChangePresets } from '../config/config.ts';
 import type { EntityId, IsoDateTime } from '../domain/common.ts';
 import { openDatabase } from '../persistence/database.ts';
 import {
@@ -306,6 +307,7 @@ export async function composeAppRuntime(
     cases,
     audit,
     viability,
+    programmeChangePresets: parseProgrammeChangePresets(config.programmeChangePresets),
   };
   const strategyFor = async (intent: { caseId: EntityId; strategyId?: EntityId }) =>
     (await cases.getCase(intent.caseId))?.strategies.find((strategy) => strategy.id === intent.strategyId);
@@ -561,6 +563,9 @@ export async function composeAppRuntime(
         {
           entities,
           signals: tripSignals,
+          ...(config.uiHeroImage
+            ? { heroImage: { url: config.uiHeroImage, alt: config.uiHeroImageAlt ?? '' } }
+            : {}),
           verdictFor: (strategyId) => {
             const option = detail?.options.find((candidate) => candidate.id === strategyId);
             return option && option.verdict !== 'UNKNOWN'
