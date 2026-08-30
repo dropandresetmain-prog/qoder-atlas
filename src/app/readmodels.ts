@@ -164,7 +164,13 @@ async function chainPresentationForCase(
   );
   return buildChainPresentationContext({
     recoveryCase: input.recoveryCase,
-    tripNotViable: deriveRemainderViability(constraints, evaluations, input.trip.viability) === 'NOT_VIABLE',
+    tripNotViable:
+      deriveRemainderViability(
+        constraints,
+        evaluations,
+        input.trip.viability,
+        input.recoveryCase?.resolution !== undefined,
+      ) === 'NOT_VIABLE',
     hardConstraintFailed,
     recoveryCommitmentId: selectRecoveryCommitment(input.trip, input.recoveryCase)?.id,
     substitutionTargetIds: resolveSubstitutionTargetIds({
@@ -389,13 +395,24 @@ async function currentConstraintEvaluations(deps: ReadModelDependencies, trip: T
 }
 
 /**
- * Propagated whole-trip viability from constraint evaluations.
+ * Remaining-journey viability for the traveller: is what is left of the trip
+ * still workable, given consequences that are unresolved right now?
+ *
+ * `tripViability` is a whole-trip aggregate, so it is only a current fact while
+ * nothing has closed the disruption it reports. `hasVerifiedResolution` says
+ * whether an observed, verified resolution exists for the trip's case: once it
+ * does, `DISRUPTED` is a historical record and the live constraint evaluations
+ * decide the remainder. Without one, `DISRUPTED` still stands as an unresolved
+ * hard consequence — a declined recovery never executed anything, so the
+ * traveller's journey remains broken even though no constraint re-fails.
+ *
  * Independent of open-case workflow status (DISRUPTED case ≠ failed commitment).
  */
 export function deriveRemainderViability(
   constraints: readonly Constraint[],
   evaluations: readonly { constraintId: string; status: string }[],
   tripViability: Trip['viability'],
+  hasVerifiedResolution: boolean,
 ): RemainderViability {
   const hardById = new Map<string, Constraint['hardness']>();
   for (const constraint of constraints) {
@@ -404,15 +421,14 @@ export function deriveRemainderViability(
   if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
     return 'NOT_VIABLE';
   }
-  // A trip already reconciled as DISRUPTED carries a direct viability failure
-  // (e.g. an impossible connection) even before a hard constraint re-fails on
-  // this snapshot. It must not present as workable.
-  if (tripViability === 'DISRUPTED') {
+  if (tripViability === 'DISRUPTED' && !hasVerifiedResolution) {
     return 'NOT_VIABLE';
   }
   if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
     return 'UNKNOWN';
   }
+  // Only SOFT failures can remain at this point: a consequence the traveller can
+  // still travel through, but which must stay visible as risk.
   if (evaluations.some((e) => e.status === 'FAIL') || tripViability === 'AT_RISK') {
     return 'AT_RISK';
   }
@@ -534,7 +550,12 @@ export async function projectOperatorDashboard(
 
     // Traveller-specific consequence for shared-incident differentiation.
     const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, generatedAt);
-    const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
+    const remainderViable = deriveRemainderViability(
+      constraints,
+      evaluations,
+      trip.viability,
+      recoveryCase?.resolution !== undefined,
+    );
 
     let travellerResponseStatus: OperatorTripView['travellerResponseStatus'] = 'NOT_REQUIRED';
     if (recoveryCase) {
@@ -1195,7 +1216,12 @@ export async function projectTravellerTrip(
 
   // Remainder viability: deterministic from current constraint evaluations.
   const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, at);
-  const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
+  const remainderViable = deriveRemainderViability(
+    constraints,
+    evaluations,
+    trip.viability,
+    recoveryCase?.resolution !== undefined,
+  );
 
   return {
     tripId,
