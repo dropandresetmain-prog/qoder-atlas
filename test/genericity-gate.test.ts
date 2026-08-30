@@ -25,6 +25,7 @@ import { join, resolve } from 'node:path';
 
 import { AppConfigSchema } from '../src/config/config.ts';
 import { composeAppRuntime } from '../src/app/compose.ts';
+import { deriveRemainderViability } from '../src/app/readmodels.ts';
 import { loadScenario } from '../src/scenarios/loader.ts';
 
 const REPO_FIXTURES = resolve('fixtures');
@@ -124,4 +125,39 @@ test('genericity: both generic trips project a traveller view', async () => {
     assert.ok(view, `${name} traveller view projects`);
     assert.equal(view.tripId, spec.trip.id);
   }
+});
+
+function hardness(hardness: 'HARD' | 'SOFT', id: string) {
+  return { id, hardness } as never;
+}
+function verdict(id: string, status: string) {
+  return { constraintId: id, status };
+}
+
+test('genericity: remainder viability follows current consequences, not a sticky aggregate', () => {
+  const hard = hardness('HARD', 'c-hard');
+  const soft = hardness('SOFT', 'c-soft');
+  const both = [hard, soft];
+
+  // An unresolved hard failure always wins.
+  assert.equal(
+    deriveRemainderViability(both, [verdict('c-hard', 'FAIL'), verdict('c-soft', 'PASS')], 'DISRUPTED', false),
+    'NOT_VIABLE',
+  );
+  // Nothing has closed this disruption, so the aggregate is still a live hard
+  // consequence: a declined recovery must never read as workable.
+  assert.equal(deriveRemainderViability(both, [verdict('c-hard', 'PASS')], 'DISRUPTED', false), 'NOT_VIABLE');
+  // Once a verified resolution exists, the live evaluations decide the remainder.
+  assert.equal(deriveRemainderViability(both, [verdict('c-hard', 'PASS')], 'DISRUPTED', true), 'VIABLE');
+  assert.equal(
+    deriveRemainderViability(both, [verdict('c-hard', 'PASS'), verdict('c-soft', 'FAIL')], 'DISRUPTED', true),
+    'AT_RISK',
+    'a soft residual consequence stays visible as risk, never as broken',
+  );
+  // Uncertainty is never presented as workable.
+  assert.equal(
+    deriveRemainderViability(both, [verdict('c-hard', 'UNKNOWN'), verdict('c-soft', 'PASS')], 'RECOVERING', true),
+    'UNKNOWN',
+  );
+  assert.equal(deriveRemainderViability(both, [verdict('c-hard', 'PASS')], 'AT_RISK', false), 'AT_RISK');
 });
