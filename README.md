@@ -155,6 +155,8 @@ Read [Architecture](docs/ARCHITECTURE.md),
 [Build with Qoder](docs/BUILD_WITH_QODER.md), and
 [Motion design](docs/MOTION_DESIGN.md) for the technical detail.
 
+Historical development documentation is preserved under `docs/archive/2026-08-30/`.
+
 Built for the Atlas × Alibaba Cloud Agentic AI Hackathon with Qoder as the primary
 agentic-development environment.
 

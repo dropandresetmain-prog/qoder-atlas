@@ -40,10 +40,6 @@ logs/
 .codex/worktrees/
 .review-worktrees/
 
-# Local historical-document preservation; the public repository keeps only the
-# consolidated documentation set.
-docs/archive/
-
 # OS / editors
 .DS_Store
 Thumbs.db
