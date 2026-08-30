@@ -62,10 +62,23 @@ async function postJson(base: string, path: string, body: unknown): Promise<{ st
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 
+/**
+ * Judge user-visible copy only. Inline scripts, styles, comments and tag
+ * attributes are machine-readable DOM state, not what an operator reads, so
+ * scanning raw HTML would fail on things like a client-side function
+ * parameter named `caseId`. Same convention as
+ * test/wave3r-dr8-projection-truth.test.ts.
+ */
 function assertNoJargon(html: string, surface: string): void {
-  const lowered = html.toLowerCase();
+  const visible = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
   for (const term of FORBIDDEN_UI_TERMS) {
-    assert.ok(!lowered.includes(term), `jargon "${term}" leaked on ${surface}`);
+    assert.ok(!visible.includes(term), `jargon "${term}" leaked on ${surface}`);
   }
 }
 
