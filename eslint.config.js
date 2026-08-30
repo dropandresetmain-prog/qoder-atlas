@@ -18,6 +18,9 @@ export default tseslint.config(
       '.claude/**',
       '.codex/**',
       '.review-worktrees/**',
+      // Browser-only motion-source programs are independently runnable static
+      // artifacts, not Node application modules.
+      'video-production/**',
     ],
   },
   js.configs.recommended,
@@ -48,6 +51,7 @@ export default tseslint.config(
       globals: {
         console: 'readonly',
         document: 'readonly',
+        window: 'readonly',
         fetch: 'readonly',
         process: 'readonly',
         setTimeout: 'readonly',

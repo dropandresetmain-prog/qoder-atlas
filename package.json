@@ -2,7 +2,7 @@
   "name": "qoder-atlas",
   "version": "0.1.0",
   "private": true,
-  "description": "AI Trip Recovery / Resolution Layer — Atlas × Alibaba Cloud hackathon build",
+  "description": "Northstar — AI Travel Resolution Engine for the Atlas × Alibaba Cloud hackathon",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -14,7 +14,7 @@
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts",
+    "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts --manifest fixtures/acceptance/manifests/s1-airline-schedule-change.json",
     "acceptance:run": "node --experimental-strip-types scripts/acceptance-run.ts",
     "acceptance:secret-scan": "node scripts/wave3r-recording-secret-scan.mjs",
     "gate:anti-hardcoding": "node scripts/anti-hardcoding-gate.mjs"

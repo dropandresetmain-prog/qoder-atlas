@@ -1,0 +1,25 @@
+:root {
+  --ns-bg: #f2f4f5;
+  --ns-surface: #ffffff;
+  --ns-surface-2: #f8f9fa;
+  --ns-ink: #14171c;
+  --ns-paper: #f5f6f7;
+  --ns-paper-warm: #f4f0e6;
+  --ns-muted: #6b7280;
+  --ns-line: rgba(20, 23, 28, 0.13);
+  --ns-line-soft: rgba(20, 23, 28, 0.07);
+  --ns-green-t: #2f6b47;
+  --ns-green-f: #4c9a6e;
+  --ns-brass-t: #96670f;
+  --ns-brass-f: #d9a24a;
+  --ns-red-t: #c2431a;
+  --ns-red-f: #e0521f;
+  --ns-grey-f: #c6cbd2;
+  --ns-shadow-1: 0 12px 28px rgba(20, 23, 28, 0.055);
+  --ns-shadow-2: 0 28px 70px rgba(20, 23, 28, 0.09);
+  --ns-radius-lg: 22px;
+  --ns-radius-md: 16px;
+  --ns-radius-sm: 10px;
+  --ns-stage-w: 1920;
+  --ns-stage-h: 1080;
+}

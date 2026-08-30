@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NORTHSTAR · Seq 04 · One Traveller to Many</title>
+  <link rel="stylesheet" href="../shared/design-tokens.css" />
+  <link rel="stylesheet" href="../shared/typography.css" />
+  <link rel="stylesheet" href="../shared/components.css" />
+  <link rel="stylesheet" href="../shared/journey.css" />
+  <link rel="stylesheet" href="../seq03-rebooking/handoff.css" />
+  <link rel="stylesheet" href="seq04.css" />
+</head>
+<body>
+<div id="ns-viewport">
+  <div id="ns-stage">
+    <div class="ns-corner-id" id="northstar-id">NORTHSTAR · TRIP STATE</div>
+    <div class="ns-corner-id" id="stage-mode">WHOLE-TRIP VIABILITY</div>
+    <div id="hero-focus"></div>
+
+    <div id="world" class="ns-world">
+      <svg id="world-svg" class="ns-world-svg" viewBox="0 0 6200 3600" aria-hidden="true"></svg>
+      <div id="medium-layer"></div>
+      <div id="health-layer"></div>
+      <section id="supplier-card" class="ns-panel">
+        <div class="supplier-top"><span class="ns-label">SUPPLIER SIGNAL</span><span class="supplier-dot"></span></div>
+        <div class="supplier-title">AIRLINE RETIME</div>
+        <div class="supplier-foot ns-data"><span>12 AFFECTED</span><span>ONE CHANGE</span></div>
+      </section>
+      <div class="cohort-label" id="cohort-a">ARRIVAL COHORT A</div>
+      <div class="cohort-label" id="cohort-b">ARRIVAL COHORT B</div>
+      <div class="cohort-label" id="cohort-c">ARRIVAL COHORT C</div>
+    </div>
+
+    <section id="hero-readout">
+      <div class="ns-label">BOOKING SYSTEM RESULT</div>
+      <div id="booking-result"><span>REBOOKED</span><span class="tick">✓</span></div>
+      <div id="trip-result">TRIP NOT RECOVERED</div>
+      <div id="truth-rule"></div>
+      <div class="truth-meta">NORTHSTAR / downstream objective still broken</div>
+    </section>
+
+    <section id="scale-hud">
+      <div class="ns-label">PROGRAMME ARRIVALS / LIVE</div>
+      <div class="scale-count ns-data"><span id="traveller-count">72</span> TRAVELLERS</div>
+      <div class="scale-sub">One supplier change. Different downstream consequences.</div>
+    </section>
+
+    <section id="state-summary" class="ns-panel">
+      <div class="summary-row"><span class="summary-glyph green">✓</span><strong>60</strong><span>HEALTHY</span></div>
+      <div class="summary-row"><span class="summary-glyph green">✓</span><strong>5</strong><span>RECOVERED</span></div>
+      <div class="summary-row"><span class="summary-glyph brass">▲</span><strong>4</strong><span>AT RISK</span></div>
+      <div class="summary-row"><span class="summary-glyph red">✕</span><strong>3</strong><span>NOT VIABLE</span></div>
+    </section>
+
+    <div id="threshold-label"><span>PROGRAMME SCALE</span><i></i><strong>CONNECTED TRAVEL STATE</strong></div>
+  </div>
+</div>
+<script src="../shared/components.js"></script>
+<script src="../shared/camera.js"></script>
+<script src="../shared/render.js"></script>
+<script src="../shared/journey.js"></script>
+<script src="../shared/lod.js"></script>
+<script src="../seq03-rebooking/handoff.js"></script>
+<script src="seq04.js"></script>
+</body>
+</html>

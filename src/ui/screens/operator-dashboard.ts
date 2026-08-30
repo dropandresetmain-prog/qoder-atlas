@@ -19,7 +19,6 @@ import {
   compareByEarliestCommitment,
   compareRosterAttentionThenId,
   countManagedTravelBuckets,
-  fleetCellClassFor,
   fleetCellClassForRoster,
   fleetPresentationForRoster,
   requiresOperatorRecoveryAttention,

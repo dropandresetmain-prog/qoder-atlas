@@ -8,7 +8,7 @@ import type { Place, Traveller } from '../domain/entities.ts';
 import type { Engagement, Stay, TransportLeg, TripElement } from '../domain/elements.ts';
 import type { PolicyRule, RuleSet } from '../domain/rules.ts';
 import type { Trip } from '../domain/trip.ts';
-import type { ActionIntent, ExecutionResult } from '../operational/intent.ts';
+import type { ActionIntent } from '../operational/intent.ts';
 import { confirmsCandidateOperations } from '../operational/intent.ts';
 import type { RecoveryStrategy } from '../operational/strategy.ts';
 import type { RecoveryCase } from '../operational/case.ts';

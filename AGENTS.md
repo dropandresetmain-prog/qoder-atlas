@@ -14,15 +14,14 @@ Not every work package or checkpoint requires an independent Reviewer. Review is
 
 Inspect current repository state before changing code. Read the relevant sections of:
 
-1. `docs/PRODUCT_SPEC.md`
+1. `README.md`
 2. `docs/ARCHITECTURE.md`
-3. `docs/IMPLEMENTATION_PLAN.md` — execution SSOT
-4. `docs/ROADMAP.md` — scope/status SSOT
-5. `docs/DECISIONS.md`
-6. `docs/TESTING.md`
-7. `docs/AGENT_MODEL_SELECTION.md`
-8. `.qoder/rules/environment-recovery.md` when terminal/tool execution is involved
-9. task-specific Qoder Spec
+3. `docs/CAPABILITIES_AND_LIMITATIONS.md`
+4. `docs/ROADMAP.md`
+5. `docs/TESTING.md`
+6. `docs/BUILD_WITH_QODER.md`
+7. `.qoder/rules/environment-recovery.md` when terminal/tool execution is involved
+8. task-specific Qoder Spec
 
 For Atlas capability questions, consult the authoritative research in `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
 
@@ -216,12 +215,11 @@ Do not pad the report by repeating the implementation plan.
 ## Source-of-truth roles
 
 - verified runtime/code/tests = implemented reality;
-- `docs/PRODUCT_SPEC.md` = product requirements;
+- `README.md` = public product entry point and reproduction guide;
 - `docs/ARCHITECTURE.md` = logical architecture/invariants;
-- `docs/IMPLEMENTATION_PLAN.md` = single active execution plan and work-package status;
+- `docs/CAPABILITIES_AND_LIMITATIONS.md` = implementation and provider truth;
 - `docs/ROADMAP.md` = capability scope/status, including Stretch/Deferred;
-- `docs/DECISIONS.md` = settled architecture decisions;
 - `docs/TESTING.md` = verification taxonomy;
-- `docs/AGENT_MODEL_SELECTION.md` = routing guidance.
+- `docs/BUILD_WITH_QODER.md` = agentic-development workflow.
 
 If code and an approved contract disagree, treat it as drift or an architecture gap to resolve; do not silently assume either side wins. When implementation intentionally changes an approved contract, update the relevant SSOT docs in the same integrated change.

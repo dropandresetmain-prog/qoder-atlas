@@ -1,0 +1,11 @@
+#world { width: 6200px; height: 3600px; }
+#world-svg { width: 6200px; height: 3600px; }
+#hero-readout { opacity: 0; }
+#booking-result { opacity: 0; }
+#trip-result { opacity: 0; }
+#truth-rule { --truth-progress: 0; opacity: 0; }
+#hero-heading { opacity: .96; }
+#world .ns-journey-node { transform-origin: center center; }
+#cascade-pulse { opacity: 0; }
+
+#hero-readout .truth-meta { opacity: 0; }

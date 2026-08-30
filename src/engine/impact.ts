@@ -252,7 +252,7 @@ export function assessDirectElementFailures(
   trip: Trip,
   ruleSets: readonly RuleSet[],
   signals: readonly TripSignal[],
-  assessedAt: IsoDateTime,
+  _assessedAt: IsoDateTime,
 ): DirectElementFailureAssessment {
   const directFailures: ElementImpact[] = [];
   const affectedElements: ElementImpact[] = [];

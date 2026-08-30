@@ -14,7 +14,6 @@ import type { ReadModelEnvelope } from '../../contracts/readmodels.ts';
 import {
   CASE_ACTIVITY_DONE_TITLE,
   CASE_ACTIVITY_TITLE,
-  CASE_AFFECTED_TITLE,
   CASE_APPROVAL_TITLE,
   CASE_AUTHORITY_COPY,
   CASE_AUTHORITY_TITLE,

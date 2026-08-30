@@ -1,92 +1,161 @@
-# AI Trip Recovery / Resolution Layer
+# Northstar
 
-Atlas × Alibaba Cloud Agentic AI Hackathon project.
+**AI Travel Resolution Engine**
 
-A trip is not a flat itinerary. It is a live network of bookings, objectives, policies, constraints, people and dependencies. When reality changes, this system determines what else becomes invalid, finds whole-trip recovery strategies, checks authority, executes permitted actions, observes the result and continues until the trip is viable again or explicitly escalated.
+Northstar maintains a Live Dependency Graph of a traveller's journey, objectives,
+constraints and shared context. When a flight, hotel, programme or traveller
+instruction changes, it works out what is actually at risk, proposes a recovery,
+checks it deterministically, obtains the required authority, executes only what is
+permitted, and reconciles the observed result.
 
 > A replacement flight is not necessarily a recovered trip.
 
-## Product thesis
+## The Live Dependency Graph
 
-Traditional travel search answers “what flight or hotel can I book?” A competent travel agent can often resolve a single disruption manually. A general chatbot can reason conversationally but does not maintain authoritative operational state or safely execute consequential actions.
+Northstar's graph is a persistent domain/state model, not a graph database. SQLite
+stores typed aggregates; explicit relationships and typed fields express the
+dependencies that matter operationally.
 
-This product is a **trip-resolution layer** above travel providers. The graph/state model is central; chat is only one interface.
+```text
+Organisation ── policy / authority ──┐
+Traveller ── preferences ── Trip ── Transport · Stay · Engagement
+                                    │                 │
+AnchorEvent ── shared commitments ──┴── objectives / constraints / sources
+```
 
-Core loop:
+The demo seeds programme and scenario fixtures through the same validated mutation
+path used at runtime. It includes provider-shaped flight and hotel observations,
+programme commitments, traveller instructions, policy, sourced transfer context,
+and—where a case needs it—dated FX evidence. Those facts are clearly marked as
+REPLAY, fixture, manually supplied, or model-extracted. It does not pretend that
+every source is live.
 
-`change -> state update -> blast radius -> recovery strategies -> deterministic viability -> authority -> action -> observation -> resolved state`
+A production deployment would additionally connect airline/TMC feeds, booking and
+servicing systems, hotel and ground-transport suppliers, calendars/event systems,
+traveller and policy systems, expense/FX sources, and approved authoritative entry
+sources. Those are future integration directions, not current product claims. See
+[the architecture](docs/ARCHITECTURE.md) for the exact boundary.
 
-## Intended users
+## How resolution works
 
-One engine supports multiple B2B2C operators:
+```text
+change → state update → dependency propagation → blast radius → recovery strategies
+       → deterministic viability → policy + authority → execution → observation
+       → state reconciliation
+```
 
-- TMC servicing teams
-- corporate HR / travel teams / EAs
-- event organisers managing invited travellers
-- group travel leaders
-- future direct corporate or traveller products
+Candidate strategies are scenario overlays: proposed mutations evaluated against the
+authoritative state. A candidate never becomes truth merely because a model proposed
+it. Only an observed successful action updates the trip.
 
-Differences should primarily be policy, permissions, approvals, scale and UI, not separate recovery engines.
+## Architecture and safety
 
-## Hackathon architecture
+AI can interpret supplied unstructured inputs, identify uncertainty, extract into
+schemas, reason about consequences, infer soft preferences, and generate or compare
+strategies. Deterministic code owns validation, time and currency arithmetic,
+constraint evaluation, propagation, policy thresholds, permissions, viability and
+state transitions.
 
-The system combines:
+```text
+AI proposal → validation → deterministic viability → authority → executor
+            → observation → state mutation
+```
 
-- a persistent trip dependency / viability graph
-- deterministic constraint and blast-radius evaluation
-- Alibaba Cloud Model Studio/Qwen for extraction, semantic interpretation and recovery planning
-- Atlas direct APIs as the hackathon flight capability adapter
-- Google Routes for dynamic local transport context when configured
-- generic webpage/document/email/manual ingestion
-- deterministic authority and execution guardrails
-- SQLite persistence
-- LIVE / RECORD / REPLAY external adapters where practical
+No LLM directly invokes an irreversible or money-moving action.
 
-## Atlas source of truth
+## What the demo exercises
 
-Atlas capability research lives in the separate repository `dropandresetmain-prog/atlas-hackathon-lab`.
+- Supplier disruption and missed-connection recovery, including multi-step overnight
+  recovery and authority stops.
+- Traveller-requested flight, hotel, origin and shared-travel changes.
+- Organiser programme changes fanned out to linked traveller commitments.
+- Policy, approval, funding and FX-normalisation paths.
 
-Use these documents as authoritative when deciding what Atlas supports:
+The named hero workflows are driven by acceptance manifests through real application
+endpoints; the demo UI exposes them in the operator panel. The fixtures deliberately
+include both provider-shaped recordings and seeded context so the demo is reliable
+without credentials.
 
-- `docs/ATLAS_FINAL_CAPABILITY_REPORT.md`
-- `docs/ATLAS_CAPABILITY_MATRIX.md`
-- `docs/SKILL_VS_API.md`
-- `docs/SANDBOX_COVERAGE_MATRIX.md` only for fixture coverage
+## Technology and provider inventory
 
-Do not infer production market behaviour from sandbox data.
+| Area | Current implementation | Important boundary |
+|---|---|---|
+| Runtime | TypeScript, Node.js ≥24, Node HTTP server, Zod | Single package; no web framework. |
+| Persistence | SQLite behind repositories | A persistent volume is required when deployed. |
+| AI | Alibaba Cloud Model Studio / Qwen | LIVE when configured; schema-gated fallback in default REPLAY. |
+| Flights | Atlas adapter | Sandbox-constrained transactions; provider-neutral domain. |
+| Hotels | Nuitée / liteAPI adapter | Date changes are cancel-and-rebook, not in-place modification. |
+| Ground context | Google Routes adapter | Optional; safely falls back to sourced/deterministic context. |
+| FX | Frankfurter / ECB reference rates | Evidence for comparison, not a payment FX service. |
+| Deployment | Railway configuration | Operational deployment evidence, not a product integration. |
 
-## Status
+Atlas search, verification, fare rules, order lifecycle and supported cancellation
+flows have provider seams and sanitized recordings. The shipped demo defaults to
+REPLAY. Refund execution remains unsupported/simulated by the sandbox. Nuitée covers
+search, quote/prebook, booking, retrieval, stay context and cancellation. Google
+Routes is wired but its live query path remains incomplete. Full statuses and
+limitations are in [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md).
 
-**Checkpoint A/B/C accepted. Checkpoint C (`3b2f0da`, generalisation + reliability + demo-ready runtime flow) passed Review Gate C after its review-fix set and is the accepted demo candidate / baseline. Reality Validation (externally sourced inputs) is the next milestone; final candidate preparation has not started.**
+## LIVE / RECORD / REPLAY
 
-What exists today:
+Northstar uses one provider-normalisation path in every mode:
 
-- runnable TypeScript/Node ≥ 24 application (starts with zero credentials in REPLAY mode)
-- full vertical recovery loop: ingestion → persistent trip graph → signal/impact → planner/capabilities/deterministic viability → authority → execution → observation → verification (`src/engine/`, `src/app/`, `src/intelligence/`)
-- two materially different scenarios through the same application code: anchor-event/organiser (`fixtures/scenarios/anchor-event-speaker`) and corporate TMC (`fixtures/scenarios/corporate-tmc`), plus selected robustness cases (hotel no-show cutoff, transit cutoff with on-demand taxi, accessibility, already-lost objective)
-- deterministic runtime recovery/reset flow over HTTP: `POST /api/runtime/{disruption,plan,begin,decide,execute,reset}` + `GET /api/runtime/state` (scenario-neutral; every stage takes a caller-supplied instant; reset reseed is audited and transactional — no manual database surgery)
-- SQLite persistence behind repository interfaces; LIVE/RECORD/REPLAY external adapters sharing one normalizer
-- credential-free recovery planning: Model Studio planner is used only when configured; otherwise a deterministic fallback planner produces strategies from replayed capability results
+- **LIVE:** provider call → normalization → Northstar.
+- **RECORD:** provider call → sanitized provider-shaped recording → same normalization → Northstar.
+- **REPLAY:** recording → same normalization → same engine.
 
-## Integration truth (LIVE / REPLAY / simulated)
+REPLAY is not a fake second implementation. It makes the submitted demo
+reproducible, credential-free and resilient to provider downtime while retaining
+real provider shapes at the system boundary.
 
-- **Atlas flight search**: LIVE-developed against the sandbox environment; the shipped default demo path replays sanitized, provider-shaped recordings through the same normalizer (REPLAY). Recordings are hash-keyed by `provider|operation|request`.
-- **Atlas order execution**: the execution boundary applies deterministic authority and guardrails, but order effects are **simulated at the provider boundary** (recorded/synthetic provider effects fed through the real observation/verification pipeline). Real `order.do` execution is stretch scope.
-- **Alibaba Cloud Model Studio**: structured extraction/planning when credentials are configured (LIVE); otherwise the deterministic fallback planner is used. The replay path never requires Model Studio credentials.
-- **Google Routes**: optional dynamic ground-context adapter; absent or unconfigured, ground legs use sourced/unknown fallbacks and never block recovery.
+## Run locally
 
-See [PRODUCT_SPEC](docs/PRODUCT_SPEC.md), [ARCHITECTURE](docs/ARCHITECTURE.md), [IMPLEMENTATION_PLAN](docs/IMPLEMENTATION_PLAN.md), [DEMO](docs/DEMO.md), and [ROADMAP](docs/ROADMAP.md).
-
-## Quickstart
+Requires Node.js 24 or later.
 
 ```bash
 npm install
-npm test          # contract + foundation + scenario tests
-npm run typecheck # tsc, no emit
-npm run lint      # eslint
-npm run build     # tsc -> dist/
-npm run dev       # run src/main.ts directly (Node type stripping)
-npm start         # run compiled dist/main.js (after build)
+npm run dev
 ```
 
-Configuration is optional; see `.env.example` and `docs/ENVIRONMENT.md`. The default mode is `REPLAY` with no external credentials required.
+The default configuration is `REPLAY`, with a local SQLite database and no provider
+credentials required. Open `http://localhost:8787`. The operator surface includes
+the demo workflow controls; traveller, programme and decisions views are linked from
+the application. `npm run build` followed by `npm start` runs the compiled build.
+
+Optional configuration is documented in [Environment](docs/ENVIRONMENT.md). Do not
+commit `.env` files or provider credentials.
+
+## Test and verify
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm run gate:anti-hardcoding
+npm run acceptance:preflight
+npm run acceptance:secret-scan
+```
+
+Tests cover contracts, deterministic evaluators, persistence, provider adapters,
+REPLAY normalization, scenarios and integrated recovery paths. See
+[Testing](docs/TESTING.md).
+
+## Repository guide
+
+- `src/domain`, `src/engine` — the model, graph semantics and deterministic recovery core.
+- `src/providers` — provider-specific adapters and recording support.
+- `src/intelligence` — schema-bound Model Studio/Qwen integration and fallback planning.
+- `src/app`, `src/server`, `src/ui` — orchestration and operator/traveller interfaces.
+- `fixtures` — versioned scenarios and sanitized provider recordings.
+- `video-production` — runnable browser-generated motion source, not rendered media.
+
+Read [Architecture](docs/ARCHITECTURE.md),
+[Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md),
+[Build with Qoder](docs/BUILD_WITH_QODER.md), and
+[Motion design](docs/MOTION_DESIGN.md) for the technical detail.
+
+Built for the Atlas × Alibaba Cloud Agentic AI Hackathon with Qoder as the primary
+agentic-development environment.
+
+> A booking gets you a ticket. Northstar gets you there.

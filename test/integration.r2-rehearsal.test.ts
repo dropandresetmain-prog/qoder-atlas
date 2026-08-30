@@ -91,13 +91,6 @@ async function continueManifest(
   assert.equal(failed.length, 0, `${manifestPath} from ${startAtStepId}: ${JSON.stringify(failed)}`);
 }
 
-async function caseBinding(base: string, tripId: string): Promise<{ caseId: string }> {
-  const eventId = resolvePopulatedDemoAnchorEventId();
-  const row = tripRow(await operatorDashboard(base, eventId), tripId);
-  assert.ok(row?.activeCaseId, `no active case for ${tripId}`);
-  return { caseId: row.activeCaseId };
-}
-
 async function authorityBindings(base: string, tripId: string): Promise<{ caseId: string; intentId: string }> {
   const eventId = resolvePopulatedDemoAnchorEventId();
   const row = tripRow(await operatorDashboard(base, eventId), tripId);
