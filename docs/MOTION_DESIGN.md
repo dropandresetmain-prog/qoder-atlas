@@ -2,7 +2,7 @@
 
 Northstar's system-world film sequences are browser programs: HTML, CSS, SVG and
 JavaScript visualise graph state, propagation and authority with deterministic timing.
-The source lives in `video-production/`; rendered media is intentionally not committed.
+The source lives in `media/`; rendered output is intentionally not committed.
 
 ## Why browser source
 
@@ -20,7 +20,7 @@ runnable rather than becoming orphaned HTML files.
 ## View and capture
 
 Open a sequence `index.html` in a modern browser, for example
-`video-production/seq06-live-dependency-graph/index.html`. The capture source uses
+`media/seq06-live-dependency-graph/index.html`. The capture source uses
 Playwright, Python Playwright/Chromium and FFmpeg to render deterministic timestamps
 and encode media. It inlines local source for capture and makes no network call.
 

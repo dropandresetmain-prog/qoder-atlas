@@ -20,7 +20,7 @@ export default tseslint.config(
       '.review-worktrees/**',
       // Browser-only motion-source programs are independently runnable static
       // artifacts, not Node application modules.
-      'video-production/**',
+      'media/**',
     ],
   },
   js.configs.recommended,

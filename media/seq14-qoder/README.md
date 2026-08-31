@@ -9,12 +9,12 @@ Open `index.html` in a browser. The logical stage is always 1920×1080; normal b
 ## Deterministic render
 
 ```bash
-python video-production/shared/capture.py \
-  --html video-production/seq14-qoder/index.html \
-  --out video-production/seq14-qoder/render/seq14-qoder.mp4 \
+python media/shared/capture.py \
+  --html media/seq14-qoder/index.html \
+  --out media/seq14-qoder/render/seq14-qoder.mp4 \
   --duration 8 --fps 30 \
   --stills 0.8,2.8,4.75,6.65,7.70 \
-  --stills-dir video-production/seq14-qoder/render/stills
+  --stills-dir media/seq14-qoder/render/stills
 ```
 
 The capture harness directly sets sequence timestamps before every frame, then encodes the 240 deterministic browser frames with FFmpeg.

@@ -21,11 +21,14 @@ coverage/
 *.sqlite3
 *.sqlite-wal
 *.sqlite-shm
-data/
 
-# Provider recordings and local runtime data
+# Local runtime state (the committed demo input pack under data/ stays tracked)
+/data/app.sqlite*
+/data/local/
+/data/ui-preview/
+
+# Provider recordings
 recordings/private/
-data/local/
 /output/
 logs/
 *.log
@@ -40,6 +43,10 @@ logs/
 .claude/worktrees/
 .codex/worktrees/
 .review-worktrees/
+
+# Superseded internal reports — kept locally, not published
+/DR7_IMPLEMENTATION.md
+/PROVIDER_WIRING_REPORT.md
 
 # OS / editors
 .DS_Store
