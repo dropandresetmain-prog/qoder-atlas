@@ -171,7 +171,7 @@ async function chainPresentationForCase(
         constraints,
         evaluations,
         input.trip.viability,
-        input.recoveryCase?.resolution !== undefined,
+        isVerifiedRepair(input.recoveryCase),
       ) === 'NOT_VIABLE',
     hardConstraintFailed,
     recoveryCommitmentId: selectRecoveryCommitment(input.trip, input.recoveryCase)?.id,
@@ -437,6 +437,21 @@ export function deriveRemainderViability(
   return 'VIABLE';
 }
 
+/**
+ * Does this case's resolution represent a verified repair of the disruption?
+ *
+ * An operator hand-off records `ESCALATED_CLOSED` to close the case without
+ * repairing anything. That is an honest terminal workflow state, but it leaves
+ * the traveller's journey unresolved, so it must not retire a `DISRUPTED`
+ * aggregate the way an observed, verified recovery does.
+ */
+export function isVerifiedRepair(
+  recoveryCase: Pick<RecoveryCase, 'resolution'> | undefined,
+): boolean {
+  const outcome = recoveryCase?.resolution?.outcome;
+  return outcome !== undefined && outcome !== 'ESCALATED_CLOSED';
+}
+
 /** Provider payable for queues/CTAs — never substitute home-policy restatement. */
 export function intentPayableAmount(intent: {
   providerSpend?: { amount: number; currency: string };
@@ -556,7 +571,7 @@ export async function projectOperatorDashboard(
       constraints,
       evaluations,
       trip.viability,
-      recoveryCase?.resolution !== undefined,
+      isVerifiedRepair(recoveryCase),
     );
 
     let travellerResponseStatus: OperatorTripView['travellerResponseStatus'] = 'NOT_REQUIRED';
@@ -1214,7 +1229,7 @@ export async function projectTravellerTrip(
     constraints,
     evaluations,
     trip.viability,
-    recoveryCase?.resolution !== undefined,
+    isVerifiedRepair(recoveryCase),
   );
 
   return {

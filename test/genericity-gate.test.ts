@@ -25,7 +25,7 @@ import { join, resolve } from 'node:path';
 
 import { AppConfigSchema } from '../src/config/config.ts';
 import { composeAppRuntime } from '../src/app/compose.ts';
-import { deriveRemainderViability } from '../src/app/readmodels.ts';
+import { deriveRemainderViability, isVerifiedRepair } from '../src/app/readmodels.ts';
 import { loadScenario } from '../src/scenarios/loader.ts';
 
 const REPO_FIXTURES = resolve('fixtures');
@@ -160,4 +160,31 @@ test('genericity: remainder viability follows current consequences, not a sticky
     'UNKNOWN',
   );
   assert.equal(deriveRemainderViability(both, [verdict('c-hard', 'PASS')], 'AT_RISK', false), 'AT_RISK');
+});
+
+test('genericity: an operator hand-off is not a verified repair', () => {
+  const resolution = (outcome: 'FULLY_RECOVERED' | 'RECOVERED_WITH_LOSS' | 'ESCALATED_CLOSED') =>
+    ({ resolution: { outcome, resolvedAt: AT, remainingLossRefs: [] } });
+
+  assert.equal(isVerifiedRepair(undefined), false, 'no case is not a repair');
+  assert.equal(
+    isVerifiedRepair(resolution('ESCALATED_CLOSED')),
+    false,
+    'hand-off closes the case without repairing the trip',
+  );
+  assert.equal(isVerifiedRepair(resolution('FULLY_RECOVERED')), true);
+  assert.equal(isVerifiedRepair(resolution('RECOVERED_WITH_LOSS')), true);
+
+  // Consequence: a disrupted, handed-off trip must not read as workable even
+  // though its constraints now recompute as passing.
+  const hard = hardness('HARD', 'c-hard');
+  assert.equal(
+    deriveRemainderViability(
+      [hard],
+      [verdict('c-hard', 'PASS')],
+      'DISRUPTED',
+      isVerifiedRepair(resolution('ESCALATED_CLOSED')),
+    ),
+    'NOT_VIABLE',
+  );
 });
