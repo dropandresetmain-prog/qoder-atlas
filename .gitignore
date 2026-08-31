@@ -54,6 +54,9 @@ logs/
 # One-shot development/probe scripts — kept locally, not published
 /scripts/archive/
 
+# License draft — this repo is private and intentionally publishes no license
+/LICENSE
+
 # OS / editors
 .DS_Store
 Thumbs.db
