@@ -2,6 +2,7 @@
   "name": "qoder-atlas",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Northstar — AI Travel Resolution Engine for the Atlas × Alibaba Cloud hackathon",
   "type": "module",
   "engines": {
@@ -11,7 +12,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "dev": "node src/main.ts",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts --manifest fixtures/acceptance/manifests/s1-airline-schedule-change.json",

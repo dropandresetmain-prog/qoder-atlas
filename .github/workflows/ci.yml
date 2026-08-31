@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # The authoritative full-suite run is serial (see docs/TESTING.md), so the
+    # test step is the long pole; this only guards against a hung browser.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # The e2e suite drives a real Chromium against the in-process server.
+      # `npm ci` installs the playwright library but not its browser build.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run gate:anti-hardcoding
+
+      - run: npm run acceptance:secret-scan
