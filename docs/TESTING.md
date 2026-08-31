@@ -14,6 +14,16 @@ Verification is **cumulative evidence**, not a ritual where every stage reruns e
 
 `docs/IMPLEMENTATION_PLAN.md` assigns these test IDs to work packages. Model selection for implementation/review remains owned by `docs/AGENT_MODEL_SELECTION.md`; this document defines **when and what to review**, not which model must do it.
 
+## Full-suite runner
+
+The authoritative full local regression run is:
+
+```
+node --test --test-concurrency=1
+```
+
+Unconstrained parallel execution starts every test file at once and can exhaust local browser/test-process resources, producing whole-file crashes even though the affected files pass when run on their own. Report that condition as test-runner resource contention, and rerun serially before drawing any conclusion; it is not evidence that assertions are unreliable. Assertion failures are never classified as flakiness.
+
 ## Test IDs
 
 ### T-DOM — Domain/schema contracts
