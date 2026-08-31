@@ -594,7 +594,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
         '<button type="button" class="btn btn-primary" data-programme-change-commit hidden data-test="programme-change-commit">Commit programme change</button>' +
         '<button type="button" class="btn btn-ghost" data-programme-change-cancel>Cancel</button>' +
       '</div>' +
-      '<p class="footnote">No programme mutation until you commit.</p>';
+      '<p class="footnote">No programme changes are saved until you commit.</p>';
 
     document.body.appendChild(scrim);
     document.body.appendChild(modal);
@@ -730,7 +730,7 @@ export function renderProgrammeChangeEnhancementScript(): string {
     }
 
     // One-click confirm: the reviewed preview is the decision — commit runs
-    // immediately and the real mutation/audit path executes unchanged.
+    // immediately through the same server-side apply and audit path.
     commitButton.addEventListener('click', runCommit);
   }
 

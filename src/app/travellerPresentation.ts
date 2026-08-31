@@ -32,6 +32,8 @@ export interface PresentationDeps {
   verdictFor: (strategyId: string) => { feasible: boolean } | undefined;
   bestStrategyId?: string;
   signals?: readonly TripSignal[];
+  /** Configured world imagery; absent when the world defines no hero image. */
+  heroImage?: { url: string; alt: string };
 }
 
 function clock(iso: IsoDateTime): string | undefined {
@@ -208,8 +210,9 @@ export async function projectTravellerPresentation(
     ...(event ? { eventName: event.name } : {}),
     ...(traveller ? { travellerName: traveller.name } : {}),
     ...(commitmentCard ? { commitmentCard } : {}),
-    heroImageUrl: '/assets/sg-dusk.png',
-    heroImageAlt: 'Singapore city skyline at dusk',
+    ...(deps.heroImage
+      ? { heroImageUrl: deps.heroImage.url, heroImageAlt: deps.heroImage.alt }
+      : {}),
     ...(itinerary.length > 0
       ? {
           itineraryHeading: recoveryCase ? 'What changed' : 'Your trip',

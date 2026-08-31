@@ -161,7 +161,8 @@ function renderOperatorTopbar(options: PageOptions): string {
  * scenario vocabulary.
  */
 function renderProfileMenu(initials: string, resetAction: string | undefined, eventName?: string): string {
-  const roleLine = `Travel Coordinator · ${eventName?.trim() || 'AI In Travel Summit'}`;
+  const eventLabel = eventName?.trim() ?? '';
+  const roleLine = eventLabel ? `Travel Coordinator · ${eventLabel}` : 'Travel Coordinator';
   const resetForm = resetAction
     ? `
       <form class="pm-reset" method="post" action="${escapeHtml(resetAction)}" data-test="profile-reset-form">
@@ -169,11 +170,10 @@ function renderProfileMenu(initials: string, resetAction: string | undefined, ev
       </form>`
     : '';
   return `<details class="profile-menu" data-test="profile-menu">
-  <summary class="profile-toggle" aria-label="Profile: Anthony, Travel Coordinator" data-test="profile-menu-toggle"><span class="avatar-circle">${escapeHtml(initials)}</span><span class="avatar-meta"><span class="am-name">Anthony</span><span class="am-role">${escapeHtml(roleLine)}</span></span></summary>
+  <summary class="profile-toggle" aria-label="Profile: ${escapeHtml(initials)}, Travel Coordinator" data-test="profile-menu-toggle"><span class="avatar-circle">${escapeHtml(initials)}</span><span class="avatar-meta"><span class="am-name">${escapeHtml(initials)}</span><span class="am-role">${escapeHtml(roleLine)}</span></span></summary>
   <div class="profile-pop" role="menu" aria-label="Profile">
-    <p class="pm-name">Anthony</p>
     <p class="pm-role">Travel Coordinator</p>
-    <p class="pm-event">${escapeHtml(eventName?.trim() || 'AI In Travel Summit')}</p>${resetForm}
+    ${eventLabel ? `<p class="pm-event">${escapeHtml(eventLabel)}</p>` : ''}${resetForm}
   </div>
 </details>`;
 }

@@ -26,6 +26,7 @@ data/
 # Provider recordings and local runtime data
 recordings/private/
 data/local/
+/output/
 logs/
 *.log
 

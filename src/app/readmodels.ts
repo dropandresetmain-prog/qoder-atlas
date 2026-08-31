@@ -83,6 +83,8 @@ export interface ReadModelDependencies {
   cases: CaseRepository;
   audit: AuditRepository;
   viability: ViabilityEngine;
+  /** World-supplied proposal defaults keyed by commitment id; empty when unset. */
+  programmeChangePresets?: Record<string, { startsAt: string; endsAt: string }>;
 }
 
 function changeTargetFromSignal(signal: TripSignal | undefined) {
@@ -164,7 +166,13 @@ async function chainPresentationForCase(
   );
   return buildChainPresentationContext({
     recoveryCase: input.recoveryCase,
-    tripNotViable: deriveRemainderViability(constraints, evaluations, input.trip.viability) === 'NOT_VIABLE',
+    tripNotViable:
+      deriveRemainderViability(
+        constraints,
+        evaluations,
+        input.trip.viability,
+        isVerifiedRepair(input.recoveryCase),
+      ) === 'NOT_VIABLE',
     hardConstraintFailed,
     recoveryCommitmentId: selectRecoveryCommitment(input.trip, input.recoveryCase)?.id,
     substitutionTargetIds: resolveSubstitutionTargetIds({
@@ -389,13 +397,24 @@ async function currentConstraintEvaluations(deps: ReadModelDependencies, trip: T
 }
 
 /**
- * Propagated whole-trip viability from constraint evaluations.
+ * Remaining-journey viability for the traveller: is what is left of the trip
+ * still workable, given consequences that are unresolved right now?
+ *
+ * `tripViability` is a whole-trip aggregate, so it is only a current fact while
+ * nothing has closed the disruption it reports. `hasVerifiedResolution` says
+ * whether an observed, verified resolution exists for the trip's case: once it
+ * does, `DISRUPTED` is a historical record and the live constraint evaluations
+ * decide the remainder. Without one, `DISRUPTED` still stands as an unresolved
+ * hard consequence — a declined recovery never executed anything, so the
+ * traveller's journey remains broken even though no constraint re-fails.
+ *
  * Independent of open-case workflow status (DISRUPTED case ≠ failed commitment).
  */
 export function deriveRemainderViability(
   constraints: readonly Constraint[],
   evaluations: readonly { constraintId: string; status: string }[],
   tripViability: Trip['viability'],
+  hasVerifiedResolution: boolean,
 ): RemainderViability {
   const hardById = new Map<string, Constraint['hardness']>();
   for (const constraint of constraints) {
@@ -404,19 +423,33 @@ export function deriveRemainderViability(
   if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'FAIL')) {
     return 'NOT_VIABLE';
   }
-  // A trip already reconciled as DISRUPTED carries a direct viability failure
-  // (e.g. an impossible connection) even before a hard constraint re-fails on
-  // this snapshot. It must not present as workable.
-  if (tripViability === 'DISRUPTED') {
+  if (tripViability === 'DISRUPTED' && !hasVerifiedResolution) {
     return 'NOT_VIABLE';
   }
   if (evaluations.some((e) => hardById.get(e.constraintId) === 'HARD' && e.status === 'UNKNOWN')) {
     return 'UNKNOWN';
   }
+  // Only SOFT failures can remain at this point: a consequence the traveller can
+  // still travel through, but which must stay visible as risk.
   if (evaluations.some((e) => e.status === 'FAIL') || tripViability === 'AT_RISK') {
     return 'AT_RISK';
   }
   return 'VIABLE';
+}
+
+/**
+ * Does this case's resolution represent a verified repair of the disruption?
+ *
+ * An operator hand-off records `ESCALATED_CLOSED` to close the case without
+ * repairing anything. That is an honest terminal workflow state, but it leaves
+ * the traveller's journey unresolved, so it must not retire a `DISRUPTED`
+ * aggregate the way an observed, verified recovery does.
+ */
+export function isVerifiedRepair(
+  recoveryCase: Pick<RecoveryCase, 'resolution'> | undefined,
+): boolean {
+  const outcome = recoveryCase?.resolution?.outcome;
+  return outcome !== undefined && outcome !== 'ESCALATED_CLOSED';
 }
 
 /** Provider payable for queues/CTAs — never substitute home-policy restatement. */
@@ -534,7 +567,12 @@ export async function projectOperatorDashboard(
 
     // Traveller-specific consequence for shared-incident differentiation.
     const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, generatedAt);
-    const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
+    const remainderViable = deriveRemainderViability(
+      constraints,
+      evaluations,
+      trip.viability,
+      isVerifiedRepair(recoveryCase),
+    );
 
     let travellerResponseStatus: OperatorTripView['travellerResponseStatus'] = 'NOT_REQUIRED';
     if (recoveryCase) {
@@ -574,19 +612,13 @@ export async function projectOperatorDashboard(
     });
   }
 
-  // Participant roster = Northstar-managed + local/self-managed only.
-  // Orphan/unspecified trips must not inflate the 67-participant hero truth.
-  const participantTrips = trips.filter(
-    (row) =>
-      row.travellerNames.length > 0 &&
-      (row.travelArrangement === 'NORTHSTAR_ARRANGED' ||
-        row.travelArrangement === 'SELF_OR_OTHER_ARRANGED'),
-  );
-
+  // `trips` is the complete operator projection: a trip never disappears just
+  // because its travellers declare no travel arrangement. Arrangement-specific
+  // participant totals are the `arrangementCounts` job below.
   return {
     generatedAt,
     summary,
-    trips: participantTrips,
+    trips,
     arrangementCounts: {
       ...arrangementCounts,
       total: arrangementCounts.northstarArranged + arrangementCounts.selfOrOtherArranged,
@@ -1035,16 +1067,8 @@ export async function projectCaseDetail(
   const caseStatus = statusFromCase(recoveryCase.status, isChangeRequest);
   const recoveryCommitment = selectRecoveryCommitment(trip, recoveryCase);
   const programmeChangeCommitmentId = recoveryCommitment?.data.anchorCommitmentId;
-  // Fixture-keyed programme proposal presets (commitment entity ids from the
-  // closed demo world). Presentation only — not person-specific branches.
-  const PROGRAMME_CHANGE_PRESETS: Record<string, { startsAt: string; endsAt: string }> = {
-    'cmt-ait-d1-headline-interview': {
-      startsAt: '2026-10-01T15:30:00+08:00',
-      endsAt: '2026-10-01T16:00:00+08:00',
-    },
-  };
   const programmePreset = programmeChangeCommitmentId
-    ? PROGRAMME_CHANGE_PRESETS[programmeChangeCommitmentId]
+    ? deps.programmeChangePresets?.[programmeChangeCommitmentId]
     : undefined;
   const hardConstraintFailed = evaluations.some((evaluation) => {
     const constraint = constraints.find((candidate) => candidate.id === evaluation.constraintId);
@@ -1201,7 +1225,12 @@ export async function projectTravellerTrip(
 
   // Remainder viability: deterministic from current constraint evaluations.
   const { constraints, evaluations } = await currentConstraintEvaluations(deps, trip, at);
-  const remainderViable = deriveRemainderViability(constraints, evaluations, trip.viability);
+  const remainderViable = deriveRemainderViability(
+    constraints,
+    evaluations,
+    trip.viability,
+    isVerifiedRepair(recoveryCase),
+  );
 
   return {
     tripId,

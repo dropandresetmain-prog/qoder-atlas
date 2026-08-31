@@ -252,24 +252,23 @@ export function presentActivityActor(actor: string, payload?: Record<string, unk
   // App/system actors are always Northstar — before keyword heuristics.
   if (trimmed === 'system' || trimmed.startsWith('app:')) return 'Northstar';
 
-  if (typeof payload?.['providerId'] === 'string') {
-    const id = String(payload['providerId']).toUpperCase();
-    if (id.includes('ZIPAIR') || id.includes('ZG')) return 'ZIPAIR';
-    if (id.includes('SCOOT') || id.includes('TR')) return 'Scoot';
-    if (id.includes('CONCORDE')) return 'Concorde Hotel Singapore';
-    if (id.includes('NUITEE') || id.includes('HOTEL')) return 'Hotel';
-    if (id.includes('ATLAS') || id.includes('FLIGHT') || id.includes('AIR')) return 'Airline';
-  }
+  // Named provider metadata is the best label available: show the carrier or
+  // property the evidence actually carries before falling back to a category.
   if (typeof payload?.['carrier'] === 'string' && String(payload['carrier']).trim()) {
     return String(payload['carrier']);
   }
   if (typeof payload?.['hotelName'] === 'string' && String(payload['hotelName']).trim()) {
     return String(payload['hotelName']);
   }
+  if (typeof payload?.['providerId'] === 'string') {
+    const id = String(payload['providerId']).toUpperCase();
+    if (id.includes('NUITEE') || id.includes('HOTEL')) return 'Hotel';
+    if (id.includes('ATLAS') || id.includes('FLIGHT') || id.includes('AIR')) return 'Airline';
+  }
 
   if (/^providers?$/i.test(trimmed)) return 'Travel provider';
   if (/^signal$/i.test(trimmed)) return 'Travel provider';
-  if (trimmed.includes('organiser') || trimmed.includes('ait')) return 'AiT organising team';
+  if (/(?:organis(?:er|ing)|event team)/i.test(trimmed)) return 'Organising team';
   if (trimmed.toLowerCase().includes('hotel')) return 'Hotel';
   if (trimmed.toLowerCase().includes('airline') || trimmed.toLowerCase().includes('flight')) return 'Airline';
   if (trimmed.toLowerCase().includes('provider')) return 'Travel provider';
@@ -365,7 +364,10 @@ export function presentDisruptedCaseSummary(input: {
   }
 
   if (commitment && bufferFail) {
-    return `${base ?? 'This trip changed.'} ${commitment} is now at risk because the new timing no longer leaves enough preparation time.`;
+    // Authored signal summaries are titles without terminal punctuation; the
+    // appended consequence must never read as one run-on sentence.
+    const lead = base && !/[.!?]$/.test(base.trimEnd()) ? `${base.trimEnd()}.` : base;
+    return `${lead ?? 'This trip changed.'} ${commitment} is now at risk because the new timing no longer leaves enough preparation time.`;
   }
 
   return base;

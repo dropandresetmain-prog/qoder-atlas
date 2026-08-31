@@ -56,6 +56,20 @@ export const AppConfigSchema = z.object({
   recordingsDir: z.string().default('recordings'),
   fixturesDir: z.string().default('fixtures'),
   /**
+   * Optional traveller-surface hero imagery. Empty means no hero image is
+   * rendered and the layout falls back to its gradient. Imagery belongs to the
+   * configured world, never to generic projection logic.
+   */
+  uiHeroImage: z.string().optional(),
+  uiHeroImageAlt: z.string().optional(),
+  /**
+   * Optional JSON object mapping a commitment id to the proposal times an
+   * organiser is expected to suggest, so one-click review starts from the
+   * world's scripted change rather than a blank form. This is a world
+   * affordance: unset or malformed means no defaults anywhere.
+   */
+  programmeChangePresets: z.string().optional(),
+  /**
    * Boot/reset world composition. `programme` seeds only programme bundles
    * plus non-harness scenarios; `full` also seeds acceptance-harness scenario
    * trips. When omitted, `demo` environment defaults to `programme`.
@@ -71,6 +85,42 @@ export const AppConfigSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
+
+export interface ProgrammeChangePreset {
+  startsAt: string;
+  endsAt: string;
+}
+
+/**
+ * Parse world-supplied proposal defaults. Never throws: a malformed value must
+ * degrade to no defaults, not fail a live projection.
+ */
+export function parseProgrammeChangePresets(
+  raw: string | undefined,
+): Record<string, ProgrammeChangePreset> {
+  if (!raw?.trim()) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+    const out: Record<string, ProgrammeChangePreset> = {};
+    for (const [commitmentId, value] of Object.entries(parsed)) {
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        typeof (value as { startsAt?: unknown }).startsAt === 'string' &&
+        typeof (value as { endsAt?: unknown }).endsAt === 'string'
+      ) {
+        out[commitmentId] = {
+          startsAt: (value as { startsAt: string }).startsAt,
+          endsAt: (value as { endsAt: string }).endsAt,
+        };
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 /** Minimal `.env` parser: KEY=VALUE lines, `#` comments, no interpolation. */
 export function parseEnvFile(content: string): Record<string, string> {
@@ -109,6 +159,9 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
     sqlitePath: optional(env.SQLITE_PATH),
     recordingsDir: optional(env.RECORDINGS_DIR),
     fixturesDir: optional(env.FIXTURES_DIR),
+    uiHeroImage: optional(env.UI_HERO_IMAGE),
+    uiHeroImageAlt: optional(env.UI_HERO_IMAGE_ALT),
+    programmeChangePresets: optional(env.DEMO_PROGRAMME_CHANGE_PRESETS),
     worldSeedMode: optional(env.WORLD_SEED_MODE),
     providers: {
       atlas: {

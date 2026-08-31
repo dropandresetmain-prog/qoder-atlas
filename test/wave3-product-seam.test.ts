@@ -62,10 +62,23 @@ async function postJson(base: string, path: string, body: unknown): Promise<{ st
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 
+/**
+ * Judge user-visible copy only. Inline scripts, styles, comments and tag
+ * attributes are machine-readable DOM state, not what an operator reads, so
+ * scanning raw HTML would fail on things like a client-side function
+ * parameter named `caseId`. Same convention as
+ * test/wave3r-dr8-projection-truth.test.ts.
+ */
 function assertNoJargon(html: string, surface: string): void {
-  const lowered = html.toLowerCase();
+  const visible = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
   for (const term of FORBIDDEN_UI_TERMS) {
-    assert.ok(!lowered.includes(term), `jargon "${term}" leaked on ${surface}`);
+    assert.ok(!visible.includes(term), `jargon "${term}" leaked on ${surface}`);
   }
 }
 
@@ -151,7 +164,18 @@ test('Wave 3 product convergence: approved UI runs on the real engine through HT
 
     // The case view now shows what a human must do (authority ran at begin).
     const casePageApproval = await getHtml(base, `/operator/cases/${caseId}`);
-    assert.ok(casePageApproval.html.includes('Approval'), 'the approval requirement is visible once authority has run');
+    assert.ok(
+      casePageApproval.html.includes('data-ui-section="primary-approval"'),
+      'the approval requirement is visible once authority has run',
+    );
+    assert.ok(
+      casePageApproval.html.includes('Traveller approval required'),
+      'the approval panel names the principal who must decide',
+    );
+    assert.ok(
+      casePageApproval.html.includes('data-approval-state="PENDING"'),
+      'the approval is presented as still awaiting a decision',
+    );
 
     // Traveller presentation (handoff items 2+3): rich options keyed by the
     // EXACT option strings the input request emits ('Approve'/'Decline').
