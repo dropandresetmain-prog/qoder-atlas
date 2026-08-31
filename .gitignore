@@ -48,6 +48,9 @@ logs/
 /DR7_IMPLEMENTATION.md
 /PROVIDER_WIRING_REPORT.md
 
+# Internal development history — kept locally, not published
+/docs/archive/
+
 # OS / editors
 .DS_Store
 Thumbs.db

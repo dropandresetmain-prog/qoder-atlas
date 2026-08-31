@@ -20,20 +20,20 @@ implementation plan.
 
 ## Relationship to other documents
 
-- `docs/FINAL_DEMO_CONTENT_SSOT.md` — **final-demo world content** (event
-  identity, venues, programme timings, population, hero cast, baseline
-  flights/hotels, scenario↔person mapping). This catalogue owns *what happens
-  over time*; the content SSOT owns *who/where/when* of the synthetic world.
-  Do not duplicate stable cast/venue facts here — reference the content SSOT.
-- `docs/DEMO.md` — demo principles, provenance label definitions, runtime demo
-  path and backup paths. Scenario definitions point here.
-- `docs/PRODUCT_SPEC.md` — product model and requirements. Cases A/B/C remain
-  frozen **engine acceptance cases** (historical proof paths); they are not the
-  current final scenario source of truth.
+- `data/ait-demo-input-pack/` — **final-demo world content** (event identity,
+  venues, programme timings, population, hero cast, baseline flights/hotels,
+  scenario↔person mapping) committed as JSON. This catalogue owns *what happens
+  over time*; the input pack owns *who/where/when* of the synthetic world.
+  Do not duplicate stable cast/venue facts here — reference the input pack.
+- Demo principles and provenance label definitions are recorded in this
+  catalogue's **Provenance** section; the runtime demo path and its repository
+  fallbacks appear with the scenario table below.
+- Cases A/B/C remain frozen **engine acceptance cases** (historical proof
+  paths); they are not the current final scenario source of truth.
 - `docs/ROADMAP.md` — capability scope/status, including the MVP vs
   High-Priority Stretch recording of this catalogue.
-- `docs/WAVE3R_DEMO_READINESS_PLAN.md` — its historical S1–S4 scenario families
-  are superseded by this catalogue for scenario naming and intent. Final-video
+- The earlier S1–S4 scenario families from superseded demo-readiness planning
+  are replaced by this catalogue for scenario naming and intent. Final-video
   order is **S2 → S1 → S3 → S7 → S5**.
 
 ## Tiering summary
@@ -61,8 +61,8 @@ All eight scenarios are intended to become runnable through the same
 generalized Northstar application path. The final hero set is **S2, S1, S3,
 S7, S5**; S5 is now proven executable for its **hotel-only personal extension**
 path, while S6/S8 remain breadth/stretch. The only approved simulated external
-seams are recorded in `docs/LIVE_SCENARIO_READINESS.md`; an internal capability
-gap is not a simulation seam.
+seams are recorded in `docs/CAPABILITIES_AND_LIMITATIONS.md`; an internal
+capability gap is not a simulation seam.
 
 ---
 
@@ -131,8 +131,9 @@ invariants.
 
 ### Final-demo choreography (S1)
 
-Stable cast, flights, and slots: `docs/FINAL_DEMO_CONTENT_SSOT.md` §5–§7
-(Sarah Lim critical; Wanderpay cohort; CGK→SIN).
+Stable cast, flights, and slots: `data/ait-demo-input-pack/` (`global/` plus
+`scenarios/s1-supplier-disruption/`; Sarah Lim critical; Wanderpay cohort;
+CGK→SIN).
 
 | Stage | What happens |
 |-------|----------------|
@@ -646,7 +647,8 @@ executable fixture data is deliberately authored to produce them.
 
 ## Provenance
 
-Provenance labels are defined in `docs/DEMO.md` and preserved here unchanged:
+Provenance labels, carried forward unchanged from earlier demo planning, are
+defined here:
 
 - **LIVE** — real provider/model call;
 - **SANDBOX** — provider test environment;
@@ -675,7 +677,7 @@ where appropriate.
 
 **Repository / fallback (not primary video):** S4, S6, S8, and S6-class breadth.
 
-World cast, timings, and hotels: `docs/FINAL_DEMO_CONTENT_SSOT.md`.
+World cast, timings, and hotels: `data/ait-demo-input-pack/`.
 
 ---
 

@@ -12,7 +12,7 @@ Verification is **cumulative evidence**, not a ritual where every stage reruns e
 - independent reviewers inspect existing evidence first and run additional checks only when a concrete uncertainty needs execution;
 - the final candidate runs the canonical broad gate on the exact candidate SHA.
 
-`docs/IMPLEMENTATION_PLAN.md` assigns these test IDs to work packages. Model selection for implementation/review remains owned by `docs/AGENT_MODEL_SELECTION.md`; this document defines **when and what to review**, not which model must do it.
+Work-package test-ID assignment and model selection for implementation/review are owned by internal planning documents that are not part of this published set; this document defines **when and what to review**, not which model must do it.
 
 ## Full-suite runner
 
@@ -164,7 +164,7 @@ Contract baseline: `test/northstar-contracts.test.ts` at `NORTHSTAR_CONTRACT_BAS
 **Programme-scale families (RV-N1..N12):**
 - commitment fan-out reaches every linked Engagement and only those;
 - initial planning through the overlay engine reaches resolved trips without provider calls;
-- Cases A/B/C as frozen in `PRODUCT_SPEC.md` ("Frozen acceptance Cases A/B/C"), each at programme scale;
+- Cases A/B/C as frozen by the original product specification ("Frozen acceptance Cases A/B/C"), each at programme scale;
 - ~40–45 traveller scale smoke: seeding, fan-out, reset/reseed and restart remain deterministic and complete at that traveller count.
 
 **Anti-hardcoding / alternate-data rule (Northstar):** every Northstar acceptance test must pass with an alternate fixture set — different event type, different cities/airports/hotels/dates, different traveller identities. No WiT/conference/speaker/SIN/KUL/route/airline/hotel/fixture/demo-date/Case-id logic may exist in `src/**`; the hardcoding search of T-GEN is extended with these families.
@@ -194,7 +194,7 @@ On the exact candidate SHA:
 
 ## Robustness scenario pool
 
-Do not require every robustness scenario before the core works. Select the highest-value subset in `IMPLEMENTATION_PLAN.md`.
+Do not require every robustness scenario before the core works. Select the highest-value subset in the internal implementation plan.
 
 Candidate scenarios:
 - late arrival vs hotel reception/no-show;
@@ -209,7 +209,7 @@ Candidate scenarios:
 ## Work-package verification rule
 
 Before an implementer declares a work package implemented:
-- run the `T-*` categories assigned in `IMPLEMENTATION_PLAN.md`;
+- run the `T-*` categories assigned in the internal implementation plan;
 - run build/typecheck/lint only when the changed package or repository baseline makes them useful, not automatically all three for every tiny task;
 - verify relevant failure/fallback behavior;
 - verify no scenario-specific domain branch was added;
@@ -229,7 +229,7 @@ The integrator:
 
 ## Independent review checkpoints
 
-Independent review is mandatory at the four historical formal gates below (A/B/C/Final). In addition, the Northstar programme adds bounded post-Checkpoint-C execution gates — NS-G1 as an internal integration gate (no scheduled Review 1), NS-G2 with mandatory different-family Review 2, the NS-G3 human product/demo evaluation, and Wave 4 stabilisation before the Final Candidate Review (`IMPLEMENTATION_PLAN.md` Section 13; reviewer routing in `AGENT_MODEL_SELECTION.md`). This is deliberate risk control, not a request to re-review every package or every historical line of code.
+Independent review is mandatory at the four historical formal gates below (A/B/C/Final). In addition, the Northstar programme adds bounded post-Checkpoint-C execution gates — NS-G1 as an internal integration gate (no scheduled Review 1), NS-G2 with mandatory different-family Review 2, the NS-G3 human product/demo evaluation, and Wave 4 stabilisation before the Final Candidate Review (internal implementation plan Section 13; reviewer routing in the internal model-selection guide). This is deliberate risk control, not a request to re-review every package or every historical line of code.
 
 A reviewer must inspect the **actual repository SHA and evidence**, not merely accept the implementer's report. Reviewer findings are triaged `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
 
@@ -316,7 +316,7 @@ Only after this gate and `T-RELEASE` pass is the repository considered final-can
 These gates do not reopen or replace accepted Checkpoints A/B/C; they exist because a single multi-day autonomous implementation horizon is deliberately not trusted.
 
 ### NS-G1 — Programme Foundation (Wave 1) — internal integration gate
-NS-G1 is an internal integration/acceptance gate, not a human/reviewer checkpoint: when it passes, the primary agent continues automatically into Wave 2. Acceptance per `IMPLEMENTATION_PLAN.md` Section 13: ~40–45 traveller programme import; individual add/update through the same normalized contract; messy reasonable input maps to validated drafts; missing facts never hallucinated; shared commitments link correctly; programme read model works; policy/funding structures work; Checkpoint C behavior remains green; alternate event/location data requires no application-code change. Test evidence extends the T-NORTHSTAR contract families (intake equivalence, commitment linkage, anti-hardcoding alternate-data).
+NS-G1 is an internal integration/acceptance gate, not a human/reviewer checkpoint: when it passes, the primary agent continues automatically into Wave 2. Acceptance per the internal implementation plan Section 13: ~40–45 traveller programme import; individual add/update through the same normalized contract; messy reasonable input maps to validated drafts; missing facts never hallucinated; shared commitments link correctly; programme read model works; policy/funding structures work; Checkpoint C behavior remains green; alternate event/location data requires no application-code change. Test evidence extends the T-NORTHSTAR contract families (intake equivalence, commitment linkage, anti-hardcoding alternate-data).
 
 ### Review 1 — no longer a scheduled mandatory gate
 Review 1 (formerly default DeepSeek-V4-Flash; fallback Kimi-K2.7-Code; fresh different-family from the primary Qwen implementer) is no longer a scheduled mandatory gate after NS-G1. A bounded different-family review may still be used voluntarily if evidence suggests a problem — focus areas: architecture drift; conference/event-specific hardcoding; duplicated programme truth outside authoritative state; AI output bypassing validation/promotion; fabricated defaults / UNKNOWN becoming certainty; shared commitment semantics; intake equivalence; alternate-event substitution; frozen RV-N0 contracts silently changed; test quality — but it does not gate Wave 2.
@@ -327,7 +327,7 @@ Backend convergence acceptance: the four shapes 0/A/B/C (incomplete → viable T
 **Result:** GREEN at candidate `91648aa481e598d42ac92769d3f550c0b7050e4b` (branch `integration/northstar`). Primary convergence evidence: `test/northstar-convergence.test.ts` — a single credential-free REPLAY run over the composed HTTP server drives all four paths through the same engine stack (initial-planning case + traveller authority + gate-checked SIMULATED execution + observation/verification; ChangeRequest window-shift re-search; FLIGHT_CANCELLATION recovery with unrelated trips untouched; commitment fan-out by `anchorCommitmentId` with authoritative engagement-fact propagation), including honest-UNKNOWN refusals (missing home evidence, unapproved execution, malformed payloads). Suite 395/395; typecheck/lint/build clean; anti-hardcoding and secrets scans clean.
 
 ### Review 2 — after NS-G2
-Default DeepSeek-V4-Pro Max (intentional premium use for the highest-risk integrated backend checkpoint); fallbacks per `AGENT_MODEL_SELECTION.md`. Adversarial focus list in `IMPLEMENTATION_PLAN.md` Section 13: authoritative vs desired target state; model-created judging criteria; mutation safety; overlay isolation; deterministic viability; UNKNOWN never PASS; funding/policy correctness; authority/approval; LLM → irreversible API prohibition; execution gate; provider success != resolved; observation/state update; fan-out correctness; unrelated Trips unaffected; LIVE/RECORD/REPLAY identical normalization; provider boundaries and degradation; generalisation; hardcoding; meaningful tests.
+Default DeepSeek-V4-Pro Max (intentional premium use for the highest-risk integrated backend checkpoint); fallbacks per the internal model-selection guide. Adversarial focus list in the internal implementation plan Section 13: authoritative vs desired target state; model-created judging criteria; mutation safety; overlay isolation; deterministic viability; UNKNOWN never PASS; funding/policy correctness; authority/approval; LLM → irreversible API prohibition; execution gate; provider success != resolved; observation/state update; fan-out correctness; unrelated Trips unaffected; LIVE/RECORD/REPLAY identical normalization; provider boundaries and degradation; generalisation; hardcoding; meaningful tests.
 
 ### NS-G3 — Integrated Product (Wave 3)
 Human product-owner evaluation of Cases A/B/C integration and the demo criteria in Section 13 — not a broad code review. LIVE/SANDBOX/RECORD/REPLAY/SIMULATED labels must be truthful.

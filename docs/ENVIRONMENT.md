@@ -51,7 +51,7 @@ Optional/non-blocking dynamic routing. Core must support REPLAY/fallback when ab
 - `GOOGLE_ROUTES_API_KEY`
 
 ### Nuitée / liteAPI hotel
-Needed only for LIVE/RECORD hotel capability. Duffel Stays was the documented first choice; it is unavailable in Singapore, so the IMPLEMENTATION_PLAN Section 13 fallback clause fired and Nuitée (liteAPI) is the wired hotel provider (see `docs/reality-validation/02_HOTEL_PROVIDER_DECISION.md`). The committed `fixtures/recordings/nuitee` corpus replays credential-free.
+Needed only for LIVE/RECORD hotel capability. Duffel Stays was the documented first choice; it is unavailable in Singapore, so the IMPLEMENTATION_PLAN Section 13 fallback clause fired and Nuitée (liteAPI) is the wired hotel provider (see the hotel lifecycle rows in `docs/CAPABILITIES_AND_LIMITATIONS.md`). The committed `fixtures/recordings/nuitee` corpus replays credential-free.
 
 - `NUITEE_API_KEY`
 - `NUITEE_SEARCH_BASE_URL` (defaults to `https://api.liteapi.travel/v3.0`)
