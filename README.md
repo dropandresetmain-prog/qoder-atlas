@@ -1,163 +1,209 @@
+<div align="center">
+
 # Northstar
 
-**AI Travel Resolution Engine**
+**An AI travel resolution engine.**
 
-Northstar maintains a Live Dependency Graph of a traveller's journey, objectives,
-constraints and shared context. When a flight, hotel, programme or traveller
-instruction changes, it works out what is actually at risk, proposes a recovery,
-checks it deterministically, obtains the required authority, executes only what is
-permitted, and reconciles the observed result.
+*A booking gets you a ticket. Northstar gets you there.*
 
-> A replacement flight is not necessarily a recovered trip.
+[Quickstart](#quickstart) · [How it works](#the-solution) · [Scenarios](#what-it-does--the-scenarios) · [Architecture](docs/ARCHITECTURE.md) · [What it can and cannot do](docs/CAPABILITIES_AND_LIMITATIONS.md)
+
+</div>
+
+---
+
+## The problem
+
+When a flight moves, the booking system rebooks the flight. Nobody checks whether the **trip** still works.
+
+A speaker flying Tokyo → Singapore for a 09:00 keynote loses their connection. The airline offers a seat on the 07:40 arrival. Technically that is a recovery. Operationally it is a disaster:
+
+- The keynote needs a 90-minute transfer plus venue check-in — the new arrival does not clear it.
+- The hotel night before is now unused, and past its free-cancellation window.
+- The replacement fare is 40% higher, in a different currency, and above the traveller's approval ceiling.
+- Two colleagues were booked to travel with them on the original flight.
+
+Today a human works that out — reading the itinerary, the programme, the policy, the fare rules and the hotel terms, then phoning suppliers. It is slow, it happens at 2am, and it is why "we have rebooked you" so often still means "you missed the thing you flew for."
+
+> **A replacement flight is not necessarily a recovered trip.**
+
+## The solution
+
+Northstar holds a **Live Dependency Graph**: a persistent operational model of what a trip is *for* — objectives, commitments, constraints, sources, and the bookings that satisfy them.
+
+When anything changes — a supplier disruption, a traveller request, an organiser moving the programme — Northstar works out what is actually at risk, proposes a recovery, checks it deterministically, obtains the required authority, executes only what is permitted, and reconciles what the provider actually did back into state.
+
+```mermaid
+flowchart LR
+  C["Change<br/>supplier · traveller · organiser"] --> S["State<br/>update"]
+  S --> P["Dependency<br/>propagation"]
+  P --> B["Blast<br/>radius"]
+  B --> R["Recovery<br/>strategies"]
+  R --> V["Deterministic<br/>viability"]
+  V --> A["Policy &<br/>authority"]
+  A --> E["Execution"]
+  E --> O["Provider<br/>observation"]
+  O --> RC["State<br/>reconciliation"]
+  RC -.-> S
+```
+
+A candidate strategy is a *proposed overlay* on authoritative state, not a fact. Only an **observed successful action** updates the trip.
 
 ## The Live Dependency Graph
 
-Northstar's graph is a persistent domain/state model, not a graph database. SQLite
-stores typed aggregates; explicit relationships and typed fields express the
-dependencies that matter operationally.
+Not a graph database — typed domain aggregates in SQLite, with explicit relations plus typed fields carrying the dependencies that matter operationally.
 
-```text
-Organisation ── policy / authority ──┐
-Traveller ── preferences ── Trip ── Transport · Stay · Engagement
-                                    │                 │
-AnchorEvent ── shared commitments ──┴── objectives / constraints / sources
+```mermaid
+graph TD
+  ORG["Organisation<br/>policy · authority · funding"]
+  TRV["Traveller<br/>preferences · documents · insurance"]
+  AE["AnchorEvent<br/>shared programme"]
+  TRIP["Trip"]
+  OBJ["TripObjective<br/>hard / soft outcomes"]
+  CON["Constraint / RuleSet<br/>policy · supplier · entry · financial"]
+  TL["TRANSPORT_LEG"]
+  ST["STAY"]
+  EN["ENGAGEMENT"]
+
+  ORG -->|policy| TRIP
+  TRV -->|travels on| TRIP
+  AE -->|commitments| TRIP
+  TRIP --> OBJ
+  TRIP --> CON
+  TRIP --> TL
+  TRIP --> ST
+  TRIP --> EN
+  TL -->|CONNECTS_TO| TL
+  ST -->|DEPENDS_ON| TL
+  EN -->|REQUIRES| TL
+  OBJ -.->|satisfied by| EN
+  TL -->|SHARES_RESOURCE_WITH| TL
 ```
 
-The demo seeds programme and scenario fixtures through the same validated mutation
-path used at runtime. It includes provider-shaped flight and hotel observations,
-programme commitments, traveller instructions, policy, sourced transfer context,
-and—where a case needs it—dated FX evidence. Those facts are clearly marked as
-REPLAY, fixture, manually supplied, or model-extracted. It does not pretend that
-every source is live.
+The executable relation vocabulary is deliberately small — `CONNECTS_TO`, `DEPENDS_ON`, `SHARES_RESOURCE_WITH`, `REQUIRES`. Everything else is a typed field, so propagation stays predictable and testable.
 
-A production deployment would additionally connect airline/TMC feeds, booking and
-servicing systems, hotel and ground-transport suppliers, calendars/event systems,
-traveller and policy systems, expense/FX sources, and approved authoritative entry
-sources. Those are future integration directions, not current product claims. See
-[the architecture](docs/ARCHITECTURE.md) for the exact boundary.
+## Where AI sits — and where it does not
 
-## How resolution works
-
-```text
-change → state update → dependency propagation → blast radius → recovery strategies
-       → deterministic viability → policy + authority → execution → observation
-       → state reconciliation
+```mermaid
+flowchart TD
+  subgraph AI["AI proposes and interprets"]
+    A1["Interpret unstructured input"]
+    A2["Extract into schemas"]
+    A3["Infer soft preferences"]
+    A4["Generate and compare strategies"]
+  end
+  subgraph DET["Deterministic core decides"]
+    D1["Schema validation"]
+    D2["Time and currency arithmetic"]
+    D3["Constraint evaluation and propagation"]
+    D4["Viability verdict"]
+    D5["Policy thresholds and authority"]
+  end
+  subgraph EXEC["Execution acts"]
+    E1["Authority-gated ActionIntent"]
+    E2["Provider adapter"]
+    E3["Observation to state mutation"]
+  end
+  AI --> DET
+  DET --> EXEC
+  EXEC -.->|observed truth| DET
 ```
 
-Candidate strategies are scenario overlays: proposed mutations evaluated against the
-authoritative state. A candidate never becomes truth merely because a model proposed
-it. Only an observed successful action updates the trip.
+**No LLM directly invokes an irreversible or money-moving action.** A model can propose; it cannot mutate authoritative state, and it cannot assert viability — the deterministic evaluators own that verdict.
 
-## Architecture and safety
+## Quickstart
 
-AI can interpret supplied unstructured inputs, identify uncertainty, extract into
-schemas, reason about consequences, infer soft preferences, and generate or compare
-strategies. Deterministic code owns validation, time and currency arithmetic,
-constraint evaluation, propagation, policy thresholds, permissions, viability and
-state transitions.
-
-```text
-AI proposal → validation → deterministic viability → authority → executor
-            → observation → state mutation
-```
-
-No LLM directly invokes an irreversible or money-moving action.
-
-## What the demo exercises
-
-- Supplier disruption and missed-connection recovery, including multi-step overnight
-  recovery and authority stops.
-- Traveller-requested flight, hotel, origin and shared-travel changes.
-- Organiser programme changes fanned out to linked traveller commitments.
-- Policy, approval, funding and FX-normalisation paths.
-
-The named hero workflows are driven by acceptance manifests through real application
-endpoints; the demo UI exposes them in the operator panel. The fixtures deliberately
-include both provider-shaped recordings and seeded context so the demo is reliable
-without credentials.
-
-## Technology and provider inventory
-
-| Area | Current implementation | Important boundary |
-|---|---|---|
-| Runtime | TypeScript, Node.js ≥24, Node HTTP server, Zod | Single package; no web framework. |
-| Persistence | SQLite behind repositories | A persistent volume is required when deployed. |
-| AI | Alibaba Cloud Model Studio / Qwen | LIVE when configured; schema-gated fallback in default REPLAY. |
-| Flights | Atlas adapter | Sandbox-constrained transactions; provider-neutral domain. |
-| Hotels | Nuitée / liteAPI adapter | Date changes are cancel-and-rebook, not in-place modification. |
-| Ground context | Google Routes adapter | Optional; safely falls back to sourced/deterministic context. |
-| FX | Frankfurter / ECB reference rates | Evidence for comparison, not a payment FX service. |
-| Deployment | Railway configuration | Operational deployment evidence, not a product integration. |
-
-Atlas search, verification, fare rules, order lifecycle and supported cancellation
-flows have provider seams and sanitized recordings. The shipped demo defaults to
-REPLAY. Refund execution remains unsupported/simulated by the sandbox. Nuitée covers
-search, quote/prebook, booking, retrieval, stay context and cancellation. Google
-Routes is wired but its live query path remains incomplete. Full statuses and
-limitations are in [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md).
-
-## LIVE / RECORD / REPLAY
-
-Northstar uses one provider-normalisation path in every mode:
-
-- **LIVE:** provider call → normalization → Northstar.
-- **RECORD:** provider call → sanitized provider-shaped recording → same normalization → Northstar.
-- **REPLAY:** recording → same normalization → same engine.
-
-REPLAY is not a fake second implementation. It makes the submitted demo
-reproducible, credential-free and resilient to provider downtime while retaining
-real provider shapes at the system boundary.
-
-## Run locally
-
-Requires Node.js 24 or later.
+Requires **Node.js 24+**. No credentials, no Docker, no database server.
 
 ```bash
 npm install
 npm run dev
 ```
 
-The default configuration is `REPLAY`, with a local SQLite database and no provider
-credentials required. Open `http://localhost:8787`. The operator surface includes
-the demo workflow controls; traveller, programme and decisions views are linked from
-the application. `npm run build` followed by `npm start` runs the compiled build.
+Open `http://localhost:8787`.
 
-Optional configuration is documented in [Environment](docs/ENVIRONMENT.md). Do not
-commit `.env` files or provider credentials.
+Defaults to `REPLAY` mode against committed provider recordings and a local SQLite file, so the demo runs offline and reproducibly. The operator panel drives the scenarios below. `npm run build && npm start` runs the compiled build.
 
-## Test and verify
+Optional provider configuration is documented in [Environment](docs/ENVIRONMENT.md). Never commit `.env` files or provider credentials.
 
-```bash
-npm test
-npm run typecheck
-npm run lint
-npm run build
-npm run gate:anti-hardcoding
-npm run acceptance:preflight
-npm run acceptance:secret-scan
+## What it does — the scenarios
+
+| # | Scenario | What it exercises |
+|---|---|---|
+| S1 | Airline schedule change | Supplier disruption, blast radius across linked commitments |
+| S2 | Missed connection | Multi-step overnight recovery, hotel cancel-and-rebook, authority stop |
+| S3 | Organiser programme change | Fan-out from an AnchorEvent to every linked traveller |
+| S4 | Thursday morning arrival | Traveller-initiated change against policy and funding |
+| S5 | Stay until Sunday | Stay extension with transfer and hotel impact |
+| S6 | Switch hotels | Partner-inventory change and companion seat impact |
+| S7 | Origin change to Tokyo | Re-origination with dated FX normalisation |
+| S8 | Travel with the speakers | Shared-travel group change and disclosure |
+
+Each is driven by an acceptance manifest through the real application endpoints — not a scripted UI. See [Scenarios](docs/SCENARIOS.md).
+
+## LIVE / RECORD / REPLAY
+
+One provider-normalisation path in every mode:
+
+```mermaid
+flowchart LR
+  L1["LIVE<br/>provider API"] --> N["Normalisation"]
+  R1["RECORD<br/>provider API"] --> R2["Sanitised recording"]
+  R2 --> N
+  P1["REPLAY<br/>committed recording"] --> N
+  N --> ENG["Northstar engine"]
 ```
 
-Tests cover contracts, deterministic evaluators, persistence, provider adapters,
-REPLAY normalization, scenarios and integrated recovery paths. See
-[Testing](docs/TESTING.md).
+REPLAY is not a second, fake implementation. It replays real provider-shaped payloads through the same normalisation and the same engine — so the demo is credential-free, reproducible and resilient to provider downtime, while keeping real provider shapes at the system boundary.
 
-## Repository guide
+## Stack
 
-- `src/domain`, `src/engine` — the model, graph semantics and deterministic recovery core.
-- `src/providers` — provider-specific adapters and recording support.
-- `src/intelligence` — schema-bound Model Studio/Qwen integration and fallback planning.
-- `src/app`, `src/server`, `src/ui` — orchestration and operator/traveller interfaces.
-- `fixtures` — versioned scenarios and sanitized provider recordings.
-- `video-production` — runnable browser-generated motion source, not rendered media.
+| Area | Implementation | Boundary |
+|---|---|---|
+| Runtime | TypeScript on Node 24, `node:http`, Zod | Single package, no web framework. One runtime dependency. |
+| Persistence | `node:sqlite` behind repository interfaces | Zero native modules. Deployment needs a persistent volume. |
+| AI | Alibaba Cloud Model Studio / Qwen | Schema-bound; LIVE when configured, deterministic fallback otherwise. |
+| Flights | Atlas adapter | Sandbox-constrained transactions; provider-neutral domain model. |
+| Hotels | Nuitée / liteAPI adapter | Date changes are cancel-and-rebook, not in-place modification. |
+| Ground context | Google Routes adapter | Optional; falls back to sourced/deterministic context. |
+| FX | Frankfurter / ECB reference rates | Comparison evidence, not a payment FX service. |
+| Deployment | Railway | Operational evidence, not a product integration. |
 
-Read [Architecture](docs/ARCHITECTURE.md),
-[Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md),
-[Build with Qoder](docs/BUILD_WITH_QODER.md), and
-[Motion design](docs/MOTION_DESIGN.md) for the technical detail.
+Full status per capability — including what is **partial** and what is **deferred** — is in [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md). Northstar does not claim provider coverage it does not have.
 
-Historical development documentation is preserved under `docs/archive/2026-08-30/`.
+## Verify it
 
-Built for the Atlas × Alibaba Cloud Agentic AI Hackathon with Qoder as the primary
-agentic-development environment.
+```bash
+node --test --test-concurrency=1
+```
 
-> A booking gets you a ticket. Northstar gets you there.
+```bash
+npm run typecheck && npm run lint && npm run gate:anti-hardcoding
+```
+
+The suite covers contracts, deterministic evaluators, persistence, provider adapters, REPLAY normalisation, scenarios and integrated recovery paths. The anti-hardcoding gate is the interesting one: it executably asserts that no demo-specific identifier is baked into engine logic. See [Testing](docs/TESTING.md).
+
+## Repository map
+
+```
+src/domain, src/engine        the model, graph semantics, deterministic core
+src/intelligence              schema-bound Qwen integration and fallback planner
+src/providers                 provider adapters and recording seams
+src/app, src/server, src/ui   orchestration and operator/traveller surfaces
+fixtures/                     versioned scenarios and sanitised recordings
+docs/                         architecture, capabilities, scenarios, testing
+```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — the graph, the ontology, the resolution path
+- [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md) — per-capability status
+- [Scenarios](docs/SCENARIOS.md) — what each demo case proves
+- [Testing](docs/TESTING.md) — how to verify the claims above
+- [Environment](docs/ENVIRONMENT.md) — optional provider configuration
+- [Build with Qoder](docs/BUILD_WITH_QODER.md) — how this was built
+- [Roadmap](docs/ROADMAP.md)
+
+---
+
+Built for the **Atlas × Alibaba Cloud Agentic AI Hackathon**, with Qoder as the primary agentic development environment.
