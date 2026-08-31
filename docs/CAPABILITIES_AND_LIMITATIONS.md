@@ -49,3 +49,11 @@ live in every environment. The local demo defaults to credential-free REPLAY.
 | Transactional ground transport | **STRETCH** | Add after a reliable provider and complete observation/cancellation path are available. |
 | Insurance claims automation | **STRETCH** | Requires carrier agreements and claims workflow evidence. |
 | Consumer super-app, graph database, microservices, Kafka, Kubernetes | **DEFERRED** | Current single-process SQLite architecture meets the submission need; reconsider only with demonstrated scale or operational requirements. |
+
+## Open findings
+
+Findings use the project triage `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
+
+| Finding | Classification | Evidence and scope |
+|---|---|---|
+| `Trip.viability` can read stale after a resolution | **Investigate Now** | The production path is correct: `compose.ts` and `caseReconciliation.ts` both give `CaseVerifier` a `MutationService`, and `reconcileTripViability` (`engine/observation.ts:248`) writes the aggregate through the normal validated mutation path, so a recovered trip returns to `VIABLE`. The guard at `engine/observation.ts:255` (`if (!this.mutations) return;`) silently downgrades verification to read-only, and seven test harnesses construct `CaseVerifier` without `mutations`, which is where the stale `DISRUPTED` aggregate was reproduced. Not a shipped-product defect, so no state-machine change was made; the read-only skip should become a declared verifier mode rather than an absence of wiring. Also unresolved: the reconcile formula has no branch for a soft-only `FAIL`, and a provider repair that displaces a `STAY` does not emit `observedEffects.operations`, so the displaced element is not cancelled. |
