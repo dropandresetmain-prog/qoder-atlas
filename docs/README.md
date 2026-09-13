@@ -23,8 +23,9 @@ These documents define the approved target. They do **not** prove the target has
 
 ## Agent / implementation workflow
 
-- **[AGENT_MODEL_SELECTION.md](AGENT_MODEL_SELECTION.md)** — current harness/model/risk/effort routing policy.
-- **[IMPLEMENTATION_AGENT_ROUTING.md](IMPLEMENTATION_AGENT_ROUTING.md)** — three recommended model + harness routes for every M0-M11 milestone and C0-C6 checkpoint.
+- **[AGENT_MODEL_SELECTION.md](AGENT_MODEL_SELECTION.md)** — operational role/harness/task-shape/effort routing policy. This is the first routing file to consult.
+- **[MODELS_ARSENAL.md](MODELS_ARSENAL.md)** — deeper, more volatile model/harness evidence, observed constraints and fallbacks. Load only when model choice itself needs reevaluation.
+- **[IMPLEMENTATION_AGENT_ROUTING.md](IMPLEMENTATION_AGENT_ROUTING.md)** — three alternative model + harness routes for every M0-M11 milestone and C0-C6 checkpoint, using the current routing policy.
 - **[BUILD_WITH_QODER.md](BUILD_WITH_QODER.md)** — historical description of the original hackathon candidate's Qoder-heavy development workflow. It is not the current routing source of truth.
 
 Root [`AGENTS.md`](../AGENTS.md) defines how these documents interact during implementation.
@@ -37,5 +38,6 @@ Use the document appropriate to the question:
 - **What is the approved future architecture?** -> architecture closure + logical schema.
 - **What happens next?** -> implementation plan + roadmap.
 - **How should agents execute/review it?** -> agent model selection + implementation routing.
+- **Why is a model/harness routed that way, or has the roster changed?** -> models arsenal.
 
 If code and the approved target disagree during the refactor, do not silently choose one. Current code remains runtime truth until cutover; the approved target governs new refactor implementation unless a documented architecture gap forces a deliberate change.
