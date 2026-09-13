@@ -140,8 +140,13 @@ fail-closed.
       `docs/refactor/evidence/M2.md` §11.
 - [x] Exact-path stage: 52 named paths, index verified clean of anything
       unexpected.
-- [ ] Implementation commit, docs-only commit carrying the head, push
-      `milestone-m2` (no merge).
+- [x] Implementation commit `aae84a7ef5f974771b64faee92ccc83da8dfa074` on
+      `milestone-m2`, parent `aab3d9f…` (the accepted C1 base). 52 files,
+      +18413/−110.
+- [ ] Publication of `milestone-m2` to origin is this lane's terminal step, so it
+      is verified with `git ls-remote origin milestone-m2` in the completion
+      report rather than claimed in a commit. No merge into
+      `data-structure-refactor`.
 
 ## Critical constraints
 
