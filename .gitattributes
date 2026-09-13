@@ -1,0 +1,7 @@
+# Migration checksums (src/persistence/postgres/migrate.ts) are the sha256 of
+# the raw bytes of each .sql file and are recorded in `schema_migrations` on
+# first apply. With core.autocrlf=true a Windows checkout rewrites those files
+# to CRLF, so the same commit hashes differently per worktree and every
+# already-migrated database reports checksum drift. Pin SQL to LF so the
+# checksum of a given commit is the same on every machine and worktree.
+*.sql text eol=lf

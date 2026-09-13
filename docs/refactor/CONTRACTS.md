@@ -142,3 +142,30 @@ criterion ("AT01-AT24 each map to packages/fixtures").
 - New `SubjectKind` values are added to `src/domain/v2/shared/identity.ts`
   only by the architect/M6 owner (plan §2 "Contract freeze package" row
   "Identity and ownership").
+
+## 8. Accepted post-C0 clarification — `CommandReceipt.resultRef` is the replay value
+
+Approved at C1 and now implemented in M2. This is the **only** change to frozen
+contract *semantics* since the C0 freeze; no field, enum member or discriminated
+variant was added, removed or repurposed.
+
+`resultRef` keeps its C0 name and its `z.string()` shape, but it is explicitly
+**not** an opaque pointer to state elsewhere. It is the JSON serialization of the
+command's committed result, and an equal-key replay decodes that value rather
+than re-running the handler.
+
+- Schema: `CommandReceiptSchema.resultRef` in
+  `src/contracts/v2/command/domainCommand.ts` carries a `refine` requiring valid
+  JSON, so a receipt that cannot be replayed is not a valid receipt.
+- Helpers: `serializeCommandResult` / `parseCommandResult` (same file) are the
+  only encode/decode pair. `buildReceipt` in
+  `src/persistence/postgres/commandSupport.ts` encodes on the committed path;
+  `PgUnitOfWork.execute` decodes on the `REPLAY` branch of
+  `IdempotencyLedger.claim` and returns without invoking the handler.
+- Consequences for every command handler in M2-M11: the returned value must be
+  JSON-compatible (no `Date`, `BigInt`, `Map`, class instances or provider
+  handles), and every identifier a result reports must be generated *before* the
+  retryable `execute` callback, because a replay never re-executes it.
+
+Evidence and the exact test that pins replay-without-re-execution:
+[`evidence/M2.md`](evidence/M2.md) and `postgres-integration/idempotency.pgtest.ts`.

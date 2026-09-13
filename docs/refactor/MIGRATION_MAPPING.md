@@ -137,3 +137,47 @@ No AT ID is unmapped. Where a package is listed as primary owner, this
 package's contract is the shared surface that owner's fixtures will exercise
 under real persistence/concurrency at M1+ — M0 proves the contract shape and
 invariant-violating rejection only.
+
+## 7. M2 landing — rules the schema now enforces
+
+M2 materialized `0010`–`0029` (42 tables). **No import has run.** What changed
+is that the §2 ambiguities below now have a named destination table, and the
+ones marked "staged" have an explicit non-destination. Each rule states the
+deterministic transform and the constraint that makes a wrong transform
+unrepresentable rather than merely discouraged.
+
+| Legacy shape | M2 destination | Deterministic rule | Enforcement |
+|---|---|---|---|
+| `entities.TRAVELLER` + same-id `booking_dossiers` | `travellers` + `traveller_names` + `traveller_contacts` + `profile_assertions` | One `travellers` row per shared legacy id — the two stores are one person, never two subjects. Flat `Traveller.name` → a `traveller_names` row; dossier given/family → a second row with `name_kind='LEGAL'`. DOB/gender/nationality → `profile_assertions`, not columns. | `travellers.id` is a `TRAVELLER` subject (`0012` + subtype checker), so a person exists only with its registry row; `display_name_ref` FK requires the display name to exist. |
+| Conflicting name values between the two stores | two dated `traveller_names` rows | No guess-and-discard: keep both with `valid_from`/`evidence_id` and classify each by `name_kind`. Which one renders is a recorded pointer, not a query-order accident. | `travellers.display_name_ref` is a deferred FK at one `traveller_names` row, and `enforce_subject_subtype_traveller` rejects a pointer that selects another traveller's name — so a merge cannot leave a person rendering someone else's name. |
+| Suspected duplicate people | `lifecycle_status='MERGED'` + `merged_into_traveller_id` | A merge is a recorded decision with a survivor pointer. Never a delete, never similarity auto-merge. | `0012` CHECK ties `MERGED` ⇔ survivor present, so half-recorded merges cannot commit. |
+| `Traveller.passports[]` / `nationalityCodes[]` `Fact<>` arrays | `travel_credentials` → `credential_versions` → one typed detail row; nationality → `profile_assertions` | A credential is a document (typed, versioned, Traveller-owned); a nationality is an assertion about the person. The two are never the same row. | `0015` composite FK `(workspace_id, id, kind)` means a VISA edition cannot receive passport detail and vice versa; deferred trigger requires exactly one detail row. |
+| Legacy credential document numbers, `paymentRef`, contact strings | detail-table `*_content_hash` / `*_storage_ref` / `*_access_policy_id` | Import the ProtectedDataRef triple only. A value with no storage ref and access policy does not enter the authoritative tables; it becomes a staged exception. | the three columns are `NOT NULL` with length/`btrim` CHECKs (`0012`/`0015`), which is deliberate: there is no "temporary plaintext" column to park a secret in. |
+| `Trip.travellerIds[]` | one `journeys` row each | `travellerIds[i]` → Journey for that Traveller in that Trip. Trip participation is *derived* from Journeys; there is no second membership list to drift. | unique index `journeys_per_traveller_per_trip_uidx` (`0021`) + the deferred Trip-membership assertion, so "Trip with zero journeys" cannot commit either. |
+| `elements[]` (`TransportLeg`/`Stay`/`Engagement`) per-traveller ownership | `journey_items` + `transport_item_details`/`stay_item_details`/`engagement_item_details` (`0022`/`0023`) | `elementKind` maps deterministically. **Owner does not** — see the staging rule below. | exactly one typed detail row per item (deferred assertion, `0023`), so an element cannot land as an untyped item. |
+| `BookingRef{system,reference}`, `Stay.guests` | **not M2** | M2 has no booking, reservation, allocation or supplier column at all, so a shared booking cannot be copied into each Journey as it migrates. M3 creates one reservation subject plus N allocations; `occupancy_needs` stays a bounded need statement, not a per-person booking. | verified by `m2SubtypeIntegrity.pgtest.ts` (no catch-all/unapproved jsonb columns) — the duplication is structurally unavailable, not just discouraged. |
+| Legacy inline `accessibilityRequirements[]` | `accompaniment_requirements` (`0027`) + `support_assignments` (`0028`) | The requirement migrates as the immutable governing definition; any already-selected supporter migrates as a separate assignment referencing it. Missing eligible-supporter data → no `accompaniment_eligible_supporters` rows, which reads as UNKNOWN, not "anyone". | `0028` requires an assignment to cite its governing requirement; `0027` is append-only, so an assignment can never rewrite what it satisfies. |
+| Legacy actor strings (`audit.actor`, case approver) | `principals` + `authority_grants` + `grant_scopes` + `grant_actions` (`0011`/`0019`) | An actor migrates only when it resolves to a real `(workspace_id, id, kind)` subject. No synthetic subject is invented to absorb an unresolvable string. | `grant_scopes_subject_fk` / `authority_grants_represented_party_fk` reference `domain_subjects (workspace_id, id, kind)`, so a right-kind-only-or-wrong-id reference fails. |
+| `audit` rows | `change_records` (M1) | Migrate as legacy evidence citing `legacy_id_map`; do not back-fill `before_revision` values that never existed. | `0005` has `before_revision bigint` nullable against `after_revision bigint NOT NULL` — an unknown prior revision is representable, a missing result revision is not. |
+
+### 7.1 Staging and provenance
+
+- Legacy→target identity resolution uses M1's `legacy_id_map` (append-only via
+  `legacy_id_map_immutable`), so a resolved duplicate keeps both its original
+  string and its survivor chain readable after the merge.
+- Ambiguous records land in `migration_runs.reconciliation_exceptions` and
+  **nothing else**. There is no M2 "quarantine" table, deliberately: staging is
+  run-scoped evidence, not domain state a reader could mistake for a fact.
+- No typed M2 table carries a legacy-source column. Fixture/scenario names,
+  supplier locators and legacy string ids are rejected by the anti-leak
+  assertions in `postgres-integration/m2SubtypeIntegrity.pgtest.ts`.
+
+### 7.2 Deferred because M2 must not express it
+
+| Not in M2 | Owner | Why it is a deferral, not an omission |
+|---|---|---|
+| `E_AUTHORISATION` typed detail table | architect (recorded in `evidence/M2.md`) | `CredentialKindSchema` admits the kind, but Schema §2's frozen detail inventory names no table for it. `0015`'s trigger is per-kind and deliberately silent here rather than inventing a column set. |
+| `PLACE` / `JURISDICTION` referents | M4 | M2 stores opaque UUID refs and indexes them; the tables and PostGIS geometry contracts are M4's range (`0050`–`0069`). |
+| Reservations, services, allocations | M3 | §4 range; see the booking-duplication rule above. |
+| `ConstraintDefinition`, requirements knowledge, evidence freshness rules | M5 | M2's support requirement is the accompaniment case only, which §3 assigns to M2. |
+| Entry/transit feasibility verdicts | M6 | A missing credential must remain a queryable absence; only M6's assessment layer may turn that into PASS/FAIL/UNKNOWN. |
