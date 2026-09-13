@@ -1,59 +1,77 @@
 # Capabilities and limitations
 
-This is the public technical truth sheet for the submitted Northstar candidate.
-`IMPLEMENTED` means a runtime path exists; it does not imply every provider path is
-live in every environment. The local demo defaults to credential-free REPLAY.
+This is the technical truth sheet for the **currently implemented Northstar runtime**.
 
-| Capability | Status and responsibility | Provider / modes | Current limitation and production direction |
+`IMPLEMENTED` means a runtime path exists; it does not imply every provider path is live in every environment. The existing local demo/runtime still uses the legacy SQLite-backed model and defaults to credential-free REPLAY where configured.
+
+Northstar also has an **approved target data/state architecture** in `DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`, `DATA_STRUCTURE_LOGICAL_SCHEMA.md` and `IMPLEMENTATION_PLAN.md`. That target is **not implemented merely because it is documented**. Until the relevant M0-M11 milestones land, current-runtime truth below wins for capability claims.
+
+## Current runtime capability matrix
+
+| Capability | Current status | Provider / modes | Current limitation / approved direction |
 |---|---|---|---|
-| Live Dependency Graph | **IMPLEMENTED.** Deterministic typed aggregates, relationships, impact and overlays. | SQLite; all modes. | Not a graph database. Revisit storage only with demonstrated scale/query needs. |
-| Signals and state mutation | **IMPLEMENTED.** Signals validate before the authoritative mutation path. | Atlas event normalization and internal inputs. | Provider webhook registration is not implemented. |
-| Flight context | **IMPLEMENTED.** Search, verify, fare rules and provider-state observation. | Atlas; LIVE/RECORD/REPLAY. | Atlas is sandbox constrained and not a universal servicing/GDS path. |
-| Flight transactions | **IMPLEMENTED, sandbox constrained.** Order/create, pay, retrieve and supported cancellation/void seams are authority-gated. | Atlas; sandbox LIVE evidence and recordings. | Refund execution is unsupported/simulated by the sandbox; no autonomous post-ticket servicing claim. |
-| Hotel lifecycle | **IMPLEMENTED.** Context, search, quote/prebook, book, retrieve and cancel. | Nuitée/liteAPI; LIVE/RECORD/REPLAY. | No in-place date modification: Northstar uses cancel-and-rebook. |
-| FX and costs | **IMPLEMENTED.** Dated rates normalise comparable recovery costs and authority amounts. | Frankfurter ECB-reference API; LIVE/RECORD/REPLAY. | Not a payment/conversion service; unavailable or incomparable amounts fail closed. Production needs explicit freshness/SLA policy. |
-| Ground routing context | **PARTIAL.** Routing can inform deterministic transfer windows. | Google Routes; REPLAY and LIVE-capable. | Live query evidence is incomplete; no transactional ground-transport provider. |
-| Programme / shared commitments | **IMPLEMENTED.** AnchorEvent, CSV/XLSX/manual intake, shared commitment fan-out and projections. | Internal supplied programme data. | No external event CMS/calendar adapter or continuous event-site ingestion. |
-| Preferences and policy | **IMPLEMENTED.** Explicit instructions, latent preferences, supplier/organisation/insurance RuleSets. | Supplied/fixture sources. | No connected enterprise policy administration system. |
-| Recovery planning | **IMPLEMENTED.** AI proposes; deterministic fallback remains available. | Model Studio/Qwen LIVE when configured; fallback/recordings in REPLAY. | No claim of a live web-browsing research tool. |
-| Viability and authority | **IMPLEMENTED.** Deterministic time, buffer, policy, funding and permission gates. | Internal engine. | Human authority may be required; no bypass for a model. |
-| Execution, observation, reconciliation | **IMPLEMENTED.** Intent → provider seam → observation → state update. | Atlas/Nuitée seams and recordings. | Provider coverage is intentionally bounded; unsupported outcomes are structured, not guessed. |
-| Documents, email and web material | **PARTIAL.** Supplied text/structured material is ingested with provenance and optional schema-bound extraction. | Internal source contracts / Model Studio. | No Gmail connector, arbitrary URL crawler or general PDF parser is included. |
-| Entry and immigration | **PARTIAL as representation.** Sourced claims can be recorded with uncertainty. | Research contract / fixtures. | No Timatic or legal-grade real-time validation; never present estimates as legal advice. |
-| Insurance | **PARTIAL as policy context.** Clauses and coverage terms can inform rules. | Supplied policy sources. | No insurer connection, coverage decision, claim or payment automation. |
-| Notifications | **DEFERRED.** In-app operational and traveller surfaces exist. | None. | No outbound email/SMS/push/Slack delivery integration. |
-| Persistence and replay | **IMPLEMENTED.** Transactional SQLite repositories and sanitized provider recordings. | SQLite; LIVE/RECORD/REPLAY. | Deployed environments need persistent storage; a durable multi-tenant backend is future work. |
+| Dependency/state model | **IMPLEMENTED (legacy model).** Typed Trip aggregates, relationships, impact and overlays. | SQLite; all application modes. | Approved target separates Trip/Journey/services/reservations/programme/knowledge and migrates authority to PostgreSQL/PostGIS. |
+| Signals and mutation | **IMPLEMENTED.** Validated signals enter the authoritative mutation path. | Internal inputs + provider normalization. | Current generic/aggregate mutation architecture will be replaced by typed commands/expected revisions. |
+| Flight context | **IMPLEMENTED.** Search, verify, fare rules and provider-state observation. | Atlas LIVE/RECORD/REPLAY. | Atlas is sandbox constrained and not a universal GDS/TMC servicing path. |
+| Flight transactions | **IMPLEMENTED, sandbox constrained.** Order/create, pay, retrieve and supported cancellation/void seams are authority-gated. | Atlas sandbox LIVE evidence + recordings. | Refund execution/provider capabilities remain bounded; target execution adds stronger attempt/reconciliation semantics. |
+| Hotel lifecycle | **IMPLEMENTED.** Search, quote/prebook, book, retrieve and cancel. | Nuitée/liteAPI LIVE/RECORD/REPLAY. | No in-place date modification; changes use cancel/rebook. Target separates reservation truth from Journey intention. |
+| FX and costs | **IMPLEMENTED.** Dated rates normalize comparable recovery costs/authority amounts. | Frankfurter ECB-reference LIVE/RECORD/REPLAY. | Not a payment FX service. Target financial model uses exact monetary boundaries/budget commitments where required. |
+| Ground routing context | **PARTIAL.** Routing can inform deterministic transfer windows. | Google Routes REPLAY and LIVE-capable. | No transactional ground-transport provider; live coverage is not universal. |
+| Programme/shared commitments | **IMPLEMENTED (legacy model).** AnchorEvent/commitment intake, fan-out and projections. | Internal supplied programme data. | Target replaces copied/embedded commitment truth with Event -> Programme -> ProgrammeItem + Participation and typed programme actions. |
+| Traveller/group modelling | **PARTIAL.** Existing Trip can contain travellers and shared-resource relationships. | Internal domain. | Approved target adds shared Trip + one Journey per Traveller, explicit relationships/support requirements/CoordinationGroups and shared reservation allocations. Not implemented yet. |
+| Preferences and policy | **IMPLEMENTED.** Explicit/latent preferences and supplier/organisation/insurance RuleSets. | Supplied/fixture sources. | Target adds versioned rule editions/assignments and revision-bound assessments. |
+| Recovery planning | **IMPLEMENTED.** AI proposes; deterministic fallback remains available. | Model Studio/Qwen LIVE when configured; fallback/recordings otherwise. | Current planner reasons over the legacy snapshot model. Target planning becomes multi-object over ResolutionSnapshot/typed scenario changes. |
+| Viability and authority | **IMPLEMENTED (legacy model).** Deterministic time/buffer/policy/funding/permission gates. | Internal engine. | Target removes editable/cached viability as canonical truth and binds approvals to exact plan/action scope and input revisions. |
+| Execution / observation / reconciliation | **IMPLEMENTED.** Intent -> provider seam -> observation -> state update. | Atlas/Nuitée seams + recordings. | Target adds durable attempts, outcome-unknown reconciliation, scoped approvals and stronger cross-root concurrency handling. |
+| Documents/email/web material | **PARTIAL.** Supplied text/structured material can be ingested with provenance and optional schema-bound extraction. | Internal source contracts / Model Studio. | No arbitrary crawler/Gmail/general PDF product integration is claimed. |
+| Entry / visa / transit | **PARTIAL representation only.** Sourced claims/uncertainty can be represented; current evaluator coverage is not a legal-grade eligibility engine. | Research/source contracts / fixtures. | Approved target includes typed credentials, intended visits, document selection, route encounters, versioned requirements and deterministic three-valued EntryAssessment. Source/provider coverage still must be selected/proven. |
+| Travel advisories / external conditions | **NOT IMPLEMENTED as the approved canonical subsystem.** Legacy sources/signals can carry contextual information. | No dedicated authoritative advisory integration. | Approved target includes publisher lineages/versions, geography/population/time applicability, coverage/freshness and organization-specific policy response. M5/M6 implementation pending. |
+| Geographic applicability | **PARTIAL.** Places/timezones/routes exist. | Internal + provider context. | Approved target adds Place/GeographicArea/Jurisdiction + PostGIS applicability. Not implemented yet. |
+| Insurance | **PARTIAL policy context.** Clauses/coverage terms can inform rules. | Supplied sources. | No insurer connection, claim decision or payment automation. |
+| Notifications | **DEFERRED / NOT INTEGRATED.** In-app operational/traveller surfaces exist. | None for email/SMS/push/Slack. | Add only with auditable delivery/consent state and a validated product requirement. |
+| Persistence | **IMPLEMENTED current runtime:** SQLite repositories + sanitized provider recordings. | SQLite + filesystem recordings. | Approved target is PostgreSQL + PostGIS with migrations, FKs, expected revisions, durable work and controlled cutover. Not active yet. |
 
 ## Provider evidence matrix
 
 | Provider / service | Purpose | Implemented | LIVE proven | RECORD proven | REPLAY | Important limitation |
 |---|---|:---:|:---:|:---:|:---:|---|
-| Atlas | Flights and sandbox transaction seams | Yes | Yes, sandbox | Yes | Yes | Not production airline ticketing; refund limits. |
-| Alibaba Cloud Model Studio / Qwen | Extraction, programme mapping and strategy proposals | Yes | Yes when configured | N/A | Fallback/fixture paths | No claim of live web-search tooling. |
-| Nuitée / liteAPI | Hotel lifecycle | Yes | Yes, sandbox | Yes | Yes | Cancel/rebook for changes. |
-| Google Routes | Ground-context estimation | Yes | Incomplete | Yes | Yes | Optional; no booking action. |
-| Frankfurter | Dated ECB reference FX | Yes | Yes | Yes | Yes | Not a payment FX service. |
-| Railway | Hosted demo runtime | Operational evidence | Time-bounded deployment evidence | N/A | N/A | Not application-domain functionality. |
+| Atlas | Flight search/verify/rules/state + sandbox transaction seams | Yes | Yes, sandbox | Yes | Yes | Not production airline/GDS servicing; sandbox and refund limits. |
+| Alibaba Cloud Model Studio / Qwen | Extraction/programme mapping/strategy proposals | Yes | Yes when configured | N/A | Deterministic/fixture fallback | No claim of general live web research. |
+| Nuitée / liteAPI | Hotel lifecycle | Yes | Yes, sandbox | Yes | Yes | Cancel/rebook for changes; provider constraints apply. |
+| Google Routes | Ground-context estimation | Yes | Bounded/optional | Yes | Yes | No booking action. |
+| Frankfurter | Dated ECB-reference FX | Yes | Yes | Yes | Yes | Comparison evidence, not payment FX. |
+| Railway | Hosted runtime | Operational evidence | Deployment-dependent | N/A | N/A | Hosting, not a domain capability. |
 
-## Evaluated and planned directions
+## Approved target capabilities that are not yet current-runtime claims
 
-| Direction | Classification | Why / revisit condition |
+The refactor has frozen the architecture for these concerns, but implementation/evidence remains required:
+
+- PostgreSQL/PostGIS canonical persistence and migration/cutover;
+- stable Traveller identity + shared Trip/per-person Journey/group/support semantics;
+- independent services/reservations/allocations/entitlements/offers;
+- mutable Programme/ProgrammeItem/Participation state through the recovery engine;
+- source-specific advisories/conditions and geographic/population/time applicability;
+- typed credentials and deterministic entry/transit assessment;
+- multi-object scope discovery, revision/generation-bound Assessments and stale invalidation;
+- scoped multi-party approvals, durable execution attempts and outcome-unknown reconciliation;
+- provider/external-record ownership/servicing boundaries suitable for future agency/GDS/TMC integration.
+
+Do not present any of these as live merely because their contracts are approved.
+
+## Current open findings
+
+Findings use `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
+
+| Finding | Classification | Current handling |
 |---|---|---|
-| Additional airline, GDS and TMC adapters | **NEXT** | Preserve provider-neutral flight contracts; add when servicing access and verified workflows justify it. |
-| Production hotel path | **NEXT** | Harden supplier lifecycle, cancellation and reconciliation after provider access/SLA evidence. |
-| FX freshness/reliability | **NEXT** | Define source, cache and policy freshness guarantees before production financial use. |
-| External event, calendar and programme adapters | **NEXT** | Add when a partner system and stable change feed are available. |
-| Authoritative entry integration | **NEXT** | Requires licensed/official data and legal review; no inferred legal assertions. |
-| Notifications and enterprise approvals | **NEXT** | Add only with an auditable delivery and consent model. |
-| Booking.com or other hotel supply | **STRETCH** | Consider if partner access exists without making it a core dependency. |
-| Transactional ground transport | **STRETCH** | Add after a reliable provider and complete observation/cancellation path are available. |
-| Insurance claims automation | **STRETCH** | Requires carrier agreements and claims workflow evidence. |
-| Consumer super-app, graph database, microservices, Kafka, Kubernetes | **DEFERRED** | Current single-process SQLite architecture meets the submission need; reconsider only with demonstrated scale or operational requirements. |
+| Current `Trip.viability` can be stale in read-only/test-harness verifier wiring and legacy evaluation stores derived judgement as state. | **Act Now through refactor** | Preserve regression evidence; target Assessment/manifest architecture removes editable viability as canonical truth. Do not invent an isolated legacy redesign unless required for current safety. |
+| Existing SQLite operational incidents are not fully root-caused. | **Investigate Now** | Inspect deployment/volume/replica/log evidence so Postgres does not inherit application-level concurrency mistakes. Database change alone is not the fix. |
+| Actual production data/obligations to migrate are not yet fully inventoried. | **Investigate Now** | M0/M10 migration mapping must classify real provider refs, traveller edits, approvals, open attempts and source material before cutover. |
+| Entry/advisory source coverage/licensing and authoritative update semantics are provider-dependent. | **Investigate Now** | Architecture boundary is frozen; choose/prove sources before claiming live coverage. |
+| Actual GDS/TMC/supplier servicing, idempotency and split-booking capabilities are unknown until partner/provider integration. | **Investigate Now** | ExternalRecord/capability/ownership boundaries must represent unsupported/manual outcomes honestly. |
 
-## Open findings
+## Truthfulness rule
 
-Findings use the project triage `Act Now | Investigate Now | Park for Later | Ignore / Accept Risk`.
+Provider success is not recovered-trip proof. A recovery claim requires the relevant internally committed or externally observed state, reconciliation, and a current deterministic assessment of mandatory requirements.
 
-| Finding | Classification | Evidence and scope |
-|---|---|---|
-| `Trip.viability` can read stale after a resolution | **Investigate Now** | The production path is correct: `compose.ts` and `caseReconciliation.ts` both give `CaseVerifier` a `MutationService`, and `reconcileTripViability` (`engine/observation.ts:248`) writes the aggregate through the normal validated mutation path, so a recovered trip returns to `VIABLE`. The guard at `engine/observation.ts:255` (`if (!this.mutations) return;`) silently downgrades verification to read-only, and seven test harnesses construct `CaseVerifier` without `mutations`, which is where the stale `DISRUPTED` aggregate was reproduced. Not a shipped-product defect, so no state-machine change was made; the read-only skip should become a declared verifier mode rather than an absence of wiring. Also unresolved: the reconcile formula has no branch for a soft-only `FAIL`, and a provider repair that displaces a `STAY` does not emit `observedEffects.operations`, so the displaced element is not cancelled. |
+Unsupported or stale information remains `UNKNOWN`/unresolved rather than being promoted into a confident PASS or product claim.

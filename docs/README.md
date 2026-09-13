@@ -1,33 +1,41 @@
 # Documentation
 
-The repository README is the product entry point and reproduction guide. This
-index says which document answers which question.
+The repository README is the product entry point and reproduction guide. This index separates **implemented-runtime truth** from the **approved target refactor** so agents do not confuse design with shipped capability.
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — the logical architecture and its
-  invariants: the Live Dependency Graph as the persistent operational model, and
-  why chat and dashboards are interfaces rather than the source of truth.
-- **[CAPABILITIES_AND_LIMITATIONS.md](CAPABILITIES_AND_LIMITATIONS.md)** —
-  implementation and provider truth for the submitted candidate: what
-  `IMPLEMENTED` means, and where a path is sandbox-constrained, simulated or
-  deliberately degrades to `UNKNOWN`.
-- **[SCENARIOS.md](SCENARIOS.md)** — the frozen scenario catalogue (S1–S8):
-  narrative, capability claim, priority and demo intent. Executable facts stay in
-  fixtures and configuration, not here.
-- **[TESTING.md](TESTING.md)** — the verification taxonomy and its `T-*` test
-  families, the checkpoint review gates, and the authoritative full-suite run.
-- **[ENVIRONMENT.md](ENVIRONMENT.md)** — setup expectations and environment
-  variable names (never values), including the credential-free REPLAY default
-  that lets the core app start with nothing configured.
-- **[DESIGN.md](DESIGN.md)** — the design system: the binding rules behind the
-  operator surfaces, whose implementation lives in `src/ui/theme.ts`.
-- **[MOTION_DESIGN.md](MOTION_DESIGN.md)** — motion as browser-rendered programs
-  with deterministic timing under `media/`, and why rendered output is not
-  committed.
-- **[BUILD_WITH_QODER.md](BUILD_WITH_QODER.md)** — the agentic-development
-  workflow used to build this: frozen shared contracts, bounded lanes, and
-  evidence-gated checkpoints.
-- **[ROADMAP.md](ROADMAP.md)** — capability scope and status, including what is
-  Stretch, Deferred or Rejected, with the reason and the revisit condition.
+## Approved target architecture / refactor
 
-When code and a document disagree, treat it as drift to resolve rather than
-assuming either side wins by default.
+- **[DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md)** — normative target architecture: frozen F01-F18 decisions, ontology, ownership, cardinalities, lifecycles, advisories/entry/group/extensibility semantics.
+- **[DATA_STRUCTURE_LOGICAL_SCHEMA.md](DATA_STRUCTURE_LOGICAL_SCHEMA.md)** — normative PostgreSQL/PostGIS logical schema, integrity, indexes, transaction/idempotency boundaries and JSON limits.
+- **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** — M0-M11 critical path, C0-C6 gates, migration/cutover plan and AT01-AT24 architecture acceptance tests.
+
+These documents define the approved target. They do **not** prove the target has been implemented.
+
+## Current product/runtime truth
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — concise map of both the current legacy runtime and approved target architecture, including the transition boundary.
+- **[CAPABILITIES_AND_LIMITATIONS.md](CAPABILITIES_AND_LIMITATIONS.md)** — implementation/provider truth **today**: what exists, what is partial/sandbox constrained, and which approved target capabilities are still pending.
+- **[ROADMAP.md](ROADMAP.md)** — current capability status plus refactor milestone status and explicitly stretched/deferred scope.
+- **[SCENARIOS.md](SCENARIOS.md)** — current scenario catalogue and demo/acceptance intent; executable facts remain in fixtures/configuration.
+- **[TESTING.md](TESTING.md)** — cumulative-verification rules and existing runtime regression families. Refactor-specific AT01-AT24 and C0-C6 are owned by `IMPLEMENTATION_PLAN.md` until they are materialised in M0.
+- **[ENVIRONMENT.md](ENVIRONMENT.md)** — current runtime setup/environment variables and provider configuration.
+- **[DESIGN.md](DESIGN.md)** — user-facing design system.
+- **[MOTION_DESIGN.md](MOTION_DESIGN.md)** — browser-rendered motion/video production guidance.
+
+## Agent / implementation workflow
+
+- **[AGENT_MODEL_SELECTION.md](AGENT_MODEL_SELECTION.md)** — current harness/model/risk/effort routing policy.
+- **[IMPLEMENTATION_AGENT_ROUTING.md](IMPLEMENTATION_AGENT_ROUTING.md)** — three recommended model + harness routes for every M0-M11 milestone and C0-C6 checkpoint.
+- **[BUILD_WITH_QODER.md](BUILD_WITH_QODER.md)** — historical description of the original hackathon candidate's Qoder-heavy development workflow. It is not the current routing source of truth.
+
+Root [`AGENTS.md`](../AGENTS.md) defines how these documents interact during implementation.
+
+## Conflict rule
+
+Use the document appropriate to the question:
+
+- **What works right now?** -> code/tests + `CAPABILITIES_AND_LIMITATIONS.md`.
+- **What is the approved future architecture?** -> architecture closure + logical schema.
+- **What happens next?** -> implementation plan + roadmap.
+- **How should agents execute/review it?** -> agent model selection + implementation routing.
+
+If code and the approved target disagree during the refactor, do not silently choose one. Current code remains runtime truth until cutover; the approved target governs new refactor implementation unless a documented architecture gap forces a deliberate change.
