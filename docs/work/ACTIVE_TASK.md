@@ -143,10 +143,13 @@ fail-closed.
 - [x] Implementation commit `aae84a7ef5f974771b64faee92ccc83da8dfa074` on
       `milestone-m2`, parent `aab3d9f…` (the accepted C1 base). 52 files,
       +18413/−110.
-- [ ] Publication of `milestone-m2` to origin is this lane's terminal step, so it
-      is verified with `git ls-remote origin milestone-m2` in the completion
-      report rather than claimed in a commit. No merge into
-      `data-structure-refactor`.
+- [x] Publication. `git push -u origin milestone-m2` created the branch (exit 0),
+      and `git ls-remote origin refs/heads/milestone-m2
+      refs/heads/data-structure-refactor` afterwards returned `e571c02…` and
+      `aab3d9f…` respectively — the lane is published, the base is untouched, no
+      merge into `data-structure-refactor`. Commit 3 (`docs`-only) carries gaps
+      G9/G10 and this line; its own publication is re-verified the same way after
+      the push, because no commit can contain evidence of its own.
 
 ## Critical constraints
 
@@ -197,10 +200,23 @@ fail-closed.
 
 ## Next action
 
-M2 is complete on this worktree. The only step left here is exact-path staging,
-the two commits and `git push -u origin milestone-m2` (no merge into
-`data-structure-refactor`). For the integrator: M2 is the base M3/M4/M5 branch
-from, and the two decisions it deliberately leaves open are gap G1 (no read-only
-transaction on `UnitOfWork`, so reads run outside the command's snapshot) and the
-`G-P17` payload-error-shape divergence between the people lane and the
-travel/support lanes.
+Nothing remains for this lane: M2 is complete on this worktree and pushed to
+`origin/milestone-m2`, and it is **not** merged into `data-structure-refactor` —
+promoting it is the integrator's decision.
+
+Left deliberately open, in the order the integrator will meet them:
+
+- **G1** — no read-only transaction on `UnitOfWork`, so repository reads run
+  outside the command's snapshot.
+- **G-P17** — the payload-error-shape divergence between the people lane
+  (`safeParse` before `submitCommand`) and the travel/support lanes
+  (`Schema.parse`, so a raw `ZodError` reaches the ledger).
+- **G10** — `docs/ROADMAP.md` still shows M0 as *NEXT* and M1/M2 as *Planned*;
+  one integrator commit should set M0/M1/M2 at promotion rather than three lanes
+  editing adjacent rows.
+- **G9** — the legacy `npm test` browser/HTTP family is load-sensitive; it needs
+  one uncontended run on the base repository to be attributable. Owner: whoever
+  holds the legacy gate.
+
+Next dependency: M3/M4/M5 branch from this head, and C2 acceptance is the
+integrator's gate, not this lane's.
