@@ -82,3 +82,57 @@ Commit recordings only if they contain no secrets/unsafe personal data, terms al
 ## Deployment
 
 Deployment target is not frozen. Avoid architecture requiring persistent local disk outside storage abstraction. If target filesystem is ephemeral, replace SQLite repository implementation or attach persistent storage; do not rewrite domain logic.
+
+## Target PostgreSQL + PostGIS foundation (M1, isolated — not the active runtime)
+
+`docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md` and `docs/refactor/evidence/M1.md` are
+normative for the target persistence foundation. This section is only setup
+instructions. **The application's default composition still uses SQLite**
+(`SQLITE_PATH` above); nothing here changes that. `src/persistence/postgres/**`
+is an isolated seam imported only by its own tests and
+`composeTargetRuntime.ts` — never by `src/main.ts`/`src/app/compose.ts`.
+
+### Starting the isolated test instance
+
+Requires Docker (or another OCI runtime that understands `docker compose`).
+
+```bash
+npm run db:postgres:up      # postgis/postgis:16-3.4, isolated port/volume
+npm run test:postgres       # real-PostgreSQL M1 integration suite
+npm run db:postgres:down    # stop and discard all test data (tmpfs-backed)
+```
+
+`docker-compose.postgres-test.yml` binds to `55432` by default (override with
+`PGTEST_PORT`/`PGTEST_HOST`/`PGTEST_USER`/`PGTEST_PASSWORD`/`PGTEST_DB` env
+vars before `up`). Data lives on `tmpfs` inside the container — intentional:
+this is a disposable test instance, never a persistent store, and
+`db:postgres:down` (`-v`) discards it completely.
+
+### Target-runtime configuration variables
+
+Read by `src/persistence/postgres/config.ts` — completely separate from
+`loadConfig()`/`AppConfigSchema` above; setting these has **no effect** on the
+default SQLite runtime.
+
+- `PG_TARGET_HOST` (default `localhost`)
+- `PG_TARGET_PORT` (default `55432`, matching the compose file's default)
+- `PG_TARGET_DATABASE` (default `northstar_test`)
+- `PG_TARGET_USER` / `PG_TARGET_PASSWORD` (default `northstar_test` / `northstar_test`)
+- `PG_TARGET_SSL` (default `false`)
+- `PG_TARGET_POOL_MAX` (default `10`)
+- `PG_TARGET_MIGRATIONS_DIR` (default: `src/persistence/postgres/migrations`)
+
+`PGTEST_*` variables (used by the compose file itself) are also accepted as
+fallbacks for the matching `PG_TARGET_*` variable, so one `.env` block can
+configure both the container and the client.
+
+Never commit real credentials for this instance; the defaults above are
+test-only and match the compose file's own test-only defaults.
+
+### Driver
+
+`pg` (node-postgres) v8 — maintained, explicit parameterized SQL, explicit
+`BEGIN`/`COMMIT`/`ROLLBACK` transaction control via a checked-out
+`PoolClient`. No ORM/query-builder is used; see
+`src/persistence/postgres/pool.ts` and `docs/refactor/evidence/M1.md` for the
+full rationale.

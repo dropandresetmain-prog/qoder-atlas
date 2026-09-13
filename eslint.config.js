@@ -38,7 +38,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['fixtures/**/*.ts', 'test/**/*.ts'],
+    files: ['fixtures/**/*.ts', 'test/**/*.ts', 'postgres-integration/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
     },

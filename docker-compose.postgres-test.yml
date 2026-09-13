@@ -1,0 +1,27 @@
+# Isolated PostgreSQL + PostGIS instance for M1 persistence-foundation
+# integration tests. Never used by the default SQLite runtime composition.
+#
+# Usage:
+#   docker compose -f docker-compose.postgres-test.yml up -d
+#   npm run test:postgres
+#   docker compose -f docker-compose.postgres-test.yml down -v
+#
+# Port/credentials are test-only and never point at a shared/production
+# database. Override via PGTEST_* env vars if 55432 is already in use locally.
+services:
+  postgres-test:
+    image: postgis/postgis:16-3.4
+    container_name: northstar-postgres-test
+    environment:
+      POSTGRES_USER: ${PGTEST_USER:-northstar_test}
+      POSTGRES_PASSWORD: ${PGTEST_PASSWORD:-northstar_test}
+      POSTGRES_DB: ${PGTEST_DB:-northstar_test}
+    ports:
+      - '${PGTEST_PORT:-55432}:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${PGTEST_USER:-northstar_test} -d ${PGTEST_DB:-northstar_test}']
+      interval: 2s
+      timeout: 3s
+      retries: 30
