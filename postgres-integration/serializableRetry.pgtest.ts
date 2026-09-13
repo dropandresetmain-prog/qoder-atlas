@@ -15,13 +15,15 @@ describe('M1 SERIALIZABLE predicate conflict + bounded retry (real PostgreSQL, i
     const uowB = new PgUnitOfWork(pool, workspaceId);
 
     const runAdvance = (uow: PgUnitOfWork, actor: string) =>
-      uow.execute(
+      {
+        const idempotencyKey = randomUUID();
+        return uow.execute(
         {
           commandType: 'TEST_ADVANCE_SCOPE',
           schemaVersion: '1',
           workspaceId,
           actorPrincipalId: actor,
-          idempotencyKey: randomUUID(),
+          idempotencyKey,
           canonicalPayloadHash: 'n/a',
           expectedAggregateRevisions: [],
           expectedScopeGenerations: [],
@@ -36,7 +38,7 @@ describe('M1 SERIALIZABLE predicate conflict + bounded retry (real PostgreSQL, i
             receipt: {
               workspaceId,
               commandNamespace: 'TEST_ADVANCE_SCOPE',
-              idempotencyKey: randomUUID(),
+              idempotencyKey,
               payloadHash: 'n/a',
               resultRef: JSON.stringify({ generation }),
               committedRevisions: [],
@@ -44,7 +46,8 @@ describe('M1 SERIALIZABLE predicate conflict + bounded retry (real PostgreSQL, i
             },
           };
         },
-      );
+        );
+      };
 
     // If PgUnitOfWork.execute's bounded SERIALIZABLE retry did not work, one
     // of these two would reject with an unhandled 40001 serialization_failure
@@ -62,5 +65,28 @@ describe('M1 SERIALIZABLE predicate conflict + bounded retry (real PostgreSQL, i
       [workspaceId, scopeRef.scopeKind, scopeRef.scopeId],
     );
     assert.equal(Number(finalRow.rows[0]?.generation), 2);
+  });
+
+  test('retry exhaustion returns a typed conflict after rolling back the failed transaction', async () => {
+    const pool = await sharedTestPool();
+    const workspaceId = freshWorkspaceId();
+    const uow = new PgUnitOfWork(pool, workspaceId, 1);
+
+    const result = await uow.execute(
+      {
+        commandType: 'FORCED_RETRY_EXHAUSTION', schemaVersion: '1', workspaceId,
+        actorPrincipalId: 'tester', idempotencyKey: randomUUID(), canonicalPayloadHash: 'forced-40001',
+        expectedAggregateRevisions: [], expectedScopeGenerations: [], evidenceRefs: [], typedPayload: {},
+      },
+      async () => {
+        await (await import('../src/persistence/postgres/transactionContext.ts')).currentTransactionClient().query(
+          "DO $$ BEGIN RAISE EXCEPTION 'forced serialization' USING ERRCODE = '40001'; END $$;",
+        );
+        throw new Error('unreachable');
+      },
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.conflict.kind, 'SERIALIZATION_RETRY_EXHAUSTED');
   });
 });

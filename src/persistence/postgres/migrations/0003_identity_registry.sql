@@ -82,6 +82,13 @@ BEGIN
       RAISE EXCEPTION
         'domain_subjects subtype violation: no workspaces row for WORKSPACE subject %', NEW.id;
     END IF;
+  ELSE
+    -- Future kinds are listed in the registry contract now, but their typed
+    -- tables do not exist until their owning migration. Fail closed rather
+    -- than letting an untyped registry/head pair become authoritative.
+    RAISE EXCEPTION
+      'domain_subjects subtype violation: kind % has no installed typed-table enforcement',
+      NEW.kind;
   END IF;
   RETURN NEW;
 END;

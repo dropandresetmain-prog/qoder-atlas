@@ -36,11 +36,37 @@ export const CommandReceiptSchema = z.strictObject({
   commandNamespace: z.string().min(1),
   idempotencyKey: z.string().min(1),
   payloadHash: z.string().min(1),
-  resultRef: z.string().min(1),
+  /**
+   * JSON serialization of the committed command result. This remains named
+   * `resultRef` for the frozen receipt shape, but it is not an opaque pointer:
+   * equal-key replay decodes this exact value without re-running the handler.
+   */
+  resultRef: z.string().min(1).refine((value) => {
+    try {
+      JSON.parse(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'resultRef must be valid JSON'),
   committedRevisions: z.array(ExpectedRevisionSchema),
   committedAt: z.iso.datetime({ offset: true }),
 });
 export type CommandReceipt = z.infer<typeof CommandReceiptSchema>;
+
+/** Serializes a JSON-compatible committed result for durable replay. */
+export function serializeCommandResult(value: unknown): string {
+  const serialized = JSON.stringify(value);
+  if (typeof serialized !== 'string') {
+    throw new Error('command result must be JSON-compatible for idempotent replay');
+  }
+  return serialized;
+}
+
+/** Decodes a result previously validated by CommandReceiptSchema and the database constraint. */
+export function parseCommandResult(value: string): unknown {
+  return JSON.parse(value);
+}
 
 /** Typed outcome — never an unconditional upsert. Exactly one branch is populated. */
 export const DomainCommandResultSchema = z.discriminatedUnion('status', [

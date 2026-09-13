@@ -17,6 +17,7 @@ import { currentTransactionClient } from './transactionContext.ts';
 
 interface HeadRow {
   aggregate_id: string;
+  kind: string;
   revision: string; // bigint comes back as string from node-postgres
 }
 
@@ -32,8 +33,12 @@ export class PgAggregateHeadReader implements AggregateHeadReader {
   /** Read-only snapshot read outside any transaction. */
   async loadHead(ref: TypedRef): Promise<RootRevision | undefined> {
     const result = await this.pool.query<HeadRow>(
-      'SELECT aggregate_id, revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2',
-      [this.workspaceId, ref.id],
+      `SELECT h.aggregate_id, s.kind, h.revision
+       FROM aggregate_heads h
+       JOIN domain_subjects s
+         ON s.workspace_id = h.workspace_id AND s.id = h.aggregate_id
+       WHERE h.workspace_id = $1 AND h.aggregate_id = $2 AND s.kind = $3`,
+      [this.workspaceId, ref.id, ref.kind],
     );
     const row = result.rows[0];
     if (!row) return undefined;
@@ -51,17 +56,20 @@ export class PgAggregateHeadReader implements AggregateHeadReader {
     const client = currentTransactionClient();
     const ids = [...new Set(refs.map((r) => r.id))].sort();
     const result = await client.query<HeadRow>(
-      `SELECT aggregate_id, revision FROM aggregate_heads
-       WHERE workspace_id = $1 AND aggregate_id = ANY($2::uuid[])
-       ORDER BY aggregate_id
-       FOR UPDATE`,
+      `SELECT h.aggregate_id, s.kind, h.revision
+       FROM aggregate_heads h
+       JOIN domain_subjects s
+         ON s.workspace_id = h.workspace_id AND s.id = h.aggregate_id
+       WHERE h.workspace_id = $1 AND h.aggregate_id = ANY($2::uuid[])
+       ORDER BY h.aggregate_id
+       FOR UPDATE OF h`,
       [this.workspaceId, ids],
     );
-    const byId = new Map(result.rows.map((row) => [row.aggregate_id, Number(row.revision)]));
+    const byId = new Map(result.rows.map((row) => [row.aggregate_id, { kind: row.kind, revision: Number(row.revision) }]));
     const out: RootRevision[] = [];
     for (const ref of refs) {
-      const revision = byId.get(ref.id);
-      if (revision !== undefined) out.push({ aggregateRef: ref, revision });
+      const head = byId.get(ref.id);
+      if (head?.kind === ref.kind) out.push({ aggregateRef: ref, revision: head.revision });
     }
     return out;
   }

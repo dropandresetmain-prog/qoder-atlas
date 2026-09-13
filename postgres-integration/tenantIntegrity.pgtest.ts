@@ -98,4 +98,56 @@ describe('M1 tenant/subtype integrity (real PostgreSQL)', () => {
     assert.equal(heads.rows.length, 1);
     assert.equal(Number(heads.rows[0].revision), 2);
   });
+
+  test('a correct ID with the wrong TypedRef kind is not a valid aggregate head', async () => {
+    const pool = await sharedTestPool();
+    const workspaceId = freshWorkspaceId();
+    const uow = new PgUnitOfWork(pool, workspaceId);
+    const created = await registerWorkspace(uow, {
+      actorPrincipalId: 'tester', idempotencyKey: randomUUID(), name: 'Wrong Kind Co', workspaceId,
+    });
+    assert.ok(created.ok);
+
+    assert.equal(await uow.heads.loadHead({ kind: 'TRIP', id: workspaceId }), undefined);
+    const result = await uow.execute(
+      {
+        commandType: 'WRONG_KIND_HEAD_PROBE', schemaVersion: '1', workspaceId,
+        actorPrincipalId: 'tester', idempotencyKey: randomUUID(), canonicalPayloadHash: 'wrong-kind',
+        expectedAggregateRevisions: [{ aggregateRef: { kind: 'TRIP', id: workspaceId }, expectedRevision: 1 }],
+        expectedScopeGenerations: [], evidenceRefs: [], typedPayload: {},
+      },
+      async () => {
+        throw new Error('wrong-kind reference must fail before the command callback runs');
+      },
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.conflict.kind, 'STALE_AGGREGATE_REVISION');
+  });
+
+  test('a pre-registered kind without an installed typed-table branch is rejected', async () => {
+    const pool = await sharedTestPool();
+    const workspaceId = freshWorkspaceId();
+    const uow = new PgUnitOfWork(pool, workspaceId);
+    const created = await registerWorkspace(uow, {
+      actorPrincipalId: 'tester', idempotencyKey: randomUUID(), name: 'Subtype Co', workspaceId,
+    });
+    assert.ok(created.ok);
+
+    const subjectId = randomUUID();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('INSERT INTO aggregate_heads (workspace_id, aggregate_id, revision) VALUES ($1, $2, 1)', [
+        workspaceId, subjectId,
+      ]);
+      await client.query(
+        "INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1, $2, 'TRIP', $2)",
+        [workspaceId, subjectId],
+      );
+      await assert.rejects(() => client.query('COMMIT'), /subtype violation|typed-table enforcement/i);
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
+  });
 });

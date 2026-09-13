@@ -12,6 +12,7 @@ import { TypedRefSchema } from './identity.ts';
 export const TypedConflictKindSchema = z.enum([
   'STALE_AGGREGATE_REVISION',
   'SCOPE_GENERATION_MISMATCH',
+  'SERIALIZATION_RETRY_EXHAUSTED',
   'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
   'DUPLICATE_REGISTRATION',
   'VALIDATION_FAILED',

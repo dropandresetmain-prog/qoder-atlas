@@ -12,7 +12,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { DomainCommandEnvelopeSchema, type DomainCommandEnvelope, type CommandReceipt } from '../../contracts/v2/command/domainCommand.ts';
+import {
+  DomainCommandEnvelopeSchema,
+  serializeCommandResult,
+  type DomainCommandEnvelope,
+  type CommandReceipt,
+} from '../../contracts/v2/command/domainCommand.ts';
 import type { UnitOfWork } from '../../contracts/v2/command/unitOfWork.ts';
 import type { ExecuteOutcome } from './pgUnitOfWork.ts';
 import { typedConflict } from '../../domain/v2/shared/errors.ts';
@@ -70,7 +75,7 @@ function buildReceipt(envelope: DomainCommandEnvelope, value: WorkspaceCommandRe
     commandNamespace: envelope.commandType,
     idempotencyKey: envelope.idempotencyKey,
     payloadHash: envelope.canonicalPayloadHash,
-    resultRef: JSON.stringify(value),
+    resultRef: serializeCommandResult(value),
     committedRevisions: [
       {
         aggregateRef: { kind: 'WORKSPACE', id: value.workspaceId },

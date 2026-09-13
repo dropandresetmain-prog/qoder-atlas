@@ -27,8 +27,13 @@ import type {
   IdempotencyLedger,
   ScopeGenerationLedger,
 } from '../../contracts/v2/command/unitOfWork.ts';
-import type { DomainCommandEnvelope, CommandReceipt } from '../../contracts/v2/command/domainCommand.ts';
-import type { RootRevision, ExpectedRevision, ScopeGenerationRef, TypedRef } from '../../domain/v2/shared/identity.ts';
+import {
+  CommandReceiptSchema,
+  parseCommandResult,
+  type DomainCommandEnvelope,
+  type CommandReceipt,
+} from '../../contracts/v2/command/domainCommand.ts';
+import { sameRef, type RootRevision, type ExpectedRevision, type ScopeGenerationRef, type TypedRef } from '../../domain/v2/shared/identity.ts';
 import type { TypedConflict } from '../../domain/v2/shared/errors.ts';
 import { typedConflict } from '../../domain/v2/shared/errors.ts';
 import { PgAggregateHeadReader } from './pgAggregateHeadReader.ts';
@@ -107,6 +112,15 @@ export class PgUnitOfWork implements UnitOfWork {
         if (isRetryableError(error) && attempt < this.maxSerializationRetries) {
           continue;
         }
+        if (isRetryableError(error)) {
+          return {
+            ok: false,
+            conflict: typedConflict(
+              'SERIALIZATION_RETRY_EXHAUSTED',
+              `command could not commit after ${attempt} serializable transaction attempt(s); retry with fresh state`,
+            ),
+          };
+        }
         throw error;
       } finally {
         client.release();
@@ -140,13 +154,13 @@ export class PgUnitOfWork implements UnitOfWork {
       };
     }
     if (claim.outcome === 'REPLAY') {
-      return { ok: true, value: JSON.parse(claim.receipt.resultRef) as T, receipt: claim.receipt };
+      return { ok: true, value: parseCommandResult(claim.receipt.resultRef) as T, receipt: claim.receipt };
     }
 
     const refs = dedupeRefs(envelope.expectedAggregateRevisions.map((r) => r.aggregateRef));
     const lockedHeads = await this.heads.lockHeads(refs);
     for (const expected of envelope.expectedAggregateRevisions) {
-      const found = lockedHeads.find((h) => h.aggregateRef.id === expected.aggregateRef.id);
+      const found = lockedHeads.find((h) => sameRef(h.aggregateRef, expected.aggregateRef));
       if (!found || found.revision !== expected.expectedRevision) {
         return {
           ok: false,
@@ -179,7 +193,27 @@ export class PgUnitOfWork implements UnitOfWork {
     });
     if (!outcome.ok) return outcome;
 
-    await insertCommandReceipt(outcome.receipt);
-    return outcome;
+    const parsedReceipt = CommandReceiptSchema.safeParse(outcome.receipt);
+    if (!parsedReceipt.success) {
+      return {
+        ok: false,
+        conflict: typedConflict('VALIDATION_FAILED', 'command handler returned an invalid receipt'),
+      };
+    }
+    const receipt = parsedReceipt.data;
+    if (
+      receipt.workspaceId !== envelope.workspaceId ||
+      receipt.commandNamespace !== commandNamespace ||
+      receipt.idempotencyKey !== envelope.idempotencyKey ||
+      receipt.payloadHash !== envelope.canonicalPayloadHash
+    ) {
+      return {
+        ok: false,
+        conflict: typedConflict('VALIDATION_FAILED', 'command receipt does not match its command envelope'),
+      };
+    }
+
+    await insertCommandReceipt(receipt);
+    return { ok: true, value: outcome.value, receipt };
   }
 }

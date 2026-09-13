@@ -7,7 +7,9 @@ CREATE TABLE command_receipts (
   command_namespace text NOT NULL,
   idempotency_key text NOT NULL,
   payload_hash text NOT NULL,
-  result_ref text NOT NULL,
+  -- `result_ref` is the durable JSON serialization replayed by PgUnitOfWork;
+  -- it is deliberately not an arbitrary opaque string despite the frozen name.
+  result_ref text NOT NULL CHECK (result_ref IS JSON),
   committed_revisions jsonb NOT NULL,
   committed_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (workspace_id, command_namespace, idempotency_key)
