@@ -2,10 +2,10 @@
 
 Status: **M0 CONTRACTS MATERIALIZED — NOT WIRED INTO PRODUCTION**.
 
-Base SHA at package start: `29118bccacbca02b48334030e335eb94d2858d52` (branch
-`data-structure-refactor`; see "Base SHA discrepancy" in
-[`evidence/M0.md`](evidence/M0.md) for why this differs from the milestone
-brief's stated starting SHA).
+Base SHA: `8eefd220e031c0abed306305a1628b5e033cc0ef` (branch
+`data-structure-refactor`, matching the milestone brief exactly — see "Base
+SHA discrepancy" in [`evidence/M0.md`](evidence/M0.md) for a self-corrected
+note on why the local clone initially resolved a different, older HEAD).
 
 This document is the exact-path index C0 needs to freeze the contract
 package. It records **where** each frozen contract family
