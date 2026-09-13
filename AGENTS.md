@@ -23,9 +23,10 @@ Before broad implementation, inspect the actual branch/head and read the relevan
 5. `docs/CAPABILITIES_AND_LIMITATIONS.md` — **implemented reality today**. Target design is not implementation evidence.
 6. `docs/ROADMAP.md` — capability/refactor status and intentionally deferred scope.
 7. `docs/TESTING.md` — cumulative verification rules and current-runtime regression families.
-8. `docs/AGENT_MODEL_SELECTION.md` — current model/harness routing policy.
-9. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — three recommended model+harness routes for each M0-M11 milestone and C0-C6 checkpoint.
-10. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
+8. `docs/AGENT_MODEL_SELECTION.md` — current operational model/harness routing policy.
+9. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
+10. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — three alternative model+harness routes for each M0-M11 milestone and C0-C6 checkpoint.
+11. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
 
 `docs/BUILD_WITH_QODER.md` is a historical record of how the original hackathon candidate was built. It is not the current routing policy.
 
@@ -70,9 +71,13 @@ Owns cross-lane seams and accepted contract reconciliation.
 - Do not let a lane solve integration by creating a local contract variant.
 
 ### Reviewer
-Used at C0-C6 as specified, and exceptionally for material architecture, persistence, authority, security, migration or irreversible-action risk.
+Independent model review is **uncertainty-driven**, not automatically attached to every checkpoint.
 
-- Prefer a different model family from the main implementer for Critical work.
+- Bounded/Normal work does not get a reviewer by default.
+- Complex work gets review only for material uncertainty, cross-contract risk or an expensive seam.
+- Critical work normally gets **one** independent reviewer plus required execution evidence when that reviewer materially reduces unresolved risk.
+- A checkpoint remains an acceptance/evidence gate even when no independent model review is needed.
+- Prefer a different model family/surface from the implementer when independence matters.
 - Inspect actual repository SHA and existing evidence first.
 - Run additional checks only for concrete unresolved questions.
 - Classify every finding exactly: `Act Now`, `Investigate Now`, `Park for Later`, or `Ignore / Accept Risk`.
@@ -137,19 +142,21 @@ If the approved ontology/contracts cannot express a requirement, report an **arc
 
 ## Agent routing
 
-Follow `docs/AGENT_MODEL_SELECTION.md` and the milestone/checkpoint options in `docs/IMPLEMENTATION_AGENT_ROUTING.md`.
+Follow `docs/AGENT_MODEL_SELECTION.md` and the milestone/checkpoint alternatives in `docs/IMPLEMENTATION_AGENT_ROUTING.md`. Load `docs/MODELS_ARSENAL.md` only when the routing decision itself needs deeper/updated evidence.
 
 There is **no single default implementation harness**. Route in this order:
 
-`role -> harness capability -> risk class -> independence -> effort`.
+`role -> harness capability -> task shape/risk -> independence -> effort`.
 
 Important current observations:
 
+- The frozen architecture means much difficult M0-M11 work is **Bounded/Hard Bounded**, not automatically Complex.
 - Cursor/Codex/Claude Code are preferred for time-sensitive local write/run/fix loops.
-- Qoder remains useful for Qwen/Kimi work but has been slow on the user's ARM64 machine; do not put urgent local iteration on it merely because the model is strong.
-- Kilo + OpenRouter is useful for economical/alternative-family bounded work when privacy/reliability are acceptable.
-- ChatGPT + GitHub and Astra are strong planning/static-review surfaces, but static inspection is not execution evidence.
-- Use Sol/Opus-class premium models for concrete Critical seams or independent high-stakes review, not ceremonial escalation.
+- Qwen3.8-Flash and GLM-5.3-Flash are legitimate defined-task implementers, not merely cheap subagents.
+- Qoder remains useful for Qwen/Kimi/GLM work; its ARM64 latency is a harness constraint, not a model-quality judgement.
+- Astra is a **model**, not a harness, and belongs in Complex/Critical architecture/investigation rather than Normal implementation.
+- Luna High/xHigh/Max are serious bounded implementation routes when the destination is already clear.
+- Sol/Opus/Astra-class use is escalation for concrete ambiguity/risk, not a tax on every Critical-labelled milestone.
 - Model choice stays separate from the execution prompt.
 
 For long-horizon work, use `docs/work/ACTIVE_TASK.md` as working memory when the task is likely to exceed a normal coding session. Re-read it before major phases, after compaction/delegation and before completion; close checklist items only with evidence.
