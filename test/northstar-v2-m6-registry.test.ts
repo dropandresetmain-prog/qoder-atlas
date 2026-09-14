@@ -10,7 +10,7 @@ import { assessSubject } from '../src/resolution/evaluation/assess.ts';
 import { emptyWorld, effectiveOf, id } from './support/m6World.ts';
 
 const CONTRACT_FAMILIES = [
-  'm6.booking', 'm6.connection', 'm6.credentials', 'm6.entry', 'm6.funding', 'm6.group', 'm6.objective', 'm6.overnight', 'm6.participation', 'm6.support',
+  'm6.booking', 'm6.connection', 'm6.credentials', 'm6.entry', 'm6.funding', 'm6.group', 'm6.information', 'm6.objective', 'm6.overnight', 'm6.participation', 'm6.support',
 ];
 
 test('registry holds every contract family once with no dimension collision', () => {
@@ -20,7 +20,7 @@ test('registry holds every contract family once with no dimension collision', ()
   assert.equal(new Set(ids).size, ids.length);
   const dims = M6_EVALUATORS.flatMap((e) => e.dimensions);
   assert.equal(new Set(dims).size, dims.length);
-  for (const topic of ['ENTRY_REQUIREMENT', 'TRANSIT_REQUIREMENT']) assert.ok(registry.informationTopics.includes(topic), `topic ${topic}`);
+  for (const topic of ['ADVISORY', 'CONDITION', 'ENTRY_REQUIREMENT', 'TRANSIT_REQUIREMENT']) assert.ok(registry.informationTopics.includes(topic), `topic ${topic}`);
   for (const e of M6_EVALUATORS) assert.deepEqual(e.subjectKinds, ['JOURNEY'], `${e.id} assesses Journeys`);
 });
 

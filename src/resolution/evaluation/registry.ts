@@ -16,6 +16,7 @@ import { credentialsEvaluator } from './evaluators/credentials.ts';
 import { entryEvaluator } from './evaluators/entry.ts';
 import { fundingEvaluator } from './evaluators/funding.ts';
 import { groupEvaluator } from './evaluators/group.ts';
+import { informationEvaluator } from './evaluators/information.ts';
 import { objectiveEvaluator } from './evaluators/objective.ts';
 import { overnightEvaluator } from './evaluators/overnight.ts';
 import { participationEvaluator } from './evaluators/participation.ts';
@@ -32,6 +33,7 @@ export const M6_EVALUATORS: readonly Evaluator[] = [
   fundingEvaluator,
   credentialsEvaluator,
   entryEvaluator,
+  informationEvaluator,
 ];
 
 export function createM6Registry(): EvaluatorRegistry {
