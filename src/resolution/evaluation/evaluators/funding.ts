@@ -206,6 +206,17 @@ export const fundingEvaluator: Evaluator = {
       }
     }
 
+    // Every allocation carried neither payer type: nothing was actually evaluated
+    // (each iteration `continue`d without a claim). `dimension()` on an empty
+    // explanation list still reports `applicable: true` with an UNKNOWN verdict
+    // and no explanation/reasonCode/uncertainty behind it — a blocking dimension
+    // with nothing to show is worse than contract rule 2 ("absence is never
+    // PASS"); it is absence with no signal at all. Report not-applicable instead,
+    // matching "No allocations ⇒ not applicable" for this equivalent case.
+    if (explanations.length === 0) {
+      return { dimensions: [notApplicable(DIMENSION)], evidence: [], missingCoverage: [] };
+    }
+
     const evidence = dedupeEvidence(explanations.flatMap((e) => e.evidenceRefs));
     return {
       dimensions: [dimension({ dimension: DIMENSION, explanations })],
