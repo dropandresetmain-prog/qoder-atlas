@@ -25,7 +25,9 @@ import type {
 import type { InstantInterval } from '../../../domain/v2/shared/time.ts';
 import type { ActorContext } from './people.ts';
 
-export type OptionalWindow = Pick<InstantInterval, 'start' | 'end'>;
+// One definition shared with the travel ports, so the repository barrel re-exports a single symbol.
+export type { OptionalWindow } from './travel.ts';
+import type { OptionalWindow } from './travel.ts';
 
 export interface EventRepository {
   create(params: { event: Event; actor: ActorContext }): Promise<void>;

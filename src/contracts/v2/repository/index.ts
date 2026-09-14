@@ -11,3 +11,6 @@ export type * from './travel.ts';
 export type * from './queries.ts';
 export type * from './arrangements.ts';
 export type * from './arrangementQueries.ts';
+export type * from './programmes.ts';
+export type * from './programmeQueries.ts';
+export type * from './knowledge.ts';

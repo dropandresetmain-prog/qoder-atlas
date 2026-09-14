@@ -43,6 +43,7 @@ import {
   seedTraveller,
   seedTrip,
   type SeedSession,
+  attachSeedSession,
 } from './m2Seed.ts';
 import {
   seedEvent,
@@ -151,9 +152,7 @@ async function fixture(): Promise<Fixture> {
  * exactly as `m2People.pgtest.ts`'s workspace-per-fixture pattern requires.
  */
 async function attachSeed(f: Fixture): Promise<SeedSession> {
-  const client = await f.pool.connect();
-  await client.query('BEGIN');
-  return { client, workspaceId: f.workspaceId, actorId: f.identity.actorPrincipalId };
+  return attachSeedSession(f.pool, f.workspaceId, f.identity.actorPrincipalId);
 }
 
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {

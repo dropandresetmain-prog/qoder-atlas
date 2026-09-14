@@ -3,7 +3,7 @@
  *
  * This file is the integrator's own proof of the four C1 amendments as they
  * apply to the identity registry. It deliberately depends on nothing any M2
- * lane wrote — only on `m2Seed.ts` and raw SQL — so the acceptance evidence for
+ * lane command — only on `m2Seed.ts` and raw SQL — so the acceptance evidence for
  * the pattern M3/M4/M5 must copy cannot be produced by the same code it audits.
  *
  * Two mechanisms are proven separately, because conflating them is the classic
@@ -66,14 +66,7 @@ const M3_ACTIVATED_KINDS = [
   'BUDGET',
 ];
 
-/**
- * Kinds M4 activates — must match docs/refactor/evidence/M4.md exactly.
- * Added when M4 landed on this branch: EVENT/PROGRAMME/PROGRAMME_ITEM/
- * PARTICIPATION/PLACE/GEOGRAPHIC_AREA/JURISDICTION now have installed
- * checkers, so the "no M3/M4/M5 kind leaked a checker" invariant below is
- * scoped to M3/M5 from this point on — M4's own activation is expected,
- * not a leak.
- */
+/** Kinds M4 activates — must match docs/refactor/evidence/M4.md exactly. */
 const M4_ACTIVATED_KINDS = [
   'EVENT',
   'PROGRAMME',
@@ -82,6 +75,26 @@ const M4_ACTIVATED_KINDS = [
   'PLACE',
   'GEOGRAPHIC_AREA',
   'JURISDICTION',
+];
+
+/** Kinds M5 activates — must match docs/refactor/evidence/M5.md exactly. */
+const M5_ACTIVATED_KINDS = [
+  'SOURCE_RECORD',
+  'EVIDENCE_RECORD',
+  'OBJECTIVE',
+  'CONSTRAINT_DEFINITION',
+  'RULE_SET',
+  'PREFERENCE',
+  'INFORMATION_RECORD',
+  'INFORMATION_VERSION',
+];
+
+/** M2-M5 integration: every lane-activated kind, checked together (docs/refactor/evidence/M2_M5_INTEGRATION.md). */
+const INTEGRATED_ACTIVATED_KINDS = [
+  ...M2_ACTIVATED_KINDS,
+  ...M3_ACTIVATED_KINDS,
+  ...M4_ACTIVATED_KINDS,
+  ...M5_ACTIVATED_KINDS,
 ];
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
@@ -100,7 +113,7 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     );
     const kinds = registered.rows.map((row) => row.kind);
     assert.ok(kinds.includes('WORKSPACE'), 'M1 WORKSPACE branch must survive the dispatcher rewrite');
-    for (const kind of M2_ACTIVATED_KINDS) {
+    for (const kind of INTEGRATED_ACTIVATED_KINDS) {
       assert.ok(kinds.includes(kind), `${kind} must have an installed subtype checker`);
     }
   });
@@ -110,9 +123,19 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     const leaked = await pool.query<{ kind: string }>(
       `SELECT kind FROM subject_subtype_checkers
         WHERE kind <> ALL($1::text[])`,
-      [[...M2_ACTIVATED_KINDS, ...M3_ACTIVATED_KINDS, ...M4_ACTIVATED_KINDS, 'WORKSPACE']],
+      [[...INTEGRATED_ACTIVATED_KINDS, 'WORKSPACE']],
     );
-    assert.deepEqual(leaked.rows, [], 'no kind outside the integrated M2/M3/M4 lanes may install a subtype checker');
+    assert.deepEqual(leaked.rows, [], 'no kind outside the integrated M2/M3/M4/M5 lanes may install a subtype checker');
+
+    const active = await pool.query<{ kind: string }>(
+      'SELECT kind FROM subject_subtype_checkers WHERE kind = ANY($1::text[]) ORDER BY kind COLLATE "C"',
+      [INTEGRATED_ACTIVATED_KINDS],
+    );
+    assert.deepEqual(
+      active.rows.map((row) => row.kind),
+      [...INTEGRATED_ACTIVATED_KINDS].sort(),
+      'every kind an integrated lane activates must have its checker row',
+    );
 
     // The kinds are pre-registered (that is the frozen contract) but unactivated.
     const pending = await pool.query<{ kind: string }>(
@@ -464,6 +487,20 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // M4 (0056): bounded operating-requirement detail nothing reverse-looks-up,
       // shape-checked by programme_items_operating_requirements_shape.
       'programme_items.operating_requirements',
+      // M5's version-tagged source/detail/coverage payloads and closed rule grammar.
+      'source_records.capture_metadata',
+      'constraint_definitions.parameter_schema',
+      'rule_set_versions.expression',
+      'rules.expression',
+      'rule_assignments.population_parameters',
+      'preferences.value',
+      'advisory_details.publisher_meanings',
+      'advisory_details.source_native_detail',
+      'condition_details.uncertainty_parameters',
+      'condition_details.source_native_detail',
+      'information_scopes.population_parameters',
+      'knowledge_coverage.query_bounds',
+      'information_quarantine.rejected_summary',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

@@ -32,6 +32,9 @@ export interface SeedSession {
   client: PoolClient;
   workspaceId: string;
   actorId: string;
+  /** Pre-registered provenance rows used by legacy M2 fixtures after 0085. */
+  evidenceIds: string[];
+  evidenceCursor: number;
 }
 
 export async function beginSeed(pool: Pool, workspaceName = 'M2 Seed Co'): Promise<SeedSession> {
@@ -39,7 +42,61 @@ export async function beginSeed(pool: Pool, workspaceName = 'M2 Seed Co'): Promi
   const workspaceId = randomUUID();
   await client.query('BEGIN');
   await client.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, workspaceName]);
-  return { client, workspaceId, actorId: 'principal:m2-seed' };
+  const actorId = 'principal:m2-seed';
+  return { client, workspaceId, actorId, evidenceIds: await seedEvidencePool(client, workspaceId, actorId, 128), evidenceCursor: 0 };
+}
+
+/**
+ * Opens a follow-up seed transaction against an already-committed workspace.
+ * `beginSeed` always mints a new workspace, so tests that need more rows in an
+ * existing fixture workspace use this instead. The session carries its own
+ * evidence pool, because every M2/M4 provenance column is FK-closed onto M5's
+ * `evidence_records` once the lanes are integrated (0085, 0087).
+ */
+export async function attachSeedSession(
+  pool: Pool,
+  workspaceId: string,
+  actorId: string,
+  evidencePoolSize = 32,
+): Promise<SeedSession> {
+  const client = await pool.connect();
+  await client.query('BEGIN');
+  return { client, workspaceId, actorId, evidenceIds: await seedEvidencePool(client, workspaceId, actorId, evidencePoolSize), evidenceCursor: 0 };
+}
+
+/** Registers `size` fixture source+evidence rows so provenance FKs resolve to real M5 rows. */
+async function seedEvidencePool(client: PoolClient, workspaceId: string, actorId: string, size: number): Promise<string[]> {
+  const evidenceIds: string[] = [];
+  for (let index = 0; index < size; index++) {
+    const sourceId = randomUUID();
+    const evidenceId = randomUUID();
+    evidenceIds.push(evidenceId);
+    await client.query(
+      `INSERT INTO source_records
+         (workspace_id, id, source_identity, received_at, content_hash, content_type,
+          capture_metadata, capture_metadata_version, created_by_actor_id)
+       VALUES ($1, $2, 'm2-fixture-source', '2000-01-01T00:00:00Z', $3, 'application/test', '{}', 'm2-fixture/1', $4)`,
+      [workspaceId, sourceId, randomUUID().replace(/-/g, '').padEnd(64, 'e'), actorId],
+    );
+    await client.query(
+      `INSERT INTO evidence_records
+         (workspace_id, id, assertion_type, observed_at, schema_version, created_by_actor_id)
+       VALUES ($1, $2, 'M2_FIXTURE_PROVENANCE', '2000-01-01T00:00:00Z', 'm2-fixture/1', $3)`,
+      [workspaceId, evidenceId, actorId],
+    );
+    await client.query(
+      `INSERT INTO evidence_sources (workspace_id, evidence_record_id, source_record_id)
+       VALUES ($1, $2, $3)`,
+      [workspaceId, evidenceId, sourceId],
+    );
+  }
+  return evidenceIds;
+}
+
+export function takeSeedEvidence(seed: SeedSession): string {
+  const evidenceId = seed.evidenceIds[seed.evidenceCursor++];
+  if (!evidenceId) throw new Error('M2 fixture evidence pool exhausted');
+  return evidenceId;
 }
 
 export async function commitSeed(seed: SeedSession): Promise<void> {
@@ -110,7 +167,7 @@ export async function seedTraveller(
       displayNameId,
       travellerId,
       opts.displayName ?? 'Seed Traveller',
-      randomUUID(),
+      takeSeedEvidence(seed),
       seed.actorId,
     ],
   );
@@ -168,7 +225,7 @@ export async function seedCredential(
       params.editionNumber ?? 1,
       params.issueDate ?? '2020-01-01',
       params.expiryDate === null ? null : (params.expiryDate ?? '2030-01-01'),
-      randomUUID(),
+      takeSeedEvidence(seed),
       seed.actorId,
     ],
   );

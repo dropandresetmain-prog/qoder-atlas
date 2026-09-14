@@ -30,7 +30,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed, seedTraveller, type SeedSession } from './m2Seed.ts';
+import { attachSeedSession, beginSeed, commitSeed, seedTraveller, type SeedSession } from './m2Seed.ts';
 import { seedJurisdiction } from './m4Seed.ts';
 import { PgUnitOfWork, type ExecuteFn, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { currentTransactionClient, runWithTransactionClient } from '../src/persistence/postgres/transactionContext.ts';
@@ -91,14 +91,25 @@ interface Fixture {
   actorId: string;
   /** Monotonic per fixture so two commands in one test never share a key. */
   seq: { value: number };
+  evidenceIds: string[];
+  evidenceCursor: number;
 }
 
-/** A workspace with nothing in it but the partition row. */
+function nextEvidenceId(f: Fixture): string {
+  const evidenceId = f.evidenceIds[f.evidenceCursor++];
+  if (!evidenceId) throw new Error('M2 people fixture evidence pool exhausted');
+  return evidenceId;
+}
+
+/** A workspace with only fixture provenance rows beyond the partition row. */
 async function bareFixture(): Promise<Fixture> {
   const pool = await sharedTestPool();
   const seed = await beginSeed(pool);
   await commitSeed(seed);
-  return { pool, workspaceId: seed.workspaceId, actorId: seed.actorId, seq: { value: 0 } };
+  return {
+    pool, workspaceId: seed.workspaceId, actorId: seed.actorId, seq: { value: 0 },
+    evidenceIds: seed.evidenceIds, evidenceCursor: seed.evidenceCursor,
+  };
 }
 
 interface PeopleFixture extends Fixture {
@@ -132,6 +143,8 @@ async function peopleFixture(): Promise<PeopleFixture> {
     workspaceId: seed.workspaceId,
     actorId: seed.actorId,
     seq: { value: 0 },
+    evidenceIds: seed.evidenceIds,
+    evidenceCursor: seed.evidenceCursor,
   };
   const uow = new PgUnitOfWork(base.pool, base.workspaceId);
   const organisationId = randomUUID();
@@ -192,9 +205,7 @@ async function peopleFixture(): Promise<PeopleFixture> {
  * row instead, and reuses `commitSeed` to close it.
  */
 async function attachSeed(f: Fixture): Promise<SeedSession> {
-  const client = await f.pool.connect();
-  await client.query('BEGIN');
-  return { client, workspaceId: f.workspaceId, actorId: f.actorId };
+  return attachSeedSession(f.pool, f.workspaceId, f.actorId);
 }
 
 function nextKey(f: Fixture): string {
@@ -356,7 +367,7 @@ describe('M2 lane P: a Traveller identity is registered in one atomic step', () 
           nameKind: 'DISPLAY',
           displayValue: 'A. Person',
           effectiveRange: { start: day(-4000) },
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -422,7 +433,7 @@ describe('M2 lane P: a Traveller identity is registered in one atomic step', () 
       nameKind: 'DISPLAY' as const,
       displayValue: 'A. Person',
       effectiveRange: OPEN_RANGE,
-      evidenceId: randomUUID(),
+      evidenceId: nextEvidenceId(f),
     };
     mustOk(
       await recordTraveller(unitOfWork(f), {
@@ -464,7 +475,7 @@ describe('M2 lane P: a Traveller identity is registered in one atomic step', () 
         nameKind: 'DISPLAY',
         displayValue: '',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       },
     });
     assert.equal(conflictOf(outcome).kind, 'VALIDATION_FAILED');
@@ -496,7 +507,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -514,7 +525,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           familyName: 'Name',
           givenName: 'Full',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -550,7 +561,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
         contacts: [
           {
@@ -558,7 +569,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
             maskedLabel: 'a***@example.invalid',
             protectedValue: PROTECTED,
             effectiveRange: OPEN_RANGE,
-            evidenceId: randomUUID(),
+            evidenceId: nextEvidenceId(f),
           },
         ],
       }),
@@ -611,7 +622,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -625,7 +636,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         travellerId: created.travellerId,
         assertionType: 'RESIDENCY',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         value: { countryOfResidence: 'NZ' },
         expectedRevision: 1,
       }),
@@ -638,7 +649,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         travellerId: created.travellerId,
         assertionType: 'RESIDENCY',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         value: { countryOfResidence: 'AU' },
         supersedesAssertionId: firstAssertion.assertionId,
         expectedRevision: 2,
@@ -676,7 +687,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -694,7 +705,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         entryDate: day(1),
         coverageClaim: 'PARTIAL',
         uncertaintyNote: 'source reports only the year of entry',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         expectedRevision: 1,
       }),
     );
@@ -735,7 +746,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -752,7 +763,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         jurisdictionId: staleJurisdictionId,
         entryDate: day(1),
         coverageClaim: 'PARTIAL',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         expectedRevision: 1,
       }),
     );
@@ -769,7 +780,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         jurisdictionId: randomUUID(),
         entryDate: day(40),
         coverageClaim: 'PARTIAL',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         expectedRevision: 1,
       }),
     );
@@ -793,7 +804,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Elsewhere',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(owner),
         },
       }),
     );
@@ -807,7 +818,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         jurisdictionId: randomUUID(),
         entryDate: day(1),
         coverageClaim: 'PARTIAL',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(other),
         expectedRevision: 1,
       }),
     );
@@ -839,7 +850,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -863,7 +874,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
       entryDate: day(1),
       exitDate: day(9),
       coverageClaim: 'WINDOW_COMPLETE' as const,
-      evidenceId: randomUUID(),
+      evidenceId: nextEvidenceId(f),
       recordedAt: at(30),
       expectedRevision: 1,
     };
@@ -912,7 +923,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
           nameKind: 'DISPLAY',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -936,7 +947,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-3000),
         expiryDate: day(400),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         documentNumber: PROTECTED,
         detail: { kind: 'PASSPORT', documentNumber: PROTECTED },
         expectedRevision: 1,
@@ -957,7 +968,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-30),
         expiryDate: day(1500),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         documentNumber: OTHER_PROTECTED,
         detail: { kind: 'PASSPORT', documentNumber: OTHER_PROTECTED },
         expectedRevision: 2,
@@ -1019,7 +1030,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-200),
         expiryDate: day(30),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'VISA', documentNumber: PROTECTED, visaClass: 'TOURIST', entriesAllowed: 2 },
         expectedRevision: 1,
       }),
@@ -1061,7 +1072,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'AU',
         issueDate: day(-10),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: PROTECTED },
         expectedRevision: 1,
       }),
@@ -1088,7 +1099,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'AU',
         issueDate: day(-10),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'VISA', documentNumber: PROTECTED, visaClass: 'TOURIST' },
         expectedRevision: 1,
       }),
@@ -1127,7 +1138,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'NZ',
         issueDate: day(-10),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         documentNumber: PROTECTED,
         detail: { kind: 'PASSPORT', documentNumber: PROTECTED, nationalityCountry: 'NZ' },
         expectedRevision: 1,
@@ -1159,7 +1170,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
             credentialId: seamCredentialId,
             issueDate: day(-10),
             issuerStatus: 'VALID',
-            evidenceId: randomUUID(),
+            evidenceId: nextEvidenceId(f),
             acceptedAt: new Date().toISOString(),
           },
           detail: { kind: 'PASSPORT', documentNumber: PROTECTED, machineReadable: true },
@@ -1190,7 +1201,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-5),
         expiryDate: day(90),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         expectedRevision: 1,
       }),
     );
@@ -1212,7 +1223,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'JP',
         issueDate: day(-5),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: PROTECTED },
         expectedRevision: 2,
       }),
@@ -1239,7 +1250,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
             credentialId: seamCredentialId,
             issueDate: day(-5),
             issuerStatus: 'VALID',
-            evidenceId: randomUUID(),
+            evidenceId: nextEvidenceId(f),
             acceptedAt: new Date().toISOString(),
           },
           detail: { kind: 'PASSPORT', documentNumber: PROTECTED },
@@ -1269,7 +1280,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'NZ',
         issueDate: day(-10),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         documentNumber: PROTECTED,
         expectedRevision: 1,
       }),
@@ -1293,7 +1304,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'NZ',
         issueDate: day(-100),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: PROTECTED },
         expectedRevision: 1,
       }),
@@ -1310,7 +1321,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issuerCountry: 'NZ',
         issueDate: day(-10),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: OTHER_PROTECTED },
         expectedRevision: 1,
       }),
@@ -1339,7 +1350,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
           issuerCountry: kind === 'PASSPORT' ? 'NZ' : 'AU',
           issueDate: day(-100),
           issuerStatus: 'VALID',
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
           detail,
           expectedRevision: index + 1,
         }),
@@ -1355,7 +1366,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         credentialId: visa,
         relatedCredentialId: passport,
         linkType: 'VISA_TO_PASSPORT',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         effectiveRange: OPEN_RANGE,
         expectedRevision: 3,
       }),
@@ -1395,7 +1406,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-300),
         expiryDate: day(700),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: PROTECTED },
         expectedRevision: 1,
       }),
@@ -1418,7 +1429,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-10),
         expiryDate: day(1400),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: OTHER_PROTECTED },
         expectedRevision: 2,
       });
@@ -1477,7 +1488,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
         issueDate: day(-10),
         expiryDate: day(1400),
         issuerStatus: 'VALID',
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
         detail: { kind: 'PASSPORT', documentNumber: OTHER_PROTECTED },
         expectedRevision: 3,
       }),
@@ -1525,7 +1536,7 @@ describe('M2 lane P: credentials are Traveller-owned, versioned documents', () =
   test('a handler replayed after a forced 40001 leaves the same rows as one that never failed', async () => {
     const f = await bareFixture();
     const travellerId = await seededPerson(f);
-    const evidenceId = randomUUID();
+    const evidenceId = nextEvidenceId(f);
 
     const appendAsOfHead = async (uow: UnitOfWork, credentialId: string) =>
       appendCredentialVersion(uow, {
@@ -1659,7 +1670,7 @@ describe('M2 lane P: a relationship and a responsibility are not authority', () 
         toTravellerId: child,
         relationshipType: 'PARENT_GUARDIAN',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       }),
     );
     assert.equal(recorded.revision, 1, 'a relationship is its own aggregate root');
@@ -1707,7 +1718,7 @@ describe('M2 lane P: a relationship and a responsibility are not authority', () 
         toTravellerId: a,
         relationshipType: 'PEER',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       }),
     );
     assert.equal(selfConflict.kind, 'VALIDATION_FAILED');
@@ -1722,7 +1733,7 @@ describe('M2 lane P: a relationship and a responsibility are not authority', () 
         toTravellerId: randomUUID(),
         relationshipType: 'PEER',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       }),
     );
     assert.equal(missingConflict.kind, 'VALIDATION_FAILED');
@@ -1981,7 +1992,7 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
         idempotencyKey: nextKey(f),
         travellerId: subject,
         expectedRevision: 1,
-        name: { nameKind: 'PREFERRED', displayValue: 'Preferred', effectiveRange: OPEN_RANGE, evidenceId: randomUUID() },
+        name: { nameKind: 'PREFERRED', displayValue: 'Preferred', effectiveRange: OPEN_RANGE, evidenceId: nextEvidenceId(f) },
       }),
     );
     const idempotencyKey = nextKey(f);
@@ -2022,7 +2033,7 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
           maskedLabel: 'a***@example.invalid',
           protectedValue: PROTECTED,
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2055,7 +2066,7 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
           nameKind: 'LEGAL',
           displayValue: 'Cited Person',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2227,7 +2238,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           nameKind: 'DISPLAY',
           displayValue: 'Should Not Exist',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(other),
         },
       }),
     );
@@ -2256,7 +2267,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           maskedLabel: '+00 *** **11',
           protectedValue: PROTECTED,
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2273,7 +2284,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           maskedLabel: '+00 *** **22',
           protectedValue: OTHER_PROTECTED,
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2298,7 +2309,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           nameKind: 'DISPLAY',
           displayValue: 'Nobody',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2338,7 +2349,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
         nameKind: 'DISPLAY' as const,
         displayValue: 'Replayed Person',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       },
     };
     const uow = unitOfWork(f);
@@ -2388,7 +2399,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
         nameKind: 'DISPLAY' as const,
         displayValue: 'Auto Id Person',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       },
     };
     const uow = unitOfWork(f);
@@ -2426,7 +2437,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           nameKind: 'DISPLAY',
           displayValue: 'First',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2437,7 +2448,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           nameKind: 'DISPLAY',
           displayValue: 'Second',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
       }),
     );
@@ -2459,7 +2470,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
         nameKind: 'DISPLAY',
         displayValue: 'Receipt Person',
         effectiveRange: OPEN_RANGE,
-        evidenceId: randomUUID(),
+        evidenceId: nextEvidenceId(f),
       },
     });
     if (!outcome.ok) assert.fail('expected the command to commit');
@@ -2480,7 +2491,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
           nameKind: 'LEGAL',
           displayValue: 'Known As',
           effectiveRange: OPEN_RANGE,
-          evidenceId: randomUUID(),
+          evidenceId: nextEvidenceId(f),
         },
         contacts: [
           {
@@ -2488,7 +2499,7 @@ describe('M2 lane P: identity redirects, tenancy and replay', () => {
             maskedLabel: 'a***@example.invalid',
             protectedValue: { ...PROTECTED, storageRef: PROTECTED_SENTINEL },
             effectiveRange: OPEN_RANGE,
-            evidenceId: randomUUID(),
+            evidenceId: nextEvidenceId(f),
           },
         ],
       }),
@@ -2589,7 +2600,7 @@ describe('M2 lane P: organisations and principals are distinct parties', () => {
       );
 
     const firstId = randomUUID();
-    const firstEvidenceId = randomUUID();
+    const firstEvidenceId = nextEvidenceId(f);
     await add({ id: firstId, role: 'STAFF', validRange: { start: day(0), end: day(90) }, evidenceId: firstEvidenceId });
 
     const stored = await scalar<{
@@ -2623,7 +2634,7 @@ describe('M2 lane P: organisations and principals are distinct parties', () => {
             principalId: f.principalId,
             role: 'STAFF',
             validRange: { start: day(45), end: day(120) },
-            evidenceId: randomUUID(),
+            evidenceId: nextEvidenceId(f),
           },
           actor,
         }),
@@ -2631,8 +2642,8 @@ describe('M2 lane P: organisations and principals are distinct parties', () => {
     );
     assert.match(overlap, /organisation_memberships_no_overlap/);
 
-    await add({ id: randomUUID(), role: 'AGENT', validRange: { start: day(0), end: day(90) }, evidenceId: randomUUID() });
-    await add({ id: randomUUID(), role: 'STAFF', validRange: { start: day(90) }, evidenceId: randomUUID() });
+    await add({ id: randomUUID(), role: 'AGENT', validRange: { start: day(0), end: day(90) }, evidenceId: nextEvidenceId(f) });
+    await add({ id: randomUUID(), role: 'STAFF', validRange: { start: day(90) }, evidenceId: nextEvidenceId(f) });
     assert.equal(
       await count(f.pool, 'SELECT count(*) AS n FROM organisation_memberships WHERE workspace_id = $1', [
         f.workspaceId,
@@ -2671,7 +2682,7 @@ describe('M2 lane P: organisations and principals are distinct parties', () => {
             principalId: f.principalId,
             role: 'STAFF',
             validRange: OPEN_RANGE,
-            evidenceId: randomUUID(),
+            evidenceId: nextEvidenceId(f),
           },
           actor,
         }),

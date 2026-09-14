@@ -22,7 +22,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { beginSeed, commitSeed, seedJourney, seedTraveller, seedTrip } from './m2Seed.ts';
+import { attachSeedSession, beginSeed, commitSeed, seedJourney, seedTraveller, seedTrip, type SeedSession } from './m2Seed.ts';
 import { seedAreaMembership, seedGeographicArea, seedJurisdictionArea } from './m4Seed.ts';
 import { sharedTestPool } from './harness.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
@@ -194,10 +194,8 @@ describe('M4: real, versioned PostGIS geometry', () => {
  * a later raw-SQL insert referencing that command's result must run in its
  * own follow-up transaction.
  */
-async function attachSeed(pool: Pool, workspaceId: string, actorId: string): Promise<import('./m2Seed.ts').SeedSession> {
-  const client = await pool.connect();
-  await client.query('BEGIN');
-  return { client, workspaceId, actorId };
+async function attachSeed(pool: Pool, workspaceId: string, actorId: string): Promise<SeedSession> {
+  return attachSeedSession(pool, workspaceId, actorId);
 }
 
 describe('M4: effective/versioned area membership', () => {
