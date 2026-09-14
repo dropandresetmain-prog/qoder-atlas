@@ -45,12 +45,11 @@ stop at a C2 candidate. Do not claim C2 passed. No M7/M8.
 - [x] **Checkpoint 2**: M6 unit 140/140; m6Acceptance 4/4 on two fresh DBs; full pg on empty DB 362/363 before the I-14 assertion fix; tsc/build/lint/anti-hardcoding/diff --check green → pushed
 - [x] P8 AT fixtures: `m6Acceptance.pgtest` (AT01/02/06/10/12/13) `52c3926`; `northstar-v2-m6-acceptance` (AT19/20/21/22, cycles) `a59ae0f`; L3/L4 suites (AT03/04/05/08/09/11)
 - [x] Docs: M6.md §8–§11 (registry, AT evidence, API, triage), ACTIVE_TASK
-- [ ] **Checkpoint 3**: migrations from empty DB, test:postgres, focused, typecheck, build, lint, gate:anti-hardcoding, diff --check → push (C2 candidate)
+- [x] **Checkpoint 3**: full `test:postgres` from an empty DB 363/363 (incl. migrations); M6 unit 140/140; tsc, build, lint, gate:anti-hardcoding, diff --check green → pushed (C2 candidate). C1 `904eeca`, C2 `89ffe87`
 
 ## Next action
 
-Final full `test:postgres` on empty DB `northstar_m6_final` running; when green, record
-checkpoint SHAs in M6.md §12, commit/push Checkpoint 3 (C2 candidate) and stop.
+STOP. C2 candidate is ready for independent C2 review. Do not claim C2 passed; do not start M7/M8.
 
 ## Critical architecture constraints
 
