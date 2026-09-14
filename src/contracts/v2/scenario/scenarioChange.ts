@@ -42,6 +42,12 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     effectKind: z.literal('WAIVE_OBJECTIVE'),
     objectiveId: SubjectIdSchema,
     rationale: z.string().min(1),
+    /**
+     * Proposed disposition only (I-7). Defaults to WAIVED. Never mutates the
+     * authoritative objective row; M8 must authorize before any durable
+     * disposition is appended to objective_dispositions.
+     */
+    disposition: z.enum(['WAIVED', 'CLOSED_WITH_LOSS']).default('WAIVED'),
   }),
 ]);
 export type ScenarioEffect = z.infer<typeof ScenarioEffectSchema>;

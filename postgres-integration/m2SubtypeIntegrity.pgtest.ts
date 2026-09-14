@@ -92,13 +92,22 @@ const M5_ACTIVATED_KINDS = [
 /** Kinds M6 activates (0091 immutable assessments) — docs/refactor/evidence/M6.md. */
 const M6_ACTIVATED_KINDS = ['ASSESSMENT'];
 
-/** M2-M6 integration: every activated kind, checked together (docs/refactor/evidence/M2_M5_INTEGRATION.md, M6.md). */
+/** Kinds M7 activates (0100–0102 recovery/planning) — docs/refactor/evidence/M7.md. */
+const M7_ACTIVATED_KINDS = [
+  'RECOVERY_CASE',
+  'RECOVERY_STRATEGY',
+  'ACTION_PLAN',
+  'ACTION_INTENT',
+];
+
+/** M2-M7 integration: every activated kind, checked together. */
 const INTEGRATED_ACTIVATED_KINDS = [
   ...M2_ACTIVATED_KINDS,
   ...M3_ACTIVATED_KINDS,
   ...M4_ACTIVATED_KINDS,
   ...M5_ACTIVATED_KINDS,
   ...M6_ACTIVATED_KINDS,
+  ...M7_ACTIVATED_KINDS,
 ];
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
@@ -129,7 +138,7 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
         WHERE kind <> ALL($1::text[])`,
       [[...INTEGRATED_ACTIVATED_KINDS, 'WORKSPACE']],
     );
-    assert.deepEqual(leaked.rows, [], 'no kind outside the integrated M2-M6 lanes may install a subtype checker');
+    assert.deepEqual(leaked.rows, [], 'no kind outside the integrated M2-M7 lanes may install a subtype checker');
 
     const active = await pool.query<{ kind: string }>(
       'SELECT kind FROM subject_subtype_checkers WHERE kind = ANY($1::text[]) ORDER BY kind COLLATE "C"',
@@ -470,7 +479,10 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
         WHERE table_schema = 'public'
            AND (column_name ~* '(^|_)(city|scenario|fixture|demo|sarah|template)($|_)'
                 OR column_name ~* 'is_supported|has_support|supported_flag')
-           AND NOT (table_name = 'provider_capabilities' AND column_name = 'supported')`,
+           AND NOT (table_name = 'provider_capabilities' AND column_name = 'supported')
+           -- M7 typed ScenarioChange payload/FK (frozen contract), not demo scenario hardcoding.
+           AND NOT (table_name IN ('recovery_strategies', 'strategy_changes', 'action_plans')
+                    AND column_name IN ('scenario_change', 'scenario_change_id'))`,
     );
     assert.deepEqual(scenarioLeaks.rows, [], 'support must be modelled as requirement + assignment, never a flag');
 
@@ -511,6 +523,23 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // bounded and schema-versioned; every queried manifest input is extracted into assessment_inputs rows.
       'assessment_results.explanations',
       'assessments.manifest_detail',
+      // M7 (0101–0102): typed ScenarioChange / RecoveryStrategy / ActionIntent payloads (§10).
+      'recovery_strategies.base_manifest',
+      'recovery_strategies.scenario_change',
+      'recovery_strategies.assumptions',
+      'recovery_strategies.required_unknowns',
+      'recovery_strategies.candidate_assessment_summaries',
+      'recovery_strategies.required_authority_scopes',
+      'strategy_changes.affected_subjects',
+      'strategy_changes.effects',
+      'action_intents.subject_refs',
+      'action_intents.expected_revisions',
+      'action_intents.preconditions',
+      'action_intents.cost_estimate',
+      'action_intents.limits',
+      'action_intents.required_authority_scopes',
+      'action_intents.expected_observations',
+      'action_intents.compensation_policy',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

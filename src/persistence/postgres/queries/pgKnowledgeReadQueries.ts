@@ -79,10 +79,20 @@ interface ObjectiveRow {
   owner_kind: Objective['ownerKind'];
   owner_id: string;
   success_predicate: string;
+  success_predicate_kind: Objective['successPredicateKind'] | null;
   hardness: Objective['hardness'];
   priority: number;
   disposition: Objective['disposition'] | null;
   disposition_evidence_id: string | null;
+  targets: {
+    label: string;
+    targetKind: 'SUBJECT' | 'PLACE' | 'TIME' | 'MONEY' | 'QUANTITY';
+    subject: TypedRef | null;
+    placeId: string | null;
+    atOrBefore: string | null;
+    amountMinor: number | null;
+    currencyCode: string | null;
+  }[] | null;
 }
 
 interface ConstraintRow {
@@ -285,8 +295,20 @@ export class PgKnowledgeReadQueries implements KnowledgeReadQueries {
 
   async governingObjectives(workspaceId: string, ownerRef: TypedRef): Promise<Objective[]> {
     const result = await this.db.query<ObjectiveRow>(
-      `SELECT o.id, o.owner_kind, o.owner_id, o.success_predicate, o.hardness, o.priority,
-              latest.disposition, latest.evidence_id AS disposition_evidence_id
+      `SELECT o.id, o.owner_kind, o.owner_id, o.success_predicate, o.success_predicate_kind, o.hardness, o.priority,
+              latest.disposition, latest.evidence_id AS disposition_evidence_id,
+              COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                          'label', t.label,
+                          'targetKind', t.target_kind,
+                          'subject', CASE WHEN t.subject_id IS NULL THEN NULL
+                            ELSE jsonb_build_object('kind', t.subject_kind, 'id', t.subject_id) END,
+                          'placeId', t.place_id,
+                          'atOrBefore', t.at_or_before,
+                          'amountMinor', t.amount_minor,
+                          'currencyCode', t.currency_code
+                        ) ORDER BY t.label)
+                 FROM objective_targets t
+                WHERE t.workspace_id = o.workspace_id AND t.objective_id = o.id), '[]'::jsonb) AS targets
          FROM objectives o
          LEFT JOIN LATERAL (
            SELECT d.disposition, d.evidence_id
@@ -304,9 +326,19 @@ export class PgKnowledgeReadQueries implements KnowledgeReadQueries {
       ownerKind: row.owner_kind,
       ownerId: row.owner_id,
       successPredicate: row.success_predicate,
+      successPredicateKind: row.success_predicate_kind ?? 'STATEMENT',
       hardness: row.hardness,
       priority: Number(row.priority),
       disposition: row.disposition ?? 'ACTIVE',
+      targets: (row.targets ?? []).map((t) => ({
+        label: t.label,
+        targetKind: t.targetKind,
+        ...(t.subject ? { subject: t.subject } : {}),
+        ...(t.placeId ? { placeId: t.placeId } : {}),
+        ...(t.atOrBefore ? { atOrBefore: t.atOrBefore } : {}),
+        ...(t.amountMinor != null ? { amountMinor: t.amountMinor } : {}),
+        ...(t.currencyCode ? { currencyCode: t.currencyCode } : {}),
+      })),
       ...(row.disposition_evidence_id ? { dispositionEvidenceId: row.disposition_evidence_id } : {}),
     }));
   }

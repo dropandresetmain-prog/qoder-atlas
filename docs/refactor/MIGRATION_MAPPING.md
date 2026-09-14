@@ -95,7 +95,7 @@ schema from `DATA_STRUCTURE_LOGICAL_SCHEMA.md`:
 | `0050`–`0069` | M4 (programme/geography) | §5 programmes/places/spatial tables |
 | `0070`–`0089` | M5 (knowledge/requirements) | §6 requirements/provenance/external-information tables |
 | `0090`–`0099` | M6 (world/evaluation, primary-owned) | `assessments`/`assessment_results`/`assessment_subjects`/`assessment_inputs`, `exposure_index` and other derived read-model tables |
-| `0100`–`0119` | M7/M8 (planning/authority/execution) | §7 resolution/integration tables (`recovery_cases` … `execution_observations`) |
+| `0100`–`0119` | M7/M8 (planning/authority/execution) | §7 resolution/integration tables (`recovery_cases` … `execution_observations`). **M7 used `0100`–`0102`**; `0103`–`0108` reserved for M7 follow-ups; **`0109`–`0119` reserved for M8**. |
 | `0120`+ | Additive extensions post-C0 (F16) | New typed detail tables registered via `ExtensionRegistration`; never renumber or reuse an earlier range |
 
 Allocator rule (Schema §1): registration of a subject, its aggregate head and

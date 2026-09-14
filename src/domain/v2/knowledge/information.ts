@@ -15,15 +15,39 @@ export type ObjectiveDisposition = z.infer<typeof ObjectiveDispositionSchema>;
 export const ObjectiveOwnerKindSchema = z.enum(['TRIP', 'JOURNEY', 'COORDINATION_GROUP', 'PROGRAMME']);
 export type ObjectiveOwnerKind = z.infer<typeof ObjectiveOwnerKindSchema>;
 
+export const ObjectiveSuccessPredicateKindSchema = z.enum([
+  'STATEMENT',
+  'ARRIVAL_BY',
+  'ATTEND',
+  'COMPLETE_ITEMS',
+  'BOUND_SPEND',
+]);
+export type ObjectiveSuccessPredicateKind = z.infer<typeof ObjectiveSuccessPredicateKindSchema>;
+
+/** Measurable target refs for an Objective (schema §6). Immutable once recorded. */
+export const ObjectiveTargetSchema = z.strictObject({
+  label: z.string().min(1).max(256),
+  targetKind: z.enum(['SUBJECT', 'PLACE', 'TIME', 'MONEY', 'QUANTITY']),
+  subject: TypedRefSchema.optional(),
+  placeId: SubjectIdSchema.optional(),
+  atOrBefore: InstantSchema.optional(),
+  amountMinor: z.number().int().min(0).optional(),
+  currencyCode: z.string().regex(/^[A-Z]{3}$/).optional(),
+});
+export type ObjectiveTarget = z.infer<typeof ObjectiveTargetSchema>;
+
 export const ObjectiveSchema = z.strictObject({
   id: SubjectIdSchema,
   ownerKind: ObjectiveOwnerKindSchema,
   ownerId: SubjectIdSchema,
   successPredicate: z.string().min(1).max(2048),
+  /** Typed success predicate kind (I-7). STATEMENT remains the prose-only default. */
+  successPredicateKind: ObjectiveSuccessPredicateKindSchema.default('STATEMENT'),
   hardness: z.enum(['HARD', 'SOFT']),
   priority: z.number().int().min(0),
   disposition: ObjectiveDispositionSchema.default('ACTIVE'),
   dispositionEvidenceId: SubjectIdSchema.optional(),
+  targets: z.array(ObjectiveTargetSchema).default([]),
 });
 export type Objective = z.infer<typeof ObjectiveSchema>;
 

@@ -568,15 +568,55 @@ export async function recordPreference(uow: UnitOfWork, params: RecordPreference
   });
 }
 
-const objectiveInput = z.strictObject({ objectiveId: Uuid.optional(), ownerKind: z.enum(['TRIP', 'JOURNEY', 'COORDINATION_GROUP', 'PROGRAMME']), ownerId: Uuid, successPredicate: z.string().min(1).max(2048), hardness: z.enum(['HARD', 'SOFT']), priority: z.number().int().min(0), disposition: z.enum(['ACTIVE', 'ACHIEVED', 'WAIVED', 'CLOSED_WITH_LOSS']).default('ACTIVE'), dispositionEvidenceId: Uuid.optional() });
-export interface RecordObjectiveParams extends KnowledgeCommandContext { objectiveId?: string; ownerKind: 'TRIP' | 'JOURNEY' | 'COORDINATION_GROUP' | 'PROGRAMME'; ownerId: string; successPredicate: string; hardness: 'HARD' | 'SOFT'; priority: number; disposition?: 'ACTIVE' | 'ACHIEVED' | 'WAIVED' | 'CLOSED_WITH_LOSS'; dispositionEvidenceId?: string; }
+const objectiveInput = z.strictObject({
+  objectiveId: Uuid.optional(),
+  ownerKind: z.enum(['TRIP', 'JOURNEY', 'COORDINATION_GROUP', 'PROGRAMME']),
+  ownerId: Uuid,
+  successPredicate: z.string().min(1).max(2048),
+  successPredicateKind: z.enum(['STATEMENT', 'ARRIVAL_BY', 'ATTEND', 'COMPLETE_ITEMS', 'BOUND_SPEND']).default('STATEMENT'),
+  hardness: z.enum(['HARD', 'SOFT']),
+  priority: z.number().int().min(0),
+  disposition: z.enum(['ACTIVE', 'ACHIEVED', 'WAIVED', 'CLOSED_WITH_LOSS']).default('ACTIVE'),
+  dispositionEvidenceId: Uuid.optional(),
+  targets: z.array(z.strictObject({
+    label: z.string().min(1).max(256),
+    targetKind: z.enum(['SUBJECT', 'PLACE', 'TIME', 'MONEY', 'QUANTITY']),
+    subject: RegistryRef.optional(),
+    placeId: Uuid.optional(),
+    atOrBefore: InstantSchema.optional(),
+    amountMinor: z.number().int().min(0).optional(),
+    currencyCode: z.string().regex(/^[A-Z]{3}$/).optional(),
+  })).default([]),
+});
+export interface RecordObjectiveParams extends KnowledgeCommandContext {
+  objectiveId?: string;
+  ownerKind: 'TRIP' | 'JOURNEY' | 'COORDINATION_GROUP' | 'PROGRAMME';
+  ownerId: string;
+  successPredicate: string;
+  successPredicateKind?: 'STATEMENT' | 'ARRIVAL_BY' | 'ATTEND' | 'COMPLETE_ITEMS' | 'BOUND_SPEND';
+  hardness: 'HARD' | 'SOFT';
+  priority: number;
+  disposition?: 'ACTIVE' | 'ACHIEVED' | 'WAIVED' | 'CLOSED_WITH_LOSS';
+  dispositionEvidenceId?: string;
+  targets?: {
+    label: string;
+    targetKind: 'SUBJECT' | 'PLACE' | 'TIME' | 'MONEY' | 'QUANTITY';
+    subject?: { kind: string; id: string };
+    placeId?: string;
+    atOrBefore?: string;
+    amountMinor?: number;
+    currencyCode?: string;
+  }[];
+}
 export interface ObjectiveRecordedResult { objectiveId: string; revision: number }
 
 export async function recordObjective(uow: UnitOfWork, params: RecordObjectiveParams): Promise<ExecuteOutcome<ObjectiveRecordedResult>> {
   const parsed = objectiveInput.safeParse({
     objectiveId: params.objectiveId, ownerKind: params.ownerKind, ownerId: params.ownerId,
-    successPredicate: params.successPredicate, hardness: params.hardness, priority: params.priority,
+    successPredicate: params.successPredicate, successPredicateKind: params.successPredicateKind,
+    hardness: params.hardness, priority: params.priority,
     disposition: params.disposition, dispositionEvidenceId: params.dispositionEvidenceId,
+    targets: params.targets,
   });
   if (!parsed.success) return { ok: false, conflict: { kind: 'VALIDATION_FAILED', message: parsed.error.message, subjectRefs: [] } };
   if (parsed.data.disposition !== 'ACTIVE' && !parsed.data.dispositionEvidenceId) return { ok: false, conflict: { kind: 'VALIDATION_FAILED', message: 'terminal objective disposition requires evidence', subjectRefs: [] } };
@@ -589,8 +629,84 @@ export async function recordObjective(uow: UnitOfWork, params: RecordObjectivePa
       try { root = await createM5Root(params.workspaceId, objectiveId, 'OBJECTIVE'); }
       catch (error) { return duplicate(String(error), [{ kind: 'OBJECTIVE', id: objectiveId }]); }
       const repo = new PgKnowledgeRepository(params.workspaceId);
-      await repo.createObjective({ objective: ObjectiveSchema.parse({ id: objectiveId, ownerKind: parsed.data.ownerKind, ownerId: parsed.data.ownerId, successPredicate: parsed.data.successPredicate, hardness: parsed.data.hardness, priority: parsed.data.priority, disposition: parsed.data.disposition, ...(parsed.data.dispositionEvidenceId ? { dispositionEvidenceId: parsed.data.dispositionEvidenceId } : {}) }), actor: { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId } });
+      await repo.createObjective({
+        objective: ObjectiveSchema.parse({
+          id: objectiveId,
+          ownerKind: parsed.data.ownerKind,
+          ownerId: parsed.data.ownerId,
+          successPredicate: parsed.data.successPredicate,
+          successPredicateKind: parsed.data.successPredicateKind,
+          hardness: parsed.data.hardness,
+          priority: parsed.data.priority,
+          disposition: parsed.data.disposition,
+          targets: parsed.data.targets,
+          ...(parsed.data.dispositionEvidenceId ? { dispositionEvidenceId: parsed.data.dispositionEvidenceId } : {}),
+        }),
+        actor: { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId },
+      });
       return { ok: true, value: { value: { objectiveId, revision: 1 }, advanced: [root] } };
+    },
+  });
+}
+
+const objectiveTargetsInput = z.strictObject({
+  objectiveId: Uuid,
+  expectedRevision: z.number().int().min(1),
+  targets: z.array(z.strictObject({
+    label: z.string().min(1).max(256),
+    targetKind: z.enum(['SUBJECT', 'PLACE', 'TIME', 'MONEY', 'QUANTITY']),
+    subject: RegistryRef.optional(),
+    placeId: Uuid.optional(),
+    atOrBefore: InstantSchema.optional(),
+    amountMinor: z.number().int().min(0).optional(),
+    currencyCode: z.string().regex(/^[A-Z]{3}$/).optional(),
+  })).min(1),
+});
+export interface RecordObjectiveTargetsParams extends KnowledgeCommandContext {
+  objectiveId: string;
+  expectedRevision: number;
+  targets: NonNullable<RecordObjectiveParams['targets']>;
+}
+export interface ObjectiveTargetsRecordedResult { objectiveId: string; revision: number }
+
+/** I-7: append immutable objective targets against an expected objective head revision. */
+export async function recordObjectiveTargets(uow: UnitOfWork, params: RecordObjectiveTargetsParams): Promise<ExecuteOutcome<ObjectiveTargetsRecordedResult>> {
+  const parsed = objectiveTargetsInput.safeParse({
+    objectiveId: params.objectiveId,
+    expectedRevision: params.expectedRevision,
+    targets: params.targets,
+  });
+  if (!parsed.success) return { ok: false, conflict: { kind: 'VALIDATION_FAILED', message: parsed.error.message, subjectRefs: [] } };
+  const payload = parsed.data;
+  return submitCommand({
+    uow,
+    commandType: 'OBJECTIVE_TARGETS_RECORDED',
+    destinationKind: 'OBJECTIVE_TARGETS_REGISTERED',
+    context: params,
+    payload,
+    evidenceRefs: [],
+    expectedAggregateRevisions: [{ aggregateRef: { kind: 'OBJECTIVE', id: parsed.data.objectiveId }, expectedRevision: parsed.data.expectedRevision }],
+    body: async ({ lockedHeads }) => {
+      const repo = new PgKnowledgeRepository(params.workspaceId);
+      await repo.recordObjectiveTargets({
+        objectiveId: parsed.data.objectiveId,
+        targets: parsed.data.targets as import('../../../domain/v2/knowledge/information.ts').ObjectiveTarget[],
+        actor: { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId },
+      });
+      const advanced = await advanceM5Root({
+        workspaceId: params.workspaceId,
+        kind: 'OBJECTIVE',
+        id: parsed.data.objectiveId,
+        lockedHeads,
+      });
+      if (!advanced.ok) return advanced;
+      return {
+        ok: true,
+        value: {
+          value: { objectiveId: parsed.data.objectiveId, revision: advanced.value.afterRevision },
+          advanced: [advanced.value],
+        },
+      };
     },
   });
 }
