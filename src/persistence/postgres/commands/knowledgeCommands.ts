@@ -83,7 +83,7 @@ async function submitCommand<R>(spec: SubmitSpec<R>): Promise<ExecuteOutcome<R>>
     typedPayload: spec.payload,
     evidenceRefs: spec.evidenceRefs ?? [],
   });
-  return spec.uow.execute<R>(envelope, async (ctx) => {
+  return mapDatabaseErrors(() => spec.uow.execute<R>(envelope, async (ctx) => {
     const outcome = await spec.body({ envelope, lockedHeads: ctx.lockedHeads });
     if (!outcome.ok) return outcome;
     await appendAuditTrail({
@@ -97,7 +97,29 @@ async function submitCommand<R>(spec: SubmitSpec<R>): Promise<ExecuteOutcome<R>>
       value: outcome.value.value,
       receipt: buildReceipt({ envelope, value: outcome.value.value, advanced: outcome.value.advanced }),
     };
-  });
+  }));
+}
+
+/**
+ * M2-M5 integration: the same database-error vocabulary the M2/M3/M4 command
+ * modules use. Deferred constraints (e.g. the 0087 cross-lane FKs) fire at
+ * COMMIT, outside any handler body, so without this a violated integrity rule
+ * escaped to the caller as a raw driver error instead of a typed conflict.
+ */
+async function mapDatabaseErrors<R>(run: () => Promise<ExecuteOutcome<R>>): Promise<ExecuteOutcome<R>> {
+  try {
+    return await run();
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    const constraint = (error as { constraint?: unknown }).constraint;
+    const message = error instanceof Error ? error.message : String(error);
+    const where = typeof constraint === 'string' && constraint.length > 0 ? ` [constraint: ${constraint}]` : '';
+    if (code === '23505') return { ok: false, conflict: { kind: 'DUPLICATE_REGISTRATION', message: `${message}${where}`, subjectRefs: [] } };
+    if (code === '23503' || code === '23514' || code === '23502' || code === '23501' || code === '22P02' || code === 'P0001') {
+      return { ok: false, conflict: { kind: 'VALIDATION_FAILED', message: `${message}${where}`, subjectRefs: [] } };
+    }
+    throw error;
+  }
 }
 
 function invalid(message: string, subjectRefs: TypedRef[] = []): TypedResult<never> {

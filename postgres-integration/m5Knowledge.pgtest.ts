@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedTraveller, seedTrip } from './m2Seed.ts';
+import { seedJurisdiction } from './m4Seed.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import {
   createOrganisation,
@@ -53,6 +54,7 @@ interface Fixture {
   actorId: string;
   travellerId: string;
   tripId: string;
+  jurisdictionId: string;
   organisationId: string;
   uow: PgUnitOfWork;
   sequence: number;
@@ -63,6 +65,8 @@ async function fixture(): Promise<Fixture> {
   const seed = await beginSeed(pool, 'M5 integration fixture');
   const { travellerId } = await seedTraveller(seed);
   const tripId = await seedTrip(seed);
+  // Integrated schema (0087): information scopes name real M4 jurisdictions.
+  const jurisdictionId = await seedJurisdiction(seed, { name: 'M5 fixture jurisdiction' });
   await commitSeed(seed);
   const uow = new PgUnitOfWork(pool, seed.workspaceId);
   const organisationId = randomUUID();
@@ -80,6 +84,7 @@ async function fixture(): Promise<Fixture> {
     actorId: seed.actorId,
     travellerId,
     tripId,
+    jurisdictionId,
     organisationId,
     uow,
     sequence: 0,
@@ -295,11 +300,11 @@ describe('M5 knowledge lineage and provenance (real PostgreSQL)', () => {
     const wrongParentScope = await recordInformationScope(f.uow, {
       workspaceId: f.workspaceId, actorPrincipalId: f.actorId, idempotencyKey: key(),
       informationRecordId: otherRecordId, informationVersionId: version.informationVersionId,
-      jurisdictionId: randomUUID(), effectiveExposure: { start: at(0), end: at(1000) }, expectedRevision: 1,
+      jurisdictionId: f.jurisdictionId, effectiveExposure: { start: at(0), end: at(1000) }, expectedRevision: 1,
     });
     assert.equal(wrongParentScope.ok, false);
     if (!wrongParentScope.ok) assert.equal(wrongParentScope.conflict.kind, 'VALIDATION_FAILED');
-    const jurisdictionId = randomUUID();
+    const jurisdictionId = f.jurisdictionId;
     mustOk(await recordInformationScope(f.uow, {
       workspaceId: f.workspaceId, actorPrincipalId: f.actorId, idempotencyKey: key(),
       informationRecordId: recordId, informationVersionId: version.informationVersionId, jurisdictionId,

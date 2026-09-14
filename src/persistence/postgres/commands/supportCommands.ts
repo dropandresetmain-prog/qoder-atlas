@@ -43,7 +43,6 @@ import {
 } from '../../../contracts/v2/command/domainCommand.ts';
 import type { UnitOfWork } from '../../../contracts/v2/command/unitOfWork.ts';
 import type { ExpectedRevision, SubjectId, TypedRef } from '../../../domain/v2/shared/identity.ts';
-import { SubjectIdSchema } from '../../../domain/v2/shared/identity.ts';
 import { InstantIntervalSchema, type Instant } from '../../../domain/v2/shared/time.ts';
 import { typedConflict, type TypedConflict } from '../../../domain/v2/shared/errors.ts';
 import { LifecycleStatusSchema, type CoordinationGroup, type GroupMembership } from '../../../domain/v2/trip/trip.ts';
@@ -75,6 +74,20 @@ const SCHEMA_VERSION = '1';
 /** Half-open window pair; written together or not at all, as 0026's CHECK requires. */
 const WindowSchema = InstantIntervalSchema;
 
+/**
+ * G12 (docs/refactor/evidence/M2_INTEGRATION_DECISIONS.md): the frozen
+ * `SubjectIdSchema` (identity.ts) legally admits legacy/source-shaped ids
+ * (e.g. `trip-legacy-7`, `journey:7`), but every column this lane writes into
+ * is typed `uuid` (0026-0028). The persistence-boundary rule immediately
+ * before `UnitOfWork.execute` is UUID shape, not the broader envelope-level
+ * `SubjectIdSchema` — matching the people lane (`peopleCommands.ts`
+ * `Uuid`/`RegistryTypedRefSchema`), M4's `programmeCommands.ts` (`Uuid`) and
+ * this promotion's own `travelCommands.ts` (`PersistedId`). `SubjectIdSchema`
+ * itself is not narrowed; it still admits legacy ids elsewhere in the
+ * envelope.
+ */
+const PersistedId = z.uuid();
+
 const CreateCoordinationGroupPayloadSchema = z.strictObject({
   name: z.string().min(1),
   purpose: z.string().min(1).optional(),
@@ -95,27 +108,39 @@ const GroupMembershipPayloadSchema = z.strictObject({
 });
 
 const AppendRequirementPayloadSchema = z.strictObject({
-  supportedTravellerId: SubjectIdSchema,
+  supportedTravellerId: PersistedId,
   requiredCoverage: WindowSchema,
   minimumSimultaneousSupporters: z.number().int().min(1),
-  eligibleSupporterTravellerIds: z.array(SubjectIdSchema).min(1),
+  eligibleSupporterTravellerIds: z.array(PersistedId).min(1),
   maximumHandoffGapMinutes: z.number().int().min(0).default(0),
-  provenanceEvidenceId: SubjectIdSchema.optional(),
+  provenanceEvidenceId: PersistedId.optional(),
 });
 
 const AssignedScopePayloadSchema = z.strictObject({
-  supporterTravellerId: SubjectIdSchema,
+  supporterTravellerId: PersistedId,
   interval: WindowSchema,
 });
 
+/**
+ * `SupportHandoffSchema` is the frozen domain shape (support.ts): its
+ * `fromSupporterTravellerId`/`toSupporterTravellerId` are only
+ * `SubjectIdSchema`-checked, but `writeHandoffs` persists both into
+ * `support_assignment_handoffs`' `uuid` columns — so this local wrapper
+ * re-checks UUID shape on top of the frozen shape/business-rule parse.
+ */
+const PersistedHandoffSchema = SupportHandoffSchema.refine(
+  (handoff) => PersistedId.safeParse(handoff.fromSupporterTravellerId).success && PersistedId.safeParse(handoff.toSupporterTravellerId).success,
+  { message: 'fromSupporterTravellerId/toSupporterTravellerId must be a UUID (PostgreSQL persistence boundary)' },
+);
+
 const CreateSupportAssignmentPayloadSchema = z.strictObject({
-  requirementId: SubjectIdSchema,
+  requirementId: PersistedId,
   requirementVersion: z.number().int().min(1),
   /** A new assignment may only open as a proposal or as a live commitment. */
   lifecycleStatus: z.enum(['PROPOSED', 'ACTIVE']).default('PROPOSED'),
-  assignedSupporterTravellerIds: z.array(SubjectIdSchema).min(1),
+  assignedSupporterTravellerIds: z.array(PersistedId).min(1),
   assignedScopes: z.array(AssignedScopePayloadSchema).min(1),
-  handoffs: z.array(SupportHandoffSchema).default([]),
+  handoffs: z.array(PersistedHandoffSchema).default([]),
 });
 
 const SetSupportAssignmentStatusPayloadSchema = z.strictObject({
@@ -123,9 +148,9 @@ const SetSupportAssignmentStatusPayloadSchema = z.strictObject({
 });
 
 const ReplaceAssignmentScopePayloadSchema = z.strictObject({
-  assignedSupporterTravellerIds: z.array(SubjectIdSchema).min(1),
+  assignedSupporterTravellerIds: z.array(PersistedId).min(1),
   assignedScopes: z.array(AssignedScopePayloadSchema).min(1),
-  handoffs: z.array(SupportHandoffSchema).default([]),
+  handoffs: z.array(PersistedHandoffSchema).default([]),
 });
 
 /** A group stops being a scope once it is completed or cancelled. */
@@ -253,19 +278,47 @@ function submitted<T>(commandType: string, build: () => T): { ok: true; value: T
 }
 
 /**
+ * M2-M5 integration: deferred constraints fire at COMMIT, outside any handler
+ * body — including the cross-lane FKs later lanes closed onto this lane's
+ * tables (0085 `accompaniment_requirements_provenance_fk`). This delegates to
+ * the real UnitOfWork and maps integrity violations to the same typed
+ * vocabulary `travelCommands.ts` / M3 / M4 / M5 use, instead of letting a raw
+ * driver error escape. Serialization retries stay inside the real execute.
+ */
+function withTypedDatabaseConflicts(uow: UnitOfWork): Pick<UnitOfWork, 'execute'> {
+  return {
+    async execute(envelope, fn) {
+      try {
+        return await uow.execute(envelope, fn);
+      } catch (error) {
+        const code = (error as { code?: unknown }).code;
+        const constraint = (error as { constraint?: unknown }).constraint;
+        const message = error instanceof Error ? error.message : String(error);
+        const where = typeof constraint === 'string' && constraint.length > 0 ? ` [constraint: ${constraint}]` : '';
+        if (code === '23505') return { ok: false, conflict: typedConflict('DUPLICATE_REGISTRATION', `${message}${where}`) };
+        if (code === '23503' || code === '23514' || code === '23502' || code === '23501' || code === '22P02' || code === 'P0001') {
+          return { ok: false, conflict: validationConflict(`${message}${where}`) };
+        }
+        throw error;
+      }
+    },
+  };
+}
+
+/**
  * The ids a caller addresses or pins are part of its submission too. They are
  * checked by `buildEnvelope`'s schema parse, which only *throws*, and a pinned
  * row id is not in the payload at all — so both used to escape the handler.
  */
 function refusedSubmission(commandType: string, refs: TypedRef[]): ExecuteOutcome<never> | undefined {
-  const malformed = refs.filter((ref) => !SubjectIdSchema.safeParse(ref.id).success);
+  const malformed = refs.filter((ref) => !PersistedId.safeParse(ref.id).success);
   if (malformed.length === 0) return undefined;
   return {
     ok: false,
     conflict: validationConflict(
       `${commandType} payload rejected: ${malformed.map((ref) => `${ref.kind}:${JSON.stringify(ref.id)}`).join(', ')} ${
         malformed.length === 1 ? 'is' : 'are'
-      } not a valid subject id`,
+      } not a UUID (PostgreSQL persistence boundary)`,
       malformed,
     ),
   };
@@ -338,7 +391,7 @@ export async function createCoordinationGroup(
   const repository = new PgCoordinationRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<CoordinationGroupCommandResult>(envelope, async () => {
+  return withTypedDatabaseConflicts(uow).execute<CoordinationGroupCommandResult>(envelope, async () => {
     if (await repository.loadGroup(params.workspaceId, groupId)) {
       return {
         ok: false,
@@ -402,7 +455,7 @@ export async function updateCoordinationGroup(
   const repository = new PgCoordinationRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<CoordinationGroupCommandResult>(envelope, async ({ lockedHeads }) => {
+  return withTypedDatabaseConflicts(uow).execute<CoordinationGroupCommandResult>(envelope, async ({ lockedHeads }) => {
     const beforeRevision = lockedRevisionOf(lockedHeads, params.groupId);
     if (beforeRevision === undefined) return { ok: false, conflict: missingHeadConflict(ref) };
     const current = await repository.loadGroup(params.workspaceId, params.groupId);
@@ -493,7 +546,7 @@ export async function addJourneyToGroup(
   const repository = new PgCoordinationRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<GroupMembershipCommandResult>(envelope, async ({ lockedHeads }) => {
+  return withTypedDatabaseConflicts(uow).execute<GroupMembershipCommandResult>(envelope, async ({ lockedHeads }) => {
     const beforeRevision = lockedRevisionOf(lockedHeads, params.groupId);
     if (beforeRevision === undefined) return { ok: false, conflict: missingHeadConflict(ref) };
     const group = await repository.loadGroup(params.workspaceId, params.groupId);
@@ -552,7 +605,7 @@ export async function removeJourneyFromGroup(
   params: RemoveJourneyFromGroupParams,
 ): Promise<ExecuteOutcome<GroupMembershipCommandResult>> {
   const parsed = submitted('COORDINATION_GROUP_JOURNEY_REMOVED', () =>
-    z.strictObject({ journeyId: SubjectIdSchema }).parse({ journeyId: params.journeyId }),
+    z.strictObject({ journeyId: PersistedId }).parse({ journeyId: params.journeyId }),
   );
   if (!parsed.ok) return parsed;
   const payload = parsed.value;
@@ -571,7 +624,7 @@ export async function removeJourneyFromGroup(
   const repository = new PgCoordinationRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<GroupMembershipCommandResult>(envelope, async ({ lockedHeads }) => {
+  return withTypedDatabaseConflicts(uow).execute<GroupMembershipCommandResult>(envelope, async ({ lockedHeads }) => {
     const beforeRevision = lockedRevisionOf(lockedHeads, params.groupId);
     if (beforeRevision === undefined) return { ok: false, conflict: missingHeadConflict(ref) };
     const existing = await repository.listMemberships(params.workspaceId, params.groupId);
@@ -634,7 +687,7 @@ export async function shareJourneyItem(
 ): Promise<ExecuteOutcome<SharedJourneyItemCommandResult>> {
   const parsed = submitted('COORDINATION_GROUP_ITEM_SHARED', () =>
     z
-      .strictObject({ journeyId: SubjectIdSchema, journeyItemId: SubjectIdSchema })
+      .strictObject({ journeyId: PersistedId, journeyItemId: PersistedId })
       .parse({ journeyId: params.journeyId, journeyItemId: params.journeyItemId }),
   );
   if (!parsed.ok) return parsed;
@@ -654,7 +707,7 @@ export async function shareJourneyItem(
   const repository = new PgCoordinationRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<SharedJourneyItemCommandResult>(envelope, async ({ lockedHeads }) => {
+  return withTypedDatabaseConflicts(uow).execute<SharedJourneyItemCommandResult>(envelope, async ({ lockedHeads }) => {
     const beforeRevision = lockedRevisionOf(lockedHeads, params.groupId);
     if (beforeRevision === undefined) return { ok: false, conflict: missingHeadConflict(ref) };
     const memberships = await repository.listMemberships(params.workspaceId, params.groupId);
@@ -759,7 +812,7 @@ export async function appendAccompanimentRequirement(
   const repository = new PgSupportRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<AccompanimentRequirementCommandResult>(envelope, async () => {
+  return withTypedDatabaseConflicts(uow).execute<AccompanimentRequirementCommandResult>(envelope, async () => {
     const latest = await repository.latestRequirementVersion(params.workspaceId, requirementId);
     const requirement = AccompanimentConstraintDefinitionSchema.parse({
       id: requirementId,
@@ -851,7 +904,7 @@ export async function createSupportAssignment(
   const repository = new PgSupportRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<SupportAssignmentCommandResult>(envelope, async () => {
+  return withTypedDatabaseConflicts(uow).execute<SupportAssignmentCommandResult>(envelope, async () => {
     if (await repository.loadAssignment(params.workspaceId, assignmentId)) {
       return {
         ok: false,
@@ -923,7 +976,7 @@ export async function setSupportAssignmentStatus(
   const repository = new PgSupportRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<SupportAssignmentCommandResult>(envelope, async ({ lockedHeads }) => {
+  return withTypedDatabaseConflicts(uow).execute<SupportAssignmentCommandResult>(envelope, async ({ lockedHeads }) => {
     const beforeRevision = lockedRevisionOf(lockedHeads, params.assignmentId);
     if (beforeRevision === undefined) return { ok: false, conflict: missingHeadConflict(ref) };
     const current = await repository.loadAssignment(params.workspaceId, params.assignmentId);
@@ -1019,7 +1072,7 @@ export async function replaceSupportAssignmentScope(
   const repository = new PgSupportRepository(params.workspaceId);
   const actor = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  return uow.execute<SupportAssignmentCommandResult>(envelope, async ({ lockedHeads }) => {
+  return withTypedDatabaseConflicts(uow).execute<SupportAssignmentCommandResult>(envelope, async ({ lockedHeads }) => {
     const beforeRevision = lockedRevisionOf(lockedHeads, params.assignmentId);
     if (beforeRevision === undefined) return { ok: false, conflict: missingHeadConflict(ref) };
     const current = await repository.loadAssignment(params.workspaceId, params.assignmentId);

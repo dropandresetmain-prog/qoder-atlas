@@ -36,7 +36,7 @@ import { DomainCommandEnvelopeSchema, type DomainCommandEnvelope } from '../../.
 import type { UnitOfWork } from '../../../contracts/v2/command/unitOfWork.ts';
 import type { ActorContext } from '../../../contracts/v2/repository/people.ts';
 import type { OptionalWindow } from '../../../contracts/v2/repository/travel.ts';
-import { SubjectIdSchema, type ExpectedRevision, type RootRevision, type SubjectKind, type TypedRef } from '../../../domain/v2/shared/identity.ts';
+import type { ExpectedRevision, RootRevision, SubjectKind, TypedRef } from '../../../domain/v2/shared/identity.ts';
 import { typedConflict, type TypedConflict } from '../../../domain/v2/shared/errors.ts';
 import { InstantIntervalSchema } from '../../../domain/v2/shared/time.ts';
 import {
@@ -73,6 +73,19 @@ import { PgJourneyRepository } from '../repositories/pgJourneyRepository.ts';
 import { PgTripRepository } from '../repositories/pgTripRepository.ts';
 
 const SCHEMA_VERSION = '1';
+
+/**
+ * G12 (docs/refactor/evidence/M2_INTEGRATION_DECISIONS.md): the frozen
+ * `SubjectIdSchema` (identity.ts) legally admits legacy/source-shaped ids
+ * (e.g. `trip-legacy-7`, `journey:7`), but every column this lane writes into
+ * is typed `uuid` (0020-0025). The persistence-boundary rule immediately
+ * before `UnitOfWork.execute` is UUID shape, not the broader envelope-level
+ * `SubjectIdSchema` — matching the people lane (`peopleCommands.ts`
+ * `Uuid`/`RegistryTypedRefSchema`) and M4's `programmeCommands.ts` (`Uuid`).
+ * `SubjectIdSchema` itself is not narrowed; it still admits legacy ids
+ * elsewhere in the envelope.
+ */
+const PersistedId = z.uuid();
 
 // --- shared shapes -----------------------------------------------------------
 
@@ -142,12 +155,12 @@ const TripDetailMutationSchema = z.strictObject({
   purpose: z.string().min(1).optional(),
   intendedWindow: WindowSchema.optional(),
   /** Explicit null clears the business context; omission leaves it alone. */
-  businessContextOrganisationId: SubjectIdSchema.nullable().optional(),
+  businessContextOrganisationId: PersistedId.nullable().optional(),
 });
 
 const JourneyDetailMutationSchema = z.strictObject({
   intendedWindow: WindowSchema.optional(),
-  responsibilityOrganisationId: SubjectIdSchema.nullable().optional(),
+  responsibilityOrganisationId: PersistedId.nullable().optional(),
   lifecycleStatus: LifecycleStatusSchema.optional(),
 });
 
@@ -230,7 +243,7 @@ function rejectedPayload(commandType: string, error: z.ZodError): ExecuteOutcome
  * `ZodError` — one that had already opened a transaction in the second case.
  */
 function refusedSubjectRefs(commandType: string, refs: TypedRef[]): ExecuteOutcome<never> | undefined {
-  const malformed = refs.filter((ref) => !SubjectIdSchema.safeParse(ref.id).success);
+  const malformed = refs.filter((ref) => !PersistedId.safeParse(ref.id).success);
   if (malformed.length === 0) return undefined;
   return {
     ok: false,
@@ -238,7 +251,7 @@ function refusedSubjectRefs(commandType: string, refs: TypedRef[]): ExecuteOutco
       'VALIDATION_FAILED',
       `${commandType} payload rejected: ${malformed.map((r) => `${r.kind}:${JSON.stringify(r.id)}`).join(', ')} ${
         malformed.length === 1 ? 'is' : 'are'
-      } not a valid subject id`,
+      } not a UUID (PostgreSQL persistence boundary)`,
       malformed,
     ),
   };
@@ -253,7 +266,7 @@ function refOf(kind: SubjectKind, id: string): TypedRef {
  * identity the caller chose, which no payload schema carries.
  */
 function refusedSubjectIds(commandType: string, ids: readonly string[]): ExecuteOutcome<never> | undefined {
-  const malformed = ids.filter((id) => !SubjectIdSchema.safeParse(id).success);
+  const malformed = ids.filter((id) => !PersistedId.safeParse(id).success);
   if (malformed.length === 0) return undefined;
   return {
     ok: false,
@@ -261,9 +274,74 @@ function refusedSubjectIds(commandType: string, ids: readonly string[]): Execute
       'VALIDATION_FAILED',
       `${commandType} payload rejected: ${malformed.map((id) => JSON.stringify(id)).join(', ')} ${
         malformed.length === 1 ? 'is' : 'are'
-      } not a valid subject id`,
+      } not a UUID (PostgreSQL persistence boundary)`,
     ),
   };
+}
+
+/**
+ * The same rule for ids nested *inside* an already-parsed domain object (a
+ * `JourneyItem`'s kind-specific place/participation/resource ids, an
+ * `IntendedVisit`'s `jurisdictionId`, …). Those shapes come from the frozen
+ * domain schemas in `domain/v2/trip/trip.ts`, which only enforce the broader
+ * `SubjectIdSchema` — so a legacy-shaped id can pass the domain parse and
+ * still reach a `uuid` column unless it is re-checked here before `execute`.
+ */
+function refusedNestedIds(
+  commandType: string,
+  entries: Array<readonly [label: string, id: string | undefined]>,
+  refs: TypedRef[] = [],
+): ExecuteOutcome<never> | undefined {
+  const malformed = entries.filter(
+    (entry): entry is readonly [string, string] => entry[1] !== undefined && !PersistedId.safeParse(entry[1]).success,
+  );
+  if (malformed.length === 0) return undefined;
+  return {
+    ok: false,
+    conflict: typedConflict(
+      'VALIDATION_FAILED',
+      `${commandType} payload rejected: ${malformed.map(([label, id]) => `${label}=${JSON.stringify(id)}`).join(', ')} ${
+        malformed.length === 1 ? 'is' : 'are'
+      } not a UUID (PostgreSQL persistence boundary)`,
+      refs,
+    ),
+  };
+}
+
+/** Every subject id embedded in one `JourneyItem`, kind-specific fields included. */
+function journeyItemIdEntries(item: JourneyItem): Array<readonly [string, string | undefined]> {
+  const entries: Array<readonly [string, string | undefined]> = [
+    ['id', item.id],
+    ['journeyId', item.journeyId],
+  ];
+  switch (item.kind) {
+    case 'TRANSPORT':
+      entries.push(
+        ['desiredOriginPlaceId', item.desiredOriginPlaceId],
+        ['desiredDestinationPlaceId', item.desiredDestinationPlaceId],
+        ['selectedServiceId', item.selectedServiceId],
+      );
+      break;
+    case 'STAY':
+      entries.push(['intendedPlaceId', item.intendedPlaceId]);
+      break;
+    case 'ENGAGEMENT':
+      entries.push(['participationId', item.participationId]);
+      break;
+    case 'RESOURCE_USE':
+      entries.push(['resourceId', item.resourceId], ['intendedLocationPlaceId', item.intendedLocationPlaceId]);
+      break;
+  }
+  return entries;
+}
+
+/** Every subject id embedded in one `IntendedVisit`. */
+function intendedVisitIdEntries(visit: IntendedVisit): Array<readonly [string, string | undefined]> {
+  return [
+    ['id', visit.id],
+    ['journeyId', visit.journeyId],
+    ['jurisdictionId', visit.jurisdictionId],
+  ];
 }
 
 /**
@@ -348,7 +426,7 @@ async function participationConflict(
 const CreateTripPayloadSchema = z.strictObject({
   purpose: z.string().min(1),
   intendedWindow: WindowSchema.optional(),
-  businessContextOrganisationId: SubjectIdSchema.optional(),
+  businessContextOrganisationId: PersistedId.optional(),
   lifecycleStatus: LifecycleStatusSchema.default('DRAFT'),
 });
 
@@ -592,10 +670,10 @@ export async function setTripLifecycleStatus(
 // --- Journey commands --------------------------------------------------------
 
 const CreateJourneyPayloadSchema = z.strictObject({
-  tripId: SubjectIdSchema,
-  travellerId: SubjectIdSchema,
+  tripId: PersistedId,
+  travellerId: PersistedId,
   intendedWindow: WindowSchema.optional(),
-  responsibilityOrganisationId: SubjectIdSchema.optional(),
+  responsibilityOrganisationId: PersistedId.optional(),
   lifecycleStatus: LifecycleStatusSchema.default('DRAFT'),
   /** Already validated by the domain union before the envelope is built. */
   items: z.array(JourneyItemSchema).optional(),
@@ -661,7 +739,13 @@ export async function createJourney(
 
   const journeyRef = refOf('JOURNEY', journeyId);
   const tripRef = refOf('TRIP', params.tripId);
-  const refused = refusedSubjectRefs('JOURNEY_CREATED', [journeyRef, tripRef]);
+  const refused =
+    refusedSubjectRefs('JOURNEY_CREATED', [journeyRef, tripRef]) ??
+    refusedNestedIds(
+      'JOURNEY_CREATED',
+      [...items.flatMap(journeyItemIdEntries), ...intendedVisits.flatMap(intendedVisitIdEntries)],
+      [journeyRef, tripRef],
+    );
   if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const expected: ExpectedRevision[] =
@@ -917,6 +1001,10 @@ export async function addJourneyItem(
   const item = parsedItem.data;
   const journeyRef = refOf('JOURNEY', params.journeyId);
   const itemRef = refOf('JOURNEY_ITEM', journeyItemId);
+  const refused =
+    refusedSubjectRefs('JOURNEY_ITEM_ADDED', [journeyRef, itemRef]) ??
+    refusedNestedIds('JOURNEY_ITEM_ADDED', journeyItemIdEntries(item), [journeyRef, itemRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'JOURNEY_ITEM_ADDED',
@@ -1097,6 +1185,10 @@ export async function addIntendedVisit(
   if (!parsedVisit.success) return rejectedPayload('INTENDED_VISIT_ADDED', parsedVisit.error);
   const visit = parsedVisit.data;
   const journeyRef = refOf('JOURNEY', params.journeyId);
+  const refused =
+    refusedSubjectRefs('INTENDED_VISIT_ADDED', [journeyRef]) ??
+    refusedNestedIds('INTENDED_VISIT_ADDED', intendedVisitIdEntries(visit), [journeyRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'INTENDED_VISIT_ADDED',
@@ -1138,11 +1230,11 @@ export async function addIntendedVisit(
 // --- Credential selection commands -------------------------------------------
 
 const SelectCredentialPayloadSchema = z.strictObject({
-  journeyId: SubjectIdSchema,
-  credentialId: SubjectIdSchema,
+  journeyId: PersistedId,
+  credentialId: PersistedId,
   /** Omitted means "pin the credential's current accepted edition". */
-  credentialVersionId: SubjectIdSchema.optional(),
-  scopeIntendedVisitIds: z.array(SubjectIdSchema).min(1),
+  credentialVersionId: PersistedId.optional(),
+  scopeIntendedVisitIds: z.array(PersistedId).min(1),
 });
 
 export interface SelectCredentialParams extends CommandIdentity {
@@ -1302,8 +1394,8 @@ export async function selectCredential(
 }
 
 const RemoveCredentialPayloadSchema = z.strictObject({
-  journeyId: SubjectIdSchema,
-  credentialId: SubjectIdSchema,
+  journeyId: PersistedId,
+  credentialId: PersistedId,
 });
 
 export interface RemoveCredentialSelectionParams extends CommandIdentity {
@@ -1328,6 +1420,8 @@ export async function removeCredentialSelection(
   if (!parsed.success) return rejectedPayload('CREDENTIAL_SELECTION_REMOVED', parsed.error);
   const payload = parsed.data;
   const journeyRef = refOf('JOURNEY', payload.journeyId);
+  const refused = refusedSubjectRefs('CREDENTIAL_SELECTION_REMOVED', [journeyRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'CREDENTIAL_SELECTION_REMOVED',

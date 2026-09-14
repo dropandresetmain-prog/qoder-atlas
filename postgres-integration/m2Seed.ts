@@ -66,30 +66,30 @@ export async function attachSeedSession(
 
 /** Registers `size` fixture source+evidence rows so provenance FKs resolve to real M5 rows. */
 async function seedEvidencePool(client: PoolClient, workspaceId: string, actorId: string, size: number): Promise<string[]> {
-  const evidenceIds: string[] = [];
-  for (let index = 0; index < size; index++) {
-    const sourceId = randomUUID();
-    const evidenceId = randomUUID();
-    evidenceIds.push(evidenceId);
-    await client.query(
-      `INSERT INTO source_records
-         (workspace_id, id, source_identity, received_at, content_hash, content_type,
-          capture_metadata, capture_metadata_version, created_by_actor_id)
-       VALUES ($1, $2, 'm2-fixture-source', '2000-01-01T00:00:00Z', $3, 'application/test', '{}', 'm2-fixture/1', $4)`,
-      [workspaceId, sourceId, randomUUID().replace(/-/g, '').padEnd(64, 'e'), actorId],
-    );
-    await client.query(
-      `INSERT INTO evidence_records
-         (workspace_id, id, assertion_type, observed_at, schema_version, created_by_actor_id)
-       VALUES ($1, $2, 'M2_FIXTURE_PROVENANCE', '2000-01-01T00:00:00Z', 'm2-fixture/1', $3)`,
-      [workspaceId, evidenceId, actorId],
-    );
-    await client.query(
-      `INSERT INTO evidence_sources (workspace_id, evidence_record_id, source_record_id)
-       VALUES ($1, $2, $3)`,
-      [workspaceId, evidenceId, sourceId],
-    );
-  }
+  const evidenceIds = Array.from({ length: size }, () => randomUUID());
+  const sourceIds = Array.from({ length: size }, () => randomUUID());
+  const hashes = sourceIds.map((id) => id.replace(/-/g, '').padEnd(64, 'e'));
+  // Set-based: three statements per pool instead of three per row.
+  await client.query(
+    `INSERT INTO source_records
+       (workspace_id, id, source_identity, received_at, content_hash, content_type,
+        capture_metadata, capture_metadata_version, created_by_actor_id)
+     SELECT $1, s.id, 'm2-fixture-source', '2000-01-01T00:00:00Z', s.hash, 'application/test', '{}', 'm2-fixture/1', $4
+       FROM unnest($2::uuid[], $3::text[]) AS s(id, hash)`,
+    [workspaceId, sourceIds, hashes, actorId],
+  );
+  await client.query(
+    `INSERT INTO evidence_records
+       (workspace_id, id, assertion_type, observed_at, schema_version, created_by_actor_id)
+     SELECT $1, e.id, 'M2_FIXTURE_PROVENANCE', '2000-01-01T00:00:00Z', 'm2-fixture/1', $3
+       FROM unnest($2::uuid[]) AS e(id)`,
+    [workspaceId, evidenceIds, actorId],
+  );
+  await client.query(
+    `INSERT INTO evidence_sources (workspace_id, evidence_record_id, source_record_id)
+     SELECT $1, l.evidence_id, l.source_id FROM unnest($2::uuid[], $3::uuid[]) AS l(evidence_id, source_id)`,
+    [workspaceId, evidenceIds, sourceIds],
+  );
   return evidenceIds;
 }
 

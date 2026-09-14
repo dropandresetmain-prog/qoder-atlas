@@ -7,7 +7,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { SeedSession } from './m2Seed.ts';
-import { seedRootSubject } from './m2Seed.ts';
+import { seedRootSubject, takeSeedEvidence } from './m2Seed.ts';
 
 export async function seedEvent(seed: SeedSession, opts: { title?: string; lifecycleStatus?: string } = {}): Promise<string> {
   const eventId = await seedRootSubject(seed, { kind: 'EVENT' });
@@ -141,7 +141,7 @@ export async function seedGeographicArea(
     [seed.workspaceId, areaId, opts.name ?? 'Seed Area', opts.areaType ?? 'COUNTRY', seed.actorId],
   );
   const areaVersionId = randomUUID();
-  const evidenceId = randomUUID();
+  const evidenceId = takeSeedEvidence(seed); // real M5 evidence (0087 FK)
   const wkt = opts.geometryWkt ?? 'MULTIPOLYGON(((-179 -89, -179 89, 179 89, 179 -89, -179 -89)))';
   await seed.client.query(
     `INSERT INTO area_versions (workspace_id, id, area_id, edition_number, valid_from, geometry, evidence_id, created_by_actor_id)
@@ -169,7 +169,7 @@ export async function seedAreaMembership(
   params: { memberKind: 'PLACE' | 'AREA'; memberPlaceId?: string; memberAreaId?: string; containingAreaVersionId: string; validFrom?: string },
 ): Promise<string> {
   const membershipId = randomUUID();
-  const evidenceId = randomUUID();
+  const evidenceId = takeSeedEvidence(seed); // real M5 evidence (0087 FK)
   await seed.client.query(
     `INSERT INTO area_memberships
        (workspace_id, id, member_kind, member_place_id, member_area_id, containing_area_version_id, valid_from, evidence_id, created_by_actor_id)

@@ -22,7 +22,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { attachSeedSession, beginSeed, commitSeed, seedJourney, seedTraveller, seedTrip, type SeedSession } from './m2Seed.ts';
+import { attachSeedSession, beginSeed, commitSeed, seedJourney, seedTraveller, seedTrip, takeSeedEvidence, type SeedSession } from './m2Seed.ts';
 import { seedAreaMembership, seedGeographicArea, seedJurisdictionArea } from './m4Seed.ts';
 import { sharedTestPool } from './harness.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
@@ -42,6 +42,8 @@ interface Fixture {
   workspaceId: string;
   identity: { workspaceId: string; actorPrincipalId: string };
   uow: () => PgUnitOfWork;
+  /** A committed M5 evidence record id from the fixture's pool (0087 FKs). */
+  evidence: () => string;
 }
 
 async function fixture(): Promise<Fixture> {
@@ -53,6 +55,7 @@ async function fixture(): Promise<Fixture> {
     workspaceId: seed.workspaceId,
     identity: { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId },
     uow: () => new PgUnitOfWork(pool, seed.workspaceId),
+    evidence: () => takeSeedEvidence(seed),
   };
 }
 
@@ -140,7 +143,7 @@ describe('M4: real, versioned PostGIS geometry', () => {
         expectedRevision: area.revision,
         validFrom: '2020-01-01',
         geometryWkt: 'MULTIPOLYGON(((-179 -89, -179 89, 179 89, 179 -89, -179 -89)))',
-        evidenceId: randomUUID(),
+        evidenceId: f.evidence(),
       }),
     );
     assert.equal(version.revision, area.revision + 1);
@@ -167,7 +170,7 @@ describe('M4: real, versioned PostGIS geometry', () => {
       expectedRevision: area.revision,
       validFrom: '2020-01-01',
       geometryWkt: 'MULTIPOLYGON(((0 0, 10 10, 10 0, 0 10, 0 0)))',
-      evidenceId: randomUUID(),
+      evidenceId: f.evidence(),
     });
     assert.equal(conflictOf(outcome).kind, 'VALIDATION_FAILED');
   });
@@ -176,7 +179,7 @@ describe('M4: real, versioned PostGIS geometry', () => {
     const f = await fixture();
     const area = mustOk(await createGeographicArea(f.uow(), { ...f.identity, idempotencyKey: randomUUID(), name: 'Immutable Area', areaType: 'TEST' }));
     const version = mustOk(
-      await addAreaVersion(f.uow(), { ...f.identity, idempotencyKey: randomUUID(), areaId: area.areaId, expectedRevision: area.revision, validFrom: '2020-01-01', geometryWkt: 'MULTIPOLYGON(((-179 -89, -179 89, 179 89, 179 -89, -179 -89)))', evidenceId: randomUUID() }),
+      await addAreaVersion(f.uow(), { ...f.identity, idempotencyKey: randomUUID(), areaId: area.areaId, expectedRevision: area.revision, validFrom: '2020-01-01', geometryWkt: 'MULTIPOLYGON(((-179 -89, -179 89, 179 89, 179 -89, -179 -89)))', evidenceId: f.evidence() }),
     );
     const versionId = await scalar<{ id: string }>(f.pool, 'SELECT id FROM area_versions WHERE workspace_id = $1 AND area_id = $2 ORDER BY edition_number DESC LIMIT 1', [f.workspaceId, area.areaId]);
     void version;
@@ -261,7 +264,7 @@ describe('M4: wrong spatial/jurisdiction conflation is rejected', () => {
       await client.query(
         `INSERT INTO area_memberships (workspace_id, id, member_kind, member_place_id, member_area_id, containing_area_version_id, valid_from, evidence_id, created_by_actor_id)
          VALUES ($1, $2, 'PLACE', NULL, $3, $4, '2020-01-01', $5, $6)`,
-        [seed.workspaceId, randomUUID(), otherArea.areaId, areaVersionId, randomUUID(), seed.actorId],
+        [seed.workspaceId, randomUUID(), otherArea.areaId, areaVersionId, takeSeedEvidence(seed), seed.actorId],
       );
     }, /area_memberships_member_shape|check constraint/i);
   });
@@ -326,7 +329,7 @@ describe('M4: M2 deferred FK closure (0061)', () => {
       await client.query(
         `INSERT INTO travel_history (workspace_id, id, traveller_id, jurisdiction_id, evidence_id, coverage_claim, created_by_actor_id)
          VALUES ($1, $2, $3, $4, $5, 'PARTIAL', $6)`,
-        [seed.workspaceId, randomUUID(), traveller.travellerId, randomUUID(), randomUUID(), seed.actorId],
+        [seed.workspaceId, randomUUID(), traveller.travellerId, randomUUID(), takeSeedEvidence(seed), seed.actorId],
       );
     }, /travel_history_jurisdiction_fk/i);
   });

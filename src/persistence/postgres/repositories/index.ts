@@ -1,7 +1,11 @@
 export { PgArrangementRepositories } from './pgArrangementRepositories.ts';
 export { PgCoordinationRepository } from './pgCoordinationRepository.ts';
+export { PgGeographyRepository, PgPlaceRepository } from './pgGeographyRepository.ts';
 export { PgGovernanceRepository } from './pgGovernanceRepository.ts';
 export { PgJourneyRepository } from './pgJourneyRepository.ts';
+export { PgKnowledgeRepository } from './pgKnowledgeRepository.ts';
+export { PgEventRepository, PgProgrammeRepository } from './pgProgrammeRepository.ts';
+export { PgResourceAssignmentRepository } from './pgResourceAssignmentRepository.ts';
 export { PgSupportRepository } from './pgSupportRepository.ts';
 export { PgTravellerRepository } from './pgTravellerRepository.ts';
 export { PgTripRepository } from './pgTripRepository.ts';

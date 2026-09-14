@@ -12,12 +12,14 @@ import {
   seedRootSubject,
   seedTrip,
   seedTraveller,
+  takeSeedEvidence,
   type SeedSession,
   type SeededJourneyItem,
   type SeededTraveller,
 } from './m2Seed.ts';
+import { seedPlace } from './m4Seed.ts';
 
-export { beginSeed, commitSeed, rollbackSeed, opaqueRef, seedJourney, seedJourneyItem, seedRootSubject, seedChildSubject, seedTraveller, seedTrip };
+export { beginSeed, commitSeed, rollbackSeed, opaqueRef, seedJourney, seedJourneyItem, seedPlace, seedRootSubject, seedChildSubject, seedTraveller, seedTrip, takeSeedEvidence };
 export type { SeedSession, SeededJourneyItem, SeededTraveller };
 
 export async function seedOrganisation(seed: SeedSession, currency = 'USD'): Promise<string> {
@@ -32,13 +34,16 @@ export async function seedOrganisation(seed: SeedSession, currency = 'USD'): Pro
 
 export async function seedTransportService(seed: SeedSession, params: { departure?: string; arrival?: string } = {}): Promise<string> {
   const id = await seedRootSubject(seed, { kind: 'TRANSPORT_SERVICE' });
-  const evidence = randomUUID();
+  // Integrated schema (0087): endpoints are real M4 places, provenance is real M5 evidence.
+  const origin = await seedPlace(seed, { name: 'M3 Seed Origin', placeType: 'AIRPORT' });
+  const destination = await seedPlace(seed, { name: 'M3 Seed Destination', placeType: 'AIRPORT' });
+  const evidence = takeSeedEvidence(seed);
   await seed.client.query(
     `INSERT INTO transport_services
        (workspace_id,id,mode,operator,origin_place_id,destination_place_id,
         published_departure,published_arrival,published_observed_at,published_evidence_id,created_by_actor_id)
      VALUES ($1,$2,'AIR','M3 Seed Operator',$3,$4,$5,$6,$7,$8,$9)`,
-    [seed.workspaceId, id, opaqueRef(), opaqueRef(), params.departure ?? '2030-01-01T00:00:00Z', params.arrival ?? '2030-01-01T02:00:00Z', '2030-01-01T00:00:00Z', evidence, seed.actorId],
+    [seed.workspaceId, id, origin, destination, params.departure ?? '2030-01-01T00:00:00Z', params.arrival ?? '2030-01-01T02:00:00Z', '2030-01-01T00:00:00Z', evidence, seed.actorId],
   );
   return id;
 }
@@ -48,7 +53,7 @@ export async function seedResource(seed: SeedSession, resourceType: 'VEHICLE' | 
   await seed.client.query(
     `INSERT INTO resources (workspace_id,id,resource_type,location_place_id,capacity,created_by_actor_id)
      VALUES ($1,$2,$3,$4,1,$5)`,
-    [seed.workspaceId, id, resourceType, opaqueRef(), seed.actorId],
+    [seed.workspaceId, id, resourceType, await seedPlace(seed, { name: 'M3 Seed Resource Location' }), seed.actorId],
   );
   const table = resourceType === 'ROOM' ? 'room_resource_details' : resourceType === 'VEHICLE' ? 'vehicle_resource_details' : 'equipment_resource_details';
   const extra = resourceType === 'ROOM' ? ', bed_configuration' : '';
@@ -75,7 +80,7 @@ export async function seedReservation(seed: SeedSession, params: { organisationI
 export async function seedReservationLine(seed: SeedSession, params: { reservationId: string; productType: 'TRANSPORT' | 'STAY' | 'RESOURCE_USE'; transportServiceId?: string; resourceId?: string }): Promise<string> {
   const id = randomUUID();
   await seedChildSubject(seed, { id, kind: 'RESERVATION_LINE', aggregateId: params.reservationId });
-  const evidence = randomUUID();
+  const evidence = takeSeedEvidence(seed);
   await seed.client.query(
     `INSERT INTO reservation_lines (workspace_id,id,reservation_id,product_type,observed_status,observed_status_at,observation_evidence_id,created_by_actor_id)
      VALUES ($1,$2,$3,$4,'CONFIRMED','2030-01-01T00:00:00Z',$5,$6)`,
@@ -90,7 +95,7 @@ export async function seedReservationLine(seed: SeedSession, params: { reservati
     await seed.client.query(
       `INSERT INTO stay_line_details (workspace_id,line_id,product_type,stay_interval_start,stay_interval_end,resource_id,place_id,occupancy)
        VALUES ($1,$2,'STAY','2030-01-01T00:00:00Z','2030-01-02T00:00:00Z',$3,$4,$5)`,
-      [seed.workspaceId, id, params.resourceId ?? null, opaqueRef(), JSON.stringify({ guests: 2 })],
+      [seed.workspaceId, id, params.resourceId ?? null, await seedPlace(seed, { name: 'M3 Seed Stay Place' }), JSON.stringify({ guests: 2 })],
     );
   } else {
     await seed.client.query(
@@ -120,24 +125,11 @@ export async function seedExternalConnection(seed: SeedSession, organisationId?:
   return id;
 }
 
-/**
- * M3's allocation tests need JourneyItems, but the shared test database may
- * already contain a later M4 schema whose place FKs are present. This fixture
- * supplies only the minimum opaque place rows when that additive schema exists;
- * it does not import or depend on M4 implementation code.
- */
+/** A TRANSPORT JourneyItem whose desired endpoints are real M4 places (0061 FKs). */
 export async function seedM3TransportJourneyItem(seed: SeedSession, journeyId: string): Promise<string> {
   const id = randomUUID();
-  const origin = randomUUID();
-  const destination = randomUUID();
-  const placeTable = await seed.client.query<{ name: string | null }>("SELECT to_regclass('public.places') AS name");
-  if (placeTable.rows[0]?.name) {
-    await seed.client.query(
-      `INSERT INTO places (workspace_id,id,name,place_type,time_zone,created_by_actor_id)
-       VALUES ($1,$2,'M3 Seed Place','M3_TEST','UTC',$3),($1,$4,'M3 Seed Place Two','M3_TEST','UTC',$3)`,
-      [seed.workspaceId, origin, seed.actorId, destination],
-    );
-  }
+  const origin = await seedPlace(seed, { name: 'M3 Seed Place' });
+  const destination = await seedPlace(seed, { name: 'M3 Seed Place Two' });
   await seedChildSubject(seed, { id, kind: 'JOURNEY_ITEM', aggregateId: journeyId });
   await seed.client.query(
     `INSERT INTO journey_items (workspace_id,id,journey_id,kind,order_key,lifecycle_status,created_by_actor_id)

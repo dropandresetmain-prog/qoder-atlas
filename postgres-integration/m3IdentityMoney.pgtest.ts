@@ -3,7 +3,7 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed, seedExternalConnection, seedOrganisation, seedReservation, seedTraveller, type SeedSession } from './m3Seed.ts';
+import { beginSeed, commitSeed, seedExternalConnection, seedOrganisation, seedReservation, seedTraveller, takeSeedEvidence, type SeedSession } from './m3Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { PgArrangementReadQueries } from '../src/persistence/postgres/queries/pgArrangementReadQueries.ts';
 import {
@@ -49,7 +49,8 @@ async function setup() {
   const reservationId = await seedReservation(seed, { organisationId, travellerId });
   const connectionId = await seedExternalConnection(seed, organisationId);
   await commitSeed(seed);
-  return { pool, seed, organisationId, travellerId, reservationId, connectionId };
+  const evidence = () => takeSeedEvidence(seed);
+  return { pool, seed, evidence, organisationId, travellerId, reservationId, connectionId };
 }
 
 describe('M3 identity, capability, entitlement, and money semantics', () => {
@@ -65,7 +66,7 @@ describe('M3 identity, capability, entitlement, and money semantics', () => {
 
     const linkedCandidate = mustOk(await observeExternalRecord(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), connectionId: f.connectionId, expectedRevision: 2, record: { recordType: 'RESERVATION', externalId: 'provider-linked', identityState: 'UNVERIFIED', observedAt: AT1 } }));
     const linkedId = linkedCandidate.recordId;
-    const link = mustOk(await linkExternalRecord(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), connectionId: f.connectionId, expectedRevision: 3, link: { id: randomUUID(), externalRecordId: linkedId, canonicalSubject: { kind: 'RESERVATION', id: f.reservationId }, linkKind: 'SYSTEM_OF_RECORD', evidenceId: randomUUID(), linkedAt: AT2 } }));
+    const link = mustOk(await linkExternalRecord(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), connectionId: f.connectionId, expectedRevision: 3, link: { id: randomUUID(), externalRecordId: linkedId, canonicalSubject: { kind: 'RESERVATION', id: f.reservationId }, linkKind: 'SYSTEM_OF_RECORD', evidenceId: f.evidence(), linkedAt: AT2 } }));
     assert.ok(link.linkId);
     const linkedRows = await new PgArrangementReadQueries(f.pool).externalRecordsForSubject(f.seed.workspaceId, f.reservationId, 'RESERVATION');
     assert.equal(linkedRows.length, 1);
@@ -90,7 +91,7 @@ describe('M3 identity, capability, entitlement, and money semantics', () => {
       client.release();
     }
 
-    const rejected = await linkExternalRecord(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), connectionId: f.connectionId, expectedRevision: 4, link: { id: randomUUID(), externalRecordId: unknownId, canonicalSubject: { kind: 'RESERVATION', id: f.reservationId }, linkKind: 'CORRELATED', evidenceId: randomUUID(), linkedAt: AT2 } });
+    const rejected = await linkExternalRecord(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), connectionId: f.connectionId, expectedRevision: 4, link: { id: randomUUID(), externalRecordId: unknownId, canonicalSubject: { kind: 'RESERVATION', id: f.reservationId }, linkKind: 'CORRELATED', evidenceId: f.evidence(), linkedAt: AT2 } });
     assert.equal(conflictOf(rejected).kind, 'VALIDATION_FAILED');
   });
 
@@ -118,7 +119,7 @@ describe('M3 identity, capability, entitlement, and money semantics', () => {
     assert.equal(conflictOf(missingEvidence).kind, 'VALIDATION_FAILED');
     const unknown = mustOk(await createServiceEntitlement(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), entitlement: { entitlementType: 'TICKET', observedStatus: 'UNKNOWN' } }));
     assert.ok(unknown.id);
-    const issued = mustOk(await createServiceEntitlement(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), entitlement: { entitlementType: 'TICKET', observedStatus: 'ISSUED', observedStatusAt: AT1, evidenceId: randomUUID() } }));
+    const issued = mustOk(await createServiceEntitlement(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), entitlement: { entitlementType: 'TICKET', observedStatus: 'ISSUED', observedStatusAt: AT1, evidenceId: f.evidence() } }));
     const rows = await f.pool.query<{ n: string }>('SELECT COUNT(*)::text AS n FROM service_entitlements WHERE workspace_id=$1', [f.seed.workspaceId]);
     assert.equal(rows.rows[0]?.n, '2');
     assert.notEqual(issued.id, unknown.id);
@@ -132,7 +133,7 @@ describe('M3 identity, capability, entitlement, and money semantics', () => {
     mustOk(await recordFxObservation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), observation }));
     const noFx = await createCostAllocation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), expectedReservationRevision: 1, allocation: { id: randomUUID(), reservationId: f.reservationId, payerOrganisationId: f.organisationId, entryKind: 'INTENDED', amount: { amount: '10.01', currency: 'EUR' } } });
     assert.equal(conflictOf(noFx).kind, 'VALIDATION_FAILED');
-    const applied = mustOk(await createCostAllocation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), expectedReservationRevision: 1, allocation: { id: randomUUID(), reservationId: f.reservationId, payerOrganisationId: f.organisationId, entryKind: 'ACTUAL', amount: { amount: '10.01', currency: 'EUR' }, fxObservationId: observation.id, evidenceId: randomUUID(), occurredAt: AT1 } }));
+    const applied = mustOk(await createCostAllocation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), expectedReservationRevision: 1, allocation: { id: randomUUID(), reservationId: f.reservationId, payerOrganisationId: f.organisationId, entryKind: 'ACTUAL', amount: { amount: '10.01', currency: 'EUR' }, fxObservationId: observation.id, evidenceId: f.evidence(), occurredAt: AT1 } }));
     assert.equal(applied.reservationRevision, 2);
     const allocations = await new PgArrangementReadQueries(f.pool).costAllocationsForReservation(f.seed.workspaceId, f.reservationId);
     assert.equal(allocations.length, 1);

@@ -22,7 +22,6 @@ import type {
   Jurisdiction,
   JurisdictionArea,
 } from '../../../domain/v2/programmes/programme.ts';
-import type { InstantInterval } from '../../../domain/v2/shared/time.ts';
 import type { ActorContext } from './people.ts';
 
 // One definition shared with the travel ports, so the repository barrel re-exports a single symbol.

@@ -603,6 +603,8 @@ export class PgArrangementRepositories implements ArrangementRepositories {
   async addReservationAllocation(params: { allocation: ReservationAllocation; actor: ActorContext }): Promise<void> {
     const workspaceId = this.scope(params.actor.workspaceId);
     const a = params.allocation;
+    // The contract field is additive-optional; persistence requires the owning reservation.
+    if (a.reservationId === undefined) throw new Error('reservation allocation must name its reservation before persistence');
     const result = await this.client().query(
       `INSERT INTO reservation_allocations
          (workspace_id, id, reservation_id, line_id, traveller_id, journey_item_id, allocation_role, quantity, created_by_actor_id)

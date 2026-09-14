@@ -3,7 +3,7 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed, seedJourney, seedM3TransportJourneyItem, seedOrganisation, seedTraveller, seedTrip, type SeedSession } from './m3Seed.ts';
+import { beginSeed, commitSeed, seedJourney, seedM3TransportJourneyItem, seedOrganisation, seedPlace, seedTraveller, seedTrip, takeSeedEvidence, type SeedSession } from './m3Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { PgArrangementReadQueries } from '../src/persistence/postgres/queries/pgArrangementReadQueries.ts';
 import {
@@ -34,13 +34,14 @@ function identity(seed: SeedSession) {
   return { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId };
 }
 
-function serviceInput(mode: 'AIR' | 'RAIL' | 'ROAD' | 'SEA') {
-  const sourceId = randomUUID();
+function serviceInput(mode: 'AIR' | 'RAIL' | 'ROAD' | 'SEA', places: { origin: string; destination: string; sourceEvidenceId: string }) {
+  // The schedule-group sourceId is persisted as *_evidence_id (0087 FK to evidence_records).
+  const sourceId = places.sourceEvidenceId;
   return {
     mode,
     operator: 'operator',
-    originPlaceId: randomUUID(),
-    destinationPlaceId: randomUUID(),
+    originPlaceId: places.origin,
+    destinationPlaceId: places.destination,
     publishedDeparture: { value: AT0, observedAt: AT0, sourceId },
     publishedArrival: { value: AT2, observedAt: AT0, sourceId },
   } as const;
@@ -75,8 +76,10 @@ async function setup() {
   const journeyB = await seedJourney(seed, { tripId: tripB, travellerId: travellerB.travellerId });
   const itemA = await seedM3TransportJourneyItem(seed, journeyA);
   const itemB = await seedM3TransportJourneyItem(seed, journeyB);
+  const places = { origin: await seedPlace(seed, { name: 'M3 origin' }), destination: await seedPlace(seed, { name: 'M3 destination' }), sourceEvidenceId: takeSeedEvidence(seed) };
   await commitSeed(seed);
-  return { pool, seed, organisationId, travellerA: travellerA.travellerId, travellerB: travellerB.travellerId, tripA, tripB, journeyA, journeyB, itemA, itemB };
+  const evidence = () => takeSeedEvidence(seed);
+  return { pool, seed, places, evidence, organisationId, travellerA: travellerA.travellerId, travellerB: travellerB.travellerId, tripA, tripB, journeyA, journeyB, itemA, itemB };
 }
 
 describe('M3 services, reservations, allocations, and enterprise context', () => {
@@ -85,17 +88,17 @@ describe('M3 services, reservations, allocations, and enterprise context', () =>
     const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
     const invalid = await createTransportService(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(),
-      service: { ...serviceInput('AIR'), id: 'not-a-uuid' },
+      service: { ...serviceInput('AIR', f.places), id: 'not-a-uuid' },
     });
     assert.equal(conflictOf(invalid).kind, 'VALIDATION_FAILED');
 
     const service = mustOk(await createTransportService(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(),
-      service: serviceInput('AIR'),
+      service: serviceInput('AIR', f.places),
     }));
     const estimated = mustOk(await recordTransportObservation(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(), serviceId: service.id, expectedRevision: 1,
-      observation: { field: 'ESTIMATED', departure: AT1, arrival: AT3, observedAt: AT1, evidenceId: randomUUID() },
+      observation: { field: 'ESTIMATED', departure: AT1, arrival: AT3, observedAt: AT1, evidenceId: f.evidence() },
     }));
     assert.equal(estimated.status, 'APPLIED');
     const times = await scalar<{ published_departure: Date; estimated_departure: Date; actual_departure: Date | null }>(f.pool, 'SELECT published_departure, estimated_departure, actual_departure FROM transport_services WHERE workspace_id=$1 AND id=$2', [f.seed.workspaceId, service.id]);
@@ -105,7 +108,7 @@ describe('M3 services, reservations, allocations, and enterprise context', () =>
 
     const actual = mustOk(await recordTransportObservation(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(), serviceId: service.id, expectedRevision: 2,
-      observation: { field: 'ACTUAL', departure: EARLY, arrival: AT1, observedAt: AT2, evidenceId: randomUUID() },
+      observation: { field: 'ACTUAL', departure: EARLY, arrival: AT1, observedAt: AT2, evidenceId: f.evidence() },
     }));
     assert.equal(actual.status, 'APPLIED');
     const early = await scalar<{ actual_departure: Date }>(f.pool, 'SELECT actual_departure FROM transport_services WHERE workspace_id=$1 AND id=$2', [f.seed.workspaceId, service.id]);
@@ -113,7 +116,7 @@ describe('M3 services, reservations, allocations, and enterprise context', () =>
 
     const resource = mustOk(await createResource(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(),
-      resource: { resourceType: 'ROOM', placeId: randomUUID(), capacity: 2 }, detail: { resourceType: 'ROOM', bedConfiguration: 'double' },
+      resource: { resourceType: 'ROOM', placeId: f.places.origin, capacity: 2 }, detail: { resourceType: 'ROOM', bedConfiguration: 'double' },
     }));
     const kinds = await f.pool.query<{ kind: string; checker_function: string }>('SELECT kind, checker_function FROM subject_subtype_checkers WHERE kind IN ($1,$2) ORDER BY kind', ['RESOURCE', 'TRANSPORT_SERVICE']);
     assert.deepEqual(kinds.rows.map((row) => row.kind), ['RESOURCE', 'TRANSPORT_SERVICE']);
@@ -159,7 +162,7 @@ describe('M3 services, reservations, allocations, and enterprise context', () =>
 
     const serviceId = mustOk(await createTransportService(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(),
-      service: serviceInput('RAIL'),
+      service: serviceInput('RAIL', f.places),
     })).id;
     const reservationId = mustOk(await createReservation(uow(), {
       ...identity(f.seed), idempotencyKey: randomUUID(),
@@ -194,11 +197,11 @@ describe('M3 services, reservations, allocations, and enterprise context', () =>
   test('line observation is stale-safe and entitlement issuance remains separate from confirmation', async () => {
     const f = await setup();
     const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
-    const serviceId = mustOk(await createTransportService(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), service: serviceInput('ROAD') })).id;
+    const serviceId = mustOk(await createTransportService(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), service: serviceInput('ROAD', f.places) })).id;
     const reservationId = mustOk(await createReservation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), reservation: { reservationType: 'TRANSPORT', responsibleTravellerId: f.travellerA, observedStatus: 'CONFIRMED', observedStatusAt: AT1 } })).id;
-    const evidence = randomUUID();
+    const evidence = f.evidence();
     const lineId = mustOk(await addReservationLine(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), reservationId, expectedRevision: 1, line: { productType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: AT1, observationEvidenceId: evidence }, detail: { productType: 'TRANSPORT', transportServiceId: serviceId } })).lineId;
-    const stale = await recordReservationLineObservation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), reservationId, lineId, expectedRevision: 2, observation: { observedStatus: 'HELD', observedStatusAt: AT0, observationEvidenceId: randomUUID() } });
+    const stale = await recordReservationLineObservation(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), reservationId, lineId, expectedRevision: 2, observation: { observedStatus: 'HELD', observedStatusAt: AT0, observationEvidenceId: f.evidence() } });
     assert.equal(mustOk(stale).status, 'STALE');
     const query = new PgArrangementReadQueries(f.pool);
     assert.equal((await query.entitlementsForLine(f.seed.workspaceId, lineId)).length, 0, 'reservation confirmation must not create an entitlement');
@@ -209,7 +212,7 @@ describe('M3 services, reservations, allocations, and enterprise context', () =>
     const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
     const agreementId = mustOk(await createCommercialAgreement(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), agreement: { organisationId: f.organisationId, publishedTerms: { rate: 'private' }, eligibleAccountIds: [], publishedAt: AT0 } })).id;
     const offerId = mustOk(await createOffer(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), offer: { sourceId: randomUUID(), accountId: f.organisationId, price: { amount: '123456789012345.67', currency: 'USD' }, quotedAt: AT0, expiresAt: AT2, fingerprint: randomUUID(), eligiblePartyRef: f.organisationId, eligiblePartyKind: 'ORGANISATION' } })).id;
-    mustOk(await addOfferItem(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), offerId, expectedRevision: 1, detail: { productType: 'STAY', placeId: randomUUID(), stayInterval: { start: AT1, end: AT2 } }, amount: { amount: '123456789012345.67', currency: 'USD' } }));
+    mustOk(await addOfferItem(uow(), { ...identity(f.seed), idempotencyKey: randomUUID(), offerId, expectedRevision: 1, detail: { productType: 'STAY', placeId: f.places.destination, stayInterval: { start: AT1, end: AT2 } }, amount: { amount: '123456789012345.67', currency: 'USD' } }));
     const eligible = await new PgArrangementReadQueries(f.pool).offersEligibleFor(f.seed.workspaceId, { at: AT1, organisationIds: [f.organisationId] });
     assert.equal(eligible.length, 1);
     assert.equal(eligible[0]?.price.amount, '123456789012345.67');

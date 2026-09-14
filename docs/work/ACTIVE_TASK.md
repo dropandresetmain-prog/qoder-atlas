@@ -1,95 +1,91 @@
-# ACTIVE TASK — M3 Services, reservations and enterprise context
+# ACTIVE TASK — Northstar Long Horizon A: M2–M5 integration → M6 → C2 candidate
+
+Working-memory ledger (AGENTS.md "long-horizon work"). Reread before each major
+phase, after compaction, after delegated work and before declaring completion.
+Close an item only with evidence. Lane ledgers are preserved separately:
+`M3_ACTIVE_TASK.md`, `M3_CLOUD_ACTIVE_TASK.md` (stale M3 original),
+`M4_ACTIVE_TASK.md`, `M5_ACTIVE_TASK.md`.
 
 ## Goal
 
-Materialize the M3 target domain (TransportService, Resource, Reservation/
-ReservationLine/ReservationAllocation, ServiceEntitlement + components/links,
-immutable Offers, CommercialAgreement editions, external connections/records/
-identity links/ownership bindings, provider capability descriptors, accounting
-dimensions/assignments, cost allocations, budgets/commitments/entries, FX
-observations) on top of the accepted M2 base. Isolated: no production runtime
-wiring, no M4 programme/geography semantics, no M5 knowledge semantics, no M8
-authority dispatch, no M6 consequence propagation.
+Integrate accepted M3/M4/M5 lanes onto the accepted M2 base (one PostgreSQL
+schema), close G12, then implement M6 (WorldSnapshot read consistency = G1,
+registered dependency closure, effective projections, pure evaluators, entry
+feasibility, invalidation/reassessment, AT fixtures) and stop at a C2
+candidate. Do not claim C2 passed. No M7/M8.
 
-## Base
+## Exact identity
 
-- Branch `milestone-m3`, worktree `/data/workspace/qoder-atlas-m3`.
-- Exact base SHA `71f638ed30d01e65981bdd9e5e6128ad067fbf1d`
-  (== `origin/data-structure-refactor` at dispatch, verified via
-  `git ls-remote` + explicit fetch; clean tree).
-- Migration range: **`0030`–`0049` only**. M2 owns `0010`–`0029`; M4 `0050`–`0069`;
-  M5 `0070`–`0089`. Do not edit any of those files.
+- Repo `dropandresetmain-prog/qoder-atlas`; worktree `C:/Dev/qoder-atlas-m6`
+- Branch `integration/m2-m6-domain-evaluation`
+- Base `data-structure-refactor` = `71f638ed30d01e65981bdd9e5e6128ad067fbf1d`
+- M3 `milestone-m3-recovered` = `959fff5f87ff0484cbd5eb9c128d508676e581f9`
+- M4 `milestone-m4` = `cad6bb8bb3d08f80098fb6a013b4fff077fe3015`
+- M5 `milestone-m5-recovered` = `8e3dee0b699ccfacd86e2c942f18d5816e6c673c`
+- All four verified against `origin` at start (2026-09-14).
+- Test DB: container `northstar-postgres-test` :55432, isolated DBs
+  `northstar_m6_*` via `PGTEST_DB` (shared `northstar_test` DB untouched).
+- Migration allocation: M1 0001–0009, M2 0010–0029, M3 0030–0049,
+  M4 0050–0069, M5 0070–0089, **M6 0090–0099** (MIGRATION_MAPPING.md).
 
-## Locked design decisions
+## Phase checklist
 
-1. **UUID persistence-boundary rule (M2 integration decisions, G12).** Every M3
-   command payload validates target domain IDs with a shared `UuidSchema`
-   before `uow.execute`. The frozen `SubjectIdSchema` regex is NOT narrowed
-   globally; legacy/source/provider ids remain external identifiers.
-2. **SubjectKinds activated by M3** (fail-closed checkers per 0010 contract):
-   `TRANSPORT_SERVICE`, `RESOURCE`, `RESERVATION`, `RESERVATION_LINE` (child of
-   Reservation), `SERVICE_ENTITLEMENT`, `OFFER`, `COMMERCIAL_AGREEMENT`,
-   `EXTERNAL_CONNECTION`, `EXTERNAL_RECORD` (child of ExternalConnection),
-   `OWNERSHIP_BINDING` (child of the bound subject's root aggregate).
-   Kinds allocated to M4/M5/M6/M7/M8 stay unregistered.
-3. **Aggregate policy.** TRANSPORT_SERVICE, RESOURCE, RESERVATION,
-   SERVICE_ENTITLEMENT, OFFER, COMMERCIAL_AGREEMENT, EXTERNAL_CONNECTION are
-   roots (own head). RESERVATION_LINE is a Reservation child (Reservation head
-   is the only counter). OWNERSHIP_BINDING is a child registered under the
-   owning subject's aggregate (bindings mutate under the owner).
-4. **Supplier truth vs journey intent.** `transport_services` carries
-   published/estimated/actual instants as separate column groups, each with its
-   own `observed_at` + provenance. Journey intent stays in M2's
-   `journey_items` + detail tables; M3 links fulfilment via
-   `transport_item_details.selected_service_id` and
-   `resource_use_item_details.resource_id` (the two M2 deferred FKs M3 closes).
-5. **Shared canonical bookings.** One reservation row + N lines + N allocations.
-   Allocation validation ( Traveller exists; JourneyItem belongs to that
-   Traveller; unique equivalent tuple) is enforced by DB assertions +
-   command pre-checks. G5 resolves here: no per-Traveller booking copies.
-6. **Confirmation ≠ issuance.** `service_entitlements.observed_status` carries
-   issuer truth with explicit UNKNOWN; nothing derives ticketed state from a
-   reservation line's CONFIRMED status.
-7. **External identity.** `external_records` unique on
-   `(connection, record_type, external_id)`; merging requires a verified
-   `external_record_links` row (evidence-backed). Unknown identity → structured
-   quarantine rows on the same tables with `identity_state IN
-   ('UNVERIFIED','QUARANTINED_UNKNOWN','QUARANTINED_AMBIGUOUS')` + reason; no
-   auto-merge. Locator equality alone is never a merge rule.
-8. **Capability ≠ authority ≠ observation.** `provider_capabilities` rows are
-   explicit per (connection, capability kind, record type); `supported=false`
-   is stored truth, not absence. Unsupported split/cancel/service returns typed
-   `CAPABILITY_UNSUPPORTED`. M8 owns authority; M3 stores capability facts only.
-9. **Money.** Exact decimal strings; sums compared via `compareExactMoney` on
-   integer minor units. FX observations are immutable dated evidence rows; no
-   mutable global rate table. Budget holds use exact amounts; unknown outcome
-   cannot release a hold (status machine).
-10. **Offers immutable.** INSERT-only with `forbid_mutation` trigger; expiry is
-    derived by query, never mutated. Eligibility requires an explicit
-    agreement/eligibility row, never bare Trip membership.
-11. **Retry safety.** All ids/timestamps minted before `uow.execute`; handler
-    callbacks contain no provider/network/irreversible work.
-12. **M2 deferred FKs closed (additively, in `0049`):**
-    `transport_item_details.selected_service_id → transport_services`,
-    `resource_use_item_details.resource_id → resources`.
+- [x] P0 preflight: docs read, SHAs verified, worktree created
+- [x] P1 merge M3 → M4 → M5 (`--no-ff`): 23b8bdc, d6880c3, bb2573a (pushed)
+- [x] P1 shared fixtures/tests combined; barrels consistent (M2_M5_INTEGRATION.md §2)
+- [x] P1A empty-DB migration order proof (integrationCrossLane); subtype matrix 37 kinds × 4 properties (integrationSubtypeMatrix 158/158)
+- [x] P1A cross-lane FK reconciliation: 0087 (25 FKs) + orphan/cross-workspace proofs
+- [x] P1B G12: travel/support UUID-gated before execute (g12UuidBoundary 22 cases; reviewed diff)
+- [ ] P1C gates green → **Checkpoint A** commit + push
+- [ ] P2 read session + WorldSnapshot capture + manifest (G1) → **Checkpoint B**
+- [ ] P3 dependency registry/closure + structured explanations
+- [ ] P4 effective Journey/Programme/Service projections → **Checkpoint C**
+- [ ] P5 evaluator registry + families
+- [ ] P6 entry/regulatory feasibility
+- [ ] P7 invalidation/currentness + durable reassessment seam → **Checkpoint D**
+- [ ] P8 AT fixtures (AT01–06, 08–15, 19–22 M6 portions) → **Checkpoint E**
+- [ ] Docs: M2_M5_INTEGRATION.md, M6.md, roadmap status; final verification
 
-## Issue triage ledger (update as found)
+## Current checkpoint
+
+P1C gate run in progress on northstar_m6_ckptA. Non-DB gates already green:
+typecheck, build, lint, anti-hardcoding, v2 contracts/invariants 41/41.
+Legacy npm test 889/890 (A-10 pre-existing at base).
+
+## Next action
+
+On green canonical pg run: fill M2_M5_INTEGRATION.md §6-§8, commit Checkpoint A,
+push, then land drafted M6 contracts (scratchpad/m6) and start P2.
+
+## Critical architecture constraints
+
+- F01–F18 frozen; UnitOfWork contract unchanged (G1 decision: M6 adds a
+  separate read-session abstraction, not a UoW overload).
+- G12: UUID validation at persistence command boundary before UoW; do not
+  narrow `SubjectIdSchema`.
+- Only registered dependency semantics propagate; FKs are not graph edges.
+- Evaluators pure over captured WorldSnapshot; injected clock; no repo reads.
+- PASS/FAIL/UNKNOWN only from evidence; absence ≠ PASS. Traveller payer home
+  currency is not authoritative → UNKNOWN/explicit input.
+- Explanations are structured (cause, affected subject, semantic, evidence
+  refs, dimension, status, uncertainty) — never prose-only.
+- Ownership: Journey = intent; TransportService/Reservation = supplier truth;
+  ProgrammeItem = schedule; InformationVersion = publisher knowledge.
+- No runtime SQLite cutover, no provider actions, no demo/Sarah branches.
+
+## Unresolved findings (triage)
 
 | ID | Finding | Triage |
 |---|---|---|
-| M3-1 | Local sandbox has no Docker; PG16+PostGIS installed locally (port 55432) and Node 20 cannot run the canonical `node --test` type-stripping script, so `npm run test:postgres` is executed via `npx tsx --test --test-concurrency=1` (same suites, same order). | Ignore / Accept Risk (environment, not repo) |
+| I-1 | Full suite at M3+M4 had one file-level failure in `m2SubtypeIntegrity` (no subtest output); file passes alone 15/15 | Investigate Now |
+| I-2 | M4 did not add its ports to repository barrel / pg repositories index | Act Now — closed |
+| I-3 | Cross-lane FKs unclosed (25 incl. M4→M3, M3→M4, M5→M4, *→M5) | Act Now — closed by 0087 |
+| I-4 | M3 non-additive `ReservationAllocation.reservationId` broke M0 contract suite | Act Now — closed (A-8) |
+| I-5 | Scope generations advanced only by 2 M2 commands; M3/M4/M5 advance none → phantom invalidation impossible | Act Now in P2 (0090 trigger propagation, drafted) |
+| I-6 | Legacy integration.r1 determinism test fails (wall clock) — also at base | Park for Later (A-10) |
 
-## Checklist
+## Evidence references
 
-- [ ] Read-first docs (done at start)
-- [ ] Migrations 0030–0049
-- [ ] Domain command layer (`src/persistence/postgres/commands/arrangementsCommands.ts`)
-- [ ] Repository port (`src/contracts/v2/repository/arrangements.ts`) + queries port
-- [ ] Pg repositories + read queries
-- [ ] Unit tests (`test/northstar-v2-m3-invariants.test.ts`)
-- [ ] PostgreSQL suites (`postgres-integration/m3Arrangements.pgtest.ts`, `m3IdentityMoney.pgtest.ts`)
-- [ ] M2 deferred FK closures + tests
-- [ ] Evidence `docs/refactor/evidence/M3.md`
-- [ ] typecheck / build / lint / anti-hardcoding / postgres gate
-- [ ] Commit + push `milestone-m3`
-
+- Lane evidence: `docs/refactor/evidence/M3.md`, `M4.md`, `M5.md`
+- Logs (scratch, not committed): `pg_m3m4.log` 138/139, `pg_m5.log` 156/156, `pg_ckptA.tap` pending
+- Integration evidence: `docs/refactor/evidence/M2_M5_INTEGRATION.md`

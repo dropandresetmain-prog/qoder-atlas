@@ -90,7 +90,10 @@ export type ReservationLine = z.infer<typeof ReservationLineSchema>;
 /** A single reservation line can allocate to several different travellers with different roles/quantities. */
 export const ReservationAllocationSchema = z.strictObject({
   id: SubjectIdSchema,
-  reservationId: SubjectIdSchema,
+  // Additive after C0 (CONTRACTS.md §7): optional in the contract so frozen
+  // C0 shapes stay valid; the M3 command always supplies it and the 0034
+  // column is NOT NULL, so persisted allocations always carry their reservation.
+  reservationId: SubjectIdSchema.optional(),
   reservationLineId: SubjectIdSchema,
   travellerId: SubjectIdSchema,
   journeyItemId: SubjectIdSchema.optional(),

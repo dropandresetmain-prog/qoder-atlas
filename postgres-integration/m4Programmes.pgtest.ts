@@ -36,6 +36,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { beginSeed, commitSeed, seedJourney, seedJourneyItem, seedTraveller, seedTrip } from './m2Seed.ts';
+import { seedResource } from './m3Seed.ts';
 import { sharedTestPool } from './harness.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
@@ -68,6 +69,8 @@ interface Fixture {
   workspaceId: string;
   identity: { workspaceId: string; actorPrincipalId: string };
   travellerIds: string[];
+  /** A real M3 Resource (resource_assignments.resource_id is FK-closed by 0087). */
+  resourceId: string;
   uow: () => PgUnitOfWork;
 }
 
@@ -76,12 +79,14 @@ async function fixture(travellerCount = 2): Promise<Fixture> {
   const seed = await beginSeed(pool);
   const travellers = [];
   for (let i = 0; i < travellerCount; i++) travellers.push((await seedTraveller(seed)).travellerId);
+  const resourceId = await seedResource(seed, 'EQUIPMENT');
   await commitSeed(seed);
   return {
     pool,
     workspaceId: seed.workspaceId,
     identity: { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId },
     travellerIds: travellers,
+    resourceId,
     uow: () => new PgUnitOfWork(pool, seed.workspaceId),
   };
 }
@@ -413,7 +418,7 @@ describe('M4: ResourceAssignment reference seam', () => {
   test('a ResourceAssignment references a real PROGRAMME_ITEM activity, validated at COMMIT', async () => {
     const f = await fixture(0);
     const { programmeItemId } = await seedEventProgrammeItem(f);
-    const resourceId = randomUUID(); // M3's resources table does not exist yet: deferred FK, opaque reference.
+    const resourceId = f.resourceId;
     const assignment = mustOk(
       await createResourceAssignment(f.uow(), { ...f.identity, idempotencyKey: randomUUID(), activityKind: 'PROGRAMME_ITEM', activityId: programmeItemId, resourceId, quantity: 2 }),
     );
@@ -435,12 +440,13 @@ describe('M4: ResourceAssignment reference seam', () => {
     const tripId = await seedTrip(seed);
     const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId });
     const { journeyItemId } = await seedJourneyItem(seed, { journeyId, kind: 'RESOURCE_USE' });
+    const resourceId = await seedResource(seed, 'VEHICLE');
     await commitSeed(seed);
 
     const identity = { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId };
     const uow = new PgUnitOfWork(pool, seed.workspaceId);
     const assignment = mustOk(
-      await createResourceAssignment(uow, { ...identity, idempotencyKey: randomUUID(), activityKind: 'JOURNEY_ITEM', activityId: journeyItemId, resourceId: randomUUID() }),
+      await createResourceAssignment(uow, { ...identity, idempotencyKey: randomUUID(), activityKind: 'JOURNEY_ITEM', activityId: journeyItemId, resourceId }),
     );
     assert.equal(assignment.ownerRef.kind, 'JOURNEY');
     assert.equal(assignment.ownerRef.id, journeyId);
@@ -448,7 +454,7 @@ describe('M4: ResourceAssignment reference seam', () => {
 
   test('a ResourceAssignment against a non-existent activity is rejected at COMMIT (0058 deferred trigger)', async () => {
     const f = await fixture(0);
-    const outcome = await createResourceAssignment(f.uow(), { ...f.identity, idempotencyKey: randomUUID(), activityKind: 'PROGRAMME_ITEM', activityId: randomUUID(), resourceId: randomUUID() });
+    const outcome = await createResourceAssignment(f.uow(), { ...f.identity, idempotencyKey: randomUUID(), activityKind: 'PROGRAMME_ITEM', activityId: randomUUID(), resourceId: f.resourceId });
     assert.equal(conflictOf(outcome).kind, 'VALIDATION_FAILED');
   });
 });
