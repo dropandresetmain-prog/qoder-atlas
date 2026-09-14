@@ -143,13 +143,19 @@ fail-closed.
 - [x] Implementation commit `aae84a7ef5f974771b64faee92ccc83da8dfa074` on
       `milestone-m2`, parent `aab3d9f…` (the accepted C1 base). 52 files,
       +18413/−110.
+- [x] Conditional-acceptance corrective commit
+      `28da24150293bbd2780a21e0350aaf5485c7318d`, parent `327825b…` (the reviewed
+      candidate). 10 files, +1158/−215. Stacked on the candidate, not folded into
+      it: no accepted commit is amended or force-pushed, so the review decision on
+      `327825b` stays readable.
 - [x] Publication. `git push -u origin milestone-m2` created the branch (exit 0),
       and `git ls-remote origin refs/heads/milestone-m2
       refs/heads/data-structure-refactor` afterwards returned `e571c02…` and
       `aab3d9f…` respectively — the lane is published, the base is untouched, no
       merge into `data-structure-refactor`. Commit 3 (`docs`-only) carries gaps
-      G9/G10 and this line; its own publication is re-verified the same way after
-      the push, because no commit can contain evidence of its own.
+      G9/G10, commit 4 the five §10A fixes, commit 5 this line and the §12 hash;
+      each push is re-verified the same way afterwards, because no commit can
+      contain evidence of its own.
 
 ## Critical constraints
 
@@ -200,17 +206,26 @@ fail-closed.
 
 ## Next action
 
-Nothing remains for this lane: M2 is complete on this worktree and pushed to
-`origin/milestone-m2`, and it is **not** merged into `data-structure-refactor` —
-promoting it is the integrator's decision.
+Nothing remains for this lane: M2 is complete on this worktree, the five
+conditional-acceptance findings are closed by `docs/refactor/evidence/M2.md` §10A,
+and the branch is pushed to `origin/milestone-m2`. It is **not** merged into
+`data-structure-refactor` — promoting it is the integrator's decision.
 
 Left deliberately open, in the order the integrator will meet them:
 
 - **G1** — no read-only transaction on `UnitOfWork`, so repository reads run
   outside the command's snapshot.
-- **G-P17** — the payload-error-shape divergence between the people lane
-  (`safeParse` before `submitCommand`) and the travel/support lanes
-  (`Schema.parse`, so a raw `ZodError` reaches the ledger).
+- **G11** — every lane still builds its *envelope* with `.parse`, so an envelope
+  violation would throw raw instead of returning `VALIDATION_FAILED`. Parked: the
+  identical shape is the accepted M1 precedent in `workspaceCommands.ts`, so this
+  is one cross-lane convention to change in M1, not an M2 inconsistency. The
+  *payload* class this row was split from is closed by §10A finding 3.
+- **G12** — subject-id shape is validated per lane: `z.uuid()` in people, the
+  frozen `SubjectIdSchema` regex in travel and support. Decide at the M3/M4/M5
+  contract freeze, before a third lane copies either choice.
+- **G-P18** — `GovernanceRepository.recordMembership` is a complete typed port
+  write with no M2 command handler behind it; minting
+  `ORGANISATION_MEMBERSHIP_RECORDED` was unrequested scope for this milestone.
 - **G10** — `docs/ROADMAP.md` still shows M0 as *NEXT* and M1/M2 as *Planned*;
   one integrator commit should set M0/M1/M2 at promotion rather than three lanes
   editing adjacent rows.
