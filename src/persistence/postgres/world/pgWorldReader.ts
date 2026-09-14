@@ -967,11 +967,11 @@ export class PgWorldReader {
     for (const x of world.coordinationGroups) scopes.push({ scopeKind: 'COORDINATION_GROUP', scopeId: x.id });
     for (const x of world.programmes) scopes.push({ scopeKind: 'PROGRAMME', scopeId: x.id });
     for (const x of world.organisations) scopes.push({ scopeKind: 'ORGANISATION_RULES', scopeId: x.id });
-    scopes.push({ scopeKind: 'ORGANISATION_RULES', scopeId: '*population*' });
+    scopes.push({ scopeKind: 'ORGANISATION_RULES', scopeId: 'm6:population-predicate' });
     scopes.push({ scopeKind: 'GEOGRAPHY', scopeId: 'catalog' });
     for (const x of world.jurisdictions) scopes.push({ scopeKind: 'GEOGRAPHY', scopeId: `jurisdiction:${x.id}` });
     for (const topic of [...request.informationTopics].sort()) scopes.push({ scopeKind: 'INFORMATION_TOPIC', scopeId: topic });
-    scopes.push({ scopeKind: 'INFORMATION_TOPIC', scopeId: '*unregistered*' });
+    scopes.push({ scopeKind: 'INFORMATION_TOPIC', scopeId: 'm6:unregistered-topic' });
     for (const x of world.travellers) extra.push({ scopeKind: 'TRAVELLER', scopeId: x.id });
     for (const x of world.resources) extra.push({ scopeKind: 'RESOURCE', scopeId: x.id });
     for (const id of uniq(world.ruleSetVersions.map((x) => x.ruleSetId))) extra.push({ scopeKind: 'RULE_SET', scopeId: id });

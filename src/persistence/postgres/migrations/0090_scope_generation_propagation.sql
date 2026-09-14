@@ -29,7 +29,7 @@ INSERT INTO scope_kinds (kind) VALUES
   ('SUBJECT_DEPENDENCIES'); -- explicit `dependencies` rows touching one subject
 
 -- Information topics M6 evaluators understand. A publication on a topic NOT
--- listed also advances INFORMATION_TOPIC:'*unregistered*', which every
+-- listed also advances INFORMATION_TOPIC:'m6:unregistered-topic', which every
 -- snapshot reads, so unclassified information cannot evade invalidation.
 CREATE TABLE registered_information_topics (
   topic text PRIMARY KEY CHECK (length(btrim(topic)) > 0),
@@ -80,7 +80,7 @@ CREATE FUNCTION m6_bump_information_topic(p_workspace uuid, p_topic text) RETURN
 BEGIN
   PERFORM m6_bump_scope(p_workspace, 'INFORMATION_TOPIC', p_topic);
   IF NOT EXISTS (SELECT 1 FROM registered_information_topics WHERE topic = p_topic) THEN
-    PERFORM m6_bump_scope(p_workspace, 'INFORMATION_TOPIC', '*unregistered*');
+    PERFORM m6_bump_scope(p_workspace, 'INFORMATION_TOPIC', 'm6:unregistered-topic');
   END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -207,7 +207,7 @@ BEGIN
         END IF;
         IF r.population_predicate_id IS NOT NULL THEN
           -- A population predicate cannot be matched to a precise scope at write time.
-          PERFORM m6_bump_scope(r.workspace_id, 'ORGANISATION_RULES', '*population*');
+          PERFORM m6_bump_scope(r.workspace_id, 'ORGANISATION_RULES', 'm6:population-predicate');
         END IF;
       WHEN 'information_records' THEN
         PERFORM m6_bump_information_topic(r.workspace_id, r.topic);

@@ -178,7 +178,7 @@ describe('M6 world capture: manifest completeness', () => {
 
     const scopeKeys = new Set(m.scopeReads.map((s) => `${s.scopeKind}:${s.scopeId}`));
     for (const expected of [`JOURNEY:${w.journeyA}`, `TRIP:${w.tripA}`, `TRAVELLER:${w.travellerA}`, `PROGRAMME:${w.programmeId}`, `COORDINATION_GROUP:${w.groupId}`,
-      `GEOGRAPHY:jurisdiction:${w.jurisdictionId}`, 'GEOGRAPHY:catalog', 'INFORMATION_TOPIC:ADVISORY', 'INFORMATION_TOPIC:ENTRY_REQUIREMENT', 'INFORMATION_TOPIC:*unregistered*']) {
+      `GEOGRAPHY:jurisdiction:${w.jurisdictionId}`, 'GEOGRAPHY:catalog', 'INFORMATION_TOPIC:ADVISORY', 'INFORMATION_TOPIC:ENTRY_REQUIREMENT', 'INFORMATION_TOPIC:m6:unregistered-topic']) {
       assert.ok(scopeKeys.has(expected), `manifest must record scope ${expected}`);
     }
     assert.ok(m.scopeReads.some((s) => s.scopeKind === 'INFORMATION_TOPIC' && s.scopeId === 'ENTRY_REQUIREMENT' && s.generation === 0), 'a never-advanced scope reads as generation 0');
@@ -247,7 +247,7 @@ describe('M6 currentness: insertion and time invalidation', () => {
     const base4 = await capture(w, [{ kind: 'JOURNEY', id: w.journeyA }]);
     await knowledge.advisory({ publisherOrganisationId: w.organisationId, topic: `NEW_CATEGORY_${randomUUID().slice(0, 8)}`, severity: 'NOTICE', jurisdictionId: w.jurisdictionId, issuedAt: '2031-02-21T00:00:00.000Z', effective: { start: '2031-02-21T00:00:00.000Z', end: '2031-04-01T00:00:00.000Z' } });
     const r4 = await currentness(w, base4);
-    assert.ok(r4.reasons.some((r) => r.kind === 'SCOPE_ADVANCED' && r.scopeKind === 'INFORMATION_TOPIC' && r.scopeId === '*unregistered*'), JSON.stringify(r4.reasons));
+    assert.ok(r4.reasons.some((r) => r.kind === 'SCOPE_ADVANCED' && r.scopeKind === 'INFORMATION_TOPIC' && r.scopeId === 'm6:unregistered-topic'), JSON.stringify(r4.reasons));
 
     // 5. New group member.
     const base5 = await capture(w, [{ kind: 'JOURNEY', id: w.journeyA }]);
