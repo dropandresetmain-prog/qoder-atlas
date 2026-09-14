@@ -7,7 +7,7 @@
  * only an accepted owner observation does.
  */
 import { z } from 'zod';
-import { SubjectIdSchema } from '../shared/identity.ts';
+import { ProtectedDataRefSchema, SubjectIdSchema } from '../shared/identity.ts';
 import { InstantSchema, InstantIntervalSchema } from '../shared/time.ts';
 import { ExactMoneySchema } from '../shared/money.ts';
 
@@ -48,10 +48,18 @@ export const ReservationSchema = z.strictObject({
   id: SubjectIdSchema,
   revision: z.number().int().min(1),
   reservationType: z.enum(['TRANSPORT', 'STAY', 'RESOURCE_USE', 'MIXED']),
+  observedStatus: z.enum(['HELD', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'UNKNOWN']).optional(),
+  observedStatusAt: InstantSchema.optional(),
   responsibleOrganisationId: SubjectIdSchema.optional(),
+  responsibleTravellerId: SubjectIdSchema.optional(),
   externalConnectionId: SubjectIdSchema.optional(),
   externalRecordId: SubjectIdSchema.optional(),
-});
+}).refine(
+  (reservation) => reservation.observedStatus === undefined || reservation.observedStatus === 'UNKNOWN'
+    ? reservation.observedStatusAt === undefined
+    : reservation.observedStatusAt !== undefined,
+  'known reservation status requires an observation time and UNKNOWN has none',
+);
 export type Reservation = z.infer<typeof ReservationSchema>;
 
 export const ReservationLineStatusSchema = z.enum([
@@ -68,16 +76,21 @@ export const ReservationLineSchema = z.strictObject({
   reservationId: SubjectIdSchema,
   productType: z.enum(['TRANSPORT', 'STAY', 'RESOURCE_USE']),
   observedStatus: ReservationLineStatusSchema,
+  observedStatusAt: InstantSchema.optional(),
   transportServiceId: SubjectIdSchema.optional(),
   resourceId: SubjectIdSchema.optional(),
   stayInterval: InstantIntervalSchema.optional(),
-  observationEvidenceId: SubjectIdSchema,
-});
+  observationEvidenceId: SubjectIdSchema.optional(),
+}).refine(
+  (line) => line.observedStatus === 'UNKNOWN' ? line.observedStatusAt === undefined : line.observedStatusAt !== undefined,
+  'known reservation-line status requires an observation time and UNKNOWN does not carry one',
+);
 export type ReservationLine = z.infer<typeof ReservationLineSchema>;
 
 /** A single reservation line can allocate to several different travellers with different roles/quantities. */
 export const ReservationAllocationSchema = z.strictObject({
   id: SubjectIdSchema,
+  reservationId: SubjectIdSchema,
   reservationLineId: SubjectIdSchema,
   travellerId: SubjectIdSchema,
   journeyItemId: SubjectIdSchema.optional(),
@@ -103,11 +116,16 @@ export const ServiceEntitlementSchema = z.strictObject({
   id: SubjectIdSchema,
   issuerOrganisationId: SubjectIdSchema.optional(),
   entitlementType: z.enum(['TICKET', 'COUPON', 'VOUCHER']),
-  observedStatus: z.enum(['ISSUED', 'ACTIVE', 'USED', 'EXCHANGED', 'VOID', 'REVOKED']),
-  protectedIdentifier: z.string().optional(),
+  observedStatus: z.enum(['ISSUED', 'ACTIVE', 'USED', 'EXCHANGED', 'VOID', 'REVOKED', 'UNKNOWN']),
+  observedStatusAt: InstantSchema.optional(),
+  /** A ticket number is a protected reference, never ordinary plaintext. */
+  protectedIdentifier: ProtectedDataRefSchema.optional(),
   exchangedFromEntitlementId: SubjectIdSchema.optional(),
-  evidenceId: SubjectIdSchema,
-});
+  evidenceId: SubjectIdSchema.optional(),
+}).refine(
+  (entitlement) => entitlement.observedStatus === 'UNKNOWN' ? entitlement.evidenceId === undefined : entitlement.evidenceId !== undefined,
+  'positive entitlement status requires issuer evidence; UNKNOWN must remain evidence-free',
+);
 export type ServiceEntitlement = z.infer<typeof ServiceEntitlementSchema>;
 
 /** Immutable quote. Never edit an old quote into a booking — capture a new one instead. */
@@ -118,6 +136,7 @@ export const OfferSchema = z.strictObject({
   price: ExactMoneySchema,
   terms: z.record(z.string(), z.unknown()).optional(),
   eligiblePartyRef: SubjectIdSchema.optional(),
+  eligiblePartyKind: z.enum(['TRAVELLER', 'ORGANISATION', 'AGREEMENT_SCOPE']).optional(),
   quotedAt: InstantSchema,
   expiresAt: InstantSchema,
   fingerprint: z.string().min(1),
@@ -135,6 +154,7 @@ export const CommercialAgreementSchema = z.strictObject({
   publishedTerms: z.record(z.string(), z.unknown()),
   eligibleAccountIds: z.array(SubjectIdSchema).default([]),
   effectiveWindow: InstantIntervalSchema.optional(),
+  publishedAt: InstantSchema.optional(),
 });
 export type CommercialAgreement = z.infer<typeof CommercialAgreementSchema>;
 

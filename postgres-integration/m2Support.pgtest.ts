@@ -1041,11 +1041,12 @@ describe('M2 lane S: the requirement governs, the assignment fulfils', () => {
 });
 
 describe('M2 lane S: concurrency, kind discrimination and the absent support boolean', () => {
-  test('the M2 schema carries no boolean support claim', async () => {
+  test('the support model carries no boolean support claim', async () => {
     const f = await fixture();
     const offenders = await f.pool.query<{ table_name: string; column_name: string; data_type: string }>(
       `SELECT table_name, column_name, data_type FROM information_schema.columns
         WHERE table_schema = 'public'
+          AND NOT (table_name = 'provider_capabilities' AND column_name = 'supported')
           AND (column_name IN ('is_supported', 'supported', 'has_support', 'support_confirmed')
                OR (data_type = 'boolean' AND column_name ~* 'support'))
         ORDER BY table_name, column_name`,

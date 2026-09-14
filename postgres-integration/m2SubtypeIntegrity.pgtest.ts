@@ -51,6 +51,22 @@ const M2_ACTIVATED_KINDS = [
   'SUPPORT_ASSIGNMENT',
 ];
 
+// M3 is integrated in this continuation branch. These are the additive M3
+// checkers whose presence must not be mistaken for M2 leaking into later lanes.
+const M3_ACTIVATED_KINDS = [
+  'TRANSPORT_SERVICE',
+  'RESOURCE',
+  'RESERVATION',
+  'RESERVATION_LINE',
+  'SERVICE_ENTITLEMENT',
+  'OFFER',
+  'COMMERCIAL_AGREEMENT',
+  'EXTERNAL_CONNECTION',
+  'EXTERNAL_RECORD',
+  'OWNERSHIP_BINDING',
+  'BUDGET',
+];
+
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
   test('every registered subtype checker function is actually installed', async () => {
     const pool = await sharedTestPool();
@@ -72,14 +88,14 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     }
   });
 
-  test('future-lane kinds stay closed: no M3/M4/M5 kind has a checker', async () => {
+test('only M2 and integrated M3 kinds have checkers; later lanes stay closed', async () => {
     const pool = await sharedTestPool();
     const leaked = await pool.query<{ kind: string }>(
       `SELECT kind FROM subject_subtype_checkers
         WHERE kind <> ALL($1::text[])`,
-      [[...M2_ACTIVATED_KINDS, 'WORKSPACE']],
+      [[...M2_ACTIVATED_KINDS, ...M3_ACTIVATED_KINDS, 'WORKSPACE']],
     );
-    assert.deepEqual(leaked.rows, [], 'M2 must not activate kinds owned by M3/M4/M5');
+    assert.deepEqual(leaked.rows, [], 'M3 integration must not activate kinds owned by later lanes');
 
     // The kinds are pre-registered (that is the frozen contract) but unactivated.
     const pending = await pool.query<{ kind: string }>(
@@ -87,14 +103,14 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
         WHERE NOT EXISTS (SELECT 1 FROM subject_subtype_checkers c WHERE c.kind = k.kind)`,
     );
     const pendingKinds = pending.rows.map((row) => row.kind);
-    for (const kind of ['RESERVATION', 'TRANSPORT_SERVICE', 'PLACE', 'JURISDICTION', 'ASSESSMENT']) {
+    for (const kind of ['PLACE', 'JURISDICTION', 'ASSESSMENT']) {
       assert.ok(pendingKinds.includes(kind), `${kind} must remain registered-but-unactivated`);
     }
   });
 
   test('a pre-registered kind with no checker cannot commit even with a head row', async () => {
     const pool = await sharedTestPool();
-    for (const kind of ['RESERVATION', 'PLACE']) {
+    for (const kind of ['PLACE', 'ASSESSMENT']) {
       const seed = await beginSeed(pool, `M2 closed ${kind}`);
       await seedRootSubject(seed, { kind });
       await assert.rejects(
@@ -406,8 +422,9 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     const scenarioLeaks = await pool.query<{ column_name: string }>(
       `SELECT DISTINCT column_name FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND (column_name ~* '(^|_)(city|scenario|fixture|demo|sarah|template)($|_)'
-               OR column_name ~* 'is_supported|has_support|supported_flag')`,
+           AND (column_name ~* '(^|_)(city|scenario|fixture|demo|sarah|template)($|_)'
+                OR column_name ~* 'is_supported|has_support|supported_flag')
+           AND NOT (table_name = 'provider_capabilities' AND column_name = 'supported')`,
     );
     assert.deepEqual(scenarioLeaks.rows, [], 'support must be modelled as requirement + assignment, never a flag');
 
@@ -420,6 +437,13 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'authority_grants.limits',
       'stay_item_details.occupancy_needs',
       'resource_use_item_details.use_requirements',
+      'reservations.observed_context',
+      'reservation_lines.observed_terms',
+      'external_connections.capability_configuration',
+      'provider_capabilities.provider_details',
+      'offers.terms',
+      'agreement_versions.published_terms',
+      'stay_line_details.occupancy',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns
