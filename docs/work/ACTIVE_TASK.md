@@ -41,16 +41,16 @@ stop at a C2 candidate. Do not claim C2 passed. No M7/M8.
 - [x] P4 effective projections (in `ea14ee1`)
 - [x] P7 persistence/invalidation/worker (`8b4a6cb`)
 - [x] **Checkpoint 1**: salvage + lane merges + `registry.ts`; tsc 0, M6 unit 61/61, focused pg on fresh DB 41/41 (migrate, crossLane, subtype, m6WorldSnapshot, m6Reassessment) → pushed
-- [ ] P5/P6 L3 tests; L4 `m6.information` + tests; merge; all-family registry test
-- [ ] **Checkpoint 2**: all evaluator families + assessment lifecycle green → push
-- [ ] P8 AT fixtures: pure AT suite + PostgreSQL AT suite through `evaluateImpact` + one registry
-- [ ] Docs: M6.md §8+ (registry, AT evidence, triage), ACTIVE_TASK
+- [x] P5/P6 L3 tests 28/28 (`d5b23ee`, funding fix `f6c032c`, merged `b08f300`); L4 `m6.information` + tests 46/46 (`1923c1e`, `5470d27`, merged `925e0ab`); registry with 11 families (`9cee67c`)
+- [x] **Checkpoint 2**: M6 unit 140/140; m6Acceptance 4/4 on two fresh DBs; full pg on empty DB 362/363 before the I-14 assertion fix; tsc/build/lint/anti-hardcoding/diff --check green → pushed
+- [x] P8 AT fixtures: `m6Acceptance.pgtest` (AT01/02/06/10/12/13) `52c3926`; `northstar-v2-m6-acceptance` (AT19/20/21/22, cycles) `a59ae0f`; L3/L4 suites (AT03/04/05/08/09/11)
+- [x] Docs: M6.md §8–§11 (registry, AT evidence, API, triage), ACTIVE_TASK
 - [ ] **Checkpoint 3**: migrations from empty DB, test:postgres, focused, typecheck, build, lint, gate:anti-hardcoding, diff --check → push (C2 candidate)
 
 ## Next action
 
-Checkpoint 1 pushed. Write postgres-integration/m6Acceptance.pgtest.ts (AT01/02/06/10/12/13 + cross-Trip closure);
-merge L3/L4 lane results when delegated agents report; add m6.information to registry.
+Final full `test:postgres` on empty DB `northstar_m6_final` running; when green, record
+checkpoint SHAs in M6.md §12, commit/push Checkpoint 3 (C2 candidate) and stop.
 
 ## Critical architecture constraints
 
@@ -75,6 +75,9 @@ merge L3/L4 lane results when delegated agents report; add m6.information to reg
 | I-10 | `money.ts` has no exact FX multiply / currency exponent table; funding.ts implements BigInt multiply locally at exponent 2 | Park for Later — promote to money.ts before M8 spend |
 | I-11 | One capture's manifest is the union read set; every Journey assessed from a joint capture is invalidated by any input of that capture (over-invalidation, never under) | Park for Later — per-subject manifest pruning is an optimisation; workers capture per subject; recorded in M6.md |
 | I-12 | `currentAssessmentView` kept reporting PENDING_REASSESSMENT after a newer assessment was saved outside the worker (work caused by a superseded assessment never cleared) | Act Now — closed: work caused by a superseded assessment is obsolete only when the latest manifest verifies current; regression test in m6Reassessment |
+| I-13 | Funding emitted a blocking UNKNOWN with no explanation when no payer was named | Act Now — closed by L3 `f6c032c` (not applicable) |
+| I-14 | Acceptance asserted `enqueueDueReassessments` inserted a row; with an open unit already present the one-open-unit index coalesces (0 rows) — correct behaviour, wrong assertion | Act Now — closed: assert exactly one open durable unit |
+| I-15 | `test/acceptance-runner.test.ts` and `integration.r1` fail in the legacy unit run, identically on unmodified lane bases | Park for Later — legacy runtime, wall-clock nondeterminism (A-10) |
 
 ## Evidence references
 

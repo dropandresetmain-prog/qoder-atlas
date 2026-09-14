@@ -309,7 +309,14 @@ describe('M6 acceptance: entry knowledge invalidation (AT10, AT12, AT13)', () =>
     const expired = await currentAssessmentView(pool, ws, journeyRef(journeyId), 'VIABILITY', expiresAt);
     assert.notEqual(expired.status, 'CURRENT', 'past nextInvalidationAt the stored result is never current');
     assert.ok(expired.staleness.some((s) => s.kind === 'CLOCK_EXPIRED'));
-    assert.ok((await enqueueDueReassessments(pool, '2031-06-20T00:00:00.000Z')) >= 1);
+    // Downtime catch-up: after the scheduler runs, durable work is open for the subject — newly inserted,
+    // or coalesced into the unit already open for it (one open unit per subject+kind).
+    await enqueueDueReassessments(pool, '2031-06-20T00:00:00.000Z');
+    const openUnits = await pool.query<{ state: string }>(
+      "SELECT state FROM scheduled_reassessments WHERE workspace_id = $1 AND subject_kind = 'JOURNEY' AND subject_id = $2 AND state IN ('PENDING', 'CLAIMED')",
+      [ws, journeyId],
+    );
+    assert.equal(openUnits.rows.length, 1, 'exactly one open durable unit covers the expired assessment');
 
     // AT10: an applicable rule inserted later invalidates although no read row changed, and is then evaluated.
     const r2base = await evaluate();
