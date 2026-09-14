@@ -30,7 +30,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed, seedTraveller } from './m2Seed.ts';
+import { beginSeed, commitSeed, seedTraveller, type SeedSession } from './m2Seed.ts';
+import { seedJurisdiction } from './m4Seed.ts';
 import { PgUnitOfWork, type ExecuteFn, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { currentTransactionClient, runWithTransactionClient } from '../src/persistence/postgres/transactionContext.ts';
 import type { UnitOfWork } from '../src/contracts/v2/command/unitOfWork.ts';
@@ -180,6 +181,20 @@ async function peopleFixture(): Promise<PeopleFixture> {
     principalId,
     issuedByPrincipalId,
   };
+}
+
+/**
+ * Continues seeding into the workspace `bareFixture`/`peopleFixture` already
+ * committed, for a test that needs one more M4-owned row (a Jurisdiction)
+ * after the fixture's own `beginSeed` session has closed. `beginSeed` always
+ * mints a *new* workspace, so it cannot be called again just to add a row to
+ * this one — this opens a plain transaction against the existing workspace
+ * row instead, and reuses `commitSeed` to close it.
+ */
+async function attachSeed(f: Fixture): Promise<SeedSession> {
+  const client = await f.pool.connect();
+  await client.query('BEGIN');
+  return { client, workspaceId: f.workspaceId, actorId: f.actorId };
 }
 
 function nextKey(f: Fixture): string {
@@ -665,7 +680,10 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         },
       }),
     );
-    const jurisdictionId = randomUUID();
+    // This movement commits, so its jurisdiction must be a real M4 row (0061 FK).
+    const coverageSeed = await attachSeed(f);
+    const jurisdictionId = await seedJurisdiction(coverageSeed, { name: 'Coverage claim jurisdiction' });
+    await commitSeed(coverageSeed);
     const partial = mustOk(
       await recordTravelHistory(unitOfWork(f), {
         workspaceId: f.workspaceId,
@@ -721,13 +739,17 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
         },
       }),
     );
+    // This movement commits, so its jurisdiction must be a real M4 row (0061 FK).
+    const staleSeed = await attachSeed(f);
+    const staleJurisdictionId = await seedJurisdiction(staleSeed, { name: 'Stale revision jurisdiction' });
+    await commitSeed(staleSeed);
     mustOk(
       await recordTravelHistory(unitOfWork(f), {
         workspaceId: f.workspaceId,
         actorPrincipalId: f.actorId,
         idempotencyKey: nextKey(f),
         travellerId: created.travellerId,
-        jurisdictionId: randomUUID(),
+        jurisdictionId: staleJurisdictionId,
         entryDate: day(1),
         coverageClaim: 'PARTIAL',
         evidenceId: randomUUID(),
@@ -735,6 +757,9 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
       }),
     );
 
+    // This second call is rejected by the revision CAS before any INSERT is
+    // attempted (stale expectedRevision), so its jurisdictionId is never
+    // written and is left as an intentionally-orphaned placeholder.
     const conflict = conflictOf(
       await recordTravelHistory(unitOfWork(f), {
         workspaceId: f.workspaceId,
@@ -819,6 +844,11 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
       }),
     );
     const replayKey = nextKey(f);
+    // This movement commits (and is read back on replay), so its jurisdiction
+    // must be a real M4 row (0061 FK).
+    const replaySeed = await attachSeed(f);
+    const replayJurisdictionId = await seedJurisdiction(replaySeed, { name: 'Replay movement jurisdiction' });
+    await commitSeed(replaySeed);
     // Replay needs the submission to hash identically, and every default this
     // handler would supply (row identity, observation instant) is computed
     // before `uow.execute` and hashed into the payload (C1 replay-safety rule).
@@ -829,7 +859,7 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
       idempotencyKey: replayKey,
       travellerId: created.travellerId,
       historyId: randomUUID(),
-      jurisdictionId: randomUUID(),
+      jurisdictionId: replayJurisdictionId,
       entryDate: day(1),
       exitDate: day(9),
       coverageClaim: 'WINDOW_COMPLETE' as const,

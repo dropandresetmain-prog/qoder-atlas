@@ -69,6 +69,18 @@ import { currentTransactionClient } from '../transactionContext.ts';
 const SCHEMA_VERSION = '1';
 const WindowSchema = InstantIntervalSchema;
 
+/**
+ * G12 (docs/refactor/evidence/M2_INTEGRATION_DECISIONS.md): the frozen
+ * `SubjectIdSchema` regex legally admits legacy/source-shaped ids (e.g.
+ * `trip-legacy-7`), but every column this lane writes through it is typed
+ * `uuid` (0050-0062). "M3/M4/M5 must follow the UUID persistence-boundary
+ * rule" — so the boundary check below validates actual UUID shape, not the
+ * broader envelope-level `SubjectIdSchema`, matching M2's people lane
+ * (`peopleCommands.ts` `Uuid`/`RegistryTypedRefSchema`) rather than reusing
+ * the looser check M2's own travel lane left as a recorded gap.
+ */
+const Uuid = z.uuid();
+
 export interface CommandIdentity {
   workspaceId: string;
   actorPrincipalId: string;
@@ -125,7 +137,7 @@ function rejectedPayload(commandType: string, error: z.ZodError): ExecuteOutcome
 }
 
 function refusedSubjectRefs(commandType: string, refs: TypedRef[]): ExecuteOutcome<never> | undefined {
-  const malformed = refs.filter((ref) => !SubjectIdSchema.safeParse(ref.id).success);
+  const malformed = refs.filter((ref) => !Uuid.safeParse(ref.id).success);
   if (malformed.length === 0) return undefined;
   return {
     ok: false,
@@ -133,7 +145,7 @@ function refusedSubjectRefs(commandType: string, refs: TypedRef[]): ExecuteOutco
       'VALIDATION_FAILED',
       `${commandType} payload rejected: ${malformed.map((r) => `${r.kind}:${JSON.stringify(r.id)}`).join(', ')} ${
         malformed.length === 1 ? 'is' : 'are'
-      } not a valid subject id`,
+      } not a valid UUID (M4 persistence boundary requires UUID, not just SubjectIdSchema)`,
       malformed,
     ),
   };
@@ -149,6 +161,23 @@ function headOrConflict(lockedHeads: RootRevision[], ref: TypedRef): HeadGate {
 async function advanceOrConflict(ref: TypedRef, workspaceId: string, fromRevision: number): Promise<HeadGate> {
   const next = await advanceHead({ workspaceId, aggregateId: ref.id, fromRevision });
   return next === undefined ? { ok: false, conflict: staleRevisionConflict(ref, fromRevision) } : { ok: true, revision: next };
+}
+
+/**
+ * The caller names the owning Programme up front (M2 pattern: `updateJourneyItem`
+ * takes `journeyId` from the caller, never discovers it via a pre-transaction
+ * lookup — `PgProgrammeRepository` methods all require the ambient transaction
+ * client `uow.execute` installs, so a lookup used to build `expectedAggregateRevisions`
+ * cannot run before `execute` is even called). This is the one place every
+ * ProgrammeItem/Participation handler below re-verifies the caller told the
+ * truth, once the item is loaded inside the transaction.
+ */
+function ownerMismatchConflict(label: string, itemId: string, claimedProgrammeId: string, actualProgrammeId: string, refs: TypedRef[]): TypedConflict {
+  return typedConflict(
+    'VALIDATION_FAILED',
+    `${label} ${itemId} belongs to programme ${actualProgrammeId}, not ${claimedProgrammeId}`,
+    refs,
+  );
 }
 
 function transitionConflict<S extends string>(
@@ -487,6 +516,8 @@ const ScheduleChangePayloadSchema = z.strictObject({
 });
 
 export interface UpdateProgrammeItemScheduleParams extends CommandIdentity {
+  /** The item's owning Programme (M2 pattern: the caller names the parent aggregate; the DB/handler still verifies it). */
+  programmeId: string;
   programmeItemId: string;
   expectedProgrammeRevision: number;
   /** Explicit null clears the window; omission leaves it alone. */
@@ -516,7 +547,8 @@ export async function updateProgrammeItemSchedule(
   if (!parsed.success) return rejectedPayload('PROGRAMME_ITEM_SCHEDULE_CHANGED', parsed.error);
   const changes = parsed.data;
   const itemRef = refOf('PROGRAMME_ITEM', params.programmeItemId);
-  const refused = refusedSubjectRefs('PROGRAMME_ITEM_SCHEDULE_CHANGED', [itemRef]);
+  const programmeRef = refOf('PROGRAMME', params.programmeId);
+  const refused = refusedSubjectRefs('PROGRAMME_ITEM_SCHEDULE_CHANGED', [itemRef, programmeRef]);
   if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const programmes = new PgProgrammeRepository();
@@ -525,11 +557,6 @@ export async function updateProgrammeItemSchedule(
     return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `no schedule fields supplied for ${params.programmeItemId}`, [itemRef]) };
   }
 
-  const programmeId = await programmes.programmeIdForItem(params.workspaceId, params.programmeItemId);
-  if (!programmeId) {
-    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
-  }
-  const programmeRef = refOf('PROGRAMME', programmeId);
   const envelope = buildEnvelope({
     commandType: 'PROGRAMME_ITEM_SCHEDULE_CHANGED',
     identity: params,
@@ -545,6 +572,9 @@ export async function updateProgrammeItemSchedule(
       const item = await programmes.loadItem(params.workspaceId, params.programmeItemId);
       if (!item) {
         return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
+      }
+      if (item.programmeId !== params.programmeId) {
+        return { ok: false, conflict: ownerMismatchConflict('programme item', params.programmeItemId, params.programmeId, item.programmeId, [itemRef, programmeRef]) };
       }
       if ((item.scheduleAuthority ?? 'INTERNAL') === 'EXTERNAL') {
         return {
@@ -566,7 +596,7 @@ export async function updateProgrammeItemSchedule(
       });
       const advancedHead = await advanceOrConflict(programmeRef, params.workspaceId, head.revision);
       if (advancedHead.ok === false) return { ok: false, conflict: advancedHead.conflict };
-      const value: ProgrammeItemCommandValue = { programmeItemId: params.programmeItemId, programmeId, programmeRevision: advancedHead.revision };
+      const value: ProgrammeItemCommandValue = { programmeItemId: params.programmeItemId, programmeId: params.programmeId, programmeRevision: advancedHead.revision };
       const advanced: AdvancedRoot[] = [{ aggregateRef: programmeRef, beforeRevision: head.revision, afterRevision: advancedHead.revision }];
       await appendAuditTrail({ envelope, advanced, destinationKind: 'PROGRAMME_ITEM_SCHEDULE_CHANGED', payload: value });
       return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
@@ -575,6 +605,7 @@ export async function updateProgrammeItemSchedule(
 }
 
 export interface SetProgrammeItemLifecycleStatusParams extends CommandIdentity {
+  programmeId: string;
   programmeItemId: string;
   expectedProgrammeRevision: number;
   lifecycleStatus: ProgrammeItemLifecycle;
@@ -589,14 +620,12 @@ export async function setProgrammeItemLifecycleStatus(
   const parsed = ProgrammeItemLifecycleSchema.safeParse(params.lifecycleStatus);
   if (!parsed.success) return rejectedPayload('PROGRAMME_ITEM_LIFECYCLE_STATUS_SET', parsed.error);
   const itemRef = refOf('PROGRAMME_ITEM', params.programmeItemId);
+  const programmeRef = refOf('PROGRAMME', params.programmeId);
+  const refused = refusedSubjectRefs('PROGRAMME_ITEM_LIFECYCLE_STATUS_SET', [itemRef, programmeRef]);
+  if (refused) return refused;
   const programmes = new PgProgrammeRepository();
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
 
-  const programmeId = await programmes.programmeIdForItem(params.workspaceId, params.programmeItemId);
-  if (!programmeId) {
-    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
-  }
-  const programmeRef = refOf('PROGRAMME', programmeId);
   const envelope = buildEnvelope({
     commandType: 'PROGRAMME_ITEM_LIFECYCLE_STATUS_SET',
     identity: params,
@@ -613,6 +642,9 @@ export async function setProgrammeItemLifecycleStatus(
       if (!item) {
         return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
       }
+      if (item.programmeId !== params.programmeId) {
+        return { ok: false, conflict: ownerMismatchConflict('programme item', params.programmeItemId, params.programmeId, item.programmeId, [itemRef, programmeRef]) };
+      }
       const illegal = transitionConflict(PROGRAMME_ITEM_TRANSITIONS, item.lifecycleStatus, params.lifecycleStatus, `programme item ${params.programmeItemId}`, [itemRef]);
       if (illegal) return { ok: false, conflict: illegal };
       if (params.lifecycleStatus === 'SCHEDULED' && !item.window) {
@@ -624,7 +656,7 @@ export async function setProgrammeItemLifecycleStatus(
       await programmes.setItemLifecycleStatus({ workspaceId: params.workspaceId, programmeItemId: params.programmeItemId, lifecycleStatus: params.lifecycleStatus, actor });
       const advancedHead = await advanceOrConflict(programmeRef, params.workspaceId, head.revision);
       if (advancedHead.ok === false) return { ok: false, conflict: advancedHead.conflict };
-      const value: ProgrammeItemCommandValue = { programmeItemId: params.programmeItemId, programmeId, programmeRevision: advancedHead.revision };
+      const value: ProgrammeItemCommandValue = { programmeItemId: params.programmeItemId, programmeId: params.programmeId, programmeRevision: advancedHead.revision };
       const advanced: AdvancedRoot[] = [{ aggregateRef: programmeRef, beforeRevision: head.revision, afterRevision: advancedHead.revision }];
       await appendAuditTrail({ envelope, advanced, destinationKind: 'PROGRAMME_ITEM_LIFECYCLE_STATUS_SET', payload: value });
       return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
@@ -633,6 +665,7 @@ export async function setProgrammeItemLifecycleStatus(
 }
 
 export interface SetProgrammeItemScheduleAuthorityParams extends CommandIdentity {
+  programmeId: string;
   programmeItemId: string;
   expectedProgrammeRevision: number;
   scheduleAuthority: 'INTERNAL' | 'EXTERNAL';
@@ -646,18 +679,15 @@ export async function setProgrammeItemScheduleAuthority(
   params: SetProgrammeItemScheduleAuthorityParams,
 ): Promise<ExecuteOutcome<ProgrammeItemCommandValue>> {
   const itemRef = refOf('PROGRAMME_ITEM', params.programmeItemId);
-  const programmes = new PgProgrammeRepository();
+  const programmeRef = refOf('PROGRAMME', params.programmeId);
+  const refused = refusedSubjectRefs('PROGRAMME_ITEM_SCHEDULE_AUTHORITY_SET', [itemRef, programmeRef]);
+  if (refused) return refused;
   if (params.scheduleAuthority === 'INTERNAL' && params.externalSourceRef) {
     return {
       ok: false,
       conflict: typedConflict('VALIDATION_FAILED', `externalSourceRef supplied while requesting INTERNAL authority for ${params.programmeItemId}`, [itemRef]),
     };
   }
-  const programmeId = await programmes.programmeIdForItem(params.workspaceId, params.programmeItemId);
-  if (!programmeId) {
-    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
-  }
-  const programmeRef = refOf('PROGRAMME', programmeId);
   const envelope = buildEnvelope({
     commandType: 'PROGRAMME_ITEM_SCHEDULE_AUTHORITY_SET',
     identity: params,
@@ -672,16 +702,16 @@ export async function setProgrammeItemScheduleAuthority(
       if (head.ok === false) return { ok: false, conflict: head.conflict };
       const client = currentTransactionClient();
       const result = await client.query(
-        `UPDATE programme_items SET schedule_authority = $3, external_source_ref = $4, updated_at = now()
-          WHERE workspace_id = $1 AND id = $2`,
-        [params.workspaceId, params.programmeItemId, params.scheduleAuthority, params.externalSourceRef ?? null],
+        `UPDATE programme_items SET schedule_authority = $4, external_source_ref = $5, updated_at = now()
+          WHERE workspace_id = $1 AND id = $2 AND programme_id = $3`,
+        [params.workspaceId, params.programmeItemId, params.programmeId, params.scheduleAuthority, params.externalSourceRef ?? null],
       );
       if (result.rowCount !== 1) {
-        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
+        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist under programme ${params.programmeId}`, [itemRef, programmeRef]) };
       }
       const advancedHead = await advanceOrConflict(programmeRef, params.workspaceId, head.revision);
       if (advancedHead.ok === false) return { ok: false, conflict: advancedHead.conflict };
-      const value: ProgrammeItemCommandValue = { programmeItemId: params.programmeItemId, programmeId, programmeRevision: advancedHead.revision };
+      const value: ProgrammeItemCommandValue = { programmeItemId: params.programmeItemId, programmeId: params.programmeId, programmeRevision: advancedHead.revision };
       const advanced: AdvancedRoot[] = [{ aggregateRef: programmeRef, beforeRevision: head.revision, afterRevision: advancedHead.revision }];
       await appendAuditTrail({ envelope, advanced, destinationKind: 'PROGRAMME_ITEM_SCHEDULE_AUTHORITY_SET', payload: value });
       return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
@@ -767,11 +797,11 @@ export async function recordExternalScheduleObservation(
 // --- Participation commands -----------------------------------------------------
 
 function refusedSubjectIds(commandType: string, ids: readonly string[]): ExecuteOutcome<never> | undefined {
-  const malformed = ids.filter((id) => !SubjectIdSchema.safeParse(id).success);
+  const malformed = ids.filter((id) => !Uuid.safeParse(id).success);
   if (malformed.length === 0) return undefined;
   return {
     ok: false,
-    conflict: typedConflict('VALIDATION_FAILED', `${commandType} payload rejected: ${malformed.map((id) => JSON.stringify(id)).join(', ')} not a valid subject id`),
+    conflict: typedConflict('VALIDATION_FAILED', `${commandType} payload rejected: ${malformed.map((id) => JSON.stringify(id)).join(', ')} not a valid UUID`),
   };
 }
 
@@ -786,6 +816,7 @@ const AddParticipationPayloadSchema = z.strictObject({
 });
 
 export interface AddParticipationParams extends CommandIdentity {
+  programmeId: string;
   programmeItemId: string;
   travellerId: string;
   obligation: Participation['obligation'];
@@ -826,16 +857,12 @@ export async function addParticipation(
   const itemRef = refOf('PROGRAMME_ITEM', params.programmeItemId);
   const participationRef = refOf('PARTICIPATION', participationId);
   const travellerRef = refOf('TRAVELLER', params.travellerId);
-  const refused = refusedSubjectRefs('PARTICIPATION_ADDED', [itemRef, participationRef, travellerRef]);
+  const programmeRef = refOf('PROGRAMME', params.programmeId);
+  const refused = refusedSubjectRefs('PARTICIPATION_ADDED', [itemRef, participationRef, travellerRef, programmeRef]);
   if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const programmes = new PgProgrammeRepository();
 
-  const programmeId = await programmes.programmeIdForItem(params.workspaceId, params.programmeItemId);
-  if (!programmeId) {
-    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
-  }
-  const programmeRef = refOf('PROGRAMME', programmeId);
   const envelope = buildEnvelope({
     commandType: 'PARTICIPATION_ADDED',
     identity: params,
@@ -848,6 +875,13 @@ export async function addParticipation(
     uow.execute<ParticipationCommandValue>(envelope, async ({ lockedHeads }) => {
       const head = headOrConflict(lockedHeads, programmeRef);
       if (head.ok === false) return { ok: false, conflict: head.conflict };
+      const item = await programmes.loadItem(params.workspaceId, params.programmeItemId);
+      if (!item) {
+        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `programme item ${params.programmeItemId} does not exist`, [itemRef]) };
+      }
+      if (item.programmeId !== params.programmeId) {
+        return { ok: false, conflict: ownerMismatchConflict('programme item', params.programmeItemId, params.programmeId, item.programmeId, [itemRef, programmeRef]) };
+      }
       const participation: Participation = ParticipationSchema.parse({
         id: participationId,
         programmeItemId: payload.programmeItemId,
@@ -857,11 +891,11 @@ export async function addParticipation(
         ...(payload.preparationWindow ? { preparationWindow: payload.preparationWindow } : {}),
         ...(payload.releaseWindow ? { releaseWindow: payload.releaseWindow } : {}),
       });
-      await registerChildSubject({ workspaceId: params.workspaceId, id: participationId, kind: 'PARTICIPATION', aggregateId: programmeId });
+      await registerChildSubject({ workspaceId: params.workspaceId, id: participationId, kind: 'PARTICIPATION', aggregateId: params.programmeId });
       await programmes.addParticipation({ participation, roles: payload.roles, actor });
       const advancedHead = await advanceOrConflict(programmeRef, params.workspaceId, head.revision);
       if (advancedHead.ok === false) return { ok: false, conflict: advancedHead.conflict };
-      const value: ParticipationCommandValue = { participationId, programmeItemId: params.programmeItemId, travellerId: params.travellerId, programmeId, programmeRevision: advancedHead.revision };
+      const value: ParticipationCommandValue = { participationId, programmeItemId: params.programmeItemId, travellerId: params.travellerId, programmeId: params.programmeId, programmeRevision: advancedHead.revision };
       const advanced: AdvancedRoot[] = [{ aggregateRef: programmeRef, beforeRevision: head.revision, afterRevision: advancedHead.revision }];
       await appendAuditTrail({ envelope, advanced, destinationKind: 'PARTICIPATION_ADDED', payload: value });
       return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
@@ -870,6 +904,7 @@ export async function addParticipation(
 }
 
 export interface UpdateParticipationParams extends CommandIdentity {
+  programmeId: string;
   participationId: string;
   expectedProgrammeRevision: number;
   accepted?: boolean;
@@ -884,15 +919,13 @@ export async function updateParticipation(
   params: UpdateParticipationParams,
 ): Promise<ExecuteOutcome<ParticipationCommandValue>> {
   const participationRef = refOf('PARTICIPATION', params.participationId);
+  const programmeRef = refOf('PROGRAMME', params.programmeId);
+  const refused = refusedSubjectRefs('PARTICIPATION_UPDATED', [participationRef, programmeRef]);
+  if (refused) return refused;
   const programmes = new PgProgrammeRepository();
   if (params.accepted === undefined && params.attended === undefined && params.addRole === undefined) {
     return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `no participation fields supplied for ${params.participationId}`, [participationRef]) };
   }
-  const programmeId = await programmes.programmeIdForParticipation(params.workspaceId, params.participationId);
-  if (!programmeId) {
-    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `participation ${params.participationId} does not exist`, [participationRef]) };
-  }
-  const programmeRef = refOf('PROGRAMME', programmeId);
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'PARTICIPATION_UPDATED',
@@ -910,6 +943,13 @@ export async function updateParticipation(
       if (!participation) {
         return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `participation ${params.participationId} does not exist`, [participationRef]) };
       }
+      const item = await programmes.loadItem(params.workspaceId, participation.programmeItemId);
+      if (!item || item.programmeId !== params.programmeId) {
+        return {
+          ok: false,
+          conflict: ownerMismatchConflict('participation', params.participationId, params.programmeId, item?.programmeId ?? 'UNKNOWN', [participationRef, programmeRef]),
+        };
+      }
       if (params.accepted !== undefined || params.attended !== undefined) {
         await programmes.updateParticipation({ workspaceId: params.workspaceId, participationId: params.participationId, accepted: params.accepted, attended: params.attended, actor });
       }
@@ -918,7 +958,7 @@ export async function updateParticipation(
       }
       const advancedHead = await advanceOrConflict(programmeRef, params.workspaceId, head.revision);
       if (advancedHead.ok === false) return { ok: false, conflict: advancedHead.conflict };
-      const value: ParticipationCommandValue = { participationId: params.participationId, programmeItemId: participation.programmeItemId, travellerId: participation.travellerId, programmeId, programmeRevision: advancedHead.revision };
+      const value: ParticipationCommandValue = { participationId: params.participationId, programmeItemId: participation.programmeItemId, travellerId: participation.travellerId, programmeId: params.programmeId, programmeRevision: advancedHead.revision };
       const advanced: AdvancedRoot[] = [{ aggregateRef: programmeRef, beforeRevision: head.revision, afterRevision: advancedHead.revision }];
       await appendAuditTrail({ envelope, advanced, destinationKind: 'PARTICIPATION_UPDATED', payload: value });
       return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
@@ -970,15 +1010,6 @@ export async function createResourceAssignment(
   const refused = refusedSubjectRefs('RESOURCE_ASSIGNMENT_CREATED', [activityRef]);
   if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
-  const programmes = new PgProgrammeRepository();
-
-  const ownerRef: TypedRef =
-    params.activityKind === 'PROGRAMME_ITEM'
-      ? refOf('PROGRAMME', (await programmes.programmeIdForItem(params.workspaceId, params.activityId)) ?? '')
-      : refOf('JOURNEY', await journeyIdForItem(params.workspaceId, params.activityId));
-  if (!ownerRef.id) {
-    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `${params.activityKind} ${params.activityId} does not exist`, [activityRef]) };
-  }
   const envelope = buildEnvelope({
     commandType: 'RESOURCE_ASSIGNMENT_CREATED',
     identity: params,
@@ -987,9 +1018,21 @@ export async function createResourceAssignment(
     evidenceRefs: params.evidenceRefs,
   });
   const resourceAssignments = new PgResourceAssignmentRepository();
+  const programmes = new PgProgrammeRepository();
 
-  return guarded([ownerRef, activityRef], () =>
+  return guarded([activityRef], () =>
     uow.execute<ResourceAssignmentCommandValue>(envelope, async () => {
+      // Resolved *inside* the transaction: `PgProgrammeRepository`/`journeyIdForItem`
+      // both require the ambient transaction client `uow.execute` installs, and
+      // no envelope field depends on this value (no revision is gated), so
+      // there is no reason to resolve it before entering the callback.
+      const ownerRef: TypedRef =
+        params.activityKind === 'PROGRAMME_ITEM'
+          ? refOf('PROGRAMME', (await programmes.programmeIdForItem(params.workspaceId, params.activityId)) ?? '')
+          : refOf('JOURNEY', await journeyIdForItem(params.workspaceId, params.activityId));
+      if (!ownerRef.id) {
+        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `${params.activityKind} ${params.activityId} does not exist`, [activityRef]) };
+      }
       await resourceAssignments.create({ assignment, activityKind: params.activityKind, actor });
       const value: ResourceAssignmentCommandValue = { assignmentId, activityKind: params.activityKind, activityId: params.activityId, ownerRef, ownerRevision: 0 };
       // No aggregate revision advances: a resource assignment is its own row,

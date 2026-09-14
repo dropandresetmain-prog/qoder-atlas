@@ -36,6 +36,9 @@ import { PgPlaceRepository, PgGeographyRepository } from '../repositories/pgGeog
 
 const SCHEMA_VERSION = '1';
 
+/** G12 UUID persistence-boundary rule — see programmeCommands.ts for the full rationale. */
+const Uuid = z.uuid();
+
 export interface CommandIdentity {
   workspaceId: string;
   actorPrincipalId: string;
@@ -91,13 +94,13 @@ function rejectedPayload(commandType: string, error: z.ZodError): ExecuteOutcome
 }
 
 function refusedSubjectRefs(commandType: string, refs: TypedRef[]): ExecuteOutcome<never> | undefined {
-  const malformed = refs.filter((ref) => !SubjectIdSchema.safeParse(ref.id).success);
+  const malformed = refs.filter((ref) => !Uuid.safeParse(ref.id).success);
   if (malformed.length === 0) return undefined;
   return {
     ok: false,
     conflict: typedConflict(
       'VALIDATION_FAILED',
-      `${commandType} payload rejected: ${malformed.map((r) => `${r.kind}:${JSON.stringify(r.id)}`).join(', ')} not a valid subject id`,
+      `${commandType} payload rejected: ${malformed.map((r) => `${r.kind}:${JSON.stringify(r.id)}`).join(', ')} not a valid UUID`,
       malformed,
     ),
   };

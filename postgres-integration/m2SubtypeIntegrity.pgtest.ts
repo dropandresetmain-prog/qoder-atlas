@@ -51,6 +51,24 @@ const M2_ACTIVATED_KINDS = [
   'SUPPORT_ASSIGNMENT',
 ];
 
+/**
+ * Kinds M4 activates — must match docs/refactor/evidence/M4.md exactly.
+ * Added when M4 landed on this branch: EVENT/PROGRAMME/PROGRAMME_ITEM/
+ * PARTICIPATION/PLACE/GEOGRAPHIC_AREA/JURISDICTION now have installed
+ * checkers, so the "no M3/M4/M5 kind leaked a checker" invariant below is
+ * scoped to M3/M5 from this point on — M4's own activation is expected,
+ * not a leak.
+ */
+const M4_ACTIVATED_KINDS = [
+  'EVENT',
+  'PROGRAMME',
+  'PROGRAMME_ITEM',
+  'PARTICIPATION',
+  'PLACE',
+  'GEOGRAPHIC_AREA',
+  'JURISDICTION',
+];
+
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
   test('every registered subtype checker function is actually installed', async () => {
     const pool = await sharedTestPool();
@@ -72,14 +90,14 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     }
   });
 
-  test('future-lane kinds stay closed: no M3/M4/M5 kind has a checker', async () => {
+  test('future-lane kinds stay closed: no M3/M5 kind has a checker', async () => {
     const pool = await sharedTestPool();
     const leaked = await pool.query<{ kind: string }>(
       `SELECT kind FROM subject_subtype_checkers
         WHERE kind <> ALL($1::text[])`,
-      [[...M2_ACTIVATED_KINDS, 'WORKSPACE']],
+      [[...M2_ACTIVATED_KINDS, ...M4_ACTIVATED_KINDS, 'WORKSPACE']],
     );
-    assert.deepEqual(leaked.rows, [], 'M2 must not activate kinds owned by M3/M4/M5');
+    assert.deepEqual(leaked.rows, [], 'M2 must not activate kinds owned by M3/M4/M5, and M4 must not activate kinds owned by M3/M5');
 
     // The kinds are pre-registered (that is the frozen contract) but unactivated.
     const pending = await pool.query<{ kind: string }>(
@@ -87,14 +105,14 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
         WHERE NOT EXISTS (SELECT 1 FROM subject_subtype_checkers c WHERE c.kind = k.kind)`,
     );
     const pendingKinds = pending.rows.map((row) => row.kind);
-    for (const kind of ['RESERVATION', 'TRANSPORT_SERVICE', 'PLACE', 'JURISDICTION', 'ASSESSMENT']) {
+    for (const kind of ['RESERVATION', 'TRANSPORT_SERVICE', 'ASSESSMENT']) {
       assert.ok(pendingKinds.includes(kind), `${kind} must remain registered-but-unactivated`);
     }
   });
 
   test('a pre-registered kind with no checker cannot commit even with a head row', async () => {
     const pool = await sharedTestPool();
-    for (const kind of ['RESERVATION', 'PLACE']) {
+    for (const kind of ['RESERVATION']) {
       const seed = await beginSeed(pool, `M2 closed ${kind}`);
       await seedRootSubject(seed, { kind });
       await assert.rejects(
@@ -420,6 +438,9 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'authority_grants.limits',
       'stay_item_details.occupancy_needs',
       'resource_use_item_details.use_requirements',
+      // M4 (0056): bounded operating-requirement detail nothing reverse-looks-up,
+      // shape-checked by programme_items_operating_requirements_shape.
+      'programme_items.operating_requirements',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

@@ -19,6 +19,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
+import { seedPlace } from './m4Seed.ts';
 
 /** A ProtectedDataRef triple that satisfies the 0012/0015 column constraints. */
 export const SEED_PROTECTED_REF = {
@@ -289,33 +290,56 @@ export async function seedJourneyItem(
       seed.actorId,
     ],
   );
-  const detailSql: Record<typeof params.kind, { sql: string; values: unknown[] }> = {
-    TRANSPORT: {
-      sql: `INSERT INTO transport_item_details
-              (workspace_id, journey_item_id, kind, desired_origin_place_id, desired_destination_place_id)
-            VALUES ($1, $2, 'TRANSPORT', $3, $4)`,
-      values: [seed.workspaceId, journeyItemId, randomUUID(), randomUUID()],
-    },
-    STAY: {
-      sql: `INSERT INTO stay_item_details
-              (workspace_id, journey_item_id, kind, intended_place_id, required_nights)
-            VALUES ($1, $2, 'STAY', $3, 1)`,
-      values: [seed.workspaceId, journeyItemId, randomUUID()],
-    },
-    ENGAGEMENT: {
-      sql: `INSERT INTO engagement_item_details
-              (workspace_id, journey_item_id, kind, participation_id)
-            VALUES ($1, $2, 'ENGAGEMENT', $3)`,
-      values: [seed.workspaceId, journeyItemId, randomUUID()],
-    },
-    RESOURCE_USE: {
-      sql: `INSERT INTO resource_use_item_details
-              (workspace_id, journey_item_id, kind, intended_location_place_id)
-            VALUES ($1, $2, 'RESOURCE_USE', $3)`,
-      values: [seed.workspaceId, journeyItemId, randomUUID()],
-    },
-  };
-  const detail = detailSql[params.kind];
+  const detail = await (async (): Promise<{ sql: string; values: unknown[] }> => {
+    switch (params.kind) {
+      case 'TRANSPORT': {
+        // Real places (0061 gives this column a live FK): distinct origin and
+        // destination satisfy the table's own not-same-place check too.
+        const originPlaceId = await seedPlace(seed, { name: 'Seed Origin Place' });
+        const destinationPlaceId = await seedPlace(seed, { name: 'Seed Destination Place' });
+        return {
+          sql: `INSERT INTO transport_item_details
+                  (workspace_id, journey_item_id, kind, desired_origin_place_id, desired_destination_place_id)
+                VALUES ($1, $2, 'TRANSPORT', $3, $4)`,
+          values: [seed.workspaceId, journeyItemId, originPlaceId, destinationPlaceId],
+        };
+      }
+      case 'STAY': {
+        const placeId = await seedPlace(seed, { name: 'Seed Stay Place' });
+        return {
+          sql: `INSERT INTO stay_item_details
+                  (workspace_id, journey_item_id, kind, intended_place_id, required_nights)
+                VALUES ($1, $2, 'STAY', $3, 1)`,
+          values: [seed.workspaceId, journeyItemId, placeId],
+        };
+      }
+      case 'ENGAGEMENT':
+        // Use the standalone-appointment branch of the source XOR rather than
+        // participation_id: this generic helper has no Participation to
+        // attach to, and nothing reads its detail row's participation_id.
+        return {
+          sql: `INSERT INTO engagement_item_details
+                  (workspace_id, journey_item_id, kind, standalone_title, standalone_window_start, standalone_window_end)
+                VALUES ($1, $2, 'ENGAGEMENT', $3, $4, $5)`,
+          values: [
+            seed.workspaceId,
+            journeyItemId,
+            'Seed Standalone Engagement',
+            params.window?.start ?? '2024-01-01T00:00:00Z',
+            params.window?.end ?? '2024-01-02T00:00:00Z',
+          ],
+        };
+      case 'RESOURCE_USE': {
+        const placeId = await seedPlace(seed, { name: 'Seed Resource Place' });
+        return {
+          sql: `INSERT INTO resource_use_item_details
+                  (workspace_id, journey_item_id, kind, intended_location_place_id)
+                VALUES ($1, $2, 'RESOURCE_USE', $3)`,
+          values: [seed.workspaceId, journeyItemId, placeId],
+        };
+      }
+    }
+  })();
   await seed.client.query(detail.sql, detail.values);
   return { journeyItemId };
 }

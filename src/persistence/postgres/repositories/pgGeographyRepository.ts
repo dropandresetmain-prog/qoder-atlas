@@ -307,36 +307,4 @@ export class PgGeographyRepository implements GeographyRepository {
     );
     if (result.rowCount !== 1) throw new Error(`jurisdiction area ${params.id} was not inserted`);
   }
-
-  async jurisdictionsForAreaVersion(
-    workspaceId: string,
-    areaVersionId: string,
-    asOfDate: string,
-  ): Promise<Jurisdiction[]> {
-    const result = await this.client().query<JurisdictionRow & { id: string }>(
-      `SELECT j.id, j.name, j.regime_kind
-         FROM jurisdiction_areas ja
-         JOIN jurisdictions j ON j.workspace_id = ja.workspace_id AND j.id = ja.jurisdiction_id
-        WHERE ja.workspace_id = $1 AND ja.area_version_id = $2
-          AND ja.valid_from <= $3::date AND (ja.valid_until IS NULL OR ja.valid_until > $3::date)`,
-      [workspaceId, areaVersionId, asOfDate],
-    );
-    return result.rows.map((row) => toJurisdiction(row.id, row));
-  }
-
-  async areasContainingPlace(workspaceId: string, placeId: string, asOfDate: string): Promise<GeographicArea[]> {
-    const result = await this.client().query<AreaRow & { id: string }>(
-      `SELECT DISTINCT a.id, a.name, a.area_type, h.revision
-         FROM area_versions av
-         JOIN geographic_areas a ON a.workspace_id = av.workspace_id AND a.id = av.area_id
-         JOIN aggregate_heads h ON h.workspace_id = a.workspace_id AND h.aggregate_id = a.id
-         JOIN places p ON p.workspace_id = av.workspace_id AND p.id = $2
-        WHERE av.workspace_id = $1
-          AND av.valid_from <= $3::date AND (av.valid_until IS NULL OR av.valid_until > $3::date)
-          AND p.location IS NOT NULL
-          AND ST_Contains(av.geometry::geometry, p.location::geometry)`,
-      [workspaceId, placeId, asOfDate],
-    );
-    return result.rows.map((row) => toArea(row.id, row));
-  }
 }

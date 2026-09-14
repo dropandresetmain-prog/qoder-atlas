@@ -35,7 +35,23 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { beginSeed, commitSeed, opaqueRef, seedCredential, seedTraveller, seedTrip } from './m2Seed.ts';
+import {
+  beginSeed,
+  commitSeed,
+  opaqueRef,
+  seedCredential,
+  seedTraveller,
+  seedTrip,
+  type SeedSession,
+} from './m2Seed.ts';
+import {
+  seedEvent,
+  seedJurisdiction,
+  seedPlace,
+  seedProgramme,
+  seedProgrammeItem,
+  seedParticipation,
+} from './m4Seed.ts';
 import { sharedTestPool } from './harness.ts';
 import type { Pool, PoolClient } from '../src/persistence/postgres/pool.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
@@ -123,6 +139,21 @@ async function fixture(): Promise<Fixture> {
     credentials,
     uow: () => new PgUnitOfWork(pool, seed.workspaceId),
   };
+}
+
+/**
+ * Continues seeding into the workspace `fixture()` already committed, for
+ * tests that need one more M4-owned row (a Place, Jurisdiction or
+ * Participation) after the fixture's own `beginSeed` session has closed.
+ * `beginSeed` always mints a *new* workspace, so it cannot be called again
+ * just to add rows to this one — this instead opens a plain transaction
+ * against the existing workspace row and reuses `commitSeed` to close it,
+ * exactly as `m2People.pgtest.ts`'s workspace-per-fixture pattern requires.
+ */
+async function attachSeed(f: Fixture): Promise<SeedSession> {
+  const client = await f.pool.connect();
+  await client.query('BEGIN');
+  return { client, workspaceId: f.workspaceId, actorId: f.identity.actorPrincipalId };
 }
 
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
@@ -242,6 +273,23 @@ function stayItem(intendedPlaceId: string, id: string): JourneyItemSeed {
 
 function engagementItem(participationId: string, id: string): JourneyItemSeed {
   return { id, kind: 'ENGAGEMENT', lifecycleStatus: 'PLANNED', participationId };
+}
+
+/**
+ * The standalone-appointment branch of 0023's source XOR, for the (common)
+ * case where a test only needs *a* valid ENGAGEMENT detail row and never
+ * asserts anything about a Participation identity — so it need not seed the
+ * Event/Programme/ProgrammeItem/Participation chain that a real
+ * `participationId` now requires under 0061/0062's live FK and trigger.
+ */
+function standaloneEngagementItem(id: string, window: { start: string; end: string } = WINDOW_INSIDE): JourneyItemSeed {
+  return {
+    id,
+    kind: 'ENGAGEMENT',
+    lifecycleStatus: 'PLANNED',
+    standaloneTitle: 'Standalone engagement',
+    standaloneWindow: window,
+  };
 }
 
 function resourceUseItem(locationPlaceId: string, id: string): JourneyItemSeed {
@@ -513,11 +561,29 @@ describe('M2 lane T: JourneyItem typed detail (0023)', () => {
         travellerId: f.travellerIds[0] ?? '',
       }),
     );
-    const origin = opaqueRef();
-    const destination = opaqueRef();
-    const stayPlace = opaqueRef();
-    const participation = opaqueRef();
-    const resourcePlace = opaqueRef();
+    // Real M4 rows: 0061 gives desired_origin/destination_place_id,
+    // intended_place_id, participation_id and intended_location_place_id live
+    // FKs, and this test asserts the exact values round-trip (below), so this
+    // is the one place in this file that must build the full
+    // Event/Programme/ProgrammeItem/Participation chain rather than switching
+    // the ENGAGEMENT item to a standalone appointment.
+    const seed = await attachSeed(f);
+    const origin = await seedPlace(seed, { name: 'Typed detail origin' });
+    const destination = await seedPlace(seed, { name: 'Typed detail destination' });
+    const stayPlace = await seedPlace(seed, { name: 'Typed detail stay' });
+    const resourcePlace = await seedPlace(seed, { name: 'Typed detail resource' });
+    const detailEventId = await seedEvent(seed);
+    const detailProgrammeId = await seedProgramme(seed, { eventId: detailEventId });
+    const { programmeItemId: detailProgrammeItemId } = await seedProgrammeItem(seed, {
+      programmeId: detailProgrammeId,
+    });
+    // 0062 requires the Participation's traveller to match this item's own
+    // Journey's traveller, so it must be the same person `journey` belongs to.
+    const participation = await seedParticipation(seed, {
+      programmeItemId: detailProgrammeItemId,
+      travellerId: f.travellerIds[0] ?? '',
+    });
+    await commitSeed(seed);
     const transportItemId = randomUUID();
     const stayItemId = randomUUID();
     const engagementItemId = randomUUID();
@@ -675,13 +741,17 @@ describe('M2 lane T: revision CAS and child-subject ownership', () => {
         travellerId: f.travellerIds[0] ?? '',
       }),
     );
+    // This item write commits, so its place must be real (0061 FK).
+    const caseSeed = await attachSeed(f);
+    const stayPlaceId = await seedPlace(caseSeed, { name: 'Revision CAS stay place' });
+    await commitSeed(caseSeed);
     const accepted = mustOk(
       await addJourneyItem(f.uow(), {
         ...f.identity,
         idempotencyKey: randomUUID(),
         journeyId: journey.journeyId,
         expectedRevision: 1,
-        item: stayItem(opaqueRef(), randomUUID()),
+        item: stayItem(stayPlaceId, randomUUID()),
       }),
     );
     assert.equal(accepted.journeyRevision, 2);
@@ -891,9 +961,15 @@ describe('M2 lane T: jurisdiction and place reverse lookups', () => {
   test('intended visits and place references are found through opaque UUIDs with their exact role', async () => {
     const f = await fixture();
     const queries = new PgJourneyReadQueries(f.pool);
-    const jurisdiction = opaqueRef();
-    const elsewhere = opaqueRef();
-    const sharedPlace = opaqueRef();
+    // Both jurisdictions and the shared place are committed and read back by
+    // exact value below, so all three must be real M4 rows (0061 FK).
+    const lookupSeed = await attachSeed(f);
+    const jurisdiction = await seedJurisdiction(lookupSeed, { name: 'Reverse lookup target jurisdiction' });
+    const elsewhere = await seedJurisdiction(lookupSeed, { name: 'Reverse lookup elsewhere jurisdiction' });
+    const sharedPlace = await seedPlace(lookupSeed, { name: 'Reverse lookup shared place' });
+    const destinationForA = await seedPlace(lookupSeed, { name: 'Reverse lookup transport A destination' });
+    const originForB = await seedPlace(lookupSeed, { name: 'Reverse lookup transport B origin' });
+    await commitSeed(lookupSeed);
     const journeyA = mustOk(
       await createJourney(f.uow(), {
         ...f.identity,
@@ -960,7 +1036,7 @@ describe('M2 lane T: jurisdiction and place reverse lookups', () => {
         idempotencyKey: randomUUID(),
         journeyId: journeyA.journeyId,
         expectedRevision: offTarget.journeyRevision,
-        item: transportItem(sharedPlace, opaqueRef(), originItemId),
+        item: transportItem(sharedPlace, destinationForA, originItemId),
       }),
     );
     const addedA2 = mustOk(
@@ -987,7 +1063,7 @@ describe('M2 lane T: jurisdiction and place reverse lookups', () => {
         idempotencyKey: randomUUID(),
         journeyId: journeyB.journeyId,
         expectedRevision: addedB.journeyRevision,
-        item: transportItem(opaqueRef(), sharedPlace, destinationItemId),
+        item: transportItem(originForB, sharedPlace, destinationItemId),
       }),
     );
 
@@ -1023,13 +1099,19 @@ describe('M2 lane T: credential selection (F06)', () => {
         travellerId: f.travellerIds[0] ?? '',
       }),
     );
+    // All three visits below commit, so all three jurisdictions must be real
+    // M4 rows (0061 FK); the test never asserts a specific jurisdiction value,
+    // so one jurisdiction, reused, is enough.
+    const visitSeed = await attachSeed(f);
+    const visitJurisdictionId = await seedJurisdiction(visitSeed, { name: 'Credential selection jurisdiction' });
+    await commitSeed(visitSeed);
     const firstVisit = mustOk(
       await addIntendedVisit(f.uow(), {
         ...f.identity,
         idempotencyKey: randomUUID(),
         journeyId: journey.journeyId,
         expectedRevision: 1,
-        visit: { jurisdictionId: opaqueRef(), purpose: VISIT_PURPOSE, intendedDates: WINDOW_INSIDE },
+        visit: { jurisdictionId: visitJurisdictionId, purpose: VISIT_PURPOSE, intendedDates: WINDOW_INSIDE },
       }),
     );
     const secondVisit = mustOk(
@@ -1038,7 +1120,7 @@ describe('M2 lane T: credential selection (F06)', () => {
         idempotencyKey: randomUUID(),
         journeyId: journey.journeyId,
         expectedRevision: firstVisit.journeyRevision,
-        visit: { jurisdictionId: opaqueRef(), purpose: VISIT_PURPOSE, intendedDates: WINDOW_ADJACENT },
+        visit: { jurisdictionId: visitJurisdictionId, purpose: VISIT_PURPOSE, intendedDates: WINDOW_ADJACENT },
       }),
     );
     const mine = f.credentials.find((credential) => credential.travellerId === journey.travellerId);
@@ -1081,7 +1163,7 @@ describe('M2 lane T: credential selection (F06)', () => {
         idempotencyKey: randomUUID(),
         journeyId: foreignJourney.journeyId,
         expectedRevision: 1,
-        visit: { jurisdictionId: opaqueRef(), purpose: VISIT_PURPOSE, intendedDates: WINDOW_INSIDE },
+        visit: { jurisdictionId: visitJurisdictionId, purpose: VISIT_PURPOSE, intendedDates: WINDOW_INSIDE },
       }),
     );
     const scopeViolation = conflictOf(
@@ -1285,8 +1367,12 @@ describe('M2 lane T: idempotency', () => {
         travellerId: f.travellerIds[0] ?? '',
       }),
     );
-    // Built once, so both submissions hash identically.
-    const itemSeed = stayItem(opaqueRef(), randomUUID());
+    // Built once, so both submissions hash identically. The write commits (a
+    // replay must not add a second one), so the place must be real (0061 FK).
+    const idemSeed = await attachSeed(f);
+    const idemPlaceId = await seedPlace(idemSeed, { name: 'Idempotent stay place' });
+    await commitSeed(idemSeed);
+    const itemSeed = stayItem(idemPlaceId, randomUUID());
     const itemKey = randomUUID();
     const addItem = () =>
       addJourneyItem(f.uow(), {
@@ -1505,10 +1591,16 @@ describe('M2 lane T: audit and outbox fan-out', () => {
     const f = await fixture();
     const tripId = f.tripIds[0] ?? '';
     const createKey = randomUUID();
-    const item = transportItem(opaqueRef(), opaqueRef(), randomUUID());
+    const fanOutSeed = await attachSeed(f);
+    const fanOutOrigin = await seedPlace(fanOutSeed, { name: 'Fan-out transport origin' });
+    const fanOutDestination = await seedPlace(fanOutSeed, { name: 'Fan-out transport destination' });
+    const fanOutStayPlace = await seedPlace(fanOutSeed, { name: 'Fan-out stay place' });
+    const fanOutJurisdictionId = await seedJurisdiction(fanOutSeed, { name: 'Fan-out jurisdiction' });
+    await commitSeed(fanOutSeed);
+    const item = transportItem(fanOutOrigin, fanOutDestination, randomUUID());
     const visit = {
       id: randomUUID(),
-      jurisdictionId: opaqueRef(),
+      jurisdictionId: fanOutJurisdictionId,
       purpose: VISIT_PURPOSE,
       intendedDates: WINDOW_INSIDE,
     };
@@ -1519,7 +1611,7 @@ describe('M2 lane T: audit and outbox fan-out', () => {
         tripId,
         travellerId: f.travellerIds[0] ?? '',
         intendedWindow: WINDOW_EARLY,
-        items: [item, stayItem(opaqueRef(), randomUUID())],
+        items: [item, stayItem(fanOutStayPlace, randomUUID())],
         intendedVisits: [visit],
       }),
     );
@@ -1614,7 +1706,7 @@ describe('M2 lane T: audit and outbox fan-out', () => {
         idempotencyKey: randomUUID(),
         journeyId: created.journeyId,
         expectedRevision: 1,
-        item: engagementItem(opaqueRef(), randomUUID()),
+        item: standaloneEngagementItem(randomUUID()),
       }),
     );
     assert.equal(added.journeyRevision, 2);
@@ -1681,14 +1773,21 @@ describe('M2 lane T: read-query access paths', () => {
         intendedWindow: WINDOW_EARLY,
       }),
     );
-    const referenced = opaqueRef();
+    // `referenced` doubled as both a place and a jurisdiction id before 0061:
+    // now the two are distinct real M4 rows in different tables, so a Place is
+    // used for the item origin/stay columns and a Jurisdiction for the visit.
+    const accessPathSeed = await attachSeed(f);
+    const referencedPlace = await seedPlace(accessPathSeed, { name: 'Access-path place' });
+    const otherPlace = await seedPlace(accessPathSeed, { name: 'Access-path transport other end' });
+    const referencedJurisdiction = await seedJurisdiction(accessPathSeed, { name: 'Access-path jurisdiction' });
+    await commitSeed(accessPathSeed);
     const withTransport = mustOk(
       await addJourneyItem(f.uow(), {
         ...f.identity,
         idempotencyKey: randomUUID(),
         journeyId: journey.journeyId,
         expectedRevision: 1,
-        item: transportItem(referenced, opaqueRef(), randomUUID()),
+        item: transportItem(referencedPlace, otherPlace, randomUUID()),
       }),
     );
     const withStay = mustOk(
@@ -1697,7 +1796,7 @@ describe('M2 lane T: read-query access paths', () => {
         idempotencyKey: randomUUID(),
         journeyId: journey.journeyId,
         expectedRevision: withTransport.journeyRevision,
-        item: stayItem(referenced, randomUUID()),
+        item: stayItem(referencedPlace, randomUUID()),
       }),
     );
     // Every item write advances the parent Journey's head, so the visit builds
@@ -1708,7 +1807,7 @@ describe('M2 lane T: read-query access paths', () => {
         idempotencyKey: randomUUID(),
         journeyId: journey.journeyId,
         expectedRevision: withStay.journeyRevision,
-        visit: { jurisdictionId: referenced, purpose: VISIT_PURPOSE, intendedDates: WINDOW_INSIDE },
+        visit: { jurisdictionId: referencedJurisdiction, purpose: VISIT_PURPOSE, intendedDates: WINDOW_INSIDE },
       }),
     );
     // Prove the fixture really wrote rows before measuring any plan — an empty
@@ -1722,7 +1821,7 @@ describe('M2 lane T: read-query access paths', () => {
     });
     assert.equal(written.items.length, 2, 'both items belong to the parent Journey');
     assert.equal(written.visits.length, 1);
-    assert.equal(written.visits[0]?.jurisdictionId, referenced);
+    assert.equal(written.visits[0]?.jurisdictionId, referencedJurisdiction);
 
     // Capture the statements the implementation actually emits, so this proves
     // something about the read model rather than about a copy of its SQL.
@@ -1736,8 +1835,8 @@ describe('M2 lane T: read-query access paths', () => {
     const queries = new PgJourneyReadQueries(recorder);
     await queries.journeysForTravellerInWindow(f.workspaceId, traveller, WINDOW_EARLY);
     await queries.journeysForTrip(f.workspaceId, tripId);
-    await queries.itemsReferencingPlace(f.workspaceId, referenced);
-    await queries.intendedVisitsInJurisdictionWindow(f.workspaceId, referenced, WINDOW_EARLY);
+    await queries.itemsReferencingPlace(f.workspaceId, referencedPlace);
+    await queries.intendedVisitsInJurisdictionWindow(f.workspaceId, referencedJurisdiction, WINDOW_EARLY);
     assert.equal(statements.length, 4, 'each read model method is exactly one statement');
 
     const expectedByMethod: string[][] = [

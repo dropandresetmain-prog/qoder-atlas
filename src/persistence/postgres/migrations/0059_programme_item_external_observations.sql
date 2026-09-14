@@ -40,14 +40,7 @@ CREATE TABLE programme_item_external_observations (
 CREATE INDEX idx_programme_item_external_observations_item
   ON programme_item_external_observations (workspace_id, programme_item_id, observed_at DESC);
 
-CREATE FUNCTION forbid_programme_item_external_observation_mutation() RETURNS trigger AS $$
-BEGIN
-  RAISE EXCEPTION
-    'programme_item_external_observations is append-only: observation % cannot be updated or deleted',
-    OLD.id;
-END;
-$$ LANGUAGE plpgsql;
-
+-- Reuses the shared `forbid_mutation()` (0003) every M2 immutable table already uses.
 CREATE TRIGGER programme_item_external_observations_immutable
   BEFORE UPDATE OR DELETE ON programme_item_external_observations
-  FOR EACH ROW EXECUTE FUNCTION forbid_programme_item_external_observation_mutation();
+  FOR EACH ROW EXECUTE FUNCTION forbid_mutation();

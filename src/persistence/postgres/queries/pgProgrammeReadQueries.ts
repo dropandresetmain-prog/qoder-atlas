@@ -20,7 +20,11 @@ import type {
 export type Queryable = Pool | PoolClient;
 
 export class PgProgrammeReadQueries implements ProgrammeReadQueries {
-  constructor(private readonly db: Queryable) {}
+  private readonly db: Queryable;
+
+  constructor(db: Queryable) {
+    this.db = db;
+  }
 
   async participationsForProgrammeItem(workspaceId: string, programmeItemId: string): Promise<AffectedParticipantHit[]> {
     const result = await this.db.query<{ id: string; traveller_id: string; obligation: string; accepted: boolean }>(
@@ -111,7 +115,11 @@ export class PgProgrammeReadQueries implements ProgrammeReadQueries {
 }
 
 export class PgGeographyReadQueries implements GeographyReadQueries {
-  constructor(private readonly db: Queryable) {}
+  private readonly db: Queryable;
+
+  constructor(db: Queryable) {
+    this.db = db;
+  }
 
   async areasContainingPlace(workspaceId: string, placeId: string, asOfDate: string): Promise<AreaHit[]> {
     const result = await this.db.query<{ area_id: string; area_version_id: string; name: string; area_type: string }>(

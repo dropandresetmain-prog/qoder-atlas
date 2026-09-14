@@ -181,8 +181,8 @@ export interface GeographyRepository {
   loadJurisdiction(workspaceId: string, jurisdictionId: string): Promise<Jurisdiction | undefined>;
   addJurisdictionArea(params: { link: JurisdictionArea; id: string; actor: ActorContext }): Promise<void>;
 
-  /** Reverse lookup H: jurisdictions whose area membership covers this area edition at `asOfDate`. */
-  jurisdictionsForAreaVersion(workspaceId: string, areaVersionId: string, asOfDate: string): Promise<Jurisdiction[]>;
-  /** Reverse lookup H: areas whose current geometry edition spatially contains this Place, at `asOfDate`. */
-  areasContainingPlace(workspaceId: string, placeId: string, asOfDate: string): Promise<GeographicArea[]>;
+  // Reverse lookup H ("jurisdictions for an area edition", "areas containing a
+  // Place") lives in the read-only `GeographyReadQueries` seam
+  // (repository/programmeQueries.ts), not here — this port is typed-row
+  // writes only, matching the M2 repository/read-query file split.
 }

@@ -52,18 +52,12 @@ CREATE INDEX idx_area_versions_geometry ON area_versions USING GIST (geometry);
 CREATE INDEX idx_area_versions_valid_range ON area_versions (workspace_id, area_id, valid_from, valid_until);
 CREATE INDEX idx_area_versions_evidence ON area_versions (workspace_id, evidence_id);
 
--- Immutable: an edition is never corrected in place, only superseded by a new one.
-CREATE FUNCTION forbid_area_version_mutation() RETURNS trigger AS $$
-BEGIN
-  RAISE EXCEPTION
-    'area_versions is append-only: edition % of area % cannot be updated or deleted (insert a new edition instead)',
-    OLD.id, OLD.area_id;
-END;
-$$ LANGUAGE plpgsql;
-
+-- Immutable: an edition is never corrected in place, only superseded by a new
+-- one. Reuses the shared `forbid_mutation()` (0003) every M2 immutable table
+-- already uses, rather than a bespoke duplicate.
 CREATE TRIGGER area_versions_immutable
   BEFORE UPDATE OR DELETE ON area_versions
-  FOR EACH ROW EXECUTE FUNCTION forbid_area_version_mutation();
+  FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
 
 CREATE FUNCTION enforce_subject_subtype_geographic_area(
   p_workspace_id uuid,
