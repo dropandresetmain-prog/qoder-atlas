@@ -37,7 +37,7 @@ CREATE TABLE information_scopes (
   CONSTRAINT information_scopes_version_fk
     FOREIGN KEY (workspace_id, information_version_id) REFERENCES information_versions (workspace_id, id),
   CONSTRAINT information_scopes_subject_fk
-    FOREIGN KEY (workspace_id, subject_kind, subject_id)
+    FOREIGN KEY (workspace_id, subject_id, subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   -- A scope must narrow to something: geography, population, subject, purpose
   -- or category. An empty scope would claim universal applicability, which is

@@ -33,7 +33,7 @@ CREATE TABLE constraint_definitions (
   created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT constraint_definitions_owner_fk
-    FOREIGN KEY (workspace_id, owner_kind, owner_id)
+    FOREIGN KEY (workspace_id, owner_id, owner_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT constraint_definitions_provenance_fk
     FOREIGN KEY (workspace_id, provenance_evidence_id)
@@ -67,7 +67,7 @@ CREATE TABLE constraint_operands (
     FOREIGN KEY (workspace_id, constraint_definition_id)
     REFERENCES constraint_definitions (workspace_id, id),
   CONSTRAINT constraint_operands_subject_fk
-    FOREIGN KEY (workspace_id, subject_kind, subject_id)
+    FOREIGN KEY (workspace_id, subject_id, subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT constraint_operands_shape CHECK (
     (operand_kind = 'SUBJECT_REF') = (subject_kind IS NOT NULL AND subject_id IS NOT NULL)
@@ -108,10 +108,10 @@ CREATE TABLE dependencies (
   created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT dependencies_from_fk
-    FOREIGN KEY (workspace_id, from_subject_kind, from_subject_id)
+    FOREIGN KEY (workspace_id, from_subject_id, from_subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT dependencies_to_fk
-    FOREIGN KEY (workspace_id, to_subject_kind, to_subject_id)
+    FOREIGN KEY (workspace_id, to_subject_id, to_subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT dependencies_constraint_fk
     FOREIGN KEY (workspace_id, constraint_definition_id)

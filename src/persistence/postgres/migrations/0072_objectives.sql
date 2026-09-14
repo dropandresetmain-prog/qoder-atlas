@@ -26,7 +26,7 @@ CREATE TABLE objectives (
   created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT objectives_owner_fk
-    FOREIGN KEY (workspace_id, owner_kind, owner_id)
+    FOREIGN KEY (workspace_id, owner_id, owner_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT objectives_owner_kind_restricted CHECK (
     owner_kind IN ('TRIP', 'JOURNEY', 'COORDINATION_GROUP', 'PROGRAMME')
@@ -51,7 +51,7 @@ CREATE TABLE objective_targets (
   CONSTRAINT objective_targets_objective_fk
     FOREIGN KEY (workspace_id, objective_id) REFERENCES objectives (workspace_id, id),
   CONSTRAINT objective_targets_subject_fk
-    FOREIGN KEY (workspace_id, subject_kind, subject_id)
+    FOREIGN KEY (workspace_id, subject_id, subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT objective_targets_subject_complete CHECK (
     (target_kind = 'SUBJECT') = (subject_kind IS NOT NULL AND subject_id IS NOT NULL)

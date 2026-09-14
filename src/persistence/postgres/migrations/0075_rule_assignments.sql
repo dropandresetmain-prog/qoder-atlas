@@ -36,11 +36,13 @@ CREATE TABLE rule_assignments (
     FOREIGN KEY (workspace_id, rule_set_id) REFERENCES rule_sets (workspace_id, id),
   CONSTRAINT rule_assignments_edition_fk
     FOREIGN KEY (workspace_id, rule_set_version_id) REFERENCES rule_set_versions (workspace_id, id),
+  CONSTRAINT rule_assignments_organisation_fk
+    FOREIGN KEY (workspace_id, organisation_id) REFERENCES organisations (workspace_id, id),
   CONSTRAINT rule_assignments_subject_fk
-    FOREIGN KEY (workspace_id, subject_kind, subject_id)
+    FOREIGN KEY (workspace_id, subject_id, subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT rule_assignments_selection_exclusive CHECK (
-    (rule_set_version_id IS NULL) <> select_current_edition
+    (rule_set_version_id IS NULL) = select_current_edition
   ),
   CONSTRAINT rule_assignments_validity_ordered CHECK (
     valid_until IS NULL OR valid_until > valid_from

@@ -1,99 +1,65 @@
--- RECOVERY NOTE: pasted section is incomplete/interleaved; do not repair during salvage.
--- DATA_STRUCTURE_LOGICAL_SCHEMA.md §6: `rule_sets` / `rule_set_versions` /
--- `rules`. Closure §4.5: "RuleSet root owns editions; assignments define
--- applicability. Draft/published/superseded/withdrawn editions; effective dates
--- separate. Published rule expressions cannot be edited by scenario."
---
--- Bounded expression grammar (closure §8): "Use a bounded typed predicate
--- language with registered operators and all/any composition ... No eval,
--- arbitrary script or unreviewed AI-produced executable rule." The expression
--- is stored as jsonb CHECKed by rule_expression_is_bounded() below — a
--- recursive shape check over ALL/ANY/NOT/PREDICATE with a depth bound and no
--- allowance for extra keys — mirroring the frozen RuleExpressionSchema
--- (src/domain/v2/knowledge/information.ts). The zod schema validates the same
--- shape at the command boundary; the database is the second, independent gate.
---
--- Edition numbering follows §1: unique (workspace_id, rule_set_id,
--- edition_number), sequential editions controlled internally (derived in SQL,
--- never supplied).
+-- M5: immutable published rule-set editions and bounded executable rules.
+-- A rule edition is a source/policy publication, not an assessment. Its
+-- expression is a closed data language; it is never evaluated as SQL, JS or a
+-- script. Draft authoring and publication are explicit state transitions.
 
 CREATE TABLE rule_sets (
   workspace_id uuid NOT NULL REFERENCES workspaces (id),
   id uuid NOT NULL,
   issuer_kind text NOT NULL REFERENCES subject_kinds (kind),
   issuer_id uuid NOT NULL,
-  -- Which policy family this set governs; selection semantics live on
-  -- rule_assignments (0075), not on the set.
   policy_family text NOT NULL CHECK (length(btrim(policy_family)) > 0),
   created_at timestamptz NOT NULL DEFAULT now(),
   created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT rule_sets_issuer_fk
-    FOREIGN KEY (workspace_id, issuer_kind, issuer_id)
+    FOREIGN KEY (workspace_id, issuer_id, issuer_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
-  CONSTRAINT rule_sets_issuer_restricted CHECK (issuer_kind IN ('ORGANISATION', 'PRINCIPAL'))
+  CONSTRAINT rule_sets_issuer_restricted
+    CHECK (issuer_kind IN ('ORGANISATION', 'PRINCIPAL'))
 );
 
 CREATE INDEX idx_rule_sets_issuer ON rule_sets (workspace_id, issuer_kind, issuer_id);
 CREATE INDEX idx_rule_sets_family ON rule_sets (workspace_id, policy_family);
 
--- Bounded-expression shape check (recursive). depth is decremented from
--- BOUNDED_RULE_EXPRESSION_MAX_DEPTH; exhausted depth means the expression is
--- too large to be a bounded policy, not a value judgment.
-CREATE FUNCTION rule_expression_is_bounded(p_expression jsonb, p_depth integer) RETURNS boolean LANGUAGE plpgsql AS $$
-CREATE FUNCTION assert_rule_set_version_immutable_but_publishable() RETURNS trigger AS $$
+-- The database repeats the application boundary check so direct SQL cannot
+-- smuggle in an unbounded expression. Object keys are deliberately closed.
+CREATE FUNCTION rule_expression_is_bounded(p_expression jsonb, p_depth integer)
+RETURNS boolean LANGUAGE plpgsql IMMUTABLE AS $$
 BEGIN
-  IF OLD.status = 'DRAFT' AND NEW.status = 'PUBLISHED' THEN
-    -- The publish transition: status plus exactly the publication/effective
-    -- columns it stamps. Anything else moving is a rejected rewrite.
-    IF NEW.expression IS DISTINCT FROM OLD.expression
-       OR NEW.edition_number IS DISTINCT FROM OLD.edition_number
-       OR NEW.rule_set_id IS DISTINCT FROM OLD.rule_set_id
-       OR NEW.created_by_actor_id IS DISTINCT FROM OLD.created_by_actor_id
-       OR NEW.created_at IS DISTINCT FROM OLD.created_at
-  IF p_depth <= 0 THEN
-       OR NEW.published_at IS NULL
-    RETURN false;
-       OR NEW.published_by_actor_id IS NULL THEN
-      RAISE EXCEPTION 'rule_set_versions violation: publishing may only stamp status and publication facts';
-  END IF;
-    END IF;
-  IF jsonb_typeof(p_expression) <> 'object' THEN
-    RETURN false;
-    RETURN NEW;
-  END IF;
-  IF NOT (p_expression ? 'operator') THEN
+  IF p_depth <= 0 OR jsonb_typeof(p_expression) <> 'object' THEN
     RETURN false;
   END IF;
+
   CASE p_expression ->> 'operator'
     WHEN 'ALL', 'ANY' THEN
-      -- composition: operands array, each bounded
       RETURN jsonb_typeof(p_expression -> 'operands') = 'array'
-        AND jsonb_array_length(p_expression -> 'operands') >= 1
-        AND (SELECT bool_and(rule_expression_is_bounded(o, p_depth - 1))
-             FROM jsonb_array_elements(p_expression -> 'operands') AS o)
+        AND jsonb_array_length(p_expression -> 'operands') BETWEEN 1 AND 32
         AND NOT EXISTS (
-          SELECT 1 FROM jsonb_object_keys(p_expression) k
-           WHERE k NOT IN ('operator', 'operands')
+          SELECT 1 FROM jsonb_object_keys(p_expression) AS k
+          WHERE k NOT IN ('operator', 'operands')
+        )
+        AND (
+          SELECT bool_and(rule_expression_is_bounded(value, p_depth - 1))
+          FROM jsonb_array_elements(p_expression -> 'operands')
         );
     WHEN 'NOT' THEN
-      RETURN rule_expression_is_bounded(p_expression -> 'operand', p_depth - 1)
+      RETURN jsonb_typeof(p_expression -> 'operand') = 'object'
         AND NOT EXISTS (
-          SELECT 1 FROM jsonb_object_keys(p_expression) k
-           WHERE k NOT IN ('operator', 'operand')
-        );
+          SELECT 1 FROM jsonb_object_keys(p_expression) AS k
+          WHERE k NOT IN ('operator', 'operand')
+        )
+        AND rule_expression_is_bounded(p_expression -> 'operand', p_depth - 1);
     WHEN 'PREDICATE' THEN
-      -- leaf: a registered predicate id + bounded parameters object
       RETURN jsonb_typeof(p_expression -> 'predicateId') = 'string'
-        AND length(p_expression ->> 'predicateId') >= 1
+        AND length(btrim(p_expression ->> 'predicateId')) > 0
         AND jsonb_typeof(p_expression -> 'parameters') = 'object'
         AND pg_column_size(p_expression -> 'parameters') <= 8192
         AND NOT EXISTS (
-          SELECT 1 FROM jsonb_object_keys(p_expression) k
-           WHERE k NOT IN ('operator', 'predicateId', 'parameters')
+          SELECT 1 FROM jsonb_object_keys(p_expression) AS k
+          WHERE k NOT IN ('operator', 'predicateId', 'parameters')
         );
     ELSE
-      -- Unknown operator: reject. There is no eval-shaped escape hatch here.
       RETURN false;
   END CASE;
 END;
@@ -116,66 +82,81 @@ CREATE TABLE rule_set_versions (
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT rule_set_versions_set_fk
     FOREIGN KEY (workspace_id, rule_set_id) REFERENCES rule_sets (workspace_id, id),
-  CONSTRAINT rule_set_versions_edition_unique UNIQUE (workspace_id, rule_set_id, edition_number),
+  CONSTRAINT rule_set_versions_edition_unique
+    UNIQUE (workspace_id, rule_set_id, edition_number),
+  CONSTRAINT rule_set_versions_published_identity_unique
+    UNIQUE (workspace_id, id, rule_set_id, published_at, published_by_actor_id),
   CONSTRAINT rule_set_versions_effective_ordered CHECK (
     effective_until IS NULL OR (effective_from IS NOT NULL AND effective_until > effective_from)
   ),
   CONSTRAINT rule_set_versions_published_shape CHECK (
-    (status IN ('PUBLISHED', 'SUPERSEDED', 'WITHDRAWN')) = (published_at IS NOT NULL AND published_by_actor_id IS NOT NULL)
-  IF OLD.status IN ('PUBLISHED', 'SUPERSEDED', 'WITHDRAWN') AND NEW.status IN ('SUPERSEDED', 'WITHDRAWN') THEN
+    (status = 'DRAFT') = (published_at IS NULL AND published_by_actor_id IS NULL)
   )
 );
 
--- Published/superseded/withdrawn editions are content-frozen: expression,
--- edition number and effective dates cannot change. Drafts stay editable
-    -- Status-only move of an accepted edition; content stays frozen.
--- (authoring is a real activity); PUBLISH is the explicit transition, and
--- withdrawal/supersession change ONLY status/published_* columns.
-CREATE FUNCTION assert_rule_set_version_publication_freeze() RETURNS trigger AS $$
+-- A published edition may only be moved to a terminal publication state. Its
+-- content/effective interval/identity never changes. DRAFT publication stamps
+-- publication facts but cannot rewrite the edition in the same statement.
+CREATE FUNCTION assert_rule_set_version_immutable_but_publishable()
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF OLD.status <> 'DRAFT' THEN
+  IF OLD.status = 'DRAFT' AND NEW.status = 'PUBLISHED' THEN
     IF NEW.expression IS DISTINCT FROM OLD.expression
        OR NEW.edition_number IS DISTINCT FROM OLD.edition_number
        OR NEW.rule_set_id IS DISTINCT FROM OLD.rule_set_id
        OR NEW.effective_from IS DISTINCT FROM OLD.effective_from
-       OR NEW.effective_until IS DISTINCT FROM OLD.effective_until THEN
        OR NEW.effective_until IS DISTINCT FROM OLD.effective_until
-       OR NEW.published_at IS DISTINCT FROM OLD.published_at
-       OR NEW.published_by_actor_id IS DISTINCT FROM OLD.published_by_actor_id
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at
        OR NEW.created_by_actor_id IS DISTINCT FROM OLD.created_by_actor_id
-       OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
-      RAISE EXCEPTION
-        'rule_set_versions violation: edition % of rule set % is %; its expression is immutable — publish a new edition',
-        OLD.edition_number, OLD.rule_set_id, OLD.status;
+       OR NEW.published_at IS NULL
+       OR NEW.published_by_actor_id IS NULL THEN
+      RAISE EXCEPTION 'rule_set_versions violation: publishing may only stamp publication facts';
     END IF;
     RETURN NEW;
   END IF;
-  IF OLD.status = 'PUBLISHED' AND NEW.status = 'DRAFT' THEN
-    RAISE EXCEPTION
-      'rule_set_versions violation: a PUBLISHED edition cannot return to DRAFT';
-    RAISE EXCEPTION 'rule_set_versions violation: a PUBLISHED edition cannot return to DRAFT';
+
+  IF OLD.status IN ('PUBLISHED', 'SUPERSEDED', 'WITHDRAWN') THEN
+    IF NEW.status NOT IN ('SUPERSEDED', 'WITHDRAWN')
+       OR NEW.expression IS DISTINCT FROM OLD.expression
+       OR NEW.edition_number IS DISTINCT FROM OLD.edition_number
+       OR NEW.rule_set_id IS DISTINCT FROM OLD.rule_set_id
+       OR NEW.effective_from IS DISTINCT FROM OLD.effective_from
+       OR NEW.effective_until IS DISTINCT FROM OLD.effective_until
+       OR NEW.published_at IS DISTINCT FROM OLD.published_at
+       OR NEW.published_by_actor_id IS DISTINCT FROM OLD.published_by_actor_id
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at
+       OR NEW.created_by_actor_id IS DISTINCT FROM OLD.created_by_actor_id THEN
+      RAISE EXCEPTION
+        'rule_set_versions violation: published content is immutable; publish a new edition';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  -- Drafts are append-only rows too. A caller edits by submitting a new draft
+  -- edition; this avoids mutable rule content being observed by an evaluator.
+  IF NEW.status <> OLD.status
+     OR NEW.expression IS DISTINCT FROM OLD.expression
+     OR NEW.edition_number IS DISTINCT FROM OLD.edition_number
+     OR NEW.rule_set_id IS DISTINCT FROM OLD.rule_set_id
+     OR NEW.effective_from IS DISTINCT FROM OLD.effective_from
+     OR NEW.effective_until IS DISTINCT FROM OLD.effective_until
+     OR NEW.published_at IS DISTINCT FROM OLD.published_at
+     OR NEW.published_by_actor_id IS DISTINCT FROM OLD.published_by_actor_id
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at
+     OR NEW.created_by_actor_id IS DISTINCT FROM OLD.created_by_actor_id THEN
+    RAISE EXCEPTION 'rule_set_versions violation: edition rows are immutable';
   END IF;
   RETURN NEW;
-  RAISE EXCEPTION
-    'rule_set_versions violation: % status cannot move to %; editions are append-only with one publish transition',
-    OLD.status, NEW.status;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER rule_set_versions_publication_freeze
-DROP TRIGGER IF EXISTS rule_set_versions_immutable ON rule_set_versions;
   BEFORE UPDATE ON rule_set_versions
-  FOR EACH ROW EXECUTE FUNCTION assert_rule_set_version_publication_freeze();
-
--- An accepted published edition can never be deleted; withdrawal is a status.
-CREATE TRIGGER rule_set_versions_immutable
-  BEFORE UPDATE OR DELETE ON rule_set_versions
-  FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
   FOR EACH ROW EXECUTE FUNCTION assert_rule_set_version_immutable_but_publishable();
+CREATE TRIGGER rule_set_versions_no_delete
+  BEFORE DELETE ON rule_set_versions
+  FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
 
--- §6 `rules`: named individual rules inside an edition. Same bounded grammar;
--- a rule belongs to exactly one edition (edition-owned, not set-floating), so
--- a new edition restates its rules and nothing mutates under a published one.
 CREATE TABLE rules (
   workspace_id uuid NOT NULL REFERENCES workspaces (id),
   id uuid NOT NULL,
@@ -191,25 +172,17 @@ CREATE TABLE rules (
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT rules_edition_fk
     FOREIGN KEY (workspace_id, rule_set_version_id) REFERENCES rule_set_versions (workspace_id, id),
-  CONSTRAINT rules_edition_key_unique UNIQUE (workspace_id, rule_set_version_id, rule_key)
+  CONSTRAINT rules_edition_key_unique
+    UNIQUE (workspace_id, rule_set_version_id, rule_key)
 );
 
--- Rules are edition content: immutable once written (draft edits happen by
--- rewriting the edition's rule set before publication).
 CREATE TRIGGER rules_immutable
   BEFORE UPDATE OR DELETE ON rules
   FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
-
 CREATE INDEX idx_rules_edition ON rules (workspace_id, rule_set_version_id, rule_key);
 
--- ---------------------------------------------------------------------------
--- Subtype checker for RULE_SET (0010 extension contract).
--- ---------------------------------------------------------------------------
 CREATE FUNCTION enforce_subject_subtype_rule_set(
-  p_workspace_id uuid,
-  p_id uuid,
-  p_kind text,
-  p_aggregate_id uuid
+  p_workspace_id uuid, p_id uuid, p_kind text, p_aggregate_id uuid
 ) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
   IF p_aggregate_id <> p_id THEN
@@ -226,5 +199,5 @@ BEGIN
 END;
 $$;
 
-INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
-  ('RULE_SET', 'enforce_subject_subtype_rule_set', 'M5');
+INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by)
+VALUES ('RULE_SET', 'enforce_subject_subtype_rule_set', 'M5');

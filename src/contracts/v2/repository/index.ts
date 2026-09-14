@@ -9,3 +9,4 @@
 export type * from './people.ts';
 export type * from './travel.ts';
 export type * from './queries.ts';
+export type * from './knowledge.ts';

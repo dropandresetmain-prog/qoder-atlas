@@ -67,7 +67,7 @@ CREATE TABLE evidence_subjects (
   CONSTRAINT evidence_subjects_evidence_fk
     FOREIGN KEY (workspace_id, evidence_record_id) REFERENCES evidence_records (workspace_id, id),
   CONSTRAINT evidence_subjects_subject_fk
-    FOREIGN KEY (workspace_id, subject_kind, subject_id)
+    FOREIGN KEY (workspace_id, subject_id, subject_kind)
     REFERENCES domain_subjects (workspace_id, id, kind)
 );
 

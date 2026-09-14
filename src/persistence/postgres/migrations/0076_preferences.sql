@@ -31,7 +31,7 @@ CREATE TABLE preferences (
   created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT preferences_owner_fk
-    FOREIGN KEY (workspace_id, owner_kind, owner_id)
+    FOREIGN KEY (workspace_id, owner_id, owner_kind)
     REFERENCES domain_subjects (workspace_id, id, kind),
   CONSTRAINT preferences_evidence_fk
     FOREIGN KEY (workspace_id, evidence_id) REFERENCES evidence_records (workspace_id, id),

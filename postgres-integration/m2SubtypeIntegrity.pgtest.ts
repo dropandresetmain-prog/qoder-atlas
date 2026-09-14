@@ -3,7 +3,7 @@
  *
  * This file is the integrator's own proof of the four C1 amendments as they
  * apply to the identity registry. It deliberately depends on nothing any M2
- * lane wrote — only on `m2Seed.ts` and raw SQL — so the acceptance evidence for
+ * lane command — only on `m2Seed.ts` and raw SQL — so the acceptance evidence for
  * the pattern M3/M4/M5 must copy cannot be produced by the same code it audits.
  *
  * Two mechanisms are proven separately, because conflating them is the classic
@@ -50,6 +50,17 @@ const M2_ACTIVATED_KINDS = [
   'COORDINATION_GROUP',
   'SUPPORT_ASSIGNMENT',
 ];
+/** M5 is the first post-M2 lane that has completed its subtype branches. */
+const M5_ACTIVATED_KINDS = [
+  'SOURCE_RECORD',
+  'EVIDENCE_RECORD',
+  'OBJECTIVE',
+  'CONSTRAINT_DEFINITION',
+  'RULE_SET',
+  'PREFERENCE',
+  'INFORMATION_RECORD',
+  'INFORMATION_VERSION',
+];
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
   test('every registered subtype checker function is actually installed', async () => {
@@ -72,14 +83,20 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     }
   });
 
-  test('future-lane kinds stay closed: no M3/M4/M5 kind has a checker', async () => {
+  test('future-lane kinds stay closed while M5 owns its activated branches', async () => {
     const pool = await sharedTestPool();
     const leaked = await pool.query<{ kind: string }>(
       `SELECT kind FROM subject_subtype_checkers
         WHERE kind <> ALL($1::text[])`,
-      [[...M2_ACTIVATED_KINDS, 'WORKSPACE']],
+      [[...M2_ACTIVATED_KINDS, ...M5_ACTIVATED_KINDS, 'WORKSPACE']],
     );
-    assert.deepEqual(leaked.rows, [], 'M2 must not activate kinds owned by M3/M4/M5');
+    assert.deepEqual(leaked.rows, [], 'only completed M2 and M5 lanes may install subtype checkers');
+
+    const active = await pool.query<{ kind: string }>(
+      'SELECT kind FROM subject_subtype_checkers WHERE kind = ANY($1::text[]) ORDER BY kind',
+      [M5_ACTIVATED_KINDS],
+    );
+    assert.deepEqual(active.rows.map((row) => row.kind), [...M5_ACTIVATED_KINDS].sort());
 
     // The kinds are pre-registered (that is the frozen contract) but unactivated.
     const pending = await pool.query<{ kind: string }>(
@@ -420,6 +437,20 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'authority_grants.limits',
       'stay_item_details.occupancy_needs',
       'resource_use_item_details.use_requirements',
+      // M5's version-tagged source/detail/coverage payloads and closed rule grammar.
+      'source_records.capture_metadata',
+      'constraint_definitions.parameter_schema',
+      'rule_set_versions.expression',
+      'rules.expression',
+      'rule_assignments.population_parameters',
+      'preferences.value',
+      'advisory_details.publisher_meanings',
+      'advisory_details.source_native_detail',
+      'condition_details.uncertainty_parameters',
+      'condition_details.source_native_detail',
+      'information_scopes.population_parameters',
+      'knowledge_coverage.query_bounds',
+      'information_quarantine.rejected_summary',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns
