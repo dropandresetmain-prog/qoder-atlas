@@ -36,8 +36,8 @@ candidate. Do not claim C2 passed. No M7/M8.
 - [x] P1A empty-DB migration order proof (integrationCrossLane); subtype matrix 37 kinds × 4 properties (integrationSubtypeMatrix 158/158)
 - [x] P1A cross-lane FK reconciliation: 0087 (25 FKs) + orphan/cross-workspace proofs
 - [x] P1B G12: travel/support UUID-gated before execute (g12UuidBoundary 22 cases; reviewed diff)
-- [ ] P1C gates green → **Checkpoint A** commit + push
-- [ ] P2 read session + WorldSnapshot capture + manifest (G1) → **Checkpoint B**
+- [x] P1C gates green → **Checkpoint A** `63e38ba` pushed (345/345 pg)
+- [x] P2 read session + WorldSnapshot capture + manifest + 0090 scope propagation (G1) → **Checkpoint B** (350/350 pg)
 - [ ] P3 dependency registry/closure + structured explanations
 - [ ] P4 effective Journey/Programme/Service projections → **Checkpoint C**
 - [ ] P5 evaluator registry + families
@@ -48,14 +48,17 @@ candidate. Do not claim C2 passed. No M7/M8.
 
 ## Current checkpoint
 
-P1C gate run in progress on northstar_m6_ckptA. Non-DB gates already green:
-typecheck, build, lint, anti-hardcoding, v2 contracts/invariants 41/41.
-Legacy npm test 889/890 (A-10 pre-existing at base).
+Checkpoint B (P2) committing: PgReadSessionFactory (REPEATABLE READ READ ONLY),
+PgWorldReader (registered-semantic discovery + canonical loading + manifest),
+currentness with typed reasons, 0090 trigger scope propagation (once per xact).
+Frozen for P3-P5 (separate commit): effectiveItinerary, evaluator contract,
+explain helpers, constraintTypes, reachability, assess composer.
 
 ## Next action
 
-On green canonical pg run: fill M2_M5_INTEGRATION.md §6-§8, commit Checkpoint A,
-push, then land drafted M6 contracts (scratchpad/m6) and start P2.
+Push B + contracts; spawn evaluator lanes L1-L4 in worktrees against
+docs/refactor/evidence/M6_EVALUATOR_CONTRACT.md; meanwhile primary builds
+assessment persistence (0091) + reassessment worker (P7).
 
 ## Critical architecture constraints
 
@@ -81,11 +84,13 @@ push, then land drafted M6 contracts (scratchpad/m6) and start P2.
 | I-2 | M4 did not add its ports to repository barrel / pg repositories index | Act Now — closed |
 | I-3 | Cross-lane FKs unclosed (25 incl. M4→M3, M3→M4, M5→M4, *→M5) | Act Now — closed by 0087 |
 | I-4 | M3 non-additive `ReservationAllocation.reservationId` broke M0 contract suite | Act Now — closed (A-8) |
-| I-5 | Scope generations advanced only by 2 M2 commands; M3/M4/M5 advance none → phantom invalidation impossible | Act Now in P2 (0090 trigger propagation, drafted) |
+| I-5 | Scope generations advanced only by 2 M2 commands; M3/M4/M5 advance none → phantom invalidation impossible | Act Now — closed by 0090 (proven in m6WorldSnapshot) |
+| I-7 | Objective targets / success_predicate_kind have no M5 command (fixtures seed rows) | Park for Later — M7 planning needs objective commands; recorded in M6.md |
+| I-8 | Jurisdiction has no ISO code; entry predicates carry issuing-state codes as rule parameters | Ignore / Accept Risk — parameters are sourced rule content, not engine constants |
 | I-6 | Legacy integration.r1 determinism test fails (wall clock) — also at base | Park for Later (A-10) |
 
 ## Evidence references
 
 - Lane evidence: `docs/refactor/evidence/M3.md`, `M4.md`, `M5.md`
-- Logs (scratch, not committed): `pg_m3m4.log` 138/139, `pg_m5.log` 156/156, `pg_ckptA.tap` pending
+- Logs (scratch, not committed): `pg_m3m4.log` 138/139, `pg_m5.log` 156/156, `pg_ckptA.tap` 345/345, `pg_ckptB.log` 350/350
 - Integration evidence: `docs/refactor/evidence/M2_M5_INTEGRATION.md`

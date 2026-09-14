@@ -104,7 +104,7 @@ async function committedSeed(pool: Pool, build: (seed: SeedSession) => Promise<v
 }
 
 describe('M2-M5 integration: migration chain from an empty database', () => {
-  test('0001-0087 apply in exact lane order; unused allocations stay unused', async () => {
+  test('0001-0087 domain lanes plus M6 apply in exact lane order; unused allocations stay unused', async () => {
     const db = await createEphemeralDatabase();
     try {
       const applied = await runMigrations(db.pool, MIGRATIONS_DIR);

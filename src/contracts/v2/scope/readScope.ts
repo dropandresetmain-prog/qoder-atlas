@@ -35,8 +35,23 @@ export const MissingCoverageSchema = z.strictObject({
 });
 export type MissingCoverage = z.infer<typeof MissingCoverageSchema>;
 
+/**
+ * M6 additive (CONTRACTS.md §7): identity of the consistent read that produced
+ * a manifest. Optional so C0-shaped manifests stay valid.
+ */
+export const SnapshotCaptureSchema = z.strictObject({
+  isolation: z.literal('REPEATABLE_READ'),
+  readOnly: z.literal(true),
+  /** Database snapshot identifier of the read transaction (PostgreSQL `pg_current_snapshot()`). */
+  databaseSnapshot: z.string().min(1),
+  capturedAt: InstantSchema,
+  modelVersion: z.string().min(1),
+});
+export type SnapshotCapture = z.infer<typeof SnapshotCaptureSchema>;
+
 export const WorldSnapshotManifestSchema = z.strictObject({
   evaluatedAt: InstantSchema,
+  capture: SnapshotCaptureSchema.optional(),
   evaluatorVersions: z.array(z.strictObject({ evaluatorId: z.string().min(1), version: z.string().min(1) })).default([]),
   aggregateReads: z.array(RootRevisionSchema).default([]),
   scopeReads: z.array(ScopeGenerationRefSchema).default([]),

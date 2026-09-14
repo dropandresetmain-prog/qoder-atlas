@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { SubjectIdSchema, TypedRefSchema } from '../../../domain/v2/shared/identity.ts';
 import { InstantSchema } from '../../../domain/v2/shared/time.ts';
 import { WorldSnapshotManifestSchema } from '../scope/readScope.ts';
+import { CausalExplanationSchema } from './explanation.ts';
 
 export const AssessmentVerdictSchema = z.enum(['PASS', 'FAIL', 'UNKNOWN']);
 export type AssessmentVerdict = z.infer<typeof AssessmentVerdictSchema>;
@@ -33,7 +34,21 @@ export type AssessmentSubject = z.infer<typeof AssessmentSubjectSchema>;
 export const AssessmentDimensionSchema = z.strictObject({
   dimension: z.string().min(1),
   verdict: AssessmentVerdictSchema,
+  /** Human-readable only. Consumers must use `explanations`, never parse these strings. */
   reasons: z.array(z.string()).default([]),
+  /**
+   * M6 additive (CONTRACTS.md §7): typed, machine-queryable causes, paths,
+   * evidence and uncertainty behind this verdict (./explanation.ts).
+   */
+  explanations: z.array(CausalExplanationSchema).default([]),
+  /** M6 additive: false when the dimension does not apply to the subject; never counted as PASS. */
+  applicable: z.boolean().default(true),
+  /**
+   * M6 additive: whether this dimension may block the overall verdict. An
+   * authorised objective loss makes that objective non-blocking; legal,
+   * support and other mandatory constraint dimensions stay blocking.
+   */
+  blocking: z.boolean().default(true),
 });
 export type AssessmentDimension = z.infer<typeof AssessmentDimensionSchema>;
 

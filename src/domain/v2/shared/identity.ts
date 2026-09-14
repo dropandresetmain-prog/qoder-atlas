@@ -124,6 +124,11 @@ export const ScopeKindSchema = z.enum([
   'ORGANISATION_GRANTS',
   'GEOGRAPHY',
   'INFORMATION_TOPIC',
+  // M6 additive (0090 scope-generation propagation; CONTRACTS.md §7).
+  'TRAVELLER',
+  'RESOURCE',
+  'RULE_SET',
+  'SUBJECT_DEPENDENCIES',
 ]);
 export type ScopeKind = z.infer<typeof ScopeKindSchema>;
 

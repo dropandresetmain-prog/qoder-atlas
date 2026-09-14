@@ -38,17 +38,25 @@ export class PgScopeGenerationLedger implements ScopeGenerationLedger {
 
   async advance(ref: ScopeRef): Promise<number> {
     const client = currentTransactionClient();
+    // At most one advance per scope per transaction (0090): the M6 propagation
+    // triggers and this explicit call compose instead of double-counting.
     const result = await client.query<{ generation: string }>(
-      `INSERT INTO scope_generations (workspace_id, scope_kind, scope_id, generation, updated_at)
-       VALUES ($1, $2, $3, 1, now())
+      `INSERT INTO scope_generations (workspace_id, scope_kind, scope_id, generation, updated_at, last_advanced_xact)
+       VALUES ($1, $2, $3, 1, now(), pg_current_xact_id())
        ON CONFLICT (workspace_id, scope_kind, scope_id)
-       DO UPDATE SET generation = scope_generations.generation + 1, updated_at = now()
+       DO UPDATE SET generation = scope_generations.generation + 1, updated_at = now(), last_advanced_xact = pg_current_xact_id()
+        WHERE scope_generations.last_advanced_xact IS DISTINCT FROM pg_current_xact_id()
        RETURNING generation`,
       [this.workspaceId, ref.scopeKind, ref.scopeId],
     );
     const row = result.rows[0];
-    if (!row) throw new Error('scope_generations upsert returned no row');
-    return Number(row.generation);
+    if (row) return Number(row.generation);
+    const current = await client.query<{ generation: string }>(
+      'SELECT generation FROM scope_generations WHERE workspace_id = $1 AND scope_kind = $2 AND scope_id = $3',
+      [this.workspaceId, ref.scopeKind, ref.scopeId],
+    );
+    if (!current.rows[0]) throw new Error('scope_generations upsert returned no row');
+    return Number(current.rows[0].generation);
   }
 }
 
