@@ -29,6 +29,7 @@ import {
   type DomainCommandEnvelope,
 } from '../../../contracts/v2/command/domainCommand.ts';
 import type { UnitOfWork } from '../../../contracts/v2/command/unitOfWork.ts';
+import type { TravelHistoryRecord } from '../../../contracts/v2/repository/people.ts';
 import type { ExpectedRevision, SubjectKind, TypedRef } from '../../../domain/v2/shared/identity.ts';
 import { ProtectedDataRefSchema, TypedRefSchema } from '../../../domain/v2/shared/identity.ts';
 import { compareInstants, DateIntervalSchema, InstantSchema, LocalDateSchema } from '../../../domain/v2/shared/time.ts';
@@ -45,7 +46,7 @@ import {
   type AdvancedRoot,
 } from '../commandSupport.ts';
 import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
-import { PgTravellerRepository, type TravelHistoryRecord } from '../repositories/pgTravellerRepository.ts';
+import { PgTravellerRepository } from '../repositories/pgTravellerRepository.ts';
 import { PgGovernanceRepository } from '../repositories/pgGovernanceRepository.ts';
 
 const SCHEMA_VERSION = '1';
@@ -1146,8 +1147,8 @@ const CreateOrganisationPayloadSchema = z.strictObject({
   organisationId: Uuid.optional(),
   legalName: z.string().min(1),
   displayName: z.string().min(1).optional(),
-  /** NOT NULL in 0011; a currency is a business fact, so the caller must state it. */
-  defaultCurrencyCode: z.string().length(3),
+  /** 0011: NOT NULL `char(3) CHECK ~ '^[A-Z]{3}$'` — a currency is a stated business fact. */
+  defaultCurrencyCode: z.string().regex(/^[A-Z]{3}$/, 'must be an exact uppercase ISO 4217 code'),
   lifecycleStatus: z.enum(['ACTIVE', 'SUSPENDED', 'ARCHIVED']).optional(),
 });
 
@@ -1221,16 +1222,18 @@ export async function createOrganisation(
 
 const CreatePrincipalPayloadSchema = z.strictObject({
   principalId: Uuid.optional(),
-  displayName: z.string().min(1),
   actorType: z.enum(['HUMAN', 'SERVICE', 'SYSTEM']),
-  /** NOT NULL and part of the unique auth identity in 0011. */
+  /**
+   * Both NOT NULL in 0011 and jointly the unique auth identity within the
+   * workspace. A principal carries no display label there: 0011 has no such
+   * column, so the command must not accept one it cannot persist.
+   */
   authIssuer: z.string().min(1),
   authSubject: z.string().min(1),
 });
 
 export interface CreatePrincipalParams extends PeopleCommandContext {
   principalId?: string;
-  displayName: string;
   actorType: 'HUMAN' | 'SERVICE' | 'SYSTEM';
   authIssuer: string;
   authSubject: string;
@@ -1247,7 +1250,6 @@ export async function createPrincipal(
 ): Promise<ExecuteOutcome<PrincipalCreatedResult>> {
   const parsed = CreatePrincipalPayloadSchema.safeParse({
     principalId: params.principalId,
-    displayName: params.displayName,
     actorType: params.actorType,
     authIssuer: params.authIssuer,
     authSubject: params.authSubject,
@@ -1280,7 +1282,6 @@ export async function createPrincipal(
       await governance.createPrincipal({
         principal: {
           id: principalId,
-          displayName: parsed.data.displayName,
           actorType: parsed.data.actorType,
           authIssuer: parsed.data.authIssuer,
           authSubject: parsed.data.authSubject,
@@ -1404,7 +1405,11 @@ const IssueAuthorityGrantPayloadSchema = z.strictObject({
   actions: z.array(z.string().min(1)).min(1),
   scopes: z.array(RegistryTypedRefSchema).min(1),
   limits: z.record(z.string(), z.unknown()).optional(),
-  /** The receipt of the command that authorised this grant (GAP(G-P16): no column stores it). */
+  /**
+   * The receipt of the command that authorised this grant. 0019 stores both
+   * halves and FKs them, deferrably, to `command_receipts`, so a grant can never
+   * cite an assertion the idempotency ledger does not hold.
+   */
   authorisingReceipt: z.strictObject({ commandNamespace: z.string().min(1), idempotencyKey: z.string().min(1) }),
 });
 
@@ -1475,10 +1480,28 @@ export async function issueAuthorityGrant(
     expectedAggregateRevisions: params.expectedAggregateRevisions,
     representedPartyId: parsed.data.representedPartyRef.id,
     ...(parsed.data.evidenceId === undefined ? {} : { evidenceRefs: [parsed.data.evidenceId] }),
-    body: async () => {
+    body: async ({ envelope }) => {
       const governance = new PgGovernanceRepository(params.workspaceId);
       if (parsed.data.expiresAt !== undefined && Date.parse(parsed.data.expiresAt) <= Date.parse(issuedAt)) {
         return validationConflict('an authority grant must expire strictly after it was issued', [grantRef]);
+      }
+      const receipt = parsed.data.authorisingReceipt;
+      // Self-citation is the ordinary case: `PgUnitOfWork` inserts this command's
+      // own receipt after the body returns, so 0019's deferrable FK resolves at
+      // COMMIT and the row is not yet visible to a read here. Anything else must
+      // already be a committed receipt in this workspace, because a citation the
+      // ledger never learns about aborts the transaction at COMMIT with a raw
+      // 23503 that `execute` rethrows rather than reporting as a conflict.
+      const citesThisCommand =
+        receipt.commandNamespace === envelope.commandType && receipt.idempotencyKey === envelope.idempotencyKey;
+      if (
+        !citesThisCommand &&
+        !(await governance.receiptIsCommitted(params.workspaceId, receipt.commandNamespace, receipt.idempotencyKey))
+      ) {
+        return validationConflict(
+          `no committed command receipt (${receipt.commandNamespace}, ${receipt.idempotencyKey}) in this workspace authorises the grant`,
+          [grantRef],
+        );
       }
       for (const principalId of [parsed.data.principalId, parsed.data.issuedByPrincipalId]) {
         const principal = await governance.loadPrincipal(params.workspaceId, principalId);

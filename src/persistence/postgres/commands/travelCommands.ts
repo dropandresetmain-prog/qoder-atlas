@@ -209,8 +209,61 @@ async function guarded<T>(refs: TypedRef[], body: () => Promise<ExecuteOutcome<T
   }
 }
 
+/**
+ * The payload gate every handler below uses: a rejected submission is a typed
+ * `VALIDATION_FAILED` returned *before* `uow.execute`, so no advisory lock, head
+ * claim or receipt is ever started for a payload the contract refuses. Same
+ * message shape the people lane returns.
+ */
+function rejectedPayload(commandType: string, error: z.ZodError): ExecuteOutcome<never> {
+  return {
+    ok: false,
+    conflict: typedConflict('VALIDATION_FAILED', `${commandType} payload rejected: ${error.message}`),
+  };
+}
+
+/**
+ * The other half of the same rule: the ids a caller supplies are payload too.
+ * An addressed ref is checked by `buildEnvelope`, whose schema parse *throws*
+ * outside `guarded`, and a pinned new-row id used to be checked only by the
+ * domain parse inside the callback. Both would reach the caller as a raw
+ * `ZodError` — one that had already opened a transaction in the second case.
+ */
+function refusedSubjectRefs(commandType: string, refs: TypedRef[]): ExecuteOutcome<never> | undefined {
+  const malformed = refs.filter((ref) => !SubjectIdSchema.safeParse(ref.id).success);
+  if (malformed.length === 0) return undefined;
+  return {
+    ok: false,
+    conflict: typedConflict(
+      'VALIDATION_FAILED',
+      `${commandType} payload rejected: ${malformed.map((r) => `${r.kind}:${JSON.stringify(r.id)}`).join(', ')} ${
+        malformed.length === 1 ? 'is' : 'are'
+      } not a valid subject id`,
+      malformed,
+    ),
+  };
+}
+
 function refOf(kind: SubjectKind, id: string): TypedRef {
   return { kind, id };
+}
+
+/**
+ * The same rule for a submitted id that is not a typed reference — a pinned row
+ * identity the caller chose, which no payload schema carries.
+ */
+function refusedSubjectIds(commandType: string, ids: readonly string[]): ExecuteOutcome<never> | undefined {
+  const malformed = ids.filter((id) => !SubjectIdSchema.safeParse(id).success);
+  if (malformed.length === 0) return undefined;
+  return {
+    ok: false,
+    conflict: typedConflict(
+      'VALIDATION_FAILED',
+      `${commandType} payload rejected: ${malformed.map((id) => JSON.stringify(id)).join(', ')} ${
+        malformed.length === 1 ? 'is' : 'are'
+      } not a valid subject id`,
+    ),
+  };
 }
 
 /**
@@ -314,7 +367,7 @@ export async function createTrip(
   uow: UnitOfWork,
   params: CreateTripParams,
 ): Promise<ExecuteOutcome<TripCommandValue>> {
-  const payload = CreateTripPayloadSchema.parse({
+  const parsed = CreateTripPayloadSchema.safeParse({
     purpose: params.purpose,
     ...(params.intendedWindow ? { intendedWindow: params.intendedWindow } : {}),
     ...(params.businessContextOrganisationId
@@ -322,8 +375,14 @@ export async function createTrip(
       : {}),
     ...(params.lifecycleStatus ? { lifecycleStatus: params.lifecycleStatus } : {}),
   });
+  if (!parsed.success) return rejectedPayload('TRIP_CREATED', parsed.error);
+  const payload = parsed.data;
+  // The client-pinned identity is deliberately outside the hashed payload: it
+  // names the row rather than describing the mutation.
   const tripId = params.tripId ?? randomUUID();
   const tripRef = refOf('TRIP', tripId);
+  const refused = refusedSubjectRefs('TRIP_CREATED', [tripRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'TRIP_CREATED',
@@ -381,14 +440,18 @@ export async function updateTripDetails(
   uow: UnitOfWork,
   params: UpdateTripDetailsParams,
 ): Promise<ExecuteOutcome<TripCommandValue>> {
-  const changes = TripDetailMutationSchema.parse({
+  const parsed = TripDetailMutationSchema.safeParse({
     ...(params.purpose === undefined ? {} : { purpose: params.purpose }),
     ...(params.intendedWindow ? { intendedWindow: params.intendedWindow } : {}),
     ...(params.businessContextOrganisationId === undefined
       ? {}
       : { businessContextOrganisationId: params.businessContextOrganisationId }),
   });
+  if (!parsed.success) return rejectedPayload('TRIP_DETAILS_UPDATED', parsed.error);
+  const changes = parsed.data;
   const tripRef = refOf('TRIP', params.tripId);
+  const refused = refusedSubjectRefs('TRIP_DETAILS_UPDATED', [tripRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'TRIP_DETAILS_UPDATED',
@@ -455,8 +518,12 @@ export async function setTripLifecycleStatus(
   uow: UnitOfWork,
   params: SetTripLifecycleStatusParams,
 ): Promise<ExecuteOutcome<TripCommandValue>> {
-  const payload = SetTripLifecyclePayloadSchema.parse({ lifecycleStatus: params.lifecycleStatus });
+  const parsed = SetTripLifecyclePayloadSchema.safeParse({ lifecycleStatus: params.lifecycleStatus });
+  if (!parsed.success) return rejectedPayload('TRIP_LIFECYCLE_STATUS_SET', parsed.error);
+  const payload = parsed.data;
   const tripRef = refOf('TRIP', params.tripId);
+  const refused = refusedSubjectRefs('TRIP_LIFECYCLE_STATUS_SET', [tripRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'TRIP_LIFECYCLE_STATUS_SET',
@@ -561,24 +628,26 @@ export async function createJourney(
   const journeyId = params.journeyId ?? randomUUID();
   // Identity and every derived value exist before the callback: a serializable
   // retry must reproduce this command byte for byte (C1 amendment c).
-  const items: JourneyItem[] = (params.items ?? []).map((seed) =>
-    JourneyItemSchema.parse({
-      ...seed,
-      journeyId,
-      id: seed.id ?? randomUUID(),
-      orderKey: seed.orderKey ?? (seed.id ?? journeyId),
-      flexible: seed.flexible ?? false,
-    }),
-  );
-  const intendedVisits: IntendedVisit[] = (params.intendedVisits ?? []).map((seed) =>
-    IntendedVisitSchema.parse({
-      ...seed,
-      journeyId,
-      id: seed.id ?? randomUUID(),
-      transitIntent: seed.transitIntent ?? false,
-    }),
-  );
-  const payload = CreateJourneyPayloadSchema.parse({
+  const itemSeeds = (params.items ?? []).map((seed) => ({
+    ...seed,
+    journeyId,
+    id: seed.id ?? randomUUID(),
+    orderKey: seed.orderKey ?? (seed.id ?? journeyId),
+    flexible: seed.flexible ?? false,
+  }));
+  const parsedItems = z.array(JourneyItemSchema).safeParse(itemSeeds);
+  if (!parsedItems.success) return rejectedPayload('JOURNEY_CREATED', parsedItems.error);
+  const items: JourneyItem[] = parsedItems.data;
+  const visitSeeds = (params.intendedVisits ?? []).map((seed) => ({
+    ...seed,
+    journeyId,
+    id: seed.id ?? randomUUID(),
+    transitIntent: seed.transitIntent ?? false,
+  }));
+  const parsedVisits = z.array(IntendedVisitSchema).safeParse(visitSeeds);
+  if (!parsedVisits.success) return rejectedPayload('JOURNEY_CREATED', parsedVisits.error);
+  const intendedVisits: IntendedVisit[] = parsedVisits.data;
+  const parsedPayload = CreateJourneyPayloadSchema.safeParse({
     tripId: params.tripId,
     travellerId: params.travellerId,
     ...(params.intendedWindow ? { intendedWindow: params.intendedWindow } : {}),
@@ -587,9 +656,13 @@ export async function createJourney(
     items,
     intendedVisits,
   });
+  if (!parsedPayload.success) return rejectedPayload('JOURNEY_CREATED', parsedPayload.error);
+  const payload = parsedPayload.data;
 
   const journeyRef = refOf('JOURNEY', journeyId);
   const tripRef = refOf('TRIP', params.tripId);
+  const refused = refusedSubjectRefs('JOURNEY_CREATED', [journeyRef, tripRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const expected: ExpectedRevision[] =
     params.expectedTripRevision === undefined
@@ -684,7 +757,9 @@ export async function setJourneyLifecycleStatus(
   uow: UnitOfWork,
   params: SetJourneyLifecycleStatusParams,
 ): Promise<ExecuteOutcome<JourneyCommandValue>> {
-  const payload = SetJourneyLifecyclePayloadSchema.parse({ lifecycleStatus: params.lifecycleStatus });
+  const parsed = SetJourneyLifecyclePayloadSchema.safeParse({ lifecycleStatus: params.lifecycleStatus });
+  if (!parsed.success) return rejectedPayload('JOURNEY_LIFECYCLE_STATUS_SET', parsed.error);
+  const payload = parsed.data;
   return mutateJourney(uow, {
     workspaceId: params.workspaceId,
     actorPrincipalId: params.actorPrincipalId,
@@ -714,14 +789,18 @@ async function mutateJourney(
     commandType: string;
   },
 ): Promise<ExecuteOutcome<JourneyCommandValue>> {
-  const changes = JourneyDetailMutationSchema.parse({
+  const parsed = JourneyDetailMutationSchema.safeParse({
     ...(params.intendedWindow ? { intendedWindow: params.intendedWindow } : {}),
     ...(params.responsibilityOrganisationId === undefined
       ? {}
       : { responsibilityOrganisationId: params.responsibilityOrganisationId }),
     ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
   });
+  if (!parsed.success) return rejectedPayload(params.commandType, parsed.error);
+  const changes = parsed.data;
   const journeyRef = refOf('JOURNEY', params.journeyId);
+  const refused = refusedSubjectRefs(params.commandType, [journeyRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: params.commandType,
@@ -827,13 +906,15 @@ export async function addJourneyItem(
   params: AddJourneyItemParams,
 ): Promise<ExecuteOutcome<JourneyItemCommandValue>> {
   const journeyItemId = params.item.id ?? randomUUID();
-  const item = JourneyItemSchema.parse({
+  const parsedItem = JourneyItemSchema.safeParse({
     ...params.item,
     journeyId: params.journeyId,
     id: journeyItemId,
     orderKey: params.item.orderKey ?? journeyItemId,
     flexible: params.item.flexible ?? false,
   });
+  if (!parsedItem.success) return rejectedPayload('JOURNEY_ITEM_ADDED', parsedItem.error);
+  const item = parsedItem.data;
   const journeyRef = refOf('JOURNEY', params.journeyId);
   const itemRef = refOf('JOURNEY_ITEM', journeyItemId);
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
@@ -895,14 +976,18 @@ export async function updateJourneyItem(
   uow: UnitOfWork,
   params: UpdateJourneyItemParams,
 ): Promise<ExecuteOutcome<JourneyItemCommandValue>> {
-  const changes = JourneyItemMutationSchema.parse({
+  const parsed = JourneyItemMutationSchema.safeParse({
     ...(params.orderKey === undefined ? {} : { orderKey: params.orderKey }),
     ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
     ...(params.flexible === undefined ? {} : { flexible: params.flexible }),
     ...(params.intendedWindow ? { intendedWindow: params.intendedWindow } : {}),
   });
+  if (!parsed.success) return rejectedPayload('JOURNEY_ITEM_UPDATED', parsed.error);
+  const changes = parsed.data;
   const journeyRef = refOf('JOURNEY', params.journeyId);
   const itemRef = refOf('JOURNEY_ITEM', params.journeyItemId);
+  const refused = refusedSubjectRefs('JOURNEY_ITEM_UPDATED', [journeyRef, itemRef]);
+  if (refused) return refused;
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
     commandType: 'JOURNEY_ITEM_UPDATED',
@@ -1003,12 +1088,14 @@ export async function addIntendedVisit(
   params: AddIntendedVisitParams,
 ): Promise<ExecuteOutcome<IntendedVisitCommandValue>> {
   const intendedVisitId = params.visit.id ?? randomUUID();
-  const visit = IntendedVisitSchema.parse({
+  const parsedVisit = IntendedVisitSchema.safeParse({
     ...params.visit,
     journeyId: params.journeyId,
     id: intendedVisitId,
     transitIntent: params.visit.transitIntent ?? false,
   });
+  if (!parsedVisit.success) return rejectedPayload('INTENDED_VISIT_ADDED', parsedVisit.error);
+  const visit = parsedVisit.data;
   const journeyRef = refOf('JOURNEY', params.journeyId);
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
@@ -1087,13 +1174,17 @@ export async function selectCredential(
   uow: UnitOfWork,
   params: SelectCredentialParams,
 ): Promise<ExecuteOutcome<CredentialSelectionCommandValue>> {
-  const payload = SelectCredentialPayloadSchema.parse({
+  const parsed = SelectCredentialPayloadSchema.safeParse({
     journeyId: params.journeyId,
     credentialId: params.credentialId,
     ...(params.credentialVersionId ? { credentialVersionId: params.credentialVersionId } : {}),
     scopeIntendedVisitIds: params.scopeIntendedVisitIds,
   });
+  if (!parsed.success) return rejectedPayload('CREDENTIAL_SELECTED', parsed.error);
+  const payload = parsed.data;
   const freshSelectionId = params.selectionId ?? randomUUID();
+  const refused = refusedSubjectIds('CREDENTIAL_SELECTED', [freshSelectionId]);
+  if (refused) return refused;
   const journeyRef = refOf('JOURNEY', payload.journeyId);
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({
@@ -1230,10 +1321,12 @@ export async function removeCredentialSelection(
   uow: UnitOfWork,
   params: RemoveCredentialSelectionParams,
 ): Promise<ExecuteOutcome<CredentialSelectionCommandValue>> {
-  const payload = RemoveCredentialPayloadSchema.parse({
+  const parsed = RemoveCredentialPayloadSchema.safeParse({
     journeyId: params.journeyId,
     credentialId: params.credentialId,
   });
+  if (!parsed.success) return rejectedPayload('CREDENTIAL_SELECTION_REMOVED', parsed.error);
+  const payload = parsed.data;
   const journeyRef = refOf('JOURNEY', payload.journeyId);
   const actor: ActorContext = { workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId };
   const envelope = buildEnvelope({

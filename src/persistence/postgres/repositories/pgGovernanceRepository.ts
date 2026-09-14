@@ -24,6 +24,7 @@ import type {
   GovernanceRepository,
   NewOrganisation,
   NewPrincipal,
+  OrganisationMembershipRecord,
 } from '../../../contracts/v2/repository/people.ts';
 
 interface OrganisationRow {
@@ -145,15 +146,6 @@ export class PgGovernanceRepository implements GovernanceRepository {
   async createOrganisation(params: NewOrganisation): Promise<void> {
     const client = currentTransactionClient();
     const { organisation, actor } = params;
-    if (organisation.defaultCurrencyCode === undefined) {
-      // GAP(G-P12): `organisations.default_currency_code` is NOT NULL with an
-      // exact-code CHECK while `NewOrganisation` types it optional. No currency
-      // may be invented here — a currency is a business fact, so the command
-      // payload requires it and the repository refuses without one.
-      throw new Error(
-        'architecture gap G-P12: organisations.default_currency_code is NOT NULL but NewOrganisation makes it optional',
-      );
-    }
     await client.query(
       `INSERT INTO organisations
          (workspace_id, id, legal_name, display_name, default_currency_code, lifecycle_status, created_by_actor_id)
@@ -194,23 +186,6 @@ export class PgGovernanceRepository implements GovernanceRepository {
   async createPrincipal(params: NewPrincipal): Promise<void> {
     const client = currentTransactionClient();
     const { principal, actor } = params;
-    if (principal.authIssuer === undefined || principal.authSubject === undefined) {
-      // GAP(G-P13): `principals.auth_issuer`/`auth_subject` are NOT NULL (and
-      // form the unique auth identity) while `NewPrincipal` types both optional.
-      throw new Error(
-        'architecture gap G-P13: principals requires an auth issuer+subject pair that NewPrincipal makes optional',
-      );
-    }
-    if (params.organisationMemberships !== undefined && params.organisationMemberships.length > 0) {
-      // GAP(G-P14): `organisation_memberships.evidence_id` is NOT NULL but the
-      // frozen membership input carries no evidence reference, and a membership
-      // is an organisation-owned association rather than a principal child, so
-      // neither of its owners is this command. Refusing is safer than inventing
-      // provenance.
-      throw new Error(
-        'architecture gap G-P14: NewPrincipal.organisationMemberships cannot supply organisation_memberships.evidence_id',
-      );
-    }
     await client.query(
       `INSERT INTO principals (workspace_id, id, auth_issuer, auth_subject, actor_type, created_by_actor_id)
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -223,10 +198,6 @@ export class PgGovernanceRepository implements GovernanceRepository {
         actor.actorPrincipalId,
       ],
     );
-    // GAP(G-P15): `principals` has no display-name column, so
-    // `NewPrincipal.principal.displayName` has nowhere to be persisted and
-    // `loadPrincipal` cannot return a stored value. No other M2 table owns a
-    // principal label, and `domain_subjects` is payload-free by §1.
   }
 
   async loadPrincipal(workspaceId: string, principalId: string): Promise<NewPrincipal['principal'] | undefined> {
@@ -239,13 +210,41 @@ export class PgGovernanceRepository implements GovernanceRepository {
     if (!row) return undefined;
     return {
       id: row.id,
-      // GAP(G-P15): empty because the schema stores no principal display name;
-      // returning a fabricated label would be false certainty.
-      displayName: '',
       actorType: row.actor_type,
       authIssuer: row.auth_issuer,
       authSubject: row.auth_subject,
     };
+  }
+
+  /**
+   * Only the membership row is written here. The role vocabulary, the
+   * `valid_until > valid_from` rule and 0011's `EXCLUDE USING gist`
+   * no-overlapping-role rule are the database's, so this method neither
+   * re-implements them nor reads them back to decide.
+   */
+  async recordMembership(params: {
+    membership: OrganisationMembershipRecord;
+    actor: ActorContext;
+  }): Promise<void> {
+    const client = currentTransactionClient();
+    const { membership, actor } = params;
+    await client.query(
+      `INSERT INTO organisation_memberships
+         (workspace_id, id, organisation_id, principal_id, role,
+          valid_from, valid_until, evidence_id, created_by_actor_id)
+       VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9)`,
+      [
+        this.workspaceId,
+        membership.id,
+        membership.organisationId,
+        membership.principalId,
+        membership.role,
+        membership.validRange.start,
+        membership.validRange.end ?? null,
+        membership.evidenceId,
+        actor.actorPrincipalId,
+      ],
+    );
   }
 
   /** Writes only the assignment row; 0018's COMMIT-time assertions own the role/kind whitelist and the registry TypedRef check. */
@@ -296,17 +295,44 @@ export class PgGovernanceRepository implements GovernanceRepository {
   }
 
   /**
+   * Identity-only receipt read, beyond the frozen port, so the issuing command
+   * can refuse a citation to a receipt that will never exist. The FK is
+   * deferrable, so an unbacked citation would otherwise abort the transaction at
+   * COMMIT — after the handler has already returned — and
+   * `PgUnitOfWork.execute` rethrows a non-retryable serialization error raw
+   * rather than turning it into a typed conflict.
+   *
+   * A receipt inserted by the *current* transaction is invisible to this read
+   * until COMMIT, which is exactly the self-citing case the deferrable FK
+   * allows; callers therefore treat `false` as "not a committed receipt" and
+   * decide whether that is acceptable.
+   */
+  async receiptIsCommitted(
+    workspaceId: string,
+    commandNamespace: string,
+    idempotencyKey: string,
+  ): Promise<boolean> {
+    const client = currentTransactionClient();
+    const result = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM command_receipts
+          WHERE workspace_id = $1 AND command_namespace = $2 AND idempotency_key = $3
+       ) AS exists`,
+      [workspaceId, commandNamespace, idempotencyKey],
+    );
+    return result.rows[0]?.exists === true;
+  }
+
+  /**
    * Inserts the grant and both child sets in one transaction; 0019's deferred
    * `authority_grants_children_assert` is what proves the min(1) action and
    * scope rules, and the discriminating FK on `grant_scopes`/represented party
    * is what proves a TypedRef's kind.
    *
-   * GAP(G-P16): the port's `receipt` ("receipt identity that authorised the
-   * grant; persisted as a deferred FK") has no column in `authority_grants` —
-   * unlike 0025's `credential_selections`, which does keep a
-   * `(command_namespace, idempotency_key)` FK into `command_receipts`. Nothing
-   * here pretends the link is durable; the issuing command echoes it into its
-   * outbox payload and the authorising receipt stays unpersisted.
+   * The authorising receipt is persisted as `(command_namespace,
+   * idempotency_key)` within this workspace and 0019 checks it against
+   * `command_receipts` — deferred, because `PgUnitOfWork` inserts the receipt
+   * row only after this handler body has run.
    */
   async issueAuthorityGrant(params: {
     grant: AuthorityGrant;
@@ -314,12 +340,13 @@ export class PgGovernanceRepository implements GovernanceRepository {
     actor: ActorContext;
   }): Promise<void> {
     const client = currentTransactionClient();
-    const { grant } = params;
+    const { grant, receipt } = params;
     await client.query(
       `INSERT INTO authority_grants
          (workspace_id, id, principal_id, represented_party_kind, represented_party_id,
-          issued_by_principal_id, issued_at, expires_at, revoked_at, evidence_id, limits, created_by_actor_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz, $9::timestamptz, $10, $11::jsonb, $12)`,
+          issued_by_principal_id, authorising_command_namespace, authorising_idempotency_key,
+          issued_at, expires_at, revoked_at, evidence_id, limits, created_by_actor_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11::timestamptz, $12, $13::jsonb, $14)`,
       [
         this.workspaceId,
         grant.id,
@@ -327,6 +354,8 @@ export class PgGovernanceRepository implements GovernanceRepository {
         grant.representedPartyRef.kind,
         grant.representedPartyRef.id,
         grant.issuedByPrincipalId,
+        receipt.commandNamespace,
+        receipt.idempotencyKey,
         grant.issuedAt,
         grant.expiresAt ?? null,
         grant.revokedAt ?? null,

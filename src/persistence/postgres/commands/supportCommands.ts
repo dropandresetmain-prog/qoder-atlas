@@ -234,6 +234,44 @@ function validationConflict(message: string, subjectRefs: TypedRef[] = []): Type
 }
 
 /**
+ * A rejected submission is an outcome, never a stack trace. Support handlers
+ * normalise caller instants *before* they parse the payload, so two raw failure
+ * modes sit in front of `uow.execute`: a schema rejection and
+ * `new Date('not-an-instant').toISOString()` raising `RangeError`. Both mean "the
+ * contract refused this submission", so both come back as the typed
+ * `VALIDATION_FAILED` the people lane returns, with no transaction started.
+ */
+function submitted<T>(commandType: string, build: () => T): { ok: true; value: T } | { ok: false; conflict: TypedConflict } {
+  try {
+    return { ok: true, value: build() };
+  } catch (error) {
+    if (error instanceof z.ZodError || error instanceof RangeError) {
+      return { ok: false, conflict: validationConflict(`${commandType} payload rejected: ${error.message}`) };
+    }
+    throw error;
+  }
+}
+
+/**
+ * The ids a caller addresses or pins are part of its submission too. They are
+ * checked by `buildEnvelope`'s schema parse, which only *throws*, and a pinned
+ * row id is not in the payload at all — so both used to escape the handler.
+ */
+function refusedSubmission(commandType: string, refs: TypedRef[]): ExecuteOutcome<never> | undefined {
+  const malformed = refs.filter((ref) => !SubjectIdSchema.safeParse(ref.id).success);
+  if (malformed.length === 0) return undefined;
+  return {
+    ok: false,
+    conflict: validationConflict(
+      `${commandType} payload rejected: ${malformed.map((ref) => `${ref.kind}:${JSON.stringify(ref.id)}`).join(', ')} ${
+        malformed.length === 1 ? 'is' : 'are'
+      } not a valid subject id`,
+      malformed,
+    ),
+  };
+}
+
+/**
  * The typed rejection for "this fulfilment does not meet the edition it pins".
  * The reasons are the domain's own words — this handler adds none — so the
  * caller sees exactly which coverage/min-count/eligibility/handoff rule failed.
@@ -268,13 +306,19 @@ export async function createCoordinationGroup(
   uow: UnitOfWork,
   params: CreateCoordinationGroupParams,
 ): Promise<ExecuteOutcome<CoordinationGroupCommandResult>> {
-  const payload = CreateCoordinationGroupPayloadSchema.parse({
-    name: params.name,
-    ...(params.purpose === undefined ? {} : { purpose: params.purpose }),
-    ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
-    ...(params.effectiveRange === undefined ? {} : { effectiveRange: utcWindow(params.effectiveRange) }),
-  });
+  const parsed = submitted('COORDINATION_GROUP_CREATED', () =>
+    CreateCoordinationGroupPayloadSchema.parse({
+      name: params.name,
+      ...(params.purpose === undefined ? {} : { purpose: params.purpose }),
+      ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
+      ...(params.effectiveRange === undefined ? {} : { effectiveRange: utcWindow(params.effectiveRange) }),
+    }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const groupId = params.groupId ?? randomUUID();
+  const refused = refusedSubmission('COORDINATION_GROUP_CREATED', [groupRef(groupId)]);
+  if (refused) return refused;
   const group: CoordinationGroup = {
     id: groupId,
     workspaceId: params.workspaceId,
@@ -330,16 +374,22 @@ export async function updateCoordinationGroup(
   uow: UnitOfWork,
   params: UpdateCoordinationGroupParams,
 ): Promise<ExecuteOutcome<CoordinationGroupCommandResult>> {
-  const payload = UpdateCoordinationGroupPayloadSchema.parse({
-    ...(params.name === undefined ? {} : { name: params.name }),
-    ...(params.purpose === undefined ? {} : { purpose: params.purpose }),
-    ...(params.effectiveRange === undefined ? {} : { effectiveRange: utcWindow(params.effectiveRange) }),
-    ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
-  });
+  const parsed = submitted('COORDINATION_GROUP_UPDATED', () =>
+    UpdateCoordinationGroupPayloadSchema.parse({
+      ...(params.name === undefined ? {} : { name: params.name }),
+      ...(params.purpose === undefined ? {} : { purpose: params.purpose }),
+      ...(params.effectiveRange === undefined ? {} : { effectiveRange: utcWindow(params.effectiveRange) }),
+      ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
+    }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   if (Object.keys(payload).length === 0) {
     return { ok: false, conflict: validationConflict('COORDINATION_GROUP_UPDATED carries no change') };
   }
   const ref = groupRef(params.groupId);
+  const refused = refusedSubmission('COORDINATION_GROUP_UPDATED', [ref]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'COORDINATION_GROUP_UPDATED',
@@ -412,10 +462,19 @@ export async function addJourneyToGroup(
   uow: UnitOfWork,
   params: AddJourneyToGroupParams,
 ): Promise<ExecuteOutcome<GroupMembershipCommandResult>> {
-  const payload = GroupMembershipPayloadSchema.parse(
-    params.effectiveRange === undefined ? {} : { effectiveRange: utcWindow(params.effectiveRange) },
+  const parsed = submitted('COORDINATION_GROUP_JOURNEY_ADDED', () =>
+    GroupMembershipPayloadSchema.parse(
+      params.effectiveRange === undefined ? {} : { effectiveRange: utcWindow(params.effectiveRange) },
+    ),
   );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const ref = groupRef(params.groupId);
+  const refused = refusedSubmission('COORDINATION_GROUP_JOURNEY_ADDED', [
+    ref,
+    { kind: 'JOURNEY', id: params.journeyId },
+  ]);
+  if (refused) return refused;
   const membership: GroupMembership = {
     id: randomUUID(),
     coordinationGroupId: params.groupId,
@@ -492,8 +551,14 @@ export async function removeJourneyFromGroup(
   uow: UnitOfWork,
   params: RemoveJourneyFromGroupParams,
 ): Promise<ExecuteOutcome<GroupMembershipCommandResult>> {
-  const payload = z.strictObject({ journeyId: SubjectIdSchema }).parse({ journeyId: params.journeyId });
+  const parsed = submitted('COORDINATION_GROUP_JOURNEY_REMOVED', () =>
+    z.strictObject({ journeyId: SubjectIdSchema }).parse({ journeyId: params.journeyId }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const ref = groupRef(params.groupId);
+  const refused = refusedSubmission('COORDINATION_GROUP_JOURNEY_REMOVED', [ref]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'COORDINATION_GROUP_JOURNEY_REMOVED',
@@ -567,10 +632,16 @@ export async function shareJourneyItem(
   uow: UnitOfWork,
   params: ShareJourneyItemParams,
 ): Promise<ExecuteOutcome<SharedJourneyItemCommandResult>> {
-  const payload = z
-    .strictObject({ journeyId: SubjectIdSchema, journeyItemId: SubjectIdSchema })
-    .parse({ journeyId: params.journeyId, journeyItemId: params.journeyItemId });
+  const parsed = submitted('COORDINATION_GROUP_ITEM_SHARED', () =>
+    z
+      .strictObject({ journeyId: SubjectIdSchema, journeyItemId: SubjectIdSchema })
+      .parse({ journeyId: params.journeyId, journeyItemId: params.journeyItemId }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const ref = groupRef(params.groupId);
+  const refused = refusedSubmission('COORDINATION_GROUP_ITEM_SHARED', [ref]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'COORDINATION_GROUP_ITEM_SHARED',
@@ -660,15 +731,23 @@ export async function appendAccompanimentRequirement(
   uow: UnitOfWork,
   params: AppendAccompanimentRequirementParams,
 ): Promise<ExecuteOutcome<AccompanimentRequirementCommandResult>> {
-  const payload = AppendRequirementPayloadSchema.parse({
-    supportedTravellerId: params.supportedTravellerId,
-    requiredCoverage: utcWindow(params.requiredCoverage),
-    minimumSimultaneousSupporters: params.minimumSimultaneousSupporters,
-    eligibleSupporterTravellerIds: [...new Set(params.eligibleSupporterTravellerIds)],
-    ...(params.maximumHandoffGapMinutes === undefined ? {} : { maximumHandoffGapMinutes: params.maximumHandoffGapMinutes }),
-    ...(params.provenanceEvidenceId === undefined ? {} : { provenanceEvidenceId: params.provenanceEvidenceId }),
-  });
+  const parsed = submitted('ACCOMPANIMENT_REQUIREMENT_APPENDED', () =>
+    AppendRequirementPayloadSchema.parse({
+      supportedTravellerId: params.supportedTravellerId,
+      requiredCoverage: utcWindow(params.requiredCoverage),
+      minimumSimultaneousSupporters: params.minimumSimultaneousSupporters,
+      eligibleSupporterTravellerIds: [...new Set(params.eligibleSupporterTravellerIds)],
+      ...(params.maximumHandoffGapMinutes === undefined
+        ? {}
+        : { maximumHandoffGapMinutes: params.maximumHandoffGapMinutes }),
+      ...(params.provenanceEvidenceId === undefined ? {} : { provenanceEvidenceId: params.provenanceEvidenceId }),
+    }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const requirementId = params.requirementId ?? randomUUID();
+  const refused = refusedSubmission('ACCOMPANIMENT_REQUIREMENT_APPENDED', [requirementRef(requirementId)]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'ACCOMPANIMENT_REQUIREMENT_APPENDED',
@@ -729,31 +808,38 @@ export async function createSupportAssignment(
   uow: UnitOfWork,
   params: CreateSupportAssignmentParams,
 ): Promise<ExecuteOutcome<SupportAssignmentCommandResult>> {
-  const payload = CreateSupportAssignmentPayloadSchema.parse({
-    requirementId: params.requirementId,
-    requirementVersion: params.requirementVersion,
-    ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
-    assignedSupporterTravellerIds: [...new Set(params.assignedSupporterTravellerIds)],
-    assignedScopes: params.assignedScopes.map((scope) => ({
-      supporterTravellerId: scope.supporterTravellerId,
-      interval: utcWindow(scope.interval),
-    })),
-    ...(params.handoffs === undefined
-      ? {}
-      : { handoffs: params.handoffs.map((handoff) => ({ ...handoff, handoffAt: asUtc(handoff.handoffAt) })) }),
-  });
   const assignmentId = params.assignmentId ?? randomUUID();
-  const ref = assignmentRef(assignmentId);
-  const assignment: SupportAssignment = SupportAssignmentSchema.parse({
-    id: assignmentId,
-    revision: 1,
-    constraintDefinitionId: payload.requirementId,
-    constraintDefinitionVersion: payload.requirementVersion,
-    lifecycleStatus: payload.lifecycleStatus,
-    assignedSupporterTravellerIds: payload.assignedSupporterTravellerIds,
-    assignedScopes: payload.assignedScopes,
-    handoffs: payload.handoffs,
+  const parsed = submitted('SUPPORT_ASSIGNMENT_CREATED', () => {
+    const payload = CreateSupportAssignmentPayloadSchema.parse({
+      requirementId: params.requirementId,
+      requirementVersion: params.requirementVersion,
+      ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
+      assignedSupporterTravellerIds: [...new Set(params.assignedSupporterTravellerIds)],
+      assignedScopes: params.assignedScopes.map((scope) => ({
+        supporterTravellerId: scope.supporterTravellerId,
+        interval: utcWindow(scope.interval),
+      })),
+      ...(params.handoffs === undefined
+        ? {}
+        : { handoffs: params.handoffs.map((handoff) => ({ ...handoff, handoffAt: asUtc(handoff.handoffAt) })) }),
+    });
+    const assignment: SupportAssignment = SupportAssignmentSchema.parse({
+      id: assignmentId,
+      revision: 1,
+      constraintDefinitionId: payload.requirementId,
+      constraintDefinitionVersion: payload.requirementVersion,
+      lifecycleStatus: payload.lifecycleStatus,
+      assignedSupporterTravellerIds: payload.assignedSupporterTravellerIds,
+      assignedScopes: payload.assignedScopes,
+      handoffs: payload.handoffs,
+    });
+    return { payload, assignment };
   });
+  if (!parsed.ok) return parsed;
+  const { payload, assignment } = parsed.value;
+  const ref = assignmentRef(assignmentId);
+  const refused = refusedSubmission('SUPPORT_ASSIGNMENT_CREATED', [ref]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'SUPPORT_ASSIGNMENT_CREATED',
@@ -817,8 +903,14 @@ export async function setSupportAssignmentStatus(
   uow: UnitOfWork,
   params: SetSupportAssignmentStatusParams,
 ): Promise<ExecuteOutcome<SupportAssignmentCommandResult>> {
-  const payload = SetSupportAssignmentStatusPayloadSchema.parse({ lifecycleStatus: params.lifecycleStatus });
+  const parsed = submitted('SUPPORT_ASSIGNMENT_STATUS_CHANGED', () =>
+    SetSupportAssignmentStatusPayloadSchema.parse({ lifecycleStatus: params.lifecycleStatus }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const ref = assignmentRef(params.assignmentId);
+  const refused = refusedSubmission('SUPPORT_ASSIGNMENT_STATUS_CHANGED', [ref]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'SUPPORT_ASSIGNMENT_STATUS_CHANGED',
@@ -898,17 +990,23 @@ export async function replaceSupportAssignmentScope(
   uow: UnitOfWork,
   params: ReplaceSupportAssignmentScopeParams,
 ): Promise<ExecuteOutcome<SupportAssignmentCommandResult>> {
-  const payload = ReplaceAssignmentScopePayloadSchema.parse({
-    assignedSupporterTravellerIds: [...new Set(params.assignedSupporterTravellerIds)],
-    assignedScopes: params.assignedScopes.map((scope) => ({
-      supporterTravellerId: scope.supporterTravellerId,
-      interval: utcWindow(scope.interval),
-    })),
-    ...(params.handoffs === undefined
-      ? {}
-      : { handoffs: params.handoffs.map((handoff) => ({ ...handoff, handoffAt: asUtc(handoff.handoffAt) })) }),
-  });
+  const parsed = submitted('SUPPORT_ASSIGNMENT_SCOPE_REPLACED', () =>
+    ReplaceAssignmentScopePayloadSchema.parse({
+      assignedSupporterTravellerIds: [...new Set(params.assignedSupporterTravellerIds)],
+      assignedScopes: params.assignedScopes.map((scope) => ({
+        supporterTravellerId: scope.supporterTravellerId,
+        interval: utcWindow(scope.interval),
+      })),
+      ...(params.handoffs === undefined
+        ? {}
+        : { handoffs: params.handoffs.map((handoff) => ({ ...handoff, handoffAt: asUtc(handoff.handoffAt) })) }),
+    }),
+  );
+  if (!parsed.ok) return parsed;
+  const payload = parsed.value;
   const ref = assignmentRef(params.assignmentId);
+  const refused = refusedSubmission('SUPPORT_ASSIGNMENT_SCOPE_REPLACED', [ref]);
+  if (refused) return refused;
 
   const envelope = buildEnvelope({
     commandType: 'SUPPORT_ASSIGNMENT_SCOPE_REPLACED',

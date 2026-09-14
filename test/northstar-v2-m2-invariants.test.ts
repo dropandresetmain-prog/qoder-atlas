@@ -32,6 +32,11 @@ import {
   type RecordTravellerParams,
 } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import {
+  addJourneyToGroup,
+  createCoordinationGroup,
+} from '../src/persistence/postgres/commands/supportCommands.ts';
+import { createTrip, updateTripDetails } from '../src/persistence/postgres/commands/travelCommands.ts';
+import {
   CommandReceiptSchema,
   DomainCommandEnvelopeSchema,
   parseCommandResult,
@@ -103,9 +108,14 @@ const validGrant = () => ({
   principalId: randomUUID(),
   representedPartyRef: { kind: 'TRAVELLER' as const, id: travellerId },
   issuedByPrincipalId: context.actorPrincipalId,
-  actions: ['TRIP_READ'],
+  actions: ['traveller.profile.write'],
   scopes: [{ kind: 'WORKSPACE' as const, id: context.workspaceId }],
-  authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: randomUUID() },
+  // Self-citation: `PgUnitOfWork` inserts this command's own receipt after the
+  // handler body, and 0019's FK is deferrable, so only this shape commits.
+  authorisingReceipt: {
+    commandNamespace: 'AUTHORITY_GRANT_ISSUED',
+    idempotencyKey: context.idempotencyKey,
+  },
   expectedAggregateRevisions: [],
 });
 
@@ -395,4 +405,100 @@ test('M2 unit: the locked revision is read by aggregate identity, not by positio
   ];
   assert.equal(lockedRevisionOf(lockedHeads, travellerId), 3);
   assert.equal(lockedRevisionOf(lockedHeads, randomUUID()), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// 6. The travel and support lanes are fail-closed at the payload gate too
+// ---------------------------------------------------------------------------
+
+const intendedWindow = { start: '2026-10-01T00:00:00Z', end: '2026-10-05T00:00:00Z' };
+
+const validCreateTrip = () => ({
+  ...context,
+  purpose: 'Regional field study',
+  intendedWindow: { ...intendedWindow },
+});
+
+const validUpdateTrip = () => ({
+  ...context,
+  tripId: randomUUID(),
+  expectedRevision: 1,
+  purpose: 'Regional survey',
+});
+
+const validCreateGroup = () => ({
+  ...context,
+  name: 'Access support desk',
+  purpose: 'Escort handoff',
+  effectiveRange: { ...intendedWindow },
+});
+
+const validAddJourney = () => ({
+  ...context,
+  groupId: randomUUID(),
+  journeyId: randomUUID(),
+  expectedRevision: 1,
+  effectiveRange: { ...intendedWindow },
+});
+
+test('M2 unit: a well-formed travel or support command does reach the UnitOfWork', async () => {
+  const gate = refusal();
+  await gate.assertReachesExecute('createTrip', (uow) => createTrip(uow, validCreateTrip()));
+  await gate.assertReachesExecute('updateTripDetails', (uow) => updateTripDetails(uow, validUpdateTrip()));
+  await gate.assertReachesExecute('createCoordinationGroup', (uow) => createCoordinationGroup(uow, validCreateGroup()));
+  await gate.assertReachesExecute('addJourneyToGroup', (uow) => addJourneyToGroup(uow, validAddJourney()));
+});
+
+test('M2 unit: the travel lane refuses a bad submission with zero transaction work', async () => {
+  const gate = refusal();
+
+  await gate.assertRefused('empty trip purpose', (uow) => createTrip(uow, { ...validCreateTrip(), purpose: '' }));
+  await gate.assertRefused('lifecycle status outside the frozen four', (uow) =>
+    createTrip(uow, { ...validCreateTrip(), lifecycleStatus: 'SUSPENDED' as 'DRAFT' }),
+  );
+  await gate.assertRefused('inverted intended window', (uow) =>
+    createTrip(uow, { ...validCreateTrip(), intendedWindow: { start: intendedWindow.end, end: intendedWindow.start } }),
+  );
+
+  // A pinned identity for a new row is caller input like any other, but it is
+  // deliberately outside the hashed payload, so no payload schema covers it.
+  // `SubjectIdSchema` allows dashes and colons; whitespace and slashes do not
+  // belong to any subject id the frozen identity contract can carry.
+  await gate.assertRefused('pinned trip id is not a subject id', (uow) =>
+    createTrip(uow, { ...validCreateTrip(), tripId: 'trip legacy 7' }),
+  );
+  await gate.assertRefused('addressed trip id is not a subject id', (uow) =>
+    updateTripDetails(uow, { ...validUpdateTrip(), tripId: 'trip/legacy/7' }),
+  );
+});
+
+test('M2 unit: the support lane refuses a bad submission with zero transaction work', async () => {
+  const gate = refusal();
+
+  await gate.assertRefused('empty group name', (uow) => createCoordinationGroup(uow, { ...validCreateGroup(), name: '' }));
+  await gate.assertRefused('inverted effective range', (uow) =>
+    createCoordinationGroup(uow, {
+      ...validCreateGroup(),
+      effectiveRange: { start: intendedWindow.end, end: intendedWindow.start },
+    }),
+  );
+  await gate.assertRefused('pinned group id is not a subject id', (uow) =>
+    createCoordinationGroup(uow, { ...validCreateGroup(), groupId: 'group legacy 7' }),
+  );
+
+  const refused = await gate.assertRefused('addressed journey id is not a subject id', (uow) =>
+    addJourneyToGroup(uow, { ...validAddJourney(), journeyId: 'journey legacy 7' }),
+  );
+  assert.deepEqual(
+    refused.subjectRefs,
+    [{ kind: 'JOURNEY', id: 'journey legacy 7' }],
+    'the conflict must name only the ref the caller can correct',
+  );
+
+  // Support normalises caller instants before it parses the payload, so an
+  // unparseable one throws `RangeError` two statements in front of the schema.
+  // It is still "this submission is refused", not a crash inside a transaction.
+  await gate.assertRefused('unparseable instant reaches Date before zod', (uow) =>
+    addJourneyToGroup(uow, { ...validAddJourney(), effectiveRange: { start: 'tomorrow', end: intendedWindow.end } }),
+  );
 });

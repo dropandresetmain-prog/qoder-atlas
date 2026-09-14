@@ -59,6 +59,25 @@ export interface TravellerContactRecord {
   evidenceId: string;
 }
 
+/**
+ * Observed entry/exit movement — 0016's `travel_history` columns, typed rather
+ * than a JSON bag (C0 froze no zod schema for a movement). `recordedAt` is
+ * supplied by the command handler, computed outside the retryable callback, so a
+ * serializable retry records the same instant.
+ */
+export interface TravelHistoryRecord {
+  id: string;
+  travellerId: string;
+  /** Opaque until M4 owns `jurisdictions`; 0016 keeps the FK deferred. */
+  jurisdictionId: string;
+  entryDate?: LocalDate;
+  exitDate?: LocalDate;
+  coverageClaim: 'PARTIAL' | 'WINDOW_COMPLETE';
+  uncertaintyNote?: string;
+  evidenceId: string;
+  recordedAt: string;
+}
+
 export interface NewTraveller {
   traveller: Traveller;
   /** The row `traveller.displayNameRef` points at; both are written in one step. */
@@ -142,6 +161,7 @@ export interface TravellerRepository {
   listCredentials(workspaceId: string, travellerId: string): Promise<TravelCredential[]>;
   listCredentialVersions(workspaceId: string, credentialId: string): Promise<CredentialVersion[]>;
   linkCredentials(params: { link: CredentialLink; actor: ActorContext }): Promise<void>;
+  recordHistory(params: { history: TravelHistoryRecord; actor: ActorContext }): Promise<void>;
 }
 
 export interface NewOrganisation {
@@ -149,7 +169,8 @@ export interface NewOrganisation {
     id: string;
     legalName: string;
     displayName?: string;
-    defaultCurrencyCode?: string;
+    /** 0011: NOT NULL `char(3)` — a currency is a stated business fact, never a default. */
+    defaultCurrencyCode: string;
     lifecycleStatus: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
   };
   actor: ActorContext;
@@ -158,17 +179,27 @@ export interface NewOrganisation {
 export interface NewPrincipal {
   principal: {
     id: string;
-    displayName: string;
     actorType: 'HUMAN' | 'SERVICE' | 'SYSTEM';
-    authIssuer?: string;
-    authSubject?: string;
+    /** 0011: both NOT NULL and the unique auth identity within the workspace. */
+    authIssuer: string;
+    authSubject: string;
   };
-  organisationMemberships?: {
-    organisationId: string;
-    role: 'STAFF' | 'AGENT' | 'MEMBER';
-    validRange: DateRange;
-  }[];
   actor: ActorContext;
+}
+
+/**
+ * A principal's sourced association with an organisation (0011). A membership is
+ * neither a principal child nor an organisation child — it names both owners and
+ * carries its own provenance, so it is written by its own operation rather than
+ * smuggled inside a principal creation that cannot supply `evidence_id`.
+ */
+export interface OrganisationMembershipRecord {
+  id: string;
+  organisationId: string;
+  principalId: string;
+  role: 'STAFF' | 'AGENT' | 'MEMBER';
+  validRange: DateRange;
+  evidenceId: string;
 }
 
 /** Organisation/principal governance roots (§2): parties, identities and memberships. */
@@ -177,6 +208,7 @@ export interface GovernanceRepository {
   loadOrganisation(workspaceId: string, organisationId: string): Promise<NewOrganisation['organisation'] | undefined>;
   createPrincipal(params: NewPrincipal): Promise<void>;
   loadPrincipal(workspaceId: string, principalId: string): Promise<NewPrincipal['principal'] | undefined>;
+  recordMembership(params: { membership: OrganisationMembershipRecord; actor: ActorContext }): Promise<void>;
   assignResponsibility(params: {
     assignment: ResponsibilityAssignment;
     actor: ActorContext;
@@ -187,7 +219,12 @@ export interface GovernanceRepository {
   ): Promise<ResponsibilityAssignment[]>;
   issueAuthorityGrant(params: {
     grant: AuthorityGrant;
-    /** Receipt identity that authorised the grant; persisted as a deferred FK. */
+    /**
+     * Identity of the command receipt that authorised the grant. Persisted on
+     * `authority_grants` and checked by a deferrable FK into `command_receipts`:
+     * deferred because `PgUnitOfWork` inserts this command's own receipt after
+     * the handler body has run.
+     */
     receipt: { commandNamespace: string; idempotencyKey: string };
     actor: ActorContext;
   }): Promise<void>;

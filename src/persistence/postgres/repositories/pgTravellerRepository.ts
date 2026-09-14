@@ -5,11 +5,11 @@
  * installed by `PgUnitOfWork.execute`, writes only the tables the Traveller
  * aggregate owns (`travellers`, `traveller_names`, `traveller_contacts`,
  * `profile_assertions`, `travel_credentials`, `credential_versions`, the four
- * 0015 typed detail tables, `credential_links`, `traveller_relationships`) and
- * never claims idempotency, never inserts `change_records`/`outbox` and never
- * advances a head — that is the command handler's job
- * (`src/persistence/postgres/peopleCommands.ts`), mirroring the accepted
- * `workspaceCommands.ts` precedent.
+ * 0015 typed detail tables, `credential_links`, `traveller_relationships`,
+ * `travel_history`) and never claims idempotency, never inserts
+ * `change_records`/`outbox` and never advances a head — that is the command
+ * handler's job (`src/persistence/postgres/peopleCommands.ts`), mirroring the
+ * accepted `workspaceCommands.ts` precedent.
  *
  * Aggregate policy this file depends on (docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md
  * §1/§2, frozen by the M2 lane brief): `TRAVELLER` and `TRAVELLER_RELATIONSHIP`
@@ -39,6 +39,7 @@ import type {
   NameKind,
   NewCredentialVersion,
   NewTraveller,
+  TravelHistoryRecord,
   TravellerContactRecord,
   TravellerMergeParams,
   TravellerNameRecord,
@@ -178,25 +179,6 @@ function toAssertion(row: ProfileAssertionRow): ProfileAssertion {
 
 /** `date` columns are always read through `to_char` so a driver Date can never shift the calendar day. */
 const DATE = (column: string): string => `to_char(${column}, 'YYYY-MM-DD')`;
-
-/**
- * C0 froze no zod schema for an observed movement, so this is the typed input
- * for exactly the columns 0016 declares — never a JSON bag. `recordedAt` is
- * supplied by the command handler (computed outside the retryable callback) so a
- * serializable retry records the same instant.
- */
-export interface TravelHistoryRecord {
-  id: string;
-  travellerId: string;
-  /** Opaque until M4 owns `jurisdictions`; 0016 keeps the FK deferred. */
-  jurisdictionId: string;
-  entryDate?: LocalDate;
-  exitDate?: LocalDate;
-  coverageClaim: 'PARTIAL' | 'WINDOW_COMPLETE';
-  uncertaintyNote?: string;
-  evidenceId: string;
-  recordedAt: string;
-}
 
 export class PgTravellerRepository implements TravellerRepository {
   private readonly workspaceId: string;
@@ -668,13 +650,8 @@ export class PgTravellerRepository implements TravellerRepository {
 
   /**
    * Observed entry/exit movement. `travel_history` is a Traveller child with no
-   * registry row, so the enclosing command advances the Traveller head.
-   *
-   * GAP(G-P10): the frozen `TravellerRepository` port has no travel-history
-   * write at all, while `TravellerFactsReadQueries.travelHistoryFor` reads the
-   * table and M2 requires a `TRAVEL_HISTORY_RECORDED` command. The write lives
-   * here rather than as SQL in the command layer so the typed-row-only rule
-   * still holds; the port itself needs the method.
+   * registry row, so the enclosing command advances the Traveller head and this
+   * method registers nothing.
    */
   async recordHistory(params: { history: TravelHistoryRecord; actor: ActorContext }): Promise<void> {
     const client = currentTransactionClient();

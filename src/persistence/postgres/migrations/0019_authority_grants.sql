@@ -34,6 +34,15 @@ CREATE TABLE authority_grants (
   represented_party_kind text NOT NULL,
   represented_party_id uuid NOT NULL,
   issued_by_principal_id uuid NOT NULL,
+  -- §2: "Grant issuance is bound to an authorising command". The identity of
+  -- that command is the (workspace, namespace, key) primary key of
+  -- command_receipts, so a grant can never cite an assertion the idempotency
+  -- ledger does not hold. DEFERRED for the same reason as 0025's
+  -- credential_selections_receipt_fk: PgUnitOfWork inserts this command's own
+  -- receipt after the handler body, so a self-citing grant only resolves at
+  -- COMMIT.
+  authorising_command_namespace text NOT NULL,
+  authorising_idempotency_key text NOT NULL,
   issued_at timestamptz NOT NULL,
   expires_at timestamptz,
   revoked_at timestamptz,
@@ -47,6 +56,10 @@ CREATE TABLE authority_grants (
     FOREIGN KEY (workspace_id, principal_id) REFERENCES principals (workspace_id, id),
   CONSTRAINT authority_grants_issued_by_fk
     FOREIGN KEY (workspace_id, issued_by_principal_id) REFERENCES principals (workspace_id, id),
+  CONSTRAINT authority_grants_authorising_receipt_fk
+    FOREIGN KEY (workspace_id, authorising_command_namespace, authorising_idempotency_key)
+    REFERENCES command_receipts (workspace_id, command_namespace, idempotency_key)
+    DEFERRABLE INITIALLY DEFERRED,
   CONSTRAINT authority_grants_represented_party_fk
     FOREIGN KEY (workspace_id, represented_party_id, represented_party_kind)
     REFERENCES domain_subjects (workspace_id, id, kind) DEFERRABLE INITIALLY DEFERRED,

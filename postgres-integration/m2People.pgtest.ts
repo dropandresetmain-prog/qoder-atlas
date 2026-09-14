@@ -153,7 +153,6 @@ async function peopleFixture(): Promise<PeopleFixture> {
       actorPrincipalId: base.actorId,
       idempotencyKey: nextKey(base),
       principalId,
-      displayName: 'Seed Principal',
       actorType: 'HUMAN',
       authIssuer: 'https://issuer.invalid/m2-people',
       authSubject: principalId,
@@ -165,7 +164,6 @@ async function peopleFixture(): Promise<PeopleFixture> {
       actorPrincipalId: base.actorId,
       idempotencyKey: nextKey(base),
       principalId: issuedByPrincipalId,
-      displayName: 'Seed Issuer',
       actorType: 'SERVICE',
       authIssuer: 'https://issuer.invalid/m2-people',
       authSubject: issuedByPrincipalId,
@@ -255,6 +253,23 @@ async function commitThatMustFail(
       return (error as Error).message;
     }
     assert.fail('expected the database to reject the write');
+  } finally {
+    client.release();
+  }
+}
+
+/** The mirror of `commitThatMustFail`: a write that must survive COMMIT, deferred constraints included. */
+async function commitWrite(pool: Pool, run: (client: PoolClient) => Promise<void>): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    try {
+      await run(client);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    }
   } finally {
     client.release();
   }
@@ -689,6 +704,166 @@ describe('M2 lane P: name, contact, assertion and history editions never rewrite
       [],
     );
     assert.equal(completenessColumns, 0);
+  });
+
+  test('a movement pinned to a stale Traveller revision conflicts and writes nothing', async () => {
+    const f = await bareFixture();
+    const created = mustOk(
+      await recordTraveller(unitOfWork(f), {
+        workspaceId: f.workspaceId,
+        actorPrincipalId: f.actorId,
+        idempotencyKey: nextKey(f),
+        displayName: {
+          nameKind: 'DISPLAY',
+          displayValue: 'Known As',
+          effectiveRange: OPEN_RANGE,
+          evidenceId: randomUUID(),
+        },
+      }),
+    );
+    mustOk(
+      await recordTravelHistory(unitOfWork(f), {
+        workspaceId: f.workspaceId,
+        actorPrincipalId: f.actorId,
+        idempotencyKey: nextKey(f),
+        travellerId: created.travellerId,
+        jurisdictionId: randomUUID(),
+        entryDate: day(1),
+        coverageClaim: 'PARTIAL',
+        evidenceId: randomUUID(),
+        expectedRevision: 1,
+      }),
+    );
+
+    const conflict = conflictOf(
+      await recordTravelHistory(unitOfWork(f), {
+        workspaceId: f.workspaceId,
+        actorPrincipalId: f.actorId,
+        idempotencyKey: nextKey(f),
+        travellerId: created.travellerId,
+        jurisdictionId: randomUUID(),
+        entryDate: day(40),
+        coverageClaim: 'PARTIAL',
+        evidenceId: randomUUID(),
+        expectedRevision: 1,
+      }),
+    );
+    assert.equal(conflict.kind, 'STALE_AGGREGATE_REVISION');
+    assert.equal(
+      await count(f.pool, 'SELECT count(*) AS n FROM travel_history WHERE workspace_id = $1', [f.workspaceId]),
+      1,
+      'a movement is only ever recorded by a command that held the current Traveller revision',
+    );
+  });
+
+  test("a movement cannot be attached to another workspace's person", async () => {
+    const owner = await bareFixture();
+    const other = await bareFixture();
+    const foreignPerson = mustOk(
+      await recordTraveller(unitOfWork(owner), {
+        workspaceId: owner.workspaceId,
+        actorPrincipalId: owner.actorId,
+        idempotencyKey: nextKey(owner),
+        displayName: {
+          nameKind: 'DISPLAY',
+          displayValue: 'Elsewhere',
+          effectiveRange: OPEN_RANGE,
+          evidenceId: randomUUID(),
+        },
+      }),
+    );
+
+    const conflict = conflictOf(
+      await recordTravelHistory(unitOfWork(other), {
+        workspaceId: other.workspaceId,
+        actorPrincipalId: other.actorId,
+        idempotencyKey: nextKey(other),
+        travellerId: foreignPerson.travellerId,
+        jurisdictionId: randomUUID(),
+        entryDate: day(1),
+        coverageClaim: 'PARTIAL',
+        evidenceId: randomUUID(),
+        expectedRevision: 1,
+      }),
+    );
+    // A movement cites the person's head, so ownership is decided by the
+    // UnitOfWork's revision gate before the handler body runs at all: another
+    // workspace's Traveller has no head *here*, so the cited revision is simply
+    // absent. The frozen vocabulary for that is STALE_AGGREGATE_REVISION; the
+    // body's own `no travellers row` check is the second line of defence.
+    assert.equal(conflict.kind, 'STALE_AGGREGATE_REVISION');
+    assert.match(conflict.message, /, found MISSING$/);
+    assert.deepEqual(conflict.subjectRefs, [travellerRef(foreignPerson.travellerId)]);
+    assert.equal(
+      await count(other.pool, 'SELECT count(*) AS n FROM travel_history WHERE traveller_id = $1', [
+        foreignPerson.travellerId,
+      ]),
+      0,
+      'the head, the audit trail and the movement are one transaction, so a foreign person is written nothing at all',
+    );
+  });
+
+  test('replaying a movement returns the recorded result instead of a second movement', async () => {
+    const f = await bareFixture();
+    const created = mustOk(
+      await recordTraveller(unitOfWork(f), {
+        workspaceId: f.workspaceId,
+        actorPrincipalId: f.actorId,
+        idempotencyKey: nextKey(f),
+        displayName: {
+          nameKind: 'DISPLAY',
+          displayValue: 'Known As',
+          effectiveRange: OPEN_RANGE,
+          evidenceId: randomUUID(),
+        },
+      }),
+    );
+    const replayKey = nextKey(f);
+    // Replay needs the submission to hash identically, and every default this
+    // handler would supply (row identity, observation instant) is computed
+    // before `uow.execute` and hashed into the payload (C1 replay-safety rule).
+    // So a caller that wants a replayable command pins them.
+    const record = {
+      workspaceId: f.workspaceId,
+      actorPrincipalId: f.actorId,
+      idempotencyKey: replayKey,
+      travellerId: created.travellerId,
+      historyId: randomUUID(),
+      jurisdictionId: randomUUID(),
+      entryDate: day(1),
+      exitDate: day(9),
+      coverageClaim: 'WINDOW_COMPLETE' as const,
+      evidenceId: randomUUID(),
+      recordedAt: at(30),
+      expectedRevision: 1,
+    };
+    const first = mustOk(await recordTravelHistory(unitOfWork(f), record));
+    const replay = mustOk(await recordTravelHistory(unitOfWork(f), record));
+
+    assert.deepEqual(replay, first);
+    assert.equal(
+      await count(f.pool, 'SELECT count(*) AS n FROM travel_history WHERE workspace_id = $1', [f.workspaceId]),
+      1,
+    );
+    assert.equal(await headRevision(f.pool, f.workspaceId, created.travellerId), 2, 'one movement, one revision');
+
+    // The same key with a different payload is a refusal, not a second movement:
+    // an idempotency key can never quietly re-issue a command it did not record.
+    const { historyId: _fresh, recordedAt: _later, ...unpinned } = record;
+    const mismatch = conflictOf(
+      await recordTravelHistory(unitOfWork(f), {
+        ...unpinned,
+        idempotencyKey: replayKey,
+        jurisdictionId: randomUUID(),
+        expectedRevision: 2,
+      }),
+    );
+    assert.equal(mismatch.kind, 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
+    assert.equal(
+      await count(f.pool, 'SELECT count(*) AS n FROM travel_history WHERE workspace_id = $1', [f.workspaceId]),
+      1,
+      'the refused resubmission recorded nothing',
+    );
   });
 });
 
@@ -1588,20 +1763,32 @@ describe('M2 lane P: a relationship and a responsibility are not authority', () 
 // ---------------------------------------------------------------------------
 
 describe('M2 lane P: authority exists only because a grant says so', () => {
-  async function grantTo(f: PeopleFixture, actions: string[]): Promise<AuthorityGrantIssuedResult> {
+  /**
+   * By default the grant cites *its own* command receipt: `PgUnitOfWork` inserts
+   * that row after the handler returns, and 0019's FK is deferrable, so the
+   * citation resolves at COMMIT. Pass `authorisingReceipt` to cite a receipt an
+   * earlier command in this workspace already committed.
+   */
+  async function grantTo(
+    f: PeopleFixture,
+    actions: string[],
+    authorisingReceipt?: { commandNamespace: string; idempotencyKey: string },
+  ): Promise<AuthorityGrantIssuedResult> {
     const [subject] = f.travellerIds;
+    const idempotencyKey = nextKey(f);
     return mustOk(
       await issueAuthorityGrant(unitOfWork(f), {
         workspaceId: f.workspaceId,
         actorPrincipalId: f.actorId,
-        idempotencyKey: nextKey(f),
+        idempotencyKey,
         principalId: f.principalId,
         representedPartyRef: travellerRef(subject),
         issuedByPrincipalId: f.issuedByPrincipalId,
         issuedAt: at(0),
         actions,
         scopes: [travellerRef(subject)],
-        authorisingReceipt: { commandNamespace: 'TRAVELLER_RECORDED', idempotencyKey: nextKey(f) },
+        authorisingReceipt:
+          authorisingReceipt ?? { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
         expectedAggregateRevisions: [],
       }),
     );
@@ -1714,28 +1901,31 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
   test('a grant requires real principals and a strictly later expiry', async () => {
     const f = await peopleFixture();
     const [subject] = f.travellerIds;
+    // Both cite their own receipt, so the only thing wrong is the thing under test.
+    const firstKey = nextKey(f);
     const unknownPrincipal = conflictOf(
       await issueAuthorityGrant(unitOfWork(f), {
         workspaceId: f.workspaceId,
         actorPrincipalId: f.actorId,
-        idempotencyKey: nextKey(f),
+        idempotencyKey: firstKey,
         principalId: randomUUID(),
         representedPartyRef: travellerRef(subject),
         issuedByPrincipalId: f.issuedByPrincipalId,
         actions: ['traveller.profile.write'],
         scopes: [travellerRef(subject)],
-        authorisingReceipt: { commandNamespace: 'TRAVELLER_RECORDED', idempotencyKey: nextKey(f) },
+        authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: firstKey },
         expectedAggregateRevisions: [],
       }),
     );
     assert.equal(unknownPrincipal.kind, 'VALIDATION_FAILED');
     assert.match(unknownPrincipal.message, /no principals row/);
 
+    const secondKey = nextKey(f);
     const backwardsExpiry = conflictOf(
       await issueAuthorityGrant(unitOfWork(f), {
         workspaceId: f.workspaceId,
         actorPrincipalId: f.actorId,
-        idempotencyKey: nextKey(f),
+        idempotencyKey: secondKey,
         principalId: f.principalId,
         representedPartyRef: travellerRef(subject),
         issuedByPrincipalId: f.issuedByPrincipalId,
@@ -1743,7 +1933,7 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
         expiresAt: at(50),
         actions: ['traveller.profile.write'],
         scopes: [travellerRef(subject)],
-        authorisingReceipt: { commandNamespace: 'TRAVELLER_RECORDED', idempotencyKey: nextKey(f) },
+        authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: secondKey },
         expectedAggregateRevisions: [],
       }),
     );
@@ -1764,17 +1954,18 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
         name: { nameKind: 'PREFERRED', displayValue: 'Preferred', effectiveRange: OPEN_RANGE, evidenceId: randomUUID() },
       }),
     );
+    const idempotencyKey = nextKey(f);
     const conflict = conflictOf(
       await issueAuthorityGrant(unitOfWork(f), {
         workspaceId: f.workspaceId,
         actorPrincipalId: f.actorId,
-        idempotencyKey: nextKey(f),
+        idempotencyKey,
         principalId: f.principalId,
         representedPartyRef: travellerRef(subject),
         issuedByPrincipalId: f.issuedByPrincipalId,
         actions: ['traveller.profile.write'],
         scopes: [travellerRef(subject)],
-        authorisingReceipt: { commandNamespace: 'TRAVELLER_RECORDED', idempotencyKey: nextKey(f) },
+        authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
         expectedAggregateRevisions: [{ aggregateRef: travellerRef(subject), expectedRevision: 1 }],
       }),
     );
@@ -1783,6 +1974,132 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
       await count(f.pool, 'SELECT count(*) AS n FROM authority_grants WHERE workspace_id = $1', [f.workspaceId]),
       0,
     );
+  });
+
+  test('a grant can cite a receipt another committed command left behind', async () => {
+    const f = await peopleFixture();
+    const [subject] = f.travellerIds;
+    const recordKey = nextKey(f);
+    mustOk(
+      await addTravellerContact(unitOfWork(f), {
+        workspaceId: f.workspaceId,
+        actorPrincipalId: f.actorId,
+        idempotencyKey: recordKey,
+        travellerId: subject,
+        expectedRevision: 1,
+        contact: {
+          channel: 'EMAIL',
+          maskedLabel: 'a***@example.invalid',
+          protectedValue: PROTECTED,
+          effectiveRange: OPEN_RANGE,
+          evidenceId: randomUUID(),
+        },
+      }),
+    );
+
+    const grant = await grantTo(f, ['traveller.profile.write'], {
+      commandNamespace: 'TRAVELLER_CONTACT_ADDED',
+      idempotencyKey: recordKey,
+    });
+
+    const cited = await scalar<{ ns: string | null; key: string | null }>(
+      f.pool,
+      `SELECT authorising_command_namespace AS ns, authorising_idempotency_key AS key
+         FROM authority_grants WHERE workspace_id = $1 AND id = $2`,
+      [f.workspaceId, grant.grantId],
+    );
+    assert.equal(cited.ns, 'TRAVELLER_CONTACT_ADDED');
+    assert.equal(cited.key, recordKey, 'the grant stores the receipt that authorised it, not a paraphrase of it');
+  });
+
+  test('a grant cannot cite an assertion the idempotency ledger does not hold', async () => {
+    const f = await peopleFixture();
+    const [subject] = f.travellerIds;
+    const recordedKey = nextKey(f);
+    mustOk(
+      await recordTraveller(unitOfWork(f), {
+        workspaceId: f.workspaceId,
+        actorPrincipalId: f.actorId,
+        idempotencyKey: recordedKey,
+        displayName: {
+          nameKind: 'LEGAL',
+          displayValue: 'Cited Person',
+          effectiveRange: OPEN_RANGE,
+          evidenceId: randomUUID(),
+        },
+      }),
+    );
+
+    // The first citation names no receipt at all; the second names a key the
+    // ledger does hold — but under a different command namespace, so the
+    // three-part identity still fails.
+    const citations = [
+      { commandNamespace: 'TRAVELLER_RECORDED', idempotencyKey: 'never-issued' },
+      { commandNamespace: 'TRAVELLER_CONTACT_ADDED', idempotencyKey: recordedKey },
+    ];
+    for (const citation of citations) {
+      const conflict = conflictOf(
+        await issueAuthorityGrant(unitOfWork(f), {
+          workspaceId: f.workspaceId,
+          actorPrincipalId: f.actorId,
+          idempotencyKey: nextKey(f),
+          principalId: f.principalId,
+          representedPartyRef: travellerRef(subject),
+          issuedByPrincipalId: f.issuedByPrincipalId,
+          actions: ['traveller.profile.write'],
+          scopes: [travellerRef(subject)],
+          authorisingReceipt: citation,
+          expectedAggregateRevisions: [],
+        }),
+      );
+      assert.equal(conflict.kind, 'VALIDATION_FAILED');
+      assert.match(conflict.message, /no committed command receipt/);
+    }
+    assert.equal(
+      await count(f.pool, 'SELECT count(*) AS n FROM authority_grants WHERE workspace_id = $1', [f.workspaceId]),
+      0,
+      'an uncitable authorisation is refused before the grant row exists, not repaired at COMMIT',
+    );
+  });
+
+  test('0019 defers the receipt FK so a same-transaction citation still commits', async () => {
+    const f = await peopleFixture();
+    const [subject] = f.travellerIds;
+    const grant = await grantTo(f, ['traveller.profile.write']);
+
+    // The grant's own receipt exists only because the deferrable FK let the
+    // insert precede it, so the two rows are visible together after COMMIT.
+    const paired = await count(
+      f.pool,
+      `SELECT count(*) AS n FROM authority_grants g
+         JOIN command_receipts r
+           ON r.workspace_id = g.workspace_id
+          AND r.command_namespace = g.authorising_command_namespace
+          AND r.idempotency_key = g.authorising_idempotency_key
+        WHERE g.workspace_id = $1 AND g.id = $2`,
+      [f.workspaceId, grant.grantId],
+    );
+    assert.equal(paired, 1);
+
+    // Bypassing the handler removes the pre-check, so only the constraint is left.
+    const message = await commitThatMustFail(f.pool, (client) =>
+      runWithTransactionClient(client, () =>
+        new PgGovernanceRepository(f.workspaceId).issueAuthorityGrant({
+          grant: {
+            id: randomUUID(),
+            principalId: f.principalId,
+            representedPartyRef: travellerRef(subject),
+            issuedByPrincipalId: f.issuedByPrincipalId,
+            issuedAt: at(0),
+            actions: ['traveller.profile.write'],
+            scopes: [travellerRef(subject)],
+          },
+          receipt: { commandNamespace: 'WILL_NEVER_BE_A_RECEIPT', idempotencyKey: 'never' },
+          actor: { workspaceId: f.workspaceId, actorPrincipalId: f.actorId },
+        }),
+      ),
+    );
+    assert.match(message, /authority_grants_authorising_receipt_fk/);
   });
 });
 
@@ -2182,7 +2499,6 @@ describe('M2 lane P: organisations and principals are distinct parties', () => {
         actorPrincipalId: f.actorId,
         idempotencyKey: nextKey(f),
         principalId,
-        displayName: 'Staff Member',
         actorType: 'HUMAN',
         authIssuer: 'https://issuer.invalid/m2-people',
         authSubject: principalId,
@@ -2221,5 +2537,129 @@ describe('M2 lane P: organisations and principals are distinct parties', () => {
       await count(f.pool, 'SELECT count(*) AS n FROM organisations WHERE workspace_id = $1', [f.workspaceId]),
       0,
     );
+  });
+
+  test('a membership commits whole and 0011 owns the overlap rule', async () => {
+    const f = await peopleFixture();
+    const repository = new PgGovernanceRepository(f.workspaceId);
+    const actor = { workspaceId: f.workspaceId, actorPrincipalId: f.actorId };
+    const add = (membership: {
+      id: string;
+      role: 'STAFF' | 'AGENT' | 'MEMBER';
+      validRange: { start: string; end?: string };
+      evidenceId: string;
+    }) =>
+      commitWrite(f.pool, (client) =>
+        runWithTransactionClient(client, () =>
+          repository.recordMembership({
+            membership: { ...membership, organisationId: f.organisationId, principalId: f.principalId },
+            actor,
+          }),
+        ),
+      );
+
+    const firstId = randomUUID();
+    const firstEvidenceId = randomUUID();
+    await add({ id: firstId, role: 'STAFF', validRange: { start: day(0), end: day(90) }, evidenceId: firstEvidenceId });
+
+    const stored = await scalar<{
+      role: string;
+      valid_from: string;
+      valid_until: string | null;
+      evidence_id: string;
+      created_by_actor_id: string;
+    }>(
+      f.pool,
+      `SELECT role, valid_from::text AS valid_from, valid_until::text AS valid_until,
+              evidence_id, created_by_actor_id
+         FROM organisation_memberships WHERE workspace_id = $1 AND id = $2`,
+      [f.workspaceId, firstId],
+    );
+    assert.deepEqual(stored, {
+      role: 'STAFF',
+      valid_from: day(0),
+      valid_until: day(90),
+      evidence_id: firstEvidenceId,
+      created_by_actor_id: f.actorId,
+    });
+
+    // The exclusion constraint, not the repository, decides what a duplicate is.
+    const overlap = await commitThatMustFail(f.pool, (client) =>
+      runWithTransactionClient(client, () =>
+        repository.recordMembership({
+          membership: {
+            id: randomUUID(),
+            organisationId: f.organisationId,
+            principalId: f.principalId,
+            role: 'STAFF',
+            validRange: { start: day(45), end: day(120) },
+            evidenceId: randomUUID(),
+          },
+          actor,
+        }),
+      ),
+    );
+    assert.match(overlap, /organisation_memberships_no_overlap/);
+
+    await add({ id: randomUUID(), role: 'AGENT', validRange: { start: day(0), end: day(90) }, evidenceId: randomUUID() });
+    await add({ id: randomUUID(), role: 'STAFF', validRange: { start: day(90) }, evidenceId: randomUUID() });
+    assert.equal(
+      await count(f.pool, 'SELECT count(*) AS n FROM organisation_memberships WHERE workspace_id = $1', [
+        f.workspaceId,
+      ]),
+      3,
+      'a different role in the same window and a later window for the same role are both legitimate facts',
+    );
+  });
+
+  test('a membership cannot borrow a party or omit the evidence that states it', async () => {
+    const f = await peopleFixture();
+    const other = await bareFixture();
+    mustOk(
+      await createOrganisation(unitOfWork(other), {
+        workspaceId: other.workspaceId,
+        actorPrincipalId: other.actorId,
+        idempotencyKey: `m2-people-other:${other.workspaceId.slice(0, 8)}`,
+        organisationId: randomUUID(),
+        legalName: 'Other Co',
+        defaultCurrencyCode: 'NZD',
+      }),
+    );
+    const foreignOrganisationId = await scalar<{ id: string }>(
+      other.pool,
+      'SELECT id::text AS id FROM organisations WHERE workspace_id = $1',
+      [other.workspaceId],
+    );
+
+    const actor = { workspaceId: f.workspaceId, actorPrincipalId: f.actorId };
+    const borrowed = await commitThatMustFail(f.pool, (client) =>
+      runWithTransactionClient(client, () =>
+        new PgGovernanceRepository(f.workspaceId).recordMembership({
+          membership: {
+            id: randomUUID(),
+            organisationId: foreignOrganisationId.id,
+            principalId: f.principalId,
+            role: 'STAFF',
+            validRange: OPEN_RANGE,
+            evidenceId: randomUUID(),
+          },
+          actor,
+        }),
+      ),
+    );
+    assert.match(borrowed, /organisation_memberships_organisation_fk/);
+
+    // 0011 makes provenance NOT NULL, so a write shape that cannot supply an
+    // evidence reference could never commit — the reason membership is written by
+    // its own operation instead of nested inside an organisation create.
+    const unproven = await commitThatMustFail(f.pool, async (client) => {
+      await client.query(
+        `INSERT INTO organisation_memberships
+           (workspace_id, id, organisation_id, principal_id, role, valid_from, evidence_id, created_by_actor_id)
+         VALUES ($1, $2, $3, $4, 'STAFF', $5::date, NULL, $6)`,
+        [f.workspaceId, randomUUID(), f.organisationId, f.principalId, day(0), f.actorId],
+      );
+    });
+    assert.match(unproven, /null value in column "evidence_id"/);
   });
 });
