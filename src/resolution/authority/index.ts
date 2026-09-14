@@ -2,3 +2,5 @@
 export * from './assessmentGate.ts';
 export * from './payerCurrencyGate.ts';
 export * from './decisionGates.ts';
+export * from './envelope.ts';
+export * from './authorize.ts';

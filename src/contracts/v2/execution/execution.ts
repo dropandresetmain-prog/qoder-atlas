@@ -14,11 +14,16 @@ import { InstantSchema } from '../../../domain/v2/shared/time.ts';
 
 export const ExecutionAttemptStatusSchema = z.enum([
   'PREPARED',
+  'CLAIMED',
+  'DISPATCHING',
   'DISPATCHED',
   'OUTCOME_UNKNOWN',
   'OBSERVED_SUCCESS',
   'OBSERVED_FAILURE',
+  'RECONCILIATION_REQUIRED',
   'RECONCILED',
+  'COMPLETED',
+  'FAILED',
 ]);
 export type ExecutionAttemptStatus = z.infer<typeof ExecutionAttemptStatusSchema>;
 
@@ -91,7 +96,12 @@ export function canDispatchNewAttempt(
 ): { allowed: true } | { allowed: false; reason: string } {
   const sameOperation = priorAttempts.filter((a) => a.logicalOperationKey === logicalOperationKey);
   const unresolved = sameOperation.find(
-    (a) => a.status === 'OUTCOME_UNKNOWN' || a.status === 'DISPATCHED',
+    (a) =>
+      a.status === 'OUTCOME_UNKNOWN'
+      || a.status === 'DISPATCHED'
+      || a.status === 'DISPATCHING'
+      || a.status === 'CLAIMED'
+      || a.status === 'RECONCILIATION_REQUIRED',
   );
   if (unresolved !== undefined) {
     return { allowed: false, reason: `attempt ${unresolved.id} for this logical operation is unresolved; reconcile before redispatch` };

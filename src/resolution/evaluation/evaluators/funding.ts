@@ -123,7 +123,6 @@ export const fundingEvaluator: Evaluator = {
         const budgetRef: TypedRef = { kind: 'BUDGET', id: budget.id };
         if (budget.valid.end) invalidations.push(budget.valid.end);
 
-        let allocationInBudgetCurrency: string;
         let fxEvidence: EvidenceRef[] = [];
         const fxRow = allocation.fxObservationId
           ? world.fxObservations.find((f) => f.id === allocation.fxObservationId)
@@ -160,7 +159,7 @@ export const fundingEvaluator: Evaluator = {
           if (fx?.expiresAt) invalidations.push(fx.expiresAt);
           continue;
         }
-        allocationInBudgetCurrency = converted.money.amount;
+        const allocationInBudgetCurrency = converted.money.amount;
         if (allocation.currency !== budget.currency) {
           fxEvidence = [{ kind: 'AGGREGATE_REVISION', id: converted.fxObservationId, detail: 'fx_observation' }];
           if (fx?.expiresAt) invalidations.push(fx.expiresAt);
