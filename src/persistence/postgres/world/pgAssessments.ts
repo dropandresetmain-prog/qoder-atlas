@@ -241,9 +241,16 @@ export type ReassessmentPipeline = (claim: ReassessmentClaim, assessmentId: stri
 
 export interface WorkerOutcome {
   claimed: boolean;
-  result?: 'COMPLETED' | 'RETRY_SCHEDULED' | 'UNAVAILABLE' | 'FENCED';
+  result?: 'COMPLETED' | 'RETRY_SCHEDULED' | 'UNAVAILABLE' | 'FENCED' | 'REQUEUED';
   assessmentId?: string;
   error?: string;
+}
+
+const COMPLETE_RETRYABLE_CODES = new Set(['40001', '40P01', '23505']);
+
+function isCompleteRetryableError(error: unknown): boolean {
+  const code = (error as { code?: string } | undefined)?.code;
+  return code !== undefined && COMPLETE_RETRYABLE_CODES.has(code);
 }
 
 export class PgReassessmentWorker {
@@ -251,12 +258,14 @@ export class PgReassessmentWorker {
   private readonly actorId: string;
   private readonly maxAttempts: number;
   private readonly leaseSeconds: number;
+  private readonly maxCompleteRetries: number;
 
-  constructor(pool: Pool, options: { actorId: string; maxAttempts?: number; leaseSeconds?: number }) {
+  constructor(pool: Pool, options: { actorId: string; maxAttempts?: number; leaseSeconds?: number; maxCompleteRetries?: number }) {
     this.pool = pool;
     this.actorId = options.actorId;
     this.maxAttempts = options.maxAttempts ?? 3;
     this.leaseSeconds = options.leaseSeconds ?? 60;
+    this.maxCompleteRetries = options.maxCompleteRetries ?? 3;
   }
 
   async claim(now: Instant, workspaceId?: string): Promise<ReassessmentClaim | undefined> {
@@ -283,8 +292,31 @@ export class PgReassessmentWorker {
     };
   }
 
-  /** Stores the result and completes the claim atomically; refuses if the claim was fenced by a newer worker. */
-  async complete(claim: ReassessmentClaim, result: AssessmentResult): Promise<'COMPLETED' | 'FENCED'> {
+  /**
+   * Stores the result and completes the claim atomically; refuses if the claim
+   * was fenced by a newer worker. Serialization failures and single-successor
+   * unique conflicts retry in-process (bounded), then durable-requeue to
+   * PENDING so recovery does not wait on lease expiry. Fencing tokens are
+   * preserved: requeue clears the claim token without bumping fencing.
+   */
+  async complete(claim: ReassessmentClaim, result: AssessmentResult): Promise<'COMPLETED' | 'FENCED' | 'REQUEUED'> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= this.maxCompleteRetries; attempt++) {
+      try {
+        return await this.completeOnce(claim, result);
+      } catch (error) {
+        lastError = error;
+        if (!isCompleteRetryableError(error) || attempt >= this.maxCompleteRetries) break;
+      }
+    }
+    if (lastError !== undefined && isCompleteRetryableError(lastError)) {
+      const requeued = await this.requeueAfterCompleteFailure(claim, lastError);
+      return requeued ? 'REQUEUED' : 'FENCED';
+    }
+    throw lastError;
+  }
+
+  private async completeOnce(claim: ReassessmentClaim, result: AssessmentResult): Promise<'COMPLETED' | 'FENCED'> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
@@ -321,6 +353,25 @@ export class PgReassessmentWorker {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Durable recovery when complete() cannot commit: return the row to PENDING
+   * under the same fencing token so another (or the same) worker can reclaim
+   * without waiting for lease expiry, and without duplicating a successful
+   * assessment (the failed transaction rolled back).
+   */
+  private async requeueAfterCompleteFailure(claim: ReassessmentClaim, error: unknown): Promise<boolean> {
+    const message = error instanceof Error ? error.message : String(error);
+    const code = (error as { code?: string } | undefined)?.code ?? 'unknown';
+    const result = await this.pool.query(
+      `UPDATE scheduled_reassessments
+          SET state = 'PENDING', claim_token = NULL, lease_expires_at = NULL,
+              last_error = $4, next_run_at = now(), updated_at = now()
+        WHERE id = $1 AND state = 'CLAIMED' AND claim_token = $2 AND fencing_token = $3`,
+      [claim.id, claim.claimToken, claim.fencingToken, `complete_requeue:${code}:${message}`.slice(0, 2000)],
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async fail(claim: ReassessmentClaim, error: unknown, now: Instant): Promise<'RETRY_SCHEDULED' | 'UNAVAILABLE' | 'FENCED'> {

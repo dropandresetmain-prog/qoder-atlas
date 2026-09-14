@@ -16,25 +16,23 @@
  * world (an M3 gap named directly in M6_EVALUATOR_CONTRACT.md §2 L3); a
  * currency is never invented.
  *
- * FINDING (reported per the assignment's own instructions): `money.ts`
- * (src/domain/v2/shared/money.ts) exposes only same-currency `addExactMoney`
- * / `compareExactMoney` — there is no exact-decimal multiply for applying an
- * FX rate. This file implements `multiplyExactDecimal` locally with BigInt
- * minor units and explicit round-half-away-from-zero rounding, mirroring
- * money.ts's own (unexported) minor-units encoding. It also has no
- * per-currency minor-unit exponent table; like `addExactMoney` /
- * `compareExactMoney`'s own default, this file fixes the exponent at 2 for
- * every currency. Recommended action: promote both a multiply/convert helper
- * and a currency-exponent table into money.ts so every evaluator (and this
- * file) shares one implementation instead of each reimplementing BigInt
- * decimal arithmetic.
+ * Exact money / FX conversion uses the shared I-10 seam in
+ * `src/domain/v2/shared/money.ts` (`currencyExponent`, `convertExactMoney`,
+ * `addExactMoney`, `compareExactMoney`). This file must not reimplement
+ * BigInt decimal arithmetic.
  *
  * Pure: reads only `(subject, { now, world, effective })`, no I/O.
  */
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import type { Instant } from '../../../domain/v2/shared/time.ts';
 import { compareInstants } from '../../../domain/v2/shared/time.ts';
-import { addExactMoney, compareExactMoney, type ExactMoney } from '../../../domain/v2/shared/money.ts';
+import {
+  addExactMoney,
+  compareExactMoney,
+  convertExactMoney,
+  type ExactMoney,
+  type FxObservation,
+} from '../../../domain/v2/shared/money.ts';
 import type { CapturedWorld, WBudget, WCostAllocation } from '../../world/world.ts';
 import type { Evaluator, EvaluatorOutput } from '../evaluator.ts';
 import { dimension, explain, notApplicable, earliestAfter } from '../explain.ts';
@@ -42,44 +40,11 @@ import type { CausalExplanation, EvidenceRef } from '../../../contracts/v2/asses
 
 const EVALUATOR_ID = 'm6.funding';
 const DIMENSION = 'funding';
-/** No per-currency minor-unit table exists in this codebase yet (see file header finding); 2 matches money.ts's own default. */
-const MONEY_EXPONENT = 2;
 
 function dedupeEvidence(refs: EvidenceRef[]): EvidenceRef[] {
   const map = new Map<string, EvidenceRef>();
   for (const r of refs) map.set(`${r.kind}:${r.id}:${r.detail ?? ''}`, r);
   return [...map.values()].sort((a, b) => `${a.kind}:${a.id}:${a.detail ?? ''}`.localeCompare(`${b.kind}:${b.id}:${b.detail ?? ''}`));
-}
-
-function minorUnitsToDecimal(minor: bigint, exponent: number): string {
-  const negative = minor < 0n;
-  const abs = negative ? -minor : minor;
-  const digits = abs.toString().padStart(exponent + 1, '0');
-  const whole = digits.slice(0, digits.length - exponent) || '0';
-  const frac = exponent > 0 ? digits.slice(digits.length - exponent) : '';
-  const body = frac.length > 0 ? `${whole}.${frac}` : whole;
-  return negative ? `-${body}` : body;
-}
-
-/**
- * Exact decimal multiply of a monetary amount by an FX rate (both arbitrary
- * -precision decimal strings), rounded to `resultExponent` minor units with
- * round-half-away-from-zero. No binary float at any point.
- */
-function multiplyExactDecimal(amount: string, rate: string, resultExponent: number): string {
-  const negative = amount.startsWith('-') !== rate.startsWith('-');
-  const a = amount.replace('-', '');
-  const r = rate.replace('-', '');
-  const [aWhole, aFrac = ''] = a.split('.');
-  const [rWhole, rFrac = ''] = r.split('.');
-  const aDigits = BigInt(`${aWhole}${aFrac}` || '0');
-  const rDigits = BigInt(`${rWhole}${rFrac}` || '0');
-  const totalFracDigits = aFrac.length + rFrac.length;
-  const product = aDigits * rDigits; // scaled by 10^totalFracDigits
-  const scaleDown = totalFracDigits - resultExponent;
-  const scaled = scaleDown <= 0 ? product * (10n ** BigInt(-scaleDown)) : (product + 10n ** BigInt(scaleDown) / 2n) / (10n ** BigInt(scaleDown));
-  const magnitude = minorUnitsToDecimal(scaled, resultExponent);
-  return negative && scaled !== 0n ? `-${magnitude}` : magnitude;
 }
 
 function budgetValidAt(budget: WBudget, now: Instant): boolean {
@@ -160,39 +125,55 @@ export const fundingEvaluator: Evaluator = {
 
         let allocationInBudgetCurrency: string;
         let fxEvidence: EvidenceRef[] = [];
-        if (allocation.currency === budget.currency) {
-          allocationInBudgetCurrency = allocation.amount;
-        } else {
-          const fx = allocation.fxObservationId ? world.fxObservations.find((f) => f.id === allocation.fxObservationId) : undefined;
-          const expired = fx?.expiresAt ? compareInstants(now, fx.expiresAt) >= 0 : false;
-          const orientationOk = fx !== undefined && fx.baseCurrency === allocation.currency && fx.quoteCurrency === budget.currency;
-          if (!fx || expired || !orientationOk) {
-            explanations.push(explain({
-              evaluatorId: EVALUATOR_ID, dimension: DIMENSION, status: 'UNKNOWN', reasonCode: 'fx_missing',
-              cause: { kind: 'MISSING_INFORMATION' }, affectedSubject: subject, relatedSubjects: [reservationRef, orgRef, budgetRef],
-              evidenceRefs: allocationEvidence,
-              facts: {
-                allocationAmount: allocation.amount, allocationCurrency: allocation.currency, budgetCurrency: budget.currency,
-                ...(fx ? { fxObservationId: fx.id } : {}),
-              },
-              uncertainty: [{ kind: 'MISSING_INPUT', code: 'fx_observation', subjectRef: reservationRef }],
-            }));
-            if (fx?.expiresAt) invalidations.push(fx.expiresAt);
-            continue;
-          }
-          allocationInBudgetCurrency = multiplyExactDecimal(allocation.amount, fx.rate, MONEY_EXPONENT);
-          fxEvidence = [{ kind: 'AGGREGATE_REVISION', id: fx.id, detail: 'fx_observation' }];
-          if (fx.expiresAt) invalidations.push(fx.expiresAt);
+        const fxRow = allocation.fxObservationId
+          ? world.fxObservations.find((f) => f.id === allocation.fxObservationId)
+          : undefined;
+        const fx: FxObservation | undefined = fxRow
+          ? {
+              id: fxRow.id,
+              baseCurrency: fxRow.baseCurrency,
+              quoteCurrency: fxRow.quoteCurrency,
+              rate: fxRow.rate,
+              asOf: fxRow.asOf,
+              // World capture carries edition identity; FxObservation.sourceId is the evidence lineage key.
+              sourceId: fxRow.edition,
+              ...(fxRow.expiresAt ? { expiresAt: fxRow.expiresAt } : {}),
+            }
+          : undefined;
+        const converted = convertExactMoney(
+          { amount: allocation.amount, currency: allocation.currency as ExactMoney['currency'] },
+          budget.currency as ExactMoney['currency'],
+          fx,
+          { now },
+        );
+        if (!converted.ok) {
+          explanations.push(explain({
+            evaluatorId: EVALUATOR_ID, dimension: DIMENSION, status: 'UNKNOWN', reasonCode: 'fx_missing',
+            cause: { kind: 'MISSING_INFORMATION' }, affectedSubject: subject, relatedSubjects: [reservationRef, orgRef, budgetRef],
+            evidenceRefs: allocationEvidence,
+            facts: {
+              allocationAmount: allocation.amount, allocationCurrency: allocation.currency, budgetCurrency: budget.currency,
+              ...(fx ? { fxObservationId: fx.id, fxFailure: converted.reason } : { fxFailure: converted.reason }),
+            },
+            uncertainty: [{ kind: 'MISSING_INPUT', code: 'fx_observation', subjectRef: reservationRef }],
+          }));
+          if (fx?.expiresAt) invalidations.push(fx.expiresAt);
+          continue;
+        }
+        allocationInBudgetCurrency = converted.money.amount;
+        if (allocation.currency !== budget.currency) {
+          fxEvidence = [{ kind: 'AGGREGATE_REVISION', id: converted.fxObservationId, detail: 'fx_observation' }];
+          if (fx?.expiresAt) invalidations.push(fx.expiresAt);
         }
 
         const commitments = world.budgetCommitments.filter(
           (c) => c.budgetId === budget.id && c.currency === budget.currency && (c.status === 'INTENDED' || c.status === 'ACTUAL' || c.status === 'HELD'),
         );
         let total: ExactMoney = { amount: '0', currency: budget.currency };
-        for (const c of commitments) total = addExactMoney(total, { amount: c.amount, currency: c.currency }, MONEY_EXPONENT);
-        total = addExactMoney(total, { amount: allocationInBudgetCurrency, currency: budget.currency }, MONEY_EXPONENT);
+        for (const c of commitments) total = addExactMoney(total, { amount: c.amount, currency: c.currency });
+        total = addExactMoney(total, { amount: allocationInBudgetCurrency, currency: budget.currency });
 
-        const withinBudget = compareExactMoney(total, { amount: budget.amount, currency: budget.currency }, MONEY_EXPONENT) <= 0;
+        const withinBudget = compareExactMoney(total, { amount: budget.amount, currency: budget.currency }) <= 0;
         explanations.push(explain({
           evaluatorId: EVALUATOR_ID, dimension: DIMENSION, status: withinBudget ? 'PASS' : 'FAIL',
           reasonCode: withinBudget ? 'within_budget' : 'budget_exceeded',
