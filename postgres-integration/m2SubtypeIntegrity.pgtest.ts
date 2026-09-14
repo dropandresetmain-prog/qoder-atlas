@@ -51,8 +51,7 @@ const M2_ACTIVATED_KINDS = [
   'SUPPORT_ASSIGNMENT',
 ];
 
-// M3 is integrated in this continuation branch. These are the additive M3
-// checkers whose presence must not be mistaken for M2 leaking into later lanes.
+/** Kinds M3 activates — must match docs/refactor/evidence/M3.md exactly. */
 const M3_ACTIVATED_KINDS = [
   'TRANSPORT_SERVICE',
   'RESOURCE',
@@ -65,6 +64,24 @@ const M3_ACTIVATED_KINDS = [
   'EXTERNAL_RECORD',
   'OWNERSHIP_BINDING',
   'BUDGET',
+];
+
+/**
+ * Kinds M4 activates — must match docs/refactor/evidence/M4.md exactly.
+ * Added when M4 landed on this branch: EVENT/PROGRAMME/PROGRAMME_ITEM/
+ * PARTICIPATION/PLACE/GEOGRAPHIC_AREA/JURISDICTION now have installed
+ * checkers, so the "no M3/M4/M5 kind leaked a checker" invariant below is
+ * scoped to M3/M5 from this point on — M4's own activation is expected,
+ * not a leak.
+ */
+const M4_ACTIVATED_KINDS = [
+  'EVENT',
+  'PROGRAMME',
+  'PROGRAMME_ITEM',
+  'PARTICIPATION',
+  'PLACE',
+  'GEOGRAPHIC_AREA',
+  'JURISDICTION',
 ];
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
@@ -88,14 +105,14 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     }
   });
 
-test('only M2 and integrated M3 kinds have checkers; later lanes stay closed', async () => {
+  test('only integrated-lane kinds have checkers; unintegrated kinds stay closed', async () => {
     const pool = await sharedTestPool();
     const leaked = await pool.query<{ kind: string }>(
       `SELECT kind FROM subject_subtype_checkers
         WHERE kind <> ALL($1::text[])`,
-      [[...M2_ACTIVATED_KINDS, ...M3_ACTIVATED_KINDS, 'WORKSPACE']],
+      [[...M2_ACTIVATED_KINDS, ...M3_ACTIVATED_KINDS, ...M4_ACTIVATED_KINDS, 'WORKSPACE']],
     );
-    assert.deepEqual(leaked.rows, [], 'M3 integration must not activate kinds owned by later lanes');
+    assert.deepEqual(leaked.rows, [], 'no kind outside the integrated M2/M3/M4 lanes may install a subtype checker');
 
     // The kinds are pre-registered (that is the frozen contract) but unactivated.
     const pending = await pool.query<{ kind: string }>(
@@ -103,14 +120,14 @@ test('only M2 and integrated M3 kinds have checkers; later lanes stay closed', a
         WHERE NOT EXISTS (SELECT 1 FROM subject_subtype_checkers c WHERE c.kind = k.kind)`,
     );
     const pendingKinds = pending.rows.map((row) => row.kind);
-    for (const kind of ['PLACE', 'JURISDICTION', 'ASSESSMENT']) {
+    for (const kind of ['ASSESSMENT']) {
       assert.ok(pendingKinds.includes(kind), `${kind} must remain registered-but-unactivated`);
     }
   });
 
   test('a pre-registered kind with no checker cannot commit even with a head row', async () => {
     const pool = await sharedTestPool();
-    for (const kind of ['PLACE', 'ASSESSMENT']) {
+    for (const kind of ['ASSESSMENT']) {
       const seed = await beginSeed(pool, `M2 closed ${kind}`);
       await seedRootSubject(seed, { kind });
       await assert.rejects(
@@ -444,6 +461,9 @@ test('only M2 and integrated M3 kinds have checkers; later lanes stay closed', a
       'offers.terms',
       'agreement_versions.published_terms',
       'stay_line_details.occupancy',
+      // M4 (0056): bounded operating-requirement detail nothing reverse-looks-up,
+      // shape-checked by programme_items_operating_requirements_shape.
+      'programme_items.operating_requirements',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns
