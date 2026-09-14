@@ -342,7 +342,10 @@ export class PgWorldReader {
         [resourceIds],
       );
       const knownLineIds = new Set(lineIds);
-      const peerLines = capacityLines.filter((l) => !knownLineIds.has(str(l.id)));
+      const peerLines = capacityLines.filter((l) => {
+        const id = str(l.id);
+        return id !== null && !knownLineIds.has(id);
+      });
       if (peerLines.length > 0) {
         lines = [...lines, ...peerLines].sort((a, b) => String(a.reservation_id).localeCompare(String(b.reservation_id)) || String(a.id).localeCompare(String(b.id)));
         lineIds = uniq(lines.map((l) => str(l.id)));
