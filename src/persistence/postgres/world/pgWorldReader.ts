@@ -255,15 +255,17 @@ export class PgWorldReader {
     );
 
     // ----------------------------------------------------------- arrangements
-    const allocations = await q(
+    // Focus-traveller allocations first; shared-resource capacity later expands
+    // peer lines that consume the same Resource without walking their Journeys.
+    let allocations = await q(
       `SELECT id, reservation_id, line_id, traveller_id, journey_item_id, allocation_role, quantity
          FROM reservation_allocations
         WHERE workspace_id = $1 AND (traveller_id = ANY($2::uuid[]) OR journey_item_id = ANY($3::uuid[]))
         ORDER BY reservation_id, line_id, id`,
       [travellerIds, itemIds],
     );
-    const reservationIds = uniq(allocations.map((a) => str(a.reservation_id)));
-    const lines = await q(
+    let reservationIds = uniq(allocations.map((a) => str(a.reservation_id)));
+    let lines = await q(
       `SELECT l.id, l.reservation_id, l.product_type, l.observed_status, l.observed_status_at, l.observation_evidence_id,
               t.transport_service_id, COALESCE(s.resource_id, u.resource_id) AS resource_id, COALESCE(s.place_id, u.place_id) AS place_id,
               COALESCE(s.stay_interval_start, u.use_interval_start) AS interval_start, COALESCE(s.stay_interval_end, u.use_interval_end) AS interval_end
@@ -275,8 +277,8 @@ export class PgWorldReader {
         ORDER BY l.reservation_id, l.id`,
       [reservationIds],
     );
-    const lineIds = uniq(lines.map((l) => str(l.id)));
-    const reservations = await q(
+    let lineIds = uniq(lines.map((l) => str(l.id)));
+    let reservations = await q(
       `SELECT id, reservation_type, observed_status, observed_status_at, responsible_organisation_id, responsible_traveller_id
          FROM reservations WHERE workspace_id = $1 AND id = ANY($2::uuid[]) ORDER BY id`,
       [reservationIds],
@@ -321,6 +323,46 @@ export class PgWorldReader {
       [[...itemIds, ...programmeItemIds], directResourceIds],
     );
     const resourceIds = uniq([...directResourceIds, ...assignmentsForActivities.map((a) => str(a.resource_id))]);
+
+    // Capacity accounting reads every reservation line that consumes a captured
+    // Resource (and every allocation on those lines). This is world-fact
+    // completeness for the evaluator — not impact/blast-radius expansion.
+    if (resourceIds.length > 0) {
+      const capacityLines = await q(
+        `SELECT l.id, l.reservation_id, l.product_type, l.observed_status, l.observed_status_at, l.observation_evidence_id,
+                t.transport_service_id, COALESCE(s.resource_id, u.resource_id) AS resource_id, COALESCE(s.place_id, u.place_id) AS place_id,
+                COALESCE(s.stay_interval_start, u.use_interval_start) AS interval_start, COALESCE(s.stay_interval_end, u.use_interval_end) AS interval_end
+           FROM reservation_lines l
+           LEFT JOIN transport_line_details t ON t.workspace_id = l.workspace_id AND t.line_id = l.id
+           LEFT JOIN stay_line_details s ON s.workspace_id = l.workspace_id AND s.line_id = l.id
+           LEFT JOIN resource_use_line_details u ON u.workspace_id = l.workspace_id AND u.line_id = l.id
+          WHERE l.workspace_id = $1
+            AND COALESCE(s.resource_id, u.resource_id) = ANY($2::uuid[])
+          ORDER BY l.reservation_id, l.id`,
+        [resourceIds],
+      );
+      const knownLineIds = new Set(lineIds);
+      const peerLines = capacityLines.filter((l) => !knownLineIds.has(str(l.id)));
+      if (peerLines.length > 0) {
+        lines = [...lines, ...peerLines].sort((a, b) => String(a.reservation_id).localeCompare(String(b.reservation_id)) || String(a.id).localeCompare(String(b.id)));
+        lineIds = uniq(lines.map((l) => str(l.id)));
+        reservationIds = uniq([...reservationIds, ...peerLines.map((l) => str(l.reservation_id))]);
+        reservations = await q(
+          `SELECT id, reservation_type, observed_status, observed_status_at, responsible_organisation_id, responsible_traveller_id
+             FROM reservations WHERE workspace_id = $1 AND id = ANY($2::uuid[]) ORDER BY id`,
+          [reservationIds],
+        );
+      }
+      // All allocations on capacity-relevant lines (peer travellers included).
+      allocations = await q(
+        `SELECT id, reservation_id, line_id, traveller_id, journey_item_id, allocation_role, quantity
+           FROM reservation_allocations
+          WHERE workspace_id = $1 AND line_id = ANY($2::uuid[])
+          ORDER BY reservation_id, line_id, id`,
+        [lineIds],
+      );
+    }
+
     // Every assignment of every involved resource: capacity is a property of the shared resource.
     const resourceAssignments = await q(
       `SELECT id, activity_kind, activity_id, resource_id, quantity, lifecycle_status FROM resource_assignments
@@ -489,6 +531,10 @@ export class PgWorldReader {
       [informationIds],
     );
     const ruleSetIds = uniq([...ruleAssignmentRows.map((r) => str(r.rule_set_id)), ...regulatoryRuleSetRows.map((r) => str(r.rule_set_id))]);
+    // Referenced RuleSets (including those with no captured PUBLISHED/SUPERSEDED
+    // edition) must still appear in the manifest so first-edition publication
+    // can invalidate an earlier UNKNOWN assessment.
+    const referencedRuleSetIds = ruleSetIds;
     const ruleSetVersionRows = await q(
       `SELECT v.id, v.rule_set_id, rs.policy_family, rs.issuer_kind, rs.issuer_id, v.edition_number, v.status, v.effective_from, v.effective_until, v.expression,
               COALESCE((SELECT json_agg(json_build_object('id', r.id, 'ruleKey', r.rule_key, 'severity', r.severity, 'expression', r.expression) ORDER BY r.rule_key)
@@ -702,7 +748,7 @@ export class PgWorldReader {
     );
     world.jurisdictions = jurisdictionRows.map((j) => ({ id: String(j.id), revision: 0, name: String(j.name), regimeKind: String(j.regime_kind) }));
 
-    await this.recordManifest(session, request, world);
+    await this.recordManifest(session, request, world, referencedRuleSetIds);
     return this.withRevisions(session, world);
   }
 
@@ -942,8 +988,14 @@ export class PgWorldReader {
     return reached;
   }
 
-  private async recordManifest(session: ReadSession, request: WorldCaptureRequest, world: Omit<CapturedWorld, 'manifest'>): Promise<void> {
+  private async recordManifest(
+    session: ReadSession,
+    request: WorldCaptureRequest,
+    world: Omit<CapturedWorld, 'manifest'>,
+    referencedRuleSetIds: string[],
+  ): Promise<void> {
     const m = session.manifest;
+    const ruleSetRefs = uniq(referencedRuleSetIds).map((id) => ref('RULE_SET', id));
     const subjects: TypedRef[] = [
       ...world.travellers.map((x) => ref('TRAVELLER', x.id)), ...world.trips.map((x) => ref('TRIP', x.id)), ...world.journeys.map((x) => ref('JOURNEY', x.id)),
       ...world.journeyItems.map((x) => ref('JOURNEY_ITEM', x.id)), ...world.coordinationGroups.map((x) => ref('COORDINATION_GROUP', x.id)),
@@ -954,7 +1006,7 @@ export class PgWorldReader {
       ...world.programmes.map((x) => ref('PROGRAMME', x.id)), ...world.programmeItems.map((x) => ref('PROGRAMME_ITEM', x.id)),
       ...world.participations.map((x) => ref('PARTICIPATION', x.id)), ...world.places.map((x) => ref('PLACE', x.id)),
       ...world.jurisdictions.map((x) => ref('JURISDICTION', x.id)), ...world.objectives.map((x) => ref('OBJECTIVE', x.id)),
-      ...world.constraints.map((x) => ref('CONSTRAINT_DEFINITION', x.id)), ...uniq(world.ruleSetVersions.map((x) => x.ruleSetId)).map((id) => ref('RULE_SET', id)),
+      ...world.constraints.map((x) => ref('CONSTRAINT_DEFINITION', x.id)), ...ruleSetRefs,
       ...world.informationVersions.map((x) => ref('INFORMATION_VERSION', x.id)),
     ];
     await session.recordAggregates(subjects);
@@ -974,7 +1026,7 @@ export class PgWorldReader {
     scopes.push({ scopeKind: 'INFORMATION_TOPIC', scopeId: 'm6:unregistered-topic' });
     for (const x of world.travellers) extra.push({ scopeKind: 'TRAVELLER', scopeId: x.id });
     for (const x of world.resources) extra.push({ scopeKind: 'RESOURCE', scopeId: x.id });
-    for (const id of uniq(world.ruleSetVersions.map((x) => x.ruleSetId))) extra.push({ scopeKind: 'RULE_SET', scopeId: id });
+    for (const id of uniq(referencedRuleSetIds)) extra.push({ scopeKind: 'RULE_SET', scopeId: id });
     for (const id of uniq([...world.journeyItems.map((x) => x.id), ...world.transportServices.map((x) => x.id), ...world.programmeItems.map((x) => x.id), ...world.reservationLines.map((x) => x.id), ...world.participations.map((x) => x.id)])) {
       extra.push({ scopeKind: 'SUBJECT_DEPENDENCIES', scopeId: id });
     }
