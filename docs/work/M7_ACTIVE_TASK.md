@@ -28,15 +28,16 @@ ActionIntent DAG. Propose and compile only. Do not execute.
 - [x] Evidence `docs/refactor/evidence/M7.md` + roadmap status
 - [x] typecheck / build / lint / anti-hardcoding / diff --check
 - [x] Canonical `test:postgres` 371/371 on fresh DB
-- [ ] Commit + push (no merge)
+- [x] Commit + push (no merge) — `51725472df0af430ddf71f1859f80458f61aa079`
 
 ## Current checkpoint
 
-CP2 — verification green. Committing and pushing.
+DONE — M7 implemented, verified, pushed. Do not merge. Do not start M8/M9.
 
 ## Next action
 
-Commit coherent M7 package and push branch. Do not merge. Do not start M8/M9.
+Integrator/reviewer acceptance of `milestone-m7-recovery-planning` before M9.
+M8 may proceed in parallel on shared ActionPlan contracts.
 
 ## Critical constraints
 
