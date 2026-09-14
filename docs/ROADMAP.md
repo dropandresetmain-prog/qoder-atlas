@@ -44,13 +44,13 @@ Target foundations include:
 | Stage | Status | Outcome |
 |---|---|---|
 | Architecture closure + logical schema + plan | **COMPLETE / APPROVED** | F01-F18 frozen; implementation not started by the architecture-doc commit. |
-| **M0 — executable contracts** | **NEXT** | Materialise frozen schemas/contracts, migration mapping and architecture fixtures; C0 freezes executable contracts. |
-| M1 — PostgreSQL/durability | Planned | Relational integrity, migrations, revisions, idempotency, inbox/outbox and transaction foundation. |
-| M2 — people/Journeys/groups | Planned | Stable identities, shared Trip/per-person Journey, coordination/support and credentials. |
-| M3 — services/reservations | Planned | Shared services, reservations, allocations, entitlements, offers and servicing ownership. |
-| M4 — programmes/geography | Planned | Mutable programme state, participation/resources, Place/Area/Jurisdiction. |
-| M5 — knowledge/requirements | Planned | Source/evidence/publication versions, advisories/conditions and rule editions/coverage. |
-| M6 — unified evaluation | Planned | Multi-object scope/propagation, entry/support/programme/condition evaluators and assessment manifests. |
+| **M0 — executable contracts** | **COMPLETE / ACCEPTED** | Materialise frozen schemas/contracts, migration mapping and architecture fixtures; **C0 passed** — contract/schema freeze accepted. |
+| M1 — PostgreSQL/durability | **COMPLETE / ACCEPTED** | Relational integrity, migrations, revisions, idempotency, inbox/outbox and transaction foundation; **C1 passed** — integrity/concurrency review closed. |
+| M2 — people/Journeys/groups | **COMPLETE / ACCEPTED** | Stable identities, shared Trip/per-person Journey, coordination/support and credentials. |
+| M3 — services/reservations | Planned / next parallel lane | Shared services, reservations, allocations, entitlements, offers and servicing ownership. |
+| M4 — programmes/geography | Planned / next parallel lane | Mutable programme state, participation/resources, Place/Area/Jurisdiction. |
+| M5 — knowledge/requirements | Planned / next parallel lane | Source/evidence/publication versions, advisories/conditions and rule editions/coverage. |
+| M6 — unified evaluation | Blocked on integrated M2-M5 | Multi-object scope/propagation, entry/support/programme/condition evaluators and assessment manifests. |
 | M7 — planning/action plans | Planned | Multi-object strategies and explicit typed action-plan DAGs. |
 | M8 — authority/durable execution | Planned | Scoped approvals, financial commitments, attempts/reconciliation and internal programme execution. |
 | M9 — application integration | Planned | Canonical runtime composition, APIs/read models and operator/traveller surfaces. |
