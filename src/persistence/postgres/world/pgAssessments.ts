@@ -185,20 +185,28 @@ export interface AssessmentView {
 /** Currentness from the database and the injected clock — never from a cached label. */
 export async function currentAssessmentView(pool: Pool, workspaceId: string, subject: TypedRef, kind: AssessmentKind, now: Instant): Promise<AssessmentView> {
   const latestId = await latestAssessmentId(pool, workspaceId, subject, kind);
-  const work = await pool.query<{ id: string; reason: string; state: string; attempts: number; last_error: string | null }>(
-    `SELECT id, reason, state, attempts, last_error FROM scheduled_reassessments
+  const work = await pool.query<{ id: string; reason: string; state: string; attempts: number; last_error: string | null; cause_assessment_id: string | null }>(
+    `SELECT id, reason, state, attempts, last_error, cause_assessment_id FROM scheduled_reassessments
       WHERE workspace_id = $1 AND subject_kind = $2 AND subject_id = $3 AND assessment_kind = $4 AND state <> 'DONE'
       ORDER BY created_at DESC LIMIT 1`,
     [workspaceId, subject.kind, subject.id, kind],
   );
-  const open = work.rows[0];
-  const openWork = open ? { id: open.id, reason: open.reason, state: open.state, attempts: open.attempts, lastError: open.last_error } : undefined;
-  if (!latestId) return { status: open?.state === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NONE', staleness: [], ...(openWork ? { openWork } : {}) };
+  const candidate = work.rows[0];
+  if (!latestId) {
+    const openWork = candidate ? { id: candidate.id, reason: candidate.reason, state: candidate.state, attempts: candidate.attempts, lastError: candidate.last_error } : undefined;
+    return { status: candidate?.state === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NONE', staleness: [], ...(openWork ? { openWork } : {}) };
+  }
   const assessment = await loadAssessment(pool, workspaceId, latestId);
   if (!assessment) return { status: 'NONE', staleness: [] };
   const state = await new PgCurrentStateReader(pool).loadFor(workspaceId, assessment.manifest);
   const verdict = assessManifestCurrentness(assessment.manifest, state, now);
-  if (open?.state === 'UNAVAILABLE') return { status: 'UNAVAILABLE', assessment, staleness: verdict.reasons, openWork };
+  // Work raised against an assessment that has since been superseded is obsolete once the latest
+  // manifest verifies current against live heads/generations and the clock: every input change that
+  // raised it is already inside the newer capture. Otherwise the work still stands.
+  const obsolete = candidate !== undefined && candidate.cause_assessment_id !== null && candidate.cause_assessment_id !== latestId && verdict.current;
+  const open = obsolete ? undefined : candidate;
+  const openWork = open ? { id: open.id, reason: open.reason, state: open.state, attempts: open.attempts, lastError: open.last_error } : undefined;
+  if (open?.state === 'UNAVAILABLE') return { status: 'UNAVAILABLE', assessment, staleness: verdict.reasons, ...(openWork ? { openWork } : {}) };
   if (verdict.current && !open) return { status: 'CURRENT', assessment, staleness: [] };
   return { status: open ? 'PENDING_REASSESSMENT' : 'STALE', assessment, staleness: verdict.reasons, ...(openWork ? { openWork } : {}) };
 }

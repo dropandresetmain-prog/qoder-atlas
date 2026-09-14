@@ -139,6 +139,19 @@ describe('M6 invalidation: durable work in the changing transaction', () => {
     assert.deepEqual(await openWork(f), [{ reason: 'INPUT_CHANGED', state: 'PENDING', attempts: 0 }]);
   });
 
+  test('work raised against a superseded assessment is obsolete once a newer capture verifies current; a later change still pends', async () => {
+    const f = await fixture();
+    const first = await assessNow(f);
+    await f.pool.query('UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2', [f.seed.workspaceId, f.serviceId]);
+    assert.equal((await currentAssessmentView(f.pool, f.seed.workspaceId, f.journey, 'VIABILITY', NOW)).status, 'PENDING_REASSESSMENT');
+    const second = await assessNow(f);
+    assert.notEqual(second.id, first.id);
+    const view = await currentAssessmentView(f.pool, f.seed.workspaceId, f.journey, 'VIABILITY', NOW);
+    assert.equal(view.status, 'CURRENT', JSON.stringify(view.staleness));
+    assert.equal(view.openWork, undefined, 'obsolete work is not reported against the newer result');
+    await f.pool.query('UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2', [f.seed.workspaceId, f.serviceId]);
+    assert.notEqual((await currentAssessmentView(f.pool, f.seed.workspaceId, f.journey, 'VIABILITY', NOW)).status, 'CURRENT', 'a change after the newer capture is never current');
+  });
   test('clock-only expiry enqueues work without any database change, and catches up after downtime', async () => {
     const f = await fixture();
     await assessNow(f);

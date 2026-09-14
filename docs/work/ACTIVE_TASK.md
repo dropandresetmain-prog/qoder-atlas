@@ -73,6 +73,8 @@ merge L3/L4 lane results when delegated agents report; add m6.information to reg
 | I-8 | Jurisdiction has no ISO code; predicates carry issuing-state codes as rule parameters | Ignore / Accept Risk |
 | I-9 | Three of four evaluator lane agents died before tests/commit | Act Now — salvaged; tests delegated |
 | I-10 | `money.ts` has no exact FX multiply / currency exponent table; funding.ts implements BigInt multiply locally at exponent 2 | Park for Later — promote to money.ts before M8 spend |
+| I-11 | One capture's manifest is the union read set; every Journey assessed from a joint capture is invalidated by any input of that capture (over-invalidation, never under) | Park for Later — per-subject manifest pruning is an optimisation; workers capture per subject; recorded in M6.md |
+| I-12 | `currentAssessmentView` kept reporting PENDING_REASSESSMENT after a newer assessment was saved outside the worker (work caused by a superseded assessment never cleared) | Act Now — closed: work caused by a superseded assessment is obsolete only when the latest manifest verifies current; regression test in m6Reassessment |
 
 ## Evidence references
 
