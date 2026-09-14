@@ -75,12 +75,63 @@ CREATE TABLE budget_entries (
     FOREIGN KEY (workspace_id, commitment_id)
     REFERENCES budget_commitments (workspace_id, id),
   CONSTRAINT budget_entries_amount_positive CHECK (amount > 0),
-  -- An entry never contradicts its commitment's currency.
-  CONSTRAINT budget_entries_currency_matches
-    FOREIGN KEY (workspace_id, commitment_id)
-    REFERENCES budget_commitments (workspace_id, id) NOT VALID
+  CONSTRAINT budget_entries_entry_kind_shape CHECK (
+    (entry_kind = 'HOLD' AND evidence_id IS NULL)
+    OR (entry_kind IN ('SETTLEMENT', 'RELEASE') AND evidence_id IS NOT NULL)
+  )
 );
 
 CREATE INDEX idx_budget_entries_commitment
   ON budget_entries (workspace_id, commitment_id);
 
+-- A row-level CHECK cannot compare the entry currency with its commitment.
+-- Keep that cross-row invariant as a deferred constraint trigger so a command
+-- may create the commitment and its first entry in either statement order.
+CREATE FUNCTION assert_budget_entry_currency_matches() RETURNS trigger AS $$
+DECLARE
+  v_currency text;
+BEGIN
+  SELECT currency INTO v_currency
+    FROM budget_commitments
+   WHERE workspace_id = NEW.workspace_id AND id = NEW.commitment_id;
+  IF v_currency IS NULL THEN
+    RAISE EXCEPTION
+      'budget entry % references missing commitment %', NEW.id, NEW.commitment_id;
+  END IF;
+  IF NEW.currency <> v_currency THEN
+    RAISE EXCEPTION
+      'budget entry % currency % does not match commitment currency %',
+      NEW.id, NEW.currency, v_currency;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER budget_entries_currency_assert
+  AFTER INSERT OR UPDATE OF commitment_id, currency ON budget_entries
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION assert_budget_entry_currency_matches();
+
+CREATE FUNCTION enforce_subject_subtype_budget(
+  p_workspace_id uuid,
+  p_id uuid,
+  p_kind text,
+  p_aggregate_id uuid
+) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  IF p_aggregate_id <> p_id THEN
+    RAISE EXCEPTION
+      'domain_subjects subtype violation: BUDGET subject % must be its own aggregate root (aggregate_id=%)',
+      p_id, p_aggregate_id;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM budgets b WHERE b.workspace_id = p_workspace_id AND b.id = p_id
+  ) THEN
+    RAISE EXCEPTION
+      'domain_subjects subtype violation: BUDGET subject % has no budgets row', p_id;
+  END IF;
+END;
+$$;
+
+INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
+  ('BUDGET', 'enforce_subject_subtype_budget', 'M3');

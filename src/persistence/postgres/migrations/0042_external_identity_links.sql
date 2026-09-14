@@ -74,9 +74,9 @@ BEGIN
       'external_record_links: external record % is LINKED but has no live link row',
       NEW.external_record_id;
   END IF;
-  IF v_state = 'UNVERIFIED' AND v_live_links = 0 THEN
+  IF v_state <> 'LINKED' AND v_live_links > 0 THEN
     RAISE EXCEPTION
-      'external_record_links %: record % has no live link; keep it UNVERIFIED or link it first (F08)',
+      'external_record_links %: record % has a live link but is not LINKED (F08)',
       NEW.id, NEW.external_record_id;
   END IF;
   RETURN NULL;
@@ -187,4 +187,3 @@ $$;
 
 INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
   ('OWNERSHIP_BINDING', 'enforce_subject_subtype_ownership_binding', 'M3');
-

@@ -34,8 +34,6 @@ CREATE TABLE cost_allocations (
     REFERENCES organisations (workspace_id, id),
   CONSTRAINT cost_allocations_payer_traveller_fk
     FOREIGN KEY (workspace_id, payer_traveller_id) REFERENCES travellers (workspace_id, id),
-  CONSTRAINT cost_allocations_fx_fk
-    FOREIGN KEY (workspace_id, fx_observation_id) REFERENCES fx_observations (workspace_id, id),
   CONSTRAINT cost_allocations_dimension_fk
     FOREIGN KEY (workspace_id, accounting_dimension_id)
     REFERENCES accounting_dimensions (workspace_id, id),
@@ -48,10 +46,7 @@ CREATE TABLE cost_allocations (
   -- evidence.
   CONSTRAINT cost_allocations_actual_requires_evidence CHECK (
     entry_kind = 'INTENDED' OR evidence_id IS NOT NULL
-  ),
   )
-  -- A cross-currency entry must cite the dated FX evidence it used.
-  CONSTRAINT cost_allocations_fx_cited_for_context CHECK (TRUE)
 );
 
 CREATE INDEX idx_cost_allocations_reservation
@@ -96,3 +91,54 @@ ALTER TABLE cost_allocations
   FOREIGN KEY (workspace_id, fx_observation_id)
   REFERENCES fx_observations (workspace_id, id);
 
+-- The allocation has one transaction currency; the organisation payer is the
+-- only row-local comparison currency in the frozen schema. When those differ,
+-- an exact dated observation is mandatory. The trigger also rejects a cited
+-- observation for an unrelated pair, while payer-less allocations remain
+-- explicit but cannot assert a conversion context that the row does not own.
+CREATE FUNCTION assert_cost_allocation_fx_citation() RETURNS trigger AS $$
+DECLARE
+  v_payer_currency text;
+  v_fx_base text;
+  v_fx_quote text;
+BEGIN
+  IF NEW.payer_organisation_id IS NOT NULL THEN
+    SELECT default_currency_code INTO v_payer_currency
+      FROM organisations
+     WHERE workspace_id = NEW.workspace_id AND id = NEW.payer_organisation_id;
+    IF v_payer_currency IS NULL THEN
+      RAISE EXCEPTION 'cost allocation % payer organisation % is missing', NEW.id, NEW.payer_organisation_id;
+    END IF;
+    IF NEW.currency <> v_payer_currency AND NEW.fx_observation_id IS NULL THEN
+      RAISE EXCEPTION
+        'cost allocation % crosses % to % without dated FX evidence',
+        NEW.id, v_payer_currency, NEW.currency;
+    END IF;
+  END IF;
+
+  IF NEW.fx_observation_id IS NOT NULL THEN
+    SELECT base_currency, quote_currency
+      INTO v_fx_base, v_fx_quote
+      FROM fx_observations
+     WHERE workspace_id = NEW.workspace_id AND id = NEW.fx_observation_id;
+    IF v_fx_base IS NULL THEN
+      RAISE EXCEPTION 'cost allocation % cites missing FX observation %', NEW.id, NEW.fx_observation_id;
+    END IF;
+    IF NEW.payer_organisation_id IS NOT NULL
+       AND NOT (
+         (v_fx_base = v_payer_currency AND v_fx_quote = NEW.currency)
+         OR (v_fx_base = NEW.currency AND v_fx_quote = v_payer_currency)
+       ) THEN
+      RAISE EXCEPTION
+        'cost allocation % cites FX pair %/% inconsistent with payer currency % and amount currency %',
+        NEW.id, v_fx_base, v_fx_quote, v_payer_currency, NEW.currency;
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER cost_allocations_fx_citation_assert
+  AFTER INSERT OR UPDATE OF currency, payer_organisation_id, fx_observation_id ON cost_allocations
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION assert_cost_allocation_fx_citation();

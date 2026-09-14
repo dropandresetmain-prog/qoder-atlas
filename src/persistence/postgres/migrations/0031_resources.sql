@@ -93,6 +93,65 @@ CREATE CONSTRAINT TRIGGER resources_typed_detail_assert
   DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW EXECUTE FUNCTION assert_resource_has_typed_detail();
 
+-- The parent trigger cannot see a detail row being deleted. A detail delete is
+-- therefore checked explicitly so a valid Resource cannot be left untyped.
+CREATE FUNCTION assert_resource_detail_parent_has_typed_detail() RETURNS trigger AS $$
+DECLARE
+  v_workspace_id uuid;
+  v_resource_id uuid;
+  v_count integer;
+BEGIN
+  IF TG_OP IN ('DELETE', 'UPDATE') THEN
+    v_workspace_id := OLD.workspace_id;
+    v_resource_id := OLD.resource_id;
+    IF EXISTS (SELECT 1 FROM resources r WHERE r.workspace_id = v_workspace_id AND r.id = v_resource_id) THEN
+      SELECT
+          (SELECT COUNT(*) FROM vehicle_resource_details d
+            WHERE d.workspace_id = v_workspace_id AND d.resource_id = v_resource_id)
+        + (SELECT COUNT(*) FROM room_resource_details d
+            WHERE d.workspace_id = v_workspace_id AND d.resource_id = v_resource_id)
+        + (SELECT COUNT(*) FROM equipment_resource_details d
+            WHERE d.workspace_id = v_workspace_id AND d.resource_id = v_resource_id)
+        INTO v_count;
+      IF v_count <> 1 THEN
+        RAISE EXCEPTION
+          'resource % would have % typed detail rows after detail mutation', v_resource_id, v_count;
+      END IF;
+    END IF;
+  END IF;
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    v_workspace_id := NEW.workspace_id;
+    v_resource_id := NEW.resource_id;
+    SELECT
+        (SELECT COUNT(*) FROM vehicle_resource_details d
+          WHERE d.workspace_id = v_workspace_id AND d.resource_id = v_resource_id)
+      + (SELECT COUNT(*) FROM room_resource_details d
+          WHERE d.workspace_id = v_workspace_id AND d.resource_id = v_resource_id)
+      + (SELECT COUNT(*) FROM equipment_resource_details d
+          WHERE d.workspace_id = v_workspace_id AND d.resource_id = v_resource_id)
+      INTO v_count;
+    IF v_count <> 1 THEN
+      RAISE EXCEPTION
+        'resource % would have % typed detail rows after detail mutation', v_resource_id, v_count;
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER vehicle_resource_details_parent_assert
+  AFTER INSERT OR UPDATE OF workspace_id, resource_id OR DELETE ON vehicle_resource_details
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION assert_resource_detail_parent_has_typed_detail();
+CREATE CONSTRAINT TRIGGER room_resource_details_parent_assert
+  AFTER INSERT OR UPDATE OF workspace_id, resource_id OR DELETE ON room_resource_details
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION assert_resource_detail_parent_has_typed_detail();
+CREATE CONSTRAINT TRIGGER equipment_resource_details_parent_assert
+  AFTER INSERT OR UPDATE OF workspace_id, resource_id OR DELETE ON equipment_resource_details
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION assert_resource_detail_parent_has_typed_detail();
+
 CREATE FUNCTION enforce_subject_subtype_resource(
   p_workspace_id uuid,
   p_id uuid,
@@ -117,4 +176,3 @@ $$;
 
 INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
   ('RESOURCE', 'enforce_subject_subtype_resource', 'M3');
-

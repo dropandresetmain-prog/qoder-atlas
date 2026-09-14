@@ -14,14 +14,7 @@ CREATE TABLE commercial_agreements (
   created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT commercial_agreements_organisation_fk
-    FOREIGN KEY (workspace_id, organisation_id) REFERENCES organisations (workspace_id, id),
     FOREIGN KEY (workspace_id, organisation_id) REFERENCES organisations (workspace_id, id)
-  -- Deferred: a version and its root register in either order within one
-  -- command; the deferred assertion below keeps the pointer honest at COMMIT.
-  CONSTRAINT commercial_agreements_current_version_fk
-    FOREIGN KEY (workspace_id, current_version_id)
-    REFERENCES agreement_versions (workspace_id, id)
-    DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX idx_commercial_agreements_organisation
@@ -104,8 +97,16 @@ ALTER TABLE commercial_agreements
   DEFERRABLE INITIALLY DEFERRED;
 
 CREATE FUNCTION assert_agreement_has_version() RETURNS trigger AS $$
+DECLARE
+  v_current_version_id uuid;
 BEGIN
-  IF NEW.current_version_id IS NULL THEN
+  -- The root is inserted before its first immutable edition because the
+  -- current-version FK is circular. A deferred INSERT trigger must inspect the
+  -- final row state at COMMIT, not the INSERT event's temporary NULL pointer.
+  SELECT current_version_id INTO v_current_version_id
+    FROM commercial_agreements
+   WHERE workspace_id = NEW.workspace_id AND id = NEW.id;
+  IF v_current_version_id IS NULL THEN
     RAISE EXCEPTION
       'commercial_agreements % committed without a current version edition',
       NEW.id;
@@ -113,12 +114,12 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM agreement_versions v
      WHERE v.workspace_id = NEW.workspace_id
-       AND v.id = NEW.current_version_id
+       AND v.id = v_current_version_id
        AND v.agreement_id = NEW.id
   ) THEN
     RAISE EXCEPTION
       'commercial_agreements %: current_version % is not an edition of this agreement',
-      NEW.id, NEW.current_version_id;
+      NEW.id, v_current_version_id;
   END IF;
   RETURN NULL;
 END;
@@ -154,4 +155,3 @@ $$;
 
 INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
   ('COMMERCIAL_AGREEMENT', 'enforce_subject_subtype_commercial_agreement', 'M3');
-

@@ -64,6 +64,17 @@ CREATE INDEX idx_reservation_allocations_journey_item
 CREATE INDEX idx_reservation_allocations_line
   ON reservation_allocations (workspace_id, line_id);
 
+-- PostgreSQL treats NULL as distinct in a normal UNIQUE constraint. These
+-- partial indexes close that hole for allocations that have not yet been
+-- attached to a JourneyItem while retaining the two documented equivalence
+-- rules above.
+CREATE UNIQUE INDEX reservation_allocations_equivalent_no_item_uidx
+  ON reservation_allocations (workspace_id, line_id, traveller_id, allocation_role)
+  WHERE journey_item_id IS NULL;
+CREATE UNIQUE INDEX reservation_allocations_item_once_no_item_uidx
+  ON reservation_allocations (workspace_id, line_id, traveller_id)
+  WHERE journey_item_id IS NULL;
+
 -- Constraint checklist #5 / closure §4.3: "Linked item must belong to that
 -- person." journey_items has no traveller column (it hangs off journeys), so
 -- the rule joins through journeys. Deferred, so the allocation and any
@@ -97,4 +108,3 @@ CREATE CONSTRAINT TRIGGER reservation_allocations_item_traveller_assert
   AFTER INSERT OR UPDATE OF journey_item_id, traveller_id ON reservation_allocations
   DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW EXECUTE FUNCTION assert_allocation_item_belongs_to_traveller();
-

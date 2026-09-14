@@ -43,29 +43,33 @@ CREATE TABLE transport_services (
   -- representable, and no CHECK can express "corridor" without a place owner.
   CONSTRAINT transport_services_endpoints_distinct CHECK (origin_place_id <> destination_place_id),
   -- A time field may only exist with its provenance: no value without "when the
-  -- supplier said so", and no provenance without a value.
+  -- supplier said so" and its evidence, and no provenance without a value.
   CONSTRAINT transport_services_departure_group CHECK (
-    (published_departure IS NULL) = (published_observed_at IS NULL)
-    AND (estimated_departure IS NULL) = (estimated_observed_at IS NULL)
-    AND (actual_departure IS NULL) = (actual_observed_at IS NULL)
+    (published_departure IS NULL OR (published_observed_at IS NOT NULL AND published_evidence_id IS NOT NULL))
+    AND (estimated_departure IS NULL OR (estimated_observed_at IS NOT NULL AND estimated_evidence_id IS NOT NULL))
+    AND (actual_departure IS NULL OR (actual_observed_at IS NOT NULL AND actual_evidence_id IS NOT NULL))
+    AND (published_observed_at IS NULL) = (published_evidence_id IS NULL)
+    AND (estimated_observed_at IS NULL) = (estimated_evidence_id IS NULL)
+    AND (actual_observed_at IS NULL) = (actual_evidence_id IS NULL)
   ),
   CONSTRAINT transport_services_arrival_group CHECK (
-    (published_arrival IS NULL) = (published_observed_at IS NULL)
-    AND (estimated_arrival IS NULL) = (estimated_observed_at IS NULL)
-    AND (actual_arrival IS NULL) = (actual_observed_at IS NULL)
+    (published_arrival IS NULL OR (published_observed_at IS NOT NULL AND published_evidence_id IS NOT NULL))
+    AND (estimated_arrival IS NULL OR (estimated_observed_at IS NOT NULL AND estimated_evidence_id IS NOT NULL))
+    AND (actual_arrival IS NULL OR (actual_observed_at IS NOT NULL AND actual_evidence_id IS NOT NULL))
+    AND (published_observed_at IS NULL) = (published_evidence_id IS NULL)
+    AND (estimated_observed_at IS NULL) = (estimated_evidence_id IS NULL)
+    AND (actual_observed_at IS NULL) = (actual_evidence_id IS NULL)
+  ),
+  CONSTRAINT transport_services_observation_has_time CHECK (
+    (published_departure IS NOT NULL OR published_arrival IS NOT NULL OR published_observed_at IS NULL)
+    AND (estimated_departure IS NOT NULL OR estimated_arrival IS NOT NULL OR estimated_observed_at IS NULL)
+    AND (actual_departure IS NOT NULL OR actual_arrival IS NOT NULL OR actual_observed_at IS NULL)
   ),
   -- A service must be observable: at least the published schedule exists.
   CONSTRAINT transport_services_published_required CHECK (published_departure IS NOT NULL),
-  -- Estimated/actual are later observations of the same occurrence; they may
-  -- deviate, but never predate the published instant.
-  CONSTRAINT transport_services_estimated_after_published CHECK (
-    estimated_departure IS NULL OR published_departure IS NULL
-    OR estimated_departure >= published_departure - interval '0 seconds'
-  ),
-  CONSTRAINT transport_services_actual_after_published CHECK (
-    actual_departure IS NULL OR published_departure IS NULL
-    OR actual_departure >= published_departure - interval '0 seconds'
-  ),
+  -- Estimated/actual observations may legitimately be earlier or later than
+  -- the published schedule. They are separate supplier facts, not values to
+  -- be rejected because the desired schedule turned out to be wrong.
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_by_actor_id text NOT NULL,
@@ -106,4 +110,3 @@ $$;
 
 INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
   ('TRANSPORT_SERVICE', 'enforce_subject_subtype_transport_service', 'M3');
-

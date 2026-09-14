@@ -37,6 +37,9 @@ CREATE TABLE reservation_lines (
     (observed_status = 'UNKNOWN' AND observed_status_at IS NULL)
     OR (observed_status <> 'UNKNOWN' AND observed_status_at IS NOT NULL)
   ),
+  CONSTRAINT reservation_lines_evidence_shape CHECK (
+    (observed_status = 'UNKNOWN') = (observation_evidence_id IS NULL)
+  ),
   CONSTRAINT reservation_lines_terms_shape CHECK (
     observed_terms IS NULL OR (jsonb_typeof(observed_terms) = 'object'
                                AND pg_column_size(observed_terms) <= 8192)
@@ -156,4 +159,3 @@ $$;
 
 INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by) VALUES
   ('RESERVATION_LINE', 'enforce_subject_subtype_reservation_line', 'M3');
-

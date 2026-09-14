@@ -23,7 +23,6 @@ CREATE TABLE entitlement_components (
     REFERENCES entitlement_components (workspace_id, id),
   CONSTRAINT entitlement_components_exchange_not_self CHECK (
     exchanged_from_component_id IS NULL OR exchanged_from_component_id <> id
-  )
   ),
   -- Referable target for 0036's "component belongs to this entitlement"
   -- composite FK from entitlement_line_links.
@@ -86,4 +85,3 @@ CREATE TABLE entitlement_person_links (
 
 CREATE INDEX idx_entitlement_person_links_traveller
   ON entitlement_person_links (workspace_id, traveller_id);
-
