@@ -47,6 +47,7 @@ import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerar
 import { evaluateRecoveryStrategy } from '../src/resolution/scenarios/evaluate.ts';
 import { compileActionPlan } from '../src/resolution/planning/compiler.ts';
 import { ScenarioChangeSchema } from '../src/contracts/v2/scenario/scenarioChange.ts';
+import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { WObjective } from '../src/resolution/world/world.ts';
 import {
@@ -93,13 +94,7 @@ async function drainReassessment(
   maxRounds = 30,
 ): Promise<void> {
   for (let i = 0; i < maxRounds; i++) {
-    const outcome = await app.reassessmentWorker.runOnce(NOW, pipeline, app.workspaceId);
-    if (outcome.result === 'NO_WORK' || outcome.claimed === false && outcome.result !== 'RETRY_SCHEDULED') {
-      if (outcome.result === 'NO_WORK') return;
-    }
-    if (outcome.result === 'COMPLETED' || outcome.result === 'UNAVAILABLE') {
-      // keep draining until queue empty
-    }
+    await app.reassessmentWorker.runOnce(NOW, pipeline, app.workspaceId);
     const pending = await app.pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM scheduled_reassessments
         WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
@@ -434,7 +429,7 @@ describe('M9 Sarah target PG E2E (composeTargetApplication)', () => {
       targets: [],
     }));
     const baseWorld = { ...captured, objectives: [...captured.objectives, ...anchorObjectives] };
-    const baseManifest = {
+    const baseManifest: WorldSnapshotManifest = {
       ...captured.manifest,
       aggregateReads: [
         ...(captured.manifest.aggregateReads ?? []).filter((r) => r.aggregateRef.kind !== 'PROGRAMME'),
