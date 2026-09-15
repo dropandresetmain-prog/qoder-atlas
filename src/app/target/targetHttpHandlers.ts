@@ -227,7 +227,7 @@ export async function handleTargetProductHttp(
 
     if (req.method === 'POST' && pathname === '/api/v2/demo/provider-event') {
       const body = (await readJson(req)) as ProviderShapedDemoEvent;
-      const result = acceptProviderShapedDemoEvent(body);
+      const result = await acceptProviderShapedDemoEvent(commandCtx(ctx.app), body);
       sendJson(res, result.ok ? 202 : 400, result);
       return true;
     }

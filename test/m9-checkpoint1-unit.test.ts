@@ -92,16 +92,48 @@ describe('M9 R-10 grant scope covering', () => {
 });
 
 describe('M9 demo ingress + errors', () => {
-  test('provider-shaped demo event never mutates and requires disclosure', () => {
-    const ok = acceptProviderShapedDemoEvent({
+  // The real acceptance path (disclosed event -> recordTransportObservation
+  // canonical mutation -> durable reassessment) needs PostgreSQL; see
+  // postgres-integration/m9DemoIngress.pgtest.ts for that proof. These are
+  // the validation-only branches, which never touch the database.
+  const noDbCtx = {
+    workspaceId: 'unused',
+    actorPrincipalId: 'unused',
+    uow: () => { throw new Error('validation-refusal paths must not open a UnitOfWork'); },
+    pool: undefined as never,
+  };
+
+  test('undisclosed input is refused before any mutation is attempted', async () => {
+    const refused = await acceptProviderShapedDemoEvent(noDbCtx, {
       providerId: 'atlas',
       providerEventId: 'evt-1',
       receivedAt: '2031-01-01T00:00:00.000Z',
-      payload: { type: 'schedule_change' },
+      payload: { subjectKind: 'TRANSPORT_SERVICE', subjectId: 'x', expectedRevision: 1, field: 'ACTUAL', arrival: '2031-01-01T01:00:00.000Z', evidenceId: 'x' },
+      disclosedAsSimulatedDemoInput: false as unknown as true,
+    });
+    assert.equal(refused.ok, false);
+  });
+
+  test('missing provider identity is refused before any mutation is attempted', async () => {
+    const refused = await acceptProviderShapedDemoEvent(noDbCtx, {
+      providerId: '',
+      providerEventId: '',
+      receivedAt: '2031-01-01T00:00:00.000Z',
+      payload: { subjectKind: 'TRANSPORT_SERVICE', subjectId: 'x', expectedRevision: 1, field: 'ACTUAL', arrival: '2031-01-01T01:00:00.000Z', evidenceId: 'x' },
       disclosedAsSimulatedDemoInput: true,
     });
-    assert.equal(ok.ok, true);
-    if (ok.ok) assert.equal(ok.next, 'NORMALISE_AND_PROCESS_SIGNAL');
+    assert.equal(refused.ok, false);
+  });
+
+  test('a payload with no departure/arrival observation is refused before any mutation is attempted', async () => {
+    const refused = await acceptProviderShapedDemoEvent(noDbCtx, {
+      providerId: 'atlas',
+      providerEventId: 'evt-1',
+      receivedAt: '2031-01-01T00:00:00.000Z',
+      payload: { subjectKind: 'TRANSPORT_SERVICE', subjectId: 'x', expectedRevision: 1, field: 'ACTUAL', evidenceId: 'x' },
+      disclosedAsSimulatedDemoInput: true,
+    });
+    assert.equal(refused.ok, false);
   });
 
   test('application errors never claim mutation', () => {
