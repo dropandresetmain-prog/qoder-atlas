@@ -269,9 +269,6 @@ export function runPrimaryScenarioVerticalLoop(input: PrimaryScenarioLoopInput):
     operatorOverview,
     travellerView,
     pendingFixtureFields: [
-      'exact provider artifact refs',
-      'exact commitment UUIDs',
-      'exact flight numbers',
       'Fable visual direction (polish only)',
     ] as const,
   };

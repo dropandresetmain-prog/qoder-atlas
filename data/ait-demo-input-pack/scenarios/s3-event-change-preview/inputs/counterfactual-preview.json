@@ -7,7 +7,7 @@
   "note": "Counterfactual two-move swap; no authoritative mutation.",
   "asOf": "2026-09-22T11:05:00+08:00",
   "proposal": {
-    "changeKind": "OPTION_SET",
+    "changeKind": "RESCHEDULED",
     "moves": [
       {
         "commitmentId": "cmt-ait-d1-headline-interview",

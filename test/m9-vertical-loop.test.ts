@@ -96,7 +96,8 @@ describe('M9 primary scenario vertical loop (generic)', () => {
     assert.match(renderProductTravellerTrip(result.travellerView), /programme/i);
     assert.match(renderProductProgrammePreview(result.preview), /does not change authoritative/i);
 
-    assert.ok(result.pendingFixtureFields.length >= 3);
+    assert.ok(result.pendingFixtureFields.includes('Fable visual direction (polish only)'));
+    assert.equal(result.pendingFixtureFields.length, 1);
     assert.ok(!JSON.stringify(result).includes('Sarah'));
     assert.ok(!JSON.stringify(result).includes('Daniel'));
   });

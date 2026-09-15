@@ -803,11 +803,11 @@ export class ProgrammeService {
   }
 
   /**
-   * Arrival-buffer parameter from governing MIN_BUFFER policy rules: only
-   * programme-wide rules (empty appliesTo — no element-level evidence exists
-   * at intake) bind; the first rule in deterministic (rule set, rule) order
-   * wins. The declared minimum binds; an absent minimum falls back to the
-   * expected duration. No qualifying rule leaves the parameter absent.
+   * Arrival-buffer parameter from governing readiness policy: prefer
+   * PROGRAMME_ARRIVAL_READINESS, else MIN_BUFFER. Only programme-wide rules
+   * (empty appliesTo) bind; first rule in deterministic (rule set, rule) order
+   * wins. Declared minimum binds; absent minimum falls back to expected.
+   * No qualifying rule leaves the parameter absent.
    */
   private async arrivalBufferFromRules(
     governingRuleSetIds: EntityId[],
@@ -819,6 +819,18 @@ export class ProgrammeService {
       .filter((ruleSet) => governingRuleSetIds.includes(ruleSet.id))
       .sort((a, b) => a.id.localeCompare(b.id));
     for (const ruleSet of ruleSets) {
+      const readiness = ruleSet.rules
+        .filter((rule): rule is Extract<PolicyRule, { kind: 'PROGRAMME_ARRIVAL_READINESS' }> =>
+          rule.kind === 'PROGRAMME_ARRIVAL_READINESS' && rule.appliesTo.length === 0,
+        )
+        .sort((a, b) => a.id.localeCompare(b.id));
+      if (readiness[0]) {
+        return {
+          minutes: readiness[0].buffer.minimumMinutes ?? readiness[0].buffer.expectedMinutes,
+          ruleId: readiness[0].id,
+          ruleSetId: ruleSet.id,
+        };
+      }
       const candidates = ruleSet.rules
         .filter((rule): rule is Extract<PolicyRule, { kind: 'MIN_BUFFER' }> =>
           rule.kind === 'MIN_BUFFER' && rule.appliesTo.length === 0,

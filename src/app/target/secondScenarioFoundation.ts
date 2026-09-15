@@ -87,9 +87,12 @@ export interface JordanS2ScenarioFoundation {
     sarahLevelVisualPolishRequired: false;
   };
   pendingEvidence: {
-    atlasFlightFacts: 'PENDING';
-    nuiteeStayFacts: 'PENDING';
-    exactTimings: 'PENDING';
+    atlasFlightFacts: 'PENDING' | 'LANDED';
+    nuiteeStayFacts: 'PENDING' | 'LANDED';
+    exactTimings: 'PENDING' | 'LANDED';
+    flightProvenance?: string;
+    hotelProvenance?: string;
+    groundTransferProvenance?: string;
   };
 }
 
@@ -133,9 +136,12 @@ export const jordanS2ScenarioFoundation: JordanS2ScenarioFoundation = {
     sarahLevelVisualPolishRequired: false,
   },
   pendingEvidence: {
-    atlasFlightFacts: 'PENDING',
-    nuiteeStayFacts: 'PENDING',
-    exactTimings: 'PENDING',
+    atlasFlightFacts: 'LANDED',
+    nuiteeStayFacts: 'LANDED',
+    exactTimings: 'LANDED',
+    flightProvenance: 'ATLAS_REPLAY',
+    hotelProvenance: 'NUITEE_SANDBOX_RECORD',
+    groundTransferProvenance: 'SCENARIO_SIMULATED_PROVIDER_BOUNDARY',
   },
 };
 

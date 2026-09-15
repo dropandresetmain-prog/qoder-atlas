@@ -51,9 +51,10 @@ export interface SharedSupplierProgrammeCohortFoundation {
     ];
   };
   pendingFixtureLane: {
-    providerArtifacts: 'PENDING';
-    exactCommitmentIds: 'PENDING';
-    exactFlightNumbers: 'PENDING';
+    providerArtifacts: 'PENDING' | 'LANDED';
+    exactCommitmentIds: 'PENDING' | 'LANDED';
+    exactFlightNumbers: 'PENDING' | 'LANDED';
+    batikProvenance?: string;
   };
 }
 
@@ -96,8 +97,9 @@ export const sharedSupplierProgrammeCohortFoundation: SharedSupplierProgrammeCoh
     ],
   },
   pendingFixtureLane: {
-    providerArtifacts: 'PENDING',
-    exactCommitmentIds: 'PENDING',
-    exactFlightNumbers: 'PENDING',
+    providerArtifacts: 'LANDED',
+    exactCommitmentIds: 'LANDED',
+    exactFlightNumbers: 'LANDED',
+    batikProvenance: 'ORGANISER_SUPPLIED_SYNTHETIC_SIMULATED_EXTERNAL_EVENT',
   },
 };

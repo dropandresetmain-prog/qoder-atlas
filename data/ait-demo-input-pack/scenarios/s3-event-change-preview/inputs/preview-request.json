@@ -6,7 +6,7 @@
   "note": "HTTP change-preview body shape for the continuous S1→S3 path (POST /api/programme/:id/change-preview).",
   "anchorEventId": "evt-ait-2026",
   "commitmentId": "cmt-ait-d1-headline-interview",
-  "changeKind": "OPTION_SET",
+  "changeKind": "RESCHEDULED",
   "newStartsAt": "2026-10-01T14:30:00+08:00",
   "newEndsAt": "2026-10-01T15:00:00+08:00",
   "at": "2026-09-22T11:05:00+08:00",
