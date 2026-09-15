@@ -437,23 +437,34 @@ export async function evaluateStoredExecutionGate(
   const state = await new PgCurrentStateReader(pool).loadFor(params.workspaceId, manifest);
   const currentness = assessManifestCurrentness(manifest, state, params.now);
   if (!currentness.current) {
-    // Narrow exemption: a dependent intent may see AGGREGATE_ADVANCED vs the
-    // original strategy base manifest when a same-plan prerequisite already
-    // observed a Programme mutation. Allow only when every staleness reason
-    // is an aggregate advance explained by that durable observation matching
-    // the current head. External concurrent advances still fail closed.
+    // Narrow exemption: a dependent intent may see AGGREGATE_ADVANCED /
+    // SCOPE_ADVANCED vs the original strategy base manifest when a same-plan
+    // prerequisite already observed a Programme mutation (schedule updates
+    // advance both the aggregate head and the PROGRAMME scope generation).
+    // Allow only when every such reason is explained by that durable
+    // observation matching the current head/generation. External concurrent
+    // advances still fail closed.
     const unexplained: typeof currentness.reasons = [];
     for (const reason of currentness.reasons) {
-      if (reason.kind !== 'AGGREGATE_ADVANCED' || reason.aggregateRef.kind !== 'PROGRAMME') {
+      if (reason.kind === 'AGGREGATE_ADVANCED' && reason.aggregateRef.kind === 'PROGRAMME') {
+        const observed = await observedProgrammeRevisionFromPrerequisites(
+          pool, params.workspaceId, intent.id, reason.aggregateRef.id,
+        );
+        if (observed !== undefined && observed === reason.currentRevision) continue;
         unexplained.push(reason);
         continue;
       }
-      const observed = await observedProgrammeRevisionFromPrerequisites(
-        pool, params.workspaceId, intent.id, reason.aggregateRef.id,
-      );
-      if (observed === undefined || observed !== reason.currentRevision) {
+      if (reason.kind === 'SCOPE_ADVANCED' && reason.scopeKind === 'PROGRAMME') {
+        const observed = await observedProgrammeRevisionFromPrerequisites(
+          pool, params.workspaceId, intent.id, reason.scopeId,
+        );
+        // Programme schedule mutation advances scope generation in lockstep
+        // with the aggregate revision in the accepted M4 command path.
+        if (observed !== undefined && observed === reason.currentGeneration) continue;
         unexplained.push(reason);
+        continue;
       }
+      unexplained.push(reason);
     }
     if (unexplained.length > 0) {
       return { allowed: false, reason: 'STALE_BASE', detail: JSON.stringify(currentness.reasons) };
