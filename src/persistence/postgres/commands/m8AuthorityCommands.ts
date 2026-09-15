@@ -411,6 +411,37 @@ export async function createPreparedExecutionAttempt(
       }
       const logicalOperationKey = intent.logical_operation_key;
       const requestFingerprint = intent.request_fingerprint;
+
+      // M7's ActionPlan DAG (action_dependencies) is honored here: a downstream
+      // intent may not prepare a dispatch attempt until every intent it depends
+      // on has a terminal-success execution_attempts row. A failed prerequisite
+      // permanently blocks the dependant (never silently skipped); an
+      // in-progress/not-yet-attempted prerequisite blocks until it resolves.
+      const deps = await client.query<{ from_action_intent_id: string; satisfied: boolean; failed: boolean }>(
+        `SELECT d.from_action_intent_id,
+                bool_or(ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED')) AS satisfied,
+                bool_or(ea.status IN ('OBSERVED_FAILURE', 'FAILED')) AS failed
+           FROM action_dependencies d
+           LEFT JOIN execution_attempts ea
+             ON ea.workspace_id = d.workspace_id AND ea.action_intent_id = d.from_action_intent_id
+          WHERE d.workspace_id = $1 AND d.to_action_intent_id = $2
+          GROUP BY d.from_action_intent_id`,
+        [params.workspaceId, params.intentId],
+      );
+      const failedPrerequisite = deps.rows.find((d) => d.failed);
+      if (failedPrerequisite) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', `prerequisite intent ${failedPrerequisite.from_action_intent_id} failed; dependant is blocked`, [planRef]),
+        };
+      }
+      const unresolvedPrerequisite = deps.rows.find((d) => !d.satisfied);
+      if (unresolvedPrerequisite) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', `prerequisite intent ${unresolvedPrerequisite.from_action_intent_id} has not completed; downstream dispatch blocked`, [planRef]),
+        };
+      }
       const prior = await client.query<{ request_fingerprint: string; status: string; id: string }>(
         `SELECT id, request_fingerprint, status FROM execution_attempts
           WHERE workspace_id = $1 AND logical_operation_key = $2`,

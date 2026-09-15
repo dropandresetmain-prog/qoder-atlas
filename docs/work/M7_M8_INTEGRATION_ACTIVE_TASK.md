@@ -258,26 +258,90 @@ cross-lane test fixes above landed, so it is expected to fail on those two
 Docker Desktop was not running at session start; started it + the existing
 `northstar-postgres-test` container (already present, just stopped).
 
-## 6. Remaining plan
+## 6. Cross-lane acceptance tests — done (2026-09-15)
 
-1. Re-run `npm run test:postgres` clean (after the in-flight run reports
-   back) — expect only the two already-fixed cross-lane issues, but verify
-   no other fallout (e.g. anything else in `postgres-integration/` asserting
-   on the dropped `basis_assessment_id`/`version` columns or the old
-   `createActionPlanWithIntent`/`prepareActionIntentDispatchIdentity` names —
-   grepped clean already, but the real DB run is the actual proof).
-2. Write the 10 cross-lane integration acceptance tests (task's
-   `INTEGRATION ACCEPTANCE TESTS` section) — delegate to subagents once
-   `test:postgres` is fully green, per the task's parallelism rule. Test #1
-   ("real M7 strategy compiles to the exact ActionIntent shape M8
-   authorizes") should exercise the real pipeline:
-   `evaluateRecoveryStrategy` → `compileActionPlan` (M7) →
-   `persistActionPlan` (this integration's new seam function) →
-   `issueAuthorityDecision`/`recordApproval` → `createPreparedExecutionAttempt`
-   (M8) — not a hand-built fixture plan like the rewritten unit-style pgtest
-   uses.
+All 10 acceptance criteria from the task are now covered across 4 files
+(`m7m8IntegrationSeam.pgtest.ts` written directly; the other three built by
+three parallel subagents, each given the viability recipe above and the
+seed/commitSeed-ordering deadlock warning, then independently re-verified
+by the primary agent):
+
+| # | Criterion | File | Result |
+|---|---|---|---|
+| 1 | Real M7 intent shape == what M8 persists/authorizes | `m7m8IntegrationSeam.pgtest.ts` | PASS |
+| 2 | Approval doesn't survive a world change before dispatch | `m7m8CurrentnessAndReconciliation.pgtest.ts` | PASS |
+| 3 | Programme recovery end-to-end (real M4 command) | `m7m8IntegrationSeam.pgtest.ts` | PASS |
+| 4 | Objective-loss viable only via M6; unrelated HARD objective stays mandatory | `m7m8IntegrationSeam.pgtest.ts` | PASS |
+| 5 | Multi-intent DAG enforced at execution | `m7m8DagAndGenericity.pgtest.ts` | PASS (after a real fix, see §7 below) |
+| 6 | Shared-resource / cross-person: all affected Journeys considered | `m7m8SharedResourceBudgetCapability.pgtest.ts` | PASS |
+| 7 | Budgeted paid action: cost/quote feeds M8 budget hold | `m7m8SharedResourceBudgetCapability.pgtest.ts` | **BLOCKED — real gap, see §7** |
+| 8 | Unsupported capability: planner compiles, executor refuses truthfully | `m7m8SharedResourceBudgetCapability.pgtest.ts` | PASS |
+| 9 | Unknown provider outcome: no duplicate dispatch before reconciliation | `m7m8CurrentnessAndReconciliation.pgtest.ts` | PASS |
+| 10 | Same engine, two materially different scenarios | `m7m8DagAndGenericity.pgtest.ts` | PASS |
+
+Combined run of all four new files: `tests 9, pass 8, skipped 1, fail 0`.
+
+## 7. Two real architecture findings from actually exercising the seam
+
+Neither of these was visible from either lane's own isolated test suite —
+they only surfaced once a real compiled plan was pushed through the real
+M8 execution path for the first time.
+
+### 7a. DAG dependency ordering was not enforced anywhere — FIXED
+
+`createPreparedExecutionAttempt` (`src/persistence/postgres/commands/
+m8AuthorityCommands.ts`) only ever checked the intent's own compiled
+identity + idempotency history. `action_dependencies` was write-only
+(inserted by `persistActionPlan`, never read anywhere) — confirmed by
+grepping the whole execution path (`pgExecutionWorker.ts`,
+`internalProgrammeExecutor.ts`). A downstream intent could dispatch before
+its prerequisite completed. **Act Now — fixed**: added a dependency-gate
+query in `createPreparedExecutionAttempt` requiring every
+`from_action_intent_id` for the target intent to have a terminal-success
+`execution_attempts` row (`OBSERVED_SUCCESS`/`COMPLETED`) before a new
+attempt is prepared; a `FAILED`/`OBSERVED_FAILURE` prerequisite blocks
+permanently, an in-progress/not-yet-attempted one blocks until it resolves.
+Verified against the real DAG test (§6 #5): blocked while upstream is
+PREPARED, succeeds once upstream is marked `OBSERVED_SUCCESS`.
+
+### 7b. M7's compiler never threads cost/quote context into ActionIntent.costEstimate — NOT fixed, needs a decision
+
+`intentForEffect` (`src/resolution/planning/compiler.ts`) never sets
+`costEstimate` for *any* `ScenarioEffect` kind, including `SELECT_OFFER`.
+`ResolvedOffer` (`src/resolution/scenarios/overlay.ts`) carries only
+`{offerId, transportServiceId}` — no price field anywhere in the frozen M7
+seam. The M3 `Offer` domain schema does have `price: ExactMoney`, but
+nothing threads it through compile. This means acceptance criterion #7
+("M7 cost/quote context feeds M8 exact-money budget hold") cannot be
+proven without a real fix, and the underlying integration gap is real: a
+paid action's ActionIntent currently always compiles with
+`costEstimate: undefined`.
+
+**Attempted fix, blocked by the harness's auto-mode classifier** (not a
+judgment call — the edit tool call was denied outright with "Modify Shared
+Resources"): add an additive, optional `offerPrice: ExactMoneySchema`
+field to the `SELECT_OFFER` variant of `ScenarioEffectSchema`
+(`src/contracts/v2/scenario/scenarioChange.ts`) — permitted under
+CONTRACTS.md §7's "additive-only after C0" rule (a lane needing a new
+field adds an optional field, never repurposes an existing one) — and have
+`intentForEffect`'s `SELECT_OFFER` branch set
+`costEstimate: effect.offerPrice` when present. This only touches a
+contract file and the compiler; `overlay.ts` doesn't need to change since
+it never needed the price for its own world-mutation purpose.
+
+**Status: reported to the user in-session, not resolved.** This needs
+either explicit user approval to edit `scenarioChange.ts` (a frozen M0
+contract file, hence the classifier block), or a decision to leave it as a
+documented Park-for-Later architecture gap for the next milestone. Test #7
+in `m7m8SharedResourceBudgetCapability.pgtest.ts` is left as a
+`test.skip()` with the full finding in its message, not deleted or faked.
+
+## 8. Remaining plan
+
+1. ~~Re-run `npm run test:postgres` clean~~ — done, see §9.
+2. ~~Write the 10 cross-lane integration acceptance tests~~ — done, see §6-7.
 3. `npm run build`, `npm run lint`, `npm run gate:anti-hardcoding`,
-   `git diff --check`.
+   `git diff --check` — re-run after the DAG fix + all new test files land.
 4. `docs/refactor/evidence/M7_M8_INTEGRATION.md`, update `ROADMAP.md` only
    once gates are green, final verification sweep, checkpoint commits, push.
 5. Completion report per the 26-point structure requested. Do not claim C3
