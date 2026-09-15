@@ -99,6 +99,7 @@ function intentForEffect(
         requiredAuthorityScopes: ['journey.service_selection'],
         expectedObservations: ['EXTERNAL_PROVIDER:reservation_or_ticket_confirmation'],
         offerFingerprint: effect.offerId,
+        ...(effect.offerPrice ? { costEstimate: effect.offerPrice } : {}),
       });
     }
     case 'PROPOSE_ALLOCATION': {

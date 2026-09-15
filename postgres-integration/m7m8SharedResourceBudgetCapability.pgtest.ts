@@ -30,26 +30,18 @@
  * Used below in acceptance #8 (Test C), which only needs the plan to
  * *compile*, not to model a real reachable booking.
  *
- * ACCEPTANCE #7 (Test B / budgeted paid action) is NOT implemented in this
- * file — see the `test.skip` block below for the exact, verified reason:
- * `compileActionPlan`'s `intentForEffect` (src/resolution/planning/compiler.ts)
- * does not set `costEstimate` on the compiled ActionIntent for ANY
- * ScenarioEffect kind, including `SELECT_OFFER`. `ResolvedOffer`
- * (src/resolution/scenarios/overlay.ts) — the only M7 structure that carries
- * a resolved offer into evaluation/compilation — carries only `offerId` and
- * `transportServiceId`, never a price. The M3 `Offer` domain schema does have
- * a real `price: ExactMoney` (src/domain/v2/arrangements/reservation.ts), but
- * nothing in the frozen M7 seam (ScenarioEffect, ResolvedOffer,
- * intentForEffect) threads that price through to `ActionIntent.costEstimate`.
- * `costEstimate` is therefore, as currently merged, only ever set by
- * hand-built test fixtures (e.g. `buildSingleIntentPlan` in
- * m8AuthorityExecution.pgtest.ts), never by the real compiler. Building Test
- * B as specified — "M7 cost/quote context feeds M8 exact-money budget hold"
- * through a REAL compiled intent — is not achievable without either editing
- * frozen `src/` production code (out of scope here) or hand-setting
- * `costEstimate` outside `compileActionPlan` (which would itself be the
- * second, independently-invented cost representation the acceptance
- * criterion exists to rule out). Flagged rather than worked around.
+ * ACCEPTANCE #7 (Test B / budgeted paid action) — CLOSED. It was originally
+ * blocked for the reason recorded in
+ * docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §7b: `compileActionPlan`'s
+ * `intentForEffect` never set `costEstimate` on ANY compiled ActionIntent,
+ * and `ResolvedOffer` (src/resolution/scenarios/overlay.ts) carried only
+ * `{offerId, transportServiceId}`, never a price. Fixed, with the user's
+ * explicit approval, by an additive `offerPrice?: ExactMoney` field on the
+ * `SELECT_OFFER` `ScenarioEffect` variant
+ * (src/contracts/v2/scenario/scenarioChange.ts — permitted under
+ * CONTRACTS.md §7's additive-only rule) plus one line in `intentForEffect`
+ * setting `costEstimate: effect.offerPrice` when present. Test B below uses
+ * the same DROPPED-item SELECT_OFFER viability fixture as Test C.
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -57,8 +49,10 @@ import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
 import { seedEvent, seedProgramme, seedProgrammeItem, seedParticipation } from './m4Seed.ts';
+import { seedOrganisation } from './m3Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createBudget } from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import {
   openRecoveryCase,
   persistActionPlan,
@@ -66,6 +60,7 @@ import {
   recordApproval,
   authorizeDispatch,
   createPreparedExecutionAttempt,
+  holdBudgetForIntent,
   type DispatchAuthorizationInput,
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecutionWorker.ts';
@@ -265,20 +260,117 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
   });
 });
 
-// ACCEPTANCE #7 — see the file header for the full, empirically-verified
-// explanation. Summary: compileActionPlan's intentForEffect
-// (src/resolution/planning/compiler.ts) never sets ActionIntent.costEstimate
-// for any ScenarioEffect kind, and M7's ResolvedOffer (the only structure
-// that could carry a real offer price into evaluation/compilation) has no
-// price field at all — only { offerId, transportServiceId }. There is no
-// path through the REAL, frozen M7 compiler that produces a compiled
-// ActionIntent with a populated costEstimate, so "M7 cost/quote context
-// feeds M8 exact-money budget hold" cannot be proven end-to-end without
-// either editing frozen src/ production code or hand-setting costEstimate
-// outside the compiler — the latter would itself be the second,
-// independently-invented cost representation this acceptance criterion
-// exists to rule out. Left as a flagged gap, not silently worked around.
-test('acceptance #7: budgeted paid action via a REAL M7-compiled costEstimate — BLOCKED, see file header', { skip: 'compileActionPlan never populates ActionIntent.costEstimate for any ScenarioEffect kind (verified by reading intentForEffect in src/resolution/planning/compiler.ts); ResolvedOffer (src/resolution/scenarios/overlay.ts) carries no price field. No real M7-compiled intent with a costEstimate is reachable without touching frozen src/ code.' }, () => {});
+describe('acceptance #7: budgeted paid action — M7 cost/quote context feeds M8 exact-money budget hold', () => {
+  test('a real compiled SELECT_OFFER costEstimate round-trips through Postgres into a budget hold with no second cost representation', async () => {
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'M7-M8 budget: real compiled costEstimate');
+    const organisationId = await seedOrganisation(seed, 'USD');
+    await commitSeed(seed);
+
+    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+    const opened = mustOk(await openRecoveryCase(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: NOW,
+    }));
+
+    // Same DROPPED-item SELECT_OFFER viability fixture as Test C (file
+    // header) — an ACTIVE transport item can never reach VIABLE through
+    // SELECT_OFFER without fabricating a real booking.
+    const journeyId = randomUUID();
+    const tripId = randomUUID();
+    const travellerId = randomUUID();
+    const itemId = randomUUID();
+    const serviceId = randomUUID();
+    const offerId = randomUUID();
+    const offerPrice = { amount: '432.10', currency: 'USD' as const };
+    const journey: WJourney = {
+      id: journeyId, revision: 1, tripId, travellerId,
+      lifecycleStatus: 'ACTIVE', intendedWindow: null, responsibilityOrganisationId: null,
+    };
+    const anchorObjective: WObjective = {
+      id: randomUUID(), revision: 1, owner: { kind: 'JOURNEY', id: journeyId },
+      successPredicateKind: 'STATEMENT', hardness: 'HARD', priority: 1,
+      disposition: 'ACHIEVED', dispositionEvidenceId: null, targets: [],
+    };
+    const item: WJourneyItem = {
+      id: itemId, journeyId, kind: 'TRANSPORT', orderKey: '010', lifecycleStatus: 'DROPPED', flexible: false, intendedWindow: null,
+      desiredOriginPlaceId: 'p-a', desiredDestinationPlaceId: 'p-b', selectedServiceId: null, intendedPlaceId: null, requiredNights: null,
+      participationId: null, standaloneTitle: null, standaloneWindow: null, resourceId: null, intendedLocationPlaceId: null,
+    };
+    const service: WTransportService = {
+      id: serviceId, revision: 1, mode: 'AIR', operator: 'op', originPlaceId: 'p-a', destinationPlaceId: 'p-b',
+      published: { departure: null, arrival: null }, estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
+    };
+    const world = emptyWorld({
+      journeys: [journey], objectives: [anchorObjective], journeyItems: [item], transportServices: [service],
+      focus: [{ kind: 'JOURNEY', id: journeyId }],
+    });
+    const scenarioChange = ScenarioChangeSchema.parse({
+      id: randomUUID(), recoveryStrategyId: randomUUID(), strategyVersion: 1,
+      affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: itemId }],
+      basisAssessmentId: randomUUID(),
+      effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: itemId, offerId, offerPrice }],
+    });
+    const evaluated = evaluateRecoveryStrategy({
+      recoveryCaseId: opened.caseId, baseWorld: world, baseManifest: emptyManifest(),
+      basisAssessmentId: scenarioChange.basisAssessmentId, scenarioChange, now: NOW,
+      resolvedOffers: [{ offerId, transportServiceId: serviceId }],
+    });
+    assert.equal(evaluated.ok, true);
+    if (!evaluated.ok) return;
+    assert.equal(evaluated.value.strategy.viability, 'VIABLE');
+
+    const compiled = compileActionPlan({
+      strategy: evaluated.value.strategy, now: NOW,
+      capabilities: [{ capabilityRef: 'external:offer.select', supported: true }],
+    });
+    assert.equal(compiled.ok, true);
+    if (!compiled.ok) return;
+    const plan = compiled.value.plan;
+    const compiledIntent = plan.intents[0]!;
+    assert.equal(compiledIntent.capabilityRef, 'external:offer.select');
+    // The compiler carried the caller-supplied offer price straight onto the
+    // ActionIntent — not re-derived, not invented, not a second cost source.
+    assert.deepEqual(compiledIntent.costEstimate, offerPrice);
+
+    const persisted = mustOk(await persistActionPlan(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+    }));
+    assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
+
+    const persistedRow = await pool.query<{ cost_amount: string; cost_currency: string }>(
+      'SELECT cost_amount, cost_currency FROM action_intents WHERE workspace_id = $1 AND id = $2',
+      [seed.workspaceId, compiledIntent.id],
+    );
+    assert.equal(persistedRow.rows[0]?.cost_amount, offerPrice.amount);
+    assert.equal(persistedRow.rows[0]?.cost_currency, offerPrice.currency);
+
+    // --- M8's budget hold uses EXACTLY the persisted (DB-read) cost, not the
+    // in-memory compiled object and not a hand-typed literal — proving the
+    // round trip, not just the in-memory shape. ---
+    const budgetId = randomUUID();
+    mustOk(await createBudget(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
+      budget: { id: budgetId, organisationId, purpose: 'travel', amount: { amount: '1000.00', currency: 'USD' } },
+    }));
+    const hold = mustOk(await holdBudgetForIntent(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
+      budgetId, expectedBudgetRevision: 1, actionIntentId: compiledIntent.id,
+      requested: { amount: persistedRow.rows[0]!.cost_amount, currency: persistedRow.rows[0]!.cost_currency as 'USD' },
+    }));
+    assert.equal(hold.holdAmount.amount, offerPrice.amount);
+    assert.equal(hold.holdAmount.currency, offerPrice.currency);
+
+    const commitments = await pool.query<{ amount: string; currency: string; action_intent_id: string }>(
+      `SELECT amount::text AS amount, currency, action_intent_id FROM budget_commitments
+        WHERE workspace_id = $1 AND budget_id = $2`,
+      [seed.workspaceId, budgetId],
+    );
+    assert.equal(commitments.rowCount, 1, 'exactly one budget commitment, no duplicate cost representation');
+    assert.equal(commitments.rows[0]?.action_intent_id, compiledIntent.id);
+    assert.equal(commitments.rows[0]?.amount, offerPrice.amount);
+    assert.equal(commitments.rows[0]?.currency, offerPrice.currency);
+  });
+});
 
 describe('acceptance #8: unsupported provider capability — planner compiles, executor refuses truthfully', () => {
   test('SELECT_OFFER compiles under a planner-side supported:true capability statement, but the executor observes supported:false and never invokes the dispatcher', async () => {

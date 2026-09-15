@@ -9,12 +9,23 @@
  */
 import { z } from 'zod';
 import { SubjectIdSchema, TypedRefSchema } from '../../../domain/v2/shared/identity.ts';
+import { ExactMoneySchema } from '../../../domain/v2/shared/money.ts';
 
 export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
   z.strictObject({
     effectKind: z.literal('SELECT_OFFER'),
     journeyItemId: SubjectIdSchema,
     offerId: SubjectIdSchema,
+    /**
+     * The resolved offer's own price — never invented here; the caller
+     * supplies it from the same offer search/capture that resolved offerId
+     * (see ResolvedOffer in src/resolution/scenarios/overlay.ts). Additive
+     * field (M7/M8 integration, docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md
+     * §7b): threads real quote/cost context into the compiled ActionIntent's
+     * costEstimate so M8's budget hold never needs a second, independently
+     * invented cost representation.
+     */
+    offerPrice: ExactMoneySchema.optional(),
   }),
   z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),

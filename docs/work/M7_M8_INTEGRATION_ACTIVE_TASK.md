@@ -274,12 +274,13 @@ by the primary agent):
 | 4 | Objective-loss viable only via M6; unrelated HARD objective stays mandatory | `m7m8IntegrationSeam.pgtest.ts` | PASS |
 | 5 | Multi-intent DAG enforced at execution | `m7m8DagAndGenericity.pgtest.ts` | PASS (after a real fix, see §7 below) |
 | 6 | Shared-resource / cross-person: all affected Journeys considered | `m7m8SharedResourceBudgetCapability.pgtest.ts` | PASS |
-| 7 | Budgeted paid action: cost/quote feeds M8 budget hold | `m7m8SharedResourceBudgetCapability.pgtest.ts` | **BLOCKED — real gap, see §7** |
+| 7 | Budgeted paid action: cost/quote feeds M8 budget hold | `m7m8SharedResourceBudgetCapability.pgtest.ts` | PASS (fixed a real gap; see §7b) |
 | 8 | Unsupported capability: planner compiles, executor refuses truthfully | `m7m8SharedResourceBudgetCapability.pgtest.ts` | PASS |
 | 9 | Unknown provider outcome: no duplicate dispatch before reconciliation | `m7m8CurrentnessAndReconciliation.pgtest.ts` | PASS |
 | 10 | Same engine, two materially different scenarios | `m7m8DagAndGenericity.pgtest.ts` | PASS |
 
-Combined run of all four new files: `tests 9, pass 8, skipped 1, fail 0`.
+Combined run of all four new files: `tests 9, pass 9, skipped 0, fail 0`
+(after §7b's fix closed the one skip).
 
 ## 7. Two real architecture findings from actually exercising the seam
 
@@ -304,7 +305,7 @@ permanently, an in-progress/not-yet-attempted one blocks until it resolves.
 Verified against the real DAG test (§6 #5): blocked while upstream is
 PREPARED, succeeds once upstream is marked `OBSERVED_SUCCESS`.
 
-### 7b. M7's compiler never threads cost/quote context into ActionIntent.costEstimate — NOT fixed, needs a decision
+### 7b. M7's compiler never threads cost/quote context into ActionIntent.costEstimate — FIXED (user-approved)
 
 `intentForEffect` (`src/resolution/planning/compiler.ts`) never sets
 `costEstimate` for *any* `ScenarioEffect` kind, including `SELECT_OFFER`.
@@ -329,12 +330,24 @@ field adds an optional field, never repurposes an existing one) — and have
 contract file and the compiler; `overlay.ts` doesn't need to change since
 it never needed the price for its own world-mutation purpose.
 
-**Status: reported to the user in-session, not resolved.** This needs
-either explicit user approval to edit `scenarioChange.ts` (a frozen M0
-contract file, hence the classifier block), or a decision to leave it as a
-documented Park-for-Later architecture gap for the next milestone. Test #7
-in `m7m8SharedResourceBudgetCapability.pgtest.ts` is left as a
-`test.skip()` with the full finding in its message, not deleted or faked.
+**Status: fixed.** Asked the user directly (the classifier block requires a
+human decision, not a workaround); they approved the fix. Applied exactly
+the minimal change described above: added `offerPrice: ExactMoneySchema.optional()`
+to the `SELECT_OFFER` `ScenarioEffect` variant in
+`src/contracts/v2/scenario/scenarioChange.ts`, and one line in
+`intentForEffect` (`src/resolution/planning/compiler.ts`) setting
+`costEstimate: effect.offerPrice` when present. `overlay.ts` needed no
+change (it never needed the price for its own world-mutation purpose).
+Re-ran the full M7/M8/contracts unit suite (40/40) after the contract
+change to confirm no regression, then replaced test #7's `test.skip()` in
+`m7m8SharedResourceBudgetCapability.pgtest.ts` with a real test: a
+DROPPED-item `SELECT_OFFER` fixture (same viability trick as test #8)
+with a real `offerPrice`, compiled, persisted, read back from the
+`action_intents` DB row (not the in-memory object), and held against a
+real budget via `holdBudgetForIntent` — asserting the `budget_commitments`
+row matches exactly, with no second/independently-invented cost
+representation anywhere in the path. All three tests in that file now
+pass for real (3/3, 0 skipped).
 
 ## 8. Remaining plan
 
