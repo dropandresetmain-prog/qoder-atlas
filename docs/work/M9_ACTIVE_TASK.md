@@ -83,11 +83,33 @@ Sarah bilateral-swap item. Do not claim C4 PASS from this file.
   built as a single E2E test, though every individual seam it depends on is
   now proven working in isolation (see proofs above + accepted M7/M8
   integration tests).
-- [ ] 3. Jordan target PG E2E (progressive connection state, TR867/TR885 via
-  evaluator, coordinated multi-action plan, partial-failure proof) — not yet
-  attempted. Not architecturally blocked (Jordan's actions are on
-  independent aggregates/capabilities, matching the already-accepted
-  "acceptance #5" multi-intent DAG pattern), purely a time/effort gap.
+- [x] 3A. Progressive connection state derived from the real M6 evaluator
+  (`connection` dimension via `createM6Registry()`), not a caller-supplied
+  hint: 160/85min -> SAFE, 30min -> AT_RISK, -65min -> IMPOSSIBLE, against a
+  real registered `minimum_connection_minutes` constraint. Proof:
+  `postgres-integration/m9ConnectionProgression.pgtest.ts`.
+- [x] 3B. TR867 vs TR885 onward-flight viability proven with the real M7
+  evaluator (`evaluateRecoveryStrategy` -> `createM6Registry()` ->
+  `participationEvaluator`'s readiness check), not fixture inventory
+  presence: TR867 (0 available min vs 150 required) -> NOT_VIABLE; TR885
+  (~370 available min) -> VIABLE. Proof:
+  `postgres-integration/m9TR867TR885Viability.pgtest.ts` (commit `bf8c68a`
+  — check exact filename in that commit if renamed).
+- [ ] 3C/3D. Coordinated multi-action plan (onward flight / Narita overnight
+  / Singapore stay replacement / displaced cancellation / ground transfer,
+  with the displaced cancellation dependency-gated on the replacement's
+  observed success) + partial-failure proof (replacement CONFIRMED,
+  cancellation OBSERVED_FAILURE -> `duplicateBookingExposure`/
+  `partialRecovery`/`remainingRecoveryWork` non-empty, case unresolved ->
+  retry CANCELLED -> reassess -> resolves, Narita untouched throughout).
+  **DRAFTED BUT NOT YET RUN, DEBUGGED, OR COMMITTED** — the implementing
+  agent was stopped (by the human, mid-task, not a crash) right after
+  writing it. File exists at
+  `postgres-integration/m9JordanMultiActionRecovery.pgtest.ts` (untracked in
+  git) but has never been executed against real PostgreSQL. Treat every
+  assertion in it as unverified until it's actually run once — it may not
+  even compile/pass on the first attempt. This is the single highest-value
+  next step: get this file green, then commit it.
 
 ## Confirmed architectural finding (STOP condition, not improvised around)
 
@@ -129,21 +151,45 @@ rewrite M6/M7/M8"). Recorded here rather than routed around (e.g. by calling
 layer for the second side — exactly the "move Sarah only" shortcut C4
 already rejected once).
 
-## Next action
+## Next action — HANDOFF (stopped by human 2026-09-16, not blocked/crashed)
 
-1. Decide (outside M9 scope) how to close the same-Programme dual-execution
-   gap above — likely an M7/M8 milestone item, not M9.
-2. Build the Sarah target PG E2E test up through real ingress -> 5-person M6
-   evaluation -> real strategy -> real server-side preview -> real authority
-   for both intents -> execute side A for real -> (blocked at side B per the
-   finding above) -> stop short of claiming full resolution until the gap is
-   fixed upstream.
-3. Build the Jordan target PG E2E test (not blocked; same multi-intent DAG
-   pattern as accepted "acceptance #5" — onward flight / Narita overnight /
-   Singapore stay / displaced cancellation / ground transfer, each on its own
-   aggregate/capability).
-4. Independent C4 review on the resulting SHA. Do not claim C4 PASS. Do not
-   start M10.
+Work was paused deliberately (human said "stop, hand off") with local HEAD at
+`bf8c68a`, 6 commits ahead of `origin/milestone-m9-product-integration`
+(still at the original C4-failed `68521d0` — nothing has been pushed; do not
+push without asking first). One untracked, unrun file sits on top of that:
+`postgres-integration/m9JordanMultiActionRecovery.pgtest.ts` (item 3C/3D
+draft — see checklist above). Working tree is otherwise clean.
+
+Resume in this order:
+
+1. `cd C:/Dev/qoder-atlas-m9`, confirm `git log -1` is `bf8c68a` and the
+   untracked 3C/3D file is still there (`git status --short`).
+2. Get `m9JordanMultiActionRecovery.pgtest.ts` running against real Postgres
+   (`node --test postgres-integration/m9JordanMultiActionRecovery.pgtest.ts`
+   or however this repo's pgtest runner is invoked — check `package.json`).
+   Debug/fix until it genuinely passes (it has never been run once — treat
+   it as a first draft, not working code). Commit once green (`fix(m9): 3C/3D ...`).
+3. Build the rest of item 2 (Sarah target PG E2E: real ingress -> 5-person
+   M6 evaluation incl. Felix -> real strategy -> real server-side preview
+   (Sarah+Daniel+Elena) -> real authority -> execute side A for real ->
+   **stop at the documented 2B blocker** (do not route around it) -> assert
+   no flight-purchase ActionIntent exists). Every individual seam this needs
+   is already proven in isolation (1A/1B/4/5/6 proofs above) — this step is
+   wiring them into one E2E, not inventing new mechanism.
+4. Decide (outside M9 scope) how/whether to close the same-Programme
+   dual-execution gap (`SAME-PROGRAMME-DUAL-EXECUTION` in triage below) —
+   likely an M7/M8 milestone item. This may be a genuine blocker to ever
+   claiming full C4 PASS on the Sarah bilateral-swap requirement as
+   originally specified; surface that tension to whoever owns the C4
+   decision rather than silently declaring partial success sufficient.
+5. Only once 2 and 3 are both as complete as they can honestly be: run the
+   ONE full final verification pass — `npm run test:postgres`,
+   `npm run typecheck`, `npm run build`, `npm run lint`,
+   `npm run gate:anti-hardcoding`, `git diff --check`, plus legacy/demo
+   coherence tests for backward-compat. Do not run the full suite as an
+   inner loop before that — focused pgtest files only, it's expensive.
+6. Independent C4 review on the resulting SHA. Do not claim C4 PASS
+   yourself. Do not start M10. Do not push without explicit confirmation.
 
 ## Issue triage
 
