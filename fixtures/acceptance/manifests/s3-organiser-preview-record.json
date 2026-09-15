@@ -76,7 +76,7 @@
         "params": {
           "anchorEventId": "evt-ait-2026",
           "commitmentId": "cmt-ait-d1-future-provocation",
-          "changeKind": "RESCHEDULED",
+          "changeKind": "bilateral Sarah↔Daniel swapD",
           "newStartsAt": "2026-10-01T09:50:00+08:00",
           "newEndsAt": "2026-10-01T10:10:00+08:00",
           "at": "2026-09-22T11:05:00+08:00"
@@ -84,16 +84,65 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "totalTravellers", "op": "equals", "expected": 67, "description": "the preview evaluates the full event roster blast radius" },
-        { "path": "affected", "op": "arrayNotEmpty", "description": "the reschedule affects at least one linked trip" },
-        { "path": "affected", "op": "arrayLengthMax", "expected": 1, "description": "the blast radius is confined: exactly one trip is linked to the commitment" },
-        { "path": "affected.0.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the engine derives the affected trip from the commitment linkage, not from the request" },
-        { "path": "affected.0.travellerIds.0", "op": "equals", "expected": "trv-evt-ait-2026-ait-draft-04", "description": "the affected traveller is resolved from the linked trip" },
-        { "path": "affected.0.viabilityConsequence", "op": "equals", "expected": "AT_RISK", "description": "an earlier session start is AT_RISK, not DISRUPTED: no hard constraint fails under the hypothetical state" },
-        { "path": "affected.0.constraintFailures", "op": "arrayLengthMax", "expected": 0, "description": "the hypothetical engagement violates no trip constraint" },
-        { "path": "affected.0.reasons.0", "op": "contains", "expected": "commitment rescheduled", "description": "the impact reason is derived from the engagement time change" },
-        { "path": "unaffected", "op": "arrayLengthMin", "expected": 66, "description": "every non-linked trip is evaluated and reported unaffected individually" },
-        { "path": "unaffected.0.reasons.0", "op": "contains", "expected": "not linked to commitment cmt-ait-d1-future-provocation", "description": "non-affectedness is reasoned from linkage evidence, not assumed" }
+        {
+          "path": "totalTravellers",
+          "op": "equals",
+          "expected": 67,
+          "description": "the preview evaluates the full event roster blast radius"
+        },
+        {
+          "path": "affected",
+          "op": "arrayNotEmpty",
+          "description": "the reschedule affects at least one linked trip"
+        },
+        {
+          "path": "affected",
+          "op": "arrayLengthMax",
+          "expected": 1,
+          "description": "the blast radius is confined: exactly one trip is linked to the commitment"
+        },
+        {
+          "path": "affected.0.tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-04",
+          "description": "the engine derives the affected trip from the commitment linkage, not from the request"
+        },
+        {
+          "path": "affected.0.travellerIds.0",
+          "op": "equals",
+          "expected": "trv-evt-ait-2026-ait-draft-04",
+          "description": "the affected traveller is resolved from the linked trip"
+        },
+        {
+          "path": "affected.0.viabilityConsequence",
+          "op": "equals",
+          "expected": "AT_RISK",
+          "description": "an earlier session start is AT_RISK, not DISRUPTED: no hard constraint fails under the hypothetical state"
+        },
+        {
+          "path": "affected.0.constraintFailures",
+          "op": "arrayLengthMax",
+          "expected": 0,
+          "description": "the hypothetical engagement violates no trip constraint"
+        },
+        {
+          "path": "affected.0.reasons.0",
+          "op": "contains",
+          "expected": "commitment rescheduled",
+          "description": "the impact reason is derived from the engagement time change"
+        },
+        {
+          "path": "unaffected",
+          "op": "arrayLengthMin",
+          "expected": 66,
+          "description": "every non-linked trip is evaluated and reported unaffected individually"
+        },
+        {
+          "path": "unaffected.0.reasons.0",
+          "op": "contains",
+          "expected": "not linked to commitment cmt-ait-d1-future-provocation",
+          "description": "non-affectedness is reasoned from linkage evidence, not assumed"
+        }
       ]
     },
     {
@@ -106,10 +155,30 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "summary.disrupted", "op": "equals", "expected": 0, "description": "preview mutated nothing: no traveller is disrupted" },
-        { "path": "summary.atRisk", "op": "equals", "expected": 0, "description": "preview mutated nothing: no traveller is at risk" },
-        { "path": "summary.planning", "op": "equals", "expected": 57, "description": "the linked traveller is still in the original PLANNING state" },
-        { "path": "endangeredCommitments", "op": "arrayLengthMax", "expected": 0, "description": "no commitment is endangered before any commit" }
+        {
+          "path": "summary.disrupted",
+          "op": "equals",
+          "expected": 0,
+          "description": "preview mutated nothing: no traveller is disrupted"
+        },
+        {
+          "path": "summary.atRisk",
+          "op": "equals",
+          "expected": 0,
+          "description": "preview mutated nothing: no traveller is at risk"
+        },
+        {
+          "path": "summary.planning",
+          "op": "equals",
+          "expected": 57,
+          "description": "the linked traveller is still in the original PLANNING state"
+        },
+        {
+          "path": "endangeredCommitments",
+          "op": "arrayLengthMax",
+          "expected": 0,
+          "description": "no commitment is endangered before any commit"
+        }
       ]
     },
     {
@@ -122,8 +191,17 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "UNKNOWN", "description": "the linked trip keeps its original viability status" },
-        { "path": "whatChanged", "op": "notExists", "description": "no change narrative exists on the trip before the commit" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "UNKNOWN",
+          "description": "the linked trip keeps its original viability status"
+        },
+        {
+          "path": "whatChanged",
+          "op": "notExists",
+          "description": "no change narrative exists on the trip before the commit"
+        }
       ]
     },
     {
@@ -136,7 +214,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "openCases", "op": "arrayLengthMax", "expected": 0, "description": "a counterfactual preview never opens recovery cases" }
+        {
+          "path": "openCases",
+          "op": "arrayLengthMax",
+          "expected": 0,
+          "description": "a counterfactual preview never opens recovery cases"
+        }
       ]
     },
     {
@@ -148,7 +231,7 @@
         "params": {
           "anchorEventId": "evt-ait-2026",
           "commitmentId": "cmt-ait-d1-future-provocation",
-          "changeKind": "RESCHEDULED",
+          "changeKind": "bilateral Sarah↔Daniel swapD",
           "newStartsAt": "2026-10-01T09:50:00+08:00",
           "newEndsAt": "2026-10-01T10:10:00+08:00",
           "at": "2026-09-22T11:20:00+08:00"
@@ -159,14 +242,52 @@
         }
       },
       "assert": [
-        { "path": "accepted", "op": "truthy", "description": "the commit is accepted through the real programme surface" },
-        { "path": "linkedTripCount", "op": "equals", "expected": 1, "description": "the commit fans out to exactly the linked trip count derived by the engine" },
-        { "path": "unlinkedTripCount", "op": "equals", "expected": 66, "description": "the engine reports the unaffected remainder explicitly" },
-        { "path": "processedSignals", "op": "arrayNotEmpty", "description": "the commit produces fan-out change signals" },
-        { "path": "processedSignals.0.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the fan-out signal targets the linked trip" },
-        { "path": "processedSignals.0.signalId", "op": "contains", "expected": "sig-change-cmt-ait-d1-future-provocation", "description": "the signal is derived from the committed commitment change" },
-        { "path": "processedSignals.0.caseStatus", "op": "equals", "expected": "ASSESSING", "description": "fan-out opens a recovery case in the assessing state for the affected traveller" },
-        { "path": "issues", "op": "arrayLengthMax", "expected": 0, "description": "the commit executes without engine-reported issues" }
+        {
+          "path": "accepted",
+          "op": "truthy",
+          "description": "the commit is accepted through the real programme surface"
+        },
+        {
+          "path": "linkedTripCount",
+          "op": "equals",
+          "expected": 1,
+          "description": "the commit fans out to exactly the linked trip count derived by the engine"
+        },
+        {
+          "path": "unlinkedTripCount",
+          "op": "equals",
+          "expected": 66,
+          "description": "the engine reports the unaffected remainder explicitly"
+        },
+        {
+          "path": "processedSignals",
+          "op": "arrayNotEmpty",
+          "description": "the commit produces fan-out change signals"
+        },
+        {
+          "path": "processedSignals.0.tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-04",
+          "description": "the fan-out signal targets the linked trip"
+        },
+        {
+          "path": "processedSignals.0.signalId",
+          "op": "contains",
+          "expected": "sig-change-cmt-ait-d1-future-provocation",
+          "description": "the signal is derived from the committed commitment change"
+        },
+        {
+          "path": "processedSignals.0.caseStatus",
+          "op": "equals",
+          "expected": "ASSESSING",
+          "description": "fan-out opens a recovery case in the assessing state for the affected traveller"
+        },
+        {
+          "path": "issues",
+          "op": "arrayLengthMax",
+          "expected": 0,
+          "description": "the commit executes without engine-reported issues"
+        }
       ]
     },
     {
@@ -179,10 +300,30 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "anchorEventId", "op": "equals", "expected": "evt-ait-2026", "description": "the programme view is scoped to the anchor event" },
-        { "path": "summary.disrupted", "op": "equals", "expected": 1, "description": "exactly one traveller flipped to DISRUPTED as a result of the commit" },
-        { "path": "summary.planning", "op": "equals", "expected": 56, "description": "the disrupted traveller left the PLANNING bucket: state moved, roster total unchanged" },
-        { "path": "summary.total", "op": "equals", "expected": 67, "description": "the commit changes trip states, never the roster size" }
+        {
+          "path": "anchorEventId",
+          "op": "equals",
+          "expected": "evt-ait-2026",
+          "description": "the programme view is scoped to the anchor event"
+        },
+        {
+          "path": "summary.disrupted",
+          "op": "equals",
+          "expected": 1,
+          "description": "exactly one traveller flipped to DISRUPTED as a result of the commit"
+        },
+        {
+          "path": "summary.planning",
+          "op": "equals",
+          "expected": 56,
+          "description": "the disrupted traveller left the PLANNING bucket: state moved, roster total unchanged"
+        },
+        {
+          "path": "summary.total",
+          "op": "equals",
+          "expected": 67,
+          "description": "the commit changes trip states, never the roster size"
+        }
       ]
     },
     {
@@ -195,8 +336,18 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "DISRUPTED", "description": "the linked trip is now DISRUPTED" },
-        { "path": "whatChanged", "op": "contains", "expected": "shared commitment rescheduled affecting engagement el-trip-trv-evt-ait-2026-ait-draft-04-eng-1", "description": "the change narrative names the exact engagement linked to the rescheduled commitment" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "DISRUPTED",
+          "description": "the linked trip is now DISRUPTED"
+        },
+        {
+          "path": "whatChanged",
+          "op": "contains",
+          "expected": "shared commitment rescheduled affecting engagement el-trip-trv-evt-ait-2026-ait-draft-04-eng-1",
+          "description": "the change narrative names the exact engagement linked to the rescheduled commitment"
+        }
       ]
     },
     {
@@ -209,11 +360,36 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the opened case belongs to the affected trip" },
-        { "path": "status", "op": "equals", "expected": "DISRUPTED", "description": "the case detail surfaces the disrupted viability" },
-        { "path": "whatChanged", "op": "contains", "expected": "shared commitment rescheduled", "description": "the case records the commitment change as its cause" },
-        { "path": "checks.0.label", "op": "contains", "expected": "arrival evidence must precede the linked commitment start", "description": "the case evaluates the arrival-before-commitment constraint against the new start" },
-        { "path": "checks.0.result", "op": "equals", "expected": "UNKNOWN", "description": "no arrival evidence exists for this trip: the check stays UNKNOWN instead of guessing" }
+        {
+          "path": "tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-04",
+          "description": "the opened case belongs to the affected trip"
+        },
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "DISRUPTED",
+          "description": "the case detail surfaces the disrupted viability"
+        },
+        {
+          "path": "whatChanged",
+          "op": "contains",
+          "expected": "shared commitment rescheduled",
+          "description": "the case records the commitment change as its cause"
+        },
+        {
+          "path": "checks.0.label",
+          "op": "contains",
+          "expected": "arrival evidence must precede the linked commitment start",
+          "description": "the case evaluates the arrival-before-commitment constraint against the new start"
+        },
+        {
+          "path": "checks.0.result",
+          "op": "equals",
+          "expected": "UNKNOWN",
+          "description": "no arrival evidence exists for this trip: the check stays UNKNOWN instead of guessing"
+        }
       ]
     },
     {
@@ -233,9 +409,23 @@
         }
       },
       "assert": [
-        { "path": "rounds", "op": "gte", "expected": 1, "description": "the planning loop completed at least one round against live providers" },
-        { "path": "bestStrategyId", "op": "exists", "description": "at least one arrival candidate survives deterministic viability and is ranked" },
-        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "the fan-out case advanced through the planning stage" }
+        {
+          "path": "rounds",
+          "op": "gte",
+          "expected": 1,
+          "description": "the planning loop completed at least one round against live providers"
+        },
+        {
+          "path": "bestStrategyId",
+          "op": "exists",
+          "description": "at least one arrival candidate survives deterministic viability and is ranked"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "PLANNING",
+          "description": "the fan-out case advanced through the planning stage"
+        }
       ]
     },
     {
@@ -256,14 +446,53 @@
         }
       },
       "assert": [
-        { "path": "intentId", "op": "exists", "description": "the strategy was staged as a validated action intent" },
-        { "path": "strategyId", "op": "equals", "expected": "{{bestStrategyId}}", "description": "the intent targets exactly the ranked strategy" },
-        { "path": "outcome", "op": "equals", "expected": "BLOCKED", "description": "the SGD ceiling cannot be deterministically compared to the USD gross spend: authority blocks instead of inventing FX" },
-        { "path": "executable", "op": "equals", "expected": false, "description": "a blocked intent is never executable" },
-        { "path": "caseStatus", "op": "equals", "expected": "ESCALATED", "description": "the blocked intent escalates the case for human resolution" },
-        { "path": "ruleTrace.0", "op": "contains", "expected": "rule-ait-airfare-spend-limit", "description": "the blocking rule is named in the deterministic rule trace" },
-        { "path": "ruleTrace.0", "op": "contains", "expected": "not deterministically comparable", "description": "the trace records currency incomparability as the fail-closed reason" },
-        { "path": "funding.summary", "op": "contains", "expected": "covered by the event organisation", "description": "ADR-037 allocation still resolves the fare to the event-funded baseline deterministically" }
+        {
+          "path": "intentId",
+          "op": "exists",
+          "description": "the strategy was staged as a validated action intent"
+        },
+        {
+          "path": "strategyId",
+          "op": "equals",
+          "expected": "{{bestStrategyId}}",
+          "description": "the intent targets exactly the ranked strategy"
+        },
+        {
+          "path": "outcome",
+          "op": "equals",
+          "expected": "BLOCKED",
+          "description": "the SGD ceiling cannot be deterministically compared to the USD gross spend: authority blocks instead of inventing FX"
+        },
+        {
+          "path": "executable",
+          "op": "equals",
+          "expected": false,
+          "description": "a blocked intent is never executable"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "ESCALATED",
+          "description": "the blocked intent escalates the case for human resolution"
+        },
+        {
+          "path": "ruleTrace.0",
+          "op": "contains",
+          "expected": "rule-ait-airfare-spend-limit",
+          "description": "the blocking rule is named in the deterministic rule trace"
+        },
+        {
+          "path": "ruleTrace.0",
+          "op": "contains",
+          "expected": "not deterministically comparable",
+          "description": "the trace records currency incomparability as the fail-closed reason"
+        },
+        {
+          "path": "funding.summary",
+          "op": "contains",
+          "expected": "covered by the event organisation",
+          "description": "ADR-037 allocation still resolves the fare to the event-funded baseline deterministically"
+        }
       ]
     },
     {
@@ -276,9 +505,24 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "DISRUPTED", "description": "the case detail keeps reporting the trip's disrupted viability" },
-        { "path": "actions.0.state", "op": "equals", "expected": "QUEUED", "description": "the blocked intent stays queued for human resolution; nothing executed" },
-        { "path": "options.0.requiresApproval", "op": "equals", "expected": true, "description": "the ranked option is surfaced as requiring approval, never auto-executable" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "DISRUPTED",
+          "description": "the case detail keeps reporting the trip's disrupted viability"
+        },
+        {
+          "path": "actions.0.state",
+          "op": "equals",
+          "expected": "QUEUED",
+          "description": "the blocked intent stays queued for human resolution; nothing executed"
+        },
+        {
+          "path": "options.0.requiresApproval",
+          "op": "equals",
+          "expected": true,
+          "description": "the ranked option is surfaced as requiring approval, never auto-executable"
+        }
       ]
     },
     {
@@ -291,8 +535,17 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "trips", "op": "arrayNotEmpty", "description": "authoritative trip state remains observable" },
-        { "path": "openCases", "op": "arrayLengthMin", "expected": 1, "description": "the escalated case stays open for human resolution instead of silently closing" }
+        {
+          "path": "trips",
+          "op": "arrayNotEmpty",
+          "description": "authoritative trip state remains observable"
+        },
+        {
+          "path": "openCases",
+          "op": "arrayLengthMin",
+          "expected": 1,
+          "description": "the escalated case stays open for human resolution instead of silently closing"
+        }
       ]
     },
     {
@@ -304,7 +557,7 @@
         "params": {
           "anchorEventId": "evt-ait-2026",
           "commitmentId": "cmt-ait-d1-future-provocation",
-          "changeKind": "RESCHEDULED",
+          "changeKind": "bilateral Sarah↔Daniel swapD",
           "newStartsAt": "2026-10-01T09:50:00+08:00",
           "newEndsAt": "2026-10-01T10:10:00+08:00",
           "at": "2026-09-22T11:35:00+08:00"
@@ -312,10 +565,30 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "affected", "op": "arrayLengthMax", "expected": 0, "description": "the same proposal now produces zero affected trips: the authoritative commitment already starts 09:50 and ends 10:10" },
-        { "path": "unaffected", "op": "arrayLengthMin", "expected": 67, "description": "every trip, including the linked one, is now unaffected by the identical proposal" },
-        { "path": "unaffected.66.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-04", "description": "the previously affected linked trip is in the unaffected set" },
-        { "path": "unaffected.66.reasons.0", "op": "contains", "expected": "does not materially affect engagement el-trip-trv-evt-ait-2026-ait-draft-04-eng-1", "description": "the engine reasons the proposal matches the committed engagement times exactly" }
+        {
+          "path": "affected",
+          "op": "arrayLengthMax",
+          "expected": 0,
+          "description": "the same proposal now produces zero affected trips: the authoritative commitment already starts 09:50 and ends 10:10"
+        },
+        {
+          "path": "unaffected",
+          "op": "arrayLengthMin",
+          "expected": 67,
+          "description": "every trip, including the linked one, is now unaffected by the identical proposal"
+        },
+        {
+          "path": "unaffected.66.tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-04",
+          "description": "the previously affected linked trip is in the unaffected set"
+        },
+        {
+          "path": "unaffected.66.reasons.0",
+          "op": "contains",
+          "expected": "does not materially affect engagement el-trip-trv-evt-ait-2026-ait-draft-04-eng-1",
+          "description": "the engine reasons the proposal matches the committed engagement times exactly"
+        }
       ]
     }
   ]

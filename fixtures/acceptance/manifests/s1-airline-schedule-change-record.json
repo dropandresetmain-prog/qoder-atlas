@@ -1,6 +1,9 @@
 {
   "scenarioId": "S1-RECORD",
-  "title": "S1 airline schedule change — current-provider RECORD proof (honest sandbox truth)",
+  "title": "S1 airline schedule change — SUPERSEDED Atlas RECORD path (not current Sarah SSOT)",
+  "status": "SUPERSEDED",
+  "supersededBy": "fixtures/acceptance/manifests/s1-airline-schedule-change.json",
+  "supersessionNote": "Current S1 hero corridor is synthetic Batik ID7159→ID7153 (CGK→SIN), five travellers, organiser-supplied — not Atlas-backed. Do not run this manifest as the Sarah demo truth until Batik provider evidence exists. Historical MN218/MNSYN* steps below are retained only as prior RECORD archaeology and must not be re-promoted as SSOT.",
   "mode": "RECORD",
   "globalInputPack": {
     "packId": "ait-global-programme",
@@ -16,17 +19,17 @@
     {
       "seam": "atlas.event_ingress",
       "mode": "SIMULATED_EXTERNAL_EVENT",
-      "note": "approved S1 simulated seam: provider-shaped event into real ingress"
+      "note": "historical; current S1 uses synthetic Batik schedule-change input, not Atlas live"
     },
     {
       "seam": "atlas.flight_state_query",
       "mode": "RECORD",
-      "note": "LIVE sandbox reconciliation read; persisted sanitized recording"
+      "note": "SUPERSEDED for Sarah corridor — Batik evidence not captured"
     },
     {
       "seam": "atlas.flight_adapter",
       "mode": "RECORD",
-      "note": "no transactional operations exercised by S1 observe-only flow"
+      "note": "no transactional operations; Batik not provider-backed"
     }
   ],
   "requiredEnv": [],
@@ -71,7 +74,7 @@
     },
     {
       "id": "notify_mn218_hero",
-      "description": "Simulated MN218 schedule-change notification for hero booking MNSYN14; reconciliation read returns the retimed 1 Oct schedule as CONNECTED state",
+      "description": "HISTORICAL MN218 (superseded; not Sarah SSOT) schedule-change notification for hero booking MNSYN14; reconciliation read returns the retimed 1 Oct schedule as CONNECTED state",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
@@ -122,7 +125,7 @@
     },
     {
       "id": "notify_mn218_draft15",
-      "description": "Same retimed MN218 notification for booking MNSYN15 (Day 0 coach commitment breaks outright)",
+      "description": "HISTORICAL same HISTORICAL retimed MN218 notification for booking MNSYN15 (Day 0 coach commitment breaks outright)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
@@ -173,7 +176,7 @@
     },
     {
       "id": "notify_mn218_draft10",
-      "description": "Retimed MN218 notification for booking MNSYN10 (tight but viable before Day 1 keynote)",
+      "description": "HISTORICAL retimed MN218 notification for booking MNSYN10 (tight but viable before Day 1 keynote)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
@@ -223,7 +226,7 @@
     },
     {
       "id": "notify_mn218_draft11",
-      "description": "Retimed MN218 notification for booking MNSYN11 (viable before Day 1 panel)",
+      "description": "HISTORICAL retimed MN218 notification for booking MNSYN11 (viable before Day 1 panel)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
@@ -273,7 +276,7 @@
     },
     {
       "id": "notify_mn218_draft30",
-      "description": "Retimed MN218 notification for booking MNSYN30 (viable before Day 1 panel)",
+      "description": "HISTORICAL retimed MN218 notification for booking MNSYN30 (viable before Day 1 panel)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
@@ -320,7 +323,7 @@
     },
     {
       "id": "notify_mn204_draft13",
-      "description": "Simulated MN204 cancellation notification for booking MNSYN13; reconciliation read confirms the cancellation as CONNECTED state",
+      "description": "HISTORICAL MN204 cancellation notification for booking MNSYN13; reconciliation read confirms the cancellation as CONNECTED state",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",

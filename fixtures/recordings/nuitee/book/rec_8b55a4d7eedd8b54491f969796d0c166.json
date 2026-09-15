@@ -1,0 +1,180 @@
+{
+  "id": "rec_8b55a4d7eedd8b54491f969796d0c166",
+  "providerId": "nuitee",
+  "operation": "book",
+  "recordedAt": "2026-09-15T14:15:42.703Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "O6vdr7G2T",
+      "clientReference": "qoder-atlas-wit-jordan-concorde-baseline",
+      "supplierBookingId": "O6vdr7G2T",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-09-29",
+      "checkout": "2026-10-03",
+      "hotel": {
+        "hotelId": "lp21d9f",
+        "name": "Concorde Hotel Singapore",
+        "parentHotelId": "lp21d9f"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJCFGN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2UJE2TMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBCTERCRJVFFQR2NGNKEOTSCKFFUURCYJ5NFERCHIVNFIUKOKJLEOVKSKRCU2QSXI5GVOVCDJVNFSR2ZGJKEWN2DJ5FUURCFGQ3UEU2HIFNEITKNIJNEORJSKRAU2QSSI5LDMRCTG5BVGR2FGJCE2TSTINEEKNCEINKFEUKLKVMVIR2TJJJUOVJUJBMU4WSVI5GTGVCJJEZFGSRUKJKTIVKTI5FFSUSUIVGUEU2HLFLVIQKPJJHEORJSKNAU2QSRJBEVSVCLJFMXYNZUGMXDOND4PRJE67D4PR6EIZLMOV4GKICQNR2XG7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+            "retailRate": {
+              "total": {
+                "amount": 743.74,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": "booking.com"
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Property service charge",
+                  "amount": 74.37,
+                  "currency": "USD"
+                },
+                {
+                  "included": false,
+                  "description": "TAX",
+                  "amount": 66.94,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-09-29 23:59:59",
+                  "amount": 743.74,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "NRFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "Room Only",
+            "boardName": "RO",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Jordan",
+          "lastName": "Hale",
+          "childrenAges": null,
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": null,
+            "hotelRemarks": [],
+            "refundableTag": "NRFN"
+          },
+          "room_id": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJCFGN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2UJE2TMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBCTERCRJVFFQR2NGNKEOTSCKFFUURCYJ5NFERCHIVNFIUKOKJLEOVKSKRCU2QSXI5GVOVCDJVNFSR2ZGJKEWN2DJ5FUURCFGQ3UEU2HIFNEITKNIJNEORJSKRAU2QSSI5LDMRCTG5BVGR2FGJCE2TSTINEEKNCEINKFEUKLKVMVIR2TJJJUOVJUJBMU4WSVI5GTGVCJJEZFGSRUKJKTIVKTI5FFSUSUIVGUEU2HLFLVIQKPJJHEORJSKNAU2QSRJBEVSVCLJFMXYNZUGMXDOND4PRJE67D4PR6EIZLMOV4GKICQNR2XG7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+          "occupancy_number": 1,
+          "amount": 743.74,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Jordan",
+              "lastName": "Hale",
+              "email": "[REDACTED]",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Jordan",
+        "lastName": "Hale",
+        "email": "[REDACTED]",
+        "phone": "[REDACTED]"
+      },
+      "createdAt": "2026-09-15T14:15:43",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": null,
+        "hotelRemarks": [],
+        "refundableTag": "NRFN"
+      },
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
+      "price": 743.74,
+      "sellingPriceToUser": 743.74,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Jordan",
+      "lastName": "Hale",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "IRLXBYima",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_fs4seQgt8YgEmTDgNgar3",
+      "sellingPrice": "743.74",
+      "exchangeRate": 0.8624513572669459,
+      "exchangeRateUsd": 1,
+      "email": "[REDACTED]",
+      "tag": "NRFN",
+      "lastFreeCancellationDate": null,
+      "userId": 383174,
+      "nationality": "SG",
+      "holderTitle": "",
+      "hotelId": "lp21d9f",
+      "hotelName": "Concorde Hotel Singapore",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 29.74,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "",
+      "payLaterDeadline": null
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

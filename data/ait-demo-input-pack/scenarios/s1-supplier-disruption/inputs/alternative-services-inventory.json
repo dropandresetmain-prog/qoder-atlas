@@ -1,7 +1,9 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
-  "sourceIds": ["src-sim-airline-mn"],
-  "note": "Simulated post-disruption CGK→SIN service inventory (what a provider search would return after the MN310 retiming). Deliberate shape for honest viability differentiation: (1) retimed MN310 on 1 Oct arrives 07:10 — fails 360min buffer before 09:20 and 10:10; (2) early MN308 on 1 Oct arrives 03:45 — restores buffer for 10:10 (Group B) but NOT for 09:20 (Group C, gap 335min < 360); (3) no earlier overnight that lands by 03:20. Hand-authored Atlas REPLAY recordings for this corridor must mirror these schedules — never invent engine PASS/FAIL.",
+  "sourceIds": [
+    "src-sim-airline-id"
+  ],
+  "note": "Synthetic Batik replacement inventory for CGK?SIN. Organiser-supplied simulation only; never claim Atlas evidence.",
   "observedAt": "2026-09-21T10:05:00+08:00",
   "routes": [
     {
@@ -9,47 +11,21 @@
       "destination": "SIN",
       "services": [
         {
-          "flightNumber": "MN310",
+          "flightNumber": "ID7153",
           "date": "2026-10-01",
-          "departure": "2026-10-01T05:00:00+07:00",
-          "arrival": "2026-10-01T07:10:00+08:00",
-          "status": "RETIMED_SERVICE",
-          "economySeatsAvailable": 41,
+          "departure": "2026-10-01T07:45:00+07:00",
+          "arrival": "2026-10-01T10:30:00+08:00",
+          "status": "INVOLUNTARY_REPROTECT",
+          "economySeatsAvailable": 5,
           "economyFare": {
             "amount": 0,
             "currency": "SGD",
-            "note": "Re-protection seat; no fare difference."
-          }
-        },
-        {
-          "flightNumber": "MN308",
-          "date": "2026-10-01",
-          "departure": "2026-10-01T01:30:00+07:00",
-          "arrival": "2026-10-01T03:45:00+08:00",
-          "status": "OPERATING",
-          "economySeatsAvailable": 9,
-          "economyFare": {
-            "amount": 0,
-            "currency": "SGD",
-            "note": "Same-carrier disruption replacement; no fare increase (authority-eligible when arrival-shift condition also holds)."
-          }
-        },
-        {
-          "flightNumber": "MN312",
-          "date": "2026-10-01",
-          "departure": "2026-10-01T09:00:00+07:00",
-          "arrival": "2026-10-01T11:15:00+08:00",
-          "status": "OPERATING",
-          "economySeatsAvailable": 18,
-          "economyFare": {
-            "amount": 110,
-            "currency": "SGD",
-            "note": "Later service; cannot restore morning programme buffers."
+            "note": "Synthetic reprotection; fare delta 0."
           }
         }
       ],
-      "noOfferArrivingBy": "2026-10-01T03:20:00+08:00",
-      "note": "03:20 is the latest landside time that still yields 360min before the 09:20 headline; inventory deliberately has none."
+      "noOfferArrivingBy": "2026-10-01T09:00:00+08:00",
+      "note": "This synthetic inventory is organiser-supplied only; it does not claim Atlas evidence for Batik. The ID7153 reprotection arrives 10:30 and leaves only 60min before Sarah's 11:30 headline."
     }
   ]
 }

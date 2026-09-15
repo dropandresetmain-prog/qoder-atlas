@@ -1,0 +1,17 @@
+{
+  "id": "rec_5676fcdd134f0c0c1e6a6fb775b812cd",
+  "providerId": "nuitee",
+  "operation": "cancel",
+  "recordedAt": "2026-09-15T14:16:03.939Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "vW4k_j-53",
+      "cancellation_fee": 576.75,
+      "currency": "USD",
+      "refund_amount": 0,
+      "status": "CANCELLED_WITH_CHARGES"
+    },
+    "sandbox": true
+  }
+}

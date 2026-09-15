@@ -18,9 +18,14 @@ import {
   placeCodeFor,
   type ConnectionPairAssessment,
 } from '../engine/connectionFeasibility.ts';
+import { bufferMinutesFromRuleSets } from '../engine/arrivalBufferPolicy.ts';
 import { formatMoney } from '../ui/html.ts';
 
 import type { WholeTripPlanItemView, WholeTripRecoveryPlanView } from '../ui/case-view-model.ts';
+
+function requiredBufferMinutesFromRules(ruleSets: readonly RuleSet[]): number | undefined {
+  return bufferMinutesFromRuleSets(ruleSets);
+}
 
 function isFlight(element: TripElement): element is TransportLeg {
   return element.elementKind === 'TRANSPORT_LEG' && element.data.mode === 'FLIGHT';
@@ -320,9 +325,16 @@ export function projectWholeTripRecoveryPlan(input: {
     const checkIn = element.data.checkIn.value;
     const arrival = replacement.data.scheduledArrival?.value;
     const hotel = placeLabel(input.places, element.data.placeId);
-    if (!arrival || instantMillis(arrival) <= instantMillis(checkIn)) {
-      // Unaffected: the recovered arrival still lands before this stay's
-      // check-in, so the existing reservation remains usable as booked.
+    const arrivalDay = calendarDay(arrival);
+    const checkInDay = calendarDay(checkIn);
+    // Destination stay is affected when recovered arrival is after check-in,
+    // or when the arrival calendar day moves past the seeded check-in day
+    // (arrival-date invalidates the booked night even if times are sparse).
+    const stayInvalidated =
+      !!arrival &&
+      (instantMillis(arrival) > instantMillis(checkIn) ||
+        (!!arrivalDay && !!checkInDay && arrivalDay > checkInDay));
+    if (!arrival || !stayInvalidated) {
       items.push({
         id: `plan-hotel-${element.id}`,
         category: 'HOTEL',
@@ -390,7 +402,10 @@ export function projectWholeTripRecoveryPlan(input: {
       replacement.data.scheduledArrival.value,
       input.engagement.data.startsAt.value,
     );
-    const ok = input.feasible && margin > 0;
+    const requiredBuffer = requiredBufferMinutesFromRules(input.ruleSets);
+    const protectedByBuffer =
+      requiredBuffer === undefined ? margin > 0 : margin >= requiredBuffer;
+    const ok = input.feasible && protectedByBuffer;
     items.push({
       id: `plan-event-${input.engagement.id}`,
       category: 'EVENT',

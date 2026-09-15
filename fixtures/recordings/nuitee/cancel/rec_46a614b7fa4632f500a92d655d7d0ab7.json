@@ -1,0 +1,17 @@
+{
+  "id": "rec_46a614b7fa4632f500a92d655d7d0ab7",
+  "providerId": "nuitee",
+  "operation": "cancel",
+  "recordedAt": "2026-09-15T14:15:47.980Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "O6vdr7G2T",
+      "cancellation_fee": 743.74,
+      "currency": "USD",
+      "refund_amount": 0,
+      "status": "CANCELLED_WITH_CHARGES"
+    },
+    "sandbox": true
+  }
+}

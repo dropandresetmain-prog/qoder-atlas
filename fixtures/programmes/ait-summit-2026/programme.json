@@ -417,16 +417,16 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T09:20:00+08:00",
+            "value": "2026-10-01T11:30:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T09:50:00+08:00",
+            "value": "2026-10-01T12:00:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -512,16 +512,16 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T11:30:00+08:00",
+            "value": "2026-10-01T16:30:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T11:40:00+08:00",
+            "value": "2026-10-01T16:40:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -550,16 +550,16 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T11:50:00+08:00",
+            "value": "2026-10-01T10:40:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T12:10:00+08:00",
+            "value": "2026-10-01T11:00:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
-            "observedAt": "2026-08-25T09:00:00+00:00"
+            "observedAt": "2026-08-26T12:00:00+00:00"
           }
         },
         {
@@ -664,13 +664,13 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T15:30:00+08:00",
+            "value": "2026-10-01T16:05:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T15:50:00+08:00",
+            "value": "2026-10-01T16:25:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-26T12:00:00+00:00"
@@ -721,13 +721,13 @@
           "kind": "SESSION",
           "placeId": "place-mbs",
           "startsAt": {
-            "value": "2026-10-01T14:30:00+08:00",
+            "value": "2026-10-01T15:30:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-26T12:00:00+00:00"
           },
           "endsAt": {
-            "value": "2026-10-01T14:50:00+08:00",
+            "value": "2026-10-01T16:00:00+08:00",
             "sourceId": "src-syn-ait-event",
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-26T12:00:00+00:00"
@@ -1169,6 +1169,25 @@
             "authority": "AUTHORITATIVE",
             "observedAt": "2026-08-25T09:00:00+00:00"
           }
+        },
+        {
+          "id": "cmt-ait-d1-local-host-session",
+          "title": "Local host session — operator marketplace",
+          "startsAt": {
+            "value": "2026-10-01T14:30:00+08:00",
+            "sourceId": "src-syn-ait-event",
+            "authority": "AUTHORITATIVE",
+            "observedAt": "2026-08-26T12:00:00+00:00"
+          },
+          "endsAt": {
+            "value": "2026-10-01T15:00:00+08:00",
+            "sourceId": "src-syn-ait-event",
+            "authority": "AUTHORITATIVE",
+            "observedAt": "2026-08-26T12:00:00+00:00"
+          },
+          "placeId": "place-mbs",
+          "anchorEventId": "evt-ait-2026",
+          "kind": "SESSION"
         }
       ],
       "sourceIds": [
@@ -1348,7 +1367,10 @@
         "name": "Tokyo Narita",
         "kind": "AIRPORT",
         "timezone": "Asia/Tokyo",
-        "coordinates": { "latitude": 35.772, "longitude": 140.3929 },
+        "coordinates": {
+          "latitude": 35.772,
+          "longitude": 140.3929
+        },
         "externalRefs": [
           {
             "system": "airport-code",
@@ -1361,7 +1383,10 @@
         "name": "Narita Gateway Hotel",
         "kind": "HOTEL",
         "timezone": "Asia/Tokyo",
-        "coordinates": { "latitude": 35.78157, "longitude": 140.349451 },
+        "coordinates": {
+          "latitude": 35.78157,
+          "longitude": 140.349451
+        },
         "externalRefs": [
           {
             "system": "nuitee-hotel-id",
@@ -1612,12 +1637,12 @@
             "id": "rule-ait-arrival-min-buffer",
             "kind": "MIN_BUFFER",
             "sourceId": "src-syn-ait-policy",
-            "description": "Required arrival buffer: every managed traveller must be landside in Singapore at least 6 hours before their first programme commitment (programme-critical travellers: 12 hours, see clauses.arrivalBuffer).",
+            "description": "Required arrival readiness: REQUIRED physical-presence programme commitments need at least 150 minutes from inbound arrival to commitment start.",
             "appliesTo": [],
             "buffer": {
-              "expectedMinutes": 360,
-              "minimumMinutes": 360,
-              "conservativeMinutes": 480,
+              "expectedMinutes": 150,
+              "minimumMinutes": 150,
+              "conservativeMinutes": 180,
               "sourceId": "src-syn-ait-policy",
               "observedAt": "2026-08-25T09:00:00+00:00",
               "quality": "HIGH"
@@ -1709,9 +1734,18 @@
             "sourceId": "src-syn-ait-insurance",
             "description": "Covers missed connections and trip delay when rebooking is required",
             "appliesTo": [],
-            "coveredReasons": ["missed_connection", "trip_delay"],
-            "excess": { "amount": 75, "currency": "USD" },
-            "maxPayout": { "amount": 1500, "currency": "USD" }
+            "coveredReasons": [
+              "missed_connection",
+              "trip_delay"
+            ],
+            "excess": {
+              "amount": 75,
+              "currency": "USD"
+            },
+            "maxPayout": {
+              "amount": 1500,
+              "currency": "USD"
+            }
           }
         ]
       },
@@ -1777,7 +1811,8 @@
           "cmt-ait-d2-lcc-chat",
           "cmt-ait-d2-loyalty-panel",
           "cmt-ait-d2-closing-debate",
-          "cmt-ait-d2-closing"
+          "cmt-ait-d2-closing",
+          "cmt-ait-d1-india-fireside"
         ],
         "travelArrangement": "SELF_OR_OTHER_ARRANGED",
         "declaredTravel": [],
@@ -1895,6 +1930,12 @@
             "role": "HOST",
             "importance": "REQUIRED",
             "flexibility": "FIXED"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-india-fireside",
+            "role": "INTERVIEWER",
+            "importance": "REQUIRED",
+            "flexibility": "CHANGEABLE"
           }
         ]
       },
@@ -1911,7 +1952,7 @@
         ],
         "notes": [
           "Co-host, day-two warm-up host and interviewer",
-          "Local co-host; self-arranged. S3 programme-side swap / CHANGEABLE afternoon partner."
+          "Local co-host; self-arranged. S3 swap counterpart on cmt-ait-d1-local-host-session (14:30 CHANGEABLE)."
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -1920,7 +1961,8 @@
           "cmt-ait-d1-marketplace-chat",
           "cmt-ait-d2-warmup",
           "cmt-ait-d2-superapp-chat",
-          "cmt-ait-d2-corporate-fireside"
+          "cmt-ait-d2-corporate-fireside",
+          "cmt-ait-d1-local-host-session"
         ],
         "travelArrangement": "SELF_OR_OTHER_ARRANGED",
         "declaredTravel": [],
@@ -1960,6 +2002,12 @@
             "role": "INTERVIEWER",
             "importance": "REQUIRED",
             "flexibility": "FIXED"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-local-host-session",
+            "role": "HOST",
+            "importance": "REQUIRED",
+            "flexibility": "CHANGEABLE"
           }
         ]
       },
@@ -1975,11 +2023,10 @@
           "ID"
         ],
         "notes": [
-          "Provocation speaker and interviewer"
+          "CGK inbound cohort peer; Day-1 REQUIRED agentic provocation 16:30 (viable after ID7153 10:30); Day-2 ota-panel"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-india-fireside",
           "cmt-ait-d1-agentic-provocation",
           "cmt-ait-d2-ota-panel"
         ],
@@ -1996,15 +2043,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN310"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN03"
+              "reference": "IDSYN03"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -2021,12 +2068,6 @@
           }
         ],
         "engagementImportance": [
-          {
-            "commitmentId": "cmt-ait-d1-india-fireside",
-            "role": "INTERVIEWER",
-            "importance": "REQUIRED",
-            "flexibility": "FIXED"
-          },
           {
             "commitmentId": "cmt-ait-d1-agentic-provocation",
             "role": "SPEAKER",
@@ -2412,10 +2453,10 @@
         },
         "homeLocationText": "Los Angeles (LAX)",
         "nationalityCodes": [
-          "US"
+          "SG"
         ],
         "notes": [
-          "Hackathon finalist (Team Waypoint); LAX ZIPAIR connection hero (S2); overnight NRT recovery may miss morning lab — evening finals 20:45 remain required; awards 2 Oct"
+          "Hackathon finalist (Team Waypoint); LAX ZIPAIR connection hero (S2); SG nationality; unbound from morning lab; evening finals 20:45 required; awards 2 Oct"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -2478,7 +2519,7 @@
               "system": "place-id",
               "value": "place-hotel-bayview"
             },
-            "checkIn": "2026-09-30T15:00:00+08:00",
+            "checkIn": "2026-09-29T15:00:00+08:00",
             "checkOut": "2026-10-03T11:00:00+08:00",
             "reservationState": "CONFIRMED"
           }
@@ -2532,15 +2573,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN310"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN10"
+              "reference": "IDSYN10"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -2609,15 +2650,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN310"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN11"
+              "reference": "IDSYN11"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -2637,7 +2678,7 @@
           {
             "commitmentId": "cmt-ait-d1-payments-panel",
             "role": "PANELLIST",
-            "importance": "PREFERRED",
+            "importance": "REQUIRED",
             "flexibility": "CHANGEABLE"
           }
         ]
@@ -2807,7 +2848,7 @@
           "AU"
         ],
         "notes": [
-          "Headline interview speaker, Day 1 09:20 — S1 critical; S3 reschedule target 15:30"
+          "Headline interview speaker, Day 1 11:30 — S1 critical under 150min readiness after ID7153 10:30; S3 bilateral swap with Daniel local-host 14:30"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -2826,15 +2867,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN310"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN14"
+              "reference": "IDSYN14"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -3196,15 +3237,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN310"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN19"
+              "reference": "IDSYN19"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -3979,15 +4020,15 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T05:15:00+07:00",
-            "scheduledArrival": "2026-09-30T07:25:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN310"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
-              "reference": "MNSYN30"
+              "reference": "IDSYN30"
             },
             "flexibility": "CHANGEABLE",
             "reservationState": "CONFIRMED"
@@ -4007,7 +4048,7 @@
           {
             "commitmentId": "cmt-ait-d1-payments-panel",
             "role": "PANELLIST",
-            "importance": "PREFERRED",
+            "importance": "REQUIRED",
             "flexibility": "CHANGEABLE"
           }
         ]
@@ -4334,7 +4375,7 @@
           "SE"
         ],
         "notes": [
-          "Recovery-platform founder; Day 1 fireside 14:30 (S5); Concorde stay; Sunday extension is traveller-funded"
+          "Recovery-platform founder; Day 1 fireside 15:30 (stage exclusivity after Daniel local-host); Concorde stay; Sunday extension is traveller-funded"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -4954,7 +4995,8 @@
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
-          "cmt-ait-d0-purpose-panel"
+          "cmt-ait-d0-purpose-panel",
+          "cmt-ait-d1-india-fireside"
         ],
         "travelArrangement": "SELF_OR_OTHER_ARRANGED",
         "declaredTravel": [],
@@ -4963,6 +5005,12 @@
             "commitmentId": "cmt-ait-d0-purpose-panel",
             "role": "PANELLIST",
             "importance": "PREFERRED",
+            "flexibility": "CHANGEABLE"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-india-fireside",
+            "role": "INTERVIEWER",
+            "importance": "REQUIRED",
             "flexibility": "CHANGEABLE"
           }
         ]

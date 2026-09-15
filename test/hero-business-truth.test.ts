@@ -78,7 +78,8 @@ test('hero-truth: S2 pack no longer calls viable TR885 inadequate', () => {
   assert.ok(tr885);
   assert.ok(tr867);
   assert.equal(/inadequate/i.test(JSON.stringify(tr885)), false);
-  assert.match(JSON.stringify(tr867), /inadequate/i);
+  assert.match(JSON.stringify(tr867), /fail|150|not.?viable|buffer/i);
+  assert.equal(/inadequate/i.test(JSON.stringify(tr867)), false);
 });
 
 test('hero-truth: Jonas data-pack checkout matches canonical 3 Oct 11:00', () => {

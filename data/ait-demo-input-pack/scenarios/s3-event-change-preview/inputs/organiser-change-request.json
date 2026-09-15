@@ -1,19 +1,21 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
-  "sourceIds": ["src-syn-traveller-messages"],
-  "note": "Organiser request after S1 Group C exhaustion: move Sarah Lim's headline interview into the later Day-1 window used by the recovery-fireside slot so the airline-retimed CGK→SIN arrival becomes buffer-viable. Approximate 'swap with later local slot' via RESCHEDULE only.",
+  "sourceIds": [
+    "src-syn-traveller-messages"
+  ],
+  "note": "Organiser request after S1 Group C exhaustion: move Sarah Lim's headline interview into the later Day-1 window used by the recovery-fireside slot so the airline-retimed CGK→SIN arrival becomes buffer-viable. Execute the Sarah↔Daniel swap as two explicit programme changes.",
   "requestedAt": "2026-09-22T11:00:00+08:00",
   "anchorEventId": "evt-ait-2026",
   "requesterRole": "ORGANISER",
-  "changeKind": "RESCHEDULED",
+  "changeKind": "OPTION_SET",
   "commitmentId": "cmt-ait-d1-headline-interview",
   "currentWindow": {
-    "startsAt": "2026-10-01T09:20:00+08:00",
-    "endsAt": "2026-10-01T09:50:00+08:00"
+    "startsAt": "2026-10-01T11:30:00+08:00",
+    "endsAt": "2026-10-01T12:00:00+08:00"
   },
   "proposedWindow": {
-    "startsAt": "2026-10-01T15:30:00+08:00",
-    "endsAt": "2026-10-01T16:00:00+08:00"
+    "startsAt": "2026-10-01T14:30:00+08:00",
+    "endsAt": "2026-10-01T15:00:00+08:00"
   },
-  "rationale": "Travel-only recovery exhausted for the critical inbound; later programme window restores viability without purchasing a new flight."
+  "rationale": "Bilateral swap option: move Sarah headline later and Daniel local-host earlier; execute as two explicit changes."
 }

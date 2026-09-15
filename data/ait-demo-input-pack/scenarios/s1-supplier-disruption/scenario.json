@@ -1,33 +1,38 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
-  "sourceIds": ["src-sim-airline-mn", "src-repo-scenarios", "src-syn-ait-roster", "src-syn-ait-event"],
+  "sourceIds": [
+    "src-sim-airline-id",
+    "src-repo-scenarios",
+    "src-syn-ait-roster",
+    "src-syn-ait-event"
+  ],
   "scenarioId": "S1",
-  "catalogueTitle": "CGK→SIN airline schedule change: accept / Atlas-recover / programme-blocked critical",
+  "catalogueTitle": "CGK?SIN synthetic Batik schedule change: accept / recover / programme continuity",
   "trigger": "SUPPLIER_EVENT",
   "stage": "POST_BOOKING_BEFORE_TRAVEL",
   "tier": "TIER_A",
   "demoRole": "Main organiser hero — continuous into S3",
   "anchorEventId": "evt-ait-2026",
   "occurredAt": "2026-09-21T09:40:00+08:00",
-  "note": "Simulated carrier Meridian Airways (MN) retimes the shared CGK→SIN inbound MN310 from 30 Sep morning to 1 Oct morning. Airline auto-reprotects every ticketed passenger onto the retimed service. Northstar evaluates travellers individually against programme buffers (engine MIN_BUFFER = 360min): Group A (Wanderpay afternoon cohort) stays VIABLE under airline reprotection; Group B (Felix Hartono / ait-draft-03, Day-1 india-fireside 10:10) fails the retimed arrival but has a viable earlier CGK→SIN Atlas/SIMULATED offer that planning can propose; Group C (Sarah Lim / ait-draft-14, Day-1 headline interview 09:20) has no travel-only offer that restores the 360min gap — continuity continues into S3 without reset. Simulated seam: every airline artifact in inputs/ is SIMULATED_EXTERNAL_EVENT (src-sim-airline-mn). Atlas search REPLAY for CGK→SIN may be hand-authored simulated inventory at the provider recording boundary with honest provenance — engine viability is never faked. Roster rehomes for non-CGK drafts are a shared patch (see output/lane-b-s1s3-shared-patch-request.md); ait-draft-03 is already home-CGK.",
+  "note": "Simulated carrier Batik (ID, synthetic) retimes the shared CGK→SIN inbound ID7159/ID7153 from 30 Sep morning to 1 Oct morning. Airline auto-reprotects every ticketed passenger onto the retimed service. Northstar evaluates travellers individually against programme buffers (engine MIN_BUFFER = 150min): Group A (Wanderpay afternoon cohort) stays VIABLE under airline reprotection; Felix Hartono / ait-draft-03 remains VIABLE for the Day-1 agentic provocation at 16:30; Group C (Sarah Lim / ait-draft-14, Day-1 headline interview 11:30) has no travel-only offer that restores the 150min gap — continuity continues into S3 without reset. Simulated seam: every airline artifact in inputs/ is SIMULATED_EXTERNAL_EVENT (src-sim-airline-id). Atlas search REPLAY for CGK→SIN may be hand-authored simulated inventory at the provider recording boundary with honest provenance — engine viability is never faked. Roster rehomes for non-CGK drafts are a shared patch (see output/lane-b-s1s3-shared-patch-request.md); ait-draft-03 is already home-CGK.",
   "affectedTravellers": [
     {
       "draftId": "ait-draft-14",
       "impactClass": "MATERIALLY_DISRUPTED_NO_TRAVEL_RECOVERY",
       "group": "C",
-      "reason": "Retimed arrival ~2026-10-01T07:10+08:00 leaves ~130min before the Day 1 headline interview (09:20), failing the 360min buffer. Simulated CGK→SIN inventory has no offer arriving by 03:20 on 1 Oct; travel-only recovery is exhausted. S3 must RESCHEDULE the commitment later (no engagement-swap API)."
+      "reason": "Synthetic ID7153 arrives 2026-10-01T10:30+08:00, leaving 60 minutes before the Day-1 headline interview (11:30), failing the 150-minute readiness buffer. Travel-only recovery is exhausted. S3 must use the bilateral Sarah↔Daniel programme swap."
     },
     {
       "draftId": "ait-draft-03",
-      "impactClass": "RECOVERABLE_BY_ATLAS_REPLACEMENT",
-      "group": "B",
-      "reason": "Same retimed arrival leaves ~180min before india-fireside (10:10), failing the 360min buffer. An earlier CGK→SIN offer arriving ~03:45 on 1 Oct restores ~385min before 10:10. Planning proposes it; auto-execute only where delegated authority permits (same carrier, fareΔ≤0, arrival shift ≤180min) — otherwise authority escalates honestly."
+      "impactClass": "VIABLE",
+      "group": "A",
+      "reason": "ID7153 arrives 10:30; Felix’s REQUIRED/FIXED agentic provocation starts 16:30, leaving 360 minutes and clearing the 150-minute buffer."
     },
     {
       "draftId": "ait-draft-10",
       "impactClass": "VIABLE",
       "group": "A",
-      "reason": "Retimed arrival leaves ~6h40m before the payments keynote (13:50); standard 360min buffer satisfied."
+      "reason": "Retimed arrival leaves ~6h40m before the payments keynote (13:50); standard 150min buffer satisfied."
     },
     {
       "draftId": "ait-draft-11",
@@ -43,23 +48,56 @@
     }
   ],
   "expectedReasoningHooks": [
-    "Programme-wide blast radius across all drafts ticketed on MN310 CGK→SIN, not a single-traveller reaction.",
-    "Provider rebooked != trip recovered: Sarah's replacement arrival must FAIL against her REQUIRED/FIXED headline engagement and the 360min MIN_BUFFER.",
-    "Group B: airline reprotection insufficient; planner searches the disrupted CGK→SIN corridor; viability engine accepts only offers that restore the buffer for THAT traveller's commitment.",
-    "Group C: no feasible travel-only strategy for the current headline slot; surface organiser programme change (S3 RESCHEDULE) rather than invent certainty.",
+    "Programme-wide blast radius across all five drafts ticketed on synthetic ID7159 CGK→SIN, not a single-traveller reaction.",
+    "Provider rebooked != trip recovered: Sarah's ID7153 replacement arrival must FAIL against her REQUIRED/FIXED headline engagement and the 150min MIN_BUFFER.",
+    "All four peers, including Felix at the 16:30 agentic provocation, remain VIABLE under the same ID7153 reprotection.",
+    "Sarah is the only NOT_VIABLE traveller; surface the organiser programme change (S3 bilateral Sarah↔Daniel swap) rather than invent certainty.",
     "Authority: supplier-disruption same-carrier rebook with fareΔ≤0 and arrival shift ≤180min may be pre-approved; larger shifts escalate — never silently auto-mutate past authority.",
     "Continuous S1→S3: no mid-flow reset; same tripId for Group C must read NOT_VIABLE before S3 commit and VIABLE after programme RESCHEDULE fan-out (plan on fan-out case if required)."
   ],
   "inputs": [
-    { "file": "inputs/airline-schedule-change-mn310.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] },
-    { "file": "inputs/baseline-itineraries.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
-    { "file": "inputs/alternative-services-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-mn"] }
+    {
+      "file": "inputs/airline-schedule-change-id7159.json",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "sourceIds": [
+        "src-sim-airline-id"
+      ]
+    },
+    {
+      "file": "inputs/baseline-itineraries.json",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "sourceIds": [
+        "src-syn-ait-event",
+        "src-syn-ait-policy"
+      ]
+    },
+    {
+      "file": "inputs/alternative-services-inventory.json",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "sourceIds": [
+        "src-sim-airline-id"
+      ]
+    }
   ],
-  "referencedDraftIds": ["ait-draft-14", "ait-draft-03", "ait-draft-10", "ait-draft-11", "ait-draft-30"],
+  "referencedDraftIds": [
+    "ait-draft-14",
+    "ait-draft-03",
+    "ait-draft-10",
+    "ait-draft-11",
+    "ait-draft-30"
+  ],
   "referencedCommitmentIds": [
     "cmt-ait-d1-headline-interview",
-    "cmt-ait-d1-india-fireside",
+    "cmt-ait-d1-agentic-provocation",
     "cmt-ait-d1-payments-keynote",
-    "cmt-ait-d1-payments-panel"
+    "cmt-ait-d1-payments-panel",
+    "cmt-ait-d1-local-host-session"
+  ],
+  "routeParams": [
+    {
+      "origin": "CGK",
+      "destination": "SIN",
+      "date": "2026-10-01"
+    }
   ]
 }

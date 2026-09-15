@@ -470,7 +470,7 @@ export class NuiteeAdapter implements HotelCapability {
       checkin: query.checkInDate,
       checkout: query.checkOutDate,
       currency: DEFAULT_CURRENCY,
-      guestNationality: DEFAULT_GUEST_NATIONALITY,
+      guestNationality: query.guestNationality?.trim() || DEFAULT_GUEST_NATIONALITY,
       occupancies: buildOccupancies(query),
       maxRatesPerHotel: MAX_RATES_PER_HOTEL,
       includeHotelData: true,

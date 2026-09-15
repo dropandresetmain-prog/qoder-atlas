@@ -1,0 +1,174 @@
+{
+  "id": "rec_cb93729e167c584d3fa8fa2bfe61c984",
+  "providerId": "nuitee",
+  "operation": "book",
+  "recordedAt": "2026-09-15T14:15:59.585Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "vW4k_j-53",
+      "clientReference": "qoder-atlas-wit-jordan-concorde-recovered",
+      "supplierBookingId": "vW4k_j-53",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-09-30",
+      "checkout": "2026-10-03",
+      "hotel": {
+        "hotelId": "lp21d9f",
+        "name": "Concorde Hotel Singapore",
+        "parentHotelId": "lp21d9f"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJKECN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2UJE2TMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBCTERCRJVFFQR2RGRCEKTSCKFHU4Q2YIFKEERCHIVNFIUKOKJLEOVKSKRHU2SSUIZKVSVCHJ5BFOR2VGJMFSVCTKNEVUSCILFGVEUKHJEZUIQKPJJJEOVKZIRAU2SSWKBITEWCZKVJFER2RGNKFGUKSLJEEKMSVGRGUGVSIII3EIS2OLJLUONBSKNDVKU2QIVHEQRSFKJJU6RKNLJCECTKSK5DFKWKEKNGEUUSHKVIUIQKNIIZEORJSKNDXYNJXGYXDONL4PRJE67D4PR6EIZLMOV4GKICQNR2XG7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+            "retailRate": {
+              "total": {
+                "amount": 576.75,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": "booking.com"
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Tax",
+                  "amount": 30.83,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-09-30 23:59:59",
+                  "amount": 576.75,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "NRFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "Room Only",
+            "boardName": "RO",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Jordan",
+          "lastName": "Hale",
+          "childrenAges": null,
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": null,
+            "hotelRemarks": [],
+            "refundableTag": "NRFN"
+          },
+          "room_id": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHIEZUOR2OLJLEONC2LBMU2SSEI5EVSRCFJZJFCSCFLJKECN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2UJE2TMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WSZJBCTERCRJVFFQR2RGRCEKTSCKFHU4Q2YIFKEERCHIVNFIUKOKJLEOVKSKRHU2SSUIZKVSVCHJ5BFOR2VGJMFSVCTKNEVUSCILFGVEUKHJEZUIQKPJJJEOVKZIRAU2SSWKBITEWCZKVJFER2RGNKFGUKSLJEEKMSVGRGUGVSIII3EIS2OLJLUONBSKNDVKU2QIVHEQRSFKJJU6RKNLJCECTKSK5DFKWKEKNGEUUSHKVIUIQKNIIZEORJSKNDXYNJXGYXDONL4PRJE67D4PR6EIZLMOV4GKICQNR2XG7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+          "occupancy_number": 1,
+          "amount": 576.75,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Jordan",
+              "lastName": "Hale",
+              "email": "[REDACTED]",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Jordan",
+        "lastName": "Hale",
+        "email": "[REDACTED]",
+        "phone": "[REDACTED]"
+      },
+      "createdAt": "2026-09-15T14:16:00",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": null,
+        "hotelRemarks": [],
+        "refundableTag": "NRFN"
+      },
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
+      "price": 576.75,
+      "sellingPriceToUser": 576.75,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Jordan",
+      "lastName": "Hale",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "-lnkAlDVD",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_qRtoAhNDUCosiOMOxMyRE",
+      "sellingPrice": "576.75",
+      "exchangeRate": 0.8624513572669459,
+      "exchangeRateUsd": 1,
+      "email": "[REDACTED]",
+      "tag": "NRFN",
+      "lastFreeCancellationDate": null,
+      "userId": 383174,
+      "nationality": "SG",
+      "holderTitle": "",
+      "hotelId": "lp21d9f",
+      "hotelName": "Concorde Hotel Singapore",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 23.07,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "",
+      "payLaterDeadline": null
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

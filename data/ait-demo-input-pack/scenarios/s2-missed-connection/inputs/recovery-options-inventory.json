@@ -1,7 +1,10 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
-  "sourceIds": ["src-sim-airline-zg", "src-wave4r-atlas"],
-  "note": "Narrative inventory mirror of REPLAY Atlas NRT→SIN searches (rec_34518610… for 29 Sep, rec_71d6274a… for 30 Sep). Shape: same-night TR875, airline-reported morning TR885 (whole-trip viable vs finals 20:45 under 360), and slower TR867 (inadequate late arrival). Executable recovery uses Atlas REPLAY recordings, not this file.",
+  "sourceIds": [
+    "src-sim-airline-zg",
+    "src-wave4r-atlas"
+  ],
+  "note": "Narrative inventory mirror of REPLAY Atlas NRT→SIN searches (rec_34518610… for 29 Sep, rec_71d6274a… for 30 Sep). Shape: same-night TR875, airline-reported morning airline-default TR867 (inadequate late arrival) and Northstar candidate TR885 (whole-trip viable vs finals 20:45 under 150min). Executable recovery uses Atlas REPLAY recordings, not this file.",
   "observedAt": "2026-09-29T17:30:00+09:00",
   "routes": [
     {
@@ -15,7 +18,10 @@
           "arrival": "2026-09-30T05:20:00+08:00",
           "status": "OPERATING",
           "role": "SAME_NIGHT_RECOVERY",
-          "economyFare": { "currency": "USD", "note": "Wave4 REPLAY offer; supplier-caused misconnect: duty-of-care rebooking expected." }
+          "economyFare": {
+            "currency": "USD",
+            "note": "Wave4 REPLAY offer; supplier-caused misconnect: duty-of-care rebooking expected."
+          }
         },
         {
           "flightNumber": "ZG053",
@@ -31,8 +37,12 @@
           "departure": "2026-09-30T08:20:00+09:00",
           "arrival": "2026-09-30T14:35:00+08:00",
           "status": "OPERATING",
-          "role": "AIRLINE_DEFAULT_MORNING",
-          "economyFare": { "currency": "USD", "note": "Airline involuntary morning recovery; whole-trip viable vs finals showcase 20:45 under 360min buffer (370 ≥ 360)." }
+          "role": "NORTHSTAR_CANDIDATE",
+          "economyFare": {
+            "currency": "USD",
+            "note": "Northstar candidate; whole-trip viable vs finals showcase 20:45 under 150min buffer (370 ≥ 150)."
+          },
+          "note": "NORTHSTAR-selected recovery candidate; arrives 14:35, clears 150min before finals 20:45."
         },
         {
           "flightNumber": "TR867",
@@ -40,8 +50,8 @@
           "departure": "2026-09-30T12:30:00+09:00",
           "arrival": "2026-09-30T20:45:00+08:00",
           "status": "OPERATING",
-          "role": "SLOWER_NEXT_DAY",
-          "note": "Slower next-day alternative; arrives at showcase start and fails the 360min buffer — inadequate inventory alternative, not the reported airline TR885 reprotection."
+          "role": "AIRLINE_DEFAULT",
+          "note": "Airline involuntary default; arrives SIN 20:45 and fails 150min readiness before finals 20:45 (gap 0) — NOT_VIABLE."
         }
       ]
     }

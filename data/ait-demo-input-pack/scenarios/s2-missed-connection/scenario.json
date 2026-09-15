@@ -1,6 +1,10 @@
 {
   "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
-  "sourceIds": ["src-syn-traveller-messages", "src-repo-scenarios", "src-syn-ait-roster"],
+  "sourceIds": [
+    "src-syn-traveller-messages",
+    "src-repo-scenarios",
+    "src-syn-ait-roster"
+  ],
   "scenarioId": "S2",
   "catalogueTitle": "Traveller misses a connection; airline reprotection is reported, not yet whole-trip recovered",
   "trigger": "TRAVELLER_STATE_REPORT",
@@ -9,12 +13,12 @@
   "demoRole": "Traveller disruption hero / supporting hero",
   "anchorEventId": "evt-ait-2026",
   "occurredAt": "2026-09-29T17:20:00+09:00",
-  "note": "Jordan Hale (ait-draft-09) flies ZIPAIR ZG023 LAX→NRT connecting to ZG053 NRT→SIN with a genuine ~2h40m connection (provider-locked). Progressive Atlas delay/schedule evidence on the inbound eventually makes ZG053 impossible. The airline reports a next-morning TR885-class reprotection (~08:20→14:35). With finals showcase at 20:45, TR885 clears the 360min buffer (370 ≥ 360). TR867 (~20:45 arrival) fails the showcase buffer and remains the slower inventory alternative. Closed hero path: reconcile traveller report + reported reprotection, then Northstar whole-trip viability ranks evidenced TR885-class recovery. Simulated seam: SIMULATED_EXTERNAL_EVENT / REPLAY Atlas; transit hotel / JP entry / insurance remain context only.",
+  "note": "Jordan Hale (ait-draft-09) flies ZIPAIR ZG023 LAX→NRT connecting to ZG053 NRT→SIN with a genuine ~2h40m connection (provider-locked). Progressive Atlas delay/schedule evidence on the inbound eventually makes ZG053 impossible. The airline reports default TR867 (~12:30→20:45); Northstar evaluates TR885 (~08:20→14:35) as the viable candidate under the 150min buffer. Closed hero path: reconcile traveller report + reported reprotection, then Northstar whole-trip viability ranks the evidenced TR885 candidate. Simulated seam: SIMULATED_EXTERNAL_EVENT / REPLAY Atlas; transit hotel / entry / insurance remain context only.",
   "affectedTravellers": [
     {
       "draftId": "ait-draft-09",
       "impactClass": "MISCONNECTED_PROVIDER_RECOVERY_UNVERIFIED",
-      "reason": "Missed NRT→SIN ZG053 after inbound delay; airline reports morning TR885-class (08:20→14:35) which is whole-trip viable against finals showcase 20:45 under 360min buffer once checked. Provider itinerary is not accepted as recovered until Northstar completes those checks."
+      "reason": "Missed NRT→SIN ZG053 after inbound delay; airline-default TR867 arrives at finals start and fails the 150min buffer. Northstar candidate TR885 (08:20→14:35) is whole-trip viable once checked."
     }
   ],
   "expectedReasoningHooks": [
@@ -22,21 +26,72 @@
     "Conversational ingestion: extract missed connection + airline morning rebook claims without treating them as authoritative provider state.",
     "Reconciliation: compare traveller report with expected LAX→NRT→SIN trip state and provider inventory; missing evidence stays UNKNOWN.",
     "Downstream invalidation: SIN hotel late arrival, REQUIRED finals showcase buffer.",
-    "Whole-trip viability of reported TR885-class morning recovery against finals showcase 20:45 (370 ≥ 360 PASS).",
+    "Whole-trip viability of reported TR885 morning recovery against finals showcase 20:45 (370 ≥ 150 PASS).",
     "Same-night / next-morning replacement search on the failed NRT→SIN corridor (REPLAY Atlas inventory including TR875/TR885/TR867-class offers).",
-    "TR867-class late arrival fails the showcase buffer and remains a non-viable inventory alternative, not the reported airline reprotection."
+    "TR867 airline-default late arrival fails the showcase buffer; TR885 Northstar candidate clears it."
   ],
   "inputs": [
-    { "file": "inputs/traveller-report-message.json", "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
-    { "file": "inputs/baseline-itinerary.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"] },
-    { "file": "inputs/provider-rebooking-state.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-zg"] },
-    { "file": "inputs/recovery-options-inventory.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-zg", "src-wave4r-atlas"] },
-    { "file": "inputs/progressive-delay-timeline.json", "provenance": "SIMULATED_EXTERNAL_EVENT", "sourceIds": ["src-sim-airline-zg", "src-wave4r-atlas"] },
-    { "file": "inputs/insurance-coverage-rules.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-ait-policy"] },
-    { "file": "inputs/entry-requirements-context.json", "provenance": "RESEARCH_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-entry-research"] }
+    {
+      "file": "inputs/traveller-report-message.json",
+      "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
+      "sourceIds": [
+        "src-syn-traveller-messages"
+      ]
+    },
+    {
+      "file": "inputs/baseline-itinerary.json",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "sourceIds": [
+        "src-syn-ait-event",
+        "src-syn-ait-policy"
+      ]
+    },
+    {
+      "file": "inputs/provider-rebooking-state.json",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "sourceIds": [
+        "src-sim-airline-zg"
+      ]
+    },
+    {
+      "file": "inputs/recovery-options-inventory.json",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "sourceIds": [
+        "src-sim-airline-zg",
+        "src-wave4r-atlas"
+      ]
+    },
+    {
+      "file": "inputs/progressive-delay-timeline.json",
+      "provenance": "SIMULATED_EXTERNAL_EVENT",
+      "sourceIds": [
+        "src-sim-airline-zg",
+        "src-wave4r-atlas"
+      ]
+    },
+    {
+      "file": "inputs/insurance-coverage-rules.json",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "sourceIds": [
+        "src-syn-ait-policy"
+      ]
+    },
+    {
+      "file": "inputs/entry-requirements-context.json",
+      "provenance": "RESEARCH_SUPPLIED_SYNTHETIC",
+      "sourceIds": [
+        "src-syn-entry-research"
+      ]
+    }
   ],
-  "referencedDraftIds": ["ait-draft-09"],
-  "referencedCommitmentIds": ["cmt-ait-d0-hackathon-lab", "cmt-ait-d0-hackathon-finals", "cmt-ait-d2-hack-awards"],
+  "referencedDraftIds": [
+    "ait-draft-09"
+  ],
+  "referencedCommitmentIds": [
+    "cmt-ait-d0-hackathon-lab",
+    "cmt-ait-d0-hackathon-finals",
+    "cmt-ait-d2-hack-awards"
+  ],
   "providerLockedFacts": {
     "inbound": {
       "flightNumber": "ZG023",
@@ -73,7 +128,10 @@
     },
     "nrtHotels": {
       "evidence": "output/wave4r-s2-hub-hotels.json",
-      "sampleProperties": ["Hilton Tokyo Narita Airport", "HOTEL MYSTAYS PREMIER Narita"]
+      "sampleProperties": [
+        "Hilton Tokyo Narita Airport",
+        "HOTEL MYSTAYS PREMIER Narita"
+      ]
     }
   }
 }

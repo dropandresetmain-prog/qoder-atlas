@@ -1,6 +1,6 @@
 {
   "scenarioId": "S1",
-  "title": "Airline schedule change — Groups A (accept) / C (critical NOT_VIABLE); CGK pack pending shared rebuild",
+  "title": "Synthetic Batik schedule change — five CGK travellers; Sarah critical NOT_VIABLE",
   "mode": "SIMULATED_EXTERNAL_EVENT",
   "globalInputPack": {
     "packId": "ait-global-programme",
@@ -16,7 +16,7 @@
     {
       "seam": "atlas.event_ingress",
       "mode": "SIMULATED_EXTERNAL_EVENT",
-      "note": "Runnable against b7d80aa KUL MN218 seed; scenario pack describes CGK MN310 target"
+      "note": "Runnable against the synthetic CGK ID7159 → ID7153 seed; no Atlas evidence is claimed for Batik."
     },
     {
       "seam": "atlas.flight_state_query",
@@ -32,22 +32,30 @@
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-ait-2026"],
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
     "travellerIds": [
       "trv-evt-ait-2026-ait-draft-14",
+      "trv-evt-ait-2026-ait-draft-03",
       "trv-evt-ait-2026-ait-draft-10",
       "trv-evt-ait-2026-ait-draft-11",
       "trv-evt-ait-2026-ait-draft-30"
     ],
     "tripIds": [
       "trip-trv-evt-ait-2026-ait-draft-14",
+      "trip-trv-evt-ait-2026-ait-draft-03",
       "trip-trv-evt-ait-2026-ait-draft-10",
       "trip-trv-evt-ait-2026-ait-draft-11",
       "trip-trv-evt-ait-2026-ait-draft-30"
     ]
   },
   "routeParams": [
-    { "origin": "KUL", "destination": "SIN", "date": "2026-10-01" }
+    {
+      "origin": "CGK",
+      "destination": "SIN",
+      "date": "2026-10-01"
+    }
   ],
   "steps": [
     {
@@ -57,108 +65,155 @@
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-21T09:00:00+08:00" },
+        "body": {
+          "at": "2026-09-21T09:00:00+08:00"
+        },
         "expectStatus": 200
       }
     },
     {
       "id": "notify_group_c",
-      "description": "Group C critical traveller schedule-change (MNSYN14)",
+      "description": "Group C critical traveller synthetic ID7159 cancellation/reprotect (IDSYN14)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-21T09:45:00+08:00" },
+        "query": {
+          "at": "2026-09-21T09:45:00+08:00"
+        },
         "body": {
-          "eventId": "sim-mn-evt-20260921-001-mnsyn14",
-          "orderNo": "MNSYN14",
+          "eventId": "sim-id-evt-20260921-001-idsyn14",
+          "orderNo": "IDSYN14",
           "eventType": "SCHEDULE_CHANGE",
           "eventStatus": 1,
           "eventTime": "2026-09-21T09:40:00+08:00",
           "createTime": "2026-09-21T09:40:00+08:00",
-          "airline": "MN",
-          "depTime": "2026-10-01T06:00:00+08:00",
-          "pnr": "MNSYN14"
+          "airline": "ID",
+          "depTime": "2026-10-01T07:45:00+07:00",
+          "pnr": "IDSYN14"
         },
-        "capture": { "heroCaseId": "results.0.caseId", "heroTripId": "results.0.tripId" },
+        "capture": {
+          "heroCaseId": "results.0.caseId",
+          "heroTripId": "results.0.tripId"
+        },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "ACCEPTED", "description": "ingress accepted" },
-        { "path": "results.0.processed.mutationAccepted", "op": "truthy", "description": "mutation accepted" },
-        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "FAIL", "description": "headline buffer fails" },
-        { "path": "results.0.processed.constraintEvaluations.0.evidence", "op": "contains", "expected": "required 360min", "description": "360min evidence" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED",
+          "description": "ingress accepted"
+        },
+        {
+          "path": "results.0.processed.mutationAccepted",
+          "op": "truthy",
+          "description": "mutation accepted"
+        },
+        {
+          "path": "results.0.processed.constraintEvaluations.0.status",
+          "op": "equals",
+          "expected": "FAIL",
+          "description": "headline buffer fails"
+        },
+        {
+          "path": "results.0.processed.constraintEvaluations.0.evidence",
+          "op": "contains",
+          "expected": "required 150min",
+          "description": "150min evidence"
+        }
       ]
     },
     {
       "id": "notify_group_a_draft10",
-      "description": "Group A (MNSYN10)",
+      "description": "Group A (IDSYN10)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-21T09:47:00+08:00" },
+        "query": {
+          "at": "2026-09-21T09:47:00+08:00"
+        },
         "body": {
-          "eventId": "sim-mn-evt-20260921-001-mnsyn10",
-          "orderNo": "MNSYN10",
+          "eventId": "sim-id-evt-20260921-001-idsyn10",
+          "orderNo": "IDSYN10",
           "eventType": "SCHEDULE_CHANGE",
           "eventStatus": 1,
           "eventTime": "2026-09-21T09:40:00+08:00",
           "createTime": "2026-09-21T09:40:00+08:00",
-          "airline": "MN",
-          "depTime": "2026-10-01T06:00:00+08:00",
-          "pnr": "MNSYN10"
+          "airline": "ID",
+          "depTime": "2026-10-01T07:45:00+07:00",
+          "pnr": "IDSYN10"
         },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS", "description": "afternoon commitment viable" }
+        {
+          "path": "results.0.processed.constraintEvaluations.0.status",
+          "op": "equals",
+          "expected": "PASS",
+          "description": "afternoon commitment viable"
+        }
       ]
     },
     {
       "id": "notify_group_a_draft11",
-      "description": "Group A (MNSYN11)",
+      "description": "Group A (IDSYN11)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-21T09:48:00+08:00" },
+        "query": {
+          "at": "2026-09-21T09:48:00+08:00"
+        },
         "body": {
-          "eventId": "sim-mn-evt-20260921-001-mnsyn11",
-          "orderNo": "MNSYN11",
+          "eventId": "sim-id-evt-20260921-001-idsyn11",
+          "orderNo": "IDSYN11",
           "eventType": "SCHEDULE_CHANGE",
           "eventStatus": 1,
           "eventTime": "2026-09-21T09:40:00+08:00",
           "createTime": "2026-09-21T09:40:00+08:00",
-          "airline": "MN",
-          "depTime": "2026-10-01T06:00:00+08:00",
-          "pnr": "MNSYN11"
+          "airline": "ID",
+          "depTime": "2026-10-01T07:45:00+07:00",
+          "pnr": "IDSYN11"
         },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS", "description": "panel viable" }
+        {
+          "path": "results.0.processed.constraintEvaluations.0.status",
+          "op": "equals",
+          "expected": "PASS",
+          "description": "panel viable"
+        }
       ]
     },
     {
       "id": "notify_group_a_draft30",
-      "description": "Group A (MNSYN30)",
+      "description": "Group A (IDSYN30)",
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-21T09:49:00+08:00" },
+        "query": {
+          "at": "2026-09-21T09:49:00+08:00"
+        },
         "body": {
-          "eventId": "sim-mn-evt-20260921-001-mnsyn30",
-          "orderNo": "MNSYN30",
+          "eventId": "sim-id-evt-20260921-001-idsyn30",
+          "orderNo": "IDSYN30",
           "eventType": "SCHEDULE_CHANGE",
           "eventStatus": 1,
           "eventTime": "2026-09-21T09:40:00+08:00",
           "createTime": "2026-09-21T09:40:00+08:00",
-          "airline": "MN",
-          "depTime": "2026-10-01T06:00:00+08:00",
-          "pnr": "MNSYN30"
+          "airline": "ID",
+          "depTime": "2026-10-01T07:45:00+07:00",
+          "pnr": "IDSYN30"
         },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "results.0.processed.constraintEvaluations.0.status", "op": "equals", "expected": "PASS", "description": "panel viable" }
+        {
+          "path": "results.0.processed.constraintEvaluations.0.status",
+          "op": "equals",
+          "expected": "PASS",
+          "description": "panel viable"
+        }
       ]
     },
     {
@@ -171,7 +226,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE", "description": "critical traveller not viable" }
+        {
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "NOT_VIABLE",
+          "description": "critical traveller not viable"
+        }
       ]
     },
     {
@@ -184,7 +244,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "remainderViable", "op": "equals", "expected": "VIABLE", "description": "airline reprotection accepted" }
+        {
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "VIABLE",
+          "description": "airline reprotection accepted"
+        }
       ]
     }
   ]

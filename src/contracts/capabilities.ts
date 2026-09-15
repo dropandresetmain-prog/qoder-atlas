@@ -583,6 +583,11 @@ export interface HotelSearchQuery {
   checkOutDate: string;
   guests?: { adults: number; children?: number };
   rooms?: number;
+  /**
+   * ISO 3166-1 alpha-2 nationality used for rate eligibility when the
+   * provider requires it. Absent = adapter default (not invented per traveller).
+   */
+  guestNationality?: string;
 }
 
 export interface HotelPropertyView {

@@ -1,11 +1,15 @@
 {
   "provenance": "SIMULATED_EXTERNAL_EVENT",
-  "sourceIds": ["src-sim-airline-zg"],
-  "note": "Simulated provider PNR state after progressive inbound delay forces a missed NRT→SIN connection. Confirms the traveller report and shows the airline's own recovery: next-morning TR885-class. Simulated at the external provider boundary; never presented as LIVE. Flight numbers/timings are provider-locked from Wave4 RECORD evidence.",
+  "sourceIds": [
+    "src-sim-airline-zg"
+  ],
+  "note": "Simulated provider PNR state after progressive inbound delay forces a missed NRT→SIN connection. Shows the airline-default TR867 recovery; Northstar separately evaluates TR885 as its viable candidate. Simulated at the external provider boundary; never presented as LIVE.",
   "observedAt": "2026-09-29T17:25:00+09:00",
   "pnr": "ZGSYN09",
   "orderNo": "ZGSYN09",
-  "passenger": { "draftId": "ait-draft-09" },
+  "passenger": {
+    "draftId": "ait-draft-09"
+  },
   "segments": [
     {
       "flightNumber": "ZG023",
@@ -27,19 +31,19 @@
       "note": "Passenger did not board; minimum connection lost after late ZG023 arrival."
     },
     {
-      "flightNumber": "TR885",
+      "flightNumber": "TR867",
       "origin": "NRT",
       "destination": "SIN",
-      "scheduledDeparture": "2026-09-30T08:20:00+09:00",
-      "scheduledArrival": "2026-09-30T14:35:00+08:00",
+      "scheduledDeparture": "2026-09-30T12:30:00+09:00",
+      "scheduledArrival": "2026-09-30T20:45:00+08:00",
       "status": "REBOOKED_INVOLUNTARY",
       "fareDifference": "NONE",
-      "note": "Airline-default morning recovery from Wave4 NRT→SIN inventory (TR885-class)."
+      "note": "Airline-default slower recovery; fails finals buffer."
     }
   ],
   "baggage": {
     "checkedBags": 1,
-    "routing": "Held for morning TR885-class; expected delivery at SIN baggage belt on 30 Sep afternoon.",
+    "routing": "Held for airline-default TR867; expected delivery at SIN baggage belt on 30 Sep evening.",
     "status": "ROUTED_WITH_REBOOKING"
   }
 }

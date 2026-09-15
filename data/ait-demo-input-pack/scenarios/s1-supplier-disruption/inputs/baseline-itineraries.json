@@ -1,71 +1,74 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
-  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy"],
-  "note": "Baseline inbound itineraries for the CGK→SIN S1 cohort before disruption (booking-plan state). Return legs omitted. Times use explicit offsets (CGK Asia/Jakarta +07:00, SIN +08:00). Drafts 10/11/14/30 require roster homeLocationText rehome to Jakarta (CGK) via shared patch — ait-draft-03 is already CGK.",
+  "sourceIds": [
+    "src-syn-ait-event",
+    "src-syn-ait-policy"
+  ],
+  "note": "Synthetic Batik baseline for five CGK cohort travellers; ID7159 is organiser-supplied and not Atlas-backed.",
   "asOf": "2026-09-21T09:00:00+08:00",
   "itineraries": [
     {
       "draftId": "ait-draft-14",
-      "plan": "Direct CGK → SIN early 30 Sep; landside SIN 30 Sep 07:25, ~26h before the Day 1 09:20 headline interview.",
+      "plan": "Direct synthetic Batik ID7159 CGK → SIN on 30 Sep 17:45–20:30; baseline landside arrival clears the Day 1 11:30 headline interview.",
       "segments": [
         {
-          "flightNumber": "MN310",
+          "flightNumber": "ID7159",
           "origin": "CGK",
           "destination": "SIN",
-          "departure": "2026-09-30T05:15:00+07:00",
-          "arrival": "2026-09-30T07:25:00+08:00"
+          "departure": "2026-09-30T17:45:00+07:00",
+          "arrival": "2026-09-30T20:30:00+08:00"
         }
       ]
     },
     {
       "draftId": "ait-draft-03",
-      "plan": "Direct CGK → SIN early 30 Sep with the shared MN310 cohort; landside SIN 30 Sep 07:25, well before Day 1 india-fireside 10:10.",
+      "plan": "Direct CGK → SIN early 30 Sep with the shared ID7159 cohort; landside SIN 30 Sep 07:25, well before Day 1 india-fireside 10:10.",
       "segments": [
         {
-          "flightNumber": "MN310",
+          "flightNumber": "ID7159",
           "origin": "CGK",
           "destination": "SIN",
-          "departure": "2026-09-30T05:15:00+07:00",
-          "arrival": "2026-09-30T07:25:00+08:00"
+          "departure": "2026-09-30T17:45:00+07:00",
+          "arrival": "2026-09-30T20:30:00+08:00"
         }
       ]
     },
     {
       "draftId": "ait-draft-10",
-      "plan": "Direct CGK → SIN with the shared MN310 cohort; landside SIN 30 Sep 07:25, >30h before the Day 1 13:50 payments keynote.",
+      "plan": "Direct CGK → SIN with the shared ID7159 cohort; landside SIN 30 Sep 07:25, >30h before the Day 1 13:50 payments keynote.",
       "segments": [
         {
-          "flightNumber": "MN310",
+          "flightNumber": "ID7159",
           "origin": "CGK",
           "destination": "SIN",
-          "departure": "2026-09-30T05:15:00+07:00",
-          "arrival": "2026-09-30T07:25:00+08:00"
+          "departure": "2026-09-30T17:45:00+07:00",
+          "arrival": "2026-09-30T20:30:00+08:00"
         }
       ]
     },
     {
       "draftId": "ait-draft-11",
-      "plan": "Direct CGK → SIN with the shared MN310 cohort; landside SIN 30 Sep 07:25.",
+      "plan": "Direct CGK → SIN with the shared ID7159 cohort; landside SIN 30 Sep 07:25.",
       "segments": [
         {
-          "flightNumber": "MN310",
+          "flightNumber": "ID7159",
           "origin": "CGK",
           "destination": "SIN",
-          "departure": "2026-09-30T05:15:00+07:00",
-          "arrival": "2026-09-30T07:25:00+08:00"
+          "departure": "2026-09-30T17:45:00+07:00",
+          "arrival": "2026-09-30T20:30:00+08:00"
         }
       ]
     },
     {
       "draftId": "ait-draft-30",
-      "plan": "Direct CGK → SIN with the shared MN310 cohort; landside SIN 30 Sep 07:25.",
+      "plan": "Direct CGK → SIN with the shared ID7159 cohort; landside SIN 30 Sep 07:25.",
       "segments": [
         {
-          "flightNumber": "MN310",
+          "flightNumber": "ID7159",
           "origin": "CGK",
           "destination": "SIN",
-          "departure": "2026-09-30T05:15:00+07:00",
-          "arrival": "2026-09-30T07:25:00+08:00"
+          "departure": "2026-09-30T17:45:00+07:00",
+          "arrival": "2026-09-30T20:30:00+08:00"
         }
       ]
     }

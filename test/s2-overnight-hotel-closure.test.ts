@@ -12,7 +12,7 @@
  *    FULLY_RECOVERED, internally: flight ActionIntent -> observe -> hotel
  *    ActionIntent (its own deterministic, envelope-covered AuthorityDecision)
  *    -> observe -> verify;
- *  - the whole-trip plan shows the Singapore stay as 'No change required'
+ *  - the whole-trip plan shows the Singapore destination stay as affected when arrival-date invalidates check-in
  *    and the Narita hotel as Confirmed, with separate flight+hotel costs.
  */
 import test from 'node:test';

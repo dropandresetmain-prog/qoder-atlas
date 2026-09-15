@@ -37,13 +37,27 @@
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-ait-2026"],
-    "travellerIds": ["trv-evt-ait-2026-ait-draft-09"],
-    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-09"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-09"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-09"
+    ]
   },
   "routeParams": [
-    { "origin": "NRT", "destination": "SIN", "date": "2026-09-29" },
-    { "origin": "LAX", "destination": "NRT", "date": "2026-09-28" }
+    {
+      "origin": "NRT",
+      "destination": "SIN",
+      "date": "2026-09-29"
+    },
+    {
+      "origin": "LAX",
+      "destination": "NRT",
+      "date": "2026-09-28"
+    }
   ],
   "steps": [
     {
@@ -53,7 +67,9 @@
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-28T11:00:00-07:00" },
+        "body": {
+          "at": "2026-09-28T11:00:00-07:00"
+        },
         "expectStatus": 200
       }
     },
@@ -63,7 +79,9 @@
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-28T12:30:00-07:00" },
+        "query": {
+          "at": "2026-09-28T12:30:00-07:00"
+        },
         "body": {
           "eventId": "sim-zg-evt-s2-delay-01",
           "orderNo": "ZGSYN09",
@@ -82,10 +100,29 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "ACCEPTED", "description": "ingress accepted the first progressive delay notification" },
-        { "path": "results", "op": "arrayLengthMin", "expected": 1, "description": "reconciled provider state produced at least one processed signal" },
-        { "path": "results.0.processed.mutationAccepted", "op": "truthy", "description": "CONNECTED retimed schedule mutated authoritative trip state" },
-        { "path": "results.0.processed.appliedOperationCount", "op": "gte", "expected": 2, "description": "departure and arrival facts both retimed from the reconciliation snapshot" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED",
+          "description": "ingress accepted the first progressive delay notification"
+        },
+        {
+          "path": "results",
+          "op": "arrayLengthMin",
+          "expected": 1,
+          "description": "reconciled provider state produced at least one processed signal"
+        },
+        {
+          "path": "results.0.processed.mutationAccepted",
+          "op": "truthy",
+          "description": "CONNECTED retimed schedule mutated authoritative trip state"
+        },
+        {
+          "path": "results.0.processed.appliedOperationCount",
+          "op": "gte",
+          "expected": 2,
+          "description": "departure and arrival facts both retimed from the reconciliation snapshot"
+        }
       ]
     },
     {
@@ -94,7 +131,9 @@
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-28T15:00:00-07:00" },
+        "query": {
+          "at": "2026-09-28T15:00:00-07:00"
+        },
         "body": {
           "eventId": "sim-zg-evt-s2-delay-02",
           "orderNo": "ZGSYN09",
@@ -109,7 +148,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "ACCEPTED", "description": "second progressive notification accepted" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED",
+          "description": "second progressive notification accepted"
+        }
       ]
     },
     {
@@ -118,7 +162,9 @@
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-29T12:00:00+09:00" },
+        "query": {
+          "at": "2026-09-29T12:00:00+09:00"
+        },
         "body": {
           "eventId": "sim-zg-evt-s2-delay-03",
           "orderNo": "ZGSYN09",
@@ -133,7 +179,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "ACCEPTED", "description": "third progressive notification accepted" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED",
+          "description": "third progressive notification accepted"
+        }
       ]
     },
     {
@@ -150,14 +201,40 @@
           "at": "2026-09-29T17:20:00+09:00"
         },
         "expectStatus": 200,
-        "capture": { "caseId": "caseId" }
+        "capture": {
+          "caseId": "caseId"
+        }
       },
       "assert": [
-        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "missed-flight report opens a recovery case" },
-        { "path": "missedElementId", "op": "equals", "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "engine resolves the reported missed NRT→SIN leg" },
-        { "path": "signalId", "op": "contains", "expected": "sig-missed-flight-el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "disruption signal derived from the missed element" },
-        { "path": "directFailureIds", "op": "arrayNotEmpty", "description": "impact assessment names direct failures" },
-        { "path": "directFailureIds.0", "op": "equals", "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "blast radius starts at the missed onward leg" }
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "ASSESSING",
+          "description": "missed-flight report opens a recovery case"
+        },
+        {
+          "path": "missedElementId",
+          "op": "equals",
+          "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2",
+          "description": "engine resolves the reported missed NRT→SIN leg"
+        },
+        {
+          "path": "signalId",
+          "op": "contains",
+          "expected": "sig-missed-flight-el-trip-trv-evt-ait-2026-ait-draft-09-leg-2",
+          "description": "disruption signal derived from the missed element"
+        },
+        {
+          "path": "directFailureIds",
+          "op": "arrayNotEmpty",
+          "description": "impact assessment names direct failures"
+        },
+        {
+          "path": "directFailureIds.0",
+          "op": "equals",
+          "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2",
+          "description": "blast radius starts at the missed onward leg"
+        }
       ]
     },
     {
@@ -170,11 +247,36 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-09", "description": "case belongs to the reporting traveller trip" },
-        { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "case awaits recovery after traveller-originated miss" },
-        { "path": "whatChanged", "op": "equals", "expected": "Traveller reported missing a scheduled flight", "description": "deterministic what-changed narrative" },
-        { "path": "checks", "op": "arrayLengthMin", "expected": 2, "description": "missed leg propagates to dependent commitments (finals + awards)" },
-        { "path": "checks.0.result", "op": "equals", "expected": "FAIL", "description": "arrival-before-commitment fails without the onward leg" }
+        {
+          "path": "tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-09",
+          "description": "case belongs to the reporting traveller trip"
+        },
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "CHANGE_REQUESTED",
+          "description": "case awaits recovery after traveller-originated miss"
+        },
+        {
+          "path": "whatChanged",
+          "op": "equals",
+          "expected": "Traveller reported missing a scheduled flight",
+          "description": "deterministic what-changed narrative"
+        },
+        {
+          "path": "checks",
+          "op": "arrayLengthMin",
+          "expected": 2,
+          "description": "missed leg propagates to dependent commitments (finals + awards)"
+        },
+        {
+          "path": "checks.0.result",
+          "op": "equals",
+          "expected": "FAIL",
+          "description": "arrival-before-commitment fails without the onward leg"
+        }
       ]
     },
     {
@@ -194,13 +296,46 @@
         }
       },
       "assert": [
-        { "path": "rounds", "op": "gte", "expected": 2, "description": "planner requests corridor evidence then proposes" },
-        { "path": "toolActivity.0.operation", "op": "equals", "expected": "flight.search", "description": "evidence request is flight.search on the failed corridor" },
-        { "path": "toolActivity.0.ok", "op": "truthy", "description": "REPLAY recording supplied NRT→SIN offers" },
-        { "path": "toolActivity", "op": "arrayLengthMin", "expected": 2, "description": "same-day and next-day corridor searches are both requested" },
-        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "boardable corridor offers become candidate strategies" },
-        { "path": "bestStrategyId", "op": "exists", "description": "at least one boardable strategy is ranked feasible against evening finals" },
-        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "case advanced through planning" }
+        {
+          "path": "rounds",
+          "op": "gte",
+          "expected": 2,
+          "description": "planner requests corridor evidence then proposes"
+        },
+        {
+          "path": "toolActivity.0.operation",
+          "op": "equals",
+          "expected": "flight.search",
+          "description": "evidence request is flight.search on the failed corridor"
+        },
+        {
+          "path": "toolActivity.0.ok",
+          "op": "truthy",
+          "description": "REPLAY recording supplied NRT→SIN offers"
+        },
+        {
+          "path": "toolActivity",
+          "op": "arrayLengthMin",
+          "expected": 2,
+          "description": "same-day and next-day corridor searches are both requested"
+        },
+        {
+          "path": "strategies",
+          "op": "arrayLengthMin",
+          "expected": 1,
+          "description": "boardable corridor offers become candidate strategies"
+        },
+        {
+          "path": "bestStrategyId",
+          "op": "exists",
+          "description": "at least one boardable strategy is ranked feasible against evening finals"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "PLANNING",
+          "description": "case advanced through planning"
+        }
       ]
     },
     {
@@ -221,10 +356,29 @@
         }
       },
       "assert": [
-        { "path": "intentId", "op": "exists", "description": "the strategy was staged as a validated action intent" },
-        { "path": "outcome", "op": "equals", "expected": "REQUIRES_HUMAN_AGENT", "description": "flight itinerary changes require human/organiser approval" },
-        { "path": "executable", "op": "equals", "expected": false, "description": "approval is required before execution" },
-        { "path": "caseStatus", "op": "equals", "expected": "AWAITING_APPROVAL", "description": "the case waits for organiser approval" }
+        {
+          "path": "intentId",
+          "op": "exists",
+          "description": "the strategy was staged as a validated action intent"
+        },
+        {
+          "path": "outcome",
+          "op": "equals",
+          "expected": "REQUIRES_HUMAN_AGENT",
+          "description": "flight itinerary changes require human/organiser approval"
+        },
+        {
+          "path": "executable",
+          "op": "equals",
+          "expected": false,
+          "description": "approval is required before execution"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "AWAITING_APPROVAL",
+          "description": "the case waits for organiser approval"
+        }
       ]
     },
     {
@@ -237,7 +391,10 @@
         "body": {
           "caseId": "{{caseId}}",
           "intentId": "{{intentId}}",
-          "decidedBy": { "entityType": "ORGANISATION", "id": "org-ait-organiser" },
+          "decidedBy": {
+            "entityType": "ORGANISATION",
+            "id": "org-ait-organiser"
+          },
           "verdict": "APPROVED",
           "note": "S2 organiser approval: accept next-morning NRT→SIN recovery after same-night window closed",
           "at": "2026-09-29T21:50:00+09:00"
@@ -245,9 +402,23 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "accepted", "op": "truthy", "description": "organiser approval is accepted" },
-        { "path": "verdict", "op": "equals", "expected": "APPROVED", "description": "verdict is APPROVED" },
-        { "path": "caseStatus", "op": "equals", "expected": "READY_TO_EXECUTE", "description": "approved intent becomes executable" }
+        {
+          "path": "accepted",
+          "op": "truthy",
+          "description": "organiser approval is accepted"
+        },
+        {
+          "path": "verdict",
+          "op": "equals",
+          "expected": "APPROVED",
+          "description": "verdict is APPROVED"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "READY_TO_EXECUTE",
+          "description": "approved intent becomes executable"
+        }
       ]
     },
     {
@@ -265,9 +436,23 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "executed", "op": "truthy", "description": "the approved flight intent executed" },
-        { "path": "caseStatus", "op": "equals", "expected": "RESOLVED", "description": "the SAME execute call carries the case through the internally-continued Narita hotel booking to resolution — no second visible recovery cycle" },
-        { "path": "resolutionOutcome", "op": "equals", "expected": "FULLY_RECOVERED", "description": "flight + overnight hotel together fully recover the trip" }
+        {
+          "path": "executed",
+          "op": "truthy",
+          "description": "the approved flight intent executed"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "RESOLVED",
+          "description": "the SAME execute call carries the case through the internally-continued Narita hotel booking to resolution — no second visible recovery cycle"
+        },
+        {
+          "path": "resolutionOutcome",
+          "op": "equals",
+          "expected": "FULLY_RECOVERED",
+          "description": "flight + overnight hotel together fully recover the trip"
+        }
       ]
     },
     {
@@ -280,7 +465,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "remainderViable", "op": "equals", "expected": "VIABLE", "description": "executed next-morning recovery restores whole-trip viability" }
+        {
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "VIABLE",
+          "description": "executed next-morning recovery restores whole-trip viability"
+        }
       ]
     },
     {
@@ -293,7 +483,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "events", "op": "arrayLengthMin", "expected": 4, "description": "planning/authority/execution/mutation trail recorded" }
+        {
+          "path": "events",
+          "op": "arrayLengthMin",
+          "expected": 4,
+          "description": "planning/authority/execution/mutation trail recorded"
+        }
       ]
     }
   ]

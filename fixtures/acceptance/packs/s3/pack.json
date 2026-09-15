@@ -2,11 +2,29 @@
   "packId": "ait-s3",
   "version": "1.0.0",
   "scenarioId": "S3",
-  "description": "Local acceptance pack for S3 RESCHEDULE continuity story; facts live in data/ait-demo-input-pack/scenarios/s3-event-change-preview",
+  "description": "Local acceptance pack for S3 bilateral Sarah headline ↔ Daniel local-host swap; facts live in data/ait-demo-input-pack/scenarios/s3-event-change-preview.",
   "inputPackPath": "../../../../data/ait-demo-input-pack/scenarios",
   "expect": {
-    "anchorEventIds": ["evt-ait-2026"],
-    "travellerIds": ["trv-evt-ait-2026-ait-draft-14"],
-    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-14"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-14"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-14"
+    ]
+  },
+  "swap": {
+    "sarah": {
+      "commitmentId": "cmt-ait-d1-headline-interview",
+      "from": "2026-10-01T11:30:00+08:00",
+      "to": "2026-10-01T14:30:00+08:00"
+    },
+    "daniel": {
+      "commitmentId": "cmt-ait-d1-local-host-session",
+      "from": "2026-10-01T14:30:00+08:00",
+      "to": "2026-10-01T11:30:00+08:00"
+    }
   }
 }

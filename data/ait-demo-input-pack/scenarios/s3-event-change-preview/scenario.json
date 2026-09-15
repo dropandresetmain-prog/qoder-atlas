@@ -1,33 +1,61 @@
 {
   "provenance": "NATIVE_UI",
-  "sourceIds": ["src-repo-scenarios", "src-syn-ait-event", "src-syn-ait-roster"],
+  "sourceIds": [
+    "src-repo-scenarios",
+    "src-syn-ait-event",
+    "src-syn-ait-roster"
+  ],
   "scenarioId": "S3",
-  "catalogueTitle": "Organiser RESCHEDULEs critical headline slot after S1 travel-only exhaustion",
+  "catalogueTitle": "Organiser bilateral speaker swap preview: Sarah headline ? Daniel local-host",
   "trigger": "ORGANISER_EVENT_SIDE_CHANGE",
   "stage": "POST_BOOKING",
   "tier": "TIER_A",
   "demoRole": "Continuous with S1 Group C — no reset",
   "anchorEventId": "evt-ait-2026",
   "occurredAt": "2026-09-22T11:00:00+08:00",
-  "note": "Continues the SAME S1 case/trip for Sarah Lim (ait-draft-14) after airline reprotection left her headline interview NOT_VIABLE and travel-only Atlas search found no feasible offer. There is NO engagement-swap / rebind HTTP API — approximate moving the critical speaker into a later local/non-travel-dependent window by RESCHEDULING cmt-ait-d1-headline-interview to 15:30–16:00 (the recovery-fireside clock window). Preview is counterfactual (zero authoritative mutation). Commit fans out a NEW case for the trip; same tripId must re-evaluate to VIABLE under the retimed MN310 arrival (~07:10) once the commitment starts at 15:30 (gap ~500min ≥ 360). True bilateral swap of speakers remains Park/shared. Standalone S3 packs that previously used Grace Nakamura (ait-draft-04) are rewritten to this continuity story.",
+  "note": "Counterfactual bilateral option: Sarah headline 14:30-15:00 and Daniel local-host 11:30-12:00. Preview is non-mutating; commit requires two explicit programme changes.",
   "affectedTravellers": [
     {
       "draftId": "ait-draft-14",
       "impactClass": "BECOMES_VIABLE_WITH_PROGRAMME_CHANGE",
-      "reason": "RESCHEDULE headline interview to 15:30–16:00 restores ≥360min after the airline-retimed CGK→SIN arrival; travel booking unchanged."
+      "reason": "The bilateral swap moves Sarah after synthetic ID7153 arrival at 10:30; the 14:30 start restores the 150-minute buffer without changing travel."
     }
   ],
   "expectedReasoningHooks": [
     "Preview-before-commit: programme mutation exists only in counterfactual overlay until organiser commit.",
-    "RESCHEDULE one commitmentId with newStartsAt/newEndsAt — never invent a swap API.",
+    "Preview two explicit commitment moves; never invent a swap API.",
     "Commit opens a NEW fan-out case; continuity asserts SAME tripId remainderViable NOT_VIABLE → VIABLE.",
     "No mid-flow runtime reset between S1 disruption and S3 commit."
   ],
   "inputs": [
-    { "file": "inputs/organiser-change-request.json", "provenance": "ORGANISER_SUPPLIED_SYNTHETIC", "sourceIds": ["src-syn-traveller-messages"] },
-    { "file": "inputs/preview-request.json", "provenance": "NATIVE_UI", "sourceIds": ["src-repo-scenarios"] },
-    { "file": "inputs/counterfactual-preview.json", "provenance": "NATIVE_UI", "sourceIds": ["src-repo-scenarios", "src-syn-ait-event"] }
+    {
+      "file": "inputs/organiser-change-request.json",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "sourceIds": [
+        "src-syn-traveller-messages"
+      ]
+    },
+    {
+      "file": "inputs/preview-request.json",
+      "provenance": "NATIVE_UI",
+      "sourceIds": [
+        "src-repo-scenarios"
+      ]
+    },
+    {
+      "file": "inputs/counterfactual-preview.json",
+      "provenance": "NATIVE_UI",
+      "sourceIds": [
+        "src-repo-scenarios",
+        "src-syn-ait-event"
+      ]
+    }
   ],
-  "referencedDraftIds": ["ait-draft-14"],
-  "referencedCommitmentIds": ["cmt-ait-d1-headline-interview", "cmt-ait-d1-recovery-fireside"]
+  "referencedDraftIds": [
+    "ait-draft-14"
+  ],
+  "referencedCommitmentIds": [
+    "cmt-ait-d1-headline-interview",
+    "cmt-ait-d1-local-host-session"
+  ]
 }

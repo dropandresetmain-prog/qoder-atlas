@@ -1,19 +1,31 @@
 {
   "provenance": "NATIVE_UI",
-  "sourceIds": ["src-repo-scenarios", "src-syn-ait-event"],
-  "note": "Expected counterfactual preview outcomes for RESCHEDULEing the headline interview later. Preview must not mutate authoritative programme or trip state. Linked trip is Sarah Lim's S1 trip (trip-trv-evt-ait-2026-ait-draft-14).",
+  "sourceIds": [
+    "src-repo-scenarios",
+    "src-syn-ait-event"
+  ],
+  "note": "Counterfactual two-move swap; no authoritative mutation.",
   "asOf": "2026-09-22T11:05:00+08:00",
   "proposal": {
-    "commitmentId": "cmt-ait-d1-headline-interview",
-    "changeKind": "RESCHEDULED",
-    "newStartsAt": "2026-10-01T15:30:00+08:00",
-    "newEndsAt": "2026-10-01T16:00:00+08:00"
+    "changeKind": "OPTION_SET",
+    "moves": [
+      {
+        "commitmentId": "cmt-ait-d1-headline-interview",
+        "newStartsAt": "2026-10-01T14:30:00+08:00",
+        "newEndsAt": "2026-10-01T15:00:00+08:00"
+      },
+      {
+        "commitmentId": "cmt-ait-d1-local-host-session",
+        "newStartsAt": "2026-10-01T11:30:00+08:00",
+        "newEndsAt": "2026-10-01T12:00:00+08:00"
+      }
+    ]
   },
   "expected": {
     "authoritativeMutation": false,
     "linkedTripId": "trip-trv-evt-ait-2026-ait-draft-14",
     "viabilityAfterCommit": "VIABLE",
     "viabilityBeforeCommit": "NOT_VIABLE",
-    "note": "Before commit the S1-retimed arrival still fails the 09:20 buffer; after commit the same trip's engagement starts 15:30 and the 360min check passes under ~07:10 arrival."
+    "note": "Before commit the S1-retimed arrival still fails the 11:30 buffer; after commit the same trip's engagement starts 14:30 and the 150min check passes under ~07:10 arrival."
   }
 }
