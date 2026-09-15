@@ -1,0 +1,12 @@
+{
+  "name": "Northstar (qoder-atlas)",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "dev-server",
+      "command": "source .cursor/node-env.sh && npm run dev",
+      "description": "Northstar dev server (REPLAY mode, credential-free) on http://localhost:8787/operator"
+    }
+  ],
+  "ports": [8787]
+}
