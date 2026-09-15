@@ -26,7 +26,7 @@ import { loadScenario } from '../src/scenarios/loader.ts';
 import { preferencePrecedence } from '../src/domain/preferences.ts';
 import type { MutationProposal } from '../src/operational/mutation.ts';
 import { createSourceIngestionCapability } from '../src/ingest/pipeline.ts';
-import { ModelStudioClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
+import { IntelligenceClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
 import {
   SqlitePreferenceStore,
   buildTripSnapshot,
@@ -279,7 +279,7 @@ test('i1: Model Studio client serves Lane B extraction seam and fails safe', asy
   });
 
   // Valid scripted output passes the same validation as live output.
-  const replayClient = new ModelStudioClient({ transport: new ScriptedModelTransport([validFlightJson]) });
+  const replayClient = new IntelligenceClient({ transport: new ScriptedModelTransport([validFlightJson]) });
   const replayExtraction = modelStudioExtractionClient(replayClient);
   const okResult = await replayExtraction.extract({
     task: 'FLIGHT_BOOKING',
@@ -289,7 +289,7 @@ test('i1: Model Studio client serves Lane B extraction seam and fails safe', asy
   assert.ok(okResult.ok);
 
   // Malformed model output: structured failure, no throw, no guessing.
-  const invalidClient = new ModelStudioClient({ transport: new ScriptedModelTransport(['this is not json']) });
+  const invalidClient = new IntelligenceClient({ transport: new ScriptedModelTransport(['this is not json']) });
   const invalidResult = await modelStudioExtractionClient(invalidClient).extract({
     task: 'FLIGHT_BOOKING',
     sourceKind: 'BOOKING_CONFIRMATION',
@@ -299,7 +299,7 @@ test('i1: Model Studio client serves Lane B extraction seam and fails safe', asy
   if (!invalidResult.ok) assert.ok(invalidResult.reason.includes('INVALID_OUTPUT'));
 
   // Unconfigured client: credential-free REPLAY boot stays safe.
-  const unconfigured = new ModelStudioClient({});
+  const unconfigured = new IntelligenceClient({});
   const notConfigured = await modelStudioExtractionClient(unconfigured).extract({
     task: 'FLIGHT_BOOKING',
     sourceKind: 'BOOKING_CONFIRMATION',
@@ -314,7 +314,7 @@ test('i1: Model Studio client serves Lane B extraction seam and fails safe', asy
     { mutations: harness.mutations, sources: harness.sources, preferences: harness.preferences, audit: harness.audit },
     SCENARIO_A_DIR,
   );
-  const pipelineClient = new ModelStudioClient({ transport: new ScriptedModelTransport([validFlightJson]) });
+  const pipelineClient = new IntelligenceClient({ transport: new ScriptedModelTransport([validFlightJson]) });
   const ingestion = createSourceIngestionCapability({
     extractionClient: modelStudioExtractionClient(pipelineClient),
     sourceRepository: harness.sources,

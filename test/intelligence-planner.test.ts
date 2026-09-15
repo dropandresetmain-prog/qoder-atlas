@@ -26,7 +26,7 @@ import type { TripSignal } from '../src/operational/signal.ts';
 import type { ExecutionResult } from '../src/operational/intent.ts';
 import type { PriorToolResult } from '../src/contracts/planner.ts';
 import { RecoveryStrategySchema } from '../src/operational/strategy.ts';
-import { ModelStudioClient, ModelTransportError, ScriptedModelTransport } from '../src/intelligence/client.ts';
+import { IntelligenceClient, ModelTransportError, ScriptedModelTransport } from '../src/intelligence/client.ts';
 import { ModelStudioRecoveryPlanner, buildPlannerPrompt } from '../src/intelligence/planner.ts';
 
 const AT = '2026-09-14T09:00:00+09:00';
@@ -168,7 +168,7 @@ function makePlanner(responses: Array<string | ModelTransportError>, configured 
   transport: ScriptedModelTransport;
 } {
   const transport = new ScriptedModelTransport(responses);
-  const client = new ModelStudioClient({ apiKey: configured ? 'k' : undefined, transport });
+  const client = new IntelligenceClient({ apiKey: configured ? 'k' : undefined, transport });
   let counter = 0;
   const planner = new ModelStudioRecoveryPlanner({
     client,
@@ -268,7 +268,7 @@ test('planner: timeout/unavailable paths degrade structurally without throwing',
 });
 
 test('planner: no-credential client degrades structurally (application compatibility)', async () => {
-  const client = new ModelStudioClient({});
+  const client = new IntelligenceClient({});
   const planner = new ModelStudioRecoveryPlanner({ client, now: () => AT });
   const out = await planner.plan(makeInput());
   assert.deepEqual(out.strategies, []);

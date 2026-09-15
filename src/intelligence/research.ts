@@ -37,7 +37,7 @@ import {
   type CapabilityResult,
 } from '../contracts/envelope.ts';
 import type { IsoDateTime } from '../domain/common.ts';
-import { MODEL_STUDIO_PROVIDER_ID, toCapabilityErrorCategory, type ModelError, type ModelStudioClient } from './client.ts';
+import { MODEL_STUDIO_PROVIDER_ID, toCapabilityErrorCategory, type ModelError, type IntelligenceClient } from './client.ts';
 import { RawResearchFindingsModelSchema, type RawResearchFindingModel } from './schemas.ts';
 import { interpretResearchFindings } from './semantics.ts';
 
@@ -59,9 +59,9 @@ export interface ResearchSource {
  */
 export class ModelStudioResearchSource implements ResearchSource {
   readonly mode: AdapterMode;
-  private readonly client: ModelStudioClient;
+  private readonly client: IntelligenceClient;
 
-  constructor(client: ModelStudioClient) {
+  constructor(client: IntelligenceClient) {
     this.client = client;
     this.mode = client.mode;
   }

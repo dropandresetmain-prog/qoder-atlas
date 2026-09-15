@@ -41,7 +41,7 @@ import { CaseVerifier, DeterministicObservationService } from '../src/engine/obs
 import { loadScenario } from '../src/scenarios/loader.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
-import { ModelStudioClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
+import { IntelligenceClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../src/intelligence/planner.ts';
 import type { TransportLeg } from '../src/domain/elements.ts';
 import type { IsoDateTime } from '../src/domain/common.ts';
@@ -362,7 +362,7 @@ test('G1: Scenario B recovers RECOVERED_WITH_LOSS through identical application 
   };
   let sequence = 0;
   const planner = new ModelStudioRecoveryPlanner({
-    client: new ModelStudioClient({ transport: new ScriptedModelTransport([JSON.stringify(round1), JSON.stringify(round2)]) }),
+    client: new IntelligenceClient({ transport: new ScriptedModelTransport([JSON.stringify(round1), JSON.stringify(round2)]) }),
     idFactory: (prefix) => `${prefix}-g1-${String(++sequence).padStart(3, '0')}`,
     now: () => PLANNING_AT,
   });

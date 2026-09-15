@@ -33,7 +33,15 @@ import { AtlasFlightTransactionAdapter } from '../providers/atlas/transactionAda
 import { GoogleRoutesAdapter } from '../providers/googleRoutes/adapter.ts';
 import { NuiteeAdapter } from '../providers/hotel/nuiteeAdapter.ts';
 import { FileRecordingStore } from '../providers/recordingStore.ts';
-import { ModelStudioClient } from '../intelligence/client.ts';
+import {
+  IntelligenceClient,
+  MODEL_STUDIO_DEFAULT_BASE_URL,
+  MODEL_STUDIO_DEFAULT_MODEL,
+  MODEL_STUDIO_PROVIDER_ID,
+  OPENROUTER_DEFAULT_BASE_URL,
+  OPENROUTER_DEFAULT_MODEL,
+  OPENROUTER_PROVIDER_ID,
+} from '../intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../intelligence/planner.ts';
 import { DeterministicFallbackPlanner } from '../intelligence/fallbackPlanner.ts';
 import { deterministicIdFactory, NorthstarPlanner } from '../intelligence/northstarPlanner.ts';
@@ -126,7 +134,7 @@ export interface ComposedRuntime {
   /** The composed recovery planner (deterministic id/timestamp wiring). */
   planner: RecoveryPlanner;
   /** Which planner powers runtime planning (credential check, not scenario). */
-  plannerMode: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+  plannerMode: 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK';
   /** Seeded during composition (empty when the store was already populated). */
   seededScenarioIds: string[];
   /** Programme bundles seeded during composition (empty when populated). */
@@ -352,19 +360,35 @@ export async function composeAppRuntime(
     fxRates: fxRateResolver,
   });
 
-  // Planner: LIVE Model Studio only when explicitly NOT in REPLAY mode AND
-  // the API key is configured; REPLAY must never make external AI calls even
-  // when credentials are present. The deterministic fallback planner is the
-  // credential-free path that completes the loop without network calls.
-  const modelClient = new ModelStudioClient({
-    apiKey: config.providers.modelStudio.apiKey,
-    model: config.providers.modelStudio.model,
-    baseUrl: config.providers.modelStudio.baseUrl,
-    // Multi-round LIVE planning (evidence gathering + strategy authoring)
-    // routinely exceeds the client's 30s default; bounded retry still applies.
-    timeoutMs: config.providers.modelStudio.timeoutMs ?? 90_000,
-  });
+  // Planner: LIVE intelligence only when explicitly NOT in REPLAY mode AND
+  // the configured provider's API key is present; REPLAY must never make
+  // external AI calls even when credentials are present for either provider.
+  // The deterministic fallback planner is the credential-free path that
+  // completes the loop without network calls. Provider choice is a pure
+  // configuration switch — same planner/schema/validation path either way.
+  const modelClient =
+    config.intelligenceProvider === 'openrouter'
+      ? new IntelligenceClient({
+          providerId: OPENROUTER_PROVIDER_ID,
+          apiKey: config.providers.openRouter.apiKey,
+          model: config.providers.openRouter.model ?? OPENROUTER_DEFAULT_MODEL,
+          baseUrl: config.providers.openRouter.baseUrl ?? OPENROUTER_DEFAULT_BASE_URL,
+          // Multi-round LIVE planning (evidence gathering + strategy authoring)
+          // routinely exceeds the client's 30s default; bounded retry still applies.
+          timeoutMs: config.providers.openRouter.timeoutMs ?? 90_000,
+        })
+      : new IntelligenceClient({
+          providerId: MODEL_STUDIO_PROVIDER_ID,
+          apiKey: config.providers.modelStudio.apiKey,
+          model: config.providers.modelStudio.model ?? MODEL_STUDIO_DEFAULT_MODEL,
+          baseUrl: config.providers.modelStudio.baseUrl ?? MODEL_STUDIO_DEFAULT_BASE_URL,
+          timeoutMs: config.providers.modelStudio.timeoutMs ?? 90_000,
+        });
   const useLivePlanner = config.adapterMode !== 'REPLAY' && modelClient.isConfigured();
+  // Honest runtime-status label: reflects the ACTUAL configured provider,
+  // never a fixed name regardless of which client is live.
+  const livePlannerMode: 'MODEL_STUDIO' | 'OPENROUTER' =
+    modelClient.providerId === OPENROUTER_PROVIDER_ID ? 'OPENROUTER' : 'MODEL_STUDIO';
   const basePlanner: RecoveryPlanner = useLivePlanner
     ? new ModelStudioRecoveryPlanner({ client: modelClient })
     // REV-2 WP-R5 doctrine extends to the fallback planner: persisted strategy
@@ -434,7 +458,7 @@ export async function composeAppRuntime(
         description: workflow.description,
         scenarioId: workflow.scenarioId ?? workflow.id,
       })),
-    plannerMode: () => useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
+    plannerMode: () => (useLivePlanner ? livePlannerMode : 'DETERMINISTIC_FALLBACK'),
     async reset(at) {
       try {
         const result = await orchestrator.reset(at);
@@ -715,7 +739,7 @@ export async function composeAppRuntime(
     capabilities,
     capabilityDescriptors,
     planner,
-    plannerMode: useLivePlanner ? 'MODEL_STUDIO' : 'DETERMINISTIC_FALLBACK',
+    plannerMode: useLivePlanner ? livePlannerMode : 'DETERMINISTIC_FALLBACK',
     seededScenarioIds,
     seededProgrammes,
     programmeService,

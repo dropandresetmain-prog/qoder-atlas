@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import { PreferenceSchema } from '../src/domain/preferences.ts';
 import { UncertaintyRecordSchema } from '../src/domain/common.ts';
-import { ModelStudioClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
+import { IntelligenceClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
 import {
   SemanticService,
   interpretResearchFindings,
@@ -34,7 +34,7 @@ function savedModelOutput(name: string): string {
 
 function service(responses: string[], idFactory?: (prefix: string) => string): SemanticService {
   const transport = new ScriptedModelTransport(responses);
-  const client = new ModelStudioClient({ apiKey: 'k', transport });
+  const client = new IntelligenceClient({ apiKey: 'k', transport });
   return new SemanticService({ client, ...(idFactory !== undefined ? { idFactory } : {}) });
 }
 
@@ -299,7 +299,7 @@ test('research capability: backend failure is a structured envelope, not a crash
 });
 
 test('research capability: model-backed source without credentials fails structured', async () => {
-  const source = new ModelStudioResearchSource(new ModelStudioClient({}));
+  const source = new ModelStudioResearchSource(new IntelligenceClient({}));
   assert.equal(source.mode, 'LIVE');
   const entry = await source.entryRequirements({ destinationCountryCode: 'XX', nationalityCodes: ['YY'] });
   assert.equal(entry.ok, false);
@@ -308,7 +308,7 @@ test('research capability: model-backed source without credentials fails structu
 
 test('research capability: model-backed source validates saved findings through the same path', async () => {
   const transport = new ScriptedModelTransport([savedModelOutput('research-entry-findings.json')]);
-  const client = new ModelStudioClient({ apiKey: 'k', transport });
+  const client = new IntelligenceClient({ apiKey: 'k', transport });
   const source = new ModelStudioResearchSource(client);
   const result = await source.entryRequirements({ destinationCountryCode: 'XX', nationalityCodes: ['YY'] });
   assert.equal(result.ok, true);
@@ -320,7 +320,7 @@ test('research capability: model-backed source validates saved findings through 
 
 test('research capability: malformed research output fails closed', async () => {
   const transport = new ScriptedModelTransport(['{"findings":[{"statement":"x"}]}']);
-  const client = new ModelStudioClient({ apiKey: 'k', transport });
+  const client = new IntelligenceClient({ apiKey: 'k', transport });
   const source = new ModelStudioResearchSource(client);
   const result = await source.localContext({ topic: 'anything' });
   assert.equal(result.ok, false);

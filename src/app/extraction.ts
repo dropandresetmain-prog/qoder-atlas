@@ -1,7 +1,9 @@
 /**
- * I1 — Lane D Model Studio client adapted onto Lane B's
- * `SemanticExtractionClient` seam. This is the ONLY model client in the
- * application; no second client is implemented (I1 directive).
+ * I1 — Lane D intelligence client adapted onto Lane B's
+ * `SemanticExtractionClient` seam. There is exactly one extraction adapter
+ * (I1 directive); it is provider-neutral — the same code path serves
+ * whichever `IntelligenceClient` composition wires in (Model Studio or
+ * OpenRouter), never a second, provider-specific extraction path.
  *
  * Failure is data: any model error (unconfigured, unavailable, invalid
  * output) becomes `{ ok: false, reason }` so ingestion records honest
@@ -9,7 +11,7 @@
  * Lane B (`validateExtraction`) — the adapter forwards raw validated values.
  */
 import { EXTRACTION_OUTPUT_SCHEMA, type SemanticExtractionClient, type SemanticExtractionRequest } from '../ingest/semantic.ts';
-import type { ModelStudioClient, ModelTask } from '../intelligence/client.ts';
+import type { IntelligenceClient, ModelTask } from '../intelligence/client.ts';
 
 /**
  * P0.4: the prompt states the exact target schema and field names for every
@@ -80,7 +82,7 @@ function buildUserPrompt(request: SemanticExtractionRequest): string {
  * Wrap a Model Studio client as the ingestion extraction seam. Task prompts
  * are generic; schema enforcement comes from the frozen extraction DTOs.
  */
-export function modelStudioExtractionClient(client: ModelStudioClient): SemanticExtractionClient {
+export function modelStudioExtractionClient(client: IntelligenceClient): SemanticExtractionClient {
   return {
     async extract(request: SemanticExtractionRequest) {
       const task: ModelTask<unknown> = {

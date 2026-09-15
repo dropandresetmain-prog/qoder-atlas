@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { z } from 'zod';
 
 import {
-  ModelStudioClient,
+  IntelligenceClient,
   ModelTransportError,
   ScriptedModelTransport,
   parseModelJson,
@@ -19,8 +19,8 @@ const EchoSchema = z.strictObject({
   confidence: z.number().min(0).max(1).optional(),
 });
 
-function liveClient(responses: Array<string | ModelTransportError>, maxAttempts = 2): ModelStudioClient {
-  return new ModelStudioClient({
+function liveClient(responses: Array<string | ModelTransportError>, maxAttempts = 2): IntelligenceClient {
+  return new IntelligenceClient({
     apiKey: 'sk-live-secret-marker',
     model: 'test-model',
     transport: new ScriptedModelTransport(responses),
@@ -29,7 +29,7 @@ function liveClient(responses: Array<string | ModelTransportError>, maxAttempts 
 }
 
 test('client: constructs without credentials and reports NOT_CONFIGURED structurally', async () => {
-  const client = new ModelStudioClient({});
+  const client = new IntelligenceClient({});
   assert.equal(client.isConfigured(), false);
   const result = await client.call({
     id: 'task_probe',
@@ -46,7 +46,7 @@ test('client: constructs without credentials and reports NOT_CONFIGURED structur
 
 test('client: replay transport bypasses credential requirement with identical validation', async () => {
   const transport = new ScriptedModelTransport(['{"message":"saved reply"}']);
-  const client = new ModelStudioClient({ transport });
+  const client = new IntelligenceClient({ transport });
   // Replay mode is explicitly not gated on credentials.
   const result = await client.call({
     id: 'task_replay',
@@ -74,7 +74,7 @@ test('client: valid structured output is accepted with meta', async () => {
 
 test('client: malformed JSON fails closed without retry', async () => {
   const transport = new ScriptedModelTransport(['this is not JSON at all']);
-  const client = new ModelStudioClient({ apiKey: 'k', transport, maxAttempts: 3 });
+  const client = new IntelligenceClient({ apiKey: 'k', transport, maxAttempts: 3 });
   const result = await client.call({ id: 'task_bad_json', systemPrompt: 's', userPrompt: 'u', schema: EchoSchema });
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -103,7 +103,7 @@ test('client: bounded retry succeeds after retryable transport failure', async (
     new ModelTransportError('RATE_LIMITED', 'model_rate_limited', 'rate limited', true),
     '{"message":"second attempt"}',
   ]);
-  const client = new ModelStudioClient({ apiKey: 'k', transport, maxAttempts: 2 });
+  const client = new IntelligenceClient({ apiKey: 'k', transport, maxAttempts: 2 });
   const result = await client.call({ id: 'task_retry', systemPrompt: 's', userPrompt: 'u', schema: EchoSchema });
   assert.equal(result.ok, true);
   if (result.ok) {
@@ -118,7 +118,7 @@ test('client: non-retryable transport failure does not retry', async () => {
     new ModelTransportError('AUTH', 'model_http_401', 'rejected credentials', false),
     '{"message":"never reached"}',
   ]);
-  const client = new ModelStudioClient({ apiKey: 'k', transport, maxAttempts: 3 });
+  const client = new IntelligenceClient({ apiKey: 'k', transport, maxAttempts: 3 });
   const result = await client.call({ id: 'task_auth', systemPrompt: 's', userPrompt: 'u', schema: EchoSchema });
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.error.category, 'AUTH');
@@ -140,7 +140,7 @@ test('client: retry budget is exhausted to a structured error, never a throw', a
     new ModelTransportError('NETWORK', 'model_network', 'down', true),
     new ModelTransportError('NETWORK', 'model_network', 'still down', true),
   ]);
-  const client = new ModelStudioClient({ apiKey: 'k', transport, maxAttempts: 2 });
+  const client = new IntelligenceClient({ apiKey: 'k', transport, maxAttempts: 2 });
   const result = await client.call({ id: 'task_network', systemPrompt: 's', userPrompt: 'u', schema: EchoSchema });
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.error.category, 'NETWORK');

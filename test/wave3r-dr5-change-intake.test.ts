@@ -32,7 +32,7 @@ import {
 } from '../src/app/changeIntake.ts';
 import { ChangeRequestSchema, type ChangeRequest } from '../src/contracts/changeRequest.ts';
 import {
-  ModelStudioClient,
+  IntelligenceClient,
   type CompletionRequest,
   type CompletionResponse,
   type ModelTransport,
@@ -374,8 +374,8 @@ class LiveScriptedTransport implements ModelTransport {
   }
 }
 
-function liveClient(responses: string[]): ModelStudioClient {
-  return new ModelStudioClient({ apiKey: 'test-key', transport: new LiveScriptedTransport(responses) });
+function liveClient(responses: string[]): IntelligenceClient {
+  return new IntelligenceClient({ apiKey: 'test-key', transport: new LiveScriptedTransport(responses) });
 }
 
 test('dr5 model path: bare clarification shape fails closed with the model\'s own question', async () => {

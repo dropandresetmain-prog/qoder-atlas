@@ -33,7 +33,7 @@ import { loadScenario } from '../src/scenarios/loader.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import {
-  ModelStudioClient,
+  IntelligenceClient,
   ModelTransportError,
   ScriptedModelTransport,
 } from '../src/intelligence/client.ts';
@@ -120,7 +120,7 @@ async function setupPlanning(harness: Harness, recordingReadDirs: ReadonlyArray<
 
 function scriptedPlanner(responses: Array<string | ModelTransportError>) {
   const transport = new ScriptedModelTransport(responses);
-  const client = new ModelStudioClient({ transport });
+  const client = new IntelligenceClient({ transport });
   let sequence = 0;
   return new ModelStudioRecoveryPlanner({
     client,
