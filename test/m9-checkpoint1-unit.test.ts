@@ -111,11 +111,12 @@ describe('M9 demo ingress + errors', () => {
 });
 
 describe('M9 second scenario foundation', () => {
-  test('traveller-initiated single journey differs from programme cohort', () => {
-    assert.equal(travellerInitiatedScenarioFoundation.signalOrigin, 'TRAVELLER_REQUEST');
+  test('Jordan S2 progressive individual disruption differs from Sarah programme cohort', () => {
+    assert.equal(travellerInitiatedScenarioFoundation.signalOrigin, 'PROVIDER_PROGRESSIVE_DELAY');
     assert.equal(travellerInitiatedScenarioFoundation.scope.journeyCount, 1);
     assert.equal(travellerInitiatedScenarioFoundation.scope.programmeWideRecovery, false);
     assert.equal(travellerInitiatedScenarioFoundation.productSurfaces.usesSharedReadModels, true);
     assert.equal(travellerInitiatedScenarioFoundation.productSurfaces.dedicatedHeroUi, false);
+    assert.equal(travellerInitiatedScenarioFoundation.recovery.multiActionStrategy, true);
   });
 });
