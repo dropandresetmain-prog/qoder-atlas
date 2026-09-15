@@ -1283,8 +1283,8 @@ describe('AN-7R decision scope bound to required intent subjects', () => {
   });
 });
 
-describe('IN-1 logical operation identity (fail-closed effect-scoped key)', () => {
-  test('Q4: re-plan same SELECT_OFFER effect keeps logicalOperationKey; second persist blocked', async () => {
+describe('IN-1 logical operation identity (M9 per-plan uniqueness)', () => {
+  test('Q4: re-plan same SELECT_OFFER effect keeps logicalOperationKey; second plan persist allowed after 0120', async () => {
     const journeyItemId = randomUUID();
     const offerId = randomUUID();
     const basisAssessmentId = randomUUID();
@@ -1345,7 +1345,7 @@ describe('IN-1 logical operation identity (fail-closed effect-scoped key)', () =
     assert.notEqual(intent1.requestFingerprint, intent2.requestFingerprint);
 
     const pool = await sharedTestPool();
-    const seed = await beginSeed(pool, 'C3 IN-1 Q4');
+    const seed = await beginSeed(pool, 'C3 IN-1 Q4 / M9');
     const organisationId = await seedOrganisation(seed, 'USD');
     await commitSeed(seed);
     const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
@@ -1379,12 +1379,12 @@ describe('IN-1 logical operation identity (fail-closed effect-scoped key)', () =
       actionPlanId: plan2.id,
       subjectRefs: [{ kind: 'ORGANISATION', id: organisationId }],
     };
-    const second = await persistActionPlan(uow(), {
+    // M9 migration 0120: intent uniqueness is per action_plan. Execution-layer
+    // known-success / live-attempt guards still prevent duplicate irreversible dispatch.
+    const second = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan: plan2,
-    });
-    assert.equal(second.ok, false);
-    if (!second.ok) {
-      assert.match(second.conflict.message, /action_intents_logical_op_uidx|duplicate key|logical_operation/i);
-    }
+      planVersion: 2,
+    }));
+    assert.ok(second.planId);
   });
 });

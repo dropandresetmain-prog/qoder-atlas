@@ -1,0 +1,288 @@
+/**
+ * M9 — deterministic RecoveryCase resolution gate.
+ *
+ * A case becomes RESOLVED / RECOVERED only when current authoritative state
+ * proves the affected scope is valid. Success of API, provider, programme
+ * command, approval, accepted loss, or planner viability alone is insufficient.
+ */
+import type { Pool, PoolClient } from '../../persistence/postgres/pool.ts';
+import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
+import type { TypedRef } from '../../domain/v2/shared/identity.ts';
+
+export type ResolutionDenialReason =
+  | 'CASE_NOT_FOUND'
+  | 'CASE_NOT_OPEN'
+  | 'NO_AFFECTED_SUBJECTS'
+  | 'ASSESSMENT_NOT_CURRENT'
+  | 'BLOCKING_FAIL'
+  | 'BLOCKING_UNKNOWN'
+  | 'REQUIRED_PERSON_MISSING'
+  | 'EXECUTION_NOT_RECONCILED'
+  | 'PROPOSED_STATE_ONLY'
+  | 'CONSTRAINT_NOT_SATISFIED';
+
+export interface ResolutionGateInput {
+  workspaceId: string;
+  recoveryCaseId: string;
+  now: string;
+  /**
+   * Traveller/Journey refs that must be included in the recovered scope.
+   * Empty means "all case subjects of role affected".
+   */
+  requiredAffectedPeople?: TypedRef[];
+}
+
+export type ResolutionGateResult =
+  | {
+      allowed: true;
+      resolutionKind: 'RECOVERED';
+      summary: string;
+      subjectVerdicts: Array<{ subjectRef: TypedRef; verdict: string; assessmentId: string }>;
+    }
+  | {
+      allowed: false;
+      reason: ResolutionDenialReason;
+      detail: string;
+      subjectVerdicts?: Array<{ subjectRef: TypedRef; verdict: string; status: string }>;
+    };
+
+type Queryable = Pick<Pool | PoolClient, 'query'>;
+
+async function loadCaseSubjects(
+  db: Queryable,
+  workspaceId: string,
+  recoveryCaseId: string,
+): Promise<Array<{ kind: string; id: string; role: string }>> {
+  const result = await db.query<{ subject_kind: string; subject_id: string; role: string }>(
+    `SELECT subject_kind, subject_id, role
+       FROM case_subjects
+      WHERE workspace_id = $1 AND recovery_case_id = $2`,
+    [workspaceId, recoveryCaseId],
+  );
+  return result.rows.map((row) => ({ kind: row.subject_kind, id: row.subject_id, role: row.role }));
+}
+
+async function loadAssessableSubjects(
+  db: Queryable,
+  workspaceId: string,
+  recoveryCaseId: string,
+): Promise<TypedRef[]> {
+  const subjects = await loadCaseSubjects(db, workspaceId, recoveryCaseId);
+  const fromCase = subjects
+    .filter((s) => s.kind === 'JOURNEY' || s.kind === 'TRIP')
+    .map((s) => ({ kind: s.kind as 'JOURNEY' | 'TRIP', id: s.id }));
+
+  // Also pull from latest selected/evaluated strategy affected subjects.
+  const strategy = await db.query<{ affected_subjects: unknown }>(
+    `SELECT sc.affected_subjects
+       FROM recovery_strategies rs
+       JOIN strategy_changes sc
+         ON sc.workspace_id = rs.workspace_id AND sc.recovery_strategy_id = rs.id
+      WHERE rs.workspace_id = $1 AND rs.recovery_case_id = $2
+        AND rs.status IN ('SELECTED', 'EVALUATED', 'PROPOSED')
+      ORDER BY rs.strategy_version DESC
+      LIMIT 1`,
+    [workspaceId, recoveryCaseId],
+  );
+  const fromStrategy: TypedRef[] = [];
+  const raw = strategy.rows[0]?.affected_subjects;
+  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? JSON.parse(raw) as unknown[] : [];
+  for (const item of list) {
+    if (
+      item &&
+      typeof item === 'object' &&
+      'kind' in item &&
+      'id' in item &&
+      (item.kind === 'JOURNEY' || item.kind === 'TRIP') &&
+      typeof item.id === 'string'
+    ) {
+      fromStrategy.push({ kind: item.kind, id: item.id });
+    }
+  }
+
+  const map = new Map<string, TypedRef>();
+  for (const ref of [...fromCase, ...fromStrategy]) {
+    map.set(`${ref.kind}:${ref.id}`, ref);
+  }
+  return [...map.values()];
+}
+
+async function hasUnreconciledExecution(
+  db: Queryable,
+  workspaceId: string,
+  recoveryCaseId: string,
+): Promise<boolean> {
+  const result = await db.query<{ id: string }>(
+    `SELECT ea.id
+       FROM execution_attempts ea
+       JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+       JOIN action_plans ap ON ap.workspace_id = ai.workspace_id AND ap.id = ai.action_plan_id
+      WHERE ea.workspace_id = $1
+        AND ap.recovery_case_id = $2
+        AND ea.status IN (
+          'PREPARED', 'CLAIMED', 'DISPATCHING', 'DISPATCHED',
+          'OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED'
+        )
+      LIMIT 1`,
+    [workspaceId, recoveryCaseId],
+  );
+  return result.rows.length > 0;
+}
+
+async function hasAuthoritativeObservedSuccess(
+  db: Queryable,
+  workspaceId: string,
+  recoveryCaseId: string,
+): Promise<boolean> {
+  const result = await db.query<{ id: string }>(
+    `SELECT ea.id
+       FROM execution_attempts ea
+       JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+       JOIN action_plans ap ON ap.workspace_id = ai.workspace_id AND ap.id = ai.action_plan_id
+      WHERE ea.workspace_id = $1
+        AND ap.recovery_case_id = $2
+        AND ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED')
+      LIMIT 1`,
+    [workspaceId, recoveryCaseId],
+  );
+  return result.rows.length > 0;
+}
+
+/**
+ * Evaluate whether the recovery case may resolve as RECOVERED.
+ * Does not mutate state — pair with `resolveRecoveryCase` command to commit.
+ */
+export async function evaluateRecoveryCaseResolution(
+  db: Queryable,
+  input: ResolutionGateInput,
+): Promise<ResolutionGateResult> {
+  const caseRow = await db.query<{ lifecycle_status: string }>(
+    `SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2`,
+    [input.workspaceId, input.recoveryCaseId],
+  );
+  const lifecycle = caseRow.rows[0]?.lifecycle_status;
+  if (!lifecycle) {
+    return { allowed: false, reason: 'CASE_NOT_FOUND', detail: `case ${input.recoveryCaseId} not found` };
+  }
+  if (['RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED'].includes(lifecycle)) {
+    return { allowed: false, reason: 'CASE_NOT_OPEN', detail: `case lifecycle is ${lifecycle}` };
+  }
+
+  const subjects = await loadAssessableSubjects(db, input.workspaceId, input.recoveryCaseId);
+  if (subjects.length === 0) {
+    return { allowed: false, reason: 'NO_AFFECTED_SUBJECTS', detail: 'no JOURNEY/TRIP subjects in case/strategy scope' };
+  }
+
+  if (input.requiredAffectedPeople && input.requiredAffectedPeople.length > 0) {
+    const present = new Set(subjects.map((s) => `${s.kind}:${s.id}`));
+    for (const required of input.requiredAffectedPeople) {
+      if (!present.has(`${required.kind}:${required.id}`)) {
+        return {
+          allowed: false,
+          reason: 'REQUIRED_PERSON_MISSING',
+          detail: `required affected subject ${required.kind}:${required.id} not in resolution scope`,
+        };
+      }
+    }
+  }
+
+  if (await hasUnreconciledExecution(db, input.workspaceId, input.recoveryCaseId)) {
+    return {
+      allowed: false,
+      reason: 'EXECUTION_NOT_RECONCILED',
+      detail: 'open or unknown execution attempts remain; reconcile before resolution',
+    };
+  }
+
+  // Proposed-only programme/strategy state (no observed authoritative success)
+  // cannot resolve the case by itself.
+  const strategies = await db.query<{ id: string; status: string }>(
+    `SELECT id, status FROM recovery_strategies
+      WHERE workspace_id = $1 AND recovery_case_id = $2
+      ORDER BY strategy_version DESC LIMIT 1`,
+    [input.workspaceId, input.recoveryCaseId],
+  );
+  const latest = strategies.rows[0];
+  if (latest && ['PROPOSED', 'EVALUATED'].includes(latest.status)) {
+    const observed = await hasAuthoritativeObservedSuccess(db, input.workspaceId, input.recoveryCaseId);
+    if (!observed) {
+      return {
+        allowed: false,
+        reason: 'PROPOSED_STATE_ONLY',
+        detail: 'strategy remains proposed/evaluated without observed authoritative execution',
+      };
+    }
+  }
+
+  const subjectVerdicts: Array<{ subjectRef: TypedRef; verdict: string; assessmentId: string; status: string }> = [];
+  for (const subject of subjects) {
+    const view = await currentAssessmentView(
+      db as Pool,
+      input.workspaceId,
+      subject,
+      'VIABILITY',
+      input.now,
+    );
+    if (view.status !== 'CURRENT' || !view.assessment) {
+      return {
+        allowed: false,
+        reason: 'ASSESSMENT_NOT_CURRENT',
+        detail: `${subject.kind}:${subject.id} assessment status=${view.status}`,
+        subjectVerdicts: subjectVerdicts.map((v) => ({
+          subjectRef: v.subjectRef,
+          verdict: v.verdict,
+          status: v.status,
+        })),
+      };
+    }
+    const verdict = view.assessment.overallVerdict;
+    subjectVerdicts.push({
+      subjectRef: subject,
+      verdict,
+      assessmentId: view.assessment.id,
+      status: view.status,
+    });
+    if (verdict === 'FAIL') {
+      return {
+        allowed: false,
+        reason: 'BLOCKING_FAIL',
+        detail: `${subject.kind}:${subject.id} overallVerdict=FAIL (action success does not imply recovered trip)`,
+        subjectVerdicts: subjectVerdicts.map((v) => ({
+          subjectRef: v.subjectRef,
+          verdict: v.verdict,
+          status: v.status,
+        })),
+      };
+    }
+    if (verdict === 'UNKNOWN') {
+      return {
+        allowed: false,
+        reason: 'BLOCKING_UNKNOWN',
+        detail: `${subject.kind}:${subject.id} overallVerdict=UNKNOWN`,
+        subjectVerdicts: subjectVerdicts.map((v) => ({
+          subjectRef: v.subjectRef,
+          verdict: v.verdict,
+          status: v.status,
+        })),
+      };
+    }
+    if (verdict !== 'PASS') {
+      return {
+        allowed: false,
+        reason: 'CONSTRAINT_NOT_SATISFIED',
+        detail: `${subject.kind}:${subject.id} unexpected verdict ${verdict}`,
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+    resolutionKind: 'RECOVERED',
+    summary: `All ${subjectVerdicts.length} affected JOURNEY/TRIP subjects CURRENT+PASS after observation/reassessment`,
+    subjectVerdicts: subjectVerdicts.map((v) => ({
+      subjectRef: v.subjectRef,
+      verdict: v.verdict,
+      assessmentId: v.assessmentId,
+    })),
+  };
+}
