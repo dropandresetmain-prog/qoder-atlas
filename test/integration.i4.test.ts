@@ -36,7 +36,7 @@ import { loadScenario } from '../src/scenarios/loader.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import {
-  ModelStudioClient,
+  IntelligenceClient,
   ScriptedModelTransport,
 } from '../src/intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../src/intelligence/planner.ts';
@@ -108,7 +108,7 @@ async function setupDisruptedTrip(harness: Harness) {
 
 function scriptedPlanner(responses: string[]) {
   const transport = new ScriptedModelTransport(responses);
-  const client = new ModelStudioClient({ transport });
+  const client = new IntelligenceClient({ transport });
   let sequence = 0;
   return new ModelStudioRecoveryPlanner({
     client,

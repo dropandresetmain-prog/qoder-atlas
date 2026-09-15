@@ -46,7 +46,7 @@ import { CaseVerifier, DeterministicObservationService } from '../src/engine/obs
 import { loadScenario } from '../src/scenarios/loader.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
-import { ModelStudioClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
+import { IntelligenceClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../src/intelligence/planner.ts';
 import type { TransportLeg, TripElement } from '../src/domain/elements.ts';
 import type { IsoDateTime } from '../src/domain/common.ts';
@@ -137,7 +137,7 @@ function legReplacement(
 function scriptedPlanner(rounds: unknown[], suffix: string, now: IsoDateTime) {
   let sequence = 0;
   return new ModelStudioRecoveryPlanner({
-    client: new ModelStudioClient({
+    client: new IntelligenceClient({
       transport: new ScriptedModelTransport(rounds.map((round) => JSON.stringify(round))),
     }),
     idFactory: (prefix) => `${prefix}-${suffix}-${String(++sequence).padStart(3, '0')}`,

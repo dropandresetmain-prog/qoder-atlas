@@ -36,7 +36,7 @@ import {
   type ToolRequest,
 } from '../operational/strategy.ts';
 import { newId } from '../util/ids.ts';
-import type { ModelErrorCategory, ModelStudioClient } from './client.ts';
+import type { ModelErrorCategory, IntelligenceClient } from './client.ts';
 import {
   PlannerModelOutputSchema,
   type PlannerModelOutput,
@@ -45,7 +45,7 @@ import {
 } from './schemas.ts';
 
 export interface RecoveryPlannerOptions {
-  client: ModelStudioClient;
+  client: IntelligenceClient;
   /** Injectable for deterministic test identifiers. */
   idFactory?: (prefix: string) => string;
   /** Injectable clock; deterministic in tests. */
@@ -53,7 +53,7 @@ export interface RecoveryPlannerOptions {
 }
 
 export class ModelStudioRecoveryPlanner implements RecoveryPlanner {
-  private readonly client: ModelStudioClient;
+  private readonly client: IntelligenceClient;
   private readonly idFactory: (prefix: string) => string;
   private readonly now: () => IsoDateTime;
 

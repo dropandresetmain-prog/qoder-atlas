@@ -1,7 +1,7 @@
 /**
  * RV-N9 — Model Studio runtime evidence (Northstar Wave 2).
  *
- * Proves, on the real ModelStudioRecoveryPlanner + ModelStudioClient:
+ * Proves, on the real ModelStudioRecoveryPlanner + IntelligenceClient:
  *  - a scripted planner response (REPLAY mode) validates into a structured
  *    PlannerOutput carrying the frozen RecoveryStrategy[] contract;
  *  - malformed scripted output (not JSON, schema violation) fails closed
@@ -9,7 +9,7 @@
  *  - a LIVE path without credentials (NOT_CONFIGURED) degrades structurally
  *    with no fabricated strategies.
  *
- * The test wires ModelStudioClient over a ScriptedModelTransport and never
+ * The test wires IntelligenceClient over a ScriptedModelTransport and never
  * reaches the network.
  */
 import test from 'node:test';
@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  ModelStudioClient,
+  IntelligenceClient,
   ModelTransportError,
   ScriptedModelTransport,
 } from '../src/intelligence/client.ts';
@@ -127,10 +127,10 @@ function makeInput(): PlannerInput {
 function scriptedPlanner(responses: Array<string | ModelTransportError>, configured = true): {
   planner: ModelStudioRecoveryPlanner;
   transport: ScriptedModelTransport;
-  client: ModelStudioClient;
+  client: IntelligenceClient;
 } {
   const transport = new ScriptedModelTransport(responses);
-  const client = new ModelStudioClient({ apiKey: configured ? 'k' : undefined, transport });
+  const client = new IntelligenceClient({ apiKey: configured ? 'k' : undefined, transport });
   let counter = 0;
   const planner = new ModelStudioRecoveryPlanner({
     client,
@@ -185,7 +185,7 @@ test('RV-N9 model: transport-level error (TIMEOUT) degrades structurally', async
 });
 
 test('RV-N9 model: LIVE without credentials fails closed, never reaches the network', async () => {
-  const client = new ModelStudioClient({}); // no apiKey -> UnconfiguredModelTransport
+  const client = new IntelligenceClient({}); // no apiKey -> UnconfiguredModelTransport
   assert.equal(client.isConfigured(), false);
   const planner = new ModelStudioRecoveryPlanner({ client, now: () => AT });
   const output = await planner.plan(makeInput());
@@ -197,9 +197,9 @@ test('RV-N9 model: LIVE without credentials fails closed, never reaches the netw
 test('RV-N9 model: client.mode reflects the underlying transport (REPLAY for ScriptedModelTransport)', () => {
   const { client } = scriptedPlanner([]);
   assert.equal(client.mode, 'REPLAY');
-  const live = new ModelStudioClient({ apiKey: 'k' });
+  const live = new IntelligenceClient({ apiKey: 'k' });
   assert.equal(live.mode, 'LIVE');
-  const unconfigured = new ModelStudioClient({});
+  const unconfigured = new IntelligenceClient({});
   assert.equal(unconfigured.mode, 'LIVE');
   assert.equal(unconfigured.isConfigured(), false);
 });
@@ -209,7 +209,7 @@ test('RV-N9 model: scripted transport records the request and consumes responses
     savedModelOutput('planner-strategies.json'),
     savedModelOutput('planner-strategies.json'),
   ]);
-  const client = new ModelStudioClient({ apiKey: 'k', transport });
+  const client = new IntelligenceClient({ apiKey: 'k', transport });
   const planner = new ModelStudioRecoveryPlanner({ client, now: () => AT });
   const output1 = await planner.plan(makeInput());
   const output2 = await planner.plan(makeInput());

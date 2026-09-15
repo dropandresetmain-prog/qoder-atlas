@@ -32,7 +32,7 @@ import { CaseService } from '../src/engine/case.ts';
 import { loadScenario } from '../src/scenarios/loader.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
-import { ModelStudioClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
+import { IntelligenceClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
 import { ModelStudioRecoveryPlanner } from '../src/intelligence/planner.ts';
 import type { TransportLeg } from '../src/domain/elements.ts';
 import type { Place } from '../src/domain/entities.ts';
@@ -137,7 +137,7 @@ function replacementOperations(
 
 function scriptedPlanner(responses: string[]) {
   const transport = new ScriptedModelTransport(responses);
-  const client = new ModelStudioClient({ transport });
+  const client = new IntelligenceClient({ transport });
   let sequence = 0;
   return new ModelStudioRecoveryPlanner({
     client,
@@ -422,7 +422,7 @@ test('i5: HTTP surface serves real projections and the decision endpoint drives 
     },
   };
 
-  const server = createAppServer({ environment: 'local', logLevel: 'info', adapterMode: 'REPLAY', httpPort: 0, sqlitePath: ':memory:', recordingsDir: 'recordings', fixturesDir: 'fixtures', providers: { atlas: { env: 'sandbox' }, modelStudio: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} } }, endpoints);
+  const server = createAppServer({ environment: 'local', logLevel: 'info', adapterMode: 'REPLAY', httpPort: 0, sqlitePath: ':memory:', recordingsDir: 'recordings', fixturesDir: 'fixtures', intelligenceProvider: 'model_studio', providers: { atlas: { env: 'sandbox' }, modelStudio: {}, openRouter: {}, googleRoutes: {}, nuitee: {}, frankfurter: {} } }, endpoints);
   await new Promise<void>((resolvePromise) => server.listen(0, resolvePromise));
   const port = (server.address() as AddressInfo).port;
   const base = `http://localhost:${port}`;

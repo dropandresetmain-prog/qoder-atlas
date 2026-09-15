@@ -29,6 +29,24 @@ const ModelStudioConfigSchema = z.object({
   timeoutMs: z.coerce.number().int().positive().optional(),
 });
 
+const OpenRouterConfigSchema = z.object({
+  baseUrl: z.string().optional(),
+  apiKey: z.string().optional(),
+  model: z.string().optional(),
+  timeoutMs: z.coerce.number().int().positive().optional(),
+});
+
+/**
+ * Which model provider backs live intelligence. Model Studio remains the
+ * default and the preferred WiT/Alibaba demo provider; OpenRouter is a
+ * second first-class option selected explicitly via INTELLIGENCE_PROVIDER.
+ * Provider choice never affects deterministic safety/authority — it only
+ * selects which client composeRuntime wires into the same planner/research/
+ * extraction seams.
+ */
+export const IntelligenceProviderSchema = z.enum(['model_studio', 'openrouter']);
+export type IntelligenceProvider = z.infer<typeof IntelligenceProviderSchema>;
+
 const GoogleRoutesConfigSchema = z.object({
   apiKey: z.string().optional(),
 });
@@ -75,9 +93,12 @@ export const AppConfigSchema = z.object({
    * trips. When omitted, `demo` environment defaults to `programme`.
    */
   worldSeedMode: WorldSeedModeSchema.optional(),
+  /** Live intelligence provider feature flag (defaults to the Alibaba demo path). */
+  intelligenceProvider: IntelligenceProviderSchema.default('model_studio'),
   providers: z.object({
     atlas: AtlasConfigSchema.prefault({}),
     modelStudio: ModelStudioConfigSchema.prefault({}),
+    openRouter: OpenRouterConfigSchema.prefault({}),
     googleRoutes: GoogleRoutesConfigSchema.prefault({}),
     nuitee: NuiteeConfigSchema.prefault({}),
     frankfurter: FrankfurterConfigSchema.prefault({}),
@@ -163,6 +184,7 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
     uiHeroImageAlt: optional(env.UI_HERO_IMAGE_ALT),
     programmeChangePresets: optional(env.DEMO_PROGRAMME_CHANGE_PRESETS),
     worldSeedMode: optional(env.WORLD_SEED_MODE),
+    intelligenceProvider: optional(env.INTELLIGENCE_PROVIDER),
     providers: {
       atlas: {
         env: optional(env.ATLAS_ENV),
@@ -175,6 +197,12 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
         apiKey: optional(env.MODEL_STUDIO_API_KEY),
         model: optional(env.MODEL_STUDIO_MODEL),
         timeoutMs: optional(env.MODEL_STUDIO_TIMEOUT_MS),
+      },
+      openRouter: {
+        baseUrl: optional(env.OPENROUTER_BASE_URL),
+        apiKey: optional(env.OPENROUTER_API_KEY),
+        model: optional(env.OPENROUTER_MODEL),
+        timeoutMs: optional(env.OPENROUTER_TIMEOUT_MS),
       },
       googleRoutes: {
         apiKey: optional(env.GOOGLE_ROUTES_API_KEY),
@@ -223,7 +251,7 @@ export function loadConfig(
 /** True when the given provider section has enough config for LIVE use. */
 export function hasLiveCredentials(
   config: AppConfig,
-  provider: 'atlas' | 'modelStudio' | 'googleRoutes' | 'nuitee',
+  provider: 'atlas' | 'modelStudio' | 'openRouter' | 'googleRoutes' | 'nuitee',
 ): boolean {
   switch (provider) {
     case 'atlas': {
@@ -235,6 +263,11 @@ export function hasLiveCredentials(
       // so the API key alone makes LIVE reachable (mirrors the nuitee rule).
       const m = config.providers.modelStudio;
       return Boolean(m.apiKey);
+    }
+    case 'openRouter': {
+      // Same rule: OPENROUTER_DEFAULT_MODEL/DEFAULT_BASE_URL cover the rest.
+      const o = config.providers.openRouter;
+      return Boolean(o.apiKey);
     }
     case 'googleRoutes':
       return Boolean(config.providers.googleRoutes.apiKey);

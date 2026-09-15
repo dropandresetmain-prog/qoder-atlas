@@ -10,7 +10,7 @@ import { escapeHtml } from '../html.ts';
 
 export interface DemoPanelContext {
   adapterMode: AppConfig['adapterMode'];
-  plannerMode: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+  plannerMode: 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK';
   scenarioNames: string[];
   scenarioRehearsals?: Array<{ id: string; title: string; description: string; scenarioId: string }>;
   heroWorkflows?: Array<{ id: string; title: string; description: string }>;
@@ -32,7 +32,13 @@ export function renderDemoPanel(ctx: DemoPanelContext): string {
     <h2>Current mode</h2>
     <p><strong>Adapter:</strong> ${escapeHtml(ctx.adapterMode)}
     &nbsp;·&nbsp;
-    <strong>Planner:</strong> ${escapeHtml(ctx.plannerMode === 'MODEL_STUDIO' ? 'Model Studio (LIVE AI)' : 'Deterministic fallback (local)')}</p>
+    <strong>Planner:</strong> ${escapeHtml(
+      ctx.plannerMode === 'MODEL_STUDIO'
+        ? 'Model Studio (LIVE AI)'
+        : ctx.plannerMode === 'OPENROUTER'
+          ? 'OpenRouter (LIVE AI)'
+          : 'Deterministic fallback (local)',
+    )}</p>
     ${isReplay
       ? '<p style="color: var(--ok); margin: 8px 0 0;">No external provider calls will be made. All data comes from local fixtures and recorded responses.</p>'
       : '<p style="color: var(--alert); margin: 8px 0 0;">WARNING: LIVE mode — external APIs may be called. Provider-side state changes are possible.</p>'}

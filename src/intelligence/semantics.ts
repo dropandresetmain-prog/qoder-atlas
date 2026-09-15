@@ -22,7 +22,7 @@ import {
   type PreferenceOriginKind,
 } from '../domain/preferences.ts';
 import { newId } from '../util/ids.ts';
-import type { ModelCallMeta, ModelCallResult, ModelError, ModelStudioClient, ModelTask } from './client.ts';
+import type { ModelCallMeta, ModelCallResult, ModelError, IntelligenceClient, ModelTask } from './client.ts';
 import {
   ConsequenceAssessmentsModelSchema,
   type ConsequenceAssessmentModel,
@@ -56,12 +56,12 @@ export interface ResolvedPreference {
 }
 
 export interface SemanticServiceOptions {
-  client: ModelStudioClient;
+  client: IntelligenceClient;
   idFactory?: (prefix: string) => string;
 }
 
 export class SemanticService {
-  private readonly client: ModelStudioClient;
+  private readonly client: IntelligenceClient;
   private readonly idFactory: (prefix: string) => string;
 
   constructor(options: SemanticServiceOptions) {

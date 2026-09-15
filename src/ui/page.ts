@@ -52,7 +52,7 @@ export interface PageOptions {
    */
   demoBanner?: {
     adapterMode: 'LIVE' | 'RECORD' | 'REPLAY';
-    plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+    plannerMode?: 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK';
   };
 }
 
@@ -185,7 +185,7 @@ function renderProfileMenu(initials: string, resetAction: string | undefined, ev
  */
 function renderDemoBanner(banner: {
   adapterMode: 'LIVE' | 'RECORD' | 'REPLAY';
-  plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+  plannerMode?: 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK';
 }): string {
   const isReplay = banner.adapterMode === 'REPLAY';
   const modeLabel = isReplay ? 'DEMO MODE — REPLAY' : `LIVE MODE — ${banner.adapterMode}`;
@@ -194,9 +194,12 @@ function renderDemoBanner(banner: {
     : banner.adapterMode === 'LIVE'
       ? 'LIVE mode: external provider APIs may be called. Provider-side state changes are possible.'
       : 'RECORD mode: external provider APIs are called and responses are recorded.';
-  const plannerNote = banner.plannerMode === 'MODEL_STUDIO'
-    ? ' Recovery suggestions: external AI (Model Studio).'
-    : ' Recovery suggestions: local deterministic (no external calls).';
+  const plannerNote =
+    banner.plannerMode === 'MODEL_STUDIO'
+      ? ' Recovery suggestions: external AI (Model Studio).'
+      : banner.plannerMode === 'OPENROUTER'
+        ? ' Recovery suggestions: external AI (OpenRouter).'
+        : ' Recovery suggestions: local deterministic (no external calls).';
   const toneClass = isReplay ? 'db-replay' : 'db-live';
   return `<div class="demo-banner ${toneClass}" role="status" aria-label="Demo mode indicator">
   <span class="db-mode">${escapeHtml(modeLabel)}</span>

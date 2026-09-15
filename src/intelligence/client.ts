@@ -1,24 +1,34 @@
 /**
- * D1 — smallest reliable Alibaba Model Studio / Qwen client for the MVP
- * (FR-07, ARCHITECTURE.md §14).
+ * D1 — provider-neutral intelligence client (FR-07, ARCHITECTURE.md §14).
+ *
+ * `IntelligenceClient` is a single OpenAI-compatible chat-completions client
+ * parameterized by `providerId`/`baseUrl`/`model`; it carries no
+ * provider-specific behaviour. Two providers currently plug into it:
+ * - Alibaba Cloud Model Studio / Qwen (DashScope-compatible surface);
+ * - OpenRouter (its own OpenAI-compatible surface).
+ * A third seam, `ScriptedModelTransport`/`UnconfiguredModelTransport`, backs
+ * REPLAY and credential-free runs regardless of which provider is configured.
  *
  * Design rules:
- * - OpenAI-compatible chat-completions surface (DashScope-compatible);
  * - credentials are optional at application startup — an unconfigured client
  *   returns a structured NOT_CONFIGURED error, it never throws at construction;
  * - every call returns a structured ModelCallResult; external/model failure is
  *   data, never an exception that can crash a RecoveryCase (NFR-03);
  * - schema-constrained output: model text is parsed and validated with Zod;
  *   invalid model output is rejected (INVALID_OUTPUT), never repaired by
- *   guessing;
+ *   guessing — identically regardless of provider;
  * - retry only when bounded and safe (retryable transport categories, capped
  *   attempts); invalid output is fail-closed without retry;
- * - the API key never appears in error messages, meta or logs.
+ * - the API key never appears in error messages, meta or logs;
+ * - provider identity (providerId/model) is reported honestly in
+ *   ModelCallMeta and capability descriptors — it is never hardcoded to a
+ *   fixed provider name regardless of which provider is actually configured.
  *
  * Saved/replayed model outputs: tests inject `ScriptedModelTransport` with
  * committed saved responses (test/fixtures/model-outputs). The validation
- * path is identical for live and replayed text — there is no separate demo
- * parse path (ADR-008 spirit applied to the model boundary).
+ * path is identical for live and replayed text, and identical across
+ * providers — there is no separate demo parse path and no per-provider
+ * schema (ADR-008 spirit applied to the model boundary).
  */
 import { z } from 'zod';
 
@@ -26,6 +36,17 @@ export const MODEL_STUDIO_PROVIDER_ID = 'model-studio';
 export const MODEL_STUDIO_DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 /** Cheap runtime default for plumbing; override via MODEL_STUDIO_MODEL. */
 export const MODEL_STUDIO_DEFAULT_MODEL = 'qwen-flash';
+
+export const OPENROUTER_PROVIDER_ID = 'openrouter';
+export const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
+/**
+ * OpenRouter's free-models auto-router: it selects among currently-free
+ * underlying models rather than promising one fixed model. Structured
+ * output is enforced downstream by the same Zod schema path as every other
+ * provider (see module docs) — the router is a routing target, not a
+ * validation exemption.
+ */
+export const OPENROUTER_DEFAULT_MODEL = 'openrouter/free';
 
 export const ModelErrorCategorySchema = z.enum([
   'NOT_CONFIGURED',
@@ -105,7 +126,9 @@ export interface ModelTransport {
 }
 
 /**
- * HTTP transport for the OpenAI-compatible Model Studio surface.
+ * HTTP transport for any OpenAI-compatible chat-completions surface (Model
+ * Studio, OpenRouter, or another future provider) — provider identity is
+ * carried entirely by `baseUrl`/`apiKey`/`model`, never assumed here.
  * Never includes the API key in thrown errors or metadata.
  */
 export class HttpModelTransport implements ModelTransport {
@@ -200,22 +223,34 @@ export class ScriptedModelTransport implements ModelTransport {
  */
 export class UnconfiguredModelTransport implements ModelTransport {
   readonly mode = 'LIVE' as const;
+  private readonly providerId: string;
+
+  constructor(providerId: string = MODEL_STUDIO_PROVIDER_ID) {
+    this.providerId = providerId;
+  }
 
   async complete(_request: CompletionRequest, _timeoutMs: number): Promise<CompletionResponse> {
-    throw new ModelTransportError(
-      'NOT_CONFIGURED',
-      'model_studio_credentials_missing',
-      'Model Studio credentials are not configured',
-      false,
-    );
+    throw notConfiguredError(this.providerId);
   }
+}
+
+/** Shared NOT_CONFIGURED error, honestly naming whichever provider is configured. */
+function notConfiguredError(providerId: string): ModelTransportError {
+  return new ModelTransportError(
+    'NOT_CONFIGURED',
+    `${providerId.replace(/[^a-z0-9]+/gi, '_')}_credentials_missing`,
+    `${providerId} credentials are not configured`,
+    false,
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
-export interface ModelStudioClientOptions {
+export interface IntelligenceClientOptions {
+  /** Honest provider identity for meta/telemetry/capability descriptors. */
+  providerId?: string;
   apiKey?: string;
   model?: string;
   baseUrl?: string;
@@ -238,7 +273,9 @@ export interface ModelTask<T> {
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_ATTEMPTS = 2;
 
-export class ModelStudioClient {
+export class IntelligenceClient {
+  /** Honest provider identity, reported in ModelCallMeta and descriptors. */
+  readonly providerId: string;
   readonly model: string;
   readonly baseUrl: string;
   private readonly apiKey?: string;
@@ -246,7 +283,8 @@ export class ModelStudioClient {
   private readonly timeoutMs: number;
   private readonly maxAttempts: number;
 
-  constructor(options: ModelStudioClientOptions) {
+  constructor(options: IntelligenceClientOptions) {
+    this.providerId = options.providerId ?? MODEL_STUDIO_PROVIDER_ID;
     this.apiKey = options.apiKey;
     this.model = options.model ?? MODEL_STUDIO_DEFAULT_MODEL;
     this.baseUrl = options.baseUrl ?? MODEL_STUDIO_DEFAULT_BASE_URL;
@@ -254,7 +292,7 @@ export class ModelStudioClient {
       options.transport ??
       (this.apiKey !== undefined
         ? new HttpModelTransport(this.baseUrl, this.apiKey)
-        : new UnconfiguredModelTransport());
+        : new UnconfiguredModelTransport(this.providerId));
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxAttempts = Math.max(1, options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
   }
@@ -271,12 +309,7 @@ export class ModelStudioClient {
    */
   async complete(request: CompletionRequest, timeoutMs: number): Promise<CompletionResponse> {
     if (!this.isConfigured() && this.transport.mode === 'LIVE') {
-      throw new ModelTransportError(
-        'NOT_CONFIGURED',
-        'model_studio_credentials_missing',
-        'Model Studio credentials are not configured',
-        false,
-      );
+      throw notConfiguredError(this.providerId);
     }
     return this.transport.complete(request, timeoutMs);
   }
@@ -288,19 +321,20 @@ export class ModelStudioClient {
 
   async call<T>(task: ModelTask<T>): Promise<ModelCallResult<T>> {
     const baseMeta: ModelCallMeta = {
-      providerId: MODEL_STUDIO_PROVIDER_ID,
+      providerId: this.providerId,
       model: this.model,
       mode: this.transport.mode,
       attempt: 0,
     };
 
     if (!this.isConfigured() && this.transport.mode === 'LIVE') {
+      const notConfigured = notConfiguredError(this.providerId);
       return {
         ok: false,
         error: {
           category: 'NOT_CONFIGURED',
-          code: 'model_studio_credentials_missing',
-          message: 'Model Studio credentials are not configured; live intelligence is unavailable',
+          code: notConfigured.code,
+          message: `${notConfigured.message}; live intelligence is unavailable`,
         },
         meta: baseMeta,
       };

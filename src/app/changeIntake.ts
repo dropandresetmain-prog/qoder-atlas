@@ -7,7 +7,7 @@
  * existing deterministic changeRequest.ts path.
  *
  * Two paths:
- * 1. Model path: when ModelStudioClient is configured and not in REPLAY, call
+ * 1. Model path: when IntelligenceClient is configured and not in REPLAY, call
  *    it with a strict system prompt (schema-first, closed vocabularies, single
  *    bare JSON object) and zod-validate the response; validation failure =>
  *    fail closed, never guess.
@@ -30,7 +30,7 @@ import {
   type IsoDateTime,
   type UncertaintyRecord,
 } from '../domain/common.ts';
-import type { ModelStudioClient, ModelTask } from '../intelligence/client.ts';
+import type { IntelligenceClient, ModelTask } from '../intelligence/client.ts';
 import {
   resolveChangeRequest,
   type ChangeRequestDeps,
@@ -43,7 +43,7 @@ import {
 
 export interface ChangeIntakeDeps {
   /** Optional model client for the LLM path. Absent = deterministic only. */
-  modelClient?: ModelStudioClient;
+  modelClient?: IntelligenceClient;
 }
 
 export interface ChangeIntakeInput {
@@ -162,7 +162,7 @@ Response: { "intentKind": "CHANGE_TRANSPORT_SCHEDULE", "urgency": "SOFT_PREFEREN
 Never invent timestamps, entity ids, or other details the traveller did not state.`;
 
 async function interpretViaModel(
-  client: ModelStudioClient,
+  client: IntelligenceClient,
   input: ChangeIntakeInput,
 ): Promise<ChangeIntakeResult> {
   // The prompt's two output shapes are BOTH strict-valid: a bare

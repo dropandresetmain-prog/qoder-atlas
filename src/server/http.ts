@@ -60,7 +60,7 @@ export interface DemoSurface {
   /** Full S1–S8 acceptance-manifest rehearsals for diagnosis. */
   scenarioRehearsals?(): Array<{ id: string; title: string; description: string; scenarioId: string }>;
   /** Which planner is active (for the demo banner display). */
-  plannerMode?: () => 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK';
+  plannerMode?: () => 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK';
   /** Plain runtime reset (diagnostic). */
   reset(at: IsoDateTime): Promise<{ status: number; body: unknown; redirectTo?: string }>;
   /**
@@ -257,7 +257,7 @@ function profileChrome(endpoints: AppEndpoints): { profileResetAction?: string }
 }
 
 /** Demo diagnostics only — not wired on judge-facing product pages. */
-function demoBannerOptions(config: AppConfig, endpoints?: AppEndpoints): { demoBanner: { adapterMode: 'LIVE' | 'RECORD' | 'REPLAY'; plannerMode?: 'MODEL_STUDIO' | 'DETERMINISTIC_FALLBACK' } } {
+function demoBannerOptions(config: AppConfig, endpoints?: AppEndpoints): { demoBanner: { adapterMode: 'LIVE' | 'RECORD' | 'REPLAY'; plannerMode?: 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK' } } {
   return { demoBanner: { adapterMode: config.adapterMode, plannerMode: endpoints?.demo?.plannerMode?.() } };
 }
 

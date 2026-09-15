@@ -24,16 +24,34 @@ Variable names were frozen during the F0 foundation and are implemented in `src/
 
 No external database account is required locally. SQLite is embedded. Persistence goes through repository interfaces so deployment can replace it if local disk is ephemeral.
 
-### Alibaba Cloud Model Studio
-Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Only required for LIVE intelligence; REPLAY/local runs need none. When unconfigured, the recovery planner degrades to the built-in deterministic fallback planner, so the full REPLAY recovery loop (plan → approve → execute → verify) remains runnable with zero credentials.
+### Intelligence provider (Model Studio / OpenRouter)
+The application talks to live intelligence (recovery planning, extraction, research) through one provider-neutral `IntelligenceClient` (`src/intelligence/client.ts`). `INTELLIGENCE_PROVIDER` selects which provider that client is configured for; everything downstream (prompts, Zod schema validation, planner/extraction/research mapping, the deterministic viability/authority/execution boundary) is identical regardless of provider — the provider only supplies a model completion.
+
+- `INTELLIGENCE_PROVIDER` — `model_studio | openrouter` (default `model_studio`)
+
+Only required for LIVE intelligence; REPLAY/local runs need none, and **REPLAY never makes an external call to either provider even when credentials for one are present** — provider choice never affects the deterministic safety boundary. When the selected provider is unconfigured (or in REPLAY), the recovery planner degrades to the built-in deterministic fallback planner, so the full REPLAY recovery loop (plan → approve → execute → verify) remains runnable with zero credentials.
+
+#### Alibaba Cloud Model Studio (preferred WiT/Alibaba demo provider)
+Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Select with `INTELLIGENCE_PROVIDER=model_studio` (the default).
 
 - `MODEL_STUDIO_API_KEY`
 - `MODEL_STUDIO_BASE_URL`
 - `MODEL_STUDIO_MODEL`
+- `MODEL_STUDIO_TIMEOUT_MS`
 
 Start with inexpensive model for plumbing/tests. Upgrade only if evidence shows quality blocks acceptance.
 
 **Regional endpoint (DR-0 finding, 24 Aug 2026):** Alibaba Cloud Model Studio has two separate regional deployments with disjoint key stores — mainland China (`https://dashscope.aliyuncs.com/compatible-mode/v1`, the code default) and international (`https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, Singapore-based). A key issued in one region's console returns `invalid_api_key` against the other region's endpoint even when the key is genuinely valid. If a LIVE call fails with `invalid_api_key` despite a correct key, try setting `MODEL_STUDIO_BASE_URL` to the international endpoint before assuming the key itself is wrong.
+
+#### OpenRouter
+A second first-class intelligence provider over the same OpenAI-compatible chat-completions surface. Select with `INTELLIGENCE_PROVIDER=openrouter`.
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`)
+- `OPENROUTER_MODEL` (default `openrouter/free`)
+- `OPENROUTER_TIMEOUT_MS`
+
+`openrouter/free` is OpenRouter's own free-models auto-router: it routes to whichever free underlying model is currently available rather than promising one fixed model. Because the underlying model can vary, model output still goes through the exact same strict Zod schema validation as Model Studio — malformed or non-conforming output is rejected (`INVALID_OUTPUT`) and fails closed, exactly as it would for any other provider; there is no relaxed validation path and no silent fallback to a different, paid OpenRouter model. If a pinned (non-free) OpenRouter model is needed instead, set `OPENROUTER_MODEL` to a specific `<vendor>/<model>` or `<vendor>/<model>:free` identifier from `openrouter.ai/models`.
 
 ### Atlas direct API
 Needed only for LIVE flight capability.

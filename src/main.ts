@@ -82,9 +82,13 @@ async function main(): Promise<void> {
   for (const scenarioId of composed.seededScenarioIds) {
     console.log(`[atlas] seeded scenario bundle ${scenarioId}`);
   }
-  console.log(
-    `[atlas] planner=${composed.plannerMode === 'MODEL_STUDIO' ? 'Model Studio (live)' : 'deterministic fallback (credential-free)'}`,
-  );
+  const plannerLabel =
+    composed.plannerMode === 'MODEL_STUDIO'
+      ? 'Model Studio (live)'
+      : composed.plannerMode === 'OPENROUTER'
+        ? 'OpenRouter (live)'
+        : 'deterministic fallback (credential-free)';
+  console.log(`[atlas] planner=${plannerLabel}`);
 
   await closeServer(early);
 
