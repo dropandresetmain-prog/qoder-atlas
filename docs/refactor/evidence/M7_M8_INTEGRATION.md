@@ -364,3 +364,46 @@ Worktree `C:\Dev\qoder-atlas-m7-m8-c3`, branch `integration/m7-m8-c3`
 
 **Do not start M9.** Return to the same C3 reviewer for targeted
 confirmation.
+
+## 13. C3 targeted remediation round 3 (AN-7R only)
+
+Status: **TARGETED-FIX CANDIDATE — READY FOR REVIEWER CONFIRMATION** (not
+C3 PASS). Round 2 closed AN-1R / AN-7 / IN-1 at `e5cb042`; this section
+closes AN-7R (decision scope unbound from acted-on subjects).
+
+### AN-7R — decision/grant scope must cover required intent subjects
+
+**Root cause (Q5):** `grantCoversEnvelopeScopes` was checked against
+issuer-chosen `envelope.scope`. A principal granted only on an unrelated
+ORGANISATION could approve a decision whose scope was that ORGANISATION
+while the intent/strategy acted on JOURNEY J — prepare returned ALLOWED.
+
+**Fix:**
+1. `requiredAuthorityScope(intent.subject_refs ∪ resolved JOURNEY/TRIP)` in
+   `storedExecutionGate.ts` — deterministic; no caller/issuer input.
+2. `issueAuthorityDecision` rejects when decision scope ⊉ required
+   (`DECISION_SCOPE_INSUFFICIENT`); the gate re-checks the same predicate.
+3. `evaluateConsequentialAuthorization` / `evaluateApproverAuthority` require
+   dispatch and authorize grants to cover the **required** scope by exact
+   TypedRef containment (not the issuer-chosen subset alone).
+4. No ORGANISATION→Journey inheritance — exact match only (architecture gap
+   if inherited coverage is later required).
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` AN-7R (Q5 issue+gate,
+partial grants, approver missing journey, positive, dispatch re-check).
+
+### Verification (round 3)
+
+Worktree `C:\Dev\qoder-atlas-m7-m8-c3`, branch `integration/m7-m8-c3`
+(see completion report for exact HEAD after push):
+
+- `npm run typecheck` / `build` / `lint` / `gate:anti-hardcoding` /
+  `git diff --check` — pass
+- Focused PG (60/60): `c3TargetedRemediation` (31), `m8AuthorityExecution`,
+  four `m7m8*.pgtest.ts`
+- Full `npm run test:postgres` on fresh lowercase DB
+  `northstar_c3_r3_full` (container `northstar-postgres-test:55432`,
+  role `northstar_test`) — **434/434 pass**
+
+**Do not start M9.** Return to the same C3 reviewer for targeted
+confirmation of AN-7R.

@@ -74,7 +74,14 @@ import type { WJourney, WObjective, WProgrammeItem, WParticipation, WJourneyItem
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
-import { persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
+import {
+  loadRequiredAuthorityScopesOrFail,
+  persistStrategyChangeRow,
+  prepareParams,
+  seedStoredExecutionAuthority,
+  tripBaseManifest,
+  unionTypedRefs,
+} from './m8ExecutionGateHelpers.ts';
 import { seedTransportIntent, seedUnlocatedPlace } from './m6WorldSeed.ts';
 
 after(async () => {
@@ -246,14 +253,21 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
     const compiledIntent = plan.intents[0]!;
     assert.equal(compiledIntent.capabilityRef, 'internal:programme.schedule');
 
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: evaluated.value.strategy.candidateAssessments.map((a) => ({ subjectRef: a.subjectRef })),
+    });
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
+    const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, compiledIntent.id);
+    const decisionScope = unionTypedRefs([{ kind: 'PROGRAMME_ITEM', id: programmeItemId }], requiredAuthorityScopes);
     const envelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActorRoles: ['CASE_OWNER'], scope: [{ kind: 'PROGRAMME_ITEM', id: programmeItemId }], grantRefs: [], ruleInputs: [],
+      requiredActorRoles: ['CASE_OWNER'], scope: decisionScope, grantRefs: [], ruleInputs: [],
     };
     const fingerprint = computeEnvelopeFingerprint(envelopeInput);
     const decision = mustOk(await issueAuthorityDecision(uow(), {
@@ -263,12 +277,12 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: travellerA.travellerId },
-      scopes: envelopeInput.scope,
+      scopes: decisionScope,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     }));
     const decisionObj: AuthorityDecision = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
@@ -276,22 +290,23 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
     };
     const approvalObj: Approval = {
       id: approval.approvalId, requirementId: decision.requirementIds[0]!, approverPrincipalId: principalId,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     };
     const envelope: AuthorityEnvelope = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: envelopeInput.scope,
+      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: decisionScope,
       grantRefs: [], ruleInputs: [], issuedAt: NOW, fingerprint,
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: travellerA.travellerId },
       issuedByPrincipalId: principalId, issuedAt: NOW,
-      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: decisionScope,
     };
     const authorized = authorizeDispatch({
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
       approvals: [approvalObj], revocations: [], grants: [grant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes,
     });
     assert.equal(authorized.allowed, true);
   });
@@ -512,9 +527,11 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       principalId, actorType: 'HUMAN', authIssuer: 'https://issuer.invalid/capability-refusal', authSubject: principalId,
     }));
+    const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, compiledIntent.id);
+    const decisionScope = unionTypedRefs([{ kind: 'TRAVELLER', id: travellerId }], requiredAuthorityScopes);
     const envelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActorRoles: ['CASE_OWNER'], scope: [{ kind: 'TRAVELLER', id: travellerId }], grantRefs: [], ruleInputs: [],
+      requiredActorRoles: ['CASE_OWNER'], scope: decisionScope, grantRefs: [], ruleInputs: [],
     };
     const fingerprint = computeEnvelopeFingerprint(envelopeInput);
     const decision = mustOk(await issueAuthorityDecision(uow(), {
@@ -524,12 +541,12 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
-      scopes: envelopeInput.scope,
+      scopes: decisionScope,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     }));
     const decisionObj: AuthorityDecision = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
@@ -537,22 +554,23 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     };
     const approvalObj: Approval = {
       id: approval.approvalId, requirementId: decision.requirementIds[0]!, approverPrincipalId: principalId,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     };
     const envelope: AuthorityEnvelope = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: envelopeInput.scope,
+      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: decisionScope,
       grantRefs: [], ruleInputs: [], issuedAt: NOW, fingerprint,
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
       issuedByPrincipalId: principalId, issuedAt: NOW,
-      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: decisionScope,
     };
     const authorization: DispatchAuthorizationInput = {
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
       approvals: [approvalObj], revocations: [], grants: [grant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes,
     };
     const preAuth = authorizeDispatch(authorization);
     assert.equal(preAuth.allowed, true);

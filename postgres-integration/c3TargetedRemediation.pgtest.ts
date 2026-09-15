@@ -32,10 +32,12 @@ import {
   seedMinimalCurrentAssessment,
   seedStoredExecutionAuthority,
   tripBaseManifest,
+  unionTypedRefs,
 } from './m8ExecutionGateHelpers.ts';
 import { computeEnvelopeFingerprint } from '../src/resolution/authority/envelope.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { RecoveryStrategy } from '../src/contracts/v2/scenario/recoveryStrategy.ts';
+import { loadRequiredAuthorityScope, evaluateStoredExecutionGate } from '../src/persistence/postgres/execution/storedExecutionGate.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -282,12 +284,79 @@ describe('AN-1R fail-closed currentness + base_manifest binding', () => {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       plan, recoveryStrategyId,
     }));
-    await seedStoredExecutionAuthority({
-      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
-      planId, intentId,
-      scope: [{ kind: 'ORGANISATION', id: organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: organisationId },
-    });
+    // Required scope includes the unresolved JOURNEY_ITEM/OFFER subject_refs — those
+    // cannot be grant_scopes (no domain_subjects rows). Seed a matching decision+approval
+    // directly so the gate reaches assessable-subject resolution and denies there.
+    const required = await loadRequiredAuthorityScope(pool, seed.workspaceId, intentId);
+    assert.ok(Array.isArray(required), 'required scope should resolve from subject_refs');
+    const intentRow = await pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [seed.workspaceId, intentId],
+    );
+    const envelopeInput = {
+      actionPlanId: planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: required as TypedRef[],
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+    const decisionId = randomUUID();
+    const requirementId = randomUUID();
+    const approvalId = randomUUID();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET CONSTRAINTS ALL DEFERRED');
+      await client.query(
+        `INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1,$2,'AUTHORITY_DECISION',$2)`,
+        [seed.workspaceId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO aggregate_heads (workspace_id, aggregate_id, revision) VALUES ($1,$2,1)`,
+        [seed.workspaceId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO authority_decisions (
+           workspace_id, id, action_plan_id, action_plan_version, action_intent_id, action_intent_version,
+           group_operator, envelope_fingerprint, scope, grant_refs, rule_inputs, issued_at, created_by_actor_id
+         ) VALUES ($1,$2,$3,1,$4,1,'AND',$5,$6::jsonb,'[]'::jsonb,'[]'::jsonb,$7::timestamptz,$8)`,
+        [
+          seed.workspaceId, decisionId, planId, intentId, fingerprint,
+          JSON.stringify(envelopeInput.scope), GATE_NOW, seed.actorId,
+        ],
+      );
+      await client.query(
+        `INSERT INTO approval_requirements (workspace_id, id, decision_id, actor_role)
+         VALUES ($1,$2,$3,'PAYER')`,
+        [seed.workspaceId, requirementId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1,$2,'APPROVAL',$3)`,
+        [seed.workspaceId, approvalId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO approvals (
+           workspace_id, id, requirement_id, decision_id, approver_principal_id, envelope_fingerprint,
+           scope, approved_at, created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::timestamptz,$9)`,
+        [
+          seed.workspaceId, approvalId, requirementId, decisionId, principalId,
+          fingerprint, JSON.stringify(envelopeInput.scope), GATE_NOW, principalId,
+        ],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
     const rejected = await createPreparedExecutionAttempt(uow(), prepareParams({
       workspaceId: seed.workspaceId, actorId: seed.actorId, planId, intentId, principalId,
     }));
@@ -332,14 +401,7 @@ describe('AN-1R fail-closed currentness + base_manifest binding', () => {
 
   test('plan with no recovery_strategy_id → STRATEGY_MISSING', async () => {
     const f = await baseC3Fixture({ omitStrategy: true, withCost: false });
-    await seedStoredExecutionAuthority({
-      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
-      planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      assessmentSubject: { kind: 'JOURNEY', id: f.journeyId },
-      assessmentTripId: f.tripId,
-    });
+    // Gate fails at strategy load before authority — no seed required.
     const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
       workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
       intentId: f.intentId, principalId: f.principalId,
@@ -643,6 +705,15 @@ async function seedExtraOrganisation(
   return organisationId;
 }
 
+async function coveringDecisionScope(
+  f: Awaited<ReturnType<typeof baseC3Fixture>>,
+  extra: TypedRef[] = [],
+): Promise<TypedRef[]> {
+  const required = await loadRequiredAuthorityScope(f.pool, f.seed.workspaceId, f.intentId);
+  assert.ok(!('allowed' in required), 'required authority scope must resolve');
+  return unionTypedRefs(extra, required as TypedRef[], [{ kind: 'ORGANISATION', id: f.organisationId }]);
+}
+
 describe('AN-7 grant scope, approver authority, gating principal', () => {
   test('approver with zero grants → recordApproval rejected; direct approval row denied at gate', async () => {
     const f = await baseC3Fixture({ withCost: false });
@@ -650,6 +721,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
       { tripId: f.tripId, tripRevision: 1 },
     );
+    const decisionScope = await coveringDecisionScope(f);
     const approverId = randomUUID();
     mustOk(await createPrincipal(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
@@ -661,7 +733,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
       issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch'],
-      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
       expectedAggregateRevisions: [],
     }));
@@ -675,7 +747,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
       actionIntentId: f.intentId, actionIntentVersion: 1,
       requiredActorRoles: ['PAYER'],
-      scope: [{ kind: 'ORGANISATION' as const, id: f.organisationId }],
+      scope: decisionScope,
       grantRefs: [] as string[], ruleInputs: [] as string[],
       ...(intentRow.rows[0]?.request_fingerprint
         ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
@@ -735,13 +807,14 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
       { tripId: f.tripId, tripRevision: 1 },
     );
+    const decisionScope = await coveringDecisionScope(f);
     const dispatchKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
       issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch'],
-      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
       expectedAggregateRevisions: [],
     }));
@@ -765,7 +838,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
       actionIntentId: f.intentId, actionIntentVersion: 1,
       requiredActorRoles: ['PAYER'],
-      scope: [{ kind: 'ORGANISATION' as const, id: f.organisationId }],
+      scope: decisionScope,
       grantRefs: [] as string[], ruleInputs: [] as string[],
       ...(intentRow.rows[0]?.request_fingerprint
         ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
@@ -790,13 +863,14 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
       { tripId: f.tripId, tripRevision: 1 },
     );
+    const decisionScope = await coveringDecisionScope(f);
     const grantKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
       issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
-      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
       expectedAggregateRevisions: [],
     }));
@@ -811,7 +885,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
       actionIntentId: f.intentId, actionIntentVersion: 1,
       requiredActorRoles: ['PAYER'],
-      scope: [{ kind: 'ORGANISATION' as const, id: f.organisationId }],
+      scope: decisionScope,
       grantRefs: [] as string[], ruleInputs: [] as string[],
       ...(intentRow.rows[0]?.request_fingerprint
         ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
@@ -843,13 +917,14 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
       { tripId: f.tripId, tripRevision: 1 },
     );
+    const decisionScope = await coveringDecisionScope(f);
     const authorizeKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
       issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
       actions: ['action.intent.authorize'],
-      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },
       expectedAggregateRevisions: [],
     }));
@@ -866,7 +941,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
     await seedStoredExecutionAuthority({
       pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
       planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      scope: decisionScope,
       representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
       skipGrants: true,
     });
@@ -927,6 +1002,284 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       intentId: f.intentId, principalId: f.principalId,
     })));
     assert.ok(prepared.attemptId);
+  });
+});
+
+describe('AN-7R decision scope bound to required intent subjects', () => {
+  test('Q5: decision scoped to unrelated org denied at issueAuthorityDecision and at gate', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const unrelatedOrg = await seedExtraOrganisation(f.uow(), f.seed.workspaceId, f.seed.actorId, 'Unrelated Org');
+    const required = await loadRequiredAuthorityScope(f.pool, f.seed.workspaceId, f.intentId);
+    assert.ok(!('allowed' in required));
+    assert.ok((required as TypedRef[]).some((r) => r.kind === 'JOURNEY' && r.id === f.journeyId));
+
+    const grantKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: unrelatedOrg },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'],
+      scopes: [{ kind: 'ORGANISATION', id: unrelatedOrg }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
+      expectedAggregateRevisions: [],
+    }));
+
+    const intentRow = await f.pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [f.seed.workspaceId, f.intentId],
+    );
+    const badEnvelope = {
+      actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: f.intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: [{ kind: 'ORGANISATION' as const, id: unrelatedOrg }],
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const issued = await issueAuthorityDecision(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      envelopeInput: badEnvelope, requirements: [{ actorRole: 'PAYER' }], issuedAt: GATE_NOW,
+    });
+    assert.equal(issued.ok, false);
+    if (!issued.ok) assert.match(issued.conflict.message, /DECISION_SCOPE_INSUFFICIENT/);
+
+    // Direct decision row with insufficient scope — gate must still deny.
+    const decisionId = randomUUID();
+    const fingerprint = computeEnvelopeFingerprint(badEnvelope);
+    const client = await f.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET CONSTRAINTS ALL DEFERRED');
+      await client.query(
+        `INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1,$2,'AUTHORITY_DECISION',$2)`,
+        [f.seed.workspaceId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO aggregate_heads (workspace_id, aggregate_id, revision) VALUES ($1,$2,1)`,
+        [f.seed.workspaceId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO authority_decisions (
+           workspace_id, id, action_plan_id, action_plan_version, action_intent_id, action_intent_version,
+           group_operator, envelope_fingerprint, scope, grant_refs, rule_inputs, issued_at, created_by_actor_id
+         ) VALUES ($1,$2,$3,1,$4,1,'AND',$5,$6::jsonb,'[]'::jsonb,'[]'::jsonb,$7::timestamptz,$8)`,
+        [
+          f.seed.workspaceId, decisionId, f.planId, f.intentId, fingerprint,
+          JSON.stringify(badEnvelope.scope), GATE_NOW, f.seed.actorId,
+        ],
+      );
+      const requirementId = randomUUID();
+      await client.query(
+        `INSERT INTO approval_requirements (workspace_id, id, decision_id, actor_role)
+         VALUES ($1,$2,$3,'PAYER')`,
+        [f.seed.workspaceId, requirementId, decisionId],
+      );
+      const approvalId = randomUUID();
+      await client.query(
+        `INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1,$2,'APPROVAL',$3)`,
+        [f.seed.workspaceId, approvalId, decisionId],
+      );
+      await client.query(
+        `INSERT INTO approvals (
+           workspace_id, id, requirement_id, decision_id, approver_principal_id, envelope_fingerprint,
+           scope, approved_at, created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::timestamptz,$9)`,
+        [
+          f.seed.workspaceId, approvalId, requirementId, decisionId, f.principalId,
+          fingerprint, JSON.stringify(badEnvelope.scope), GATE_NOW, f.principalId,
+        ],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    const gateDenied = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(gateDenied.ok, false);
+    if (!gateDenied.ok) assert.match(gateDenied.conflict.message, /DECISION_SCOPE_INSUFFICIENT/);
+  });
+
+  test('grants covering only part of required scope → denied', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const decisionScope = await coveringDecisionScope(f);
+    // Grant only ORGANISATION, missing JOURNEY from required set.
+    const grantKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'],
+      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
+      expectedAggregateRevisions: [],
+    }));
+    const intentRow = await f.pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [f.seed.workspaceId, f.intentId],
+    );
+    const envelopeInput = {
+      actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: f.intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: decisionScope,
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+    // Decision may cover required scope; recordApproval would reject the partial authorize
+    // grant — insert approval directly so the gate re-checks grant coverage.
+    const decision = mustOk(await issueAuthorityDecision(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      envelopeInput, requirements: [{ actorRole: 'PAYER' }], issuedAt: GATE_NOW,
+    }));
+    const approvalId = randomUUID();
+    const client = await f.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET CONSTRAINTS ALL DEFERRED');
+      await client.query(
+        `INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1,$2,'APPROVAL',$3)`,
+        [f.seed.workspaceId, approvalId, decision.decisionId],
+      );
+      await client.query(
+        `INSERT INTO approvals (
+           workspace_id, id, requirement_id, decision_id, approver_principal_id, envelope_fingerprint,
+           scope, approved_at, created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::timestamptz,$9)`,
+        [
+          f.seed.workspaceId, approvalId, decision.requirementIds[0]!, decision.decisionId, f.principalId,
+          fingerprint, JSON.stringify(envelopeInput.scope), GATE_NOW, f.principalId,
+        ],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /GRANT_SCOPE_INSUFFICIENT|APPROVER_UNAUTHORIZED/);
+  });
+
+  test('approver authorize-grant missing required journey → denied', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const decisionScope = await coveringDecisionScope(f);
+    const dispatchKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch'],
+      scopes: decisionScope,
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
+      expectedAggregateRevisions: [],
+    }));
+    const authorizeKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.authorize'],
+      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },
+      expectedAggregateRevisions: [],
+    }));
+    const intentRow = await f.pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [f.seed.workspaceId, f.intentId],
+    );
+    const envelopeInput = {
+      actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: f.intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: decisionScope,
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+    const decision = mustOk(await issueAuthorityDecision(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      envelopeInput, requirements: [{ actorRole: 'PAYER' }], issuedAt: GATE_NOW,
+    }));
+    const rejected = await recordApproval(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.principalId, idempotencyKey: randomUUID(),
+      decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
+      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: GATE_NOW,
+    });
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /APPROVER_UNAUTHORIZED/);
+  });
+
+  test('positive path with grants on actual subjects → allowed', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedAuthorityForFixture(f, { cost: false });
+    const prepared = mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    })));
+    assert.ok(prepared.attemptId);
+  });
+
+  test('dispatch-time re-check still denies when world/scope invalid', async () => {
+    const f = await baseC3Fixture();
+    await seedAuthorityForFixture(f);
+    mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    })));
+    await f.pool.query(
+      'UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2',
+      [f.seed.workspaceId, f.tripId],
+    );
+    const worker = new PgExecutionWorker(f.pool, { actorId: 'c3-an7r-dispatch' });
+    const claim = await worker.claimNext(f.seed.workspaceId);
+    assert.ok(claim);
+    let dispatchCount = 0;
+    const outcome = await worker.dispatchClaimed(claim!, {
+      principalId: f.principalId, now: GATE_NOW,
+      observed: { capabilityKind: 'BOOK', supported: true },
+      dispatcher: async () => { dispatchCount += 1; return { kind: 'SUCCESS', responseRef: 'x', sourceOwnedFields: {} }; },
+    });
+    assert.equal(outcome.outcome, 'FAILED');
+    assert.equal(dispatchCount, 0);
+    const live = await evaluateStoredExecutionGate(f.pool, {
+      workspaceId: f.seed.workspaceId, intentId: f.intentId, principalId: f.principalId, now: GATE_NOW,
+    });
+    assert.equal(live.allowed, false);
   });
 });
 

@@ -3,9 +3,13 @@
  * envelope fingerprint, grants, and multi-actor approvals.
  *
  * C3 round 2 (AN-7): a dispatch grant counts only when its scopes cover every
- * envelope scope ref (exact TypedRef containment, matching M2 mayPrincipalAct).
+ * required subject ref (exact TypedRef containment, matching M2 mayPrincipalAct).
  * An approval counts only when its approver holds a live authorize grant that
- * covers the same envelope scope (and matches required_party when set).
+ * covers the same required scope (and matches required_party when set).
+ *
+ * C3 round 3 (AN-7R): the decision/envelope scope is not authority by itself —
+ * it must cover the deterministically required subject set, and grants are
+ * checked against that required set (not against an issuer-chosen subset).
  */
 import type { AssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityEnvelope, Approval, ApprovalRevocation, AuthorityDecision } from '../../contracts/v2/authority/authorityEnvelope.ts';
@@ -30,6 +34,7 @@ export type AuthorizeDenialReason =
   | 'GRANT_EXPIRED'
   | 'GRANT_REVOKED'
   | 'GRANT_SCOPE_INSUFFICIENT'
+  | 'DECISION_SCOPE_INSUFFICIENT'
   | 'APPROVER_UNAUTHORIZED'
   | 'APPROVER_PARTY_MISMATCH'
   | 'AMOUNT_CEILING_EXCEEDED'
@@ -56,10 +61,15 @@ export function descriptiveRoleIsNotAuthority(): true {
 }
 
 /** Exact TypedRef containment — same semantics as M2 `mayPrincipalAct` scope match. */
-export function grantCoversEnvelopeScopes(grant: AuthorityGrant, envelopeScopes: readonly TypedRef[]): boolean {
-  if (envelopeScopes.length === 0) return false;
-  return envelopeScopes.every((scope) =>
-    grant.scopes.some((gs) => gs.kind === scope.kind && gs.id === scope.id),
+export function grantCoversEnvelopeScopes(grant: AuthorityGrant, requiredScopes: readonly TypedRef[]): boolean {
+  return scopeCoversRequired(grant.scopes, requiredScopes);
+}
+
+/** True iff every required ref appears in covering by exact kind+id. */
+export function scopeCoversRequired(covering: readonly TypedRef[], required: readonly TypedRef[]): boolean {
+  if (required.length === 0) return false;
+  return required.every((need) =>
+    covering.some((have) => have.kind === need.kind && have.id === need.id),
   );
 }
 
@@ -82,14 +92,16 @@ function liveActionGrants(
   );
 }
 
-/** Approver must hold a live authorize grant covering envelope scope (+ required party). */
+/** Approver must hold a live authorize grant covering the required subject scope (+ required party). */
 export function evaluateApproverAuthority(params: {
   approval: Approval;
   requirement: AuthorityDecision['requirements'][number];
-  envelopeScopes: readonly TypedRef[];
+  /** Deterministic required subjects — not the issuer-chosen envelope alone. */
+  requiredAuthorityScopes: readonly TypedRef[];
   grants: readonly AuthorityGrant[];
   now: Instant;
 }): AuthorizeResult | null {
+  const required = params.requiredAuthorityScopes;
   const live = liveActionGrants(params.grants, params.approval.approverPrincipalId, AUTHORIZE_ACTION_KIND, params.now);
   if (live.length === 0) {
     const matching = params.grants.filter((g) =>
@@ -105,12 +117,12 @@ export function evaluateApproverAuthority(params: {
       detail: `approver ${params.approval.approverPrincipalId} lacks ${AUTHORIZE_ACTION_KIND}`,
     };
   }
-  const covering = live.filter((g) => grantCoversEnvelopeScopes(g, params.envelopeScopes));
+  const covering = live.filter((g) => grantCoversEnvelopeScopes(g, required));
   if (covering.length === 0) {
     return {
       allowed: false,
       reason: 'APPROVER_UNAUTHORIZED',
-      detail: `approver ${params.approval.approverPrincipalId} authorize grant does not cover envelope scope`,
+      detail: `approver ${params.approval.approverPrincipalId} authorize grant does not cover required scope`,
     };
   }
   const requiredParty = params.requirement.requiredPartyRef;
@@ -142,6 +154,11 @@ export function evaluateConsequentialAuthorization(params: {
   principalId: string;
   now: Instant;
   requestedAmount?: ExactMoney;
+  /**
+   * Deterministic subjects the intent acts on. Decision scope must cover these;
+   * dispatch/authorize grants must cover these (exact TypedRef).
+   */
+  requiredAuthorityScopes: readonly TypedRef[];
 }): AuthorizeResult {
   const principalDenied = assertAuthenticatedPrincipal(params.principalId);
   if (principalDenied) return principalDenied;
@@ -159,6 +176,14 @@ export function evaluateConsequentialAuthorization(params: {
     return { allowed: false, reason: 'GRANT_EXPIRED', detail: 'envelope expired' };
   }
 
+  if (!scopeCoversRequired(params.envelope.scope, params.requiredAuthorityScopes)) {
+    return {
+      allowed: false,
+      reason: 'DECISION_SCOPE_INSUFFICIENT',
+      detail: 'decision/envelope scope does not cover required authority subjects',
+    };
+  }
+
   const liveDispatch = liveActionGrants(params.grants, params.principalId, params.requiredActionKind, params.now);
   if (liveDispatch.length === 0) {
     const matching = params.grants.filter((g) =>
@@ -174,12 +199,12 @@ export function evaluateConsequentialAuthorization(params: {
       detail: params.requiredActionKind,
     };
   }
-  const scopedDispatch = liveDispatch.filter((g) => grantCoversEnvelopeScopes(g, params.envelope.scope));
+  const scopedDispatch = liveDispatch.filter((g) => grantCoversEnvelopeScopes(g, params.requiredAuthorityScopes));
   if (scopedDispatch.length === 0) {
     return {
       allowed: false,
       reason: 'GRANT_SCOPE_INSUFFICIENT',
-      detail: `${params.requiredActionKind} grant does not cover envelope scope`,
+      detail: `${params.requiredActionKind} grant does not cover required scope`,
     };
   }
 
@@ -199,7 +224,7 @@ export function evaluateConsequentialAuthorization(params: {
     const approverDenied = evaluateApproverAuthority({
       approval,
       requirement,
-      envelopeScopes: params.envelope.scope,
+      requiredAuthorityScopes: params.requiredAuthorityScopes,
       grants: params.grants,
       now: params.now,
     });

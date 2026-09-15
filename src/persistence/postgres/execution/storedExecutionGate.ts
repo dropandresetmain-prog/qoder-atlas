@@ -21,6 +21,7 @@ import {
   AUTHORIZE_ACTION_KIND,
   DISPATCH_ACTION_KIND,
   evaluateConsequentialAuthorization,
+  scopeCoversRequired,
   type AuthorizeResult,
 } from '../../../resolution/authority/authorize.ts';
 import { currentAssessmentView, type AssessmentView } from '../world/pgAssessments.ts';
@@ -314,6 +315,57 @@ async function resolveAssessableSubjects(db: Queryable, workspaceId: string, see
   return [...resolved.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
 }
 
+/**
+ * Deterministic authority subjects for an intent: stored subject_refs ∪
+ * JOURNEY/TRIP subjects resolved from strategy affected/candidate data.
+ * No caller or decision-issuer input.
+ */
+export function requiredAuthorityScope(
+  intentSubjectRefs: readonly TypedRef[],
+  resolvedAssessableSubjects: readonly TypedRef[],
+): TypedRef[] {
+  const map = new Map<string, TypedRef>();
+  for (const ref of [...intentSubjectRefs, ...resolvedAssessableSubjects]) {
+    map.set(`${ref.kind}:${ref.id}`, ref);
+  }
+  return [...map.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+}
+
+async function loadStrategySubjectSeeds(
+  db: Queryable, workspaceId: string, strategy: { strategyId: string; scenarioChangeId: string; candidateSummaries: unknown },
+): Promise<TypedRef[]> {
+  const affected = await db.query<{ affected_subjects: unknown }>(
+    `SELECT affected_subjects FROM strategy_changes
+      WHERE workspace_id = $1 AND recovery_strategy_id = $2 AND scenario_change_id = $3`,
+    [workspaceId, strategy.strategyId, strategy.scenarioChangeId],
+  );
+  const seeds = affected.rows.flatMap((row) => parseJsonArray<TypedRef>(row.affected_subjects));
+  for (const summary of parseJsonArray<{ subjectRef?: unknown }>(strategy.candidateSummaries)) {
+    const ref = subjectRef(summary.subjectRef);
+    if (ref) seeds.push(ref);
+  }
+  return seeds;
+}
+
+/** Load the deterministic required authority scope for a stored intent (AN-7R). */
+export async function loadRequiredAuthorityScope(
+  pool: Pool | PoolClient,
+  workspaceId: string,
+  intentId: string,
+): Promise<TypedRef[] | ExecutionGateDenial> {
+  const intent = await loadStoredIntent(pool, workspaceId, intentId);
+  if (!intent) return { allowed: false, reason: 'INTENT_MISSING' };
+  const strategy = await loadStrategyForPlan(pool, workspaceId, intent.actionPlanId);
+  if ('allowed' in strategy) return strategy;
+  const seeds = await loadStrategySubjectSeeds(pool, workspaceId, strategy);
+  const assessable = await resolveAssessableSubjects(pool, workspaceId, seeds);
+  const required = requiredAuthorityScope(intent.subjectRefs, assessable);
+  if (required.length === 0) {
+    return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED', detail: 'required authority scope is empty' };
+  }
+  return required;
+}
+
 async function requireAllAssessmentsCurrent(
   pool: Pool | PoolClient, workspaceId: string, subjects: TypedRef[], now: Instant,
 ): Promise<AssessmentView | ExecutionGateDenial> {
@@ -422,6 +474,19 @@ export async function evaluateStoredExecutionGate(
   const assessmentView = await requireAllAssessmentsCurrent(pool, params.workspaceId, subjects, params.now);
   if ('allowed' in assessmentView && assessmentView.allowed === false) return assessmentView;
 
+  const requiredScopes = requiredAuthorityScope(intent.subjectRefs, subjects);
+  if (requiredScopes.length === 0) {
+    return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED', detail: 'required authority scope is empty' };
+  }
+  const decisionScope = parseJsonArray<TypedRef>(decisionMeta.scope);
+  if (!scopeCoversRequired(decisionScope, requiredScopes)) {
+    return {
+      allowed: false,
+      reason: 'DECISION_SCOPE_INSUFFICIENT',
+      detail: 'decision scope does not cover required authority subjects',
+    };
+  }
+
   const principalIds = new Set([params.principalId, ...bundle.approvals.map((approval) => approval.approverPrincipalId)]);
   const grants = (await Promise.all(
     [...principalIds].sort().map((principalId) => loadGrantsForPrincipal(pool, params.workspaceId, principalId, params.now)),
@@ -432,6 +497,7 @@ export async function evaluateStoredExecutionGate(
     assessmentView: assessmentView as AssessmentView, envelopeInput, envelope: bundle.envelope,
     decision: bundle.decision, approvals: bundle.approvals, revocations: bundle.revocations,
     grants, requiredActionKind: DISPATCH_ACTION_KIND, principalId: params.principalId, now: params.now,
+    requiredAuthorityScopes: requiredScopes,
     ...(requestedAmount ? { requestedAmount } : {}),
   });
   if (!auth.allowed) return { allowed: false, reason: auth.reason, detail: auth.detail };

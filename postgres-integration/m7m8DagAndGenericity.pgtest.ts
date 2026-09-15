@@ -57,7 +57,14 @@ import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessm
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ActionIntent } from '../src/contracts/v2/action/actionPlan.ts';
-import { persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
+import {
+  loadRequiredAuthorityScopesOrFail,
+  persistStrategyChangeRow,
+  prepareParams,
+  seedStoredExecutionAuthority,
+  tripBaseManifest,
+  unionTypedRefs,
+} from './m8ExecutionGateHelpers.ts';
 import { seedReservation, seedReservationLine, seedResource } from './m3Seed.ts';
 
 after(async () => {
@@ -167,9 +174,11 @@ async function runViableScenarioToAuthorizedDispatch(params: {
   }));
   assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
+  const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(params.pool, params.workspaceId, compiledIntent.id);
+  const decisionScope = unionTypedRefs(params.scope, requiredAuthorityScopes);
   const envelopeInput: EnvelopeFingerprintInput = {
     actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-    requiredActorRoles: ['CASE_OWNER'], scope: params.scope, grantRefs: [], ruleInputs: [],
+    requiredActorRoles: ['CASE_OWNER'], scope: decisionScope, grantRefs: [], ruleInputs: [],
   };
   const fingerprint = computeEnvelopeFingerprint(envelopeInput);
   const decision = mustOk(await issueAuthorityDecision(uow(), {
@@ -179,12 +188,12 @@ async function runViableScenarioToAuthorizedDispatch(params: {
   await issueApproverGrant(uow(), {
     workspaceId: params.workspaceId, actorId: params.actorId, principalId: params.principalId,
     representedPartyRef: { kind: 'TRAVELLER', id: params.travellerId },
-    scopes: envelopeInput.scope,
+    scopes: decisionScope,
   });
   const approval = mustOk(await recordApproval(uow(), {
     workspaceId: params.workspaceId, actorPrincipalId: params.principalId, idempotencyKey: randomUUID(),
     decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
-    envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+    envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
   }));
   const decisionObj: AuthorityDecision = {
     id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
@@ -208,6 +217,7 @@ async function runViableScenarioToAuthorizedDispatch(params: {
     assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
     approvals: [approvalObj], revocations: [], grants: [grant], requiredActionKind: 'action.intent.dispatch',
     principalId: params.principalId, now: NOW,
+    requiredAuthorityScopes,
   });
   assert.equal(allowed.allowed, true);
 
@@ -349,7 +359,8 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
 
     // --- Authorize + prepare the UPSTREAM (allocation) intent, and leave its
     // execution_attempts row at PREPARED (never claimed/dispatched/observed). ---
-    const upstreamScope: TypedRef[] = [{ kind: 'RESERVATION_LINE', id: reservationLineId }];
+    const upstreamRequired = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, allocIntent.id);
+    const upstreamScope = unionTypedRefs([{ kind: 'RESERVATION_LINE', id: reservationLineId }], upstreamRequired);
     const upstreamEnvelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: allocIntent.id, actionIntentVersion: 1,
       requiredActorRoles: ['CASE_OWNER'], scope: upstreamScope, grantRefs: [], ruleInputs: [],
@@ -367,7 +378,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     const upstreamApproval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: upstreamDecision.decisionId, requirementId: upstreamDecision.requirementIds[0]!,
-      envelopeFingerprint: upstreamFingerprint, scope: upstreamEnvelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: upstreamFingerprint, scope: upstreamScope, approvedAt: NOW,
     }));
     const upstreamGrant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
@@ -391,6 +402,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       }],
       revocations: [], grants: [upstreamGrant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes: upstreamRequired,
     });
     assert.equal(upstreamAllowed.allowed, true);
 
@@ -428,7 +440,8 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     // upstream `allocIntent` attempt above is still PREPARED (never
     // claimed/dispatched/observed), so the downstream (programme) intent's
     // prepared execution attempt must be rejected here.
-    const downstreamScope: TypedRef[] = [{ kind: 'PROGRAMME_ITEM', id: programmeItemId }];
+    const downstreamRequired = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, programmeIntent.id);
+    const downstreamScope = unionTypedRefs([{ kind: 'PROGRAMME_ITEM', id: programmeItemId }], downstreamRequired);
     const downstreamEnvelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: programmeIntent.id, actionIntentVersion: 1,
       requiredActorRoles: ['CASE_OWNER'], scope: downstreamScope, grantRefs: [], ruleInputs: [],
@@ -446,7 +459,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     const downstreamApproval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: downstreamDecision.decisionId, requirementId: downstreamDecision.requirementIds[0]!,
-      envelopeFingerprint: downstreamFingerprint, scope: downstreamEnvelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: downstreamFingerprint, scope: downstreamScope, approvedAt: NOW,
     }));
     const downstreamGrant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
@@ -470,6 +483,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       }],
       revocations: [], grants: [downstreamGrant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes: downstreamRequired,
     });
     // Authority itself is satisfied (this is not an authority-scope test) —
     // the only question is whether the DAG edge blocks preparation.

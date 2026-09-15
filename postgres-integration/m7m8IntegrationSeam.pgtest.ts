@@ -58,10 +58,12 @@ import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/cont
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import {
+  loadRequiredAuthorityScopesOrFail,
   prepareParams,
   persistStrategyChangeRow,
   seedStoredExecutionAuthority,
   tripBaseManifest,
+  unionTypedRefs,
 } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
@@ -242,9 +244,11 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
 
     // --- The objective-loss disposition is NOT effective merely because M7
     // proposed it — M8 authority is required before it can be accepted. ---
+    const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, compiledIntent.id);
+    const decisionScope = unionTypedRefs([{ kind: 'OBJECTIVE', id: objectiveId }], requiredAuthorityScopes);
     const envelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActorRoles: ['CASE_OWNER'], scope: [{ kind: 'OBJECTIVE', id: objectiveId }], grantRefs: [], ruleInputs: [],
+      requiredActorRoles: ['CASE_OWNER'], scope: decisionScope, grantRefs: [], ruleInputs: [],
     };
     const fingerprint = computeEnvelopeFingerprint(envelopeInput);
     const decision = mustOk(await issueAuthorityDecision(uow(), {
@@ -257,13 +261,13 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     };
     const envelope: AuthorityEnvelope = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: envelopeInput.scope,
+      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: decisionScope,
       grantRefs: [], ruleInputs: [], issuedAt: NOW, fingerprint,
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       issuedByPrincipalId: principalId, issuedAt: NOW,
-      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: decisionScope,
     };
 
     // No approval yet: dispatch must be denied.
@@ -271,6 +275,7 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
       approvals: [], revocations: [], grants: [grant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes,
     });
     assert.equal(deniedNoApproval.allowed, false);
     if (!deniedNoApproval.allowed) assert.equal(deniedNoApproval.reason, 'APPROVALS_INCOMPLETE');
@@ -278,21 +283,22 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      scopes: envelopeInput.scope,
+      scopes: decisionScope,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     }));
     const approvalObj: Approval = {
       id: approval.approvalId, requirementId: decision.requirementIds[0]!, approverPrincipalId: principalId,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     };
     const allowed = authorizeDispatch({
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
       approvals: [approvalObj], revocations: [], grants: [grant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes,
     });
     assert.equal(allowed.allowed, true);
 
@@ -410,9 +416,11 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
     // --- M8 authority ---
+    const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, compiledIntent.id);
+    const decisionScope = unionTypedRefs([{ kind: 'PROGRAMME_ITEM', id: programmeItemId }], requiredAuthorityScopes);
     const envelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActorRoles: ['CASE_OWNER'], scope: [{ kind: 'PROGRAMME_ITEM', id: programmeItemId }], grantRefs: [], ruleInputs: [],
+      requiredActorRoles: ['CASE_OWNER'], scope: decisionScope, grantRefs: [], ruleInputs: [],
     };
     const fingerprint = computeEnvelopeFingerprint(envelopeInput);
     const decision = mustOk(await issueAuthorityDecision(uow(), {
@@ -422,12 +430,12 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      scopes: envelopeInput.scope,
+      scopes: decisionScope,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     }));
     const decisionObj: AuthorityDecision = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
@@ -435,22 +443,23 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     };
     const approvalObj: Approval = {
       id: approval.approvalId, requirementId: decision.requirementIds[0]!, approverPrincipalId: principalId,
-      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: NOW,
+      envelopeFingerprint: fingerprint, scope: decisionScope, approvedAt: NOW,
     };
     const envelope: AuthorityEnvelope = {
       id: decision.decisionId, actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: envelopeInput.scope,
+      requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'CASE_OWNER' }], scope: decisionScope,
       grantRefs: [], ruleInputs: [], issuedAt: NOW, fingerprint,
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       issuedByPrincipalId: principalId, issuedAt: NOW,
-      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: decisionScope,
     };
     const authorization: DispatchAuthorizationInput = {
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
       approvals: [approvalObj], revocations: [], grants: [grant], requiredActionKind: 'action.intent.dispatch',
       principalId, now: NOW,
+      requiredAuthorityScopes,
     };
     const preAuth = authorizeDispatch(authorization);
     assert.equal(preAuth.allowed, true);

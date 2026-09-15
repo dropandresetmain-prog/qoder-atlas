@@ -25,7 +25,7 @@ import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../../../resolution/authority/envelope.ts';
 import { admitBudgetHold } from '../../../resolution/budget/protect.ts';
 import { canTransitionExecutionStatus, type DurableExecutionStatus } from '../../../resolution/execution/stateMachine.ts';
-import { evaluateApproverAuthority, evaluateConsequentialAuthorization } from '../../../resolution/authority/authorize.ts';
+import { evaluateApproverAuthority, evaluateConsequentialAuthorization, scopeCoversRequired } from '../../../resolution/authority/authorize.ts';
 import type { AssessmentView } from '../world/pgAssessments.ts';
 import type { AuthorityEnvelope, Approval, ApprovalRevocation, AuthorityDecision } from '../../../contracts/v2/authority/authorityEnvelope.ts';
 import type { AuthorityGrant } from '../../../domain/v2/people/traveller.ts';
@@ -34,6 +34,7 @@ import {
   evaluateStoredExecutionGate,
   findBlockingAttempt,
   findKnownSuccessAttempt,
+  loadRequiredAuthorityScope,
 } from '../execution/storedExecutionGate.ts';
 import type { Pool } from '../pool.ts';
 
@@ -224,6 +225,23 @@ export async function issueAuthorityDecision(
     body: async () => {
       const client = currentTransactionClient();
       const input = params.envelopeInput;
+      const required = await loadRequiredAuthorityScope(client, params.workspaceId, input.actionIntentId);
+      if ('allowed' in required && required.allowed === false) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', `${required.reason}${required.detail ? `: ${required.detail}` : ''}`, [decisionRef]),
+        };
+      }
+      if (!scopeCoversRequired(input.scope, required as TypedRef[])) {
+        return {
+          ok: false,
+          conflict: typedConflict(
+            'VALIDATION_FAILED',
+            'DECISION_SCOPE_INSUFFICIENT: decision scope does not cover required authority subjects',
+            [decisionRef],
+          ),
+        };
+      }
       await createRoot({ workspaceId: params.workspaceId, id: decisionId, kind: 'AUTHORITY_DECISION' });
       await client.query(
         `INSERT INTO authority_decisions (
@@ -291,13 +309,34 @@ export async function recordApproval(
           conflict: typedConflict('VALIDATION_FAILED', 'approval requirement missing', [decisionRef]),
         };
       }
-      const decisionScope = await client.query<{ scope: unknown }>(
-        `SELECT scope FROM authority_decisions WHERE workspace_id = $1 AND id = $2`,
+      const decisionRow = await client.query<{ scope: unknown; action_intent_id: string }>(
+        `SELECT scope, action_intent_id FROM authority_decisions WHERE workspace_id = $1 AND id = $2`,
         [params.workspaceId, params.decisionId],
       );
-      const envelopeScopes = Array.isArray(decisionScope.rows[0]?.scope)
-        ? decisionScope.rows[0]!.scope as TypedRef[]
+      const envelopeScopes = Array.isArray(decisionRow.rows[0]?.scope)
+        ? decisionRow.rows[0]!.scope as TypedRef[]
         : [];
+      const intentId = decisionRow.rows[0]?.action_intent_id;
+      if (!intentId) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', 'authority decision missing action intent', [decisionRef]),
+        };
+      }
+      const required = await loadRequiredAuthorityScope(client, params.workspaceId, intentId);
+      if ('allowed' in required && required.allowed === false) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', `${required.reason}${required.detail ? `: ${required.detail}` : ''}`, [decisionRef]),
+        };
+      }
+      const requiredAuthorityScopes = required as TypedRef[];
+      if (!scopeCoversRequired(envelopeScopes, requiredAuthorityScopes)) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', 'DECISION_SCOPE_INSUFFICIENT: decision scope does not cover required authority subjects', [decisionRef]),
+        };
+      }
       const grantRows = await client.query<{
         id: string;
         principal_id: string;
@@ -348,7 +387,7 @@ export async function recordApproval(
             ? { requiredPartyRef: { kind: req.required_party_kind as TypedRef['kind'], id: req.required_party_id } }
             : {}),
         },
-        envelopeScopes,
+        requiredAuthorityScopes,
         grants,
         now: params.approvedAt,
       });
@@ -627,6 +666,8 @@ export type DispatchAuthorizationInput = {
   principalId: string;
   now: string;
   requestedAmount?: ExactMoney;
+  /** Deterministic subjects the intent acts on (AN-7R). */
+  requiredAuthorityScopes: TypedRef[];
 };
 
 export function authorizeDispatch(input: DispatchAuthorizationInput) {

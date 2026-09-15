@@ -32,7 +32,15 @@ import { computeRequestFingerprint } from '../src/resolution/execution/stateMach
 import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ExactMoney } from '../src/domain/v2/shared/money.ts';
-import { GATE_NOW, persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
+import {
+  GATE_NOW,
+  loadRequiredAuthorityScopesOrFail,
+  persistStrategyChangeRow,
+  prepareParams,
+  seedStoredExecutionAuthority,
+  tripBaseManifest,
+  unionTypedRefs,
+} from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -276,13 +284,18 @@ async function seedAuthorizedDispatch(
   approvalObj: Approval;
   envelope: AuthorityEnvelope;
   grant: AuthorityGrant;
+  envelopeInput: EnvelopeFingerprintInput;
+  requiredAuthorityScopes: TypedRef[];
 }> {
-  const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+  const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(f.pool, f.seed.workspaceId, f.intentId);
+  const decisionScope = unionTypedRefs(envelopeInput.scope, requiredAuthorityScopes);
+  const expandedEnvelopeInput = { ...envelopeInput, scope: decisionScope };
+  const fingerprint = computeEnvelopeFingerprint(expandedEnvelopeInput);
   const decision = mustOk(await issueAuthorityDecision(f.uow(), {
     workspaceId: f.seed.workspaceId,
     actorPrincipalId: f.seed.actorId,
     idempotencyKey: randomUUID(),
-    envelopeInput,
+    envelopeInput: expandedEnvelopeInput,
     requirements: [{ actorRole: 'PAYER' }],
     issuedAt: NOW,
   }));
@@ -291,7 +304,7 @@ async function seedAuthorizedDispatch(
     actorId: f.seed.actorId,
     principalId: f.principalId,
     representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-    scopes: envelopeInput.scope,
+    scopes: decisionScope,
   });
   const approval = mustOk(await recordApproval(f.uow(), {
     workspaceId: f.seed.workspaceId,
@@ -300,7 +313,7 @@ async function seedAuthorizedDispatch(
     decisionId: decision.decisionId,
     requirementId: decision.requirementIds[0]!,
     envelopeFingerprint: fingerprint,
-    scope: envelopeInput.scope,
+    scope: decisionScope,
     approvedAt: NOW,
   }));
   const decisionObj: AuthorityDecision = {
@@ -317,7 +330,7 @@ async function seedAuthorizedDispatch(
     requirementId: decision.requirementIds[0]!,
     approverPrincipalId: f.principalId,
     envelopeFingerprint: fingerprint,
-    scope: envelopeInput.scope,
+    scope: decisionScope,
     approvedAt: NOW,
   };
   const envelope: AuthorityEnvelope = {
@@ -327,14 +340,22 @@ async function seedAuthorizedDispatch(
     actionIntentId: f.intentId,
     actionIntentVersion: 1,
     requiredActors: [{ id: decision.requirementIds[0]!, actorRole: 'PAYER' }],
-    scope: envelopeInput.scope,
+    scope: decisionScope,
     grantRefs: [],
     ruleInputs: [],
     issuedAt: NOW,
     fingerprint,
   };
-  const grant = baseGrant(f, envelopeInput.scope);
-  return { fingerprint, decisionObj, approvalObj, envelope, grant };
+  const grant = baseGrant(f, decisionScope);
+  return {
+    fingerprint,
+    decisionObj,
+    approvalObj,
+    envelope,
+    grant,
+    envelopeInput: expandedEnvelopeInput,
+    requiredAuthorityScopes,
+  };
 }
 
 function dispatchAuthInput(
@@ -345,6 +366,7 @@ function dispatchAuthInput(
     decisionObj: AuthorityDecision;
     approvalObj: Approval;
     grant: AuthorityGrant;
+    requiredAuthorityScopes: TypedRef[];
   },
   now: string,
   overrides?: Partial<DispatchAuthorizationInput>,
@@ -361,6 +383,7 @@ function dispatchAuthInput(
     principalId: f.principalId,
     now,
     requestedAmount: { amount: '40.00', currency: 'USD' },
+    requiredAuthorityScopes: pieces.requiredAuthorityScopes,
     ...overrides,
   };
 }
@@ -560,13 +583,15 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
 describe('M8 approval fingerprint binding', () => {
   test('revoke and fingerprint mismatch deny authorizeDispatch', async () => {
     const f = await baseFixture();
+    const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(f.pool, f.seed.workspaceId, f.intentId);
+    const decisionScope = unionTypedRefs([{ kind: 'ACTION_INTENT' as const, id: f.intentId }], requiredAuthorityScopes);
     const envelopeInput = {
       actionPlanId: f.planId,
       actionPlanVersion: 1,
       actionIntentId: f.intentId,
       actionIntentVersion: 1,
       requiredActorRoles: ['PAYER'],
-      scope: [{ kind: 'ACTION_INTENT' as const, id: f.intentId }],
+      scope: decisionScope,
       grantRefs: [],
       ruleInputs: [],
       amountCeiling: { amount: '40.00', currency: 'USD' as const },
@@ -585,7 +610,7 @@ describe('M8 approval fingerprint binding', () => {
       actorId: f.seed.actorId,
       principalId: f.principalId,
       representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      scopes: envelopeInput.scope,
+      scopes: decisionScope,
     });
     const approval = mustOk(await recordApproval(f.uow(), {
       workspaceId: f.seed.workspaceId,
@@ -594,7 +619,7 @@ describe('M8 approval fingerprint binding', () => {
       decisionId: decision.decisionId,
       requirementId: decision.requirementIds[0]!,
       envelopeFingerprint: fingerprint,
-      scope: envelopeInput.scope,
+      scope: decisionScope,
       approvedAt: NOW,
     }));
 
@@ -671,6 +696,7 @@ describe('M8 approval fingerprint binding', () => {
       principalId: f.principalId,
       now: NOW,
       requestedAmount: { amount: '40.00', currency: 'USD' },
+      requiredAuthorityScopes,
     });
     assert.equal(ok.allowed, true);
 
@@ -692,6 +718,7 @@ describe('M8 approval fingerprint binding', () => {
       requiredActionKind: 'action.intent.dispatch',
       principalId: f.principalId,
       now: '2031-07-01T01:01:00.000Z',
+      requiredAuthorityScopes,
     });
     assert.equal(revoked.allowed, false);
 
@@ -706,6 +733,7 @@ describe('M8 approval fingerprint binding', () => {
       requiredActionKind: 'action.intent.dispatch',
       principalId: f.principalId,
       now: NOW,
+      requiredAuthorityScopes,
     });
     assert.equal(mismatched.allowed, false);
     if (!mismatched.allowed) assert.equal(mismatched.reason, 'ENVELOPE_MISMATCH');
@@ -717,10 +745,10 @@ describe('M8 authority grant lifecycle', () => {
     const f = await baseFixture();
     const envelopeInput = defaultEnvelopeInput(f);
     const auth = await seedAuthorizedDispatch(f, envelopeInput);
-    const expiredGrant = baseGrant(f, envelopeInput.scope, {
+    const expiredGrant = baseGrant(f, auth.envelopeInput.scope, {
       expiresAt: '2031-06-30T00:00:00.000Z',
     });
-    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, envelopeInput, grant: expiredGrant }, '2031-07-01T00:00:00.000Z'));
+    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, grant: expiredGrant }, '2031-07-01T00:00:00.000Z'));
     assert.equal(denied.allowed, false);
     if (!denied.allowed) assert.equal(denied.reason, 'GRANT_EXPIRED');
   });
@@ -732,7 +760,6 @@ describe('M8 authority grant lifecycle', () => {
     const expiredEnvelope: AuthorityEnvelope = { ...auth.envelope, expiresAt: '2031-06-30T00:00:00.000Z' };
     const denied = authorizeDispatch(dispatchAuthInput(f, {
       ...auth,
-      envelopeInput,
       envelope: expiredEnvelope,
     }, '2031-07-01T00:00:00.000Z'));
     assert.equal(denied.allowed, false);
@@ -743,10 +770,10 @@ describe('M8 authority grant lifecycle', () => {
     const f = await baseFixture();
     const envelopeInput = defaultEnvelopeInput(f);
     const auth = await seedAuthorizedDispatch(f, envelopeInput);
-    const revokedGrant = baseGrant(f, envelopeInput.scope, {
+    const revokedGrant = baseGrant(f, auth.envelopeInput.scope, {
       revokedAt: '2031-07-01T00:30:00.000Z',
     });
-    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, envelopeInput, grant: revokedGrant }, '2031-07-01T01:00:00.000Z'));
+    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, grant: revokedGrant }, '2031-07-01T01:00:00.000Z'));
     assert.equal(denied.allowed, false);
     if (!denied.allowed) assert.equal(denied.reason, 'GRANT_REVOKED');
   });
@@ -757,7 +784,7 @@ describe('M8 amount ceiling and quote protection', () => {
     const f = await baseFixture();
     const envelopeInput = defaultEnvelopeInput(f);
     const auth = await seedAuthorizedDispatch(f, envelopeInput);
-    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, envelopeInput }, NOW, {
+    const denied = authorizeDispatch(dispatchAuthInput(f, auth, NOW, {
       requestedAmount: { amount: '50.00', currency: 'USD' },
     }));
     assert.equal(denied.allowed, false);
@@ -803,7 +830,7 @@ describe('M8 assessment gate at dispatch', () => {
         currentRevision: 2,
       }],
     };
-    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, envelopeInput }, NOW, { assessmentView: staleView }));
+    const denied = authorizeDispatch(dispatchAuthInput(f, auth, NOW, { assessmentView: staleView }));
     assert.equal(denied.allowed, false);
     if (!denied.allowed) assert.equal(denied.reason, 'ASSESSMENT_NOT_CURRENT');
   });
@@ -817,7 +844,7 @@ describe('M8 assessment gate at dispatch', () => {
       assessment: undefined,
       staleness: [],
     };
-    const denied = authorizeDispatch(dispatchAuthInput(f, { ...auth, envelopeInput }, NOW, { assessmentView: pendingView }));
+    const denied = authorizeDispatch(dispatchAuthInput(f, auth, NOW, { assessmentView: pendingView }));
     assert.equal(denied.allowed, false);
     if (!denied.allowed) assert.equal(denied.reason, 'ASSESSMENT_NOT_CURRENT');
   });

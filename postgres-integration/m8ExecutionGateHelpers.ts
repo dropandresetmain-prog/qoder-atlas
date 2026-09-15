@@ -11,6 +11,7 @@ import {
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../src/resolution/authority/envelope.ts';
+import { loadRequiredAuthorityScope } from '../src/persistence/postgres/execution/storedExecutionGate.ts';
 import { saveAssessment } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AssessmentResult } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
@@ -19,6 +20,29 @@ import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.
 import assert from 'node:assert/strict';
 
 export const GATE_NOW = '2031-07-01T00:00:00.000Z';
+
+/** Unique union of TypedRefs, sorted for stable fingerprints. */
+export function unionTypedRefs(...sets: readonly TypedRef[][]): TypedRef[] {
+  const map = new Map<string, TypedRef>();
+  for (const set of sets) {
+    for (const ref of set) {
+      map.set(`${ref.kind}:${ref.id}`, ref);
+    }
+  }
+  return [...map.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+}
+
+export async function loadRequiredAuthorityScopesOrFail(
+  pool: Pool,
+  workspaceId: string,
+  intentId: string,
+): Promise<TypedRef[]> {
+  const required = await loadRequiredAuthorityScope(pool, workspaceId, intentId);
+  if (!Array.isArray(required)) {
+    assert.fail(`loadRequiredAuthorityScope denied: ${required.reason}${required.detail ? `: ${required.detail}` : ''}`);
+  }
+  return required;
+}
 
 export function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
@@ -123,7 +147,9 @@ export async function seedStoredExecutionAuthority(opts: {
 }): Promise<{ fingerprint: string; grantId: string | undefined }> {
   const now = opts.now ?? GATE_NOW;
   const requirementRole = opts.requirementRole ?? 'PAYER';
-  const grantScopes = opts.grantScopes ?? opts.scope;
+  const requiredAuthorityScopes = await loadRequiredAuthorityScopesOrFail(opts.pool, opts.workspaceId, opts.intentId);
+  const decisionScope = unionTypedRefs(opts.scope, requiredAuthorityScopes);
+  const grantScopes = opts.grantScopes ?? decisionScope;
   const approverPrincipalId = opts.approverPrincipalId ?? opts.principalId;
   const uow = () => new PgUnitOfWork(opts.pool, opts.workspaceId);
   if (opts.assessmentSubject) {
@@ -154,7 +180,7 @@ export async function seedStoredExecutionAuthority(opts: {
     ...defaultEnvelopeInput({
       planId: opts.planId,
       intentId: opts.intentId,
-      scope: opts.scope,
+      scope: decisionScope,
       ...(cost ? { amountCeiling: cost } : {}),
       planVersion: ir.plan_version ?? opts.planVersion ?? 1,
       requiredActorRoles: [requirementRole],
@@ -226,7 +252,7 @@ export async function seedStoredExecutionAuthority(opts: {
     decisionId: row.id,
     requirementId: row.requirement_ids[0]!,
     envelopeFingerprint: fingerprint,
-    scope: opts.scope,
+    scope: decisionScope,
     approvedAt: now,
   }));
   if (opts.cost && opts.budgetId) {
