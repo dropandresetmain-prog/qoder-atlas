@@ -17,7 +17,7 @@ import type {
   RecoveryCaseFacts,
   TravellerTripFacts,
 } from './types.ts';
-import { mapConnectionProgression } from './mapConnectionProgression.ts';
+import { mapConnectionProgression, deriveConnectionViabilityFromEvaluator, type ConnectionViabilityHint } from './mapConnectionProgression.ts';
 import {
   evaluateSharedDisruptionCohort,
   type CohortTravellerEvaluationInput,
@@ -274,6 +274,11 @@ export async function loadRecoveryCaseFacts(
   // PENDING_REASSESSMENT / UNAVAILABLE / NONE all read as UNKNOWN with an
   // explicit staleness note (see M9 C4 current-assessment finding).
   const subjectTones: AssessmentTone[] = [];
+  // M9 3A: derive connection viability from the real m6.connection dimension
+  // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
+  // case subjects — one broken connection is enough to flag the case.
+  const CONNECTION_SEVERITY: Record<ConnectionViabilityHint, number> = { VIABLE: 0, UNKNOWN: 1, TIGHT: 2, IMPOSSIBLE: 3 };
+  let connectionViability: ConnectionViabilityHint | undefined;
   for (const s of subjects.rows) {
     const view = await currentAssessmentView(
       pool,
@@ -288,6 +293,16 @@ export async function loadRecoveryCaseFacts(
       subjectTones.push(tone);
       if (tone === 'UNKNOWN') {
         uncertainty.push(`${s.subject_kind}:${s.subject_id} current assessment verdict ${verdict}`);
+      }
+      const connectionDim = view.assessment.dimensions.find((d) => d.dimension === 'connection_feasibility' && d.applicable);
+      if (connectionDim) {
+        const derived = deriveConnectionViabilityFromEvaluator({
+          verdict: connectionDim.verdict as 'PASS' | 'FAIL' | 'UNKNOWN',
+          reasonCode: connectionDim.explanations[0]?.reasonCode ?? '',
+        });
+        if (!connectionViability || CONNECTION_SEVERITY[derived] > CONNECTION_SEVERITY[connectionViability]) {
+          connectionViability = derived;
+        }
       }
     } else {
       subjectTones.push('UNKNOWN');
@@ -305,6 +320,7 @@ export async function loadRecoveryCaseFacts(
     partialRecoveryIncomplete: partialIncomplete && row.lifecycle_status === 'EXECUTING',
     allMandatoryActionsComplete: recoveryActions.length > 0 && !partialIncomplete,
     wholeTripPass: tripVerdict === 'PASS' && !partialIncomplete,
+    ...(connectionViability ? { viability: connectionViability } : {}),
   });
 
   const status = (['OPEN', 'PLANNING', 'AWAITING_AUTHORITY', 'EXECUTING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED'] as const)
