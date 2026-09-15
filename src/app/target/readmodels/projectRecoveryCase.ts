@@ -4,6 +4,13 @@ import {
 } from '../../../contracts/v2/product/readModels.ts';
 import { buildChangeAwareness } from './changeAwareness.ts';
 import { projectLiveDependencyGraph } from './liveDependencyGraph.ts';
+import {
+  deriveDuplicateBookingExposure,
+  derivePartialRecovery,
+  deriveRemainingRecoveryWork,
+  projectRecoveryAction,
+  sumAggregateRecoveryCost,
+} from './recoveryActionProjection.ts';
 import type { RecoveryCaseFacts } from './types.ts';
 
 export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView {
@@ -11,6 +18,21 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     ...input,
     scope: 'FOCUSED_CASE',
   });
+  const actions = input.recoveryActions ?? [];
+  const recoveryActions = actions.map(projectRecoveryAction);
+  const partialRecovery = input.partialRecovery ?? (actions.length > 0 ? derivePartialRecovery(actions) : undefined);
+  const duplicateBookingExposure = input.duplicateBookingExposure
+    ?? (actions.length > 0 ? deriveDuplicateBookingExposure(actions) : []);
+  const remainingRecoveryWork = input.remainingRecoveryWork
+    ?? (actions.length > 0 ? deriveRemainingRecoveryWork(actions) : []);
+  const aggregateRecoveryCost = input.aggregateRecoveryCost ?? sumAggregateRecoveryCost(actions);
+
+  const uncertainty = [...(input.uncertainty ?? [])];
+  for (const exposure of duplicateBookingExposure) {
+    const note = exposure.detail ?? 'duplicate booking/cost exposure';
+    if (!uncertainty.includes(note)) uncertainty.push(note);
+  }
+
   return RecoveryCaseViewSchema.parse({
     generatedAt: input.generatedAt,
     caseRef: input.caseRef,
@@ -32,8 +54,14 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     authorityState: input.authorityState,
     executionState: input.executionState,
     reconciliationState: input.reconciliationState,
-    uncertainty: [...(input.uncertainty ?? [])],
+    uncertainty,
     ...(input.resolutionSummary ? { resolutionSummary: input.resolutionSummary } : {}),
+    ...(input.connectionProgression ? { connectionProgression: input.connectionProgression } : {}),
+    recoveryActions,
+    ...(aggregateRecoveryCost ? { aggregateRecoveryCost } : {}),
+    remainingRecoveryWork: [...remainingRecoveryWork],
+    ...(partialRecovery ? { partialRecovery } : {}),
+    duplicateBookingExposure: duplicateBookingExposure.map((e) => ({ ...e })),
     ldg,
     change: buildChangeAwareness(input),
   });

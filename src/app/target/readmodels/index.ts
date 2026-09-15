@@ -4,4 +4,5 @@ export * from './projectIncidentProgramme.ts';
 export * from './projectOperatorOverview.ts';
 export * from './projectRecoveryCase.ts';
 export * from './projectTravellerTrip.ts';
+export * from './recoveryActionProjection.ts';
 export * from './types.ts';

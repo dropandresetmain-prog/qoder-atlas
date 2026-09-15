@@ -22,11 +22,44 @@
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import type { Instant } from '../../../domain/v2/shared/time.ts';
 import type { CausalExplanation, EvidenceRef } from '../../../contracts/v2/assessment/explanation.ts';
-import type { CapturedWorld, WParticipation } from '../../world/world.ts';
+import type { CapturedWorld, WParticipation, WProgrammeItem } from '../../world/world.ts';
 import type { EffectiveItem, EffectiveJourney } from '../../world/effectiveTypes.ts';
 import type { DimensionResult, EvaluationContext, Evaluator, EvaluatorOutput } from '../evaluator.ts';
 import { addMinutes, dimension, earliestAfter, explain, notApplicable } from '../explain.ts';
-import { reachPlaceBy, transferMinutes } from '../reachability.ts';
+import { reachPlaceBy, transferMinutes, constraintsFor } from '../reachability.ts';
+import { operandNumber } from '../constraintTypes.ts';
+import {
+  evaluateProgrammeArrivalReadiness,
+  PROGRAMME_ARRIVAL_READINESS_CONSTRAINT,
+  readinessMinutesFromOperatingRequirements,
+  requiresPhysicalPresenceFromOperatingRequirements,
+} from '../programmeArrivalReadiness.ts';
+
+function resolveReadinessMinutes(
+  world: CapturedWorld,
+  journey: EffectiveJourney,
+  programmeItem: WProgrammeItem,
+): number | undefined {
+  const fromItem = readinessMinutesFromOperatingRequirements(programmeItem.operatingRequirements);
+  if (fromItem !== undefined) return fromItem;
+
+  const constraints = constraintsFor(world, journey, PROGRAMME_ARRIVAL_READINESS_CONSTRAINT);
+  const scoped = constraints.filter((c) =>
+    (c.owner.kind === 'PROGRAMME_ITEM' && c.owner.id === programmeItem.id)
+    || (c.owner.kind === 'PROGRAMME' && c.owner.id === programmeItem.programmeId)
+    || c.owner.kind === 'ORGANISATION'
+    || c.owner.kind === 'EVENT'
+    || c.owner.kind === 'TRIP'
+    || c.owner.kind === 'JOURNEY'
+    || c.owner.kind === 'TRAVELLER',
+  );
+  const minutes = scoped
+    .map((c) => operandNumber(c, 'minutes'))
+    .filter((n): n is number => n !== undefined);
+  if (minutes.length === 0) return undefined;
+  // Most conservative: largest required readiness window.
+  return Math.max(...minutes);
+}
 
 export const EVALUATOR_ID = 'm6.participation';
 const VERSION = '1';
@@ -132,6 +165,39 @@ function evaluateParticipation(participation: WParticipation, journey: Effective
         relatedSubjects: reachRelated, facts: arrivalFacts, uncertainty: reach.uncertainty,
       }),
     };
+  }
+
+  // REQUIRED + physical-presence: enforce rule-driven arrival readiness window.
+  const physicalPresence = requiresPhysicalPresenceFromOperatingRequirements(programmeItem.operatingRequirements);
+  if (participation.obligation === 'REQUIRED' && physicalPresence) {
+    const requiredMinutes = resolveReadinessMinutes(world, journey, programmeItem);
+    const readiness = evaluateProgrammeArrivalReadiness({
+      scheduledArrival: reach.arrival ?? reach.readyAt,
+      commitmentStart: windowStart,
+      requiredMinutes,
+      requiresPhysicalPresence: true,
+      obligation: 'REQUIRED',
+    });
+    const readinessFacts = { ...arrivalFacts, ...readiness.facts, readinessReason: readiness.reasonCode };
+    if (readiness.verdict === 'FAIL' || readiness.verdict === 'UNKNOWN') {
+      return {
+        dim,
+        invalidations: [windowStart],
+        explanation: explain({
+          evaluatorId,
+          dimension: dim,
+          status: readiness.verdict,
+          reasonCode: readiness.reasonCode,
+          cause: { kind: 'REQUIREMENT', subjectRef: { kind: 'PROGRAMME_ITEM', id: programmeItem.id } },
+          affectedSubject,
+          relatedSubjects: reachRelated,
+          facts: readinessFacts,
+          ...(readiness.verdict === 'UNKNOWN'
+            ? { uncertainty: [{ kind: 'MISSING_INPUT' as const, code: 'programme_arrival_readiness_minutes', subjectRef: { kind: 'PROGRAMME_ITEM' as const, id: programmeItem.id } }] }
+            : {}),
+        }),
+      };
+    }
   }
 
   // Arrival PASS: check departure after the item's window using the arrival actually used.

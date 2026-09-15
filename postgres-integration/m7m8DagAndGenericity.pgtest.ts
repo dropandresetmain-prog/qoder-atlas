@@ -275,7 +275,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     };
     const worldProgrammeItem: WProgrammeItem = {
       id: programmeItemId, programmeId, title: 'DAG item', itemType: 'SESSION', placeId: null,
-      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
     };
     const worldParticipation: WParticipation = {
       id: randomUUID(), programmeItemId, travellerId: traveller.travellerId,
@@ -578,7 +578,7 @@ describe('acceptance #10: two materially different scenarios, persisted and auth
     };
     const worldProgrammeItem: WProgrammeItem = {
       id: programmeItemId, programmeId, title: 'Genericity item', itemType: 'SESSION', placeId: null,
-      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
     };
     const worldParticipation: WParticipation = {
       id: randomUUID(), programmeItemId, travellerId: traveller.travellerId,

@@ -14,6 +14,11 @@ import { resolveRecoveryCase } from '../../persistence/postgres/commands/m9CaseR
 import { evaluateRecoveryCaseResolution } from './recoveryCaseResolution.ts';
 import { denyDirectObjectiveDisposition, M9_OBJECTIVE_DISPOSITION_API_EXPOSED } from './objectiveDispositionBoundary.ts';
 import { issueRequiredAuthorityGrant } from './grantIssuance.ts';
+import {
+  previewBilateralProgrammeTimeSwap,
+  type BilateralProgrammeTimeSwapInput,
+  type BilateralProgrammeTimeSwapPreview,
+} from './programmeTimeSwapPreview.ts';
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { ActionPlan } from '../../contracts/v2/action/actionPlan.ts';
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
@@ -172,4 +177,14 @@ export function commandDirectObjectiveDisposition(input: {
     return { ok: false, error: applicationError('OBJECTIVE_DISPOSITION_FORBIDDEN', denial.reason) };
   }
   return { ok: true };
+}
+
+/**
+ * Preview a bilateral programme time swap — never mutates authoritative state.
+ * Commitment IDs are caller-supplied runtime inputs (fixture lane), never hardcoded.
+ */
+export function commandPreviewBilateralProgrammeTimeSwap(
+  input: BilateralProgrammeTimeSwapInput,
+): BilateralProgrammeTimeSwapPreview {
+  return previewBilateralProgrammeTimeSwap(input);
 }

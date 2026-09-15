@@ -182,11 +182,12 @@ export function projectWholeTripRecoveryPlan(input: {
     }
   }
   if (!replacement) return undefined;
-  const flightIntent = input.recoveryCase
-    ? input.recoveryCase.actionIntents.find(
+  const flightIntents = input.recoveryCase
+    ? input.recoveryCase.actionIntents.filter(
         (i) => i.operation === 'flight.change' || i.operation === 'flight.book' || i.operation === 'flight.pay',
       )
-    : input.intent;
+    : (input.intent ? [input.intent] : []);
+  const flightIntent = flightIntents[0] ?? input.intent;
 
   const items: WholeTripPlanItemView[] = [];
   const policyRules = input.ruleSets.flatMap((ruleSet) => ruleSet.rules);
@@ -216,6 +217,18 @@ export function projectWholeTripRecoveryPlan(input: {
     statusTone: flightLifecycle.statusTone,
     ...(brokenLeg ? { before: legSummary(brokenLeg, input.places) } : {}),
   });
+  for (const extraFlight of flightIntents.slice(1)) {
+    const extraLifecycle = actionLifecycle(input.recoveryCase, extraFlight);
+    items.push({
+      id: `plan-flight-action-${extraFlight.id}`,
+      category: 'FLIGHT',
+      title: `Flight action — ${extraFlight.operation}`,
+      finding: `Independent flight action ${extraFlight.operation}`,
+      kind: 'EXECUTABLE',
+      statusLabel: extraLifecycle.statusLabel,
+      statusTone: extraLifecycle.statusTone,
+    });
+  }
 
   // Derive the hub from the connection pair regardless of viability: once the
   // flight is fixed the connection is VIABLE, but the overnight gap (and the
@@ -253,13 +266,13 @@ export function projectWholeTripRecoveryPlan(input: {
   // an earlier local day than the onward departure at the hub. This persists
   // after the flight is fixed (the gap remains until a hotel covers it).
   if (hubPlaceId && inboundDay && replacementDay && inboundDay !== replacementDay) {
-    const hotelIntent = input.recoveryCase
-      ? input.recoveryCase.actionIntents.find((i) => i.operation === 'hotel.book' || i.operation === 'hotel.modify')
-      : undefined;
+    const hotelIntents = hotelActionIntents(input.recoveryCase).filter(
+      (i) => i.operation === 'hotel.book' || i.operation === 'hotel.modify',
+    );
+    // Prefer the first unused book/modify for the hub overnight — remaining
+    // intents stay available for destination stay replacement/cancel rows.
+    const hotelIntent = hotelIntents[0];
     const hotelLifecycle = actionLifecycle(input.recoveryCase, hotelIntent);
-    // Name the hotel from the booked stay once it is in the trip, otherwise
-    // from the hotel intent's candidate place (so the hotel is named while it
-    // is still awaiting approval / being booked).
     const hotelName =
       (overnightStay ? placeLabel(input.places, overnightStay.data.placeId) : undefined) ??
       hotelPlaceNameFromIntent(input.recoveryCase, hotelIntent, input.places);
@@ -323,6 +336,42 @@ export function projectWholeTripRecoveryPlan(input: {
     }
     const crossesDay =
       calendarDay(arrival) !== undefined && calendarDay(arrival) !== calendarDay(checkIn);
+    const stayIntents = hotelIntentsForAffectedStay(input.recoveryCase, {
+      overnightClaimedFirstBook: Boolean(
+        hubPlaceId && inboundDay && replacementDay && inboundDay !== replacementDay,
+      ),
+      stayElementId: element.id,
+    });
+    if (stayIntents.length > 0) {
+      const primary = stayIntents[0]!;
+      const lifecycle = actionLifecycle(input.recoveryCase, primary);
+      items.push({
+        id: `plan-hotel-${element.id}`,
+        category: 'HOTEL',
+        title: 'Affected stay — replacement / cancel+rebook',
+        finding: crossesDay
+          ? `The first night at ${hotel} is no longer usable as booked; Northstar will replace and cancel via coordinated hotel actions`
+          : `The stay at ${hotel} starts before the new arrival; Northstar will adjust via coordinated hotel actions`,
+        kind: 'EXECUTABLE',
+        statusLabel: lifecycle.statusLabel,
+        statusTone: lifecycle.statusTone,
+      });
+      // Surface each additional same-domain stay intent (e.g. displaced cancel)
+      // so multi-action strategies do not collapse into one hotel row.
+      for (const extra of stayIntents.slice(1)) {
+        const extraLifecycle = actionLifecycle(input.recoveryCase, extra);
+        items.push({
+          id: `plan-hotel-action-${extra.id}`,
+          category: 'HOTEL',
+          title: `Stay action — ${extra.operation}`,
+          finding: `Independent hotel action ${extra.operation} for the affected stay at ${hotel}`,
+          kind: 'EXECUTABLE',
+          statusLabel: extraLifecycle.statusLabel,
+          statusTone: extraLifecycle.statusTone,
+        });
+      }
+      continue;
+    }
     items.push({
       id: `plan-hotel-${element.id}`,
       category: 'HOTEL',
@@ -357,34 +406,48 @@ export function projectWholeTripRecoveryPlan(input: {
 
   const costNotes: string[] = [];
   let knownIncrementalCost: Money | undefined;
-  // Flight cost (from the flight intent's frozen spend, or the strategy cost).
-  const flightCost = flightIntent?.spendExposure ?? flightIntent?.providerSpend ?? flightStrategy.costImpact;
-  if (flightCost) {
-    knownIncrementalCost = flightCost;
+  // Flight costs — preserve every flight intent with spend (no single-slot fold).
+  for (const fi of flightIntents) {
+    const flightCost = fi.spendExposure ?? fi.providerSpend ?? (fi === flightIntent ? flightStrategy.costImpact : undefined);
+    if (!flightCost) continue;
+    if (!knownIncrementalCost) knownIncrementalCost = flightCost;
     items.push({
-      id: `plan-cost-${flightStrategy.id}`,
+      id: `plan-cost-${fi.id}`,
       category: 'COST',
-      title: 'Known cost — flight',
-      finding: `${formatMoney(flightCost)} for the replacement flight, chargeable through Northstar`,
+      title: `Known cost — ${fi.operation}`,
+      finding: `${formatMoney(flightCost)} for ${fi.operation}, chargeable through Northstar`,
       kind: 'EXECUTABLE',
       statusLabel: 'Handled by Northstar',
       statusTone: 'ok',
     });
-  } else {
-    costNotes.push('Flight cost will be confirmed when inventory is priced');
   }
-  // Hotel cost (from the hotel intent's frozen spend) shown separately so it is
-  // never merged into the flight charge.
-  const hotelIntentForCost = input.recoveryCase
-    ? input.recoveryCase.actionIntents.find((i) => i.operation === 'hotel.book' || i.operation === 'hotel.modify')
-    : undefined;
-  const hotelCost = hotelIntentForCost?.spendExposure ?? hotelIntentForCost?.providerSpend;
-  if (hotelCost) {
+  if (!flightIntents.some((fi) => fi.spendExposure ?? fi.providerSpend) && !flightStrategy.costImpact) {
+    costNotes.push('Flight cost will be confirmed when inventory is priced');
+  } else if (flightIntents.length === 0 && flightStrategy.costImpact) {
+    knownIncrementalCost = flightStrategy.costImpact;
     items.push({
-      id: `plan-cost-hotel-${flightStrategy.id}`,
+      id: `plan-cost-${flightStrategy.id}`,
       category: 'COST',
-      title: 'Known cost — overnight hotel',
-      finding: `${formatMoney(hotelCost)} for the overnight stay, chargeable through Northstar`,
+      title: 'Known cost — flight',
+      finding: `${formatMoney(flightStrategy.costImpact)} for the replacement flight, chargeable through Northstar`,
+      kind: 'EXECUTABLE',
+      statusLabel: 'Handled by Northstar',
+      statusTone: 'ok',
+    });
+  }
+  // Hotel costs — one row per hotel intent with spend so multi-stay strategies
+  // do not collapse into a single overnight charge.
+  const hotelIntentsWithCost = hotelActionIntents(input.recoveryCase).filter(
+    (i) => i.spendExposure ?? i.providerSpend,
+  );
+  for (const hotelIntentForCost of hotelIntentsWithCost) {
+    const hotelCost = hotelIntentForCost.spendExposure ?? hotelIntentForCost.providerSpend;
+    if (!hotelCost) continue;
+    items.push({
+      id: `plan-cost-hotel-${hotelIntentForCost.id}`,
+      category: 'COST',
+      title: `Known cost — ${hotelIntentForCost.operation}`,
+      finding: `${formatMoney(hotelCost)} for hotel action ${hotelIntentForCost.operation}, chargeable through Northstar`,
       kind: 'EXECUTABLE',
       statusLabel: 'Handled by Northstar',
       statusTone: 'ok',
@@ -418,14 +481,48 @@ function flightStrategyFor(input: {
 }): RecoveryStrategy | undefined {
   const recoveryCase = input.recoveryCase;
   if (!recoveryCase) return proposedFlight(input.strategy) ? input.strategy : undefined;
-  const flightIntent = recoveryCase.actionIntents.find(
+  const flightIntents = recoveryCase.actionIntents.filter(
     (i) => i.operation === 'flight.change' || i.operation === 'flight.book' || i.operation === 'flight.pay',
   );
-  if (flightIntent) {
+  for (const flightIntent of flightIntents) {
     const strategy = recoveryCase.strategies.find((s) => s.id === flightIntent.strategyId);
     if (strategy && proposedFlight(strategy)) return strategy;
   }
   return proposedFlight(input.strategy) ? input.strategy : undefined;
+}
+
+/** All hotel-domain intents — never assume a single hotel.book per case. */
+function hotelActionIntents(recoveryCase: RecoveryCase | undefined): ActionIntent[] {
+  if (!recoveryCase) return [];
+  return recoveryCase.actionIntents.filter(
+    (i) =>
+      i.operation === 'hotel.book'
+      || i.operation === 'hotel.modify'
+      || i.operation === 'hotel.cancel',
+  );
+}
+
+/**
+ * Intents that apply to an affected destination stay after any hub overnight
+ * has claimed the first book/modify slot. Remaining book/modify/cancel intents
+ * stay EXECUTABLE rather than collapsing to MANUAL_FOLLOWUP.
+ */
+function hotelIntentsForAffectedStay(
+  recoveryCase: RecoveryCase | undefined,
+  opts: { overnightClaimedFirstBook: boolean; stayElementId: string },
+): ActionIntent[] {
+  const all = hotelActionIntents(recoveryCase);
+  if (all.length === 0) return [];
+  const books = all.filter((i) => i.operation === 'hotel.book' || i.operation === 'hotel.modify');
+  const cancels = all.filter((i) => i.operation === 'hotel.cancel');
+  const remainingBooks = opts.overnightClaimedFirstBook ? books.slice(1) : books;
+  // Prefer intents whose id/target text mentions the stay element when present;
+  // otherwise allocate remaining same-domain intents in order.
+  const mentioned = [...remainingBooks, ...cancels].filter((i) =>
+    JSON.stringify(i).includes(opts.stayElementId),
+  );
+  if (mentioned.length > 0) return mentioned;
+  return [...remainingBooks, ...cancels];
 }
 
 /**

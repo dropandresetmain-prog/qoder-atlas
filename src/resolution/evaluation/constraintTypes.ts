@@ -42,6 +42,15 @@ export const CONSTRAINT_TYPES: readonly ConstraintTypeRegistration[] = [
     operands: { destination_place: { kind: 'SUBJECT_REF', required: false, subjectKind: 'PLACE' } },
     meaning: 'members of the owning coordination group travel into the destination on the same transport service',
   },
+  {
+    registeredType: 'programme_arrival_readiness_minutes',
+    evaluatorId: 'm6.participation',
+    operands: {
+      minutes: { kind: 'NUMBER', required: true },
+      requires_physical_presence: { kind: 'BOOLEAN', required: false },
+    },
+    meaning: 'REQUIRED physical-presence programme commitments need at least this many minutes between scheduled arrival and commitment start (RuleSet/policy data — not a hardcoded duration)',
+  },
 ];
 
 const BY_TYPE = new Map(CONSTRAINT_TYPES.map((entry) => [entry.registeredType, entry]));

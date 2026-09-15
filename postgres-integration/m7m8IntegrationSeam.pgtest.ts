@@ -370,7 +370,7 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     };
     const worldProgrammeItem: WProgrammeItem = {
       id: programmeItemId, programmeId, title: 'Seam item', itemType: 'SESSION', placeId: null,
-      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
     };
     const worldParticipation: WParticipation = {
       id: randomUUID(), programmeItemId, travellerId: traveller.travellerId,

@@ -84,7 +84,18 @@ export interface WFxObservation { id: string; baseCurrency: string; quoteCurrenc
 
 /** ---- programmes and geography ------------------------------------------ */
 export interface WProgramme { id: string; revision: number; eventId: string; title: string; lifecycleStatus: string }
-export interface WProgrammeItem { id: string; programmeId: string; title: string; itemType: string; placeId: string | null; window: { start: Instant; end: Instant } | null; lifecycleStatus: string; scheduleAuthority: string }
+export interface WProgrammeItem {
+  id: string;
+  programmeId: string;
+  title: string;
+  itemType: string;
+  placeId: string | null;
+  window: { start: Instant; end: Instant } | null;
+  lifecycleStatus: string;
+  scheduleAuthority: string;
+  /** Opaque operating requirements (e.g. requiresPhysicalPresence, readinessBufferMinutes). */
+  operatingRequirements: Record<string, unknown> | null;
+}
 export interface WParticipation { id: string; programmeItemId: string; travellerId: string; obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED'; accepted: boolean; preparationWindow: { start: Instant; end: Instant } | null }
 export interface WResourceAssignment { id: string; activityKind: 'PROGRAMME_ITEM' | 'JOURNEY_ITEM'; activityId: string; resourceId: string; quantity: number; lifecycleStatus: string }
 export interface WPlace { id: string; revision: number; name: string; placeType: string; timeZone: string; hasCoordinates: boolean }

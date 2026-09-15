@@ -59,7 +59,7 @@ function subjectTarget(subject: TypedRef) {
 }
 
 function programmeItemRow(over: Partial<WProgrammeItem> = {}): WProgrammeItem {
-  return { id: id(), programmeId: id(), title: 't', itemType: 'SESSION', placeId: 'p-venue', window: { start: '2030-01-02T10:00:00.000Z', end: '2030-01-02T11:00:00.000Z' }, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', ...over };
+  return { id: id(), programmeId: id(), title: 't', itemType: 'SESSION', placeId: 'p-venue', window: { start: '2030-01-02T10:00:00.000Z', end: '2030-01-02T11:00:00.000Z' }, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null, ...over };
 }
 
 function participationRow(travellerId: string, programmeItemId: string, over: Partial<WParticipation> = {}): WParticipation {

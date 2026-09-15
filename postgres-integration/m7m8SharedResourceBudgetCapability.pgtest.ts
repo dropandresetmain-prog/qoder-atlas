@@ -197,7 +197,7 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
     };
     const worldProgrammeItem: WProgrammeItem = {
       id: programmeItemId, programmeId, title: 'Shared resource item', itemType: 'SESSION', placeId: null,
-      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+      window: originalWindow, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
     };
     const worldParticipationA: WParticipation = {
       id: randomUUID(), programmeItemId, travellerId: travellerA.travellerId,

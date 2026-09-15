@@ -51,7 +51,7 @@ function constraintRow(registeredType: string, owner: TypedRef, operands: Return
 }
 
 function programmeItemRow(placeId: string, start: string, end: string, over: Partial<WProgrammeItem> = {}): WProgrammeItem {
-  return { id: id(), programmeId: id(), title: 'item', itemType: 'SESSION', placeId, window: window(start, end), lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', ...over };
+  return { id: id(), programmeId: id(), title: 'item', itemType: 'SESSION', placeId, window: window(start, end), lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null, ...over };
 }
 
 function participationRow(travellerId: string, programmeItemId: string): WParticipation {

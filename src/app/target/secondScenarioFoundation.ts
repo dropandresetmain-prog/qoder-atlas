@@ -69,6 +69,15 @@ export interface JordanS2ScenarioFoundation {
     partialExecutionVisible: true;
     /** Case resolves only via CK1 deterministic reassessment gate. */
     providerSuccessDoesNotResolveCase: true;
+    /**
+     * Additive multi-stay contract (generic — not Jordan-only):
+     * a strategy may include hub overnight insert AND destination
+     * cancel+rebook as independent ActionIntents with dependency order
+     * (cancel displaced only after replacement CONFIRMED).
+     */
+    multipleStayActionsPerStrategy: true;
+    cancelDisplacedAfterReplacementConfirmed: true;
+    duplicateStayExposureMustRemainVisible: true;
   };
   productSurfaces: {
     usesSharedReadModels: true;
@@ -112,6 +121,9 @@ export const jordanS2ScenarioFoundation: JordanS2ScenarioFoundation = {
     multiActionStrategy: true,
     partialExecutionVisible: true,
     providerSuccessDoesNotResolveCase: true,
+    multipleStayActionsPerStrategy: true,
+    cancelDisplacedAfterReplacementConfirmed: true,
+    duplicateStayExposureMustRemainVisible: true,
   },
   productSurfaces: {
     usesSharedReadModels: true,
@@ -131,13 +143,48 @@ export const jordanS2ScenarioFoundation: JordanS2ScenarioFoundation = {
 export const travellerInitiatedScenarioFoundation = jordanS2ScenarioFoundation;
 
 /**
+ * Multi-stay Jordan requirement audit (additive to first Jordan addendum).
+ *
+ * Domain ActionPlan already allows N ActionIntents + dependency edges with
+ * independent subject/cost/authority/status — no one-hotel-per-strategy rule.
+ *
+ * CK1 product RecoveryCaseView still projects singular bookingServiceState /
+ * executionState rollups. That is presentation compression, not a frozen
+ * uniqueness constraint. Land per-action arrays at CK2 (below) so operators
+ * can see independent stay outcomes and duplicate-booking exposure.
+ *
+ * Legacy whole-trip plan presentation currently `.find()`s one hotel.book and
+ * may surface other stays as MANUAL_FOLLOWUP — correct generically at CK2;
+ * do not reopen CK1.
+ *
+ * Verdict: multi-stay Jordan requirement compatible — no CK1 reopen.
+ */
+export const JORDAN_S2_MULTI_STAY_AUDIT_VERDICT =
+  'multi-stay Jordan requirement compatible — no CK1 reopen.' as const;
+
+/**
  * Additive generic read-model fields to land at Checkpoint 2 start
  * (not a CK1 reopen — existing enums already express SAFE/AT_RISK/IMPOSSIBLE).
  */
 export const JORDAN_S2_CK2_ADDITIVE_READMODEL_FIELDS = [
   'RecoveryCaseView.connectionProgression — optional enum mapped from existing RemainderViability/status (presentation aid)',
-  'RecoveryCaseView.recoveryActions[] — per ActionIntent: domain/capability, cost, authority, execution, observed outcome, order',
+  'RecoveryCaseView.recoveryActions[] — per ActionIntent: domain/capability, subject/booking identity, cost, authority, approval, dependency order, execution, observed outcome (supports multiple stay / hotel.book intents)',
   'RecoveryCaseView.aggregateRecoveryCost — deterministic total when all action costs known',
-  'RecoveryCaseView.remainingRecoveryWork[] — unresolved consequences after partial execution',
-  'RecoveryCaseView.partialRecovery — explicit successful/failed/pending action summaries (never collapse to one boolean)',
+  'RecoveryCaseView.remainingRecoveryWork[] — unresolved consequences after partial execution (incl. failed/unknown displaced cancellation)',
+  'RecoveryCaseView.partialRecovery — explicit successful/failed/pending action summaries (never collapse to one boolean or hotel=recovered)',
+  'RecoveryCaseView.duplicateBookingExposure[] — when replacement stay CONFIRMED and displaced cancellation FAILED/OUTCOME_UNKNOWN',
+  'Strategy/action projections — no one-action-per-domain assumption; cancel displaced depends on replacement CONFIRMED unless strategy explicitly permits otherwise',
+  'Legacy wholeTripRecoveryPlan — stop assuming a single hotel.book via .find(); sequence hub overnight + destination cancel+rebook as independent intents when strategy requires both',
+] as const;
+
+/**
+ * Jordan acceptance additions before C4 candidate (fixture facts still pending
+ * Atlas + Nuitée — do not invent hotel/date/rate/provider values now).
+ */
+export const JORDAN_S2_ACCEPTANCE_MULTI_STAY = [
+  'disruption → hub overnight required → destination stay affected',
+  'strategy contains both stay consequences as independent ActionIntents',
+  'safe destination replacement: quote → spend/authority gate → book → observe CONFIRMED → cancel displaced → observe CANCELLED',
+  'partial-failure test: replacement CONFIRMED + displaced cancel FAILED/OUTCOME_UNKNOWN → duplicate exposure visible → case unresolved',
+  'success path: replacement CONFIRMED + displaced CANCELLED + other mandatory actions complete + whole-trip reassessment PASS → case may resolve',
 ] as const;

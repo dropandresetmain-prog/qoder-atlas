@@ -74,6 +74,18 @@ export const PolicyRuleSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     ...RuleBase,
     /**
+     * Minutes required between scheduled arrival and a REQUIRED physical-presence
+     * programme commitment start. Duration is data — another RuleSet may use a
+     * different value. Distinct from CONNECTION_BUFFER (leg-to-leg).
+     */
+    kind: z.literal('PROGRAMME_ARRIVAL_READINESS'),
+    buffer: DurationEstimateSchema,
+    requiresPhysicalPresence: z.literal(true).default(true),
+    obligation: z.literal('REQUIRED').default('REQUIRED'),
+  }),
+  z.strictObject({
+    ...RuleBase,
+    /**
      * Minimum connection time between linked transport legs (CONNECTS_TO or
      * inferred hub pairs). Distinct from MIN_BUFFER before programme commitments.
      */
@@ -182,6 +194,7 @@ export const PolicyRuleKindSchema = z.enum([
   'TIME_WINDOW',
   'NO_SHOW_CUTOFF',
   'MIN_BUFFER',
+  'PROGRAMME_ARRIVAL_READINESS',
   'CONNECTION_BUFFER',
   'SPEND_LIMIT',
   'APPROVAL_ABOVE_SPEND',

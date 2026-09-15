@@ -307,7 +307,7 @@ test('ProgrammeItem move strategy: one participant can improve while another wor
   const programmeItem: WProgrammeItem = {
     id: itemId, programmeId, title: 'session', itemType: 'SESSION', placeId: 'p-venue',
     window: { start: '2030-06-02T10:00:00.000Z', end: '2030-06-02T11:00:00.000Z' },
-    lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+    lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
   };
   const parts: WParticipation[] = [
     { id: id(), programmeItemId: itemId, travellerId: travellerEarly, obligation: 'REQUIRED', accepted: true, preparationWindow: null },
@@ -540,7 +540,7 @@ test('ActionPlan DAG ordering is acyclic; forced cycles are rejected', () => {
   const programmeItem: WProgrammeItem = {
     id: id(), programmeId: id(), title: 's', itemType: 'SESSION', placeId: 'p-v',
     window: { start: '2030-06-02T10:00:00.000Z', end: '2030-06-02T11:00:00.000Z' },
-    lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+    lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
   };
   const svc = service({
     destinationPlaceId: 'p-v',
@@ -632,7 +632,7 @@ test('two materially different scenarios use the same evaluate/compile engine', 
   const programmeItem: WProgrammeItem = {
     id: id(), programmeId: id(), title: 'a', itemType: 'SESSION', placeId: 'p1',
     window: { start: '2030-06-02T10:00:00.000Z', end: '2030-06-02T11:00:00.000Z' },
-    lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+    lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null,
   };
   const jA = journeyRow();
   const worldA = emptyWorld({

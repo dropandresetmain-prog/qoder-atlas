@@ -305,7 +305,7 @@ export class PgWorldReader {
     );
     const programmeItemIds = uniq(participationRows.map((p) => str(p.programme_item_id)));
     const programmeItems = await q(
-      `SELECT id, programme_id, title, item_type, place_id, window_start, window_end, lifecycle_status, schedule_authority
+      `SELECT id, programme_id, title, item_type, place_id, window_start, window_end, lifecycle_status, schedule_authority, operating_requirements
          FROM programme_items WHERE workspace_id = $1 AND id = ANY($2::uuid[]) ORDER BY programme_id, id`,
       [programmeItemIds],
     );
@@ -677,6 +677,9 @@ export class PgWorldReader {
       programmeItems: programmeItems.map((p) => ({
         id: String(p.id), programmeId: String(p.programme_id), title: String(p.title), itemType: String(p.item_type), placeId: str(p.place_id),
         window: interval(p.window_start, p.window_end), lifecycleStatus: String(p.lifecycle_status), scheduleAuthority: String(p.schedule_authority),
+        operatingRequirements: (p.operating_requirements && typeof p.operating_requirements === 'object' && !Array.isArray(p.operating_requirements))
+          ? p.operating_requirements as Record<string, unknown>
+          : null,
       })),
       participations: participationRows.map((p) => ({
         id: String(p.id), programmeItemId: String(p.programme_item_id), travellerId: String(p.traveller_id), obligation: String(p.obligation) as 'REQUIRED' | 'OPTIONAL' | 'INFORMED',

@@ -44,6 +44,12 @@ export interface EventChangePreviewInput {
   newEndsAt?: IsoDateTime;
   newPlaceId?: EntityId;
   at: IsoDateTime;
+  /**
+   * Arrival→commitment readiness minutes from governing RuleSet / policy data.
+   * Defaults to 360 when omitted (legacy organiser pack). Prefer
+   * PROGRAMME_ARRIVAL_READINESS / physical-presence rule values (e.g. 150).
+   */
+  requiredArrivalBufferMinutes?: number;
 }
 
 export interface AffectedTripPreview {
@@ -359,9 +365,8 @@ function evaluateLinkedTrip(
   }
 
   // Compare inbound arrival preparation time before vs after the proposed start.
-  // The minutes feed the verdict; the reasons translate them into consequences
-  // (raw buffer arithmetic stays in machine evidence, not user-facing copy).
-  const REQUIRED_BUFFER_MIN = 360;
+  // Minutes come from policy data — never a hardcoded scenario duration.
+  const REQUIRED_BUFFER_MIN = input.requiredArrivalBufferMinutes ?? 360;
   let timingRestored = false;
   let bufferStillFails = false;
   let bufferStillPasses = false;

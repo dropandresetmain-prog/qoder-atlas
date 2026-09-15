@@ -65,7 +65,7 @@ test('an engagement takes the canonical programme schedule; intent is not copied
   const { world, journeyId, travellerId } = baseWorld();
   const programmeItemId = id();
   const participationId = id();
-  world.programmeItems.push({ id: programmeItemId, programmeId: id(), title: 't', itemType: 'SESSION', placeId: 'p-venue', window: { start: '2030-01-02T14:00:00.000Z', end: '2030-01-02T15:00:00.000Z' }, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL' });
+  world.programmeItems.push({ id: programmeItemId, programmeId: id(), title: 't', itemType: 'SESSION', placeId: 'p-venue', window: { start: '2030-01-02T14:00:00.000Z', end: '2030-01-02T15:00:00.000Z' }, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', operatingRequirements: null });
   world.participations.push({ id: participationId, programmeItemId, travellerId, obligation: 'REQUIRED', accepted: true, preparationWindow: null });
   world.journeyItems.push({ ...transportItem(journeyId), kind: 'ENGAGEMENT', desiredOriginPlaceId: null, desiredDestinationPlaceId: null, participationId, intendedWindow: { start: '2030-01-01T00:00:00.000Z', end: '2030-01-01T01:00:00.000Z' } });
   const item = effectiveOf(world).journeys[0]!.items[0]!;

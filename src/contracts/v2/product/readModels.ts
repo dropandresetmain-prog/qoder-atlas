@@ -143,6 +143,73 @@ export const IncidentProgrammeViewSchema = z.strictObject({
 });
 export type IncidentProgrammeView = z.infer<typeof IncidentProgrammeViewSchema>;
 
+/** Progressive connection / disruption presentation (generic — not scenario-named). */
+export const ConnectionProgressionSchema = z.enum([
+  'HEALTHY',
+  'CONNECTION_SAFE',
+  'CONNECTION_AT_RISK',
+  'CONNECTION_IMPOSSIBLE',
+  'RECOVERY_PLANNING',
+  'AWAITING_APPROVAL',
+  'EXECUTING_COORDINATED_RECOVERY',
+  'CHECKING_RESULTS',
+  'RECOVERED',
+  'STILL_UNRESOLVED',
+]);
+export type ConnectionProgression = z.infer<typeof ConnectionProgressionSchema>;
+
+export const RecoveryActionExecutionStateSchema = z.enum([
+  'PROPOSED',
+  'AUTHORIZED',
+  'REJECTED',
+  'SUPERSEDED',
+  'EXECUTING',
+  'COMPLETED',
+  'FAILED',
+  'PENDING',
+  'RECONCILING',
+  'OUTCOME_UNKNOWN',
+]);
+export type RecoveryActionExecutionState = z.infer<typeof RecoveryActionExecutionStateSchema>;
+
+/** One ActionIntent projection — same-domain actions must not collapse. */
+export const RecoveryActionViewSchema = z.strictObject({
+  actionRef: z.string().min(1),
+  domain: z.string().min(1),
+  capability: z.string().min(1),
+  subjectRefs: z.array(z.string().min(1)).default([]),
+  cost: z.strictObject({
+    amount: z.string().min(1),
+    currency: z.string().length(3),
+  }).optional(),
+  authorityState: z.string().min(1),
+  approvalState: z.string().min(1).optional(),
+  dependencyOrder: z.number().int().min(0),
+  dependsOnActionRefs: z.array(z.string().min(1)).default([]),
+  executionState: RecoveryActionExecutionStateSchema,
+  observationResult: z.string().min(1).optional(),
+  uncertainty: z.array(z.string()).default([]),
+});
+export type RecoveryActionView = z.infer<typeof RecoveryActionViewSchema>;
+
+export const PartialRecoveryViewSchema = z.strictObject({
+  succeeded: z.array(z.string().min(1)),
+  failed: z.array(z.string().min(1)),
+  pending: z.array(z.string().min(1)),
+});
+export type PartialRecoveryView = z.infer<typeof PartialRecoveryViewSchema>;
+
+/** Replacement CONFIRMED + displaced cancel FAILED/UNKNOWN → incomplete recovery. */
+export const DuplicateBookingExposureViewSchema = z.strictObject({
+  replacementActionRef: z.string().min(1),
+  displacedActionRef: z.string().min(1).optional(),
+  displacedSubjectRef: z.string().min(1),
+  replacementObservation: z.string().min(1),
+  displacedCancellationObservation: z.string().min(1),
+  detail: z.string().max(2048).optional(),
+});
+export type DuplicateBookingExposureView = z.infer<typeof DuplicateBookingExposureViewSchema>;
+
 export const RecoveryCaseViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   caseRef: z.string().min(1),
@@ -184,6 +251,17 @@ export const RecoveryCaseViewSchema = z.strictObject({
   reconciliationState: z.string(),
   uncertainty: z.array(z.string()),
   resolutionSummary: z.string().optional(),
+  /** Optional progressive connection presentation aid (CK2). */
+  connectionProgression: ConnectionProgressionSchema.optional(),
+  /** Per-ActionIntent projections — multiple stay/hotel actions allowed. */
+  recoveryActions: z.array(RecoveryActionViewSchema).default([]),
+  aggregateRecoveryCost: z.strictObject({
+    amount: z.string().min(1),
+    currency: z.string().length(3),
+  }).optional(),
+  remainingRecoveryWork: z.array(z.string().min(1)).default([]),
+  partialRecovery: PartialRecoveryViewSchema.optional(),
+  duplicateBookingExposure: z.array(DuplicateBookingExposureViewSchema).default([]),
   ldg: LiveDependencyGraphSchema,
   change: ChangeAwarenessSchema,
 });

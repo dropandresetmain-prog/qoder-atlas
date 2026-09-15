@@ -98,6 +98,21 @@ export interface RecoveryStrategyFact {
   projectedPeople: readonly { personLabel: string; verdict: AssessmentTone }[];
 }
 
+export interface RecoveryActionFact {
+  actionRef: string;
+  domain: string;
+  capability: string;
+  subjectRefs: readonly string[];
+  cost?: { amount: string; currency: string };
+  authorityState: string;
+  approvalState?: string;
+  dependencyOrder: number;
+  dependsOnActionRefs?: readonly string[];
+  executionState: import('../../../contracts/v2/product/readModels.ts').RecoveryActionExecutionState;
+  observationResult?: string;
+  uncertainty?: readonly string[];
+}
+
 export interface RecoveryCaseFacts extends ProductWorldFacts {
   caseRef: string;
   status: 'OPEN' | 'PLANNING' | 'AWAITING_AUTHORITY' | 'EXECUTING' | 'RESOLVED' | 'CLOSED' | 'CANCELLED' | 'SUPERSEDED';
@@ -114,6 +129,13 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
   reconciliationState: string;
   uncertainty?: readonly string[];
   resolutionSummary?: string;
+  connectionProgression?: import('../../../contracts/v2/product/readModels.ts').ConnectionProgression;
+  recoveryActions?: readonly RecoveryActionFact[];
+  /** When omitted, derived from recoveryActions when present. */
+  remainingRecoveryWork?: readonly string[];
+  aggregateRecoveryCost?: { amount: string; currency: string };
+  partialRecovery?: import('../../../contracts/v2/product/readModels.ts').PartialRecoveryView;
+  duplicateBookingExposure?: readonly import('../../../contracts/v2/product/readModels.ts').DuplicateBookingExposureView[];
 }
 
 export interface TravellerTripFacts extends ProductWorldFacts {
