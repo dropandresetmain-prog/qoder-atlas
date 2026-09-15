@@ -28,11 +28,11 @@ test('formatMoney uses US$ / S$ and never bare $ for USD', () => {
 
 test('presentBufferEvidence translates gap evidence into consequence copy', () => {
   assert.equal(
-    presentBufferEvidence('gap 370min >= required 360min'),
+    presentBufferEvidence('gap 370min >= required 150min'),
     'Arrival leaves enough preparation time before the commitment',
   );
   assert.equal(
-    presentBufferEvidence('gap 120min < required 360min'),
+    presentBufferEvidence('gap 120min < required 150min'),
     'Arrival does not leave enough preparation time before the commitment',
   );
   assert.equal(
@@ -47,7 +47,7 @@ test('presentBufferEvidence translates gap evidence into consequence copy', () =
         description: 'arrival buffer',
       },
       'PASS',
-      'gap 370min >= required 360min',
+      'gap 370min >= required 150min',
     ),
     'Arrival still leaves enough time before the commitment',
   );

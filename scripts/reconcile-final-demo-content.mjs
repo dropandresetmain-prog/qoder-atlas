@@ -1097,3 +1097,50 @@ for (const fileName of ['s3-organiser-preview.json', 's3-organiser-preview-recor
   ]);
   writeJson(file, value);
 }
+
+{
+  const file = path.join(ROOT, 'fixtures/acceptance/packs/s1/pack.json');
+  const value = readJson(file);
+  const felix = 'trv-evt-ait-2026-ait-draft-03';
+  const felixTrip = 'trip-trv-evt-ait-2026-ait-draft-03';
+  if (!value.expect.travellerIds.includes(felix)) value.expect.travellerIds.splice(1, 0, felix);
+  if (!value.expect.tripIds.includes(felixTrip)) value.expect.tripIds.splice(1, 0, felixTrip);
+  value.description = 'Local acceptance pack for S1; five synthetic CGK ID7159→ID7153 travellers. Continuity proof: fixtures/acceptance/manifests/s1-s3-continuity.json';
+  writeJson(file, value);
+}
+
+{
+  const file = path.join(ROOT, 'fixtures/acceptance/packs/s2/pack.json');
+  const value = readJson(file);
+  value.version = '1.2.0';
+  value.description =
+    'Local acceptance pack for S2 LAX→NRT→SIN progressive missed connection; Jordan is SG, baseline Concorde check-in is 29 Sep and recovery arrival is 30 Sep.';
+  value.corridor.airlineDefault = 'TR867';
+  value.corridor.northstarCandidate = 'TR885';
+  value.corridor.nationality = 'SG';
+  value.corridor.hotelStay = {
+    checkIn: '2026-09-29T15:00:00+08:00',
+    checkOut: '2026-10-03T11:00:00+08:00',
+  };
+  writeJson(file, value);
+}
+
+{
+  const file = path.join(ROOT, 'fixtures/acceptance/packs/s3/pack.json');
+  const value = readJson(file);
+  value.description =
+    'Local acceptance pack for S3 bilateral Sarah headline ↔ Daniel local-host swap; facts live in data/ait-demo-input-pack/scenarios/s3-event-change-preview.';
+  value.swap = {
+    sarah: {
+      commitmentId: 'cmt-ait-d1-headline-interview',
+      from: '2026-10-01T11:30:00+08:00',
+      to: '2026-10-01T14:30:00+08:00',
+    },
+    daniel: {
+      commitmentId: 'cmt-ait-d1-local-host-session',
+      from: '2026-10-01T14:30:00+08:00',
+      to: '2026-10-01T11:30:00+08:00',
+    },
+  };
+  writeJson(file, value);
+}

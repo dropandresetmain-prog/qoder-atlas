@@ -1642,7 +1642,7 @@
             "buffer": {
               "expectedMinutes": 150,
               "minimumMinutes": 150,
-              "conservativeMinutes": 150,
+              "conservativeMinutes": 180,
               "sourceId": "src-syn-ait-policy",
               "observedAt": "2026-08-25T09:00:00+00:00",
               "quality": "HIGH"
