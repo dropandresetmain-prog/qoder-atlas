@@ -608,6 +608,45 @@ test('funding: a valid FX observation converts the allocation exactly into the b
   assert.equal(dim?.explanations[0]?.facts.allocationAmountInBudgetCurrency, '90.00');
 });
 
+test('funding I-10: JPY zero-decimal budget converts USD allocation via shared FX seam', () => {
+  const journeyId = id();
+  const travellerId = id();
+  const orgId = id();
+  const fxId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+  const { reservationId } = addAllocatedReservation(world, { travellerId });
+  world.budgets.push({ id: id(), revision: 1, organisationId: orgId, amount: '20000', currency: 'JPY', valid: { start: null, end: null } });
+  world.fxObservations.push({ id: fxId, baseCurrency: 'USD', quoteCurrency: 'JPY', rate: '150', asOf: '2029-12-01T00:00:00.000Z', expiresAt: null, edition: '1' });
+  world.costAllocations.push({ id: id(), reservationId, payerOrganisationId: orgId, payerTravellerId: null, entryKind: 'FARE', amount: '100.00', currency: 'USD', fxObservationId: fxId, evidenceId: null });
+  const out = fundingEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+  const dim = out.dimensions.find((d) => d.dimension === 'funding');
+  assert.equal(dim?.verdict, 'PASS');
+  assert.equal(dim?.explanations[0]?.facts.allocationAmountInBudgetCurrency, '15000');
+});
+
+test('funding I-10: KWD three-decimal budget uses shared FX seam (missing FX stays UNKNOWN)', () => {
+  const journeyId = id();
+  const travellerId = id();
+  const orgId = id();
+  const fxId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+  const { reservationId } = addAllocatedReservation(world, { travellerId });
+  world.budgets.push({ id: id(), revision: 1, organisationId: orgId, amount: '5.000', currency: 'KWD', valid: { start: null, end: null } });
+  world.fxObservations.push({ id: fxId, baseCurrency: 'USD', quoteCurrency: 'KWD', rate: '0.30715', asOf: '2029-12-01T00:00:00.000Z', expiresAt: null, edition: '1' });
+  world.costAllocations.push({ id: id(), reservationId, payerOrganisationId: orgId, payerTravellerId: null, entryKind: 'FARE', amount: '10.00', currency: 'USD', fxObservationId: fxId, evidenceId: null });
+  const out = fundingEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+  const dim = out.dimensions.find((d) => d.dimension === 'funding');
+  assert.equal(dim?.verdict, 'PASS');
+  assert.equal(dim?.explanations[0]?.facts.allocationAmountInBudgetCurrency, '3.072');
+
+  const missing = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+  const { reservationId: r2 } = addAllocatedReservation(missing, { travellerId });
+  missing.budgets.push({ id: id(), revision: 1, organisationId: orgId, amount: '5.000', currency: 'KWD', valid: { start: null, end: null } });
+  missing.costAllocations.push({ id: id(), reservationId: r2, payerOrganisationId: orgId, payerTravellerId: null, entryKind: 'FARE', amount: '10.00', currency: 'USD', fxObservationId: null, evidenceId: null });
+  const unknown = fundingEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world: missing, effective: effectiveOf(missing) });
+  assert.equal(unknown.dimensions.find((d) => d.dimension === 'funding')?.explanations[0]?.reasonCode, 'fx_missing');
+});
+
 test('funding: a traveller payer UNKNOWNs payer_home_currency_unknown and never PASSes', () => {
   const journeyId = id();
   const travellerId = id();
