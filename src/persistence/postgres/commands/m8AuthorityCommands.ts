@@ -29,7 +29,13 @@ import { evaluateConsequentialAuthorization } from '../../../resolution/authorit
 import type { AssessmentView } from '../world/pgAssessments.ts';
 import type { AuthorityEnvelope, Approval, ApprovalRevocation, AuthorityDecision } from '../../../contracts/v2/authority/authorityEnvelope.ts';
 import type { AuthorityGrant } from '../../../domain/v2/people/traveller.ts';
-import type { ActionPlan } from '../../../contracts/v2/action/actionPlan.ts';
+import { ActionPlanSchema, validateActionPlanAcyclic, type ActionPlan } from '../../../contracts/v2/action/actionPlan.ts';
+import {
+  evaluateStoredExecutionGate,
+  findBlockingAttempt,
+  findKnownSuccessAttempt,
+} from '../execution/storedExecutionGate.ts';
+import type { Pool } from '../pool.ts';
 
 const SCHEMA_VERSION = '1';
 
@@ -136,7 +142,15 @@ export async function persistActionPlan(
     planVersion?: number;
   },
 ): Promise<ExecuteOutcome<{ planId: string; intentIds: string[] }>> {
-  const { plan } = params;
+  let plan: ActionPlan;
+  try {
+    plan = ActionPlanSchema.parse(params.plan);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', message, []) };
+  }
+  const acyclic = validateActionPlanAcyclic(plan);
+  if (!acyclic.ok) return acyclic;
   const planVersion = params.planVersion ?? 1;
   const planRef = ref('ACTION_PLAN', plan.id);
   const intentIds = plan.intents.map((i) => i.id);
@@ -306,20 +320,46 @@ export async function holdBudgetForIntent(
     budgetId: string;
     expectedBudgetRevision: number;
     actionIntentId: string;
-    requested: ExactMoney;
+    /** Ignored when intent has stored cost — authoritative amount comes from action_intents. */
+    requested?: ExactMoney;
     approvedCeiling?: ExactMoney;
     commitmentId?: string;
   },
 ): Promise<ExecuteOutcome<{ commitmentId: string; holdAmount: ExactMoney; budgetRevision: number }>> {
   const commitmentId = params.commitmentId ?? randomUUID();
   const budgetRef = ref('BUDGET', params.budgetId);
+  const intentRef = ref('ACTION_INTENT', params.actionIntentId);
   return submit({
     uow, identity: params, commandType: 'BUDGET_HOLD_CREATED', destinationKind: 'BUDGET',
-    payload: { budgetId: params.budgetId, actionIntentId: params.actionIntentId, requested: params.requested, commitmentId },
+    payload: { budgetId: params.budgetId, actionIntentId: params.actionIntentId, commitmentId },
     expectedAggregateRevisions: [{ aggregateRef: budgetRef, expectedRevision: params.expectedBudgetRevision }],
-    refs: [budgetRef],
+    refs: [budgetRef, intentRef],
     body: async ({ lockedHeads }) => {
       const client = currentTransactionClient();
+      const intentCost = await client.query<{ cost_amount: string | null; cost_currency: string | null }>(
+        `SELECT cost_amount::text AS cost_amount, cost_currency
+           FROM action_intents WHERE workspace_id = $1 AND id = $2`,
+        [params.workspaceId, params.actionIntentId],
+      );
+      const costRow = intentCost.rows[0];
+      if (!costRow) {
+        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'action intent missing', [intentRef]) };
+      }
+      const requested: ExactMoney | undefined = costRow.cost_amount && costRow.cost_currency
+        ? { amount: costRow.cost_amount, currency: costRow.cost_currency }
+        : params.requested;
+      if (!requested) {
+        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'uncosted intent has no hold amount', [intentRef]) };
+      }
+      if (params.requested && costRow.cost_amount && costRow.cost_currency) {
+        if (params.requested.currency !== costRow.cost_currency
+          || params.requested.amount !== costRow.cost_amount) {
+          return {
+            ok: false,
+            conflict: typedConflict('VALIDATION_FAILED', 'requested hold must match stored intent cost', [intentRef]),
+          };
+        }
+      }
       const budget = await client.query<{ amount: string; currency: string }>(
         'SELECT amount::text AS amount, currency FROM budgets WHERE workspace_id = $1 AND id = $2 FOR UPDATE',
         [params.workspaceId, params.budgetId],
@@ -342,7 +382,7 @@ export async function holdBudgetForIntent(
           status: c.status,
         })),
         actionIntentId: params.actionIntentId,
-        requested: params.requested,
+        requested,
         ...(params.approvedCeiling ? { approvedCeiling: params.approvedCeiling } : {}),
       });
       if (!admission.ok) {
@@ -390,27 +430,56 @@ export async function createPreparedExecutionAttempt(
     intentId: string;
     attemptNumber: number;
     providerOperationKey?: string;
+    principalId: string;
+    now: string;
   },
-): Promise<ExecuteOutcome<{ attemptId: string }>> {
+): Promise<ExecuteOutcome<{ attemptId: string; replayed?: boolean; knownSuccess?: boolean; authorityDecisionId?: string }>> {
   const attemptId = params.attemptId ?? randomUUID();
   const planRef = ref('ACTION_PLAN', params.planId);
+  const intentRef = ref('ACTION_INTENT', params.intentId);
   return submit({
     uow, identity: params, commandType: 'EXECUTION_ATTEMPT_PREPARED', destinationKind: 'EXECUTION_ATTEMPT',
     payload: { attemptId, intentId: params.intentId, attemptNumber: params.attemptNumber },
-    refs: [planRef],
-    body: async () => {
+    refs: [planRef, intentRef],
+    body: async (): Promise<BodyResult<{ attemptId: string; replayed?: boolean; knownSuccess?: boolean }>> => {
       const client = currentTransactionClient();
-      const intentRow = await client.query<{ logical_operation_key: string | null; request_fingerprint: string | null }>(
-        'SELECT logical_operation_key, request_fingerprint FROM action_intents WHERE workspace_id = $1 AND id = $2',
-        [params.workspaceId, params.intentId],
-      );
-      const intent = intentRow.rows[0];
-      if (!intent) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'action intent missing', [planRef]) };
-      if (!intent.logical_operation_key || !intent.request_fingerprint) {
-        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'action intent has no compiled dispatch identity', [planRef]) };
+      const pool = client as unknown as Pool;
+      const gate = await evaluateStoredExecutionGate(pool, {
+        workspaceId: params.workspaceId,
+        intentId: params.intentId,
+        principalId: params.principalId,
+        now: params.now,
+      });
+      if (!gate.allowed) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', `${gate.reason}${gate.detail ? `: ${gate.detail}` : ''}`, [planRef]),
+        };
       }
-      const logicalOperationKey = intent.logical_operation_key;
-      const requestFingerprint = intent.request_fingerprint;
+      const logicalOperationKey = gate.intent.logicalOperationKey;
+      const requestFingerprint = gate.intent.requestFingerprint;
+
+      const knownSuccess = await findKnownSuccessAttempt(client, params.workspaceId, logicalOperationKey, requestFingerprint);
+      if (knownSuccess) {
+        return { ok: true, value: { attemptId: knownSuccess.id, replayed: true, knownSuccess: true }, advanced: [] };
+      }
+
+      const blocking = await findBlockingAttempt(client, params.workspaceId, logicalOperationKey, requestFingerprint);
+      if (blocking && blocking.request_fingerprint !== requestFingerprint) {
+        return {
+          ok: false,
+          conflict: typedConflict('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH', `attempt ${blocking.id}`, [planRef]),
+        };
+      }
+      if (blocking && blocking.request_fingerprint === requestFingerprint) {
+        if (['PREPARED', 'CLAIMED', 'DISPATCHING', 'DISPATCHED', 'OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED'].includes(blocking.status)) {
+          return {
+            ok: false,
+            conflict: typedConflict('VALIDATION_FAILED', `reconcile attempt ${blocking.id} before new dispatch`, [planRef]),
+          };
+        }
+        return { ok: true, value: { attemptId: blocking.id, replayed: true, knownSuccess: true }, advanced: [] };
+      }
 
       // M7's ActionPlan DAG (action_dependencies) is honored here: a downstream
       // intent may not prepare a dispatch attempt until every intent it depends
@@ -442,33 +511,18 @@ export async function createPreparedExecutionAttempt(
           conflict: typedConflict('VALIDATION_FAILED', `prerequisite intent ${unresolvedPrerequisite.from_action_intent_id} has not completed; downstream dispatch blocked`, [planRef]),
         };
       }
-      const prior = await client.query<{ request_fingerprint: string; status: string; id: string }>(
-        `SELECT id, request_fingerprint, status FROM execution_attempts
-          WHERE workspace_id = $1 AND logical_operation_key = $2`,
-        [params.workspaceId, logicalOperationKey],
-      );
-      const conflict = prior.rows.find((r) => r.request_fingerprint !== requestFingerprint);
-      if (conflict) {
-        return { ok: false, conflict: typedConflict('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH', `attempt ${conflict.id}`, [planRef]) };
-      }
-      const unresolved = prior.rows.find((r) =>
-        ['CLAIMED', 'DISPATCHING', 'DISPATCHED', 'OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED'].includes(r.status),
-      );
-      if (unresolved) {
-        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `reconcile attempt ${unresolved.id} before new dispatch`, [planRef]) };
-      }
       await registerChildSubject({
         workspaceId: params.workspaceId, id: attemptId, kind: 'EXECUTION_ATTEMPT', aggregateId: params.planId,
       });
       await client.query(
         `INSERT INTO execution_attempts (
            workspace_id, id, action_intent_id, attempt_number, logical_operation_key, request_fingerprint,
-           status, provider_operation_key, created_by_actor_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,'PREPARED',$7,$8)`,
+           status, provider_operation_key, authority_decision_id, created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,'PREPARED',$7,$8,$9)`,
         [
           params.workspaceId, attemptId, params.intentId, params.attemptNumber,
           logicalOperationKey, requestFingerprint,
-          params.providerOperationKey ?? null, params.actorPrincipalId,
+          params.providerOperationKey ?? null, gate.authorityDecisionId, params.actorPrincipalId,
         ],
       );
       return { ok: true, value: { attemptId }, advanced: [] };

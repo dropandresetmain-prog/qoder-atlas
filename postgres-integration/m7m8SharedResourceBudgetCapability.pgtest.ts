@@ -74,6 +74,7 @@ import type { WJourney, WObjective, WProgrammeItem, WParticipation, WJourneyItem
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
+import { prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -81,6 +82,8 @@ after(async () => {
 });
 
 const NOW = '2031-09-01T00:00:00.000Z';
+/** After NOW so seedStoredExecutionAuthority is the gate's latest decision. */
+const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
@@ -376,6 +379,7 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
   test('SELECT_OFFER compiles under a planner-side supported:true capability statement, but the executor observes supported:false and never invokes the dispatcher', async () => {
     const pool = await sharedTestPool();
     const seed = await beginSeed(pool, 'M7-M8 capability refusal: SELECT_OFFER');
+    const seededTraveller = await seedTraveller(seed, { displayName: 'Capability Traveller' });
     await commitSeed(seed);
 
     const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
@@ -392,7 +396,7 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     // offer selection still applies and still compiles for real.
     const journeyId = randomUUID();
     const tripId = randomUUID();
-    const travellerId = randomUUID();
+    const travellerId = seededTraveller.travellerId;
     const itemId = randomUUID();
     const serviceId = randomUUID();
     const offerId = randomUUID();
@@ -461,7 +465,7 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     }));
     const envelopeInput: EnvelopeFingerprintInput = {
       actionPlanId: plan.id, actionPlanVersion: 1, actionIntentId: compiledIntent.id, actionIntentVersion: 1,
-      requiredActorRoles: ['CASE_OWNER'], scope: [{ kind: 'ACTION_INTENT', id: compiledIntent.id }], grantRefs: [], ruleInputs: [],
+      requiredActorRoles: ['CASE_OWNER'], scope: [{ kind: 'TRAVELLER', id: travellerId }], grantRefs: [], ruleInputs: [],
     };
     const fingerprint = computeEnvelopeFingerprint(envelopeInput);
     const decision = mustOk(await issueAuthorityDecision(uow(), {
@@ -498,10 +502,18 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     const preAuth = authorizeDispatch(authorization);
     assert.equal(preAuth.allowed, true);
 
-    mustOk(await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: compiledIntent.id, attemptNumber: 1,
-    }));
+    await seedStoredExecutionAuthority({
+      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      planId: plan.id, intentId: compiledIntent.id,
+      scope: envelopeInput.scope,
+      representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
+      requirementRole: 'CASE_OWNER',
+      now: EXEC_NOW,
+    });
+    mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: compiledIntent.id, principalId, now: EXEC_NOW,
+    })));
 
     // --- The executor is the one that discovers the truth: the observed
     // capability is unsupported. The dispatcher must NEVER be invoked, and
@@ -511,7 +523,8 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     assert.ok(claim);
     let dispatcherInvoked = false;
     const result = await worker.dispatchClaimed(claim!, {
-      capability: { required: 'BOOK', observed: { capabilityKind: 'BOOK', supported: false } },
+      principalId, now: EXEC_NOW,
+      observed: { capabilityKind: 'SERVICE', supported: false },
       dispatcher: async () => {
         dispatcherInvoked = true;
         return { kind: 'SUCCESS', responseRef: 'should-never-happen', sourceOwnedFields: {} };

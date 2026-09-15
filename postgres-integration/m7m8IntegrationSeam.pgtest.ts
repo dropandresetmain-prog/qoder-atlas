@@ -56,6 +56,11 @@ import type { WJourney, WObjective, WProgrammeItem, WParticipation } from '../sr
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
+import {
+  prepareParams,
+  persistStrategyChangeRow,
+  seedStoredExecutionAuthority,
+} from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -63,6 +68,8 @@ after(async () => {
 });
 
 const NOW = '2031-09-01T00:00:00.000Z';
+/** After NOW so seedStoredExecutionAuthority is the gate's latest decision. */
+const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
@@ -236,10 +243,18 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     assert.equal(allowed.allowed, true);
 
     // --- Durable execution accepts the real compiled+persisted intent identity. ---
-    const attempt = mustOk(await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: compiledIntent.id, attemptNumber: 1,
-    }));
+    await seedStoredExecutionAuthority({
+      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      planId: plan.id, intentId: compiledIntent.id,
+      scope: envelopeInput.scope,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requirementRole: 'CASE_OWNER',
+      now: EXEC_NOW,
+    });
+    const attempt = mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: compiledIntent.id, principalId, now: EXEC_NOW,
+    })));
     const attemptRow = await pool.query<{ logical_operation_key: string; request_fingerprint: string; status: string }>(
       'SELECT logical_operation_key, request_fingerprint, status FROM execution_attempts WHERE id = $1',
       [attempt.attemptId],
@@ -373,11 +388,19 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     assert.equal(preAuth.allowed, true);
 
     // --- Durable internal execution: the REAL M4 command mutates the REAL programme_items row. ---
-    const result = mustOk(await executeInternalProgrammeItemSchedule(uow(), {
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange);
+    await seedStoredExecutionAuthority({
+      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      planId: plan.id, intentId: compiledIntent.id,
+      scope: envelopeInput.scope,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requirementRole: 'CASE_OWNER',
+      now: EXEC_NOW,
+    });
+    const result = mustOk(await executeInternalProgrammeItemSchedule(pool, uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      authorization, planId: plan.id, intentId: compiledIntent.id, attemptNumber: 1,
-      programmeId, programmeItemId, expectedProgrammeRevision: 1,
-      schedule: { window: proposedWindow },
+      planId: plan.id, intentId: compiledIntent.id, attemptNumber: 1,
+      principalId, now: EXEC_NOW,
     }));
 
     const attemptRow = await pool.query<{ status: string }>(

@@ -85,6 +85,7 @@ import type {
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
+import { prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -92,6 +93,8 @@ after(async () => {
 });
 
 const NOW = '2031-10-01T00:00:00.000Z';
+/** After NOW so seedStoredExecutionAuthority is the gate's latest decision. */
+const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
@@ -427,10 +430,18 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
 
     // --- Durable execution: claim, dispatch (provider response lost),
     // blocked blind redispatch while unknown, then reconcile via lookup. ---
-    mustOk(await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: compiledIntent.id, attemptNumber: 1,
-    }));
+    await seedStoredExecutionAuthority({
+      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      planId: plan.id, intentId: compiledIntent.id,
+      scope: envelopeInput.scope,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requirementRole: 'CASE_OWNER',
+      now: EXEC_NOW,
+    });
+    mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: compiledIntent.id, principalId, now: EXEC_NOW,
+    })));
 
     const worker = new PgExecutionWorker(pool, { actorId: 'worker-offer-select' });
     const claim = await worker.claimNext(seed.workspaceId);
@@ -438,7 +449,8 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     assert.equal(claim!.actionIntentId, compiledIntent.id);
 
     const lost = await worker.dispatchClaimed(claim!, {
-      capability: { required: 'SERVICE', observed: { capabilityKind: 'SERVICE', supported: true } },
+      principalId, now: EXEC_NOW,
+      observed: { capabilityKind: 'SERVICE', supported: true },
       dispatcher: async () => ({ kind: 'LOST_RESPONSE', requestRef: 'req-offer-select-1' }),
     });
     assert.equal(lost.outcome, 'OUTCOME_UNKNOWN');
@@ -450,10 +462,11 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
 
     // Blind redispatch must stay blocked while the outcome is unknown — no
     // duplicate dispatch of the same external offer-selection operation.
-    const blockedRedispatch = await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: compiledIntent.id, attemptNumber: 2,
-    });
+    const blockedRedispatch = await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: compiledIntent.id, principalId,
+      attemptNumber: 2, now: EXEC_NOW,
+    }));
     assert.equal(blockedRedispatch.ok, false);
 
     const refreshed = { ...claim!, status: 'OUTCOME_UNKNOWN' as const };

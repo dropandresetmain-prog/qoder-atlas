@@ -12,6 +12,11 @@ import {
   mayHaveBeenSent,
   type DurableExecutionStatus,
 } from '../../../resolution/execution/stateMachine.ts';
+import {
+  externalCapabilityKindFromRef,
+  evaluateStoredExecutionGate,
+  isInternalCapability,
+} from './storedExecutionGate.ts';
 import { requireProviderCapability, type CapabilityKind } from '../../../resolution/execution/capability.ts';
 import { transitionExecutionAttempt } from '../commands/m8AuthorityCommands.ts';
 
@@ -39,6 +44,13 @@ export type ReconcileLookup = (claim: ExecutionClaim) => Promise<
   | { kind: 'FOUND_FAILURE'; responseRef?: string; error: string }
   | { kind: 'STILL_UNKNOWN' }
 >;
+
+const RECONCILABLE_STATUSES: DurableExecutionStatus[] = [
+  'OUTCOME_UNKNOWN',
+  'RECONCILIATION_REQUIRED',
+  'DISPATCHING',
+  'DISPATCHED',
+];
 
 export class PgExecutionWorker {
   private readonly pool: Pool;
@@ -90,21 +102,88 @@ export class PgExecutionWorker {
     };
   }
 
+  /** Claim an uncertain attempt for reconciliation without redispatching. */
+  async claimForReconciliation(workspaceId: string, attemptId: string): Promise<ExecutionClaim | undefined> {
+    const claimToken = randomUUID();
+    const leaseSeconds = this.options.leaseSeconds ?? 60;
+    const result = await this.pool.query<{
+      id: string; workspace_id: string; action_intent_id: string; attempt_number: number;
+      logical_operation_key: string; request_fingerprint: string; fencing_token: string;
+      status: DurableExecutionStatus; provider_operation_key: string | null;
+    }>(
+      `UPDATE execution_attempts
+          SET status = 'RECONCILIATION_REQUIRED', claim_token = $4, fencing_token = fencing_token + 1,
+              lease_expires_at = now() + ($5 * interval '1 second'), updated_at = now()
+        WHERE workspace_id = $1 AND id = $2
+          AND status = ANY($3::text[])
+        RETURNING id, workspace_id, action_intent_id, attempt_number, logical_operation_key,
+                  request_fingerprint, fencing_token, status, provider_operation_key`,
+      [workspaceId, attemptId, RECONCILABLE_STATUSES, claimToken, leaseSeconds],
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      workspaceId: row.workspace_id,
+      actionIntentId: row.action_intent_id,
+      attemptNumber: row.attempt_number,
+      logicalOperationKey: row.logical_operation_key,
+      requestFingerprint: row.request_fingerprint,
+      claimToken,
+      fencingToken: Number(row.fencing_token),
+      status: 'RECONCILIATION_REQUIRED',
+      providerOperationKey: row.provider_operation_key,
+    };
+  }
+
   /**
    * Durable path: CLAIMED → DISPATCHING (committed) → adapter → DISPATCHED /
-   * OBSERVED_* / OUTCOME_UNKNOWN. Capability must be supported; otherwise
-   * structured unavailable without fake success.
+   * OBSERVED_* / OUTCOME_UNKNOWN. Re-checks stored authority/currentness at
+   * dispatch time; capability derived from stored intent.capabilityRef.
    */
   async dispatchClaimed(
     claim: ExecutionClaim,
     params: {
-      capability: { required: CapabilityKind; observed?: { capabilityKind: CapabilityKind; supported: boolean } | null };
+      principalId: string;
+      now: string;
+      observed?: { capabilityKind: CapabilityKind; supported: boolean } | null;
       dispatcher: ExternalDispatcher;
     },
   ): Promise<{ outcome: DurableExecutionStatus; detail?: string }> {
+    const gate = await evaluateStoredExecutionGate(this.pool, {
+      workspaceId: claim.workspaceId,
+      intentId: claim.actionIntentId,
+      principalId: params.principalId,
+      now: params.now,
+    });
+    if (!gate.allowed) {
+      await transitionExecutionAttempt(this.pool, {
+        workspaceId: claim.workspaceId,
+        attemptId: claim.id,
+        from: 'CLAIMED',
+        to: 'FAILED',
+        claimToken: claim.claimToken,
+        fencingToken: claim.fencingToken,
+        lastError: `${gate.reason}:${gate.detail ?? ''}`,
+      });
+      return { outcome: 'FAILED', detail: gate.detail ?? gate.reason };
+    }
+    if (isInternalCapability(gate.capabilityRef)) {
+      await transitionExecutionAttempt(this.pool, {
+        workspaceId: claim.workspaceId,
+        attemptId: claim.id,
+        from: 'CLAIMED',
+        to: 'FAILED',
+        claimToken: claim.claimToken,
+        fencingToken: claim.fencingToken,
+        lastError: 'internal capability cannot use external dispatcher',
+      });
+      return { outcome: 'FAILED', detail: 'internal capability cannot use external dispatcher' };
+    }
+    const required = externalCapabilityKindFromRef(gate.capabilityRef) ?? 'SERVICE';
     const capability = requireProviderCapability({
-      required: params.capability.required,
-      observed: params.capability.observed,
+      required,
+      observed: params.observed,
     });
     if (!capability.ok) {
       await transitionExecutionAttempt(this.pool, {
@@ -174,7 +253,6 @@ export class PgExecutionWorker {
       return { outcome: 'OBSERVED_FAILURE', detail: result.error };
     }
 
-    // Persist observation then mark success.
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -214,43 +292,69 @@ export class PgExecutionWorker {
     }
   }
 
-  /** Reconcile OUTCOME_UNKNOWN / RECONCILIATION_REQUIRED via provider lookup — never blind retry. */
+  /** Reconcile uncertain attempts via provider lookup — never blind retry. */
   async reconcileUnknown(claim: ExecutionClaim, lookup: ReconcileLookup): Promise<{ outcome: DurableExecutionStatus }> {
-    if (!mayHaveBeenSent(claim.status) && claim.status !== 'OUTCOME_UNKNOWN' && claim.status !== 'RECONCILIATION_REQUIRED') {
+    if (!RECONCILABLE_STATUSES.includes(claim.status) && claim.status !== 'OUTCOME_UNKNOWN') {
       return { outcome: claim.status };
     }
-    const from: DurableExecutionStatus = claim.status === 'OUTCOME_UNKNOWN' ? 'OUTCOME_UNKNOWN' : 'RECONCILIATION_REQUIRED';
-    if (claim.status === 'OUTCOME_UNKNOWN') {
-      await transitionExecutionAttempt(this.pool, {
-        workspaceId: claim.workspaceId,
-        attemptId: claim.id,
-        from: 'OUTCOME_UNKNOWN',
-        to: 'RECONCILIATION_REQUIRED',
-        claimToken: claim.claimToken,
-        fencingToken: claim.fencingToken,
-      });
+
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      if (claim.status === 'OUTCOME_UNKNOWN' || claim.status === 'DISPATCHING' || claim.status === 'DISPATCHED') {
+        const toRecon = claim.status === 'OUTCOME_UNKNOWN' ? 'OUTCOME_UNKNOWN' : claim.status;
+        const moved = await transitionExecutionAttempt(client, {
+          workspaceId: claim.workspaceId,
+          attemptId: claim.id,
+          from: toRecon,
+          to: 'RECONCILIATION_REQUIRED',
+          claimToken: claim.claimToken,
+          fencingToken: claim.fencingToken,
+        });
+        if (moved !== 'APPLIED') {
+          await client.query('ROLLBACK');
+          return { outcome: claim.status };
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
+
     const found = await lookup(claim);
     if (found.kind === 'STILL_UNKNOWN') {
       return { outcome: 'RECONCILIATION_REQUIRED' };
     }
-    if (found.kind === 'FOUND_FAILURE') {
-      await transitionExecutionAttempt(this.pool, {
-        workspaceId: claim.workspaceId,
-        attemptId: claim.id,
-        from: 'RECONCILIATION_REQUIRED',
-        to: 'OBSERVED_FAILURE',
-        claimToken: claim.claimToken,
-        fencingToken: claim.fencingToken,
-        responseRef: found.responseRef,
-        lastError: found.error,
-      });
-      return { outcome: 'OBSERVED_FAILURE' };
-    }
-    const client = await this.pool.connect();
+
+    const reconClient = await this.pool.connect();
     try {
-      await client.query('BEGIN');
-      await client.query(
+      await reconClient.query('BEGIN');
+
+      if (found.kind === 'FOUND_FAILURE') {
+        const moved = await transitionExecutionAttempt(reconClient, {
+          workspaceId: claim.workspaceId,
+          attemptId: claim.id,
+          from: 'RECONCILIATION_REQUIRED',
+          to: 'OBSERVED_FAILURE',
+          claimToken: claim.claimToken,
+          fencingToken: claim.fencingToken,
+          responseRef: found.responseRef,
+          lastError: found.error,
+        });
+        if (moved !== 'APPLIED') {
+          await reconClient.query('ROLLBACK');
+          return { outcome: 'RECONCILIATION_REQUIRED' };
+        }
+        await reconClient.query('COMMIT');
+        return { outcome: 'OBSERVED_FAILURE' };
+      }
+
+      await reconClient.query(
         `INSERT INTO execution_observations (
            workspace_id, id, attempt_id, action_intent_id, origin, external_record_id,
            source_owned_fields, observed_at, owned_subject_refs, created_by_actor_id
@@ -263,22 +367,26 @@ export class PgExecutionWorker {
           this.options.actorId,
         ],
       );
-      await transitionExecutionAttempt(client, {
+      const moved = await transitionExecutionAttempt(reconClient, {
         workspaceId: claim.workspaceId,
         attemptId: claim.id,
-        from: from === 'OUTCOME_UNKNOWN' ? 'RECONCILIATION_REQUIRED' : 'RECONCILIATION_REQUIRED',
+        from: 'RECONCILIATION_REQUIRED',
         to: 'OBSERVED_SUCCESS',
         claimToken: claim.claimToken,
         fencingToken: claim.fencingToken,
         responseRef: found.responseRef,
       });
-      await client.query('COMMIT');
+      if (moved !== 'APPLIED') {
+        await reconClient.query('ROLLBACK');
+        return { outcome: 'RECONCILIATION_REQUIRED' };
+      }
+      await reconClient.query('COMMIT');
       return { outcome: 'OBSERVED_SUCCESS' };
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
+      await reconClient.query('ROLLBACK').catch(() => undefined);
       throw error;
     } finally {
-      client.release();
+      reconClient.release();
     }
   }
 }

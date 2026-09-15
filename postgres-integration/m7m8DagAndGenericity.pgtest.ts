@@ -56,6 +56,7 @@ import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessm
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ActionIntent } from '../src/contracts/v2/action/actionPlan.ts';
+import { prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -63,6 +64,8 @@ after(async () => {
 });
 
 const NOW = '2031-09-01T00:00:00.000Z';
+/** After NOW so seedStoredExecutionAuthority is the gate's latest decision. */
+const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
@@ -337,10 +340,18 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     });
     assert.equal(upstreamAllowed.allowed, true);
 
-    const upstreamAttempt = mustOk(await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: allocIntent.id, attemptNumber: 1,
-    }));
+    await seedStoredExecutionAuthority({
+      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      planId: plan.id, intentId: allocIntent.id,
+      scope: upstreamScope,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requirementRole: 'CASE_OWNER',
+      now: EXEC_NOW,
+    });
+    const upstreamAttempt = mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: allocIntent.id, principalId, now: EXEC_NOW,
+    })));
     const upstreamAttemptRow = await pool.query<{ status: string }>(
       'SELECT status FROM execution_attempts WHERE id = $1', [upstreamAttempt.attemptId],
     );
@@ -401,10 +412,18 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     // the only question is whether the DAG edge blocks preparation.
     assert.equal(downstreamAllowed.allowed, true);
 
-    const downstreamAttempt = await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: programmeIntent.id, attemptNumber: 1,
+    await seedStoredExecutionAuthority({
+      pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      planId: plan.id, intentId: programmeIntent.id,
+      scope: downstreamScope,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requirementRole: 'CASE_OWNER',
+      now: EXEC_NOW,
     });
+    const downstreamAttempt = await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: programmeIntent.id, principalId, now: EXEC_NOW,
+    }));
     assert.equal(downstreamAttempt.ok, false);
     if (!downstreamAttempt.ok) {
       assert.match(downstreamAttempt.conflict.message, /prerequisite intent .* has not completed/);
@@ -420,10 +439,10 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       `UPDATE execution_attempts SET status = 'OBSERVED_SUCCESS', updated_at = now() WHERE id = $1`,
       [upstreamAttempt.attemptId],
     );
-    const downstreamAttemptAfter = mustOk(await createPreparedExecutionAttempt(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      planId: plan.id, intentId: programmeIntent.id, attemptNumber: 1,
-    }));
+    const downstreamAttemptAfter = mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
+      workspaceId: seed.workspaceId, actorId: seed.actorId,
+      planId: plan.id, intentId: programmeIntent.id, principalId, now: EXEC_NOW,
+    })));
     const downstreamAttemptRow = await pool.query<{ status: string }>(
       'SELECT status FROM execution_attempts WHERE id = $1', [downstreamAttemptAfter.attemptId],
     );

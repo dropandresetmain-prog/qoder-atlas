@@ -126,16 +126,25 @@ export async function saveAssessment(pool: Pool, workspaceId: string, result: As
 }
 
 /** Reads a stored assessment back into the contract shape (manifest reconstructed from input rows + detail). */
-export async function loadAssessment(pool: Pool, workspaceId: string, assessmentId: string): Promise<AssessmentResult | undefined> {
+export async function loadAssessment(pool: Pool | PoolClient, workspaceId: string, assessmentId: string): Promise<AssessmentResult | undefined> {
   const header = await pool.query<{ id: string; kind: string; subject_kind: string; subject_id: string; evaluated_at: Date; overall_verdict: string; next_invalidation_at: Date | null; manifest_detail: { capture: unknown; coverageReads: unknown[]; missingCoverage: unknown[]; evaluatedAt: string } }>(
     'SELECT * FROM assessments WHERE workspace_id = $1 AND id = $2', [workspaceId, assessmentId]);
   const row = header.rows[0];
   if (!row) return undefined;
-  const [subjects, results, inputs] = await Promise.all([
-    pool.query<{ subject_kind: string; subject_id: string; role: string }>('SELECT subject_kind, subject_id, role FROM assessment_subjects WHERE workspace_id = $1 AND assessment_id = $2 ORDER BY role, subject_kind, subject_id', [workspaceId, assessmentId]),
-    pool.query<{ dimension: string; verdict: string; applicable: boolean; blocking: boolean; explanations: unknown[] }>('SELECT dimension, verdict, applicable, blocking, explanations FROM assessment_results WHERE workspace_id = $1 AND assessment_id = $2 ORDER BY dimension', [workspaceId, assessmentId]),
-    pool.query<{ input_kind: string; input_key: string; revision: string | null; generation: string | null; version: string | null }>('SELECT input_kind, input_key, revision, generation, version FROM assessment_inputs WHERE workspace_id = $1 AND assessment_id = $2 ORDER BY input_kind, input_key', [workspaceId, assessmentId]),
-  ]);
+  // Sequential queries: this may run on an ambient UnitOfWork PoolClient, which
+  // cannot safely multiplex concurrent queries on one connection.
+  const subjects = await pool.query<{ subject_kind: string; subject_id: string; role: string }>(
+    'SELECT subject_kind, subject_id, role FROM assessment_subjects WHERE workspace_id = $1 AND assessment_id = $2 ORDER BY role, subject_kind, subject_id',
+    [workspaceId, assessmentId],
+  );
+  const results = await pool.query<{ dimension: string; verdict: string; applicable: boolean; blocking: boolean; explanations: unknown[] }>(
+    'SELECT dimension, verdict, applicable, blocking, explanations FROM assessment_results WHERE workspace_id = $1 AND assessment_id = $2 ORDER BY dimension',
+    [workspaceId, assessmentId],
+  );
+  const inputs = await pool.query<{ input_kind: string; input_key: string; revision: string | null; generation: string | null; version: string | null }>(
+    'SELECT input_kind, input_key, revision, generation, version FROM assessment_inputs WHERE workspace_id = $1 AND assessment_id = $2 ORDER BY input_kind, input_key',
+    [workspaceId, assessmentId],
+  );
   const split = (key: string) => {
     const at = key.indexOf(':');
     return [key.slice(0, at), key.slice(at + 1)] as const;
@@ -183,7 +192,13 @@ export interface AssessmentView {
 }
 
 /** Currentness from the database and the injected clock — never from a cached label. */
-export async function currentAssessmentView(pool: Pool, workspaceId: string, subject: TypedRef, kind: AssessmentKind, now: Instant): Promise<AssessmentView> {
+export async function currentAssessmentView(
+  pool: Pool | PoolClient,
+  workspaceId: string,
+  subject: TypedRef,
+  kind: AssessmentKind,
+  now: Instant,
+): Promise<AssessmentView> {
   const latestId = await latestAssessmentId(pool, workspaceId, subject, kind);
   const work = await pool.query<{ id: string; reason: string; state: string; attempts: number; last_error: string | null; cause_assessment_id: string | null }>(
     `SELECT id, reason, state, attempts, last_error, cause_assessment_id FROM scheduled_reassessments

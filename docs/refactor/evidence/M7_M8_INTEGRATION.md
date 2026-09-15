@@ -1,9 +1,8 @@
 # M7 + M8 → C3 candidate integration evidence
 
-Status: **C3 CANDIDATE — NOT PASSED**. C3 is an independent review outside
-this integration package; this document records what the integration owner
-did and verified, not an acceptance decision. Do not treat anything below
-as a C3 PASS.
+Status: **C3 TARGETED-FIX CANDIDATE — READY FOR REVIEWER CONFIRMATION** (not
+C3 PASS). The original candidate evidence below is preserved; §11 records
+targeted remediation for reviewer Act Now findings AN-1 … AN-6.
 
 ## 1. Identity
 
@@ -191,5 +190,115 @@ additive-only-after-C0 rule, plus one line in the compiler to carry it onto
 
 ## 10. Next dependency
 
-C3 — independent authority/execution review of this candidate, per
-`docs/IMPLEMENTATION_PLAN.md` §2. Do not begin M9 before C3 closes.
+Return the targeted-fix candidate to the **same C3 reviewer** for
+confirmation. Do not begin M9 before C3 closes.
+
+## 11. C3 targeted remediation (reviewer Act Now AN-1 … AN-6)
+
+Reviewer base: `integration/m7-m8-c3` @ `ec5b07413168c2506473ae0c5220f97408db4108`.
+Remediation continues on the same branch lineage.
+
+### AN-1 — stored authority + live currentness gate
+
+**Root cause:** `authorizeDispatch` accepted caller-built envelope/assessment
+objects; `createPreparedExecutionAttempt` did not load `authority_decisions`,
+approvals, revocations, grants, or live `currentAssessmentView`.
+
+**Fix:** `src/persistence/postgres/execution/storedExecutionGate.ts`
+(`evaluateStoredExecutionGate`) builds the envelope from stored
+`action_intents` + `action_plans`, loads persisted authority bundle and grants,
+requires live `currentAssessmentView` for assessable subjects, and is invoked
+from `createPreparedExecutionAttempt` and `PgExecutionWorker.dispatchClaimed`.
+`authority_decision_id` stored on new attempts (migration `0113`).
+
+**Focused proof:** `postgres-integration/c3TargetedRemediation.pgtest.ts`
+(AN-1 A/B/C). AN-1C advances an assessment aggregate after authority and
+proves the same stored gate refuses prepare (live `currentAssessmentView`);
+dispatch-time re-check uses the identical `evaluateStoredExecutionGate` path.
+
+### AN-6 — budget hold from stored intent cost
+
+**Root cause:** `holdBudgetForIntent` treated caller `requested` as authoritative.
+
+**Fix:** `holdBudgetForIntent` loads `action_intents.cost_amount/cost_currency`
+and uses those for admission; gate requires a HELD commitment matching stored
+cost for costed intents.
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` (AN-6).
+
+### AN-2 — internal programme executor bound to stored intent
+
+**Root cause:** `executeInternalProgrammeItemSchedule` trusted caller
+authorization/programmeItem/schedule; M4 failure left DISPATCHED attempts.
+
+**Fix:** Executor loads schedule from `strategy_changes` (or embedded
+`recovery_strategies.scenario_change`), runs canonical gate via prepare,
+uses stored `PROGRAMME_ITEM` subject ref, records `OBSERVED_FAILURE` on M4
+reject, uses real `programmeRevision` from command receipt.
+
+**Focused proof:** `m7m8IntegrationSeam.pgtest.ts` programme path (updated).
+
+### AN-3 — known success must not dispatch again
+
+**Root cause:** Second prepare with new idempotency key could create a fresh
+attempt after `OBSERVED_SUCCESS`.
+
+**Fix:** `findKnownSuccessAttempt` replays; partial unique index
+`execution_attempts_one_live_logical_op_uidx` on non-retryable statuses.
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` (AN-3).
+
+### AN-4 — reconciliation honours fencing
+
+**Root cause:** Reconcile path ignored failed transitions and could insert
+observations after fence failure; crash states lacked claim path.
+
+**Fix:** `PgExecutionWorker.reconcileUnknown` checks every transition;
+atomic observation+terminal transition; `claimForReconciliation` for
+DISPATCHING/DISPATCHED/OUTCOME_UNKNOWN; `DISPATCHING → RECONCILIATION_REQUIRED`
+allowed in state machine.
+
+**Focused proof:** `m7m8CurrentnessAndReconciliation.pgtest.ts` (updated).
+
+### AN-5 — plan validation at persistence boundary
+
+**Root cause:** `persistActionPlan` could store cyclic/cross-plan edges.
+
+**Fix:** `ActionPlanSchema.parse` + `validateActionPlanAcyclic` at entry;
+DB trigger `action_dependencies_same_plan`.
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` (AN-5).
+
+### IN-1 — re-plan logical operation identity (Investigate Now → decision)
+
+**Decision:** **Ignore / Accept Risk** for code change — existing identity is
+sufficient when used as designed.
+
+- **Identity rule:** `(workspace_id, logical_operation_key)` where the key
+  embeds effect-specific ids (compiler) and `request_fingerprint` binds
+  `strategyVersion` + effect payload hash.
+- **Retry rule:** Same intent row ⇒ same key+fingerprint; safe retry after
+  `OBSERVED_FAILURE`/`FAILED` only (partial unique index excludes those).
+- **Re-plan rule:** Later strategy compiles a **new** `ActionIntent`
+  SubjectId ⇒ new key/fingerprint; not blocked by prior failed attempt.
+- **Duplicate irreversible action:** Prevented by success/in-flight partial
+  unique index + prepare-time replay of known success.
+
+M9 must not inherit an undecided identity — this decision closes IN-1.
+
+### Verification (targeted remediation)
+
+Ran on worktree `C:\Dev\qoder-atlas-m7-m8-c3`, branch `integration/m7-m8-c3`
+(base `ec5b074…`; changes uncommitted at evidence write):
+
+- `npm run typecheck` — pass
+- `npm run build` — pass
+- Focused PG suites (42 tests): `c3TargetedRemediation`, `m8AuthorityExecution`,
+  four `m7m8*` seam files — **42/42 pass**
+- `npm run test:postgres` — **415/416 pass** after registering migration `0113`
+  in `integrationCrossLane.pgtest.ts`
+
+**Park for Later:** `m2Travel.pgtest.ts` “every statement the read model emits
+can use the index its port names” — planner chose
+`idx_transport_item_details_destination` for an origin OR-query; unrelated to
+the C3 execution gate. Revisit if it keeps failing on a clean DB.
