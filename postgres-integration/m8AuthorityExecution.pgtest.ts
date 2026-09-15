@@ -117,7 +117,7 @@ async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload
     idempotencyKey: randomUUID(),
     openedAt: NOW,
   }));
-  const { plan, intentId, planId } = buildSingleIntentPlan({
+  const { plan } = buildSingleIntentPlan({
     recoveryCaseId: opened.caseId,
     organisationId,
     costEstimate: { amount: '40.00', currency: 'USD' },
@@ -131,9 +131,6 @@ async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload
     plan,
   }));
   return { pool, seed, uow, organisationId, principalId, caseId: opened.caseId, planId: persisted.planId, intentId: persisted.intentIds[0]! };
-  // planId/intentId above are identical to the local `planId`/`intentId` — kept
-  // from the command's own return value so tests assert against what actually
-  // committed, not just what was requested.
 }
 
 type BaseFixture = Awaited<ReturnType<typeof baseFixture>>;
