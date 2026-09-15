@@ -42,7 +42,7 @@ Next: Checkpoint 2 blocked on Sarah/product handoff.
 - [x] Typed read models + LDG + change-awareness
 - [x] Application commands + demo ingress + second-scenario foundation
 - [x] Focused unit + PG tests green
-- [ ] Checkpoint 1 commit + push (in progress)
+- [x] Checkpoint 1 commit + push (`a641da0`)
 
 ## Current blocker
 
