@@ -20,7 +20,7 @@
       "draftId": "ait-draft-14",
       "impactClass": "MATERIALLY_DISRUPTED_NO_TRAVEL_RECOVERY",
       "group": "C",
-      "reason": "Retimed arrival ~2026-10-01T07:10+08:00 leaves ~130min before the Day 1 headline interview (11:30), failing the 150min buffer. Simulated CGK→SIN inventory has no offer arriving by 03:20 on 1 Oct; travel-only recovery is exhausted. S3 must use the bilateral Sarah↔Daniel programme swap."
+      "reason": "Synthetic ID7153 arrives 2026-10-01T10:30+08:00, leaving 60 minutes before the Day-1 headline interview (11:30), failing the 150-minute readiness buffer. Travel-only recovery is exhausted. S3 must use the bilateral Sarah↔Daniel programme swap."
     },
     {
       "draftId": "ait-draft-03",
@@ -88,9 +88,10 @@
   ],
   "referencedCommitmentIds": [
     "cmt-ait-d1-headline-interview",
-    "cmt-ait-d1-india-fireside",
+    "cmt-ait-d1-agentic-provocation",
     "cmt-ait-d1-payments-keynote",
-    "cmt-ait-d1-payments-panel"
+    "cmt-ait-d1-payments-panel",
+    "cmt-ait-d1-local-host-session"
   ],
   "routeParams": [
     {

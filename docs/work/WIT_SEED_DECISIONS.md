@@ -1,7 +1,7 @@
 # WiT programme seed — implementation decisions
 
 Branch: `lane/wit-demo-programme-seed`  
-Base: `milestone-m9-product-integration` @ `a89f22a70d226896be2bcdfe9dc96cf4a6de68d1`  
+Base: M9 accepted tip @ `e6fdc9c76498a1397727db7b165513f227983d0a`  
 Freeze: `docs/work/WIT_DEMO_WORLD_PROGRAMME_SEED_FREEZE_v1.md` + Amendments A–C
 
 ## Amendment C — Daniel commitment ID
