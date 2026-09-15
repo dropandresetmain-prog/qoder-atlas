@@ -203,7 +203,12 @@ test('final-demo content: hero baselines viable before disruption; no impossible
     const arr = inboundArrival(t);
     assert.ok(arr, draftId);
     const gap = minutesBetween(arr, commitment.startsAt.value);
-    assert.ok(gap >= 360, `${draftId} baseline gap ${gap} < 360 to ${cmtId}`);
+    const requiredBuffer = 150;
+    if (draftId === 'ait-draft-14') {
+      assert.ok(gap < requiredBuffer, `${draftId} should require S3 programme recovery`);
+    } else {
+      assert.ok(gap >= requiredBuffer, `${draftId} gap ${gap} < ${requiredBuffer} to ${cmtId}`);
+    }
   }
 
   const jordan = byId.get('ait-draft-09');
@@ -236,8 +241,8 @@ test('final-demo content: S2 timing supports intended recovery stages', () => {
 
   const tr885Arr = '2026-09-30T14:35:00+08:00';
   const tr867Arr = '2026-09-30T20:45:00+08:00';
-  assert.ok(minutesBetween(tr885Arr, finals.startsAt.value) >= 360, 'TR885 clears evening finals');
-  assert.ok(minutesBetween(tr867Arr, finals.startsAt.value) <= 0, 'TR867 does not clear finals start');
+  assert.ok(minutesBetween(tr885Arr, finals.startsAt.value) >= 150, 'TR885 clears evening finals');
+  assert.ok(minutesBetween(tr867Arr, finals.startsAt.value) < 150, 'TR867 does not clear finals buffer');
 
   assert.equal(
     (jordan.anchorCommitmentIds ?? []).includes('cmt-ait-d0-hackathon-lab'),
@@ -245,25 +250,25 @@ test('final-demo content: S2 timing supports intended recovery stages', () => {
     'Jordan must not be bound to morning lab',
   );
   const stay = (jordan.declaredTravel ?? []).find((x) => x.itemKind === 'STAY');
-  assert.equal(stay?.checkIn, '2026-09-30T15:00:00+08:00');
+  assert.equal(stay?.checkIn, '2026-09-29T15:00:00+08:00');
 });
 
 test('final-demo content: S1 cohort differentiated + S3 programme path free', () => {
   const prog = load();
   const byId = new Map(prog.importDraft.travellers.map((t) => [t.draftId, t]));
   const headline = cmt(prog, 'cmt-ait-d1-headline-interview');
-  assert.equal(headline.startsAt.value, '2026-10-01T09:20:00+08:00');
+  assert.equal(headline.startsAt.value, '2026-10-01T11:30:00+08:00');
 
-  const rebookArr = '2026-10-01T07:00:00+08:00';
-  assert.ok(minutesBetween(rebookArr, headline.startsAt.value) < 360, 'critical fails');
+  const rebookArr = '2026-10-01T10:30:00+08:00';
+  assert.ok(minutesBetween(rebookArr, headline.startsAt.value) < 150, 'critical fails');
 
   const payments = cmt(prog, 'cmt-ait-d1-payments-keynote');
-  assert.ok(minutesBetween(rebookArr, payments.startsAt.value) >= 360, 'cohort can pass');
+  assert.ok(minutesBetween(rebookArr, payments.startsAt.value) >= 150, 'cohort can pass');
 
   const fireside = cmt(prog, 'cmt-ait-d1-recovery-fireside');
-  assert.equal(fireside.startsAt.value, '2026-10-01T14:30:00+08:00');
-  const s3TargetStart = Date.parse('2026-10-01T15:30:00+08:00');
-  assert.ok(Date.parse(fireside.endsAt.value) <= s3TargetStart, 'fireside must clear S3 15:30');
+  assert.equal(fireside.startsAt.value, '2026-10-01T15:30:00+08:00');
+  const searchStart = Date.parse('2026-10-01T16:05:00+08:00');
+  assert.ok(Date.parse(fireside.endsAt.value) <= searchStart, 'fireside must clear search chat');
 
   const daniel = byId.get('ait-draft-02');
   assert.ok(daniel);

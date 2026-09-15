@@ -435,21 +435,27 @@ export class ProgrammeService {
       const arrivalSubjectId = arrivalEvidenceId ?? `el-${resolvedTripId}-arrival`;
       const arrivalBuffer = await this.arrivalBufferFromRules(input.governingRuleSetIds);
       for (const engagement of engagements) {
+        // REQUIRED physical-presence (venue placeId) engagements bind the
+        // organiser MIN_BUFFER; other engagements get temporal ordering only.
+        const appliesReadinessBuffer =
+          engagement.importance === 'REQUIRED' && engagement.data.placeId !== undefined;
         const constraint: Constraint = {
           id: `c-${resolvedTripId}-arrival-before-${engagement.id}`,
           kind: 'TEMPORAL',
           hardness: 'HARD',
           evaluator: 'DETERMINISTIC',
           status: 'UNKNOWN',
-          description: 'arrival evidence must precede the linked commitment start',
+          description: appliesReadinessBuffer
+            ? 'arrival evidence must precede the linked commitment start with organiser readiness buffer'
+            : 'arrival evidence must precede the linked commitment start',
           refs: [
             { entityType: 'TRIP_ELEMENT', id: arrivalSubjectId },
             { entityType: 'TRIP_ELEMENT', id: engagement.id },
           ],
-          // Arrival-buffer evidence comes from governing MIN_BUFFER policy
-          // rules when present; absent policy stays a recorded absence
-          // (evaluator default zero applies), never a fabricated default.
-          ...(arrivalBuffer
+          // Arrival-buffer minutes come from governing MIN_BUFFER policy when
+          // applicable; absent policy stays a recorded absence (evaluator
+          // default zero), never a fabricated default.
+          ...(appliesReadinessBuffer && arrivalBuffer
             ? {
                 derivedFromRuleId: arrivalBuffer.ruleId,
                 ruleSetId: arrivalBuffer.ruleSetId,

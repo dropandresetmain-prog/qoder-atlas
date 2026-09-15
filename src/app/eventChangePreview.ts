@@ -22,6 +22,12 @@ import type { TripRepository, SignalRepository, CaseRepository, AuditRepository 
 import type { MutationService } from '../contracts/services.ts';
 import { processCommitmentChange, type CommitmentFanOutOutcome } from './programme.ts';
 import { elementStartInstant } from '../engine/evaluators.ts';
+import { constraintsForTrip } from './snapshot.ts';
+import {
+  resolveArrivalBufferMinutes,
+  tripGoverningRuleSetIds,
+} from '../engine/arrivalBufferPolicy.ts';
+import type { RuleSet } from '../domain/rules.ts';
 
 function humanStayInstantSafe(iso: string | undefined): string | undefined {
   if (!iso) return undefined;
@@ -46,8 +52,8 @@ export interface EventChangePreviewInput {
   at: IsoDateTime;
   /**
    * Arrival→commitment readiness minutes from governing RuleSet / policy data.
-   * Defaults to 360 when omitted (legacy organiser pack). Prefer
-   * PROGRAMME_ARRIVAL_READINESS / physical-presence rule values (e.g. 150).
+   * When omitted, preview resolves minutes from trip constraints / MIN_BUFFER /
+   * PROGRAMME_ARRIVAL_READINESS. Never falls back to a hardcoded duration.
    */
   requiredArrivalBufferMinutes?: number;
 }
@@ -171,7 +177,16 @@ export async function previewEventChange(
   }
 
   for (const { trip, engagement } of linkedTrips) {
-    const result = evaluateLinkedTrip(deps, anchorEvent, trip, engagement, input, commitment);
+    const requiredBufferMinutes = await resolvePreviewBufferMinutes(deps, trip, engagement);
+    const result = evaluateLinkedTrip(
+      deps,
+      anchorEvent,
+      trip,
+      engagement,
+      input,
+      commitment,
+      requiredBufferMinutes,
+    );
     const travellerNames = await resolveTravellerNames(deps, trip.travellerIds);
     if (result.affected) {
       affected.push({
@@ -207,6 +222,27 @@ async function resolveTravellerNames(
     }
   }
   return names;
+}
+
+/**
+ * Buffer minutes for preview readiness checks: persisted TEMPORAL constraints
+ * first, else governing MIN_BUFFER for REQUIRED physical-presence engagements.
+ */
+async function resolvePreviewBufferMinutes(
+  deps: EventChangePreviewDeps,
+  trip: Trip,
+  engagement: Engagement,
+): Promise<number | undefined> {
+  const constraints = await constraintsForTrip(deps.entities, trip);
+  const ruleSets = (await deps.entities.list('RULE_SET'))
+    .filter((entry): entry is { entityType: 'RULE_SET'; entity: RuleSet } => entry.entityType === 'RULE_SET')
+    .map((entry) => entry.entity);
+  return resolveArrivalBufferMinutes({
+    engagement,
+    constraints,
+    ruleSets,
+    governingRuleSetIds: tripGoverningRuleSetIds(trip),
+  });
 }
 
 /**
@@ -251,6 +287,7 @@ function evaluateLinkedTrip(
   engagement: Engagement,
   input: EventChangePreviewInput,
   _commitment: AnchorEvent['commitments'][number],
+  requiredBufferMinutes: number | undefined,
 ): LinkedTripEvaluation {
   const reasons: string[] = [];
   const constraintFailures: Array<{ constraintId: EntityId; description: string }> = [];
@@ -365,28 +402,35 @@ function evaluateLinkedTrip(
   }
 
   // Compare inbound arrival preparation time before vs after the proposed start.
-  // Minutes come from policy data — never a hardcoded scenario duration.
-  const REQUIRED_BUFFER_MIN = input.requiredArrivalBufferMinutes ?? 360;
+  // Minutes come from caller override or authoritative policy/constraints —
+  // never a hardcoded scenario duration.
+  const effectiveBufferMinutes = input.requiredArrivalBufferMinutes ?? requiredBufferMinutes;
   let timingRestored = false;
   let bufferStillFails = false;
   let bufferStillPasses = false;
   let arrivalGapMinutes: number | undefined;
   let priorGapMinutes: number | undefined;
   const commitmentLabel = engagement.data.title?.trim() || 'the programme commitment';
-  for (const element of trip.elements) {
-    if (element.elementKind !== 'TRANSPORT_LEG' || element.data.mode !== 'FLIGHT') continue;
-    const arrival = element.data.scheduledArrival?.value;
-    const currentStart = engagement.data.startsAt.value;
-    const newStart = hypotheticalEngagement.data.startsAt?.value;
-    if (!arrival || !newStart) continue;
-    const gapAfter = Math.round((instantMillis(newStart) - instantMillis(arrival)) / 60_000);
-    const gapBefore = Math.round((instantMillis(currentStart) - instantMillis(arrival)) / 60_000);
-    if (!Number.isFinite(gapAfter)) continue;
-    arrivalGapMinutes = gapAfter;
-    if (Number.isFinite(gapBefore)) priorGapMinutes = gapBefore;
-    if (gapAfter >= REQUIRED_BUFFER_MIN && gapBefore < REQUIRED_BUFFER_MIN) timingRestored = true;
-    else if (gapAfter < REQUIRED_BUFFER_MIN) bufferStillFails = true;
-    else bufferStillPasses = true;
+  if (effectiveBufferMinutes !== undefined) {
+    for (const element of trip.elements) {
+      if (element.elementKind !== 'TRANSPORT_LEG' || element.data.mode !== 'FLIGHT') continue;
+      const arrival = element.data.scheduledArrival?.value;
+      const currentStart = engagement.data.startsAt.value;
+      const newStart = hypotheticalEngagement.data.startsAt?.value;
+      if (!arrival || !newStart) continue;
+      const gapAfter = Math.round((instantMillis(newStart) - instantMillis(arrival)) / 60_000);
+      const gapBefore = Math.round((instantMillis(currentStart) - instantMillis(arrival)) / 60_000);
+      if (!Number.isFinite(gapAfter)) continue;
+      arrivalGapMinutes = gapAfter;
+      if (Number.isFinite(gapBefore)) priorGapMinutes = gapBefore;
+      if (gapAfter >= effectiveBufferMinutes && gapBefore < effectiveBufferMinutes) {
+        timingRestored = true;
+      } else if (gapAfter < effectiveBufferMinutes) {
+        bufferStillFails = true;
+      } else {
+        bufferStillPasses = true;
+      }
+    }
   }
 
   if (temporalChange) {

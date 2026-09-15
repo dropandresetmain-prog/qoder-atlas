@@ -1,18 +1,44 @@
 {
   "provenance": "TRAVELLER_SUPPLIED_SYNTHETIC",
-  "sourceIds": ["src-syn-traveller-messages"],
-  "note": "Literal synthetic traveller message as it arrives on the Northstar traveller channel after the connection is lost. Claims must be reconciled against provider state, not trusted as authoritative. Display name in frozen roster may still read Chloe Martin until the shared roster patch lands.",
+  "sourceIds": [
+    "src-syn-traveller-messages"
+  ],
+  "note": "Literal synthetic traveller message after the connection is lost. Claims must be reconciled against provider state, not trusted as authoritative.",
   "messageId": "msg-ait-s2-001",
   "channel": "TRAVELLER_CHAT",
   "fromDraftId": "ait-draft-09",
   "receivedAt": "2026-09-29T17:20:00+09:00",
   "text": "Hi — stuck at Narita. My LAX flight kept getting delayed and I landed too late for the Zipair connection to Singapore tonight. The airline desk put me on a Scoot flight tomorrow morning around 08:20 that gets in mid-afternoon. I am supposed to be at the hackathon lab in the morning and I present at the finals tomorrow afternoon. My bag is tagged for the morning flight. What do we do — is there anything tonight, or do I need a hotel here?",
   "extractedClaims": [
-    { "claim": "LAX→NRT inbound was progressively delayed", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_STATE" },
-    { "claim": "Missed the NRT→SIN connection", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_STATE" },
-    { "claim": "Airline rebooked onto NRT→SIN morning service ~08:20 arriving mid-afternoon", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_STATE" },
-    { "claim": "Checked baggage routed on the morning flight", "status": "UNVERIFIED", "verificationNeededFrom": "PROVIDER_STATE" },
-    { "claim": "Has hackathon lab and finals commitments on 30 Sep", "status": "CONFIRMED_BY_PROGRAMME", "verificationNeededFrom": "NONE" },
-    { "claim": "May need overnight accommodation at Narita", "status": "UNVERIFIED", "verificationNeededFrom": "RECOVERY_PLAN" }
+    {
+      "claim": "LAX→NRT inbound was progressively delayed",
+      "status": "UNVERIFIED",
+      "verificationNeededFrom": "PROVIDER_STATE"
+    },
+    {
+      "claim": "Missed the NRT→SIN connection",
+      "status": "UNVERIFIED",
+      "verificationNeededFrom": "PROVIDER_STATE"
+    },
+    {
+      "claim": "Airline rebooked onto NRT→SIN morning service ~08:20 arriving mid-afternoon",
+      "status": "UNVERIFIED",
+      "verificationNeededFrom": "PROVIDER_STATE"
+    },
+    {
+      "claim": "Checked baggage routed on the morning flight",
+      "status": "UNVERIFIED",
+      "verificationNeededFrom": "PROVIDER_STATE"
+    },
+    {
+      "claim": "Has hackathon lab and finals commitments on 30 Sep",
+      "status": "CONFIRMED_BY_PROGRAMME",
+      "verificationNeededFrom": "NONE"
+    },
+    {
+      "claim": "May need overnight accommodation at Narita",
+      "status": "UNVERIFIED",
+      "verificationNeededFrom": "RECOVERY_PLAN"
+    }
   ]
 }

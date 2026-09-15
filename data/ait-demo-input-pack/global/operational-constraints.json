@@ -18,10 +18,10 @@
   "arrivalDepartureConventions": {
     "standardArrivalDay": "2026-09-29",
     "standardDepartureDays": ["2026-10-02", "2026-10-03"],
-    "arrivalBufferStandardMinutes": 360,
-    "arrivalBufferProgrammeCriticalMinutes": 720,
+    "arrivalBufferStandardMinutes": 150,
+    "arrivalBufferProgrammeCriticalMinutes": 150,
     "landByLocalTime": "23:00",
-    "note": "Standard managed travellers arrive 29 Sep; programme-critical travellers (importance REQUIRED on any on-stage role) must be landside at least 12 hours before their first commitment (policy clause arrivalBuffer + rule-ait-arrival-min-buffer). Land by 23:00 the evening before the first commitment when the buffer allows it."
+    "note": "REQUIRED physical-presence engagements need 150 minutes arrival-to-commitment readiness (organiser-policy rule-ait-arrival-min-buffer). Prefer/optional engagements do not bind this rule. Retired prior 360/720 dual demo policy."
   },
   "checkInAndBadge": {
     "hotelCheckInFrom": "15:00",

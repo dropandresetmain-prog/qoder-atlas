@@ -1,11 +1,15 @@
 {
   "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
-  "sourceIds": ["src-syn-ait-event", "src-syn-ait-policy", "src-wave4r-atlas"],
-  "note": "Expected trip state for ait-draft-09 before disruption: LAX→NRT→SIN ZIPAIR connection with SIN partner hotel. Provider-locked ZG023/ZG053 timings. Booking-plan state; the pack does not execute provider bookings. Traveller display identity remains Chloe Martin in frozen roster until primary applies the Jordan Hale / LAX home patch.",
+  "sourceIds": [
+    "src-syn-ait-event",
+    "src-syn-ait-policy",
+    "src-wave4r-atlas"
+  ],
+  "note": "Expected trip state for ait-draft-09 before disruption: LAX→NRT→SIN ZIPAIR connection; nationality SG; Concorde check-in 29 Sep → 3 Oct. Provider-locked ZG023/ZG053 timings. Booking-plan state; pack does not execute provider bookings.",
   "asOf": "2026-09-28T08:00:00-07:00",
   "draftId": "ait-draft-09",
   "inboundItinerary": {
-    "plan": "LAX -> NRT -> SIN; landside SIN 23:00 on 29 Sep — inside the evening-before-critical-day window and the 360min buffer before Day 0 finals (15:10 on 30 Sep).",
+    "plan": "LAX -> NRT -> SIN; landside SIN 23:00 on 29 Sep — inside the evening-before-critical-day window and the 150min buffer before Day 0 finals (20:45 on 30 Sep).",
     "segments": [
       {
         "flightNumber": "ZG023",
@@ -25,7 +29,7 @@
   },
   "hotelStay": {
     "placeId": "place-hotel-bayview",
-    "checkIn": "2026-09-30T15:00:00+08:00",
+    "checkIn": "2026-09-29T15:00:00+08:00",
     "checkOut": "2026-10-03T11:00:00+08:00",
     "noShowCutoff": "2026-10-01T00:00:00+08:00",
     "note": "Baseline assumes next-morning arrival day: Jordan's SIN check-in is 30 Sep (post-NRT-overnight). The first-night no-show cutoff sits after the check-in date so the overnight story is about programme viability, not an artificial hotel cancellation hardcode."

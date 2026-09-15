@@ -1,0 +1,70 @@
+{
+  "provenance": "SIMULATED_EXTERNAL_EVENT",
+  "sourceIds": [
+    "src-sim-airline-id"
+  ],
+  "note": "Synthetic Batik schedule-change story; organiser-supplied, not Atlas-backed. ID7159 is cancelled and all five tickets are involuntarily reprotected to ID7153.",
+  "eventId": "sim-id-evt-20260921-cgk-001",
+  "eventType": "SCHEDULE_CHANGE",
+  "issuedAt": "2026-09-21T09:40:00+08:00",
+  "carrier": {
+    "code": "ID",
+    "name": "Batik Air (simulated)"
+  },
+  "flight": {
+    "flightNumber": "ID7159",
+    "origin": "CGK",
+    "destination": "SIN",
+    "originalSchedule": {
+      "departure": "2026-09-30T17:45:00+07:00",
+      "arrival": "2026-09-30T20:30:00+08:00"
+    },
+    "newSchedule": {
+      "departure": "2026-10-01T07:45:00+07:00",
+      "arrival": "2026-10-01T10:30:00+08:00"
+    },
+    "reason": "Aircraft rotation constraint following network-wide disruption earlier in September."
+  },
+  "autoRebooking": {
+    "policy": "All five ticketed passengers are involuntarily reprotected onto synthetic Batik ID7153 on 1 Oct; no fare difference.",
+    "fareDifference": "NONE",
+    "ticketReissue": "AUTOMATIC"
+  },
+  "ticketedManagedTravellers": [
+    {
+      "draftId": "ait-draft-14",
+      "pnr": "IDSYN14",
+      "segments": [
+        "CGK-SIN ID7159 ? ID7153"
+      ]
+    },
+    {
+      "draftId": "ait-draft-03",
+      "pnr": "IDSYN03",
+      "segments": [
+        "CGK-SIN ID7159 ? ID7153"
+      ]
+    },
+    {
+      "draftId": "ait-draft-10",
+      "pnr": "IDSYN10",
+      "segments": [
+        "CGK-SIN ID7159 ? ID7153"
+      ]
+    },
+    {
+      "draftId": "ait-draft-11",
+      "pnr": "IDSYN11",
+      "segments": [
+        "CGK-SIN ID7159 ? ID7153"
+      ]
+    },
+    {
+      "draftId": "ait-draft-30",
+      "pnr": "IDSYN30",
+      "segments": [
+        "CGK-SIN ID7159 ? ID7153"
+      ]
+    }
+  ]
+}

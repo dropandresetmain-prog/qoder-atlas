@@ -1,6 +1,6 @@
 {
   "scenarioId": "S3",
-  "title": "Organiser RESCHEDULE preview/commit for headline interview (continuity-aligned)",
+  "title": "Organiser bilateral speaker-swap preview/commit (continuity-aligned)",
   "mode": "REPLAY",
   "globalInputPack": {
     "packId": "ait-global-programme",
@@ -27,9 +27,15 @@
   "requiredEnv": [],
   "requiredProviders": [],
   "expect": {
-    "anchorEventIds": ["evt-ait-2026"],
-    "travellerIds": ["trv-evt-ait-2026-ait-draft-14"],
-    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-14"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-14"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-14"
+    ]
   },
   "routeParams": [],
   "steps": [
@@ -40,30 +46,47 @@
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-22T10:00:00+08:00" },
+        "body": {
+          "at": "2026-09-22T10:00:00+08:00"
+        },
         "expectStatus": 200
       }
     },
     {
       "id": "organiser_preview",
-      "description": "Preview RESCHEDULE headline interview to 15:30–16:00 without authoritative mutation",
+      "description": "Preview bilateral swap: Sarah headline to 14:30–15:00 and Daniel local-host to 11:30–12:00 without authoritative mutation",
       "action": {
         "type": "ui_action",
         "kind": "organiser_preview",
         "params": {
           "anchorEventId": "evt-ait-2026",
           "commitmentId": "cmt-ait-d1-headline-interview",
-          "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-10-01T15:30:00+08:00",
-          "newEndsAt": "2026-10-01T16:00:00+08:00",
+          "changeKind": "OPTION_SET",
+          "newStartsAt": "2026-10-01T14:30:00+08:00",
+          "newEndsAt": "2026-10-01T15:00:00+08:00",
           "at": "2026-09-22T11:05:00+08:00"
         },
         "expectStatus": 200
       },
       "assert": [
-        { "path": "totalTravellers", "op": "equals", "expected": 67, "description": "full roster blast radius" },
-        { "path": "affected", "op": "arrayLengthMin", "expected": 2, "description": "interviewer and speaker linked" },
-        { "path": "affected.1.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14", "description": "Sarah Lim trip linked to headline interview" }
+        {
+          "path": "totalTravellers",
+          "op": "equals",
+          "expected": 67,
+          "description": "full roster blast radius"
+        },
+        {
+          "path": "affected",
+          "op": "arrayLengthMin",
+          "expected": 2,
+          "description": "interviewer and speaker linked"
+        },
+        {
+          "path": "affected.1.tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-14",
+          "description": "Sarah Lim trip linked to headline interview"
+        }
       ]
     },
     {
@@ -76,30 +99,51 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "summary.disrupted", "op": "equals", "expected": 3, "description": "preview leaves baseline disrupted count unchanged (truthful post-import viability)" }
+        {
+          "path": "summary.disrupted",
+          "op": "equals",
+          "expected": 3,
+          "description": "preview leaves baseline disrupted count unchanged (truthful post-import viability)"
+        }
       ]
     },
     {
       "id": "organiser_commit",
-      "description": "Commit RESCHEDULE fan-out",
+      "description": "Commit two explicit programme moves and fan out",
       "action": {
         "type": "ui_action",
         "kind": "organiser_commit",
         "params": {
           "anchorEventId": "evt-ait-2026",
           "commitmentId": "cmt-ait-d1-headline-interview",
-          "changeKind": "RESCHEDULED",
-          "newStartsAt": "2026-10-01T15:30:00+08:00",
-          "newEndsAt": "2026-10-01T16:00:00+08:00",
+          "changeKind": "OPTION_SET",
+          "newStartsAt": "2026-10-01T14:30:00+08:00",
+          "newEndsAt": "2026-10-01T15:00:00+08:00",
           "at": "2026-09-22T11:20:00+08:00"
         },
         "expectStatus": 200,
-        "capture": { "caseId": "processedSignals.1.caseId" }
+        "capture": {
+          "caseId": "processedSignals.1.caseId"
+        }
       },
       "assert": [
-        { "path": "accepted", "op": "truthy", "description": "commit accepted" },
-        { "path": "processedSignals", "op": "arrayLengthMin", "expected": 2, "description": "fan-out signals for interviewer and speaker" },
-        { "path": "processedSignals.1.tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14", "description": "fan-out targets headline speaker trip" }
+        {
+          "path": "accepted",
+          "op": "truthy",
+          "description": "commit accepted"
+        },
+        {
+          "path": "processedSignals",
+          "op": "arrayLengthMin",
+          "expected": 2,
+          "description": "fan-out signals for interviewer and speaker"
+        },
+        {
+          "path": "processedSignals.1.tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-14",
+          "description": "fan-out targets headline speaker trip"
+        }
       ]
     },
     {
@@ -112,7 +156,12 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-14", "description": "case belongs to headline speaker trip" }
+        {
+          "path": "tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-14",
+          "description": "case belongs to headline speaker trip"
+        }
       ]
     }
   ]

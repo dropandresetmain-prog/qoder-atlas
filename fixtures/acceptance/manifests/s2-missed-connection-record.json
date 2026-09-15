@@ -39,15 +39,30 @@
       "note": "LIVE sandbox NRT→SIN search through Atlas; sanitized recordings for REPLAY"
     }
   ],
-  "requiredEnv": ["MODEL_STUDIO_API_KEY"],
-  "requiredProviders": ["atlas", "modelStudio"],
+  "requiredEnv": [
+    "MODEL_STUDIO_API_KEY"
+  ],
+  "requiredProviders": [
+    "atlas",
+    "modelStudio"
+  ],
   "expect": {
-    "anchorEventIds": ["evt-ait-2026"],
-    "travellerIds": ["trv-evt-ait-2026-ait-draft-09"],
-    "tripIds": ["trip-trv-evt-ait-2026-ait-draft-09"]
+    "anchorEventIds": [
+      "evt-ait-2026"
+    ],
+    "travellerIds": [
+      "trv-evt-ait-2026-ait-draft-09"
+    ],
+    "tripIds": [
+      "trip-trv-evt-ait-2026-ait-draft-09"
+    ]
   },
   "routeParams": [
-    { "origin": "NRT", "destination": "SIN", "date": "2026-09-29" }
+    {
+      "origin": "NRT",
+      "destination": "SIN",
+      "date": "2026-09-29"
+    }
   ],
   "steps": [
     {
@@ -57,7 +72,9 @@
         "type": "http",
         "method": "POST",
         "path": "/api/runtime/reset",
-        "body": { "at": "2026-09-28T11:00:00-07:00" },
+        "body": {
+          "at": "2026-09-28T11:00:00-07:00"
+        },
         "expectStatus": 200
       }
     },
@@ -67,7 +84,9 @@
       "action": {
         "type": "simulated_external_event",
         "path": "/api/events/atlas",
-        "query": { "at": "2026-09-29T12:00:00+09:00" },
+        "query": {
+          "at": "2026-09-29T12:00:00+09:00"
+        },
         "body": {
           "eventId": "sim-zg-evt-s2-record-delay-final",
           "orderNo": "ZGSYN09",
@@ -82,8 +101,18 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "ACCEPTED", "description": "ingress accepted" },
-        { "path": "results", "op": "arrayLengthMin", "expected": 1, "description": "reconciled state processed" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "ACCEPTED",
+          "description": "ingress accepted"
+        },
+        {
+          "path": "results",
+          "op": "arrayLengthMin",
+          "expected": 1,
+          "description": "reconciled state processed"
+        }
       ]
     },
     {
@@ -100,12 +129,28 @@
           "at": "2026-09-29T17:20:00+09:00"
         },
         "expectStatus": 200,
-        "capture": { "caseId": "caseId" }
+        "capture": {
+          "caseId": "caseId"
+        }
       },
       "assert": [
-        { "path": "caseStatus", "op": "equals", "expected": "ASSESSING", "description": "case opens in assessing" },
-        { "path": "missedElementId", "op": "equals", "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2", "description": "missed NRT→SIN leg resolved" },
-        { "path": "directFailureIds", "op": "arrayNotEmpty", "description": "direct failures named" }
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "ASSESSING",
+          "description": "case opens in assessing"
+        },
+        {
+          "path": "missedElementId",
+          "op": "equals",
+          "expected": "el-trip-trv-evt-ait-2026-ait-draft-09-leg-2",
+          "description": "missed NRT→SIN leg resolved"
+        },
+        {
+          "path": "directFailureIds",
+          "op": "arrayNotEmpty",
+          "description": "direct failures named"
+        }
       ]
     },
     {
@@ -118,9 +163,24 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "tripId", "op": "equals", "expected": "trip-trv-evt-ait-2026-ait-draft-09", "description": "case on correct trip" },
-        { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "awaiting recovery" },
-        { "path": "checks", "op": "arrayLengthMin", "expected": 1, "description": "downstream checks present" }
+        {
+          "path": "tripId",
+          "op": "equals",
+          "expected": "trip-trv-evt-ait-2026-ait-draft-09",
+          "description": "case on correct trip"
+        },
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "CHANGE_REQUESTED",
+          "description": "awaiting recovery"
+        },
+        {
+          "path": "checks",
+          "op": "arrayLengthMin",
+          "expected": 1,
+          "description": "downstream checks present"
+        }
       ]
     },
     {
@@ -137,9 +197,24 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "rounds", "op": "gte", "expected": 1, "description": "planning loop completed at least one round" },
-        { "path": "strategies", "op": "arrayLengthMin", "expected": 1, "description": "at least one candidate strategy" },
-        { "path": "caseStatus", "op": "equals", "expected": "PLANNING", "description": "case in planning" }
+        {
+          "path": "rounds",
+          "op": "gte",
+          "expected": 1,
+          "description": "planning loop completed at least one round"
+        },
+        {
+          "path": "strategies",
+          "op": "arrayLengthMin",
+          "expected": 1,
+          "description": "at least one candidate strategy"
+        },
+        {
+          "path": "caseStatus",
+          "op": "equals",
+          "expected": "PLANNING",
+          "description": "case in planning"
+        }
       ]
     },
     {
@@ -152,8 +227,18 @@
         "expectStatus": 200
       },
       "assert": [
-        { "path": "status", "op": "equals", "expected": "CHANGE_REQUESTED", "description": "trip disrupted" },
-        { "path": "remainderViable", "op": "equals", "expected": "NOT_VIABLE", "description": "remainder not viable until execution" }
+        {
+          "path": "status",
+          "op": "equals",
+          "expected": "CHANGE_REQUESTED",
+          "description": "trip disrupted"
+        },
+        {
+          "path": "remainderViable",
+          "op": "equals",
+          "expected": "NOT_VIABLE",
+          "description": "remainder not viable until execution"
+        }
       ]
     }
   ]

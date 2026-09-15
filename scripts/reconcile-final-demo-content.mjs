@@ -63,13 +63,15 @@ const CORRIDORS = {
     ],
   },
   CGK: {
+    // Synthetic Batik geometry (WiT seed). Not Atlas provider-backed.
+    // The final story cancels ID7159 and reprotects to ID7153.
     legs: (pnr) => [
       flightLeg({
         origin: 'CGK',
         dest: 'SIN',
-        dep: '2026-09-30T05:15:00+07:00',
-        arr: '2026-09-30T07:25:00+08:00',
-        flight: 'MN310',
+        dep: '2026-10-01T07:45:00+07:00',
+        arr: '2026-10-01T10:30:00+08:00',
+        flight: 'ID7153',
         pnr,
       }),
     ],
@@ -351,7 +353,19 @@ function originFromTraveller(t) {
 function pnrFor(draftId, origin) {
   const n = draftId.replace('ait-draft-', '');
   const prefix =
-    origin === 'LAX' ? 'ZG' : origin === 'HND' || origin === 'NRT' ? 'TR' : origin === 'BKK' || origin === 'SYD' || origin === 'SGN' ? 'TR' : origin === 'MNL' || origin === 'HKG' ? 'AK' : 'MN';
+    origin === 'CGK'
+      ? 'ID'
+      : origin === 'LAX'
+      ? 'ZG'
+      : origin === 'CGK'
+        ? 'ID'
+        : origin === 'HND' || origin === 'NRT'
+          ? 'TR'
+          : origin === 'BKK' || origin === 'SYD' || origin === 'SGN'
+            ? 'TR'
+            : origin === 'MNL' || origin === 'HKG'
+              ? 'AK'
+              : 'MN';
   return `${prefix}SYN${n}`;
 }
 
@@ -363,9 +377,11 @@ function hotelFor(draftId) {
 }
 
 function stayWindow(draftId) {
+  // Jordan baseline destination stay starts on arrival eve (29 Sep); recovered
+  // TR885 path shifts usable nights to 30 Sep — consequence must be visible.
   if (draftId === 'ait-draft-09') {
     return {
-      checkIn: '2026-09-30T15:00:00+08:00',
+      checkIn: '2026-09-29T15:00:00+08:00',
       checkOut: '2026-10-03T11:00:00+08:00',
     };
   }
@@ -376,6 +392,20 @@ function stayWindow(draftId) {
 }
 
 const prog = JSON.parse(fs.readFileSync(PROGRAMME, 'utf8'));
+
+// Keep the fixture's embedded policy mirror aligned with the input pack.
+for (const ruleSet of prog.context.ruleSets || []) {
+  for (const rule of ruleSet.rules || []) {
+    if (rule.kind !== 'MIN_BUFFER') continue;
+    rule.description = rule.description
+      .replace(/6 hours|360-minute|360min|360 minutes/gi, '150-minute');
+    if (rule.buffer) {
+      rule.buffer.expectedMinutes = 150;
+      rule.buffer.minimumMinutes = 150;
+      rule.buffer.conservativeMinutes = 150;
+    }
+  }
+}
 
 // --- Places: real hotel names + nuitee refs ---
 for (const pl of prog.context.places) {
@@ -410,13 +440,49 @@ function findCmt(id) {
   seedup.startsAt = timed('2026-09-30T15:10:00+08:00');
   seedup.endsAt = timed('2026-09-30T15:50:00+08:00');
 
+  const headline = findCmt('cmt-ait-d1-headline-interview');
+  headline.startsAt = timed('2026-10-01T11:30:00+08:00');
+  headline.endsAt = timed('2026-10-01T12:00:00+08:00');
+
+  // Elena free for headline 11:30–12:00: move ota-chat earlier.
+  const ota = findCmt('cmt-ait-d1-ota-chat');
+  ota.startsAt = timed('2026-10-01T10:40:00+08:00');
+  ota.endsAt = timed('2026-10-01T11:00:00+08:00');
+
+  // Daniel local CHANGEABLE swap counterpart (new commitment — see WIT_SEED_DECISIONS.md).
+  let localHost = cmts.find((x) => x.id === 'cmt-ait-d1-local-host-session');
+  if (!localHost) {
+    localHost = {
+      id: 'cmt-ait-d1-local-host-session',
+      anchorEventId: 'evt-ait-2026',
+      title: 'Local host session — operator marketplace',
+      kind: 'SESSION',
+      startsAt: timed('2026-10-01T14:30:00+08:00'),
+      endsAt: timed('2026-10-01T15:00:00+08:00'),
+      placeId: 'place-mbs',
+    };
+    cmts.push(localHost);
+  } else {
+    localHost.anchorEventId = localHost.anchorEventId || 'evt-ait-2026';
+    localHost.kind = localHost.kind || 'SESSION';
+    localHost.title = 'Local host session — operator marketplace';
+    localHost.startsAt = timed('2026-10-01T14:30:00+08:00');
+    localHost.endsAt = timed('2026-10-01T15:00:00+08:00');
+    localHost.placeId = 'place-mbs';
+  }
+
   const fireside = findCmt('cmt-ait-d1-recovery-fireside');
-  fireside.startsAt = timed('2026-10-01T14:30:00+08:00');
-  fireside.endsAt = timed('2026-10-01T14:50:00+08:00');
+  fireside.startsAt = timed('2026-10-01T15:30:00+08:00');
+  fireside.endsAt = timed('2026-10-01T16:00:00+08:00');
 
   const search = findCmt('cmt-ait-d1-search-chat');
-  search.startsAt = timed('2026-10-01T15:30:00+08:00');
-  search.endsAt = timed('2026-10-01T15:50:00+08:00');
+  search.startsAt = timed('2026-10-01T16:05:00+08:00');
+  search.endsAt = timed('2026-10-01T16:25:00+08:00');
+
+  // Felix Day-1 REQUIRED later slot (Amendment B): viable after 10:30 arrival.
+  const agentic = findCmt('cmt-ait-d1-agentic-provocation');
+  agentic.startsAt = timed('2026-10-01T16:30:00+08:00');
+  agentic.endsAt = timed('2026-10-01T16:40:00+08:00');
 }
 
 // --- Travellers ---
@@ -429,9 +495,23 @@ for (const id of ['ait-draft-01', 'ait-draft-02', 'ait-draft-05']) {
   t.declaredTravel = [];
   if (id === 'ait-draft-02') {
     t.notes = [
-      ...(t.notes || []).filter((n) => !/Northstar|arranged travel/i.test(n)),
-      'Local co-host; self-arranged. S3 programme-side swap / CHANGEABLE afternoon partner.',
+      ...(t.notes || []).filter(
+        (n) => !/Northstar|arranged travel|S3 programme|local co-host/i.test(n),
+      ),
+      'Local co-host; self-arranged. S3 swap counterpart on cmt-ait-d1-local-host-session (14:30 CHANGEABLE).',
     ];
+    t.anchorCommitmentIds = Array.from(
+      new Set([...(t.anchorCommitmentIds || []), 'cmt-ait-d1-local-host-session']),
+    );
+    const eng = t.engagementImportance || [];
+    const withoutLocal = eng.filter((e) => e.commitmentId !== 'cmt-ait-d1-local-host-session');
+    withoutLocal.push({
+      commitmentId: 'cmt-ait-d1-local-host-session',
+      role: 'HOST',
+      importance: 'REQUIRED',
+      flexibility: 'CHANGEABLE',
+    });
+    t.engagementImportance = withoutLocal;
   }
 }
 
@@ -486,10 +566,11 @@ for (const [id, spec] of Object.entries(rewrites)) {
   }
 }
 
-// Jordan: no morning lab engagement (S2 overnight lane); finals + awards only
+// Jordan: no morning lab; SG nationality; finals + awards only
 {
   const jordan = travellers.find((x) => x.draftId === 'ait-draft-09');
   if (jordan) {
+    jordan.nationalityCodes = ['SG'];
     jordan.anchorCommitmentIds = ['cmt-ait-d0-hackathon-finals', 'cmt-ait-d2-hack-awards'];
     jordan.engagementImportance = [
       {
@@ -506,23 +587,93 @@ for (const [id, spec] of Object.entries(rewrites)) {
       },
     ];
     jordan.notes = [
-      'Hackathon finalist (Team Waypoint); LAX ZIPAIR connection hero (S2); overnight NRT recovery may miss morning lab — evening finals 20:45 remain required; awards 2 Oct',
+      'Hackathon finalist (Team Waypoint); LAX ZIPAIR connection hero (S2); SG nationality; unbound from morning lab; evening finals 20:45 required; awards 2 Oct',
     ];
   }
 }
 
-// Jonas notes + Sarah stay
+// Felix: remove morning india-fireside REQUIRED; keep later agentic + Day-2 panel
+{
+  const felix = travellers.find((x) => x.draftId === 'ait-draft-03');
+  if (felix) {
+    felix.anchorCommitmentIds = (felix.anchorCommitmentIds || []).filter(
+      (id) => id !== 'cmt-ait-d1-india-fireside',
+    );
+    if (!felix.anchorCommitmentIds.includes('cmt-ait-d1-agentic-provocation')) {
+      felix.anchorCommitmentIds.push('cmt-ait-d1-agentic-provocation');
+    }
+    felix.engagementImportance = (felix.engagementImportance || []).filter(
+      (e) => e.commitmentId !== 'cmt-ait-d1-india-fireside',
+    );
+    const agentic = felix.engagementImportance.find(
+      (e) => e.commitmentId === 'cmt-ait-d1-agentic-provocation',
+    );
+    if (agentic) {
+      agentic.role = 'SPEAKER';
+      agentic.importance = 'REQUIRED';
+      agentic.flexibility = 'FIXED';
+    } else {
+      felix.engagementImportance.push({
+        commitmentId: 'cmt-ait-d1-agentic-provocation',
+        role: 'SPEAKER',
+        importance: 'REQUIRED',
+        flexibility: 'FIXED',
+      });
+    }
+    felix.notes = [
+      'CGK inbound cohort peer; Day-1 REQUIRED agentic provocation 16:30 (viable after ID7153 10:30); Day-2 ota-panel',
+    ];
+  }
+}
+
+// Elevate payments panellists to REQUIRED
+for (const draftId of ['ait-draft-11', 'ait-draft-30']) {
+  const t = travellers.find((x) => x.draftId === draftId);
+  if (!t) continue;
+  for (const e of t.engagementImportance || []) {
+    if (e.commitmentId === 'cmt-ait-d1-payments-panel') {
+      e.importance = 'REQUIRED';
+    }
+  }
+}
+
+{
+  // Elena is local, has no inbound readiness dependency, and is free between
+  // the 10:10 fireside and her 11:30 headline slot.
+  const localInterviewer = travellers.find((x) => x.draftId === 'ait-draft-01');
+  if (localInterviewer) {
+    localInterviewer.engagementImportance = [
+      ...(localInterviewer.engagementImportance || []).filter(
+        (e) => e.commitmentId !== 'cmt-ait-d1-india-fireside',
+      ),
+      {
+        commitmentId: 'cmt-ait-d1-india-fireside',
+        role: 'INTERVIEWER',
+        importance: 'REQUIRED',
+        flexibility: 'CHANGEABLE',
+      },
+    ];
+    localInterviewer.anchorCommitmentIds = Array.from(
+      new Set([
+        ...(localInterviewer.anchorCommitmentIds || []),
+        'cmt-ait-d1-india-fireside',
+      ]),
+    );
+  }
+}
+
+// Jonas notes + Sarah notes
 {
   const jonas = travellers.find((x) => x.draftId === 'ait-draft-35');
   if (jonas) {
     jonas.notes = [
-      'Recovery-platform founder; Day 1 fireside 14:30 (S5); Concorde stay; Sunday extension is traveller-funded',
+      'Recovery-platform founder; Day 1 fireside 15:30 (stage exclusivity after Daniel local-host); Concorde stay; Sunday extension is traveller-funded',
     ];
   }
   const sarah = travellers.find((x) => x.draftId === 'ait-draft-14');
   if (sarah) {
     sarah.notes = [
-      'Headline interview speaker, Day 1 09:20 — S1 critical; S3 reschedule target 15:30',
+      'Headline interview speaker, Day 1 11:30 — S1 critical under 150min readiness after ID7153 10:30; S3 bilateral swap with Daniel local-host 14:30',
     ];
   }
 }
@@ -589,3 +740,360 @@ console.log(
 
 fs.writeFileSync(PROGRAMME, JSON.stringify(prog, null, 2) + '\n');
 console.log('Wrote', PROGRAMME);
+
+// --- Input-pack / acceptance-manifest SSOT sync ---
+// Keep the pack deliberately data-driven: the fixture remains the canonical
+// promoted world, while scenario-local files carry provenance and narrative.
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function writeJson(file, value) {
+  fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
+}
+
+function replaceStrings(value, replacements) {
+  if (typeof value === 'string') {
+    return replacements.reduce((result, [from, to]) => result.split(from).join(to), value);
+  }
+  if (Array.isArray(value)) return value.map((item) => replaceStrings(item, replacements));
+  if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      value[key] = replaceStrings(child, replacements);
+    }
+  }
+  return value;
+}
+
+const PACK_ROOT = path.join(ROOT, 'data/ait-demo-input-pack');
+const GLOBAL_ROOT = path.join(PACK_ROOT, 'global');
+const SCENARIO_ROOT = path.join(PACK_ROOT, 'scenarios');
+const MANIFEST_ROOT = path.join(ROOT, 'fixtures/acceptance/manifests');
+
+// Anchor timings and programme sessions are copied by commitment id so the
+// input pack cannot silently retain a retired time window.
+{
+  const anchorPackFile = path.join(GLOBAL_ROOT, 'anchor-event.json');
+  const anchorPack = readJson(anchorPackFile);
+  const fixtureCommitments = new Map(
+    prog.context.anchorEvent.commitments.map((commitment) => [commitment.id, commitment]),
+  );
+  const packCommitments = anchorPack.anchorEvent.commitments;
+  for (const commitment of packCommitments) {
+    const fixture = fixtureCommitments.get(commitment.id);
+    if (!fixture) continue;
+    commitment.startsAt = fixture.startsAt;
+    commitment.endsAt = fixture.endsAt;
+    commitment.title = fixture.title;
+    commitment.placeId = fixture.placeId;
+  }
+  if (!packCommitments.some((commitment) => commitment.id === 'cmt-ait-d1-local-host-session')) {
+    const localHost = fixtureCommitments.get('cmt-ait-d1-local-host-session');
+    if (localHost) {
+      packCommitments.push({
+        ...localHost,
+        anchorEventId: anchorPack.anchorEventId,
+      });
+    }
+  }
+  writeJson(anchorPackFile, anchorPack);
+
+  const programmeFile = path.join(GLOBAL_ROOT, 'programme.json');
+  const programmePack = readJson(programmeFile);
+  const fixtureTimes = new Map(
+    prog.context.anchorEvent.commitments.map((commitment) => [
+      commitment.id,
+      [commitment.startsAt.value.slice(11, 16), commitment.endsAt.value.slice(11, 16)],
+    ]),
+  );
+  for (const day of programmePack.days) {
+    for (const session of day.sessions) {
+      const times = fixtureTimes.get(session.commitmentId);
+      if (times) session.time = `${times[0]}-${times[1]}`;
+    }
+  }
+  const roles = new Map(
+    programmePack.roleAssignments.map((assignment) => [assignment.commitmentId, assignment]),
+  );
+  const india = roles.get('cmt-ait-d1-india-fireside');
+  if (india) {
+    india.roles = india.roles.map((role) =>
+      role.role === 'INTERVIEWER' ? { ...role, draftIds: ['ait-draft-01'] } : role,
+    );
+  }
+  const localHost = roles.get('cmt-ait-d1-local-host-session');
+  if (localHost) localHost.roles = [{ role: 'HOST', draftIds: ['ait-draft-02'] }];
+  writeJson(programmeFile, programmePack);
+}
+
+// Programme importance is an explicit input, not inferred from role names.
+{
+  const file = path.join(GLOBAL_ROOT, 'programme-importance.json');
+  const importance = readJson(file);
+  importance.entries = importance.entries.filter(
+    (entry) =>
+      !(entry.draftId === 'ait-draft-03' && entry.commitmentId === 'cmt-ait-d1-india-fireside') &&
+      !(entry.draftId === 'ait-draft-09' && entry.commitmentId === 'cmt-ait-d0-hackathon-lab'),
+  );
+  const upsert = (entry) => {
+    const index = importance.entries.findIndex(
+      (candidate) =>
+        candidate.draftId === entry.draftId && candidate.commitmentId === entry.commitmentId,
+    );
+    if (index >= 0) importance.entries[index] = { ...importance.entries[index], ...entry };
+    else importance.entries.push(entry);
+  };
+  upsert({
+    draftId: 'ait-draft-03',
+    commitmentId: 'cmt-ait-d1-agentic-provocation',
+    role: 'SPEAKER',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  upsert({
+    draftId: 'ait-draft-02',
+    commitmentId: 'cmt-ait-d1-local-host-session',
+    role: 'HOST',
+    importance: 'REQUIRED',
+    flexibility: 'CHANGEABLE',
+  });
+  for (const draftId of ['ait-draft-11', 'ait-draft-30']) {
+    upsert({
+      draftId,
+      commitmentId: 'cmt-ait-d1-payments-panel',
+      role: 'PANELLIST',
+      importance: 'REQUIRED',
+      flexibility: 'CHANGEABLE',
+    });
+  }
+  writeJson(file, importance);
+}
+
+// Roster common fields mirror the promoted fixture. This intentionally leaves
+// declaredTravel out of the roster pack; travel belongs to the programme build.
+{
+  const file = path.join(GLOBAL_ROOT, 'roster.json');
+  const roster = readJson(file);
+  const rosterById = new Map(roster.importDraft.travellers.map((traveller) => [traveller.draftId, traveller]));
+  for (const traveller of prog.importDraft.travellers) {
+    const target = rosterById.get(traveller.draftId);
+    if (!target) continue;
+    for (const key of [
+      'displayName',
+      'identity',
+      'homeLocationText',
+      'nationalityCodes',
+      'notes',
+      'anchorCommitmentIds',
+      'travelArrangement',
+    ]) {
+      if (traveller[key] !== undefined) target[key] = traveller[key];
+    }
+  }
+  writeJson(file, roster);
+}
+
+// Jordan's synthetic booking dossier is SG and spans the baseline arrival eve
+// through the canonical 3 Oct checkout. The recovered 30 Sep arrival can
+// therefore invalidate the first Singapore night through generic stay logic.
+{
+  const file = path.join(GLOBAL_ROOT, 'booking-dossiers.json');
+  const dossiers = readJson(file);
+  const flight = dossiers.dossiers.flight.find((item) => item.draftId === 'ait-draft-09');
+  if (flight?.passengers?.[0]) flight.passengers[0].nationality = 'SG';
+  const hotel = dossiers.dossiers.hotel.find((item) => item.draftId === 'ait-draft-09');
+  if (hotel) {
+    hotel.checkIn = '2026-09-29T15:00:00+08:00';
+    hotel.checkOut = '2026-10-03T11:00:00+08:00';
+  }
+  writeJson(file, dossiers);
+}
+
+const s1Root = path.join(SCENARIO_ROOT, 's1-supplier-disruption');
+const oldS1Event = path.join(s1Root, 'inputs/airline-schedule-change-mn310.json');
+const newS1Event = path.join(s1Root, 'inputs/airline-schedule-change-id7159.json');
+if (fs.existsSync(oldS1Event)) fs.renameSync(oldS1Event, newS1Event);
+for (const file of [
+  path.join(s1Root, 'scenario.json'),
+  path.join(s1Root, 'inputs/baseline-itineraries.json'),
+  path.join(s1Root, 'inputs/alternative-services-inventory.json'),
+  newS1Event,
+]) {
+  if (!fs.existsSync(file)) continue;
+  const value = replaceStrings(readJson(file), [
+    ['airline-schedule-change-mn310.json', 'airline-schedule-change-id7159.json'],
+    ['MN310', 'ID7159'],
+    ['src-sim-airline-mn', 'src-sim-airline-id'],
+    ['Meridian Airways', 'Batik Air'],
+    ['09:20', '11:30'],
+    ['360min', '150min'],
+    ['360min', '150min'],
+    ['360 minutes', '150 minutes'],
+    ['6h40m', '6h40m'],
+    ['S3 RESCHEDULE', 'S3 bilateral Sarah↔Daniel swap'],
+    [
+      'Group B (Felix Hartono / ait-draft-03, Day-1 india-fireside 10:10) fails the retimed arrival but has a viable earlier CGK→SIN Atlas/SIMULATED offer that planning can propose; ',
+      'Felix Hartono / ait-draft-03 remains VIABLE for the Day-1 agentic provocation at 16:30; ',
+    ],
+  ]);
+  if (file === newS1Event) {
+    value.carrier = { code: 'ID', name: 'Batik Air (simulated)' };
+    value.eventId = 'sim-id-evt-20260921-cgk-001';
+  }
+  if (file.endsWith(`${path.sep}s1-supplier-disruption${path.sep}scenario.json`)) {
+    const felix = value.affectedTravellers.find((traveller) => traveller.draftId === 'ait-draft-03');
+    if (felix) {
+      felix.impactClass = 'VIABLE';
+      felix.group = 'A';
+      felix.reason =
+        'ID7153 arrives 10:30; Felix’s REQUIRED/FIXED agentic provocation starts 16:30, leaving 360 minutes and clearing the 150-minute buffer.';
+    }
+    value.expectedReasoningHooks = value.expectedReasoningHooks.map((hook) =>
+      hook
+        .replace(
+          'Group B: airline reprotection insufficient; planner searches the disrupted CGK→SIN corridor; viability engine accepts only offers that restore the buffer for THAT traveller\'s commitment.',
+          'All four peers, including Felix at the 16:30 agentic provocation, remain VIABLE under the same ID7153 reprotection.',
+        )
+        .replace(
+          'Group C: no feasible travel-only strategy for the current headline slot; surface organiser programme change (S3 bilateral Sarah↔Daniel swap) rather than invent certainty.',
+          'Sarah is the only NOT_VIABLE traveller; surface the organiser programme change (S3 bilateral Sarah↔Daniel swap) rather than invent certainty.',
+        ),
+    );
+    const sarah = value.affectedTravellers.find((traveller) => traveller.draftId === 'ait-draft-14');
+    if (sarah) {
+      sarah.reason = sarah.reason.replace(
+        'S3 must RESCHEDULE the commitment later (no engagement-swap API).',
+        'S3 must use the bilateral Sarah↔Daniel programme swap.',
+      );
+    }
+  }
+  writeJson(file, value);
+}
+
+const s2Root = path.join(SCENARIO_ROOT, 's2-missed-connection');
+for (const file of [
+  path.join(s2Root, 'scenario.json'),
+  path.join(s2Root, 'inputs/baseline-itinerary.json'),
+  path.join(s2Root, 'inputs/provider-rebooking-state.json'),
+  path.join(s2Root, 'inputs/recovery-options-inventory.json'),
+  path.join(s2Root, 'inputs/progressive-delay-timeline.json'),
+  path.join(s2Root, 'inputs/entry-requirements-context.json'),
+]) {
+  const value = replaceStrings(readJson(file), [
+    ['United States', 'Singapore'],
+    ['"US"', '"SG"'],
+    ['US passport', 'Singapore passport'],
+    ['nationality": "US"', 'nationality": "SG"'],
+    ['nationality": "US"', 'nationality": "SG"'],
+    ['15:10', '20:45'],
+    ['360min', '150min'],
+    ['360 minutes', '150 minutes'],
+    ['360 ≥ 360', '370 ≥ 150'],
+    ['no change required', 'can be affected when arrival moves to 30 Sep'],
+    ['TR885-class', 'TR885'],
+  ]);
+  if (file.endsWith('entry-requirements-context.json')) {
+    value.assumedNationality = {
+      codes: ['SG'],
+      note: 'Jordan Hale is seeded as Singapore nationality; authoritative entry evidence remains UNKNOWN until decision time.',
+    };
+    value.toolHint.parameters.nationality = 'SG';
+  }
+  if (file.endsWith('baseline-itinerary.json')) {
+    value.hotelStay.checkIn = '2026-09-29T15:00:00+08:00';
+    value.hotelStay.checkOut = '2026-10-03T11:00:00+08:00';
+  }
+  writeJson(file, value);
+}
+
+// Keep the four delay phases explicit while preserving the existing
+// zg053_impossible id used by the runtime acceptance manifest.
+{
+  const file = path.join(s2Root, 'inputs/progressive-delay-timeline.json');
+  const timeline = readJson(file);
+  const impossible = timeline.stages.find((stage) => stage.id === 'zg053_impossible');
+  if (impossible) impossible.phase = 'D3';
+  timeline.stages.push({
+    id: 'D4_connection_missed',
+    at: '2026-09-29T17:20:00+09:00',
+    eventId: 'sim-zg-evt-s2-delay-04',
+    eventType: 'MISSED_CONNECTION',
+    transfer: {
+      inboundArrival: '2026-09-29T17:55:00+09:00',
+      onwardDeparture: '2026-09-29T16:50:00+09:00',
+      connectionRemainingMinutes: -65,
+    },
+    narrative: 'D4: transfer is missed; reported TR867 airline default and TR885 Northstar recovery are evaluated against the 20:45 finals.',
+  });
+  writeJson(file, timeline);
+}
+
+// S3 is a bilateral swap, never a one-commitment reschedule to an arbitrary
+// 15:30 slot.
+for (const file of [
+  path.join(SCENARIO_ROOT, 's3-event-change-preview/scenario.json'),
+  path.join(SCENARIO_ROOT, 's3-event-change-preview/inputs/counterfactual-preview.json'),
+  path.join(SCENARIO_ROOT, 's3-event-change-preview/inputs/organiser-change-request.json'),
+]) {
+  const value = replaceStrings(readJson(file), [
+    ['RESCHEDULE headline interview to 15:30–16:00', 'swap Sarah headline 11:30–12:00 with Daniel local-host 14:30–15:00'],
+    ['RESCHEDULE-to-15:30', 'bilateral Sarah↔Daniel swap'],
+    ['Approximate \'swap with later local slot\' via RESCHEDULE only.', 'Execute the Sarah↔Daniel swap as two explicit programme changes.'],
+    ['09:20', '11:30'],
+    ['360min', '150min'],
+    ['360 minutes', '150 minutes'],
+    ['same trip\'s engagement starts 15:30', 'same trip\'s engagement starts 14:30'],
+  ]);
+  writeJson(file, value);
+}
+
+// Dossier and acceptance metadata are part of the same SSOT sync.
+const dossier = readJson(path.join(GLOBAL_ROOT, 'booking-dossiers.json'));
+if (dossier.dossiers?.flight?.[0]?.passengers?.[0]) dossier.dossiers.flight[0].passengers[0].nationality = 'SG';
+writeJson(path.join(GLOBAL_ROOT, 'booking-dossiers.json'), dossier);
+
+for (const fileName of ['s1-airline-schedule-change.json', 's1-s3-continuity.json']) {
+  const file = path.join(MANIFEST_ROOT, fileName);
+  const value = replaceStrings(readJson(file), [
+    ['s1-supplier-disruption', 's1-supplier-disruption'],
+    ['MN310', 'ID7159'],
+    ['MN218', 'ID7153'],
+    ['09:20', '11:30'],
+    ['360min', '150min'],
+    ['360 minutes', '150 minutes'],
+    ['RESCHEDULE', 'bilateral Sarah↔Daniel swap'],
+  ]);
+  const ids = value.expect?.travellerIds ?? [];
+  const trips = value.expect?.tripIds ?? [];
+  const felix = 'trv-evt-ait-2026-ait-draft-03';
+  const felixTrip = 'trip-trv-evt-ait-2026-ait-draft-03';
+  if (!ids.includes(felix)) ids.splice(1, 0, felix);
+  if (!trips.includes(felixTrip)) trips.splice(1, 0, felixTrip);
+  value.expect.travellerIds = ids;
+  value.expect.tripIds = trips;
+  writeJson(file, value);
+}
+
+for (const fileName of ['s2-missed-connection.json', 's2-missed-connection-record.json']) {
+  const file = path.join(MANIFEST_ROOT, fileName);
+  const value = replaceStrings(readJson(file), [
+    ['United States', 'Singapore'],
+    ['"US"', '"SG"'],
+    ['15:10', '20:45'],
+    ['TR885-as-default', 'TR867-as-default'],
+    ['TR885 airline-default', 'TR867 airline-default'],
+    ['TR885-class', 'TR885'],
+  ]);
+  writeJson(file, value);
+}
+
+for (const fileName of ['s3-organiser-preview.json', 's3-organiser-preview-record.json']) {
+  const file = path.join(MANIFEST_ROOT, fileName);
+  const value = replaceStrings(readJson(file), [
+    ['RESCHEDULE', 'bilateral Sarah↔Daniel swap'],
+    ['15:30', '14:30'],
+    ['09:20', '11:30'],
+    ['360min', '150min'],
+  ]);
+  writeJson(file, value);
+}

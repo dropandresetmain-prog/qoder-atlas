@@ -137,11 +137,11 @@ CGK→SIN).
 
 | Stage | What happens |
 |-------|----------------|
-| **Initial state** | Post-booking. Multiple CGK→SIN speakers confirmed on shared morning service. Sarah’s hard commitment is Day-1 headline **09:20**. Baseline arrivals clear the 360-minute buffer. |
+| **Initial state** | Post-booking. Five CGK→SIN speakers share synthetic Batik ID7159 (30 Sep 17:45→20:30). Sarah’s hard commitment is Day-1 headline **11:30**. The 150-minute buffer is initially clear. |
 | **Trigger** | Simulated airline schedule change / retime enters via the real flight-event ingress (`SIMULATED SOURCE EVENT` disclosed — not LIVE). |
-| **Successive state changes** | Shared inbound retimed; airline auto-rebooks cohort onto a later morning arrival (~07:00 Day 1 class). Blast radius fans out per traveller. |
-| **Provider/AI/tool evidence** | Atlas schedule/search REPLAY for CGK→SIN alternatives; deterministic constraint eval against `MIN_BUFFER` 360; programme commitment graph. |
-| **Deterministic viability** | Differentiated: Wanderpay afternoon speakers remain **VIABLE**; Sarah’s gap to 09:20 fails 360 → **NOT_VIABLE**. Travel-only strategies do not restore the morning slot. |
+| **Successive state changes** | Synthetic ID7159 is cancelled; all five tickets are involuntarily reprotected to synthetic ID7153 (1 Oct 07:45→10:30). Blast radius fans out per traveller. |
+| **Provider/AI/tool evidence** | Organiser-supplied synthetic Batik inputs; no Atlas evidence is claimed. Deterministic constraint eval uses `MIN_BUFFER` 150 and the programme commitment graph. |
+| **Deterministic viability** | Felix’s 16:30 REQUIRED slot is **VIABLE** (360 minutes after arrival); Sarah’s 11:30 slot is **NOT_VIABLE** (60 minutes against the 150-minute buffer). S3 provides the bilateral Sarah↔Daniel programme swap. |
 | **Authority/decision** | Organiser-facing recovery case; programme-side options may be **proposed** but not auto-committed. |
 | **Surfaces** | Organiser blast-radius / case view; traveller trip view for Sarah. |
 | **Action/observation** | No money-moving auto-act that “fixes” the headline; hand-off into **S3** on the **same trip** (no reset). |
@@ -261,14 +261,14 @@ Stable cast and programme: Jordan Hale (`ait-draft-09`); hard finals showcase
 | **trigger / delay_1** | Simulated Atlas schedule/delay notification on ZG023 — delay begins; connection still comfortable. | Still **VIABLE** |
 | **delay_2_tight** | Further delay; NRT connection becomes tight but still theoretically makeable. | **VIABLE_TIGHT** / watch |
 | **zg053_impossible** | Upstream delay makes ZG053 impossible; missed-connection signal; airline may still suggest same-night options. | Onward leg **failed**; recovery search opens |
-| **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 360. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
+| **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 150. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
 | **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight near Narita is required as known trip context. | Same-night **NOT_VIABLE** |
 | **overnight_context** | Narita hotel options and landside-entry/insurance needs are known contextual consequences. **They are not composed/executed/attached in the closed hero path.** | Context only; accepted-risk gaps remain |
-| **airline_morning** | Next-morning inventory includes Scoot **TR885-class** (~08:20→14:35) and slower **TR867** (20:45). | TR885 clears 20:45 finals under 360; TR867 does not |
-| **northstar_morning** | Northstar ranks boardable next-morning flight inventory; TR885-class recovery is selected in the closed acceptance. | Flight + event path **VIABLE** |
+| **airline_morning** | Airline-default inventory includes Scoot **TR867** (~12:30→20:45); Northstar also sees TR885 (~08:20→14:35). | TR867 fails the 20:45 finals buffer; TR885 clears it under 150 |
+| **northstar_morning** | Northstar ranks boardable next-morning flight inventory; TR885 is selected as the candidate in the closed acceptance. | Flight + event path **VIABLE** |
 | **authority / surfaces** | Organiser case exposes the proposed flight recovery and policy result; REPLAY/RECORD provenance is preserved. | **Organiser approval required** |
 | **action / observation** | Organiser approves flight change; execute through provider boundary; observe; authoritative trip update. | |
-| **final_state** | Recovered flight arrives SIN 14:35; 370-minute gap clears the 360-minute policy buffer; case **RESOLVED**, trip **VIABLE**. | **RESOLVED / VIABLE** |
+| **final_state** | Northstar candidate arrives SIN 14:35; 370-minute gap clears the 150-minute policy buffer; case **RESOLVED**, trip **VIABLE**. | **RESOLVED / VIABLE** |
 
 Do **not** treat VietJet VJ823 as a direct NRT→SIN 12:55 hero option (recordings show NRT→SGN connections).
 
@@ -339,11 +339,11 @@ Tan — content SSOT §5. **No runtime reset** between S1 and S3.
 
 | Stage | What happens |
 |-------|----------------|
-| **Initial state** | Continues from S1: Sarah **NOT_VIABLE** against 09:20 headline after airline rebook ~07:00. |
+| **Initial state** | Continues from S1: Sarah **NOT_VIABLE** against the 11:30 headline after synthetic ID7153 arrival at 10:30. |
 | **Trigger** | Organiser considers programme-side resolution (availability / slot move), not a new travel purchase. |
 | **Successive state changes** | Counterfactual preview only — zero authoritative mutation until commit. |
 | **Provider/AI/tool evidence** | Programme graph + trip constraints; optional travel alternatives remain visible but secondary. |
-| **Deterministic viability (preview)** | Proposed RESCHEDULE of headline → **15:30–16:00** Day 1: Sarah’s airline arrival clears 360; preview lists blast-radius faces (Elena interviewer; Daniel local CHANGEABLE). |
+| **Deterministic viability (preview)** | Bilateral option set moves Sarah’s headline → **14:30–15:00** and Daniel’s local-host session → **11:30–12:00**. Sarah clears 150; preview lists Elena and Daniel in the blast radius. |
 | **Authority/decision** | Organiser must explicitly **commit**; Northstar cannot auto-mutate programme. |
 | **Surfaces** | Organiser event-change preview / commit; case view still on Sarah’s trip. |
 | **Action/observation** | Commit → programme state updates → **same trip re-evaluates**. |

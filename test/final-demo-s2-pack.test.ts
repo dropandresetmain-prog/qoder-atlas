@@ -13,7 +13,7 @@ function readJson(rel: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(ROOT, rel), 'utf8')) as Record<string, unknown>;
 }
 
-test('S2 baseline itinerary is ZIPAIR LAX→NRT→SIN with draftId ait-draft-09', () => {
+test('S2 baseline is ZIPAIR LAX→NRT→SIN with SG Jordan and arrival-eve stay', () => {
   const baseline = readJson('inputs/baseline-itinerary.json');
   assert.equal(baseline.draftId, 'ait-draft-09');
   const inbound = baseline.inboundItinerary as { segments: Array<Record<string, string>> };
@@ -50,14 +50,19 @@ test('S2 baseline itinerary is ZIPAIR LAX→NRT→SIN with draftId ait-draft-09'
       arrival: '2026-09-29T23:00:00+08:00',
     },
   );
+  const hotel = baseline.hotelStay as { checkIn: string; checkOut: string };
+  assert.equal(hotel.checkIn, '2026-09-29T15:00:00+08:00');
+  assert.equal(hotel.checkOut, '2026-10-03T11:00:00+08:00');
+  const entry = readJson('inputs/entry-requirements-context.json');
+  assert.deepEqual((entry.assumedNationality as { codes: string[] }).codes, ['SG']);
 });
 
-test('S2 provider rebooking state carries ZGSYN09 and airline morning TR885-class', () => {
+test('S2 provider rebooking state carries ZGSYN09 and airline-default TR867', () => {
   const state = readJson('inputs/provider-rebooking-state.json');
   assert.equal(state.pnr, 'ZGSYN09');
   const segments = state.segments as Array<Record<string, string>>;
   assert.ok(segments.some((s) => s.status === 'MISSED_CONNECTION' && s.flightNumber === 'ZG053'));
-  assert.ok(segments.some((s) => s.status === 'REBOOKED_INVOLUNTARY' && s.flightNumber === 'TR885'));
+  assert.ok(segments.some((s) => s.status === 'REBOOKED_INVOLUNTARY' && s.flightNumber === 'TR867'));
 });
 
 test('S2 progressive timeline documents six stages and reconcile snapshot flag', () => {
