@@ -72,6 +72,13 @@ CREATE TABLE action_intents (
   compensation_requires_separate_authority boolean NOT NULL DEFAULT true,
   compensation_description text,
   status text NOT NULL REFERENCES action_intent_statuses (status),
+  -- Every other entity table in this range (recovery_cases, recovery_strategies,
+  -- action_plans) carries created_at/created_by_actor_id; this table omitted
+  -- both in M7's original migration — added here as an integration-owner fix,
+  -- not a new invariant (join/edge tables like action_dependencies/
+  -- case_action_links intentionally have neither).
+  created_at timestamptz NOT NULL DEFAULT now(),
+  created_by_actor_id text NOT NULL,
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT action_intents_plan_fk
     FOREIGN KEY (workspace_id, action_plan_id) REFERENCES action_plans (workspace_id, id),

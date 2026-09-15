@@ -552,6 +552,18 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'action_intents.limits',
       'action_intents.required_authority_scopes',
       'action_intents.expected_observations',
+      // M8 (0109-0110): typed AuthorityDecision/AuthorityEnvelope/Approval/
+      // ExecutionObservation payloads (§10) — scope is TypedRef[], limits is
+      // the envelope's bounded record, grant_refs/rule_inputs are id arrays,
+      // source_owned_fields/owned_subject_refs mirror the frozen
+      // ExecutionObservationSchema discriminated union exactly.
+      'authority_decisions.scope',
+      'authority_decisions.limits',
+      'authority_decisions.grant_refs',
+      'authority_decisions.rule_inputs',
+      'approvals.scope',
+      'execution_observations.source_owned_fields',
+      'execution_observations.owned_subject_refs',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

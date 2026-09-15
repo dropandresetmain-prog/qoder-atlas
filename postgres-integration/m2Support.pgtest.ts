@@ -1047,6 +1047,11 @@ describe('M2 lane S: concurrency, kind discrimination and the absent support boo
       `SELECT table_name, column_name, data_type FROM information_schema.columns
         WHERE table_schema = 'public'
           AND NOT (table_name = 'provider_capabilities' AND column_name = 'supported')
+          -- M7/M8 ActionIntent.compensationPolicy.supported (frozen
+          -- CompensationPolicySchema, src/contracts/v2/action/actionPlan.ts):
+          -- whether COMPENSATION is offered for this action, unrelated to the
+          -- accompaniment/support-person model this gate protects.
+          AND NOT (table_name = 'action_intents' AND column_name = 'compensation_supported')
           AND (column_name IN ('is_supported', 'supported', 'has_support', 'support_confirmed')
                OR (data_type = 'boolean' AND column_name ~* 'support'))
         ORDER BY table_name, column_name`,

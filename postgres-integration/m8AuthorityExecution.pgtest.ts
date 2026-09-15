@@ -71,7 +71,7 @@ function buildSingleIntentPlan(opts: {
   const plan: ActionPlan = {
     id: planId,
     recoveryCaseId: opts.recoveryCaseId,
-    scenarioChangeId: opts.scenarioChangeId ?? 'scenario-fixture-1',
+    scenarioChangeId: opts.scenarioChangeId ?? randomUUID(),
     intents: [
       {
         id: intentId,
@@ -303,7 +303,6 @@ describe('M8 budget concurrency', () => {
     const { plan: planB } = buildSingleIntentPlan({
       recoveryCaseId: f.caseId,
       organisationId: f.organisationId,
-      scenarioChangeId: 'scenario-fixture-2',
       operationNamespace: 'provider:test-b',
     });
     const persistedB = mustOk(await persistActionPlan(f.uow(), {
@@ -386,7 +385,6 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
     const { plan: rekeyedPlan } = buildSingleIntentPlan({
       recoveryCaseId: f.caseId,
       organisationId: f.organisationId,
-      scenarioChangeId: 'scenario-fixture-fp-2',
       operationNamespace: 'provider:test-fp2',
       logicalOperationKey: 'op-fp',
       requestPayload: { amount: 999 },
