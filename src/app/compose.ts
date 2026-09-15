@@ -562,6 +562,23 @@ export async function composeAppRuntime(
 
   const programmeService = bootProgrammeService;
   const now = clock ?? ((): IsoDateTime => new Date().toISOString());
+
+  // Optional M9 target PostgreSQL product surface (`/api/v2/*`).
+  // Opt-in only — default SQLite boot must remain credential-free and PG-free.
+  let targetV2: AppEndpoints['targetV2'];
+  if ((process.env.NORTHSTAR_ENABLE_TARGET_V2 ?? '').trim() === '1') {
+    const workspaceId = (process.env.PG_TARGET_WORKSPACE_ID ?? '').trim();
+    if (!workspaceId) {
+      throw new Error('NORTHSTAR_ENABLE_TARGET_V2=1 requires PG_TARGET_WORKSPACE_ID');
+    }
+    const { composeTargetEndpoints } = await import('./target/composeTargetEndpoints.ts');
+    const target = await composeTargetEndpoints({
+      workspaceId,
+      env: process.env,
+    });
+    targetV2 = target.handle;
+  }
+
   const endpoints: AppEndpoints = {
     now,
     operatorDashboard: (at, options) =>
@@ -724,6 +741,7 @@ export async function composeAppRuntime(
     }),
     upload: createUploadIntakeHandlers(programmeService),
     demo,
+    ...(targetV2 ? { targetV2 } : {}),
   };
 
   return {

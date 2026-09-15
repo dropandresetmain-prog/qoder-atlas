@@ -13,10 +13,9 @@ Compose one coherent target PostgreSQL application/runtime over accepted M2–M8
 
 ## Current checkpoint
 
-**CHECKPOINT 2 — IN PROGRESS** (CK1 remains closed; not reopened)
+**CHECKPOINT 2 — GENERIC COMPLETE — C4 CANDIDATE (fixture/Fable/Jordan Atlas evidence still external)**
 
-WiT/demo product contract frozen at semantics level — generic CK2 work unblocked without waiting for final fixture IDs.
-
+CK1 remains closed; not reopened.
 OpenRouter already on branch (`2eeff2a` ancestor) — do not re-merge.
 
 ## Discovered runtime topology
@@ -24,45 +23,45 @@ OpenRouter already on branch (`2eeff2a` ancestor) — do not re-merge.
 | Area | State |
 |---|---|
 | Target composition | `src/app/target/composeTargetApplication.ts` (PG-only) |
+| Opt-in HTTP mount | `NORTHSTAR_ENABLE_TARGET_V2=1` + `PG_TARGET_WORKSPACE_ID` → `compose.ts` attaches `/api/v2/*` |
 | Strategy / grants / IN-1 / resolution | CK1 complete |
-| Read models | CK1 + **CK2 additive** `recoveryActions[]`, partial/duplicate/remaining/cost/connectionProgression |
-| Readiness | `PROGRAMME_ARRIVAL_READINESS` rule + `programmeArrivalReadiness` + participation evaluator hook |
-| Cohort | `cohortDisruption.evaluateSharedDisruptionCohort` (5 independent outcomes) |
-| Swap preview | `programmeTimeSwapPreview` / `commandPreviewBilateralProgrammeTimeSwap` (no auth mutation) |
-| Primary scenario | `primaryScenarioFoundation` (shared supplier programme cohort — no hardcoded names) |
-| Second scenario | Jordan S2 — `secondScenarioFoundation.ts` |
-| wholeTripRecoveryPlan | Multi hotel/flight intents (no single `.find()` collapse) |
+| Read models | CK2 additive `recoveryActions[]`, partial/duplicate/remaining/cost/connectionProgression |
+| PG assemblers | strategies, actions, operator overview, incident/programme, traveller trip |
+| Readiness | `PROGRAMME_ARRIVAL_READINESS` + participation evaluator |
+| Cohort | `cohortDisruption.evaluateSharedDisruptionCohort` |
+| Swap preview | non-authoritative bilateral programme time-swap |
+| Primary scenario | `primaryScenarioFoundation` + vertical loop + PG programme loop proof |
+| Second scenario | Jordan S2 generic multi-action / multi-stay (fixture E2E pending) |
 
 ## Checklist — Checkpoint 1
 
-- [x] All CK1 items (see prior ledger) — **closed**
+- [x] All CK1 items — **closed**
 
 ## Checklist — Checkpoint 2
 
-- [x] A. Additive generic read-model fields (`recoveryActions[]`, partial, duplicate exposure, …)
-- [x] B. Generic 150-min REQUIRED physical-presence readiness (rule/data-driven)
-- [x] C. Five-person shared disruption independent evaluation helper
+- [x] A. Additive generic read-model fields
+- [x] B. Generic 150-min REQUIRED physical-presence readiness
+- [x] C. Five-person shared disruption independent evaluation
 - [x] D. Bilateral programme time-swap preview (no authoritative mutation)
 - [x] Fix legacy `wholeTripRecoveryPlan` single-hotel / single-flight assumptions
-- [x] Focused CK2 unit tests (`test/m9-checkpoint2-unit.test.ts`)
-- [ ] E. Full Sarah backend vertical loop wired to PG runtime + HTTP (generic config; fixture IDs later)
+- [x] E. Sarah backend vertical loop + PG assemblers + `/api/v2` product routes (generic; fixture IDs later)
+- [x] G. Product surfaces (structural DESIGN.md baseline; Fable polish deferred)
+- [x] Jordan generic multi-action / multi-stay / progression / partial recovery
 - [ ] F. Replace fixture/provider artifacts when fixture lane delivers
-- [ ] G. Final Sarah product surfaces + demo acceptance (Fable direction when supplied)
 - [ ] Jordan multi-stay acceptance with Atlas/Nuitée evidence
+- [ ] Fable visual refinement (if supplied)
 
-## Current blocker / pending
+## Current blocker / pending (external only)
 
-**Fixture lane (does not block generic work):** exact provider refs, flight numbers, commitment IDs, hotel rates, Jordan timings.
-
-**Fable visual direction:** backend/read models proceed; final UI styling waits.
-
-**Acceptance tests still needing fixture lane:** end-to-end Sarah §12 with real provider-shaped disruption + exact commitment IDs; Jordan §13 with Atlas/Nuitée stays.
+**Fixture lane:** exact provider refs, flight numbers, commitment IDs, hotel rates, Jordan timings.
+**Fable visual direction:** functional surfaces done; styling delta when Fable arrives.
+**Acceptance still needing fixture lane:** Sarah §12 provider-shaped E2E IDs; Jordan §13 Atlas/Nuitée stays.
 
 ## Next action
 
-1. Continue E: wire target HTTP/read-model assembly + end-to-end loop using scenario/config placeholders (no invented fixture UUIDs).
-2. Keep Jordan multi-stay RM path green; defer Jordan fixture acceptance.
-3. Do not claim C4 PASS; do not start M10.
+1. Independent C4 review on pushed candidate SHA (do not claim C4 PASS here).
+2. When fixture lane delivers: data-only fixture/config updates.
+3. Do not start M10.
 
 ## Critical constraints
 
@@ -78,8 +77,8 @@ OpenRouter already on branch (`2eeff2a` ancestor) — do not re-merge.
 |---|---|---|
 | ORG-INHERIT | Park for Later | Exact grant match only |
 | ISSUER-POL | Investigate Now | Issuer policy table still absent |
-| CK2-SARAH-LOOP-E | Act Now | Wire full vertical loop on target runtime |
 | CK2-FIXTURE-LANE | Park for Later | Exact IDs/artifacts |
 | JORDAN-EVIDENCE | Park for Later | Atlas + Nuitée pending |
-| JORDAN-CK2-ADDITIVE-RM | Done (schema+projector) | Assembled from facts; PG assembler still part of E |
+| FABLE-POLISH | Park for Later | Visual refinement only |
 | LEGACY-R1-WALLCLOCK | Ignore / Accept Risk | Pre-existing on C3 without OpenRouter |
+| PG-ASSESS-SERIAL | Accept Risk | Sequential assessment saves + retry; run M9 PG with concurrency=1 |

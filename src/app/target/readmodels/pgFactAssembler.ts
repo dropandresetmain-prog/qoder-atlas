@@ -18,7 +18,10 @@ import type {
   TravellerTripFacts,
 } from './types.ts';
 import { mapConnectionProgression } from './mapConnectionProgression.ts';
-import { evaluateSharedDisruptionCohort } from '../cohortDisruption.ts';
+import {
+  evaluateSharedDisruptionCohort,
+  type CohortTravellerEvaluationInput,
+} from '../cohortDisruption.ts';
 
 function isoNow(at?: string): string {
   return at ?? new Date().toISOString();
@@ -192,6 +195,37 @@ export async function loadRecoveryCaseFacts(
   const recoveryActions = await loadRecoveryActionFacts(pool, workspaceId, caseId);
   const generatedAt = isoNow(at);
 
+  const strategyRows = await pool.query<{
+    id: string;
+    strategy_version: number;
+    viability: string;
+    status: string;
+    candidate_assessment_summaries: unknown;
+  }>(
+    `SELECT id, strategy_version, viability, status, candidate_assessment_summaries
+       FROM recovery_strategies
+      WHERE workspace_id = $1 AND recovery_case_id = $2
+      ORDER BY strategy_version DESC`,
+    [workspaceId, caseId],
+  );
+  const strategies = strategyRows.rows.map((s) => {
+    const summaries = Array.isArray(s.candidate_assessment_summaries)
+      ? (s.candidate_assessment_summaries as { personLabel?: string; verdict?: string }[])
+      : [];
+    return {
+      strategyRef: s.id,
+      version: s.strategy_version,
+      viability: s.viability,
+      status: s.status,
+      projectedPeople: summaries.map((row) => ({
+        personLabel: row.personLabel ?? 'Traveller',
+        verdict: (row.verdict === 'PASS' || row.verdict === 'FAIL' || row.verdict === 'UNKNOWN'
+          ? row.verdict
+          : 'UNKNOWN') as AssessmentTone,
+      })),
+    };
+  });
+
   // Assessments for case subjects — best-effort.
   const subjects = await pool.query<{ subject_kind: string; subject_id: string }>(
     `SELECT subject_kind, subject_id FROM case_subjects WHERE workspace_id = $1 AND recovery_case_id = $2`,
@@ -265,8 +299,14 @@ export async function loadRecoveryCaseFacts(
       verdict: tripVerdict,
     },
     affectedItems: subjects.rows.map((s) => `${s.subject_kind}:${s.subject_id}`),
-    strategies: [],
-    authorityState: status === 'AWAITING_AUTHORITY' ? 'awaiting' : 'recorded',
+    strategies,
+    authorityState: status === 'AWAITING_AUTHORITY'
+      ? 'awaiting'
+      : strategies.some((s) => s.status === 'SELECTED' || s.status === 'EVALUATED')
+        ? 'recorded'
+        : status === 'RESOLVED' || status === 'CLOSED'
+          ? 'satisfied'
+          : 'recorded',
     executionState: status === 'EXECUTING' ? 'executing' : status === 'RESOLVED' ? 'complete' : 'idle',
     reconciliationState: partialIncomplete ? 'reconciling' : 'idle',
     uncertainty,
@@ -303,9 +343,23 @@ export async function loadOperatorOverviewFacts(
         ? 'VIABLE'
         : 'UNKNOWN';
     const affected = facts.affectedItems ?? [];
+    let travellerLabel = affected[0] ?? 'Traveller';
+    const firstJourney = affected.find((a) => a.startsWith('JOURNEY:'));
+    if (firstJourney) {
+      const journeyId = firstJourney.slice('JOURNEY:'.length);
+      const named = await pool.query<{ display_value: string }>(
+        `SELECT n.display_value
+           FROM journeys j
+           JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
+           JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+          WHERE j.workspace_id = $1 AND j.id = $2`,
+        [workspaceId, journeyId],
+      );
+      if (named.rows[0]?.display_value) travellerLabel = named.rows[0].display_value;
+    }
     items.push({
       tripRef: affected[0] ?? `case:${c.id}`,
-      travellerLabel: affected[0] ?? 'Traveller',
+      travellerLabel,
       status,
       remainderViability: remainder,
       caseRef: c.id,
@@ -415,4 +469,165 @@ export function buildTravellerTripFacts(input: {
     ...(input.whatDoYouNeedFromMe ? { whatDoYouNeedFromMe: input.whatDoYouNeedFromMe } : {}),
     doesTheRestWork: input.doesTheRestWork,
   };
+}
+
+/**
+ * Assemble Incident/Programme facts from a recovery case + programme rows.
+ * Outcomes come from latest VIABILITY assessments on JOURNEY subjects — never invented.
+ */
+export async function loadIncidentProgrammeFacts(
+  pool: Pool,
+  workspaceId: string,
+  caseId: string,
+  at?: string,
+): Promise<IncidentProgrammeFacts | null> {
+  const caseFacts = await loadRecoveryCaseFacts(pool, workspaceId, caseId, at);
+  if (!caseFacts) return null;
+
+  const journeySubjects = await pool.query<{ subject_id: string }>(
+    `SELECT subject_id FROM case_subjects
+      WHERE workspace_id = $1 AND recovery_case_id = $2 AND subject_kind = 'JOURNEY'`,
+    [workspaceId, caseId],
+  );
+
+  const travellers: CohortTravellerEvaluationInput[] = [];
+  for (const row of journeySubjects.rows) {
+    const journey = await pool.query<{ trip_id: string; traveller_id: string }>(
+      `SELECT trip_id, traveller_id FROM journeys WHERE workspace_id = $1 AND id = $2`,
+      [workspaceId, row.subject_id],
+    );
+    const j = journey.rows[0];
+    if (!j) continue;
+    const name = await pool.query<{ display_value: string }>(
+      `SELECT n.display_value
+         FROM travellers t
+         JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+        WHERE t.workspace_id = $1 AND t.id = $2`,
+      [workspaceId, j.traveller_id],
+    );
+    const assessment = await pool.query<{ overall_verdict: string }>(
+      `SELECT a.overall_verdict
+         FROM assessments a
+         JOIN assessment_subjects s ON s.workspace_id = a.workspace_id AND s.assessment_id = a.id
+        WHERE a.workspace_id = $1 AND a.kind = 'VIABILITY'
+          AND s.subject_kind = 'JOURNEY' AND s.subject_id = $2
+        ORDER BY a.evaluated_at DESC LIMIT 1`,
+      [workspaceId, row.subject_id],
+    );
+    const participation = await pool.query<{ id: string }>(
+      `SELECT p.id FROM participations p
+        WHERE p.workspace_id = $1 AND p.traveller_id = $2 AND p.obligation = 'REQUIRED' AND p.accepted = true
+        LIMIT 1`,
+      [workspaceId, j.traveller_id],
+    );
+    const verdictRaw = assessment.rows[0]?.overall_verdict;
+    const programmeOutcome: AssessmentTone =
+      verdictRaw === 'PASS' || verdictRaw === 'FAIL' || verdictRaw === 'UNKNOWN'
+        ? verdictRaw
+        : 'UNKNOWN';
+    travellers.push({
+      travellerRef: j.traveller_id,
+      personLabel: name.rows[0]?.display_value ?? `Traveller ${j.traveller_id.slice(0, 8)}`,
+      tripRef: j.trip_id,
+      journeyRef: row.subject_id,
+      programmeOutcome,
+      remainderViability: programmeOutcome === 'PASS' ? 'VIABLE' : programmeOutcome === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN',
+      hasEvaluatedRequiredProgrammeDependency: participation.rows.length > 0,
+    });
+  }
+
+  const programmeItems = await pool.query<{
+    id: string;
+    title: string;
+    window_start: Date | null;
+    lifecycle_status: string;
+  }>(
+    `SELECT DISTINCT pi.id, pi.title, pi.window_start, pi.lifecycle_status
+       FROM programme_items pi
+       JOIN participations p ON p.workspace_id = pi.workspace_id AND p.programme_item_id = pi.id
+       JOIN journeys j ON j.workspace_id = p.workspace_id AND j.traveller_id = p.traveller_id
+       JOIN case_subjects cs ON cs.workspace_id = j.workspace_id AND cs.subject_id = j.id
+      WHERE pi.workspace_id = $1 AND cs.recovery_case_id = $2 AND cs.subject_kind = 'JOURNEY'
+      ORDER BY pi.window_start NULLS LAST`,
+    [workspaceId, caseId],
+  );
+
+  return loadIncidentProgrammeFactsFromCohort({
+    incidentRef: caseId,
+    sourceChangeSummary: caseFacts.changeSummary,
+    generatedAt: caseFacts.generatedAt,
+    travellers,
+    programmeCommitments: programmeItems.rows.map((pi) => ({
+      itemRef: pi.id,
+      label: pi.title,
+      ...(pi.window_start ? { windowLabel: pi.window_start.toISOString() } : {}),
+      state: pi.lifecycle_status === 'CANCELLED' ? 'FAILED' as const : 'ACTIVE' as const,
+    })),
+    currentProgrammeState: programmeItems.rows
+      .map((pi) => `${pi.title}@${pi.window_start?.toISOString() ?? 'unscheduled'}`)
+      .join('; ') || undefined,
+  });
+}
+
+/**
+ * Assemble Traveller Trip facts from a journey subject linked to a case (optional).
+ */
+export async function loadTravellerTripFacts(
+  pool: Pool,
+  workspaceId: string,
+  journeyId: string,
+  at?: string,
+): Promise<TravellerTripFacts | null> {
+  const journey = await pool.query<{ trip_id: string; traveller_id: string; lifecycle_status: string }>(
+    `SELECT trip_id, traveller_id, lifecycle_status FROM journeys WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, journeyId],
+  );
+  const j = journey.rows[0];
+  if (!j) return null;
+
+  const assessment = await pool.query<{ overall_verdict: string }>(
+    `SELECT a.overall_verdict
+       FROM assessments a
+       JOIN assessment_subjects s ON s.workspace_id = a.workspace_id AND s.assessment_id = a.id
+      WHERE a.workspace_id = $1 AND a.kind = 'VIABILITY'
+        AND s.subject_kind = 'JOURNEY' AND s.subject_id = $2
+      ORDER BY a.evaluated_at DESC LIMIT 1`,
+    [workspaceId, journeyId],
+  );
+  const verdict = assessment.rows[0]?.overall_verdict;
+  const amIOkay: 'YES' | 'NO' | 'UNKNOWN' =
+    verdict === 'PASS' ? 'YES' : verdict === 'FAIL' ? 'NO' : 'UNKNOWN';
+  const doesTheRestWork: RemainderViability =
+    verdict === 'PASS' ? 'VIABLE' : verdict === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN';
+
+  const caseLink = await pool.query<{ recovery_case_id: string; lifecycle_status: string }>(
+    `SELECT cs.recovery_case_id, rc.lifecycle_status
+       FROM case_subjects cs
+       JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
+      WHERE cs.workspace_id = $1 AND cs.subject_kind = 'JOURNEY' AND cs.subject_id = $2
+      ORDER BY rc.opened_at DESC LIMIT 1`,
+    [workspaceId, journeyId],
+  );
+  const linked = caseLink.rows[0];
+
+  return buildTravellerTripFacts({
+    tripRef: j.trip_id,
+    amIOkay,
+    doesTheRestWork,
+    generatedAt: isoNow(at),
+    whatChanged: linked
+      ? `Linked recovery case ${linked.recovery_case_id} is ${linked.lifecycle_status}`
+      : 'No open recovery case linked to this journey',
+    whatMattersNow: amIOkay === 'NO'
+      ? 'Your participation is not viable under current assessments'
+      : amIOkay === 'YES'
+        ? 'Current assessment reports your journey as viable'
+        : 'Viability is not yet known',
+    whatNorthstarIsDoing: linked
+      ? `Recovery case status: ${linked.lifecycle_status}`
+      : 'Monitoring journey state',
+    whatDoYouNeedFromMe: linked?.lifecycle_status === 'AWAITING_AUTHORITY'
+      ? 'Authority decision may be required'
+      : 'Nothing required from you right now unless contacted',
+  });
 }

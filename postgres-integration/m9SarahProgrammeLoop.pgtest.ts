@@ -230,16 +230,37 @@ describe('M9 Sarah-equivalent programme loop (PG)', () => {
     }
 
     // --- Save PASS assessments for all journeys; resolve case ---
+    // Assessments are indexed by primary subject+kind; each journey needs its own.
+    // Retry SERIALIZATION_FAILURE (40001) which can occur under shared test pools.
+    async function saveAssessmentWithRetry(
+      subjectId: string,
+      attempts = 5,
+    ): Promise<void> {
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          await saveAssessment(pool, seed.workspaceId, {
+            id: randomUUID(),
+            kind: 'VIABILITY',
+            evaluatedAt: NOW,
+            overallVerdict: 'PASS',
+            subjects: [{ subjectRef: { kind: 'JOURNEY', id: subjectId }, role: 'PRIMARY' }],
+            dimensions: [],
+            manifest: emptyManifest(),
+          }, seed.actorId);
+          return;
+        } catch (error) {
+          lastError = error;
+          const code = (error as { code?: string } | undefined)?.code;
+          if (code !== '40001' || attempt === attempts) throw error;
+          await new Promise((r) => setTimeout(r, 25 * attempt));
+        }
+      }
+      throw lastError;
+    }
+
     for (const j of journeys) {
-      await saveAssessment(pool, seed.workspaceId, {
-        id: randomUUID(),
-        kind: 'VIABILITY',
-        evaluatedAt: NOW,
-        overallVerdict: 'PASS',
-        subjects: [{ subjectRef: { kind: 'JOURNEY', id: j.journeyId }, role: 'PRIMARY' }],
-        dimensions: [],
-        manifest: emptyManifest(),
-      }, seed.actorId);
+      await saveAssessmentWithRetry(j.journeyId);
     }
 
     const evaluation = await evaluateRecoveryCaseResolution(pool, {
