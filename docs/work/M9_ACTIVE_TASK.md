@@ -17,6 +17,8 @@ Compose one coherent target PostgreSQL application/runtime over accepted M2–M8
 
 Jordan S2 product-contract addendum applied: second scenario superseded; CK1 contracts audited compatible.
 
+OpenRouter lane (`feature/openrouter-provider-neutral` @ `2eeff2a`) merged early into M9 (touches `compose.ts`/`config.ts`).
+
 Next: Checkpoint 2 blocked on **Sarah** product handoff (Jordan evidence does not unblock Sarah).
 
 ## Discovered runtime topology
@@ -76,3 +78,4 @@ Next: Checkpoint 2 blocked on **Sarah** product handoff (Jordan evidence does no
 | CK2-SARAH-HANDOFF | Park for Later | Blocks polished CK2 |
 | JORDAN-EVIDENCE | Park for Later | Atlas + Nuitée pending; do not invent fixtures |
 | JORDAN-CK2-ADDITIVE-RM | Act Now at CK2 start | Multi-action / partial-recovery fields recorded; implement when CK2 begins |
+| LEGACY-R1-WALLCLOCK | Ignore / Accept Risk (for OpenRouter) | `integration.r1` determinism fails via wall-clock `observedAt` on C3 **without** OpenRouter; not an OpenRouter regression (A-10) |
