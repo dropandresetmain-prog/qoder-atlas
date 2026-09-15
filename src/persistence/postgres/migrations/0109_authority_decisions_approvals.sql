@@ -1,5 +1,34 @@
--- M8 (0102): authority decisions, approval requirements, approvals, revocations.
+-- M8 (0109): authority decisions, approval requirements, approvals, revocations.
 -- Approvals bind to an exact envelope fingerprint — never a case-wide reusable grant.
+--
+-- Integration-owner amendments (M7/M8/C3 integration; see
+-- docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §3):
+--  - M8's provisional 0100/0101 recovery_cases/action_plans/action_intents
+--    tables are dropped; M7's canonical 0100/0102 are the base. This
+--    migration amends them additively (resolution_kind, plan/version
+--    uniqueness) instead of recreating them.
+--  - action_intents has no independent per-row version (immutable, one row
+--    per identity — a superseding proposal gets a new SubjectId, never a
+--    version bump in place). AuthorityDecisionSchema/AuthorityEnvelopeSchema
+--    (frozen) still require actionIntentVersion for envelope-fingerprint
+--    symmetry with actionPlanVersion; it is always 1 for a real intent.
+
+-- ActionIntent's currentness basis lives one layer up, on
+-- recovery_strategies/strategy_changes.basis_assessment_id (M7, planning
+-- time) — M8's original action_intents.basis_assessment_id column was
+-- unread by assessmentGate.ts/decisionGates.ts and is not recreated here.
+
+ALTER TABLE recovery_cases
+  ADD COLUMN resolution_kind text
+    CHECK (resolution_kind IS NULL OR resolution_kind IN (
+      'RECOVERED', 'RECOVERED_WITH_LOSS', 'UNRESOLVED', 'CANCELLED'
+    ));
+
+INSERT INTO recovery_case_lifecycles (status) VALUES ('SUPERSEDED');
+
+-- Nothing today stops two plans in the same case sharing a plan_version.
+CREATE UNIQUE INDEX action_plans_case_version_uidx
+  ON action_plans (workspace_id, recovery_case_id, plan_version);
 
 CREATE TABLE authority_decisions (
   workspace_id uuid NOT NULL REFERENCES workspaces (id),
@@ -7,7 +36,8 @@ CREATE TABLE authority_decisions (
   action_plan_id uuid NOT NULL,
   action_plan_version integer NOT NULL CHECK (action_plan_version >= 1),
   action_intent_id uuid NOT NULL,
-  action_intent_version integer NOT NULL CHECK (action_intent_version >= 1),
+  -- Always 1 — ActionIntent has no independent version (see file header).
+  action_intent_version integer NOT NULL DEFAULT 1 CHECK (action_intent_version = 1),
   group_operator text NOT NULL CHECK (group_operator IN ('AND', 'OR')),
   envelope_fingerprint text NOT NULL CHECK (length(btrim(envelope_fingerprint)) > 0),
   scope jsonb NOT NULL CHECK (jsonb_typeof(scope) = 'array' AND pg_column_size(scope) <= 8192),

@@ -1,5 +1,15 @@
 -- M7 (0102): action_plans / action_intents / action_dependencies / case_action_links.
 -- Typed DAG only. M8 owns authority_decisions / execution_attempts (0109+).
+--
+-- Integration-owner note (M7/M8/C3 integration; see
+-- docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §3c): cost_estimate and
+-- compensation_policy below are stored as typed columns rather than opaque
+-- jsonb — this exactly matches the frozen ExactMoneySchema {amount,currency}
+-- and CompensationPolicySchema {supported,requiresSeparateAuthority,
+-- description} shapes (src/contracts/v2/action/actionPlan.ts,
+-- src/domain/v2/shared/money.ts) with real constraints instead of an opaque
+-- blob, and keeps money in Postgres `numeric` (exact, no float) consistent
+-- with the I-10 exact-arithmetic invariant M8 owns.
 
 CREATE TABLE action_intent_statuses (status text PRIMARY KEY);
 INSERT INTO action_intent_statuses (status) VALUES
@@ -45,9 +55,8 @@ CREATE TABLE action_intents (
     jsonb_typeof(preconditions) = 'array' AND pg_column_size(preconditions) <= 16384
   ),
   offer_fingerprint text CHECK (offer_fingerprint IS NULL OR length(offer_fingerprint) <= 128),
-  cost_estimate jsonb CHECK (cost_estimate IS NULL OR (
-    jsonb_typeof(cost_estimate) = 'object' AND pg_column_size(cost_estimate) <= 4096
-  )),
+  cost_amount numeric,
+  cost_currency text CHECK (cost_currency IS NULL OR cost_currency ~ '^[A-Z]{3}$'),
   limits jsonb CHECK (limits IS NULL OR (
     jsonb_typeof(limits) = 'object' AND pg_column_size(limits) <= 8192
   )),
@@ -59,13 +68,17 @@ CREATE TABLE action_intents (
     jsonb_typeof(expected_observations) = 'array' AND jsonb_array_length(expected_observations) >= 1
     AND pg_column_size(expected_observations) <= 16384
   ),
-  compensation_policy jsonb NOT NULL CHECK (
-    jsonb_typeof(compensation_policy) = 'object' AND pg_column_size(compensation_policy) <= 4096
-  ),
+  compensation_supported boolean NOT NULL,
+  compensation_requires_separate_authority boolean NOT NULL DEFAULT true,
+  compensation_description text,
   status text NOT NULL REFERENCES action_intent_statuses (status),
   PRIMARY KEY (workspace_id, id),
   CONSTRAINT action_intents_plan_fk
-    FOREIGN KEY (workspace_id, action_plan_id) REFERENCES action_plans (workspace_id, id)
+    FOREIGN KEY (workspace_id, action_plan_id) REFERENCES action_plans (workspace_id, id),
+  CONSTRAINT action_intents_cost_shape CHECK (
+    (cost_amount IS NULL AND cost_currency IS NULL)
+    OR (cost_amount IS NOT NULL AND cost_currency IS NOT NULL AND cost_amount > 0)
+  )
 );
 
 -- Once a logical operation key is prepared, it is unique per workspace+namespace.

@@ -23,8 +23,6 @@ export async function executeInternalProgrammeItemSchedule(
     planId: string;
     intentId: string;
     attemptNumber: number;
-    logicalOperationKey: string;
-    requestFingerprint: string;
     programmeId: string;
     programmeItemId: string;
     expectedProgrammeRevision: number;
@@ -47,8 +45,6 @@ export async function executeInternalProgrammeItemSchedule(
     planId: params.planId,
     intentId: params.intentId,
     attemptNumber: params.attemptNumber,
-    logicalOperationKey: params.logicalOperationKey,
-    requestFingerprint: params.requestFingerprint,
   });
   if (!prepared.ok) return prepared;
 
@@ -145,10 +141,11 @@ export async function executeInternalProgrammeItemSchedule(
         params.actorPrincipalId,
       ],
     );
-    await client.query(
-      `UPDATE action_intents SET status = 'COMPLETED', updated_at = now() WHERE workspace_id = $1 AND id = $2`,
-      [params.workspaceId, params.intentId],
-    );
+    // action_intents.status is a write-once planning disposition (set by M7's
+    // compiler at compile time) — it is never updated here. Execution truth is
+    // now fully recorded above (execution_attempts.status + the
+    // INTERNAL_COMMAND_RECEIPT execution_observations row). See
+    // docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §4.
     const value = {
       attemptId: prepared.value.attemptId,
       observationId,

@@ -13,8 +13,7 @@ import { createBudget } from '../src/persistence/postgres/commands/arrangementCo
 import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import {
   openRecoveryCase,
-  createActionPlanWithIntent,
-  prepareActionIntentDispatchIdentity,
+  persistActionPlan,
   holdBudgetForIntent,
   createPreparedExecutionAttempt,
   issueAuthorityDecision,
@@ -31,6 +30,9 @@ import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/cont
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import { computeRequestFingerprint } from '../src/resolution/execution/stateMachine.ts';
+import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
+import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
+import type { ExactMoney } from '../src/domain/v2/shared/money.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -44,7 +46,56 @@ function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   return outcome.value;
 }
 
-async function baseFixture() {
+/**
+ * Builds a single-intent ActionPlan matching the exact shape M7's compiler
+ * produces (src/resolution/planning/compiler.ts) — logicalOperationKey and
+ * requestFingerprint are fixed at compile/build time here, never assigned
+ * later, matching the integrated immutable action_intents row.
+ */
+function buildSingleIntentPlan(opts: {
+  recoveryCaseId: string;
+  organisationId: string;
+  scenarioChangeId?: string;
+  operationNamespace?: string;
+  capabilityRef?: string;
+  subjectRefs?: TypedRef[];
+  expectedObservations?: string[];
+  costEstimate?: ExactMoney;
+  logicalOperationKey?: string;
+  requestPayload?: unknown;
+}): { plan: ActionPlan; intentId: string; planId: string } {
+  const intentId = randomUUID();
+  const planId = randomUUID();
+  const logicalOperationKey = opts.logicalOperationKey ?? `op-fixture-${intentId}`;
+  const requestFingerprint = computeRequestFingerprint(opts.requestPayload ?? { intentId });
+  const plan: ActionPlan = {
+    id: planId,
+    recoveryCaseId: opts.recoveryCaseId,
+    scenarioChangeId: opts.scenarioChangeId ?? 'scenario-fixture-1',
+    intents: [
+      {
+        id: intentId,
+        actionPlanId: planId,
+        operationNamespace: opts.operationNamespace ?? 'provider:test',
+        logicalOperationKey,
+        requestFingerprint,
+        capabilityRef: opts.capabilityRef ?? 'SERVICE:RESERVATION',
+        subjectRefs: opts.subjectRefs ?? [{ kind: 'ORGANISATION', id: opts.organisationId }],
+        expectedRevisions: [],
+        preconditions: [],
+        requiredAuthorityScopes: [],
+        expectedObservations: opts.expectedObservations ?? ['booking_status'],
+        ...(opts.costEstimate ? { costEstimate: opts.costEstimate } : {}),
+        compensationPolicy: { supported: false, requiresSeparateAuthority: true },
+        status: 'PROPOSED',
+      },
+    ],
+    dependencies: [],
+  };
+  return { plan, intentId, planId };
+}
+
+async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload?: unknown }) {
   const pool = await sharedTestPool();
   const seed = await beginSeed(pool, 'M8 authority');
   const organisationId = await seedOrganisation(seed, 'USD');
@@ -66,19 +117,23 @@ async function baseFixture() {
     idempotencyKey: randomUUID(),
     openedAt: NOW,
   }));
-  const plan = mustOk(await createActionPlanWithIntent(uow(), {
+  const { plan, intentId, planId } = buildSingleIntentPlan({
+    recoveryCaseId: opened.caseId,
+    organisationId,
+    costEstimate: { amount: '40.00', currency: 'USD' },
+    ...(opts?.logicalOperationKey ? { logicalOperationKey: opts.logicalOperationKey } : {}),
+    ...(opts?.requestPayload !== undefined ? { requestPayload: opts.requestPayload } : {}),
+  });
+  const persisted = mustOk(await persistActionPlan(uow(), {
     workspaceId: seed.workspaceId,
     actorPrincipalId: seed.actorId,
     idempotencyKey: randomUUID(),
-    recoveryCaseId: opened.caseId,
-    scenarioChangeId: 'scenario-fixture-1',
-    operationNamespace: 'provider:test',
-    capabilityRef: 'SERVICE:RESERVATION',
-    subjectRefs: [{ kind: 'ORGANISATION', id: organisationId }],
-    expectedObservations: ['booking_status'],
-    costEstimate: { amount: '40.00', currency: 'USD' },
+    plan,
   }));
-  return { pool, seed, uow, organisationId, principalId, ...opened, ...plan };
+  return { pool, seed, uow, organisationId, principalId, caseId: opened.caseId, planId: persisted.planId, intentId: persisted.intentIds[0]! };
+  // planId/intentId above are identical to the local `planId`/`intentId` — kept
+  // from the command's own return value so tests assert against what actually
+  // committed, not just what was requested.
 }
 
 type BaseFixture = Awaited<ReturnType<typeof baseFixture>>;
@@ -245,18 +300,20 @@ describe('M8 budget concurrency', () => {
       budget: { id: budgetId, organisationId: f.organisationId, purpose: 'travel', amount: { amount: '100.00', currency: 'USD' } },
     }));
     const intentA = f.intentId;
-    const planB = mustOk(await createActionPlanWithIntent(f.uow(), {
+    const { plan: planB } = buildSingleIntentPlan({
+      recoveryCaseId: f.caseId,
+      organisationId: f.organisationId,
+      scenarioChangeId: 'scenario-fixture-2',
+      operationNamespace: 'provider:test-b',
+    });
+    const persistedB = mustOk(await persistActionPlan(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
       idempotencyKey: randomUUID(),
-      recoveryCaseId: f.caseId,
-      scenarioChangeId: 'scenario-fixture-2',
+      plan: planB,
       planVersion: 2,
-      operationNamespace: 'provider:test-b',
-      capabilityRef: 'SERVICE:RESERVATION',
-      subjectRefs: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      expectedObservations: ['booking_status'],
     }));
+    const intentB = persistedB.intentIds[0]!;
 
     const [left, right] = await Promise.all([
       holdBudgetForIntent(new PgUnitOfWork(f.pool, f.seed.workspaceId), {
@@ -274,7 +331,7 @@ describe('M8 budget concurrency', () => {
         idempotencyKey: randomUUID(),
         budgetId,
         expectedBudgetRevision: 1,
-        actionIntentId: planB.intentId,
+        actionIntentId: intentB,
         requested: { amount: '70.00', currency: 'USD' },
       }),
     ]);
@@ -290,17 +347,7 @@ describe('M8 budget concurrency', () => {
 
 describe('M8 execution claim / idempotency / unknown outcome', () => {
   test('two workers claim the same prepared attempt — only one wins', async () => {
-    const f = await baseFixture();
-    const prepared = mustOk(await prepareActionIntentDispatchIdentity(f.uow(), {
-      workspaceId: f.seed.workspaceId,
-      actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      expectedPlanRevision: 1,
-      logicalOperationKey: 'op-claim-race',
-      requestPayload: { book: true },
-    }));
+    const f = await baseFixture({ logicalOperationKey: 'op-claim-race', requestPayload: { book: true } });
     mustOk(await createPreparedExecutionAttempt(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
@@ -308,8 +355,6 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: 'op-claim-race',
-      requestFingerprint: prepared.requestFingerprint,
     }));
     const a = new PgExecutionWorker(f.pool, { actorId: 'worker-a' });
     const b = new PgExecutionWorker(f.pool, { actorId: 'worker-b' });
@@ -319,17 +364,7 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
   });
 
   test('same logical key with different fingerprint is rejected', async () => {
-    const f = await baseFixture();
-    const first = mustOk(await prepareActionIntentDispatchIdentity(f.uow(), {
-      workspaceId: f.seed.workspaceId,
-      actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      expectedPlanRevision: 1,
-      logicalOperationKey: 'op-fp',
-      requestPayload: { amount: 10 },
-    }));
+    const f = await baseFixture({ logicalOperationKey: 'op-fp', requestPayload: { amount: 10 } });
     mustOk(await createPreparedExecutionAttempt(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
@@ -337,40 +372,46 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: 'op-fp',
-      requestFingerprint: first.requestFingerprint,
     }));
     // Mark first attempt terminal so only fingerprint collision remains relevant.
     await f.pool.query(
       `UPDATE execution_attempts SET status = 'RECONCILED' WHERE workspace_id = $1 AND logical_operation_key = 'op-fp'`,
       [f.seed.workspaceId],
     );
+    // A second, differently-fingerprinted intent reusing the same logical
+    // operation key is the only way to provoke a fingerprint mismatch now
+    // that dispatch identity always comes from the immutable intent row.
+    // action_intents_logical_op_uidx is scoped per operation_namespace, so
+    // a distinct namespace is required to even persist this second intent.
+    const { plan: rekeyedPlan } = buildSingleIntentPlan({
+      recoveryCaseId: f.caseId,
+      organisationId: f.organisationId,
+      scenarioChangeId: 'scenario-fixture-fp-2',
+      operationNamespace: 'provider:test-fp2',
+      logicalOperationKey: 'op-fp',
+      requestPayload: { amount: 999 },
+    });
+    const rekeyed = mustOk(await persistActionPlan(f.uow(), {
+      workspaceId: f.seed.workspaceId,
+      actorPrincipalId: f.seed.actorId,
+      idempotencyKey: randomUUID(),
+      plan: rekeyedPlan,
+      planVersion: 2,
+    }));
     const rejected = await createPreparedExecutionAttempt(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
       idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      attemptNumber: 2,
-      logicalOperationKey: 'op-fp',
-      requestFingerprint: 'different-fingerprint',
+      planId: rekeyed.planId,
+      intentId: rekeyed.intentIds[0]!,
+      attemptNumber: 1,
     });
     assert.equal(rejected.ok, false);
     if (!rejected.ok) assert.equal(rejected.conflict.kind, 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
   });
 
   test('lost response becomes OUTCOME_UNKNOWN then reconciles via lookup', async () => {
-    const f = await baseFixture();
-    const prepared = mustOk(await prepareActionIntentDispatchIdentity(f.uow(), {
-      workspaceId: f.seed.workspaceId,
-      actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      expectedPlanRevision: 1,
-      logicalOperationKey: 'op-lost',
-      requestPayload: { x: 1 },
-    }));
+    const f = await baseFixture({ logicalOperationKey: 'op-lost', requestPayload: { x: 1 } });
     mustOk(await createPreparedExecutionAttempt(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
@@ -378,8 +419,6 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: 'op-lost',
-      requestFingerprint: prepared.requestFingerprint,
     }));
     const worker = new PgExecutionWorker(f.pool, { actorId: 'worker-lost' });
     const claim = await worker.claimNext(f.seed.workspaceId);
@@ -403,8 +442,6 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 2,
-      logicalOperationKey: 'op-lost',
-      requestFingerprint: prepared.requestFingerprint,
     });
     assert.equal(blocked.ok, false);
 
@@ -418,17 +455,7 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
   });
 
   test('unsupported capability fails structurally without fake success', async () => {
-    const f = await baseFixture();
-    const prepared = mustOk(await prepareActionIntentDispatchIdentity(f.uow(), {
-      workspaceId: f.seed.workspaceId,
-      actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      expectedPlanRevision: 1,
-      logicalOperationKey: 'op-cap',
-      requestPayload: { y: 1 },
-    }));
+    const f = await baseFixture({ logicalOperationKey: 'op-cap', requestPayload: { y: 1 } });
     mustOk(await createPreparedExecutionAttempt(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
@@ -436,8 +463,6 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: 'op-cap',
-      requestFingerprint: prepared.requestFingerprint,
     }));
     const worker = new PgExecutionWorker(f.pool, { actorId: 'worker-cap' });
     const claim = await worker.claimNext(f.seed.workspaceId);
@@ -715,17 +740,8 @@ describe('M8 assessment gate at dispatch', () => {
 });
 
 describe('M8 execution lease reclaim and fencing', () => {
-  async function preparedAttempt(f: BaseFixture, logicalKey: string) {
-    const prepared = mustOk(await prepareActionIntentDispatchIdentity(f.uow(), {
-      workspaceId: f.seed.workspaceId,
-      actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      expectedPlanRevision: 1,
-      logicalOperationKey: logicalKey,
-      requestPayload: { op: logicalKey },
-    }));
+  async function preparedAttempt(logicalKey: string) {
+    const f = await baseFixture({ logicalOperationKey: logicalKey, requestPayload: { op: logicalKey } });
     mustOk(await createPreparedExecutionAttempt(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
@@ -733,15 +749,12 @@ describe('M8 execution lease reclaim and fencing', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: logicalKey,
-      requestFingerprint: prepared.requestFingerprint,
     }));
-    return prepared;
+    return f;
   }
 
   test('expired CLAIMED without request_ref is reclaimed with new fencing token', async () => {
-    const f = await baseFixture();
-    await preparedAttempt(f, 'op-lease-reclaim');
+    const f = await preparedAttempt('op-lease-reclaim');
     const worker = new PgExecutionWorker(f.pool, { actorId: 'worker-lease', leaseSeconds: 1 });
     const first = await worker.claimNext(f.seed.workspaceId);
     assert.ok(first);
@@ -766,8 +779,7 @@ describe('M8 execution lease reclaim and fencing', () => {
   });
 
   test('wrong claim_token or fencing_token transition is rejected', async () => {
-    const f = await baseFixture();
-    await preparedAttempt(f, 'op-fencing');
+    const f = await preparedAttempt('op-fencing');
     const worker = new PgExecutionWorker(f.pool, { actorId: 'worker-fence' });
     const claim = await worker.claimNext(f.seed.workspaceId);
     assert.ok(claim);
@@ -800,8 +812,7 @@ describe('M8 execution lease reclaim and fencing', () => {
   });
 
   test('stale worker claim cannot dispatch after lease reclaim', async () => {
-    const f = await baseFixture();
-    await preparedAttempt(f, 'op-stale-dispatch');
+    const f = await preparedAttempt('op-stale-dispatch');
     const worker = new PgExecutionWorker(f.pool, { actorId: 'worker-stale', leaseSeconds: 1 });
     const stale = await worker.claimNext(f.seed.workspaceId);
     assert.ok(stale);
@@ -888,17 +899,7 @@ describe('M8 command idempotency replay', () => {
   });
 
   test('createPreparedExecutionAttempt replays same idempotency key and payload', async () => {
-    const f = await baseFixture();
-    const prepared = mustOk(await prepareActionIntentDispatchIdentity(f.uow(), {
-      workspaceId: f.seed.workspaceId,
-      actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(),
-      planId: f.planId,
-      intentId: f.intentId,
-      expectedPlanRevision: 1,
-      logicalOperationKey: 'op-idem-replay',
-      requestPayload: { v: 1 },
-    }));
+    const f = await baseFixture({ logicalOperationKey: 'op-idem-replay', requestPayload: { v: 1 } });
     const idempotencyKey = randomUUID();
     const attemptId = randomUUID();
     const params = {
@@ -908,8 +909,6 @@ describe('M8 command idempotency replay', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: 'op-idem-replay',
-      requestFingerprint: prepared.requestFingerprint,
       attemptId,
     };
     const first = mustOk(await createPreparedExecutionAttempt(f.uow(), params));
@@ -925,13 +924,11 @@ describe('M8 command idempotency replay', () => {
 });
 
 describe('M8 internal programme item execution', () => {
-  test('authorized internal schedule path completes attempt and intent', async () => {
+  test('authorized internal schedule path completes attempt; intent status stays the immutable planning disposition', async () => {
     const f = await baseFixture();
     const { programmeId, programmeItemId } = await seedProgrammeGraph(f);
     const envelopeInput = defaultEnvelopeInput(f, [{ kind: 'PROGRAMME_ITEM', id: programmeItemId }]);
     const auth = await seedAuthorizedDispatch(f, envelopeInput);
-    const newWindow = { start: '2031-08-01T10:00:00.000Z', end: '2031-08-01T11:00:00.000Z' };
-    const requestFingerprint = computeRequestFingerprint({ programmeItemId, window: newWindow });
 
     const result = mustOk(await executeInternalProgrammeItemSchedule(f.uow(), {
       workspaceId: f.seed.workspaceId,
@@ -941,12 +938,10 @@ describe('M8 internal programme item execution', () => {
       planId: f.planId,
       intentId: f.intentId,
       attemptNumber: 1,
-      logicalOperationKey: 'internal-schedule-op',
-      requestFingerprint,
       programmeId,
       programmeItemId,
       expectedProgrammeRevision: 1,
-      schedule: { window: newWindow },
+      schedule: { window: { start: '2031-08-01T10:00:00.000Z', end: '2031-08-01T11:00:00.000Z' } },
     }));
 
     const attempt = await f.pool.query<{ status: string }>(
@@ -955,17 +950,28 @@ describe('M8 internal programme item execution', () => {
     );
     assert.equal(attempt.rows[0]?.status, 'OBSERVED_SUCCESS');
 
+    const observation = await f.pool.query<{ origin: string; command_receipt_ref: string | null }>(
+      'SELECT origin, command_receipt_ref FROM execution_observations WHERE id = $1',
+      [result.observationId],
+    );
+    assert.equal(observation.rows[0]?.origin, 'INTERNAL_COMMAND_RECEIPT');
+    assert.ok(observation.rows[0]?.command_receipt_ref);
+
+    // action_intents.status is a write-once immutable planning disposition
+    // (M7's compiler set PROPOSED at compile time) — execution never mutates
+    // it. Canonical execution truth is execution_attempts.status +
+    // execution_observations above, not this column.
     const intent = await f.pool.query<{ status: string }>(
       'SELECT status FROM action_intents WHERE workspace_id = $1 AND id = $2',
       [f.seed.workspaceId, f.intentId],
     );
-    assert.equal(intent.rows[0]?.status, 'COMPLETED');
+    assert.equal(intent.rows[0]?.status, 'PROPOSED');
 
     const item = await f.pool.query<{ window_start: string; window_end: string }>(
       'SELECT window_start, window_end FROM programme_items WHERE workspace_id = $1 AND id = $2',
       [f.seed.workspaceId, programmeItemId],
     );
-    assert.equal(new Date(item.rows[0]!.window_start).toISOString(), newWindow.start);
-    assert.equal(new Date(item.rows[0]!.window_end).toISOString(), newWindow.end);
+    assert.equal(new Date(item.rows[0]!.window_start).toISOString(), '2031-08-01T10:00:00.000Z');
+    assert.equal(new Date(item.rows[0]!.window_end).toISOString(), '2031-08-01T11:00:00.000Z');
   });
 });

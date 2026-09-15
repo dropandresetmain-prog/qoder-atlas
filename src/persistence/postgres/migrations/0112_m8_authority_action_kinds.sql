@@ -1,4 +1,4 @@
--- M8 (0105): closed vocabulary of authority action kinds for consequential work.
+-- M8 (0112): closed vocabulary of authority action kinds for consequential work.
 
 INSERT INTO authority_action_kinds (action_kind, installed_by) VALUES
   ('action.intent.authorize', 'M8'),

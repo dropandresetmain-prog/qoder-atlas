@@ -1,4 +1,4 @@
--- M8 (0104): bind budget_commitments.action_intent_id to action_intents and
+-- M8 (0111): bind budget_commitments.action_intent_id to action_intents and
 -- add a concurrency helper view for remaining budget under SERIALIZABLE holds.
 
 ALTER TABLE budget_commitments

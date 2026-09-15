@@ -100,7 +100,14 @@ const M7_ACTIVATED_KINDS = [
   'ACTION_INTENT',
 ];
 
-/** M2-M7 integration: every activated kind, checked together. */
+/** Kinds M8 activates (0109–0110 authority/execution) — docs/refactor/evidence/M8.md. */
+const M8_ACTIVATED_KINDS = [
+  'AUTHORITY_DECISION',
+  'APPROVAL',
+  'EXECUTION_ATTEMPT',
+];
+
+/** M2-M8 integration: every activated kind, checked together. */
 const INTEGRATED_ACTIVATED_KINDS = [
   ...M2_ACTIVATED_KINDS,
   ...M3_ACTIVATED_KINDS,
@@ -108,6 +115,7 @@ const INTEGRATED_ACTIVATED_KINDS = [
   ...M5_ACTIVATED_KINDS,
   ...M6_ACTIVATED_KINDS,
   ...M7_ACTIVATED_KINDS,
+  ...M8_ACTIVATED_KINDS,
 ];
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
@@ -524,6 +532,12 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'assessment_results.explanations',
       'assessments.manifest_detail',
       // M7 (0101–0102): typed ScenarioChange / RecoveryStrategy / ActionIntent payloads (§10).
+      // M7/M8 integration (docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §3c): cost
+      // and compensation are typed columns (cost_amount/cost_currency,
+      // compensation_supported/compensation_requires_separate_authority/
+      // compensation_description), not jsonb — they exactly match the closed
+      // ExactMoneySchema/CompensationPolicySchema shapes, so they are not listed
+      // here and must not reappear as jsonb.
       'recovery_strategies.base_manifest',
       'recovery_strategies.scenario_change',
       'recovery_strategies.assumptions',
@@ -535,11 +549,9 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'action_intents.subject_refs',
       'action_intents.expected_revisions',
       'action_intents.preconditions',
-      'action_intents.cost_estimate',
       'action_intents.limits',
       'action_intents.required_authority_scopes',
       'action_intents.expected_observations',
-      'action_intents.compensation_policy',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

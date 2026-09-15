@@ -1,4 +1,4 @@
--- M8 (0103): execution_attempts and execution_observations.
+-- M8 (0110): execution_attempts and execution_observations.
 -- Logical operation identity belongs to the ActionIntent. Lease expiry after
 -- possible dispatch is NEVER proof that a resend is safe.
 

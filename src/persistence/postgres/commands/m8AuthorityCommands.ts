@@ -24,11 +24,12 @@ import { currentTransactionClient } from '../transactionContext.ts';
 import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../../../resolution/authority/envelope.ts';
 import { admitBudgetHold } from '../../../resolution/budget/protect.ts';
-import { computeRequestFingerprint, canTransitionExecutionStatus, type DurableExecutionStatus } from '../../../resolution/execution/stateMachine.ts';
+import { canTransitionExecutionStatus, type DurableExecutionStatus } from '../../../resolution/execution/stateMachine.ts';
 import { evaluateConsequentialAuthorization } from '../../../resolution/authority/authorize.ts';
 import type { AssessmentView } from '../world/pgAssessments.ts';
 import type { AuthorityEnvelope, Approval, ApprovalRevocation, AuthorityDecision } from '../../../contracts/v2/authority/authorityEnvelope.ts';
 import type { AuthorityGrant } from '../../../domain/v2/people/traveller.ts';
+import type { ActionPlan } from '../../../contracts/v2/action/actionPlan.ts';
 
 const SCHEMA_VERSION = '1';
 
@@ -118,102 +119,72 @@ export async function openRecoveryCase(
   });
 }
 
-export async function createActionPlanWithIntent(
+/**
+ * Persists a fully compiled M7 `ActionPlan` (src/resolution/planning/compiler.ts
+ * output) verbatim — every ActionIntent field (status, compensationPolicy,
+ * logicalOperationKey, requestFingerprint, ...) comes from the compiler, not
+ * from this command. M8 does not mint a second ActionIntent representation;
+ * this is the persistence adapter for the one frozen model
+ * (src/contracts/v2/action/actionPlan.ts). See
+ * docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §4.
+ */
+export async function persistActionPlan(
   uow: UnitOfWork,
   params: M8CommandIdentity & {
-    planId?: string;
-    intentId?: string;
-    recoveryCaseId: string;
-    scenarioChangeId: string;
+    plan: ActionPlan;
+    recoveryStrategyId?: string;
     planVersion?: number;
-    operationNamespace: string;
-    capabilityRef: string;
-    subjectRefs: TypedRef[];
-    expectedObservations: string[];
-    costEstimate?: ExactMoney;
-    basisAssessmentId?: string;
   },
-): Promise<ExecuteOutcome<{ planId: string; intentId: string }>> {
-  const planId = params.planId ?? randomUUID();
-  const intentId = params.intentId ?? randomUUID();
-  const version = params.planVersion ?? 1;
-  const planRef = ref('ACTION_PLAN', planId);
+): Promise<ExecuteOutcome<{ planId: string; intentIds: string[] }>> {
+  const { plan } = params;
+  const planVersion = params.planVersion ?? 1;
+  const planRef = ref('ACTION_PLAN', plan.id);
+  const intentIds = plan.intents.map((i) => i.id);
   return submit({
     uow, identity: params, commandType: 'ACTION_PLAN_CREATED', destinationKind: 'ACTION_PLAN',
-    payload: { planId, intentId, recoveryCaseId: params.recoveryCaseId, version }, refs: [planRef],
+    payload: { planId: plan.id, intentIds, recoveryCaseId: plan.recoveryCaseId, planVersion }, refs: [planRef],
     body: async () => {
       const client = currentTransactionClient();
-      await createRoot({ workspaceId: params.workspaceId, id: planId, kind: 'ACTION_PLAN' });
+      await createRoot({ workspaceId: params.workspaceId, id: plan.id, kind: 'ACTION_PLAN' });
       await client.query(
-        `INSERT INTO action_plans (workspace_id, id, recovery_case_id, scenario_change_id, version, created_by_actor_id)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [params.workspaceId, planId, params.recoveryCaseId, params.scenarioChangeId, version, params.actorPrincipalId],
-      );
-      await registerChildSubject({ workspaceId: params.workspaceId, id: intentId, kind: 'ACTION_INTENT', aggregateId: planId });
-      await client.query(
-        `INSERT INTO action_intents (
-           workspace_id, id, action_plan_id, version, operation_namespace, capability_ref,
-           subject_refs, expected_observations, cost_amount, cost_currency, status,
-           basis_assessment_id, compensation_supported, created_by_actor_id
-         ) VALUES ($1,$2,$3,1,$4,$5,$6::jsonb,$7::jsonb,$8,$9,'PROPOSED',$10,false,$11)`,
+        `INSERT INTO action_plans (workspace_id, id, recovery_case_id, scenario_change_id, recovery_strategy_id, plan_version, created_by_actor_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
         [
-          params.workspaceId, intentId, planId, params.operationNamespace, params.capabilityRef,
-          JSON.stringify(params.subjectRefs), JSON.stringify(params.expectedObservations),
-          params.costEstimate?.amount ?? null, params.costEstimate?.currency ?? null,
-          params.basisAssessmentId ?? null, params.actorPrincipalId,
+          params.workspaceId, plan.id, plan.recoveryCaseId, plan.scenarioChangeId,
+          params.recoveryStrategyId ?? null, planVersion, params.actorPrincipalId,
         ],
       );
-      return { ok: true, value: { planId, intentId }, advanced: [rootCreated(planRef)] };
-    },
-  });
-}
-
-export async function prepareActionIntentDispatchIdentity(
-  uow: UnitOfWork,
-  params: M8CommandIdentity & {
-    planId: string;
-    intentId: string;
-    expectedPlanRevision: number;
-    logicalOperationKey: string;
-    requestPayload: unknown;
-  },
-): Promise<ExecuteOutcome<{ requestFingerprint: string }>> {
-  const requestFingerprint = computeRequestFingerprint(params.requestPayload);
-  const planRef = ref('ACTION_PLAN', params.planId);
-  return submit({
-    uow, identity: params, commandType: 'ACTION_INTENT_DISPATCH_PREPARED', destinationKind: 'ACTION_INTENT',
-    payload: { intentId: params.intentId, logicalOperationKey: params.logicalOperationKey, requestFingerprint },
-    expectedAggregateRevisions: [{ aggregateRef: planRef, expectedRevision: params.expectedPlanRevision }],
-    refs: [planRef],
-    body: async ({ lockedHeads }) => {
-      const client = currentTransactionClient();
-      const before = lockedRevisionOf(lockedHeads, params.planId);
-      if (before === undefined) return { ok: false, conflict: missingHeadConflict(planRef) };
-      const after = await advanceHead({ workspaceId: params.workspaceId, aggregateId: params.planId, fromRevision: before });
-      if (after === undefined) return { ok: false, conflict: staleRevisionConflict(planRef, before) };
-      const existing = await client.query<{ logical_operation_key: string | null; request_fingerprint: string | null }>(
-        'SELECT logical_operation_key, request_fingerprint FROM action_intents WHERE workspace_id = $1 AND id = $2 FOR UPDATE',
-        [params.workspaceId, params.intentId],
-      );
-      const row = existing.rows[0];
-      if (!row) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'action intent missing', [planRef]) };
-      if (row.logical_operation_key && row.logical_operation_key !== params.logicalOperationKey) {
-        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'logical operation key already bound differently', [planRef]) };
+      for (const intent of plan.intents) {
+        await registerChildSubject({ workspaceId: params.workspaceId, id: intent.id, kind: 'ACTION_INTENT', aggregateId: plan.id });
+        await client.query(
+          `INSERT INTO action_intents (
+             workspace_id, id, action_plan_id, operation_namespace, logical_operation_key, request_fingerprint,
+             capability_ref, subject_refs, expected_revisions, preconditions, offer_fingerprint,
+             cost_amount, cost_currency, limits, required_authority_scopes, expected_observations,
+             compensation_supported, compensation_requires_separate_authority, compensation_description,
+             status, created_by_actor_id
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19,$20,$21)`,
+          [
+            params.workspaceId, intent.id, plan.id, intent.operationNamespace,
+            intent.logicalOperationKey ?? null, intent.requestFingerprint ?? null,
+            intent.capabilityRef, JSON.stringify(intent.subjectRefs), JSON.stringify(intent.expectedRevisions),
+            JSON.stringify(intent.preconditions), intent.offerFingerprint ?? null,
+            intent.costEstimate?.amount ?? null, intent.costEstimate?.currency ?? null,
+            intent.limits ? JSON.stringify(intent.limits) : null,
+            JSON.stringify(intent.requiredAuthorityScopes), JSON.stringify(intent.expectedObservations),
+            intent.compensationPolicy.supported, intent.compensationPolicy.requiresSeparateAuthority,
+            intent.compensationPolicy.description ?? null, intent.status, params.actorPrincipalId,
+          ],
+        );
       }
-      if (row.request_fingerprint && row.request_fingerprint !== requestFingerprint) {
-        return { ok: false, conflict: typedConflict('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH', 'same intent identity with different fingerprint', [planRef]) };
+      for (const dep of plan.dependencies) {
+        await client.query(
+          `INSERT INTO action_dependencies (workspace_id, action_plan_id, from_action_intent_id, to_action_intent_id)
+           VALUES ($1,$2,$3,$4)`,
+          [params.workspaceId, plan.id, dep.fromActionIntentId, dep.toActionIntentId],
+        );
       }
-      await client.query(
-        `UPDATE action_intents
-            SET logical_operation_key = $3, request_fingerprint = $4, updated_at = now()
-          WHERE workspace_id = $1 AND id = $2`,
-        [params.workspaceId, params.intentId, params.logicalOperationKey, requestFingerprint],
-      );
-      return {
-        ok: true,
-        value: { requestFingerprint },
-        advanced: [{ aggregateRef: planRef, beforeRevision: before, afterRevision: after }],
-      };
+      return { ok: true, value: { planId: plan.id, intentIds }, advanced: [rootCreated(planRef)] };
     },
   });
 }
@@ -402,6 +373,15 @@ export async function holdBudgetForIntent(
   });
 }
 
+/**
+ * Dispatch identity (logicalOperationKey/requestFingerprint) is never taken
+ * from the caller — it is read from the already-compiled, immutable
+ * ActionIntent row (see persistActionPlan above; M7's compiler sets both at
+ * plan-compile time). This also means action_intents is never UPDATEd here:
+ * `action_intents.status` is a write-once planning disposition, and the real
+ * execution truth is execution_attempts.status (ExecutionAttemptStatus).
+ * See docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md §4.
+ */
 export async function createPreparedExecutionAttempt(
   uow: UnitOfWork,
   params: M8CommandIdentity & {
@@ -409,8 +389,6 @@ export async function createPreparedExecutionAttempt(
     planId: string;
     intentId: string;
     attemptNumber: number;
-    logicalOperationKey: string;
-    requestFingerprint: string;
     providerOperationKey?: string;
   },
 ): Promise<ExecuteOutcome<{ attemptId: string }>> {
@@ -418,19 +396,27 @@ export async function createPreparedExecutionAttempt(
   const planRef = ref('ACTION_PLAN', params.planId);
   return submit({
     uow, identity: params, commandType: 'EXECUTION_ATTEMPT_PREPARED', destinationKind: 'EXECUTION_ATTEMPT',
-    payload: {
-      attemptId, intentId: params.intentId, attemptNumber: params.attemptNumber,
-      logicalOperationKey: params.logicalOperationKey, requestFingerprint: params.requestFingerprint,
-    },
+    payload: { attemptId, intentId: params.intentId, attemptNumber: params.attemptNumber },
     refs: [planRef],
     body: async () => {
       const client = currentTransactionClient();
+      const intentRow = await client.query<{ logical_operation_key: string | null; request_fingerprint: string | null }>(
+        'SELECT logical_operation_key, request_fingerprint FROM action_intents WHERE workspace_id = $1 AND id = $2',
+        [params.workspaceId, params.intentId],
+      );
+      const intent = intentRow.rows[0];
+      if (!intent) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'action intent missing', [planRef]) };
+      if (!intent.logical_operation_key || !intent.request_fingerprint) {
+        return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'action intent has no compiled dispatch identity', [planRef]) };
+      }
+      const logicalOperationKey = intent.logical_operation_key;
+      const requestFingerprint = intent.request_fingerprint;
       const prior = await client.query<{ request_fingerprint: string; status: string; id: string }>(
         `SELECT id, request_fingerprint, status FROM execution_attempts
           WHERE workspace_id = $1 AND logical_operation_key = $2`,
-        [params.workspaceId, params.logicalOperationKey],
+        [params.workspaceId, logicalOperationKey],
       );
-      const conflict = prior.rows.find((r) => r.request_fingerprint !== params.requestFingerprint);
+      const conflict = prior.rows.find((r) => r.request_fingerprint !== requestFingerprint);
       if (conflict) {
         return { ok: false, conflict: typedConflict('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH', `attempt ${conflict.id}`, [planRef]) };
       }
@@ -450,13 +436,9 @@ export async function createPreparedExecutionAttempt(
          ) VALUES ($1,$2,$3,$4,$5,$6,'PREPARED',$7,$8)`,
         [
           params.workspaceId, attemptId, params.intentId, params.attemptNumber,
-          params.logicalOperationKey, params.requestFingerprint,
+          logicalOperationKey, requestFingerprint,
           params.providerOperationKey ?? null, params.actorPrincipalId,
         ],
-      );
-      await client.query(
-        `UPDATE action_intents SET status = 'EXECUTING', updated_at = now() WHERE workspace_id = $1 AND id = $2`,
-        [params.workspaceId, params.intentId],
       );
       return { ok: true, value: { attemptId }, advanced: [] };
     },

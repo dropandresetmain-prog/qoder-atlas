@@ -181,29 +181,107 @@ Still to verify while implementing: `budget/protect.ts`, `stateMachine.ts`,
 dropped `action_intents` columns/functions, and every test file that
 constructs an intent via the now-deleted `createActionPlanWithIntent`.
 
-## 5. Remaining plan (unstarted as of this write)
+## 5. Progress log
 
-1. Merge M7 lane into `integration/m7-m8-c3` (git merge, preserve history).
-2. Merge M8 lane; resolve `docs/ROADMAP.md` conflict by hand; the
-   migration-number "conflict" is not a git conflict (different filenames)
-   — must be fixed by hand per §2 immediately after merge, before anything
-   runs.
-3. Apply §2 migration renumbering + §3 field amendments (drop M8's 0100/0101,
-   renumber 0102-0105→0109-0112, hand-edit the amended M7 0102).
-4. Apply §4 code changes to `m8AuthorityCommands.ts` /
-   `internalProgrammeExecutor.ts` (and any other file found to touch the
-   dropped columns/functions).
-5. Update every M8 test/fixture that used `createActionPlanWithIntent` or the
-   dropped columns to instead go through M7's compiler output.
-6. Prove migrations apply cleanly from an empty Postgres/PostGIS DB.
-7. Run M7 unit + M8 unit + full `test:postgres`; fix fallout from §3/§4.
-8. Write the 10 cross-lane integration acceptance tests (task's
-   `INTEGRATION ACCEPTANCE TESTS` section) — delegate to subagents once this
-   seam is frozen and green, per the task's parallelism rule.
-9. `docs/refactor/evidence/M7_M8_INTEGRATION.md`, update `ROADMAP.md` only
+Done (2026-09-15, this session):
+
+1. ✅ Merged M7 lane into `integration/m7-m8-c3` — clean, no conflicts.
+2. ✅ Merged M8 lane — only `docs/ROADMAP.md` conflicted (hand-resolved:
+   merged both lanes' rows + added an "M7/M8 integration in progress" row).
+   Migration-number collision confirmed present as expected (two files each
+   claiming 0100/0101/0102 with different content — not a git conflict since
+   filenames differ).
+3. ✅ Applied §2 migration renumbering: deleted M8's `0100_recovery_cases_minimal.sql`
+   and `0101_action_plans_intents.sql`; renamed M8's `0102-0105` →
+   `0109-0112` (`git mv`, header comments updated).
+4. ✅ Applied §3 field amendments: `0109` now ALTERs `recovery_cases` to add
+   `resolution_kind` + `SUPERSEDED` lifecycle value, and adds
+   `action_plans_case_version_uidx`. `0102_action_plans.sql` (M7, hand-edited)
+   now uses typed `cost_amount`/`cost_currency` and
+   `compensation_supported`/`compensation_requires_separate_authority`/
+   `compensation_description` columns instead of the two opaque jsonb blobs.
+   `authority_decisions.action_intent_version` kept with a
+   `CHECK (... = 1)` + explanatory comment (no independent ActionIntent
+   version exists; frozen AuthorityDecision/Envelope schemas still require
+   the field for structural symmetry with actionPlanVersion).
+5. ✅ Applied §4 code changes:
+   - `m8AuthorityCommands.ts`: `createActionPlanWithIntent` +
+     `prepareActionIntentDispatchIdentity` replaced by one
+     `persistActionPlan(uow, {plan: ActionPlan, ...})` that writes a fully
+     compiled M7 `ActionPlan` (all intents + dependencies) verbatim — no
+     second ActionIntent representation, no field defaults invented here.
+   - `createPreparedExecutionAttempt` no longer accepts
+     `logicalOperationKey`/`requestFingerprint` as caller params — both are
+     read from the already-persisted, immutable `action_intents` row. The
+     `UPDATE action_intents SET status='EXECUTING'` statement is deleted.
+   - `internalProgrammeExecutor.ts`: dropped the same two params from
+     `executeInternalProgrammeItemSchedule`; deleted the
+     `UPDATE action_intents SET status='COMPLETED'` statement (execution
+     truth was already fully committed one statement earlier via
+     `execution_attempts` + `execution_observations`).
+   - `pgExecutionWorker.ts`: no `action_intents` references at all — untouched.
+6. ✅ Rewrote `postgres-integration/m8AuthorityExecution.pgtest.ts` end to end
+   for the new `persistActionPlan`/`createPreparedExecutionAttempt`
+   signatures (added a `buildSingleIntentPlan` test helper). The internal-
+   programme-execution test now asserts `action_intents.status` stays
+   `'PROPOSED'` (the immutable planning disposition) instead of asserting it
+   became `'COMPLETED'` — that assertion was testing the bug this
+   integration removes.
+7. ✅ `npm run typecheck` — clean (0 errors) after all of the above.
+8. ✅ All 83 pure-unit tests across M6/M7/M8/contracts (`node --test` via
+   `tsx`, no DB) still pass unchanged.
+9. ✅ Proved migrations `0001`-`0112` (90 files) apply cleanly, in order,
+   from a completely empty PostgreSQL/PostGIS database (`m7m8_empty_check`,
+   dropped after). No duplicate-version error (the exact failure mode the
+   pre-fix state would have hit).
+10. Found and fixed two more integration seams while auditing cross-lane
+    test infrastructure M7 had modified:
+    - `postgres-integration/integrationCrossLane.pgtest.ts`: `LANE_RANGES`
+      had no M8 entry (only went up to M7's `100-108`) — migrations
+      `0109-0112` would have failed its "no migration outside an allocated
+      range" assertion. Added `{ lane: 'M8', from: 109, to: 119 }` +
+      an `inLane('M8')` contiguity assertion.
+    - `postgres-integration/m2SubtypeIntegrity.pgtest.ts`: `INTEGRATED_ACTIVATED_KINDS`
+      only listed M2-M7 kinds; M8's `AUTHORITY_DECISION`/`APPROVAL`/
+      `EXECUTION_ATTEMPT` subtype-checker registrations would have failed
+      the "only integrated-lane kinds have checkers" assertion as "leaked"
+      kinds. Added `M8_ACTIVATED_KINDS` and included it. Also removed the
+      now-nonexistent `action_intents.cost_estimate`/`compensation_policy`
+      jsonb-column allowlist entries (§3c typed the columns instead).
+    - `docs/refactor/MIGRATION_MAPPING.md` §5 table updated to record where
+      M8 actually landed (`0109-0112`) instead of just "reserved".
+
+In progress: full `npm run test:postgres` run against a fresh DB
+(`m7m8fullrun`) to catch any further fallout — started **before** the two
+cross-lane test fixes above landed, so it is expected to fail on those two
+(already fixed) and needs a re-run once it finishes to get a clean signal.
+Docker Desktop was not running at session start; started it + the existing
+`northstar-postgres-test` container (already present, just stopped).
+
+## 6. Remaining plan
+
+1. Re-run `npm run test:postgres` clean (after the in-flight run reports
+   back) — expect only the two already-fixed cross-lane issues, but verify
+   no other fallout (e.g. anything else in `postgres-integration/` asserting
+   on the dropped `basis_assessment_id`/`version` columns or the old
+   `createActionPlanWithIntent`/`prepareActionIntentDispatchIdentity` names —
+   grepped clean already, but the real DB run is the actual proof).
+2. Write the 10 cross-lane integration acceptance tests (task's
+   `INTEGRATION ACCEPTANCE TESTS` section) — delegate to subagents once
+   `test:postgres` is fully green, per the task's parallelism rule. Test #1
+   ("real M7 strategy compiles to the exact ActionIntent shape M8
+   authorizes") should exercise the real pipeline:
+   `evaluateRecoveryStrategy` → `compileActionPlan` (M7) →
+   `persistActionPlan` (this integration's new seam function) →
+   `issueAuthorityDecision`/`recordApproval` → `createPreparedExecutionAttempt`
+   (M8) — not a hand-built fixture plan like the rewritten unit-style pgtest
+   uses.
+3. `npm run build`, `npm run lint`, `npm run gate:anti-hardcoding`,
+   `git diff --check`.
+4. `docs/refactor/evidence/M7_M8_INTEGRATION.md`, update `ROADMAP.md` only
    once gates are green, final verification sweep, checkpoint commits, push.
-10. Completion report per the 26-point structure requested. Do not claim C3
-    PASS. Do not start M9.
+5. Completion report per the 26-point structure requested. Do not claim C3
+   PASS. Do not start M9.
 
 ## 6. Test-DB / environment notes (carried from M2-M6 integration, memory
 `northstar-long-horizon-a`)
