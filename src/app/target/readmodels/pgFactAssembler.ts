@@ -22,6 +22,8 @@ import {
   evaluateSharedDisruptionCohort,
   type CohortTravellerEvaluationInput,
 } from '../cohortDisruption.ts';
+import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
+import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
 function isoNow(at?: string): string {
   return at ?? new Date().toISOString();
@@ -74,14 +76,20 @@ export async function loadRecoveryActionFacts(
     [workspaceId, intents.rows.map((i) => i.id)],
   );
 
+  // Presence of an observation row (origin) is not the outcome — the actual
+  // outcome lives on the linked execution_attempts.status. Join through
+  // attempt_id so we never collapse FAILED/CANCELLED into "CONFIRMED" just
+  // because an observation exists (see M9 C4 finding on observation projection).
   const observations = await pool.query<{
     action_intent_id: string;
-    origin: string;
+    attempt_status: string;
   }>(
-    `SELECT action_intent_id, origin
-       FROM execution_observations
-      WHERE workspace_id = $1 AND action_intent_id = ANY($2::uuid[])
-      ORDER BY observed_at DESC`,
+    `SELECT o.action_intent_id, ea.status AS attempt_status
+       FROM execution_observations o
+       JOIN execution_attempts ea
+         ON ea.workspace_id = o.workspace_id AND ea.id = o.attempt_id
+      WHERE o.workspace_id = $1 AND o.action_intent_id = ANY($2::uuid[])
+      ORDER BY o.observed_at DESC`,
     [workspaceId, intents.rows.map((i) => i.id)],
   );
 
@@ -97,20 +105,18 @@ export async function loadRecoveryActionFacts(
   for (const a of attempts.rows) {
     if (!latestAttempt.has(a.action_intent_id)) latestAttempt.set(a.action_intent_id, a.status);
   }
+  // Real recorded outcome per intent — derived from the linked attempt's
+  // status (never from observation "origin" alone, which says who reported
+  // it, not what happened). Capability semantics (cancel vs book/modify)
+  // decide whether an OBSERVED_SUCCESS reads as CONFIRMED or CANCELLED.
   const latestObs = new Map<string, string>();
   for (const o of observations.rows) {
-    if (!latestObs.has(o.action_intent_id)) {
-      latestObs.set(
-        o.action_intent_id,
-        o.origin === 'INTERNAL_COMMAND_RECEIPT' || o.origin === 'EXTERNAL_PROVIDER'
-          ? 'CONFIRMED'
-          : o.origin,
-      );
-    }
+    if (!latestObs.has(o.action_intent_id)) latestObs.set(o.action_intent_id, o.attempt_status);
   }
 
   return intents.rows.map((intent, index): RecoveryActionFact => {
     const capability = intent.capability_ref;
+    const isCancelCapability = /cancel/i.test(capability);
     const domain = capability.includes('hotel') || capability.includes('stay')
       ? 'stay'
       : capability.includes('flight') || capability.includes('transport')
@@ -124,7 +130,8 @@ export async function loadRecoveryActionFacts(
       ? (intent.subject_refs as { kind?: string; id?: string }[]).map((s) => `${s.kind ?? 'SUBJECT'}:${s.id ?? ''}`)
       : [];
     const attemptStatus = latestAttempt.get(intent.id);
-    const obs = latestObs.get(intent.id);
+    const observedAttemptStatus = latestObs.get(intent.id);
+    const obs = deriveObservationResult(observedAttemptStatus ?? attemptStatus, isCancelCapability);
     const executionState = mapIntentExecutionState(intent.status, attemptStatus, obs);
     const cost = intent.cost_amount && intent.cost_currency
       ? { amount: String(intent.cost_amount), currency: String(intent.cost_currency) }
@@ -146,6 +153,31 @@ export async function loadRecoveryActionFacts(
       uncertainty: executionState === 'OUTCOME_UNKNOWN' ? ['execution outcome unknown'] : [],
     };
   });
+}
+
+/**
+ * Map a durable execution_attempts.status to the actual recorded outcome —
+ * never invent CONFIRMED from the mere presence of an observation row.
+ * A successful cancel-shaped capability reads as CANCELLED, not CONFIRMED.
+ */
+function deriveObservationResult(
+  attemptStatus: string | undefined,
+  isCancelCapability: boolean,
+): string | undefined {
+  switch (attemptStatus) {
+    case 'OBSERVED_SUCCESS':
+    case 'RECONCILED':
+    case 'COMPLETED':
+      return isCancelCapability ? 'CANCELLED' : 'CONFIRMED';
+    case 'OBSERVED_FAILURE':
+    case 'FAILED':
+      return 'FAILED';
+    case 'OUTCOME_UNKNOWN':
+    case 'RECONCILIATION_REQUIRED':
+      return 'OUTCOME_UNKNOWN';
+    default:
+      return undefined;
+  }
 }
 
 function mapIntentExecutionState(
@@ -236,18 +268,34 @@ export async function loadRecoveryCaseFacts(
   const uncertainty: string[] = [];
   if (subjects.rows.length === 0) uncertainty.push('no case subjects attached');
 
-  const assessments = await pool.query<{ overall_verdict: string }>(
-    `SELECT a.overall_verdict
-       FROM assessments a
-       JOIN assessment_subjects s ON s.workspace_id = a.workspace_id AND s.assessment_id = a.id
-      WHERE a.workspace_id = $1
-        AND s.subject_id = ANY($2::uuid[])
-      ORDER BY a.evaluated_at DESC
-      LIMIT 20`,
-    [workspaceId, subjects.rows.map((s) => s.subject_id)],
-  );
-  if (assessments.rows.some((a) => a.overall_verdict === 'FAIL')) tripVerdict = 'FAIL';
-  else if (assessments.rows.length > 0 && assessments.rows.every((a) => a.overall_verdict === 'PASS')) tripVerdict = 'PASS';
+  // Per-subject CURRENT-assessment semantics (never "latest N assessments
+  // across every subject" — an old superseded verdict must never decide the
+  // case). CURRENT+PASS -> PASS, CURRENT+FAIL -> FAIL; STALE /
+  // PENDING_REASSESSMENT / UNAVAILABLE / NONE all read as UNKNOWN with an
+  // explicit staleness note (see M9 C4 current-assessment finding).
+  const subjectTones: AssessmentTone[] = [];
+  for (const s of subjects.rows) {
+    const view = await currentAssessmentView(
+      pool,
+      workspaceId,
+      { kind: s.subject_kind, id: s.subject_id } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    if (view.status === 'CURRENT' && view.assessment) {
+      const verdict = view.assessment.overallVerdict;
+      const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
+      subjectTones.push(tone);
+      if (tone === 'UNKNOWN') {
+        uncertainty.push(`${s.subject_kind}:${s.subject_id} current assessment verdict ${verdict}`);
+      }
+    } else {
+      subjectTones.push('UNKNOWN');
+      uncertainty.push(`${s.subject_kind}:${s.subject_id} assessment ${view.status.toLowerCase()}`);
+    }
+  }
+  if (subjectTones.some((t) => t === 'FAIL')) tripVerdict = 'FAIL';
+  else if (subjectTones.length > 0 && subjectTones.every((t) => t === 'PASS')) tripVerdict = 'PASS';
 
   const partialIncomplete = recoveryActions.some((a) =>
     a.executionState === 'FAILED' || a.executionState === 'OUTCOME_UNKNOWN' || a.executionState === 'PENDING' || a.executionState === 'EXECUTING' || a.executionState === 'RECONCILING' || a.executionState === 'PROPOSED',
@@ -266,7 +314,7 @@ export async function loadRecoveryCaseFacts(
 
   return {
     generatedAt,
-    projectionRevision: recoveryActions.length + assessments.rows.length,
+    projectionRevision: recoveryActions.length + subjects.rows.length,
     changedVisibleRefs: recoveryActions.map((a) => a.actionRef),
     currentSemanticState: tripVerdict === 'FAIL' ? 'FAILED' : tripVerdict === 'PASS' ? 'RECOVERED' : 'AFFECTED',
     nodes: [

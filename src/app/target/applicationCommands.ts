@@ -95,6 +95,7 @@ export async function commandIssueRequiredGrant(
     workspaceId: ctx.workspaceId,
     actorPrincipalId: ctx.actorPrincipalId,
     idempotencyKey: input.idempotencyKey ?? randomUUID(),
+    pool: ctx.pool,
     ...input,
   });
 }

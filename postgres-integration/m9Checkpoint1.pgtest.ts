@@ -12,7 +12,11 @@ import { createPrincipal } from '../src/persistence/postgres/commands/peopleComm
 import { openRecoveryCase, persistActionPlan } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { persistRecoveryStrategy } from '../src/persistence/postgres/commands/m7StrategyCommands.ts';
 import { evaluateRecoveryCaseResolution } from '../src/app/target/recoveryCaseResolution.ts';
-import { issueRequiredAuthorityGrant } from '../src/app/target/grantIssuance.ts';
+import {
+  issueRequiredAuthorityGrant,
+  provisionOrganiserAuthority,
+  GRANT_ISSUANCE_ACTION_KIND,
+} from '../src/app/target/grantIssuance.ts';
 import { compileActionPlan } from '../src/resolution/planning/compiler.ts';
 import type { RecoveryStrategy } from '../src/contracts/v2/scenario/recoveryStrategy.ts';
 import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
@@ -169,17 +173,34 @@ describe('M9 R-10 practical grant issuance', () => {
     }));
 
     const required = [{ kind: 'JOURNEY' as const, id: journeyId }];
+
+    // ISSUER-POL: normal issuance requires an issuer that already holds
+    // grant-issuing authority. Bootstrap one organiser principal for this.
+    const organiser = mustOk(await provisionOrganiserAuthority({
+      uow: uow(),
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      organisationLegalName: 'M9 Grant Test Org',
+      authIssuer: 'https://issuer.invalid/m9-organiser',
+      authSubject: randomUUID(),
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requiredScopes: required,
+      actions: [GRANT_ISSUANCE_ACTION_KIND],
+      issuedAt: NOW,
+    }));
+
     const okGrant = mustOk(await issueRequiredAuthorityGrant(uow(), {
       workspaceId: seed.workspaceId,
       actorPrincipalId: seed.actorId,
       idempotencyKey: randomUUID(),
       principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId,
+      issuedByPrincipalId: organiser.principalId,
       issuedAt: NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
       proposedScopes: required,
       requiredScopes: required,
+      pool,
     }));
     assert.ok(okGrant.grantId);
 
@@ -189,14 +210,120 @@ describe('M9 R-10 practical grant issuance', () => {
       idempotencyKey: randomUUID(),
       principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId,
+      issuedByPrincipalId: organiser.principalId,
       issuedAt: NOW,
       actions: ['action.intent.dispatch'],
       proposedScopes: [{ kind: 'JOURNEY', id: randomUUID() }],
       requiredScopes: required,
+      pool,
     });
     assert.equal(weak.ok, false);
     if (!weak.ok) assert.match(weak.conflict.message, /GRANT_SCOPE_INSUFFICIENT/);
+  });
+
+  test('ISSUER-POL: unauthorised issuer fails; organiser cannot self-mint', async () => {
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'M9 grants issuer policy');
+    const traveller = await seedTraveller(seed, { displayName: 'Issuer Policy Traveller' });
+    const tripId = await seedTrip(seed);
+    const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId });
+    await commitSeed(seed);
+    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+
+    const principalId = randomUUID();
+    mustOk(await createPrincipal(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      principalId,
+      actorType: 'HUMAN',
+      authIssuer: 'https://issuer.invalid/m9-unauthorised',
+      authSubject: principalId,
+    }));
+    const required = [{ kind: 'JOURNEY' as const, id: journeyId }];
+
+    // Self-mint: principal proposes to issue its own grant.
+    const selfMint = await issueRequiredAuthorityGrant(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      issuedByPrincipalId: principalId,
+      issuedAt: NOW,
+      actions: ['action.intent.dispatch'],
+      proposedScopes: required,
+      requiredScopes: required,
+      pool,
+    });
+    assert.equal(selfMint.ok, false);
+    if (!selfMint.ok) assert.match(selfMint.conflict.message, /ISSUER_SELF_ISSUANCE_FORBIDDEN/);
+
+    // A second, ordinary principal with no authority.grant.write of its own.
+    const bystanderId = randomUUID();
+    mustOk(await createPrincipal(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      principalId: bystanderId,
+      actorType: 'HUMAN',
+      authIssuer: 'https://issuer.invalid/m9-bystander',
+      authSubject: bystanderId,
+    }));
+    const unauthorised = await issueRequiredAuthorityGrant(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      issuedByPrincipalId: bystanderId,
+      issuedAt: NOW,
+      actions: ['action.intent.dispatch'],
+      proposedScopes: required,
+      requiredScopes: required,
+      pool,
+    });
+    assert.equal(unauthorised.ok, false);
+    if (!unauthorised.ok) assert.match(unauthorised.conflict.message, /ISSUER_UNAUTHORISED/);
+
+    // An authorised organiser (bootstrap) can issue for this principal.
+    const organiser = mustOk(await provisionOrganiserAuthority({
+      uow: uow(),
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      organisationLegalName: 'M9 Issuer Policy Org',
+      authIssuer: 'https://issuer.invalid/m9-issuer-policy-organiser',
+      authSubject: randomUUID(),
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      requiredScopes: required,
+      actions: [GRANT_ISSUANCE_ACTION_KIND],
+      issuedAt: NOW,
+    }));
+    const authorised = mustOk(await issueRequiredAuthorityGrant(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      issuedByPrincipalId: organiser.principalId,
+      issuedAt: NOW,
+      actions: ['action.intent.dispatch'],
+      proposedScopes: required,
+      requiredScopes: required,
+      pool,
+    }));
+    assert.ok(authorised.grantId);
+
+    // Bootstrap mechanism must not be reachable through ordinary application
+    // HTTP: applicationCommands.ts's HTTP-facing surface never imports it.
+    const httpSource = await import('node:fs/promises').then((fs) =>
+      fs.readFile(new URL('../src/app/target/targetHttpHandlers.ts', import.meta.url), 'utf8'),
+    );
+    assert.doesNotMatch(httpSource, /provisionOrganiserAuthority|bootstrapIssueAuthorityGrant/);
+    const appCommandsSource = await import('node:fs/promises').then((fs) =>
+      fs.readFile(new URL('../src/app/target/applicationCommands.ts', import.meta.url), 'utf8'),
+    );
+    assert.doesNotMatch(appCommandsSource, /provisionOrganiserAuthority|bootstrapIssueAuthorityGrant/);
   });
 });
 
@@ -359,5 +486,153 @@ describe('M9 RecoveryCase resolution gate', () => {
     });
     assert.equal(unknown.allowed, false);
     if (!unknown.allowed) assert.equal(unknown.reason, 'BLOCKING_UNKNOWN');
+  });
+});
+
+describe('M9 I1 — consequential action plan gates resolution (C4 finding)', () => {
+  test('mandatory action intent without observed success blocks resolution despite PASS assessments', async () => {
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'M9 I1 resolution');
+    const traveller = await seedTraveller(seed, { displayName: 'I1 Traveller' });
+    const tripId = await seedTrip(seed);
+    const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId });
+    await commitSeed(seed);
+    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+
+    const caseId = mustOk(await openRecoveryCase(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: NOW,
+    })).caseId;
+
+    await pool.query(
+      `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role)
+       VALUES ($1, $2, 'JOURNEY', $3, 'affected')`,
+      [seed.workspaceId, caseId, journeyId],
+    );
+    await saveAssessment(pool, seed.workspaceId, {
+      id: randomUUID(),
+      kind: 'VIABILITY',
+      evaluatedAt: NOW,
+      overallVerdict: 'PASS',
+      subjects: [{ subjectRef: { kind: 'JOURNEY', id: journeyId }, role: 'PRIMARY' }],
+      dimensions: [],
+      manifest: emptyManifest(),
+    }, seed.actorId);
+
+    const journeyItemId = randomUUID();
+    const basisAssessmentId = randomUUID();
+    const strategyId = randomUUID();
+    const strategy: RecoveryStrategy = {
+      id: strategyId,
+      recoveryCaseId: caseId,
+      strategyVersion: 1,
+      status: 'SELECTED',
+      viability: 'VIABLE',
+      basisAssessmentId,
+      affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: journeyItemId }],
+      requiredAuthorityScopes: [],
+      createdAt: NOW,
+      scenarioChange: {
+        id: randomUUID(),
+        recoveryStrategyId: strategyId,
+        strategyVersion: 1,
+        affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: journeyItemId }],
+        effects: [{
+          effectKind: 'SELECT_OFFER',
+          journeyItemId,
+          offerId: randomUUID(),
+          offerPrice: { amount: '10.00', currency: 'USD' },
+        }],
+        basisAssessmentId,
+      },
+      assumptions: [],
+      requiredUnknowns: [],
+      candidateAssessments: [],
+      candidateAssessmentResults: [],
+      baseManifest: emptyManifest(),
+    };
+    const compiled = compileActionPlan({
+      strategy,
+      now: NOW,
+      capabilities: [{ capabilityRef: 'external:offer.select', supported: true }],
+    });
+    assert.equal(compiled.ok, true);
+    if (!compiled.ok) return;
+
+    const plan: ActionPlan = { ...compiled.value.plan, id: randomUUID(), recoveryCaseId: caseId, scenarioChangeId: randomUUID() };
+    plan.intents[0] = {
+      ...compiled.value.plan.intents[0]!,
+      id: randomUUID(),
+      actionPlanId: plan.id,
+      subjectRefs: [{ kind: 'JOURNEY', id: journeyId }],
+    };
+    mustOk(await persistActionPlan(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+    }));
+
+    // No execution attempt yet for the intent: mandatory work is not observed-success.
+    const blocked = await evaluateRecoveryCaseResolution(pool, {
+      workspaceId: seed.workspaceId,
+      recoveryCaseId: caseId,
+      now: NOW,
+    });
+    assert.equal(blocked.allowed, false);
+    if (!blocked.allowed) assert.equal(blocked.reason, 'ACTION_INTENT_NOT_COMPLETE');
+
+    // Observed-success recorded for the intent: gate proceeds past the
+    // action-plan check to current assessments (PASS) and allows resolution.
+    await pool.query(
+      `INSERT INTO execution_attempts (
+         workspace_id, id, action_intent_id, attempt_number, logical_operation_key,
+         request_fingerprint, status, created_by_actor_id
+       ) VALUES ($1, $2, $3, 1, $4, $5, 'OBSERVED_SUCCESS', $6)`,
+      [
+        seed.workspaceId, randomUUID(), plan.intents[0]!.id,
+        plan.intents[0]!.logicalOperationKey, plan.intents[0]!.requestFingerprint, seed.actorId,
+      ],
+    );
+    const allowed = await evaluateRecoveryCaseResolution(pool, {
+      workspaceId: seed.workspaceId,
+      recoveryCaseId: caseId,
+      now: NOW,
+      requiredAffectedPeople: [{ kind: 'JOURNEY', id: journeyId }],
+    });
+    assert.equal(allowed.allowed, true, !allowed.allowed ? `${allowed.reason}: ${allowed.detail}` : '');
+  });
+
+  test('no strategy/action plan + current PASS assessments allows passive resolution', async () => {
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'M9 I1 passive resolution');
+    const traveller = await seedTraveller(seed, { displayName: 'Passive Traveller' });
+    const tripId = await seedTrip(seed);
+    const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId });
+    await commitSeed(seed);
+    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+    const caseId = mustOk(await openRecoveryCase(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: NOW,
+    })).caseId;
+    await pool.query(
+      `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role)
+       VALUES ($1, $2, 'JOURNEY', $3, 'affected')`,
+      [seed.workspaceId, caseId, journeyId],
+    );
+    await saveAssessment(pool, seed.workspaceId, {
+      id: randomUUID(),
+      kind: 'VIABILITY',
+      evaluatedAt: NOW,
+      overallVerdict: 'PASS',
+      subjects: [{ subjectRef: { kind: 'JOURNEY', id: journeyId }, role: 'PRIMARY' }],
+      dimensions: [],
+      manifest: emptyManifest(),
+    }, seed.actorId);
+
+    // No RecoveryStrategy/ActionPlan for this case at all: external state
+    // self-recovered and current deterministic state is valid — passive
+    // resolution remains available.
+    const allowed = await evaluateRecoveryCaseResolution(pool, {
+      workspaceId: seed.workspaceId,
+      recoveryCaseId: caseId,
+      now: NOW,
+    });
+    assert.equal(allowed.allowed, true, !allowed.allowed ? `${allowed.reason}: ${allowed.detail}` : '');
   });
 });

@@ -217,7 +217,7 @@ async function loadAuthorityBundle(
   return { decision, envelope, approvals, revocations, decisionId: row.id };
 }
 
-async function loadGrantsForPrincipal(db: Queryable, workspaceId: string, principalId: string, now: Instant): Promise<AuthorityGrant[]> {
+export async function loadGrantsForPrincipal(db: Queryable, workspaceId: string, principalId: string, now: Instant): Promise<AuthorityGrant[]> {
   const result = await db.query<{
     id: string; principal_id: string; represented_party_kind: string; represented_party_id: string;
     issued_by_principal_id: string; issued_at: Date; expires_at: Date | null; revoked_at: Date | null;

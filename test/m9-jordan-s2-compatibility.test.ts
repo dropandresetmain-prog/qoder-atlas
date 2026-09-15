@@ -47,7 +47,9 @@ describe('M9 Jordan S2 read-model compatibility (CK1 audit)', () => {
     assert.equal(jordanS2ScenarioFoundation.recovery.multipleStayActionsPerStrategy, true);
     assert.equal(jordanS2ScenarioFoundation.productSurfaces.usesSharedReadModels, true);
     assert.equal(jordanS2ScenarioFoundation.productSurfaces.dedicatedHeroUi, false);
-    assert.equal(jordanS2ScenarioFoundation.pendingEvidence.atlasFlightFacts, 'PENDING');
+    // Atlas flight facts are now landed (committed REPLAY recordings) — no
+    // longer pending fixture evidence (see docs/refactor/evidence/M9.md).
+    assert.equal(jordanS2ScenarioFoundation.pendingEvidence.atlasFlightFacts, 'LANDED');
   });
 
   test('multi-stay Jordan requirement compatible — no CK1 reopen', () => {

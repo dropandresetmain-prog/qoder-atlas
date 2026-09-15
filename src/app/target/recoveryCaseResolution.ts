@@ -19,6 +19,7 @@ export type ResolutionDenialReason =
   | 'REQUIRED_PERSON_MISSING'
   | 'EXECUTION_NOT_RECONCILED'
   | 'PROPOSED_STATE_ONLY'
+  | 'ACTION_INTENT_NOT_COMPLETE'
   | 'CONSTRAINT_NOT_SATISFIED';
 
 export interface ResolutionGateInput {
@@ -129,6 +130,43 @@ async function hasUnreconciledExecution(
   return result.rows.length > 0;
 }
 
+/**
+ * I1 (C4 finding): a case with a RecoveryStrategy/ActionPlan that contains
+ * consequential mandatory work must not resolve until that work reaches an
+ * observed-success execution outcome. `action_intents.status` is set once at
+ * plan-compile time (`compileActionPlan` always writes 'PROPOSED') and the
+ * table is immutable thereafter (0102's `action_intents_immutable` trigger),
+ * so completion can never be read from that column — it is read from the
+ * durable `execution_attempts` state machine (M8), same success set already
+ * used by `hasAuthoritativeObservedSuccess` below, applied per-intent. This
+ * holds even when no execution_attempts row exists yet at all (authorised
+ * but never dispatched). A case with no action_plans/action_intents is
+ * unaffected — passive resolution from authoritative current assessments
+ * remains available.
+ */
+async function hasIncompleteMandatoryActions(
+  db: Queryable,
+  workspaceId: string,
+  recoveryCaseId: string,
+): Promise<boolean> {
+  const result = await db.query<{ id: string }>(
+    `SELECT ai.id
+       FROM action_intents ai
+       JOIN action_plans ap ON ap.workspace_id = ai.workspace_id AND ap.id = ai.action_plan_id
+      WHERE ai.workspace_id = $1
+        AND ap.recovery_case_id = $2
+        AND NOT EXISTS (
+          SELECT 1 FROM execution_attempts ea
+           WHERE ea.workspace_id = ai.workspace_id
+             AND ea.action_intent_id = ai.id
+             AND ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED')
+        )
+      LIMIT 1`,
+    [workspaceId, recoveryCaseId],
+  );
+  return result.rows.length > 0;
+}
+
 async function hasAuthoritativeObservedSuccess(
   db: Queryable,
   workspaceId: string,
@@ -191,6 +229,14 @@ export async function evaluateRecoveryCaseResolution(
       allowed: false,
       reason: 'EXECUTION_NOT_RECONCILED',
       detail: 'open or unknown execution attempts remain; reconcile before resolution',
+    };
+  }
+
+  if (await hasIncompleteMandatoryActions(db, input.workspaceId, input.recoveryCaseId)) {
+    return {
+      allowed: false,
+      reason: 'ACTION_INTENT_NOT_COMPLETE',
+      detail: 'case has an action plan with an action intent that has not reached an observed-success execution outcome',
     };
   }
 
