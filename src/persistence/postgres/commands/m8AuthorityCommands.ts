@@ -25,7 +25,7 @@ import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../../../resolution/authority/envelope.ts';
 import { admitBudgetHold } from '../../../resolution/budget/protect.ts';
 import { canTransitionExecutionStatus, type DurableExecutionStatus } from '../../../resolution/execution/stateMachine.ts';
-import { evaluateConsequentialAuthorization } from '../../../resolution/authority/authorize.ts';
+import { evaluateApproverAuthority, evaluateConsequentialAuthorization } from '../../../resolution/authority/authorize.ts';
 import type { AssessmentView } from '../world/pgAssessments.ts';
 import type { AuthorityEnvelope, Approval, ApprovalRevocation, AuthorityDecision } from '../../../contracts/v2/authority/authorityEnvelope.ts';
 import type { AuthorityGrant } from '../../../domain/v2/people/traveller.ts';
@@ -274,6 +274,90 @@ export async function recordApproval(
     refs: [decisionRef],
     body: async () => {
       const client = currentTransactionClient();
+      const requirement = await client.query<{
+        actor_role: string;
+        required_party_kind: string | null;
+        required_party_id: string | null;
+      }>(
+        `SELECT actor_role, required_party_kind, required_party_id
+           FROM approval_requirements
+          WHERE workspace_id = $1 AND decision_id = $2 AND id = $3`,
+        [params.workspaceId, params.decisionId, params.requirementId],
+      );
+      const req = requirement.rows[0];
+      if (!req) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', 'approval requirement missing', [decisionRef]),
+        };
+      }
+      const decisionScope = await client.query<{ scope: unknown }>(
+        `SELECT scope FROM authority_decisions WHERE workspace_id = $1 AND id = $2`,
+        [params.workspaceId, params.decisionId],
+      );
+      const envelopeScopes = Array.isArray(decisionScope.rows[0]?.scope)
+        ? decisionScope.rows[0]!.scope as TypedRef[]
+        : [];
+      const grantRows = await client.query<{
+        id: string;
+        principal_id: string;
+        represented_party_kind: string;
+        represented_party_id: string;
+        issued_by_principal_id: string;
+        issued_at: Date;
+        expires_at: Date | null;
+        revoked_at: Date | null;
+        action_kinds: string[] | null;
+        scope_refs: { kind: TypedRef['kind']; id: string }[] | null;
+      }>(
+        `SELECT g.id, g.principal_id, g.represented_party_kind, g.represented_party_id,
+                g.issued_by_principal_id, g.issued_at, g.expires_at, g.revoked_at,
+                (SELECT COALESCE(array_agg(a.action_kind ORDER BY a.action_kind), '{}')
+                   FROM grant_actions a WHERE a.workspace_id = g.workspace_id AND a.grant_id = g.id) AS action_kinds,
+                (SELECT COALESCE(jsonb_agg(jsonb_build_object('kind', s.scope_kind, 'id', s.scope_id)
+                                           ORDER BY s.scope_kind, s.scope_id), '[]'::jsonb)
+                   FROM grant_scopes s WHERE s.workspace_id = g.workspace_id AND s.grant_id = g.id) AS scope_refs
+           FROM authority_grants g
+          WHERE g.workspace_id = $1 AND g.principal_id = $2`,
+        [params.workspaceId, params.actorPrincipalId],
+      );
+      const grants = grantRows.rows.map((row) => ({
+        id: row.id,
+        principalId: row.principal_id,
+        representedPartyRef: { kind: row.represented_party_kind as TypedRef['kind'], id: row.represented_party_id },
+        issuedByPrincipalId: row.issued_by_principal_id,
+        issuedAt: row.issued_at.toISOString(),
+        ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
+        ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
+        actions: row.action_kinds ?? [],
+        scopes: (row.scope_refs ?? []).map((s) => ({ kind: s.kind, id: s.id })),
+      }));
+      const denied = evaluateApproverAuthority({
+        approval: {
+          id: approvalId,
+          requirementId: params.requirementId,
+          approverPrincipalId: params.actorPrincipalId,
+          envelopeFingerprint: params.envelopeFingerprint,
+          scope: params.scope,
+          approvedAt: params.approvedAt,
+        },
+        requirement: {
+          id: params.requirementId,
+          actorRole: req.actor_role,
+          ...(req.required_party_kind && req.required_party_id
+            ? { requiredPartyRef: { kind: req.required_party_kind as TypedRef['kind'], id: req.required_party_id } }
+            : {}),
+        },
+        envelopeScopes,
+        grants,
+        now: params.approvedAt,
+      });
+      if (denied && !denied.allowed) {
+        return {
+          ok: false,
+          conflict: typedConflict('VALIDATION_FAILED', `${denied.reason}${denied.detail ? `: ${denied.detail}` : ''}`, [decisionRef]),
+        };
+      }
       await registerChildSubject({
         workspaceId: params.workspaceId, id: approvalId, kind: 'APPROVAL', aggregateId: params.decisionId,
       });
@@ -517,12 +601,13 @@ export async function createPreparedExecutionAttempt(
       await client.query(
         `INSERT INTO execution_attempts (
            workspace_id, id, action_intent_id, attempt_number, logical_operation_key, request_fingerprint,
-           status, provider_operation_key, authority_decision_id, created_by_actor_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,'PREPARED',$7,$8,$9)`,
+           status, provider_operation_key, authority_decision_id, gating_principal_id, created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,'PREPARED',$7,$8,$9,$10)`,
         [
           params.workspaceId, attemptId, params.intentId, params.attemptNumber,
           logicalOperationKey, requestFingerprint,
-          params.providerOperationKey ?? null, gate.authorityDecisionId, params.actorPrincipalId,
+          params.providerOperationKey ?? null, gate.authorityDecisionId, params.principalId,
+          params.actorPrincipalId,
         ],
       );
       return { ok: true, value: { attemptId }, advanced: [] };

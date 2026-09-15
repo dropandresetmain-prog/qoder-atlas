@@ -15,6 +15,7 @@ import { saveAssessment } from '../src/persistence/postgres/world/pgAssessments.
 import type { AssessmentResult } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ExactMoney } from '../src/domain/v2/shared/money.ts';
+import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.ts';
 import assert from 'node:assert/strict';
 
 export const GATE_NOW = '2031-07-01T00:00:00.000Z';
@@ -45,23 +46,41 @@ export function defaultEnvelopeInput(opts: {
   };
 }
 
+/** Non-empty currentness boundary for a single aggregate root at a known revision. */
+export function tripBaseManifest(tripId: string, revision: number, evaluatedAt: string = GATE_NOW): WorldSnapshotManifest {
+  return {
+    evaluatedAt,
+    evaluatorVersions: [],
+    aggregateReads: [{ aggregateRef: { kind: 'TRIP', id: tripId }, revision }],
+    scopeReads: [],
+    evidenceReads: [],
+    coverageReads: [],
+    missingCoverage: [],
+  };
+}
+
 export async function seedMinimalCurrentAssessment(
   pool: Pool,
   workspaceId: string,
   subject: TypedRef,
   now: string = GATE_NOW,
+  opts?: { tripId?: string; tripRevision?: number; assessmentId?: string; verdict?: 'PASS' | 'FAIL' },
 ): Promise<AssessmentResult> {
+  const tripId = opts?.tripId;
+  const tripRevision = opts?.tripRevision ?? 1;
   const result: AssessmentResult = {
-    id: randomUUID(),
+    id: opts?.assessmentId ?? randomUUID(),
     kind: 'VIABILITY',
     evaluatedAt: now,
-    overallVerdict: 'PASS',
+    overallVerdict: opts?.verdict ?? 'PASS',
     subjects: [{ subjectRef: subject, role: 'PRIMARY' }],
     dimensions: [],
     manifest: {
       evaluatedAt: now,
       evaluatorVersions: [],
-      aggregateReads: [],
+      aggregateReads: tripId
+        ? [{ aggregateRef: { kind: 'TRIP', id: tripId }, revision: tripRevision }]
+        : [],
       scopeReads: [],
       evidenceReads: [],
       coverageReads: [],
@@ -85,20 +104,32 @@ export async function seedStoredExecutionAuthority(opts: {
   budgetId?: string;
   budgetRevision?: number;
   assessmentSubject?: TypedRef;
+  assessmentTripId?: string;
+  assessmentTripRevision?: number;
   requirementRole?: string;
   planVersion?: number;
   now?: string;
   /** When set, envelope fingerprint uses this instead of the stored intent fingerprint. */
   overrideRequestFingerprint?: string;
-  /** Grant scopes must exist in domain_subjects; defaults to representedPartyRef. */
+  /**
+   * Grant scopes must cover every envelope scope ref (exact TypedRef match).
+   * Defaults to the envelope scope — not merely representedPartyRef.
+   */
   grantScopes?: TypedRef[];
-}): Promise<{ fingerprint: string; grantId: string }> {
+  /** Principal that records the approval; defaults to principalId (dispatcher). */
+  approverPrincipalId?: string;
+  /** Skip issuing grants (caller already seeded them). */
+  skipGrants?: boolean;
+}): Promise<{ fingerprint: string; grantId: string | undefined }> {
   const now = opts.now ?? GATE_NOW;
   const requirementRole = opts.requirementRole ?? 'PAYER';
-  const grantScopes = opts.grantScopes ?? [opts.representedPartyRef];
+  const grantScopes = opts.grantScopes ?? opts.scope;
+  const approverPrincipalId = opts.approverPrincipalId ?? opts.principalId;
   const uow = () => new PgUnitOfWork(opts.pool, opts.workspaceId);
   if (opts.assessmentSubject) {
-    await seedMinimalCurrentAssessment(opts.pool, opts.workspaceId, opts.assessmentSubject, now);
+    await seedMinimalCurrentAssessment(opts.pool, opts.workspaceId, opts.assessmentSubject, now, {
+      ...(opts.assessmentTripId ? { tripId: opts.assessmentTripId, tripRevision: opts.assessmentTripRevision ?? 1 } : {}),
+    });
   }
   const intentRow = await opts.pool.query<{
     request_fingerprint: string | null;
@@ -135,21 +166,41 @@ export async function seedStoredExecutionAuthority(opts: {
     ...(cost ? { costEstimate: cost } : {}),
   };
   const fingerprint = computeEnvelopeFingerprint(envelopeInput);
-  const grantIdempotency = randomUUID();
-  const grant = mustOk(await issueAuthorityGrant(uow(), {
-    workspaceId: opts.workspaceId,
-    actorPrincipalId: opts.actorId,
-    idempotencyKey: grantIdempotency,
-    principalId: opts.principalId,
-    representedPartyRef: opts.representedPartyRef,
-    issuedByPrincipalId: opts.principalId,
-    issuedAt: now,
-    actions: ['action.intent.dispatch'],
-    scopes: grantScopes,
-    // Self-cite this command's own receipt (deferrable FK resolves at COMMIT).
-    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantIdempotency },
-    expectedAggregateRevisions: [],
-  }));
+  let grantId: string | undefined;
+  if (!opts.skipGrants) {
+    const grantIdempotency = randomUUID();
+    const grant = mustOk(await issueAuthorityGrant(uow(), {
+      workspaceId: opts.workspaceId,
+      actorPrincipalId: opts.actorId,
+      idempotencyKey: grantIdempotency,
+      principalId: opts.principalId,
+      representedPartyRef: opts.representedPartyRef,
+      issuedByPrincipalId: opts.principalId,
+      issuedAt: now,
+      // Dispatcher needs dispatch; same principal often also approves → authorize.
+      actions: ['action.intent.dispatch', 'action.intent.authorize'],
+      scopes: grantScopes,
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantIdempotency },
+      expectedAggregateRevisions: [],
+    }));
+    grantId = grant.grantId;
+    if (approverPrincipalId !== opts.principalId) {
+      const approverIdempotency = randomUUID();
+      mustOk(await issueAuthorityGrant(uow(), {
+        workspaceId: opts.workspaceId,
+        actorPrincipalId: opts.actorId,
+        idempotencyKey: approverIdempotency,
+        principalId: approverPrincipalId,
+        representedPartyRef: opts.representedPartyRef,
+        issuedByPrincipalId: approverPrincipalId,
+        issuedAt: now,
+        actions: ['action.intent.authorize'],
+        scopes: grantScopes,
+        authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: approverIdempotency },
+        expectedAggregateRevisions: [],
+      }));
+    }
+  }
   mustOk(await issueAuthorityDecision(uow(), {
     workspaceId: opts.workspaceId,
     actorPrincipalId: opts.actorId,
@@ -170,7 +221,7 @@ export async function seedStoredExecutionAuthority(opts: {
   const row = decision.rows[0]!;
   mustOk(await recordApproval(uow(), {
     workspaceId: opts.workspaceId,
-    actorPrincipalId: opts.principalId,
+    actorPrincipalId: approverPrincipalId,
     idempotencyKey: randomUUID(),
     decisionId: row.id,
     requirementId: row.requirement_ids[0]!,
@@ -188,10 +239,10 @@ export async function seedStoredExecutionAuthority(opts: {
       actionIntentId: opts.intentId,
     }));
   }
-  return { fingerprint, grantId: grant.grantId };
+  return { fingerprint, grantId };
 }
 
-/** Persist recovery strategy + strategy_changes so internal executors can load effect payloads. */
+/** Persist recovery strategy + strategy_changes so the gate and internal executors can load them. */
 export async function persistStrategyChangeRow(
   pool: Pool,
   workspaceId: string,
@@ -205,15 +256,33 @@ export async function persistStrategyChangeRow(
     effects: unknown[];
     basisAssessmentId?: string;
   },
+  opts?: {
+    baseManifest?: WorldSnapshotManifest;
+    candidateSummaries?: Array<{ subjectRef: TypedRef }>;
+  },
 ): Promise<void> {
+  const baseManifest = opts?.baseManifest ?? {
+    evaluatedAt: GATE_NOW,
+    evaluatorVersions: [],
+    aggregateReads: [],
+    scopeReads: [],
+    evidenceReads: [],
+    coverageReads: [],
+    missingCoverage: [],
+  };
+  const candidateSummaries = opts?.candidateSummaries
+    ?? scenarioChange.affectedSubjectRefs
+      .filter((ref) => ref.kind === 'JOURNEY' || ref.kind === 'TRIP')
+      .map((subjectRef) => ({ subjectRef }));
   await pool.query(
     `INSERT INTO recovery_strategies
        (workspace_id, id, recovery_case_id, strategy_version, status, viability,
-        base_manifest, scenario_change, created_by_actor_id)
-     VALUES ($1, $2, $3, $4, 'SELECTED', 'VIABLE', '{}'::jsonb, $5::jsonb, $6)`,
+        base_manifest, scenario_change, candidate_assessment_summaries, created_by_actor_id)
+     VALUES ($1, $2, $3, $4, 'SELECTED', 'VIABLE', $5::jsonb, $6::jsonb, $7::jsonb, $8)`,
     [
       workspaceId, scenarioChange.recoveryStrategyId, recoveryCaseId, scenarioChange.strategyVersion,
-      JSON.stringify(scenarioChange), actorId,
+      JSON.stringify(baseManifest), JSON.stringify(scenarioChange),
+      JSON.stringify(candidateSummaries), actorId,
     ],
   );
   await pool.query(
@@ -224,7 +293,6 @@ export async function persistStrategyChangeRow(
     [
       workspaceId, scenarioChange.recoveryStrategyId, scenarioChange.id, scenarioChange.strategyVersion,
       JSON.stringify(scenarioChange.affectedSubjectRefs), JSON.stringify(scenarioChange.effects),
-      // Only cite a real assessment id; planner fixtures often use a random UUID placeholder.
       null,
     ],
   );

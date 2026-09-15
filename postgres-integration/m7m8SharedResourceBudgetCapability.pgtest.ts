@@ -47,11 +47,11 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
+import { beginSeed, commitSeed, seedRootSubject, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
 import { seedEvent, seedProgramme, seedProgrammeItem, seedParticipation } from './m4Seed.ts';
 import { seedOrganisation } from './m3Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
-import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createPrincipal, issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import { createBudget } from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import {
   openRecoveryCase,
@@ -74,7 +74,8 @@ import type { WJourney, WObjective, WProgrammeItem, WParticipation, WJourneyItem
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
-import { prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
+import { persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
+import { seedTransportIntent, seedUnlocatedPlace } from './m6WorldSeed.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -88,6 +89,33 @@ const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
   return outcome.value;
+}
+
+async function issueApproverGrant(
+  uow: PgUnitOfWork,
+  params: {
+    workspaceId: string;
+    actorId: string;
+    principalId: string;
+    representedPartyRef: { kind: 'TRAVELLER'; id: string };
+    scopes: EnvelopeFingerprintInput['scope'];
+    issuedAt?: string;
+  },
+): Promise<void> {
+  const idempotencyKey = randomUUID();
+  mustOk(await issueAuthorityGrant(uow, {
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorId,
+    idempotencyKey,
+    principalId: params.principalId,
+    representedPartyRef: params.representedPartyRef,
+    issuedByPrincipalId: params.principalId,
+    issuedAt: params.issuedAt ?? NOW,
+    actions: ['action.intent.dispatch', 'action.intent.authorize'],
+    scopes: params.scopes,
+    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
+    expectedAggregateRevisions: [],
+  }));
 }
 
 function emptyManifest(): WorldSnapshotManifest {
@@ -232,6 +260,11 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: travellerA.travellerId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -252,7 +285,8 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: travellerA.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
     };
     const authorized = authorizeDispatch({
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
@@ -380,6 +414,20 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     const pool = await sharedTestPool();
     const seed = await beginSeed(pool, 'M7-M8 capability refusal: SELECT_OFFER');
     const seededTraveller = await seedTraveller(seed, { displayName: 'Capability Traveller' });
+    const tripId = await seedTrip(seed);
+    const journeyId = await seedJourney(seed, { tripId, travellerId: seededTraveller.travellerId });
+    const originPlaceId = await seedUnlocatedPlace(seed, 'Capability origin');
+    const destinationPlaceId = await seedUnlocatedPlace(seed, 'Capability destination');
+    const itemId = await seedTransportIntent(seed, {
+      journeyId, orderKey: '010', originPlaceId, destinationPlaceId, lifecycleStatus: 'DROPPED',
+    });
+    const offerId = randomUUID();
+    await seedRootSubject(seed, { kind: 'OFFER', id: offerId });
+    await seed.client.query(
+      `INSERT INTO offers (workspace_id, id, source_id, price_amount, price_currency, quoted_at, expires_at, fingerprint, created_by_actor_id)
+       VALUES ($1, $2, 'test-source', 100, 'USD', '2030-01-01T00:00:00Z', '2030-02-01T00:00:00Z', $3, $4)`,
+      [seed.workspaceId, offerId, offerId, seed.actorId],
+    );
     await commitSeed(seed);
 
     const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
@@ -394,12 +442,8 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     // places/advisories evaluators, while applyScenarioOverlay's SELECT_OFFER
     // handling itself does not gate on lifecycle status, so the proposed
     // offer selection still applies and still compiles for real.
-    const journeyId = randomUUID();
-    const tripId = randomUUID();
     const travellerId = seededTraveller.travellerId;
-    const itemId = randomUUID();
     const serviceId = randomUUID();
-    const offerId = randomUUID();
     const journey: WJourney = {
       id: journeyId, revision: 1, tripId, travellerId,
       lifecycleStatus: 'ACTIVE', intendedWindow: null, responsibilityOrganisationId: null,
@@ -411,11 +455,11 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     };
     const item: WJourneyItem = {
       id: itemId, journeyId, kind: 'TRANSPORT', orderKey: '010', lifecycleStatus: 'DROPPED', flexible: false, intendedWindow: null,
-      desiredOriginPlaceId: 'p-a', desiredDestinationPlaceId: 'p-b', selectedServiceId: null, intendedPlaceId: null, requiredNights: null,
+      desiredOriginPlaceId: originPlaceId, desiredDestinationPlaceId: destinationPlaceId, selectedServiceId: null, intendedPlaceId: null, requiredNights: null,
       participationId: null, standaloneTitle: null, standaloneWindow: null, resourceId: null, intendedLocationPlaceId: null,
     };
     const service: WTransportService = {
-      id: serviceId, revision: 1, mode: 'AIR', operator: 'op', originPlaceId: 'p-a', destinationPlaceId: 'p-b',
+      id: serviceId, revision: 1, mode: 'AIR', operator: 'op', originPlaceId, destinationPlaceId,
       published: { departure: null, arrival: null }, estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
     };
     const world = emptyWorld({
@@ -452,8 +496,13 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     assert.equal(compiledIntent.capabilityRef, 'external:offer.select');
     assert.equal(compiledIntent.status, 'PROPOSED');
 
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
@@ -472,6 +521,11 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -492,7 +546,8 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
     };
     const authorization: DispatchAuthorizationInput = {
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
@@ -508,7 +563,10 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
       scope: envelopeInput.scope,
       representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
       requirementRole: 'CASE_OWNER',
+      assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+      assessmentTripId: tripId,
       now: EXEC_NOW,
+      skipGrants: true,
     });
     mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
       workspaceId: seed.workspaceId, actorId: seed.actorId,

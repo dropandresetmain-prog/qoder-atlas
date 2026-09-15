@@ -9,7 +9,6 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from '../pool.ts';
 import {
   canTransitionExecutionStatus,
-  mayHaveBeenSent,
   type DurableExecutionStatus,
 } from '../../../resolution/execution/stateMachine.ts';
 import {
@@ -31,6 +30,8 @@ export interface ExecutionClaim {
   fencingToken: number;
   status: DurableExecutionStatus;
   providerOperationKey: string | null;
+  /** Principal that passed the prepare gate; dispatch must use this identity. */
+  gatingPrincipalId: string | null;
 }
 
 export type ExternalDispatcher = (claim: ExecutionClaim) => Promise<
@@ -69,6 +70,7 @@ export class PgExecutionWorker {
       id: string; workspace_id: string; action_intent_id: string; attempt_number: number;
       logical_operation_key: string; request_fingerprint: string; fencing_token: string;
       status: DurableExecutionStatus; provider_operation_key: string | null;
+      gating_principal_id: string | null;
     }>(
       `UPDATE execution_attempts
           SET status = 'CLAIMED', claim_token = $1, fencing_token = fencing_token + 1,
@@ -83,7 +85,7 @@ export class PgExecutionWorker {
            LIMIT 1
         )
         RETURNING id, workspace_id, action_intent_id, attempt_number, logical_operation_key,
-                  request_fingerprint, fencing_token, status, provider_operation_key`,
+                  request_fingerprint, fencing_token, status, provider_operation_key, gating_principal_id`,
       [claimToken, leaseSeconds, workspaceId ?? null],
     );
     const row = result.rows[0];
@@ -99,6 +101,7 @@ export class PgExecutionWorker {
       fencingToken: Number(row.fencing_token),
       status: 'CLAIMED',
       providerOperationKey: row.provider_operation_key,
+      gatingPrincipalId: row.gating_principal_id,
     };
   }
 
@@ -110,6 +113,7 @@ export class PgExecutionWorker {
       id: string; workspace_id: string; action_intent_id: string; attempt_number: number;
       logical_operation_key: string; request_fingerprint: string; fencing_token: string;
       status: DurableExecutionStatus; provider_operation_key: string | null;
+      gating_principal_id: string | null;
     }>(
       `UPDATE execution_attempts
           SET status = 'RECONCILIATION_REQUIRED', claim_token = $4, fencing_token = fencing_token + 1,
@@ -117,7 +121,7 @@ export class PgExecutionWorker {
         WHERE workspace_id = $1 AND id = $2
           AND status = ANY($3::text[])
         RETURNING id, workspace_id, action_intent_id, attempt_number, logical_operation_key,
-                  request_fingerprint, fencing_token, status, provider_operation_key`,
+                  request_fingerprint, fencing_token, status, provider_operation_key, gating_principal_id`,
       [workspaceId, attemptId, RECONCILABLE_STATUSES, claimToken, leaseSeconds],
     );
     const row = result.rows[0];
@@ -133,6 +137,7 @@ export class PgExecutionWorker {
       fencingToken: Number(row.fencing_token),
       status: 'RECONCILIATION_REQUIRED',
       providerOperationKey: row.provider_operation_key,
+      gatingPrincipalId: row.gating_principal_id,
     };
   }
 
@@ -150,10 +155,23 @@ export class PgExecutionWorker {
       dispatcher: ExternalDispatcher;
     },
   ): Promise<{ outcome: DurableExecutionStatus; detail?: string }> {
+    const gatingPrincipalId = claim.gatingPrincipalId;
+    if (!gatingPrincipalId || gatingPrincipalId !== params.principalId) {
+      await transitionExecutionAttempt(this.pool, {
+        workspaceId: claim.workspaceId,
+        attemptId: claim.id,
+        from: 'CLAIMED',
+        to: 'FAILED',
+        claimToken: claim.claimToken,
+        fencingToken: claim.fencingToken,
+        lastError: `GATING_PRINCIPAL_MISMATCH: caller ${params.principalId} != stored ${gatingPrincipalId ?? 'null'}`,
+      });
+      return { outcome: 'FAILED', detail: 'GATING_PRINCIPAL_MISMATCH' };
+    }
     const gate = await evaluateStoredExecutionGate(this.pool, {
       workspaceId: claim.workspaceId,
       intentId: claim.actionIntentId,
-      principalId: params.principalId,
+      principalId: gatingPrincipalId,
       now: params.now,
     });
     if (!gate.allowed) {

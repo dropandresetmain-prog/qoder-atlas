@@ -35,7 +35,8 @@ import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
 import { seedEvent, seedProgramme, seedProgrammeItem, seedParticipation } from './m4Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
-import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createPrincipal, issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { recordObjective } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 import {
   openRecoveryCase,
   persistActionPlan,
@@ -60,6 +61,7 @@ import {
   prepareParams,
   persistStrategyChangeRow,
   seedStoredExecutionAuthority,
+  tripBaseManifest,
 } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
@@ -74,6 +76,33 @@ const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
   return outcome.value;
+}
+
+async function issueApproverGrant(
+  uow: PgUnitOfWork,
+  params: {
+    workspaceId: string;
+    actorId: string;
+    principalId: string;
+    representedPartyRef: { kind: 'TRAVELLER'; id: string };
+    scopes: EnvelopeFingerprintInput['scope'];
+    issuedAt?: string;
+  },
+): Promise<void> {
+  const idempotencyKey = randomUUID();
+  mustOk(await issueAuthorityGrant(uow, {
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorId,
+    idempotencyKey,
+    principalId: params.principalId,
+    representedPartyRef: params.representedPartyRef,
+    issuedByPrincipalId: params.principalId,
+    issuedAt: params.issuedAt ?? NOW,
+    actions: ['action.intent.dispatch', 'action.intent.authorize'],
+    scopes: params.scopes,
+    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
+    expectedAggregateRevisions: [],
+  }));
 }
 
 function emptyManifest(): WorldSnapshotManifest {
@@ -166,9 +195,28 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     assert.equal(compiledIntent.capabilityRef, 'internal:objective.disposition');
     assert.ok(compiledIntent.requiredAuthorityScopes.includes('objective.disposition:CLOSED_WITH_LOSS'));
 
+    mustOk(await recordObjective(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      objectiveId,
+      ownerKind: 'JOURNEY',
+      ownerId: journeyId,
+      successPredicate: 'seam objective loss',
+      hardness: 'HARD',
+      priority: 1,
+      disposition: 'ACTIVE',
+    }));
+
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
+
     // --- M8 persists the compiled plan verbatim: no second ActionIntent representation. ---
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
@@ -214,7 +262,8 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
     };
 
     // No approval yet: dispatch must be denied.
@@ -226,6 +275,11 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     assert.equal(deniedNoApproval.allowed, false);
     if (!deniedNoApproval.allowed) assert.equal(deniedNoApproval.reason, 'APPROVALS_INCOMPLETE');
 
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -249,7 +303,10 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
       scope: envelopeInput.scope,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       requirementRole: 'CASE_OWNER',
+      assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+      assessmentTripId: tripId,
       now: EXEC_NOW,
+      skipGrants: true,
     });
     const attempt = mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
       workspaceId: seed.workspaceId, actorId: seed.actorId,
@@ -342,8 +399,13 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     const compiledIntent = plan.intents[0]!;
     assert.equal(compiledIntent.capabilityRef, 'internal:programme.schedule');
 
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
@@ -357,6 +419,11 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -377,7 +444,8 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
     };
     const authorization: DispatchAuthorizationInput = {
       assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
@@ -388,14 +456,16 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     assert.equal(preAuth.allowed, true);
 
     // --- Durable internal execution: the REAL M4 command mutates the REAL programme_items row. ---
-    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange);
     await seedStoredExecutionAuthority({
       pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       planId: plan.id, intentId: compiledIntent.id,
       scope: envelopeInput.scope,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       requirementRole: 'CASE_OWNER',
+      assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+      assessmentTripId: tripId,
       now: EXEC_NOW,
+      skipGrants: true,
     });
     const result = mustOk(await executeInternalProgrammeItemSchedule(pool, uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),

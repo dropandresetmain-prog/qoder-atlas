@@ -271,20 +271,9 @@ DB trigger `action_dependencies_same_plan`.
 
 ### IN-1 — re-plan logical operation identity (Investigate Now → decision)
 
-**Decision:** **Ignore / Accept Risk** for code change — existing identity is
-sufficient when used as designed.
-
-- **Identity rule:** `(workspace_id, logical_operation_key)` where the key
-  embeds effect-specific ids (compiler) and `request_fingerprint` binds
-  `strategyVersion` + effect payload hash.
-- **Retry rule:** Same intent row ⇒ same key+fingerprint; safe retry after
-  `OBSERVED_FAILURE`/`FAILED` only (partial unique index excludes those).
-- **Re-plan rule:** Later strategy compiles a **new** `ActionIntent`
-  SubjectId ⇒ new key/fingerprint; not blocked by prior failed attempt.
-- **Duplicate irreversible action:** Prevented by success/in-flight partial
-  unique index + prepare-time replay of known success.
-
-M9 must not inherit an undecided identity — this decision closes IN-1.
+**Superseded by §12.** The §11 “re-plan gets a new key” claim was false for
+effect-scoped keys (SELECT_OFFER). Round 2 records a fail-closed decision
+and a real PG proof; see §12 / ROADMAP.
 
 ### Verification (targeted remediation)
 
@@ -302,3 +291,76 @@ Ran on worktree `C:\Dev\qoder-atlas-m7-m8-c3`, branch `integration/m7-m8-c3`
 can use the index its port names” — planner chose
 `idx_transport_item_details_destination` for an origin OR-query; unrelated to
 the C3 execution gate. Revisit if it keeps failing on a clean DB.
+
+## 12. C3 targeted remediation round 2 (AN-1R, AN-7, IN-1)
+
+Status: **TARGETED-FIX CANDIDATE — READY FOR REVIEWER CONFIRMATION** (not
+C3 PASS). Round 1 closed AN-2…AN-6 at `a0a1766`; this section closes the
+remaining Act Now / Investigate Now findings from that confirmation review.
+
+### AN-1R — fail-closed currentness bound to strategy base world
+
+**Root cause:** When intent subjects were not JOURNEY/TRIP, the gate
+synthesised CURRENT. Separately, it checked live assessment currentness
+only, never whether the plan's strategy `base_manifest` was still current
+— so a superseded basis could pass after reassessment.
+
+**Fix:** `evaluateStoredExecutionGate` now:
+1. Denies with `ASSESSMENT_SUBJECTS_UNRESOLVED` when no JOURNEY/TRIP can be
+   derived from `strategy_changes.affected_subjects` /
+   `candidate_assessment_summaries` (plus deterministic owner lookups).
+2. Requires `action_plans.recovery_strategy_id` → strategy row
+   (`STRATEGY_MISSING`).
+3. Parses stored `base_manifest`; denies `EMPTY_BASE_MANIFEST` /
+   `INVALID_BASE_MANIFEST`; denies `STALE_BASE` unless
+   `assessManifestCurrentness(base_manifest, live PgCurrentStateReader, now)`
+   passes.
+4. Still requires every resolved subject CURRENT via `currentAssessmentView`.
+5. Same gate remains on `PgExecutionWorker.dispatchClaimed`.
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` AN-1R (Q1, Q2,
+STRATEGY_MISSING, EMPTY_BASE_MANIFEST, prepare→dispatch stale, positive).
+
+### AN-7 — grant scope, approver authority, gating principal
+
+**Root cause:** `authorize.ts` ignored `grant.scopes`; approvals were never
+checked for `action.intent.authorize` coverage / required party; dispatch
+accepted any caller principal.
+
+**Fix:**
+- Exact TypedRef containment (`grantCoversEnvelopeScopes`) for dispatch and
+  authorize grants (same semantics as M2 `mayPrincipalAct`).
+- `evaluateApproverAuthority` enforced in `recordApproval` and re-checked at
+  gate time against live grants.
+- Migration `0114_c3_gating_principal.sql` stores `gating_principal_id` on
+  `execution_attempts`; `dispatchClaimed` requires the caller to match it.
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` AN-7 suite.
+
+### IN-1 — corrected decision (fail-closed effect-scoped key)
+
+**False premise corrected:** Re-planning the same SELECT_OFFER effect does
+**not** mint a new `logicalOperationKey` — only `requestFingerprint`
+changes with `strategyVersion`. Second persist hits
+`action_intents_logical_op_uidx`.
+
+**Decision:** Keep the effect-scoped key (fail-closed). Re-planning the
+same effect is blocked until M9 defines an explicit re-plan/retry identity
+rule. Documented in `docs/ROADMAP.md` with revisit condition.
+
+**Focused proof:** `c3TargetedRemediation.pgtest.ts` IN-1 Q4 (real PG test;
+no tautological `assert.ok(true)`).
+
+### Verification (round 2)
+
+Worktree `C:\Dev\qoder-atlas-m7-m8-c3`, branch `integration/m7-m8-c3`
+(see completion report for exact HEAD after push):
+
+- `npm run typecheck` / `build` / `lint` / `gate:anti-hardcoding` /
+  `git diff --check`
+- Focused PG: `c3TargetedRemediation`, `m8AuthorityExecution`, four
+  `m7m8*.pgtest.ts`
+- Full `npm run test:postgres` on a fresh lowercase DB
+
+**Do not start M9.** Return to the same C3 reviewer for targeted
+confirmation.

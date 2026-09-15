@@ -1,8 +1,8 @@
 /**
- * C3 canonical database-backed execution gate (AN-1, AN-6).
+ * C3 canonical database-backed execution gate (AN-1R, AN-6, AN-7).
  *
- * Loads ActionIntent, authority envelope, approvals, grants, budget hold and
- * live currentAssessmentView from PostgreSQL — never caller-built duplicates.
+ * The strategy's base manifest is the currentness boundary for dispatch. The
+ * gate never manufactures an assessment or trusts caller-built subjects.
  */
 import type { Pool, PoolClient } from '../pool.ts';
 import type { TypedRef, SubjectKind } from '../../../domain/v2/shared/identity.ts';
@@ -15,13 +15,21 @@ import type {
   ApprovalRevocation,
 } from '../../../contracts/v2/authority/authorityEnvelope.ts';
 import type { AuthorityGrant } from '../../../domain/v2/people/traveller.ts';
+import { WorldSnapshotManifestSchema } from '../../../contracts/v2/scope/readScope.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../../../resolution/authority/envelope.ts';
-import { evaluateConsequentialAuthorization, type AuthorizeResult } from '../../../resolution/authority/authorize.ts';
+import {
+  AUTHORIZE_ACTION_KIND,
+  DISPATCH_ACTION_KIND,
+  evaluateConsequentialAuthorization,
+  type AuthorizeResult,
+} from '../../../resolution/authority/authorize.ts';
 import { currentAssessmentView, type AssessmentView } from '../world/pgAssessments.ts';
-import { requireProviderCapability, type CapabilityKind } from '../../../resolution/execution/capability.ts';
+import { PgCurrentStateReader } from '../world/pgCurrentState.ts';
+import { assessManifestCurrentness } from '../../../resolution/world/currentness.ts';
 import { compareExactMoney } from '../../../domain/v2/shared/money.ts';
+import type { CapabilityKind } from '../../../resolution/execution/capability.ts';
 
-export const DISPATCH_ACTION_KIND = 'action.intent.dispatch';
+export { DISPATCH_ACTION_KIND };
 export const INTERNAL_PROGRAMME_SCHEDULE_CAPABILITY = 'internal:programme.schedule';
 
 export interface StoredActionIntentRow {
@@ -42,12 +50,7 @@ export interface StoredActionIntentRow {
   requiredAuthorityScopes: string[];
 }
 
-export type ExecutionGateDenial = {
-  allowed: false;
-  reason: string;
-  detail?: string;
-};
-
+export type ExecutionGateDenial = { allowed: false; reason: string; detail?: string };
 export type ExecutionGatePass = {
   allowed: true;
   authorityDecisionId: string;
@@ -56,54 +59,34 @@ export type ExecutionGatePass = {
   capabilityRef: string;
   requestedAmount?: ExactMoney;
 };
-
 export type ExecutionGateResult = ExecutionGatePass | ExecutionGateDenial;
 
 const ASSESSABLE_SUBJECT_KINDS: ReadonlySet<SubjectKind> = new Set(['JOURNEY', 'TRIP']);
-
-const SUCCESS_STATUSES = new Set([
-  'OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED',
-]);
-
+const SUCCESS_STATUSES = new Set(['OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED']);
 const BLOCKING_STATUSES = new Set([
   'PREPARED', 'CLAIMED', 'DISPATCHING', 'DISPATCHED',
-  'OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED',
-  ...SUCCESS_STATUSES,
+  'OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED', ...SUCCESS_STATUSES,
 ]);
-
 type Queryable = Pick<Pool | PoolClient, 'query'>;
 
 function parseJsonArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
-  if (typeof value === 'string') return JSON.parse(value) as T[];
-  return [];
-}
-
-function basisAssessmentId(preconditions: string[]): string | undefined {
-  for (const p of preconditions) {
-    const match = /^basisAssessment:([0-9a-f-]{36})$/i.exec(p);
-    if (match) return match[1];
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as T[] : [];
+  } catch {
+    return [];
   }
-  return undefined;
 }
 
 async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: string): Promise<StoredActionIntentRow | undefined> {
   const result = await db.query<{
-    id: string;
-    action_plan_id: string;
-    plan_version: number;
-    operation_namespace: string;
-    logical_operation_key: string | null;
-    request_fingerprint: string | null;
-    capability_ref: string;
-    subject_refs: unknown;
-    expected_revisions: unknown;
-    preconditions: unknown;
-    offer_fingerprint: string | null;
-    cost_amount: string | null;
-    cost_currency: string | null;
-    limits: unknown;
-    required_authority_scopes: unknown;
+    id: string; action_plan_id: string; plan_version: number; operation_namespace: string;
+    logical_operation_key: string | null; request_fingerprint: string | null; capability_ref: string;
+    subject_refs: unknown; expected_revisions: unknown; preconditions: unknown;
+    offer_fingerprint: string | null; cost_amount: string | null; cost_currency: string | null;
+    limits: unknown; required_authority_scopes: unknown;
   }>(
     `SELECT i.id, i.action_plan_id, p.plan_version, i.operation_namespace,
             i.logical_operation_key, i.request_fingerprint, i.capability_ref,
@@ -118,19 +101,13 @@ async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: st
   const row = result.rows[0];
   if (!row || !row.logical_operation_key || !row.request_fingerprint) return undefined;
   return {
-    id: row.id,
-    actionPlanId: row.action_plan_id,
-    planVersion: row.plan_version,
-    operationNamespace: row.operation_namespace,
-    logicalOperationKey: row.logical_operation_key,
-    requestFingerprint: row.request_fingerprint,
-    capabilityRef: row.capability_ref,
+    id: row.id, actionPlanId: row.action_plan_id, planVersion: row.plan_version,
+    operationNamespace: row.operation_namespace, logicalOperationKey: row.logical_operation_key,
+    requestFingerprint: row.request_fingerprint, capabilityRef: row.capability_ref,
     subjectRefs: parseJsonArray<TypedRef>(row.subject_refs),
     expectedRevisions: parseJsonArray(row.expected_revisions),
     preconditions: parseJsonArray<string>(row.preconditions),
-    offerFingerprint: row.offer_fingerprint,
-    costAmount: row.cost_amount,
-    costCurrency: row.cost_currency,
+    offerFingerprint: row.offer_fingerprint, costAmount: row.cost_amount, costCurrency: row.cost_currency,
     limits: row.limits as Record<string, unknown> | null,
     requiredAuthorityScopes: parseJsonArray<string>(row.required_authority_scopes),
   };
@@ -138,27 +115,19 @@ async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: st
 
 function buildEnvelopeInput(
   intent: StoredActionIntentRow,
-  decision: {
-    scope: TypedRef[];
-    grantRefs: string[];
-    ruleInputs: string[];
-    limits: Record<string, unknown> | null;
-  },
+  decision: { scope: TypedRef[]; grantRefs: string[]; ruleInputs: string[]; limits: Record<string, unknown> | null },
   requirements: { actorRole: string }[],
 ): EnvelopeFingerprintInput {
   const costEstimate = intent.costAmount && intent.costCurrency
     ? { amount: intent.costAmount, currency: intent.costCurrency }
     : undefined;
   return {
-    actionPlanId: intent.actionPlanId,
-    actionPlanVersion: intent.planVersion,
-    actionIntentId: intent.id,
-    actionIntentVersion: 1,
+    actionPlanId: intent.actionPlanId, actionPlanVersion: intent.planVersion,
+    actionIntentId: intent.id, actionIntentVersion: 1,
     requiredActorRoles: requirements.map((r) => r.actorRole).sort(),
     scope: decision.scope,
     ...(decision.limits ? { limits: decision.limits } : intent.limits ? { limits: intent.limits } : {}),
-    grantRefs: decision.grantRefs,
-    ruleInputs: decision.ruleInputs,
+    grantRefs: decision.grantRefs, ruleInputs: decision.ruleInputs,
     ...(costEstimate ? { amountCeiling: costEstimate, costEstimate } : {}),
     ...(intent.offerFingerprint ? { offerFingerprint: intent.offerFingerprint } : {}),
     requestFingerprint: intent.requestFingerprint,
@@ -166,70 +135,45 @@ function buildEnvelopeInput(
 }
 
 async function loadAuthorityBundle(
-  db: Queryable,
-  workspaceId: string,
-  intentId: string,
-  envelopeFingerprint: string,
+  db: Queryable, workspaceId: string, intentId: string, envelopeFingerprint: string,
 ): Promise<{
-  decision: AuthorityDecision;
-  envelope: AuthorityEnvelope;
-  approvals: Approval[];
-  revocations: ApprovalRevocation[];
-  decisionId: string;
+  decision: AuthorityDecision; envelope: AuthorityEnvelope; approvals: Approval[];
+  revocations: ApprovalRevocation[]; decisionId: string;
 } | undefined> {
   const decisions = await db.query<{
-    id: string;
-    action_plan_id: string;
-    action_plan_version: number;
-    action_intent_id: string;
-    action_intent_version: number;
-    group_operator: 'AND' | 'OR';
-    envelope_fingerprint: string;
-    scope: unknown;
-    limits: unknown;
-    grant_refs: unknown;
-    rule_inputs: unknown;
-    issued_at: Date;
-    expires_at: Date | null;
+    id: string; action_plan_id: string; action_plan_version: number; action_intent_id: string;
+    action_intent_version: number; group_operator: 'AND' | 'OR'; envelope_fingerprint: string;
+    scope: unknown; limits: unknown; grant_refs: unknown; rule_inputs: unknown;
+    issued_at: Date; expires_at: Date | null;
   }>(
     `SELECT id, action_plan_id, action_plan_version, action_intent_id, action_intent_version,
             group_operator, envelope_fingerprint, scope, limits, grant_refs, rule_inputs,
             issued_at, expires_at
        FROM authority_decisions
       WHERE workspace_id = $1 AND action_intent_id = $2 AND envelope_fingerprint = $3
-      ORDER BY issued_at DESC
-      LIMIT 1`,
+      ORDER BY issued_at DESC LIMIT 1`,
     [workspaceId, intentId, envelopeFingerprint],
   );
   const row = decisions.rows[0];
   if (!row) return undefined;
-
-  const requirements = await db.query<{ id: string; actor_role: string }>(
-    `SELECT id, actor_role FROM approval_requirements WHERE workspace_id = $1 AND decision_id = $2`,
+  const requirements = await db.query<{
+    id: string; actor_role: string; required_party_kind: string | null; required_party_id: string | null;
+  }>(
+    `SELECT id, actor_role, required_party_kind, required_party_id
+       FROM approval_requirements WHERE workspace_id = $1 AND decision_id = $2`,
     [workspaceId, row.id],
   );
-
   const approvalsRaw = await db.query<{
-    id: string;
-    requirement_id: string;
-    approver_principal_id: string;
-    envelope_fingerprint: string;
-    scope: unknown;
-    amount_limit_amount: string | null;
-    amount_limit_currency: string | null;
-    approved_at: Date;
+    id: string; requirement_id: string; approver_principal_id: string; envelope_fingerprint: string;
+    scope: unknown; amount_limit_amount: string | null; amount_limit_currency: string | null; approved_at: Date;
   }>(
     `SELECT id, requirement_id, approver_principal_id, envelope_fingerprint, scope,
             amount_limit_amount::text, amount_limit_currency, approved_at
        FROM approvals WHERE workspace_id = $1 AND decision_id = $2`,
     [workspaceId, row.id],
   );
-
   const revocationsRaw = await db.query<{
-    id: string;
-    approval_id: string;
-    revoked_at: Date;
-    revoked_by_principal_id: string;
+    id: string; approval_id: string; revoked_at: Date; revoked_by_principal_id: string;
   }>(
     `SELECT r.id, r.approval_id, r.revoked_at, r.revoked_by_principal_id
        FROM approval_revocations r
@@ -237,73 +181,46 @@ async function loadAuthorityBundle(
       WHERE r.workspace_id = $1 AND a.decision_id = $2`,
     [workspaceId, row.id],
   );
-
   const decision: AuthorityDecision = {
-    id: row.id,
-    actionPlanId: row.action_plan_id,
-    actionPlanVersion: row.action_plan_version,
-    actionIntentId: row.action_intent_id,
-    actionIntentVersion: row.action_intent_version,
+    id: row.id, actionPlanId: row.action_plan_id, actionPlanVersion: row.action_plan_version,
+    actionIntentId: row.action_intent_id, actionIntentVersion: row.action_intent_version,
     groupOperator: row.group_operator,
-    requirements: requirements.rows.map((r) => ({ id: r.id, actorRole: r.actor_role })),
+    requirements: requirements.rows.map((r) => ({
+      id: r.id, actorRole: r.actor_role,
+      ...(r.required_party_kind && r.required_party_id
+        ? { requiredPartyRef: { kind: r.required_party_kind as SubjectKind, id: r.required_party_id } }
+        : {}),
+    })),
     ...(row.limits ? { limits: row.limits as Record<string, unknown> } : {}),
   };
-
   const envelope: AuthorityEnvelope = {
-    id: row.id,
-    actionPlanId: row.action_plan_id,
-    actionPlanVersion: row.action_plan_version,
-    actionIntentId: row.action_intent_id,
-    actionIntentVersion: row.action_intent_version,
-    requiredActors: decision.requirements,
-    scope: parseJsonArray<TypedRef>(row.scope),
+    id: row.id, actionPlanId: row.action_plan_id, actionPlanVersion: row.action_plan_version,
+    actionIntentId: row.action_intent_id, actionIntentVersion: row.action_intent_version,
+    requiredActors: decision.requirements, scope: parseJsonArray<TypedRef>(row.scope),
     ...(row.limits ? { limits: row.limits as Record<string, unknown> } : {}),
-    grantRefs: parseJsonArray<string>(row.grant_refs),
-    ruleInputs: parseJsonArray<string>(row.rule_inputs),
-    issuedAt: row.issued_at.toISOString(),
-    ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
+    grantRefs: parseJsonArray<string>(row.grant_refs), ruleInputs: parseJsonArray<string>(row.rule_inputs),
+    issuedAt: row.issued_at.toISOString(), ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
     fingerprint: row.envelope_fingerprint,
   };
-
   const approvals: Approval[] = approvalsRaw.rows.map((a) => ({
-    id: a.id,
-    requirementId: a.requirement_id,
-    approverPrincipalId: a.approver_principal_id,
-    envelopeFingerprint: a.envelope_fingerprint,
-    scope: parseJsonArray<TypedRef>(a.scope),
+    id: a.id, requirementId: a.requirement_id, approverPrincipalId: a.approver_principal_id,
+    envelopeFingerprint: a.envelope_fingerprint, scope: parseJsonArray<TypedRef>(a.scope),
     approvedAt: a.approved_at.toISOString(),
     ...(a.amount_limit_amount && a.amount_limit_currency
-      ? { amountLimit: { amount: a.amount_limit_amount, currency: a.amount_limit_currency } }
-      : {}),
+      ? { amountLimit: { amount: a.amount_limit_amount, currency: a.amount_limit_currency } } : {}),
   }));
-
   const revocations: ApprovalRevocation[] = revocationsRaw.rows.map((r) => ({
-    id: r.id,
-    approvalId: r.approval_id,
-    revokedAt: r.revoked_at.toISOString(),
+    id: r.id, approvalId: r.approval_id, revokedAt: r.revoked_at.toISOString(),
     revokedByPrincipalId: r.revoked_by_principal_id,
   }));
-
   return { decision, envelope, approvals, revocations, decisionId: row.id };
 }
 
-async function loadGrantsForPrincipal(
-  db: Queryable,
-  workspaceId: string,
-  principalId: string,
-  now: Instant,
-): Promise<AuthorityGrant[]> {
+async function loadGrantsForPrincipal(db: Queryable, workspaceId: string, principalId: string, now: Instant): Promise<AuthorityGrant[]> {
   const result = await db.query<{
-    id: string;
-    principal_id: string;
-    represented_party_kind: string;
-    represented_party_id: string;
-    issued_by_principal_id: string;
-    issued_at: Date;
-    expires_at: Date | null;
-    revoked_at: Date | null;
-    action_kinds: string[] | null;
-    scope_refs: { kind: SubjectKind; id: string }[] | null;
+    id: string; principal_id: string; represented_party_kind: string; represented_party_id: string;
+    issued_by_principal_id: string; issued_at: Date; expires_at: Date | null; revoked_at: Date | null;
+    action_kinds: string[] | null; scope_refs: { kind: SubjectKind; id: string }[] | null;
   }>(
     `SELECT g.id, g.principal_id, g.represented_party_kind, g.represented_party_id,
             g.issued_by_principal_id, g.issued_at, g.expires_at, g.revoked_at,
@@ -313,82 +230,94 @@ async function loadGrantsForPrincipal(
                                        ORDER BY s.scope_kind, s.scope_id), '[]'::jsonb)
                FROM grant_scopes s WHERE s.workspace_id = g.workspace_id AND s.grant_id = g.id) AS scope_refs
        FROM authority_grants g
-      WHERE g.workspace_id = $1 AND g.principal_id = $2
-        AND g.revoked_at IS NULL
+      WHERE g.workspace_id = $1 AND g.principal_id = $2 AND g.revoked_at IS NULL
         AND g.issued_at <= $3::timestamptz
         AND (g.expires_at IS NULL OR g.expires_at > $3::timestamptz)`,
     [workspaceId, principalId, now],
   );
   return result.rows.map((row) => ({
-    id: row.id,
-    principalId: row.principal_id,
+    id: row.id, principalId: row.principal_id,
     representedPartyRef: { kind: row.represented_party_kind as SubjectKind, id: row.represented_party_id },
-    issuedByPrincipalId: row.issued_by_principal_id,
-    issuedAt: row.issued_at.toISOString(),
+    issuedByPrincipalId: row.issued_by_principal_id, issuedAt: row.issued_at.toISOString(),
     ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
     ...(row.revoked_at ? { revokedAt: row.revoked_at.toISOString() } : {}),
-    actions: row.action_kinds ?? [],
-    scopes: (row.scope_refs ?? []).map((s) => ({ kind: s.kind, id: s.id })),
+    actions: row.action_kinds ?? [], scopes: (row.scope_refs ?? []).map((s) => ({ kind: s.kind, id: s.id })),
   }));
 }
 
-async function assessmentSubjectsForIntent(
-  db: Queryable,
-  workspaceId: string,
-  intent: StoredActionIntentRow,
-  scope: TypedRef[],
-): Promise<TypedRef[]> {
-  const basisId = basisAssessmentId(intent.preconditions);
-  if (basisId) {
-    const subjects = await db.query<{ subject_kind: string; subject_id: string }>(
-      `SELECT subject_kind, subject_id FROM assessment_subjects
-        WHERE workspace_id = $1 AND assessment_id = $2 AND subject_kind = ANY($3::text[])`,
-      [workspaceId, basisId, [...ASSESSABLE_SUBJECT_KINDS]],
-    );
-    if (subjects.rows.length > 0) {
-      return subjects.rows.map((s) => ({ kind: s.subject_kind as SubjectKind, id: s.subject_id }));
-    }
+async function loadStrategyForPlan(db: Queryable, workspaceId: string, actionPlanId: string): Promise<{
+  scenarioChangeId: string; baseManifest: unknown; candidateSummaries: unknown; strategyId: string;
+} | ExecutionGateDenial> {
+  const result = await db.query<{
+    scenario_change_id: string; recovery_strategy_id: string | null;
+    base_manifest: unknown | null; candidate_assessment_summaries: unknown | null;
+  }>(
+    `SELECT p.scenario_change_id, p.recovery_strategy_id, s.base_manifest, s.candidate_assessment_summaries
+       FROM action_plans p
+       LEFT JOIN recovery_strategies s ON s.workspace_id = p.workspace_id AND s.id = p.recovery_strategy_id
+      WHERE p.workspace_id = $1 AND p.id = $2`,
+    [workspaceId, actionPlanId],
+  );
+  const row = result.rows[0];
+  if (!row?.recovery_strategy_id || row.base_manifest === null || row.candidate_assessment_summaries === null) {
+    return { allowed: false, reason: 'STRATEGY_MISSING' };
   }
-  const fromIntent = intent.subjectRefs.filter((s) => ASSESSABLE_SUBJECT_KINDS.has(s.kind));
-  const fromScope = scope.filter((s) => ASSESSABLE_SUBJECT_KINDS.has(s.kind));
-  const seen = new Set<string>();
-  return [...fromIntent, ...fromScope].filter((s) => {
-    const key = `${s.kind}:${s.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return {
+    scenarioChangeId: row.scenario_change_id, strategyId: row.recovery_strategy_id,
+    baseManifest: row.base_manifest, candidateSummaries: row.candidate_assessment_summaries,
+  };
+}
+
+function subjectRef(value: unknown): TypedRef | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as { kind?: unknown; id?: unknown };
+  return typeof candidate.kind === 'string' && typeof candidate.id === 'string'
+    ? { kind: candidate.kind as SubjectKind, id: candidate.id } : undefined;
+}
+
+async function resolveAssessableSubjects(db: Queryable, workspaceId: string, seeds: TypedRef[]): Promise<TypedRef[]> {
+  const resolved = new Map<string, TypedRef>();
+  const add = (ref: TypedRef): void => {
+    if (ASSESSABLE_SUBJECT_KINDS.has(ref.kind)) resolved.set(`${ref.kind}:${ref.id}`, ref);
+  };
+  const journeyItems = new Set<string>();
+  const travellers = new Set<string>();
+  const programmeItems = new Set<string>();
+  for (const seed of seeds) {
+    if (seed.kind === 'JOURNEY' || seed.kind === 'TRIP') add(seed);
+    else if (seed.kind === 'JOURNEY_ITEM') journeyItems.add(seed.id);
+    else if (seed.kind === 'TRAVELLER') travellers.add(seed.id);
+    else if (seed.kind === 'PROGRAMME_ITEM') programmeItems.add(seed.id);
+  }
+  for (const id of [...journeyItems].sort()) {
+    const result = await db.query<{ journey_id: string }>(
+      'SELECT journey_id FROM journey_items WHERE workspace_id = $1 AND id = $2', [workspaceId, id],
+    );
+    for (const row of result.rows) add({ kind: 'JOURNEY', id: row.journey_id });
+  }
+  for (const id of [...travellers].sort()) {
+    const result = await db.query<{ id: string }>(
+      'SELECT id FROM journeys WHERE workspace_id = $1 AND traveller_id = $2', [workspaceId, id],
+    );
+    for (const row of result.rows) add({ kind: 'JOURNEY', id: row.id });
+  }
+  for (const id of [...programmeItems].sort()) {
+    const result = await db.query<{ journey_id: string }>(
+      `SELECT DISTINCT j.id AS journey_id
+         FROM participations p
+         JOIN journeys j ON j.workspace_id = p.workspace_id AND j.traveller_id = p.traveller_id
+        WHERE p.workspace_id = $1 AND p.programme_item_id = $2`,
+      [workspaceId, id],
+    );
+    for (const row of result.rows) add({ kind: 'JOURNEY', id: row.journey_id });
+  }
+  return [...resolved.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
 }
 
 async function requireAllAssessmentsCurrent(
-  pool: Pool,
-  workspaceId: string,
-  subjects: TypedRef[],
-  now: Instant,
+  pool: Pool | PoolClient, workspaceId: string, subjects: TypedRef[], now: Instant,
 ): Promise<AssessmentView | ExecutionGateDenial> {
-  if (subjects.length === 0) {
-    return {
-      status: 'CURRENT',
-      assessment: {
-        id: 'synthetic-none',
-        kind: 'VIABILITY',
-        evaluatedAt: now,
-        overallVerdict: 'PASS',
-        subjects: [{ subjectRef: { kind: 'JOURNEY', id: '00000000-0000-0000-0000-000000000000' }, role: 'PRIMARY' }],
-        dimensions: [],
-        manifest: {
-          evaluatedAt: now,
-          evaluatorVersions: [],
-          aggregateReads: [],
-          scopeReads: [],
-          evidenceReads: [],
-          coverageReads: [],
-          missingCoverage: [],
-        },
-      },
-      staleness: [],
-    };
-  }
+  if (subjects.length === 0) return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED' };
   let primaryView: AssessmentView | undefined;
   for (const subject of subjects) {
     const view = await currentAssessmentView(pool, workspaceId, subject, 'VIABILITY', now);
@@ -401,17 +330,12 @@ async function requireAllAssessmentsCurrent(
 }
 
 async function requireBudgetHold(
-  db: Queryable,
-  workspaceId: string,
-  intent: StoredActionIntentRow,
+  db: Queryable, workspaceId: string, intent: StoredActionIntentRow,
 ): Promise<ExecutionGateDenial | { ok: true; hold: ExactMoney }> {
-  if (!intent.costAmount || !intent.costCurrency) {
-    return { ok: true, hold: { amount: '0', currency: 'USD' } };
-  }
+  if (!intent.costAmount || !intent.costCurrency) return { ok: true, hold: { amount: '0', currency: 'USD' } };
   const expected: ExactMoney = { amount: intent.costAmount, currency: intent.costCurrency };
-  const holds = await db.query<{ amount: string; currency: string; status: string }>(
-    `SELECT amount::text AS amount, currency, status
-       FROM budget_commitments
+  const holds = await db.query<{ amount: string; currency: string }>(
+    `SELECT amount::text AS amount, currency FROM budget_commitments
       WHERE workspace_id = $1 AND action_intent_id = $2 AND status = 'HELD'`,
     [workspaceId, intent.id],
   );
@@ -421,9 +345,7 @@ async function requireBudgetHold(
   const matching = holds.rows.find(
     (h) => h.currency === expected.currency && compareExactMoney({ amount: h.amount, currency: h.currency }, expected) === 0,
   );
-  if (!matching) {
-    return { allowed: false, reason: 'BUDGET_HOLD_MISMATCH', detail: 'held amount/currency does not match stored intent cost' };
-  }
+  if (!matching) return { allowed: false, reason: 'BUDGET_HOLD_MISMATCH', detail: 'held amount/currency does not match stored intent cost' };
   return { ok: true, hold: expected };
 }
 
@@ -435,146 +357,111 @@ export function externalCapabilityKindFromRef(capabilityRef: string): Capability
   if (capabilityRef.includes('OBSERVE')) return 'OBSERVE';
   return 'SERVICE';
 }
-
 export function isInternalCapability(capabilityRef: string): boolean {
   return capabilityRef.startsWith('internal:');
 }
 
-/** Evaluate the canonical stored execution gate at prepare or dispatch time. */
 export async function evaluateStoredExecutionGate(
-  pool: Pool,
-  params: {
-    workspaceId: string;
-    intentId: string;
-    principalId: string;
-    now: Instant;
-    requiredCapabilityRef?: string;
-  },
+  pool: Pool | PoolClient,
+  params: { workspaceId: string; intentId: string; principalId: string; now: Instant; requiredCapabilityRef?: string },
 ): Promise<ExecutionGateResult> {
   const intent = await loadStoredIntent(pool, params.workspaceId, params.intentId);
-  if (!intent) {
-    return { allowed: false, reason: 'INTENT_MISSING' };
-  }
-
+  if (!intent) return { allowed: false, reason: 'INTENT_MISSING' };
   if (params.requiredCapabilityRef && intent.capabilityRef !== params.requiredCapabilityRef) {
-    return {
-      allowed: false,
-      reason: 'CAPABILITY_MISMATCH',
-      detail: `intent capability ${intent.capabilityRef} != required ${params.requiredCapabilityRef}`,
-    };
+    return { allowed: false, reason: 'CAPABILITY_MISMATCH', detail: `intent capability ${intent.capabilityRef} != required ${params.requiredCapabilityRef}` };
   }
+  const strategy = await loadStrategyForPlan(pool, params.workspaceId, intent.actionPlanId);
+  if ('allowed' in strategy) return strategy;
+  const manifestValue = typeof strategy.baseManifest === 'string'
+    ? (() => { try { return JSON.parse(strategy.baseManifest); } catch { return strategy.baseManifest; } })()
+    : strategy.baseManifest;
+  const parsedManifest = WorldSnapshotManifestSchema.safeParse(manifestValue);
+  if (!parsedManifest.success) return { allowed: false, reason: 'INVALID_BASE_MANIFEST', detail: parsedManifest.error.message };
+  const manifest = parsedManifest.data;
+  if (manifest.aggregateReads.length === 0 && manifest.scopeReads.length === 0) {
+    return { allowed: false, reason: 'EMPTY_BASE_MANIFEST' };
+  }
+  const state = await new PgCurrentStateReader(pool).loadFor(params.workspaceId, manifest);
+  const currentness = assessManifestCurrentness(manifest, state, params.now);
+  if (!currentness.current) return { allowed: false, reason: 'STALE_BASE', detail: JSON.stringify(currentness.reasons) };
 
   const decisionRow = await pool.query<{
-    id: string;
-    scope: unknown;
-    limits: unknown;
-    grant_refs: unknown;
-    rule_inputs: unknown;
-    group_operator: 'AND' | 'OR';
+    id: string; scope: unknown; limits: unknown; grant_refs: unknown; rule_inputs: unknown; group_operator: 'AND' | 'OR';
   }>(
-    `SELECT id, scope, limits, grant_refs, rule_inputs, group_operator
-       FROM authority_decisions
-      WHERE workspace_id = $1 AND action_intent_id = $2
-      ORDER BY issued_at DESC
-      LIMIT 1`,
+    `SELECT id, scope, limits, grant_refs, rule_inputs, group_operator FROM authority_decisions
+      WHERE workspace_id = $1 AND action_intent_id = $2 ORDER BY issued_at DESC LIMIT 1`,
     [params.workspaceId, params.intentId],
   );
   const decisionMeta = decisionRow.rows[0];
-  if (!decisionMeta) {
-    return { allowed: false, reason: 'AUTHORITY_MISSING', detail: 'no persisted authority decision for intent' };
-  }
-
+  if (!decisionMeta) return { allowed: false, reason: 'AUTHORITY_MISSING', detail: 'no persisted authority decision for intent' };
   const requirements = await pool.query<{ actor_role: string }>(
-    `SELECT actor_role FROM approval_requirements WHERE workspace_id = $1 AND decision_id = $2`,
+    'SELECT actor_role FROM approval_requirements WHERE workspace_id = $1 AND decision_id = $2',
     [params.workspaceId, decisionMeta.id],
   );
-
   const envelopeInput = buildEnvelopeInput(intent, {
     scope: parseJsonArray<TypedRef>(decisionMeta.scope),
     grantRefs: parseJsonArray<string>(decisionMeta.grant_refs),
     ruleInputs: parseJsonArray<string>(decisionMeta.rule_inputs),
     limits: decisionMeta.limits as Record<string, unknown> | null,
   }, requirements.rows.map((r) => ({ actorRole: r.actor_role })));
-
   const fingerprint = computeEnvelopeFingerprint(envelopeInput);
   const bundle = await loadAuthorityBundle(pool, params.workspaceId, params.intentId, fingerprint);
-  if (!bundle) {
-    return { allowed: false, reason: 'ENVELOPE_MISMATCH', detail: 'stored authority does not match compiled intent envelope' };
-  }
+  if (!bundle) return { allowed: false, reason: 'ENVELOPE_MISMATCH', detail: 'stored authority does not match compiled intent envelope' };
 
-  const subjects = await assessmentSubjectsForIntent(pool, params.workspaceId, intent, bundle.envelope.scope);
+  const affected = await pool.query<{ affected_subjects: unknown }>(
+    `SELECT affected_subjects FROM strategy_changes
+      WHERE workspace_id = $1 AND recovery_strategy_id = $2 AND scenario_change_id = $3`,
+    [params.workspaceId, strategy.strategyId, strategy.scenarioChangeId],
+  );
+  const seeds = affected.rows.flatMap((row) => parseJsonArray<TypedRef>(row.affected_subjects));
+  for (const summary of parseJsonArray<{ subjectRef?: unknown }>(strategy.candidateSummaries)) {
+    const ref = subjectRef(summary.subjectRef);
+    if (ref) seeds.push(ref);
+  }
+  const subjects = await resolveAssessableSubjects(pool, params.workspaceId, seeds);
   const assessmentView = await requireAllAssessmentsCurrent(pool, params.workspaceId, subjects, params.now);
-  if ('allowed' in assessmentView && assessmentView.allowed === false) {
-    return assessmentView;
-  }
+  if ('allowed' in assessmentView && assessmentView.allowed === false) return assessmentView;
 
-  const grants = await loadGrantsForPrincipal(pool, params.workspaceId, params.principalId, params.now);
+  const principalIds = new Set([params.principalId, ...bundle.approvals.map((approval) => approval.approverPrincipalId)]);
+  const grants = (await Promise.all(
+    [...principalIds].sort().map((principalId) => loadGrantsForPrincipal(pool, params.workspaceId, principalId, params.now)),
+  )).flat();
   const requestedAmount = intent.costAmount && intent.costCurrency
-    ? { amount: intent.costAmount, currency: intent.costCurrency }
-    : undefined;
-
+    ? { amount: intent.costAmount, currency: intent.costCurrency } : undefined;
   const auth: AuthorizeResult = evaluateConsequentialAuthorization({
-    assessmentView: assessmentView as AssessmentView,
-    envelopeInput,
-    envelope: bundle.envelope,
-    decision: bundle.decision,
-    approvals: bundle.approvals,
-    revocations: bundle.revocations,
-    grants,
-    requiredActionKind: DISPATCH_ACTION_KIND,
-    principalId: params.principalId,
-    now: params.now,
+    assessmentView: assessmentView as AssessmentView, envelopeInput, envelope: bundle.envelope,
+    decision: bundle.decision, approvals: bundle.approvals, revocations: bundle.revocations,
+    grants, requiredActionKind: DISPATCH_ACTION_KIND, principalId: params.principalId, now: params.now,
     ...(requestedAmount ? { requestedAmount } : {}),
   });
-  if (!auth.allowed) {
-    return { allowed: false, reason: auth.reason, detail: auth.detail };
-  }
-
+  if (!auth.allowed) return { allowed: false, reason: auth.reason, detail: auth.detail };
   const budget = await requireBudgetHold(pool, params.workspaceId, intent);
-  if ('allowed' in budget) {
-    return budget;
-  }
-
+  if ('allowed' in budget) return budget;
   return {
-    allowed: true,
-    authorityDecisionId: bundle.decisionId,
-    envelopeFingerprint: fingerprint,
-    intent,
-    capabilityRef: intent.capabilityRef,
-    ...(requestedAmount ? { requestedAmount } : {}),
+    allowed: true, authorityDecisionId: bundle.decisionId, envelopeFingerprint: fingerprint,
+    intent, capabilityRef: intent.capabilityRef, ...(requestedAmount ? { requestedAmount } : {}),
   };
 }
 
 export async function findKnownSuccessAttempt(
-  db: Queryable,
-  workspaceId: string,
-  logicalOperationKey: string,
-  requestFingerprint: string,
+  db: Queryable, workspaceId: string, logicalOperationKey: string, requestFingerprint: string,
 ): Promise<{ id: string; status: string } | undefined> {
   const result = await db.query<{ id: string; status: string }>(
     `SELECT id, status FROM execution_attempts
-      WHERE workspace_id = $1 AND logical_operation_key = $2
-        AND request_fingerprint = $3
-        AND status = ANY($4::text[])
-      ORDER BY created_at DESC
-      LIMIT 1`,
+      WHERE workspace_id = $1 AND logical_operation_key = $2 AND request_fingerprint = $3
+        AND status = ANY($4::text[]) ORDER BY created_at DESC LIMIT 1`,
     [workspaceId, logicalOperationKey, requestFingerprint, [...SUCCESS_STATUSES]],
   );
   return result.rows[0];
 }
 
 export async function findBlockingAttempt(
-  db: Queryable,
-  workspaceId: string,
-  logicalOperationKey: string,
-  requestFingerprint: string,
+  db: Queryable, workspaceId: string, logicalOperationKey: string, requestFingerprint: string,
 ): Promise<{ id: string; status: string; request_fingerprint: string } | undefined> {
   const result = await db.query<{ id: string; status: string; request_fingerprint: string }>(
     `SELECT id, status, request_fingerprint FROM execution_attempts
-      WHERE workspace_id = $1 AND logical_operation_key = $2
-        AND status = ANY($3::text[])
-      ORDER BY created_at DESC
-      LIMIT 1`,
+      WHERE workspace_id = $1 AND logical_operation_key = $2 AND status = ANY($3::text[])
+      ORDER BY created_at DESC LIMIT 1`,
     [workspaceId, logicalOperationKey, [...BLOCKING_STATUSES]],
   );
   const row = result.rows[0];
@@ -584,4 +471,4 @@ export async function findBlockingAttempt(
   return row;
 }
 
-export { BLOCKING_STATUSES, SUCCESS_STATUSES };
+export { AUTHORIZE_ACTION_KIND, BLOCKING_STATUSES, SUCCESS_STATUSES };

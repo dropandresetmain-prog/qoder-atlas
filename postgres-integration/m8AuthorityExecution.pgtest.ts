@@ -5,12 +5,12 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { attachSeedSession, beginSeed, commitSeed } from './m2Seed.ts';
+import { beginSeed, commitSeed, seedJourney, seedTraveller, seedTrip } from './m2Seed.ts';
 import { seedOrganisation } from './m3Seed.ts';
-import { seedEvent, seedProgramme, seedProgrammeItem } from './m4Seed.ts';
+import type { UnitOfWork } from '../src/contracts/v2/command/unitOfWork.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { createBudget } from '../src/persistence/postgres/commands/arrangementCommands.ts';
-import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createPrincipal, issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import {
   openRecoveryCase,
   persistActionPlan,
@@ -24,7 +24,6 @@ import {
   type DispatchAuthorizationInput,
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecutionWorker.ts';
-import { executeInternalProgrammeItemSchedule } from '../src/persistence/postgres/execution/internalProgrammeExecutor.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../src/resolution/authority/envelope.ts';
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
@@ -33,7 +32,7 @@ import { computeRequestFingerprint } from '../src/resolution/execution/stateMach
 import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ExactMoney } from '../src/domain/v2/shared/money.ts';
-import { GATE_NOW, prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
+import { GATE_NOW, persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -57,6 +56,7 @@ function buildSingleIntentPlan(opts: {
   recoveryCaseId: string;
   organisationId: string;
   scenarioChangeId?: string;
+  recoveryStrategyId?: string;
   operationNamespace?: string;
   capabilityRef?: string;
   subjectRefs?: TypedRef[];
@@ -64,15 +64,17 @@ function buildSingleIntentPlan(opts: {
   costEstimate?: ExactMoney;
   logicalOperationKey?: string;
   requestPayload?: unknown;
-}): { plan: ActionPlan; intentId: string; planId: string } {
+}): { plan: ActionPlan; intentId: string; planId: string; recoveryStrategyId: string; scenarioChangeId: string } {
   const intentId = randomUUID();
   const planId = randomUUID();
+  const scenarioChangeId = opts.scenarioChangeId ?? randomUUID();
+  const recoveryStrategyId = opts.recoveryStrategyId ?? randomUUID();
   const logicalOperationKey = opts.logicalOperationKey ?? `op-fixture-${intentId}`;
   const requestFingerprint = computeRequestFingerprint(opts.requestPayload ?? { intentId });
   const plan: ActionPlan = {
     id: planId,
     recoveryCaseId: opts.recoveryCaseId,
-    scenarioChangeId: opts.scenarioChangeId ?? randomUUID(),
+    scenarioChangeId,
     intents: [
       {
         id: intentId,
@@ -93,13 +95,43 @@ function buildSingleIntentPlan(opts: {
     ],
     dependencies: [],
   };
-  return { plan, intentId, planId };
+  return { plan, intentId, planId, recoveryStrategyId, scenarioChangeId };
+}
+
+async function issueApproverGrant(
+  uow: UnitOfWork,
+  params: {
+    workspaceId: string;
+    actorId: string;
+    principalId: string;
+    representedPartyRef: TypedRef;
+    scopes: TypedRef[];
+    issuedAt?: string;
+  },
+): Promise<void> {
+  const idempotencyKey = randomUUID();
+  mustOk(await issueAuthorityGrant(uow, {
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorId,
+    idempotencyKey,
+    principalId: params.principalId,
+    representedPartyRef: params.representedPartyRef,
+    issuedByPrincipalId: params.principalId,
+    issuedAt: params.issuedAt ?? NOW,
+    actions: ['action.intent.authorize'],
+    scopes: params.scopes,
+    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
+    expectedAggregateRevisions: [],
+  }));
 }
 
 async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload?: unknown }) {
   const pool = await sharedTestPool();
   const seed = await beginSeed(pool, 'M8 authority');
   const organisationId = await seedOrganisation(seed, 'USD');
+  const traveller = await seedTraveller(seed, { displayName: 'M8 Traveller' });
+  const tripId = await seedTrip(seed, { purpose: 'TEST', lifecycleStatus: 'ACTIVE' });
+  const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId, lifecycleStatus: 'ACTIVE' });
   await commitSeed(seed);
   const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
   const principalId = randomUUID();
@@ -118,18 +150,29 @@ async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload
     idempotencyKey: randomUUID(),
     openedAt: NOW,
   }));
-  const { plan } = buildSingleIntentPlan({
+  const { plan, recoveryStrategyId, scenarioChangeId } = buildSingleIntentPlan({
     recoveryCaseId: opened.caseId,
     organisationId,
     costEstimate: { amount: '40.00', currency: 'USD' },
     ...(opts?.logicalOperationKey ? { logicalOperationKey: opts.logicalOperationKey } : {}),
     ...(opts?.requestPayload !== undefined ? { requestPayload: opts.requestPayload } : {}),
   });
+  await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, {
+    id: scenarioChangeId,
+    recoveryStrategyId,
+    strategyVersion: 1,
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: journeyId }],
+    effects: [],
+  }, {
+    baseManifest: tripBaseManifest(tripId, 1),
+    candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+  });
   const persisted = mustOk(await persistActionPlan(uow(), {
     workspaceId: seed.workspaceId,
     actorPrincipalId: seed.actorId,
     idempotencyKey: randomUUID(),
     plan,
+    recoveryStrategyId,
   }));
   const budgetId = randomUUID();
   mustOk(await createBudget(uow(), {
@@ -150,10 +193,13 @@ async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload
     cost: { amount: '40.00', currency: 'USD' },
     budgetId,
     budgetRevision: 1,
+    assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+    assessmentTripId: tripId,
   });
   return {
-    pool, seed, uow, organisationId, principalId, budgetId,
+    pool, seed, uow, organisationId, principalId, budgetId, tripId, journeyId,
     caseId: opened.caseId, planId: persisted.planId, intentId: persisted.intentIds[0]!,
+    recoveryStrategyId, scenarioChangeId,
   };
 }
 
@@ -215,7 +261,7 @@ function baseGrant(f: BaseFixture, scope: EnvelopeFingerprintInput['scope'], ove
     representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
     issuedByPrincipalId: f.principalId,
     issuedAt: NOW,
-    actions: ['action.intent.dispatch'],
+    actions: ['action.intent.dispatch', 'action.intent.authorize'],
     scopes: scope,
     ...overrides,
   };
@@ -240,6 +286,13 @@ async function seedAuthorizedDispatch(
     requirements: [{ actorRole: 'PAYER' }],
     issuedAt: NOW,
   }));
+  await issueApproverGrant(f.uow(), {
+    workspaceId: f.seed.workspaceId,
+    actorId: f.seed.actorId,
+    principalId: f.principalId,
+    representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+    scopes: envelopeInput.scope,
+  });
   const approval = mustOk(await recordApproval(f.uow(), {
     workspaceId: f.seed.workspaceId,
     actorPrincipalId: f.principalId,
@@ -312,15 +365,6 @@ function dispatchAuthInput(
   };
 }
 
-async function seedProgrammeGraph(f: BaseFixture): Promise<{ programmeId: string; programmeItemId: string }> {
-  const s = await attachSeedSession(f.pool, f.seed.workspaceId, f.seed.actorId);
-  const eventId = await seedEvent(s);
-  const programmeId = await seedProgramme(s, { eventId });
-  const { programmeItemId } = await seedProgrammeItem(s, { programmeId, scheduleAuthority: 'INTERNAL' });
-  await commitSeed(s);
-  return { programmeId, programmeItemId };
-}
-
 describe('M8 budget concurrency', () => {
   test('two workers racing for remaining budget — one hold wins', async () => {
     const f = await baseFixture();
@@ -332,17 +376,28 @@ describe('M8 budget concurrency', () => {
       budget: { id: budgetId, organisationId: f.organisationId, purpose: 'travel', amount: { amount: '100.00', currency: 'USD' } },
     }));
     const intentA = f.intentId;
-    const { plan: planB } = buildSingleIntentPlan({
+    const planBSpec = buildSingleIntentPlan({
       recoveryCaseId: f.caseId,
       organisationId: f.organisationId,
       operationNamespace: 'provider:test-b',
       costEstimate: { amount: '70.00', currency: 'USD' },
     });
+    await persistStrategyChangeRow(f.pool, f.seed.workspaceId, f.seed.actorId, f.caseId, {
+      id: planBSpec.scenarioChangeId,
+      recoveryStrategyId: planBSpec.recoveryStrategyId,
+      strategyVersion: 2,
+      affectedSubjectRefs: [{ kind: 'JOURNEY', id: f.journeyId }],
+      effects: [],
+    }, {
+      baseManifest: tripBaseManifest(f.tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: f.journeyId } }],
+    });
     const persistedB = mustOk(await persistActionPlan(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
       idempotencyKey: randomUUID(),
-      plan: planB,
+      plan: planBSpec.plan,
+      recoveryStrategyId: planBSpec.recoveryStrategyId,
       planVersion: 2,
     }));
     const intentB = persistedB.intentIds[0]!;
@@ -399,7 +454,7 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
     // that dispatch identity always comes from the immutable intent row.
     // action_intents_logical_op_uidx is scoped per operation_namespace, so
     // a distinct namespace is required to even persist this second intent.
-    const { plan: rekeyedPlan } = buildSingleIntentPlan({
+    const rekeyedSpec = buildSingleIntentPlan({
       recoveryCaseId: f.caseId,
       organisationId: f.organisationId,
       operationNamespace: 'provider:test-fp2',
@@ -407,11 +462,22 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       requestPayload: { amount: 999 },
       costEstimate: { amount: '40.00', currency: 'USD' },
     });
+    await persistStrategyChangeRow(f.pool, f.seed.workspaceId, f.seed.actorId, f.caseId, {
+      id: rekeyedSpec.scenarioChangeId,
+      recoveryStrategyId: rekeyedSpec.recoveryStrategyId,
+      strategyVersion: 2,
+      affectedSubjectRefs: [{ kind: 'JOURNEY', id: f.journeyId }],
+      effects: [],
+    }, {
+      baseManifest: tripBaseManifest(f.tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: f.journeyId } }],
+    });
     const rekeyed = mustOk(await persistActionPlan(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.seed.actorId,
       idempotencyKey: randomUUID(),
-      plan: rekeyedPlan,
+      plan: rekeyedSpec.plan,
+      recoveryStrategyId: rekeyedSpec.recoveryStrategyId,
       planVersion: 2,
     }));
     await seedStoredExecutionAuthority({
@@ -514,6 +580,13 @@ describe('M8 approval fingerprint binding', () => {
       requirements: [{ actorRole: 'PAYER' }],
       issuedAt: NOW,
     }));
+    await issueApproverGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId,
+      actorId: f.seed.actorId,
+      principalId: f.principalId,
+      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(f.uow(), {
       workspaceId: f.seed.workspaceId,
       actorPrincipalId: f.principalId,
@@ -582,7 +655,7 @@ describe('M8 approval fingerprint binding', () => {
       representedPartyRef: { kind: 'ORGANISATION' as const, id: f.organisationId },
       issuedByPrincipalId: f.principalId,
       issuedAt: NOW,
-      actions: ['action.intent.dispatch'],
+      actions: ['action.intent.dispatch', 'action.intent.authorize'],
       scopes: envelopeInput.scope,
     };
 

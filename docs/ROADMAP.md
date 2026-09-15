@@ -88,6 +88,7 @@ These are product priorities/capability directions, not permission to bypass the
 | Microservices / Kafka / Kubernetes | **Deferred** | Modular monolith + durable DB work is sufficient; revisit with independent scaling/streaming/deployment evidence. |
 | Unbounded autonomous refunds/post-ticket servicing | **Deferred** | Consequential supplier actions remain capability/authority/observation gated. |
 | Generic legal advice | **Rejected as product claim** | Northstar may evaluate sourced entry requirements but must not manufacture legal certainty or present unsupported advice. |
+| M7/M8 effect-scoped `logicalOperationKey` re-plan identity (IN-1) | **Park for Later (fail-closed)** | Compiler keys SELECT_OFFER as `select-offer:item:offer` without strategyVersion; re-planning the same effect is blocked by `action_intents_logical_op_uidx`. Keep fail-closed through C3. **Revisit in M9** when defining explicit re-plan vs retry identity (must preserve no duplicate irreversible dispatch). Evidence: `docs/refactor/evidence/M7_M8_INTEGRATION.md` §12. |
 
 ## Roadmap discipline
 

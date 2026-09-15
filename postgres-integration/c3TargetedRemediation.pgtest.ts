@@ -1,15 +1,15 @@
 /**
- * C3 targeted remediation proofs (AN-1 … AN-6, IN-1).
+ * C3 targeted remediation proofs (AN-1…AN-6, AN-1R, AN-7, IN-1).
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed } from './m2Seed.ts';
+import { beginSeed, commitSeed, seedJourney, seedTraveller, seedTrip } from './m2Seed.ts';
 import { seedOrganisation } from './m3Seed.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { createBudget } from '../src/persistence/postgres/commands/arrangementCommands.ts';
-import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createPrincipal, issueAuthorityGrant, revokeAuthorityGrant, createOrganisation } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import {
   openRecoveryCase,
   persistActionPlan,
@@ -18,7 +18,7 @@ import {
   issueAuthorityDecision,
   recordApproval,
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
-import { withForcedCycle } from '../src/resolution/planning/compiler.ts';
+import { withForcedCycle, compileActionPlan } from '../src/resolution/planning/compiler.ts';
 import { computeRequestFingerprint } from '../src/resolution/execution/stateMachine.ts';
 import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
 import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecutionWorker.ts';
@@ -27,12 +27,15 @@ import { INTERNAL_PROGRAMME_SCHEDULE_CAPABILITY } from '../src/persistence/postg
 import {
   GATE_NOW,
   mustOk,
+  persistStrategyChangeRow,
   prepareParams,
+  seedMinimalCurrentAssessment,
   seedStoredExecutionAuthority,
+  tripBaseManifest,
 } from './m8ExecutionGateHelpers.ts';
-import { saveAssessment } from '../src/persistence/postgres/world/pgAssessments.ts';
-import type { AssessmentResult } from '../src/contracts/v2/assessment/assessmentManifest.ts';
-import { seedJourney, seedTraveller, seedTrip } from './m6WorldSeed.ts';
+import { computeEnvelopeFingerprint } from '../src/resolution/authority/envelope.ts';
+import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
+import type { RecoveryStrategy } from '../src/contracts/v2/scenario/recoveryStrategy.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -42,40 +45,57 @@ after(async () => {
 function buildPlan(opts: {
   recoveryCaseId: string;
   organisationId: string;
+  scenarioChangeId?: string;
   cost?: { amount: string; currency: string };
   logicalOperationKey?: string;
-}): ActionPlan {
+  subjectRefs?: TypedRef[];
+  preconditions?: string[];
+}): { plan: ActionPlan; scenarioChangeId: string; recoveryStrategyId: string } {
   const intentId = randomUUID();
   const planId = randomUUID();
+  const scenarioChangeId = opts.scenarioChangeId ?? randomUUID();
+  const recoveryStrategyId = randomUUID();
   const logicalOperationKey = opts.logicalOperationKey ?? `c3-op-${intentId}`;
   return {
-    id: planId,
-    recoveryCaseId: opts.recoveryCaseId,
-    scenarioChangeId: randomUUID(),
-    intents: [{
-      id: intentId,
-      actionPlanId: planId,
-      operationNamespace: 'provider:c3',
-      logicalOperationKey,
-      requestFingerprint: computeRequestFingerprint({ intentId }),
-      capabilityRef: 'SERVICE:RESERVATION',
-      subjectRefs: [{ kind: 'ORGANISATION', id: opts.organisationId }],
-      expectedRevisions: [],
-      preconditions: [],
-      requiredAuthorityScopes: [],
-      expectedObservations: ['booking_status'],
-      ...(opts.cost ? { costEstimate: opts.cost } : {}),
-      compensationPolicy: { supported: false, requiresSeparateAuthority: true },
-      status: 'PROPOSED',
-    }],
-    dependencies: [],
+    scenarioChangeId,
+    recoveryStrategyId,
+    plan: {
+      id: planId,
+      recoveryCaseId: opts.recoveryCaseId,
+      scenarioChangeId,
+      intents: [{
+        id: intentId,
+        actionPlanId: planId,
+        operationNamespace: 'provider:c3',
+        logicalOperationKey,
+        requestFingerprint: computeRequestFingerprint({ intentId }),
+        capabilityRef: 'SERVICE:RESERVATION',
+        subjectRefs: opts.subjectRefs ?? [{ kind: 'ORGANISATION', id: opts.organisationId }],
+        expectedRevisions: [],
+        preconditions: opts.preconditions ?? [],
+        requiredAuthorityScopes: [],
+        expectedObservations: ['booking_status'],
+        ...(opts.cost ? { costEstimate: opts.cost } : {}),
+        compensationPolicy: { supported: false, requiresSeparateAuthority: true },
+        status: 'PROPOSED',
+      }],
+      dependencies: [],
+    },
   };
 }
 
-async function baseC3Fixture(opts?: { withCost?: boolean; logicalOperationKey?: string }) {
+async function baseC3Fixture(opts?: {
+  withCost?: boolean;
+  logicalOperationKey?: string;
+  emptyManifest?: boolean;
+  omitStrategy?: boolean;
+}) {
   const pool = await sharedTestPool();
   const seed = await beginSeed(pool, 'C3 remediation');
   const organisationId = await seedOrganisation(seed, 'USD');
+  const traveller = await seedTraveller(seed, { displayName: 'C3 Traveller' });
+  const tripId = await seedTrip(seed, { purpose: 'TEST', lifecycleStatus: 'ACTIVE' });
+  const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId, lifecycleStatus: 'ACTIVE' });
   await commitSeed(seed);
   const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
   const principalId = randomUUID();
@@ -86,14 +106,38 @@ async function baseC3Fixture(opts?: { withCost?: boolean; logicalOperationKey?: 
   const opened = mustOk(await openRecoveryCase(uow(), {
     workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: GATE_NOW,
   }));
-  const plan = buildPlan({
+  const built = buildPlan({
     recoveryCaseId: opened.caseId,
     organisationId,
     ...(opts?.withCost !== false ? { cost: { amount: '40.00', currency: 'USD' } } : {}),
     ...(opts?.logicalOperationKey ? { logicalOperationKey: opts.logicalOperationKey } : {}),
   });
+  if (!opts?.omitStrategy) {
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, {
+      id: built.scenarioChangeId,
+      recoveryStrategyId: built.recoveryStrategyId,
+      strategyVersion: 1,
+      affectedSubjectRefs: [{ kind: 'JOURNEY', id: journeyId }],
+      effects: [],
+    }, {
+      baseManifest: opts?.emptyManifest
+        ? {
+          evaluatedAt: GATE_NOW,
+          evaluatorVersions: [],
+          aggregateReads: [],
+          scopeReads: [],
+          evidenceReads: [],
+          coverageReads: [],
+          missingCoverage: [],
+        }
+        : tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
+  }
   const persisted = mustOk(await persistActionPlan(uow(), {
-    workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+    workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
+    plan: built.plan,
+    ...(opts?.omitStrategy ? {} : { recoveryStrategyId: built.recoveryStrategyId }),
   }));
   const budgetId = randomUUID();
   mustOk(await createBudget(uow(), {
@@ -101,9 +145,31 @@ async function baseC3Fixture(opts?: { withCost?: boolean; logicalOperationKey?: 
     budget: { id: budgetId, organisationId, purpose: 'c3', amount: { amount: '100.00', currency: 'USD' } },
   }));
   return {
-    pool, seed, uow, organisationId, principalId, budgetId,
-    planId: persisted.planId, intentId: persisted.intentIds[0]!, plan,
+    pool, seed, uow, organisationId, principalId, budgetId, tripId, journeyId,
+    planId: persisted.planId, intentId: persisted.intentIds[0]!, plan: built.plan,
+    recoveryStrategyId: built.recoveryStrategyId, scenarioChangeId: built.scenarioChangeId,
+    caseId: opened.caseId,
   };
+}
+
+async function seedAuthorityForFixture(f: Awaited<ReturnType<typeof baseC3Fixture>>, opts?: {
+  cost?: boolean;
+  now?: string;
+  overrideRequestFingerprint?: string;
+}) {
+  return seedStoredExecutionAuthority({
+    pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
+    planId: f.planId, intentId: f.intentId,
+    scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
+    representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+    assessmentSubject: { kind: 'JOURNEY', id: f.journeyId },
+    assessmentTripId: f.tripId,
+    ...(opts?.cost !== false && f.budgetId
+      ? { cost: { amount: '40.00', currency: 'USD' }, budgetId: f.budgetId }
+      : {}),
+    ...(opts?.now ? { now: opts.now } : {}),
+    ...(opts?.overrideRequestFingerprint ? { overrideRequestFingerprint: opts.overrideRequestFingerprint } : {}),
+  });
 }
 
 describe('AN-1 stored authority + live currentness gate', () => {
@@ -118,22 +184,16 @@ describe('AN-1 stored authority + live currentness gate', () => {
       intentId: f.intentId, principalId: f.principalId,
     }));
     assert.equal(rejected.ok, false);
-    let dispatched = 0;
+    const dispatched = 0;
     const worker = new PgExecutionWorker(f.pool, { actorId: 'c3-an1a' });
     const claim = await worker.claimNext(f.seed.workspaceId);
     assert.equal(claim, undefined);
-    void dispatched;
     assert.equal(dispatched, 0);
   });
 
   test('B: approval for wrong intent fingerprint → refused', async () => {
     const f = await baseC3Fixture();
-    await seedStoredExecutionAuthority({
-      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
-      planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      cost: { amount: '40.00', currency: 'USD' }, budgetId: f.budgetId,
+    await seedAuthorityForFixture(f, {
       overrideRequestFingerprint: computeRequestFingerprint({ intentId: randomUUID() }),
     });
     const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
@@ -143,66 +203,198 @@ describe('AN-1 stored authority + live currentness gate', () => {
     assert.equal(rejected.ok, false);
   });
 
-  test('C: valid authority then world change → live assessment not CURRENT → prepare refused', async () => {
+  test('C: valid authority then world change → prepare refused', async () => {
+    const f = await baseC3Fixture();
+    await seedAuthorityForFixture(f);
+    await f.pool.query(
+      'UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2',
+      [f.seed.workspaceId, f.tripId],
+    );
+    const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /STALE_BASE|ASSESSMENT_NOT_CURRENT/i);
+  });
+});
+
+describe('AN-1R fail-closed currentness + base_manifest binding', () => {
+  test('Q1: unresolved assessable subjects → ASSESSMENT_SUBJECTS_UNRESOLVED', async () => {
     const pool = await sharedTestPool();
-    const seed = await beginSeed(pool, 'C3 AN-1C');
-    const traveller = (await seedTraveller(seed)).travellerId;
-    const tripId = await seedTrip(seed);
-    const journeyId = await seedJourney(seed, { tripId, travellerId: traveller });
+    const seed = await beginSeed(pool, 'C3 AN-1R Q1');
     const organisationId = await seedOrganisation(seed, 'USD');
+    await seedTraveller(seed);
+    await seedTrip(seed);
     await commitSeed(seed);
-    const journey = { kind: 'JOURNEY' as const, id: journeyId };
     const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
     const principalId = randomUUID();
     mustOk(await createPrincipal(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
-      principalId, actorType: 'HUMAN', authIssuer: 'https://issuer.invalid/c3c', authSubject: principalId,
+      principalId, actorType: 'HUMAN', authIssuer: 'https://issuer.invalid/q1', authSubject: principalId,
     }));
     const opened = mustOk(await openRecoveryCase(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: GATE_NOW,
     }));
-    const assessmentId = randomUUID();
-    const assessment: AssessmentResult = {
-      id: assessmentId,
-      kind: 'VIABILITY',
-      evaluatedAt: GATE_NOW,
-      overallVerdict: 'PASS',
-      subjects: [{ subjectRef: journey, role: 'PRIMARY' }],
-      dimensions: [],
-      manifest: {
-        evaluatedAt: GATE_NOW,
-        evaluatorVersions: [],
-        aggregateReads: [{ aggregateRef: { kind: 'TRIP', id: tripId }, revision: 1 }],
-        scopeReads: [],
-        evidenceReads: [],
-        coverageReads: [],
-        missingCoverage: [],
+    const journeyItemId = randomUUID();
+    const offerId = randomUUID();
+    const scenarioChangeId = randomUUID();
+    const recoveryStrategyId = randomUUID();
+    const intentId = randomUUID();
+    const planId = randomUUID();
+    // Strategy affected subjects are OFFER/JOURNEY_ITEM with no owner rows → unresolved.
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, {
+      id: scenarioChangeId, recoveryStrategyId, strategyVersion: 1,
+      affectedSubjectRefs: [
+        { kind: 'JOURNEY_ITEM', id: journeyItemId },
+        { kind: 'OFFER', id: offerId },
+      ],
+      effects: [],
+    }, {
+      baseManifest: {
+        evaluatedAt: GATE_NOW, evaluatorVersions: [],
+        aggregateReads: [{ aggregateRef: { kind: 'ORGANISATION', id: organisationId }, revision: 1 }],
+        scopeReads: [], evidenceReads: [], coverageReads: [], missingCoverage: [],
       },
+      candidateSummaries: [],
+    });
+    const plan: ActionPlan = {
+      id: planId, recoveryCaseId: opened.caseId, scenarioChangeId,
+      intents: [{
+        id: intentId, actionPlanId: planId, operationNamespace: 'provider.offer',
+        logicalOperationKey: `select-offer:${journeyItemId}:${offerId}`,
+        requestFingerprint: computeRequestFingerprint({ intentId }),
+        capabilityRef: 'external:offer.select',
+        subjectRefs: [
+          { kind: 'JOURNEY_ITEM', id: journeyItemId },
+          { kind: 'OFFER', id: offerId },
+        ],
+        expectedRevisions: [],
+        preconditions: [`basisAssessment:${randomUUID()}`],
+        requiredAuthorityScopes: [],
+        expectedObservations: ['booking_status'],
+        compensationPolicy: { supported: false, requiresSeparateAuthority: true },
+        status: 'PROPOSED',
+      }],
+      dependencies: [],
     };
-    await saveAssessment(pool, seed.workspaceId, assessment, 'test:c3-an1c');
-    const plan = buildPlan({ recoveryCaseId: opened.caseId, organisationId });
-    plan.intents[0]!.subjectRefs = [journey, { kind: 'ORGANISATION', id: organisationId }];
-    plan.intents[0]!.preconditions = [`basisAssessment:${assessmentId}`];
-    const persisted = mustOk(await persistActionPlan(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+    mustOk(await persistActionPlan(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
+      plan, recoveryStrategyId,
     }));
     await seedStoredExecutionAuthority({
       pool, workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
-      planId: persisted.planId, intentId: persisted.intentIds[0]!,
+      planId, intentId,
       scope: [{ kind: 'ORGANISATION', id: organisationId }],
       representedPartyRef: { kind: 'ORGANISATION', id: organisationId },
     });
-    // Live currentness at the gate: world advances after authority was recorded.
-    await pool.query(
-      'UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2',
-      [seed.workspaceId, tripId],
-    );
     const rejected = await createPreparedExecutionAttempt(uow(), prepareParams({
-      workspaceId: seed.workspaceId, actorId: seed.actorId, planId: persisted.planId,
-      intentId: persisted.intentIds[0]!, principalId,
+      workspaceId: seed.workspaceId, actorId: seed.actorId, planId, intentId, principalId,
     }));
     assert.equal(rejected.ok, false);
-    if (!rejected.ok) assert.match(rejected.conflict.message, /ASSESSMENT_NOT_CURRENT|STALE|PENDING_REASSESSMENT/i);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /ASSESSMENT_SUBJECTS_UNRESOLVED/);
+  });
+
+  test('Q2: superseded basis → STALE_BASE even when reassessment is CURRENT', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    const assessmentA = await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1, verdict: 'PASS' },
+    );
+    await seedStoredExecutionAuthority({
+      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
+      planId: f.planId, intentId: f.intentId,
+      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+    });
+    await f.pool.query(
+      'UPDATE aggregate_heads SET revision = 2 WHERE workspace_id = $1 AND aggregate_id = $2',
+      [f.seed.workspaceId, f.tripId],
+    );
+    const deniedWhileStale = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(deniedWhileStale.ok, false);
+
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, '2031-07-01T01:00:00.000Z',
+      { tripId: f.tripId, tripRevision: 2, verdict: 'FAIL' },
+    );
+    void assessmentA;
+    const deniedAfterReassessment = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId, now: '2031-07-01T01:00:00.000Z',
+    }));
+    assert.equal(deniedAfterReassessment.ok, false);
+    if (!deniedAfterReassessment.ok) assert.match(deniedAfterReassessment.conflict.message, /STALE_BASE/);
+  });
+
+  test('plan with no recovery_strategy_id → STRATEGY_MISSING', async () => {
+    const f = await baseC3Fixture({ omitStrategy: true, withCost: false });
+    await seedStoredExecutionAuthority({
+      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
+      planId: f.planId, intentId: f.intentId,
+      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      assessmentSubject: { kind: 'JOURNEY', id: f.journeyId },
+      assessmentTripId: f.tripId,
+    });
+    const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /STRATEGY_MISSING/);
+  });
+
+  test('empty base manifest → EMPTY_BASE_MANIFEST', async () => {
+    const f = await baseC3Fixture({ emptyManifest: true, withCost: false });
+    await seedAuthorityForFixture(f, { cost: false });
+    const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /EMPTY_BASE_MANIFEST/);
+  });
+
+  test('world change between prepare and dispatchClaimed → FAILED, 0 dispatcher calls', async () => {
+    const f = await baseC3Fixture();
+    await seedAuthorityForFixture(f);
+    mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    })));
+    await f.pool.query(
+      'UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2',
+      [f.seed.workspaceId, f.tripId],
+    );
+    const worker = new PgExecutionWorker(f.pool, { actorId: 'c3-an1r-dispatch' });
+    const claim = await worker.claimNext(f.seed.workspaceId);
+    assert.ok(claim);
+    let dispatchCount = 0;
+    const outcome = await worker.dispatchClaimed(claim!, {
+      principalId: f.principalId, now: GATE_NOW,
+      observed: { capabilityKind: 'BOOK', supported: true },
+      dispatcher: async () => { dispatchCount += 1; return { kind: 'SUCCESS', responseRef: 'x', sourceOwnedFields: {} }; },
+    });
+    assert.equal(outcome.outcome, 'FAILED');
+    assert.equal(dispatchCount, 0);
+  });
+
+  test('positive path with current base manifest → allowed', async () => {
+    const f = await baseC3Fixture();
+    await seedAuthorityForFixture(f);
+    const prepared = mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    })));
+    assert.ok(prepared.attemptId);
+    const row = await f.pool.query<{ gating_principal_id: string | null }>(
+      'SELECT gating_principal_id FROM execution_attempts WHERE id = $1', [prepared.attemptId],
+    );
+    assert.equal(row.rows[0]?.gating_principal_id, f.principalId);
   });
 });
 
@@ -277,6 +469,8 @@ describe('AN-6 budget hold from stored intent cost', () => {
       planId: f.planId, intentId: f.intentId,
       scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
       representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      assessmentSubject: { kind: 'JOURNEY', id: f.journeyId },
+      assessmentTripId: f.tripId,
     });
     const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
       workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
@@ -288,12 +482,7 @@ describe('AN-6 budget hold from stored intent cost', () => {
 
   test('mismatched hold amount → refused at prepare', async () => {
     const f = await baseC3Fixture();
-    await seedStoredExecutionAuthority({
-      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
-      planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-    });
+    await seedAuthorityForFixture(f, { cost: false });
     const badHold = await holdBudgetForIntent(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
       budgetId: f.budgetId, expectedBudgetRevision: 1, actionIntentId: f.intentId,
@@ -306,13 +495,7 @@ describe('AN-6 budget hold from stored intent cost', () => {
 describe('AN-3 known success must not dispatch again', () => {
   test('second prepare replays success without second dispatcher call', async () => {
     const f = await baseC3Fixture({ logicalOperationKey: 'c3-an3-success' });
-    await seedStoredExecutionAuthority({
-      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
-      planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      cost: { amount: '40.00', currency: 'USD' }, budgetId: f.budgetId,
-    });
+    await seedAuthorityForFixture(f);
     mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
       workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
       intentId: f.intentId, principalId: f.principalId,
@@ -354,10 +537,18 @@ describe('AN-5 plan validation at persistence boundary', () => {
 
   test('cross-plan dependency edge rejected by DB trigger', async () => {
     const f = await baseC3Fixture();
-    const otherPlan = buildPlan({ recoveryCaseId: f.plan.recoveryCaseId, organisationId: f.organisationId });
+    const other = buildPlan({ recoveryCaseId: f.plan.recoveryCaseId, organisationId: f.organisationId });
+    await persistStrategyChangeRow(f.pool, f.seed.workspaceId, f.seed.actorId, f.caseId, {
+      id: other.scenarioChangeId, recoveryStrategyId: other.recoveryStrategyId, strategyVersion: 2,
+      affectedSubjectRefs: [{ kind: 'JOURNEY', id: f.journeyId }], effects: [],
+    }, {
+      baseManifest: tripBaseManifest(f.tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: f.journeyId } }],
+    });
     const otherPersisted = mustOk(await persistActionPlan(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId,
-      idempotencyKey: randomUUID(), plan: otherPlan, planVersion: 2,
+      idempotencyKey: randomUUID(), plan: other.plan, planVersion: 2,
+      recoveryStrategyId: other.recoveryStrategyId,
     }));
     const foreignIntentId = otherPersisted.intentIds[0]!;
     await assert.rejects(
@@ -374,13 +565,7 @@ describe('AN-5 plan validation at persistence boundary', () => {
 describe('AN-4 reconciliation honours fencing', () => {
   test('stale fencing token does not insert observation', async () => {
     const f = await baseC3Fixture({ logicalOperationKey: 'c3-an4-fence' });
-    await seedStoredExecutionAuthority({
-      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
-      planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      cost: { amount: '40.00', currency: 'USD' }, budgetId: f.budgetId,
-    });
+    await seedAuthorityForFixture(f);
     mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
       workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
       intentId: f.intentId, principalId: f.principalId,
@@ -414,13 +599,7 @@ describe('AN-4 reconciliation honours fencing', () => {
 
   test('claimForReconciliation covers DISPATCHED; PREPARED is not reclaimable', async () => {
     const f = await baseC3Fixture({ logicalOperationKey: 'c3-an4-claim' });
-    await seedStoredExecutionAuthority({
-      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
-      planId: f.planId, intentId: f.intentId,
-      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
-      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      cost: { amount: '40.00', currency: 'USD' }, budgetId: f.budgetId,
-    });
+    await seedAuthorityForFixture(f);
     const prepared = mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
       workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
       intentId: f.intentId, principalId: f.principalId,
@@ -445,11 +624,414 @@ describe('AN-4 reconciliation honours fencing', () => {
   });
 });
 
-describe('IN-1 logical operation identity decision', () => {
-  test('documented: identity binds intent fingerprint + logical key; re-plan gets new intent id', () => {
-    // logicalOperationKey embeds effect-specific ids; requestFingerprint includes strategyVersion.
-    // FAILED attempts do not block retry (partial unique index excludes OBSERVED_FAILURE/FAILED).
-    // Re-plan from a later strategy compiles a new ActionIntent SubjectId → new operation identity.
-    assert.ok(true);
+async function seedExtraOrganisation(
+  uow: ReturnType<Awaited<ReturnType<typeof baseC3Fixture>>['uow']>,
+  workspaceId: string,
+  actorId: string,
+  label: string,
+): Promise<string> {
+  const organisationId = randomUUID();
+  mustOk(await createOrganisation(uow, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    idempotencyKey: randomUUID(),
+    organisationId,
+    legalName: label,
+    displayName: label,
+    defaultCurrencyCode: 'USD',
+  }));
+  return organisationId;
+}
+
+describe('AN-7 grant scope, approver authority, gating principal', () => {
+  test('approver with zero grants → recordApproval rejected; direct approval row denied at gate', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const approverId = randomUUID();
+    mustOk(await createPrincipal(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      principalId: approverId, actorType: 'HUMAN', authIssuer: 'https://issuer.invalid/an7-a', authSubject: approverId,
+    }));
+    const dispatchKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch'],
+      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
+      expectedAggregateRevisions: [],
+    }));
+    const intentRow = await f.pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [f.seed.workspaceId, f.intentId],
+    );
+    const envelopeInput = {
+      actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: f.intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: [{ kind: 'ORGANISATION' as const, id: f.organisationId }],
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+    const decision = mustOk(await issueAuthorityDecision(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      envelopeInput, requirements: [{ actorRole: 'PAYER' }], issuedAt: GATE_NOW,
+    }));
+    const rejected = await recordApproval(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: approverId, idempotencyKey: randomUUID(),
+      decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
+      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: GATE_NOW,
+    });
+    assert.equal(rejected.ok, false);
+
+    // Bypass recordApproval: insert approval under deferred subtype checks.
+    const approvalId = randomUUID();
+    const client = await f.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET CONSTRAINTS ALL DEFERRED');
+      await client.query(
+        `INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1,$2,'APPROVAL',$3)`,
+        [f.seed.workspaceId, approvalId, decision.decisionId],
+      );
+      await client.query(
+        `INSERT INTO approvals (
+           workspace_id, id, requirement_id, decision_id, approver_principal_id, envelope_fingerprint,
+           scope, approved_at, created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::timestamptz,$9)`,
+        [
+          f.seed.workspaceId, approvalId, decision.requirementIds[0]!, decision.decisionId, approverId,
+          fingerprint, JSON.stringify(envelopeInput.scope), GATE_NOW, approverId,
+        ],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+    const gateDenied = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(gateDenied.ok, false);
+    if (!gateDenied.ok) assert.match(gateDenied.conflict.message, /APPROVER_UNAUTHORIZED|GRANT/);
+  });
+
+  test('approver authorize-grant scoped to another party → denied', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    const orgB = await seedExtraOrganisation(f.uow(), f.seed.workspaceId, f.seed.actorId, 'Org B');
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const dispatchKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch'],
+      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
+      expectedAggregateRevisions: [],
+    }));
+    const authorizeKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: orgB },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.authorize'],
+      scopes: [{ kind: 'ORGANISATION', id: orgB }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },
+      expectedAggregateRevisions: [],
+    }));
+    const intentRow = await f.pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [f.seed.workspaceId, f.intentId],
+    );
+    const envelopeInput = {
+      actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: f.intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: [{ kind: 'ORGANISATION' as const, id: f.organisationId }],
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+    const decision = mustOk(await issueAuthorityDecision(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      envelopeInput, requirements: [{ actorRole: 'PAYER' }], issuedAt: GATE_NOW,
+    }));
+    const rejected = await recordApproval(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.principalId, idempotencyKey: randomUUID(),
+      decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
+      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: GATE_NOW,
+    });
+    assert.equal(rejected.ok, false);
+  });
+
+  test('required_party mismatch → denied', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const grantKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'],
+      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
+      expectedAggregateRevisions: [],
+    }));
+    const orgB = await seedExtraOrganisation(f.uow(), f.seed.workspaceId, f.seed.actorId, 'Required Org');
+    const intentRow = await f.pool.query<{ request_fingerprint: string | null; plan_version: number }>(
+      `SELECT i.request_fingerprint, p.plan_version FROM action_intents i
+         JOIN action_plans p ON p.workspace_id = i.workspace_id AND p.id = i.action_plan_id
+        WHERE i.workspace_id = $1 AND i.id = $2`,
+      [f.seed.workspaceId, f.intentId],
+    );
+    const envelopeInput = {
+      actionPlanId: f.planId, actionPlanVersion: intentRow.rows[0]!.plan_version,
+      actionIntentId: f.intentId, actionIntentVersion: 1,
+      requiredActorRoles: ['PAYER'],
+      scope: [{ kind: 'ORGANISATION' as const, id: f.organisationId }],
+      grantRefs: [] as string[], ruleInputs: [] as string[],
+      ...(intentRow.rows[0]?.request_fingerprint
+        ? { requestFingerprint: intentRow.rows[0].request_fingerprint }
+        : {}),
+    };
+    const fingerprint = computeEnvelopeFingerprint(envelopeInput);
+    const decision = mustOk(await issueAuthorityDecision(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      envelopeInput,
+      requirements: [{
+        actorRole: 'PAYER',
+        requiredPartyRef: { kind: 'ORGANISATION', id: orgB },
+      }],
+      issuedAt: GATE_NOW,
+    }));
+    const rejected = await recordApproval(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.principalId, idempotencyKey: randomUUID(),
+      decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
+      envelopeFingerprint: fingerprint, scope: envelopeInput.scope, approvedAt: GATE_NOW,
+    });
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /APPROVER_PARTY_MISMATCH|party/i);
+  });
+
+  test('dispatcher grant scoped to another org → denied', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    const orgB = await seedExtraOrganisation(f.uow(), f.seed.workspaceId, f.seed.actorId, 'Dispatch Org B');
+    await seedMinimalCurrentAssessment(
+      f.pool, f.seed.workspaceId, { kind: 'JOURNEY', id: f.journeyId }, GATE_NOW,
+      { tripId: f.tripId, tripRevision: 1 },
+    );
+    const authorizeKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.authorize'],
+      scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },
+      expectedAggregateRevisions: [],
+    }));
+    const dispatchKey = randomUUID();
+    mustOk(await issueAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
+      principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: orgB },
+      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      actions: ['action.intent.dispatch'],
+      scopes: [{ kind: 'ORGANISATION', id: orgB }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
+      expectedAggregateRevisions: [],
+    }));
+    await seedStoredExecutionAuthority({
+      pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
+      planId: f.planId, intentId: f.intentId,
+      scope: [{ kind: 'ORGANISATION', id: f.organisationId }],
+      representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
+      skipGrants: true,
+    });
+    const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    }));
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /GRANT_SCOPE_INSUFFICIENT/);
+  });
+
+  test('approver grant revoked after approval → gate denied', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    const seeded = await seedAuthorityForFixture(f, { cost: false });
+    assert.ok(seeded.grantId);
+    mustOk(await revokeAuthorityGrant(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      grantId: seeded.grantId!, revokedAt: '2031-07-01T00:30:00.000Z', expectedRevision: 1,
+    }));
+    const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId, now: '2031-07-01T01:00:00.000Z',
+    }));
+    assert.equal(rejected.ok, false);
+  });
+
+  test('dispatchClaimed with wrong principal → FAILED, 0 dispatcher calls', async () => {
+    const f = await baseC3Fixture();
+    await seedAuthorityForFixture(f);
+    mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    })));
+    const otherPrincipal = randomUUID();
+    mustOk(await createPrincipal(f.uow(), {
+      workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
+      principalId: otherPrincipal, actorType: 'HUMAN',
+      authIssuer: 'https://issuer.invalid/an7-wrong', authSubject: otherPrincipal,
+    }));
+    const worker = new PgExecutionWorker(f.pool, { actorId: 'c3-an7-gate' });
+    const claim = await worker.claimNext(f.seed.workspaceId);
+    assert.ok(claim);
+    let dispatchCount = 0;
+    const outcome = await worker.dispatchClaimed(claim!, {
+      principalId: otherPrincipal, now: GATE_NOW,
+      observed: { capabilityKind: 'BOOK', supported: true },
+      dispatcher: async () => { dispatchCount += 1; return { kind: 'SUCCESS', responseRef: 'x', sourceOwnedFields: {} }; },
+    });
+    assert.equal(outcome.outcome, 'FAILED');
+    assert.equal(dispatchCount, 0);
+  });
+
+  test('positive path → allowed', async () => {
+    const f = await baseC3Fixture({ withCost: false });
+    await seedAuthorityForFixture(f, { cost: false });
+    const prepared = mustOk(await createPreparedExecutionAttempt(f.uow(), prepareParams({
+      workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, planId: f.planId,
+      intentId: f.intentId, principalId: f.principalId,
+    })));
+    assert.ok(prepared.attemptId);
+  });
+});
+
+describe('IN-1 logical operation identity (fail-closed effect-scoped key)', () => {
+  test('Q4: re-plan same SELECT_OFFER effect keeps logicalOperationKey; second persist blocked', async () => {
+    const journeyItemId = randomUUID();
+    const offerId = randomUUID();
+    const basisAssessmentId = randomUUID();
+    const recoveryCaseId = randomUUID();
+    const effect = {
+      effectKind: 'SELECT_OFFER' as const,
+      journeyItemId,
+      offerId,
+      offerPrice: { amount: '10.00', currency: 'USD' },
+    };
+    function strategyAt(version: number): RecoveryStrategy {
+      const strategyId = randomUUID();
+      return {
+        id: strategyId,
+        recoveryCaseId,
+        strategyVersion: version,
+        status: 'SELECTED',
+        viability: 'VIABLE',
+        basisAssessmentId,
+        affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: journeyItemId }],
+        requiredAuthorityScopes: [],
+        createdAt: GATE_NOW,
+        scenarioChange: {
+          id: randomUUID(),
+          recoveryStrategyId: strategyId,
+          strategyVersion: version,
+          affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: journeyItemId }],
+          effects: [effect],
+          basisAssessmentId,
+        },
+        assumptions: [],
+        requiredUnknowns: [],
+        candidateAssessments: [],
+        candidateAssessmentResults: [],
+        baseManifest: {
+          evaluatedAt: GATE_NOW, evaluatorVersions: [], aggregateReads: [],
+          scopeReads: [], evidenceReads: [], coverageReads: [], missingCoverage: [],
+        },
+      };
+    }
+    const compiled1 = compileActionPlan({
+      strategy: strategyAt(1),
+      now: GATE_NOW,
+      capabilities: [{ capabilityRef: 'external:offer.select', supported: true }],
+    });
+    const compiled2 = compileActionPlan({
+      strategy: strategyAt(2),
+      now: GATE_NOW,
+      capabilities: [{ capabilityRef: 'external:offer.select', supported: true }],
+    });
+    assert.equal(compiled1.ok, true);
+    assert.equal(compiled2.ok, true);
+    if (!compiled1.ok || !compiled2.ok) return;
+    const intent1 = compiled1.value.plan.intents[0]!;
+    const intent2 = compiled2.value.plan.intents[0]!;
+    assert.equal(intent1.logicalOperationKey, intent2.logicalOperationKey);
+    assert.equal(intent1.logicalOperationKey, `select-offer:${journeyItemId}:${offerId}`);
+    assert.notEqual(intent1.requestFingerprint, intent2.requestFingerprint);
+
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'C3 IN-1 Q4');
+    const organisationId = await seedOrganisation(seed, 'USD');
+    await commitSeed(seed);
+    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+    const opened = mustOk(await openRecoveryCase(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: GATE_NOW,
+    }));
+    const plan1: ActionPlan = {
+      ...compiled1.value.plan,
+      id: randomUUID(),
+      recoveryCaseId: opened.caseId,
+      scenarioChangeId: randomUUID(),
+    };
+    plan1.intents[0] = {
+      ...intent1,
+      id: randomUUID(),
+      actionPlanId: plan1.id,
+      subjectRefs: [{ kind: 'ORGANISATION', id: organisationId }],
+    };
+    mustOk(await persistActionPlan(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan: plan1,
+    }));
+    const plan2: ActionPlan = {
+      ...compiled2.value.plan,
+      id: randomUUID(),
+      recoveryCaseId: opened.caseId,
+      scenarioChangeId: randomUUID(),
+    };
+    plan2.intents[0] = {
+      ...intent2,
+      id: randomUUID(),
+      actionPlanId: plan2.id,
+      subjectRefs: [{ kind: 'ORGANISATION', id: organisationId }],
+    };
+    const second = await persistActionPlan(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan: plan2,
+    });
+    assert.equal(second.ok, false);
+    if (!second.ok) {
+      assert.match(second.conflict.message, /action_intents_logical_op_uidx|duplicate key|logical_operation/i);
+    }
   });
 });

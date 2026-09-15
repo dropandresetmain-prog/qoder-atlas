@@ -53,9 +53,10 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { beginSeed, commitSeed, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
+import { beginSeed, commitSeed, seedRootSubject, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
-import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createPrincipal, issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { recordObjective } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 import {
   openRecoveryCase,
   persistActionPlan,
@@ -85,7 +86,8 @@ import type {
 import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/contracts/v2/authority/authorityEnvelope.ts';
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
-import { prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
+import { persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
+import { seedJurisdictionWithPlaces, seedTransportIntent } from './m6WorldSeed.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -99,6 +101,33 @@ const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
   return outcome.value;
+}
+
+async function issueApproverGrant(
+  uow: PgUnitOfWork,
+  params: {
+    workspaceId: string;
+    actorId: string;
+    principalId: string;
+    representedPartyRef: { kind: 'TRAVELLER'; id: string };
+    scopes: EnvelopeFingerprintInput['scope'];
+    issuedAt?: string;
+  },
+): Promise<void> {
+  const idempotencyKey = randomUUID();
+  mustOk(await issueAuthorityGrant(uow, {
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorId,
+    idempotencyKey,
+    principalId: params.principalId,
+    representedPartyRef: params.representedPartyRef,
+    issuedByPrincipalId: params.principalId,
+    issuedAt: params.issuedAt ?? NOW,
+    actions: ['action.intent.dispatch', 'action.intent.authorize'],
+    scopes: params.scopes,
+    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
+    expectedAggregateRevisions: [],
+  }));
 }
 
 function emptyManifest(): WorldSnapshotManifest {
@@ -182,8 +211,26 @@ describe('acceptance #2: approved dispatch is blocked once more when the world c
     const compiledIntent = plan.intents[0]!;
     assert.equal(compiledIntent.capabilityRef, 'internal:objective.disposition');
 
+    mustOk(await recordObjective(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      objectiveId,
+      ownerKind: 'JOURNEY',
+      ownerId: journeyId,
+      successPredicate: 'currentness objective loss',
+      hardness: 'HARD',
+      priority: 1,
+      disposition: 'ACTIVE',
+    }));
+
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
@@ -208,8 +255,14 @@ describe('acceptance #2: approved dispatch is blocked once more when the world c
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
     };
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -269,6 +322,25 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     const traveller = await seedTraveller(seed, { displayName: 'Offer Traveller' });
     const tripId = await seedTrip(seed, { purpose: 'TEST', lifecycleStatus: 'ACTIVE' });
     const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId, lifecycleStatus: 'ACTIVE' });
+    const { jurisdictionId: seededJurisdictionId, areaVersionId, placeIds } = await seedJurisdictionWithPlaces(seed, {
+      name: 'Offer corridor',
+      places: [
+        { name: 'Origin', placeType: 'AIRPORT' },
+        { name: 'Destination', placeType: 'AIRPORT' },
+      ],
+    });
+    const originPlaceId = placeIds[0]!;
+    const destinationPlaceId = placeIds[1]!;
+    const itemId = await seedTransportIntent(seed, {
+      journeyId, orderKey: '010', originPlaceId, destinationPlaceId, lifecycleStatus: 'PLANNED',
+    });
+    const offerId = randomUUID();
+    await seedRootSubject(seed, { kind: 'OFFER', id: offerId });
+    await seed.client.query(
+      `INSERT INTO offers (workspace_id, id, source_id, price_amount, price_currency, quoted_at, expires_at, fingerprint, created_by_actor_id)
+       VALUES ($1, $2, 'test-source', 100, 'USD', '2030-01-01T00:00:00Z', '2030-02-01T00:00:00Z', $3, $4)`,
+      [seed.workspaceId, offerId, offerId, seed.actorId],
+    );
     await commitSeed(seed);
 
     const principalId = randomUUID();
@@ -284,11 +356,9 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     // --- Real M7 pipeline for a VIABLE SELECT_OFFER strategy (see file
     // header for why each of these fixtures is required — empirically
     // verified against the real M6 registry before writing this test). ---
-    const itemId = randomUUID();
     const svcId = randomUUID();
     const anchorObjectiveId = randomUUID();
-    const offerId = randomUUID();
-    const jurisdictionId = randomUUID();
+    const jurisdictionId = seededJurisdictionId;
     const reservationId = randomUUID();
     const lineId = randomUUID();
 
@@ -298,11 +368,11 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     };
     const item: WJourneyItem = {
       id: itemId, journeyId, kind: 'TRANSPORT', orderKey: '010', lifecycleStatus: 'PLANNED', flexible: false, intendedWindow: null,
-      desiredOriginPlaceId: 'p-a', desiredDestinationPlaceId: 'p-b', selectedServiceId: null, intendedPlaceId: null, requiredNights: null,
+      desiredOriginPlaceId: originPlaceId, desiredDestinationPlaceId: destinationPlaceId, selectedServiceId: null, intendedPlaceId: null, requiredNights: null,
       participationId: null, standaloneTitle: null, standaloneWindow: null, resourceId: null, intendedLocationPlaceId: null,
     };
     const svc: WTransportService = {
-      id: svcId, revision: 1, mode: 'AIR', operator: 'op', originPlaceId: 'p-a', destinationPlaceId: 'p-b',
+      id: svcId, revision: 1, mode: 'AIR', operator: 'op', originPlaceId, destinationPlaceId,
       published: { departure: null, arrival: null }, estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
     };
     const anchorObjective: WObjective = {
@@ -314,8 +384,8 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     // unexpired advisory/condition coverage -> `advisories` resolves PASS
     // instead of blocking UNKNOWN.
     const placeJurisdictions: WPlaceJurisdiction[] = [
-      { placeId: 'p-a', jurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId: 'av1', evidenceId: null },
-      { placeId: 'p-b', jurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId: 'av1', evidenceId: null },
+      { placeId: originPlaceId, jurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId, evidenceId: null },
+      { placeId: destinationPlaceId, jurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId, evidenceId: null },
     ];
     const coverage: WCoverage[] = [
       { id: randomUUID(), topic: 'ADVISORY', queryBounds: { jurisdictionId }, edition: 'e1', watermark: null, completeness: 'COMPLETE', limitations: [], expiresAt: null, evidenceId: null },
@@ -383,8 +453,13 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     assert.ok(compiledIntent.logicalOperationKey && compiledIntent.logicalOperationKey.length > 0);
     assert.ok(compiledIntent.requestFingerprint && compiledIntent.requestFingerprint.length > 0);
 
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
@@ -410,8 +485,14 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
     };
     const grant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
     };
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      scopes: envelopeInput.scope,
+    });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -436,7 +517,10 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
       scope: envelopeInput.scope,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       requirementRole: 'CASE_OWNER',
+      assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+      assessmentTripId: tripId,
       now: EXEC_NOW,
+      skipGrants: true,
     });
     mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
       workspaceId: seed.workspaceId, actorId: seed.actorId,

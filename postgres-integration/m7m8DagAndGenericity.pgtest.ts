@@ -32,7 +32,8 @@ import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedTraveller, seedTrip, seedJourney } from './m2Seed.ts';
 import { seedEvent, seedProgramme, seedProgrammeItem, seedParticipation } from './m4Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
-import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { createPrincipal, issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import { recordObjective } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 import {
   openRecoveryCase,
   persistActionPlan,
@@ -56,7 +57,8 @@ import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessm
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ActionIntent } from '../src/contracts/v2/action/actionPlan.ts';
-import { prepareParams, seedStoredExecutionAuthority } from './m8ExecutionGateHelpers.ts';
+import { persistStrategyChangeRow, prepareParams, seedStoredExecutionAuthority, tripBaseManifest } from './m8ExecutionGateHelpers.ts';
+import { seedReservation, seedReservationLine, seedResource } from './m3Seed.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -70,6 +72,33 @@ const EXEC_NOW = '2032-01-01T00:00:00.000Z';
 function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
   return outcome.value;
+}
+
+async function issueApproverGrant(
+  uow: PgUnitOfWork,
+  params: {
+    workspaceId: string;
+    actorId: string;
+    principalId: string;
+    representedPartyRef: { kind: 'TRAVELLER'; id: string };
+    scopes: EnvelopeFingerprintInput['scope'];
+    issuedAt?: string;
+  },
+): Promise<void> {
+  const idempotencyKey = randomUUID();
+  mustOk(await issueAuthorityGrant(uow, {
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorId,
+    idempotencyKey,
+    principalId: params.principalId,
+    representedPartyRef: params.representedPartyRef,
+    issuedByPrincipalId: params.principalId,
+    issuedAt: params.issuedAt ?? NOW,
+    actions: ['action.intent.dispatch', 'action.intent.authorize'],
+    scopes: params.scopes,
+    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
+    expectedAggregateRevisions: [],
+  }));
 }
 
 function emptyManifest(): WorldSnapshotManifest {
@@ -105,6 +134,8 @@ async function runViableScenarioToAuthorizedDispatch(params: {
   recoveryCaseId: string;
   principalId: string;
   travellerId: string;
+  tripId: string;
+  journeyId: string;
   world: CapturedWorld;
   scenarioChange: ScenarioChange;
   scope: TypedRef[];
@@ -126,8 +157,13 @@ async function runViableScenarioToAuthorizedDispatch(params: {
   assert.equal(plan.intents.length, 1);
   const compiledIntent = plan.intents[0]!;
 
+  await persistStrategyChangeRow(params.pool, params.workspaceId, params.actorId, params.recoveryCaseId, params.scenarioChange, {
+    baseManifest: tripBaseManifest(params.tripId, 1),
+    candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: params.journeyId } }],
+  });
   const persisted = mustOk(await persistActionPlan(uow(), {
     workspaceId: params.workspaceId, actorPrincipalId: params.actorId, idempotencyKey: randomUUID(), plan,
+    recoveryStrategyId: params.scenarioChange.recoveryStrategyId,
   }));
   assert.deepEqual(persisted.intentIds, [compiledIntent.id]);
 
@@ -140,6 +176,11 @@ async function runViableScenarioToAuthorizedDispatch(params: {
     workspaceId: params.workspaceId, actorPrincipalId: params.actorId, idempotencyKey: randomUUID(),
     envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
   }));
+  await issueApproverGrant(uow(), {
+    workspaceId: params.workspaceId, actorId: params.actorId, principalId: params.principalId,
+    representedPartyRef: { kind: 'TRAVELLER', id: params.travellerId },
+    scopes: envelopeInput.scope,
+  });
   const approval = mustOk(await recordApproval(uow(), {
     workspaceId: params.workspaceId, actorPrincipalId: params.principalId, idempotencyKey: randomUUID(),
     decisionId: decision.decisionId, requirementId: decision.requirementIds[0]!,
@@ -160,7 +201,8 @@ async function runViableScenarioToAuthorizedDispatch(params: {
   };
   const grant: AuthorityGrant = {
     id: randomUUID(), principalId: params.principalId, representedPartyRef: { kind: 'TRAVELLER', id: params.travellerId },
-    issuedByPrincipalId: params.principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: envelopeInput.scope,
+    issuedByPrincipalId: params.principalId, issuedAt: NOW,
+    actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: envelopeInput.scope,
   };
   const allowed = authorizeDispatch({
     assessmentView: currentAssessmentView(), envelopeInput, envelope, decision: decisionObj,
@@ -186,6 +228,9 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       programmeId, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL', window: originalWindow,
     });
     await seedParticipation(seed, { programmeItemId, travellerId: traveller.travellerId, obligation: 'OPTIONAL', accepted: true });
+    const resourceId = await seedResource(seed, 'EQUIPMENT');
+    const reservationId = await seedReservation(seed, { travellerId: traveller.travellerId, reservationType: 'RESOURCE_USE' });
+    const reservationLineId = await seedReservationLine(seed, { reservationId, productType: 'RESOURCE_USE', resourceId });
     await commitSeed(seed);
 
     const principalId = randomUUID();
@@ -208,8 +253,6 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     // opaque JSONB with no FK to reservation tables, so nothing here needs
     // seeding beyond what M7 evaluation itself reads). ---
     const anchorObjectiveId = randomUUID();
-    const reservationId = randomUUID();
-    const reservationLineId = randomUUID();
     const proposedWindow = { start: '2031-09-10T14:00:00.000Z', end: '2031-09-10T15:00:00.000Z' };
     const journey: WJourney = {
       id: journeyId, revision: 1, tripId, travellerId: traveller.travellerId,
@@ -277,8 +320,13 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     });
 
     // --- Persist verbatim: both ActionIntents AND the dependency edge. ---
+    await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
+      baseManifest: tripBaseManifest(tripId, 1),
+      candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
+    });
     const persisted = mustOk(await persistActionPlan(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), plan,
+      recoveryStrategyId: scenarioChange.recoveryStrategyId,
     }));
     assert.deepEqual(new Set(persisted.intentIds), new Set([allocIntent.id, programmeIntent.id]));
 
@@ -311,6 +359,11 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput: upstreamEnvelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      scopes: upstreamScope,
+    });
     const upstreamApproval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: upstreamDecision.decisionId, requirementId: upstreamDecision.requirementIds[0]!,
@@ -318,7 +371,8 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     }));
     const upstreamGrant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: upstreamScope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: upstreamScope,
     };
     const upstreamAllowed = authorizeDispatch({
       assessmentView: currentAssessmentView(), envelopeInput: upstreamEnvelopeInput,
@@ -346,7 +400,10 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       scope: upstreamScope,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       requirementRole: 'CASE_OWNER',
+      assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+      assessmentTripId: tripId,
       now: EXEC_NOW,
+      skipGrants: true,
     });
     const upstreamAttempt = mustOk(await createPreparedExecutionAttempt(uow(), prepareParams({
       workspaceId: seed.workspaceId, actorId: seed.actorId,
@@ -381,6 +438,11 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput: downstreamEnvelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    await issueApproverGrant(uow(), {
+      workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
+      scopes: downstreamScope,
+    });
     const downstreamApproval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
       decisionId: downstreamDecision.decisionId, requirementId: downstreamDecision.requirementIds[0]!,
@@ -388,7 +450,8 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     }));
     const downstreamGrant: AuthorityGrant = {
       id: randomUUID(), principalId, representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
-      issuedByPrincipalId: principalId, issuedAt: NOW, actions: ['action.intent.dispatch'], scopes: downstreamScope,
+      issuedByPrincipalId: principalId, issuedAt: NOW,
+      actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: downstreamScope,
     };
     const downstreamAllowed = authorizeDispatch({
       assessmentView: currentAssessmentView(), envelopeInput: downstreamEnvelopeInput,
@@ -418,7 +481,10 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       scope: downstreamScope,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       requirementRole: 'CASE_OWNER',
+      assessmentSubject: { kind: 'JOURNEY', id: journeyId },
+      assessmentTripId: tripId,
       now: EXEC_NOW,
+      skipGrants: true,
     });
     const downstreamAttempt = await createPreparedExecutionAttempt(uow(), prepareParams({
       workspaceId: seed.workspaceId, actorId: seed.actorId,
@@ -545,16 +611,28 @@ describe('acceptance #10: two materially different scenarios, persisted and auth
       basisAssessmentId: randomUUID(),
       effects: [{ effectKind: 'WAIVE_OBJECTIVE', objectiveId: lossObjectiveId, rationale: 'genericity test loss', disposition: 'CLOSED_WITH_LOSS' }],
     });
+    mustOk(await recordObjective(uow(), {
+      workspaceId: seed.workspaceId,
+      actorPrincipalId: seed.actorId,
+      idempotencyKey: randomUUID(),
+      objectiveId: lossObjectiveId,
+      ownerKind: 'JOURNEY',
+      ownerId: journeyId,
+      successPredicate: 'genericity test loss',
+      hardness: 'HARD',
+      priority: 1,
+      disposition: 'ACTIVE',
+    }));
 
     // --- Same helper, same call sequence, zero branching on scenario kind. ---
     const resultA = await runViableScenarioToAuthorizedDispatch({
       pool, workspaceId: seed.workspaceId, actorId: seed.actorId, recoveryCaseId: openedA.caseId,
-      principalId, travellerId: traveller.travellerId, world: worldA, scenarioChange: scenarioChangeA,
+      principalId, travellerId: traveller.travellerId, tripId, journeyId, world: worldA, scenarioChange: scenarioChangeA,
       scope: [{ kind: 'PROGRAMME_ITEM', id: programmeItemId }],
     });
     const resultB = await runViableScenarioToAuthorizedDispatch({
       pool, workspaceId: seed.workspaceId, actorId: seed.actorId, recoveryCaseId: openedB.caseId,
-      principalId, travellerId: traveller.travellerId, world: worldB, scenarioChange: scenarioChangeB,
+      principalId, travellerId: traveller.travellerId, tripId, journeyId, world: worldB, scenarioChange: scenarioChangeB,
       scope: [{ kind: 'OBJECTIVE', id: lossObjectiveId }],
     });
 
