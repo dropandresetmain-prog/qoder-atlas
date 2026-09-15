@@ -118,6 +118,21 @@ export interface ObjectiveInput {
   actor: ActorContext;
 }
 
+export interface ObjectiveTargetInput {
+  objectiveId: string;
+  targets: Objective['targets'];
+  actor: ActorContext;
+}
+
+export interface ObjectiveDispositionInput {
+  objectiveId: string;
+  disposition: Objective['disposition'];
+  evidenceId: string;
+  reason?: string;
+  objectiveTargetLabel?: string;
+  actor: ActorContext;
+}
+
 export interface ConstraintInput {
   definition: ConstraintDefinition & {
     ownerRef: TypedRef;
@@ -164,6 +179,13 @@ export interface KnowledgeRepository {
   createRuleAssignment(input: RuleAssignmentInput): Promise<void>;
   createPreference(input: PreferenceInput): Promise<void>;
   createObjective(input: ObjectiveInput): Promise<void>;
+  /** I-7: append immutable objective targets; does not rewrite the objective row. */
+  recordObjectiveTargets(input: ObjectiveTargetInput): Promise<void>;
+  /**
+   * I-7 durable disposition append (authorised path). Scenario proposals use
+   * overlay WAIVE_OBJECTIVE and must not call this without M8 authority.
+   */
+  recordObjectiveDisposition(input: ObjectiveDispositionInput): Promise<void>;
   createConstraintDefinition(input: ConstraintInput): Promise<void>;
   createInformationScope(input: InformationScopeInput): Promise<void>;
   createKnowledgeCoverage(input: CoverageInput): Promise<void>;

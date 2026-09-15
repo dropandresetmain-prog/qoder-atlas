@@ -51,7 +51,7 @@ Target foundations include:
 | M4 — programmes/geography | Planned / next parallel lane | Mutable programme state, participation/resources, Place/Area/Jurisdiction. |
 | M5 — knowledge/requirements | Planned / next parallel lane | Source/evidence/publication versions, advisories/conditions and rule editions/coverage. |
 | M6 — unified evaluation | Complete — **C2 PASS / ACCEPTED** at `82fa96827fc8d517145498a0ee258f5cdf34c30b` | Multi-object scope/propagation, entry/support/programme/condition evaluators and assessment manifests. Evidence: `docs/refactor/evidence/M6.md` §13-§14. |
-| M7 — planning/action plans | Unblocked (C2 accepted; branch from `82fa96827fc8d517145498a0ee258f5cdf34c30b`) | Multi-object strategies and explicit typed action-plan DAGs. |
+| M7 — planning/action plans | Implemented (unmerged branch `milestone-m7-recovery-planning`) | Multi-object strategies and typed action-plan DAGs. Evidence: `docs/refactor/evidence/M7.md`. |
 | M8 — authority/durable execution | Unblocked (C2 accepted; branch from `82fa96827fc8d517145498a0ee258f5cdf34c30b`) — pre-M8 conditions open | Scoped approvals, financial commitments, attempts/reconciliation and internal programme execution. Pre-M8 conditions (M6.md §14): I-10 exact FX arithmetic/currency exponents; traveller-payer currency UNKNOWN stays blocking; authority/dispatch re-check `currentAssessmentView`; `PgReassessmentWorker.complete()` bounded retry / clean requeue. |
 | M9 — application integration | Planned | Canonical runtime composition, APIs/read models and operator/traveller surfaces. |
 | M10 — migration rehearsal | Planned | Legacy export/transform/reconciliation, restore proof and exact candidate verification. |

@@ -1,0 +1,332 @@
+/**
+ * NORTHSTAR M7 — isolated scenario overlay.
+ *
+ * Projects typed ScenarioChanges over a deep-cloned CapturedWorld. Canonical
+ * PostgreSQL state is never touched. Owner semantics are preserved: intent
+ * fields may be proposed; supplier observations, RuleSets, ConstraintDefinitions,
+ * credentials and external facts cannot be rewritten by a candidate.
+ *
+ * Proposed objective disposition (I-7) updates only the overlay copy and
+ * records an authority requirement for M8 — it does not append
+ * objective_dispositions and does not relax unrelated mandatory constraints.
+ */
+import type { TypedRef } from '../../domain/v2/shared/identity.ts';
+import { typedConflict, type TypedResult, ok, conflict } from '../../domain/v2/shared/errors.ts';
+import type { ScenarioChange, ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
+import type {
+  CapturedWorld,
+  WAllocation,
+  WJourneyItem,
+  WObjective,
+  WProgrammeItem,
+  WSupportAssignment,
+} from '../world/world.ts';
+
+export interface ResolvedOffer {
+  offerId: string;
+  /** Transport/service the offer selects. Must already exist in the captured world. */
+  transportServiceId: string;
+}
+
+export interface OverlayApplyInput {
+  baseWorld: CapturedWorld;
+  scenarioChange: ScenarioChange;
+  /** Known offers from search/capture — never fabricated inside the overlay. */
+  resolvedOffers?: readonly ResolvedOffer[];
+}
+
+export interface OverlayApplyResult {
+  /** Candidate world — structurally separate from `baseWorld`. */
+  proposedWorld: CapturedWorld;
+  affectedSubjectRefs: TypedRef[];
+  /** Authority scopes that M8 must satisfy before any durable disposition/action. */
+  requiredAuthorityScopes: string[];
+  appliedEffects: ScenarioEffect[];
+}
+
+function cloneWorld(world: CapturedWorld): CapturedWorld {
+  return structuredClone(world);
+}
+
+function sameWorldRef(a: CapturedWorld, b: CapturedWorld): boolean {
+  return a === b;
+}
+
+function refKey(ref: TypedRef): string {
+  return `${ref.kind}:${ref.id}`;
+}
+
+function addAffected(set: Map<string, TypedRef>, ref: TypedRef): void {
+  set.set(refKey(ref), ref);
+}
+
+function findJourneyItem(world: CapturedWorld, id: string): WJourneyItem | undefined {
+  return world.journeyItems.find((i) => i.id === id);
+}
+
+function findProgrammeItem(world: CapturedWorld, id: string): WProgrammeItem | undefined {
+  return world.programmeItems.find((i) => i.id === id);
+}
+
+function findObjective(world: CapturedWorld, id: string): WObjective | undefined {
+  return world.objectives.find((o) => o.id === id);
+}
+
+function findSupportAssignment(world: CapturedWorld, constraintDefinitionId: string): WSupportAssignment | undefined {
+  return world.supportAssignments.find((a) => a.requirementId === constraintDefinitionId);
+}
+
+/**
+ * Apply a closed ScenarioEffect set to a deep clone. Rejects any attempt to
+ * invent supplier confirmation, mutate judging criteria, or reference missing
+ * subjects. Returns a TypedResult — never throws for expected candidate errors.
+ */
+export function applyScenarioOverlay(input: OverlayApplyInput): TypedResult<OverlayApplyResult> {
+  const proposedWorld = cloneWorld(input.baseWorld);
+  if (sameWorldRef(proposedWorld, input.baseWorld)) {
+    return conflict(typedConflict('VALIDATION_FAILED', 'overlay clone must not alias the base world'));
+  }
+
+  const offers = new Map((input.resolvedOffers ?? []).map((o) => [o.offerId, o]));
+  const affected = new Map<string, TypedRef>();
+  const authority = new Set<string>();
+  const applied: ScenarioEffect[] = [];
+
+  for (const effect of input.scenarioChange.effects) {
+    const appliedOne = applyEffect(proposedWorld, effect, offers, affected, authority);
+    if (!appliedOne.ok) return appliedOne;
+    applied.push(effect);
+  }
+
+  // Closed-union defence: ScenarioEffectSchema already excludes rule/assessment/
+  // observation edits. Re-check judging criteria were not mutated relative to base.
+  const criteriaIssue = judgingCriteriaMutated(input.baseWorld, proposedWorld);
+  if (criteriaIssue) {
+    return conflict(typedConflict('REQUIREMENT_WOULD_BE_RELAXED', criteriaIssue));
+  }
+
+  for (const ref of input.scenarioChange.affectedSubjectRefs) addAffected(affected, ref);
+
+  return ok({
+    proposedWorld,
+    affectedSubjectRefs: [...affected.values()].sort((a, b) => refKey(a).localeCompare(refKey(b))),
+    requiredAuthorityScopes: [...authority].sort(),
+    appliedEffects: applied,
+  });
+}
+
+function applyEffect(
+  world: CapturedWorld,
+  effect: ScenarioEffect,
+  offers: Map<string, ResolvedOffer>,
+  affected: Map<string, TypedRef>,
+  authority: Set<string>,
+): TypedResult<true> {
+  switch (effect.effectKind) {
+    case 'SELECT_OFFER': {
+      const item = findJourneyItem(world, effect.journeyItemId);
+      if (!item) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'SELECT_OFFER journey item not in captured world', [
+          { kind: 'JOURNEY_ITEM', id: effect.journeyItemId },
+        ]));
+      }
+      const offer = offers.get(effect.offerId);
+      if (!offer) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'SELECT_OFFER offer is not resolved; cannot fabricate supplier selection', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      if (!world.transportServices.some((s) => s.id === offer.transportServiceId)) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'SELECT_OFFER service is not in captured world', [
+          { kind: 'TRANSPORT_SERVICE', id: offer.transportServiceId },
+        ]));
+      }
+      // Intent/selection only — never set reservation observedStatus or invent confirmation.
+      item.selectedServiceId = offer.transportServiceId;
+      addAffected(affected, { kind: 'JOURNEY_ITEM', id: item.id });
+      addAffected(affected, { kind: 'JOURNEY', id: item.journeyId });
+      authority.add('journey.service_selection');
+      return ok(true);
+    }
+    case 'PROPOSE_ALLOCATION': {
+      if (!world.reservationLines.some((l) => l.id === effect.reservationLineId)) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'PROPOSE_ALLOCATION line not in captured world', [
+          { kind: 'RESERVATION_LINE', id: effect.reservationLineId },
+        ]));
+      }
+      if (!world.travellers.some((t) => t.id === effect.travellerId)) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'PROPOSE_ALLOCATION traveller not in captured world', [
+          { kind: 'TRAVELLER', id: effect.travellerId },
+        ]));
+      }
+      const line = world.reservationLines.find((l) => l.id === effect.reservationLineId)!;
+      const allocation: WAllocation = {
+        id: `overlay-alloc:${effect.reservationLineId}:${effect.travellerId}`,
+        reservationId: line.reservationId,
+        lineId: effect.reservationLineId,
+        travellerId: effect.travellerId,
+        journeyItemId: effect.journeyItemId ?? null,
+        role: 'TRAVELLER',
+        quantity: 1,
+      };
+      world.allocations = [...world.allocations.filter(
+        (a) => !(a.lineId === allocation.lineId && a.travellerId === allocation.travellerId),
+      ), allocation];
+      addAffected(affected, { kind: 'RESERVATION', id: line.reservationId });
+      addAffected(affected, { kind: 'TRAVELLER', id: effect.travellerId });
+      if (effect.journeyItemId) {
+        const ji = findJourneyItem(world, effect.journeyItemId);
+        if (ji) addAffected(affected, { kind: 'JOURNEY', id: ji.journeyId });
+      }
+      authority.add('reservation.allocation');
+      return ok(true);
+    }
+    case 'CHANGE_PROGRAMME_ITEM_TIME': {
+      const item = findProgrammeItem(world, effect.programmeItemId);
+      if (!item) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CHANGE_PROGRAMME_ITEM_TIME item not in captured world', [
+          { kind: 'PROGRAMME_ITEM', id: effect.programmeItemId },
+        ]));
+      }
+      if (item.scheduleAuthority !== 'INTERNAL' && item.scheduleAuthority !== 'SHARED') {
+        return conflict(typedConflict(
+          'CAPABILITY_UNSUPPORTED',
+          'programme item schedule is not internally authoritative; external schedule changes require a supported capability',
+          [{ kind: 'PROGRAMME_ITEM', id: item.id }],
+        ));
+      }
+      item.window = { start: effect.proposedWindow.start, end: effect.proposedWindow.end };
+      addAffected(affected, { kind: 'PROGRAMME_ITEM', id: item.id });
+      addAffected(affected, { kind: 'PROGRAMME', id: item.programmeId });
+      for (const p of world.participations.filter((x) => x.programmeItemId === item.id)) {
+        addAffected(affected, { kind: 'TRAVELLER', id: p.travellerId });
+        for (const j of world.journeys.filter((jj) => jj.travellerId === p.travellerId)) {
+          addAffected(affected, { kind: 'JOURNEY', id: j.id });
+        }
+      }
+      authority.add('programme.schedule');
+      return ok(true);
+    }
+    case 'ALTER_JOURNEY_ITEM_INTENT': {
+      const item = findJourneyItem(world, effect.journeyItemId);
+      if (!item) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ALTER_JOURNEY_ITEM_INTENT item not in captured world', [
+          { kind: 'JOURNEY_ITEM', id: effect.journeyItemId },
+        ]));
+      }
+      if (effect.proposedWindow) {
+        item.intendedWindow = { start: effect.proposedWindow.start, end: effect.proposedWindow.end };
+      }
+      addAffected(affected, { kind: 'JOURNEY_ITEM', id: item.id });
+      addAffected(affected, { kind: 'JOURNEY', id: item.journeyId });
+      authority.add('journey.intent');
+      return ok(true);
+    }
+    case 'CHANGE_SUPPORT_ASSIGNMENT': {
+      const assignment = findSupportAssignment(world, effect.constraintDefinitionId);
+      if (!assignment) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CHANGE_SUPPORT_ASSIGNMENT assignment not in captured world', [
+          { kind: 'CONSTRAINT_DEFINITION', id: effect.constraintDefinitionId },
+        ]));
+      }
+      if (assignment.requirementVersion !== effect.constraintDefinitionVersion) {
+        return conflict(typedConflict(
+          'STALE_AGGREGATE_REVISION',
+          'support assignment requirement version does not match proposed change',
+          [{ kind: 'CONSTRAINT_DEFINITION', id: effect.constraintDefinitionId }],
+        ));
+      }
+      const req = world.accompanimentRequirements.find(
+        (r) => r.id === effect.constraintDefinitionId && r.version === effect.constraintDefinitionVersion,
+      );
+      if (!req) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'support requirement version not in captured world', [
+          { kind: 'CONSTRAINT_DEFINITION', id: effect.constraintDefinitionId },
+        ]));
+      }
+      for (const supporterId of effect.proposedAssignedSupporterTravellerIds) {
+        if (!req.eligibleSupporterTravellerIds.includes(supporterId)) {
+          return conflict(typedConflict(
+            'REQUIREMENT_WOULD_BE_RELAXED',
+            'proposed supporter is not in the governing eligible set',
+            [{ kind: 'TRAVELLER', id: supporterId }],
+          ));
+        }
+      }
+      assignment.assigneeTravellerIds = [...effect.proposedAssignedSupporterTravellerIds];
+      addAffected(affected, { kind: 'SUPPORT_ASSIGNMENT', id: assignment.id });
+      addAffected(affected, { kind: 'TRAVELLER', id: req.supportedTravellerId });
+      authority.add('support.assignment');
+      return ok(true);
+    }
+    case 'WAIVE_OBJECTIVE': {
+      const objective = findObjective(world, effect.objectiveId);
+      if (!objective) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'WAIVE_OBJECTIVE objective not in captured world', [
+          { kind: 'OBJECTIVE', id: effect.objectiveId },
+        ]));
+      }
+      // Proposed disposition only — original objective identity/targets remain;
+      // dispositionEvidenceId stays null until M8 authorises a durable record.
+      objective.disposition = effect.disposition ?? 'WAIVED';
+      objective.dispositionEvidenceId = null;
+      addAffected(affected, { kind: 'OBJECTIVE', id: objective.id });
+      addAffected(affected, objective.owner);
+      authority.add('objective.disposition');
+      authority.add(`objective.disposition:${effect.disposition ?? 'WAIVED'}`);
+      return ok(true);
+    }
+    default: {
+      const _exhaustive: never = effect;
+      return conflict(typedConflict('VALIDATION_FAILED', `unsupported scenario effect ${JSON.stringify(_exhaustive)}`));
+    }
+  }
+}
+
+/**
+ * Candidates may not loosen judging criteria. Comparing constraint/rule set
+ * identity sets catches any accidental mutation path.
+ */
+function judgingCriteriaMutated(base: CapturedWorld, proposed: CapturedWorld): string | undefined {
+  const baseConstraintIds = new Set(base.constraints.map((c) => c.id));
+  const proposedConstraintIds = new Set(proposed.constraints.map((c) => c.id));
+  for (const id of baseConstraintIds) {
+    if (!proposedConstraintIds.has(id)) {
+      return `candidate removed constraint ${id} from the evaluation basis`;
+    }
+    const before = base.constraints.find((c) => c.id === id)!;
+    const after = proposed.constraints.find((c) => c.id === id)!;
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      return `candidate mutated constraint ${id}; strategies cannot edit judging criteria`;
+    }
+  }
+
+  const baseRuleIds = new Set(base.ruleSetVersions.map((r) => r.id));
+  for (const id of baseRuleIds) {
+    const before = base.ruleSetVersions.find((r) => r.id === id)!;
+    const after = proposed.ruleSetVersions.find((r) => r.id === id);
+    if (!after || JSON.stringify(before) !== JSON.stringify(after)) {
+      return `candidate mutated rule set edition ${id}; strategies cannot edit judging criteria`;
+    }
+  }
+
+  // Supplier observations and credentials must be byte-identical.
+  if (JSON.stringify(base.transportServices) !== JSON.stringify(proposed.transportServices)) {
+    return 'candidate mutated transport service observations; cannot fabricate supplier confirmation';
+  }
+  if (JSON.stringify(base.reservationLines.map((l) => ({ id: l.id, observedStatus: l.observedStatus, evidenceId: l.evidenceId })))
+    !== JSON.stringify(proposed.reservationLines.map((l) => ({ id: l.id, observedStatus: l.observedStatus, evidenceId: l.evidenceId })))) {
+    return 'candidate mutated reservation observation status; cannot fabricate supplier confirmation';
+  }
+  if (JSON.stringify(base.credentialVersions) !== JSON.stringify(proposed.credentialVersions)) {
+    return 'candidate mutated credential editions';
+  }
+  return undefined;
+}
+
+/** Test helper: proves overlay evaluation left the caller's base object graph untouched. */
+export function assertCanonicalWorldUntouched(baseBefore: CapturedWorld, baseAfter: CapturedWorld): void {
+  if (JSON.stringify(baseBefore) !== JSON.stringify(baseAfter)) {
+    throw new Error('canonical CapturedWorld was mutated during scenario overlay evaluation');
+  }
+}

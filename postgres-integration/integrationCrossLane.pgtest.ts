@@ -43,6 +43,7 @@ const LANE_RANGES = [
   { lane: 'M4', from: 50, to: 69 },
   { lane: 'M5', from: 70, to: 89 },
   { lane: 'M6', from: 90, to: 99 },
+  { lane: 'M7', from: 100, to: 108 },
 ] as const;
 
 /** Every constraint 0087 adds: `table.constraint` (M2_M5_INTEGRATION.md §4). */
@@ -104,7 +105,7 @@ async function committedSeed(pool: Pool, build: (seed: SeedSession) => Promise<v
 }
 
 describe('M2-M5 integration: migration chain from an empty database', () => {
-  test('0001-0087 domain lanes plus M6 apply in exact lane order; unused allocations stay unused', async () => {
+  test('0001-0102 domain lanes plus M6/M7 apply in exact lane order; unused allocations stay unused', async () => {
     const db = await createEphemeralDatabase();
     try {
       const applied = await runMigrations(db.pool, MIGRATIONS_DIR);
@@ -126,6 +127,7 @@ describe('M2-M5 integration: migration chain from an empty database', () => {
       assert.deepEqual(inLane('M3'), contiguous(30, 49));
       assert.deepEqual(inLane('M4'), contiguous(50, 62), 'M4 used 0050-0062; 0063-0069 are deliberately unused');
       assert.deepEqual(inLane('M5'), contiguous(70, 87), 'M5 range: lane 0070-0086 plus integration closure 0087');
+      assert.deepEqual(inLane('M7'), contiguous(100, 102), 'M7 used 0100-0102; 0103-0108 reserved; 0109-0119 for M8');
       assert.ok(versions.every((v) => LANE_RANGES.some((r) => v >= r.from && v <= r.to)), 'no migration outside an allocated range');
 
       // A rerun on the fully migrated schema is a no-op (checksums unchanged).

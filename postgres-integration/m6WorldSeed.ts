@@ -9,9 +9,9 @@
  * test's own fixture data.
  *
  * Knowledge (rule sets, information editions, coverage, objectives,
- * constraints) is written through the M5 commands so its subtype/revision
- * rules stay real; objective targets have no M5 command yet (M5.md Park for
- * Later), so they are seeded as rows.
+ * constraints) is written through the M5/M7 commands so its subtype/revision
+ * rules stay real; objective targets use `recordObjective` /
+ * `recordObjectiveTargets` (I-7 closed in M7).
  */
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';

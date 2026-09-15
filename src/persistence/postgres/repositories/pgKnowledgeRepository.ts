@@ -401,19 +401,28 @@ export class PgKnowledgeRepository implements KnowledgeRepository {
     const client = currentTransactionClient();
     await client.query(
       `INSERT INTO objectives
-         (workspace_id, id, owner_kind, owner_id, success_predicate, hardness, priority, created_by_actor_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         (workspace_id, id, owner_kind, owner_id, success_predicate, success_predicate_kind,
+          hardness, priority, created_by_actor_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         this.workspaceId,
         objective.id,
         objective.ownerKind,
         objective.ownerId,
         objective.successPredicate,
+        objective.successPredicateKind ?? 'STATEMENT',
         objective.hardness,
         objective.priority,
         input.actor.actorPrincipalId,
       ],
     );
+    if (objective.targets && objective.targets.length > 0) {
+      await this.recordObjectiveTargets({
+        objectiveId: objective.id,
+        targets: objective.targets,
+        actor: input.actor,
+      });
+    }
     if (objective.disposition !== 'ACTIVE') {
       if (!objective.dispositionEvidenceId) throw new Error('terminal objective disposition requires evidence');
       await client.query(
@@ -423,6 +432,69 @@ export class PgKnowledgeRepository implements KnowledgeRepository {
         [this.workspaceId, objective.id, objective.disposition, objective.dispositionEvidenceId, input.actor.actorPrincipalId],
       );
     }
+  }
+
+  async recordObjectiveTargets(input: {
+    objectiveId: string;
+    targets: NonNullable<import('../../../domain/v2/knowledge/information.ts').Objective['targets']>;
+    actor: { workspaceId: string; actorPrincipalId: string };
+  }): Promise<void> {
+    assertActorWorkspace(input.actor.workspaceId, this.workspaceId);
+    const client = currentTransactionClient();
+    for (const target of input.targets) {
+      await client.query(
+        `INSERT INTO objective_targets
+           (workspace_id, objective_id, target_kind, subject_kind, subject_id, place_id,
+            at_or_before, amount_minor, currency_code, label)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          this.workspaceId,
+          input.objectiveId,
+          target.targetKind,
+          target.subject?.kind ?? null,
+          target.subject?.id ?? null,
+          target.placeId ?? null,
+          target.atOrBefore ?? null,
+          target.amountMinor ?? null,
+          target.currencyCode ?? null,
+          target.label,
+        ],
+      );
+    }
+  }
+
+  async recordObjectiveDisposition(input: {
+    objectiveId: string;
+    disposition: string;
+    evidenceId: string;
+    reason?: string;
+    objectiveTargetLabel?: string;
+    actor: { workspaceId: string; actorPrincipalId: string };
+  }): Promise<void> {
+    assertActorWorkspace(input.actor.workspaceId, this.workspaceId);
+    const client = currentTransactionClient();
+    const seq = await client.query<{ n: string }>(
+      `SELECT COALESCE(MAX(sequence_number), 0) + 1 AS n
+         FROM objective_dispositions
+        WHERE workspace_id = $1 AND objective_id = $2`,
+      [this.workspaceId, input.objectiveId],
+    );
+    await client.query(
+      `INSERT INTO objective_dispositions
+         (workspace_id, objective_id, sequence_number, disposition, evidence_id,
+          objective_target_label, reason, decided_by_actor_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        this.workspaceId,
+        input.objectiveId,
+        Number(seq.rows[0]?.n ?? 1),
+        input.disposition,
+        input.evidenceId,
+        input.objectiveTargetLabel ?? null,
+        input.reason ?? null,
+        input.actor.actorPrincipalId,
+      ],
+    );
   }
 
   async createConstraintDefinition(input: ConstraintInput): Promise<void> {
