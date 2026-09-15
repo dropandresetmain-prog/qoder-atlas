@@ -29,6 +29,7 @@ import { PgCurrentStateReader } from '../world/pgCurrentState.ts';
 import { assessManifestCurrentness } from '../../../resolution/world/currentness.ts';
 import { compareExactMoney } from '../../../domain/v2/shared/money.ts';
 import type { CapabilityKind } from '../../../resolution/execution/capability.ts';
+import { observedProgrammeRevisionFromPrerequisites } from './programmeRevisionRefresh.ts';
 
 export { DISPATCH_ACTION_KIND };
 export const INTERNAL_PROGRAMME_SCHEDULE_CAPABILITY = 'internal:programme.schedule';
@@ -435,7 +436,29 @@ export async function evaluateStoredExecutionGate(
   }
   const state = await new PgCurrentStateReader(pool).loadFor(params.workspaceId, manifest);
   const currentness = assessManifestCurrentness(manifest, state, params.now);
-  if (!currentness.current) return { allowed: false, reason: 'STALE_BASE', detail: JSON.stringify(currentness.reasons) };
+  if (!currentness.current) {
+    // Narrow exemption: a dependent intent may see AGGREGATE_ADVANCED vs the
+    // original strategy base manifest when a same-plan prerequisite already
+    // observed a Programme mutation. Allow only when every staleness reason
+    // is an aggregate advance explained by that durable observation matching
+    // the current head. External concurrent advances still fail closed.
+    const unexplained: typeof currentness.reasons = [];
+    for (const reason of currentness.reasons) {
+      if (reason.kind !== 'AGGREGATE_ADVANCED' || reason.aggregateRef.kind !== 'PROGRAMME') {
+        unexplained.push(reason);
+        continue;
+      }
+      const observed = await observedProgrammeRevisionFromPrerequisites(
+        pool, params.workspaceId, intent.id, reason.aggregateRef.id,
+      );
+      if (observed === undefined || observed !== reason.currentRevision) {
+        unexplained.push(reason);
+      }
+    }
+    if (unexplained.length > 0) {
+      return { allowed: false, reason: 'STALE_BASE', detail: JSON.stringify(currentness.reasons) };
+    }
+  }
 
   const decisionRow = await pool.query<{
     id: string; scope: unknown; limits: unknown; grant_refs: unknown; rule_inputs: unknown; group_operator: 'AND' | 'OR';

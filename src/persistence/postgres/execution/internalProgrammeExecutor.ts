@@ -14,6 +14,7 @@ import {
   type M8CommandIdentity,
 } from '../commands/m8AuthorityCommands.ts';
 import { INTERNAL_PROGRAMME_SCHEDULE_CAPABILITY } from './storedExecutionGate.ts';
+import { observedProgrammeRevisionFromPrerequisites } from './programmeRevisionRefresh.ts';
 import { currentTransactionClient } from '../transactionContext.ts';
 import { randomUUID } from 'node:crypto';
 import { DomainCommandEnvelopeSchema } from '../../../contracts/v2/command/domainCommand.ts';
@@ -35,6 +36,7 @@ async function loadStoredProgrammeSchedule(
   db: Pool,
   workspaceId: string,
   planId: string,
+  intentId: string,
   programmeItemId: string,
   expectedRevisions: { aggregateRef: { kind: string; id: string }; expectedRevision: number }[],
 ): Promise<StoredProgrammeSchedule | undefined> {
@@ -46,19 +48,31 @@ async function loadStoredProgrammeSchedule(
   if (!scenarioChangeId) return undefined;
 
   let effects: unknown[] | undefined;
+  let baseManifest: { aggregateReads?: { aggregateRef: { kind: string; id: string }; revision: number }[] } | undefined;
   const change = await db.query<{ effects: unknown }>(
     'SELECT effects FROM strategy_changes WHERE workspace_id = $1 AND scenario_change_id = $2',
     [workspaceId, scenarioChangeId],
   );
   if (Array.isArray(change.rows[0]?.effects)) {
     effects = change.rows[0]!.effects as unknown[];
-  } else if (plan.rows[0]?.recovery_strategy_id) {
-    const strategy = await db.query<{ scenario_change: { effects?: unknown[] } }>(
-      'SELECT scenario_change FROM recovery_strategies WHERE workspace_id = $1 AND id = $2',
+  }
+  if (plan.rows[0]?.recovery_strategy_id) {
+    const strategy = await db.query<{ scenario_change: { effects?: unknown[] }; base_manifest: unknown }>(
+      'SELECT scenario_change, base_manifest FROM recovery_strategies WHERE workspace_id = $1 AND id = $2',
       [workspaceId, plan.rows[0].recovery_strategy_id],
     );
     const embedded = strategy.rows[0]?.scenario_change?.effects;
-    if (Array.isArray(embedded)) effects = embedded;
+    if (!effects && Array.isArray(embedded)) effects = embedded;
+    const rawManifest = strategy.rows[0]?.base_manifest;
+    if (rawManifest && typeof rawManifest === 'object') {
+      baseManifest = rawManifest as { aggregateReads?: { aggregateRef: { kind: string; id: string }; revision: number }[] };
+    } else if (typeof rawManifest === 'string') {
+      try {
+        baseManifest = JSON.parse(rawManifest) as typeof baseManifest;
+      } catch {
+        baseManifest = undefined;
+      }
+    }
   }
   if (!effects) return undefined;
 
@@ -81,7 +95,16 @@ async function loadStoredProgrammeSchedule(
   const programmeId = programmeRow.rows[0]?.programme_id;
   if (!programmeId) return undefined;
 
-  const expectedProgrammeRevision = expectedRevisions.find((r) => r.aggregateRef.kind === 'PROGRAMME')?.expectedRevision ?? 1;
+  const fromIntent = expectedRevisions.find(
+    (r) => r.aggregateRef.kind === 'PROGRAMME' && r.aggregateRef.id === programmeId,
+  )?.expectedRevision;
+  const fromManifest = baseManifest?.aggregateReads?.find(
+    (r) => r.aggregateRef.kind === 'PROGRAMME' && r.aggregateRef.id === programmeId,
+  )?.revision;
+  const fromPrereq = await observedProgrammeRevisionFromPrerequisites(
+    db, workspaceId, intentId, programmeId,
+  );
+  const expectedProgrammeRevision = fromPrereq ?? fromIntent ?? fromManifest ?? 1;
 
   return {
     programmeId,
@@ -130,7 +153,9 @@ export async function executeInternalProgrammeItemSchedule(
     ? intent.expected_revisions
     : JSON.parse(String(intent.expected_revisions))) as { aggregateRef: { kind: string; id: string }; expectedRevision: number }[];
 
-  const stored = await loadStoredProgrammeSchedule(pool, params.workspaceId, params.planId, programmeItemRef.id, expectedRevisions);
+  const stored = await loadStoredProgrammeSchedule(
+    pool, params.workspaceId, params.planId, params.intentId, programmeItemRef.id, expectedRevisions,
+  );
   if (!stored) {
     return { ok: false, conflict: { kind: 'VALIDATION_FAILED', message: 'no stored programme schedule effect for intent', subjectRefs: [] } };
   }
@@ -283,19 +308,24 @@ export async function executeInternalProgrammeItemSchedule(
     await client.query(
       `INSERT INTO execution_observations (
          workspace_id, id, attempt_id, action_intent_id, origin, command_receipt_ref,
-         observed_at, owned_subject_refs, created_by_actor_id
-       ) VALUES ($1,$2,$3,$4,'INTERNAL_COMMAND_RECEIPT',$5,now(),$6::jsonb,$7)`,
+         observed_at, owned_subject_refs, source_owned_fields, created_by_actor_id
+       ) VALUES ($1,$2,$3,$4,'INTERNAL_COMMAND_RECEIPT',$5,now(),$6::jsonb,$7::jsonb,$8)`,
       [
         params.workspaceId, observationId, prepared.value.attemptId, params.intentId,
         scheduleResult.receipt.idempotencyKey,
         JSON.stringify([{ kind: 'PROGRAMME_ITEM', id: stored.programmeItemId }]),
+        JSON.stringify({
+          programmeId: stored.programmeId,
+          programmeRevision: scheduleResult.value.programmeRevision,
+        }),
         params.actorPrincipalId,
       ],
     );
+    const programmeRevision = scheduleResult.value.programmeRevision;
     const value = {
       attemptId: prepared.value.attemptId,
       observationId,
-      programmeRevision: scheduleResult.value.programmeRevision,
+      programmeRevision,
     };
     await appendAuditTrail({ envelope, advanced: [], destinationKind: 'EXECUTION_ATTEMPT', payload: value });
     return {

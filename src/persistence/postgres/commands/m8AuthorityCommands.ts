@@ -567,6 +567,31 @@ export async function createPreparedExecutionAttempt(
     body: async (): Promise<BodyResult<{ attemptId: string; replayed?: boolean; knownSuccess?: boolean }>> => {
       const client = currentTransactionClient();
       const pool = client as unknown as Pool;
+      // Known-success replay must short-circuit before the currentness gate:
+      // a prior OBSERVED_SUCCESS may itself have advanced aggregates the
+      // strategy base manifest still names. Replaying that identity is not a
+      // new consequential dispatch.
+      const storedIntent = await pool.query<{
+        logical_operation_key: string | null; request_fingerprint: string | null;
+      }>(
+        `SELECT logical_operation_key, request_fingerprint FROM action_intents
+          WHERE workspace_id = $1 AND id = $2`,
+        [params.workspaceId, params.intentId],
+      );
+      const intentKeys = storedIntent.rows[0];
+      if (intentKeys?.logical_operation_key && intentKeys.request_fingerprint) {
+        const knownSuccessEarly = await findKnownSuccessAttempt(
+          client, params.workspaceId, intentKeys.logical_operation_key, intentKeys.request_fingerprint,
+        );
+        if (knownSuccessEarly) {
+          return {
+            ok: true,
+            value: { attemptId: knownSuccessEarly.id, replayed: true, knownSuccess: true },
+            advanced: [],
+          };
+        }
+      }
+
       const gate = await evaluateStoredExecutionGate(pool, {
         workspaceId: params.workspaceId,
         intentId: params.intentId,

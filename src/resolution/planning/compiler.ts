@@ -38,6 +38,15 @@ export interface CompileActionPlanInput {
   /** Known capability statements; missing → unsupported (do not fabricate). */
   capabilities?: readonly CapabilityStatement[];
   actionPlanId?: string;
+  /**
+   * Optional programmeItemId → programmeId ownership map used to capture a
+   * real PROGRAMME expectedRevision on CHANGE_PROGRAMME_ITEM_TIME intents.
+   * When omitted, a single PROGRAMME aggregateRead on the strategy base
+   * manifest is used as a deterministic fallback (bilateral same-Programme
+   * plans). Never invents a revision: missing ownership/manifest → empty
+   * expectedRevisions (executor may still resolve from the stored manifest).
+   */
+  programmeItemOwnership?: ReadonlyMap<string, string>;
 }
 
 export interface CompileActionPlanResult {
@@ -63,11 +72,35 @@ function fingerprint(parts: Record<string, unknown>): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
+/**
+ * Resolve the Programme aggregate + revision that a programme-item schedule
+ * mutation must CAS against. Prefer explicit ownership; otherwise accept a
+ * single PROGRAMME aggregateRead on the strategy base manifest.
+ */
+function programmeExpectedRevisions(
+  strategy: RecoveryStrategy,
+  programmeItemId: string,
+  ownership: ReadonlyMap<string, string> | undefined,
+): { aggregateRef: TypedRef; expectedRevision: number }[] {
+  const programmeReads = strategy.baseManifest.aggregateReads.filter((r) => r.aggregateRef.kind === 'PROGRAMME');
+  const ownedProgrammeId = ownership?.get(programmeItemId);
+  const programmeId = ownedProgrammeId
+    ?? (programmeReads.length === 1 ? programmeReads[0]!.aggregateRef.id : undefined);
+  if (!programmeId) return [];
+  const read = programmeReads.find((r) => r.aggregateRef.id === programmeId);
+  if (!read) return [];
+  return [{
+    aggregateRef: { kind: 'PROGRAMME', id: programmeId },
+    expectedRevision: read.revision,
+  }];
+}
+
 function intentForEffect(
   planId: string,
   strategy: RecoveryStrategy,
   effect: ScenarioEffect,
   index: number,
+  ownership: ReadonlyMap<string, string> | undefined,
 ): TypedResult<ActionIntent> {
   const id = randomUUID();
   const base = {
@@ -129,7 +162,7 @@ function intentForEffect(
         requestFingerprint: fingerprint({ effect, strategyVersion: strategy.strategyVersion }),
         capabilityRef,
         subjectRefs: [{ kind: 'PROGRAMME_ITEM', id: effect.programmeItemId }],
-        expectedRevisions: [],
+        expectedRevisions: programmeExpectedRevisions(strategy, effect.programmeItemId, ownership),
         preconditions: [`basisAssessment:${strategy.basisAssessmentId}`],
         requiredAuthorityScopes: ['programme.schedule'],
         expectedObservations: ['INTERNAL_COMMAND_RECEIPT:programme_item_schedule_updated'],
@@ -194,8 +227,16 @@ function intentForEffect(
 /**
  * Default dependency order: external offer selection before allocations;
  * journey/service changes before programme moves; objective disposition last.
+ * Sequential CHANGE_PROGRAMME_ITEM_TIME intents that share a Programme are
+ * ordered by effect index so action N+1 can rebase against action N's
+ * observed revision (same-aggregate multi-action plans).
  */
-function defaultDependencies(intents: ActionIntent[], effects: ScenarioEffect[]): ActionDependency[] {
+function defaultDependencies(
+  intents: ActionIntent[],
+  effects: ScenarioEffect[],
+  ownership: ReadonlyMap<string, string> | undefined,
+  strategy: RecoveryStrategy,
+): ActionDependency[] {
   const byEffect = intents.map((intent, i) => ({ intent, effect: effects[i]! }));
   const deps: ActionDependency[] = [];
   const select = byEffect.filter((x) => x.effect.effectKind === 'SELECT_OFFER');
@@ -219,6 +260,28 @@ function defaultDependencies(intents: ActionIntent[], effects: ScenarioEffect[])
   for (const prior of [...select, ...alloc, ...programme]) {
     for (const d of disposition) {
       deps.push({ fromActionIntentId: prior.intent.id, toActionIntentId: d.intent.id });
+    }
+  }
+
+  const programmeReads = strategy.baseManifest.aggregateReads.filter((r) => r.aggregateRef.kind === 'PROGRAMME');
+  const singleProgrammeId = programmeReads.length === 1 ? programmeReads[0]!.aggregateRef.id : undefined;
+  const byProgramme = new Map<string, typeof programme>();
+  for (const row of programme) {
+    if (row.effect.effectKind !== 'CHANGE_PROGRAMME_ITEM_TIME') continue;
+    const programmeId = ownership?.get(row.effect.programmeItemId)
+      ?? row.intent.expectedRevisions.find((r) => r.aggregateRef.kind === 'PROGRAMME')?.aggregateRef.id
+      ?? singleProgrammeId;
+    if (!programmeId) continue;
+    const group = byProgramme.get(programmeId) ?? [];
+    group.push(row);
+    byProgramme.set(programmeId, group);
+  }
+  for (const group of byProgramme.values()) {
+    for (let i = 0; i < group.length - 1; i += 1) {
+      deps.push({
+        fromActionIntentId: group[i]!.intent.id,
+        toActionIntentId: group[i + 1]!.intent.id,
+      });
     }
   }
   return deps;
@@ -250,7 +313,7 @@ export function compileActionPlan(input: CompileActionPlanInput): TypedResult<Co
   const intents: ActionIntent[] = [];
   for (let i = 0; i < strategy.scenarioChange.effects.length; i += 1) {
     const effect = strategy.scenarioChange.effects[i]!;
-    const built = intentForEffect(planId, strategy, effect, i);
+    const built = intentForEffect(planId, strategy, effect, i, input.programmeItemOwnership);
     if (!built.ok) return built;
     if (!capabilitySupported(input.capabilities, built.value.capabilityRef)) {
       return conflict(typedConflict(
@@ -266,7 +329,12 @@ export function compileActionPlan(input: CompileActionPlanInput): TypedResult<Co
     return conflict(typedConflict('VALIDATION_FAILED', 'action plan requires at least one typed intent'));
   }
 
-  const dependencies = defaultDependencies(intents, strategy.scenarioChange.effects);
+  const dependencies = defaultDependencies(
+    intents,
+    strategy.scenarioChange.effects,
+    input.programmeItemOwnership,
+    strategy,
+  );
   const plan = ActionPlanSchema.parse({
     id: planId,
     recoveryCaseId: strategy.recoveryCaseId,
