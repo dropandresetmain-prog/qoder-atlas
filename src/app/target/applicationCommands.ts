@@ -16,6 +16,9 @@ import { denyDirectObjectiveDisposition, M9_OBJECTIVE_DISPOSITION_API_EXPOSED } 
 import { issueRequiredAuthorityGrant } from './grantIssuance.ts';
 import {
   previewBilateralProgrammeTimeSwap,
+  previewAuthoritativeBilateralProgrammeTimeSwap,
+  type AuthoritativeProgrammeSwapPreviewInput,
+  type AuthoritativeProgrammeSwapPreviewOutcome,
   type BilateralProgrammeTimeSwapInput,
   type BilateralProgrammeTimeSwapPreview,
 } from './programmeTimeSwapPreview.ts';
@@ -183,9 +186,30 @@ export function commandDirectObjectiveDisposition(input: {
 /**
  * Preview a bilateral programme time swap — never mutates authoritative state.
  * Commitment IDs are caller-supplied runtime inputs (fixture lane), never hardcoded.
+ *
+ * Internal/demo-loop building block only (takes an injected `evaluate`
+ * callback) — NOT the HTTP-facing preview command. `targetHttpHandlers.ts`
+ * must use `commandPreviewAuthoritativeBilateralProgrammeTimeSwap` below,
+ * which builds the evaluator server-side from real PostgreSQL state.
  */
 export function commandPreviewBilateralProgrammeTimeSwap(
   input: BilateralProgrammeTimeSwapInput,
 ): BilateralProgrammeTimeSwapPreview {
   return previewBilateralProgrammeTimeSwap(input);
+}
+
+/**
+ * HTTP-facing preview command (M9 1B). The caller identifies the two
+ * programme items only; the server loads authoritative state, builds the
+ * real M7 counterfactual overlay, and invokes the real M6 evaluator. Never
+ * mutates authoritative state.
+ */
+export async function commandPreviewAuthoritativeBilateralProgrammeTimeSwap(
+  ctx: TargetCommandContext,
+  input: Omit<AuthoritativeProgrammeSwapPreviewInput, 'workspaceId'>,
+): Promise<AuthoritativeProgrammeSwapPreviewOutcome> {
+  return previewAuthoritativeBilateralProgrammeTimeSwap(ctx.pool, {
+    workspaceId: ctx.workspaceId,
+    ...input,
+  });
 }

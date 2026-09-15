@@ -19,15 +19,15 @@ import {
   acceptProviderShapedDemoEvent,
   commandEvaluateResolution,
   commandOpenRecoveryCase,
-  commandPreviewBilateralProgrammeTimeSwap,
+  commandPreviewAuthoritativeBilateralProgrammeTimeSwap,
   commandResolveCase,
   type ProviderShapedDemoEvent,
   type TargetCommandContext,
 } from './applicationCommands.ts';
-import type { BilateralProgrammeTimeSwapInput } from './programmeTimeSwapPreview.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
 import { renderProductRecoveryCase } from '../../ui/screens/product-recovery-case.ts';
 import { renderProductProgrammePreview } from '../../ui/screens/product-programme-preview.ts';
+import { toLegacyRenderableShape } from './programmeTimeSwapPreview.ts';
 import { renderProductIncidentProgramme } from '../../ui/screens/product-incident-programme.ts';
 import { renderProductTravellerTrip } from '../../ui/screens/product-traveller-trip.ts';
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
@@ -154,12 +154,30 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'POST' && pathname === '/api/v2/programme/time-swap/preview') {
-      const body = (await readJson(req)) as BilateralProgrammeTimeSwapInput;
-      const preview = commandPreviewBilateralProgrammeTimeSwap(body);
+      // Caller identifies the proposed change only (which two programme items
+      // to swap); it may NOT supply evaluation/viability logic — the server
+      // loads authoritative state and invokes the real evaluator itself (M9 1B).
+      const body = (await readJson(req)) as {
+        itemARef?: unknown; itemBRef?: unknown; recoveryCaseId?: unknown; now?: unknown;
+      };
+      if (typeof body.itemARef !== 'string' || typeof body.itemBRef !== 'string') {
+        sendJson(res, 400, { error: 'VALIDATION_FAILED', message: 'itemARef and itemBRef (programme item ids) are required' });
+        return true;
+      }
+      const outcome = await commandPreviewAuthoritativeBilateralProgrammeTimeSwap(commandCtx(ctx.app), {
+        itemARef: body.itemARef,
+        itemBRef: body.itemBRef,
+        now: typeof body.now === 'string' ? body.now : new Date().toISOString(),
+        ...(typeof body.recoveryCaseId === 'string' ? { recoveryCaseId: body.recoveryCaseId } : {}),
+      });
+      if (!outcome.ok) {
+        sendJson(res, 422, { error: 'PREVIEW_FAILED', message: outcome.error });
+        return true;
+      }
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductProgrammePreview(preview));
+        sendHtml(res, 200, renderProductProgrammePreview(toLegacyRenderableShape(outcome.result)));
       } else {
-        sendJson(res, 200, preview);
+        sendJson(res, 200, outcome.result);
       }
       return true;
     }
