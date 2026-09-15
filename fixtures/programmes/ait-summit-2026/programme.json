@@ -2043,11 +2043,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-10-01T07:45:00+07:00",
-            "scheduledArrival": "2026-10-01T10:30:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "ID7153"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
@@ -2573,11 +2573,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-10-01T07:45:00+07:00",
-            "scheduledArrival": "2026-10-01T10:30:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "ID7153"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
@@ -2650,11 +2650,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-10-01T07:45:00+07:00",
-            "scheduledArrival": "2026-10-01T10:30:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "ID7153"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
@@ -2867,11 +2867,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-10-01T07:45:00+07:00",
-            "scheduledArrival": "2026-10-01T10:30:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "ID7153"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
@@ -3237,11 +3237,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-10-01T07:45:00+07:00",
-            "scheduledArrival": "2026-10-01T10:30:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "ID7153"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",
@@ -4020,11 +4020,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-10-01T07:45:00+07:00",
-            "scheduledArrival": "2026-10-01T10:30:00+08:00",
+            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
+            "scheduledArrival": "2026-09-30T20:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "ID7153"
+              "value": "ID7159"
             },
             "bookingRef": {
               "system": "pnr",

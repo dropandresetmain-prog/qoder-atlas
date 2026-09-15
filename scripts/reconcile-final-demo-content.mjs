@@ -64,14 +64,14 @@ const CORRIDORS = {
   },
   CGK: {
     // Synthetic Batik geometry (WiT seed). Not Atlas provider-backed.
-    // The final story cancels ID7159 and reprotects to ID7153.
+    // Baseline original: ID7159. S1 pack synthesizes cancel→ID7153 reprotection.
     legs: (pnr) => [
       flightLeg({
         origin: 'CGK',
         dest: 'SIN',
-        dep: '2026-10-01T07:45:00+07:00',
-        arr: '2026-10-01T10:30:00+08:00',
-        flight: 'ID7153',
+        dep: '2026-09-30T17:45:00+07:00',
+        arr: '2026-09-30T20:30:00+08:00',
+        flight: 'ID7159',
         pnr,
       }),
     ],
