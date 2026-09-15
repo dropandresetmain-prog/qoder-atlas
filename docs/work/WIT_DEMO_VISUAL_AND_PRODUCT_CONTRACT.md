@@ -1,10 +1,8 @@
-# WiT demo visual + product contract — recovered SSOT
+# WiT demo visual + product contract
 
-**Status:** recovered from the settled WiT product pass, the earlier NORTHSTAR System World motion work, `docs/DESIGN.md`, and the frozen Sarah/Jordan scenario world.
+**Purpose:** durable source of truth for the graph/product decisions settled in the current WiT finalist demo workstream.
 
-**Purpose:** preserve the already-agreed visual/product design so the graph is not redesigned from memory again.
-
-This document does **not** replace scenario/data SSOTs:
+This document does **not** replace the scenario/data SSOTs:
 
 - `docs/work/WIT_DEMO_WORLD_PROGRAMME_SEED_FREEZE_v1.md`
 - `docs/work/WIT_SEED_DECISIONS.md`
@@ -12,403 +10,99 @@ This document does **not** replace scenario/data SSOTs:
 
 Those own world facts, timings, provider provenance, participant assignments and seeded-vs-derived boundaries.
 
-This document owns the **WiT graph/product visual contract**, the two hero visual state machines, and the post-M9 acceptance target.
+This document owns only:
 
-Historical visual references that informed this contract:
+1. the Live Dependency Graph product contract agreed in this WiT chat;
+2. the Sarah graph projections;
+3. the Jordan extension of the same graph system;
+4. the post-M9 Sarah/Jordan acceptance target.
 
-- `docs/DESIGN.md`
-- `docs/MOTION_DESIGN.md`
-- `media/seq05-objective-field/`
-- `media/seq06-live-dependency-graph/`
-- `media/seq07-blast-radius/`
-- `media/seq08-resolution-engine/`
-- `media/seq09-qwen-atlas/`
-- `media/seq10-authority-hitl/`
-- historical `docs/HACKATHON_VIDEO_STORYBOARD_AND_ASSET_PLAN.md` at commit `185d84f1ebd6bb99340935fae5253d3c67aca3b8`
-
-The old motion work is a **visual-language reference**, not a second product architecture.
+`docs/DESIGN.md` remains the visual-design authority.
 
 ---
 
-# 1. Core visual thesis
+# 1. Binding graph principles
 
-The Live Dependency Graph is not a supporting diagram. It is a **primary intelligence surface** of the operator product.
+## One canonical world, purpose-built projections
 
-The graph must make this product thesis visually undeniable:
+There is one authoritative dependency/state world.
 
-> **A replacement booking is not necessarily a recovered trip.**
-
-The demo/product state flow remains:
-
-`change -> state update -> blast radius -> recovery strategies -> deterministic viability -> authority -> action -> observation -> reconciled state`
-
-The graph must feel **live, causal, spatial and high-end**. “Fancy” is desirable. Generic graph-library aesthetics are not.
-
-The theatre comes from:
-
-- scale;
-- focus and level-of-detail;
-- reveal order;
-- selective dimming;
-- causal propagation;
-- counterfactual overlays;
-- deterministic strategy rejection;
-- authority boundaries;
-- provider evidence returning into the graph;
-- observation and reconciliation visibly changing authoritative state.
-
-It does **not** come from random particles, neon, force physics, meaningless pulsing or fake AI-thinking animations.
-
----
-
-# 2. One canonical world, multiple purpose-built projections
-
-There is one canonical dependency/state world.
-
-Each screen receives a **purpose-built backend projection** of that world. The frontend does not inspect a raw graph and infer business truth.
+Different screens expose scoped projections of that same world.
 
 Required direction:
 
-`authoritative state -> scoped projection/read model -> visual graph`
+`authoritative state -> scoped read model / projection -> visual graph`
 
-Forbidden direction:
+Never:
 
-`raw DB/ontology graph -> frontend guesses viability/impact/recovery`
+`raw graph -> frontend infers viability / impact / recovery`
 
 The graph never owns business truth.
 
-The same underlying state may be projected differently for:
+## Deterministic horizontal layout
 
-- dashboard operational impact;
-- programme/incident blast radius;
-- focused traveller causal explanation;
-- counterfactual programme preview;
-- recovery strategies;
-- authority/execution/observation;
-- Jordan progressive connection and multi-action recovery.
+All demo dependency graphs are deliberately placed **left -> right**.
 
----
+Use deterministic HTML/SVG/CSS/JS rendering.
 
-# 3. Superseded decisions
+Do not use:
 
-The historical August storyboard mentioned `force-graph` as a possible product rendering technology. That idea is **superseded**.
+- force-directed layouts;
+- physics;
+- radial layouts;
+- freeform graph exploration;
+- raw ontology/database graphs;
+- traveller/scenario-specific layout logic.
 
-The settled WiT product decision is:
+The graph should read as a causal operational world, not a developer debugger.
 
-> **Deterministic, deliberately placed, horizontal left-to-right HTML/SVG/CSS/JS. No force simulation or physics.**
+## State semantics
 
-Also superseded:
+Use `docs/DESIGN.md`:
 
-- old 360/720-minute demo timing assumptions;
-- old Sarah 09:20 / 15:30 geometry;
-- old four-person Sarah affected cohort;
-- old MN218/MN310 Sarah visual truth;
-- old Jordan 15:10 hard gate;
-- old TR885-as-airline-default story.
-
-The visual grammar survives; scenario facts come from the current seed SSOTs.
-
----
-
-# 4. Product composition
-
-The operator graph experience uses three persistent regions.
-
-## Main graph canvas
-
-The graph is the dominant explanatory surface, not a small card.
-
-Typical focused graph density is roughly **6–12 meaningful human-labelled nodes**, not hundreds of raw entities.
-
-The canvas supports level-of-detail:
-
-- programme-wide / cohort view;
-- focused traveller view;
-- strategy view;
-- authority/action view.
-
-The world should feel continuous as focus changes. It should not feel like seven disconnected screenshots.
-
-## Thin top status bar
-
-The top bar summarizes the current operational state without competing with the graph.
-
-Examples:
-
-- `5 AFFECTED · 1 DISRUPTED · 4 ON TRACK`
-- `SARAH · NOT VIABLE`
-- `PREVIEW · NO CHANGES MADE`
-- `RECOVERY IN PROGRESS`
-- `OBSERVED · STATE UPDATED`
-
-## Contextual right rail
-
-The right rail is **not permanently noisy**. It appears or expands when the current graph state needs explanation, comparison, approval or action detail.
-
-It can carry:
-
-- plain-language failed reason;
-- checks / uncertainties;
-- option summary;
-- projected blast radius;
-- cost delta;
-- policy/authority decision;
-- human-in-the-loop approval;
-- action progress;
-- provider observation / partial failure.
-
-When it is not needed, it collapses so the graph remains the main character.
-
-Traveller-facing UI remains simpler and does not expose the operator graph as a raw analytical surface.
-
----
-
-# 5. Visual language
-
-## 5.1 NORTHSTAR cockpit daylight
-
-Use the current `docs/DESIGN.md` system:
-
-- cool blue-grey/fog base;
-- white surfaces;
-- restrained hairlines;
-- near-black ink as the strongest anchor;
-- mono/tabular numerals for times/counts/status data;
-- sans for explanation;
-- serif only where a traveller-facing commitment moment deliberately uses the concierge register.
-
-Avoid dark-neon AI-dashboard aesthetics.
-
-## 5.2 State colours are semantic
-
-- **Green** — confirmed, healthy, done, recovered.
-- **Brass** — changed, proposed, waiting, needs eyes.
-- **Vermilion** — broken, blocked, human decision required.
-- **Grey** — unknown, missing, unbooked, unverifiable.
-- **Ink** — system actively tracing/planning/recovering.
+- **green** — healthy / confirmed / done;
+- **brass** — proposed / changed / waiting / needs eyes;
+- **vermilion** — broken / blocked / decision required;
+- **grey** — unknown / missing / unverified;
+- **ink** — system actively working.
 
 Healthy is always green, never grey.
 
-Colour is never the only signal: pair it with glyph/text/status.
+State must never be colour-only; include labels/glyphs/text.
 
-## 5.3 Current / observed / proposed / computed / unresolved
+## Edge semantics
 
-The product must visually distinguish:
+- **solid green** — authoritative healthy relation;
+- **solid vermilion** — authoritative broken relation;
+- **dashed brass** — proposed/counterfactual relation;
+- **dotted grey** — unknown/missing/unverified relation;
+- **ink** — active tracing / planning / work-in-progress where useful.
 
-- **CURRENT / OBSERVED authoritative state** — solid;
-- **PROPOSED counterfactual state** — ghosted/dashed brass;
-- **COMPUTED / ASSESSED consequence** — labelled as evaluation, not provider observation;
-- **ACTIVE work** — ink;
-- **UNKNOWN / STALE / unresolved** — grey with explicit unknown/stale language.
+Proposed state must never look authoritative before commit.
 
-A proposed node or edge does not become authoritative merely because the user selected it.
+## Revision-driven motion
 
-It becomes current only after the applicable chain of:
+Graph motion follows actual projection revisions/state changes.
 
-`authority -> execution -> observation -> reconciliation / reassessment`
+Prefer `revision`, `changedNodeIds`, `changedEdgeIds` or equivalent semantics so only changed items animate.
 
-## 5.4 Edge semantics
+No fake timers. No fake AI thinking. No decorative perpetual pulsing.
 
-- solid green — authoritative healthy dependency;
-- solid vermilion — authoritative broken dependency;
-- dashed brass — proposed/counterfactual/change-awaiting-decision;
-- dotted grey — unknown/missing/unverified;
-- ink tracing path — active causal propagation / system work.
-
-Relationship vocabulary exposed by the projection may include:
-
-- **affected by**;
-- **relies on**;
-- **must happen before**;
-- **participates in**;
-- **proposed change**.
-
-Copy should remain user-facing rather than exposing ontology jargon.
+Entry stagger should remain restrained (<= 600 ms total).
 
 ---
 
-# 6. The “fancy” behavior carried over from System World
+# 2. Shared graph/read-model contract
 
-The old HTML/SVG System World is the visual reference for how NORTHSTAR should feel when the graph is alive.
-
-## 6.1 Level-of-detail focus
-
-At programme scale, travellers can be compact/minified.
-
-When the operator focuses a traveller/case, the detailed journey **emerges from the compact representation** rather than appearing as an unrelated new diagram.
-
-The prior System World did this by moving from programme camera scale into a detailed hero representation while the rest of the field faded back. Product implementation need not reproduce the exact timed camera path, but it should preserve the concept:
-
-> overview -> focused causal world -> back to wider context
-
-## 6.2 Selective dimming
-
-When one causal path is being explained, unrelated programme nodes and edges recede strongly rather than disappearing.
-
-The user should retain spatial context while attention is controlled.
-
-Affected nodes remain strong; unrelated nodes stay quiet.
-
-## 6.3 Selective propagation trace
-
-A new signal appears at the left/root of the relevant projection.
-
-An **ink trace moves left-to-right along the actual affected path**.
-
-Affected nodes react once as the trace reaches them.
-
-Do not make every edge pulse continuously.
-
-## 6.4 Constraints tether in contextually
-
-Constraints/policies should not be dumped as a giant list.
-
-When a constraint becomes relevant to the current explanation, its small card/chip tethers to the affected stage/path.
-
-Example for Sarah:
-
-- `ARRIVAL 10:30`
-- `AVAILABLE 60 MIN`
-- `REQUIRED 150 MIN`
-
-The readiness rule should visually attach to the causal point it evaluates.
-
-## 6.5 Outcome chips / health marks
-
-Cohort outcomes can settle as compact result chips/marks adjacent to the traveller branches:
-
-- `✓ ON TRACK`
-- `▲ AT RISK`
-- `✕ DISRUPTED`
-
-They are summaries of runtime truth, not seeded graph decorations.
-
-## 6.6 Strategy branches grow from the impacted trip
-
-Recovery strategies do not appear as an unrelated AI sidebar.
-
-They **branch out of the impacted trip / causal path**.
-
-Option-card information architecture remains recognisable:
-
-- route/action;
-- timing;
-- cost delta;
-- effect on the commitment;
-- rejection reason.
-
-This directly carries forward the old resolution-engine visual where strategies grew from the impacted trip.
-
-## 6.7 Deterministic viability is visible
-
-Recovery branches are evaluated by deterministic viability.
-
-Branches that do not restore the trip purpose should visibly fail and recede — for example by fading/shrinking/de-emphasising while retaining the rejection reason.
-
-Viable branches remain strong and can receive a restrained green settle/glow.
-
-This is not decorative ranking. It visualises actual deterministic evaluation.
-
-## 6.8 Qwen / Atlas / evidence appear inside the graph when relevant
-
-Do not turn provider/model integrations into a logo montage.
-
-The old System World visual logic remains useful:
-
-- structured context can feed into the intelligence/planning step;
-- recovery candidates emerge;
-- Atlas Search/Verify appears on the relevant flight strategy path;
-- provider evidence returns to the strategy as a verified fact;
-- the strategy state changes from “verify” to “verified” based on actual provider evidence.
-
-For the current product this can be rendered as restrained service/evidence nodes/chips rather than huge branded objects, but the causal relationship should remain visible when it helps prove the loop.
-
-## 6.9 Authority threshold / human-in-the-loop
-
-Authority is a visible boundary, not hidden backend logic.
-
-The old System World used an **AUTHORITY THRESHOLD** separating permitted automatic action from actions needing human approval.
-
-Carry that concept into the product:
-
-- actions within authority can progress;
-- actions requiring approval visibly stop at a human-in-the-loop decision;
-- no irreversible action visually crosses the boundary before approval.
-
-## 6.10 Observation visibly reconciles state
-
-After an action, do not jump straight to “Resolved”.
-
-Show an observation/reconciliation beat:
-
-`EXECUTED -> PROVIDER OBSERVED -> STATE UPDATED -> REASSESSED`
-
-Only then should new authoritative edges/nodes settle to green.
-
-The old System World explicitly used `✓ OBSERVED · STATE UPDATED`; that semantic remains correct.
-
----
-
-# 7. Motion rules
-
-Motion is **state-driven and meaningful**, but it should still look premium.
-
-Use:
-
-- split-flap/data-board **settle** when values/statuses change;
-- brief new-state colour wash;
-- ordered stagger when a field/graph is first revealed;
-- left-to-right propagation trace for a real state change;
-- level-of-detail focus transitions;
-- local node/edge transitions based on projection revision/change-set;
-- restrained green settle when recovery is actually reconciled.
-
-Affected nodes react once. Unrelated nodes remain quiet.
-
-Avoid:
-
-- fake countdowns;
-- fake AI thinking;
-- perpetual pulsing;
-- autoplay state changes unrelated to runtime state;
-- decorative particle systems;
-- celebration/confetti after recovery.
-
-The product should feel calm, precise and alive — not static, and not chaotic.
-
----
-
-# 8. Projection/read-model contract
-
-The visual graph consumes a presentation-safe projection.
-
-Previously agreed shape:
+Exact DTO names may follow current M9 contracts, but the protected semantics are:
 
 ```ts
 {
   scope,
   revision,
   rootRefs,
-  nodes: [
-    {
-      id,
-      kind,
-      label,
-      secondaryLabel,
-      state,
-      provenance,
-      href?
-    }
-  ],
-  edges: [
-    {
-      id,
-      from,
-      to,
-      relation,
-      state
-    }
-  ],
+  nodes,
+  edges,
   changedNodeIds,
   changedEdgeIds,
   focusPath,
@@ -416,19 +110,33 @@ Previously agreed shape:
 }
 ```
 
-The exact DTO naming can follow current M9 contracts; the semantics are protected.
+A presentation-safe node needs enough information to render a meaningful operator-facing entity, for example:
 
-Semantic graph states previously agreed:
+```ts
+{
+  id,
+  kind,
+  label,
+  secondaryLabel,
+  state,
+  provenance,
+  href?
+}
+```
 
-- `HEALTHY`
-- `CHANGED` / `AFFECTED`
-- `FAILED`
-- `PROPOSED`
-- `ACTIVE`
-- `UNKNOWN`
-- `RECOVERED`
+Edges need at minimum:
 
-Meaningful node concepts may include:
+```ts
+{
+  id,
+  from,
+  to,
+  relation,
+  state
+}
+```
+
+Meaningful projection concepts may include:
 
 - disruption/source event;
 - affected service/booking;
@@ -436,393 +144,258 @@ Meaningful node concepts may include:
 - meaningful arrival/timing state;
 - transfer/stay when causally relevant;
 - programme commitment;
-- recovery proposal;
-- action/authority/observation when relevant to the current projection.
+- proposed recovery;
+- authority/action/observation where relevant.
 
 Do not expose every canonical domain object merely because it exists.
 
 ---
 
-# 9. Sarah — recovered seven-state visual progression
+# 3. Sarah — protected graph projections
 
-The settled Sarah product progression is:
+Sarah is the primary WiT hero.
 
-**Healthy -> Signal -> Blast radius -> Why Sarah fails -> Recovery proposal -> Impact/approval -> Execute/observe/recover**
+Her graph story must prove that the airline can recover the booking while the trip remains broken.
 
-The current seed facts below supersede historical timings.
-
-## State 1 — Healthy connected world
-
-Main canvas: programme/cohort field at a readable wide level of detail.
-
-All five shared inbound travellers are healthy.
-
-The shared travel dependency is visible without dominating the whole event.
-
-Top status: healthy event/cohort summary.
-
-Right rail: collapsed/minimal.
-
-The graph feels populated and connected before anything breaks; disruption does not create the graph, it changes an already-maintained world.
-
-## State 2 — Supplier signal enters
-
-The synthetic ID7159 cancellation/reprotection signal appears at the left of the affected projection.
-
-The relevant shared service/path receives an ink “tracing change” state.
-
-A single left-to-right trace begins.
-
-The replacement/reprotected booking can settle as valid/green at booking level once authoritative, while downstream evaluation is still active/ink/brass.
-
-Only affected structures react.
-
-## State 3 — Shared blast radius resolves
-
-Strict horizontal structure:
-
-```text
-[ID7159 CANCEL / ID7153 REPROTECTION] ──▶ [SHARED SERVICE] ──┬──▶ [SARAH] ──▶ [11:30 HEADLINE] ──▶ [✕ DISRUPTED]
-                                                             ├──▶ [ARJUN] ──▶ [13:50 KEYNOTE]  ──▶ [✓ ON TRACK]
-                                                             ├──▶ [SITI]  ──▶ [14:00 PANEL]    ──▶ [✓ ON TRACK]
-                                                             ├──▶ [MEI]   ──▶ [14:00 PANEL]    ──▶ [✓ ON TRACK]
-                                                             └──▶ [FELIX] ──▶ [16:30 TALK]     ──▶ [✓ ON TRACK]
-```
-
-The dominant readout is:
-
-> **5 affected · 1 disrupted · 4 still on track**
-
-Unrelated world dims but remains spatially present.
-
-Selecting Sarah transitions/focuses into her detailed causal world.
-
-## State 4 — Why Sarah fails
-
-Strict horizontal causal chain:
-
-```text
-[ID7153 REPROTECTED ✓] ──▶ [SIN ARRIVAL 10:30 ✓] ──▶ [READINESS: 60 AVAILABLE / 150 REQUIRED ✕] ──▶ [11:30 HEADLINE ✕] ──▶ [TRIP PURPOSE NOT VIABLE]
-```
-
-This frame must make the thesis visually undeniable:
-
-> **The flight is green. The trip is red.**
-
-The readiness rule appears as a contextual constraint tether, not as unexplained backend jargon.
-
-Right rail explains the failure in plain language.
-
-## State 5 — Recovery strategies grow from the broken trip
-
-Structured context / relevant constraints become visible around the focused Sarah path.
-
-Recovery branches grow **to the right of the impacted trip**, rather than appearing as an unrelated recommendations list.
-
-Travel-side and programme-side strategies can coexist.
-
-Actual provider search/verification may appear on the relevant flight branch.
-
-Deterministic viability visibly rejects options that do not restore the purpose.
-
-The programme-side zero-new-flight recovery remains strong because it restores the objective without replacing the airline’s valid reprotected flight.
-
-## State 6 — Counterfactual programme impact + human approval
-
-Current and proposed state coexist.
-
-Current authoritative programme:
-
-```text
-[SARAH] ──solid vermilion──▶ [11:30 HEADLINE · BROKEN]
-[DANIEL] ──solid green──────▶ [14:30 LOCAL HOST · HEALTHY]
-```
-
-Counterfactual overlay:
-
-```text
-[SARAH]  - - dashed brass - -▶ [14:30 HEADLINE · PROJECTED HEALTHY]
-[DANIEL] - - dashed brass - -▶ [11:30 LOCAL HOST · PROJECTED HEALTHY]
-```
-
-The preview graph can expand horizontally as:
-
-```text
-[PROPOSED CHANGE] ──▶ [SARAH / DANIEL / ELENA] ──▶ [TRIP + PARTICIPATION DEPENDENCIES] ──▶ [11:30 + 14:30 PROGRAMME STATE]
-```
-
-The right rail shows impact/checks and the **human-in-the-loop approval**.
-
-Top status must make clear: `PREVIEW · NO CHANGES MADE`.
-
-No authoritative graph mutation has occurred.
-
-## State 7 — Execute, observe, reconcile, recover
-
-After approval:
-
-- programme action enters active/ink state;
-- execution progresses;
-- authoritative programme observation returns;
-- state update/reassessment runs;
-- proposed edges become current only after observation/reconciliation;
-- dashed brass edges settle to solid green;
-- old authoritative relationships retire;
-- Sarah’s same trip becomes viable;
-- cohort/event health count settles;
-- no new Sarah flight exists.
-
-Final state should feel stable again, not celebratory.
-
----
-
-# 10. Sarah graph scopes — protected definitions
-
-## Dashboard operational impact projection
+## 3.1 Dashboard operational-impact projection
 
 Direction:
 
 `SIGNAL / CHANGE -> SERVICE -> AFFECTED TRAVELLERS -> CONSEQUENCE / COMMITMENT`
 
-Purpose: differentiated cohort impact at a glance.
+For the frozen Sarah world:
 
-## Focused Sarah causal projection
+```text
+[ID7159 CANCEL / ID7153 REPROTECTION] -> [SHARED CGK->SIN SERVICE] -> [SARAH] -> [11:30 HEADLINE] -> DISRUPTED
+                                                                    -> [ARJUN] -> [13:50 KEYNOTE] -> ON TRACK
+                                                                    -> [SITI]  -> [14:00 PANEL]   -> ON TRACK
+                                                                    -> [MEI]   -> [14:00 PANEL]   -> ON TRACK
+                                                                    -> [FELIX] -> [16:30 TALK]    -> ON TRACK
+```
+
+Required summary:
+
+> **5 affected · 1 disrupted · 4 still on track**
+
+The five-person affected set and each outcome must come from runtime/read-model truth, not hardcoded graph colouring.
+
+## 3.2 Sarah focused causal projection
 
 Direction:
 
 `REPLACEMENT FLIGHT -> ARRIVAL -> OPERATIONAL WINDOW -> PURPOSE`
 
-Purpose: explain why valid booking != viable trip.
+Frozen geometry:
 
-## Programme / incident blast-radius projection
+```text
+[ID7153 REPROTECTED ✓] -> [SIN ARRIVAL 10:30 ✓] -> [60 MIN AVAILABLE / 150 REQUIRED ✕] -> [11:30 HEADLINE ✕] -> [TRIP NOT VIABLE]
+```
+
+The critical visual contrast is:
+
+> **FLIGHT = GREEN**
+>
+> **TRIP / PURPOSE = RED**
+
+Do not mark the replacement flight broken merely because the overall trip is not viable.
+
+## 3.3 Programme / incident blast-radius projection
 
 Direction:
 
 `CHANGE -> PEOPLE -> TRIP DEPENDENCIES -> PROGRAMME`
 
-Purpose: show who/what a programme change would touch.
+For Sarah's programme recovery, include only genuinely affected people/relationships, including as applicable:
 
-## Counterfactual programme preview
+- Sarah;
+- Daniel Ong;
+- Elena Tan;
+- any other participant genuinely linked to the affected commitments.
 
-Direction: current + proposed left-to-right relationships in one spatial frame.
+Do not add unrelated people for visual density.
 
-Purpose: show mutation-free proposed world before approval, then visibly reconcile into authoritative state afterward.
+## 3.4 Counterfactual programme preview
+
+Current authoritative state:
+
+```text
+[SARAH]  -> [11:30 HEADLINE]      BROKEN
+[DANIEL] -> [14:30 LOCAL HOST]    HEALTHY
+```
+
+Proposed counterfactual:
+
+```text
+[SARAH]  - - -> [14:30 HEADLINE]      PROJECTED HEALTHY
+[DANIEL] - - -> [11:30 LOCAL HOST]    PROJECTED HEALTHY
+```
+
+Before approval/commit:
+
+- current relations remain authoritative;
+- proposed relations are dashed brass;
+- preview performs zero authoritative mutation.
+
+After approval -> commit -> observation -> reassessment:
+
+- new programme relations become authoritative;
+- dashed brass becomes solid green only if the observed/revalidated state is healthy;
+- old authoritative relations retire;
+- the same Sarah trip re-evaluates.
+
+The operator must be able to distinguish current vs proposed state clearly.
 
 ---
 
-# 11. Jordan — current application of the same visual grammar
+# 4. Sarah — agreed interaction/state progression
 
-Jordan is not a new graph philosophy. He uses the same world/projection/motion language.
+The settled Sarah progression is:
 
-His role is to prove progressive live state and coordinated multi-domain action.
+**Healthy -> Signal -> Blast Radius -> Why Sarah Fails -> Recovery Proposal -> Impact/Approval -> Execute/Observe/Recover**
 
-## 11.1 Healthy baseline
+Important interaction expectations:
 
-Strict left-to-right journey:
+- select a traveller branch -> focus/open that case;
+- inspect a failed node/path -> plain-language reason;
+- compare current authoritative vs proposed counterfactual state;
+- inspect projected affected people/viability before commit;
+- approval releases the real change path;
+- the same graph/read model updates after observation rather than jumping to a detached success screen.
+
+The graph is expected to be polished and visually strong. It is not a raw graph editor; the operator is inspecting, comparing, approving and following recovery.
+
+---
+
+# 5. Jordan — extension of the same graph system
+
+Jordan does not introduce a second graph philosophy.
+
+His role is to prove progressive live state plus coordinated multi-domain recovery.
+
+## 5.1 Progressive connection-state projection
+
+Direction:
+
+`LAX FLIGHT -> NRT ARRIVAL -> CONNECTION WINDOW -> NRT->SIN LEG -> SIN ARRIVAL`
+
+The **same horizontal path** revises as D1-D4 arrive:
+
+- baseline healthy;
+- D1 safe;
+- D2 at risk;
+- D3 ZG053 impossible;
+- TR875 may appear as temporary recovery;
+- D4 eliminates TR875 and forces an overnight consequence.
+
+State changes only on actual runtime/input changes.
+
+## 5.2 Airline-default causal proof
+
+Airline-default TR867 may be a valid booking while the trip remains invalid:
 
 ```text
-[ZG023 LAX→NRT] ──▶ [NRT ARRIVAL 14:10] ──▶ [160 MIN CONNECTION] ──▶ [ZG053 NRT→SIN] ──▶ [SIN 23:00] ──▶ [CONCORDE / TRANSFER] ──▶ [20:45 FINALS · FUTURE COMMITMENT]
+[TR867 BOOKING ✓] -> [SIN ARRIVAL 20:45 ✓] -> [0 MIN TO 20:45 FINALS ✕] -> [WHOLE TRIP NOT VIABLE]
 ```
 
-All relevant authoritative nodes are healthy/green.
+This intentionally echoes Sarah's booking-valid / trip-invalid thesis.
 
-## 11.2 Progressive degradation
+## 5.3 Deep whole-trip recovery projection
 
-The graph does not cut to a new diagram for every delay.
-
-The **same horizontal path** revises as D1–D4 arrive.
-
-Connection-window node is the main changing object:
-
-- D1: safe;
-- D2: at risk/brass;
-- D3: ZG053 impossible/vermilion;
-- TR875 recovery branch becomes available;
-- D4: TR875 itself becomes unboardable, overnight consequence appears.
-
-Only changed nodes/edges settle/trace.
-
-## 11.3 Airline default proves the thesis again
-
-Airline default branch:
-
-```text
-[TR867 BOOKING ✓] ──▶ [SIN ARRIVAL 20:45 ✓] ──▶ [READINESS TO 20:45 FINALS = 0 ✕] ──▶ [WHOLE TRIP NOT VIABLE]
-```
-
-Again, a booking can be green while the objective is red.
-
-## 11.4 Whole-trip recovery expands horizontally
-
-The recovery view grows from the broken NRT state and changed arrival.
+Direction remains left -> right.
 
 Conceptually:
 
 ```text
-[BROKEN NRT CONNECTION] ──▶ [TR885 RECOVERY FLIGHT] ───────────────▶ [SIN ARRIVAL 14:35] ──▶ [20:45 FINALS ✓]
-                         ├──▶ [NARITA OVERNIGHT] ───────────────────▶ [OBSERVED ✓]
-                         └──▶ [CHANGED SIN ARRIVAL] ──┬────────────▶ [CONCORDE 30 SEP→3 OCT]
-                                                     └────────────▶ [AIRPORT TRANSFER REDISPATCH]
+[BROKEN NRT CONNECTION] -> [TR885 RECOVERY FLIGHT] -> [SIN ARRIVAL 14:35] -> [20:45 FINALS ✓]
+                        -> [NARITA OVERNIGHT] -> [STAY VALID / OBSERVED]
+                        -> [CHANGED SIN ARRIVAL] -> [SINGAPORE HOTEL CONSEQUENCE]
+                                                  -> [AIRPORT TRANSFER CONSEQUENCE]
 ```
 
-The visual point is:
+The graph must support the distinction:
 
 > **The airline recovered the passenger. NORTHSTAR recovered the trip.**
 
-## 11.5 Multi-action plan / action DAG
+## 5.4 Multi-action recovery truth
 
-The coordinated recovery should expose per-action truth:
+Consequential actions may carry their own:
 
-- proposal;
-- deterministic viability;
 - cost;
-- authority;
-- execution;
-- observation;
-- failure/partial-failure.
+- authority state;
+- execution state;
+- observed result;
+- partial-failure state.
 
-The action flow remains left-to-right and may branch where actions can be coordinated/parallel, then converge on final whole-trip reassessment.
-
-For Singapore hotel cancel+rebook, the dependency ordering must remain visible/truthful:
+For destination-stay cancel+rebook, the ordering must remain truthful:
 
 ```text
-[QUOTE / AUTHORITY] ──▶ [BOOK REPLACEMENT] ──▶ [OBSERVE CONFIRMED] ──▶ [CANCEL DISPLACED] ──▶ [OBSERVE CANCELLED] ──▶ [REASSESS]
+[QUOTE / AUTHORITY] -> [BOOK REPLACEMENT] -> [OBSERVE CONFIRMED] -> [CANCEL DISPLACED] -> [OBSERVE CANCELLED] -> [REASSESS]
 ```
 
-If displaced cancellation fails, that branch does not become green and whole-trip/full-resolution status must remain appropriately unresolved/partial.
+If a consequential branch fails or remains ambiguous, the graph/read model must not imply full recovery.
 
 ---
 
-# 12. User interaction contract
+# 6. Post-M9 functional acceptance
 
-This is **not “nothing fancy.”** The graph is expected to be polished and interactive enough to feel like the core product intelligence surface.
+Leave M9 to finish independently.
 
-Required interaction behavior includes:
-
-- selecting/clicking a traveller branch to focus/open that case;
-- smooth level-of-detail transition from cohort/programme view into focused traveller path;
-- selecting a failed node/path to reveal its plain-language reason in the right rail;
-- selecting a recovery strategy to emphasise its branch and de-emphasise alternatives;
-- visibly toggling/contrasting current authoritative versus proposed counterfactual state;
-- approval action at the human-in-the-loop boundary;
-- execution/observation state updating the same graph rather than navigating to an unrelated “success” screen;
-- ability to return to wider programme context without losing the state story.
-
-Do not turn the graph into an editor. The operator is inspecting, comparing, approving and following recovery — not manually rewiring ontology edges.
-
----
-
-# 13. What the old motion work contributes, and what remains video-only
-
-Carry into product:
-
-- cockpit-daylight design;
-- horizontal causality;
-- crisp SVG paths;
-- deliberate placement;
-- LOD/focus;
-- selective dimming;
-- propagation tracing;
-- constraint tethers;
-- outcome chips;
-- strategies growing from the impacted trip;
-- deterministic rejection;
-- Qwen/Atlas evidence paths where useful;
-- authority threshold semantics;
-- observed/state-updated reconciliation;
-- settle/stagger motion.
-
-Video-only / not required in product:
-
-- authored camera timing in seconds;
-- cinematic airport footage;
-- OpenMontage/Runway/Wan/stock footage;
-- sound-design timing;
-- exact scripted sequence duration.
-
-The product should feel like the System World became real and interactive, not like a separate dashboard unrelated to it.
-
----
-
-# 14. Anti-patterns — explicitly rejected
-
-Do not build:
-
-- force-directed/physics graph;
-- radial graph;
-- graph-database debugger;
-- raw ontology explorer;
-- random “AI network” decoration;
-- cyberpunk neon;
-- every node equally bright or equally labelled;
-- perpetual pulses;
-- graph changes driven by fake timers;
-- giant logo montage for Qwen/Atlas;
-- plain recommendation cards detached from the impacted path when graph strategy data exists;
-- proposal that visually looks committed;
-- instant `RESOLVED` jump without execute/observe/reassess;
-- Sarah/Jordan-specific graph code or IDs in domain/application logic.
-
----
-
-# 15. Post-M9 functional acceptance
-
-M9 is allowed to finish independently. The WiT lane resumes scenario hardening after its accepted integration tip.
+After M9 is accepted, this WiT lane has two functional goals.
 
 ## Sarah definition of done
 
-Without a reset between disruption and recovery:
+Without reset between disruption and recovery:
 
 1. coherent viable baseline;
-2. shared disruption/reprotection enters through normal path;
-3. all five replacement bookings valid;
-4. five-person blast radius rendered from projection;
-5. runtime derives Sarah NOT_VIABLE and four peers VIABLE;
+2. shared disruption/reprotection enters through the normal path;
+3. all five replacement bookings remain valid;
+4. five-person blast radius comes from runtime truth;
+5. Sarah is derived NOT_VIABLE while Arjun, Siti, Mei and Felix remain VIABLE;
 6. focused graph proves green flight / red trip purpose;
-7. recovery planning runs through normal engine;
-8. Sarah↔Daniel programme recovery available;
+7. normal recovery planning evaluates travel/programme options;
+8. Sarah<->Daniel programme recovery is available;
 9. preview is mutation-free;
-10. current/proposed graph truthfully rendered;
-11. affected linked participants projected viable;
-12. human-in-the-loop authority/approval runs;
-13. change commits;
-14. programme observation/state update occurs;
-15. same Sarah trip re-evaluates VIABLE;
-16. no new Sarah flight purchased;
+10. current/proposed state is rendered truthfully;
+11. affected linked participants are projected viable;
+12. real authority/approval path runs;
+13. programme change commits;
+14. observation/state update occurs;
+15. same Sarah trip becomes VIABLE;
+16. no new Sarah flight is purchased;
 17. four peers remain viable.
 
 ## Jordan definition of done
 
-1. viable ZG023→ZG053 baseline;
-2. progressive D1→D4 updates revise same graph;
-3. safe→at-risk→impossible derived truthfully;
-4. temporary TR875 can appear then disappear;
-5. overnight NRT consequence derived;
-6. TR867 valid booking but whole trip NOT_VIABLE;
-7. TR885 identified/evaluated as stronger recovery;
-8. Narita overnight consequence/action present;
-9. Singapore hotel consequence/action present;
-10. transfer consequence present where represented;
-11. finals viability restored by whole plan;
-12. authority/execution/observation visible per consequential action;
+1. viable ZG023->ZG053 baseline;
+2. D1-D4 revise the same graph/state path;
+3. safe -> at-risk -> impossible is derived truthfully;
+4. TR875 can appear then disappear;
+5. overnight NRT consequence is derived;
+6. TR867 can be a valid booking while whole trip is NOT_VIABLE;
+7. TR885 is evaluated as the stronger recovery;
+8. Narita overnight consequence/action is present;
+9. Singapore hotel consequence/action is present;
+10. transfer consequence is present where represented;
+11. finals viability is restored by the whole plan;
+12. authority/execution/observation remains truthful per action;
 13. partial failures remain partial;
-14. final whole-trip viability recomputed;
-15. recovered/resolved only when required authoritative state is valid or remaining uncertainty explicitly escalated.
+14. final whole-trip viability is recomputed;
+15. recovered/resolved only when required authoritative state is valid or remaining uncertainty is explicitly escalated.
 
 ---
 
-# 16. Remaining scope after M9
+# 7. Remaining scope after M9
 
 ## Act Now
 
 - Sarah end-to-end hardening.
 - Jordan end-to-end hardening.
-- Implement/polish the recovered graph contract against actual M9 projections and revisions.
-- Ensure state changes remain truthful through signal, preview, authority, execution, observation and reassessment.
+- Implement/polish the agreed left-to-right projections against actual M9 state/read models.
+- Ensure graph state remains truthful through preview, approval, execution, observation and reassessment.
 
 ## Investigate Now
 
-Only when one of the two heroes fails: classify the issue as fixture/data drift, product/read-model bug, generalized engine bug or architecture gap. Fix the generic cause.
+Only if one of the two heroes fails: classify the issue as fixture/data drift, read-model/product integration, generalized engine bug or architecture gap. Fix the generic cause.
 
 ## Park for Later
 
@@ -834,21 +407,44 @@ Only when one of the two heroes fails: classify the issue as fixture/data drift,
 - insurance execution;
 - extra transfer-provider integration;
 - further OpenRouter work;
-- provider-class cosmetic naming cleanup;
 - Batik evidence capture unless needed for a truthful external claim.
 
 ## Ignore / Accept Risk
 
-- Sarah Batik flight geometry remains honestly synthetic/organiser-supplied until provider evidence is captured.
+- Sarah Batik geometry remains honestly synthetic/organiser-supplied until provider evidence is captured.
 - REPLAY/sandbox provider actions are acceptable when provenance is explicit.
 - Synthetic disruption triggers are acceptable at the external-event boundary.
 
 ---
 
-# 17. Final protected statement
+# Appendix A — optional visual reference only
 
-The WiT graph is **not** a simple trip chain with a few colours.
+**This appendix is non-binding. It is not the product contract and must not override the main sections above.**
 
-It is a polished, deterministic, left-to-right operational world that can move between programme scale and traveller scale, trace real causal propagation, compare authoritative and counterfactual state, grow recovery branches from the impacted trip, show deterministic rejection, expose provider evidence and human authority boundaries, then reconcile the same world after observed execution.
+Older NORTHSTAR System World / hackathon-video work may be consulted as optional visual inspiration for motion/composition, especially:
 
-That visual system is a protected demo deliverable. Do not simplify it into generic cards, raw graph-debugger UI, force physics or top-to-bottom flow.
+- `docs/MOTION_DESIGN.md`
+- `media/seq05-objective-field/`
+- `media/seq06-live-dependency-graph/`
+- `media/seq07-blast-radius/`
+- `media/seq08-resolution-engine/`
+- `media/seq09-qwen-atlas/`
+- `media/seq10-authority-hitl/`
+- historical `docs/HACKATHON_VIDEO_STORYBOARD_AND_ASSET_PLAN.md` at commit `185d84f1ebd6bb99340935fae5253d3c67aca3b8`
+
+Useful optional motifs from that older work include:
+
+- level-of-detail focus from programme scale into a traveller;
+- selective dimming of unrelated context;
+- one-time causal propagation traces;
+- contextual constraint cards/tethers;
+- strategy branches growing from an impacted trip;
+- deterministic rejection/de-emphasis of invalid strategies;
+- restrained provider/evidence nodes;
+- visible authority boundary / human-in-the-loop concept;
+- observation/state-update reconciliation;
+- NORTHSTAR's cockpit-daylight visual language.
+
+These are references only. They do **not** require recreating old video camera choreography, old scenario timings, old graph technology experiments, or old storyboard structure.
+
+Where old material conflicts with the main body of this document or current scenario/data SSOTs, the main body/current SSOT wins.
