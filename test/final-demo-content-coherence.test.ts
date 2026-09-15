@@ -196,6 +196,7 @@ test('final-demo content: hero baselines viable before disruption; no impossible
     ['ait-draft-38', 'cmt-ait-d1-distribution-debate'],
     ['ait-draft-35', 'cmt-ait-d1-recovery-fireside'],
   ];
+  const requiredBuffer = 150;
   for (const [draftId, cmtId] of checks) {
     const t = byId.get(draftId);
     assert.ok(t, draftId);
@@ -203,12 +204,33 @@ test('final-demo content: hero baselines viable before disruption; no impossible
     const arr = inboundArrival(t);
     assert.ok(arr, draftId);
     const gap = minutesBetween(arr, commitment.startsAt.value);
-    const requiredBuffer = 150;
-    if (draftId === 'ait-draft-14') {
-      assert.ok(gap < requiredBuffer, `${draftId} should require S3 programme recovery`);
-    } else {
-      assert.ok(gap >= requiredBuffer, `${draftId} gap ${gap} < ${requiredBuffer} to ${cmtId}`);
-    }
+    // Baseline seed must be viable before disruption for every hero check,
+    // including Sarah (ID7159 evening arrival → next-day 11:30 headline).
+    assert.ok(gap >= requiredBuffer, `${draftId} gap ${gap} < ${requiredBuffer} to ${cmtId}`);
+  }
+
+  // S1 post-reprotection geometry (synthetic): ID7153 10:30 fails Sarah's 11:30 + 150.
+  {
+    const sarah = byId.get('ait-draft-14');
+    assert.ok(sarah);
+    const headline = cmt(prog, 'cmt-ait-d1-headline-interview');
+    const reprotectArrival = '2026-10-01T10:30:00+08:00';
+    const gapAfter = minutesBetween(reprotectArrival, headline.startsAt.value);
+    assert.ok(gapAfter < requiredBuffer, `Sarah after ID7153 should fail readiness (${gapAfter} < ${requiredBuffer})`);
+  }
+
+  // Four cohort peers remain viable against their Day-1 REQUIRED starts after the same 10:30 arrival.
+  for (const [draftId, cmtId] of [
+    ['ait-draft-10', 'cmt-ait-d1-payments-keynote'],
+    ['ait-draft-11', 'cmt-ait-d1-payments-panel'],
+    ['ait-draft-30', 'cmt-ait-d1-payments-panel'],
+    ['ait-draft-03', 'cmt-ait-d1-agentic-provocation'],
+  ] as const) {
+    const peer = byId.get(draftId);
+    assert.ok(peer, draftId);
+    const commitment = cmt(prog, cmtId);
+    const gapAfter = minutesBetween('2026-10-01T10:30:00+08:00', commitment.startsAt.value);
+    assert.ok(gapAfter >= requiredBuffer, `${draftId} after ID7153 gap ${gapAfter} < ${requiredBuffer}`);
   }
 
   const jordan = byId.get('ait-draft-09');
