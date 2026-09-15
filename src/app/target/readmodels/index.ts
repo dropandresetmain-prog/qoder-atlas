@@ -1,5 +1,7 @@
 export * from './changeAwareness.ts';
 export * from './liveDependencyGraph.ts';
+export * from './mapConnectionProgression.ts';
+export * from './pgFactAssembler.ts';
 export * from './projectIncidentProgramme.ts';
 export * from './projectOperatorOverview.ts';
 export * from './projectRecoveryCase.ts';

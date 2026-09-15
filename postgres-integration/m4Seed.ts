@@ -46,6 +46,8 @@ export async function seedProgrammeItem(
     window?: { start: string; end: string } | null;
     lifecycleStatus?: string;
     scheduleAuthority?: 'INTERNAL' | 'EXTERNAL';
+    /** Opaque operating requirements (e.g. requiresPhysicalPresence, readinessBufferMinutes). */
+    operatingRequirements?: Record<string, unknown> | null;
   },
 ): Promise<SeededProgrammeItem> {
   const programmeItemId = randomUUID();
@@ -56,8 +58,8 @@ export async function seedProgrammeItem(
   await seed.client.query(
     `INSERT INTO programme_items
        (workspace_id, id, programme_id, title, item_type, place_id, window_start, window_end,
-        lifecycle_status, schedule_authority, created_by_actor_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'DRAFT'), COALESCE($10, 'INTERNAL'), $11)`,
+        lifecycle_status, schedule_authority, operating_requirements, created_by_actor_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'DRAFT'), COALESCE($10, 'INTERNAL'), $11, $12)`,
     [
       seed.workspaceId,
       programmeItemId,
@@ -69,6 +71,7 @@ export async function seedProgrammeItem(
       params.window?.end ?? null,
       params.lifecycleStatus ?? 'DRAFT',
       params.scheduleAuthority ?? 'INTERNAL',
+      params.operatingRequirements ? JSON.stringify(params.operatingRequirements) : null,
       seed.actorId,
     ],
   );

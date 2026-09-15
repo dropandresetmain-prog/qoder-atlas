@@ -229,6 +229,11 @@ export interface AppEndpoints {
   upload?: UploadIntakeHandlers;
   /** Demo-only: scenario triggers for local clickaround. */
   demo?: DemoSurface;
+  /**
+   * Optional M9 target PostgreSQL product routes (`/api/v2/*`).
+   * Returns true when the request was handled.
+   */
+  targetV2?: (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<boolean>;
 }
 
 function pageLinks(endpoints: AppEndpoints): { dashboard: string; programme?: string; decisions: string; activity: string; traveller: string } {
@@ -316,6 +321,10 @@ async function handle(
 ): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const segments = url.pathname.split('/').filter(Boolean);
+
+  if (endpoints?.targetV2 && url.pathname.startsWith('/api/v2/')) {
+    if (await endpoints.targetV2(req, res, url)) return;
+  }
 
   if (req.method === 'GET' && url.pathname === '/health') {
     const view: HealthView = {
