@@ -1,5 +1,34 @@
 # ACTIVE TASK — Frontend semantic contract
 
+## Independent review checkpoint (Opus, 2026-09-17)
+
+- Reviewed: `lane/wit-frontend-semantic-contract` @ `20b9b61c34f3f2d526dbe4e143aba6c8304adc9b`
+  (clean; accepted M9 `c45a928` is an ancestor; 5 commits on top). Not reviewed against M10.
+- Fix branch: `review/wit-frontend-semantic-contract-opus` from the exact reviewed SHA.
+- Evaluated against the frozen live-demo choreography (baseline -> disruption ->
+  scope identified -> under evaluation -> clear / settle failed -> escalate -> open case).
+
+Act Now, in this lane (fixed on the review branch):
+
+- R1. Edge `truthMode` was inferred from `semanticState === PROPOSED` or kind
+  `PROPOSED_CHANGE`, and edge `changeState` from `semanticState === CHANGED`. This
+  promotes a semantic state into the truth/change dimensions, contradicting the node
+  rule ("preserve both dimensions without promotion"). M9 edges carry no authority and
+  no change set, so both are now always `unspecified` / `not-supplied`.
+- R2. M9 operator surfaces bypassed the boundary for viability labels (`copy.ts`:
+  UNKNOWN = "Still checking", AT_RISK = "May be affected"). Those phrases assert an
+  evaluation lifecycle the read model never supplies. Operator surfaces now take the label
+  from `presentViability`.
+- R3. Tone re-collapse downstream of the boundary: overview queue glyph rendered
+  RECOVERING as a green check; incident-programme commitment dot rendered UNKNOWN and
+  ACTIVE as brass. Both now use exhaustive tone-keyed tables.
+- R4. Contract doc: FIG re-triage against the live demo, new gaps FIG-7..FIG-9.
+
+Act Now, blocking live wiring but outside this lane (backend read-model owners):
+FIG-1 edge id, FIG-2 edge authority + changed edge ids, FIG-3 monotonic revision,
+FIG-4 subject-keyed node refs, FIG-6 producer fidelity, FIG-7 assessment lifecycle.
+See `docs/FRONTEND_SEMANTIC_CONTRACT.md` for the smallest additive change per gap.
+
 ## Goal
 
 Implement the accepted-M9 presentation contract, one adapter boundary, shared
