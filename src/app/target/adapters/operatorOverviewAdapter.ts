@@ -13,6 +13,9 @@ import type {
 } from '../../../contracts/v2/product/readModels.ts';
 import { escapeHtml } from '../../../ui/html.ts';
 import { VIABILITY_LABEL } from '../../../ui/copy.ts';
+import {
+  presentAssessment, presentGraphState, presentOperationalStatus, presentViability,
+} from '../../../ui/semantics/adapter.ts';
 
 /** Presentation-safe dashboard surface — HTML fragments the UI can compose. */
 export interface ProductSurfaceModel {
@@ -21,65 +24,24 @@ export interface ProductSurfaceModel {
   itemsHtml: string;
 }
 
-const OPERATIONAL_STATUS_LABEL: Record<ProductOperationalStatus, string> = {
-  READY: 'Confirmed',
-  AT_RISK: 'At risk',
-  DISRUPTED: 'Needs attention',
-  RECOVERING: 'Recovery under way',
-  UNKNOWN: 'Unconfirmed',
-};
-
-const OPERATIONAL_STATUS_TONE: Record<ProductOperationalStatus, string> = {
-  READY: 'ok',
-  AT_RISK: 'watch',
-  DISRUPTED: 'alert',
-  RECOVERING: 'active',
-  UNKNOWN: 'neutral',
-};
-
 export function operationalStatusLabel(status: ProductOperationalStatus): string {
-  return OPERATIONAL_STATUS_LABEL[status];
+  return presentOperationalStatus(status).label;
 }
 
 export function operationalStatusTone(status: ProductOperationalStatus): string {
-  return OPERATIONAL_STATUS_TONE[status];
+  return presentOperationalStatus(status).tone;
 }
 
 export function assessmentToneClass(tone: AssessmentTone): string {
-  if (tone === 'PASS') return 'ok';
-  if (tone === 'FAIL') return 'alert';
-  return 'neutral';
+  return presentAssessment(tone).tone;
 }
 
 export function ldgSemanticTone(state: LdgSemanticState): string {
-  switch (state) {
-    case 'HEALTHY':
-    case 'RECOVERED':
-      return 'ok';
-    case 'CHANGED':
-    case 'AFFECTED':
-    case 'PROPOSED':
-      return 'watch';
-    case 'FAILED':
-      return 'alert';
-    case 'ACTIVE':
-      return 'active';
-    default:
-      return 'neutral';
-  }
+  return presentGraphState(state).tone;
 }
 
 export function remainderViabilityTone(viability: RemainderViability): string {
-  switch (viability) {
-    case 'VIABLE':
-      return 'ok';
-    case 'AT_RISK':
-      return 'watch';
-    case 'NOT_VIABLE':
-      return 'alert';
-    default:
-      return 'neutral';
-  }
+  return presentViability(viability).tone;
 }
 
 function summaryTiles(view: OperatorOverview): string {

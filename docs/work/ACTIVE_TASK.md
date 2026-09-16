@@ -1,84 +1,110 @@
-# ACTIVE TASK — Northstar Long Horizon A: M2–M5 integration → M6 → C2 candidate
-
-Working-memory ledger (AGENTS.md "long-horizon work"). Reread before each major
-phase, after compaction, after delegated work and before declaring completion.
-Close an item only with evidence. Lane ledgers are preserved separately:
-`M3_ACTIVE_TASK.md`, `M3_CLOUD_ACTIVE_TASK.md` (stale M3 original),
-`M4_ACTIVE_TASK.md`, `M5_ACTIVE_TASK.md`.
+# ACTIVE TASK — Frontend semantic contract
 
 ## Goal
 
-Finish M6 (continuation/recovery of an interrupted run — NOT a restart) and
-stop at a C2 candidate. Do not claim C2 passed. No M7/M8.
+Implement the accepted-M9 presentation contract, one adapter boundary, shared
+visual grammar and a fixture-only Contract Lab. Stop before live graph wiring.
+This lane supersedes the old M6 ledger here; that ledger remains in base history.
 
-## Exact identity
+## Identity and preflight
 
-- Repo `dropandresetmain-prog/qoder-atlas`; worktree `C:/Dev/qoder-atlas-m6`
-- Branch `integration/m2-m6-domain-evaluation`
-- Base `data-structure-refactor` = `71f638ed30d01e65981bdd9e5e6128ad067fbf1d`
-- Checkpoint A `63e38ba` (345/345 pg); Checkpoint B `9c093dd` (350/350 pg);
-  frozen evaluator contracts `ea14ee1` (last remote checkpoint before interruption)
-- Recovery session start (2026-09-15): remote/branch HEAD `ea14ee1`; uncommitted
-  P7 work in primary; lane worktrees `C:/Dev/qoder-atlas-m6-l{1..4}`.
-- Test DB: container `northstar-postgres-test` :55432, isolated lowercase DBs
-  via `PGTEST_DB`. Migration allocation M6 `0090`–`0099` (used: 0090, 0091).
+- Milestone: WiT frontend semantic contract (independent of M10).
+- Branch: `lane/wit-frontend-semantic-contract`.
+- Worktree: `C:/Dev/qoder-atlas/.worktrees/wit-frontend-semantic-contract`.
+- Exact base: `c45a9289b7f7ff730cdce97ced6124b1a9332bf8` (accepted M9).
+- Frozen `2728acd` -> `ffa77ace2014f597e465179b988a28e0a3d55e14`.
+- Frozen `49e7b4d` -> `9efd57de4d7dc9deba99928be7eaf1e7beef30b1`.
+- Frozen `e1eb5f4` -> `6ea0ea875a4cb90b1f798bbd670fa608b91c6c29`.
+- `git diff --name-only c45a928 HEAD` = `docs/work/WIT_DEMO_VISUAL_AND_PRODUCT_CONTRACT.md`
+  only, so the three cherry-picks touched no source file.
+- No separate programme-seed merge; no moving M10 dependency.
 
-## Recovery inventory (verified from disk 2026-09-15)
+## Acceptance checklist
 
-| Item | State found | Action |
-|---|---|---|
-| P7 primary: 0091 assessments + reverse-lookup invalidation, PgReassessmentWorker (fencing, retry→UNAVAILABLE, re-enqueue after stale capture), sentinel rename, JSON allowlist, blastRadius, pgEvaluation, M6.md §1–7 | uncommitted; tsc 0; prior full pg run 358/358 incl. m6Reassessment 8 + m6WorldSnapshot | committed `8b4a6cb` |
-| L1 booking/connection/overnight | committed `c521262`; 22/22 lane tests | merged `d87eea3` |
-| L2 objective/participation | uncommitted; 24/24 lane tests | salvaged `3a9cdf4`, merged `7673a38` |
-| L3 support/group/funding | uncommitted; tsc 0; NO tests | salvaged `7d65280`, merged `ba655e7`; tests delegated (lane worktree l3) |
-| L4 encounters/predicates/credentials/entry | uncommitted; tsc 0; NO tests; `m6.information` MISSING | salvaged `3da69fd`, merged `d51307a`; information + tests delegated (l4) |
-| Place-owned constraints / reachability helpers | already in `ea14ee1` (owner list includes PLACE) | none |
+- [x] Exact accepted M9 base, frozen commits, visual contract and clean preflight.
+- [x] Inventory actual M9 enums, categories, relationships and metadata.
+- [x] Record node identity, edge identity and bounded integration gaps (FIG-1..FIG-6).
+- [x] Canonical small presentation model with independent dimensions (`model.ts`, 59 lines).
+- [x] One pure adapter boundary; exhaustive mappings; loud invalid input (`adapter.ts`, 124 lines).
+- [x] Central visual grammar following DESIGN and frozen WiT contract (`grammar.ts`, 71 lines).
+- [x] Fixture-only Contract Lab: states, changes, truth, focus, edges, compositions.
+- [x] Components consume presentation objects, not raw domain objects (`components.ts`).
+- [x] Adapter/unit/render tests pass — `test/ui-semantic-contract.test.ts` 14/14.
+- [x] Typecheck, build, lint, anti-hardcoding and regression checkpoint recorded below.
+- [x] Browser desktop/mobile, controls, edge cases and console verified.
+- [x] Anti-hardcoding / no business reasoning / unchanged ontology checked.
+- [x] Contract doc, roadmap and evidence updated; no tracker/DECISIONS entry applies.
+- [ ] Exact-path commit and push verified; stop before next milestone.
 
-## Phase checklist
+## Current checkpoint
 
-- [x] P0–P2 (Checkpoints A, B) — see M2_M5_INTEGRATION.md / M6.md
-- [x] P3 dependency registry/closure + structured explanations (in `9c093dd`/`ea14ee1`)
-- [x] P4 effective projections (in `ea14ee1`)
-- [x] P7 persistence/invalidation/worker (`8b4a6cb`)
-- [x] **Checkpoint 1**: salvage + lane merges + `registry.ts`; tsc 0, M6 unit 61/61, focused pg on fresh DB 41/41 (migrate, crossLane, subtype, m6WorldSnapshot, m6Reassessment) → pushed
-- [x] P5/P6 L3 tests 28/28 (`d5b23ee`, funding fix `f6c032c`, merged `b08f300`); L4 `m6.information` + tests 46/46 (`1923c1e`, `5470d27`, merged `925e0ab`); registry with 11 families (`9cee67c`)
-- [x] **Checkpoint 2**: M6 unit 140/140; m6Acceptance 4/4 on two fresh DBs; full pg on empty DB 362/363 before the I-14 assertion fix; tsc/build/lint/anti-hardcoding/diff --check green → pushed
-- [x] P8 AT fixtures: `m6Acceptance.pgtest` (AT01/02/06/10/12/13) `52c3926`; `northstar-v2-m6-acceptance` (AT19/20/21/22, cycles) `a59ae0f`; L3/L4 suites (AT03/04/05/08/09/11)
-- [x] Docs: M6.md §8–§11 (registry, AT evidence, API, triage), ACTIVE_TASK
-- [x] **Checkpoint 3**: full `test:postgres` from an empty DB 363/363 (incl. migrations); M6 unit 140/140; tsc, build, lint, gate:anti-hardcoding, diff --check green → pushed (C2 candidate). C1 `904eeca`, C2 `89ffe87`
+Implementation and verification are complete. `operatorOverviewAdapter.ts` is the
+only pre-existing source file touched: it now delegates to the single boundary
+instead of keeping its own silent-default palette (+8/-46). The change is
+behaviour-preserving for every legal enum value; the only semantic difference is
+that an unmapped value now throws instead of returning `neutral`.
 
 ## Next action
 
-STOP. C2 candidate is ready for independent C2 review. Do not claim C2 passed; do not start M7/M8.
+Commit by exact path, push the lane, report, then STOP. Live `LiveDependencyGraph`
+wiring stays blocked on FIG-1/FIG-2/FIG-6 and is explicitly out of scope here.
 
-## Critical architecture constraints
+## Critical constraints
 
-- F01–F18 frozen; UnitOfWork contract unchanged (G1: separate read session).
-- G12: UUID validation at persistence command boundary before UoW.
-- Only registered dependency semantics propagate; FKs are not graph edges.
-- Evaluators pure over captured WorldSnapshot; injected clock; no repo reads.
-- PASS/FAIL/UNKNOWN only from evidence; absence ≠ PASS. Traveller payer home
-  currency is not authoritative → UNKNOWN/explicit input.
-- Explanations structured (never prose-only). No M7/M8, no SQLite cutover,
-  no provider actions, no demo branches.
+- Backend remains semantic authority; no viability/time/policy/authority reasoning.
+- Do not promote proposal health to authoritative truth.
+- Preserve UNKNOWN and absent relation state distinctly.
+- Never synthesize stable edge identity or infer changed edges from endpoints.
+- No domain/schema/read-model behavior changes without stopping for approval.
+- Use current theme and inline SVG vocabulary; no new framework or dependencies.
+- No live provider calls, database, SQLite additions, M10 or runtime LDG wiring.
+- No animation, revision transitions, layout engine or full demo flows.
+- Fixture facts stay in dev/test data; generic components remain scenario-free.
 
-## Unresolved findings (triage)
+## Verification actually run
 
-| ID | Finding | Triage |
-|---|---|---|
-| I-1 | m2SubtypeIntegrity file-level failure at M3+M4 | Investigate Now — not reproduced in 350/358 full runs; re-check at Checkpoint 3 |
-| I-6 | Legacy integration.r1 determinism test fails (wall clock) — also at base | Park for Later (A-10) |
-| I-7 | Objective targets / success_predicate_kind have no M5 command | Park for Later (M7) |
-| I-8 | Jurisdiction has no ISO code; predicates carry issuing-state codes as rule parameters | Ignore / Accept Risk |
-| I-9 | Three of four evaluator lane agents died before tests/commit | Act Now — salvaged; tests delegated |
-| I-10 | `money.ts` has no exact FX multiply / currency exponent table; funding.ts implements BigInt multiply locally at exponent 2 | Park for Later — promote to money.ts before M8 spend |
-| I-11 | One capture's manifest is the union read set; every Journey assessed from a joint capture is invalidated by any input of that capture (over-invalidation, never under) | Park for Later — per-subject manifest pruning is an optimisation; workers capture per subject; recorded in M6.md |
-| I-12 | `currentAssessmentView` kept reporting PENDING_REASSESSMENT after a newer assessment was saved outside the worker (work caused by a superseded assessment never cleared) | Act Now — closed: work caused by a superseded assessment is obsolete only when the latest manifest verifies current; regression test in m6Reassessment |
-| I-13 | Funding emitted a blocking UNKNOWN with no explanation when no payer was named | Act Now — closed by L3 `f6c032c` (not applicable) |
-| I-14 | Acceptance asserted `enqueueDueReassessments` inserted a row; with an open unit already present the one-open-unit index coalesces (0 rows) — correct behaviour, wrong assertion | Act Now — closed: assert exactly one open durable unit |
-| I-15 | `test/acceptance-runner.test.ts` and `integration.r1` fail in the legacy unit run, identically on unmodified lane bases | Park for Later — legacy runtime, wall-clock nondeterminism (A-10) |
+- `npm run typecheck` exit 0; `npm run build` exit 0; `npm run lint` exit 0.
+- `npm run gate:anti-hardcoding` -> `VERDICT: CLEAN`; 352 TS files
+  (strict=211 app=122 provider=16 demo=3 excluded=0). `src/ui/` classifies as
+  tier `app`, so the Lab and semantics modules were scanned; `fixtures/` is
+  outside `src/` and therefore the permitted home for demo facts.
+- `node --test test/ui-semantic-contract.test.ts` -> 14 pass / 0 fail, exit 0.
+- Full suite `npm run test` -> exit 1: 1110 pass, **3 fail**.
+- Browser: `/contract-lab` DOM snapshot covers all seven sections; fixture
+  selector exercised 5 -> 1 -> 5; console clean; no overflow at 530x617;
+  computed-style audits confirm all four dimensions encode independently and
+  16/16 connectors render. No pixel screenshot: the in-app browser surface
+  stayed `visibilityState=hidden`, so the visual claim rests on computed styles
+  and structure, not on a rendered image.
 
-## Evidence references
+## The three full-suite failures are pre-existing at base
 
-- Lane evidence: `docs/refactor/evidence/M3.md`, `M4.md`, `M5.md`; M6: `M6.md`, `M6_EVALUATOR_CONTRACT.md`
-- Prior-session logs (scratch): `pg_ckptA.tap` 345/345, `pg_ckptB.log` 350/350, `pg_p7full.log` 358/358
+Proven, not assumed. `operatorOverviewAdapter.ts` was temporarily replaced with
+its exact base content (`git show c45a928:<path>`, verified
+`git diff --quiet c45a928 -- <path>` -> `[adapter == base: YES]`) and the three
+files re-run: same exit 1, same 3 fail / 8 pass, same three assertion messages.
+My version was then restored and re-verified (+8/-46, typecheck 0, 14/14).
+
+- `test/e2e/hero-lifecycle-rehearsal.test.ts:213` — no `RECOVERY_ENVELOPE_APPLIED`
+  activity event for the Jordan S2 hotel intent. Server-side authority record;
+  the file imports only `compose.ts`, `server/http.ts`, `config.ts`, `demoWorld.ts`.
+- `test/integration.r1.test.ts:234` — determinism diff is confined to two
+  wall-clock `observedAt` stamps ~2.2s apart; everything else byte-identical
+  including `version: 6`. Time-dependent, not state-dependent.
+- `test/wave3r-m1-ait-canonical-seed.test.ts:46` — harvested PNR `MNSYN03` not on
+  a promoted leg. Seed/promotion data concern.
+
+Triage: all three are **Park for Later** for this lane (out of scope, pre-existing,
+no presentation coupling) and must be raised against M9/seed owners separately.
+One **Investigate Now** design finding is recorded in
+`docs/FRONTEND_SEMANTIC_CONTRACT.md`: `HEALTHY` and `RECOVERED` share tone `ok`
+and glyph `check`, differing only by label — weak for the state the product
+thesis turns on. Fixing it means extending the frozen `SemanticIndicator['glyph']`
+set, which is DESIGN.md authority, so it is not a FIG entry and was not changed.
+
+## Documentation scope note
+
+`docs/ROADMAP.md` gained a lane row. `docs/IMPLEMENTATION_PLAN.md` has no
+frontend/WiT tracker and this is not an M0-M11 package, so no tracker row was
+invented. `docs/DECISIONS.md` does not exist in this tree and no architecture
+invariant changed, so no decision entry was created.
