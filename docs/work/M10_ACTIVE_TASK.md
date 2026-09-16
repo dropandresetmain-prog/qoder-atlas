@@ -18,8 +18,17 @@ candidate SHA plus a C5 cutover request. No production cutover in M10.
 
 ## Current phase
 
-Phase 0 (setup) complete. Starting Phase 7 inventory (pre-implementation
-discovery) in parallel with Phase 1 planning (runtime convergence).
+Phase 0 (setup), Phase 1 (documented, scoped decision — see below), and
+Phase 2 (all four items closed with real PostgreSQL evidence) are done as
+of `ea15a3a`. Phases 3-10 (the actual migration rehearsal pipeline) are
+**not built** — see `docs/refactor/evidence/M10_MIGRATION_CONTRACT.md` for
+the frozen contract and concrete build plan for the next session. This is a
+genuine from-scratch build (confirmed by direct inventory: no exporter,
+importer, reconciliation tool, or backup/restore automation exists anywhere
+in the repo before this session), not something safely compressible into
+the remainder of this one without corner-cutting the project's own evidence
+standards (real PG persistence, typed commands, no hardcoding, comprehensive
+focused tests per AT23).
 
 ## Checklist
 
@@ -32,11 +41,27 @@ discovery) in parallel with Phase 1 planning (runtime convergence).
 - [ ] Read current CI/acceptance scripts
 
 ### Phase 1 — Runtime convergence
-- [ ] Inventory: legacy writer/worker/entrypoint/reset-tool surface (dispatched to subagent)
-- [ ] Rewire `src/main.ts` default boot to `composeTargetApplication`/`composeTargetEndpoints` (PostgreSQL); legacy SQLite path becomes explicit legacy/migration-only entrypoint, not default `npm run dev`/`npm start`
-- [ ] Audit forward test suite default (`npm test`) — currently legacy SQLite `node --test`; PG is separate `npm run test:postgres`. Decide convergence approach without breaking the two-suite reality documented in TESTING.md
-- [ ] Audit no target path calls SQLite (signal ingestion, planner, authority, execution, observation, reassessment, read models, workers, demo/reset routes)
-- [ ] Product/API convergence: confirm minimum typed HTTP surface for ordinary product/demo operation (targetHttpHandlers.ts under `NORTHSTAR_ENABLE_TARGET_V2=1` today — should this flag become the default?)
+- [x] Inventory: legacy writer/worker/entrypoint/reset-tool surface — complete (see "Legacy writer inventory" below).
+- [x] Audit: no target path calls SQLite — **confirmed true**. Exhaustive grep of `src/app/target/**` and `src/persistence/postgres/**` for any legacy-store import returns zero hits (one doc-comment mention only). `composeTargetApplication`'s `sqliteAuthoritativeFallback: false` is a static literal, only read by the `/api/v2/health` response body, not a control-flow branch.
+- [x] `src/main.ts`/`src/app/compose.ts` doc comments updated to state plainly which composition is legacy (frozen migration source) and which is the forward target runtime, and why.
+- [ ] **Not done, deliberately: did not rewire the default boot path.** `composeAppRuntime` (legacy SQLite) remains the unconditional default for `npm run dev`/`npm start`; the target runtime stays opt-in behind `NORTHSTAR_ENABLE_TARGET_V2=1`. Reason: the target `/api/v2/*` HTTP surface (`targetHttpHandlers.ts`) does not have parity with the legacy surface — programme import/upload, demo reset, event ingestion, and several other legacy-only routes have no target-runtime equivalent yet (see legacy writer inventory below). Flipping the default now would silently break existing demo/product functionality, not just rename something. `docs/IMPLEMENTATION_PLAN.md` §15 assigns the actual "target becomes sole authoritative runtime" switch to **M11**, not M10 — M10's own §14 language ("construct a target candidate without legacy runtime writes") is about the final candidate configuration, which `NORTHSTAR_ENABLE_TARGET_V2=1` already achieves, not the whole milestone's default dev-boot behavior. Flagging this as a judgment call the user/reviewer may want to weigh in on if the M10 task's intent was actually the more aggressive reading.
+- [ ] Forward test suite default (`npm test` vs `npm run test:postgres`) — not resolved, same parity blocker as above.
+
+#### Legacy writer inventory (Phase 8 input, produced now)
+
+Every legacy-SQLite write path is exhaustively enumerated with file:line and
+a suggested M11-retirement disposition in the session transcript (produced
+via direct repo inventory). Summary: all writes funnel through 8 files
+(`src/persistence/{database,repositories,entityStore}.ts` +
+`src/app/{preferenceStore,dossierStore,fxStore,eventInboxStore}.ts`), reachable
+only via HTTP routes in `src/server/http.ts` (no CLI/worker/scheduled-job
+legacy write path exists — `PgReassessmentWorker` is the only worker and it
+is exclusively PostgreSQL). Two call sites in `src/engine/mutation.ts`
+bypass the repository classes and write raw SQL directly to
+`trips`/`entities`/`audit` — flagged separately since a PG port must
+replicate that transactional behavior, not just the repository interfaces.
+This inventory should be transcribed into a proper disposition table as the
+actual Phase 8 deliverable once Phases 3-7 land.
 
 ### Phase 2 — Close pre-M11 correctness debt
 - [x] ISSUER-POL: closed at command level. `issueAuthorityGrant` (`src/persistence/postgres/commands/peopleCommands.ts`) now enforces self-issuance rejection + issuer-must-hold-covering-`authority.grant.write`-grant unconditionally, inside the transaction, for every caller (not just the `grantIssuance.ts` facade, which now just builds the scope union and lets the command enforce policy). Added a separate `bootstrapIssueAuthorityGrant` export: requires `SYSTEM`-typed issuer + zero pre-existing `authority_grants` rows in the workspace (new `PgGovernanceRepository.countGrantsInWorkspace`), so it can only seed a workspace's very first grant, ever. `grantIssuance.ts`'s `provisionOrganiserAuthority` routes through it via a dedicated bootstrap-seed principal (never the organiser). Verified: `m9Checkpoint1.pgtest.ts` (ISSUER-POL self-mint/unauthorised/authorised-organiser scenarios), `m9SarahTargetE2E.pgtest.ts` (flagship C4 evidence, full run), `m8AuthorityExecution.pgtest.ts` (20/20), `m2People.pgtest.ts` (46/46), `m9SameProgrammeSequentialActions.pgtest.ts` (3/3) — all green against real PostgreSQL. Fixed ~9 test fixtures across these files that took the old self-issuance shortcut (see `bootstrapTestGrantIssuer` helper in `postgres-integration/m8ExecutionGateHelpers.ts`). Remaining files (`c3TargetedRemediation.pgtest.ts`, `m7m8SharedResourceBudgetCapability/IntegrationSeam/DagAndGenericity/CurrentnessAndReconciliation.pgtest.ts`) dispatched to a subagent using the same proven pattern — verify its result before considering this fully closed.
@@ -65,14 +90,14 @@ and acceptance criteria before implementing broad changes").
 
 ## Next action
 
-1. Collect the three dispatched inventory subagent reports (legacy writer
-   surface; existing migration/backup tooling + AT23 coverage; PG target
-   schema + open identity-mapping seams from MIGRATION_MAPPING.md's "Act
-   Now/Investigate" rows).
-2. Freeze migration contract/acceptance criteria.
-3. Implement Phase 1 runtime convergence (src/main.ts rewire) — this blocks
-   demo/product acceptance being PG-authoritative, which most later phases
-   assume.
+Start Phase 3 (legacy exporter) per the build plan in
+`docs/refactor/evidence/M10_MIGRATION_CONTRACT.md` §"Build plan for Phases
+3-10". First concrete step: `src/migration/legacyEvidence.ts` (the shared
+evidence-writing helper every subsequent command needs to cite), then
+`src/migration/legacyExporter.ts` against a small synthetic fixture DB. Do
+not start the importer until the Constraint-status archival destination
+decision (flagged as **open** in the contract) is made — building against
+`assessments` before that decision is finalized risks a rework.
 
 ## Critical constraints
 
@@ -110,6 +135,12 @@ and acceptance criteria before implementing broad changes").
 
 ## Exact candidate state
 
-Not yet finalized. Base SHA `c45a9289b7f7ff730cdce97ced6124b1a9332bf8`. Will
-record final M10 candidate SHA, dataset/config identity, and migration
-tooling versions here once Phase 9 rehearsal completes.
+Not yet finalized — M10 is not complete, Phases 3-10 remain. Current head
+of `milestone-m10-migration-rehearsal`: `ea15a3a` (base
+`c45a9289b7f7ff730cdce97ced6124b1a9332bf8`). This SHA closes Phase 2 in
+full (real PostgreSQL evidence, 456/456 `npm run test:postgres` on a fresh
+database, clean typecheck/build/lint/anti-hardcoding/diff-check) and
+documents Phase 1's scope decision, but is **not** a candidate for C5 —
+no migration rehearsal has been performed. Will record the final M10
+candidate SHA, dataset/config identity, and migration tooling versions once
+Phase 9 rehearsal actually completes in a future session.
