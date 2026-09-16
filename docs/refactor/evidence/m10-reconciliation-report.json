@@ -1,16 +1,16 @@
 {
   "reconcilerVersion": "northstar-migration-reconciler/1.0.0",
   "generatedAt": "2026-03-02T09:00:00Z",
-  "runId": "d5d72775-8b49-4157-8809-868cd8e6b298",
+  "runId": "39a112d5-dc51-4b61-b1da-74cebcee6404",
   "sourceDataset": "legacy-deployment-m10-restore-rehearsal",
-  "datasetHash": "3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596",
+  "datasetHash": "6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d",
   "exporterVersion": "northstar-legacy-exporter/1.1.0",
   "importerVersion": "northstar-legacy-importer/1.0.0",
   "runStatus": "COMPLETED",
   "totals": {
     "exportedRecords": 11,
     "mappedRecords": 11,
-    "exceptions": 1,
+    "exceptions": 2,
     "cutoverBlocking": 1
   },
   "coverage": [
@@ -60,7 +60,7 @@
       "exported": 2,
       "mapped": 1,
       "archived": 0,
-      "withExceptions": 1
+      "withExceptions": 2
     },
     {
       "categoryId": "CONSTRAINT",
@@ -152,7 +152,7 @@
       "id": "PROVIDER_REFS_PRESERVED",
       "question": "Did every provider booking reference survive, or get named as lost?",
       "status": "PASS",
-      "detail": "1 legacy booking reference(s) in the bundle; 1 preserved as evidence against a migrated reservation; 1 element-level exception(s) account for the rest. Binding references as target external identity remains a documented open seam."
+      "detail": "2 legacy booking reference(s) in the bundle; 2 preserved as evidence against a migrated reservation; 2 element-level exception(s) account for the rest. Binding references as target external identity remains a documented open seam."
     },
     {
       "id": "EVIDENCE_LINEAGE_INTACT",
@@ -164,13 +164,13 @@
       "id": "OBLIGATIONS_COMPLETE",
       "question": "Does every migrated booking actually record what was booked?",
       "status": "PASS",
-      "detail": "1 reservation(s), 0 holding no line"
+      "detail": "2 reservation(s), 0 holding no line"
     },
     {
       "id": "UNCERTAINTY_PRESERVED",
       "question": "Did anything the old system did not know become certainty in the new one?",
       "status": "PASS",
-      "detail": "0 reservation line(s) remain UNKNOWN; 0 uncertain external outcome(s) are explicitly preserved as unknown rather than resolved to failed or succeeded"
+      "detail": "1 uncertain source fact(s) in the bundle, all accounted for: 1 migrated uncertain reservation(s) against 1 target UNKNOWN line(s), 1 named PRESERVED_UNKNOWN_EXTERNAL_OUTCOME exception(s), 0 archived provider delivery record(s)"
     },
     {
       "id": "MONEY_ACCOUNTED",
@@ -192,6 +192,17 @@
     }
   ],
   "exceptions": [
+    {
+      "classification": "PRESERVED_UNKNOWN_EXTERNAL_OUTCOME",
+      "categoryId": "TRIP",
+      "sourceType": "trips",
+      "sourceId": "trip-single",
+      "reason": "legacy element el-single-return stood at CHANGED — the supplier state was never reconciled by the legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED would assert something never observed, so it migrated as UNKNOWN",
+      "affectedScope": "element el-single-return on trip trip-single, reservation d60b6843-2537-542b-844c-5af62cf77ce0",
+      "safetyImpact": "the real supplier state must be re-observed before anyone relies on this booking; until then the target correctly reports that it does not know",
+      "owner": "operations owner",
+      "blocksCutover": false
+    },
     {
       "classification": "QUARANTINED_MULTI_TRAVELLER_ALLOCATION",
       "categoryId": "TRIP",

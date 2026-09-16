@@ -62,18 +62,23 @@ single ping before the real server is up.
 
 ## Observed result
 
-Run on branch `milestone-m10-migration-rehearsal` at the final candidate `1d81dd7`,
-2026-09-16T12:35Z. Raw transcript: `m10-backup-restore-output.txt`.
+Run on branch `milestone-m10-migration-rehearsal` at the C5 remediation candidate. Raw transcript:
+`m10-backup-restore-output.txt`.
 
 | | |
 | --- | --- |
 | Dataset identity | `legacy-deployment-m10-restore-rehearsal` |
-| Dataset hash | `3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596` |
-| Migration run | `d5d72775-8b49-4157-8809-868cd8e6b298`, status `COMPLETED` |
+| Dataset hash | `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d` |
+| Migration run | `39a112d5-dc51-4b61-b1da-74cebcee6404`, status `COMPLETED` |
 | Tooling | exporter `1.1.0`, importer `1.0.0`, reconciler `1.0.0` |
-| Import outcome | imported 10, quarantined 1, deferred 0, exceptions 1 |
-| Pre-backup state | 11 `legacy_id_map` mappings; organisations 1, travellers 3, trips 1, journeys 1, constraint_definitions 1, evidence_records 4, source_records 2, assessments 1 |
-| Dump size | `pg_dump -Fc` produced 785,055 bytes |
+| Import outcome | imported 10, quarantined 1, deferred 0, exceptions 2 |
+| Pre-backup state | 11 `legacy_id_map` mappings; organisations 1, travellers 3, trips 1, journeys 1, constraint_definitions 1, evidence_records 5, source_records 2, assessments 1 |
+
+The organisation migrated with `default_currency_code = SGD`, mapped from the fixture's explicit
+legacy `homeCurrency` rather than defaulted — that is the C5 blocker-1 fix visible in the rehearsal.
+The two reconciliation exceptions (`PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` on the `CHANGED` element,
+`QUARANTINED_MULTI_TRAVELLER_ALLOCATION` on the unallocated trip) both survive the restore with
+their classifications intact, and only the second blocks cutover.
 
 ```
 VERDICT: PASS — 10/10 checks passed; migrated target state survived backup, destruction and restore
@@ -98,10 +103,14 @@ Two earlier runs of this rehearsal exist in the history and are **not** the fina
   mappings and dataset hash `5da1d341b6067123ddebfaee1347599f0efaa1396a1776cb04be8fe844820c18`.
   That hash is **obsolete**. It changed because the script was later extended to also rehearse the
   cutover sequence, which required enriching the fixture with places and a booked transport leg so
-  the reconciliation checks were not vacuous. A different fixture is a different dataset and
-  therefore a different hash — by design, since the hash is the dataset's identity.
+  the reconciliation checks were not vacuous.
+- At `1d81dd7`/`eff19a9` the combined run produced dataset hash `3077f43e…` with 1 exception. Also
+  **obsolete**: the C5 remediation changed the fixture twice — the organisation gained an explicit
+  `homeCurrency` so the rehearsal proves real currency mapping rather than a fabricated `USD`
+  default, and the single-traveller trip gained a `CHANGED` element so `UNCERTAINTY_PRESERVED` has
+  real uncertainty to verify instead of passing over an empty set.
 
-Re-running at the final candidate reproduced dataset hash `3077f43e…` exactly, which is the
-determinism property the migration depends on: the importer changed between `0c5015a` and
-`1d81dd7`, and the dataset hash did not, because the hash identifies the *source dataset* rather
-than the tooling that reads it.
+A different fixture is a different dataset and therefore a different hash — by design, since the
+hash is the dataset's identity, not the tooling's. Determinism was separately demonstrated when the
+importer changed between `0c5015a` and `1d81dd7` and the hash did **not** move, because the fixture
+had not.

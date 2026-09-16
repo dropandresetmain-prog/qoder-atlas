@@ -265,7 +265,13 @@ function buildLegacyFixture() {
   db.prepare('INSERT INTO schema_meta (key, value) VALUES (?, ?)').run('schema_version', '2');
 
   const entity = db.prepare('INSERT INTO entities (entity_type, id, data) VALUES (?, ?, ?)');
-  entity.run('ORGANISATION', 'org-fixture', JSON.stringify({ id: 'org-fixture', name: 'Fixture Operator Ltd' }));
+  // Explicit source-side home currency: the rehearsal must prove real currency
+  // mapping rather than a fabricated default.
+  entity.run(
+    'ORGANISATION',
+    'org-fixture',
+    JSON.stringify({ id: 'org-fixture', name: 'Fixture Operator Ltd', homeCurrency: 'SGD' }),
+  );
   entity.run('TRAVELLER', 'trav-single', JSON.stringify({ id: 'trav-single', displayName: 'Fixture Traveller One' }));
   entity.run('TRAVELLER', 'trav-multi-a', JSON.stringify({ id: 'trav-multi-a', displayName: 'Fixture Traveller Two' }));
   entity.run('TRAVELLER', 'trav-multi-b', JSON.stringify({ id: 'trav-multi-b', displayName: 'Fixture Traveller Three' }));
@@ -325,6 +331,28 @@ function buildLegacyFixture() {
             scheduledDeparture: { value: '2026-02-19T07:00:00Z' },
             scheduledArrival: { value: '2026-02-19T09:30:00Z' },
             bookingRef: { system: 'atlas', reference: 'FIXTURE-PNR-1' },
+            carrierRef: { system: 'iata', value: 'ZZ' },
+          },
+        },
+        {
+          // CHANGED: the supplier moved this and the legacy runtime never
+          // reconciled it. Present so the rehearsal's UNCERTAINTY_PRESERVED
+          // check has real uncertainty to account for rather than passing
+          // over an empty set.
+          id: 'el-single-return',
+          tripId: 'trip-single',
+          elementKind: 'TRANSPORT_LEG',
+          importance: 'CRITICAL',
+          flexibility: 'CHANGEABLE',
+          reservationState: 'CHANGED',
+          status: 'UNKNOWN',
+          data: {
+            mode: 'AIR',
+            originPlaceId: 'place-arrive',
+            destinationPlaceId: 'place-depart',
+            scheduledDeparture: { value: '2026-02-22T18:00:00Z' },
+            scheduledArrival: { value: '2026-02-22T20:30:00Z' },
+            bookingRef: { system: 'atlas', reference: 'FIXTURE-PNR-2' },
             carrierRef: { system: 'iata', value: 'ZZ' },
           },
         },

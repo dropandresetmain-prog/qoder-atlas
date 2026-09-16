@@ -9,28 +9,33 @@ isolated environments.
 
 ## 1. Candidate identity
 
+> **C5 re-review.** An independent C5 review of `m10-candidate-final` found two blockers:
+> a fabricated organisation currency, and a fail-open `UNCERTAINTY_PRESERVED` check. Both are
+> fixed in this candidate, which supersedes `m10-candidate-final`. §12 records what changed and
+> what the previous candidate got wrong. The rest of M10 is unchanged.
+
 | | |
 | --- | --- |
 | Branch | `milestone-m10-migration-rehearsal` |
-| **Candidate under review** | tag **`m10-candidate-final`** |
+| **Candidate under review** | tag **`m10-candidate-c5-remediation`** |
+| Superseded candidates | `m10-candidate-final` (`eff19a9`), `m10-candidate` (`1d81dd7`) |
 | Accepted M9/C4 base | `c45a9289b7f7ff730cdce97ced6124b1a9332bf8` |
 
 The candidate is identified by an annotated tag rather than a SHA written into this file, because a
 document cannot contain the hash of the commit that contains it. Resolve it with
-`git rev-list -n 1 m10-candidate-final` (`git rev-parse` on an annotated tag returns the tag object,
-not the commit).
+`git rev-list -n 1 m10-candidate-c5-remediation` (`git rev-parse` on an annotated tag returns the
+tag object, not the commit).
 
-Two tags exist deliberately, and only one of them is under review:
+Three tags exist deliberately. Earlier tags are never moved, so their history stays honest:
 
 | tag | what it marks |
 | --- | --- |
-| `m10-candidate` | `1d81dd7` — implementation-complete. Published earlier; left where it is rather than moved, so earlier references stay honest. |
-| **`m10-candidate-final`** | **the commit under review** — `m10-candidate` plus a documentation-only evidence-consistency pass. No runtime or migration behaviour differs between the two. |
+| `m10-candidate` | `1d81dd7` — implementation complete. |
+| `m10-candidate-final` | `eff19a9` — plus an evidence-consistency pass. **Failed C5** on the two blockers in §12. |
+| **`m10-candidate-c5-remediation`** | **the commit under review** — both C5 blockers fixed, with new focused tests and regenerated rehearsal evidence. |
 
-The evidence-consistency pass changed documentation only. Everything executable below was produced
-at `1d81dd7`, which is the parent content of the final candidate — so a reviewer can verify either
-tag and get the same runtime behaviour. `git diff m10-candidate m10-candidate-final --stat` shows
-`docs/` only, and that is the claim to check first.
+Unlike the previous pass, this one **changes executable code**, so every result in §9 was re-run on
+this candidate rather than carried forward.
 
 ## 2. Tooling versions
 
@@ -55,27 +60,27 @@ migrated target. So one dataset and one hash cover both.
 | | |
 | --- | --- |
 | Source identity | `legacy-deployment-m10-restore-rehearsal` |
-| **Dataset hash** | **`3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596`** |
+| **Dataset hash** | **`6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`** |
 | Export cutoff | `2026-03-01T00:00:00Z` |
-| Migration run | `d5d72775-8b49-4157-8809-868cd8e6b298` |
-| Produced at | the final candidate, 2026-09-16T12:35Z |
+| Migration run | `39a112d5-dc51-4b61-b1da-74cebcee6404` |
+| Produced at | this candidate, by `scripts/m10-cutover-and-restore-rehearsal.mjs` |
 
 The hash is deterministic: re-exporting the same frozen source produces the same hash, and the same
 hash produces the same target ids, which is what makes a re-import a replay rather than a second
-divergent world. This was demonstrated across a tooling change — the importer changed between
-`0c5015a` and `1d81dd7`, and re-running the rehearsal reproduced `3077f43e…` unchanged, because the
-hash identifies the source dataset rather than the tool that reads it.
+divergent world.
 
-### One superseded hash, named so it cannot be confused
+### Superseded hashes, named so they cannot be confused
 
-An earlier version of this document cited
-`5da1d341b6067123ddebfaee1347599f0efaa1396a1776cb04be8fe844820c18`. **That hash is obsolete and
-describes no current evidence.** It came from a backup/restore-only run at `edfe0fc` over a smaller
-fixture (9 mappings). When the script was extended to also rehearse the cutover sequence, the
-fixture had to gain places and a booked transport leg so the reconciliation checks were not vacuous
-— a different fixture is a different dataset and therefore a different hash. Detail in
-`M10_BACKUP_RESTORE.md` §superseded runs. Nothing in the current evidence set refers to
-`5da1d341…` as live.
+The dataset hash is the identity of the *fixture*, so changing the fixture changes it by design.
+Two earlier hashes appear in the history and **describe no current evidence**:
+
+| hash | run | why superseded |
+| --- | --- | --- |
+| `5da1d341…` | backup/restore only, at `edfe0fc` | The script later absorbed the cutover sequence, which required places and a booked leg in the fixture so the reconciliation checks were not vacuous. |
+| `3077f43e…` | cutover + restore, at `1d81dd7`/`eff19a9` | The C5 remediation changed the fixture twice: the organisation gained an explicit `homeCurrency` (so the rehearsal proves real currency mapping instead of a fabricated default), and the single-traveller trip gained a `CHANGED` element (so `UNCERTAINTY_PRESERVED` has real uncertainty to account for instead of passing over an empty set). |
+
+Both changes are fixture data, not application behaviour. Detail in `M10_BACKUP_RESTORE.md`
+§superseded runs.
 
 ## 4. Reconciliation
 
@@ -124,24 +129,39 @@ exported record is either represented in the target or named in an exception; it
 These are two different things and an earlier version of this document ran them together. A reviewer
 should not have to infer which is which.
 
-### 5A. Observed in the final rehearsal — exactly one
+### 5A. Observed in the final rehearsal — two exceptions, one activation blocker
 
 This is the complete list of what `m10-reconciliation-report.{md,json}` actually produced against
-the final dataset. One exception, one activation blocker, nothing else:
+the final dataset.
+
+**1. `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` — blocks cutover for its scope**
 
 | | |
 | --- | --- |
-| Classification | `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` |
 | Source | `trips/trip-multi` |
 | Reason | the legacy trip carries 2 travellers and 2 elements; `TripElement` has no `travellerId` and `Stay.guests` is a bare headcount, so element → Journey ownership cannot be proven from source evidence |
 | Affected scope | trip `trip-multi`, travellers `[trav-multi-a, trav-multi-b]`, 2 elements |
 | Safety impact | guessing allocation would attribute flights and stays to the wrong person, and recovery would then act on the wrong traveller; the source data is preserved unmigrated instead |
 | Owner | migration owner |
-| Blocks cutover | yes, for that scope only |
 
-Three further facts about the final dataset, stated because their absence is itself evidence:
-**zero** uncertain external outcomes occurred, **zero** legacy FX observations were present, and
-**no** priced, held or settled budget commitment existed to migrate.
+**2. `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` — does not block cutover**
+
+| | |
+| --- | --- |
+| Source | `trips/trip-single`, element `el-single-return` |
+| Reason | the element stood at legacy `CHANGED`: the supplier had moved it and the legacy runtime never reconciled the new state. It migrated as target `UNKNOWN`, because CONFIRMED and CANCELLED would each assert something never observed |
+| Safety impact | the real supplier state must be re-observed before anyone relies on this booking; until then the target correctly reports that it does not know |
+| Owner | operations owner |
+
+This second exception is new in this candidate and is deliberate: the previous rehearsal fixture
+contained **no** uncertainty, so `UNCERTAINTY_PRESERVED` was evaluating an empty set. It now has
+real uncertainty to account for, and reports `1 uncertain source fact(s) in the bundle, all
+accounted for: 1 migrated uncertain reservation(s) against 1 target UNKNOWN line(s), 1 named
+PRESERVED_UNKNOWN_EXTERNAL_OUTCOME exception(s)`.
+
+Two further facts about the final dataset, stated because their absence is itself evidence:
+**zero** legacy FX observations were present, and **no** priced, held or settled budget commitment
+existed to migrate.
 
 ### 5B. Category policies that did not apply to this dataset
 
@@ -162,7 +182,7 @@ rather than more engineering.
 | `QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING` | ambiguous engagements | migration owner | yes |
 | `QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING` | constraints with no registered target expression | migration owner | no |
 | `ARCHIVED_REQUIRES_PROTECTED_CONTENT_STORE` | protected dossier content (contact, payment) | data protection owner | no |
-| `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` | uncertain provider outcomes | operations owner | no |
+| `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` | organisation with no usable `homeCurrency` | migration owner | yes |
 | `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` | latent (inferred) preferences | migration owner | no |
 | `DEFERRED_NO_HANDLER` | any category with no registered handler | migration owner | yes |
 
@@ -173,12 +193,12 @@ passing quietly.
 
 ## 6. Uncertain-operation disposition
 
-Nothing unknown was resolved by migrating it.
+Nothing unknown was resolved by migrating it, and **reconciliation can now prove that rather than
+assert it** — see §12 blocker 2.
 
-**In the final rehearsal dataset there were no uncertain external operations** — `UNCERTAINTY_PRESERVED`
-reports `0 reservation line(s) remain UNKNOWN; 0 uncertain external outcome(s)`. There was nothing
-uncertain to mishandle, which is a weaker statement than the behaviour being proven, so the proof
-comes from the integration test rather than from this rehearsal.
+The final rehearsal exercises this for real: one legacy `CHANGED` element migrates to target
+`UNKNOWN`, carries a named `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` exception, and
+`UNCERTAINTY_PRESERVED` verifies the source fact against the target representation.
 
 The behaviour below is proven by `postgres-integration/m10LegacyMigration.pgtest.ts` against a
 fixture built to contain uncertainty on purpose:
@@ -198,11 +218,12 @@ fixture built to contain uncertainty on purpose:
 isolated, **volume-backed** instance — deliberately not the shared tmpfs test database, since
 restoring into a RAM-backed non-durable data directory would prove nothing.
 
-Run at the final candidate, over the same single dataset `3077f43e…` as §3 and §4, migration run
-`d5d72775-8b49-4157-8809-868cd8e6b298`. **10/10 checks PASS**, including that the instance really is
+Run at this candidate, over the same single dataset `6ebf05ce…` as §3 and §4, migration run
+`39a112d5-dc51-4b61-b1da-74cebcee6404`. **10/10 checks PASS**, including that the instance really is
 volume-backed, that the database is genuinely destroyed before restore (0 tables remaining), that
 all 11 `legacy_id_map` tuples and the migration run identity survive, that the recomputed assessment
-survives, and that the append-only trigger is restored with the data rather than just the rows.
+survives, and that the append-only trigger is restored with the data rather than just the rows. Both
+reconciliation exceptions survive the restore with their classifications intact.
 
 Because the script rehearses cutover and restore in one pass, the reconciliation evidence in §4 and
 the restore evidence here describe the **same** migrated target, not two separately built ones.
@@ -222,9 +243,10 @@ the real `src/main.ts`) and `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`
 | `postgres-integration/m9SarahTargetE2E.pgtest.ts` | PASS |
 | `postgres-integration/m9JordanMultiActionRecovery.pgtest.ts` | PASS |
 | `postgres-integration/m9JordanReplacementFlightViability.pgtest.ts` | PASS |
-| `postgres-integration/m10LegacyMigration.pgtest.ts` | 7/7 PASS |
+| `postgres-integration/m10LegacyMigration.pgtest.ts` | **9/9 PASS** (7 + both new C5 blocker tests) |
+| `postgres-integration/m10RuntimePurgeBoot.pgtest.ts` | PASS |
 | `test/m10-legacy-exporter.test.ts` + `test/m10-runtime-purge.test.ts` | 10/10 PASS |
-| `npm run test:postgres` on a **fresh** database | **468/468 PASS** |
+| `npm run test:postgres` on a **fresh** database | **470/470 PASS**, exit 0 |
 | `npx tsc --noEmit` | clean |
 | `npm run build` | clean |
 | `npm run lint` | clean |
@@ -233,10 +255,9 @@ the real `src/main.ts`) and `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`
 Sarah and Jordan were not modified to accommodate migration tooling; they remain independent
 target-runtime regression evidence.
 
-Every executable result in this table was produced at `1d81dd7` (tag `m10-candidate`). The final
-candidate `m10-candidate-final` adds a documentation-only evidence pass on top, so no test result
-above needs re-running to apply to it — verify with
-`git diff m10-candidate m10-candidate-final --stat`, which touches `docs/` only.
+470 is the previous 468 plus the two new C5 blocker tests. Every result in this table was produced
+on **this** candidate; unlike the previous evidence pass, nothing is carried forward, because this
+candidate changes executable code.
 
 ## 10. Cutover steps and rollback boundaries
 
@@ -262,20 +283,99 @@ The boundary is observable rather than a judgement call: Zone B begins at the fi
 
 ## 11. Suite behaviour on an accumulated database, disclosed rather than hidden
 
-The gate above was run on a freshly created `northstar_test` database and is 468/468.
+The gate above was run on a freshly created `northstar_test` database and is 470/470, exit 0.
 
-Two earlier runs against the *shared, accumulated* test database each failed one test, and a
-different one each time: `m3IdentityMoney.pgtest.ts` on the first, `m2Travel.pgtest.ts` on the
-second. Both pass on a fresh database. The `m2Travel` failure is diagnostic of the cause — it
-asserts that a specific query uses a specific index, and on an accumulated database the planner
-chose a *different* index (still no sequential scan) because table statistics had shifted.
+This suite has a low-rate, non-deterministic single-file failure that a reviewer should expect and
+not mistake for a regression. Across four full runs it has landed on a **different file every
+time** and never twice on the same one:
 
-So this is a property of running the suite against a database that other worktrees have been filling
-for hours, not a regression and not the carried `PG-ASSESS-SERIAL` concurrency risk. The exit gate
-correctly requires a fresh database. A reviewer running against a reused database should expect
-plan-sensitive assertions to be unreliable and should recreate the database first.
+| run | database | result |
+| --- | --- | --- |
+| 1 | shared, accumulated | 1 failure: `m3IdentityMoney.pgtest.ts` |
+| 2 | shared, accumulated | 1 failure: `m2Travel.pgtest.ts` |
+| 3 | fresh | 1 failure: `m2SubtypeIntegrity.pgtest.ts` |
+| 4 | fresh | **470/470 PASS** |
 
-## 12. What a reviewer should probe
+Two distinct causes are visible. The `m2Travel` failure is plan-sensitivity: it asserts a specific
+query uses a specific index, and on an accumulated database the planner chose a *different* index
+(still no sequential scan) because table statistics had shifted. The run-3 failure was different in
+kind — `m2SubtypeIntegrity` failed at **file level in 547ms without executing a single subtest**,
+which is a startup/connection failure rather than a failed assertion. It passes 15/15 in isolation,
+61/61 when run with its alphabetical predecessor, and passed in run 4, so it is a connection-setup
+race under a long sequential suite, not a broken invariant.
+
+Neither cause is the carried `PG-ASSESS-SERIAL` concurrency risk, and neither is specific to the
+M10 changes. Recorded here rather than buried because a reviewer who hits it should re-run the
+affected file in isolation before treating it as a finding. The residual risk is accepted, not
+fixed: chasing a connection-setup race in the test harness is out of M10's scope, and it is tracked
+as `PGTEST-FILE-STARTUP-RACE`.
+
+## 12. C5 remediation — what the previous candidate got wrong
+
+Both findings were correct, and both were cases of the migration asserting something it had not
+established. That is exactly the failure mode the rest of M10 is built to prevent, which is why
+neither was acceptable as a documented caveat.
+
+### Blocker 1 — organisation currency was invented
+
+The importer read `payload.defaultCurrencyCode` and fell back to `'USD'`. Two things were wrong:
+
+- `defaultCurrencyCode` is a **target** field name (`peopleCommands.ts`, `organisations`). It does
+  not exist in the legacy model at all, so that branch could never be taken — **every** migrated
+  organisation received a fabricated `USD`.
+- The real legacy field is `homeCurrency` (`src/domain/entities.ts`), optional and guarded by
+  `/^[A-Z]{3}$/`, and its documented semantics (ADR-045/052) are that **absent means the
+  organisation had no home-currency normalisation**. Absence is a fact about the source, not a gap
+  to fill.
+
+Now: a valid `homeCurrency` maps straight to `default_currency_code`, preserving the exact code. An
+absent or non-conforming value **fails closed** — the organisation is not created, its payload is
+archived as `LEGACY_ORGANISATION` evidence so the lineage survives, and an
+`ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` exception blocks cutover for that scope with owner, scope
+and safety impact named. The target schema was not weakened: `default_currency_code` remains
+`NOT NULL`, which is what forces the honest answer.
+
+Dependent records already failed safely and this is now covered by a test: a trip whose
+`operatorOrganisationId` has no migrated identity is quarantined as
+`QUARANTINED_AMBIGUOUS_IDENTITY` and blocks cutover, rather than migrating without its business
+party or attaching to invented state.
+
+The rehearsal fixture's organisation now carries an explicit `homeCurrency: 'SGD'`, so the headline
+rehearsal proves positive mapping instead of exercising a default. That is fixture data; no currency
+is hardcoded in application logic, and `gate:anti-hardcoding` is clean.
+
+### Blocker 2 — `UNCERTAINTY_PRESERVED` could not fail
+
+The check passed a literal `'PASS'` and put its counts in the detail string. A dataset that lost or
+falsely resolved uncertainty would still have reconciled green, which made the one check most
+responsible for "we did not invent certainty" worthless.
+
+It is now computed from the **source bundle**, because only the source can say what the old system
+did not know. `src/migration/legacyUncertainty.ts` holds the single definition of uncertain legacy
+state — `CHANGED` and `UNKNOWN` reservation states, and provider deliveries whose
+`processedStatus` is not `PROCESSED`/`IGNORED`/`FAILED` — and **both the importer and the reconciler
+read it**, so the two cannot drift into different interpretations of the same legacy row. Fixing
+this also closed a real inconsistency: the importer previously raised its preserved-unknown
+exception only for `CHANGED`, silently treating a legacy `UNKNOWN` as unremarkable.
+
+For each uncertain source fact the reconciler requires one of: an explicitly `UNKNOWN` target
+representation, a named exception, or archived evidence. It returns `FAIL` when a fact is
+unaccounted for, and when the count of target `UNKNOWN` reservation lines falls below the number of
+migrated uncertain elements — that second arm is what catches an unknown being resolved to a status
+nobody observed.
+
+Proven by `C5 blocker 2: falsely resolving a migrated UNKNOWN makes UNCERTAINTY_PRESERVED fail`,
+which imports the bundle, confirms the check passes honestly, then updates a migrated `UNKNOWN`
+line to `CONFIRMED` — satisfying the table's CHECK constraints so the row looks superficially
+complete — and asserts the check flips to `FAIL` and the verdict to `BLOCKED`.
+
+### Deliberately not changed
+
+`QUARANTINED_MULTI_TRAVELLER_ALLOCATION` remains, as C5 accepted, and was not "solved" by guessing
+traveller ownership. Provider-reference correlation, RecoveryCase/Signal/preference/rule-set
+archive decisions, and the old SQLite UI routes were untouched.
+
+## 13. What a reviewer should probe
 
 Three judgement calls deserve independent scrutiny more than the code does:
 
@@ -289,3 +389,26 @@ Three judgement calls deserve independent scrutiny more than the code does:
 3. **Provider references preserved but not correlated.** Binding them as target external identity
    needs the M3 external-identity resolution seam. Is deferring that acceptable for the M10
    candidate?
+4. **The organisation-currency disposition (new).** A legacy organisation with no `homeCurrency`
+   now blocks its own scope rather than migrating. Is `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` with
+   archived evidence the right disposition, or should M11 carry an operator-supplied currency input
+   so such organisations can migrate? The deliberate choice here was *not* to invent a migration
+   input mechanism for this one field.
+
+### Verifying the two C5 fixes directly
+
+```bash
+# Blocker 1: the fabricated default is gone, and the real field is read.
+rg -n "homeCurrency" src/migration/legacyImporter.ts
+rg -n "USD" src/migration/            # expect no match
+
+# Blocker 2: the status is computed, and one definition is shared.
+rg -n "uncertaintyStatus" src/migration/reconcileMigration.ts
+rg -n "legacyUncertainty" src/migration/   # importer and reconciler both read it
+
+# Both, executed:
+node --test postgres-integration/m10LegacyMigration.pgtest.ts   # 9/9
+```
+
+The second test deliberately falsifies target state and asserts the check turns `FAIL`, so it is
+also the proof that the check *can* fail.

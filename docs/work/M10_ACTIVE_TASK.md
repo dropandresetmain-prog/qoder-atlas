@@ -315,6 +315,10 @@ seam. After Phase 1's named gaps close, start Phase 3 (legacy exporter) per
 | EVIDENCE-MAPPING-SEMANTICS | **Closed** (final evidence pass) | "11 exported / 11 mappings" read as though all 11 source records became live target entities. They are two different elevens: 9 live + 1 archived-as-evidence + 1 quarantined-with-no-mapping-row, and the 11th mapping is a synthetic `trips.journey` row because the legacy model had no Journey concept. |
 | EVIDENCE-SQLITE-FALLBACK | **Closed** (final evidence pass) | Rollback Zone A said "point traffic back at the legacy runtime", contradicting the frozen single-runtime rule. Rewritten as abort/freeze/restore-pre-import-backup/re-import/retry, with an explicit statement that neither zone permits reactivating the SQLite application. Historical M1/M2/M5/M7/M9 evidence left unedited — it described its own moment accurately. |
 | DOC-ENCODING-DAMAGE | **Closed** (final evidence pass) | `M10_ACTIVE_TASK.md` had been written through a lossy single-byte encoding: 5 section signs decoded as U+FFFD and ~72 em dashes, 5 arrows and 2 ellipses flattened to literal `?`. Repaired to real UTF-8; the URL query and `?? 1` operator references were preserved. Meaning unchanged. |
+| C5-ORG-CURRENCY | **Closed** (C5 remediation) | Blocker 1. The importer read `payload.defaultCurrencyCode` — a *target* field name absent from the legacy model — and fell back to `'USD'`, so every migrated organisation got a fabricated currency. Now maps legacy `homeCurrency` exactly when it matches /^[A-Z]{3}$/, and otherwise fails closed: no organisation row, payload archived as `LEGACY_ORGANISATION` evidence, `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` exception blocking that scope. Target schema unchanged (`default_currency_code NOT NULL` is what forces the honest answer). |
+| C5-UNCERTAINTY-FAIL-OPEN | **Closed** (C5 remediation) | Blocker 2. `UNCERTAINTY_PRESERVED` passed a literal `'PASS'` with counts only in the detail string, so a dataset that lost or falsely resolved uncertainty still reconciled green. Now computed from the source bundle via the shared `legacyUncertainty.ts`, which the importer reads too so the two cannot drift. Returns FAIL on an unaccounted fact or when target UNKNOWN lines fall below migrated uncertain elements. Negative proof: tamper a migrated UNKNOWN to CONFIRMED, check flips to FAIL and verdict to BLOCKED. |
+| C5-LEGACY-UNKNOWN-UNNAMED | **Closed** (C5 remediation) | Found while sharing the uncertainty definition: the importer raised `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` only for legacy `CHANGED`, treating a legacy `UNKNOWN` reservation as unremarkable even though it is equally an unresolved external outcome. Both now earn a named exception. |
+| PGTEST-FILE-STARTUP-RACE | Ignore / Accept Risk | A full `test:postgres` run intermittently fails exactly one file, a different one each time (`m3IdentityMoney`, then `m2Travel`, then `m2SubtypeIntegrity`). The third failed at file level in 547ms with no subtest executed — a startup/connection failure, not an assertion — and passed 15/15 alone, 61/61 with its predecessor, and in the next full run (470/470). Two causes: planner plan-sensitivity on an accumulated database, and a connection-setup race under a long sequential suite. Neither is an M10 regression; chasing a harness race is out of scope. Re-run the affected file in isolation before treating it as a finding. |
 | MIG-VERIFY-DUP | Park for Later | The rehearsal script's `snapshotMigratedState` and `reconcileMigration` each hand-roll their own mapping-tuple and run-identity reads. They check genuinely different invariants (restore fidelity vs. migration semantics), so this is duplication of SQL rather than of meaning — but a shared `summariseMigratedDataset` read would stop them drifting. Revisit if a third caller appears, or before M11 cutover verification is written. |
 | ORG-INHERIT | Park for Later (carried) | Exact grant match only |
 | FABLE-POLISH | Park for Later (carried) | Visual refinement only |
@@ -323,43 +327,46 @@ seam. After Phase 1's named gaps close, start Phase 3 (legacy exporter) per
 
 ## Exact candidate state
 
-**Candidate under review: tag `m10-candidate-final` on
+**Candidate under review: tag `m10-candidate-c5-remediation` on
 `milestone-m10-migration-rehearsal`** (resolve with
-`git rev-list -n 1 m10-candidate-final`), base
+`git rev-list -n 1 m10-candidate-c5-remediation`), base
 `c45a9289b7f7ff730cdce97ced6124b1a9332bf8`.
 
-Two tags, deliberately: `m10-candidate` marks `1d81dd7` (implementation
-complete) and was left where it was published rather than moved;
-`m10-candidate-final` adds a **documentation-only** evidence-consistency pass.
-`git diff m10-candidate m10-candidate-final --stat` touches `docs/` only, so
-every executable result below, produced at `1d81dd7`, applies unchanged.
+Three tags, none ever moved, so each stays honest: `m10-candidate` = `1d81dd7`
+(implementation complete); `m10-candidate-final` = `eff19a9` (evidence pass,
+**failed C5**); `m10-candidate-c5-remediation` = this candidate, with both C5
+blockers fixed. Unlike the evidence pass, this one changes executable code, so
+all gates were re-run here rather than carried forward.
 
-Phases 3-10 are implemented and rehearsed. **One** final rehearsal dataset,
+Phases 3-10 are implemented and rehearsed. **One** canonical rehearsal dataset,
 covering cutover and restore in a single run of
 `scripts/m10-cutover-and-restore-rehearsal.mjs`: identity
 `legacy-deployment-m10-restore-rehearsal`, hash
-`3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596`, run
-`d5d72775-8b49-4157-8809-868cd8e6b298`, exporter
+`6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`, run
+`39a112d5-dc51-4b61-b1da-74cebcee6404`, exporter
 `northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`,
 reconciler `northstar-migration-reconciler/1.0.0`.
 
-The earlier hash `5da1d341…` is **obsolete** — a backup/restore-only run at
-`edfe0fc` over a smaller fixture, superseded when the script gained the cutover
-sequence and the fixture gained places and a booked leg. Re-running at the
-final candidate reproduced `3077f43e…` unchanged across an importer change,
-which is the determinism property that matters.
+Two earlier hashes are **obsolete**, both because the fixture changed and the
+hash is the fixture's identity: `5da1d341…` (backup/restore only, `edfe0fc`)
+and `3077f43e…` (`1d81dd7`/`eff19a9`, before the organisation gained an
+explicit `homeCurrency` and the single trip gained a `CHANGED` element).
 
-Observed exceptions in the final rehearsal: **exactly one**,
-`QUARANTINED_MULTI_TRAVELLER_ALLOCATION` (`trips/trip-multi`), cutover-blocking
-for that scope. Everything else in the category matrix is a *policy that did
-not apply* to this dataset — proven by `m10LegacyMigration.pgtest.ts`, exported
-zero rows here. C5 §5A/§5B keeps those two lists apart.
+Observed exceptions in the canonical rehearsal: **two**, one blocking.
+`QUARANTINED_MULTI_TRAVELLER_ALLOCATION` (`trips/trip-multi`) blocks its scope;
+`PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` (`trips/trip-single`, the `CHANGED`
+element) does not. The second is new and deliberate: the previous fixture had
+no uncertainty at all, so `UNCERTAINTY_PRESERVED` was evaluating an empty set.
+Everything else in the category matrix is a *policy that did not apply* to this
+dataset. C5 §5A/§5B keeps those two lists apart.
 
-Evidence on the exact candidate: `npm run test:postgres` **468/468 on a fresh
-database**; cutover + restore rehearsal 10/10; 9/9 semantic checks PASS with
-verdict BLOCKED (correct while one scope is quarantined); Sarah and both Jordan
-PG regressions PASS; typecheck, build, lint and anti-hardcoding all clean. The
-C5 request package is `docs/refactor/evidence/C5_REQUEST_PACKAGE.md`.
+Evidence on this candidate: `npm run test:postgres` **on a fresh database**;
+migration suite 9/9 including both new C5 blocker tests; cutover + restore
+rehearsal 10/10; 9/9 semantic checks PASS with verdict BLOCKED (correct while
+one scope is quarantined); Sarah and both Jordan PG regressions PASS;
+exporter + runtime-purge 10/10; purge boot PASS; typecheck, build, lint and
+anti-hardcoding all clean. The C5 request package is
+`docs/refactor/evidence/C5_REQUEST_PACKAGE.md`, §12 records the remediation.
 
 **C5 is not claimed** — it is an independent review and owner gate. **No
 production cutover occurred.**

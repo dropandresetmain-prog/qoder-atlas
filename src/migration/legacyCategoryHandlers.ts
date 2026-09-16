@@ -20,6 +20,7 @@
  */
 
 import type { MigrationSourceRecord } from './legacyExportBundle.ts';
+import { isSettledProviderStatus, isUncertainReservationState } from './legacyUncertainty.ts';
 import {
   archiveLegacyRecord,
   asObject,
@@ -41,6 +42,7 @@ import {
   addReservationLine,
 } from '../persistence/postgres/commands/arrangementCommands.ts';
 
+export const LEGACY_ORGANISATION_ASSERTION = 'LEGACY_ORGANISATION';
 export const LEGACY_RULE_SET_ASSERTION = 'LEGACY_RULE_SET';
 export const LEGACY_RECOVERY_CASE_ASSERTION = 'LEGACY_RECOVERY_CASE';
 export const LEGACY_CHANGE_SIGNAL_ASSERTION = 'LEGACY_CHANGE_SIGNAL';
@@ -656,7 +658,8 @@ export async function importProviderDelivery(
   const providerEventId = str(payload.providerEventId) ?? 'unknown event';
   const status = str(payload.processedStatus);
   const receivedAt = str(payload.receivedAt);
-  const settled = status === 'PROCESSED' || status === 'IGNORED' || status === 'FAILED';
+  // Shared with the reconciler: one definition of a settled provider outcome.
+  const settled = isSettledProviderStatus(status);
 
   const archived = await archiveLegacyRecord(ctx, record, {
     assertionType: LEGACY_PROVIDER_DELIVERY_ASSERTION,
@@ -712,9 +715,9 @@ function reservationStatus(legacy: string | undefined): {
       return { reservation: 'CANCELLED', line: 'CANCELLED' };
     case 'COMPLETED':
       return { reservation: 'COMPLETED', line: 'FULFILLED' };
-    // CHANGED means the supplier moved it and the legacy runtime had not
-    // reconciled the new state. The target has no CHANGED, and both CONFIRMED
-    // and CANCELLED would assert something unobserved.
+    // Everything else — CHANGED, UNKNOWN, or an unrecognised value — reaches
+    // the target as UNKNOWN. See `legacyUncertainty.ts`, which the reconciler
+    // reads from the same constants so it can prove this happened.
     default:
       return { reservation: 'UNKNOWN', line: 'UNKNOWN' };
   }
@@ -962,12 +965,15 @@ export async function migrateTripElements(
       if (!archived.ok && archived.outcome.kind === 'QUARANTINED') result.exceptions.push(archived.outcome.exception);
     }
 
-    if (legacyState === 'CHANGED') {
+    // Every uncertain legacy state earns its own named exception, not just
+    // CHANGED: a legacy UNKNOWN is equally an unresolved external outcome, and
+    // the reconciler holds both to the same standard.
+    if (isUncertainReservationState(legacyState)) {
       result.exceptions.push({
         classification: 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
         reason:
-          `legacy element ${elementId} stood at CHANGED — the supplier had moved it and the legacy runtime had ` +
-          'not reconciled the new state. The target has no CHANGED status, and both CONFIRMED and CANCELLED ' +
+          `legacy element ${elementId} stood at ${legacyState} — the supplier state was never reconciled by the ` +
+          'legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED ' +
           'would assert something never observed, so it migrated as UNKNOWN',
         affectedScope: `element ${elementId} on trip ${record.sourceId}, reservation ${reservation.value.id}`,
         safetyImpact:

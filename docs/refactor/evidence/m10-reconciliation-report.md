@@ -2,10 +2,10 @@
 
 **Verdict: BLOCKED.** 1 exception(s) block cutover for their scope. Cutover must not proceed for the affected scope until an owner resolves these.
 
-- Run `d5d72775-8b49-4157-8809-868cd8e6b298` (COMPLETED), generated 2026-03-02T09:00:00Z
-- Dataset hash `3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596`
+- Run `39a112d5-dc51-4b61-b1da-74cebcee6404` (COMPLETED), generated 2026-03-02T09:00:00Z
+- Dataset hash `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`
 - Exporter `northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`, reconciler `northstar-migration-reconciler/1.0.0`
-- 11 exported record(s), 11 mapping(s), 1 exception(s), 1 blocking cutover
+- 11 exported record(s), 11 mapping(s), 2 exception(s), 1 blocking cutover
 
 ## Semantic checks
 
@@ -23,10 +23,10 @@
 
 - **IDENTITY_ACCOUNTED — PASS.** all 11 exported records are accounted for
 - **JOURNEY_OWNERSHIP_PROVEN — PASS.** 1 migrated journey(ies), 0 without a traveller. Trips whose element ownership was unprovable were quarantined rather than allocated: 1 case(s).
-- **PROVIDER_REFS_PRESERVED — PASS.** 1 legacy booking reference(s) in the bundle; 1 preserved as evidence against a migrated reservation; 1 element-level exception(s) account for the rest. Binding references as target external identity remains a documented open seam.
+- **PROVIDER_REFS_PRESERVED — PASS.** 2 legacy booking reference(s) in the bundle; 2 preserved as evidence against a migrated reservation; 2 element-level exception(s) account for the rest. Binding references as target external identity remains a documented open seam.
 - **EVIDENCE_LINEAGE_INTACT — PASS.** all 11 mappings cite an evidence record that exists
-- **OBLIGATIONS_COMPLETE — PASS.** 1 reservation(s), 0 holding no line
-- **UNCERTAINTY_PRESERVED — PASS.** 0 reservation line(s) remain UNKNOWN; 0 uncertain external outcome(s) are explicitly preserved as unknown rather than resolved to failed or succeeded
+- **OBLIGATIONS_COMPLETE — PASS.** 2 reservation(s), 0 holding no line
+- **UNCERTAINTY_PRESERVED — PASS.** 1 uncertain source fact(s) in the bundle, all accounted for: 1 migrated uncertain reservation(s) against 1 target UNKNOWN line(s), 1 named PRESERVED_UNKNOWN_EXTERNAL_OUTCOME exception(s), 0 archived provider delivery record(s)
 - **MONEY_ACCOUNTED — PASS.** no budget commitment migrated: the legacy dataset held no priced, held or settled commitment. 0 legacy FX observation(s) are archived as dated history and are never used as a current conversion rate.
 - **DERIVED_TRUTH_RECOMPUTED — PASS.** 1/1 assessment(s) were evaluated after the import began; legacy verdicts are archived as LEGACY_CONSTRAINT_STATUS evidence and are not assessments
 - **NO_PROVIDER_DISPATCH — PASS.** no execution attempt exists in this workspace: the migration is provider-side-effect-free
@@ -40,7 +40,7 @@
 | PLACE | MIGRATE_TRANSFORM | 2 | 2 | 0 | 0 |
 | ANCHOR_EVENT | MIGRATE_TRANSFORM | 0 | 0 | 0 | 0 |
 | RULE_SET | ARCHIVE_AND_REGENERATE | 0 | 0 | 0 | 0 |
-| TRIP | MIGRATE_THEN_RECONCILE | 2 | 1 | 0 | 1 |
+| TRIP | MIGRATE_THEN_RECONCILE | 2 | 1 | 0 | 2 |
 | CONSTRAINT | TRANSFORM_AND_REASSESS | 1 | 1 | 0 | 0 |
 | RECOVERY_CASE | ARCHIVE_AND_REGENERATE | 0 | 0 | 0 | 0 |
 | SIGNAL | ARCHIVE_AS_IMMUTABLE_HISTORY | 0 | 0 | 0 | 0 |
@@ -53,7 +53,15 @@
 
 ## Exceptions
 
-1 of 1 block cutover for their scope.
+1 of 2 block cutover for their scope.
+
+### PRESERVED_UNKNOWN_EXTERNAL_OUTCOME — `trips/trip-single`
+
+- **Blocks cutover:** no
+- **Owner:** operations owner
+- **Reason:** legacy element el-single-return stood at CHANGED — the supplier state was never reconciled by the legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED would assert something never observed, so it migrated as UNKNOWN
+- **Affected scope:** element el-single-return on trip trip-single, reservation d60b6843-2537-542b-844c-5af62cf77ce0
+- **Safety impact:** the real supplier state must be re-observed before anyone relies on this booking; until then the target correctly reports that it does not know
 
 ### QUARANTINED_MULTI_TRAVELLER_ALLOCATION — `trips/trip-multi`
 

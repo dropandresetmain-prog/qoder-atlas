@@ -96,11 +96,12 @@ a warning.
 
 Two separate lists. Conflating them would overstate what the rehearsal found.
 
-### Observed in the final rehearsal — one
+### Observed in the final rehearsal — two, of which one blocks
 
 | finding | scope held back | owner | what unblocks it |
 | --- | --- | --- | --- |
 | `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` | multi-traveller legacy trips (`trip-multi`, 2 travellers, 2 elements) | migration owner | source evidence proving element → traveller ownership, or an accepted manual allocation |
+| `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` (**does not block**) | one `CHANGED` element on `trip-single`, migrated as target `UNKNOWN` | operations owner | re-observation of the actual supplier state |
 
 ### Policies that will apply only if the real final export contains such rows
 
@@ -115,7 +116,7 @@ handling is decided and tested; what remains is an owner decision at M11, not en
 | `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` (rule sets) | supplier/operational policy checks | policy owner | registered rule expressions authored against the predicate registry |
 | `QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING` (engagements) | programme participation | migration owner | obligation level per participant, which the legacy engagement did not record |
 | `ARCHIVED_REQUIRES_PROTECTED_CONTENT_STORE` (dossier PII) | traveller contact/payment | data protection owner | a real protected-content store to hold the values a `ProtectedDataRef` points at |
-| `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` | specific bookings and deliveries | operations owner | re-observation of actual supplier state |
+| `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` (organisation with no `homeCurrency`) | the organisation and everything scoped to it | migration owner | an owner-supplied currency; the target requires `default_currency_code NOT NULL` and migration will not invent a money value |
 | `DEFERRED_NO_HANDLER` | any category with no registered handler | migration owner | a handler, or an accepted decision to exclude that category |
 
 Note that none of these is a defect to fix in the migration. Each is a place where the legacy data

@@ -37,8 +37,10 @@ import {
 } from './legacyExportBundle.ts';
 import { resolveLegacyConstraint } from './legacyConstraintMapping.ts';
 import {
+  archiveLegacyRecord,
   asObject,
   conflictText,
+  str,
   stringArray,
   type CategoryHandler,
   type ImportContext,
@@ -56,6 +58,7 @@ import {
   importRuleSet,
   importSignal,
   migrateTripElements,
+  LEGACY_ORGANISATION_ASSERTION,
 } from './legacyCategoryHandlers.ts';
 import {
   appendReconciliationException,
@@ -135,17 +138,54 @@ async function importOrganisation(
       },
     };
   }
+  // The legacy field is `homeCurrency` (src/domain/entities.ts), optional and
+  // guarded by /^[A-Z]{3}$/. Absent means the organisation had *no*
+  // home-currency normalisation (ADR-045/052) — a real fact about the source,
+  // not a gap to paper over. The target column is NOT NULL, so there is no way
+  // to migrate the organisation while staying silent about the currency, and
+  // choosing one would be inventing a money field. So this fails closed.
+  const legacyCurrency = str(payload?.homeCurrency);
+  const homeCurrency = legacyCurrency !== undefined && /^[A-Z]{3}$/.test(legacyCurrency)
+    ? legacyCurrency
+    : undefined;
+  if (homeCurrency === undefined) {
+    const archived = await archiveLegacyRecord(ctx, record, {
+      assertionType: LEGACY_ORGANISATION_ASSERTION,
+      contentKind: 'organisation',
+      provenance:
+        `legacy organisation ${record.sourceId} ("${legalName}") carried ` +
+        `${legacyCurrency === undefined ? 'no homeCurrency' : `homeCurrency "${legacyCurrency}", which is not a supported 3-letter code`}. ` +
+        'Archived verbatim; not migrated, because the target requires a currency and migration does not choose one',
+    });
+    return {
+      kind: 'QUARANTINED',
+      exception: {
+        classification: 'ARCHIVED_REQUIRES_TARGET_POLICY_INPUT',
+        reason:
+          legacyCurrency === undefined
+            ? `legacy ORGANISATION has no homeCurrency, which legitimately means it had no home-currency ` +
+              `normalisation; the target requires default_currency_code NOT NULL, and migration must not invent a ` +
+              `money value, so an owner must supply the currency for this organisation`
+            : `legacy ORGANISATION homeCurrency "${legacyCurrency}" is not a supported 3-letter currency code, so it ` +
+              `cannot be mapped to the target's default_currency_code without an owner deciding the real value`,
+        affectedScope: `organisation ${record.sourceId} and everything scoped to it`,
+        safetyImpact:
+          'defaulting the currency would attach invented money semantics to every spend comparison, policy ' +
+          'threshold and budget check made against this organisation',
+        owner: 'migration owner',
+        blocksCutover: true,
+      },
+      ...(archived.ok ? { evidenceId: archived.evidenceId } : {}),
+    };
+  }
+
   const outcome = await createOrganisation(ctx.uow(), {
     workspaceId: ctx.workspaceId,
     actorPrincipalId: ctx.actorPrincipalId,
     idempotencyKey: ctx.idempotencyKey(record, 'organisation'),
     organisationId: ctx.targetId(record, 'organisation'),
     legalName,
-    // Legacy organisations carry no currency. The target column is NOT NULL,
-    // so a value must exist; taking it from the legacy payload when present
-    // and otherwise recording the absence in the mapping note is honest,
-    // whereas silently defaulting a *money* field would not be.
-    defaultCurrencyCode: typeof payload?.defaultCurrencyCode === 'string' ? payload.defaultCurrencyCode : 'USD',
+    defaultCurrencyCode: homeCurrency,
   });
   if (!outcome.ok) {
     return {
@@ -164,10 +204,7 @@ async function importOrganisation(
     kind: 'IMPORTED',
     targetKind: 'ORGANISATION',
     targetId: outcome.value.organisationId,
-    note:
-      typeof payload?.defaultCurrencyCode === 'string'
-        ? 'legal name and default currency from legacy payload'
-        : 'legal name from legacy payload; legacy source carried no default currency (target column is NOT NULL)',
+    note: `legal name and default currency ${homeCurrency} mapped from legacy homeCurrency`,
   };
 }
 

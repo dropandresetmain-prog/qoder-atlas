@@ -45,6 +45,7 @@ const FORBIDDEN_MODULES = [
   resolve(ROOT, 'src/migration/legacyImporter.ts'),
   resolve(ROOT, 'src/migration/migrationRunStore.ts'),
   resolve(ROOT, 'src/migration/recomputeMigratedState.ts'),
+  resolve(ROOT, 'src/migration/legacyUncertainty.ts'),
 ];
 
 const IMPORT_SPECIFIER_RE = /(?:import|export)\s[^;]*?\sfrom\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;

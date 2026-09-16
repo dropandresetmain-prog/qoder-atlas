@@ -33,6 +33,7 @@ import {
 import { readMigrationRun } from '../src/migration/migrationRunStore.ts';
 import { recomputeMigratedState } from '../src/migration/recomputeMigratedState.ts';
 import { reconcileMigration, renderReconciliationReport } from '../src/migration/reconcileMigration.ts';
+import { collectUncertainSourceFacts } from '../src/migration/legacyUncertainty.ts';
 import { currentAssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 
 const CUTOFF = '2026-03-01T00:00:00Z';
@@ -79,7 +80,13 @@ function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): strin
   db.prepare('INSERT INTO schema_meta (key, value) VALUES (?, ?)').run('schema_version', '2');
 
   const entity = db.prepare('INSERT INTO entities (entity_type, id, data) VALUES (?, ?, ?)');
-  entity.run('ORGANISATION', 'org-legacy', JSON.stringify({ id: 'org-legacy', name: 'Legacy Operations Ltd' }));
+  // An explicit source-side home currency: the happy path must prove real
+  // mapping, not a default. A second organisation below deliberately omits it.
+  entity.run(
+    'ORGANISATION',
+    'org-legacy',
+    JSON.stringify({ id: 'org-legacy', name: 'Legacy Operations Ltd', homeCurrency: 'SGD' }),
+  );
   entity.run('TRAVELLER', 'trav-solo', JSON.stringify({ id: 'trav-solo', displayName: 'Solo Traveller' }));
   entity.run('TRAVELLER', 'trav-pair-a', JSON.stringify({ id: 'trav-pair-a', displayName: 'Pair Traveller A' }));
   entity.run('TRAVELLER', 'trav-pair-b', JSON.stringify({ id: 'trav-pair-b', displayName: 'Pair Traveller B' }));
@@ -807,4 +814,233 @@ test('MigrationInterrupted is a real interruption, not a swallowed error', () =>
   const error = new MigrationInterrupted(3);
   assert.equal(error.afterRecords, 3);
   assert.match(error.message, /interrupted after 3 record/);
+});
+
+// ---------------------------------------------------------------------------
+// C5 blocker 1 — organisation currency is mapped, never invented
+// ---------------------------------------------------------------------------
+
+const CURRENCY_DATASET = 'legacy-deployment-currency';
+
+/**
+ * Three organisations that differ only in their currency evidence, plus a trip
+ * that depends on the one which cannot migrate.
+ *
+ * The legacy field is `homeCurrency` and it is optional: absent genuinely means
+ * the organisation had no home-currency normalisation. The target requires
+ * `default_currency_code NOT NULL`, so absence cannot be migrated silently and
+ * must not be defaulted.
+ */
+function buildCurrencyDataset(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'm10-currency-'));
+  workDirs.push(dir);
+  const path = join(dir, 'legacy.db');
+  const db = new DatabaseSync(path);
+  db.exec(`
+    CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE entities (entity_type TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (entity_type, id));
+    CREATE TABLE trips (id TEXT PRIMARY KEY, version INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+  `);
+  db.prepare('INSERT INTO schema_meta (key, value) VALUES (?, ?)').run('schema_version', '2');
+
+  const entity = db.prepare('INSERT INTO entities (entity_type, id, data) VALUES (?, ?, ?)');
+  entity.run(
+    'ORGANISATION',
+    'org-sgd',
+    JSON.stringify({ id: 'org-sgd', name: 'Singapore Operations Pte', homeCurrency: 'SGD' }),
+  );
+  // No homeCurrency at all: a legitimate legacy state, not corruption.
+  entity.run('ORGANISATION', 'org-none', JSON.stringify({ id: 'org-none', name: 'No Currency Ltd' }));
+  // Present but not a supported 3-letter code, so equally unmappable.
+  entity.run(
+    'ORGANISATION',
+    'org-bad',
+    JSON.stringify({ id: 'org-bad', name: 'Bad Currency Ltd', homeCurrency: 'sgd' }),
+  );
+  entity.run('TRAVELLER', 'trav-dep', JSON.stringify({ id: 'trav-dep', displayName: 'Dependent Traveller' }));
+
+  // This trip's business context is the organisation that cannot migrate.
+  db.prepare('INSERT INTO trips (id, version, data, updated_at) VALUES (?, ?, ?, ?)').run(
+    'trip-dependent',
+    1,
+    JSON.stringify({
+      id: 'trip-dependent',
+      label: 'Trip scoped to an unmigratable organisation',
+      travellerIds: ['trav-dep'],
+      operatorOrganisationId: 'org-none',
+      elements: [],
+    }),
+    '2026-02-01T00:00:00Z',
+  );
+
+  db.close();
+  return path;
+}
+
+test('C5 blocker 1: legacy homeCurrency maps exactly, and a missing currency fails closed', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportLegacyDataset({
+    sqlitePath: buildCurrencyDataset(),
+    sourceIdentity: CURRENCY_DATASET,
+    exportCutoff: CUTOFF,
+    now: () => '2026-03-01T12:00:00Z',
+  });
+
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+
+  // --- 1. The organisation that had a currency maps it exactly ---
+  const orgs = await pool.query<{ legal_name: string; default_currency_code: string }>(
+    'SELECT legal_name, default_currency_code FROM organisations WHERE workspace_id = $1 ORDER BY legal_name',
+    [workspaceId],
+  );
+  assert.equal(orgs.rowCount, 1, 'only the organisation with a defensible currency migrated');
+  assert.equal(orgs.rows[0]?.legal_name, 'Singapore Operations Pte');
+  assert.equal(orgs.rows[0]?.default_currency_code, 'SGD', 'legacy homeCurrency SGD became default_currency_code');
+
+  // --- 2. Nothing was defaulted to USD, which is the actual C5 blocker ---
+  const fabricated = await pool.query(
+    `SELECT 1 FROM organisations WHERE workspace_id = $1 AND default_currency_code = 'USD'`,
+    [workspaceId],
+  );
+  assert.equal(fabricated.rowCount, 0, 'no organisation was created with a fabricated USD currency');
+
+  // --- 3. Both unmappable organisations are owned exceptions, not silence ---
+  const run = await readMigrationRun(pool, result.runId);
+  const currencyExceptions = run.reconciliationExceptions.filter(
+    (entry) => entry.classification === 'ARCHIVED_REQUIRES_TARGET_POLICY_INPUT' && entry.sourceType === 'entities.ORGANISATION',
+  );
+  assert.equal(currencyExceptions.length, 2, 'the absent and the invalid currency each raise their own exception');
+  for (const exception of currencyExceptions) {
+    assert.ok(exception.blocksCutover, 'an organisation nothing can be scoped to blocks its own cutover');
+    assert.ok(exception.owner.length > 0, 'the exception names an owner');
+    assert.ok(exception.affectedScope.includes('organisation'), 'the exception names its scope');
+    assert.ok(exception.safetyImpact.length > 0, 'the exception states the safety impact');
+  }
+  assert.ok(
+    currencyExceptions.some((entry) => entry.sourceId === 'org-none' && /no homeCurrency/.test(entry.reason)),
+    'the absent-currency reason names the real legacy field',
+  );
+  assert.ok(
+    currencyExceptions.some((entry) => entry.sourceId === 'org-bad' && /not a supported 3-letter/.test(entry.reason)),
+    'the invalid-currency reason explains why it cannot map',
+  );
+
+  // --- 4. Source lineage survives for what did not migrate ---
+  const archived = await pool.query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM evidence_records
+     WHERE workspace_id = $1 AND assertion_type = 'LEGACY_ORGANISATION'`,
+    [workspaceId],
+  );
+  assert.equal(Number(archived.rows[0]?.count), 2, 'each unmigrated organisation is archived as evidence, not dropped');
+
+  // --- 5. A dependent record fails safely and explicitly ---
+  const dependent = run.reconciliationExceptions.find((entry) => entry.sourceId === 'trip-dependent');
+  assert.ok(dependent, 'the trip scoped to the unmigratable organisation raised an exception');
+  assert.equal(dependent.classification, 'QUARANTINED_AMBIGUOUS_IDENTITY');
+  assert.ok(dependent.blocksCutover, 'it blocks cutover rather than migrating without its business party');
+  const trips = await pool.query('SELECT 1 FROM trips WHERE workspace_id = $1', [workspaceId]);
+  assert.equal(trips.rowCount, 0, 'the dependent trip was not attached to invented state');
+
+  // --- 6. Replay stays deterministic and idempotent ---
+  const replay = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(replay.status, 'COMPLETED');
+  assert.equal(replay.datasetHash, bundle.datasetHash, 'the same source yields the same dataset identity');
+  const orgsAfter = await countRows(pool, 'organisations', workspaceId);
+  assert.equal(orgsAfter, 1, 'replay duplicated nothing');
+  const archivedAfter = await pool.query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM evidence_records
+     WHERE workspace_id = $1 AND assertion_type = 'LEGACY_ORGANISATION'`,
+    [workspaceId],
+  );
+  assert.equal(Number(archivedAfter.rows[0]?.count), 2, 'replay re-archived nothing');
+});
+
+// ---------------------------------------------------------------------------
+// C5 blocker 2 — UNCERTAINTY_PRESERVED can actually fail
+// ---------------------------------------------------------------------------
+
+test('C5 blocker 2: falsely resolving a migrated UNKNOWN makes UNCERTAINTY_PRESERVED fail', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+  const importStartedAt = NOW;
+
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+  await recomputeMigratedState(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    runId: result.runId,
+    sourceDataset: DATASET,
+    now: NOW,
+  });
+
+  // --- The source really does contain uncertainty to preserve ---
+  const uncertain = collectUncertainSourceFacts(bundle);
+  assert.ok(uncertain.length > 0, 'the fixture carries at least one uncertain source fact');
+  assert.ok(
+    uncertain.some((fact) => fact.kind === 'RESERVATION_OUTCOME' && fact.legacyValue === 'CHANGED'),
+    'a legacy CHANGED reservation is classified as uncertain',
+  );
+
+  // --- Happy path: migration preserved it, so the check passes ---
+  const before = await reconcileMigration(pool, {
+    workspaceId,
+    runId: result.runId,
+    bundle,
+    now: NOW,
+    importStartedAt,
+  });
+  const passing = before.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(passing);
+  assert.equal(passing.status, 'PASS', 'uncertainty is genuinely preserved by the import');
+
+  // --- Now falsely resolve the unknown, exactly what must never pass ---
+  const unknownLine = await pool.query<{ id: string; reservation_id: string }>(
+    `SELECT id, reservation_id FROM reservation_lines
+     WHERE workspace_id = $1 AND observed_status = 'UNKNOWN' LIMIT 1`,
+    [workspaceId],
+  );
+  assert.equal(unknownLine.rowCount, 1, 'the migrated uncertain element left an UNKNOWN line to tamper with');
+  const evidence = await pool.query<{ id: string }>(
+    'SELECT id FROM evidence_records WHERE workspace_id = $1 LIMIT 1',
+    [workspaceId],
+  );
+  // The table's CHECK constraints require a time and evidence for a known
+  // status, so a false resolution has to look superficially complete — which
+  // is precisely why reconciliation cannot rely on the row looking plausible.
+  await pool.query(
+    `UPDATE reservation_lines
+     SET observed_status = 'CONFIRMED', observed_status_at = $3, observation_evidence_id = $4
+     WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, unknownLine.rows[0]?.id, NOW, evidence.rows[0]?.id],
+  );
+
+  const after = await reconcileMigration(pool, {
+    workspaceId,
+    runId: result.runId,
+    bundle,
+    now: NOW,
+    importStartedAt,
+  });
+  const failing = after.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(failing);
+  assert.equal(failing.status, 'FAIL', 'resolving an unknown the source never observed must fail the check');
+  assert.match(failing.detail, /resolved to a status the source never observed/);
+  assert.equal(after.verdict, 'BLOCKED', 'a failed semantic check blocks the verdict');
 });
