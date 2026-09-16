@@ -56,22 +56,24 @@ candidate, then move `main` to it. **No Slice A / Slice B feature work.**
 
 ## Phase checklist
 
-- [ ] P1 convergence branch + ledger
-- [ ] P2 frontend handoff merged
-- [ ] P3 live read-model lane merged
-- [ ] P4 roadmap/plan reconciled to Slice A / Slice B / submission
-- [ ] P5 test-suite convergence (classification, scripts, guardrails, M2-ACCESS-PATH-PLANNER)
-- [ ] P6 integrated convergence verification
-- [ ] P7 tag + `main` fast-forward
-- [ ] P8 cleanup candidates identified
+- [x] P1 convergence branch + ledger — `46ebaf8`
+- [x] P2 frontend handoff merged — `85e2e92` (only conflict: `ACTIVE_TASK.md`; lane ledger archived)
+- [x] P3 live read-model lane merged — `dd0886d` (only conflict: `ACTIVE_TASK.md`; `targetHttpHandlers.ts` auto-merged and hand-verified)
+- [x] P4 roadmap/plan reconciled — `7943f53` (`IMPLEMENTATION_PLAN.md` §22)
+- [x] P5 test-suite convergence — `7f4ac85` (M2 access path), `d72c25b` (suites + gate + CI), `d6c9671` (0123 registry)
+- [x] P6 integrated convergence verification — see Evidence
+- [x] P7 tag + `main` fast-forward
+- [x] P8 cleanup candidates identified
 
 ## Current checkpoint
 
-P1 in progress.
+Convergence complete and verified.
 
 ## Next action
 
-Merge the accepted frontend handoff.
+Slice A (`IMPLEMENTATION_PLAN.md` §22.1). First integrated smoke:
+known Sarah baseline -> normal product boot -> provider-shaped event through
+HTTP -> authoritative PostgreSQL/read-model result. **Not** implemented here.
 
 ## Critical constraints
 
@@ -88,7 +90,32 @@ Merge the accepted frontend handoff.
 
 | ID | Finding | Triage |
 |---|---|---|
+| CV-1 | `M2-ACCESS-PATH-PLANNER`: `itemsReferencingPlace`'s ORIGIN branch planned on `idx_transport_item_details_destination` with a filter, so the origin index assertion failed. Root cause was the test leaving the sibling index in place — the two are each other's incidental alternative — and depending on whether autovacuum had reached the shared database. | **Act Now — CLOSED** `7f4ac85`. Each transport branch is measured with its sibling dropped; tables are `ANALYZE`d before measuring. Reproduced red on a warm DB pre-fix, green cold and warm after. Both indexes exist and are usable; no schema change. |
+| CV-2 | Migration `0123` was added by the read-model lane after the cross-lane allocation registry was updated for `0121/0122`; the lane never ran the full PG gate, so convergence was the first run to see it. | **Act Now — CLOSED** `d6c9671`. Registry now asserts `[120,121,122,123]`. |
+| CV-3 | `npm start` could not boot: `tsc` emits only `.ts` output, so `dist/persistence/postgres/migrations` did not exist and the boot-time migration run failed with ENOENT. Pre-existing at C5, not caused by the merges. Would have blocked M11 operational activation. | **Act Now — CLOSED** `9bdd662`. `build` now copies the 96 `.sql` files and verifies the count. |
+| CV-4 | 76 `HISTORICAL_LEGACY` test files and the retired SQLite modules they cover remain in the tree. | **Park for Later.** The import-graph gate stops them affecting current correctness; deleting them is a separate reviewable change. |
+| CV-5 | Suites are separated by manifest, not by directory. | **Ignore / Accept Risk.** `test/suites.json` + `gate:test-boundary` already make conflation impossible; moving ~76 files is churn without added safety. |
+| CV-6 | Some `CURRENT_TARGET` unit tests still cover legacy-era pure modules (`src/domain`, `src/resolution`, `src/providers`) that the target runtime may not use. They are green and SQLite-free. | **Park for Later** — dead-code test audit, folded into CV-4. |
+| CV-7 | Read-model open items inherited from the closed lane: noisy changed sets on a busy cluster; `LIMIT 200` silent population truncation; graph-level `currentSemanticState` still FAILED-or-HEALTHY; no subject→transport-service edges. | **Park for Later** — recorded in `WIT_LIVE_READMODEL_ACTIVE_TASK.md`; revisit inside Slice A, not before. |
+| CV-8 | `/contract-lab` returns 404 on the product runtime. | **Ignore / Accept Risk** — by design. The Contract Lab is a fixture-only dev preview (`scripts/contract-lab-preview.ts`), deliberately not wired into the runtime. |
 
 ## Evidence
 
-(recorded per phase below)
+Candidate `9bdd662` (pre-ledger-close), tag `wit-post-c5-convergence`.
+
+| Check | Result |
+|---|---|
+| `npm test` (boundary gate + current suite, 56 files) | **627/627 pass**, 0 fail |
+| `npm run test:postgres` on fresh DB `conv_final` (45 files) | **462/462 pass**, 0 fail, 114 suites |
+| `npm run test:migration` (2 files) | **23/23 pass** |
+| `npm run gate:test-boundary` | CLEAN — 179 files classified, boundaries hold |
+| `npm run typecheck` / `lint` / `build` | exit 0 |
+| `npm run gate:anti-hardcoding` | VERDICT: CLEAN (368 TS files) |
+| `npm run acceptance:secret-scan` | VERDICT: CLEAN (329 files) |
+| Sarah/Jordan PG regressions | green — `m9SarahTargetE2E`, `m9SarahProgrammeLoop`, `m9JordanMultiActionRecovery` |
+| WiT live read-model proof (`witLiveReadModelContract`) | green |
+| PostgreSQL boot smoke from `dist` on fresh DB `conv_boot` | `runtime=POSTGRES_TARGET`, migrations applied at boot |
+| Live read-model seam over HTTP | `/api/v2/operator/overview` 200 with `changeCursor` / `changedVisibleRefs` / `changedEdgeIds`; `?sinceCursor=` accepted |
+| `npm run test:legacy` | **deliberately not run** — non-gating |
+
+Suite sizes: CURRENT_TARGET 101 (56 current + 45 postgres), MIGRATION_BOUNDARY 2, HISTORICAL_LEGACY 76.
