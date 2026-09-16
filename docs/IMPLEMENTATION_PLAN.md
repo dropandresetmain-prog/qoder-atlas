@@ -972,3 +972,114 @@ First milestone: **M0 executable contracts and acceptance materialization**.
 Parallel lanes start after **C0 + M1**; high-risk shared integration remains under
 one architectural owner. Old state stops being authoritative only at the approved
 **M11 cutover**. This commit records the plan; it does not implement that path.
+
+## 22. Post-C5 delivery sequence
+
+M0-M10 and C5 are accepted. What remains before M11 is **product delivery**, and it is
+sequenced as two vertical slices that a founder can actually test, not as a catalogue of
+independent backend packages.
+
+This section **supersedes the six-package (WP1-WP6) delivery framing** in
+`docs/work/POST_C5_DEMO_BACKEND_COMPLETION_PLAN.md`. That document is retained for its
+technical analysis and provenance; its requirements are distributed below. Do not
+execute it as six milestones.
+
+| # | Stage | Ends when |
+|---|---|---|
+| 1 | **Repository + test-suite convergence** | **COMPLETE** — `integration/post-c5-convergence`, tag `wit-post-c5-convergence`. |
+| 2 | **Slice A** — disruption reaches a focused Sarah case | The sequence below is true from authoritative PostgreSQL state alone. |
+| 3 | **Founder Test A** | Founder drives Slice A end to end and accepts or rejects. |
+| 4 | **Slice B** — recovery strategy reaches a recovered trip | The sequence below is true from authoritative PostgreSQL state alone. |
+| 5 | **Founder Test B** | Founder drives Slice B end to end and accepts or rejects. |
+| 6 | **Submission rehearsal / M11 activation** | Repeatability, replay/failure rehearsal, exact candidate gate, operational activation. |
+| 7 | **Polish / stretch** | Only after 1-6. Nothing here may pull work forward. |
+
+A slice is not complete because its parts exist separately. It is complete when the whole
+sequence runs through the normal product path without manual state edits.
+
+### 22.1 Slice A — real baseline to real focused case
+
+```
+real Sarah baseline -> real product UI -> controlled provider-shaped disruption
+-> authoritative PostgreSQL mutation -> affected cohort -> four cleared / Sarah disrupted
+-> Sarah RecoveryCase -> founder clicks Sarah -> real focused case
+```
+
+Required technical content (from the superseded WP2/WP5/WP6 analysis):
+
+- a **repeatable real Sarah baseline** — deterministic reset/reseed of known demo state
+  through the PostgreSQL command surface;
+- an **event operational projection that does not depend on a RecoveryCase existing** —
+  affected people must be renderable before escalation;
+- **provider-shaped disruption through normal ingress** — the frozen external-event
+  boundary, not a test hook;
+- **real affected-scope discovery** — blast radius computed by the backend, never inferred
+  by the browser from topology;
+- **incident-linked evaluation provenance** — proof that a cleared traveller was evaluated
+  *because of this incident*, not merely that they have no open issue;
+- **evaluation -> case orchestration** — what turns a failed evaluation into a RecoveryCase;
+- the **focused Sarah case** with a structured quantitative reason and causal/breakpoint refs;
+- **automatic authoritative refresh/refetch** in the product UI;
+- the **minimum graph identity/state** the focused case needs.
+
+Already landed, do not re-plan: projection freshness/revision, change cursor,
+stable edge identity and authority, assessment lifecycle and the changed-visible-ref
+contract all shipped with the accepted live read-model lane `cbe5f83`.
+
+### 22.2 Slice B — real recovery to truthfully recovered state
+
+```
+real recovery strategy -> mutation-free preview -> complete affected participants
+-> real authority/approval -> ordered execution -> observation -> reassessment
+-> same Sarah trip becomes viable
+```
+
+Required technical content (from the superseded WP4/WP5 analysis):
+
+- a **real typed strategy**, not a presentation-only option list;
+- a **mutation-free preview** — candidate state stays isolated from world state;
+- **complete programme participation, including participants with no Journey**, through
+  existing Programme/Participation concepts (never a "local participant" scenario type);
+- a **real approval principal and authority path**;
+- a **persisted, versioned execution basis** — post-authority mutation cannot raise a ceiling;
+- **ordered programme actions**;
+- **observation** — provider success alone is never a recovered trip;
+- **reassessment**, and a **truthful recovered state** including recovered-with-loss.
+
+### 22.3 Investigate before the relevant slice
+
+These are evidence questions, not build items. Answer them against actual PostgreSQL state
+before the slice that depends on them, and let the answer drive the UI rather than the reverse.
+
+| Question | Needed before |
+|---|---|
+| Participants with no Journey — already representable and evaluated? | Slice B |
+| Sarah stay consequence after the arrival date moves | Slice A/B |
+| Felix's actual authoritative programme requirement linkage | Slice A |
+| Exact rebooking semantics | Slice B |
+| Provider-ref correlation where the flow needs it | Slice B |
+| `M2-ACCESS-PATH-PLANNER` | **RESOLVED** at convergence — the assertion now isolates each named access path and `ANALYZE`s before measuring, so it no longer depends on database warmth. See `docs/TESTING.md`. |
+
+### 22.4 Parked
+
+Real, understood, and deliberately not required for Slice A/B or submission. They stay
+visible in `ROADMAP.md` with a revisit condition and must not expand into a slice:
+
+progressive per-person evaluation telemetry; rich considered-option history; polished tool
+activity projection; authoritative Before/After toggle; whole-event Live Dependency Graph;
+semantic zoom; multiple simultaneous disruption focuses.
+
+### 22.5 Unresolved design
+
+The **Event Overview visual design is unresolved**. The first prototype was rejected and is
+deliberately absent from this repository. Convergence froze nothing about it. It must be
+approved as a design before it is mapped to authoritative backend fields — do not implement
+it, and do not treat the V5.6 focused-graph reference or its mock facts as runtime truth.
+
+### 22.6 Verification for these stages
+
+Per `docs/TESTING.md`: focused unit/integration test, then the focused PostgreSQL seam test,
+then typecheck/build/lint only when relevant. Broad gates at coherent checkpoints only. The
+full canonical CURRENT target gate runs once on a fresh database at a candidate.
+`npm run test:legacy` is never part of acceptance and historical SQLite runtime failures are
+never a release blocker.

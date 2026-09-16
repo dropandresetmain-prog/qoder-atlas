@@ -4,7 +4,12 @@ This roadmap separates **implemented runtime truth** from the **approved target 
 
 ## Implemented baseline
 
-- Generalized recovery loop over the current SQLite-backed Trip/RecoveryCase model.
+> Since M10/C5, **PostgreSQL is the sole NORTHSTAR runtime**. The SQLite-era application
+> runtime is retired: it survives only as offline read-only migration input, its tests are
+> classified `HISTORICAL_LEGACY` and non-gating (`docs/TESTING.md`), and the capabilities
+> below describe behaviour that the target runtime now owns.
+
+- Generalized recovery loop over the Trip/RecoveryCase model.
 - Supplier, traveller and organiser-side changes through the same recovery engine.
 - Atlas flight search, verify, fare rules, state observation and sandbox transaction seams; sanitized provider recordings.
 - Nuitée/liteAPI hotel search, quote/prebook, book, retrieve and cancellation.
@@ -55,8 +60,11 @@ Target foundations include:
 | M8 — authority/durable execution | Implemented, integrated onto `integration/m7-m8-c3` (was `milestone-m8-authority-execution`; Checkpoint 0 closed; authority/budget/execution/observation landed) | Scoped approvals, financial commitments, attempts/reconciliation and internal programme execution. Pre-M8 conditions closed: I-10 exact FX; traveller-payer UNKNOWN blocking; decision-time `currentAssessmentView`; reassessment `complete()` bounded retry/requeue. |
 | M7/M8 integration | **C3 candidate — C3 not claimed** (independent review pending). All gates green: migrations 0001-0112 from empty, typecheck/build/lint/anti-hardcoding/`git diff --check` clean, `npm run test:postgres` 403/403 pass. Evidence: `docs/refactor/evidence/M7_M8_INTEGRATION.md`; ledger `docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md`. | Single coherent pipeline proven end-to-end: M6 world → M7 strategy/plan → M8 authority/execution → observation/reassessment, across all 10 required cross-lane acceptance tests. |
 | M9 — application integration | **C4 candidate** on `milestone-m9-product-integration`. Seed lane `2a14c51` integrated; Sarah S1+S1→S3 and Jordan S2+partial-failure fixture proofs green. Sarah Batik = synthetic/simulated; Jordan flights = Atlas REPLAY; hotels = Nuitée RECORD. Fable polish deferred. Evidence: `docs/refactor/evidence/M9.md`. | Independent C4 review; then M10. |
-| WiT frontend semantic contract | **COMPLETE — lane candidate** on `lane/wit-frontend-semantic-contract`, based on accepted M9 `c45a928` (deliberately not the moving M10 branch). One presentation adapter boundary at `src/ui/semantics/adapter.ts`, a central visual grammar, exhaustive enum mappings that throw `UNMAPPED SEMANTIC STATE` instead of defaulting silently, and a fixture-only Contract Lab served at `/contract-lab`. No live graph wiring, no backend/schema/read-model change, no new dependencies. Evidence: `docs/FRONTEND_SEMANTIC_CONTRACT.md`. | Independent review; live `LiveDependencyGraph` wiring stays blocked on the six Frontend Integration Contract Gaps FIG-1…FIG-6 recorded in that document. |
-| M10 — migration rehearsal | Planned | Legacy export/transform/reconciliation, restore proof and exact candidate verification. |
+| WiT frontend semantic contract | **COMPLETE / ACCEPTED** — reviewed at `review/wit-frontend-semantic-contract-opus` `fe09c52`, handed off at `integration/wit-frontend-handoff` `6a655dd`. One presentation adapter boundary at `src/ui/semantics/adapter.ts`, a central visual grammar, exhaustive enum mappings that throw `UNMAPPED SEMANTIC STATE` instead of defaulting silently, and a fixture-only Contract Lab served at `/contract-lab`. No live graph wiring, no new dependencies. Evidence: `docs/FRONTEND_SEMANTIC_CONTRACT.md`, `docs/work/WIT_FRONTEND_INTEGRATION_HANDOFF.md`. | Consumed by post-C5 convergence. |
+| WiT live read-model contract | **COMPLETE / ACCEPTED** — `lane/wit-live-readmodel-contract` `cbe5f83`; lane CLOSED. Closed FIG-1/2/3/4/6/7: stable edge identity and authority, monotonic change cursor over a single `REPEATABLE READ` projection snapshot (migrations 0121-0123), assessment-lifecycle exposure, subject-keyed refs, per-subject verdict fidelity, authoritative traveller names, pre-escalation population nodes. | Consumed by post-C5 convergence. **Contract:** the frontend applies the complete authoritative snapshot; `changedVisibleRefs` is an at-least-once emphasis hint and never an exact diff. |
+| M10 — migration rehearsal | **COMPLETE / ACCEPTED — C5 PASS** at `87783c0` (`milestone-m10-migration-rehearsal`). Legacy export/transform/reconciliation, restore drill and exact candidate verification. **PostgreSQL is now the sole NORTHSTAR runtime**; SQLite survives only as offline read-only migration input. Evidence: `docs/refactor/evidence/M10_*.md`, `C5_REQUEST_PACKAGE.md`. | Post-C5 product delivery (Slice A / Slice B), then M11. |
+| Post-C5 convergence | **COMPLETE** — `integration/post-c5-convergence`, tag `wit-post-c5-convergence`. C5 + accepted frontend foundation + accepted live read models on one candidate; test topology split into classified suites with an enforced SQLite import boundary; `M2-ACCESS-PATH-PLANNER` resolved. | Slice A. |
+| Slice A / Slice B product delivery | Planned — sequence frozen in `IMPLEMENTATION_PLAN.md` §22 | Two founder-testable vertical slices. Replaces the superseded six-package framing in `docs/work/POST_C5_DEMO_BACKEND_COMPLETION_PLAN.md`. |
 | M11 — controlled cutover | Planned | Target becomes sole application authority after explicit approval. |
 
 Do not mark a stage implemented because its target shape is documented.
@@ -90,6 +98,14 @@ These are product priorities/capability directions, not permission to bypass the
 | Unbounded autonomous refunds/post-ticket servicing | **Deferred** | Consequential supplier actions remain capability/authority/observation gated. |
 | Generic legal advice | **Rejected as product claim** | Northstar may evaluate sourced entry requirements but must not manufacture legal certainty or present unsupported advice. |
 | M7/M8 effect-scoped `logicalOperationKey` re-plan identity (IN-1) | **Resolved in M9 Checkpoint 1** | Intent uniqueness is per action plan (`0120_m9_replan_identity.sql`). Effect-scoped keys remain; execution known-success/live guards still block duplicate irreversible dispatch. Evidence: `docs/refactor/evidence/M9.md`, `src/app/target/replanIdentity.ts`. |
+| Progressive per-person evaluation telemetry | **Park for Later** | Authoritative atomic snapshots are sufficient for the demo; revisit if a slice needs mid-evaluation progress. |
+| Rich considered-option / rejected-candidate history | **Park for Later** | Expose it only if planner evidence already retains it; do not invent rejected options for drama. |
+| Polished provider/tool activity projection | **Park for Later** | Presentation polish, not product truth. |
+| Authoritative Before/After toggle | **Park for Later** | Needs historical projection retention; revisit after Slice B. |
+| Whole-event Live Dependency Graph, semantic zoom, multiple simultaneous disruption focuses | **Park for Later** | Slice A/B need one bounded focused graph. Revisit only with an approved Event Overview design. |
+| Event Overview visual design | **Unresolved / redesign required** | The first prototype was rejected and is deliberately absent from the repository. Approve a design before mapping it to authoritative backend fields. |
+| Retired-SQLite dead-code test audit | **Park for Later** | 76 `HISTORICAL_LEGACY` files and the modules they cover remain in the tree. Deleting them is a separate, reviewable change; the import-graph gate already stops them affecting current correctness. |
+| Physical test-directory split (`test/legacy-sqlite/**`, `test/migration/**`) | **Park for Later** | `test/suites.json` plus `gate:test-boundary` already prevent suite conflation; moving ~76 files is churn without added safety. |
 
 ## Roadmap discipline
 
