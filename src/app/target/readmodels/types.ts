@@ -18,6 +18,8 @@ export interface ChangeAwarenessInput {
   now?: string;
   changedAt?: string;
   changeSource?: string;
+  /** See `ChangeAwarenessSchema.changeCursor` — opaque at-least-once xid8 cursor. */
+  changeCursor?: string;
 }
 
 export interface ProductNodeFact {
@@ -145,11 +147,13 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
   duplicateBookingExposure?: readonly import('../../../contracts/v2/product/readModels.ts').DuplicateBookingExposureView[];
   /**
    * Internal only — never parsed into `RecoveryCaseView`. Each case subject's
-   * own tone/evaluation status, so callers building other projections (e.g.
-   * the overview) can reuse the CURRENT-assessment lookup already done here
-   * instead of re-querying (FIG-6/FIG-7).
+   * own tone/evaluation status (and, defect-1, its raw EVALUATION_LIFECYCLE
+   * xid8 `stamp`), so callers building other projections (e.g. the overview,
+   * incident/programme) can reuse the CURRENT-assessment lookup already done
+   * here instead of re-querying (FIG-6/FIG-7) and stay on the same cursor
+   * scale without a second stamp read.
    */
-  subjectFacts?: readonly { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus }[];
+  subjectFacts?: readonly { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; stamp?: bigint }[];
 }
 
 export interface TravellerTripFacts extends ProductWorldFacts {

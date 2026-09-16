@@ -4,7 +4,7 @@
  * Pure projectors stay in project*.ts — this module owns I/O and joins.
  * Missing tables/rows yield UNKNOWN / empty arrays — never invented certainty.
  */
-import type { Pool } from '../../../persistence/postgres/pool.ts';
+import type { Pool, PoolClient } from '../../../persistence/postgres/pool.ts';
 import type {
   AssessmentTone,
   AssessmentViewStatus,
@@ -30,41 +30,104 @@ function isoNow(at?: string): string {
   return at ?? new Date().toISOString();
 }
 
+/** Either a checked-out client already inside a transaction, or a bare pool. */
+export type Queryable = Pool | PoolClient;
+
+const MAX_SAFE_STAMP = BigInt(Number.MAX_SAFE_INTEGER);
+
 /**
- * FIG-3 revision source. `EVALUATION_LIFECYCLE` (migrations 0121/0122) is a
- * scope_generations family bumped only by the assessments/
- * scheduled_reassessments triggers (per subject) and the recovery_cases
- * triggers (per case) — deliberately never read by assessment_inputs so it
- * cannot feed the M6 invalidation triggers. Reads `last_advanced_xact`
- * (`pg_current_xact_id()`, written by every `m6_bump_scope` call, 0090), not
- * the small per-scope `generation` counter: xid8 is a per-database, globally
- * unique, strictly increasing value, so two different real changes can never
- * tie — a `MAX` across many subjects' values, and a caller-supplied
- * `sinceRevision` compared against each of them, both stay correct. A small
- * per-scope counter could tie (subject B catching up to, not passing,
- * subject A's already-observed value) and mask a real change to B. Read
- * directly here (not through PgScopeGenerationLedger/ScopeGenerationRef,
- * which is typed to the general invalidation-scope enum) to keep the
- * isolation from assessment_inputs explicit and unreachable from the general
- * scope API.
+ * Never silently truncate an xid8-derived stamp into the public `number`
+ * `projectionRevision` field — throw loudly instead. In practice this never
+ * fires: xid8 is a per-database transaction counter, nowhere near 2^53.
  */
-export async function readEvaluationLifecycleRevision(
+function checkedRevisionNumber(stamp: bigint): number {
+  if (stamp > MAX_SAFE_STAMP) {
+    throw new Error(`EVALUATION_LIFECYCLE stamp ${stamp} exceeds Number.MAX_SAFE_INTEGER — cannot report as projectionRevision`);
+  }
+  return Number(stamp);
+}
+
+/** Shared PASS/FAIL/UNKNOWN -> node semanticState mapping (FIG-6 fidelity). */
+const TONE_TO_STATE = { PASS: 'HEALTHY', FAIL: 'FAILED', UNKNOWN: 'UNKNOWN' } as const;
+
+/**
+ * Defect-1 fix. Stamps are `pg_current_xact_id()`, assigned at a
+ * transaction's first write, not at commit — a transaction that starts
+ * first (lower xid) but commits later than one that started after it can
+ * make `stamp > sinceRevision` (comparing only the last-seen max) miss the
+ * later commit forever, and independent autocommit `pool.query` calls can
+ * each see a different snapshot within one logical read. The fix: every
+ * projection read that must be internally consistent and must not miss a
+ * change now runs inside one REPEATABLE READ transaction on a single
+ * checked-out client. The transaction's own snapshot xmin, read as the first
+ * statement (so it fixes the REPEATABLE READ snapshot), becomes the opaque
+ * `changeCursor` returned to the caller: any transaction whose stamp is >=
+ * that xmin might not have been visible yet at read time, so a caller
+ * comparing a later read's stamps against this cursor with `>=` (never `>`)
+ * can miss nothing — at-least-once, never zero times (a ref may be reported
+ * twice; it is never silently dropped). READ ONLY because every caller here
+ * only ever reads.
+ */
+export async function withProjectionSnapshot<T>(
   pool: Pool,
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<{ value: T; changeCursor: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    const snap = await client.query<{ xmin: string }>(
+      'SELECT pg_snapshot_xmin(pg_current_snapshot())::text AS xmin',
+    );
+    const changeCursor = snap.rows[0]!.xmin;
+    const value = await fn(client);
+    await client.query('COMMIT');
+    return { value, changeCursor };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * FIG-3 revision source, defect-1 corrected. `EVALUATION_LIFECYCLE`
+ * (migrations 0121/0122/0123) is a scope_generations family bumped only by
+ * the assessments/scheduled_reassessments triggers (per subject), the
+ * recovery_cases trigger (per case) and the case-content triggers (0123:
+ * action plans/intents/dependencies, execution attempts/observations,
+ * strategies, case subjects) — deliberately never read by assessment_inputs
+ * so it cannot feed the M6 invalidation triggers. Returns the raw
+ * `last_advanced_xact` xid8 stamp as a `bigint` (via `::text` -> `BigInt`,
+ * never through a JS `Number`, so no magnitude is ever silently truncated):
+ * xid8 is a per-database, globally unique, strictly increasing value, so two
+ * different real changes can never tie — a `>=` comparison against a
+ * caller-supplied cursor, and a `MAX` across many subjects' values, both stay
+ * exact at any scale. Read directly here (not through
+ * PgScopeGenerationLedger/ScopeGenerationRef, which is typed to the general
+ * invalidation-scope enum) to keep the isolation from assessment_inputs
+ * explicit and unreachable from the general scope API. Must run against a
+ * client already inside the caller's `withProjectionSnapshot` transaction —
+ * never a bare pool — or its read can land on a different snapshot than the
+ * rest of the projection.
+ */
+export async function readEvaluationLifecycleStamp(
+  client: Queryable,
   workspaceId: string,
   subjectKind: string,
   subjectId: string,
   assessmentKind: string,
-): Promise<number> {
-  const result = await pool.query<{ xact: string }>(
-    `SELECT last_advanced_xact::text::bigint AS xact FROM scope_generations
+): Promise<bigint> {
+  const result = await client.query<{ xact: string }>(
+    `SELECT last_advanced_xact::text AS xact FROM scope_generations
       WHERE workspace_id = $1 AND scope_kind = 'EVALUATION_LIFECYCLE' AND scope_id = $2`,
     [workspaceId, `${subjectKind}:${subjectId}:${assessmentKind}`],
   );
-  return result.rows[0] ? Number(result.rows[0].xact) : 0;
+  return result.rows[0] ? BigInt(result.rows[0].xact) : 0n;
 }
 
 export async function loadRecoveryActionFacts(
-  pool: Pool,
+  pool: Queryable,
   workspaceId: string,
   caseId: string,
 ): Promise<RecoveryActionFact[]> {
@@ -240,21 +303,29 @@ function mapIntentExecutionState(
   return 'PROPOSED';
 }
 
-export async function loadRecoveryCaseFacts(
-  pool: Pool,
+/**
+ * Defect-1 fix: the actual query/join logic, run against a client already
+ * inside the caller's `withProjectionSnapshot` transaction. Never call this
+ * directly against a bare `Pool` — use `loadRecoveryCaseFacts` below, or (for
+ * a caller that must read several cases/subjects under one shared snapshot,
+ * e.g. the overview or incident-programme producers) open the transaction
+ * once and call this per case within it.
+ */
+async function loadRecoveryCaseFactsInner(
+  client: Queryable,
   workspaceId: string,
   caseId: string,
-  at?: string,
+  at: string | undefined,
   /**
-   * FIG-3: when supplied, changedVisibleRefs names exactly the refs whose own
-   * revision source (see readEvaluationLifecycleRevision) exceeds this value
-   * — never "every ref" or an unrelated id list. Omitted on a first read,
-   * which honestly reports nothing changed (no prior revision to compare
-   * against) rather than everything.
+   * FIG-3/defect-1: when supplied, changedVisibleRefs names exactly the refs
+   * whose own revision source (see readEvaluationLifecycleStamp) is >= this
+   * cursor (at-least-once — never "every ref" or an unrelated id list).
+   * Omitted on a first read, which honestly reports nothing changed (no
+   * prior cursor to compare against) rather than everything.
    */
-  sinceRevision?: number,
+  sinceCursor: string | undefined,
 ): Promise<RecoveryCaseFacts | null> {
-  const caseRow = await pool.query<{
+  const caseRow = await client.query<{
     id: string;
     lifecycle_status: string;
     opened_at: string;
@@ -266,13 +337,14 @@ export async function loadRecoveryCaseFacts(
   const row = caseRow.rows[0];
   if (!row) return null;
 
-  // FIG-3: the case's own revision source (0122's recovery_cases trigger),
-  // on the same global scale as each subject's (see readEvaluationLifecycleRevision).
-  const caseRevision = await readEvaluationLifecycleRevision(pool, workspaceId, 'RECOVERY_CASE', caseId, 'CASE');
-  const recoveryActions = await loadRecoveryActionFacts(pool, workspaceId, caseId);
+  // FIG-3: the case's own revision source (0122's recovery_cases trigger;
+  // 0123's case-content triggers), on the same global scale as each
+  // subject's (see readEvaluationLifecycleStamp).
+  const caseStamp = await readEvaluationLifecycleStamp(client, workspaceId, 'RECOVERY_CASE', caseId, 'CASE');
+  const recoveryActions = await loadRecoveryActionFacts(client, workspaceId, caseId);
   const generatedAt = isoNow(at);
 
-  const strategyRows = await pool.query<{
+  const strategyRows = await client.query<{
     id: string;
     strategy_version: number;
     viability: string;
@@ -306,7 +378,7 @@ export async function loadRecoveryCaseFacts(
   // Assessments for case subjects — best-effort. ORDER BY is required (FIG-1):
   // without it, edge/node array order (and any position-derived key) can
   // change between reads of the same content, causing false delete/recreate.
-  const subjects = await pool.query<{ subject_kind: string; subject_id: string; role: string }>(
+  const subjects = await client.query<{ subject_kind: string; subject_id: string; role: string }>(
     `SELECT subject_kind, subject_id, role FROM case_subjects
       WHERE workspace_id = $1 AND recovery_case_id = $2
       ORDER BY subject_kind, subject_id, role`,
@@ -324,7 +396,7 @@ export async function loadRecoveryCaseFacts(
   // explicit staleness note (see M9 C4 current-assessment finding). Each
   // subject keeps its own tone/evaluation status (FIG-6/FIG-7) — the case's
   // aggregate verdict below must never be copied back onto every subject node.
-  interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; revision: number }
+  interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; stamp: bigint }
   const subjectFacts: SubjectFact[] = [];
   // M9 3A: derive connection viability from the real m6.connection dimension
   // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
@@ -333,9 +405,9 @@ export async function loadRecoveryCaseFacts(
   let connectionViability: ConnectionViabilityHint | undefined;
   for (const s of subjects.rows) {
     const ref = `${s.subject_kind}:${s.subject_id}`;
-    const revision = await readEvaluationLifecycleRevision(pool, workspaceId, s.subject_kind, s.subject_id, 'VIABILITY');
+    const stamp = await readEvaluationLifecycleStamp(client, workspaceId, s.subject_kind, s.subject_id, 'VIABILITY');
     const view = await currentAssessmentView(
-      pool,
+      client,
       workspaceId,
       { kind: s.subject_kind, id: s.subject_id } as TypedRef,
       'VIABILITY',
@@ -344,7 +416,7 @@ export async function loadRecoveryCaseFacts(
     if (view.status === 'CURRENT' && view.assessment) {
       const verdict = view.assessment.overallVerdict;
       const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
-      subjectFacts.push({ ref, tone, evaluation: view.status, revision });
+      subjectFacts.push({ ref, tone, evaluation: view.status, stamp });
       if (tone === 'UNKNOWN') {
         uncertainty.push(`${ref} current assessment verdict ${verdict}`);
       }
@@ -359,7 +431,7 @@ export async function loadRecoveryCaseFacts(
         }
       }
     } else {
-      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status, revision });
+      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status, stamp });
       uncertainty.push(`${ref} assessment ${view.status.toLowerCase()}`);
     }
   }
@@ -384,24 +456,26 @@ export async function loadRecoveryCaseFacts(
     : 'OPEN';
 
   const subjectFactByRef = new Map(subjectFacts.map((f) => [f.ref, f]));
-  const TONE_TO_STATE = { PASS: 'HEALTHY', FAIL: 'FAILED', UNKNOWN: 'UNKNOWN' } as const;
-  // FIG-3: a per-node source revision — the case node's own EVALUATION_LIFECYCLE
-  // xact stamp, each subject node's own — taken as their maximum. This is
-  // safe (unlike maxing small per-scope counters) because every stamp is a
-  // globally unique, strictly increasing xid8: two different real changes
-  // can never tie, so the max always moves when any component does, and a
-  // caller-supplied sinceRevision compares correctly against every component
-  // on that same scale (see readEvaluationLifecycleRevision).
+  // FIG-3/defect-1: a per-node source revision — the case node's own
+  // EVALUATION_LIFECYCLE xact stamp, each subject node's own — taken as their
+  // maximum. Safe (unlike maxing small per-scope counters) because every
+  // stamp is a globally unique, strictly increasing xid8: two different real
+  // changes can never tie, so the max always moves when any component does.
   const caseRefStr = `case:${caseId}`;
-  const projectionRevision = Math.max(caseRevision, ...subjectFacts.map((f) => f.revision), 0);
-  // Exactly the refs whose own revision source exceeds sinceRevision — never
-  // "every case" or an action-id list that doesn't match a node. Omitted
-  // sinceRevision (first read) honestly reports nothing changed, not everything.
-  const changedVisibleRefs = sinceRevision === undefined
+  const maxStamp = subjectFacts.reduce((m, f) => (f.stamp > m ? f.stamp : m), caseStamp);
+  const projectionRevision = checkedRevisionNumber(maxStamp);
+  // Defect-1: exactly the refs whose own stamp is >= sinceCursor (at-least-
+  // once — a ref whose stamp equals the caller's previous snapshot xmin
+  // might not have been visible in that earlier read, so it is reported
+  // again rather than risk a silent miss). Never "every case" or an
+  // action-id list that doesn't match a node. Omitted sinceCursor (first
+  // read) honestly reports nothing changed, not everything.
+  const sinceCursorBig = sinceCursor === undefined ? undefined : BigInt(sinceCursor);
+  const changedVisibleRefs = sinceCursorBig === undefined
     ? []
     : [
-        ...(caseRevision > sinceRevision ? [caseRefStr] : []),
-        ...subjectFacts.filter((f) => f.revision > sinceRevision).map((f) => f.ref),
+        ...(caseStamp >= sinceCursorBig ? [caseRefStr] : []),
+        ...subjectFacts.filter((f) => f.stamp >= sinceCursorBig).map((f) => f.ref),
       ];
   return {
     generatedAt,
@@ -470,24 +544,47 @@ export async function loadRecoveryCaseFacts(
   };
 }
 
-export async function loadOperatorOverviewFacts(
+/**
+ * Defect-1 fix: opens the single REPEATABLE READ transaction and runs the
+ * query/join logic against that one client, so this read can never mix
+ * snapshots across its several queries and its `changeCursor` describes
+ * exactly what it saw.
+ */
+export async function loadRecoveryCaseFacts(
   pool: Pool,
   workspaceId: string,
+  caseId: string,
   at?: string,
-  /** FIG-3: see loadRecoveryCaseFacts — same "changed since" semantics, applied per listed case. */
-  sinceRevision?: number,
+  sinceCursor?: string,
+): Promise<RecoveryCaseFacts | null> {
+  const { value, changeCursor } = await withProjectionSnapshot(pool, (client) =>
+    loadRecoveryCaseFactsInner(client, workspaceId, caseId, at, sinceCursor),
+  );
+  return value ? { ...value, changeCursor } : null;
+}
+
+async function loadOperatorOverviewFactsInner(
+  client: Queryable,
+  workspaceId: string,
+  at: string | undefined,
+  sinceCursor: string | undefined,
 ): Promise<OperatorOverviewFacts> {
   const generatedAt = isoNow(at);
-  const cases = await pool.query<{ id: string; lifecycle_status: string }>(
+  const sinceCursorBig = sinceCursor === undefined ? undefined : BigInt(sinceCursor);
+
+  // ---- Case-driven operator queue (`items`) — existing semantics, unchanged
+  // except the defect-4 `evaluation` fix below. ----
+  const cases = await client.query<{ id: string; lifecycle_status: string }>(
     `SELECT id, lifecycle_status FROM recovery_cases WHERE workspace_id = $1 ORDER BY opened_at DESC LIMIT 50`,
     [workspaceId],
   );
 
   const items = [];
-  const itemRevisions = new Map<string, number>();
+  const caseStamps: bigint[] = [];
   for (const c of cases.rows) {
-    const facts = await loadRecoveryCaseFacts(pool, workspaceId, c.id, generatedAt);
+    const facts = await loadRecoveryCaseFactsInner(client, workspaceId, c.id, generatedAt, undefined);
     if (!facts) continue;
+    caseStamps.push(BigInt(facts.projectionRevision));
     const status = facts.tripViability.verdict === 'FAIL'
       ? 'DISRUPTED' as const
       : facts.tripViability.verdict === 'PASS'
@@ -505,7 +602,7 @@ export async function loadOperatorOverviewFacts(
     const firstJourney = affected.find((a) => a.startsWith('JOURNEY:'));
     if (firstJourney) {
       const journeyId = firstJourney.slice('JOURNEY:'.length);
-      const named = await pool.query<{ display_value: string }>(
+      const named = await client.query<{ display_value: string }>(
         `SELECT n.display_value
            FROM journeys j
            JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
@@ -515,10 +612,12 @@ export async function loadOperatorOverviewFacts(
       );
       if (named.rows[0]?.display_value) travellerLabel = named.rows[0].display_value;
     }
-    // The dashboard node's subject is the primary affected item (FIG-4); its
-    // evaluation lifecycle (FIG-7) is that same subject's, reused from the
-    // CURRENT-assessment lookup `loadRecoveryCaseFacts` already did.
-    const primaryEvaluation = facts.subjectFacts?.[0]?.evaluation;
+    // Defect-4 fix: `evaluation` is set only when this item maps to exactly
+    // one subject — never the case's first subject, and never an invented
+    // aggregation across several. A multi-subject case's item honestly omits
+    // the field rather than misreport one subject's lifecycle as the case's.
+    const subjectFacts = facts.subjectFacts ?? [];
+    const primaryEvaluation = subjectFacts.length === 1 ? subjectFacts[0]!.evaluation : undefined;
     items.push({
       tripRef: affected[0] ?? `case:${c.id}`,
       travellerLabel,
@@ -532,50 +631,126 @@ export async function loadOperatorOverviewFacts(
       unresolvedUncertainty: facts.uncertainty ?? [],
       ...(primaryEvaluation ? { evaluation: primaryEvaluation } : {}),
     });
-    // FIG-3: each listed case's own revision (the same source loadRecoveryCaseFacts
-    // computed for it), reused rather than re-derived.
-    itemRevisions.set(c.id, facts.projectionRevision);
   }
 
-  const STATUS_TO_STATE = {
-    READY: 'HEALTHY', AT_RISK: 'AFFECTED', DISRUPTED: 'FAILED', RECOVERING: 'ACTIVE', UNKNOWN: 'UNKNOWN',
-  } as const;
-  // Each case's own revision is already a xid8-based max (loadRecoveryCaseFacts),
-  // globally unique and tie-proof, so maxing across cases here stays safe and
-  // keeps this scalar on the same scale each item's revision is compared against.
-  const projectionRevision = Math.max(0, ...itemRevisions.values());
-  // Exactly the trip refs whose underlying case revision exceeds sinceRevision.
-  // Omitted sinceRevision (first read) honestly reports nothing changed.
-  const changedVisibleRefs = sinceRevision === undefined
-    ? []
-    : items
-        .filter((i) => (itemRevisions.get(i.caseRef!) ?? 0) > sinceRevision)
-        .map((i) => i.tripRef);
+  // ---- Defect-5 fix: DASHBOARD graph nodes come from the in-scope SUBJECT
+  // POPULATION, not from `recovery_cases` — so a subject can render before
+  // any case exists (closing the FIG-4 "no node before escalation" gap).
+  //
+  // Explicit scope key: every JOURNEY whose traveller holds an accepted
+  // REQUIRED participation in an ACTIVE programme's programme_item. This
+  // reuses the exact REQUIRED+accepted membership predicate
+  // `loadIncidentProgrammeFacts` already treats as authoritative, bounded to
+  // programmes with lifecycle_status = 'ACTIVE' — the schema has no single
+  // per-workspace "the current programme" key (a workspace can hold many
+  // events/programmes), so an unbounded `workspace_id` scan would not be "an
+  // explicit scope key"; ACTIVE-programme membership is the smallest
+  // additive population that is authoritative, bounded, and exercisable
+  // before any case exists. Journeys exclude only CANCELLED — DRAFT is this
+  // schema's normal pre-booking-confirmation status (seedJourney's own
+  // default), not an out-of-scope state, and evaluation/assessment do not
+  // gate on it elsewhere in this producer. LIMIT mirrors the existing
+  // cases-query page size.
+  const population = await client.query<{ journey_id: string }>(
+    `SELECT DISTINCT j.id AS journey_id
+       FROM journeys j
+       JOIN participations p ON p.workspace_id = j.workspace_id AND p.traveller_id = j.traveller_id
+       JOIN programme_items pi ON pi.workspace_id = p.workspace_id AND pi.id = p.programme_item_id
+       JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
+      WHERE j.workspace_id = $1
+        AND j.lifecycle_status <> 'CANCELLED'
+        AND p.obligation = 'REQUIRED' AND p.accepted = true
+        AND prog.lifecycle_status = 'ACTIVE'
+      ORDER BY j.id
+      LIMIT 200`,
+    [workspaceId],
+  );
+
+  const dashboardNodes: OperatorOverviewFacts['nodes'][number][] = [];
+  const subjectStamps: bigint[] = [];
+  const changedNodeRefs: string[] = [];
+  for (const p of population.rows) {
+    const ref = `JOURNEY:${p.journey_id}`;
+    const stamp = await readEvaluationLifecycleStamp(client, workspaceId, 'JOURNEY', p.journey_id, 'VIABILITY');
+    subjectStamps.push(stamp);
+    if (sinceCursorBig !== undefined && stamp >= sinceCursorBig) changedNodeRefs.push(ref);
+    const view = await currentAssessmentView(
+      client,
+      workspaceId,
+      { kind: 'JOURNEY', id: p.journey_id } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    const tone: AssessmentTone = view.status === 'CURRENT' && view.assessment
+      ? (view.assessment.overallVerdict === 'PASS' ? 'PASS' : view.assessment.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN')
+      : 'UNKNOWN';
+    // caseRef (FIG-4): the most recently opened case this subject is
+    // attached to, if any — an escalation marker, never identity.
+    const caseLink = await client.query<{ recovery_case_id: string }>(
+      `SELECT cs.recovery_case_id
+         FROM case_subjects cs
+         JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
+        WHERE cs.workspace_id = $1 AND cs.subject_kind = 'JOURNEY' AND cs.subject_id = $2
+        ORDER BY rc.opened_at DESC LIMIT 1`,
+      [workspaceId, p.journey_id],
+    );
+    dashboardNodes.push({
+      ref,
+      kind: 'TRAVELLER' as const,
+      label: 'JOURNEY',
+      semanticState: TONE_TO_STATE[tone],
+      authority: 'AUTHORITATIVE' as const,
+      ...(caseLink.rows[0] ? { caseRef: caseLink.rows[0].recovery_case_id } : {}),
+      evaluation: view.status,
+    });
+  }
+
+  // Defect-5 edge gap: a subject's dependency on a transport service is real
+  // (journey_items/transport_item_details), but that service has no
+  // authoritative semantic-state source of its own and is not one of the
+  // seven accepted LdgNodeKind categories — presenting it would mean either
+  // inventing its state or shipping a node without one. Per the fix's own
+  // fallback ("otherwise ship nodes only and report the edge gap; never
+  // derive edges from topology or names"), this producer ships population
+  // nodes only; see docs/work/ACTIVE_TASK.md for the gap note.
+  const dashboardEdges: OperatorOverviewFacts['edges'] = [];
+
+  // Defect-1: the overview's own scalar/changed-set span both the case queue
+  // and the population graph, so the revision moves whenever anything the
+  // dashboard actually presents changes, on the same xid8 scale as every
+  // other projection.
+  const maxStamp = [...caseStamps, ...subjectStamps].reduce((m, s) => (s > m ? s : m), 0n);
+  const projectionRevision = checkedRevisionNumber(maxStamp);
+  const changedVisibleRefs = sinceCursorBig === undefined ? [] : changedNodeRefs;
+
   return {
     generatedAt,
     projectionRevision,
     changedVisibleRefs,
-    // The overview producer emits no edges, so there is nothing to mark changed.
+    // The overview producer emits no edges (see the defect-5 gap note above).
     changedEdgeIds: [],
     currentSemanticState: items.some((i) => i.status === 'DISRUPTED') ? 'FAILED' : 'HEALTHY',
-    nodes: items.map((i) => ({
-      // FIG-4: keyed by the canonical subject ref the case graph already uses
-      // (e.g. `JOURNEY:<id>`), not the bare case id — so the same subject
-      // keeps one ref before and after escalation. caseRef is the separate
-      // linkage/escalation marker, never identity.
-      ref: i.tripRef,
-      kind: 'DISRUPTION' as const,
-      label: i.travellerLabel,
-      // FIG-6: the full operational-status range, not a DISRUPTED-or-HEALTHY
-      // collapse — AT_RISK/RECOVERING/UNKNOWN must not render green.
-      semanticState: STATUS_TO_STATE[i.status],
-      authority: 'AUTHORITATIVE' as const,
-      ...(i.caseRef ? { caseRef: i.caseRef } : {}),
-      ...(i.evaluation ? { evaluation: i.evaluation } : {}),
-    })),
-    edges: [],
+    nodes: dashboardNodes,
+    edges: dashboardEdges,
     items,
   };
+}
+
+/**
+ * Defect-1 fix: opens the single REPEATABLE READ transaction and runs the
+ * whole overview (case queue + population graph) against that one client, so
+ * every part of this read shares one consistent snapshot and one cursor.
+ */
+export async function loadOperatorOverviewFacts(
+  pool: Pool,
+  workspaceId: string,
+  at?: string,
+  sinceCursor?: string,
+): Promise<OperatorOverviewFacts> {
+  const { value, changeCursor } = await withProjectionSnapshot(pool, (client) =>
+    loadOperatorOverviewFactsInner(client, workspaceId, at, sinceCursor),
+  );
+  return { ...value, changeCursor };
 }
 
 export function loadIncidentProgrammeFactsFromCohort(input: {
@@ -667,70 +842,73 @@ export function buildTravellerTripFacts(input: {
 
 /**
  * Assemble Incident/Programme facts from a recovery case + programme rows.
- * Outcomes come from latest VIABILITY assessments on JOURNEY subjects — never invented.
+ * Outcomes come from latest VIABILITY assessments on JOURNEY subjects — never
+ * invented.
+ *
+ * Defect-3 fix: this PostgreSQL path used to delegate refs, revision and
+ * changed refs entirely to `loadIncidentProgrammeFactsFromCohort` (the pure,
+ * in-memory cohort builder) — which gave a traveller-*count* revision, marked
+ * every traveller changed on every read regardless of what actually changed,
+ * used raw traveller UUIDs as node refs (not the canonical `JOURNEY:<id>`
+ * form the case graph uses for the same subject) and carried no `evaluation`.
+ * The pure cohort builder (`evaluateSharedDisruptionCohort` below) is still
+ * used for `affectedSet`'s outcome/remainderViability, and
+ * `loadIncidentProgrammeFactsFromCohort` remains available unchanged for
+ * `primaryScenarioVerticalLoop.ts`'s pure in-memory path — but this
+ * PostgreSQL producer now builds its own nodes/edges/change-metadata,
+ * reusing the exact subject facts (canonical ref, tone, evaluation, xid8
+ * stamp) `loadRecoveryCaseFactsInner` already computed for the same case, on
+ * the same shared snapshot.
  */
-export async function loadIncidentProgrammeFacts(
-  pool: Pool,
+async function loadIncidentProgrammeFactsInner(
+  client: Queryable,
   workspaceId: string,
   caseId: string,
-  at?: string,
+  at: string | undefined,
+  sinceCursor: string | undefined,
 ): Promise<IncidentProgrammeFacts | null> {
-  const caseFacts = await loadRecoveryCaseFacts(pool, workspaceId, caseId, at);
+  const caseFacts = await loadRecoveryCaseFactsInner(client, workspaceId, caseId, at, sinceCursor);
   if (!caseFacts) return null;
 
-  const journeySubjects = await pool.query<{ subject_id: string }>(
-    `SELECT subject_id FROM case_subjects
-      WHERE workspace_id = $1 AND recovery_case_id = $2 AND subject_kind = 'JOURNEY'`,
-    [workspaceId, caseId],
-  );
+  const journeySubjectFacts = (caseFacts.subjectFacts ?? []).filter((f) => f.ref.startsWith('JOURNEY:'));
 
   const travellers: CohortTravellerEvaluationInput[] = [];
-  for (const row of journeySubjects.rows) {
-    const journey = await pool.query<{ trip_id: string; traveller_id: string }>(
+  for (const f of journeySubjectFacts) {
+    const journeyId = f.ref.slice('JOURNEY:'.length);
+    const journey = await client.query<{ trip_id: string; traveller_id: string }>(
       `SELECT trip_id, traveller_id FROM journeys WHERE workspace_id = $1 AND id = $2`,
-      [workspaceId, row.subject_id],
+      [workspaceId, journeyId],
     );
     const j = journey.rows[0];
     if (!j) continue;
-    const name = await pool.query<{ display_value: string }>(
+    const name = await client.query<{ display_value: string }>(
       `SELECT n.display_value
          FROM travellers t
          JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
         WHERE t.workspace_id = $1 AND t.id = $2`,
       [workspaceId, j.traveller_id],
     );
-    const assessment = await pool.query<{ overall_verdict: string }>(
-      `SELECT a.overall_verdict
-         FROM assessments a
-         JOIN assessment_subjects s ON s.workspace_id = a.workspace_id AND s.assessment_id = a.id
-        WHERE a.workspace_id = $1 AND a.kind = 'VIABILITY'
-          AND s.subject_kind = 'JOURNEY' AND s.subject_id = $2
-        ORDER BY a.evaluated_at DESC LIMIT 1`,
-      [workspaceId, row.subject_id],
-    );
-    const participation = await pool.query<{ id: string }>(
+    const participation = await client.query<{ id: string }>(
       `SELECT p.id FROM participations p
         WHERE p.workspace_id = $1 AND p.traveller_id = $2 AND p.obligation = 'REQUIRED' AND p.accepted = true
         LIMIT 1`,
       [workspaceId, j.traveller_id],
     );
-    const verdictRaw = assessment.rows[0]?.overall_verdict;
-    const programmeOutcome: AssessmentTone =
-      verdictRaw === 'PASS' || verdictRaw === 'FAIL' || verdictRaw === 'UNKNOWN'
-        ? verdictRaw
-        : 'UNKNOWN';
+    // Reuse the case graph's own per-subject CURRENT-assessment tone — never
+    // a second, independently-queried "latest assessment" that could race or
+    // disagree with what the case view just presented for this same subject.
     travellers.push({
       travellerRef: j.traveller_id,
       personLabel: name.rows[0]?.display_value ?? `Traveller ${j.traveller_id.slice(0, 8)}`,
       tripRef: j.trip_id,
-      journeyRef: row.subject_id,
-      programmeOutcome,
-      remainderViability: programmeOutcome === 'PASS' ? 'VIABLE' : programmeOutcome === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN',
+      journeyRef: journeyId,
+      programmeOutcome: f.tone,
+      remainderViability: f.tone === 'PASS' ? 'VIABLE' : f.tone === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN',
       hasEvaluatedRequiredProgrammeDependency: participation.rows.length > 0,
     });
   }
 
-  const programmeItems = await pool.query<{
+  const programmeItems = await client.query<{
     id: string;
     title: string;
     window_start: Date | null;
@@ -746,11 +924,57 @@ export async function loadIncidentProgrammeFacts(
     [workspaceId, caseId],
   );
 
-  return loadIncidentProgrammeFactsFromCohort({
+  const cohort = evaluateSharedDisruptionCohort({
     incidentRef: caseId,
     sourceChangeSummary: caseFacts.changeSummary,
-    generatedAt: caseFacts.generatedAt,
     travellers,
+  });
+
+  const sinceCursorBig = sinceCursor === undefined ? undefined : BigInt(sinceCursor);
+  const maxStamp = journeySubjectFacts.reduce((m, f) => ((f.stamp ?? 0n) > m ? f.stamp! : m), 0n);
+  const projectionRevision = checkedRevisionNumber(maxStamp);
+  // Defect-3: exactly the subjects whose own stamp is >= sinceCursor
+  // (at-least-once, same rule as the case graph) — never "every traveller".
+  const changedVisibleRefs = sinceCursorBig === undefined
+    ? []
+    : journeySubjectFacts.filter((f) => (f.stamp ?? 0n) >= sinceCursorBig).map((f) => f.ref);
+
+  return {
+    generatedAt: caseFacts.generatedAt,
+    projectionRevision,
+    changedVisibleRefs,
+    changedEdgeIds: [],
+    currentSemanticState: cohort.travellers.some((t) => t.outcome === 'FAIL') ? 'FAILED' : 'AFFECTED',
+    nodes: [
+      { ref: caseId, kind: 'DISRUPTION', label: 'Shared supplier disruption', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
+      // Defect-3: canonical `JOURNEY:<id>` refs — the same form and the same
+      // value the case graph already uses for this subject — never a raw
+      // traveller UUID. `evaluation` is the same lookup the case view made.
+      ...journeySubjectFacts.map((f) => ({
+        ref: f.ref,
+        kind: 'TRAVELLER' as const,
+        label: f.ref,
+        semanticState: TONE_TO_STATE[f.tone],
+        authority: 'AUTHORITATIVE' as const,
+        caseRef: caseId,
+        evaluation: f.evaluation,
+      })),
+    ],
+    edges: journeySubjectFacts.map((f) => ({
+      id: `AFFECTED_BY:${f.ref}:${caseId}`,
+      fromRef: f.ref,
+      toRef: caseId,
+      kind: 'AFFECTED_BY' as const,
+      authority: 'AUTHORITATIVE' as const,
+    })),
+    incidentRef: caseId,
+    sourceChangeSummary: caseFacts.changeSummary,
+    affectedSet: cohort.travellers.map((t) => ({
+      personLabel: t.personLabel,
+      tripRef: t.tripRef,
+      outcome: t.outcome,
+      remainderViability: t.remainderViability,
+    })),
     programmeCommitments: programmeItems.rows.map((pi) => ({
       itemRef: pi.id,
       label: pi.title,
@@ -760,7 +984,20 @@ export async function loadIncidentProgrammeFacts(
     currentProgrammeState: programmeItems.rows
       .map((pi) => `${pi.title}@${pi.window_start?.toISOString() ?? 'unscheduled'}`)
       .join('; ') || undefined,
-  });
+  };
+}
+
+export async function loadIncidentProgrammeFacts(
+  pool: Pool,
+  workspaceId: string,
+  caseId: string,
+  at?: string,
+  sinceCursor?: string,
+): Promise<IncidentProgrammeFacts | null> {
+  const { value, changeCursor } = await withProjectionSnapshot(pool, (client) =>
+    loadIncidentProgrammeFactsInner(client, workspaceId, caseId, at, sinceCursor),
+  );
+  return value ? { ...value, changeCursor } : null;
 }
 
 /**

@@ -124,15 +124,35 @@ relations. Rendering arrows does not perform propagation or blast-radius analysi
   AFFECTED comes only from a supplied semantic state, not traversal.
 - Exact membership in changedVisibleRefs is a node marker. Absence is **not marked**,
   not proof of unchanged. CHANGED is also an independent supplied semantic state.
-- Producers use counts (case: actions + subjects; overview: items; cohort: people;
-  traveller: constant 1). Equal revision does not guarantee unchanged content.
-  Case changed refs are action IDs, potentially absent from graph nodes. Preserve
-  these metadata values; do not manufacture an animation/diff clock.
-  **FIG-3 resolved** for case/overview (see the gap table): real per-node source
-  revisions, `changedVisibleRefs` now names exactly what changed relative to a
-  supplied `sinceRevision`. Cohort/traveller producers are unchanged (still counts;
-  they are pure/caller-fed, not Postgres-backed, so no DB revision source exists
-  for them — a known limit, not closed by this lane).
+- Producers use counts (cohort: people; traveller: constant 1). Equal revision does
+  not guarantee unchanged content. Preserve these metadata values; do not
+  manufacture an animation/diff clock.
+  **FIG-3 resolved** for case/overview/incident-programme/dashboard (see the gap
+  table): real per-node source revisions, `changedVisibleRefs` now names exactly
+  what changed relative to a supplied cursor. Cohort/traveller producers are
+  unchanged (still counts; they are pure/caller-fed, not Postgres-backed, so no DB
+  revision source exists for them — a known limit, not closed by this lane).
+  **Corrected (post-review) on `lane/wit-live-readmodel-contract`:** the original
+  FIG-3 design compared a `stamp > sinceRevision` numeric revision, where `stamp`
+  is `pg_current_xact_id()` assigned at a transaction's first *write*, not at
+  commit. A transaction that starts before another but commits after it can make
+  that comparison permanently miss the later commit — the remembered "last seen"
+  revision never falls behind the earlier-starting transaction's stamp, so the
+  later commit's own (smaller) stamp never clears the `>` bar. Every PostgreSQL
+  projection read (case, overview, incident-programme, dashboard) now also runs
+  inside one `REPEATABLE READ` transaction on a single client (previously several
+  independent autocommit queries per read, which could each land on a different
+  snapshot within one logical response) and returns a new opaque
+  `ChangeAwareness.changeCursor` string field — that transaction's own snapshot
+  xmin, read as its first statement. **Client rule:** a client must apply every
+  snapshot it receives (never skip one because `projectionRevision` looks
+  unchanged — equal revisions do NOT prove nothing changed), and must echo the
+  most recently received `changeCursor` back as `sinceCursor` on its next read.
+  The server compares each ref's own stamp against that cursor with `>=`, which
+  is *at-least-once*: a ref already visible in the previous read may be reported
+  changed again, but a ref is never silently omitted. `sinceRevision` (a plain
+  number) is retired; `sinceCursor`/`changeCursor` are always opaque strings, so
+  the underlying 64-bit xid8 value is never coerced through a JS number.
 
 ### Current vs proposed
 
@@ -236,8 +256,8 @@ every "Act Now (prerequisite)" row below.
 |---|---|---|
 | FIG-1 — **Resolved** | `LdgEdge.id` is now required, producer-owned and unique within a graph (`contracts/v2/product/readModels.ts` — a `superRefine` on `LiveDependencyGraphSchema` rejects duplicates loudly). `case_subjects` is queried with a deterministic `ORDER BY subject_kind, subject_id, role` (`pgFactAssembler.ts`). Ids are derived from the canonical relation (kind + endpoints), never array position. Adapter `renderKey` is now `edge.id`. Evidence: `test/ui-semantic-contract.test.ts` ("edge renderKey is the producer-owned stable id", "duplicate edge ids are refused loudly"); `postgres-integration/witLiveReadModelContract.pgtest.ts` asserts edge ids identical across every re-evaluation/settlement step. | Any edge transition across revisions |
 | FIG-2 — **Resolved** | `LdgEdge.authority` mirrors node authority (required, backend-supplied). `ChangeAwareness.changedEdgeIds` is keyed by FIG-1 ids. The adapter's edge `truthMode`/`changeState` now come from these real fields, never inferred from edge kind or `semanticState`. Evidence: `test/ui-semantic-contract.test.ts` ("edge truth and change come only from authority/changedEdgeIds..."). | Authoritative edge styling; edge change marking |
-| FIG-3 — **Resolved** | `projectionRevision` is now `MAX` of real per-node revision sources: each subject's and the case's own `EVALUATION_LIFECYCLE` `scope_generations` family (migrations 0121/0122), read via `last_advanced_xact` (`pg_current_xact_id()`, a per-database globally unique strictly-increasing xid8 — safe to `MAX`, unlike the small per-scope `generation` counter, which can tie and mask a real change; an initial sum-based design was tried and rejected for exactly that reason, caught by the proof test). `changedVisibleRefs` is exactly the refs whose own source exceeds a caller-supplied `sinceRevision` (omitted = first read = honestly empty, never "everything"). `changedEdgeIds` stays `[]` for the current AFFECTED_BY edges, which carry no independent state. `?sinceRevision=<n>` is wired through `targetHttpHandlers.ts`. Evidence: `postgres-integration/witLiveReadModelContract.pgtest.ts` (full 6-step proof: revision strictly increases at injection and at each settlement step; two quiet reads are identical). | Revision-driven updates and settle transitions |
-| FIG-4 — **Resolved** (dashboard/overview scope only) | The overview producer now keys dashboard nodes by the canonical `<SUBJECT_KIND>:<id>` ref the case graph already uses (`loadOperatorOverviewFacts`), with `caseRef` as a separate optional linkage field. **Known limit, not closed by this lane:** the overview producer only lists items with an existing `recovery_cases` row, so no read model can render a subject's node before it is attached to a case — "no node before escalation, same ref after" could not be exercised end-to-end in the proof test; see the FIG-4 note in `docs/work/ACTIVE_TASK.md`. Cohort/incident-programme refs remain a separate identity space (caller-string `travellerRef`/`journeyRef`), unchanged and still explicitly accepted as a different scope. | Baseline -> escalation continuity; open-case selection |
+| FIG-3 — **Resolved, corrected post-review** | `projectionRevision` is `MAX` of real per-node revision sources: each subject's, the case's and (0123) the case's owned content's own `EVALUATION_LIFECYCLE` `scope_generations` family (migrations 0121/0122/0123), read via `last_advanced_xact` (`pg_current_xact_id()` xid8). **Post-review correction:** the original `stamp > sinceRevision` design compared a stamp assigned at a transaction's first write, not at commit, so an earlier-starting/later-committing transaction could be missed forever, and independent autocommit queries within one read could mix snapshots. Every PostgreSQL projection read now runs inside one `REPEATABLE READ` transaction on a single client; the transaction's own snapshot xmin becomes a new `ChangeAwareness.changeCursor` string field, accepted back as `?sinceCursor=<xid8>` (replaces `sinceRevision`), compared with `>=` — at-least-once, never a silent miss. `changedEdgeIds` stays `[]` for the current AFFECTED_BY edges, which carry no independent state. Evidence: `postgres-integration/witLiveReadModelContract.pgtest.ts` (case revision/settlement proof, plus an overlapping-transaction proof that fails against pre-fix `4a04172`). | Revision-driven updates and settle transitions |
+| FIG-4 — **Resolved** (case/overview/dashboard scope) | Case and overview producers key nodes by the canonical `<SUBJECT_KIND>:<id>` ref, with `caseRef` as a separate optional linkage field. **Known limit closed for the DASHBOARD scope (post-review defect 5):** `loadOperatorOverviewFacts` now builds DASHBOARD graph nodes from the in-scope subject population (every JOURNEY with an accepted REQUIRED participation in an ACTIVE programme — see `pgFactAssembler.ts`), not from `recovery_cases` rows, so a subject renders before any case exists and keeps the same ref after escalation (`caseRef` attaches once one exists). No subject -> transport-service edge is shipped for this population graph — the edge gap is reported, not fabricated (no accepted `LdgNodeKind` category has an authoritative semantic state for a transport service). FOCUSED_CASE/overview-queue item scopes are unaffected. Cohort/incident-programme refs (post-review defect 3) now also use the canonical `<SUBJECT_KIND>:<id>` form, the same as the case graph, instead of raw traveller UUIDs. | Baseline -> escalation continuity; open-case selection |
 | FIG-5a — Act Now (merged into FIG-7) | "Affected dependency scope identified" needs a backend candidate set. The M6 invalidation enqueue is that set (the subjects whose assessments read the changed input), so FIG-7 supplies it. Do not derive it from graph topology. | Under-evaluation scope |
 | FIG-5b — Investigate Now | No backend focus/causal path. If the FOCUSED_CASE producer emits only the causal chain (frozen Sarah geometry), scope is the evidence and no `focusPath` is needed; if it emits a wider graph, add `focusPathEdgeIds` (FIG-1 ids). Until decided, product surfaces must not populate `causal`. | Focused causal emphasis |
 | FIG-5c — Investigate Now | No paired current/proposed overlay. Needed only if the counterfactual is drawn on the graph rather than the existing mutation-free preview surface. If so, add `replacesEdgeId` pairing on proposed edges (requires FIG-1/FIG-2). | Counterfactual graph overlay |

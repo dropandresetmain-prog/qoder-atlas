@@ -174,11 +174,87 @@ bug).
   `npm run gate:anti-hardcoding` — not yet run at this checkpoint; scheduled next before
   push, per "Working rules" (full-suite runs reserved for one final pass).
 
-### Next action
+### Next action (superseded — see "Post-review defect fixes" below)
 
 Run the final gates (full unit suite with pre-existing-failure baseline comparison, full
 `test:postgres`, lint, build, anti-hardcoding), scan added lines for persona/flight/airport
 literals, commit-if-clean, push, verify with `git ls-remote`, then write the final report.
+
+## Post-review defect fixes (2026-09-17)
+
+An independent review of the pushed checkpoint (`4a04172`) found five defects in the
+FIG-3/4/6/7 mechanism. Fixed on the same branch/worktree, not a new lane.
+
+1. **Revision could permanently miss a change.** `stamp` (`pg_current_xact_id()`) is
+   assigned at a transaction's first *write*, not at commit — an earlier-starting,
+   later-committing transaction could be missed forever by `stamp > sinceRevision`, and
+   independent autocommit `pool.query` calls within one logical read could mix snapshots.
+   Fix: every PostgreSQL projection read (`loadRecoveryCaseFacts`, `loadOperatorOverviewFacts`,
+   `loadIncidentProgrammeFacts`) now runs inside one `REPEATABLE READ READ ONLY` transaction on
+   a single checked-out client (`withProjectionSnapshot`, `pgFactAssembler.ts`). Each read
+   returns a new `ChangeAwareness.changeCursor` string field (that transaction's own
+   `pg_snapshot_xmin`), accepted back as `sinceCursor` (`sinceRevision` retired), compared with
+   `>=` — at-least-once, never a silent miss. Internal stamps are carried as `bigint`
+   (`readEvaluationLifecycleStamp`, `::text` -> `BigInt`, never through a JS `Number`);
+   `projectionRevision` stays a `number`, guarded by `checkedRevisionNumber` (throws rather than
+   silently truncating — never fires in practice, xid8 is nowhere near 2^53).
+   `?sinceCursor=<xid8>` replaces `?sinceRevision=<n>` in `targetHttpHandlers.ts`.
+2. **Case revision ignored most case content.** Only `recovery_cases` row writes bumped the
+   case's `EVALUATION_LIFECYCLE` scope (0122). Migration `0123` adds triggers on
+   `action_plans`, `action_intents`, `action_dependencies`, `execution_attempts`,
+   `execution_observations`, `recovery_strategies` and `case_subjects` that resolve the owning
+   case (direct `recovery_case_id` column, or one/two joins through `action_plan_id`/
+   `action_intent_id` — table shapes confirmed against `migrations/0100-0110`) and bump the same
+   `EVALUATION_LIFECYCLE` scope family, never a new scope kind, never read by
+   `assessment_inputs`.
+3. **Incident/blast-radius view never converted.** `loadIncidentProgrammeFacts` delegated
+   refs/revision/changed-refs to `loadIncidentProgrammeFactsFromCohort` (traveller-count
+   revision, "every traveller changed" every read, raw traveller UUIDs as refs, no
+   `evaluation`). Fixed: the PostgreSQL path now builds its own nodes/edges/change-metadata
+   from `loadRecoveryCaseFactsInner`'s own per-subject facts (canonical `JOURNEY:<id>` refs,
+   real `evaluation`, xid8 stamp) on the same shared snapshot; the pure cohort builder still
+   backs `affectedSet` and remains unchanged for `primaryScenarioVerticalLoop.ts`'s in-memory
+   path.
+4. **Overview collapsed multi-subject cases.** `OperatorOverviewItem.evaluation` is now set
+   only when the item maps to exactly one subject (never the case's first subject, never an
+   invented aggregation).
+5. **Nothing could render subjects before escalation.** `loadOperatorOverviewFacts`'s DASHBOARD
+   graph nodes now come from the in-scope subject population, not `recovery_cases` rows — one
+   node per subject, `caseRef` attached when a case exists. **Population scope key (documented
+   decision):** every JOURNEY with an accepted REQUIRED `participations` row on a programme_item
+   whose `programmes.lifecycle_status = 'ACTIVE'` (excluding only `journeys.lifecycle_status =
+   'CANCELLED'`) — reuses the exact membership predicate `loadIncidentProgrammeFacts` already
+   treats as authoritative; the schema has no single per-workspace "current programme" key
+   (many events/programmes can exist per workspace), so this is the smallest bounded,
+   authoritative population available pre-escalation. **Edges:** none shipped for this
+   population graph — a subject's dependency on a transport service is real
+   (`journey_items`/`transport_item_details`), but that service has no accepted `LdgNodeKind`
+   category and no authoritative semantic state of its own to present as a node; per the fix's
+   own fallback, the gap is reported (this note, plus `FRONTEND_SEMANTIC_CONTRACT.md`), not
+   fabricated.
+
+**Proof:** `postgres-integration/witLiveReadModelContract.pgtest.ts` was extended in place
+(same file, corrected/expanded scenario) to cover all five defects, including an
+overlapping-transactions step (two explicit `pool.connect()` clients, real `assessments`-insert
+write path via the genuine `fig3_bump_on_assessment` trigger) that fails against pre-fix
+`4a04172`.
+
+**Verification for this checkpoint:**
+- `npm run typecheck`, `npm run lint`, `npm run gate:anti-hardcoding` — all clean.
+- Focused unit (47/47): `test/ui-semantic-contract.test.ts test/m9-product-readmodels.test.ts
+  test/m9-product-surfaces.test.ts test/m9-checkpoint2-unit.test.ts
+  test/m9-jordan-partial-failure-acceptance.test.ts test/m9-vertical-loop.test.ts`.
+- Focused Postgres (23/23, `PGTEST_DB=witlivereadmodel`): `postgres-integration/migrate.pgtest.ts`
+  (0123 applies cleanly from empty, re-run is a no-op, checksum drift still fails loudly),
+  `postgres-integration/m9*.pgtest.ts` and the rewritten
+  `postgres-integration/witLiveReadModelContract.pgtest.ts` together.
+- Full `npm test` / `npm run test:postgres` — see the final report for this checkpoint's
+  numbers (run once, at the very end, per the lane's own working rules).
+
+### Next action
+
+Push once the full-suite gates land clean; write the final report per the fixer brief's
+five-point structure.
 
 ## Independent review checkpoint (Opus, 2026-09-17)
 

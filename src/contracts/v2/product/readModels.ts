@@ -77,6 +77,17 @@ export const ChangeAwarenessSchema = z.strictObject({
   currentSemanticState: LdgSemanticStateSchema,
   changedAt: z.string().datetime({ offset: true }).optional(),
   changeSource: z.string().min(1).optional(),
+  /**
+   * Opaque at-least-once change cursor (xid8-derived), to be echoed back as
+   * `sinceCursor` on the next read. Present only on projections backed by the
+   * PostgreSQL snapshot-xmin mechanism (case/overview/incident-programme/
+   * dashboard); omitted on pure/count-based producers (cohort, traveller
+   * trip), which have no durable revision source to draw one from. Carried as
+   * a string so the 64-bit xid8 value is never coerced through a JS number.
+   * Equal `projectionRevision` values do NOT prove nothing changed — only the
+   * changed sets, compared against a previously returned `changeCursor`, do.
+   */
+  changeCursor: z.string().min(1).optional(),
 });
 export type ChangeAwareness = z.infer<typeof ChangeAwarenessSchema>;
 

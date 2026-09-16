@@ -15,6 +15,7 @@ export function buildChangeAwareness(input: ChangeAwarenessInput) {
     currentSemanticState: input.currentSemanticState,
     ...((input.changedAt ?? input.now) ? { changedAt: input.changedAt ?? input.now } : {}),
     ...(input.changeSource ? { changeSource: input.changeSource } : {}),
+    ...(input.changeCursor ? { changeCursor: input.changeCursor } : {}),
   });
 }
 

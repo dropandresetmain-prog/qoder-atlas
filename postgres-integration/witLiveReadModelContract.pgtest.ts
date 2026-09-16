@@ -1,12 +1,20 @@
 /**
- * WiT live read-model contract — FIG-1/2/3/4/6/7 proof.
+ * WiT live read-model contract — FIG-1/2/3/4/6/7 proof, corrected post-review
+ * for five defects found in the original lane (see docs/work/ACTIVE_TASK.md):
  *
- * Proves, against real PostgreSQL, the sequence the live demo needs:
- * baseline -> operator injects a real disruption through the normal
- * ingestion path -> the engine identifies the dependent scope -> potentially
- * affected subjects read as under evaluation -> the unaffected subject stays
- * current -> the affected subjects settle (clear or fail) -> the failed
- * subject carries stable case linkage.
+ *  1. The revision could permanently miss a change (xact-at-first-write vs
+ *     commit-order race; mixed snapshots across several autocommit queries).
+ *     Fixed with one REPEATABLE READ transaction per read and an xmin-based
+ *     `changeCursor`/`sinceCursor`, compared with `>=` (at-least-once).
+ *  2. The case revision ignored most case content (only `recovery_cases` row
+ *     writes bumped it). Fixed with migration 0123's case-content triggers.
+ *  3. The incident/blast-radius view was never converted off the pure cohort
+ *     builder (traveller-count revision, "every traveller changed" always,
+ *     raw traveller UUIDs as refs, no `evaluation`).
+ *  4. The overview collapsed multi-subject cases to one item/node from the
+ *     first subject.
+ *  5. Nothing could render a subject before escalation — every PostgreSQL
+ *     projection was case-driven.
  *
  * Two journeys (J1, J2) share one transport service; a third (J3) does not
  * depend on it. J1's onward connection is tight enough that the injected
@@ -15,11 +23,16 @@
  * `connection_feasibility` evaluator (same mechanism as
  * m9ConnectionProgression.pgtest.ts), not a caller-supplied hint.
  *
- * No assessment or scheduled_reassessments row is ever hand-inserted: the
- * baseline uses `evaluateImpact(..., persist)`, the injection uses
+ * No assessment or scheduled_reassessments row is hand-inserted for the
+ * baseline/injection/settlement flow: the baseline uses
+ * `evaluateImpact(..., persist)`, the injection uses
  * `acceptProviderShapedDemoEvent` (same as m9DemoIngress.pgtest.ts), and
  * reassessment is driven one claim at a time through the real
- * `PgReassessmentWorker`.
+ * `PgReassessmentWorker`. The overlapping-transaction proof (defect 1) does
+ * insert `assessments` rows directly through two explicit clients — that is
+ * the one place a raw insert is used on purpose, to control commit timing
+ * precisely while still firing the real `fig3_bump_on_assessment` trigger
+ * (0121), not a fabricated cursor.
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,6 +49,7 @@ import {
   seedTraveller,
   seedTrip,
 } from './m6WorldSeed.ts';
+import { seedEvent, seedParticipation, seedProgramme, seedProgrammeItem } from './m4Seed.ts';
 import { acceptProviderShapedDemoEvent } from '../src/app/target/applicationCommands.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { openRecoveryCase } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
@@ -46,7 +60,11 @@ import { PgReassessmentWorker, type ReassessmentPipeline } from '../src/persiste
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
 import { assessSubject } from '../src/resolution/evaluation/assess.ts';
 import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
-import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
+import {
+  loadIncidentProgrammeFacts,
+  loadOperatorOverviewFacts,
+  loadRecoveryCaseFacts,
+} from '../src/app/target/readmodels/pgFactAssembler.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 
 after(async () => {
@@ -76,8 +94,36 @@ function pipeline(pool: Pool): ReassessmentPipeline {
   };
 }
 
-describe('WiT live read-model contract (FIG-1/2/3/4/6/7)', () => {
-  test('baseline -> disruption -> dependent scope under evaluation -> settle -> case linkage stays stable', async () => {
+/**
+ * Real trigger path (0121's `fig3_bump_on_assessment`), not a fabricated
+ * stamp — but still a minimal, schema-valid manifest/subjects shape so a
+ * later `currentAssessmentView`/`loadAssessment` read of this row (e.g. from
+ * `loadRecoveryCaseFacts` re-reading the whole case after this insert) does
+ * not fail to parse it.
+ */
+async function insertViabilityAssessment(
+  client: { query: Pool['query'] },
+  workspaceId: string,
+  journeyId: string,
+  actorId: string,
+  verdict: 'PASS' | 'FAIL' | 'UNKNOWN',
+): Promise<void> {
+  const assessmentId = randomUUID();
+  const manifestDetail = { capture: null, coverageReads: [], missingCoverage: [], evaluatedAt: NOW };
+  await client.query(
+    `INSERT INTO assessments (workspace_id, id, kind, subject_kind, subject_id, evaluated_at, overall_verdict, manifest_detail, manifest_schema_version, created_by_actor_id)
+     VALUES ($1, $2, 'VIABILITY', 'JOURNEY', $3, $4::timestamptz, $5, $6::jsonb, 'wit-live-readmodel-contract-test', $7)`,
+    [workspaceId, assessmentId, journeyId, NOW, verdict, JSON.stringify(manifestDetail), actorId],
+  );
+  await client.query(
+    `INSERT INTO assessment_subjects (workspace_id, assessment_id, subject_kind, subject_id, role)
+     VALUES ($1, $2, 'JOURNEY', $3, 'primary')`,
+    [workspaceId, assessmentId, journeyId],
+  );
+}
+
+describe('WiT live read-model contract (FIG-1/2/3/4/6/7, defects 1-5 corrected)', () => {
+  test('pre-escalation dashboard -> disruption -> settle -> escalation -> case/incident/overview consistency', async () => {
     const pool = await sharedTestPool();
     const seed: SeedSession = await beginSeed(pool, 'WiT live read-model contract');
 
@@ -132,6 +178,24 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7)', () => {
     const j3Item = await seedTransportIntent(seed, { journeyId: journey3Id, orderKey: '010', originPlaceId: originId, destinationPlaceId: dest3Id, selectedServiceId: independentServiceId });
     await seedBooking(seed, { travellerId: traveller3, serviceId: independentServiceId, journeyItemId: j3Item });
 
+    // Defect-5 population scope key: an ACTIVE programme's programme_item with
+    // an accepted REQUIRED participation for each traveller — the same
+    // membership predicate loadIncidentProgrammeFacts already treats as
+    // authoritative, reused here to bound the DASHBOARD subject population.
+    // The programme item is seeded CANCELLED: `m6.participation`'s REQUIRED
+    // dimension is otherwise blocking and needs a real reachable
+    // window/place to resolve PASS (real scheduling feasibility, not a test
+    // shortcut) — CANCELLED deterministically PASSes ("programme_item_cancelled")
+    // regardless of itinerary, which is exactly what this scope-population
+    // probe needs and does not touch the connection_feasibility proof this
+    // test's disruption/settlement steps depend on.
+    const eventId = await seedEvent(seed, { lifecycleStatus: 'ACTIVE' });
+    const programmeId = await seedProgramme(seed, { eventId, lifecycleStatus: 'ACTIVE' });
+    const { programmeItemId } = await seedProgrammeItem(seed, { programmeId, lifecycleStatus: 'CANCELLED' });
+    for (const travellerId of [traveller1, traveller2, traveller3]) {
+      await seedParticipation(seed, { programmeItemId, travellerId, obligation: 'REQUIRED', accepted: true });
+    }
+
     await commitSeed(seed);
 
     const knowledge = new KnowledgeFixture(pool, seed);
@@ -149,43 +213,30 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7)', () => {
       }
     }
 
-    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
-    const caseId = mustOk(await openRecoveryCase(uow(), {
-      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: NOW,
-    })).caseId;
-    for (const [subjectId, role] of [[journey1Id, 'dependent-tight'], [journey2Id, 'dependent-safe'], [journey3Id, 'independent']] as const) {
-      await pool.query(
-        `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role) VALUES ($1, $2, 'JOURNEY', $3, $4)`,
-        [seed.workspaceId, caseId, subjectId, role],
-      );
-    }
-
     const j1Ref = `JOURNEY:${journey1Id}`;
     const j2Ref = `JOURNEY:${journey2Id}`;
     const j3Ref = `JOURNEY:${journey3Id}`;
 
-    // --- Step 1: baseline read — every subject CURRENT with its own verdict.
-    // Evaluated one focus at a time so each manifest captures only what that
-    // journey actually reads — a batched capture would otherwise record every
-    // aggregate touched by ANY focus subject against ALL of them. ---
+    // --- Baseline evaluation (real evaluator, not hand-inserted rows). ---
     for (const journeyId of [journey1Id, journey2Id, journey3Id]) {
       await evaluateImpact(pool, {
         workspaceId: seed.workspaceId, focus: [{ kind: 'JOURNEY', id: journeyId }], now: NOW, registry, persist: { actorId: seed.actorId },
       });
     }
 
-    const read1 = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW);
-    assert.ok(read1);
-    const nodeByRef1 = new Map(read1!.nodes.map((n) => [n.ref, n]));
-    assert.equal(nodeByRef1.get(j1Ref)?.evaluation, 'CURRENT');
-    assert.equal(nodeByRef1.get(j2Ref)?.evaluation, 'CURRENT');
-    assert.equal(nodeByRef1.get(j3Ref)?.evaluation, 'CURRENT');
-    assert.equal(nodeByRef1.get(j1Ref)?.semanticState, 'HEALTHY');
-    assert.equal(nodeByRef1.get(j2Ref)?.semanticState, 'HEALTHY');
-    assert.equal(nodeByRef1.get(j3Ref)?.semanticState, 'HEALTHY');
-    const revision1 = read1!.projectionRevision;
-    const nodeRefs1 = read1!.nodes.map((n) => n.ref).sort();
-    const edgeIds1 = read1!.edges.map((e) => e.id).sort();
+    // --- Requirement 1a: before escalation — with no case rows, the
+    // DASHBOARD projection already renders the population's subjects. ---
+    const dash1 = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW);
+    const dashNodeByRef1 = new Map(dash1.nodes.map((n) => [n.ref, n]));
+    assert.equal(dashNodeByRef1.get(j1Ref)?.evaluation, 'CURRENT', 'J1 renders before any case exists');
+    assert.equal(dashNodeByRef1.get(j2Ref)?.evaluation, 'CURRENT', 'J2 renders before any case exists');
+    assert.equal(dashNodeByRef1.get(j3Ref)?.evaluation, 'CURRENT', 'J3 (independent) renders before any case exists');
+    assert.equal(dashNodeByRef1.get(j1Ref)?.semanticState, 'HEALTHY');
+    assert.equal(dashNodeByRef1.get(j2Ref)?.semanticState, 'HEALTHY');
+    assert.equal(dashNodeByRef1.get(j3Ref)?.semanticState, 'HEALTHY');
+    assert.equal(dashNodeByRef1.get(j1Ref)?.caseRef, undefined, 'no case exists yet, so no caseRef');
+    let dashCursor = dash1.changeCursor!;
+    assert.ok(dashCursor, 'the dashboard read returns a changeCursor');
 
     // --- Step 2: inject the disruption through the normal ingestion path. ---
     const headBefore = await pool.query<{ revision: string }>(
@@ -209,67 +260,177 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7)', () => {
     });
     assert.equal(ingress.ok, true, ingress.ok ? '' : JSON.stringify(ingress.error));
 
-    // --- Step 3: read again — exactly the dependent subjects are under evaluation. ---
-    const read2 = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW, revision1);
-    assert.ok(read2);
-    const nodeByRef2 = new Map(read2!.nodes.map((n) => [n.ref, n]));
-    assert.equal(nodeByRef2.get(j1Ref)?.evaluation, 'PENDING_REASSESSMENT');
-    assert.equal(nodeByRef2.get(j2Ref)?.evaluation, 'PENDING_REASSESSMENT');
-    assert.equal(nodeByRef2.get(j3Ref)?.evaluation, 'CURRENT');
-    const revision2 = read2!.projectionRevision;
-    assert.ok(revision2 > revision1, `revision must strictly increase (${revision2} > ${revision1})`);
-    assert.deepEqual(read2!.nodes.map((n) => n.ref).sort(), nodeRefs1, 'node refs unchanged by re-evaluation');
-    assert.deepEqual(read2!.edges.map((e) => e.id).sort(), edgeIds1, 'edge ids unchanged by re-evaluation');
-    assert.deepEqual([...read2!.changedVisibleRefs].sort(), [j1Ref, j2Ref].sort(), 'changed refs name exactly the dependent subjects');
+    // --- Requirement 1a (cont'd): only the dependents go PENDING_REASSESSMENT. ---
+    const dash2 = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW, dashCursor);
+    const dashNodeByRef2 = new Map(dash2.nodes.map((n) => [n.ref, n]));
+    assert.equal(dashNodeByRef2.get(j1Ref)?.evaluation, 'PENDING_REASSESSMENT');
+    assert.equal(dashNodeByRef2.get(j2Ref)?.evaluation, 'PENDING_REASSESSMENT');
+    assert.equal(dashNodeByRef2.get(j3Ref)?.evaluation, 'CURRENT');
+    assert.deepEqual([...dash2.changedVisibleRefs].sort(), [j1Ref, j2Ref].sort(), 'changed refs name exactly the dependent subjects');
+    dashCursor = dash2.changeCursor!;
 
-    // --- Step 4: run the real reassessment worker, one subject at a time. ---
+    // --- Requirement 1a (cont'd): the real worker, one claim at a time —
+    // changed refs reported since the previous cursor are correct at every step. ---
     const worker = new PgReassessmentWorker(pool, { actorId: 'm-lane-worker' });
-    let lastRevision = revision2;
     const settled: Record<string, 'HEALTHY' | 'FAILED'> = {};
     for (let step = 0; step < 2; step++) {
       const outcome = await worker.runOnce(NOW, pipeline(pool), seed.workspaceId);
       assert.equal(outcome.claimed, true, `expected a claim on step ${step}`);
       assert.equal(outcome.result, 'COMPLETED', JSON.stringify(outcome));
 
-      const read = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW, lastRevision);
-      assert.ok(read);
-      const revision = read!.projectionRevision;
-      assert.ok(revision > lastRevision, `revision must increase after step ${step} (${revision} > ${lastRevision})`);
-      assert.equal(read!.changedVisibleRefs.length, 1, `exactly one subject should have settled on step ${step}`);
-      const settledRef = read!.changedVisibleRefs[0]!;
-      const node = read!.nodes.find((n) => n.ref === settledRef)!;
+      const dash = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW, dashCursor);
+      assert.equal(dash.changedVisibleRefs.length, 1, `exactly one subject should have settled on step ${step}`);
+      const settledRef = dash.changedVisibleRefs[0]!;
+      const node = dash.nodes.find((n) => n.ref === settledRef)!;
       assert.equal(node.evaluation, 'CURRENT', 'a settled subject reads CURRENT, not still-pending');
       assert.ok(node.semanticState === 'HEALTHY' || node.semanticState === 'FAILED', `settled subject must clear or fail, got ${node.semanticState}`);
       settled[settledRef] = node.semanticState as 'HEALTHY' | 'FAILED';
-      assert.deepEqual(read!.nodes.map((n) => n.ref).sort(), nodeRefs1, 'node refs stay unchanged through settlement');
-      assert.deepEqual(read!.edges.map((e) => e.id).sort(), edgeIds1, 'edge ids stay unchanged through settlement');
-      lastRevision = revision;
+      dashCursor = dash.changeCursor!;
     }
-
-    // The tight connection (J1) breaks; the safe one (J2) clears.
     assert.equal(settled[j1Ref], 'FAILED', 'the tight onward connection settles to FAILED after the delay');
     assert.equal(settled[j2Ref], 'HEALTHY', 'the slack onward connection clears to HEALTHY despite the same delay');
 
-    const readFinal = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW);
-    assert.ok(readFinal);
-    const nodeByRefFinal = new Map(readFinal!.nodes.map((n) => [n.ref, n]));
-    assert.equal(nodeByRefFinal.get(j3Ref)?.evaluation, 'CURRENT', 'the independent subject was never touched');
-    assert.equal(nodeByRefFinal.get(j3Ref)?.semanticState, 'HEALTHY');
+    const dashFinal = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW);
+    const dashNodeByRefFinal = new Map(dashFinal.nodes.map((n) => [n.ref, n]));
+    assert.equal(dashNodeByRefFinal.get(j3Ref)?.evaluation, 'CURRENT', 'the independent subject was never touched');
+    assert.equal(dashNodeByRefFinal.get(j3Ref)?.semanticState, 'HEALTHY');
 
-    // --- Step 5: case linkage is stable — the failed subject's ref is
-    // identical to the baseline read and it carries caseRef throughout. The
-    // read model has no route to render a subject node before it is attached
-    // to a case (see docs/work/ACTIVE_TASK.md FIG-4 note) — RecoveryCase
-    // lifecycle transitions are M7/M8-owned and frozen for this lane, so no
-    // lifecycle command is exercised here. ---
-    const failedNode = nodeByRefFinal.get(j1Ref)!;
-    assert.equal(failedNode.ref, j1Ref, 'the failed subject keeps the exact ref used at the baseline read');
-    assert.equal(failedNode.caseRef, caseId);
-    const overviewByRefFinal = readFinal!.affectedItems;
-    assert.ok(overviewByRefFinal?.includes(j1Ref), 'affectedItems names the same canonical ref');
+    // --- Requirement 2: escalation — create the case through the real
+    // escalation command (openRecoveryCase), attach subjects (the codebase
+    // has no dedicated "attach subject" command anywhere — every existing
+    // proof, including m9SarahTargetE2E.pgtest.ts, attaches case_subjects by
+    // direct insert after the real command opens the case). ---
+    const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+    const caseId = mustOk(await openRecoveryCase(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: NOW,
+    })).caseId;
+    for (const [subjectId, role] of [[journey1Id, 'dependent-tight'], [journey2Id, 'dependent-safe'], [journey3Id, 'independent']] as const) {
+      await pool.query(
+        `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role) VALUES ($1, $2, 'JOURNEY', $3, $4)`,
+        [seed.workspaceId, caseId, subjectId, role],
+      );
+    }
 
-    // --- Step 6: reading twice with no further changes yields an identical
-    // revision, node/edge ids and order. ---
+    const caseFacts = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW);
+    assert.ok(caseFacts);
+    const caseNodeByRef = new Map(caseFacts!.nodes.map((n) => [n.ref, n]));
+    const failedCaseNode = caseNodeByRef.get(j1Ref)!;
+    assert.equal(failedCaseNode.ref, j1Ref, 'the failed subject keeps the exact ref used before escalation');
+    assert.equal(failedCaseNode.caseRef, caseId);
+
+    const dashAfterEscalation = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW);
+    const dashNodeAfterEscalation = new Map(dashAfterEscalation.nodes.map((n) => [n.ref, n]));
+    assert.equal(dashNodeAfterEscalation.get(j1Ref)?.ref, j1Ref, 'same ref on the DASHBOARD population node after escalation');
+    assert.equal(dashNodeAfterEscalation.get(j1Ref)?.caseRef, caseId, 'the DASHBOARD node now carries caseRef');
+
+    // Defect-3: the incident/programme (PostgreSQL) projection uses the same
+    // canonical ref as the case graph, and now carries a real `evaluation` —
+    // not a raw traveller UUID and not an omitted field.
+    const incidentFacts = await loadIncidentProgrammeFacts(pool, seed.workspaceId, caseId, NOW);
+    assert.ok(incidentFacts);
+    const incidentNodeByRef = new Map(incidentFacts!.nodes.map((n) => [n.ref, n]));
+    const incidentJ1Node = incidentNodeByRef.get(j1Ref);
+    assert.ok(incidentJ1Node, 'the incident projection uses the same canonical ref as the case graph');
+    assert.equal(incidentJ1Node!.evaluation, 'CURRENT', 'defect-3: the incident projection now carries evaluation');
+    assert.equal(incidentJ1Node!.caseRef, caseId);
+    assert.deepEqual(
+      [...incidentFacts!.nodes.map((n) => n.ref)].filter((r) => r.startsWith('JOURNEY:')).sort(),
+      [j1Ref, j2Ref, j3Ref].sort(),
+      'defect-3: canonical JOURNEY refs, not raw traveller UUIDs',
+    );
+    // Defect-3: a quiet second read must not claim every traveller changed.
+    const incidentCursor = incidentFacts!.changeCursor!;
+    const incidentQuiet = await loadIncidentProgrammeFacts(pool, seed.workspaceId, caseId, NOW, incidentCursor);
+    assert.deepEqual(incidentQuiet!.changedVisibleRefs, [], 'a quiet read reports nothing changed, not "every traveller"');
+
+    // --- Requirement 3: overlapping transactions. T1 (subject A = J1) starts
+    // first (first write assigns the lower xid) but commits last; T2
+    // (subject B = J2) starts second but commits first. A cursor read taken
+    // while T1 is still open, then compared after T1 commits, must still
+    // report A — this is exactly the case `stamp > sinceRevision` (assigned
+    // at first write, not commit) could miss forever, and must fail against
+    // pre-fix `4a04172`. ---
+    const clientA = await pool.connect();
+    const clientB = await pool.connect();
+    try {
+      await clientA.query('BEGIN');
+      await insertViabilityAssessment(clientA, seed.workspaceId, journey1Id, seed.actorId, 'PASS'); // T1 first write — assigns the lower xid
+
+      await clientB.query('BEGIN');
+      await insertViabilityAssessment(clientB, seed.workspaceId, journey2Id, seed.actorId, 'PASS'); // T2 starts after T1
+      await clientB.query('COMMIT'); // T2 commits before T1
+
+      const readWhileOpen = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW);
+      const cursorC = readWhileOpen!.changeCursor!;
+
+      await clientA.query('COMMIT'); // T1 (the earlier-starting transaction) commits last
+
+      const readAfter = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW, cursorC);
+      assert.ok(
+        readAfter!.changedVisibleRefs.includes(j1Ref),
+        'the earlier-starting, later-committing transaction must still be reported — never silently missed',
+      );
+    } finally {
+      clientA.release();
+      clientB.release();
+    }
+
+    // --- Requirement 4: case content coverage (migration 0123). An
+    // action-intent write (via a real action_plans/action_intents row, not a
+    // recovery_cases write) must change the case's own cursor result. ---
+    const caseFactsBeforeContent = (await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW))!;
+    const caseCursorBeforeContent = caseFactsBeforeContent.changeCursor!;
+    const caseRevisionBeforeContent = caseFactsBeforeContent.projectionRevision;
+    const actionPlanId = randomUUID();
+    await pool.query(
+      `INSERT INTO action_plans (workspace_id, id, recovery_case_id, scenario_change_id, plan_version, created_by_actor_id)
+       VALUES ($1, $2, $3, $4, 1, $5)`,
+      [seed.workspaceId, actionPlanId, caseId, randomUUID(), seed.actorId],
+    );
+    await pool.query(
+      `INSERT INTO action_intents (
+         workspace_id, id, action_plan_id, operation_namespace, capability_ref, subject_refs,
+         expected_observations, compensation_supported, status, created_by_actor_id
+       ) VALUES ($1, $2, $3, 'wit-live-readmodel-contract-test', 'test.capability.rebook', $4::jsonb, $5::jsonb, true, 'PROPOSED', $6)`,
+      [
+        seed.workspaceId, randomUUID(), actionPlanId,
+        JSON.stringify([{ kind: 'JOURNEY', id: journey1Id }]),
+        JSON.stringify([{ type: 'test-observation' }]),
+        seed.actorId,
+      ],
+    );
+    const caseFactsAfterContent = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW, caseCursorBeforeContent);
+    const caseRefStr = `case:${caseId}`;
+    assert.ok(
+      caseFactsAfterContent!.changedVisibleRefs.includes(caseRefStr),
+      'an action-intent write must change the case cursor result and report the case ref (migration 0123)',
+    );
+    assert.ok(
+      caseFactsAfterContent!.projectionRevision > caseRevisionBeforeContent,
+      `case revision must advance after case-content writes (${caseFactsAfterContent!.projectionRevision} > ${caseRevisionBeforeContent})`,
+    );
+
+    // --- Requirement 5: overview multi-subject fidelity (defect 4). A
+    // two-subject case yields two DASHBOARD nodes, and the item carries no
+    // first-subject evaluation. ---
+    const twoSubjectCaseId = mustOk(await openRecoveryCase(uow(), {
+      workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), openedAt: NOW,
+    })).caseId;
+    for (const [subjectId, role] of [[journey1Id, 'a'], [journey2Id, 'b']] as const) {
+      await pool.query(
+        `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role) VALUES ($1, $2, 'JOURNEY', $3, $4)`,
+        [seed.workspaceId, twoSubjectCaseId, subjectId, role],
+      );
+    }
+    const overview5 = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW);
+    const twoSubjectItem = overview5.items.find((i) => i.caseRef === twoSubjectCaseId);
+    assert.ok(twoSubjectItem, 'the two-subject case still yields an overview item');
+    assert.equal(twoSubjectItem!.evaluation, undefined, 'a multi-subject item must never report a single first-subject evaluation');
+    const overviewNodeRefs = new Set(overview5.nodes.map((n) => n.ref));
+    assert.ok(overviewNodeRefs.has(j1Ref) && overviewNodeRefs.has(j2Ref), 'both of the two-subject case\'s subjects render as separate DASHBOARD nodes');
+
+    // --- Final: reading twice with no further changes yields an identical
+    // revision, node/edge ids and order (case graph, unchanged assertion). ---
     const readA = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW);
     const readB = await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW);
     assert.ok(readA && readB);
