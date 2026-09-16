@@ -27,80 +27,60 @@ AI proposal -> validation -> deterministic viability -> authority
 
 An LLM cannot directly mutate authoritative state or invoke an irreversible or money-moving action.
 
-## Architecture status: current runtime vs approved target
+## Architecture status: post-C5 implemented foundation
 
-Northstar is in a controlled architecture refactor. Two truths must remain separate until cutover:
+The M0-M10 data/state refactor is implemented and accepted through **C5**. Post-C5 repository convergence is complete.
 
-1. **Current implemented runtime** — the submitted/hardened application that still uses the legacy aggregate model and SQLite persistence.
-2. **Approved target architecture** — the production-oriented model frozen in the data-structure refactor and scheduled through M0-M11.
+**PostgreSQL + PostGIS is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and survives only as explicit offline, read-only migration input plus historical code/test evidence.
 
-The target is normative for new refactor implementation. The current runtime remains implementation truth until target paths actually land and the controlled cutover occurs.
+The remaining work is no longer a persistence-architecture migration. It is product delivery and operational activation:
 
-Normative target documents:
+1. Slice A — baseline -> disruption -> authoritative affected outcomes -> Sarah case.
+2. Founder Test A.
+3. Slice B — preview -> approval -> execution -> observation -> reassessment -> recovery.
+4. Founder Test B.
+5. Submission rehearsal and M11 operational activation/retirement.
+6. Polish/stretch.
+
+Normative architecture documents:
 
 - [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) — F01-F18, canonical ontology, ownership, lifecycles and extension semantics.
 - [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational schema, integrity, transaction and persistence contracts.
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — M0-M11 execution, C0-C6 gates and AT01-AT24 architecture acceptance.
+- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — historical M0-M11 execution decomposition plus the current post-C5 delivery sequence in Section 22.
+- [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — current implementation truth and limitations.
+- [`ROADMAP.md`](ROADMAP.md) — current milestone status and deferred scope.
+
+Historical milestone evidence under `docs/refactor/evidence/**` records what was true at each checkpoint and should not be rewritten to match the present runtime.
 
 ## Current implemented architecture
 
-The current runtime persists typed domain aggregates in SQLite behind repositories. Its operational graph is assembled from typed aggregate fields plus explicit `TripRelation` records.
+The current runtime is a PostgreSQL-backed modular monolith with deterministic domain/evaluation code separated from persistence, provider adapters and delivery workers.
 
-Current principal concepts are:
+Core ownership concepts are:
 
-| Current object | Current role |
+| Object | Current role |
 |---|---|
-| Organisation | Policy/operation/approval/payer/duty-of-care context. |
-| Traveller | Person/profile context including arrangement declaration and sourced passport/nationality information. |
-| AnchorEvent / AnchorCommitment | Shared event/programme context and addressable commitments. |
-| Trip | Aggregate containing one or more travellers, elements, objectives, relations, policy references and stored viability. |
-| TripElement | `TRANSPORT_LEG`, `STAY` or `ENGAGEMENT`, combining intended journey state with reservation/health fields. |
-| TripObjective | Hard/soft outcomes linked to elements. |
-| Place | Operational location/timezone/coordinates/provider refs. |
-| RuleSet / Constraint | Sourced policy and executable conditions. |
-| TripSignal | Normalised disruption/request/event-side change. |
-| RecoveryCase / RecoveryStrategy | Resolution workflow and hypothetical recovery candidates. |
-| ActionIntent | Authority-gated consequential operation request. |
+| Workspace | Data/access partition and top-level operational scope. |
+| Organisation | Business party for policy, payer, duty-of-care and approval context. |
+| Traveller | Stable person identity. |
+| Trip | Shared undertaking/purpose that may contain several travellers. |
+| Journey | One Traveller's independently managed participation in a Trip. |
+| JourneyItem | Intended travel/programme participation owned by a Journey. |
+| TransportService / Resource | Shared operational fulfilment independent of traveller intent. |
+| Reservation / ReservationLine / Allocation / Entitlement | Supplier commitments, shared use and traveller allocation. |
+| Event -> Programme -> ProgrammeItem | Mutable event/programme truth. |
+| Participation | Person-to-programme participation independent of whether that person has a Journey. |
+| RuleSet / Constraint / Requirement | Sourced or internal rules evaluated deterministically. |
+| InformationRecord / InformationVersion / Evidence | Versioned external knowledge, provenance, freshness and coverage. |
+| Assessment | Immutable computed result bound to revisions/generations/evidence/time. |
+| RecoveryCase / RecoveryStrategy / ActionPlan | Resolution work over current state and proposed changes. |
+| AuthorityDecision / ActionIntent / ExecutionAttempt / Observation | Consequential-action safety, durable execution and reconciliation. |
 
-This model remains useful as a compatibility/runtime baseline, but it is **not the approved target ownership model**. In particular, current Trip/TripElement/AnchorCommitment/Constraint persistence combines concepts that the target architecture separates.
-
-## Approved target domain hierarchy
-
-The target remains a modular monolith with deterministic domain/evaluation code separated from persistence, connectors and delivery workers.
-
-At a high level:
-
-```mermaid
-flowchart TB
-  N[Northstar]
-  N --> G[People + governance]
-  N --> J[Trips + per-person Journeys]
-  N --> B[Services + reservations]
-  N --> P[Programmes + places/geography]
-  N --> K[Requirements + external knowledge]
-  N --> R[Resolution work]
-  N --> D[Durability + projections]
-```
-
-Key ownership decisions:
-
-- **Workspace** is the data/access partition. **Organisation** is a business party.
-- **Traveller** is a stable person.
-- **Trip** is a shared undertaking/purpose.
-- **Journey** belongs to exactly one Traveller and one Trip and owns that person's intended itinerary.
-- **Reservation / ReservationLine / Allocation** represent supplier commitments and shared use; a booking is not owned by whichever Journey imported it first.
-- **TransportService / Resource** represent shared operational fulfilment independently from traveller intention.
-- **Event -> Programme -> ProgrammeItem** is real mutable programme state.
-- **Participation** links a Traveller to a ProgrammeItem independently of whether that person has travel.
-- **TravelCredential, IntendedVisit and credential selection** support traveller- and itinerary-specific entry/transit reasoning.
-- **InformationRecord / InformationVersion, Source/Evidence, RuleSet versions and coverage** preserve source-specific claims, freshness, applicability and uncertainty for advisories, conditions and regulatory requirements.
-- **RecoveryCase, Strategy, Assessment, ActionPlan/Intent, AuthorityDecision and ExecutionAttempt** coordinate resolution without becoming a second copy of current-world truth.
-
-Detailed properties/cardinalities belong only in the architecture-closure/logical-schema documents rather than being duplicated here.
+Legacy aggregate/SQLite modules remain in-tree only for migration/historical evidence. They are structurally unreachable from the normal runtime.
 
 ## One owner for each kind of truth
 
-The target distinguishes five classes of information:
+NORTHSTAR distinguishes five classes of information:
 
 1. **Observed** — what a provider, publisher, person or external system reports.
 2. **Intended** — what the traveller/organisation plans to do.
@@ -120,16 +100,16 @@ Examples:
 
 ## Relationships and the operational graph
 
-Northstar does not require a graph database. Most relationships should be normal relational/domain references.
+NORTHSTAR does not require a graph database. Most relationships are normal relational/domain references.
 
-Use explicit executable dependency semantics only where ordinary ownership/reference links are insufficient. The approved generic dependency vocabulary starts with:
+Use explicit executable dependency semantics only where ordinary ownership/reference links are insufficient. The generic dependency vocabulary starts with:
 
 - `CONNECTS_TO` — upstream context affects downstream connection/order feasibility; failure triggers reevaluation rather than blanket invalidation.
 - `REQUIRES` — a subject depends on a prerequisite through a registered requirement/evaluator.
 
 Travel-together, accompaniment, co-presence, capacity and similar conditions are typed requirements, not vague graph edges.
 
-Consequence propagation is therefore deliberate:
+Consequence propagation is deliberate:
 
 ```text
 change/new evidence
@@ -144,9 +124,7 @@ Geography/population/time-wide information such as advisories or weather should 
 
 ## External information and extensibility
 
-The target does not attempt to predict every future travel-data category. It defines stable extension rules.
-
-A new category must establish:
+The architecture does not attempt to predict every future travel-data category. A new category must establish:
 
 - whether it is observed information, internally owned state, requirement, intention or computed result;
 - stable identity/lifecycle where warranted;
@@ -155,7 +133,7 @@ A new category must establish:
 - deterministic consumer/evaluator semantics;
 - reverse applicability/dependency discovery;
 - assessment invalidation rules;
-- optional action capability if Northstar can do something about it.
+- optional action capability if NORTHSTAR can do something about it.
 
 Weather, new regulatory publications, resource availability and future trip-relevant information can therefore add typed modules/subtypes/evaluators without changing what Trip, Journey, Programme, Reservation, Assessment or RecoveryCase mean.
 
@@ -163,7 +141,7 @@ Do not solve extensibility with a generic entity-attribute-value/JSON dumping gr
 
 ## Programme and group semantics
 
-Programme state is no longer treated as seed-only context in the target architecture. Moving/cancelling a ProgrammeItem is an authoritative domain change (or an externally owned request awaiting observation) that can affect many participations/Journeys and must be evaluated through the same consequence/recovery machinery.
+Programme state is real mutable domain state. Moving/cancelling a ProgrammeItem is an authoritative domain change (or an externally owned request awaiting observation) that can affect many participations/Journeys and must be evaluated through the same consequence/recovery machinery.
 
 Group travel is represented without a universal main/sub-traveller hierarchy:
 
@@ -178,11 +156,11 @@ A group can diverge/reconverge without duplicating people/bookings or losing ind
 
 ## Advisory and entry semantics
 
-Travel advisories/conditions preserve publisher-specific versions, source-native levels/text, applicability, effective dates, supersession/retraction, provenance and coverage. There is no universal 'highest authority wins' risk field. Fast emerging reports and slower official guidance may coexist; organisational policy determines how each affects action/approval while the original claims remain distinguishable.
+Travel advisories/conditions preserve publisher-specific versions, source-native levels/text, applicability, effective dates, supersession/retraction, provenance and coverage. There is no universal "highest authority wins" risk field. Fast emerging reports and slower official guidance may coexist; organisational policy determines how each affects action/approval while the original claims remain distinguishable.
 
 Entry/transit feasibility is traveller- and itinerary-specific. Credentials, intended visits, document selections, route/transit context and versioned authoritative requirements feed deterministic three-valued evaluation. Missing coverage remains `UNKNOWN`; an organisation cannot approve a legal requirement into `PASS`.
 
-The architecture supports these domains. Current provider/source integrations do **not** yet constitute legal-grade live entry/advisory coverage; implementation truth remains in `CAPABILITIES_AND_LIMITATIONS.md`.
+The architecture and evaluator boundaries for these domains are implemented. Current provider/source coverage does **not** constitute legal-grade live entry/advisory coverage; implementation truth remains in `CAPABILITIES_AND_LIMITATIONS.md`.
 
 ## Deterministic and agentic responsibilities
 
@@ -194,13 +172,9 @@ AI outputs are proposals/evidence transformations subject to typed validation. T
 
 ## Persistence
 
-### Current baseline
+### Current runtime
 
-The current runtime uses SQLite JSON-oriented repositories. It remains the current application authority until the approved refactor reaches cutover.
-
-### Approved target
-
-The target uses **PostgreSQL + PostGIS** with:
+The current runtime uses **PostgreSQL + PostGIS** with:
 
 - relational identity/ownership and foreign keys;
 - typed domain tables instead of whole mutable Trip/Journey/Programme/Case JSON blobs;
@@ -211,6 +185,16 @@ The target uses **PostgreSQL + PostGIS** with:
 - durable inbox/outbox/scheduled reassessment work;
 - explicit migration/reconciliation rather than routine dual-writing.
 
+### Retired SQLite boundary
+
+SQLite is not an application runtime. It remains only for:
+
+- read-only legacy migration sources;
+- deterministic migration/rehearsal fixtures;
+- historical tests and code archaeology.
+
+`test/m10-runtime-purge.test.ts` and `npm run gate:test-boundary` enforce that live runtime/current tests cannot reach the retired composition.
+
 No graph database, event-sourcing requirement, Kafka, Kubernetes or microservice split is implied by this design.
 
 ## Provider and external-system boundaries
@@ -220,17 +204,35 @@ Atlas, Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio and future GDS/
 Where practical:
 
 ```text
-LIVE   -> provider/source -> normalization -> Northstar
-RECORD -> provider/source -> sanitized provider-shaped recording -> normalization -> Northstar
-REPLAY -> recording -> normalization -> Northstar
+LIVE   -> provider/source -> normalization -> NORTHSTAR
+RECORD -> provider/source -> sanitized provider-shaped recording -> normalization -> NORTHSTAR
+REPLAY -> recording -> normalization -> NORTHSTAR
 ```
 
 LIVE and REPLAY share downstream semantics. Mocks remain at external boundaries; internal state, evaluation, authority and reconciliation stay real.
 
 Future external systems may be observation-only, serviceable through a partner, or authoritative owners of specific field groups. Observability never implies mutability.
 
-## Interfaces
+## Read models and interfaces
 
 Operator and traveller surfaces project from the same canonical state and assessment currency. UI terminology should answer operational questions without exposing internal graph/agent jargon.
 
-The current runtime surfaces remain valid baseline evidence. Target API/read-model changes land only through the implementation milestones and are not claimed complete until their acceptance gates pass.
+The accepted frontend semantic boundary is:
+
+`authoritative backend/read model -> semantic adapter -> normalized presentation model -> shared visual grammar -> UI`
+
+The accepted live read-model contract supplies stable relation identity/authority, monotonic change cursor, assessment lifecycle exposure, subject-keyed refs and authoritative traveller naming. Frontends apply the **complete authoritative snapshot**; `changedVisibleRefs` is an at-least-once transition/emphasis hint, not an exact diff.
+
+The focused V5.6 case graph is an accepted visual reference, not an authoritative data fixture.
+
+The final Event Overview visual design is unresolved. Do not create backend-specific semantics solely to satisfy a rejected prototype.
+
+## Current delivery boundary
+
+The next product proof is Slice A:
+
+`known Sarah baseline -> provider-shaped disruption through normal HTTP -> PostgreSQL mutation/evaluation -> incident-linked five-person outcome -> four cleared/Sarah failed -> one Sarah case -> click/reload authoritative case`
+
+Only after founder testing that slice should Slice B add strategy/preview/approval/execution/observation/recovery.
+
+M11 follows proven product slices as an **operational activation/retirement** milestone, not a return to or migration from an active SQLite runtime.

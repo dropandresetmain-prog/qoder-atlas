@@ -1,114 +1,153 @@
 # Northstar roadmap
 
-This roadmap separates **implemented runtime truth** from the **approved target refactor**. A planned/frozen architecture is not an implemented capability.
+This roadmap records **implemented runtime truth, current delivery status, and intentionally deferred scope**.
 
-## Implemented baseline
+## Current baseline
 
-> Since M10/C5, **PostgreSQL is the sole NORTHSTAR runtime**. The SQLite-era application
-> runtime is retired: it survives only as offline read-only migration input, its tests are
-> classified `HISTORICAL_LEGACY` and non-gating (`docs/TESTING.md`), and the capabilities
-> below describe behaviour that the target runtime now owns.
+> Since M10/C5, **PostgreSQL + PostGIS is the sole NORTHSTAR runtime**. The SQLite-era application runtime is retired: it survives only as offline read-only migration input plus historical test/code evidence. Historical SQLite tests are classified `HISTORICAL_LEGACY` and are non-gating under `docs/TESTING.md`.
 
-- Generalized recovery loop over the Trip/RecoveryCase model.
-- Supplier, traveller and organiser-side changes through the same recovery engine.
-- Atlas flight search, verify, fare rules, state observation and sandbox transaction seams; sanitized provider recordings.
-- Nuitée/liteAPI hotel search, quote/prebook, book, retrieve and cancellation.
-- Frankfurter/ECB-reference FX evidence for deterministic cost/authority comparison.
-- Optional Google Routes context with recorded/deterministic fallback.
-- Model Studio/Qwen schema-bound extraction/planning plus deterministic fallback.
-- Programme intake, shared commitment fan-out, policy/authority gates and observation/reconciliation.
-- Operator/traveller read surfaces over application state.
+Current authoritative development branch: `main`.
+
+Current delivery sequence:
+
+`Slice A -> Founder Test A -> Slice B -> Founder Test B -> submission rehearsal / M11 operational activation -> polish/stretch`
+
+The final Event Overview visual design remains unresolved. The focused Sarah case uses the accepted V5.6 visual language as a design reference, with runtime data supplied by authoritative PostgreSQL/read-model state.
+
+## Implemented product/architecture foundation
+
+- PostgreSQL/PostGIS authoritative persistence and typed relational ownership.
+- Workspace/Organisation/Principal responsibility separation.
+- stable Traveller identity, shared Trip and per-person Journey semantics.
+- independent supplier services/reservations/allocations/entitlements.
+- mutable Event -> Programme -> ProgrammeItem + Participation state.
+- versioned source/evidence/rule/requirement foundations with provenance/freshness/coverage.
+- deterministic multi-object evaluation and assessment invalidation.
+- typed recovery strategies/action plans, scoped authority, durable execution, observation and reconciliation.
+- provider-neutral adapters with Atlas flight, Nuitée/liteAPI hotel, Frankfurter FX, optional Google Routes and Model Studio/Qwen intelligence seams.
+- accepted frontend semantic contract and accepted live read-model contract.
+- LIVE / RECORD / REPLAY boundaries where supported, with internal recovery logic remaining real.
 
 Current capability details and limitations are authoritative in [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md).
 
-## Approved data/state refactor
+## Architecture source of truth
 
-Architecture decision: **GO / PARTIAL REFACTOR**.
+- [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) — frozen F01-F18 architecture decisions.
+- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational ownership/integrity/transaction contracts.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — current post-C5 architecture map.
+- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — historical M0-M11 decomposition plus current post-C5 delivery sequence in Section 22.
+- [`TESTING.md`](TESTING.md) — canonical current/migration/legacy suite contract.
 
-The approved target is defined by:
+## Refactor and convergence status
 
-- [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) — F01-F18 and domain semantics.
-- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — PostgreSQL/PostGIS logical schema and transaction contracts.
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — M0-M11, C0-C6 and AT01-AT24.
-
-Target foundations include:
-
-- PostgreSQL + PostGIS as authoritative application persistence after controlled cutover;
-- Workspace/Organisation/Principal responsibility separation;
-- shared Trip + per-Traveller Journey ownership;
-- independent supplier services/reservations/entitlements/allocations;
-- Event -> Programme -> ProgrammeItem + Participation as real mutable state;
-- explicit credentials/intended visits/document selection for entry/transit feasibility;
-- versioned advisories/conditions/external requirements with provenance, freshness, applicability and coverage;
-- multi-object assessments/recovery with revision/generation invalidation;
-- typed authority/action/execution-attempt/reconciliation boundaries;
-- clean typed extension rules for new trip-relevant information such as weather/resource conditions.
-
-## Refactor implementation status
-
-| Stage | Status | Outcome |
+| Stage | Status | Outcome / next |
 |---|---|---|
-| Architecture closure + logical schema + plan | **COMPLETE / APPROVED** | F01-F18 frozen; implementation not started by the architecture-doc commit. |
-| **M0 — executable contracts** | **COMPLETE / ACCEPTED** | Materialise frozen schemas/contracts, migration mapping and architecture fixtures; **C0 passed** — contract/schema freeze accepted. |
-| M1 — PostgreSQL/durability | **COMPLETE / ACCEPTED** | Relational integrity, migrations, revisions, idempotency, inbox/outbox and transaction foundation; **C1 passed** — integrity/concurrency review closed. |
-| M2 — people/Journeys/groups | **COMPLETE / ACCEPTED** | Stable identities, shared Trip/per-person Journey, coordination/support and credentials. |
-| M3 — services/reservations | Planned / next parallel lane | Shared services, reservations, allocations, entitlements, offers and servicing ownership. |
-| M4 — programmes/geography | Planned / next parallel lane | Mutable programme state, participation/resources, Place/Area/Jurisdiction. |
-| M5 — knowledge/requirements | Planned / next parallel lane | Source/evidence/publication versions, advisories/conditions and rule editions/coverage. |
-| M6 — unified evaluation | Complete — **C2 PASS / ACCEPTED** at `82fa96827fc8d517145498a0ee258f5cdf34c30b` | Multi-object scope/propagation, entry/support/programme/condition evaluators and assessment manifests. Evidence: `docs/refactor/evidence/M6.md` §13-§14. |
-| M7 — planning/action plans | Implemented, integrated onto `integration/m7-m8-c3` (was `milestone-m7-recovery-planning`) | Multi-object strategies and typed action-plan DAGs. Evidence: `docs/refactor/evidence/M7.md`. |
-| M8 — authority/durable execution | Implemented, integrated onto `integration/m7-m8-c3` (was `milestone-m8-authority-execution`; Checkpoint 0 closed; authority/budget/execution/observation landed) | Scoped approvals, financial commitments, attempts/reconciliation and internal programme execution. Pre-M8 conditions closed: I-10 exact FX; traveller-payer UNKNOWN blocking; decision-time `currentAssessmentView`; reassessment `complete()` bounded retry/requeue. |
-| M7/M8 integration | **C3 candidate — C3 not claimed** (independent review pending). All gates green: migrations 0001-0112 from empty, typecheck/build/lint/anti-hardcoding/`git diff --check` clean, `npm run test:postgres` 403/403 pass. Evidence: `docs/refactor/evidence/M7_M8_INTEGRATION.md`; ledger `docs/work/M7_M8_INTEGRATION_ACTIVE_TASK.md`. | Single coherent pipeline proven end-to-end: M6 world → M7 strategy/plan → M8 authority/execution → observation/reassessment, across all 10 required cross-lane acceptance tests. |
-| M9 — application integration | **C4 candidate** on `milestone-m9-product-integration`. Seed lane `2a14c51` integrated; Sarah S1+S1→S3 and Jordan S2+partial-failure fixture proofs green. Sarah Batik = synthetic/simulated; Jordan flights = Atlas REPLAY; hotels = Nuitée RECORD. Fable polish deferred. Evidence: `docs/refactor/evidence/M9.md`. | Independent C4 review; then M10. |
-| WiT frontend semantic contract | **COMPLETE / ACCEPTED** — reviewed at `review/wit-frontend-semantic-contract-opus` `fe09c52`, handed off at `integration/wit-frontend-handoff` `6a655dd`. One presentation adapter boundary at `src/ui/semantics/adapter.ts`, a central visual grammar, exhaustive enum mappings that throw `UNMAPPED SEMANTIC STATE` instead of defaulting silently, and a fixture-only Contract Lab served at `/contract-lab`. No live graph wiring, no new dependencies. Evidence: `docs/FRONTEND_SEMANTIC_CONTRACT.md`, `docs/work/WIT_FRONTEND_INTEGRATION_HANDOFF.md`. | Consumed by post-C5 convergence. |
-| WiT live read-model contract | **COMPLETE / ACCEPTED** — `lane/wit-live-readmodel-contract` `cbe5f83`; lane CLOSED. Closed FIG-1/2/3/4/6/7: stable edge identity and authority, monotonic change cursor over a single `REPEATABLE READ` projection snapshot (migrations 0121-0123), assessment-lifecycle exposure, subject-keyed refs, per-subject verdict fidelity, authoritative traveller names, pre-escalation population nodes. | Consumed by post-C5 convergence. **Contract:** the frontend applies the complete authoritative snapshot; `changedVisibleRefs` is an at-least-once emphasis hint and never an exact diff. |
-| M10 — migration rehearsal | **COMPLETE / ACCEPTED — C5 PASS** at `87783c0` (`milestone-m10-migration-rehearsal`). Legacy export/transform/reconciliation, restore drill and exact candidate verification. **PostgreSQL is now the sole NORTHSTAR runtime**; SQLite survives only as offline read-only migration input. Evidence: `docs/refactor/evidence/M10_*.md`, `C5_REQUEST_PACKAGE.md`. | Post-C5 product delivery (Slice A / Slice B), then M11. |
-| Post-C5 convergence | **COMPLETE** — `integration/post-c5-convergence`, tag `wit-post-c5-convergence`. C5 + accepted frontend foundation + accepted live read models on one candidate; test topology split into classified suites with an enforced SQLite import boundary; `M2-ACCESS-PATH-PLANNER` resolved. | Slice A. |
-| Slice A / Slice B product delivery | Planned — sequence frozen in `IMPLEMENTATION_PLAN.md` §22 | Two founder-testable vertical slices. Replaces the superseded six-package framing in `docs/work/POST_C5_DEMO_BACKEND_COMPLETION_PLAN.md`. |
-| M11 — controlled cutover | Planned | Target becomes sole application authority after explicit approval. |
+| Architecture closure + logical schema | **COMPLETE / APPROVED** | F01-F18 frozen. |
+| M0 — executable contracts | **COMPLETE / ACCEPTED — C0 PASS** | Executable schemas/contracts and acceptance mapping frozen. |
+| M1 — PostgreSQL/durability | **COMPLETE / ACCEPTED — C1 PASS** | Relational integrity, revisions, idempotency, durable work and migration foundation. |
+| M2 — people/Journeys/groups | **COMPLETE / ACCEPTED** | Stable identities, shared Trip/per-person Journey, support/coordination and credentials. |
+| M3 — services/reservations | **COMPLETE / INTEGRATED** | Services, reservations, allocations, entitlements, offers and servicing ownership landed before M6. |
+| M4 — programmes/geography | **COMPLETE / INTEGRATED** | Mutable programme/participation/resource and geography foundations landed before M6. |
+| M5 — knowledge/requirements | **COMPLETE / INTEGRATED** | Versioned evidence/information/rules/requirements/coverage foundations landed before M6. |
+| M6 — unified evaluation | **COMPLETE / ACCEPTED — C2 PASS** at `82fa96827fc8d517145498a0ee258f5cdf34c30b` | Multi-object scope/propagation and revision-bound deterministic assessment. |
+| M7 — planning/action plans | **COMPLETE / ACCEPTED** | Multi-object RecoveryStrategy/ScenarioChange/ActionPlan foundation. |
+| M8 — authority/durable execution | **COMPLETE / ACCEPTED — C3 PASS** at `f8103379ed2426d442d342895e9e1d1573f875da` | Scoped approvals, durable intents/attempts, observation/reconciliation and partial-failure truth. |
+| M9 — application/product integration | **COMPLETE / ACCEPTED — C4 PASS** at `c45a9289b7f7ff730cdce97ced6124b1a9332bf8` | PostgreSQL product composition/read models, Sarah/Jordan target E2Es and no legacy fallback. |
+| WiT frontend semantic contract | **COMPLETE / ACCEPTED** — source `fe09c525...`, handoff `6a655dd...` | Semantic adapter/model/grammar foundation consumed by convergence. |
+| WiT live read-model contract | **COMPLETE / ACCEPTED** — `cbe5f837...` | Stable edge identity/authority, change cursor, assessment lifecycle, subject refs and traveller names; complete-snapshot contract. |
+| M10 — migration rehearsal | **COMPLETE / ACCEPTED — C5 PASS** at `87783c0bcbdc12cf263851a36e06b9d5255289ce` | Offline legacy export/import/reconciliation and restore evidence accepted; PostgreSQL is sole runtime. |
+| Post-C5 convergence | **COMPLETE** on current `main` lineage | C5 + accepted frontend foundation + accepted live read models + converged test topology on one code line; `M2-ACCESS-PATH-PLANNER` resolved. |
+| SQLite readiness audit | **COMPLETE — classification A: NO MEANINGFUL LEGACY STATE IDENTIFIED** | No repository evidence of real legacy state or reachable normal-runtime SQLite writer. One bounded external file/volume inventory remains before M11 activation. |
+| **Slice A** | **NEXT / PLANNED** | Known Sarah baseline -> normal UI -> provider-shaped disruption -> five incident-linked outcomes -> four cleared / Sarah failed -> one case -> click/reload Sarah. Founder test at T1-T4. |
+| **Founder Test A** | **PLANNED** | Physically test Slice A before continuing. Fix first broken product boundary rather than expanding scope. |
+| **Slice B** | **PLANNED** | Real strategy -> mutation-free preview -> complete affected participants -> authority/approval -> execution -> observation -> reassessment -> recovery. |
+| **Founder Test B** | **PLANNED** | Physically test T5-T6 before polish/stretch. |
+| M11 — operational activation / retirement | **PLANNED AFTER SLICE B** | Final external legacy-source inventory, authority/sole-writer/reconciliation/provenance closure, old operational-access retirement. **Not** a switch from an active SQLite runtime. |
+| C6 / submission candidate | **PLANNED** | Exact candidate, repeatability/failure rehearsal, final current-target gate, operating/backup evidence and submission capture. |
 
-Do not mark a stage implemented because its target shape is documented.
+## Immediate product milestones
 
-## Product capabilities to build on the target foundation
+### Slice A — earliest testable NORTHSTAR
 
-These are product priorities/capability directions, not permission to bypass the M0-M11 dependencies:
+The first founder-testable target is deliberately narrow:
 
-- authoritative/appropriately licensed entry and transit data with explicit coverage/freshness and safe `UNKNOWN` behaviour;
-- travel advisory/condition sources that preserve publisher truth while allowing organization-specific policy response;
-- corporate/TMC/GDS integrations behind provider-neutral external-record/servicing boundaries;
-- stronger airline servicing/exchange/cancellation/observation as access permits;
-- production hotel servicing/reconciliation and broader supply only where partner access is reliable;
-- dynamic ground/local context when it can change a deterministic recovery verdict;
-- event/calendar/programme integrations with explicit ownership mode;
-- enterprise policy/approval/accounting context and auditable notifications;
-- traveller-facing interaction over the same canonical Journey/recovery state.
+1. restore/load a reproducible Sarah PostgreSQL baseline;
+2. open a real product surface;
+3. trigger the disclosed provider-shaped flight disruption through normal HTTP;
+4. canonical PostgreSQL state changes and reassessment occurs;
+5. the UI receives authoritative updated state without manual reload;
+6. exactly five incident-linked affected people are accounted for;
+7. four are viable/cleared and Sarah is disrupted with the real quantitative reason;
+8. exactly one Sarah RecoveryCase is opened/attached idempotently;
+9. founder clicks Sarah;
+10. focused Sarah case renders from authoritative state and survives reload.
 
-## Stretch / deferred / not in the current core
+Stop and test here.
+
+The final Event Overview visual layout does **not** need to be frozen before this spine works. A minimal truthful operational surface is acceptable for early testing.
+
+### Slice B — complete Sarah recovery
+
+After Founder Test A:
+
+1. produce/select one real typed recovery strategy;
+2. preview remains mutation-free and covers every genuinely affected participation, including no-Journey participants;
+3. bind a real operator principal and scoped authority decision to the exact reviewed basis;
+4. execute ordered programme changes with revisions/idempotency;
+5. observe/commit resulting state;
+6. reassess all relevant subjects;
+7. same Sarah Journey becomes viable;
+8. RecoveryCase resolves only after current passing assessment;
+9. action evidence truthfully shows no new Sarah flight purchase.
+
+Stop and founder-test again before polish.
+
+## Current investigations
+
+| Item | Status | Why / revisit condition |
+|---|---|---|
+| Exact five-person Sarah incident provenance | **Investigate in Slice A** | Baseline PASS must not be misrepresented as checked-by-this-disruption evidence. |
+| Exact provider event semantics (`ID7159 cancelled -> moved to ID7153`) | **Investigate in Slice A** | UI claim must match actual accepted commands/state changes. |
+| Evaluation -> case orchestration through normal HTTP/product lifecycle | **Act Now in Slice A** | Engine E2E evidence currently includes test-helper assembly not yet proven as browser interaction. |
+| Sarah stay/hotel consequence | **Investigate in Slice A/B** | Do not render a healthy stay branch unless target evaluator actually says so. |
+| Felix programme linkage | **Investigate in Slice A** | Use actual PostgreSQL programme/requirement truth, not historical fixture drift. |
+| No-Journey programme participants (Daniel/Elena equivalents) | **Investigate early; Act Now in Slice B if omission confirmed** | Missing participants must not silently become viable. |
+| External legacy SQLite file/volume inventory | **Before M11 activation** | Git cannot prove absence of ignored external files. Does not block Slice A/B. |
+
+## Stretch / deferred / not in current critical path
 
 | Item | Status | Reason / revisit condition |
 |---|---|---|
-| Advanced large-tour/scheduling optimisation | **Park for Later** | Correct shared-state/group semantics come first; add optimisation when scale evidence requires it. |
-| Automated visa applications | **Park for Later** | Credential/entry architecture supports it, but provider/legal/workflow capability must be validated first. |
-| Rich household-management product | **Park for Later** | Family/dependant travel semantics are included; a consumer household admin surface is a separate product need. |
-| Full accounting ledger | **Park for Later** | Northstar needs payer/cost/budget boundaries, not a general ERP. |
-| Insurance claims automation | **Stretch** | Requires carrier integrations, claim authority and observed outcomes. |
-| Transactional ground transport | **Stretch** | Add when reliable quote/book/cancel/observe capability exists. |
-| Dedicated graph database | **Deferred** | PostgreSQL relational ownership + explicit dependency/applicability indexes satisfy the approved model; revisit only with demonstrated query/scale limits. |
-| Microservices / Kafka / Kubernetes | **Deferred** | Modular monolith + durable DB work is sufficient; revisit with independent scaling/streaming/deployment evidence. |
-| Unbounded autonomous refunds/post-ticket servicing | **Deferred** | Consequential supplier actions remain capability/authority/observation gated. |
-| Generic legal advice | **Rejected as product claim** | Northstar may evaluate sourced entry requirements but must not manufacture legal certainty or present unsupported advice. |
-| M7/M8 effect-scoped `logicalOperationKey` re-plan identity (IN-1) | **Resolved in M9 Checkpoint 1** | Intent uniqueness is per action plan (`0120_m9_replan_identity.sql`). Effect-scoped keys remain; execution known-success/live guards still block duplicate irreversible dispatch. Evidence: `docs/refactor/evidence/M9.md`, `src/app/target/replanIdentity.ts`. |
-| Progressive per-person evaluation telemetry | **Park for Later** | Authoritative atomic snapshots are sufficient for the demo; revisit if a slice needs mid-evaluation progress. |
-| Rich considered-option / rejected-candidate history | **Park for Later** | Expose it only if planner evidence already retains it; do not invent rejected options for drama. |
-| Polished provider/tool activity projection | **Park for Later** | Presentation polish, not product truth. |
+| Progressive per-person evaluation telemetry | **Park for Later** | Atomic authoritative snapshots are sufficient for Slice A; add only if truthful live progress becomes necessary. |
+| Rich considered-option / rejected-candidate history | **Park for Later** | Retain/show only if planner evidence genuinely persists it. |
+| Polished provider/tool activity projection | **Park for Later** | Useful demo polish, not recovery truth. |
 | Authoritative Before/After toggle | **Park for Later** | Needs historical projection retention; revisit after Slice B. |
-| Whole-event Live Dependency Graph, semantic zoom, multiple simultaneous disruption focuses | **Park for Later** | Slice A/B need one bounded focused graph. Revisit only with an approved Event Overview design. |
-| Event Overview visual design | **Unresolved / redesign required** | The first prototype was rejected and is deliberately absent from the repository. Approve a design before mapping it to authoritative backend fields. |
-| Retired-SQLite dead-code test audit | **Park for Later** | 76 `HISTORICAL_LEGACY` files and the modules they cover remain in the tree. Deleting them is a separate, reviewable change; the import-graph gate already stops them affecting current correctness. |
-| Physical test-directory split (`test/legacy-sqlite/**`, `test/migration/**`) | **Park for Later** | `test/suites.json` plus `gate:test-boundary` already prevent suite conflation; moving ~76 files is churn without added safety. |
+| Whole-event Live Dependency Graph / semantic zoom / multiple simultaneous focuses | **Park for Later / Stretch** | Focused case + Slice A/B first; revisit only after core works and Event Overview design is approved. |
+| Event Overview final visual design | **Unresolved / redesign required** | First prototype rejected. Do not map backend semantics to it prematurely. |
+| Deep Participants / Decisions / Activity functionality | **Stretch** | Pages should eventually be presentable, but core demo path wins. |
+| Traveller/phone view | **Stretch** | Revisit after core operator path works. |
+| Automated visa applications | **Park for Later** | Requires validated legal/provider workflow capability. |
+| Insurance claims automation | **Stretch** | Requires insurer integrations/authority/observed outcomes. |
+| Transactional ground transport | **Stretch** | Add when reliable quote/book/cancel/observe provider exists. |
+| Dedicated graph database | **Deferred** | PostgreSQL relational ownership + explicit dependency/applicability indexes are sufficient until query/scale evidence says otherwise. |
+| Microservices / Kafka / Kubernetes | **Deferred** | Modular monolith + durable DB work is sufficient. |
+| Unbounded autonomous refunds/post-ticket servicing | **Deferred** | Consequential supplier actions remain capability/authority/observation gated. |
+| Generic legal advice | **Rejected as product claim** | NORTHSTAR evaluates sourced requirements; it does not manufacture legal certainty. |
+| Retired SQLite dead-code deletion | **Park for Later** | Runtime/test boundaries already make it harmless. Remove after M11/submission when migration archaeology is no longer useful. |
+| Physical test-directory split | **Ignore / Accept Risk for now** | Explicit suite manifest + import-graph gate already prevent suite conflation; moving dozens of files is churn. |
+
+## Current test contract
+
+- `npm test` — boundary gate + CURRENT_TARGET surface.
+- `npm run test:postgres` — current PostgreSQL integration gate.
+- `npm run test:migration` — offline migration boundary.
+- `npm run test:legacy` — historical SQLite runtime, manual/non-gating only.
+
+During implementation use focused tests first. Run the broad current/PG gate only at coherent slice/candidate checkpoints. Do not let agents debug by repeatedly running historical/full suites.
 
 ## Roadmap discipline
 
 - Every intentionally excluded capability stays visible with a reason/revisit condition.
 - New provider/source work must use the approved extension/ownership boundaries instead of adding scenario-specific domain branches.
 - If implementation exposes a requirement the frozen ontology cannot express, classify it as an architecture gap and resolve it explicitly rather than hardcoding around it.
+- Founder-visible integration evidence outranks horizontal completeness. If a slice is blocked, fix the first broken boundary before expanding scope.

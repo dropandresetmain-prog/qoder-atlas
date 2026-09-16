@@ -3,57 +3,108 @@
 This file defines setup expectations, not secret values.
 
 ## Principles
-- Core application must start without optional external credentials in REPLAY/local mode.
+
+- **PostgreSQL + PostGIS is the sole normal NORTHSTAR runtime.**
+- SQLite is retired as an application runtime and may be used only as explicit offline, read-only migration input or historical test data.
+- Core application behaviour must start without optional external-provider credentials in REPLAY/local mode, but the PostgreSQL runtime itself must be available.
 - Never commit `.env*`, API keys, OAuth tokens, raw sensitive provider responses or local SQLite databases.
-- External-provider failures degrade to structured unavailable/unknown states rather than crashing core engine.
+- External-provider failures degrade to structured unavailable/unknown states rather than crashing the core engine.
+- LIVE/RECORD is always an intentional operator choice; routine tests should stay credential-free unless a specific live capability is being proven.
 
-## Expected configuration areas
-
-Variable names were frozen during the F0 foundation and are implemented in `src/config/config.ts` (see `.env.example`). The app starts with **zero** variables set (REPLAY/local defaults).
+## Current runtime configuration
 
 ### Application
-- `APP_ENVIRONMENT` — `local | dev | demo` (default `local`)
+
+- `APP_ENVIRONMENT` — `local | dev | demo` (default `local` where the auxiliary config surface uses it)
 - `LOG_LEVEL` — `debug | info | warn | error` (default `info`)
-- `HTTP_PORT` — application server port (default `8787`; host `PORT` wins when both are set, e.g. Railway)
+- `HTTP_PORT` — application server port (default `8787`; host `PORT` wins when both are set)
 - `ADAPTER_MODE` — `LIVE | RECORD | REPLAY` (default `REPLAY`)
-- `RECORDINGS_DIR` — sanitized provider-shaped recordings (default `recordings`)
-- `FIXTURES_DIR` — scenario fixtures (default `fixtures`)
+- `RECORDINGS_DIR` — sanitized provider-shaped recordings
+- `FIXTURES_DIR` — scenario fixtures
 
-### SQLite
-- `SQLITE_PATH` — database file path (default `data/app.sqlite`; `:memory:` in tests)
+### PostgreSQL / PostGIS — current runtime
 
-No external database account is required locally. SQLite is embedded. Persistence goes through repository interfaces so deployment can replace it if local disk is ephemeral.
+The normal runtime boots through the target PostgreSQL composition.
 
-### Intelligence provider (Model Studio / OpenRouter)
-The application talks to live intelligence (recovery planning, extraction, research) through one provider-neutral `IntelligenceClient` (`src/intelligence/client.ts`). `INTELLIGENCE_PROVIDER` selects which provider that client is configured for; everything downstream (prompts, Zod schema validation, planner/extraction/research mapping, the deterministic viability/authority/execution boundary) is identical regardless of provider — the provider only supplies a model completion.
+Required for a real product boot:
 
-- `INTELLIGENCE_PROVIDER` — `model_studio | openrouter` (default `model_studio`)
+- a reachable PostgreSQL database with the NORTHSTAR migrations available;
+- `PG_TARGET_WORKSPACE_ID` identifying the workspace the application should serve.
 
-Only required for LIVE intelligence; REPLAY/local runs need none, and **REPLAY never makes an external call to either provider even when credentials for one are present** — provider choice never affects the deterministic safety boundary. When the selected provider is unconfigured (or in REPLAY), the recovery planner degrades to the built-in deterministic fallback planner, so the full REPLAY recovery loop (plan → approve → execute → verify) remains runnable with zero credentials.
+Current configuration variables are read by `src/persistence/postgres/config.ts`:
 
-#### Alibaba Cloud Model Studio (preferred WiT/Alibaba demo provider)
-Used for Qwen extraction/mapping, recovery planning/comparison and agentic web research. Select with `INTELLIGENCE_PROVIDER=model_studio` (the default).
+- `PG_TARGET_WORKSPACE_ID`
+- `PG_TARGET_HOST` (local test default `localhost`)
+- `PG_TARGET_PORT` (local compose default `55432`)
+- `PG_TARGET_DATABASE` (local test default `northstar_test`)
+- `PG_TARGET_USER`
+- `PG_TARGET_PASSWORD`
+- `PG_TARGET_SSL`
+- `PG_TARGET_POOL_MAX`
+- `PG_TARGET_MIGRATIONS_DIR` when an explicit migration directory override is required.
+
+`PGTEST_*` variables used by the local Docker Compose test instance may be accepted as fallbacks for matching target values where implemented.
+
+`npm run build` copies the SQL migration files required by the built runtime. `npm start` must boot the built PostgreSQL target composition; it must not fall back to SQLite.
+
+### Local PostgreSQL test instance
+
+Requires Docker or another OCI runtime that understands `docker compose`.
+
+```bash
+npm run db:postgres:up
+npm run test:postgres
+npm run db:postgres:down
+```
+
+`docker-compose.postgres-test.yml` binds to port `55432` by default. The test database is disposable by design; `db:postgres:down` removes its data.
+
+For product development, use isolated databases/workspaces between parallel lanes when they can mutate state. Separate Git worktrees do not isolate a shared PostgreSQL database.
+
+## SQLite — migration/historical only
+
+`SQLITE_PATH` is **not** a normal application-runtime setting anymore.
+
+It may appear only when explicitly operating on a historical SQLite source or historical tooling. The retained migration path is:
+
+`legacy SQLite -> read-only exporter -> deterministic bundle -> PostgreSQL importer -> recomputation/reconciliation`
+
+The migration source opener is deliberately read-only. Do not use the retired `openDatabase()` application path to inspect a source that may need preservation because that legacy API can perform writes on open.
+
+Historical/ignored `data/app.sqlite` files are not assumed to contain valuable state. Before final M11 activation, perform one bounded external read-only inventory of any developer/deployment volumes that historically ran NORTHSTAR. If no meaningful source exists, record that there is no migration source. If one exists, freeze/copy/hash it before export/import.
+
+## Intelligence provider
+
+The application talks to live intelligence through the provider-neutral intelligence boundary. Model output remains proposal/extraction data subject to schema validation and deterministic viability/authority/execution gates.
+
+- `INTELLIGENCE_PROVIDER` — `model_studio | openrouter` (default `model_studio` where configured)
+
+REPLAY must not make a live model call even if credentials are present.
+
+### Alibaba Cloud Model Studio
+
+Preferred WiT/Alibaba demo provider for Qwen-backed extraction/planning where live intelligence is explicitly enabled.
 
 - `MODEL_STUDIO_API_KEY`
 - `MODEL_STUDIO_BASE_URL`
 - `MODEL_STUDIO_MODEL`
 - `MODEL_STUDIO_TIMEOUT_MS`
 
-Start with inexpensive model for plumbing/tests. Upgrade only if evidence shows quality blocks acceptance.
+Regional note: Model Studio mainland-China and international deployments use different key stores. A key issued for one region can return `invalid_api_key` against the other. If a valid key fails, confirm whether `MODEL_STUDIO_BASE_URL` should use the international endpoint before assuming the key is wrong.
 
-**Regional endpoint (DR-0 finding, 24 Aug 2026):** Alibaba Cloud Model Studio has two separate regional deployments with disjoint key stores — mainland China (`https://dashscope.aliyuncs.com/compatible-mode/v1`, the code default) and international (`https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, Singapore-based). A key issued in one region's console returns `invalid_api_key` against the other region's endpoint even when the key is genuinely valid. If a LIVE call fails with `invalid_api_key` despite a correct key, try setting `MODEL_STUDIO_BASE_URL` to the international endpoint before assuming the key itself is wrong.
+### OpenRouter
 
-#### OpenRouter
-A second first-class intelligence provider over the same OpenAI-compatible chat-completions surface. Select with `INTELLIGENCE_PROVIDER=openrouter`.
+Optional second intelligence provider over the same schema-validated completion boundary.
 
 - `OPENROUTER_API_KEY`
-- `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`)
-- `OPENROUTER_MODEL` (default `openrouter/free`)
+- `OPENROUTER_BASE_URL`
+- `OPENROUTER_MODEL`
 - `OPENROUTER_TIMEOUT_MS`
 
-`openrouter/free` is OpenRouter's own free-models auto-router: it routes to whichever free underlying model is currently available rather than promising one fixed model. Because the underlying model can vary, model output still goes through the exact same strict Zod schema validation as Model Studio — malformed or non-conforming output is rejected (`INVALID_OUTPUT`) and fails closed, exactly as it would for any other provider; there is no relaxed validation path and no silent fallback to a different, paid OpenRouter model. If a pinned (non-free) OpenRouter model is needed instead, set `OPENROUTER_MODEL` to a specific `<vendor>/<model>` or `<vendor>/<model>:free` identifier from `openrouter.ai/models`.
+No provider choice weakens deterministic validation or authority gates.
 
-### Atlas direct API
+## Atlas direct API
+
 Needed only for LIVE flight capability.
 
 - `ATLAS_ENV` (default `sandbox`)
@@ -63,94 +114,59 @@ Needed only for LIVE flight capability.
 
 Authoritative capability docs live in `dropandresetmain-prog/atlas-hackathon-lab`. Do not treat sandbox Search data as real market evidence.
 
-### Google Maps Routes
-Optional/non-blocking dynamic routing. Core must support REPLAY/fallback when absent.
+## Nuitée / liteAPI hotel
+
+Needed only for LIVE/RECORD hotel capability. Credential-free routine work can use replay fixtures.
+
+- `NUITEE_API_KEY`
+- `NUITEE_SEARCH_BASE_URL`
+- `NUITEE_BOOKING_BASE_URL`
+
+LIVE/RECORD should fail closed with structured configuration/provider errors when credentials are absent.
+
+## Google Routes
+
+Optional/non-blocking dynamic routing.
 
 - `GOOGLE_ROUTES_API_KEY`
 
-### Nuitée / liteAPI hotel
-Needed only for LIVE/RECORD hotel capability. Duffel Stays was the documented first choice; it is unavailable in Singapore, so the IMPLEMENTATION_PLAN Section 13 fallback clause fired and Nuitée (liteAPI) is the wired hotel provider (see the hotel lifecycle rows in `docs/CAPABILITIES_AND_LIMITATIONS.md`). The committed `fixtures/recordings/nuitee` corpus replays credential-free.
+Core recovery must support replay/fallback when absent.
 
-- `NUITEE_API_KEY`
-- `NUITEE_SEARCH_BASE_URL` (defaults to `https://api.liteapi.travel/v3.0`)
-- `NUITEE_BOOKING_BASE_URL` (defaults to `https://book.liteapi.travel/v3.0`)
+## Frankfurter / FX evidence
 
-LIVE/RECORD fail closed with NOT_CONFIGURED while `NUITEE_API_KEY` is absent.
+Frankfurter provides dated ECB-reference comparison evidence where wired. It is not a payment FX service. Routine replay/deterministic evidence should remain available without depending on live network success.
 
-### Booking.com Demand API
-Not required for MVP. Credentials/access are a separate bounded investigation. Do not add variables until access is approved and adapter accepted into scope.
+## Optional / stretch providers
+
+Hotelbeds Transfers and future provider integrations are not required for the current Slice A/Slice B critical path unless separately approved.
+
+Do not add a provider merely because a UI could display it.
 
 ## LIVE / RECORD / REPLAY
 
 ### LIVE
-Call provider and normalize response.
+Call the provider/source, normalize the response, and continue through the normal engine.
 
 ### RECORD
-Call provider, sanitize sensitive values where required, persist provider-shaped response for replay, then run same normalizer.
+Call the provider/source, sanitize and save a provider-shaped recording where allowed, then run the same normalization/downstream engine.
 
 ### REPLAY
-Load saved provider-shaped response and run same normalizer/downstream engine.
+Load saved provider-shaped data and run the same normalization/downstream engine.
 
-Do not maintain separate demo logic paths.
+Record/replay external boundary inputs/results, not precomputed internal assessments, cases or UI outcomes.
 
 ## Provider recordings
 
-Commit recordings only if they contain no secrets/unsafe personal data, terms allow storage/use, and they are intentionally curated as test/demo fixtures. Otherwise keep in ignored local paths and create safe fixtures.
+Commit recordings only if they contain no secrets/unsafe personal data, terms allow storage/use, and they are intentionally curated as test/demo fixtures. Otherwise keep them in ignored local paths and create safe fixtures.
 
 ## Deployment
 
-Deployment target is not frozen. Avoid architecture requiring persistent local disk outside storage abstraction. If target filesystem is ephemeral, replace SQLite repository implementation or attach persistent storage; do not rewrite domain logic.
+The deployable application is the PostgreSQL target runtime:
 
-## Target PostgreSQL + PostGIS foundation (M1, isolated — not the active runtime)
+`npm run build -> npm start -> dist/main.js -> POSTGRES_TARGET`
 
-`docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md` and `docs/refactor/evidence/M1.md` are
-normative for the target persistence foundation. This section is only setup
-instructions. **The application's default composition still uses SQLite**
-(`SQLITE_PATH` above); nothing here changes that. `src/persistence/postgres/**`
-is an isolated seam imported only by its own tests and
-`composeTargetRuntime.ts` — never by `src/main.ts`/`src/app/compose.ts`.
+Deployment must provide PostgreSQL connectivity/workspace configuration and may provide optional live provider credentials.
 
-### Starting the isolated test instance
+Do not mount or configure a SQLite database as an application fallback.
 
-Requires Docker (or another OCI runtime that understands `docker compose`).
-
-```bash
-npm run db:postgres:up      # postgis/postgis:16-3.4, isolated port/volume
-npm run test:postgres       # real-PostgreSQL M1 integration suite
-npm run db:postgres:down    # stop and discard all test data (tmpfs-backed)
-```
-
-`docker-compose.postgres-test.yml` binds to `55432` by default (override with
-`PGTEST_PORT`/`PGTEST_HOST`/`PGTEST_USER`/`PGTEST_PASSWORD`/`PGTEST_DB` env
-vars before `up`). Data lives on `tmpfs` inside the container — intentional:
-this is a disposable test instance, never a persistent store, and
-`db:postgres:down` (`-v`) discards it completely.
-
-### Target-runtime configuration variables
-
-Read by `src/persistence/postgres/config.ts` — completely separate from
-`loadConfig()`/`AppConfigSchema` above; setting these has **no effect** on the
-default SQLite runtime.
-
-- `PG_TARGET_HOST` (default `localhost`)
-- `PG_TARGET_PORT` (default `55432`, matching the compose file's default)
-- `PG_TARGET_DATABASE` (default `northstar_test`)
-- `PG_TARGET_USER` / `PG_TARGET_PASSWORD` (default `northstar_test` / `northstar_test`)
-- `PG_TARGET_SSL` (default `false`)
-- `PG_TARGET_POOL_MAX` (default `10`)
-- `PG_TARGET_MIGRATIONS_DIR` (default: `src/persistence/postgres/migrations`)
-
-`PGTEST_*` variables (used by the compose file itself) are also accepted as
-fallbacks for the matching `PG_TARGET_*` variable, so one `.env` block can
-configure both the container and the client.
-
-Never commit real credentials for this instance; the defaults above are
-test-only and match the compose file's own test-only defaults.
-
-### Driver
-
-`pg` (node-postgres) v8 — maintained, explicit parameterized SQL, explicit
-`BEGIN`/`COMMIT`/`ROLLBACK` transaction control via a checked-out
-`PoolClient`. No ORM/query-builder is used; see
-`src/persistence/postgres/pool.ts` and `docs/refactor/evidence/M1.md` for the
-full rationale.
+M11 is the final operational activation/retirement milestone, not the point where source code first switches from SQLite to PostgreSQL. Before M11 activation verify sole-writer/authority state, final provenance/reconciliation, backup/restore readiness, any externally retained legacy source disposition, and retirement/fencing of old operational tooling such as the embedded legacy acceptance runner.

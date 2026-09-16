@@ -2,37 +2,50 @@
 
 ## Mission
 
-Build Northstar as a generalized travel-resolution product without scenario-specific hardcoding or false capability claims.
+Build NORTHSTAR as a generalized travel-resolution product without scenario-specific hardcoding or false capability claims.
 
-The graph/state model is central. Chat, dashboards and mobile surfaces are interfaces over authoritative state; they are not the source of truth.
+The graph/state model is central. Chat, dashboards and traveller surfaces are interfaces over authoritative state; they are not the source of truth.
 
 The normal orchestration lifecycle is:
 
-`Planner / Architect -> Prompter -> Implementer -> Integrator -> Reviewer when warranted -> Promotion / Cutover`
+`Planner / Architect -> Prompter -> Implementer -> Integrator -> Reviewer when warranted -> Promotion / Activation`
 
 Review is a risk-control step, not a ritual.
+
+## Current project state
+
+The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository convergence is also complete.
+
+**PostgreSQL is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and exists only as explicit offline, read-only migration input or historical test/code archaeology. It is not a fallback runtime, alternate runtime, demo runtime or current product authority.
+
+The current delivery sequence is:
+
+`Slice A -> Founder Test A -> Slice B -> Founder Test B -> submission rehearsal / M11 operational activation -> polish/stretch`
+
+Slice A is the next product milestone. Do not reopen broad architecture unless implementation exposes a concrete requirement the frozen ontology cannot express.
 
 ## Source-of-truth order
 
 Before broad implementation, inspect the actual branch/head and read the relevant parts of:
 
-1. `docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md` — **approved target architecture**, frozen decisions F01-F18, ownership/cardinality/lifecycle semantics.
-2. `docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md` — **approved target persistence and transaction model**.
-3. `docs/IMPLEMENTATION_PLAN.md` — M0-M11 execution sequence, C0-C6 checkpoints and AT01-AT24 acceptance coverage.
-4. `docs/ARCHITECTURE.md` — concise current-runtime versus approved-target architecture map.
-5. `docs/CAPABILITIES_AND_LIMITATIONS.md` — **implemented reality today**. Target design is not implementation evidence.
-6. `docs/ROADMAP.md` — capability/refactor status and intentionally deferred scope.
-7. `docs/TESTING.md` — cumulative verification rules and current-runtime regression families.
-8. `docs/AGENT_MODEL_SELECTION.md` — current operational model/harness routing policy.
-9. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
-10. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — three alternative model+harness routes for each M0-M11 milestone and C0-C6 checkpoint.
-11. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
+1. `docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md` — frozen F01-F18 architecture decisions, ownership/cardinality/lifecycle semantics.
+2. `docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md` — approved persistence and transaction model.
+3. `docs/ARCHITECTURE.md` — concise **current** architecture map after C5/convergence.
+4. `docs/CAPABILITIES_AND_LIMITATIONS.md` — implemented reality and current limitations.
+5. `docs/ROADMAP.md` — milestone status, current delivery sequence and intentionally deferred scope.
+6. `docs/IMPLEMENTATION_PLAN.md` — historical M0-M11 execution decomposition plus the authoritative post-C5 delivery sequence in Section 22. Where old pre-C5 sequencing language conflicts with Section 22/current status docs, Section 22/current status wins.
+7. `docs/TESTING.md` — canonical suite classification and focused-test-first verification rules.
+8. `docs/work/ACTIVE_TASK.md` — current working-memory ledger for the active delivery slice.
+9. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
+10. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
+11. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for milestones/checkpoints.
+12. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
 
-`docs/BUILD_WITH_QODER.md` is a historical record of how the original hackathon candidate was built. It is not the current routing policy.
+Historical milestone evidence under `docs/refactor/evidence/**` is evidence of what was true at that checkpoint. Do not rewrite it to match the current runtime.
+
+`docs/BUILD_WITH_QODER.md` is historical build context, not current routing policy.
 
 For Atlas capability questions, consult the authoritative research in `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
-
-If current code and the approved target differ during the refactor, that is expected until cutover. Do not silently reinterpret the legacy runtime as the target design or claim target capability before it lands.
 
 ## Orchestration roles
 
@@ -43,11 +56,12 @@ Owns architecture, shared contracts, decomposition, dependencies, lane boundarie
 - Reopen a frozen decision only for a concrete contradiction or new requirement the approved architecture cannot express.
 - Freeze shared contracts before parallel implementation.
 - Specify dependencies, overlapping paths, integration order and merge risks.
+- Prefer founder-testable vertical slices over long horizontal completion tunnels.
 
 ### Prompter
 Turns an approved milestone/package into an execution prompt.
 
-Include exact branch/worktree/head, package objective, authoritative files, frozen contracts, owned/do-not-touch paths, acceptance criteria, scoped verification, exclusions, delegation guidance and completion report.
+Include exact branch/worktree/head, objective, authoritative files, frozen contracts, owned/do-not-touch paths, acceptance criteria, scoped verification, exclusions, delegation guidance and completion report.
 
 Do not re-plan the product.
 
@@ -58,9 +72,9 @@ Owns one assigned package/lane.
 - Execute the approved plan; do not silently fork schemas/contracts.
 - Surface architecture gaps instead of hardcoding around them.
 - Delegate bounded, independently verifiable work where useful.
-- Keep architecture, integration decisions, Critical changes and final verification with the primary agent.
+- Keep architecture, integration decisions, critical changes and final verification with the primary agent.
 - Run the narrowest checks that prove changed behaviour and relevant failure paths.
-- Update the implementation evidence required by `docs/IMPLEMENTATION_PLAN.md`.
+- Do not use full-suite execution as the debugging loop.
 
 ### Integrator
 Owns cross-lane seams and accepted contract reconciliation.
@@ -75,9 +89,7 @@ Independent model review is **uncertainty-driven**, not automatically attached t
 
 - Bounded/Normal work does not get a reviewer by default.
 - Complex work gets review only for material uncertainty, cross-contract risk or an expensive seam.
-- Critical work normally gets **one** independent reviewer plus required execution evidence when that reviewer materially reduces unresolved risk.
-- A checkpoint remains an acceptance/evidence gate even when no independent model review is needed.
-- Prefer a different model family/surface from the implementer when independence matters.
+- Critical work normally gets one independent reviewer plus required execution evidence when that reviewer materially reduces unresolved risk.
 - Inspect actual repository SHA and existing evidence first.
 - Run additional checks only for concrete unresolved questions.
 - Classify every finding exactly: `Act Now`, `Investigate Now`, `Park for Later`, or `Ignore / Accept Risk`.
@@ -94,13 +106,12 @@ Independent model review is **uncertainty-driven**, not automatically attached t
 - Proposed recovery state is isolated from current world state until an internally authoritative commit or external observation establishes the result.
 - `UNKNOWN` is valid. Missing, stale, conflicting or incomplete information must not become certainty.
 - Explicit instructions outrank latent preferences; inferred preferences remain soft signals.
-- Externally owned state is not changed merely because Northstar submitted a request.
+- Externally owned state is not changed merely because NORTHSTAR submitted a request.
 
-## Approved refactor foundation
+## Implemented refactor foundation
 
-The target architecture is defined by F01-F18. Key consequences for implementation include:
+The current PostgreSQL runtime implements the F01-F18 target foundation through M10/C5. Important consequences include:
 
-- PostgreSQL is the target authoritative application database; PostGIS handles geographic applicability.
 - Workspace is the data/access partition; Organisation is a business party.
 - Traveller is a stable person; Trip is a shared undertaking; Journey is one traveller's independently managed participation in a Trip.
 - Event -> Programme -> ProgrammeItem is real mutable domain state; Participation links people to programme items independently of travel.
@@ -113,15 +124,33 @@ The target architecture is defined by F01-F18. Key consequences for implementati
 
 Do not introduce Neo4j, microservices, Kafka, Kubernetes or another infrastructure tier without a demonstrated requirement and an approved architecture change.
 
-## Current runtime versus target persistence
+## Runtime and persistence boundary
 
-The **current baseline runtime still uses SQLite** and the legacy aggregate model until the controlled refactor cutover. That is implementation truth, not the approved future architecture.
+**Current runtime:** PostgreSQL + PostGIS target composition.
 
-The **approved target is PostgreSQL + PostGIS** behind explicit repository/unit-of-work boundaries, with relational ownership/integrity, expected revisions, idempotency receipts, durable work and typed domain tables.
+**Retired runtime:** SQLite legacy application composition. It remains in-tree only for historical evidence and offline migration tooling.
 
-Since M10/C5, **PostgreSQL is the sole NORTHSTAR runtime.** SQLite exists only as explicit offline, read-only migration input. It is not a fallback runtime, not an alternate runtime, not a demo runtime and not a normal application runtime. `test/m10-runtime-purge.test.ts` proves the runtime import graph cannot reach it; `npm run gate:test-boundary` proves the current test suites cannot either.
+`test/m10-runtime-purge.test.ts` proves the live runtime import graph cannot reach the retired SQLite composition. `npm run gate:test-boundary` proves CURRENT_TARGET tests cannot reach it either.
 
-M11 remains the controlled operational switch where the target becomes the sole application authority.
+M11 is no longer a database-runtime migration. It is the final **operational activation / retirement** step: external legacy-source inventory if relevant, final authority/sole-writer verification, reconciliation/provenance closure and retirement of any remaining old operational access. Do not reactivate SQLite as rollback.
+
+## Product delivery discipline
+
+The current critical path is two founder-testable vertical slices.
+
+### Slice A
+
+Known Sarah baseline -> normal product UI -> controlled provider-shaped disruption -> authoritative PostgreSQL mutation -> incident-linked affected cohort -> four cleared / Sarah disrupted -> one Sarah RecoveryCase -> click Sarah -> authoritative focused case.
+
+Stop and founder-test at this point. Do not require Slice B before testing Slice A.
+
+### Slice B
+
+Real recovery strategy -> mutation-free preview -> complete affected participation -> real authority/approval -> ordered execution -> observation -> reassessment -> same Sarah trip/Journey viable -> truthful recovered state.
+
+Stop and founder-test again before polish/stretch.
+
+The Event Overview final visual design is unresolved. Do not overfit backend contracts to a rejected prototype. Build only the minimum truthful operational projection required for Slice A.
 
 ## Anti-hardcoding
 
@@ -136,41 +165,42 @@ If the approved ontology/contracts cannot express a requirement, report an **arc
 ## External capability boundaries
 
 - Atlas is a flight adapter, not the architecture.
-- Existing Nuitée/liteAPI, Google Routes, Model Studio and other providers are adapters/capabilities, not domain owners by default.
+- Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio and future providers are adapters/capabilities, not domain owners by default.
 - Mocks are allowed only at external provider/action boundaries.
 - Internal ingestion, mutation, propagation, planning, viability, authority, observation and lifecycle logic stay real.
 - LIVE / RECORD / REPLAY should share normalisation/downstream paths where practical.
+- Record/replay external boundary inputs/results, not precomputed internal assessments/cases/UI outcomes.
 - A new provider, GDS/TMC system, advisory source, entry-data source or weather source must enter through the approved ownership/information/capability boundaries rather than force scenario logic into the engine.
 
 ## Agent routing
 
-Follow `docs/AGENT_MODEL_SELECTION.md` and the milestone/checkpoint alternatives in `docs/IMPLEMENTATION_AGENT_ROUTING.md`. Load `docs/MODELS_ARSENAL.md` only when the routing decision itself needs deeper/updated evidence.
+Follow `docs/AGENT_MODEL_SELECTION.md` and `docs/IMPLEMENTATION_AGENT_ROUTING.md`. Load `docs/MODELS_ARSENAL.md` only when the routing decision itself needs deeper/updated evidence.
 
-There is **no single default implementation harness**. Route in this order:
+There is no single default implementation harness. Route in this order:
 
 `role -> harness capability -> task shape/risk -> independence -> effort`.
 
 Important current observations:
 
-- The frozen architecture means much difficult M0-M11 work is **Bounded/Hard Bounded**, not automatically Complex.
+- The frozen architecture means much remaining work is bounded product integration, not fresh architecture design.
 - Cursor/Codex/Claude Code are preferred for time-sensitive local write/run/fix loops.
 - Qwen3.8-Flash and GLM-5.3-Flash are legitimate defined-task implementers, not merely cheap subagents.
-- Qoder remains useful for Qwen/Kimi/GLM work; its ARM64 latency is a harness constraint, not a model-quality judgement.
-- Astra is a **model**, not a harness, and belongs in Complex/Critical architecture/investigation rather than Normal implementation.
-- Luna High/xHigh/Max are serious bounded implementation routes when the destination is already clear.
-- Sol/Opus/Astra-class use is escalation for concrete ambiguity/risk, not a tax on every Critical-labelled milestone.
+- Qoder remains useful for Qwen/Kimi/GLM work; harness latency is a harness constraint, not a model-quality judgement.
+- Astra is a model, not a harness, and belongs in Complex/Critical architecture/investigation rather than Normal implementation.
+- Sol/Opus/Astra-class use is escalation for concrete ambiguity/risk, not a tax on every milestone.
 - Model choice stays separate from the execution prompt.
 
-For long-horizon work, use `docs/work/ACTIVE_TASK.md` as working memory when the task is likely to exceed a normal coding session. Re-read it before major phases, after compaction/delegation and before completion; close checklist items only with evidence.
+For long-horizon work, use `docs/work/ACTIVE_TASK.md` as working memory. Re-read it before major phases, after compaction/delegation and before completion; close checklist items only with evidence.
 
 ## Verification is cumulative evidence
 
-Follow `docs/TESTING.md` plus AT01-AT24/checkpoint requirements in `docs/IMPLEMENTATION_PLAN.md`.
+Follow `docs/TESTING.md` plus the relevant acceptance criteria in `docs/IMPLEMENTATION_PLAN.md`.
 
-- **Implementation:** focused relevant unit/integration test -> focused PG seam test -> typecheck/build/lint only when relevant. Do **not** run the broad suite after every edit.
+- **Implementation:** focused relevant unit/integration test -> focused PG seam test -> typecheck/build/lint only when relevant.
 - **Integration:** seam/conflict/new-interaction checks; reuse valid lane evidence.
 - **Review:** inspect existing evidence first; execute more only for concrete uncertainty.
-- **Candidate/cutover:** the full canonical CURRENT target gate once, on a fresh database.
+- **Coherent slice checkpoint:** run the appropriate broader PostgreSQL gate.
+- **Final candidate/cutover:** run the full canonical CURRENT target gate once, on a fresh database.
 
 Never claim a check passed unless it ran successfully. Do not use paid/live provider calls in routine verification unless explicitly needed and authorised.
 
@@ -187,7 +217,7 @@ Every test file is classified in `test/suites.json`; commands run explicit file 
 
 `npm run gate:test-boundary` walks the real import graph and fails if a current test reaches the retired SQLite runtime, `node:sqlite` or `src/migration/**`, or if any test file is unclassified.
 
-**Historical SQLite runtime failures are never a release blocker and are not current product correctness.** Do not run `test:legacy` during normal implementation and do not repair what it reports unless you were explicitly assigned historical/migration investigation.
+Historical SQLite runtime failures are never a release blocker and are not current product correctness. Do not run `test:legacy` during normal implementation and do not repair what it reports unless explicitly assigned historical/migration investigation.
 
 ## Issue and scope discipline
 
@@ -203,7 +233,8 @@ Every intentionally excluded capability remains visible in `docs/ROADMAP.md` wit
 ## Git and worktrees
 
 - Verify actual branch/head before implementation/integration.
-- Parallel lanes must not share uncommitted state.
+- New product work branches from the current authoritative `main` unless an explicit integration plan says otherwise.
+- Parallel lanes must not share uncommitted state or a shared mutable test database.
 - Use exact-path staging; do not default to `git add .` / `git add -A`.
 - Commit coherent, testable checkpoints and push them.
 - Before claiming pushed/integrated state, verify actual branch/commit/remote.
