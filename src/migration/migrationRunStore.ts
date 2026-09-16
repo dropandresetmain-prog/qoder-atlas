@@ -57,6 +57,8 @@ export const MigrationExceptionClassificationSchema = z.enum([
   'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
   /** External operation outcome was never observed; stays unknown, never failed. */
   'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
+  /** Exported but no handler was registered, so nothing was transformed. */
+  'DEFERRED_NO_HANDLER',
   /**
    * History preserved as evidence, deliberately NOT re-injected as live
    * target state — replaying a historical signal or case into a live target

@@ -942,7 +942,23 @@ async function importOneRecord(
   }
 
   const handler = HANDLERS[category.categoryId];
-  if (handler === undefined) return 'recordsDeferred';
+  if (handler === undefined) {
+    // A counter alone tells a reader that something was skipped without
+    // saying what, which is indistinguishable from data loss when they come
+    // back to it. Deferral is a decision, so it gets named like one.
+    await appendReconciliationException(ctx.pool, ctx.runId, {
+      classification: 'DEFERRED_NO_HANDLER',
+      categoryId: category.categoryId,
+      sourceType: record.sourceType,
+      sourceId: record.sourceId,
+      reason: `no importer handler is registered for category ${category.categoryId}; the record was exported but not transformed`,
+      affectedScope: `${category.categoryId} ${record.sourceId}`,
+      safetyImpact: 'whatever this row represented is absent from the target and nothing in the target refers to it',
+      owner: 'migration owner',
+      blocksCutover: true,
+    });
+    return 'recordsDeferred';
+  }
 
   if (record.rawUnparseableText !== undefined) {
     await appendReconciliationException(ctx.pool, ctx.runId, {
