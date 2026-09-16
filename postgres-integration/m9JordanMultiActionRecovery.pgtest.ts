@@ -37,6 +37,7 @@ import {
   prepareParams,
   seedStoredExecutionAuthority,
   tripBaseManifest,
+  bootstrapTestGrantIssuer,
 } from './m8ExecutionGateHelpers.ts';
 import type { ActionPlan, ActionIntent } from '../src/contracts/v2/action/actionPlan.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
@@ -181,8 +182,18 @@ describe('M9 3C/3D Jordan coordinated multi-action recovery (real dependency + p
       recoveryStrategyId,
     }));
 
-    for (const intent of plan.intents) {
-      const scope = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, intent.id);
+    // ISSUER-POL: bootstrap once for this workspace, scoped to cover every
+    // intent's required authority scope, then reuse below — bootstrap only
+    // satisfies a workspace's very first grant.
+    const allRequiredScopes = await Promise.all(
+      plan.intents.map((intent) => loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, intent.id)),
+    );
+    const issuerPrincipalId = await bootstrapTestGrantIssuer(
+      pool, seed.workspaceId, seed.actorId, GATE_NOW, allRequiredScopes.flat(),
+    );
+    for (let i = 0; i < plan.intents.length; i++) {
+      const intent = plan.intents[i]!;
+      const scope = allRequiredScopes[i]!;
       await seedStoredExecutionAuthority({
         pool,
         workspaceId: seed.workspaceId,
@@ -196,6 +207,7 @@ describe('M9 3C/3D Jordan coordinated multi-action recovery (real dependency + p
         assessmentTripId: tripId,
         requirementRole: 'CASE_OWNER',
         now: GATE_NOW,
+        issuerPrincipalId,
       });
     }
 
