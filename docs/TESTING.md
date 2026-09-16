@@ -52,6 +52,8 @@ Historical legacy failures are **not** current product correctness and **never**
 
 Adding a test file without classifying it fails the gate rather than silently joining a suite.
 
+**The graph follows runtime edges only.** `import type ... from` is erased at emit, so naming a retired module's *types* creates no runtime dependency and does not make a test legacy — ten UI/presentation/authority tests reach `entityStore` this way and never load SQLite. `tsconfig.json` sets `verbatimModuleSyntax`, so the inline `import { type A } from` form still emits the import and is deliberately treated as a value edge. `npm run test:suites` flags type-only reach as `retired-types-only`: allowed, but a signal that the test still depends on retired type shapes.
+
 ### Physical organisation
 
 Suites are currently separated by explicit manifest rather than by directory. Moving ~76 historical files would be large mechanical churn for no additional safety: the manifest plus the import-graph gate already make it impossible for a command or CI job to conflate the suites. Incremental physical moves (`test/legacy-sqlite/**`, `test/migration/**`) remain welcome but are not a precondition for anything.

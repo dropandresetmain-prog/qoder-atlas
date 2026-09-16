@@ -54,19 +54,36 @@ function listFiles(dir, predicate, acc = []) {
   return acc;
 }
 
-const IMPORT_RE = /(?:^|[\s;{(])(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|(?:^|[\s;{(])import\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|[\s;{(])import\s*['"]([^'"]+)['"]/gm;
+/**
+ * `import type ... from` / `export type ... from` is erased at emit, so it
+ * creates no runtime dependency — a test that only names a retired module's
+ * TYPES never loads SQLite. `tsconfig.json` sets `verbatimModuleSyntax`, so
+ * the inline `import { type A } from` form DOES still emit the import and is
+ * deliberately treated as a value edge here.
+ *
+ * Runtime reachability is what the boundary is about, so value edges decide
+ * pass/fail; type-only reach is surfaced by `--report` as information.
+ */
+const FROM_RE = /(?:^|[\s;{(])(?:import|export)\s+(type\s+)?([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
+const DYNAMIC_RE = /(?:^|[\s;{(])import\s*\(\s*['"]([^'"]+)['"]\s*\)/gm;
+const BARE_RE = /(?:^|[\s;{(])import\s*['"]([^'"]+)['"]/gm;
 
 function readImports(file) {
   const src = readFileSync(file, 'utf8');
   const out = [];
-  for (const m of src.matchAll(IMPORT_RE)) out.push(m[1] ?? m[2] ?? m[3]);
+  for (const m of src.matchAll(FROM_RE)) out.push({ spec: m[3], typeOnly: m[1] !== undefined });
+  for (const m of src.matchAll(DYNAMIC_RE)) out.push({ spec: m[1], typeOnly: false });
+  for (const m of src.matchAll(BARE_RE)) out.push({ spec: m[1], typeOnly: false });
   return out;
 }
 
 const importCache = new Map();
 
-/** Resolve everything a test file can reach, plus which bare specifiers it uses. */
-function reachable(entry) {
+/**
+ * Resolve everything a test file can reach, plus which bare specifiers it uses.
+ * `valueOnly` walks only edges that survive emit.
+ */
+function reachable(entry, valueOnly) {
   const seen = new Set();
   const bare = new Set();
   const stack = [entry];
@@ -79,7 +96,8 @@ function reachable(entry) {
       specs = readImports(file);
       importCache.set(file, specs);
     }
-    for (const spec of specs) {
+    for (const { spec, typeOnly } of specs) {
+      if (valueOnly && typeOnly) continue;
       if (!spec.startsWith('.')) {
         bare.add(spec);
         continue;
@@ -92,12 +110,16 @@ function reachable(entry) {
 }
 
 function analyse(absFile) {
-  const { files, bare } = reachable(absFile);
-  const rels = [...files].map((f) => posix(relative(repoRoot, f)));
+  const runtime = reachable(absFile, true);
+  const runtimeRels = [...runtime.files].map((f) => posix(relative(repoRoot, f)));
+  const anyRels = [...reachable(absFile, false).files].map((f) => posix(relative(repoRoot, f)));
+  const retired = RETIRED_RUNTIME.filter((m) => runtimeRels.includes(m));
   return {
-    retired: RETIRED_RUNTIME.filter((m) => rels.includes(m)),
-    sqlite: bare.has(SQLITE_SPECIFIER),
-    migration: rels.some((r) => r.startsWith('src/migration/')),
+    retired,
+    sqlite: runtime.bare.has(SQLITE_SPECIFIER),
+    migration: runtimeRels.some((r) => r.startsWith('src/migration/')),
+    // Names a retired module's types but never loads it — allowed, worth seeing.
+    retiredTypesOnly: retired.length === 0 && RETIRED_RUNTIME.some((m) => anyRels.includes(m)),
   };
 }
 
@@ -150,7 +172,12 @@ for (const file of classOf.keys()) {
 
 if (process.argv.includes('--report')) {
   for (const r of report) {
-    const flags = [r.retired.length > 0 ? `retired(${r.retired.length})` : '', r.sqlite ? 'sqlite' : '', r.migration ? 'migration' : '']
+    const flags = [
+      r.retired.length > 0 ? `retired(${r.retired.length})` : '',
+      r.sqlite ? 'sqlite' : '',
+      r.migration ? 'migration' : '',
+      r.retiredTypesOnly ? 'retired-types-only' : '',
+    ]
       .filter(Boolean)
       .join(' ');
     console.log(`${r.cls.padEnd(19)} ${r.suite.padEnd(10)} ${r.file}${flags === '' ? '' : `  [${flags}]`}`);

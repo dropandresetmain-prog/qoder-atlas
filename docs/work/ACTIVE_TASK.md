@@ -93,7 +93,8 @@ HTTP -> authoritative PostgreSQL/read-model result. **Not** implemented here.
 | CV-1 | `M2-ACCESS-PATH-PLANNER`: `itemsReferencingPlace`'s ORIGIN branch planned on `idx_transport_item_details_destination` with a filter, so the origin index assertion failed. Root cause was the test leaving the sibling index in place — the two are each other's incidental alternative — and depending on whether autovacuum had reached the shared database. | **Act Now — CLOSED** `7f4ac85`. Each transport branch is measured with its sibling dropped; tables are `ANALYZE`d before measuring. Reproduced red on a warm DB pre-fix, green cold and warm after. Both indexes exist and are usable; no schema change. |
 | CV-2 | Migration `0123` was added by the read-model lane after the cross-lane allocation registry was updated for `0121/0122`; the lane never ran the full PG gate, so convergence was the first run to see it. | **Act Now — CLOSED** `d6c9671`. Registry now asserts `[120,121,122,123]`. |
 | CV-3 | `npm start` could not boot: `tsc` emits only `.ts` output, so `dist/persistence/postgres/migrations` did not exist and the boot-time migration run failed with ENOENT. Pre-existing at C5, not caused by the merges. Would have blocked M11 operational activation. | **Act Now — CLOSED** `9bdd662`. `build` now copies the 96 `.sql` files and verifies the count. |
-| CV-4 | 76 `HISTORICAL_LEGACY` test files and the retired SQLite modules they cover remain in the tree. | **Park for Later.** The import-graph gate stops them affecting current correctness; deleting them is a separate reviewable change. |
+| CV-4 | 66 `HISTORICAL_LEGACY` test files and the retired SQLite modules they cover remain in the tree. | **Park for Later.** The import-graph gate stops them affecting current correctness; deleting them is a separate reviewable change. |
+| CV-9 | The boundary gate first followed **every** import edge, so ten tests that merely name a retired module's TYPES (`ui`, `ui-programme`, `presentation-lane`, `r3d-user-contracts`, `case-lifecycle-state`, `connection-feasibility`, `hero-business-truth`, `final-demo-s7-fx-path`, `wave3r-p0-spend-authority`, `wave3r-r1-fixes`) were demoted to non-gating legacy. `import type` is erased at emit, so they never load SQLite — 122 real tests had been dropped out of the gate. Found by cross-checking an independent inventory against the manifest. | **Act Now — CLOSED.** The gate now decides on runtime (value) edges and reports type-only reach as `retired-types-only`. `npm test` 627 -> **749/749**; CURRENT_TARGET 101 -> 111, HISTORICAL_LEGACY 76 -> 66. |
 | CV-5 | Suites are separated by manifest, not by directory. | **Ignore / Accept Risk.** `test/suites.json` + `gate:test-boundary` already make conflation impossible; moving ~76 files is churn without added safety. |
 | CV-6 | Some `CURRENT_TARGET` unit tests still cover legacy-era pure modules (`src/domain`, `src/resolution`, `src/providers`) that the target runtime may not use. They are green and SQLite-free. | **Park for Later** — dead-code test audit, folded into CV-4. |
 | CV-7 | Read-model open items inherited from the closed lane: noisy changed sets on a busy cluster; `LIMIT 200` silent population truncation; graph-level `currentSemanticState` still FAILED-or-HEALTHY; no subject→transport-service edges. | **Park for Later** — recorded in `WIT_LIVE_READMODEL_ACTIVE_TASK.md`; revisit inside Slice A, not before. |
@@ -105,7 +106,7 @@ Candidate `9bdd662` (pre-ledger-close), tag `wit-post-c5-convergence`.
 
 | Check | Result |
 |---|---|
-| `npm test` (boundary gate + current suite, 56 files) | **627/627 pass**, 0 fail |
+| `npm test` (boundary gate + current suite, 66 files) | **749/749 pass**, 0 fail |
 | `npm run test:postgres` on fresh DB `conv_final` (45 files) | **462/462 pass**, 0 fail, 114 suites |
 | `npm run test:migration` (2 files) | **23/23 pass** |
 | `npm run gate:test-boundary` | CLEAN — 179 files classified, boundaries hold |
@@ -118,7 +119,7 @@ Candidate `9bdd662` (pre-ledger-close), tag `wit-post-c5-convergence`.
 | Live read-model seam over HTTP | `/api/v2/operator/overview` 200 with `changeCursor` / `changedVisibleRefs` / `changedEdgeIds`; `?sinceCursor=` accepted |
 | `npm run test:legacy` | **deliberately not run** — non-gating |
 
-Suite sizes: CURRENT_TARGET 101 (56 current + 45 postgres), MIGRATION_BOUNDARY 2, HISTORICAL_LEGACY 76.
+Suite sizes: CURRENT_TARGET 111 (66 current + 45 postgres), MIGRATION_BOUNDARY 2, HISTORICAL_LEGACY 66.
 
 ## Main convergence
 
