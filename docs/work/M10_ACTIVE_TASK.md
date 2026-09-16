@@ -31,13 +31,17 @@ without concrete contradictory evidence.
 
 Phase 0 (setup) and Phase 2 (all four items closed with real PostgreSQL
 evidence) are done. Phase 1 (runtime convergence) is **substantially
-underway but not complete**: the boot/composition boundary is now
-PostgreSQL-only and structurally proven (see below), but several real
-product capabilities (programme import/upload, demo reset/bootstrap, event
-ingestion, and the full legacy read-model/HTML surface) do not yet have
-target-runtime equivalents — see the disposition table below. Phases 3-10
-(the migration rehearsal pipeline) remain **not built** — see
-`docs/refactor/evidence/M10_MIGRATION_CONTRACT.md`.
+complete**: the boot/composition boundary is PostgreSQL-only and
+structurally proven (`npm run dev`/`npm start` cannot reach SQLite — proven
+by a real import-graph walk plus a live boot-with-no-SQLite test, not
+grep), and 2 of 3 named product-capability gaps are closed with real,
+tested, PG-backed capability (programme import/upload, demo reset). Event
+ingestion is precisely scoped but not finished — see the disposition table
+for the exact remaining piece (provider-event-to-subject correlation via
+the M3 external-identity tables, not a dedup-mechanism gap). The legacy
+read-model/HTML surface (`/operator`, `/decisions`, etc.) is RETIRE, not
+PORT — see below for why. Phases 3-10 (the migration rehearsal pipeline)
+remain **not built** — see `docs/refactor/evidence/M10_MIGRATION_CONTRACT.md`.
 
 ## Checklist
 
@@ -109,7 +113,7 @@ target-runtime equivalents — see the disposition table below. Phases 3-10
 | `RuntimeOrchestrator.reset()` raw `DELETE FROM`/`sqlite_master` table-wipe | RETIRE outright — do not resurrect this pattern in Postgres | N/A |
 | Programme import/upload/promotion (`programme.ts`, `programmeHttp.ts`, `uploadIntakeHttp.ts`) | PORT | **Done (bounded)** — `src/app/target/programmeImport.ts`, wired at `POST /api/v2/programme/import`. Real command pipeline (org → source/evidence → event/programme/items → travellers/trips/journeys/participations), generic bundle schema (no fixture-specific hardcoding). Not yet ported: AI-assisted roster/brief parsing (`map-roster`/`map-brief`) — those call an intelligence extraction client, not persistence, and were not in scope for this pass; the intake persistence path itself is real and PG-backed. |
 | Demo reset/bootstrap (`demoWorld.ts`, `bootstrap.ts`, `programmeSeed.ts`) | PORT (the seeding *concept*, not the SQLite table-wipe mechanics) | **Done (bounded)** — `src/app/target/demoSeed.ts` (thin wrapper over `programmeImport.ts`), wired at `POST /api/v2/demo/reset`. Seeds a small coherent world (org, event/programme/item, 2 travellers/trips/journeys/participations), not the legacy's full 67-trip AiT programme — scope explicitly reduced, real and PG-backed either way. |
-| Event ingestion + dedup inbox (`eventIngestHttp.ts`, `eventInboxStore.ts`) | PORT | **Not started** — no target-side inbox/dedup table found; `applicationCommands.ts`'s `acceptProviderShapedDemoEvent` covers demo-event ingress only, not a general dedup inbox |
+| Event ingestion + dedup inbox (`eventIngestHttp.ts`, `eventInboxStore.ts`) | PORT | **Partially closed — core mechanism already real, one genuine gap remains.** `acceptProviderShapedDemoEvent` → `recordTransportObservation` already proves real, working, idempotency-key-based dedup ingestion on PG (arguably stronger than the legacy `provider_event_inbox`'s plain insert-or-ignore, since it also detects changed-payload conflicts via canonical payload hashing) — this is not a missing-dedup gap. `AtlasFlightEventNormalizer` (`src/providers/atlas/eventNormalizer.ts`) is pure provider-adapter logic, reusable as-is (ADR-044 ASSERTED-authority ceiling carries over unchanged). **The actual remaining gap**: correlating an incoming provider event's `providerOrderRefs` (PNR/order number) to the right target `TRANSPORT_SERVICE`/journey subject — the legacy path does this via SQLite Trip.elements matching (`eventIngest.ts`, 413 lines, tightly coupled to the old aggregate model, not portable 1:1 per "do not recreate legacy aggregate behaviour"); the target side has real identity-linking infrastructure for exactly this (`external_connections`/`external_records`/`external_identity_links`, migration `0040-0042`, with `identity_state ∈ {LINKED, UNVERIFIED, QUARANTINED_UNKNOWN, QUARANTINED_AMBIGUOUS}`) but no code wiring a normalized Atlas event through it yet. This is genuine new design work (which correlation resolves LINKED vs. QUARANTINED, not just a rewire) — flagging precisely rather than rushing a version that guesses at correlation.|
 | Preferences/booking-dossiers/FX evidence stores | PORT | **Not started** |
 | `main.ts`'s direct `kvGet`/`kvSet`/raw `db.prepare` calls | RETIRE | Done — removed, new `main.ts` has none of this |
 | `openDatabase`/repository **read** methods | MOVE TO OFFLINE MIGRATION TOOLING | Not built yet — Phase 3 (legacy exporter) owns this; must not be importable from `src/main.ts` or any `src/app/**`/`src/server/**` normal-execution file (structurally enforced by `test/m10-runtime-purge.test.ts` once the exporter exists — add its own module to the allowed-outside-the-graph list explicitly, never make it reachable from `main.ts`)
