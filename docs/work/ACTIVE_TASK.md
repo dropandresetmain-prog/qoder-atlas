@@ -1,84 +1,94 @@
-# ACTIVE TASK — Northstar Long Horizon A: M2–M5 integration → M6 → C2 candidate
+# ACTIVE TASK — Post-C5 repository convergence
 
 Working-memory ledger (AGENTS.md "long-horizon work"). Reread before each major
-phase, after compaction, after delegated work and before declaring completion.
-Close an item only with evidence. Lane ledgers are preserved separately:
-`M3_ACTIVE_TASK.md`, `M3_CLOUD_ACTIVE_TASK.md` (stale M3 original),
-`M4_ACTIVE_TASK.md`, `M5_ACTIVE_TASK.md`.
+phase, after delegated work and before declaring completion. Close an item only
+with evidence. The previous M2–M6 ledger content is archived at
+`docs/work/M6_ACTIVE_TASK.md`; lane ledgers `M7..M10_ACTIVE_TASK.md` are
+unchanged.
 
 ## Goal
 
-Finish M6 (continuation/recovery of an interrupted run — NOT a restart) and
-stop at a C2 candidate. Do not claim C2 passed. No M7/M8.
+Converge the accepted backend (C5), the accepted frontend foundation, the
+accepted live read-model lane and the test topology onto ONE authoritative
+candidate, then move `main` to it. **No Slice A / Slice B feature work.**
 
 ## Exact identity
 
-- Repo `dropandresetmain-prog/qoder-atlas`; worktree `C:/Dev/qoder-atlas-m6`
-- Branch `integration/m2-m6-domain-evaluation`
-- Base `data-structure-refactor` = `71f638ed30d01e65981bdd9e5e6128ad067fbf1d`
-- Checkpoint A `63e38ba` (345/345 pg); Checkpoint B `9c093dd` (350/350 pg);
-  frozen evaluator contracts `ea14ee1` (last remote checkpoint before interruption)
-- Recovery session start (2026-09-15): remote/branch HEAD `ea14ee1`; uncommitted
-  P7 work in primary; lane worktrees `C:/Dev/qoder-atlas-m6-l{1..4}`.
-- Test DB: container `northstar-postgres-test` :55432, isolated lowercase DBs
-  via `PGTEST_DB`. Migration allocation M6 `0090`–`0099` (used: 0090, 0091).
+- Repo `dropandresetmain-prog/qoder-atlas`; primary worktree `C:/Dev/qoder-atlas`
+- Convergence branch `integration/post-c5-convergence`
+- Base = accepted C5 SHA `87783c0bcbdc12cf263851a36e06b9d5255289ce`
+  (branch `milestone-m10-migration-rehearsal`)
+- Accepted frontend handoff `6a655ddc0d57d64595e7c8ab207ae8c6ebbb37ab`
+  (`integration/wit-frontend-handoff`), semantic source
+  `fe09c525528df67a0a5fb5df4811bb7d5feddd77`
+  (`review/wit-frontend-semantic-contract-opus`). `20b9b61` is NOT authoritative.
+- Accepted live read-model lane `cbe5f837c3c4c45bec576f5ea1022b8a26871520`
+  (`lane/wit-live-readmodel-contract`) — CLOSED, no further independent review.
+- Stale `main` `8b03934dadee20ec7ec271a45c5769de676dc3e7` — ancestor of C5, never
+  merged back into the candidate.
 
-## Recovery inventory (verified from disk 2026-09-15)
+## Topology (verified)
 
-| Item | State found | Action |
-|---|---|---|
-| P7 primary: 0091 assessments + reverse-lookup invalidation, PgReassessmentWorker (fencing, retry→UNAVAILABLE, re-enqueue after stale capture), sentinel rename, JSON allowlist, blastRadius, pgEvaluation, M6.md §1–7 | uncommitted; tsc 0; prior full pg run 358/358 incl. m6Reassessment 8 + m6WorldSnapshot | committed `8b4a6cb` |
-| L1 booking/connection/overnight | committed `c521262`; 22/22 lane tests | merged `d87eea3` |
-| L2 objective/participation | uncommitted; 24/24 lane tests | salvaged `3a9cdf4`, merged `7673a38` |
-| L3 support/group/funding | uncommitted; tsc 0; NO tests | salvaged `7d65280`, merged `ba655e7`; tests delegated (lane worktree l3) |
-| L4 encounters/predicates/credentials/entry | uncommitted; tsc 0; NO tests; `m6.information` MISSING | salvaged `3da69fd`, merged `d51307a`; information + tests delegated (l4) |
-| Place-owned constraints / reachability helpers | already in `ea14ee1` (owner list includes PLACE) | none |
+- `merge-base(C5, frontend) = merge-base(C5, readmodel) = c45a928` (M9).
+- `merge-base(frontend, readmodel) = fe09c52` (opus semantic contract).
+- Stale `main` IS an ancestor of C5 → `main` can fast-forward to the candidate.
+- File overlap C5 × frontend: none. C5 × readmodel: `src/app/target/targetHttpHandlers.ts` only.
+- File overlap frontend × readmodel since `fe09c52`: none.
+
+## Merge sequence
+
+1. C5 base → convergence branch.
+2. Merge `integration/wit-frontend-handoff@6a655dd`.
+3. Merge `lane/wit-live-readmodel-contract@cbe5f83`.
+4. Planning reconciliation (Slice A / Slice B / submission).
+5. Test-suite convergence.
+6. Integrated verification → tag → `main`.
+
+## Conflict ownership rule
+
+- **C5 wins**: PostgreSQL-only boot, migration/runtime convergence,
+  authority/execution safety, M10/C5 fixes, migration schema semantics.
+- **Live read-model lane wins**: read-model contracts, revision/freshness,
+  edge identity/authority, assessment lifecycle, changed-visible-ref contract,
+  read-model tests.
+- **Frontend handoff wins**: semantic adapter/model, visual grammar, design
+  reference assets, frontend semantic documentation.
 
 ## Phase checklist
 
-- [x] P0–P2 (Checkpoints A, B) — see M2_M5_INTEGRATION.md / M6.md
-- [x] P3 dependency registry/closure + structured explanations (in `9c093dd`/`ea14ee1`)
-- [x] P4 effective projections (in `ea14ee1`)
-- [x] P7 persistence/invalidation/worker (`8b4a6cb`)
-- [x] **Checkpoint 1**: salvage + lane merges + `registry.ts`; tsc 0, M6 unit 61/61, focused pg on fresh DB 41/41 (migrate, crossLane, subtype, m6WorldSnapshot, m6Reassessment) → pushed
-- [x] P5/P6 L3 tests 28/28 (`d5b23ee`, funding fix `f6c032c`, merged `b08f300`); L4 `m6.information` + tests 46/46 (`1923c1e`, `5470d27`, merged `925e0ab`); registry with 11 families (`9cee67c`)
-- [x] **Checkpoint 2**: M6 unit 140/140; m6Acceptance 4/4 on two fresh DBs; full pg on empty DB 362/363 before the I-14 assertion fix; tsc/build/lint/anti-hardcoding/diff --check green → pushed
-- [x] P8 AT fixtures: `m6Acceptance.pgtest` (AT01/02/06/10/12/13) `52c3926`; `northstar-v2-m6-acceptance` (AT19/20/21/22, cycles) `a59ae0f`; L3/L4 suites (AT03/04/05/08/09/11)
-- [x] Docs: M6.md §8–§11 (registry, AT evidence, API, triage), ACTIVE_TASK
-- [x] **Checkpoint 3**: full `test:postgres` from an empty DB 363/363 (incl. migrations); M6 unit 140/140; tsc, build, lint, gate:anti-hardcoding, diff --check green → pushed (C2 candidate). C1 `904eeca`, C2 `89ffe87`
+- [ ] P1 convergence branch + ledger
+- [ ] P2 frontend handoff merged
+- [ ] P3 live read-model lane merged
+- [ ] P4 roadmap/plan reconciled to Slice A / Slice B / submission
+- [ ] P5 test-suite convergence (classification, scripts, guardrails, M2-ACCESS-PATH-PLANNER)
+- [ ] P6 integrated convergence verification
+- [ ] P7 tag + `main` fast-forward
+- [ ] P8 cleanup candidates identified
+
+## Current checkpoint
+
+P1 in progress.
 
 ## Next action
 
-STOP. C2 candidate is ready for independent C2 review. Do not claim C2 passed; do not start M7/M8.
+Merge the accepted frontend handoff.
 
-## Critical architecture constraints
+## Critical constraints
 
-- F01–F18 frozen; UnitOfWork contract unchanged (G1: separate read session).
-- G12: UUID validation at persistence command boundary before UoW.
-- Only registered dependency semantics propagate; FKs are not graph edges.
-- Evaluators pure over captured WorldSnapshot; injected clock; no repo reads.
-- PASS/FAIL/UNKNOWN only from evidence; absence ≠ PASS. Traveller payer home
-  currency is not authoritative → UNKNOWN/explicit input.
-- Explanations structured (never prose-only). No M7/M8, no SQLite cutover,
-  no provider actions, no demo branches.
+- **PostgreSQL is the sole NORTHSTAR runtime.** SQLite only as offline
+  read-only migration input — never a fallback/alternate/demo runtime.
+- Frontend applies the COMPLETE authoritative snapshot; `changedVisibleRefs` is
+  an at-least-once transition/emphasis hint, never an exact-diff contract.
+- V5.6 mock data is not runtime truth; no mock Sarah facts into backend logic.
+- Event Overview prototype is REJECTED/unresolved — do not integrate or freeze it.
+- No Slice A / Slice B implementation, no M11 activation, no F01–F18 reopening.
+- Exact-path staging; no `git add .`; no casual force-push.
 
-## Unresolved findings (triage)
+## Findings / triage
 
 | ID | Finding | Triage |
 |---|---|---|
-| I-1 | m2SubtypeIntegrity file-level failure at M3+M4 | Investigate Now — not reproduced in 350/358 full runs; re-check at Checkpoint 3 |
-| I-6 | Legacy integration.r1 determinism test fails (wall clock) — also at base | Park for Later (A-10) |
-| I-7 | Objective targets / success_predicate_kind have no M5 command | Park for Later (M7) |
-| I-8 | Jurisdiction has no ISO code; predicates carry issuing-state codes as rule parameters | Ignore / Accept Risk |
-| I-9 | Three of four evaluator lane agents died before tests/commit | Act Now — salvaged; tests delegated |
-| I-10 | `money.ts` has no exact FX multiply / currency exponent table; funding.ts implements BigInt multiply locally at exponent 2 | Park for Later — promote to money.ts before M8 spend |
-| I-11 | One capture's manifest is the union read set; every Journey assessed from a joint capture is invalidated by any input of that capture (over-invalidation, never under) | Park for Later — per-subject manifest pruning is an optimisation; workers capture per subject; recorded in M6.md |
-| I-12 | `currentAssessmentView` kept reporting PENDING_REASSESSMENT after a newer assessment was saved outside the worker (work caused by a superseded assessment never cleared) | Act Now — closed: work caused by a superseded assessment is obsolete only when the latest manifest verifies current; regression test in m6Reassessment |
-| I-13 | Funding emitted a blocking UNKNOWN with no explanation when no payer was named | Act Now — closed by L3 `f6c032c` (not applicable) |
-| I-14 | Acceptance asserted `enqueueDueReassessments` inserted a row; with an open unit already present the one-open-unit index coalesces (0 rows) — correct behaviour, wrong assertion | Act Now — closed: assert exactly one open durable unit |
-| I-15 | `test/acceptance-runner.test.ts` and `integration.r1` fail in the legacy unit run, identically on unmodified lane bases | Park for Later — legacy runtime, wall-clock nondeterminism (A-10) |
 
-## Evidence references
+## Evidence
 
-- Lane evidence: `docs/refactor/evidence/M3.md`, `M4.md`, `M5.md`; M6: `M6.md`, `M6_EVALUATOR_CONTRACT.md`
-- Prior-session logs (scratch): `pg_ckptA.tap` 345/345, `pg_ckptB.log` 350/350, `pg_p7full.log` 358/358
+(recorded per phase below)
