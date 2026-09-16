@@ -170,6 +170,40 @@ bundle still imports independently into two workspaces. The run's provenance
 assertion describes the *dataset*, not the run, for the same reason.
 
 ### Phase 5 — Reconciliation
+- [x] Every exported category now has a handler; `recordsDeferred` is 0.
+  `src/migration/legacyCategoryHandlers.ts` (+ shared `legacyImportContext.ts`)
+  covers PLACE, ANCHOR_EVENT, RULE_SET, RECOVERY_CASE, SIGNAL, AUDIT_HISTORY,
+  BOOKING_DOSSIER, PREFERENCE, FX_RATE_EVIDENCE, PROVIDER_EVENT_INBOX, and
+  legacy trip **elements** (the obligations, money and provider refs) into real
+  Reservation/ReservationLine/TransportService state under the owning Journey.
+- [ ] Machine-readable + human-readable reconciliation report (next).
+
+**Two frozen decisions revised on repo evidence, not preference:**
+
+1. `RECOVERY_CASE`: `MIGRATE_THEN_RECONCILE` → `ARCHIVE_AND_REGENERATE`. The
+   target has **no case-authoring command**. `recovery_cases` rows are created
+   inside `m8AuthorityCommands` as the evaluate → strategy → plan → authority
+   pipeline runs, because in the target a case is *derived*, not authored.
+   Writing one by raw SQL would fabricate a case with no strategy, plan or
+   authority lineage. Closed cases archive as history; an **open** case becomes
+   a cutover-blocking owned exception for the target to re-derive.
+2. `SIGNAL`: `MIGRATE_TRANSFORM` → `ARCHIVE_AS_IMMUTABLE_HISTORY`. Replaying
+   historical provider signals into a live target would re-trigger recovery for
+   disruptions that are long over. Archived with their real `observedAt`.
+
+**Other honest-mapping outcomes** (content preserved, activation owned):
+`PREFERENCE` and `RULE_SET` need a target input the legacy row never held (an
+effective window; a registered rule expression) — explicit preferences block
+cutover, latent ones do not, because explicit instructions outrank inferred
+signals. `BOOKING_DOSSIER` contact/payment needs a real protected store to hold
+a `ProtectedDataRef`; minting one over legacy plaintext would fabricate custody.
+Legacy `reservationState: CHANGED` maps to **UNKNOWN**, never CONFIRMED or
+CANCELLED. An unprocessed provider delivery keeps `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME`.
+
+Exporter bumped to `1.1.0`: records now carry `sourceTimestamp`, so archived
+history is asserted at the instant it actually happened rather than at import
+wall-clock.
+
 ### Phase 6 — Recompute derived state
 - [x] `src/migration/recomputeMigratedState.ts` runs the real `evaluateImpact`
   + `createM6Registry` path (the one `m9SarahTargetE2E.pgtest.ts` proves) over

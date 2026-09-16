@@ -66,6 +66,14 @@ function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): strin
     CREATE TABLE source_contents (source_id TEXT PRIMARY KEY, content TEXT NOT NULL);
     CREATE TABLE entities (entity_type TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (entity_type, id));
     CREATE TABLE audit (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, subject TEXT, payload TEXT NOT NULL);
+    CREATE TABLE preferences (id TEXT PRIMARY KEY, traveller_id TEXT, trip_id TEXT, data TEXT NOT NULL);
+    CREATE TABLE fx_rates (rate_id TEXT PRIMARY KEY, base_currency TEXT NOT NULL, home_currency TEXT NOT NULL, data TEXT NOT NULL);
+    CREATE TABLE booking_dossiers (traveller_id TEXT PRIMARY KEY, flight_data TEXT, hotel_data TEXT);
+    CREATE TABLE provider_event_inbox (
+      provider_id TEXT NOT NULL, provider_event_id TEXT NOT NULL, received_at TEXT NOT NULL,
+      raw_payload TEXT NOT NULL, processed_status TEXT, processed_outcome TEXT,
+      PRIMARY KEY (provider_id, provider_event_id)
+    );
   `);
   db.prepare('INSERT INTO schema_meta (key, value) VALUES (?, ?)').run('schema_version', '2');
 
@@ -74,6 +82,64 @@ function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): strin
   entity.run('TRAVELLER', 'trav-solo', JSON.stringify({ id: 'trav-solo', displayName: 'Solo Traveller' }));
   entity.run('TRAVELLER', 'trav-pair-a', JSON.stringify({ id: 'trav-pair-a', displayName: 'Pair Traveller A' }));
   entity.run('TRAVELLER', 'trav-pair-b', JSON.stringify({ id: 'trav-pair-b', displayName: 'Pair Traveller B' }));
+
+  // Two places migrate; the third has no zone and must not get a guessed one.
+  entity.run(
+    'PLACE',
+    'place-origin',
+    JSON.stringify({ id: 'place-origin', name: 'Origin Airport', kind: 'AIRPORT', timezone: 'Europe/London' }),
+  );
+  entity.run(
+    'PLACE',
+    'place-venue',
+    JSON.stringify({
+      id: 'place-venue',
+      name: 'Venue Hall',
+      kind: 'VENUE',
+      timezone: 'Europe/Lisbon',
+      coordinates: { latitude: 38.7223, longitude: -9.1393 },
+    }),
+  );
+  entity.run('PLACE', 'place-nozone', JSON.stringify({ id: 'place-nozone', name: 'Unknown Zone Site', kind: 'OTHER' }));
+
+  entity.run(
+    'ANCHOR_EVENT',
+    'anchor-summit',
+    JSON.stringify({
+      id: 'anchor-summit',
+      name: 'Annual Operations Summit',
+      kind: 'CONFERENCE',
+      placeId: 'place-venue',
+      organiserOrganisationId: 'org-legacy',
+      window: { startsAt: '2026-02-20T09:00:00Z', endsAt: '2026-02-20T17:00:00Z' },
+      commitments: [
+        {
+          id: 'commit-keynote',
+          anchorEventId: 'anchor-summit',
+          title: 'Opening keynote',
+          kind: 'SESSION',
+          placeId: 'place-venue',
+          startsAt: { value: '2026-02-20T09:00:00Z' },
+          endsAt: { value: '2026-02-20T10:30:00Z' },
+        },
+        {
+          // Start but no end: the target needs a bounded interval and must not
+          // invent a duration.
+          id: 'commit-openended',
+          anchorEventId: 'anchor-summit',
+          title: 'Evening reception',
+          kind: 'SOCIAL',
+          startsAt: { value: '2026-02-20T19:00:00Z' },
+        },
+      ],
+    }),
+  );
+
+  entity.run(
+    'RULE_SET',
+    'rules-hotel',
+    JSON.stringify({ id: 'rules-hotel', name: 'Hotel no-show policy', rules: [{ statement: 'no-show after 18:00 forfeits' }] }),
+  );
 
   // Maps deterministically: TEMPORAL + minBufferMinutes is the arrival-readiness
   // buffer the legacy engine actually implemented.
@@ -114,7 +180,54 @@ function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): strin
       label: options.renameSingleTrip === true ? 'Solo trip renamed by an operator' : 'Solo trip',
       travellerIds: ['trav-solo'],
       operatorOrganisationId: 'org-legacy',
-      elements: [{ id: 'el-solo-arrival', kind: 'FLIGHT' }],
+      elements: [
+        {
+          id: 'el-solo-arrival',
+          tripId: 'trip-solo',
+          elementKind: 'TRANSPORT_LEG',
+          importance: 'CRITICAL',
+          flexibility: 'FIXED',
+          reservationState: 'CONFIRMED',
+          status: 'VALID',
+          data: {
+            mode: 'AIR',
+            originPlaceId: 'place-origin',
+            destinationPlaceId: 'place-venue',
+            scheduledDeparture: { value: '2026-02-19T07:00:00Z' },
+            scheduledArrival: { value: '2026-02-19T09:30:00Z' },
+            bookingRef: { system: 'atlas', reference: 'PNR123' },
+            carrierRef: { system: 'iata', value: 'BA' },
+          },
+        },
+        {
+          // The supplier moved it and the legacy runtime never reconciled:
+          // must land as UNKNOWN, never as CONFIRMED or CANCELLED.
+          id: 'el-solo-stay',
+          tripId: 'trip-solo',
+          elementKind: 'STAY',
+          importance: 'IMPORTANT',
+          flexibility: 'FLEXIBLE',
+          reservationState: 'CHANGED',
+          status: 'UNKNOWN',
+          data: {
+            placeId: 'place-venue',
+            checkIn: { value: '2026-02-19T15:00:00Z' },
+            checkOut: { value: '2026-02-21T11:00:00Z' },
+            bookingRef: { system: 'nuitee', reference: 'HTL-778' },
+            guests: 1,
+          },
+        },
+        {
+          id: 'el-solo-onward',
+          tripId: 'trip-solo',
+          elementKind: 'TRANSPORT_LEG',
+          importance: 'OPTIONAL',
+          flexibility: 'FLEXIBLE',
+          reservationState: 'NONE',
+          status: 'UNKNOWN',
+          data: { mode: 'ROAD', originPlaceId: 'place-venue', destinationPlaceId: 'place-origin' },
+        },
+      ],
       updatedAt: '2026-02-10T10:00:00Z',
     }),
     '2026-02-10T10:00:00Z',
@@ -151,6 +264,88 @@ function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): strin
     'TRIP_UPDATED',
     'trip-solo',
     JSON.stringify({ change: 'label' }),
+  );
+
+  db.prepare('INSERT INTO cases (id, trip_id, status, version, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+    'case-open',
+    'trip-solo',
+    'OPEN',
+    3,
+    JSON.stringify({ id: 'case-open', tripId: 'trip-solo', status: 'OPEN', trigger: 'flight delay' }),
+    '2026-02-12T09:00:00Z',
+  );
+  db.prepare('INSERT INTO cases (id, trip_id, status, version, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+    'case-closed',
+    'trip-solo',
+    'RESOLVED',
+    5,
+    JSON.stringify({ id: 'case-closed', tripId: 'trip-solo', status: 'RESOLVED' }),
+    '2026-02-08T09:00:00Z',
+  );
+
+  db.prepare('INSERT INTO signals (id, trip_id, occurred_at, data) VALUES (?, ?, ?, ?)').run(
+    'sig-delay',
+    'trip-solo',
+    '2026-02-12T08:30:00Z',
+    JSON.stringify({ id: 'sig-delay', tripId: 'trip-solo', kind: 'SCHEDULE_CHANGE' }),
+  );
+
+  const preference = db.prepare('INSERT INTO preferences (id, traveller_id, trip_id, data) VALUES (?, ?, ?, ?)');
+  preference.run(
+    'pref-explicit',
+    'trav-solo',
+    'trip-solo',
+    JSON.stringify({
+      id: 'pref-explicit',
+      travellerId: 'trav-solo',
+      statement: 'never rebook onto an overnight connection',
+      origin: { kind: 'EXPLICIT_INSTRUCTION', issuedAt: '2026-01-05T09:00:00Z', issuedBy: 'trav-solo' },
+    }),
+  );
+  preference.run(
+    'pref-latent',
+    'trav-solo',
+    null,
+    JSON.stringify({
+      id: 'pref-latent',
+      travellerId: 'trav-solo',
+      statement: 'seems to favour aisle seats',
+      origin: { kind: 'LATENT_INFERRED' },
+    }),
+  );
+
+  db.prepare('INSERT INTO fx_rates (rate_id, base_currency, home_currency, data) VALUES (?, ?, ?, ?)').run(
+    'fx-gbp-eur',
+    'GBP',
+    'EUR',
+    JSON.stringify({ rateId: 'fx-gbp-eur', baseCurrency: 'GBP', homeCurrency: 'EUR', rate: '1.17' }),
+  );
+
+  db.prepare('INSERT INTO booking_dossiers (traveller_id, flight_data, hotel_data) VALUES (?, ?, ?)').run(
+    'trav-solo',
+    JSON.stringify({ passenger: 'SOLO/TRAVELLER', contactEmail: 'solo@example.invalid' }),
+    JSON.stringify({ guestName: 'Solo Traveller', paymentRef: 'tok_legacy_9911' }),
+  );
+
+  const delivery = db.prepare(
+    'INSERT INTO provider_event_inbox (provider_id, provider_event_id, received_at, raw_payload, processed_status, processed_outcome) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  delivery.run(
+    'atlas',
+    'evt-handled',
+    '2026-02-12T08:31:00Z',
+    JSON.stringify({ type: 'FLIGHT_DELAY', orderRef: 'PNR123' }),
+    'PROCESSED',
+    JSON.stringify({ signalId: 'sig-delay' }),
+  );
+  // Never finished processing: its effect on the world is genuinely unknown.
+  delivery.run(
+    'atlas',
+    'evt-pending',
+    '2026-02-13T04:00:00Z',
+    JSON.stringify({ type: 'SCHEDULE_CHANGE', orderRef: 'PNR123' }),
+    'PENDING',
+    null,
   );
 
   db.close();
@@ -307,6 +502,116 @@ test('AT23: legacy dataset migrates into PostgreSQL with real evidence, mappings
     (entry) => entry.check === 'DERIVED_STATE_RECOMPUTED',
   );
   assert.ok(recomputeValidation?.passed, 'the recompute is recorded on the migration run as evidence');
+});
+
+test('Phase 5: every deployed category lands as real state, archived history or an owned exception', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+
+  const run = await readMigrationRun(pool, result.runId);
+  const exceptionFor = (sourceId: string) =>
+    run.reconciliationExceptions.find((entry) => entry.sourceId === sourceId);
+  const mappings = await pool.query<{ source_type: string; source_id: string; target_kind: string; target_id: string }>(
+    'SELECT source_type, source_id, target_kind, target_id FROM legacy_id_map WHERE workspace_id = $1 AND source_dataset = $2',
+    [workspaceId, DATASET],
+  );
+  const byKey = new Map(mappings.rows.map((row) => [`${row.source_type}/${row.source_id}`, row]));
+  const evidenceByType = async (assertionType: string) =>
+    (
+      await pool.query<{ interpretation_provenance: string }>(
+        'SELECT interpretation_provenance FROM evidence_records WHERE workspace_id = $1 AND assertion_type = $2',
+        [workspaceId, assertionType],
+      )
+    ).rows;
+
+  // --- Geography: zoned places migrate, an unzoned one is never guessed ---
+  assert.ok(byKey.get('entities.PLACE/place-origin'), 'a zoned place migrated');
+  assert.equal(byKey.has('entities.PLACE/place-nozone'), false, 'no place was given an invented time zone');
+  assert.match(exceptionFor('place-nozone')?.reason ?? '', /timezone/);
+
+  // --- Programme: Event + synthesised Programme + items, with the
+  //     unbounded commitment archived rather than given a fake duration ---
+  assert.ok(byKey.get('entities.ANCHOR_EVENT/anchor-summit'), 'the anchor event migrated');
+  const items = await pool.query<{ title: string; lifecycle_status: string; window_start: string | null }>(
+    'SELECT title, lifecycle_status, window_start::text AS window_start FROM programme_items WHERE workspace_id = $1 ORDER BY title',
+    [workspaceId],
+  );
+  assert.equal(items.rowCount, 2, 'both legacy commitments became programme items');
+  const reception = items.rows.find((row) => row.title === 'Evening reception');
+  assert.equal(reception?.window_start, null, 'no window was invented for the open-ended commitment');
+  assert.equal(reception?.lifecycle_status, 'DRAFT', 'an unplaceable item is not reported as SCHEDULED');
+  assert.equal(items.rows.find((row) => row.title === 'Opening keynote')?.lifecycle_status, 'SCHEDULED');
+  assert.equal((await evidenceByType('LEGACY_PROGRAMME_ITEM_WINDOW')).length, 1);
+
+  // --- Arrangements: obligations, statuses and provider refs survive ---
+  const reservations = await pool.query<{ id: string; reservation_type: string; observed_status: string; observed_status_at: string | null }>(
+    'SELECT id, reservation_type, observed_status, observed_status_at FROM reservations WHERE workspace_id = $1',
+    [workspaceId],
+  );
+  assert.equal(reservations.rowCount, 2, 'both booked elements became reservations; the unbooked one did not');
+  const transport = reservations.rows.find((row) => row.reservation_type === 'TRANSPORT');
+  assert.equal(transport?.observed_status, 'CONFIRMED');
+  assert.ok(transport?.observed_status_at, 'a known status carries the instant it was observed');
+
+  // CHANGED is not CONFIRMED and not CANCELLED. It is not known.
+  const stay = reservations.rows.find((row) => row.reservation_type === 'STAY');
+  assert.equal(stay?.observed_status, 'UNKNOWN', 'an unreconciled supplier change stays unknown');
+  assert.equal(stay?.observed_status_at, null, 'UNKNOWN carries no observation time');
+  const changedException = run.reconciliationExceptions.find((entry) => /CHANGED/.test(entry.reason));
+  assert.equal(changedException?.classification, 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME');
+
+  const providerRefs = await evidenceByType('LEGACY_PROVIDER_BOOKING_REF');
+  assert.equal(providerRefs.length, 2, 'both provider booking references are preserved');
+  assert.ok(providerRefs.some((row) => /PNR123/.test(row.interpretation_provenance)));
+  assert.equal((await evidenceByType('LEGACY_UNBOOKED_ELEMENT')).length, 1, 'the unbooked need is archived, not booked');
+
+  // --- Cases: closed history archives quietly, open work is owned ---
+  assert.equal((await evidenceByType('LEGACY_RECOVERY_CASE')).length, 2);
+  const openCase = exceptionFor('case-open');
+  assert.equal(openCase?.classification, 'ARCHIVED_NOT_REPLAYED_AS_LIVE_STATE');
+  assert.equal(openCase?.blocksCutover, true, 'unfinished recovery work blocks cutover for its scope');
+  assert.equal(exceptionFor('case-closed'), undefined, 'a resolved case needs no owner decision');
+  assert.equal(await countRows(pool, 'recovery_cases', workspaceId), 0, 'no case was fabricated without lineage');
+
+  // --- Signals archive with their real age and are never replayed ---
+  const signals = await pool.query<{ observed_at: string }>(
+    "SELECT observed_at::text FROM evidence_records WHERE workspace_id = $1 AND assertion_type = 'LEGACY_CHANGE_SIGNAL'",
+    [workspaceId],
+  );
+  assert.equal(signals.rowCount, 1);
+  assert.match(signals.rows[0]?.observed_at ?? '', /2026-02-12/, 'archived history keeps the age it actually has');
+
+  // --- Preferences: explicit blocks cutover, latent does not ---
+  assert.equal((await evidenceByType('LEGACY_PREFERENCE')).length, 2);
+  assert.equal(exceptionFor('pref-explicit')?.blocksCutover, true);
+  assert.equal(exceptionFor('pref-latent')?.blocksCutover, false);
+  assert.equal(await countRows(pool, 'preferences', workspaceId), 0, 'no preference got an invented effective window');
+
+  // --- Dossier PII is preserved but not activated without custody ---
+  assert.equal(
+    exceptionFor('trav-solo')?.classification,
+    'ARCHIVED_REQUIRES_PROTECTED_CONTENT_STORE',
+    'dossier content is owned, not silently dropped or faked into a ProtectedDataRef',
+  );
+
+  // --- Provider deliveries: settled ones settle, pending stays unknown ---
+  assert.equal((await evidenceByType('LEGACY_PROVIDER_EVENT_DELIVERY')).length, 2);
+  assert.equal(exceptionFor('atlas:evt-handled'), undefined);
+  assert.equal(exceptionFor('atlas:evt-pending')?.classification, 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME');
+
+  // --- FX and rule sets ---
+  assert.equal((await evidenceByType('LEGACY_FX_RATE_OBSERVATION')).length, 1);
+  assert.equal(exceptionFor('rules-hotel')?.classification, 'ARCHIVED_REQUIRES_TARGET_POLICY_INPUT');
+
+  // --- Nothing was silently skipped ---
+  assert.equal(run.progress.recordsDeferred, 0, 'every exported category has a handler');
 });
 
 test('AT23: re-importing the identical bundle is idempotent and duplicates nothing', async () => {

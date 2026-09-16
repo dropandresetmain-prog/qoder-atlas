@@ -29,7 +29,6 @@ import { PgUnitOfWork } from '../persistence/postgres/pgUnitOfWork.ts';
 import { createOrganisation, recordTraveller } from '../persistence/postgres/commands/peopleCommands.ts';
 import { recordSource, recordEvidence, recordConstraintDefinition } from '../persistence/postgres/commands/knowledgeCommands.ts';
 import { createTrip, createJourney } from '../persistence/postgres/commands/travelCommands.ts';
-import type { TypedConflict } from '../domain/v2/shared/errors.ts';
 import {
   bundleRecordsInReplayOrder,
   type MigrationBundle,
@@ -37,6 +36,27 @@ import {
   type MigrationSourceRecord,
 } from './legacyExportBundle.ts';
 import { resolveLegacyConstraint } from './legacyConstraintMapping.ts';
+import {
+  asObject,
+  conflictText,
+  stringArray,
+  type CategoryHandler,
+  type ImportContext,
+  type RecordOutcome,
+} from './legacyImportContext.ts';
+import {
+  importAnchorEvent,
+  importAuditEntry,
+  importBookingDossier,
+  importFxRate,
+  importPlace,
+  importPreference,
+  importProviderDelivery,
+  importRecoveryCase,
+  importRuleSet,
+  importSignal,
+  migrateTripElements,
+} from './legacyCategoryHandlers.ts';
 import {
   appendReconciliationException,
   appendValidation,
@@ -91,51 +111,6 @@ export interface LegacyImportResult {
 }
 
 /** What one record's handler concluded. */
-type RecordOutcome =
-  | { kind: 'IMPORTED'; targetKind: string; targetId: string; note: string }
-  /** Imported, but deliberately not represented as a target subject (history only). */
-  | { kind: 'ARCHIVED'; note: string }
-  | { kind: 'QUARANTINED'; exception: Omit<MigrationReconciliationException, 'categoryId' | 'sourceType' | 'sourceId'> }
-  | { kind: 'DEFERRED'; reason: string };
-
-interface ImportContext {
-  pool: Pool;
-  workspaceId: string;
-  actorPrincipalId: string;
-  runId: string;
-  datasetHash: string;
-  sourceDataset: string;
-  runEvidenceId: string;
-  now: string;
-  /** The `source_records` row capturing the legacy dataset for this run. */
-  runSourceId: string;
-  /** legacy trip element id -> owning legacy trip id(s), built from the bundle. */
-  tripElementOwners: Map<string, string[]>;
-  resolve(sourceType: string, sourceId: string): Promise<{ targetKind: string; targetId: string } | undefined>;
-  idempotencyKey(record: MigrationSourceRecord, step: string): string;
-  /**
-   * The target id this record's `step` will always produce. Derived, not
-   * random, so a command re-issued after a crash replays with an identical
-   * payload instead of tripping the idempotency ledger's payload check.
-   */
-  targetId(record: MigrationSourceRecord, step: string): string;
-  uow(): PgUnitOfWork;
-}
-
-function conflictText(conflict: TypedConflict | undefined): string {
-  return conflict === undefined ? 'unknown conflict' : `${conflict.kind}: ${conflict.message}`;
-}
-
-function asObject(payload: unknown): Record<string, unknown> | undefined {
-  return payload !== null && typeof payload === 'object' && !Array.isArray(payload)
-    ? (payload as Record<string, unknown>)
-    : undefined;
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
-}
-
 // ---------------------------------------------------------------------------
 // Category handlers
 // ---------------------------------------------------------------------------
@@ -411,13 +386,28 @@ async function importTrip(ctx: ImportContext, record: MigrationSourceRecord): Pr
     note: `single-traveller legacy trip ${record.sourceId} yields exactly one Journey for traveller ${legacyTravellerId}`,
   });
 
+  // Elements are the trip's actual obligations — the bookings, the money and
+  // the provider references. They migrate here, under the Journey that now
+  // provably owns them, because a single-traveller trip is the only case
+  // where that ownership is established by source evidence.
+  const elements = Array.isArray(payload.elements) ? payload.elements : [];
+  const elementMigration = await migrateTripElements(ctx, record, {
+    journeyTargetId: journeyOutcome.value.journeyId,
+    travellerTargetId: traveller.targetId,
+    elements,
+  });
+
   return {
     kind: 'IMPORTED',
     targetKind: 'TRIP',
     targetId: tripOutcome.value.tripId,
     note:
       `single-traveller legacy trip: deterministic Trip + one Journey for traveller ${legacyTravellerId}` +
-      (elementCount > 0 ? `; ${elementCount} legacy element(s) await Phase 5 itinerary mapping` : ''),
+      (elementCount > 0
+        ? `; ${elementMigration.imported}/${elementCount} element(s) migrated as arrangements` +
+          (elementMigration.notes.length > 0 ? ` [${elementMigration.notes.join('; ')}]` : '')
+        : ''),
+    ...(elementMigration.exceptions.length > 0 ? { extraExceptions: elementMigration.exceptions } : {}),
   };
 }
 
@@ -665,18 +655,28 @@ async function importSourceRecord(
   };
 }
 
-type CategoryHandler = (ctx: ImportContext, record: MigrationSourceRecord) => Promise<RecordOutcome>;
-
 /**
- * Handlers by category. A category with no handler is DEFERRED and counted —
- * never silently skipped. Phase 5 adds handlers here; nothing else changes.
+ * Handlers by category, and the only place a category becomes reachable. A
+ * category with no handler is DEFERRED and counted — never silently skipped.
+ *
+ * Ordering of execution comes from `LEGACY_CATEGORIES`, not from this map.
  */
 const HANDLERS: Readonly<Record<string, CategoryHandler>> = {
   ORGANISATION: importOrganisation,
   TRAVELLER: importTraveller,
+  PLACE: importPlace,
+  ANCHOR_EVENT: importAnchorEvent,
+  RULE_SET: importRuleSet,
   TRIP: importTrip,
   CONSTRAINT: importConstraint,
+  RECOVERY_CASE: importRecoveryCase,
+  SIGNAL: importSignal,
   SOURCE_RECORD: importSourceRecord,
+  AUDIT_HISTORY: importAuditEntry,
+  BOOKING_DOSSIER: importBookingDossier,
+  PREFERENCE: importPreference,
+  FX_RATE_EVIDENCE: importFxRate,
+  PROVIDER_EVENT_INBOX: importProviderDelivery,
 };
 
 // ---------------------------------------------------------------------------
@@ -960,6 +960,18 @@ async function importOneRecord(
   }
 
   const outcome = await handler(ctx, record);
+
+  if (outcome.kind !== 'DEFERRED') {
+    for (const extra of outcome.extraExceptions ?? []) {
+      await appendReconciliationException(ctx.pool, ctx.runId, {
+        ...extra,
+        categoryId: category.categoryId,
+        sourceType: record.sourceType,
+        sourceId: record.sourceId,
+      });
+    }
+  }
+
   if (outcome.kind === 'QUARANTINED') {
     await appendReconciliationException(ctx.pool, ctx.runId, {
       ...outcome.exception,
@@ -970,7 +982,29 @@ async function importOneRecord(
     return 'recordsQuarantined';
   }
   if (outcome.kind === 'DEFERRED') return 'recordsDeferred';
-  if (outcome.kind === 'ARCHIVED') return 'recordsImported';
+
+  // An archived record still earns a mapping row, keyed to the evidence it
+  // became. Without one, a replay would see no prior mapping and redo the
+  // work rather than being recognised as an idempotent replay.
+  if (outcome.kind === 'ARCHIVED') {
+    if (outcome.evidenceId !== undefined) {
+      await insertLegacyMapping(ctx.pool, {
+        workspaceId: ctx.workspaceId,
+        sourceDataset: ctx.sourceDataset,
+        sourceType: record.sourceType,
+        sourceId: record.sourceId,
+        targetKind: 'EVIDENCE_RECORD',
+        targetId: outcome.evidenceId,
+        runId: ctx.runId,
+        datasetHash: ctx.datasetHash,
+        sourceHash: record.sourceHash,
+        evidenceId: ctx.runEvidenceId,
+        importerVersion: IMPORTER_VERSION,
+        note: outcome.note,
+      });
+    }
+    return 'recordsImported';
+  }
 
   await insertLegacyMapping(ctx.pool, {
     workspaceId: ctx.workspaceId,

@@ -37,6 +37,14 @@ const FORBIDDEN_MODULES = [
   resolve(ROOT, 'src/migration/legacySqliteSource.ts'),
   resolve(ROOT, 'src/migration/legacyCategories.ts'),
   resolve(ROOT, 'src/migration/legacyExporter.ts'),
+  // Phase 4/5: the importer writes to PostgreSQL through the normal command
+  // surface, but it is still migration tooling and must never become
+  // reachable from the running product.
+  resolve(ROOT, 'src/migration/legacyImportContext.ts'),
+  resolve(ROOT, 'src/migration/legacyCategoryHandlers.ts'),
+  resolve(ROOT, 'src/migration/legacyImporter.ts'),
+  resolve(ROOT, 'src/migration/migrationRunStore.ts'),
+  resolve(ROOT, 'src/migration/recomputeMigratedState.ts'),
 ];
 
 const IMPORT_SPECIFIER_RE = /(?:import|export)\s[^;]*?\sfrom\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;

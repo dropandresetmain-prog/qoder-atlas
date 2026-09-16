@@ -57,6 +57,24 @@ export const MigrationExceptionClassificationSchema = z.enum([
   'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
   /** External operation outcome was never observed; stays unknown, never failed. */
   'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
+  /**
+   * History preserved as evidence, deliberately NOT re-injected as live
+   * target state — replaying a historical signal or case into a live target
+   * would re-trigger recovery for events that are long over.
+   */
+  'ARCHIVED_NOT_REPLAYED_AS_LIVE_STATE',
+  /**
+   * Content preserved, but the value cannot be migrated without a real
+   * protected-content store to hold it (the target stores a
+   * ProtectedDataRef triple, never a plaintext value).
+   */
+  'ARCHIVED_REQUIRES_PROTECTED_CONTENT_STORE',
+  /**
+   * Content preserved, but activating it in the target needs an input the
+   * legacy source never held (e.g. an effective window, a registered rule
+   * expression) and which must come from an owner, not a guess.
+   */
+  'ARCHIVED_REQUIRES_TARGET_POLICY_INPUT',
   /** Same source identity re-presented with a different payload hash. */
   'CONFLICT_SOURCE_CHANGED_SINCE_IMPORT',
   /** The target rejected the write with a typed conflict. */

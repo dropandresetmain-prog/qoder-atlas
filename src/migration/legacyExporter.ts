@@ -27,7 +27,8 @@ import {
   type MigrationSourceRecord,
 } from './legacyExportBundle.ts';
 
-export const EXPORTER_VERSION = 'northstar-legacy-exporter/1.0.0';
+/** 1.1.0 carries `sourceTimestamp` so archived history keeps its real age. */
+export const EXPORTER_VERSION = 'northstar-legacy-exporter/1.1.0';
 export const LEGACY_SOURCE_SYSTEM = 'northstar-legacy-sqlite';
 
 export interface LegacyExportRequest {
@@ -130,6 +131,7 @@ function exportCategory(
       sourceOrderingKey: extracted.sourceOrderingKey,
       payload,
       ...(rawUnparseableText === undefined ? {} : { rawUnparseableText }),
+      ...(extracted.timestamp === undefined ? {} : { sourceTimestamp: extracted.timestamp }),
       sourceHash: sha256(canonicalJson({ payload, rawUnparseableText: rawUnparseableText ?? null })),
     });
   }

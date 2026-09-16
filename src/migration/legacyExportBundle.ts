@@ -35,6 +35,12 @@ export const MigrationSourceRecordSchema = z.strictObject({
   rawUnparseableText: z.string().optional(),
   /** Hash of this record's content. Drives IDEMPOTENT_REPLAY vs. CONFLICT. */
   sourceHash: z.string().min(1),
+  /**
+   * The legacy instant this row carried, when its table had one. Archived
+   * history is asserted `observedAt` this instant rather than at import
+   * wall-clock, so a migrated observation keeps the age it actually has.
+   */
+  sourceTimestamp: z.string().optional(),
 });
 export type MigrationSourceRecord = z.infer<typeof MigrationSourceRecordSchema>;
 

@@ -90,7 +90,10 @@ export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
   entityCategory('TRAVELLER', 'MIGRATE_TRANSFORM'),
   entityCategory('PLACE', 'MIGRATE_TRANSFORM'),
   entityCategory('ANCHOR_EVENT', 'MIGRATE_TRANSFORM'),
-  entityCategory('RULE_SET', 'MIGRATE_TRANSFORM'),
+  // Legacy rule sets carry free-text statements and ad-hoc parameters; the
+  // target requires a validated RuleExpression against a predicate registry.
+  // Archived with the content preserved; an owner supplies the expression.
+  entityCategory('RULE_SET', 'ARCHIVE_AND_REGENERATE'),
   {
     categoryId: 'TRIP',
     sourceTable: 'trips',
@@ -118,7 +121,14 @@ export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
     categoryId: 'RECOVERY_CASE',
     sourceTable: 'cases',
     sourceType: 'cases',
-    decision: 'MIGRATE_THEN_RECONCILE',
+    // Revised from MIGRATE_THEN_RECONCILE on repo evidence: the target has no
+    // case-authoring command at all. `recovery_cases` rows come into being
+    // through the evaluate -> strategy -> plan -> authority pipeline
+    // (m8AuthorityCommands), because in the target a case is DERIVED, not
+    // authored. Re-creating one by raw SQL would fabricate a case with no
+    // strategy/plan/authority lineage. History is archived; unfinished work is
+    // an owned exception for the target pipeline to re-derive after cutover.
+    decision: 'ARCHIVE_AND_REGENERATE',
     timestamped: true,
     extract(source) {
       return source
@@ -139,7 +149,10 @@ export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
     categoryId: 'SIGNAL',
     sourceTable: 'signals',
     sourceType: 'signals',
-    decision: 'MIGRATE_TRANSFORM',
+    // Archive, never replay. A change signal in the target is produced by
+    // ingress observation; re-injecting historical signals into a live target
+    // would re-trigger recovery for disruptions that are long over.
+    decision: 'ARCHIVE_AS_IMMUTABLE_HISTORY',
     timestamped: true,
     extract(source) {
       return source.rows('signals', ['id', 'trip_id', 'occurred_at', 'data']).map((row) => {
@@ -219,7 +232,10 @@ export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
     categoryId: 'BOOKING_DOSSIER',
     sourceTable: 'booking_dossiers',
     sourceType: 'booking_dossiers',
-    decision: 'MIGRATE_TRANSFORM',
+    // Structured passenger names migrate as target name editions; contact and
+    // payment values cannot, because the target stores a ProtectedDataRef
+    // triple rather than a value and there is no protected store to put them in.
+    decision: 'QUARANTINE_ARCHIVE_REPAIR_WITH_EVIDENCE',
     timestamped: false,
     extract(source) {
       return source
@@ -244,7 +260,11 @@ export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
     categoryId: 'PREFERENCE',
     sourceTable: 'preferences',
     sourceType: 'preferences',
-    decision: 'MIGRATE_TRANSFORM',
+    // The legacy preference is a free-text statement with an origin but no
+    // effective window; the target requires a bounded window. Content is
+    // archived with its explicit/latent provenance intact rather than given a
+    // fabricated expiry.
+    decision: 'QUARANTINE_ARCHIVE_REPAIR_WITH_EVIDENCE',
     timestamped: false,
     extract(source) {
       return source.rows('preferences', ['id', 'traveller_id', 'trip_id', 'data']).map((row) => {
