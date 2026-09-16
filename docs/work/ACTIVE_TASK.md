@@ -34,7 +34,9 @@ This lane supersedes the old M6 ledger here; that ledger remains in base history
 - [x] Browser desktop/mobile, controls, edge cases and console verified.
 - [x] Anti-hardcoding / no business reasoning / unchanged ontology checked.
 - [x] Contract doc, roadmap and evidence updated; no tracker/DECISIONS entry applies.
-- [ ] Exact-path commit and push verified; stop before next milestone.
+- [x] Exact-path commit and push verified; stop before next milestone — milestone
+  commit `0f6f5500bc5c81c1910655a070d3cb3d4a8026ca`, 13 paths staged explicitly,
+  `git ls-remote origin` == local `HEAD`, 0 ahead / 0 behind.
 
 ## Current checkpoint
 
@@ -46,8 +48,11 @@ that an unmapped value now throws instead of returning `neutral`.
 
 ## Next action
 
-Commit by exact path, push the lane, report, then STOP. Live `LiveDependencyGraph`
-wiring stays blocked on FIG-1/FIG-2/FIG-6 and is explicitly out of scope here.
+None — this lane is closed. Milestone commit `0f6f5500` is pushed to
+`origin/lane/wit-frontend-semantic-contract` and the working tree is clean. The
+hand-off is independent review. Live `LiveDependencyGraph` wiring stays blocked
+on FIG-1/FIG-2/FIG-6 and is explicitly out of scope here; do not start M10 or
+any live-state integration from this branch.
 
 ## Critical constraints
 
