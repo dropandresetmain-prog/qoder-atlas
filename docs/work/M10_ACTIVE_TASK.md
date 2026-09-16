@@ -147,14 +147,62 @@ payloads are preserved verbatim and marked, never dropped and never
 guessed.
 
 ### Phase 4 — Staging importer
-- [ ] Idempotent by dataset+source identity; typed conflicts; no silent overwrite
+- [x] Idempotent by dataset+source identity; typed conflicts; no silent overwrite.
+  `src/migration/legacyImporter.ts` + `migrationRunStore.ts`. First writes ever
+  to `migration_runs`/`legacy_id_map`. Imports through the real M2-M5 command
+  surface (no migration-only write path), quarantines rather than guesses, and
+  records every exception with classification/reason/scope/safety/owner/
+  cutover-blocking. Handlers cover ORGANISATION, TRAVELLER, TRIP, CONSTRAINT,
+  SOURCE_RECORD; uncovered categories are counted as `recordsDeferred`, never
+  silently skipped (Phase 5 adds handlers; nothing else changes).
+
+**Key correctness finding (fixed, not worked around):** every migrated target
+id and the run's provenance source/evidence ids are now **derived** from
+`(datasetHash, sourceType, sourceId, step)` rather than random. With random
+ids, a command re-issued under the same deterministic idempotency key
+presents a different canonical payload, and `PgUnitOfWork` correctly rejects
+it as `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` — so the documented
+crash-between-command-commit-and-mapping-insert recovery would have failed.
+Derived ids make the migration content-addressed: the same dataset always
+produces the same target ids, so a re-issued command is a true REPLAY. Ids are
+only unique per workspace (`PRIMARY KEY (workspace_id, id)`), so the same
+bundle still imports independently into two workspaces. The run's provenance
+assertion describes the *dataset*, not the run, for the same reason.
 
 ### Phase 5 — Reconciliation
 ### Phase 6 — Recompute derived state
+- [x] `src/migration/recomputeMigratedState.ts` runs the real `evaluateImpact`
+  + `createM6Registry` path (the one `m9SarahTargetE2E.pgtest.ts` proves) over
+  exactly the journeys `legacy_id_map` says were migrated. No legacy verdict is
+  imported as current: import alone creates zero `assessments` rows, and the
+  legacy `Constraint.status` is archived as `LEGACY_CONSTRAINT_STATUS` evidence
+  instead. Verified: migrated journey reaches `CURRENT` via
+  `currentAssessmentView`.
+
 ### Phase 7 — Interrupt/resume/restore
+- [x] Interrupt/resume proven against real PostgreSQL (not a unit stub):
+  `failAfterRecords` is a real code path that leaves the run `IN_PROGRESS`
+  with accurate `progress`; the resumed run adopts the same `runId` and the
+  final state matches a clean single-pass run table-for-table.
+- [ ] Backup/restore rehearsal on a volume-backed instance
+
 ### Phase 8 — Legacy retirement rehearsal
 ### Phase 9 — Exact cutover rehearsal
 ### Phase 10 — Rollback model + runbook
+
+## Environment hazard found (not a product defect)
+
+The shared `northstar-postgres-test` container had `schema_migrations`
+checksum drift for `0120_m9_replan_identity.sql`: recorded
+`78b46c4c…` vs this worktree's file `2843cb27…`. Cause confirmed: the
+**M9 worktree has that file checked out CRLF and the M10 worktree LF**
+(content identical ignoring EOL), and `migrate.ts` hashes file bytes. So the
+same commit in two worktrees cannot share one test database. Resolved by
+recreating the `northstar_test` database (migration `0001` creates the
+postgis/pgcrypto extensions itself, so a template1-based database is fine).
+Classification: **Park for Later** — a multi-worktree developer-environment
+hazard, not a runtime or cutover risk (one deployment has one checkout).
+`ID: PGTEST-EOL-DRIFT`.
 
 ## Blockers
 

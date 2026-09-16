@@ -76,15 +76,21 @@ function entityCategory(
   };
 }
 
+/**
+ * Catalog order IS migration dependency order, and the exporter emits
+ * categories in exactly this order. A category may only reference target
+ * subjects produced by a category above it — e.g. constraints resolve their
+ * owning Journey, so they must follow TRIP. Keeping one ordering (rather
+ * than a separate import order) means the bundle's canonical replay order
+ * and the importer's execution order cannot drift apart, which is what makes
+ * a resume index meaningful.
+ */
 export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
   entityCategory('ORGANISATION', 'MIGRATE_TRANSFORM'),
   entityCategory('TRAVELLER', 'MIGRATE_TRANSFORM'),
-  entityCategory('ANCHOR_EVENT', 'MIGRATE_TRANSFORM'),
   entityCategory('PLACE', 'MIGRATE_TRANSFORM'),
+  entityCategory('ANCHOR_EVENT', 'MIGRATE_TRANSFORM'),
   entityCategory('RULE_SET', 'MIGRATE_TRANSFORM'),
-  // Definition migrates normally; the persisted PASS/FAIL/UNKNOWN status is
-  // archived as historical evidence and recomputed — see legacyImporter.ts.
-  entityCategory('CONSTRAINT', 'TRANSFORM_AND_REASSESS'),
   {
     categoryId: 'TRIP',
     sourceTable: 'trips',
@@ -104,6 +110,10 @@ export const LEGACY_CATEGORIES: readonly LegacyCategorySpec[] = [
       });
     },
   },
+  // Definition migrates normally; the persisted PASS/FAIL/UNKNOWN status is
+  // archived as historical evidence and recomputed — see legacyImporter.ts.
+  // Follows TRIP because a constraint's target owner is a migrated Journey.
+  entityCategory('CONSTRAINT', 'TRANSFORM_AND_REASSESS'),
   {
     categoryId: 'RECOVERY_CASE',
     sourceTable: 'cases',
