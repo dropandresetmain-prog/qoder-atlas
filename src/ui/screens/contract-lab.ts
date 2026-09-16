@@ -16,16 +16,16 @@
 import { escapeHtml } from '../html.ts';
 import { THEME_CSS } from '../theme.ts';
 import {
-  presentAssessment, presentConnection, presentDependencyGraph,
+  presentAssessment, presentConnection, presentDependencyGraph, presentEvaluationState,
   presentOperationalStatus, presentViability,
 } from '../semantics/adapter.ts';
 import { semanticBadge, semanticContractError, semanticEdge, semanticNode } from '../semantics/components.ts';
-import { SEMANTIC_CSS } from '../semantics/grammar.ts';
+import { EVALUATION_LABEL, SEMANTIC_CSS } from '../semantics/grammar.ts';
 import type { PresentationFocus, PresentationGraph, SemanticIndicator } from '../semantics/model.ts';
 import {
-  AssessmentToneSchema, ConnectionProgressionSchema, LdgNodeKindSchema,
+  AssessmentToneSchema, AssessmentViewStatusSchema, ConnectionProgressionSchema, LdgNodeKindSchema,
   LdgSemanticStateSchema, ProductOperationalStatusSchema, RemainderViabilitySchema,
-  type ChangeAwareness, type ConnectionProgression, type LdgEdge, type LdgNode,
+  type AssessmentViewStatus, type ChangeAwareness, type ConnectionProgression, type LdgEdge, type LdgNode,
   type LiveDependencyGraph, type RemainderViability,
 } from '../../contracts/v2/product/readModels.ts';
 import { CONTRACT_LAB_CSS } from './contract-lab-theme.ts';
@@ -45,20 +45,22 @@ export interface ContractLabSample {
 // ---------------------------------------------------------------------------
 
 const quietChange = (): ChangeAwareness =>
-  ({ projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' });
+  ({ projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' });
 
 function graphOf(nodes: readonly LdgNode[], edges: readonly LdgEdge[] = [], change: ChangeAwareness = quietChange()): LiveDependencyGraph {
   return { scope: 'FOCUSED_CASE', nodes: [...nodes], edges: [...edges], change };
 }
 
-function nodeOf(ref: string, kind: LdgNode['kind'], label: string, semanticState: LdgNode['semanticState'], authority: LdgNode['authority'], detail?: string): LdgNode {
-  return detail === undefined
-    ? { ref, kind, label, semanticState, authority }
-    : { ref, kind, label, semanticState, authority, detail };
+function nodeOf(
+  ref: string, kind: LdgNode['kind'], label: string, semanticState: LdgNode['semanticState'], authority: LdgNode['authority'],
+  extra?: { detail?: string; caseRef?: string; evaluation?: AssessmentViewStatus },
+): LdgNode {
+  return { ref, kind, label, semanticState, authority, ...extra };
 }
 
-function edgeOf(fromRef: string, toRef: string, kind: LdgEdge['kind'], semanticState?: LdgEdge['semanticState']): LdgEdge {
-  return semanticState === undefined ? { fromRef, toRef, kind } : { fromRef, toRef, kind, semanticState };
+function edgeOf(fromRef: string, toRef: string, kind: LdgEdge['kind'], semanticState?: LdgEdge['semanticState'], authority: LdgEdge['authority'] = 'AUTHORITATIVE'): LdgEdge {
+  const id = `${kind}:${fromRef}:${toRef}`;
+  return semanticState === undefined ? { id, fromRef, toRef, kind, authority } : { id, fromRef, toRef, kind, semanticState, authority };
 }
 
 /** Run a synthetic graph through the single adapter and render its nodes. */
@@ -126,15 +128,18 @@ function sectionStates(): string {
 }
 
 function sectionChange(): string {
+  const changedEdge = edgeOf('changed-node', 'steady-node', 'RELIES_ON', 'CHANGED');
+  const steadyEdge = edgeOf('steady-node', 'changed-node', 'RELIES_ON', 'HEALTHY');
   const input = graphOf(
     [
       nodeOf('changed-node', 'TIMING', 'Listed in changedVisibleRefs', 'CHANGED', 'AUTHORITATIVE'),
       nodeOf('steady-node', 'SERVICE_BOOKING', 'Not listed in changedVisibleRefs', 'HEALTHY', 'AUTHORITATIVE'),
     ],
-    [],
+    [changedEdge, steadyEdge],
     {
       projectionRevision: 7,
       changedVisibleRefs: ['changed-node'],
+      changedEdgeIds: [changedEdge.id],
       previousSemanticState: 'HEALTHY',
       currentSemanticState: 'CHANGED',
       changeSource: 'fixture-supplied revision',
@@ -142,8 +147,10 @@ function sectionChange(): string {
   );
   const presented = presentDependencyGraph(input);
   return section('lab-change', 'B', 'Change semantics',
-    'Change marking comes only from supplied changedVisibleRefs and revision metadata. The frontend diffs nothing and never infers a changed edge from its endpoints.',
-    `${changeMeta(presented.change)}<div class="lab-grid">${presented.nodes.map(semanticNode).join('')}</div>`);
+    'Change marking comes only from supplied changedVisibleRefs / changedEdgeIds and revision metadata (FIG-1/FIG-2/FIG-3). The frontend diffs nothing and never infers a changed edge from its endpoints or semantic state.',
+    `${changeMeta(presented.change)}<div class="lab-grid">${presented.nodes.map(semanticNode).join('')}</div>
+     <h3 class="lab-sub">Edge change marking</h3>
+     <div class="lab-grid">${presented.edges.map(semanticEdge).join('')}</div>`);
 }
 
 function sectionTruth(): string {
@@ -153,13 +160,13 @@ function sectionTruth(): string {
       nodeOf('proposed-node', 'RECOVERY_PROPOSAL', 'Proposed node', 'PROPOSED', 'PROPOSED'),
     ],
     [
-      edgeOf('current-node', 'proposed-node', 'PROPOSED_CHANGE', 'PROPOSED'),
-      edgeOf('current-node', 'proposed-node', 'RELIES_ON'),
+      edgeOf('current-node', 'proposed-node', 'PROPOSED_CHANGE', 'PROPOSED', 'PROPOSED'),
+      edgeOf('current-node', 'proposed-node', 'RELIES_ON', undefined, 'AUTHORITATIVE'),
     ],
   );
   const presented = presentDependencyGraph(input);
   return section('lab-truth', 'C', 'Current versus proposed',
-    'Node authority is always supplied, so a node is current or proposed. M9 edges carry no authority, so every edge truth mode is unspecified — a PROPOSED state or PROPOSED_CHANGE kind stays visible as its own state/relationship, never promoted to proposed or current truth (gap FIG-2).',
+    'Node and edge authority are both always supplied (FIG-2), so current/proposed is never inferred from semantic state, edge kind or endpoints — a PROPOSED state or PROPOSED_CHANGE kind stays visible as its own state/relationship, independent of authority.',
     `<div class="lab-grid">${presented.nodes.map(semanticNode).join('')}</div>
      <h3 class="lab-sub">Edge truth modes</h3>
      <div class="lab-grid">${presented.edges.map(semanticEdge).join('')}</div>`);
@@ -195,15 +202,29 @@ function sectionRelationships(): string {
   ];
   const presented = presentDependencyGraph(graphOf(nodes, edges), { causalEdgeIndices: [1] });
   return section('lab-relationships', 'E', 'Relationships',
-    'Every real LdgEdgeKind rendered once, across HEALTHY, CHANGED, PROPOSED and state-not-supplied semantic states. Edge state never sets edge truth or change marking. Edges have no stable identity in M9; renderKey is snapshot-local position only (gap FIG-1).',
+    'Every real LdgEdgeKind rendered once, across HEALTHY, CHANGED, PROPOSED and state-not-supplied semantic states. Edge state never sets edge truth or change marking. Each edge carries a producer-owned stable id (FIG-1); renderKey is that id, never array position.',
     `<h3 class="lab-sub">Edge kinds and states</h3>
      <div class="lab-grid">${presented.edges.map(semanticEdge).join('')}</div>
      <h3 class="lab-sub">Endpoints</h3>
      <div class="lab-strip">${presented.nodes.map(semanticNode).join('')}</div>`);
 }
 
+function sectionEvaluation(): string {
+  const nodes = AssessmentViewStatusSchema.options.map((value) =>
+    nodeOf(`eval-${value}`, 'TRAVELLER', value, 'UNKNOWN', 'AUTHORITATIVE', { evaluation: value }));
+  // No `evaluation` supplied — a case/disruption node is not an assessed subject.
+  nodes.push(nodeOf('eval-not-supplied', 'RECOVERY_PROPOSAL', 'Not an assessed subject', 'ACTIVE', 'AUTHORITATIVE'));
+  const presented = presentDependencyGraph(graphOf(nodes));
+  const family = `<div class="lab-family"><h3>Evaluation lifecycle (AssessmentViewStatus)</h3><ul>${
+    presented.nodes.map((n) => `<li><span class="sem-evaluation">${escapeHtml(EVALUATION_LABEL[n.evaluationState])}</span><code>${escapeHtml(n.evaluationState)}</code></li>`).join('')
+  }</ul></div>`;
+  return section('lab-evaluation', 'F', 'Evaluation lifecycle',
+    'FIG-7: an independent, non-domain dimension passed through from AssessmentViewStatus. It never changes semanticState, changeState or tone — "under evaluation" is its own marker, not a re-collapse of ACTIVE/AFFECTED/UNKNOWN.',
+    `${family}<div class="lab-grid">${presented.nodes.map(semanticNode).join('')}</div>`);
+}
+
 // ---------------------------------------------------------------------------
-// Section F: composed fixture samples, plus the loud invalid-contract panel
+// Section G: composed fixture samples, plus the loud invalid-contract panel
 // ---------------------------------------------------------------------------
 
 function renderSampleBody(sample: ContractLabSample): string {
@@ -239,7 +260,7 @@ function sectionComposed(samples: readonly ContractLabSample[]): string {
     .map((sample, index) => `<option value="${index}">${escapeHtml(sample.title)}</option>`)
     .join('');
   const rendered = samples.map(renderSample).join('');
-  return section('lab-composed', 'F', 'Composed examples',
+  return section('lab-composed', 'G', 'Composed examples',
     'Fixture-backed mini graphs that combine state, change, truth and focus the way a real case reads. Demo facts come from fixtures/ui, never from generic presentation code.',
     `<div class="lab-toolbar">
        <label for="lab-sample-select">Show sample</label>
@@ -297,8 +318,8 @@ const SELECTION_SCRIPT = `<script>
 export function renderContractLabBody(samples: readonly ContractLabSample[]): string {
   const nav = [
     ['lab-states', 'A · States'], ['lab-change', 'B · Change'], ['lab-truth', 'C · Current/Proposed'],
-    ['lab-focus', 'D · Focus'], ['lab-relationships', 'E · Relationships'], ['lab-composed', 'F · Composed'],
-    ['lab-invalid', '! · Invalid'],
+    ['lab-focus', 'D · Focus'], ['lab-relationships', 'E · Relationships'], ['lab-evaluation', 'F · Evaluation'],
+    ['lab-composed', 'G · Composed'], ['lab-invalid', '! · Invalid'],
   ].map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
   return `<main class="lab" data-test="contract-lab">
   <header class="lab-intro">
@@ -315,6 +336,7 @@ export function renderContractLabBody(samples: readonly ContractLabSample[]): st
   ${sectionTruth()}
   ${sectionFocus()}
   ${sectionRelationships()}
+  ${sectionEvaluation()}
   ${sectionComposed(samples)}
   ${invalidPanel()}
   <footer class="lab-end">Semantic contract source of truth: docs/FRONTEND_SEMANTIC_CONTRACT.md · visual authority: docs/DESIGN.md and the frozen WiT graph contract. Colour always pairs with a glyph and label.</footer>

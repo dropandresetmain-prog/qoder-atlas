@@ -7,6 +7,7 @@
 import type { Pool } from '../../../persistence/postgres/pool.ts';
 import type {
   AssessmentTone,
+  AssessmentViewStatus,
   ConnectionProgression,
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
@@ -258,9 +259,13 @@ export async function loadRecoveryCaseFacts(
     };
   });
 
-  // Assessments for case subjects — best-effort.
-  const subjects = await pool.query<{ subject_kind: string; subject_id: string }>(
-    `SELECT subject_kind, subject_id FROM case_subjects WHERE workspace_id = $1 AND recovery_case_id = $2`,
+  // Assessments for case subjects — best-effort. ORDER BY is required (FIG-1):
+  // without it, edge/node array order (and any position-derived key) can
+  // change between reads of the same content, causing false delete/recreate.
+  const subjects = await pool.query<{ subject_kind: string; subject_id: string; role: string }>(
+    `SELECT subject_kind, subject_id, role FROM case_subjects
+      WHERE workspace_id = $1 AND recovery_case_id = $2
+      ORDER BY subject_kind, subject_id, role`,
     [workspaceId, caseId],
   );
 
@@ -272,14 +277,18 @@ export async function loadRecoveryCaseFacts(
   // across every subject" — an old superseded verdict must never decide the
   // case). CURRENT+PASS -> PASS, CURRENT+FAIL -> FAIL; STALE /
   // PENDING_REASSESSMENT / UNAVAILABLE / NONE all read as UNKNOWN with an
-  // explicit staleness note (see M9 C4 current-assessment finding).
-  const subjectTones: AssessmentTone[] = [];
+  // explicit staleness note (see M9 C4 current-assessment finding). Each
+  // subject keeps its own tone/evaluation status (FIG-6/FIG-7) — the case's
+  // aggregate verdict below must never be copied back onto every subject node.
+  interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus }
+  const subjectFacts: SubjectFact[] = [];
   // M9 3A: derive connection viability from the real m6.connection dimension
   // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
   // case subjects — one broken connection is enough to flag the case.
   const CONNECTION_SEVERITY: Record<ConnectionViabilityHint, number> = { VIABLE: 0, UNKNOWN: 1, TIGHT: 2, IMPOSSIBLE: 3 };
   let connectionViability: ConnectionViabilityHint | undefined;
   for (const s of subjects.rows) {
+    const ref = `${s.subject_kind}:${s.subject_id}`;
     const view = await currentAssessmentView(
       pool,
       workspaceId,
@@ -290,9 +299,9 @@ export async function loadRecoveryCaseFacts(
     if (view.status === 'CURRENT' && view.assessment) {
       const verdict = view.assessment.overallVerdict;
       const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
-      subjectTones.push(tone);
+      subjectFacts.push({ ref, tone, evaluation: view.status });
       if (tone === 'UNKNOWN') {
-        uncertainty.push(`${s.subject_kind}:${s.subject_id} current assessment verdict ${verdict}`);
+        uncertainty.push(`${ref} current assessment verdict ${verdict}`);
       }
       const connectionDim = view.assessment.dimensions.find((d) => d.dimension === 'connection_feasibility' && d.applicable);
       if (connectionDim) {
@@ -305,10 +314,11 @@ export async function loadRecoveryCaseFacts(
         }
       }
     } else {
-      subjectTones.push('UNKNOWN');
-      uncertainty.push(`${s.subject_kind}:${s.subject_id} assessment ${view.status.toLowerCase()}`);
+      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status });
+      uncertainty.push(`${ref} assessment ${view.status.toLowerCase()}`);
     }
   }
+  const subjectTones = subjectFacts.map((f) => f.tone);
   if (subjectTones.some((t) => t === 'FAIL')) tripVerdict = 'FAIL';
   else if (subjectTones.length > 0 && subjectTones.every((t) => t === 'PASS')) tripVerdict = 'PASS';
 
@@ -328,28 +338,42 @@ export async function loadRecoveryCaseFacts(
     ? (row.lifecycle_status as RecoveryCaseFacts['status'])
     : 'OPEN';
 
+  const subjectFactByRef = new Map(subjectFacts.map((f) => [f.ref, f]));
+  const TONE_TO_STATE = { PASS: 'HEALTHY', FAIL: 'FAILED', UNKNOWN: 'UNKNOWN' } as const;
   return {
     generatedAt,
     projectionRevision: recoveryActions.length + subjects.rows.length,
     changedVisibleRefs: recoveryActions.map((a) => a.actionRef),
+    changedEdgeIds: [],
     currentSemanticState: tripVerdict === 'FAIL' ? 'FAILED' : tripVerdict === 'PASS' ? 'RECOVERED' : 'AFFECTED',
     nodes: [
       { ref: `case:${caseId}`, kind: 'RECOVERY_PROPOSAL', label: 'Recovery case', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
       ...subjects.rows.map((s) => {
-        const semanticState = tripVerdict === 'FAIL' ? 'FAILED' as const : 'AFFECTED' as const;
+        const ref = `${s.subject_kind}:${s.subject_id}`;
+        // FIG-6: each subject's own CURRENT verdict decides its node, never the
+        // case's aggregate (a PASS subject must be able to read HEALTHY even
+        // when another subject fails the whole case).
+        const fact = subjectFactByRef.get(ref);
+        const semanticState = fact ? TONE_TO_STATE[fact.tone] : 'UNKNOWN' as const;
         return {
-          ref: `${s.subject_kind}:${s.subject_id}`,
+          ref,
           kind: 'TRAVELLER' as const,
           label: s.subject_kind,
           semanticState,
           authority: 'AUTHORITATIVE' as const,
+          caseRef: caseId,
+          ...(fact ? { evaluation: fact.evaluation } : {}),
         };
       }),
     ],
     edges: subjects.rows.map((s) => ({
+      // FIG-1: derived from the canonical relation, never array position —
+      // stable across revisions and unique per (subject, case) pair.
+      id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:case:${caseId}`,
       fromRef: `${s.subject_kind}:${s.subject_id}`,
       toRef: `case:${caseId}`,
       kind: 'AFFECTED_BY' as const,
+      authority: 'AUTHORITATIVE' as const,
     })),
     caseRef: caseId,
     status,
@@ -376,6 +400,7 @@ export async function loadRecoveryCaseFacts(
     uncertainty,
     connectionProgression,
     recoveryActions,
+    subjectFacts,
   };
 }
 
@@ -421,6 +446,10 @@ export async function loadOperatorOverviewFacts(
       );
       if (named.rows[0]?.display_value) travellerLabel = named.rows[0].display_value;
     }
+    // The dashboard node's subject is the primary affected item (FIG-4); its
+    // evaluation lifecycle (FIG-7) is that same subject's, reused from the
+    // CURRENT-assessment lookup `loadRecoveryCaseFacts` already did.
+    const primaryEvaluation = facts.subjectFacts?.[0]?.evaluation;
     items.push({
       tripRef: affected[0] ?? `case:${c.id}`,
       travellerLabel,
@@ -432,20 +461,33 @@ export async function loadOperatorOverviewFacts(
       affectedItems: affected,
       decisionRequired: facts.status === 'AWAITING_AUTHORITY',
       unresolvedUncertainty: facts.uncertainty ?? [],
+      ...(primaryEvaluation ? { evaluation: primaryEvaluation } : {}),
     });
   }
 
+  const STATUS_TO_STATE = {
+    READY: 'HEALTHY', AT_RISK: 'AFFECTED', DISRUPTED: 'FAILED', RECOVERING: 'ACTIVE', UNKNOWN: 'UNKNOWN',
+  } as const;
   return {
     generatedAt,
     projectionRevision: items.length,
     changedVisibleRefs: items.map((i) => i.caseRef!).filter(Boolean) as string[],
+    changedEdgeIds: [],
     currentSemanticState: items.some((i) => i.status === 'DISRUPTED') ? 'FAILED' : 'HEALTHY',
     nodes: items.map((i) => ({
-      ref: i.caseRef ?? i.tripRef,
+      // FIG-4: keyed by the canonical subject ref the case graph already uses
+      // (e.g. `JOURNEY:<id>`), not the bare case id — so the same subject
+      // keeps one ref before and after escalation. caseRef is the separate
+      // linkage/escalation marker, never identity.
+      ref: i.tripRef,
       kind: 'DISRUPTION' as const,
       label: i.travellerLabel,
-      semanticState: i.status === 'DISRUPTED' ? 'FAILED' as const : 'HEALTHY' as const,
+      // FIG-6: the full operational-status range, not a DISRUPTED-or-HEALTHY
+      // collapse — AT_RISK/RECOVERING/UNKNOWN must not render green.
+      semanticState: STATUS_TO_STATE[i.status],
       authority: 'AUTHORITATIVE' as const,
+      ...(i.caseRef ? { caseRef: i.caseRef } : {}),
+      ...(i.evaluation ? { evaluation: i.evaluation } : {}),
     })),
     edges: [],
     items,
@@ -471,6 +513,7 @@ export function loadIncidentProgrammeFactsFromCohort(input: {
     generatedAt,
     projectionRevision: cohort.travellers.length,
     changedVisibleRefs: cohort.travellers.map((t) => t.travellerRef),
+    changedEdgeIds: [],
     currentSemanticState: cohort.travellers.some((t) => t.outcome === 'FAIL') ? 'FAILED' : 'AFFECTED',
     nodes: [
       { ref: input.incidentRef, kind: 'DISRUPTION', label: 'Shared supplier disruption', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
@@ -490,9 +533,11 @@ export function loadIncidentProgrammeFactsFromCohort(input: {
       }),
     ],
     edges: cohort.travellers.map((t) => ({
+      id: `AFFECTED_BY:${t.travellerRef}:${input.incidentRef}`,
       fromRef: t.travellerRef,
       toRef: input.incidentRef,
       kind: 'AFFECTED_BY' as const,
+      authority: 'AUTHORITATIVE' as const,
     })),
     incidentRef: input.incidentRef,
     sourceChangeSummary: input.sourceChangeSummary,
@@ -522,6 +567,7 @@ export function buildTravellerTripFacts(input: {
     generatedAt: isoNow(input.generatedAt),
     projectionRevision: 1,
     changedVisibleRefs: [input.tripRef],
+    changedEdgeIds: [],
     currentSemanticState: input.amIOkay === 'NO' ? 'FAILED' : input.amIOkay === 'YES' ? 'HEALTHY' : 'UNKNOWN',
     nodes: [{ ref: input.tripRef, kind: 'TRAVELLER', label: 'Your trip', semanticState: input.amIOkay === 'NO' ? 'FAILED' : 'HEALTHY', authority: 'AUTHORITATIVE' }],
     edges: [],

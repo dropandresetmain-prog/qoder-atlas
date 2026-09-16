@@ -24,6 +24,7 @@ const graphBase = {
   generatedAt,
   projectionRevision: 2,
   changedVisibleRefs: ['stay:replacement'],
+  changedEdgeIds: [] as const,
   currentSemanticState: 'AFFECTED' as const,
   nodes: [] as const,
   edges: [] as const,

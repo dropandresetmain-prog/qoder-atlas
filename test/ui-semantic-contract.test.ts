@@ -17,13 +17,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
-  presentAssessment, presentConnection, presentDependencyGraph, presentGraphState,
+  presentAssessment, presentConnection, presentDependencyGraph, presentEvaluationState, presentGraphState,
   presentOperationalStatus, presentViability,
 } from '../src/ui/semantics/adapter.ts';
 import { semanticEdge, semanticNode } from '../src/ui/semantics/components.ts';
 import { renderContractLabDocument, type ContractLabSample } from '../src/ui/screens/contract-lab.ts';
 import {
-  AssessmentToneSchema, ConnectionProgressionSchema, LdgEdgeKindSchema, LdgNodeKindSchema,
+  AssessmentToneSchema, AssessmentViewStatusSchema, ConnectionProgressionSchema, LdgEdgeKindSchema, LdgNodeKindSchema,
   LdgSemanticStateSchema, ProductOperationalStatusSchema, RemainderViabilitySchema,
   type ConnectionProgression, type LdgSemanticState, type LiveDependencyGraph,
 } from '../src/contracts/v2/product/readModels.ts';
@@ -59,6 +59,14 @@ test('an unmapped semantic state throws UNMAPPED SEMANTIC STATE rather than defa
   assert.throws(() => presentConnection(badProgression), /UNMAPPED SEMANTIC STATE/);
 });
 
+test('every AssessmentViewStatus maps to a real EvaluationState (FIG-7, no silent default)', () => {
+  for (const value of AssessmentViewStatusSchema.options) {
+    const mapped = presentEvaluationState(value);
+    assert.notEqual(mapped, 'not-supplied', `${value} must not collapse into the absent-field marker`);
+  }
+  assert.equal(presentEvaluationState(undefined), 'not-supplied');
+});
+
 // ---------------------------------------------------------------------------
 // 2. Orthogonal node/edge presentation semantics
 // ---------------------------------------------------------------------------
@@ -70,11 +78,17 @@ const sampleGraph: LiveDependencyGraph = {
     { ref: 'b', kind: 'RECOVERY_PROPOSAL', label: 'Beta', semanticState: 'PROPOSED', authority: 'PROPOSED', detail: 'supplied detail' },
   ],
   edges: [
-    { fromRef: 'a', toRef: 'b', kind: 'PROPOSED_CHANGE' },
-    { fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', semanticState: 'CHANGED' },
-    { fromRef: 'b', toRef: 'a', kind: 'AFFECTED_BY', semanticState: 'PROPOSED' },
+    // Kind PROPOSED_CHANGE but authority AUTHORITATIVE: truth must come from
+    // authority, never from a "proposed-sounding" kind (FIG-2 no-promotion).
+    { id: 'e1', fromRef: 'a', toRef: 'b', kind: 'PROPOSED_CHANGE', authority: 'AUTHORITATIVE' },
+    // semanticState CHANGED but not in changedEdgeIds: change marking must
+    // come only from changedEdgeIds, never from semantic state.
+    { id: 'e2', fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' },
+    // semanticState PROPOSED but marked changed via changedEdgeIds: change
+    // marking is independent of the PROPOSED state.
+    { id: 'e3', fromRef: 'b', toRef: 'a', kind: 'AFFECTED_BY', semanticState: 'PROPOSED', authority: 'PROPOSED' },
   ],
-  change: { projectionRevision: 3, changedVisibleRefs: ['b'], currentSemanticState: 'PROPOSED' },
+  change: { projectionRevision: 3, changedVisibleRefs: ['b'], changedEdgeIds: ['e3'], currentSemanticState: 'PROPOSED' },
 };
 
 test('node truth, change and category come only from supplied fields', () => {
@@ -92,22 +106,24 @@ test('node truth, change and category come only from supplied fields', () => {
   assert.equal(b?.indicator.tone, 'watch');
 });
 
-test('edge truth and change are never promoted from edge kind or edge semantic state', () => {
+test('edge truth and change come only from authority/changedEdgeIds, never from edge kind or semantic state', () => {
   const presented = presentDependencyGraph(sampleGraph);
   const [proposedKind, changedState, proposedState] = presented.edges;
-  // M9 edges carry no authority and no changed-edge set (FIG-2): every edge is
-  // unspecified / not-supplied, while kind and state stay visible on their own.
-  for (const edge of presented.edges) {
-    assert.equal(edge.truthMode, 'unspecified');
-    assert.equal(edge.changeState, 'not-supplied');
-  }
+  // FIG-2: authority decides truth (not the PROPOSED_CHANGE kind); changedEdgeIds
+  // decides change marking (not the CHANGED/PROPOSED semantic state).
   assert.equal(proposedKind?.relationshipKind, 'PROPOSED_CHANGE');
+  assert.equal(proposedKind?.truthMode, 'current');
+  assert.equal(proposedKind?.changeState, 'not-marked');
   assert.equal(proposedKind?.label, 'Proposed change');
   assert.equal(proposedKind?.semanticState, undefined);
   assert.equal(proposedKind?.indicator.label, 'State not supplied');
   assert.equal(changedState?.semanticState, 'CHANGED');
+  assert.equal(changedState?.truthMode, 'current');
+  assert.equal(changedState?.changeState, 'not-marked');
   assert.equal(changedState?.indicator.glyph, 'change');
   assert.equal(proposedState?.semanticState, 'PROPOSED');
+  assert.equal(proposedState?.truthMode, 'proposed');
+  assert.equal(proposedState?.changeState, 'marked');
   assert.equal(proposedState?.indicator.glyph, 'proposal');
 });
 
@@ -122,8 +138,8 @@ test('node and edge apply the same no-promotion rule to PROPOSED and CHANGED sta
       // A proposed record can be healthy; health never implies commitment.
       { ref: 'h', kind: 'PROGRAMME_COMMITMENT', label: 'H', semanticState: 'HEALTHY', authority: 'PROPOSED' },
     ],
-    edges: [{ fromRef: 'p', toRef: 'c', kind: 'PROPOSED_CHANGE', semanticState: 'CHANGED' }],
-    change: { projectionRevision: 1, changedVisibleRefs: ['h'], currentSemanticState: 'CHANGED' },
+    edges: [{ id: 'pc1', fromRef: 'p', toRef: 'c', kind: 'PROPOSED_CHANGE', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' }],
+    change: { projectionRevision: 1, changedVisibleRefs: ['h'], changedEdgeIds: [], currentSemanticState: 'CHANGED' },
   };
   const presented = presentDependencyGraph(graph);
   const byRef = new Map(presented.nodes.map((node) => [node.ref, node]));
@@ -134,8 +150,29 @@ test('node and edge apply the same no-promotion rule to PROPOSED and CHANGED sta
   assert.equal(byRef.get('h')?.truthMode, 'proposed');
   assert.equal(byRef.get('h')?.changeState, 'marked');
   assert.equal(byRef.get('h')?.indicator.tone, 'ok');
-  assert.equal(presented.edges[0]?.truthMode, 'unspecified');
-  assert.equal(presented.edges[0]?.changeState, 'not-supplied');
+  // Edge kind PROPOSED_CHANGE with semanticState CHANGED but authority
+  // AUTHORITATIVE and absent from changedEdgeIds: current / not-marked.
+  assert.equal(presented.edges[0]?.truthMode, 'current');
+  assert.equal(presented.edges[0]?.changeState, 'not-marked');
+});
+
+test('node caseRef and evaluation pass through independently of semanticState/changeState (FIG-4/FIG-7)', () => {
+  const graph: LiveDependencyGraph = {
+    scope: 'FOCUSED_CASE',
+    nodes: [
+      { ref: 'subj', kind: 'TRAVELLER', label: 'Subject', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE', caseRef: 'case:1', evaluation: 'PENDING_REASSESSMENT' },
+      { ref: 'no-eval', kind: 'RECOVERY_PROPOSAL', label: 'Case node', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [],
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
+  };
+  const presented = presentDependencyGraph(graph);
+  const byRef = new Map(presented.nodes.map((node) => [node.ref, node]));
+  assert.equal(byRef.get('subj')?.caseRef, 'case:1');
+  assert.equal(byRef.get('subj')?.evaluationState, 'pending-reassessment');
+  assert.equal(byRef.get('subj')?.semanticState, 'HEALTHY', 'evaluation must never change semanticState');
+  assert.equal(byRef.get('no-eval')?.caseRef, undefined);
+  assert.equal(byRef.get('no-eval')?.evaluationState, 'not-supplied');
 });
 
 test('HEALTHY and RECOVERED stay distinguishable in the presentation model', () => {
@@ -146,7 +183,7 @@ test('HEALTHY and RECOVERED stay distinguishable in the presentation model', () 
       { ref: 'r', kind: 'SERVICE_BOOKING', label: 'R', semanticState: 'RECOVERED', authority: 'AUTHORITATIVE' },
     ],
     edges: [],
-    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
   };
   const [healthy, recovered] = presentDependencyGraph(graph).nodes;
   assert.notEqual(healthy?.semanticState, recovered?.semanticState);
@@ -162,10 +199,10 @@ test('UNKNOWN edge state and an omitted edge state remain distinct', () => {
       { ref: 'b', kind: 'TIMING', label: 'B', semanticState: 'UNKNOWN', authority: 'AUTHORITATIVE' },
     ],
     edges: [
-      { fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', semanticState: 'UNKNOWN' },
-      { fromRef: 'a', toRef: 'b', kind: 'RELIES_ON' },
+      { id: 'unknown-edge', fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', semanticState: 'UNKNOWN', authority: 'AUTHORITATIVE' },
+      { id: 'omitted-edge', fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', authority: 'AUTHORITATIVE' },
     ],
-    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
   };
   const [unknownEdge, omittedEdge] = presentDependencyGraph(graph).edges;
   assert.equal(unknownEdge?.semanticState, 'UNKNOWN');
@@ -175,11 +212,25 @@ test('UNKNOWN edge state and an omitted edge state remain distinct', () => {
   assert.ok(semanticEdge(omittedEdge!).includes('data-state="NOT_SUPPLIED"'));
 });
 
-test('edge renderKey is snapshot-local position, not a stable identity', () => {
+test('edge renderKey is the producer-owned stable id (FIG-1), not array position', () => {
   const presented = presentDependencyGraph(sampleGraph);
-  assert.deepEqual(presented.edges.map((edge) => edge.renderKey), [
-    'snapshot-edge-0', 'snapshot-edge-1', 'snapshot-edge-2',
-  ]);
+  assert.deepEqual(presented.edges.map((edge) => edge.renderKey), ['e1', 'e2', 'e3']);
+});
+
+test('duplicate edge ids are refused loudly', () => {
+  const dupeEdges: LiveDependencyGraph = {
+    scope: 'FOCUSED_CASE',
+    nodes: [
+      { ref: 'a', kind: 'SERVICE_BOOKING', label: 'A', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+      { ref: 'b', kind: 'SERVICE_BOOKING', label: 'B', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [
+      { id: 'dup', fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', authority: 'AUTHORITATIVE' },
+      { id: 'dup', fromRef: 'b', toRef: 'a', kind: 'RELIES_ON', authority: 'AUTHORITATIVE' },
+    ],
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
+  };
+  assert.throws(() => presentDependencyGraph(dupeEdges), /INVALID PRESENTATION CONTRACT/);
 });
 
 test('focus role is an explicit UI selection, not derived from topology', () => {
@@ -200,8 +251,8 @@ test('a dangling edge endpoint is refused', () => {
   const dangling = {
     scope: 'FOCUSED_CASE',
     nodes: [{ ref: 'a', kind: 'SERVICE_BOOKING', label: 'A', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' }],
-    edges: [{ fromRef: 'a', toRef: 'missing', kind: 'RELIES_ON' }],
-    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+    edges: [{ id: 'e1', fromRef: 'a', toRef: 'missing', kind: 'RELIES_ON', authority: 'AUTHORITATIVE' }],
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
   };
   assert.throws(() => presentDependencyGraph(dangling), /INVALID PRESENTATION CONTRACT/);
 });
@@ -214,7 +265,7 @@ test('duplicate node references are refused', () => {
       { ref: 'a', kind: 'TIMING', label: 'A again', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
     ],
     edges: [],
-    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
   };
   assert.throws(() => presentDependencyGraph(dupes), /ambiguous node references/);
 });
@@ -224,7 +275,7 @@ test('a schema-invalid state is refused as an unmapped/invalid contract', () => 
     scope: 'FOCUSED_CASE',
     nodes: [{ ref: 'a', kind: 'SERVICE_BOOKING', label: 'A', semanticState: 'NOPE', authority: 'AUTHORITATIVE' }],
     edges: [],
-    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' },
   };
   assert.throws(() => presentDependencyGraph(badState), /UNMAPPED SEMANTIC STATE \/ INVALID PRESENTATION CONTRACT/);
 });
@@ -247,8 +298,8 @@ test('semanticEdge emits relationship and truth/change dimensions', () => {
   const presented = presentDependencyGraph(sampleGraph);
   const html = semanticEdge(presented.edges[0]!);
   assert.ok(html.includes('data-relationship="PROPOSED_CHANGE"'));
-  assert.ok(html.includes('data-truth="unspecified"'));
-  assert.ok(html.includes('data-change="not-supplied"'));
+  assert.ok(html.includes('data-truth="current"'));
+  assert.ok(html.includes('data-change="not-marked"'));
 });
 
 test('hostile label text is escaped, never emitted as markup', () => {
@@ -259,7 +310,7 @@ test('hostile label text is escaped, never emitted as markup', () => {
       semanticState: 'HEALTHY' as const, authority: 'AUTHORITATIVE' as const,
     }],
     edges: [],
-    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' as const },
+    change: { projectionRevision: 0, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'UNKNOWN' as const },
   };
   const html = semanticNode(presentDependencyGraph(hostile).nodes[0]!);
   assert.ok(!html.includes('<img'), 'no live img tag may survive');
@@ -286,12 +337,16 @@ test('shipped fixtures pass the adapter directly (not silently caught)', () => {
 test('the Contract Lab document renders every discovered dimension and the loud refusals', () => {
   const doc = renderContractLabDocument(samples);
   assert.ok(doc.startsWith('<!doctype html>'));
-  for (const id of ['lab-states', 'lab-change', 'lab-truth', 'lab-focus', 'lab-relationships', 'lab-composed', 'lab-invalid']) {
+  for (const id of ['lab-states', 'lab-change', 'lab-truth', 'lab-focus', 'lab-relationships', 'lab-evaluation', 'lab-composed', 'lab-invalid']) {
     assert.ok(doc.includes(`id="${id}"`), `missing section ${id}`);
   }
   for (const state of LdgSemanticStateSchema.options) assert.ok(doc.includes(`data-state="${state}"`), `state ${state} not rendered`);
   for (const kind of LdgNodeKindSchema.options) assert.ok(doc.includes(`data-kind="${kind}"`), `node kind ${kind} not rendered`);
   for (const edgeKind of LdgEdgeKindSchema.options) assert.ok(doc.includes(`data-relationship="${edgeKind}"`), `edge kind ${edgeKind} not rendered`);
+  for (const status of AssessmentViewStatusSchema.options) {
+    assert.ok(doc.includes(`data-evaluation="${presentEvaluationState(status)}"`), `evaluation ${status} not rendered`);
+  }
+  assert.ok(doc.includes('data-evaluation="not-supplied"'), 'not-supplied evaluation state not rendered');
   // The deliberately invalid panels surface their refusal text.
   assert.ok(doc.includes('INVALID PRESENTATION CONTRACT'));
   assert.ok(doc.includes('UNMAPPED SEMANTIC STATE / INVALID PRESENTATION CONTRACT'));

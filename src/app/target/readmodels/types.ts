@@ -1,5 +1,6 @@
 import type {
   AssessmentTone,
+  AssessmentViewStatus,
   ChangeAwareness,
   LdgEdgeKind,
   LdgNodeKind,
@@ -11,6 +12,7 @@ import type {
 export interface ChangeAwarenessInput {
   projectionRevision: number;
   changedVisibleRefs: readonly string[];
+  changedEdgeIds: readonly string[];
   previousSemanticState?: LdgSemanticState;
   currentSemanticState: LdgSemanticState;
   now?: string;
@@ -24,14 +26,18 @@ export interface ProductNodeFact {
   label: string;
   semanticState: LdgSemanticState;
   authority?: 'AUTHORITATIVE' | 'PROPOSED';
+  caseRef?: string;
+  evaluation?: AssessmentViewStatus;
   detail?: string;
 }
 
 export interface ProductEdgeFact {
+  id: string;
   fromRef: string;
   toRef: string;
   kind: LdgEdgeKind;
   semanticState?: LdgSemanticState;
+  authority?: 'AUTHORITATIVE' | 'PROPOSED';
 }
 
 export interface LiveDependencyFacts {
@@ -57,6 +63,7 @@ export interface OperatorItemFact {
   recoveryActivity?: string;
   decisionRequired?: boolean;
   unresolvedUncertainty?: readonly string[];
+  evaluation?: AssessmentViewStatus;
 }
 
 export interface OperatorOverviewFacts extends ProductWorldFacts {
@@ -136,6 +143,13 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
   aggregateRecoveryCost?: { amount: string; currency: string };
   partialRecovery?: import('../../../contracts/v2/product/readModels.ts').PartialRecoveryView;
   duplicateBookingExposure?: readonly import('../../../contracts/v2/product/readModels.ts').DuplicateBookingExposureView[];
+  /**
+   * Internal only — never parsed into `RecoveryCaseView`. Each case subject's
+   * own tone/evaluation status, so callers building other projections (e.g.
+   * the overview) can reuse the CURRENT-assessment lookup already done here
+   * instead of re-querying (FIG-6/FIG-7).
+   */
+  subjectFacts?: readonly { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus }[];
 }
 
 export interface TravellerTripFacts extends ProductWorldFacts {

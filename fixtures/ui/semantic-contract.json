@@ -5,15 +5,15 @@
     "viability": "NOT_VIABLE",
     "graph": {
       "scope": "FOCUSED_CASE",
-      "change": { "projectionRevision": 1, "changedVisibleRefs": ["sample-booking"], "currentSemanticState": "FAILED" },
+      "change": { "projectionRevision": 1, "changedVisibleRefs": ["sample-booking"], "changedEdgeIds": [], "currentSemanticState": "FAILED" },
       "nodes": [
         { "ref": "sample-booking", "kind": "SERVICE_BOOKING", "label": "Replacement transport confirmed", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" },
         { "ref": "sample-arrival", "kind": "TIMING", "label": "Arrival misses required window", "semanticState": "FAILED", "authority": "AUTHORITATIVE", "detail": "Consequence supplied by fixture, not calculated by the browser." },
         { "ref": "sample-commitment", "kind": "PROGRAMME_COMMITMENT", "label": "Headline engagement cannot be met", "semanticState": "FAILED", "authority": "AUTHORITATIVE" }
       ],
       "edges": [
-        { "fromRef": "sample-booking", "toRef": "sample-arrival", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "HEALTHY" },
-        { "fromRef": "sample-arrival", "toRef": "sample-commitment", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "FAILED" }
+        { "id": "MUST_HAPPEN_BEFORE:sample-booking:sample-arrival", "fromRef": "sample-booking", "toRef": "sample-arrival", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" },
+        { "id": "MUST_HAPPEN_BEFORE:sample-arrival:sample-commitment", "fromRef": "sample-arrival", "toRef": "sample-commitment", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "FAILED", "authority": "AUTHORITATIVE" }
       ]
     },
     "focus": { "primaryRefs": ["sample-commitment"], "causalRefs": ["sample-arrival", "sample-booking"], "causalEdgeIndices": [0, 1] }
@@ -25,15 +25,15 @@
     "progression": "CONNECTION_SAFE",
     "graph": {
       "scope": "FOCUSED_CASE",
-      "change": { "projectionRevision": 1, "changedVisibleRefs": [], "currentSemanticState": "HEALTHY" },
+      "change": { "projectionRevision": 1, "changedVisibleRefs": [], "changedEdgeIds": [], "currentSemanticState": "HEALTHY" },
       "nodes": [
         { "ref": "sample-inbound", "kind": "SERVICE_BOOKING", "label": "Inbound transport leg", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" },
         { "ref": "sample-connection", "kind": "TIMING", "label": "Connection window", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" },
         { "ref": "sample-onward", "kind": "SERVICE_BOOKING", "label": "Downstream transport leg", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" }
       ],
       "edges": [
-        { "fromRef": "sample-inbound", "toRef": "sample-connection", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "HEALTHY" },
-        { "fromRef": "sample-connection", "toRef": "sample-onward", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "HEALTHY" }
+        { "id": "MUST_HAPPEN_BEFORE:sample-inbound:sample-connection", "fromRef": "sample-inbound", "toRef": "sample-connection", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" },
+        { "id": "MUST_HAPPEN_BEFORE:sample-connection:sample-onward", "fromRef": "sample-connection", "toRef": "sample-onward", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" }
       ]
     },
     "focus": { "primaryRefs": ["sample-connection"], "causalRefs": ["sample-inbound", "sample-onward"], "causalEdgeIndices": [0, 1] }
@@ -45,15 +45,15 @@
     "progression": "CONNECTION_AT_RISK",
     "graph": {
       "scope": "FOCUSED_CASE",
-      "change": { "projectionRevision": 1, "changedVisibleRefs": ["sample-inbound", "sample-connection"], "currentSemanticState": "AFFECTED" },
+      "change": { "projectionRevision": 1, "changedVisibleRefs": ["sample-inbound", "sample-connection"], "changedEdgeIds": ["MUST_HAPPEN_BEFORE:sample-inbound:sample-connection"], "currentSemanticState": "AFFECTED" },
       "nodes": [
         { "ref": "sample-inbound", "kind": "SERVICE_BOOKING", "label": "Inbound transport leg changed", "semanticState": "CHANGED", "authority": "AUTHORITATIVE" },
         { "ref": "sample-connection", "kind": "TIMING", "label": "Connection window affected", "semanticState": "AFFECTED", "authority": "AUTHORITATIVE" },
         { "ref": "sample-onward", "kind": "SERVICE_BOOKING", "label": "Downstream booking still confirmed", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" }
       ],
       "edges": [
-        { "fromRef": "sample-inbound", "toRef": "sample-connection", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "CHANGED" },
-        { "fromRef": "sample-connection", "toRef": "sample-onward", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "AFFECTED" }
+        { "id": "MUST_HAPPEN_BEFORE:sample-inbound:sample-connection", "fromRef": "sample-inbound", "toRef": "sample-connection", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "CHANGED", "authority": "AUTHORITATIVE" },
+        { "id": "MUST_HAPPEN_BEFORE:sample-connection:sample-onward", "fromRef": "sample-connection", "toRef": "sample-onward", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "AFFECTED", "authority": "AUTHORITATIVE" }
       ]
     },
     "focus": { "primaryRefs": ["sample-connection"], "causalRefs": ["sample-inbound", "sample-onward"], "causalEdgeIndices": [0, 1] }
@@ -65,15 +65,15 @@
     "progression": "CONNECTION_IMPOSSIBLE",
     "graph": {
       "scope": "FOCUSED_CASE",
-      "change": { "projectionRevision": 1, "changedVisibleRefs": ["sample-connection"], "currentSemanticState": "FAILED" },
+      "change": { "projectionRevision": 1, "changedVisibleRefs": ["sample-connection"], "changedEdgeIds": ["MUST_HAPPEN_BEFORE:sample-inbound:sample-connection", "MUST_HAPPEN_BEFORE:sample-connection:sample-onward"], "currentSemanticState": "FAILED" },
       "nodes": [
         { "ref": "sample-inbound", "kind": "SERVICE_BOOKING", "label": "Inbound transport leg changed", "semanticState": "CHANGED", "authority": "AUTHORITATIVE" },
         { "ref": "sample-connection", "kind": "TIMING", "label": "Connection cannot be made", "semanticState": "FAILED", "authority": "AUTHORITATIVE" },
         { "ref": "sample-onward", "kind": "SERVICE_BOOKING", "label": "Downstream booking still confirmed", "semanticState": "HEALTHY", "authority": "AUTHORITATIVE" }
       ],
       "edges": [
-        { "fromRef": "sample-inbound", "toRef": "sample-connection", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "FAILED" },
-        { "fromRef": "sample-connection", "toRef": "sample-onward", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "FAILED" }
+        { "id": "MUST_HAPPEN_BEFORE:sample-inbound:sample-connection", "fromRef": "sample-inbound", "toRef": "sample-connection", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "FAILED", "authority": "AUTHORITATIVE" },
+        { "id": "MUST_HAPPEN_BEFORE:sample-connection:sample-onward", "fromRef": "sample-connection", "toRef": "sample-onward", "kind": "MUST_HAPPEN_BEFORE", "semanticState": "FAILED", "authority": "AUTHORITATIVE" }
       ]
     },
     "focus": { "primaryRefs": ["sample-connection"], "causalRefs": ["sample-inbound", "sample-onward"], "causalEdgeIndices": [0, 1] }
@@ -84,7 +84,7 @@
     "viability": "UNKNOWN",
     "graph": {
       "scope": "FOCUSED_CASE",
-      "change": { "projectionRevision": 0, "changedVisibleRefs": [], "currentSemanticState": "UNKNOWN" },
+      "change": { "projectionRevision": 0, "changedVisibleRefs": [], "changedEdgeIds": [], "currentSemanticState": "UNKNOWN" },
       "nodes": [], "edges": []
     },
     "focus": {}

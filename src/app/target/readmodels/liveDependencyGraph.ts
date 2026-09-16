@@ -17,14 +17,18 @@ export function projectLiveDependencyGraph(input: LiveDependencyGraphInput): Liv
     label: node.label,
     semanticState: node.semanticState,
     authority: node.authority ?? 'AUTHORITATIVE',
+    ...(node.caseRef ? { caseRef: node.caseRef } : {}),
+    ...(node.evaluation ? { evaluation: node.evaluation } : {}),
     ...(node.detail ? { detail: node.detail } : {}),
   }));
   const edges = input.edges
     .filter((edge) => nodeRefs.has(edge.fromRef) && nodeRefs.has(edge.toRef))
     .map((edge) => ({
+      id: edge.id,
       fromRef: edge.fromRef,
       toRef: edge.toRef,
       kind: edge.kind,
+      authority: edge.authority ?? 'AUTHORITATIVE',
       ...(edge.semanticState ? { semanticState: edge.semanticState } : {}),
     }));
 

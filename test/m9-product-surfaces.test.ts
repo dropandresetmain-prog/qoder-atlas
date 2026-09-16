@@ -23,6 +23,7 @@ const generatedAt = '2031-09-15T08:00:00.000Z';
 const changeAwareness = {
   projectionRevision: 1,
   changedVisibleRefs: ['item-1'],
+  changedEdgeIds: [],
   currentSemanticState: 'AFFECTED' as const,
 };
 
