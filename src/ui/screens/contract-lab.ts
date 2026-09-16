@@ -16,7 +16,7 @@
 import { escapeHtml } from '../html.ts';
 import { THEME_CSS } from '../theme.ts';
 import {
-  presentAssessment, presentConnection, presentDependencyGraph, presentEvaluationState,
+  presentAssessment, presentConnection, presentDependencyGraph,
   presentOperationalStatus, presentViability,
 } from '../semantics/adapter.ts';
 import { semanticBadge, semanticContractError, semanticEdge, semanticNode } from '../semantics/components.ts';

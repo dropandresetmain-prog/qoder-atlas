@@ -138,12 +138,14 @@ describe('M9 Jordan S2 read-model compatibility (CK1 audit)', () => {
         change: {
           projectionRevision: 1,
           changedVisibleRefs: [],
+          changedEdgeIds: [],
           currentSemanticState: 'AFFECTED',
         },
       },
       change: {
         projectionRevision: 1,
         changedVisibleRefs: ['stay:replacement'],
+        changedEdgeIds: [],
         currentSemanticState: 'AFFECTED',
       },
     });
@@ -204,12 +206,14 @@ describe('M9 Jordan S2 read-model compatibility (CK1 audit)', () => {
         change: {
           projectionRevision: 1,
           changedVisibleRefs: [],
+          changedEdgeIds: [],
           currentSemanticState: 'AFFECTED',
         },
       },
       change: {
         projectionRevision: 1,
         changedVisibleRefs: ['booking:replacement'],
+        changedEdgeIds: [],
         previousSemanticState: 'FAILED',
         currentSemanticState: 'AFFECTED',
       },
@@ -231,6 +235,7 @@ describe('M9 Jordan S2 read-model compatibility (CK1 audit)', () => {
       change: {
         projectionRevision: 2,
         changedVisibleRefs: ['connection'],
+        changedEdgeIds: [],
         previousSemanticState: 'AFFECTED',
         currentSemanticState: 'FAILED',
       },
@@ -278,9 +283,9 @@ describe('M9 Jordan S2 read-model compatibility (CK1 audit)', () => {
         scope: 'FOCUSED_CASE',
         nodes: [],
         edges: [],
-        change: { projectionRevision: 1, changedVisibleRefs: [], currentSemanticState: 'AFFECTED' },
+        change: { projectionRevision: 1, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'AFFECTED' },
       },
-      change: { projectionRevision: 1, changedVisibleRefs: [], currentSemanticState: 'AFFECTED' },
+      change: { projectionRevision: 1, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'AFFECTED' },
     });
     assert.equal(view.recoveryActions.length, 1);
     assert.equal(view.connectionProgression, 'EXECUTING_COORDINATED_RECOVERY');
