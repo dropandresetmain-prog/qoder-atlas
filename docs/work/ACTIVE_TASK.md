@@ -112,6 +112,74 @@ the single frontend boundary follow-through. Does not merge/depend on M10.
    6-step sequence, plus unit tests for edge-id uniqueness, revision monotonicity, adapter
    mappings and Contract Lab rendering.
 
+### Phase 2 checkpoint — all commits landed, FIG-3 design corrected during implementation
+
+Commits on `lane/wit-live-readmodel-contract` (base `fe09c52`):
+`61a7829` phase-1 plan, `837829e` FIG-3 migration 0121 (approved), `c4822f6` FIG-1/2/4/6/7,
+`e9e3c95` FIG-3 revision engine + migration 0122 + proof test, `a782179` doc updates.
+
+**FIG-3 design correction, found by the proof test itself.** The plan approved in the
+"FIG-3 revision design" section above (`GREATEST(aggregate_heads.revision, MAX(scope_generations.generation ...))`)
+had two bugs neither review caught until the pgtest exercised it:
+
+1. A first attempt at `projectionRevision` **summed** the case's `aggregate_heads.revision`
+   and every subject's small `EVALUATION_LIFECYCLE` `generation` counter (0121) into one
+   scalar. Sum is safe against ties for "did anything change" (strictly increases whenever
+   any component does), but `changedVisibleRefs` compared each subject's own small counter
+   (starting near 1) against that combined scalar (starting near 4) — a settled subject
+   still read `PENDING_REASSESSMENT` in the test because its own counter could never exceed
+   the much larger sum. Caught by
+   `postgres-integration/witLiveReadModelContract.pgtest.ts`'s "changed refs name exactly
+   the dependent subjects" assertion.
+2. Reverting to `MAX` (to keep the scale consistent) reintroduced the original tie hazard:
+   in the test, after the worker settled the first of two pending subjects, the second
+   subject's small `generation` counter caught up to (without exceeding) the first
+   subject's already-recorded max, so the real second settlement was invisible —
+   `revision must increase after step 1 (4 > 4)`.
+
+**Fix (migration 0122, same commit as the revision engine):** read `last_advanced_xact`
+(the `pg_current_xact_id()` xid8 stamp every `m6_bump_scope` call already writes, 0090)
+instead of the small `generation` counter, and route `RECOVERY_CASE`'s own presented-content
+changes through the same `EVALUATION_LIFECYCLE` scope family (new trigger on
+`recovery_cases`) instead of `aggregate_heads.revision`, so every component is on the same
+scale. xid8 is per-database, globally unique and strictly increasing, so `MAX` is safe (no
+two different real transactions ever tie) and a caller's `sinceRevision` compares correctly
+against every component. This did not require touching 0121 or re-approval — it reads an
+existing column the approved migration's own trigger machinery (0090's `m6_bump_scope`)
+already populated; 0122 only adds the `recovery_cases` trigger.
+
+**FIG-4 known limit (not closed).** `loadOperatorOverviewFacts` only lists items with an
+existing `recovery_cases` row, so no read model can render a subject's node before it is
+attached to a case. The proof test's step 5 could not literally exercise "no node before
+escalation, same ref after" for that reason; it instead asserts the ref-stability guarantee
+that *is* real — the failed subject's ref is identical to the baseline read and to the case
+graph's own ref, and it carries `caseRef` throughout. Flagged for a future lane; closing it
+would mean a new pre-case-membership read model (out of "smallest additive change" scope
+here) or opening the case earlier in the choreography (a product decision, not a read-model
+bug).
+
+**Verification run for this checkpoint:**
+- `npm run typecheck` — exit 0, after every edit in this lane.
+- Focused unit: `node --test test/ui-semantic-contract.test.ts test/m9-product-readmodels.test.ts
+  test/m9-product-surfaces.test.ts test/m9-checkpoint2-unit.test.ts
+  test/m9-jordan-partial-failure-acceptance.test.ts test/m9-vertical-loop.test.ts` — 47/47 pass.
+- Focused Postgres: `postgres-integration/migrate.pgtest.ts` (0121+0122 apply cleanly from
+  empty), all `postgres-integration/m9*.pgtest.ts` (23/23 pass) and
+  `postgres-integration/witLiveReadModelContract.pgtest.ts` (the required proof, passing) —
+  run together, 23/23 pass total, against a dedicated `witlivereadmodel` PGTEST_DB on the
+  shared `northstar-postgres-test` container (this worktree's own `db:postgres:up` hit a
+  container-name conflict with another worktree already using that container; reused it
+  directly per the memory note on shared containers across worktrees).
+- Full `npm test` / `npm run test:postgres`, `npm run lint`, `npm run build`,
+  `npm run gate:anti-hardcoding` — not yet run at this checkpoint; scheduled next before
+  push, per "Working rules" (full-suite runs reserved for one final pass).
+
+### Next action
+
+Run the final gates (full unit suite with pre-existing-failure baseline comparison, full
+`test:postgres`, lint, build, anti-hardcoding), scan added lines for persona/flight/airport
+literals, commit-if-clean, push, verify with `git ls-remote`, then write the final report.
+
 ## Independent review checkpoint (Opus, 2026-09-17)
 
 - Reviewed: `lane/wit-frontend-semantic-contract` @ `20b9b61c34f3f2d526dbe4e143aba6c8304adc9b`
