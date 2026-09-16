@@ -1,38 +1,34 @@
 /**
- * Application entrypoint — Checkpoint C composition.
+ * Application entrypoint — M10 PostgreSQL-target-only boot.
  *
- * Boots credential-free (REPLAY by default), composes the full runtime
- * (bootstrap seeding, recovery loop seams, read models, generic runtime
- * disruption/reset flow — see src/app/compose.ts), and serves it over HTTP.
- * No scenario-specific endpoints.
+ * Normal NORTHSTAR operation has exactly one runtime: the PostgreSQL target
+ * (`composeTargetBoot` -> `composeTargetApplication`/`composeTargetEndpoints`
+ * -> `targetHttpHandlers.ts`). Nothing this file imports, directly or
+ * transitively, touches SQLite — see `test/m10-runtime-purge.test.ts` for the
+ * structural check that keeps that true, not just this comment.
  *
- * Runtime note (M10): `composeAppRuntime` below is the LEGACY SQLite
- * composition — the frozen migration source per docs/AGENTS.md and the M10
- * migration decision matrix (docs/IMPLEMENTATION_PLAN.md §14/§16), not the
- * approved target architecture. The PostgreSQL target runtime
- * (`composeTargetApplication`/`/api/v2/*`) is composed alongside it, opt-in,
- * inside `composeAppRuntime` when `NORTHSTAR_ENABLE_TARGET_V2=1` — see the
- * comment there for why the default boot path isn't flipped yet (M11 owns
- * that controlled cutover).
+ * The legacy SQLite composition (`src/app/compose.ts`, `src/server/http.ts`)
+ * still exists for existing test harnesses and the M10 migration rehearsal
+ * (offline export reads legacy stores directly, never through a running
+ * server) — it is not imported here and is never reachable from a normal
+ * `npm run dev` / `npm start` boot.
  *
  * Railway: bind `PORT` on `0.0.0.0` as early as possible so platform health
- * checks succeed while composition/seeding is still running.
+ * checks succeed while composition is still running.
  */
 import { createServer, type Server } from 'node:http';
-import { loadConfig, type AppConfig } from './config/config.ts';
-import { kvGet, kvSet } from './persistence/database.ts';
-import { createAppServer } from './server/http.ts';
-import { composeAppRuntime } from './app/compose.ts';
-import { POPULATED_DEMO_BOOTSTRAP_VERSION } from './app/demoWorld.ts';
+import { loadConfig } from './config/config.ts';
+import { composeTargetBoot } from './app/composeTargetBoot.ts';
+import { createTargetAppServer } from './server/targetHttp.ts';
 
-function resolveListenPort(config: AppConfig): number {
+function resolveListenPort(configuredPort: number): number {
   // Host PORT must win on Railway; empty HTTP_PORT must never displace it.
   const raw = process.env.PORT?.trim() || process.env.HTTP_PORT?.trim();
   if (raw) {
     const parsed = Number(raw);
     if (Number.isInteger(parsed) && parsed > 0 && parsed <= 65535) return parsed;
   }
-  return config.httpPort;
+  return configuredPort;
 }
 
 async function listenEarlyHealth(port: number): Promise<Server> {
@@ -60,8 +56,10 @@ async function closeServer(server: Server): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const config = loadConfig();
-  const listenPort = resolveListenPort(config);
+  // `loadConfig` reads env only (zod parsing) — it never opens the SQLite
+  // path it happens to also resolve; that field is simply unused here.
+  const config = loadConfig(process.env);
+  const listenPort = resolveListenPort(config.httpPort);
 
   if (process.env.RAILWAY_ENVIRONMENT && !process.env.PORT?.trim()) {
     throw new Error(
@@ -76,70 +74,42 @@ async function main(): Promise<void> {
   );
 
   // Bind immediately so Railway healthchecks do not mark the deploy failed
-  // while compose/seed work is still in progress.
+  // while composition is still in progress.
   const early = await listenEarlyHealth(listenPort);
   console.log(`[atlas] early health listener ready on 0.0.0.0:${listenPort}`);
 
-  let composed: Awaited<ReturnType<typeof composeAppRuntime>>;
+  let boot: Awaited<ReturnType<typeof composeTargetBoot>>;
   try {
-    composed = await composeAppRuntime(config);
+    boot = await composeTargetBoot(process.env);
   } catch (error) {
     await closeServer(early).catch(() => undefined);
     throw error;
   }
 
-  for (const scenarioId of composed.seededScenarioIds) {
-    console.log(`[atlas] seeded scenario bundle ${scenarioId}`);
-  }
-  const plannerLabel =
-    composed.plannerMode === 'MODEL_STUDIO'
-      ? 'Model Studio (live)'
-      : composed.plannerMode === 'OPENROUTER'
-        ? 'OpenRouter (live)'
-        : 'deterministic fallback (credential-free)';
-  console.log(`[atlas] planner=${plannerLabel}`);
-
   await closeServer(early);
 
-  const server = createAppServer(config, composed.endpoints);
+  const server = createTargetAppServer(
+    { environment: boot.config.environment, workspaceId: boot.config.workspaceId },
+    boot.endpoints,
+  );
   server.on('error', (error) => {
     console.error('[atlas] failed to start HTTP server:', error);
-    composed.db.close();
-    process.exit(1);
+    void boot.close().finally(() => process.exit(1));
   });
   server.listen(listenPort, '0.0.0.0', () => {
     const address = server.address();
     const port = typeof address === 'object' && address !== null ? address.port : listenPort;
     const host = typeof address === 'object' && address !== null ? address.address : '0.0.0.0';
     console.log(
-      `[atlas] AI Trip Recovery Layer started env=${config.environment} mode=${config.adapterMode} ` +
-        `schema=v${kvGet(composed.db, 'schema_version')} http=http://${host}:${port}/operator`,
+      `[atlas] AI Trip Recovery Layer started env=${boot.config.environment} runtime=POSTGRES_TARGET ` +
+        `workspace=${boot.config.workspaceId} http=http://${host}:${port}/`,
     );
-
-    if (config.environment === 'demo' && composed.endpoints.demo?.resetPopulatedWorld) {
-      const caseRow = composed.db.prepare('SELECT COUNT(*) AS c FROM cases').get() as { c: number };
-      const bootstrapVersion = kvGet(composed.db, 'populated_demo_bootstrap_version');
-      const needsBootstrap =
-        caseRow.c === 0 || bootstrapVersion !== POPULATED_DEMO_BOOTSTRAP_VERSION;
-      if (needsBootstrap) {
-        const baseUrl = `http://127.0.0.1:${port}`;
-        void composed.endpoints.demo.resetPopulatedWorld(baseUrl).then((outcome) => {
-          if (outcome.status !== 200) {
-            console.warn('[atlas] populated demo world bootstrap failed:', outcome.body);
-          } else {
-            kvSet(composed.db, 'populated_demo_bootstrap_version', POPULATED_DEMO_BOOTSTRAP_VERSION);
-            console.log('[atlas] populated demo world bootstrapped for default Overview entry');
-          }
-        });
-      }
-    }
   });
 
   const shutdown = (signal: string): void => {
     console.log(`[atlas] received ${signal}, shutting down`);
     server.close(() => {
-      composed.db.close();
-      process.exit(0);
+      void boot.close().finally(() => process.exit(0));
     });
     // Hard exit if connections refuse to drain.
     setTimeout(() => process.exit(1), 3000).unref();

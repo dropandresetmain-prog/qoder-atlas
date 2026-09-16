@@ -24,6 +24,7 @@ import {
   type ProviderShapedDemoEvent,
   type TargetCommandContext,
 } from './applicationCommands.ts';
+import { seedDemoWorld } from './demoSeed.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
 import { renderProductRecoveryCase } from '../../ui/screens/product-recovery-case.ts';
 import { renderProductProgrammePreview } from '../../ui/screens/product-programme-preview.ts';
@@ -229,6 +230,16 @@ export async function handleTargetProductHttp(
       const body = (await readJson(req)) as ProviderShapedDemoEvent;
       const result = await acceptProviderShapedDemoEvent(commandCtx(ctx.app), body);
       sendJson(res, result.ok ? 202 : 400, result);
+      return true;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/demo/reset') {
+      try {
+        const result = await seedDemoWorld(ctx.app.pool, ctx.app.workspaceId, commandCtx(ctx.app).actorPrincipalId);
+        sendJson(res, 200, result);
+      } catch (error) {
+        sendJson(res, 500, { error: 'DEMO_SEED_FAILED', message: error instanceof Error ? error.message : String(error) });
+      }
       return true;
     }
 

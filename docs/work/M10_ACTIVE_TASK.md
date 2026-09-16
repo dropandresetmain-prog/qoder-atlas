@@ -18,17 +18,26 @@ candidate SHA plus a C5 cutover request. No production cutover in M10.
 
 ## Current phase
 
-Phase 0 (setup), Phase 1 (documented, scoped decision — see below), and
-Phase 2 (all four items closed with real PostgreSQL evidence) are done as
-of `ea15a3a`. Phases 3-10 (the actual migration rehearsal pipeline) are
-**not built** — see `docs/refactor/evidence/M10_MIGRATION_CONTRACT.md` for
-the frozen contract and concrete build plan for the next session. This is a
-genuine from-scratch build (confirmed by direct inventory: no exporter,
-importer, reconciliation tool, or backup/restore automation exists anywhere
-in the repo before this session), not something safely compressible into
-the remainder of this one without corner-cutting the project's own evidence
-standards (real PG persistence, typed commands, no hardcoding, comprehensive
-focused tests per AT23).
+**Correction (owner-directed, this pass):** the previous checkpoint's Phase 1
+scope decision ("did not flip the default boot path... actual cutover
+belongs to M11") was **wrong** and has been reversed. Runtime/code
+convergence — making PostgreSQL the sole runtime `npm run dev`/`npm start`
+can reach, with SQLite reduced to an explicit offline migration-only
+reader — is M10's job, not M11's. M11 deploys/activates the already-PG-only
+candidate and performs the controlled *data/authority* switch; it must not
+become the milestone where remaining application behaviour finally gets
+ported off SQLite. This correction is now in effect; do not reopen it
+without concrete contradictory evidence.
+
+Phase 0 (setup) and Phase 2 (all four items closed with real PostgreSQL
+evidence) are done. Phase 1 (runtime convergence) is **substantially
+underway but not complete**: the boot/composition boundary is now
+PostgreSQL-only and structurally proven (see below), but several real
+product capabilities (programme import/upload, demo reset/bootstrap, event
+ingestion, and the full legacy read-model/HTML surface) do not yet have
+target-runtime equivalents — see the disposition table below. Phases 3-10
+(the migration rehearsal pipeline) remain **not built** — see
+`docs/refactor/evidence/M10_MIGRATION_CONTRACT.md`.
 
 ## Checklist
 
@@ -41,27 +50,69 @@ focused tests per AT23).
 - [ ] Read current CI/acceptance scripts
 
 ### Phase 1 — Runtime convergence
-- [x] Inventory: legacy writer/worker/entrypoint/reset-tool surface — complete (see "Legacy writer inventory" below).
-- [x] Audit: no target path calls SQLite — **confirmed true**. Exhaustive grep of `src/app/target/**` and `src/persistence/postgres/**` for any legacy-store import returns zero hits (one doc-comment mention only). `composeTargetApplication`'s `sqliteAuthoritativeFallback: false` is a static literal, only read by the `/api/v2/health` response body, not a control-flow branch.
-- [x] `src/main.ts`/`src/app/compose.ts` doc comments updated to state plainly which composition is legacy (frozen migration source) and which is the forward target runtime, and why.
-- [ ] **Not done, deliberately: did not rewire the default boot path.** `composeAppRuntime` (legacy SQLite) remains the unconditional default for `npm run dev`/`npm start`; the target runtime stays opt-in behind `NORTHSTAR_ENABLE_TARGET_V2=1`. Reason: the target `/api/v2/*` HTTP surface (`targetHttpHandlers.ts`) does not have parity with the legacy surface — programme import/upload, demo reset, event ingestion, and several other legacy-only routes have no target-runtime equivalent yet (see legacy writer inventory below). Flipping the default now would silently break existing demo/product functionality, not just rename something. `docs/IMPLEMENTATION_PLAN.md` §15 assigns the actual "target becomes sole authoritative runtime" switch to **M11**, not M10 — M10's own §14 language ("construct a target candidate without legacy runtime writes") is about the final candidate configuration, which `NORTHSTAR_ENABLE_TARGET_V2=1` already achieves, not the whole milestone's default dev-boot behavior. Flagging this as a judgment call the user/reviewer may want to weigh in on if the M10 task's intent was actually the more aggressive reading.
-- [ ] Forward test suite default (`npm test` vs `npm run test:postgres`) — not resolved, same parity blocker as above.
 
-#### Legacy writer inventory (Phase 8 input, produced now)
+- [x] Exhaustive SQLite-reachability inventory — **reads and writes both**,
+  not just writes (the first pass only covered writes; corrected). Confirmed:
+  `npm run dev`/`npm start` could not structurally boot without SQLite before
+  this pass (no config path to skip `openDatabase`), 23+ `src/app/**` files
+  reachable from `composeAppRuntime` touch SQLite reads/writes, and no
+  differential/dual-read/dual-write compatibility adapter exists anywhere
+  (confirmed clean). No offline exporter exists yet (confirms the migration
+  contract's finding).
+- [x] **Boot/composition boundary is now PostgreSQL-only.** New composition
+  root `src/app/composeTargetBoot.ts` (zero SQLite imports, wires
+  `composeTargetEndpoints` + a real M6-evaluator-backed reassessment pipeline
+  — `captureWorld`/`createM6Registry`/`assessSubject`, the same pipeline
+  `m9SarahTargetE2E.pgtest.ts` proves against real PostgreSQL, not test-only
+  scaffolding). New minimal server `src/server/targetHttp.ts` (health, `/`
+  redirect to the target operator overview, static assets, delegates
+  everything else to `handleTargetProductHttp`). `src/main.ts` rewritten to
+  call only these — verified by live boot: `/health` and `/api/v2/health`
+  return 200, `/` redirects to `/api/v2/operator/overview?format=html`, and
+  the old `/operator` route now genuinely 404s (not silently stubbed).
+- [x] **Structural regression proof added** (not grep): `test/m10-runtime-purge.test.ts`
+  walks the *real* import graph from `src/main.ts` (parses actual
+  `import`/`export...from` specifiers, resolves relative paths, BFS) and
+  asserts a forbidden-module list (`persistence/{database,repositories,entityStore}.ts`,
+  the four app-owned SQLite stores, `compose.ts`, `runtime.ts`,
+  `engine/mutation.ts`, `server/http.ts`, any `node:sqlite` import) is
+  unreachable — verified this actually catches a violation by temporarily
+  reintroducing one and confirming the test fails, then reverting.
+  `postgres-integration/m10RuntimePurgeBoot.pgtest.ts` is the live
+  companion: boots `composeTargetBoot` end-to-end against real PostgreSQL
+  with `SQLITE_PATH` deliberately unset and asserts the full request cycle
+  works and the legacy route is gone.
+- [ ] **Still open — real product-capability gaps** confirmed by the
+  inventory, not yet closed (legacy SQLite composition still exists as a
+  *separate, non-default* module for these until ported): programme
+  import/upload, demo reset/bootstrap (no production-grade PG world-seeder
+  exists — Sarah/Jordan proofs seed via test-only harness helpers, not a
+  product-facing capability), event ingestion/dedup inbox, and the full
+  legacy read-model/HTML surface (`/operator`, `/decisions`, `/activity`,
+  `/programme`, `/traveller` and their `/api/*` JSON equivalents). See the
+  disposition table below. The target already has ITS OWN complete,
+  differently-shaped, already-proven product surface (`/api/v2/*` — operator
+  overview, case detail, incident/programme, traveller/trip, all with
+  HTML+JSON, via `pgFactAssembler.ts` + `src/ui/screens/product-*.ts`) —
+  these legacy routes are **RETIRE**, not 1:1-port, targets: recreating the
+  old aggregate-shaped dashboard against Postgres would violate "do not
+  recreate legacy aggregate behaviour inside PostgreSQL."
+- [ ] Forward test suite default (`npm test` vs `npm run test:postgres`) — not resolved.
 
-Every legacy-SQLite write path is exhaustively enumerated with file:line and
-a suggested M11-retirement disposition in the session transcript (produced
-via direct repo inventory). Summary: all writes funnel through 8 files
-(`src/persistence/{database,repositories,entityStore}.ts` +
-`src/app/{preferenceStore,dossierStore,fxStore,eventInboxStore}.ts`), reachable
-only via HTTP routes in `src/server/http.ts` (no CLI/worker/scheduled-job
-legacy write path exists — `PgReassessmentWorker` is the only worker and it
-is exclusively PostgreSQL). Two call sites in `src/engine/mutation.ts`
-bypass the repository classes and write raw SQL directly to
-`trips`/`entities`/`audit` — flagged separately since a PG port must
-replicate that transactional behavior, not just the repository interfaces.
-This inventory should be transcribed into a proper disposition table as the
-actual Phase 8 deliverable once Phases 3-7 land.
+#### SQLite reachability disposition table (Phase 8 input)
+
+| Capability | Disposition | Status |
+|---|---|---|
+| Boot/composition (`main.ts`/`compose.ts`) | PORT | **Done** — `composeTargetBoot.ts`/`targetHttp.ts` |
+| Operator dashboard, case detail, decisions, activity, programme view, traveller trip (GET routes + HTML) | RETIRE (superseded by target's own `/api/v2/*` product surface, not ported 1:1) | Target equivalents already exist and work (`pgFactAssembler.ts` + `product-*.ts` screens); legacy routes simply unmounted in the new default boot |
+| Runtime recovery lifecycle (`RuntimeOrchestrator.processDisruption/plan/begin/decide/execute`, `SqlMutationService`) | RETIRE (legacy aggregate model; superseded by the target's M6-M9 evaluate→strategy→plan→authority→execute→resolve pipeline, a different shape by design) | Not reachable from new boot |
+| `RuntimeOrchestrator.reset()` raw `DELETE FROM`/`sqlite_master` table-wipe | RETIRE outright — do not resurrect this pattern in Postgres | N/A |
+| Programme import/upload/promotion (`programme.ts`, `programmeHttp.ts`, `uploadIntakeHttp.ts`) | PORT | **Not started** — real product capability, needs new target-side intake using existing M2-M4 PG commands (`recordTraveller`, `createTrip`, `createJourney`, programme commands) |
+| Demo reset/bootstrap (`demoWorld.ts`, `bootstrap.ts`, `programmeSeed.ts`) | PORT (the seeding *concept*, not the SQLite table-wipe mechanics) | **Not started** — no production-grade PG world-seeder exists yet; next concrete step |
+| Event ingestion + dedup inbox (`eventIngestHttp.ts`, `eventInboxStore.ts`) | PORT | **Not started** — no target-side inbox/dedup table found; `applicationCommands.ts`'s `acceptProviderShapedDemoEvent` covers demo-event ingress only, not a general dedup inbox |
+| Preferences/booking-dossiers/FX evidence stores | PORT | **Not started** |
+| `main.ts`'s direct `kvGet`/`kvSet`/raw `db.prepare` calls | RETIRE | Done — removed, new `main.ts` has none of this |
+| `openDatabase`/repository **read** methods | MOVE TO OFFLINE MIGRATION TOOLING | Not built yet — Phase 3 (legacy exporter) owns this; must not be importable from `src/main.ts` or any `src/app/**`/`src/server/**` normal-execution file (structurally enforced by `test/m10-runtime-purge.test.ts` once the exporter exists — add its own module to the allowed-outside-the-graph list explicitly, never make it reachable from `main.ts`)
 
 ### Phase 2 — Close pre-M11 correctness debt
 - [x] ISSUER-POL: closed at command level. `issueAuthorityGrant` (`src/persistence/postgres/commands/peopleCommands.ts`) now enforces self-issuance rejection + issuer-must-hold-covering-`authority.grant.write`-grant unconditionally, inside the transaction, for every caller (not just the `grantIssuance.ts` facade, which now just builds the scope union and lets the command enforce policy). Added a separate `bootstrapIssueAuthorityGrant` export: requires `SYSTEM`-typed issuer + zero pre-existing `authority_grants` rows in the workspace (new `PgGovernanceRepository.countGrantsInWorkspace`), so it can only seed a workspace's very first grant, ever. `grantIssuance.ts`'s `provisionOrganiserAuthority` routes through it via a dedicated bootstrap-seed principal (never the organiser). Verified: `m9Checkpoint1.pgtest.ts` (ISSUER-POL self-mint/unauthorised/authorised-organiser scenarios), `m9SarahTargetE2E.pgtest.ts` (flagship C4 evidence, full run), `m8AuthorityExecution.pgtest.ts` (20/20), `m2People.pgtest.ts` (46/46), `m9SameProgrammeSequentialActions.pgtest.ts` (3/3) — all green against real PostgreSQL. Fixed ~9 test fixtures across these files that took the old self-issuance shortcut (see `bootstrapTestGrantIssuer` helper in `postgres-integration/m8ExecutionGateHelpers.ts`). Remaining files (`c3TargetedRemediation.pgtest.ts`, `m7m8SharedResourceBudgetCapability/IntegrationSeam/DagAndGenericity/CurrentnessAndReconciliation.pgtest.ts`) dispatched to a subagent using the same proven pattern — verify its result before considering this fully closed.
@@ -90,14 +141,14 @@ and acceptance criteria before implementing broad changes").
 
 ## Next action
 
-Start Phase 3 (legacy exporter) per the build plan in
-`docs/refactor/evidence/M10_MIGRATION_CONTRACT.md` §"Build plan for Phases
-3-10". First concrete step: `src/migration/legacyEvidence.ts` (the shared
-evidence-writing helper every subsequent command needs to cite), then
-`src/migration/legacyExporter.ts` against a small synthetic fixture DB. Do
-not start the importer until the Constraint-status archival destination
-decision (flagged as **open** in the contract) is made — building against
-`assessments` before that decision is finalized risks a rework.
+Continue Phase 1's remaining product-capability gaps in priority order:
+programme import/upload, then event ingestion/dedup inbox. Demo
+reset/bootstrap is done (`src/app/target/demoSeed.ts`, wired at
+`POST /api/v2/demo/reset`). Reuse the same pattern proven for the demo
+seeder: real PG commands, evidence-chain ordering (source → evidence citing
+an already-registered subject → dependent records), focused pgtest per
+seam. After Phase 1's named gaps close, start Phase 3 (legacy exporter) per
+`docs/refactor/evidence/M10_MIGRATION_CONTRACT.md`.
 
 ## Critical constraints
 
@@ -127,7 +178,7 @@ decision (flagged as **open** in the contract) is made — building against
 | STALE_BASE | Act Now (M10 scope) | Exemption keys on observed==head; needs same-plan-chain attribution proof |
 | EXPECTED-REV-FALLBACK | Act Now (M10 scope) | Remove `?? 1` fallback |
 | WAVE3R-AIT-HARVESTED-PNR | Investigate Now | M9 evidence: fails on unmodified pre-remediation SHA too, pre-existing/unrelated — confirm before M10 close |
-| RUNTIME-DEFAULT-SQLITE | Act Now (new, M10 Phase 1) | `src/main.ts` boots legacy SQLite (`composeAppRuntime`) by default; target PG path exists (`composeTargetApplication`) but isn't the default entrypoint |
+| RUNTIME-DEFAULT-SQLITE | **Closed** (M10 Phase 1) | `src/main.ts` now boots only `composeTargetBoot` (PostgreSQL-only); structurally proven by `test/m10-runtime-purge.test.ts` + `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`. Remaining product-capability gaps (programme intake, event ingestion) tracked separately in the Phase 1 disposition table, not this line. |
 | ORG-INHERIT | Park for Later (carried) | Exact grant match only |
 | FABLE-POLISH | Park for Later (carried) | Visual refinement only |
 | PG-ASSESS-SERIAL | Accept Risk (carried) | concurrency=1 + retry |
