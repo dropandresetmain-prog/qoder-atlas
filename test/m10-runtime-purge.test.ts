@@ -30,6 +30,13 @@ const FORBIDDEN_MODULES = [
   resolve(ROOT, 'src/app/runtime.ts'),
   resolve(ROOT, 'src/engine/mutation.ts'),
   resolve(ROOT, 'src/server/http.ts'),
+  // M10 Phase 3: the offline migration reader/exporter. SQLite survives only
+  // as read-only migration input, so the migration path must stay
+  // unreachable from normal runtime composition — importing the exporter
+  // into the product would reintroduce SQLite as a runtime by the back door.
+  resolve(ROOT, 'src/migration/legacySqliteSource.ts'),
+  resolve(ROOT, 'src/migration/legacyCategories.ts'),
+  resolve(ROOT, 'src/migration/legacyExporter.ts'),
 ];
 
 const IMPORT_SPECIFIER_RE = /(?:import|export)\s[^;]*?\sfrom\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;

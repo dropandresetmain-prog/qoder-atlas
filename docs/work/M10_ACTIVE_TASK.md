@@ -127,6 +127,25 @@ remain **not built** — see `docs/refactor/evidence/M10_MIGRATION_CONTRACT.md`.
 ### Phase 3 — Legacy export (offline, read-only)
 - [ ] Build exporter; no provider dispatch; deterministic/resumable
 
+**Contract correction (this pass, verified by probe):** the migration
+contract's build plan said to read the legacy DB "over
+`SqliteTripRepository`/`SqliteEntityStore`/`SqliteSourceRepository`
+(already safe to call)". That is wrong on two counts and is superseded:
+1. Obtaining a handle for those repositories means calling `openDatabase`,
+   which **writes** — `PRAGMA journal_mode = WAL`, the full `CREATE TABLE IF
+   NOT EXISTS` DDL, and a `schema_meta` upsert. That violates "zero SQLite
+   writes" on the frozen source before a single row is read.
+2. Those repositories zod-re-parse every row, so one corrupt legacy row
+   aborts the whole export instead of becoming a quarantine candidate.
+
+The exporter therefore opens the source with `new DatabaseSync(path,
+{ readOnly: true })` and reads raw rows. Probed on Node v24.15.0: reads
+succeed, and both `INSERT` and `PRAGMA journal_mode = WAL` fail with
+`attempt to write a readonly database` — SQLite itself enforces the
+read-only boundary, rather than us promising not to write. Unparseable
+payloads are preserved verbatim and marked, never dropped and never
+guessed.
+
 ### Phase 4 — Staging importer
 - [ ] Idempotent by dataset+source identity; typed conflicts; no silent overwrite
 
