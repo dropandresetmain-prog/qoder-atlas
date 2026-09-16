@@ -32,6 +32,7 @@ import {
 } from '../src/migration/legacyImporter.ts';
 import { readMigrationRun } from '../src/migration/migrationRunStore.ts';
 import { recomputeMigratedState } from '../src/migration/recomputeMigratedState.ts';
+import { reconcileMigration, renderReconciliationReport } from '../src/migration/reconcileMigration.ts';
 import { currentAssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 
 const CUTOFF = '2026-03-01T00:00:00Z';
@@ -612,6 +613,75 @@ test('Phase 5: every deployed category lands as real state, archived history or 
 
   // --- Nothing was silently skipped ---
   assert.equal(run.progress.recordsDeferred, 0, 'every exported category has a handler');
+});
+
+test('Phase 5: reconciliation answers semantic questions and owns every exception', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+  const importStartedAt = NOW;
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  await recomputeMigratedState(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    runId: result.runId,
+    sourceDataset: DATASET,
+    now: NOW,
+  });
+
+  const report = await reconcileMigration(pool, {
+    workspaceId,
+    runId: result.runId,
+    bundle,
+    now: NOW,
+    importStartedAt,
+  });
+
+  const byId = new Map(report.checks.map((entry) => [entry.id, entry]));
+  const statusOf = (id: string) => byId.get(id)?.status;
+
+  // Nothing exported may disappear without a decision recorded about it.
+  assert.equal(statusOf('IDENTITY_ACCOUNTED'), 'PASS', byId.get('IDENTITY_ACCOUNTED')?.detail);
+  assert.equal(statusOf('JOURNEY_OWNERSHIP_PROVEN'), 'PASS');
+  assert.equal(statusOf('PROVIDER_REFS_PRESERVED'), 'PASS', byId.get('PROVIDER_REFS_PRESERVED')?.detail);
+  assert.equal(statusOf('EVIDENCE_LINEAGE_INTACT'), 'PASS', byId.get('EVIDENCE_LINEAGE_INTACT')?.detail);
+  assert.equal(statusOf('OBLIGATIONS_COMPLETE'), 'PASS', byId.get('OBLIGATIONS_COMPLETE')?.detail);
+  assert.equal(statusOf('UNCERTAINTY_PRESERVED'), 'PASS');
+  assert.equal(statusOf('MONEY_ACCOUNTED'), 'PASS', byId.get('MONEY_ACCOUNTED')?.detail);
+  assert.equal(statusOf('DERIVED_TRUTH_RECOMPUTED'), 'PASS', byId.get('DERIVED_TRUTH_RECOMPUTED')?.detail);
+  assert.equal(statusOf('NO_PROVIDER_DISPATCH'), 'PASS', 'migration performed no external action');
+  assert.equal(report.checks.filter((entry) => entry.status === 'FAIL').length, 0);
+
+  // Known outstanding work is owned rather than hidden, so the verdict is
+  // BLOCKED — the honest answer while a multi-traveller trip and an open case
+  // remain unresolved.
+  assert.equal(report.verdict, 'BLOCKED');
+  assert.ok(report.totals.cutoverBlocking > 0);
+  for (const entry of report.exceptions) {
+    assert.ok(entry.owner.length > 0, `${entry.classification} names an owner`);
+    assert.ok(entry.reason.length > 0);
+    assert.ok(entry.affectedScope.length > 0);
+    assert.ok(entry.safetyImpact.length > 0);
+  }
+
+  // Coverage is per category, and every category that exported anything has a
+  // decision reflected in the numbers.
+  const coverageFor = (categoryId: string) => report.coverage.find((entry) => entry.categoryId === categoryId);
+  assert.ok((coverageFor('TRIP')?.mapped ?? 0) >= 1);
+  assert.ok((coverageFor('SIGNAL')?.archived ?? 0) >= 1, 'signals are archived, not mapped as live state');
+  assert.equal(coverageFor('TRIP')?.decision, 'MIGRATE_THEN_RECONCILE');
+  assert.equal(coverageFor('RECOVERY_CASE')?.decision, 'ARCHIVE_AND_REGENERATE');
+
+  const markdown = renderReconciliationReport(report);
+  assert.match(markdown, /^# Migration reconciliation/);
+  assert.match(markdown, /\*\*Verdict: BLOCKED\.\*\*/);
+  assert.match(markdown, new RegExp(bundle.datasetHash));
+  assert.match(markdown, /QUARANTINED_MULTI_TRAVELLER_ALLOCATION/);
+  assert.match(markdown, /Blocks cutover:/);
 });
 
 test('AT23: re-importing the identical bundle is idempotent and duplicates nothing', async () => {

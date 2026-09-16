@@ -1,0 +1,208 @@
+{
+  "reconcilerVersion": "northstar-migration-reconciler/1.0.0",
+  "generatedAt": "2026-03-02T09:00:00Z",
+  "runId": "fcaafe52-7143-48ed-a8da-00c78b6d30df",
+  "sourceDataset": "legacy-deployment-m10-restore-rehearsal",
+  "datasetHash": "3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596",
+  "exporterVersion": "northstar-legacy-exporter/1.1.0",
+  "importerVersion": "northstar-legacy-importer/1.0.0",
+  "runStatus": "COMPLETED",
+  "totals": {
+    "exportedRecords": 11,
+    "mappedRecords": 11,
+    "exceptions": 1,
+    "cutoverBlocking": 1
+  },
+  "coverage": [
+    {
+      "categoryId": "ORGANISATION",
+      "decision": "MIGRATE_TRANSFORM",
+      "exported": 1,
+      "mapped": 1,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "TRAVELLER",
+      "decision": "MIGRATE_TRANSFORM",
+      "exported": 3,
+      "mapped": 3,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "PLACE",
+      "decision": "MIGRATE_TRANSFORM",
+      "exported": 2,
+      "mapped": 2,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "ANCHOR_EVENT",
+      "decision": "MIGRATE_TRANSFORM",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "RULE_SET",
+      "decision": "ARCHIVE_AND_REGENERATE",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "TRIP",
+      "decision": "MIGRATE_THEN_RECONCILE",
+      "exported": 2,
+      "mapped": 1,
+      "archived": 0,
+      "withExceptions": 1
+    },
+    {
+      "categoryId": "CONSTRAINT",
+      "decision": "TRANSFORM_AND_REASSESS",
+      "exported": 1,
+      "mapped": 1,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "RECOVERY_CASE",
+      "decision": "ARCHIVE_AND_REGENERATE",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "SIGNAL",
+      "decision": "ARCHIVE_AS_IMMUTABLE_HISTORY",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "SOURCE_RECORD",
+      "decision": "MIGRATE_TRANSFORM",
+      "exported": 1,
+      "mapped": 1,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "AUDIT_HISTORY",
+      "decision": "ARCHIVE_AS_IMMUTABLE_HISTORY",
+      "exported": 1,
+      "mapped": 0,
+      "archived": 1,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "BOOKING_DOSSIER",
+      "decision": "QUARANTINE_ARCHIVE_REPAIR_WITH_EVIDENCE",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "PREFERENCE",
+      "decision": "QUARANTINE_ARCHIVE_REPAIR_WITH_EVIDENCE",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "FX_RATE_EVIDENCE",
+      "decision": "ARCHIVE_AS_IMMUTABLE_HISTORY",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    },
+    {
+      "categoryId": "PROVIDER_EVENT_INBOX",
+      "decision": "ARCHIVE_AS_IMMUTABLE_HISTORY",
+      "exported": 0,
+      "mapped": 0,
+      "archived": 0,
+      "withExceptions": 0
+    }
+  ],
+  "checks": [
+    {
+      "id": "IDENTITY_ACCOUNTED",
+      "question": "Is every exported legacy record either represented in the target or named in an exception?",
+      "status": "PASS",
+      "detail": "all 11 exported records are accounted for"
+    },
+    {
+      "id": "JOURNEY_OWNERSHIP_PROVEN",
+      "question": "Does every migrated Journey name exactly one real traveller, with no allocation guessed?",
+      "status": "PASS",
+      "detail": "1 migrated journey(ies), 0 without a traveller. Trips whose element ownership was unprovable were quarantined rather than allocated: 1 case(s)."
+    },
+    {
+      "id": "PROVIDER_REFS_PRESERVED",
+      "question": "Did every provider booking reference survive, or get named as lost?",
+      "status": "PASS",
+      "detail": "1 legacy booking reference(s) in the bundle; 1 preserved as evidence against a migrated reservation; 1 element-level exception(s) account for the rest. Binding references as target external identity remains a documented open seam."
+    },
+    {
+      "id": "EVIDENCE_LINEAGE_INTACT",
+      "question": "Does every mapping point at a real evidence chain rather than a marker string?",
+      "status": "PASS",
+      "detail": "all 11 mappings cite an evidence record that exists"
+    },
+    {
+      "id": "OBLIGATIONS_COMPLETE",
+      "question": "Does every migrated booking actually record what was booked?",
+      "status": "PASS",
+      "detail": "1 reservation(s), 0 holding no line"
+    },
+    {
+      "id": "UNCERTAINTY_PRESERVED",
+      "question": "Did anything the old system did not know become certainty in the new one?",
+      "status": "PASS",
+      "detail": "0 reservation line(s) remain UNKNOWN; 0 uncertain external outcome(s) are explicitly preserved as unknown rather than resolved to failed or succeeded"
+    },
+    {
+      "id": "MONEY_ACCOUNTED",
+      "question": "Did any money-bearing state migrate, and if so does it carry evidence?",
+      "status": "PASS",
+      "detail": "no budget commitment migrated: the legacy dataset held no priced, held or settled commitment. 0 legacy FX observation(s) are archived as dated history and are never used as a current conversion rate."
+    },
+    {
+      "id": "DERIVED_TRUTH_RECOMPUTED",
+      "question": "Is current health/viability computed from migrated state rather than carried over?",
+      "status": "PASS",
+      "detail": "1/1 assessment(s) were evaluated after the import began; legacy verdicts are archived as LEGACY_CONSTRAINT_STATUS evidence and are not assessments"
+    },
+    {
+      "id": "NO_PROVIDER_DISPATCH",
+      "question": "Did the migration cause any external or money-moving action?",
+      "status": "PASS",
+      "detail": "no execution attempt exists in this workspace: the migration is provider-side-effect-free"
+    }
+  ],
+  "exceptions": [
+    {
+      "classification": "QUARANTINED_MULTI_TRAVELLER_ALLOCATION",
+      "categoryId": "TRIP",
+      "sourceType": "trips",
+      "sourceId": "trip-multi",
+      "reason": "legacy trip carries 2 travellers and 2 element(s); TripElement has no travellerId and Stay.guests is a bare headcount, so element -> Journey ownership cannot be proven from source evidence",
+      "affectedScope": "trip trip-multi, travellers [trav-multi-a, trav-multi-b], 2 element(s)",
+      "safetyImpact": "guessing allocation would attribute flights/stays to the wrong person, and recovery would act on the wrong traveller; source data is preserved unmigrated instead",
+      "owner": "migration owner",
+      "blocksCutover": true
+    }
+  ],
+  "verdict": "BLOCKED"
+}

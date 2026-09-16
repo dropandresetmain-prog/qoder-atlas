@@ -24,12 +24,13 @@
  * so the run is preserved as C5 evidence.
  *
  * Usage:
- *   node scripts/m10-backup-restore-rehearsal.mjs
+ *   node scripts/m10-cutover-and-restore-rehearsal.mjs
  *   $env:M10_KEEP_RESTORE_ENV = '1'   # leave the container+volume up afterwards
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { dirname } from 'node:path';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
@@ -68,10 +69,18 @@ const { runMigrations } = await import('../src/persistence/postgres/migrate.ts')
 const { exportLegacyDataset } = await import('../src/migration/legacyExporter.ts');
 const { importLegacyBundle } = await import('../src/migration/legacyImporter.ts');
 const { recomputeMigratedState } = await import('../src/migration/recomputeMigratedState.ts');
+const { reconcileMigration, renderReconciliationReport } = await import('../src/migration/reconcileMigration.ts');
 
 const MIGRATIONS_DIR = fileURLToPath(
   new URL('../src/persistence/postgres/migrations/', import.meta.url),
 );
+const RECONCILIATION_MD = fileURLToPath(
+  new URL('../docs/refactor/evidence/m10-reconciliation-report.md', import.meta.url),
+);
+const RECONCILIATION_JSON = fileURLToPath(
+  new URL('../docs/refactor/evidence/m10-reconciliation-report.json', import.meta.url),
+);
+
 const OUTPUT_FILE = fileURLToPath(
   new URL('../docs/refactor/evidence/m10-backup-restore-output.txt', import.meta.url),
 );
@@ -261,6 +270,19 @@ function buildLegacyFixture() {
   entity.run('TRAVELLER', 'trav-multi-a', JSON.stringify({ id: 'trav-multi-a', displayName: 'Fixture Traveller Two' }));
   entity.run('TRAVELLER', 'trav-multi-b', JSON.stringify({ id: 'trav-multi-b', displayName: 'Fixture Traveller Three' }));
 
+  // Zoned places, so the booked leg below has real endpoints and the
+  // reconciliation's provider/obligation checks are not vacuous.
+  entity.run(
+    'PLACE',
+    'place-depart',
+    JSON.stringify({ id: 'place-depart', name: 'Fixture Departure Airport', kind: 'AIRPORT', timezone: 'Europe/London' }),
+  );
+  entity.run(
+    'PLACE',
+    'place-arrive',
+    JSON.stringify({ id: 'place-arrive', name: 'Fixture Arrival Airport', kind: 'AIRPORT', timezone: 'Europe/Lisbon' }),
+  );
+
   // TEMPORAL + minBufferMinutes maps to a registered target constraint type, so
   // the migrated Journey has something for the real evaluator to assess.
   entity.run(
@@ -287,7 +309,26 @@ function buildLegacyFixture() {
       label: 'Single-traveller fixture trip',
       travellerIds: ['trav-single'],
       operatorOrganisationId: 'org-fixture',
-      elements: [{ id: 'el-single-arrival', kind: 'FLIGHT' }],
+      elements: [
+        {
+          id: 'el-single-arrival',
+          tripId: 'trip-single',
+          elementKind: 'TRANSPORT_LEG',
+          importance: 'CRITICAL',
+          flexibility: 'FIXED',
+          reservationState: 'CONFIRMED',
+          status: 'VALID',
+          data: {
+            mode: 'AIR',
+            originPlaceId: 'place-depart',
+            destinationPlaceId: 'place-arrive',
+            scheduledDeparture: { value: '2026-02-19T07:00:00Z' },
+            scheduledArrival: { value: '2026-02-19T09:30:00Z' },
+            bookingRef: { system: 'atlas', reference: 'FIXTURE-PNR-1' },
+            carrierRef: { system: 'iata', value: 'ZZ' },
+          },
+        },
+      ],
       updatedAt: '2026-02-10T10:00:00Z',
     }),
     '2026-02-10T10:00:00Z',
@@ -506,6 +547,56 @@ async function rehearse() {
     `recomputeMigratedState assessed ${recompute.journeySubjects.length} migrated Journey(s), ` +
       `${recompute.assessments.length} assessment(s); witness ${witnessAssessmentId}`,
   );
+
+  // --- 3b. reconcile: the cutover decision point ---------------------------
+  const report = await reconcileMigration(pool, {
+    workspaceId,
+    runId: imported.runId,
+    bundle,
+    now: IMPORT_NOW,
+    importStartedAt: IMPORT_NOW,
+  });
+  mkdirSync(dirname(RECONCILIATION_MD), { recursive: true });
+  writeFileSync(RECONCILIATION_MD, renderReconciliationReport(report), 'utf8');
+  writeFileSync(RECONCILIATION_JSON, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  say();
+  say(`reconcileMigration verdict ${report.verdict} (${report.reconcilerVersion})`);
+  for (const entry of report.checks) say(`  ${entry.status.padEnd(9)} ${entry.id}`);
+  say(`  report written to docs/refactor/evidence/m10-reconciliation-report.{md,json}`);
+
+  const failedChecks = report.checks.filter((entry) => entry.status === 'FAIL');
+  check(
+    'reconciliation_semantic_checks_pass',
+    failedChecks.length === 0,
+    failedChecks.length === 0
+      ? `${report.checks.length}/${report.checks.length} semantic checks passed`
+      : `failed: ${failedChecks.map((entry) => `${entry.id} (${entry.detail})`).join('; ')}`,
+  );
+
+  // A blocker is acceptable; an *unowned* blocker is not. The rehearsal's job
+  // is to prove that everything outstanding has a named owner and a stated
+  // safety impact, so the cutover decision is informed rather than hopeful.
+  const unowned = report.exceptions.filter(
+    (entry) => entry.owner.trim() === '' || entry.safetyImpact.trim() === '' || entry.affectedScope.trim() === '',
+  );
+  check(
+    'every_exception_is_owned',
+    unowned.length === 0,
+    unowned.length === 0
+      ? `${report.exceptions.length} exception(s), all carrying owner, scope and safety impact`
+      : `${unowned.length} exception(s) lack an owner, scope or safety impact`,
+  );
+
+  // --- 3c. activation blockers ----------------------------------------------
+  const activationBlockers = report.exceptions.filter((entry) => entry.blocksCutover);
+  say();
+  say(`activation blockers: ${activationBlockers.length}`);
+  for (const entry of activationBlockers) {
+    say(`  [${entry.classification}] ${entry.sourceType}/${entry.sourceId}`);
+    say(`      scope: ${entry.affectedScope}`);
+    say(`      owner: ${entry.owner}`);
+  }
+  if (activationBlockers.length === 0) say('  none — no scope is held back by an unresolved migration finding');
 
   const before = await snapshotMigratedState(pool, workspaceId, imported.runId);
   say();
