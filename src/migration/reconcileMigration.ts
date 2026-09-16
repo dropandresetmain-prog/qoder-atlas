@@ -78,26 +78,16 @@ async function scalar(pool: Pool, sql: string, params: unknown[]): Promise<numbe
 }
 
 /**
- * Findings that mean "this element was deliberately held back, so it has no
- * reservation line" — as distinct from "its line exists and reads UNKNOWN".
- *
- * Derived from the control flow of `migrateTripElements()`: every
- * classification here is emitted on a path that `continue`s before any line is
- * written. `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` is deliberately absent — it is
- * emitted only after a reservation *and* its line exist, so it asserts the
- * opposite of a hold-back and can never explain a missing row.
- */
-const FACT_SCOPED_HOLD_BACK_CLASSIFICATIONS: ReadonlySet<string> = new Set([
-  'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
-  'QUARANTINED_AMBIGUOUS_IDENTITY',
-  'TARGET_REJECTED_WRITE',
-]);
-
-/**
  * Findings that hold back an entire record, and so cover every uncertain
  * element hanging off it. Only honoured when the record itself never became
  * target state — otherwise a finding about one unnamed part of a migrated
  * record could stand in for a different part of it.
+ *
+ * A fact-scoped equivalent used to live here. It could not be correct: a
+ * classification says what went wrong, not how far the element got, and
+ * `TARGET_REJECTED_WRITE` is emitted both before and after a reservation line
+ * exists. Fact-level hold-backs are read from the importer's own
+ * `holdsBackReservationLine` declaration instead.
  */
 const RECORD_SCOPED_HOLD_BACK_CLASSIFICATIONS: ReadonlySet<string> = new Set([
   'QUARANTINED_MULTI_TRAVELLER_ALLOCATION',
@@ -279,8 +269,7 @@ export async function reconcileMigration(pool: Pool, request: ReconcileRequest):
   const factHoldBacks = new Set(
     run.reconciliationExceptions
       .filter(
-        (entry) =>
-          entry.factSourceId !== undefined && FACT_SCOPED_HOLD_BACK_CLASSIFICATIONS.has(entry.classification),
+        (entry) => entry.factSourceId !== undefined && entry.holdsBackReservationLine === true,
       )
       .map((entry) => `${entry.sourceType}/${entry.sourceId}|${entry.factSourceId}`),
   );
@@ -353,7 +342,7 @@ export async function reconcileMigration(pool: Pool, request: ReconcileRequest):
         bound.length === 0
           ? 'no exception names this fact at all'
           : `its only bound exception(s) (${bound.map((entry) => entry.classification).join(', ')}) ` +
-            'say it migrated, not that it was held back';
+            `do not declare that they hold back this fact's reservation line`;
       const scope =
         recordHoldBacks.has(fact.recordKey) && !heldBackAsWholeRecord
           ? '; the record has an exception but the record itself migrated, so it covers one part of it, not this fact'
@@ -532,6 +521,11 @@ export function renderReconciliationReport(report: ReconciliationReport): string
         lines.push(
           `- **Fact scope:** \`${entry.factSourceId}\` — this finding is about that one fact, ` +
             'not about the record as a whole',
+        );
+        lines.push(
+          entry.holdsBackReservationLine === true
+            ? '- **Reservation line:** held back — this finding is why the fact has no reservation line'
+            : '- **Reservation line:** not claimed as held back — this finding says nothing about whether the fact has one',
         );
       }
       lines.push(`- **Reason:** ${entry.reason}`);

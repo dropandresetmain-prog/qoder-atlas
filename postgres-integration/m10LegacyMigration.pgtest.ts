@@ -16,6 +16,7 @@
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,6 +24,8 @@ import { join } from 'node:path';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed } from './m2Seed.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
+import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
+import { recordEvidence, recordSource } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 import { exportLegacyDataset } from '../src/migration/legacyExporter.ts';
 import { bundleRecordsInReplayOrder } from '../src/migration/legacyExportBundle.ts';
 import {
@@ -1319,7 +1322,7 @@ test('C5 remediation 3: an absent uncertain line fails even while its own PRESER
   assert.match(failing.detail, new RegExp(lineId), 'and the exact target row that is gone');
   assert.match(
     failing.detail,
-    /PRESERVED_UNKNOWN_EXTERNAL_OUTCOME\) say it migrated, not that it was held back/,
+    /PRESERVED_UNKNOWN_EXTERNAL_OUTCOME\) do not declare that they hold back this fact's reservation line/,
     'and spells out why the bound exception is the wrong kind of answer',
   );
   assert.equal(after.verdict, 'BLOCKED');
@@ -1352,9 +1355,10 @@ test('C5 remediation 3: a fact-scoped hold-back accounts for an absent line', as
   const run = await readMigrationRun(pool, result.runId);
   const bound = run.reconciliationExceptions.filter((entry) => entry.factSourceId === 'trip-solo:el-solo-ghostleg');
   assert.deepEqual(
-    bound.map((entry) => entry.classification),
-    ['QUARANTINED_AMBIGUOUS_IDENTITY'],
-    'and that fact carries its own reason for having no row',
+    bound.map((entry) => [entry.classification, entry.holdsBackReservationLine]),
+    [['QUARANTINED_AMBIGUOUS_IDENTITY', true]],
+    'and that fact carries its own reason for having no row, read back from the run row with its ' +
+      'hold-back declaration intact — the declaration, not the classification, is what reconciles',
   );
 
   const report = await reconcileMigration(pool, {
@@ -1407,5 +1411,124 @@ test('C5 remediation 3: a sibling element hold-back cannot mask a different miss
   const [, lost = ''] = failing.detail.split('lost their preserved uncertainty:');
   assert.match(lost, /el-solo-stay/);
   assert.doesNotMatch(lost, /el-solo-ghostleg/, 'the accounted-for sibling is not reported as a loss');
+  assert.equal(after.verdict, 'BLOCKED');
+});
+
+// ---------------------------------------------------------------------------
+// C5 remediation 4 — a post-line rejection is not proof the line was held back
+//
+// `TARGET_REJECTED_WRITE` sits in the same classification vocabulary whether
+// the rejected write was the reservation line or an archival attached after the
+// line had already been written. Only the first can explain an absent row, so
+// the reconciler may not read the disposition off the classification. This is
+// the exact false PASS the C5 re-review found, exercised through the real
+// handler path.
+// ---------------------------------------------------------------------------
+
+/**
+ * Take the evidence id the importer derives for one element's provider
+ * reference archival, so that archival is genuinely rejected by the target when
+ * the import reaches it. Nothing here writes a reconciliation exception.
+ */
+async function occupyArchivalEvidenceId(pool: Pool, workspaceId: string, actorId: string, evidenceId: string): Promise<void> {
+  const capture = await recordSource(new PgUnitOfWork(pool, workspaceId), {
+    workspaceId,
+    actorPrincipalId: actorId,
+    idempotencyKey: `c5r4-occupy-source:${evidenceId}`,
+    sourceId: randomUUID(),
+    sourceIdentity: 'c5-remediation-4:occupied-archival-id',
+    receivedAt: NOW,
+    contentHash: 'f'.repeat(64),
+    contentType: 'application/test',
+  });
+  if (!capture.ok) throw new Error(`fixture capture must succeed: ${capture.conflict.message}`);
+  const claim = await recordEvidence(new PgUnitOfWork(pool, workspaceId), {
+    workspaceId,
+    actorPrincipalId: actorId,
+    idempotencyKey: `c5r4-occupy-evidence:${evidenceId}`,
+    evidenceId,
+    // Deliberately neither a provider booking reference nor a provider event
+    // delivery, so no reference-preservation check can mistake it for one.
+    assertionType: 'C5_R4_ID_OCCUPIED_BY_FIXTURE',
+    observedAt: NOW,
+    schemaVersion: '1',
+    sourceIds: [capture.value.sourceId],
+    subjectRefs: [{ kind: 'SOURCE_RECORD', id: capture.value.sourceId }],
+    interpretationProvenance: 'fixture holding the id the importer derives for an element archival',
+  });
+  if (!claim.ok) throw new Error(`fixture claim must succeed: ${claim.conflict.message}`);
+}
+
+test('C5 remediation 4: a TARGET_REJECTED_WRITE raised after the line exists cannot excuse its absence', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+
+  // `el-solo-stay` is CHANGED and carries a booking reference, so the import
+  // writes its line and then archives that reference — the post-line step.
+  const archivalEvidenceId = migrationTargetId({
+    datasetHash: bundle.datasetHash,
+    sourceType: 'trips',
+    sourceId: 'trip-solo:el-solo-stay',
+    step: 'archive-evidence',
+  });
+  await occupyArchivalEvidenceId(pool, workspaceId, actorId, archivalEvidenceId);
+
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED', 'a rejected archival is a named finding, not a failed import');
+
+  const lineId = lineIdFor(bundle.datasetHash, 'trip-solo:el-solo-stay');
+  const line = await pool.query<{ observed_status: string }>(
+    'SELECT observed_status FROM reservation_lines WHERE workspace_id = $1 AND id = $2',
+    [workspaceId, lineId],
+  );
+  assert.deepEqual(
+    line.rows.map((row) => row.observed_status),
+    ['UNKNOWN'],
+    'the element migrated and its line exists and reads UNKNOWN, so this finding is post-line',
+  );
+
+  const run = await readMigrationRun(pool, result.runId);
+  const rejected = run.reconciliationExceptions.filter((entry) => entry.classification === 'TARGET_REJECTED_WRITE');
+  assert.deepEqual(
+    rejected.map((entry) => [entry.sourceType, entry.sourceId, entry.factSourceId, entry.holdsBackReservationLine]),
+    [['trips', 'trip-solo', 'trip-solo:el-solo-stay', undefined]],
+    'the rejection names exactly this fact and declines to claim the line was held back',
+  );
+  assert.match(
+    rejected[0]?.reason ?? '',
+    /target rejected LEGACY_PROVIDER_BOOKING_REF/,
+    'and it came from the archival attached after the line, not from a reservation write',
+  );
+
+  const reconcileArgs = { workspaceId, runId: result.runId, bundle, now: NOW, importStartedAt: NOW };
+  const whileLineExists = await reconcileMigration(pool, reconcileArgs);
+  assert.equal(
+    whileLineExists.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED')?.status,
+    'PASS',
+    'with the line in place the unknown is preserved on its own evidence',
+  );
+
+  await removeLine(pool, workspaceId, lineId);
+
+  const after = await reconcileMigration(pool, reconcileArgs);
+  const failing = after.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(failing);
+  assert.equal(
+    failing.status,
+    'FAIL',
+    'under the old classification allowlist this exact pair PASSed: same fact, same classification',
+  );
+  assert.match(failing.detail, /trip-solo#el-solo-stay/, 'the failure names the element that lost its unknown');
+  assert.match(failing.detail, new RegExp(lineId), 'and the reservation line it expected to find');
+  assert.match(
+    failing.detail,
+    /TARGET_REJECTED_WRITE.*do not declare that they hold back this fact's reservation line/,
+    'and says plainly that the bound rejection makes no hold-back claim',
+  );
   assert.equal(after.verdict, 'BLOCKED');
 });

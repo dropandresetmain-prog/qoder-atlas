@@ -55,38 +55,53 @@ single ping before the real server is up.
 | `target_database_destroyed_before_restore` | `legacy_id_map`/`migration_runs` are genuinely gone and `public` holds 0 tables, so the restore lands in an empty target |
 | `pg_restore_completed_without_error` | `pg_restore --exit-on-error` exited 0 |
 | `legacy_id_map_mappings_survive_identically` | every `(source_dataset, source_type, source_id, target_kind, target_id)` tuple is identical — the idempotency keys a re-import depends on |
-| `migration_run_identity_survives` | same run id, `dataset_hash`, exporter/importer versions, status, and a `reconciliation_exceptions` array of the same length whose *classification + fact binding* pairs are identical. The binding is compared because blocker 3 is a binding: an element-scoped finding is only traceable to its fact if `factSourceId` survives the restore. Record-level findings render as `(record-level)` so a binding dropped by the restore cannot compare equal to one that was never there |
+| `migration_run_identity_survives` | same run id, `dataset_hash`, exporter/importer versions, status, and a `reconciliation_exceptions` array of the same length whose *classification + fact binding + reservation-line disposition* triples are identical. The binding is compared because blocker 3 is a binding: an element-scoped finding is only traceable to its fact if `factSourceId` survives the restore. The disposition is compared because blocker 4 is a claim: `holdsBackReservationLine` says whether that finding explains the fact's **absent** reservation line, and a binding restored with its meaning stripped off would otherwise still compare equal. Record-level findings render as `(record-level)` and findings that make no claim as `#(no-line-claim)`, so neither a dropped binding nor a dropped disposition can masquerade as the real thing |
 | `imported_domain_state_row_counts_survive` | `organisations`, `travellers`, `trips`, `journeys`, `constraint_definitions`, `evidence_records`, `source_records` counts match pre-backup |
 | `recomputed_assessment_survives` | the `assessments` count matches and one specific recomputed assessment id is present |
 | `append_only_trigger_survives` | `pg_trigger` still carries `legacy_id_map_immutable` on `legacy_id_map`, so append-only enforcement is restored with the data, not just the rows |
 
 ## Observed result
 
-Run on branch `milestone-m10-migration-rehearsal` at the blocker-3 remediation candidate
-(`m10-candidate-c5-remediation-3`). Raw transcript: `m10-backup-restore-output.txt`.
+Run on branch `milestone-m10-migration-rehearsal` at the blocker-4 remediation candidate
+(`m10-candidate-c5-remediation-4`). Raw transcript: `m10-backup-restore-output.txt`. The previous
+candidate (`m10-candidate-c5-remediation-3`) failed C5 re-review and is recorded in
+`C5_REQUEST_PACKAGE.md` §12 Blocker 4; its rehearsal run `c06305bc-204c-4e81-985d-764fab26a5be` is
+superseded by the one below.
 
 | | |
 | --- | --- |
 | Dataset identity | `legacy-deployment-m10-restore-rehearsal` |
 | Dataset hash | `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d` |
-| Migration run | `c06305bc-204c-4e81-985d-764fab26a5be`, status `COMPLETED` |
+| Migration run | `9b6e6cb1-b3d7-42fb-b373-bd07c574b9a8`, status `COMPLETED` |
 | Tooling | exporter `1.1.0`, importer `1.0.0`, reconciler `1.0.0` |
 | Import outcome | imported 10, quarantined 1, deferred 0, exceptions 2 |
+| Reconciliation | 9/9 semantic checks PASS; report verdict `BLOCKED` solely because the accepted `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` blocks its own scope |
 | Pre-backup state | 11 `legacy_id_map` mappings; organisations 1, travellers 3, trips 1, journeys 1, constraint_definitions 1, evidence_records 5, source_records 2, assessments 1 |
 
-The hash and the pre-backup row counts are unchanged from the previous candidate: this fix renamed
-how an exception is scoped and changed how a missing line is judged, so it moved no fixture row and
-no migrated row.
+The hash and the pre-backup row counts are unchanged from the previous candidate: this fix changed
+the exception schema, which paths declare a hold-back, and how a missing line is judged, so it moved
+no fixture row and no migrated row. The run id is new because the import genuinely ran again.
 
 The organisation migrated with `default_currency_code = SGD`, mapped from the fixture's explicit
 legacy `homeCurrency` rather than defaulted — that is the C5 blocker-1 fix visible in the rehearsal.
 After the restore the two exceptions read
-`PRESERVED_UNKNOWN_EXTERNAL_OUTCOME=trip-single:el-single-return` and
-`QUARANTINED_MULTI_TRAVELLER_ALLOCATION=(record-level)`, so the element-level binding survives with
-its classification. The asymmetry is deliberate and is what blocker 3 is about: the `CHANGED`
-element's finding names one fact, while the multi-traveller quarantine is a finding about the whole
-trip and would be dishonest to stamp with an element identity the importer never examined. Only the
-second blocks cutover.
+`PRESERVED_UNKNOWN_EXTERNAL_OUTCOME=trip-single:el-single-return#(no-line-claim)` and
+`QUARANTINED_MULTI_TRAVELLER_ALLOCATION=(record-level)#(no-line-claim)`, so each element-level binding
+survives with its classification **and** its disposition. The asymmetry is deliberate: the `CHANGED`
+element's finding names one fact and says nothing about its line (the line exists, and that finding
+is evidence of it), while the multi-traveller quarantine is a finding about the whole trip and would
+be dishonest to stamp with an element identity the importer never examined. Only the second blocks
+cutover.
+
+**What this run does and does not prove about the disposition.** Every fact-bound finding this
+fixture produces is either a preserved `UNKNOWN` or a record-level quarantine, so both render
+`#(no-line-claim)` and the rehearsal never writes a `true` disposition — by construction, because the
+canonical fixture contains no element held back before its line. What the rehearsal proves is that
+the compared key now includes the disposition, so a finding that gained or lost one across the dump
+would fail `migration_run_identity_survives`. That a `true` disposition is stored and read back
+intact through JSONB is proven where such a path exists: the migration pgtest asserts
+`holdsBackReservationLine === true` on the exception returned by `readMigrationRun`, not merely on
+the object the importer handed back.
 
 ```
 VERDICT: PASS — 10/10 checks passed; migrated target state survived backup, destruction and restore

@@ -448,10 +448,15 @@ async function snapshotMigratedState(pool, workspaceId, runId) {
       classifications: exceptions.map((entry) => entry.classification).sort(),
       // An exception that accounts for one element is only useful if that binding
       // survives the restore too — a classification alone cannot be traced back to
-      // the fact it names. Record-level findings render explicitly so a dropped
-      // binding cannot compare equal to an absent one.
+      // the fact it names, and the fact it names is not yet a claim about its
+      // reservation line. So the disposition travels with the binding, and an
+      // exception that makes no claim renders distinctly from one that lost it.
       factBindings: exceptions
-        .map((entry) => `${entry.classification}=${entry.factSourceId ?? '(record-level)'}`)
+        .map(
+          (entry) =>
+            `${entry.classification}=${entry.factSourceId ?? '(record-level)'}` +
+            `#${entry.holdsBackReservationLine === true ? 'holds-line-back' : '(no-line-claim)'}`,
+        )
         .sort(),
     },
     counts,

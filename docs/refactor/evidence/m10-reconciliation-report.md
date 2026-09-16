@@ -2,7 +2,7 @@
 
 **Verdict: BLOCKED.** 1 exception(s) block cutover for their scope. Cutover must not proceed for the affected scope until an owner resolves these.
 
-- Run `c06305bc-204c-4e81-985d-764fab26a5be` (COMPLETED), generated 2026-03-02T09:00:00Z
+- Run `9b6e6cb1-b3d7-42fb-b373-bd07c574b9a8` (COMPLETED), generated 2026-03-02T09:00:00Z
 - Dataset hash `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`
 - Exporter `northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`, reconciler `northstar-migration-reconciler/1.0.0`
 - 11 exported record(s), 11 mapping(s), 2 exception(s), 1 blocking cutover
@@ -60,6 +60,7 @@
 - **Blocks cutover:** no
 - **Owner:** operations owner
 - **Fact scope:** `trip-single:el-single-return` — this finding is about that one fact, not about the record as a whole
+- **Reservation line:** not claimed as held back — this finding says nothing about whether the fact has one
 - **Reason:** legacy element el-single-return stood at CHANGED — the supplier state was never reconciled by the legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED would assert something never observed, so it migrated as UNKNOWN
 - **Affected scope:** element el-single-return on trip trip-single, reservation d60b6843-2537-542b-844c-5af62cf77ce0
 - **Safety impact:** the real supplier state must be re-observed before anyone relies on this booking; until then the target correctly reports that it does not know

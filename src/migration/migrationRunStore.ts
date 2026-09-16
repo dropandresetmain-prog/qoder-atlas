@@ -126,6 +126,24 @@ export const MigrationReconciliationExceptionSchema = z.strictObject({
    * genuinely apply to a whole record, and free text is not an identity.
    */
   factSourceId: z.string().min(1).optional(),
+  /**
+   * The importer's declaration that this finding explains why the fact named by
+   * `factSourceId` has no reservation line: control flow stopped *before*
+   * `addReservationLine` was attempted, so the absent line is the expected
+   * shape of this record rather than a lost unknown.
+   *
+   * Written only by the element paths that hold the fact back, and read only by
+   * `UNCERTAINTY_PRESERVED`. Deliberately not derivable from `classification`:
+   * `TARGET_REJECTED_WRITE` is emitted both when a reservation write is
+   * rejected before any line exists and when an archival attached *after* a
+   * successfully written line fails. Only the first explains an absent line, so
+   * a classification-based allowlist turns the second into a false PASS.
+   *
+   * Absent means "this finding makes no claim about the line" — never "the line
+   * exists". A finding with no line to speak of (an unbound record-level
+   * quarantine, archived history) simply omits it.
+   */
+  holdsBackReservationLine: z.literal(true).optional(),
   reason: z.string().min(1),
   /** What is affected if this is never resolved — scope, not a row count. */
   affectedScope: z.string().min(1),

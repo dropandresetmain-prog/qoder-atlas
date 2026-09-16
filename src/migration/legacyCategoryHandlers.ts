@@ -756,6 +756,14 @@ export async function migrateTripElements(
     factSourceId: legacyTripElementSourceId(record.sourceId, elementId),
   });
 
+  // Naming the fact is not the same as explaining the missing line: a finding
+  // raised after the line was written is bound to the very same element. Only
+  // the paths below that give up before `addReservationLine` succeeds use this.
+  const heldBack = (elementId: string, exception: RecordException): RecordException => ({
+    ...forElement(elementId, exception),
+    holdsBackReservationLine: true,
+  });
+
   for (const raw of params.elements) {
     const element = asObject(raw);
     const elementId = str(element?.id);
@@ -797,7 +805,7 @@ export async function migrateTripElements(
 
     if (kind === 'ENGAGEMENT') {
       result.exceptions.push(
-        forElement(elementId, {
+        heldBack(elementId, {
           classification: 'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
           reason:
             `legacy ENGAGEMENT ${elementId} links this trip to an anchor commitment; the target expresses that as ` +
@@ -816,7 +824,7 @@ export async function migrateTripElements(
 
     if (kind !== 'TRANSPORT_LEG' && kind !== 'STAY') {
       result.exceptions.push(
-        forElement(elementId, {
+        heldBack(elementId, {
           classification: 'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
           reason: `legacy element ${elementId} has unrecognised kind "${kind ?? 'absent'}"`,
           affectedScope: `element ${elementId} on trip ${record.sourceId}`,
@@ -839,7 +847,7 @@ export async function migrateTripElements(
         legacyDestination === undefined ? undefined : await ctx.resolve('entities.PLACE', legacyDestination);
       if (origin === undefined || destination === undefined) {
         result.exceptions.push(
-          forElement(elementId, {
+          heldBack(elementId, {
             classification: 'QUARANTINED_AMBIGUOUS_IDENTITY',
             reason:
               `legacy transport leg ${elementId} runs ${legacyOrigin ?? 'unknown'} -> ${legacyDestination ?? 'unknown'}; ` +
@@ -878,7 +886,7 @@ export async function migrateTripElements(
       });
       if (!service.ok) {
         result.exceptions.push(
-          forElement(elementId, {
+          heldBack(elementId, {
             classification: 'TARGET_REJECTED_WRITE',
             reason: `target rejected TRANSPORT_SERVICE_CREATED for element ${elementId} — ${conflictText(service.conflict)}`,
             affectedScope: `element ${elementId} on trip ${record.sourceId}`,
@@ -908,7 +916,7 @@ export async function migrateTripElements(
     });
     if (!reservation.ok) {
       result.exceptions.push(
-        forElement(elementId, {
+        heldBack(elementId, {
           classification: 'TARGET_REJECTED_WRITE',
           reason: `target rejected RESERVATION_CREATED for element ${elementId} — ${conflictText(reservation.conflict)}`,
           affectedScope: `element ${elementId} on trip ${record.sourceId}`,
@@ -960,7 +968,7 @@ export async function migrateTripElements(
     });
     if (!line.ok) {
       result.exceptions.push(
-        forElement(elementId, {
+        heldBack(elementId, {
           classification: 'TARGET_REJECTED_WRITE',
           reason: `target rejected RESERVATION_LINE_ADDED for element ${elementId} — ${conflictText(line.conflict)}`,
           affectedScope: `element ${elementId} on trip ${record.sourceId}`,
@@ -988,6 +996,8 @@ export async function migrateTripElements(
           'resolution, which is a documented open seam, so it is not asserted as a correlated provider record',
       });
       if (!archived.ok && archived.outcome.kind === 'QUARANTINED') {
+        // Fact-bound but not hold-back-bound: the line was already written
+        // successfully, so a lost reference here cannot explain an absent line.
         result.exceptions.push(forElement(elementId, archived.outcome.exception));
       }
     }
