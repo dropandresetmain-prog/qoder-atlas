@@ -50,6 +50,23 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
+/**
+ * Defect-1: `?sinceCursor=<xid8>` opts a GET into the "changed since"
+ * comparison (see loadRecoveryCaseFacts/loadOperatorOverviewFacts) —
+ * replaces the old `sinceRevision` numeric-revision query param, which
+ * compared a transaction-start-ordered stamp with `>` and could permanently
+ * miss a change committed out of xid order (see
+ * docs/work/ACTIVE_TASK.md). Carried as an opaque string (never parsed as a
+ * JS number) so the underlying 64-bit xid8 cursor is never truncated.
+ * Omitted or empty is treated as a first read, never as "since cursor 0" — a
+ * caller that doesn't echo back a real prior `changeCursor` gets an honestly
+ * empty changed set, not a synthetic "everything changed".
+ */
+function parseSinceCursor(url: URL): string | undefined {
+  const raw = url.searchParams.get('sinceCursor');
+  return raw !== null && raw.length > 0 ? raw : undefined;
+}
+
 function sendHtml(res: ServerResponse, status: number, html: string): void {
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
@@ -94,7 +111,8 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'GET' && pathname === '/api/v2/operator/overview') {
-      const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId);
+      const sinceCursor = parseSinceCursor(url);
+      const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId, undefined, sinceCursor);
       const view = projectOperatorOverview(facts);
       if (url.searchParams.get('format') === 'html') {
         sendHtml(res, 200, renderProductOperatorOverview(view));
@@ -107,7 +125,8 @@ export async function handleTargetProductHttp(
     const caseMatch = pathname.match(/^\/api\/v2\/cases\/([^/]+)$/);
     if (req.method === 'GET' && caseMatch) {
       const caseId = decodeURIComponent(caseMatch[1]!);
-      const facts = await loadRecoveryCaseFacts(ctx.app.pool, ctx.app.workspaceId, caseId);
+      const sinceCursor = parseSinceCursor(url);
+      const facts = await loadRecoveryCaseFacts(ctx.app.pool, ctx.app.workspaceId, caseId, undefined, sinceCursor);
       if (!facts) {
         sendJson(res, 404, { error: 'CASE_NOT_FOUND' });
         return true;

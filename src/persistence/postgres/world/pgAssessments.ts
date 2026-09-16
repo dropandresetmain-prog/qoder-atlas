@@ -20,6 +20,7 @@ import type { SubjectKind, TypedRef } from '../../../domain/v2/shared/identity.t
 import type { Instant } from '../../../domain/v2/shared/time.ts';
 import { AssessmentResultSchema, type AssessmentKind, type AssessmentResult } from '../../../contracts/v2/assessment/assessmentManifest.ts';
 import type { WorldSnapshotManifest } from '../../../contracts/v2/scope/readScope.ts';
+import type { AssessmentViewStatus } from '../../../contracts/v2/product/readModels.ts';
 import { assessManifestCurrentness, type StalenessReason } from '../../../resolution/world/currentness.ts';
 import { PgCurrentStateReader } from './pgCurrentState.ts';
 
@@ -182,7 +183,7 @@ export async function loadAssessment(pool: Pool | PoolClient, workspaceId: strin
   });
 }
 
-export type AssessmentViewStatus = 'CURRENT' | 'STALE' | 'PENDING_REASSESSMENT' | 'UNAVAILABLE' | 'NONE';
+export type { AssessmentViewStatus };
 
 export interface AssessmentView {
   status: AssessmentViewStatus;

@@ -13,6 +13,7 @@ const graphFacts = {
   generatedAt,
   projectionRevision: 4,
   changedVisibleRefs: ['booking-1'],
+  changedEdgeIds: [] as const,
   previousSemanticState: 'HEALTHY' as const,
   currentSemanticState: 'AFFECTED' as const,
   changedAt: generatedAt,
@@ -21,7 +22,7 @@ const graphFacts = {
     { ref: 'incident-1', kind: 'DISRUPTION' as const, label: 'Service interruption', semanticState: 'AFFECTED' as const },
     { ref: 'booking-1', kind: 'SERVICE_BOOKING' as const, label: 'Transport booking', semanticState: 'AFFECTED' as const },
   ],
-  edges: [{ fromRef: 'booking-1', toRef: 'incident-1', kind: 'AFFECTED_BY' as const }],
+  edges: [{ id: 'booking-1->incident-1', fromRef: 'booking-1', toRef: 'incident-1', kind: 'AFFECTED_BY' as const }],
 };
 
 test('recovery case keeps booking health separate from trip failure', () => {

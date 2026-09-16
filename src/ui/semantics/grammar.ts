@@ -2,7 +2,7 @@ import {
   ICON_COMMITMENT, ICON_GROUND, ICON_IMPACT, ICON_PROVIDER,
   ICON_SEARCH, ICON_TIME, ICON_TRAVELLERS,
 } from '../icons.ts';
-import type { ChangeMarker, FocusRole, IconKind, SemanticIndicator, TruthMode, VisualTone } from './model.ts';
+import type { ChangeMarker, EvaluationState, FocusRole, IconKind, SemanticIndicator, TruthMode, VisualTone } from './model.ts';
 
 export const SEMANTIC_ICONS: Record<IconKind, string> = {
   signal: ICON_IMPACT, booking: ICON_PROVIDER, person: ICON_TRAVELLERS,
@@ -19,13 +19,18 @@ export const TONE_DOT_CLASS: Record<VisualTone, string> = {
   ok: 'd-ok', watch: 'd-watch', alert: 'd-bad', active: 'd-active', neutral: 'd-unconfirmed',
 };
 export const TRUTH_LABEL: Record<TruthMode, string> = {
-  current: 'Current · authoritative', proposed: 'Proposed · not committed', unspecified: 'Authority not supplied',
+  current: 'Current · authoritative', proposed: 'Proposed · not committed',
 };
 export const CHANGE_LABEL: Record<ChangeMarker, string> = {
-  marked: 'Marked changed', 'not-marked': 'Not marked changed', 'not-supplied': 'Change metadata not supplied',
+  marked: 'Marked changed', 'not-marked': 'Not marked changed',
 };
 export const FOCUS_LABEL: Record<FocusRole, string> = {
   primary: 'Primary focus', causal: 'Causal focus · UI selected', context: 'Context',
+};
+/** FIG-7: assessment lifecycle, an independent dimension — never a tone/state re-label. */
+export const EVALUATION_LABEL: Record<EvaluationState, string> = {
+  current: 'Evaluation current', stale: 'Evaluation stale', 'pending-reassessment': 'Under evaluation',
+  unavailable: 'Evaluation unavailable', none: 'Not yet evaluated', 'not-supplied': 'Evaluation not supplied',
 };
 
 export const SEMANTIC_CSS = `
@@ -45,7 +50,6 @@ export const SEMANTIC_CSS = `
   --sem-boundary: var(--watch); --sem-border-style: dashed;
   border-style: dashed; border-color: var(--watch);
 }
-.sem-edge[data-truth="unspecified"] { --sem-boundary: var(--neutral); --sem-border-style: dotted; }
 .sem-node[data-focus="primary"] { box-shadow: 0 0 0 2px var(--ink); }
 .sem-node[data-focus="causal"], .sem-edge[data-focus="causal"] { border-block-start-width: 3px; }
 .sem-node[data-focus="context"], .sem-edge[data-focus="context"] { background: var(--surface-2); }
@@ -65,6 +69,8 @@ export const SEMANTIC_CSS = `
 .sem-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; font-size: 11px; color: var(--neutral); }
 .sem-truth { font-size: 11px; color: var(--neutral); display: block; margin-top: 12px; }
 [data-truth="proposed"] > .sem-truth { color: var(--watch); font-weight: 650; }
+/* Plain text marker only (FIG-7) — amber/motion treatment is a design-lane decision, not made here. */
+.sem-evaluation { font-size: 11px; color: var(--neutral); display: block; margin-top: 4px; }
 .sem-connector { display: flex; align-items: center; gap: 10px; color: var(--sem-boundary); margin: 12px 0; }
 .sem-connector::before { content: ''; flex: 1; border-top: 2px var(--sem-border-style) var(--sem-boundary); }
 .sem-connector::after { content: '→'; font: 700 20px var(--font-mono); }

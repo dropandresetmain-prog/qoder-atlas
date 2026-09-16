@@ -117,6 +117,7 @@ describe('M9 Jordan connection progression + multi-stay unresolved', () => {
       generatedAt: '2031-09-01T00:00:00.000Z',
       projectionRevision: 3,
       changedVisibleRefs: ['act-dest-cancel'],
+      changedEdgeIds: [],
       currentSemanticState: 'AFFECTED',
       nodes: [],
       edges: [],

@@ -1,10 +1,10 @@
 import {
   LiveDependencyGraphSchema,
-  type AssessmentTone, type ConnectionProgression, type LdgEdgeKind, type LdgNode,
+  type AssessmentTone, type AssessmentViewStatus, type ConnectionProgression, type LdgEdgeKind, type LdgNode,
   type LdgNodeKind, type LdgSemanticState, type ProductOperationalStatus, type RemainderViability,
 } from '../../contracts/v2/product/readModels.ts';
 import type {
-  IconKind, PresentationFocus, PresentationGraph, PresentationNode, SemanticIndicator,
+  EvaluationState, IconKind, PresentationFocus, PresentationGraph, PresentationNode, SemanticIndicator,
 } from './model.ts';
 
 const indicator = (label: string, tone: SemanticIndicator['tone'], glyph: SemanticIndicator['glyph']): SemanticIndicator =>
@@ -69,6 +69,10 @@ const RELATIONSHIPS: Record<LdgEdgeKind, string> = {
 const AUTHORITY: Record<LdgNode['authority'], PresentationNode['truthMode']> = {
   AUTHORITATIVE: 'current', PROPOSED: 'proposed',
 };
+/** FIG-7: `AssessmentViewStatus` -> presentation-only `EvaluationState`; absence maps separately below. */
+const EVALUATION: Record<AssessmentViewStatus, Exclude<EvaluationState, 'not-supplied'>> = {
+  CURRENT: 'current', STALE: 'stale', PENDING_REASSESSMENT: 'pending-reassessment', UNAVAILABLE: 'unavailable', NONE: 'none',
+};
 
 function mapped<K extends string, V>(table: Record<K, V>, value: K): V {
   if (!Object.hasOwn(table, value)) throw new Error('UNMAPPED SEMANTIC STATE');
@@ -80,6 +84,8 @@ export const presentViability = (value: RemainderViability): SemanticIndicator =
 export const presentAssessment = (value: AssessmentTone): SemanticIndicator => ({ ...mapped(ASSESSMENTS, value) });
 export const presentOperationalStatus = (value: ProductOperationalStatus): SemanticIndicator => ({ ...mapped(OPERATIONAL, value) });
 export const presentConnection = (value: ConnectionProgression): SemanticIndicator => ({ ...mapped(CONNECTION, value) });
+export const presentEvaluationState = (value: AssessmentViewStatus | undefined): EvaluationState =>
+  value === undefined ? 'not-supplied' : mapped(EVALUATION, value);
 
 export function presentDependencyGraph(input: unknown, focus: PresentationFocus = {}): PresentationGraph {
   const parsed = LiveDependencyGraphSchema.safeParse(input);
@@ -91,6 +97,7 @@ export function presentDependencyGraph(input: unknown, focus: PresentationFocus 
     throw new Error('INVALID PRESENTATION CONTRACT: ambiguous node references');
   }
   const changedRefs = new Set(graph.change.changedVisibleRefs);
+  const changedEdgeIds = new Set(graph.change.changedEdgeIds);
   const primaryRefs = new Set(focus.primaryRefs);
   const causalRefs = new Set(focus.causalRefs);
   const causalEdges = new Set(focus.causalEdgeIndices);
@@ -106,17 +113,19 @@ export function presentDependencyGraph(input: unknown, focus: PresentationFocus 
         changeState: changedRefs.has(node.ref) ? 'marked' : 'not-marked',
         focusRole: primaryRefs.has(node.ref) ? 'primary' : causalRefs.has(node.ref) ? 'causal' : 'context',
         label: node.label, secondaryLabel: node.detail, iconKind: entity.icon,
+        evaluationState: presentEvaluationState(node.evaluation),
+        ...(node.caseRef ? { caseRef: node.caseRef } : {}),
       };
     }),
     edges: graph.edges.map((edge, index) => ({
-      renderKey: `snapshot-edge-${index}`,
+      renderKey: edge.id,
       sourceRef: edge.fromRef, targetRef: edge.toRef,
       sourceLabel: nodeByRef.get(edge.fromRef)!.label, targetLabel: nodeByRef.get(edge.toRef)!.label,
       relationshipKind: edge.kind, semanticState: edge.semanticState,
       indicator: edge.semanticState === undefined
         ? indicator('State not supplied', 'neutral', 'question') : presentGraphState(edge.semanticState),
-      truthMode: 'unspecified',
-      changeState: 'not-supplied',
+      truthMode: mapped(AUTHORITY, edge.authority),
+      changeState: changedEdgeIds.has(edge.id) ? 'marked' : 'not-marked',
       focusRole: causalEdges.has(index) ? 'causal' : 'context',
       label: mapped(RELATIONSHIPS, edge.kind),
     })),

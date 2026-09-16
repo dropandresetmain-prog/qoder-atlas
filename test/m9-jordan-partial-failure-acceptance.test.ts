@@ -285,6 +285,7 @@ test('Jordan fixture: replacement CONFIRMED + cancel FAILED → duplicate exposu
     generatedAt: AT,
     projectionRevision: 1,
     changedVisibleRefs: actions.map((a) => a.actionRef),
+    changedEdgeIds: [],
     currentSemanticState: 'AFFECTED',
     nodes: [],
     edges: [],

@@ -19,6 +19,22 @@ export type RemainderViability = z.infer<typeof RemainderViabilitySchema>;
 export const AssessmentToneSchema = z.enum(['PASS', 'FAIL', 'UNKNOWN']);
 export type AssessmentTone = z.infer<typeof AssessmentToneSchema>;
 
+/**
+ * Mirrors `AssessmentViewStatus` in
+ * `src/persistence/postgres/world/pgAssessments.ts` — the assessment
+ * lifecycle (never domain viability/health), shared here so the frontend
+ * boundary (`src/ui/**`, which must not import `src/persistence`) can present
+ * it without inventing its own copy (FIG-7).
+ */
+export const AssessmentViewStatusSchema = z.enum([
+  'CURRENT',
+  'STALE',
+  'PENDING_REASSESSMENT',
+  'UNAVAILABLE',
+  'NONE',
+]);
+export type AssessmentViewStatus = z.infer<typeof AssessmentViewStatusSchema>;
+
 export const LdgSemanticStateSchema = z.enum([
   'HEALTHY',
   'CHANGED',
@@ -54,11 +70,35 @@ export type LdgEdgeKind = z.infer<typeof LdgEdgeKindSchema>;
 /** Deterministic change-awareness metadata for truthful settle transitions. */
 export const ChangeAwarenessSchema = z.strictObject({
   projectionRevision: z.number().int().min(0),
+  /**
+   * Node refs the producer reports as changed since the caller's `sinceCursor`
+   * — an at-least-once hint for transition/emphasis, never an exact
+   * transactional diff. A ref already seen may be reported again; a ref that
+   * really changed is never silently omitted. Absence is not proof of
+   * unchanged: a client applies every complete snapshot it receives and reads
+   * a node's actual presented fields for truth.
+   */
   changedVisibleRefs: z.array(z.string().min(1)),
+  /** Edge ids (FIG-1) whose presented fields differ from the compared revision (FIG-2/3). */
+  changedEdgeIds: z.array(z.string().min(1)),
   previousSemanticState: LdgSemanticStateSchema.optional(),
   currentSemanticState: LdgSemanticStateSchema,
   changedAt: z.string().datetime({ offset: true }).optional(),
   changeSource: z.string().min(1).optional(),
+  /**
+   * Opaque at-least-once change cursor (xid8-derived), to be echoed back as
+   * `sinceCursor` on the next read. Present only on projections backed by the
+   * PostgreSQL snapshot-xmin mechanism (case/overview/incident-programme/
+   * dashboard); omitted on pure/count-based producers (cohort, traveller
+   * trip), which have no durable revision source to draw one from. Carried as
+   * a string so the 64-bit xid8 value is never coerced through a JS number.
+   * Equal `projectionRevision` values do NOT prove nothing changed, and
+   * neither does an empty changed set: a changed set compared against a
+   * previously returned `changeCursor` is an at-least-once hint, so a client
+   * applies every complete snapshot it receives and uses the changed set only
+   * to decide what to emphasise.
+   */
+  changeCursor: z.string().min(1).optional(),
 });
 export type ChangeAwareness = z.infer<typeof ChangeAwarenessSchema>;
 
@@ -69,15 +109,27 @@ export const LdgNodeSchema = z.strictObject({
   semanticState: LdgSemanticStateSchema,
   /** Authoritative vs proposed presentation — UI must not invent this. */
   authority: z.enum(['AUTHORITATIVE', 'PROPOSED']),
+  /** Escalation marker (FIG-4): the case this subject is linked to, if any. Never identity. */
+  caseRef: z.string().min(1).optional(),
+  /**
+   * Assessment lifecycle (FIG-7), non-domain. Omitted for nodes that are not
+   * assessed subjects (case, disruption). Never used to signal evaluation via
+   * semanticState/changeState/tone.
+   */
+  evaluation: AssessmentViewStatusSchema.optional(),
   detail: z.string().max(2048).optional(),
 });
 export type LdgNode = z.infer<typeof LdgNodeSchema>;
 
 export const LdgEdgeSchema = z.strictObject({
+  /** Producer-owned, unique within a graph, stable across revisions (FIG-1). Never array position. */
+  id: z.string().min(1),
   fromRef: z.string().min(1),
   toRef: z.string().min(1),
   kind: LdgEdgeKindSchema,
   semanticState: LdgSemanticStateSchema.optional(),
+  /** Authoritative vs proposed — from backend evidence only, never inferred (FIG-2). */
+  authority: z.enum(['AUTHORITATIVE', 'PROPOSED']),
 });
 export type LdgEdge = z.infer<typeof LdgEdgeSchema>;
 
@@ -86,6 +138,15 @@ export const LiveDependencyGraphSchema = z.strictObject({
   nodes: z.array(LdgNodeSchema),
   edges: z.array(LdgEdgeSchema),
   change: ChangeAwarenessSchema,
+}).superRefine((graph, ctx) => {
+  const seen = new Set<string>();
+  for (const edge of graph.edges) {
+    if (seen.has(edge.id)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate LdgEdge id: ${edge.id}`, path: ['edges'] });
+      return;
+    }
+    seen.add(edge.id);
+  }
 });
 export type LiveDependencyGraph = z.infer<typeof LiveDependencyGraphSchema>;
 
@@ -102,6 +163,8 @@ export const OperatorOverviewItemSchema = z.strictObject({
   recoveryActivity: z.string().max(2048).optional(),
   decisionRequired: z.boolean(),
   unresolvedUncertainty: z.array(z.string()),
+  /** Assessment lifecycle (FIG-7), non-domain. Never fabricated. */
+  evaluation: AssessmentViewStatusSchema.optional(),
 });
 export type OperatorOverviewItem = z.infer<typeof OperatorOverviewItemSchema>;
 

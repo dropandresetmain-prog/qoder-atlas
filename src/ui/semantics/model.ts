@@ -1,12 +1,19 @@
 import type {
-  ChangeAwareness, LdgEdgeKind, LdgNodeKind, LdgSemanticState, LiveDependencyGraph,
+  AssessmentViewStatus, ChangeAwareness, LdgEdgeKind, LdgNodeKind, LdgSemanticState, LiveDependencyGraph,
 } from '../../contracts/v2/product/readModels.ts';
 
 export type VisualTone = 'ok' | 'watch' | 'alert' | 'active' | 'neutral';
 export type FocusRole = 'primary' | 'causal' | 'context';
-export type TruthMode = 'current' | 'proposed' | 'unspecified';
-export type ChangeMarker = 'marked' | 'not-marked' | 'not-supplied';
+export type TruthMode = 'current' | 'proposed';
+export type ChangeMarker = 'marked' | 'not-marked';
 export type IconKind = 'signal' | 'booking' | 'person' | 'time' | 'support' | 'commitment' | 'proposal';
+/**
+ * Assessment lifecycle presentation (FIG-7) — an independent dimension, never
+ * a stand-in for semanticState/changeState/tone. 'not-supplied' is distinct
+ * from every real `AssessmentViewStatus`: it means the node is not an
+ * assessed subject (e.g. a case or disruption node), not "unknown".
+ */
+export type EvaluationState = 'current' | 'stale' | 'pending-reassessment' | 'unavailable' | 'none' | 'not-supplied';
 
 export interface SemanticIndicator {
   readonly label: string;
@@ -20,16 +27,19 @@ export interface PresentationNode {
   readonly entityLabel: string;
   readonly semanticState: LdgSemanticState;
   readonly indicator: SemanticIndicator;
-  readonly truthMode: Exclude<TruthMode, 'unspecified'>;
-  readonly changeState: Exclude<ChangeMarker, 'not-supplied'>;
+  readonly truthMode: TruthMode;
+  readonly changeState: ChangeMarker;
   readonly focusRole: FocusRole;
   readonly label: string;
   readonly secondaryLabel?: string;
   readonly iconKind: IconKind;
+  readonly evaluationState: EvaluationState;
+  readonly caseRef?: string;
 }
 
 export interface PresentationEdge {
-  // Position within one snapshot only; never an identity for reconciliation.
+  // The producer-owned LdgEdge.id (FIG-1) — stable across revisions, safe to
+  // use as a reconciliation/DOM key.
   readonly renderKey: string;
   readonly sourceRef: string;
   readonly targetRef: string;
@@ -38,13 +48,13 @@ export interface PresentationEdge {
   readonly relationshipKind: LdgEdgeKind;
   readonly semanticState?: LdgSemanticState;
   readonly indicator: SemanticIndicator;
-  // M9 edges carry no authority and no changed-edge set (FIG-2). A PROPOSED or
-  // CHANGED edge state, or the PROPOSED_CHANGE kind, is not a truth/change signal.
-  readonly truthMode: Extract<TruthMode, 'unspecified'>;
-  readonly changeState: Extract<ChangeMarker, 'not-supplied'>;
+  readonly truthMode: TruthMode;
+  readonly changeState: ChangeMarker;
   readonly focusRole: FocusRole;
   readonly label: string;
 }
+
+export type { AssessmentViewStatus };
 
 export interface PresentationGraph {
   readonly scope: LiveDependencyGraph['scope'];
