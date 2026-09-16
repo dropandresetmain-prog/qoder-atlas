@@ -119,3 +119,40 @@ Candidate `9bdd662` (pre-ledger-close), tag `wit-post-c5-convergence`.
 | `npm run test:legacy` | **deliberately not run** — non-gating |
 
 Suite sizes: CURRENT_TARGET 101 (56 current + 45 postgres), MIGRATION_BOUNDARY 2, HISTORICAL_LEGACY 76.
+
+## Main convergence
+
+- Candidate `2673714a1b5dbf267aade670532acdc4ee491e5f`, tag `wit-post-c5-convergence`.
+- Stale `main` `8b03934` was a strict ancestor → **fast-forward**, no merge of stale
+  main into the candidate, no history rewrite, no force-push.
+- `origin/main` = `2673714`. Reachable from it: C5 `87783c0`, frontend handoff
+  `6a655dd`, semantic source `fe09c52`, live read-model lane `cbe5f83`, M9 `c45a928`.
+
+## Cleanup candidates — PROPOSED ONLY, nothing deleted
+
+Do not delete accepted C5/M10 tags, C5/M10 provenance branches, or audit/review history.
+
+**Safe once reachability is accepted** (all merged into `main`, content fully preserved):
+`lane/wit-frontend-semantic-contract`, `review/wit-frontend-semantic-contract-opus`,
+`integration/wit-frontend-handoff`, `lane/wit-live-readmodel-contract`,
+`lane/wit-demo-programme-seed`, `integration/m7-m8-c3`,
+`integration/m2-m6-domain-evaluation`, `m6/evaluators-l1..l4`,
+`fix/c2-m6-invalidation-gaps`, `fix/genericity-regression`, `chore/repo-structure`.
+
+**Keep through submission:** `milestone-m10-migration-rehearsal`,
+`milestone-m9-product-integration`, `milestone-m2..m8`, `data-structure-refactor`,
+and all `m10-candidate*` / `submission-*` tags — C5/M10 provenance.
+
+**Keep — NOT reachable from `main`:** `plan/post-c5-demo-backend-completion`. Its document
+was imported into `main`, but with a superseded banner, so the original commit is the only
+copy of the exact original text. Tag it before any deletion.
+
+**Not reachable, unrelated to the refactor** (video/demo/cursor experiments) — a separate
+decision, out of convergence scope: `archive/video-seq13-*`, `demo-videos-*`,
+`video-production-integration`, `video-system-world-production`, `cursor/*`,
+`design/live-dependency-graph-v5-6`, `docs/northstar-readme`,
+`docs/wit-demo-visual-contract`, `integration/wave3-product`,
+`lane/r3-reference-visual-convergence`.
+
+**Local worktrees** (23 besides the primary) are stale for every merged lane above;
+prune after the branch decision, not before.
