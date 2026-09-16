@@ -1,5 +1,117 @@
 # ACTIVE TASK — Frontend semantic contract
 
+## Fixer lane: live read-model contract prerequisites (2026-09-17)
+
+Branch `lane/wit-live-readmodel-contract` from `review/wit-frontend-semantic-contract-opus`
+@ `fe09c525528df67a0a5fb5df4811bb7d5feddd77` (verified via `git rev-parse`), in worktree
+`C:/Dev/qoder-atlas/.worktrees/wit-live-readmodel-contract`. Scope: FIG-1/2/3/4/6/7 from
+`docs/FRONTEND_SEMANTIC_CONTRACT.md`'s gap table — backend read-model producer fixes plus
+the single frontend boundary follow-through. Does not merge/depend on M10.
+
+### Phase 1 investigation — key files and findings
+
+- `LdgNode`/`LdgEdge`/`ChangeAwareness`/`LiveDependencyGraph` live in
+  `src/contracts/v2/product/readModels.ts:65-90`. `LdgEdge` today is
+  `{fromRef, toRef, kind, semanticState?}` — no id, no authority.
+- Producer: `src/app/target/readmodels/pgFactAssembler.ts`. `loadRecoveryCaseFacts`
+  (`:209-380`) queries `case_subjects` with no `ORDER BY` (`:263`), sets
+  `projectionRevision = recoveryActions.length + subjects.rows.length` (`:333`),
+  `changedVisibleRefs = recoveryActions.map(a => a.actionRef)` (`:334`, action ids that
+  never match a graph node ref), builds case-subject nodes that all take the aggregate
+  verdict (`:339-347`, FAILED if any subject fails else AFFECTED — a PASS subject can
+  never read HEALTHY). `loadOperatorOverviewFacts` (`:382-453`) makes only case rows into
+  nodes (`:443-449`, `ref = caseRef ?? tripRef`), collapses everything but DISRUPTED into
+  HEALTHY (`:447`), revision = item count, changedVisibleRefs = every case every read.
+- Pure projectors: `src/app/target/readmodels/liveDependencyGraph.ts` (defaults omitted
+  node authority to AUTHORITATIVE at `:19`; drops dangling edges) and
+  `changeAwareness.ts` (dedupes/sorts refs, passes revision through — no diff engine).
+  Facts shape: `src/app/target/readmodels/types.ts` (`ProductNodeFact`/`ProductEdgeFact`
+  `:21-35`, no id/authority on edges, no `evaluation` field).
+- FIG-7 source of truth: `currentAssessmentView` in
+  `src/persistence/postgres/world/pgAssessments.ts:195-227` returns
+  `AssessmentViewStatus` (`CURRENT|STALE|PENDING_REASSESSMENT|UNAVAILABLE|NONE`, type
+  defined at `:185`, not currently exported from any `contracts/` module — `src/ui` may
+  not import `src/persistence`, so this needs a contracts-level re-export). Reassessment
+  worker: `PgReassessmentWorker` same file `:271-422`, `runOnce(now, pipeline, workspaceId)`
+  claims exactly one row (`SELECT ... FOR UPDATE SKIP LOCKED ... LIMIT 1`), driven directly
+  in `postgres-integration/m6Reassessment.pgtest.ts`. Ingestion path:
+  `acceptProviderShapedDemoEvent` (`src/app/target/applicationCommands.ts:183-246`) calls
+  `recordTransportObservation` (`src/persistence/postgres/commands/arrangementCommands.ts`),
+  whose transaction fires the M6 triggers in migration `0091` that enqueue
+  `scheduled_reassessments` rows for every reached subject — proven end to end in
+  `postgres-integration/m9DemoIngress.pgtest.ts` (ingress -> `currentAssessmentView` reads
+  `PENDING_REASSESSMENT`).
+- Frontend boundary: `src/ui/semantics/adapter.ts` (124 lines) — one exhaustive
+  `Record<Enum, SemanticIndicator>` table per dimension via a `mapped()` helper that
+  throws `UNMAPPED SEMANTIC STATE` on a miss (`:73-76`); `truthMode` from `AUTHORITY`
+  table (`:69-71,105`); `changeState` from `changedVisibleRefs` set membership (`:93,106`,
+  inline, not a table). `src/ui/semantics/model.ts` — `PresentationNode` fields at
+  `:17-29`. `src/ui/semantics/grammar.ts` — label maps `:21-29`, `data-*` attribute CSS
+  selectors `:44-55`. `src/ui/semantics/components.ts` — `semanticNode()` builds
+  `data-*` attrs and marker spans, `:11-21`. `src/ui/screens/contract-lab.ts` — lettered
+  panel sections A-F built via a `section()` helper (`:93-99`), registered in a nav array
+  (`:298-302`).
+- Edge identity source (FIG-1): `case_subjects` PK is
+  `(workspace_id, recovery_case_id, subject_kind, subject_id, role)` — no serial column
+  (`migrations/0100_recovery_cases.sql:25-40`). A canonical edge id can be derived as
+  `${kind}:${fromRef}:${toRef}` (or with `role` where available) since the composite is
+  already unique per relation; `ORDER BY subject_kind, subject_id, role` makes producer
+  order deterministic without a schema change.
+
+### FIG-3 revision design — durable sources found, gap identified
+
+- `aggregate_heads.revision` (`migrations/0003_identity_registry.sql:37-44`, PK
+  `(workspace_id, aggregate_id)`) is a real per-aggregate-root monotonic bigint, CAS-advanced
+  by `advanceHead`/`createRoot` in `commandSupport.ts`. `RECOVERY_CASE` and `ACTION_PLAN`
+  are each registered as their own aggregate root (`createRoot` calls at
+  `m8AuthorityCommands.ts:118,163`), so a case's own lifecycle changes are already covered.
+  **Confirmed gap:** `ACTION_INTENT` is a *child* subject under its `ACTION_PLAN` root
+  (`registerChildSubject`, `commandSupport.ts:72-84`, "no aggregate_heads row: the root is
+  the only revision counter"), and `execution_attempts`/`execution_observations` inserts in
+  `m8AuthorityCommands.ts` never call `advanceHead` on that plan (`grep` for `advanceHead`
+  in that file only hits the RESOURCE budget path at `:516`) — so a recovery action's
+  execution/observation state changing does **not** advance any existing monotonic counter.
+- `scope_generations.generation` (`migrations/0006`, extended `0090`) is monotonic per
+  `(scope_kind, scope_id)`, trigger-advanced for ~50 owning tables, but has no scope kind
+  for "this subject's assessment/evaluation lifecycle changed", and `assessments` /
+  `scheduled_reassessments` have no serial/sequence column at all (`id` is a random uuid on
+  both) — confirmed by grep across `migrations/` for `CREATE SEQUENCE|bigserial|GENERATED
+  ALWAYS AS IDENTITY|serial`: no matches anywhere in the schema. So neither a subject's
+  CURRENT-assessment verdict changing nor its `AssessmentViewStatus` transitioning
+  (`CURRENT -> PENDING_REASSESSMENT -> CURRENT`) advances any existing counter — this is
+  exactly the dimension the FIG-3/FIG-7 proof test needs to observe increasing.
+- **Conclusion: an honest monotonic revision needs a new migration** (matches the lane's
+  own stop condition). Smallest proposed shape — reuse the existing `scope_generations`
+  machinery rather than inventing a new table: add one new `scope_kind`
+  (`'EVALUATION_LIFECYCLE'`, scope_id = `<SUBJECT_KIND>:<subject_id>:<assessment_kind>`,
+  deliberately not referenced by any `assessment_inputs` row so it cannot feed back into
+  `m6_enqueue_reassessment_for_input` and cause invalidation loops), plus two small
+  `AFTER INSERT`/`AFTER INSERT OR UPDATE OF state` triggers that bump it: one on
+  `assessments` (new CURRENT verdict), one on `scheduled_reassessments` (state transitions
+  PENDING/CLAIMED/DONE/UNAVAILABLE). A node/case revision reads as
+  `GREATEST(aggregate_heads.revision for its own/plan aggregate, MAX(scope_generations.generation
+  WHERE scope_kind='EVALUATION_LIFECYCLE' for each subject the node presents))`.
+  **Paused per the lane's explicit stop condition — proposal sent to the user for approval
+  before writing this migration.** FIG-1/2/4/6/7 (minus the revision-dependent parts of the
+  proof test) do not depend on this and proceed in parallel.
+
+### Commit plan (one FIG per commit where practical)
+
+1. FIG-1: `LdgEdge.id` (contract + producers + adapter `renderKey`), deterministic
+   `case_subjects` ORDER BY, duplicate-id rejection in the schema/adapter boundary.
+2. FIG-2: `LdgEdge.authority`, `ChangeAwareness.changedEdgeIds`, adapter `truthMode`/
+   `changeState` for edges.
+3. FIG-4: subject-keyed node refs on dashboard/overview producer + `caseRef` linkage field.
+4. FIG-6: per-subject CURRENT-verdict fidelity on case/overview node `semanticState`.
+5. FIG-7 (contract + producer + frontend, minus revision): `AssessmentViewStatus` re-export,
+   `evaluation` field on `LdgNode`/`OperatorOverviewItem`, adapter `evaluationState`
+   dimension, grammar/components `data-evaluation` + marker, Contract Lab panel.
+6. FIG-3 (blocked): migration (pending approval) + real revision on all producers +
+   honest `changedVisibleRefs`/`changedEdgeIds` semantics.
+7. Proof test: `postgres-integration/witLiveReadModelContract.pgtest.ts` per the required
+   6-step sequence, plus unit tests for edge-id uniqueness, revision monotonicity, adapter
+   mappings and Contract Lab rendering.
+
 ## Independent review checkpoint (Opus, 2026-09-17)
 
 - Reviewed: `lane/wit-frontend-semantic-contract` @ `20b9b61c34f3f2d526dbe4e143aba6c8304adc9b`
