@@ -256,6 +256,46 @@ write path via the genuine `fig3_bump_on_assessment` trigger) that fails against
 Push once the full-suite gates land clean; write the final report per the fixer brief's
 five-point structure.
 
+## Independent review of post-review fixes (Opus, 2026-09-17)
+
+- Reviewed: the working tree committed as `f775abc` (identical per-file line counts, clean tree).
+- Verdict: PASS WITH FOLLOW-UPS. Defects 1-5 are genuinely fixed; nothing found makes the
+  read model report something false.
+- Verified in code: single `REPEATABLE READ READ ONLY` snapshot per read; `pg_snapshot_xmin`
+  cursor compared with `>=` (at-least-once); 0123 triggers on all seven case-content tables,
+  bumping only `EVALUATION_LIFECYCLE`; incident view on `JOURNEY:<id>` refs with real
+  `evaluation`; item `evaluation` only for single-subject items; DASHBOARD population nodes
+  from accepted REQUIRED participation in ACTIVE programmes, `caseRef` when escalated.
+- Evidence (isolated DB `witreviewopus`): typecheck OK; focused unit 50/50
+  (`ui-semantic-contract`, `m9-product-readmodels`, `m9-product-surfaces`,
+  `m9-checkpoint2-unit`, `m9-jordan-partial-failure-acceptance`, `m9-vertical-loop`,
+  `m9-target-http`); focused Postgres 8/8 (`witLiveReadModelContract`, `migrate`,
+  `m9ReadModelCurrentness`). Not run by the reviewer: lint, build, anti-hardcoding, full suites.
+
+Act Now (before live wiring):
+
+- R1. Proof test asserts exact changed sets ("exactly the dependent subjects", "exactly one
+  subject should have settled"). The cursor is a cluster-wide snapshot xmin, so concurrent
+  activity can legitimately add refs. Observed ~5 failures in ~15 executions, clustered, then
+  8 consecutive passes. Likely cause of the fixer's test loop. Assert superset; prove
+  "unchanged" through `evaluation`/`semanticState`.
+- R2. Escalation is not reported as a change: a DASHBOARD node's stamp is only its subject's
+  `VIABILITY` stamp, but escalation writes `case_subjects`, which bumps the case scope. The
+  node gains `caseRef` without appearing in `changedVisibleRefs`. Use max(subject stamp,
+  linked case stamp) and assert it in the escalation step (currently read without a cursor).
+  Found by code reading; a probe was blocked by R1.
+- R3. Every population node is labelled the literal `JOURNEY`. Use the traveller display-name
+  join the overview items already use.
+
+Investigate Now: how noisy changed sets are on the demo database cluster; `m2Travel` EXPLAIN
+failure (pre-existing per this ledger, not verified by the reviewer).
+
+Park for Later: `LIMIT 200` silent population truncation; graph-level
+`currentSemanticState` still FAILED-or-HEALTHY; subject -> transport-service edges.
+
+Renderer rule for the next milestone: apply every snapshot; changed sets are at-least-once
+hints; animate a node only when its presented fields differ between two backend snapshots.
+
 ## Independent review checkpoint (Opus, 2026-09-17)
 
 - Reviewed: `lane/wit-frontend-semantic-contract` @ `20b9b61c34f3f2d526dbe4e143aba6c8304adc9b`
