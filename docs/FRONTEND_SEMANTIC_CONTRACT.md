@@ -112,9 +112,14 @@ relations. Rendering arrows does not perform propagation or blast-radius analysi
 - Edges have no stable identity. Source + kind + target is **not guaranteed unique**;
   parallel duplicates are schema-valid and remain distinct. `renderKey` is an
   explicitly snapshot-local array-position key, never persistence/transition ID.
+  **As of `lane/wit-live-readmodel-contract` (FIG-1, resolved):** `LdgEdge.id` is now
+  required, producer-owned and unique within a graph (schema-enforced); `renderKey`
+  is that id. This paragraph otherwise still describes the M9 baseline this lane
+  started from.
 - `ChangeAwareness` contains projectionRevision, changedVisibleRefs,
   currentSemanticState, optional previousSemanticState/changedAt/changeSource.
   Previous/current states describe the projection, not each node's history.
+  **FIG-2 resolved:** `changedEdgeIds` is now also present, keyed by FIG-1 ids.
 - No separate affected refs, changed edge refs, added/removed sets or focusPath.
   AFFECTED comes only from a supplied semantic state, not traversal.
 - Exact membership in changedVisibleRefs is a node marker. Absence is **not marked**,
@@ -123,6 +128,11 @@ relations. Rendering arrows does not perform propagation or blast-radius analysi
   traveller: constant 1). Equal revision does not guarantee unchanged content.
   Case changed refs are action IDs, potentially absent from graph nodes. Preserve
   these metadata values; do not manufacture an animation/diff clock.
+  **FIG-3 resolved** for case/overview (see the gap table): real per-node source
+  revisions, `changedVisibleRefs` now names exactly what changed relative to a
+  supplied `sinceRevision`. Cohort/traveller producers are unchanged (still counts;
+  they are pure/caller-fed, not Postgres-backed, so no DB revision source exists
+  for them — a known limit, not closed by this lane).
 
 ### Current vs proposed
 
@@ -131,14 +141,14 @@ change marker and focus. A proposed HEALTHY node must still have a brass dashed
 boundary and proposal label; it cannot look committed. M9 allows proposal-related
 semantic state on a current record; preserve both dimensions without promotion.
 
-M9 edges carry no authority, so every edge truth mode is **unspecified**. A PROPOSED
-edge state or the PROPOSED_CHANGE kind is not promoted to proposed truth: the same
+M9 edges carried no authority, so every edge truth mode was **unspecified**. **As of
+`lane/wit-live-readmodel-contract` (FIG-2, resolved):** `LdgEdge.authority` mirrors
+node authority, backend-supplied only, so solid-green/solid-vermilion authoritative
+and dashed-brass proposed edges are now honestly producible. A PROPOSED edge state
+or the PROPOSED_CHANGE kind is still not promoted to proposed truth: the same
 no-promotion rule as nodes applies (a relationship *about* a proposal can itself be an
 authoritative record). Kind and state stay visible as their own label and badge.
-Do not infer authority from endpoints. Unspecified authority keeps a dotted grey
-connector plus the separately supplied state badge. Solid-green/solid-vermilion
-**authoritative** and dashed-brass **proposed** edges cannot honestly be produced
-from this M9 DTO (FIG-2).
+Do not infer authority from endpoints — it is read only from the supplied field.
 
 IncidentProgrammeView has separate currentProgrammeState/proposedProgrammeState
 strings; the bilateral preview has current/proposed windows and participant verdicts
@@ -148,21 +158,27 @@ retired edges or generic graph-overlay lifecycle. No counterfactual engine is ad
 ## Presentation model and visual grammar
 
 - Node: ref, entityKind (accepted graph category), semanticState, indicator,
-  truthMode, changeState, focusRole, label/secondaryLabel and iconKind.
-- Edge: snapshot-local renderKey, sourceRef/targetRef, relationshipKind,
-  optional semanticState, indicator, truthMode, changeState, focusRole and label.
+  truthMode, changeState, focusRole, label/secondaryLabel, iconKind, and (FIG-7,
+  resolved) `evaluationState` plus optional `caseRef` (FIG-4, resolved).
+- Edge: renderKey (FIG-1: the producer's `LdgEdge.id`, resolved), sourceRef/targetRef,
+  relationshipKind, optional semanticState, indicator, truthMode (FIG-2, resolved),
+  changeState (FIG-2, resolved), focusRole and label.
 - Graph: scope, unchanged source change metadata, nodes, edges.
 - Focus: primary / causal / context, from explicit selections only. Edge focus
   is explicitly supplied by snapshot index; no path-finding or impact inference.
   `primary` may come from operator selection. `causal` asserts causality, so a product
   surface may populate it only from a backend-supplied path or a backend-scoped causal
-  projection, never from adjacency (FIG-5b). The Lab populates it from fixtures only.
-- Node change: marked / not-marked, from `changedVisibleRefs` only. Edge change: always
-  not-supplied (no changed-edge set, FIG-2). A CHANGED semantic state never sets the
-  change marker on nodes or edges; AFFECTED stays a separate state.
+  projection, never from adjacency (FIG-5b, still open). The Lab populates it from
+  fixtures only.
+- Node change: marked / not-marked, from `changedVisibleRefs` only. Edge change
+  (FIG-2, resolved): marked / not-marked, from `changedEdgeIds` only — no longer
+  always not-supplied. A CHANGED semantic state never sets the change marker on
+  nodes or edges; AFFECTED stays a separate state.
 - Indicator: label + glyph + tone; graph states retain their raw accepted values.
-- No evaluation/processing dimension exists yet. It must not be emulated with
-  `semanticState`, `changeState` or tone (FIG-7).
+- Evaluation lifecycle (FIG-7, resolved): an independent `evaluationState`
+  presentation dimension, exhaustively mapped from `AssessmentViewStatus`
+  (`not-supplied` when the node has none). It is never emulated with
+  `semanticState`, `changeState` or tone, and never changes them.
 
 ### LdgSemanticState is a mixed vocabulary
 
@@ -178,11 +194,18 @@ The live demo needs potentially affected entities to read as *under evaluation*,
 clear or settle. The engine already has that truth: `currentAssessmentView`
 (`persistence/postgres/world/pgAssessments.ts`) returns CURRENT, STALE,
 PENDING_REASSESSMENT, UNAVAILABLE or NONE, backed by `scheduled_reassessments` work that
-the M6 triggers enqueue for exactly the assessments that read a changed input. No read
-model exposes it: `loadRecoveryCaseFacts` collapses every non-CURRENT status into
-AssessmentTone UNKNOWN plus a free-text uncertainty string, and the overview/cohort
-producers drop it. The frontend therefore cannot show "under evaluation" without
-inventing it, and must not. See FIG-7.
+the M6 triggers enqueue for exactly the assessments that read a changed input.
+
+**As of `lane/wit-live-readmodel-contract` (FIG-7, resolved):** `AssessmentViewStatus`
+moved to `contracts/v2/product/readModels.ts` and `LdgNode`/`OperatorOverviewItem` gained
+an optional `evaluation` field passed through from that same lookup — `loadRecoveryCaseFacts`
+no longer collapses it away. `semanticState` still comes only from the subject's own CURRENT
+verdict (FIG-6); `evaluation` is a wholly separate field the frontend renders as an
+independent dimension, never a `semanticState`/`changeState`/tone stand-in. The
+`AssessmentTone`/uncertainty-string collapse for non-CURRENT subjects is unchanged and
+stays useful for the free-text detail; `evaluation` is what makes the lifecycle itself
+(as opposed to the last-known verdict) observable. Cohort producers remain unchanged
+(pure/caller-fed, not Postgres-backed — no `currentAssessmentView` to read from).
 
 `ui/semantics/adapter.ts` is the single mapping boundary, including exhaustive typed
 records for accepted unions. Unknown future enum values throw visibly with
@@ -201,28 +224,27 @@ large coloured fills. No perpetual effects or artificial activity.
 
 ## Frontend Integration Contract Gaps
 
-No backend change is made in this lane. The original FIG-1..6 were all triaged Park for
-Later before the live-demo choreography was frozen. The independent review re-triaged
-each against that sequence (baseline -> disruption -> scope identified -> under
-evaluation -> clear or settle failed -> escalate -> open case), asking: *can the UI
-be driven through it without frontend invention if this stays unresolved?*
-
-"Act Now (prerequisite)" means it blocks live graph wiring and is owned by the read-model
-producer, not by this frontend lane. The static Lab can continue without any of them.
+FIG-1/2/3/4/6/7 are **resolved** (`lane/wit-live-readmodel-contract`, backend read-model
+producer fixes plus the single frontend boundary follow-through). FIG-5b/5c/8/9 are
+untouched, left for a future lane. The independent review re-triaged each against the
+live-demo choreography (baseline -> disruption -> scope identified -> under evaluation ->
+clear or settle failed -> escalate -> open case), asking: *can the UI be driven through it
+without frontend invention if this stays unresolved?* — that question is now answered for
+every "Act Now (prerequisite)" row below.
 
 | ID / triage | Evidence and smallest change | Blocks |
 |---|---|---|
-| FIG-1 — Act Now (prerequisite) | `LdgEdge` has no id; the case producer's `case_subjects` query has no ORDER BY, so edge order (and every `renderKey`/`causalEdgeIndices`) can change between reads with no content change, causing false delete/recreate. Add a producer-owned `id` per edge, unique within the graph and stable across revisions for the same relation. Parallel edges keep distinct ids. | Any edge transition across revisions |
-| FIG-2 — Act Now (prerequisite) | No edge authority and no changed-edge set, so every edge is dotted grey "authority not supplied". The frozen graph needs solid green/vermilion authoritative edges and dashed brass proposed edges. Add `authority: AUTHORITATIVE \| PROPOSED` to `LdgEdge` (mirroring nodes) and `changedEdgeIds` to `ChangeAwareness`, keyed by FIG-1. | Authoritative edge styling; edge change marking |
-| FIG-3 — Act Now (prerequisite) | `projectionRevision` is a count (case: actions + subjects; overview: items; cohort: travellers; traveller: 1). Re-evaluation changes content without changing counts, so polled snapshots cannot be ordered or discarded as stale. Overview `changedVisibleRefs` lists every case on every read, so every node is permanently marked; case `changedVisibleRefs` are action ids that never match nodes. Define a monotonic per-scope revision from real sources, and define `changedVisibleRefs` as refs whose presented fields differ from the previous revision. | Revision-driven updates and settle transitions |
-| FIG-4 — Act Now (prerequisite) | Overview node `ref` is the bare case id, and only cases produce overview nodes. A participant has no node before escalation and a different ref after it, so baseline -> escalate cannot keep one entity. Case graph uses `<SUBJECT_KIND>:<id>`; cohort refs are caller strings. Key dashboard and incident nodes by the canonical subject ref used by the case graph, and carry case linkage as a separate optional field (for example `caseRef`) instead of as identity. That field is also the escalation marker. | Baseline -> escalation continuity; open-case selection |
+| FIG-1 — **Resolved** | `LdgEdge.id` is now required, producer-owned and unique within a graph (`contracts/v2/product/readModels.ts` — a `superRefine` on `LiveDependencyGraphSchema` rejects duplicates loudly). `case_subjects` is queried with a deterministic `ORDER BY subject_kind, subject_id, role` (`pgFactAssembler.ts`). Ids are derived from the canonical relation (kind + endpoints), never array position. Adapter `renderKey` is now `edge.id`. Evidence: `test/ui-semantic-contract.test.ts` ("edge renderKey is the producer-owned stable id", "duplicate edge ids are refused loudly"); `postgres-integration/witLiveReadModelContract.pgtest.ts` asserts edge ids identical across every re-evaluation/settlement step. | Any edge transition across revisions |
+| FIG-2 — **Resolved** | `LdgEdge.authority` mirrors node authority (required, backend-supplied). `ChangeAwareness.changedEdgeIds` is keyed by FIG-1 ids. The adapter's edge `truthMode`/`changeState` now come from these real fields, never inferred from edge kind or `semanticState`. Evidence: `test/ui-semantic-contract.test.ts` ("edge truth and change come only from authority/changedEdgeIds..."). | Authoritative edge styling; edge change marking |
+| FIG-3 — **Resolved** | `projectionRevision` is now `MAX` of real per-node revision sources: each subject's and the case's own `EVALUATION_LIFECYCLE` `scope_generations` family (migrations 0121/0122), read via `last_advanced_xact` (`pg_current_xact_id()`, a per-database globally unique strictly-increasing xid8 — safe to `MAX`, unlike the small per-scope `generation` counter, which can tie and mask a real change; an initial sum-based design was tried and rejected for exactly that reason, caught by the proof test). `changedVisibleRefs` is exactly the refs whose own source exceeds a caller-supplied `sinceRevision` (omitted = first read = honestly empty, never "everything"). `changedEdgeIds` stays `[]` for the current AFFECTED_BY edges, which carry no independent state. `?sinceRevision=<n>` is wired through `targetHttpHandlers.ts`. Evidence: `postgres-integration/witLiveReadModelContract.pgtest.ts` (full 6-step proof: revision strictly increases at injection and at each settlement step; two quiet reads are identical). | Revision-driven updates and settle transitions |
+| FIG-4 — **Resolved** (dashboard/overview scope only) | The overview producer now keys dashboard nodes by the canonical `<SUBJECT_KIND>:<id>` ref the case graph already uses (`loadOperatorOverviewFacts`), with `caseRef` as a separate optional linkage field. **Known limit, not closed by this lane:** the overview producer only lists items with an existing `recovery_cases` row, so no read model can render a subject's node before it is attached to a case — "no node before escalation, same ref after" could not be exercised end-to-end in the proof test; see the FIG-4 note in `docs/work/ACTIVE_TASK.md`. Cohort/incident-programme refs remain a separate identity space (caller-string `travellerRef`/`journeyRef`), unchanged and still explicitly accepted as a different scope. | Baseline -> escalation continuity; open-case selection |
 | FIG-5a — Act Now (merged into FIG-7) | "Affected dependency scope identified" needs a backend candidate set. The M6 invalidation enqueue is that set (the subjects whose assessments read the changed input), so FIG-7 supplies it. Do not derive it from graph topology. | Under-evaluation scope |
 | FIG-5b — Investigate Now | No backend focus/causal path. If the FOCUSED_CASE producer emits only the causal chain (frozen Sarah geometry), scope is the evidence and no `focusPath` is needed; if it emits a wider graph, add `focusPathEdgeIds` (FIG-1 ids). Until decided, product surfaces must not populate `causal`. | Focused causal emphasis |
 | FIG-5c — Investigate Now | No paired current/proposed overlay. Needed only if the counterfactual is drawn on the graph rather than the existing mutation-free preview surface. If so, add `replacesEdgeId` pairing on proposed edges (requires FIG-1/FIG-2). | Counterfactual graph overlay |
-| FIG-6 — Act Now (prerequisite) | Producer fidelity, not additive. Overview nodes are FAILED only for DISRUPTED, otherwise HEALTHY, so UNKNOWN, AT_RISK and RECOVERING render green. Case subject nodes all take the aggregate (FAILED if any subject fails, else AFFECTED), so a PASS subject can never clear to HEALTHY and an unassessed subject reads AFFECTED. Use each subject's own CURRENT verdict; non-CURRENT stays UNKNOWN plus FIG-7. DTO unchanged. | Clear-to-healthy / settle-to-failed truth |
-| FIG-7 — Act Now (prerequisite, new) | Assessment lifecycle is not in any read model (see *Evaluation lifecycle vs semantic truth*). Add an optional, non-domain `evaluation` on `LdgNode` (and `OperatorOverviewItem`) that passes through `AssessmentViewStatus` for that node's subject. The backend decides whether `semanticState` keeps the last CURRENT verdict or reads UNKNOWN while PENDING_REASSESSMENT. The frontend then adds an independent `evaluationState` presentation dimension (`not-supplied` when absent) and never changes `semanticState` to animate. No push channel exists (plain GET handlers; the demo event returns 202 and the worker reassesses asynchronously), so progress is visible only through polled revisions (FIG-3). | "Under evaluation" treatment |
-| FIG-8 — Investigate Now (new) | `LdgSemanticState` mixes PROPOSED (truth), CHANGED (change) and ACTIVE (processing) with health. Once FIG-2/3/7 exist, decide per value whether node producers may still emit it; the frontend will not reinterpret it. | Long-term dimension hygiene |
-| FIG-9 — Investigate Now (new) | Traveller-facing copy (`ui/copy.ts` `VIABILITY_LABEL`, `product-traveller-trip.ts`, `app/presentation.ts`) renders UNKNOWN as "Still checking", which asserts a lifecycle. Operator surfaces are fixed; decide traveller wording once FIG-7 can say whether checking is actually happening. | Traveller surface in the live demo |
+| FIG-6 — **Resolved** | Case-subject and dashboard nodes now take each subject's own CURRENT-assessment verdict / operational status (`pgFactAssembler.ts` `TONE_TO_STATE`/`STATUS_TO_STATE` tables), not the case's aggregate verdict or a DISRUPTED-or-HEALTHY collapse. A PASS subject reads HEALTHY even when the case overall fails; AT_RISK/RECOVERING/UNKNOWN no longer render green. DTO unchanged, as specified. Evidence: `postgres-integration/witLiveReadModelContract.pgtest.ts` (the slack-connection subject clears to HEALTHY while the tight one settles FAILED, same case, same read). | Clear-to-healthy / settle-to-failed truth |
+| FIG-7 — **Resolved** | `AssessmentViewStatus` moved to `contracts/v2/product/readModels.ts` (re-exported from `pgAssessments.ts` for existing consumers), so the frontend boundary can present it without importing persistence. `LdgNode`/`OperatorOverviewItem` gained an optional `evaluation` field, passed through from the same `currentAssessmentView` lookup the case assembler already performs — never fabricated for non-assessed nodes. The adapter gained an independent `evaluationState` dimension (`presentEvaluationState`, exhaustively mapped, `not-supplied` when absent) that never touches `semanticState`/`changeState`/tone; rendered as a `data-evaluation` attribute plus a plain-text `.sem-evaluation` marker only (amber/motion styling stays a design-lane decision). Contract Lab section F covers it. Progress is visible only through polled revisions (FIG-3) — no push channel was added, matching scope. | "Under evaluation" treatment |
+| FIG-8 — Investigate Now (new) | `LdgSemanticState` mixes PROPOSED (truth), CHANGED (change) and ACTIVE (processing) with health. FIG-2/3/7 now exist; still Investigate Now — deciding per-value whether node producers may still emit it is a separate design pass, out of this lane's "smallest additive change" scope. | Long-term dimension hygiene |
+| FIG-9 — Investigate Now (new) | Traveller-facing copy (`ui/copy.ts` `VIABILITY_LABEL`, `product-traveller-trip.ts`, `app/presentation.ts`) renders UNKNOWN as "Still checking", which asserts a lifecycle. Operator surfaces are fixed; FIG-7 can now say whether checking is actually happening, but traveller wording itself is unchanged — a copy decision for a future lane. | Traveller surface in the live demo |
 
 Other triage:
 
@@ -264,12 +286,17 @@ families, independent truth/change/focus, all five relationship kinds and all op
 edge states. It includes booking-valid/trip-invalid and supplied connection-stage
 compositions, an empty snapshot and a visible invalid-contract panel. Switching
 fixtures selects existing static markup only; it does not evaluate or mutate a trip.
+**As of `lane/wit-live-readmodel-contract`:** a new section F ("Evaluation lifecycle")
+covers all five `AssessmentViewStatus` values plus the absent-field `not-supplied` case
+(`presentEvaluationState`); Composed examples moved to section G. See
+`test/ui-semantic-contract.test.ts` for the current coverage assertions.
 
-Browser verification was run against the served page at `/contract-lab`. A DOM/accessibility
-snapshot confirmed all seven sections (A states, B change, C current/proposed, D focus,
-E relationships, F composed, plus the invalid panel), every enum value, and both refusal
-strings render. The sample selector was exercised: five samples visible by default, one
-visible when a single sample is chosen, five restored on "All samples". The console was
+Browser verification below predates that section (historical evidence, kept as-is). A
+DOM/accessibility snapshot confirmed the seven sections that existed then (A states, B
+change, C current/proposed, D focus, E relationships, F composed, plus the invalid panel),
+every enum value, and both refusal strings render. The sample selector was exercised: five
+samples visible by default, one visible when a single sample is chosen, five restored on
+"All samples". The console was
 clean and there was no horizontal overflow at a narrow 530x617 viewport. A computed-style
 audit confirmed the four dimensions stay independently encoded rather than collapsing into
 one status: state drives the border-inline-start tone colour and glyph, truth drives border
