@@ -234,3 +234,48 @@ describe('M9 product surface renderers', () => {
     assert.doesNotMatch(html, /Sarah|Daniel|airport/i);
   });
 });
+
+describe('M9 operator surfaces consume the single semantic boundary', () => {
+  test('operator overview never claims an evaluation lifecycle the read model did not supply', () => {
+    const model = adaptOperatorOverviewToDashboard(fivePersonOverview());
+    const html = `${model.summaryHtml}${model.itemsHtml}`;
+    // UNKNOWN viability is not "still checking"; AT_RISK is not "may be affected".
+    assert.doesNotMatch(html, /Still checking|May be affected/);
+    assert.match(html, /Viability unknown/);
+    assert.match(html, />At risk</);
+  });
+
+  test('operator overview queue never draws RECOVERING as a confirmed check', () => {
+    const { itemsHtml } = adaptOperatorOverviewToDashboard(fivePersonOverview());
+    const glyphFor = (tripRef: string): string => {
+      const row = itemsHtml.slice(itemsHtml.indexOf(`data-trip-ref="${tripRef}"`));
+      const match = /q-glyph ([a-z-]+)" aria-hidden="true">([^<]+)</.exec(row);
+      assert.ok(match, `glyph for ${tripRef}`);
+      return `${match[1]} ${match[2]}`;
+    };
+    assert.equal(glyphFor('trip-1'), 'g-ok ✓');
+    assert.equal(glyphFor('trip-2'), 'g-warn ▲');
+    assert.equal(glyphFor('trip-3'), 'g-bad ✕');
+    assert.equal(glyphFor('trip-4'), 'g-active …');
+    assert.equal(glyphFor('trip-5'), 'g-unk ?');
+  });
+
+  test('incident programme commitment dots keep UNKNOWN and ACTIVE out of brass', () => {
+    const view = incidentProgrammeView();
+    const states = ['HEALTHY', 'CHANGED', 'AFFECTED', 'FAILED', 'PROPOSED', 'ACTIVE', 'UNKNOWN', 'RECOVERED'] as const;
+    const html = renderProductIncidentProgramme({
+      ...view,
+      programmeCommitments: states.map((state) => ({ itemRef: `commit-${state}`, label: state, state })),
+    });
+    const expected: Record<(typeof states)[number], string> = {
+      HEALTHY: 'd-ok', CHANGED: 'd-watch', AFFECTED: 'd-watch', FAILED: 'd-bad',
+      PROPOSED: 'd-watch', ACTIVE: 'd-active', UNKNOWN: 'd-unconfirmed', RECOVERED: 'd-ok',
+    };
+    for (const state of states) {
+      const item = html.slice(html.indexOf(`data-item-ref="commit-${state}"`));
+      assert.ok(item.includes(`<span class="dot ${expected[state]}">`) && item.indexOf(`<span class="dot ${expected[state]}">`) < item.indexOf('</div>'),
+        `commitment dot for ${state}`);
+    }
+    assert.doesNotMatch(html, /Still checking|May be affected/);
+  });
+});

@@ -7,9 +7,10 @@ import type { IncidentProgrammeView } from '../../contracts/v2/product/readModel
 import {
   assessmentToneClass,
   ldgSemanticTone,
+  remainderViabilityLabel,
   remainderViabilityTone,
+  semanticToneDotClass,
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
-import { VIABILITY_LABEL } from '../copy.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 
 function badge(label: string, tone: string): string {
@@ -24,7 +25,7 @@ function affectedSetTable(view: IncidentProgrammeView): string {
         <td>${escapeHtml(person.personLabel)}</td>
         <td class="num">${escapeHtml(person.tripRef)}</td>
         <td>${badge(person.outcome, assessmentToneClass(person.outcome))}</td>
-        <td>${badge(VIABILITY_LABEL[person.remainderViability], remainderViabilityTone(person.remainderViability))}</td>
+        <td>${badge(remainderViabilityLabel(person.remainderViability), remainderViabilityTone(person.remainderViability))}</td>
       </tr>`,
     )
     .join('');
@@ -52,7 +53,7 @@ function commitmentsList(view: IncidentProgrammeView): string {
     .map(
       (item) => `
       <div class="tl-item" data-test="programme-commitment" data-item-ref="${escapeHtml(item.itemRef)}">
-        <span class="dot d-${ldgSemanticTone(item.state) === 'ok' ? 'ok' : ldgSemanticTone(item.state) === 'alert' ? 'bad' : 'watch'}"></span>
+        <span class="dot ${semanticToneDotClass(ldgSemanticTone(item.state))}"></span>
         <span class="ttl">${escapeHtml(item.label)}</span>
         ${item.windowLabel ? `<span class="t">${escapeHtml(item.windowLabel)}</span>` : ''}
         <span class="tag">${escapeHtml(item.state)}</span>

@@ -12,7 +12,11 @@ import type {
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
 import { escapeHtml } from '../../../ui/html.ts';
-import { VIABILITY_LABEL } from '../../../ui/copy.ts';
+import {
+  presentAssessment, presentGraphState, presentOperationalStatus, presentViability,
+} from '../../../ui/semantics/adapter.ts';
+import { TONE_DOT_CLASS } from '../../../ui/semantics/grammar.ts';
+import type { VisualTone } from '../../../ui/semantics/model.ts';
 
 /** Presentation-safe dashboard surface — HTML fragments the UI can compose. */
 export interface ProductSurfaceModel {
@@ -21,114 +25,72 @@ export interface ProductSurfaceModel {
   itemsHtml: string;
 }
 
-const OPERATIONAL_STATUS_LABEL: Record<ProductOperationalStatus, string> = {
-  READY: 'Confirmed',
-  AT_RISK: 'At risk',
-  DISRUPTED: 'Needs attention',
-  RECOVERING: 'Recovery under way',
-  UNKNOWN: 'Unconfirmed',
-};
-
-const OPERATIONAL_STATUS_TONE: Record<ProductOperationalStatus, string> = {
-  READY: 'ok',
-  AT_RISK: 'watch',
-  DISRUPTED: 'alert',
-  RECOVERING: 'active',
-  UNKNOWN: 'neutral',
-};
-
 export function operationalStatusLabel(status: ProductOperationalStatus): string {
-  return OPERATIONAL_STATUS_LABEL[status];
+  return presentOperationalStatus(status).label;
 }
 
-export function operationalStatusTone(status: ProductOperationalStatus): string {
-  return OPERATIONAL_STATUS_TONE[status];
+export function operationalStatusTone(status: ProductOperationalStatus): VisualTone {
+  return presentOperationalStatus(status).tone;
 }
 
-export function assessmentToneClass(tone: AssessmentTone): string {
-  if (tone === 'PASS') return 'ok';
-  if (tone === 'FAIL') return 'alert';
-  return 'neutral';
+export function assessmentToneClass(tone: AssessmentTone): VisualTone {
+  return presentAssessment(tone).tone;
 }
 
-export function ldgSemanticTone(state: LdgSemanticState): string {
-  switch (state) {
-    case 'HEALTHY':
-    case 'RECOVERED':
-      return 'ok';
-    case 'CHANGED':
-    case 'AFFECTED':
-    case 'PROPOSED':
-      return 'watch';
-    case 'FAILED':
-      return 'alert';
-    case 'ACTIVE':
-      return 'active';
-    default:
-      return 'neutral';
-  }
+export function ldgSemanticTone(state: LdgSemanticState): VisualTone {
+  return presentGraphState(state).tone;
 }
 
-export function remainderViabilityTone(viability: RemainderViability): string {
-  switch (viability) {
-    case 'VIABLE':
-      return 'ok';
-    case 'AT_RISK':
-      return 'watch';
-    case 'NOT_VIABLE':
-      return 'alert';
-    default:
-      return 'neutral';
-  }
+export function remainderViabilityTone(viability: RemainderViability): VisualTone {
+  return presentViability(viability).tone;
 }
+
+/** Operator-facing viability wording comes from the single boundary, never traveller copy. */
+export function remainderViabilityLabel(viability: RemainderViability): string {
+  return presentViability(viability).label;
+}
+
+export function semanticToneDotClass(tone: VisualTone): string {
+  return TONE_DOT_CLASS[tone];
+}
+
+const SUMMARY_TILES: readonly { key: keyof OperatorOverview['summary']; status: ProductOperationalStatus }[] = [
+  { key: 'ready', status: 'READY' },
+  { key: 'atRisk', status: 'AT_RISK' },
+  { key: 'disrupted', status: 'DISRUPTED' },
+  { key: 'recovering', status: 'RECOVERING' },
+  { key: 'unknown', status: 'UNKNOWN' },
+];
 
 function summaryTiles(view: OperatorOverview): string {
-  const { summary } = view;
-  const tiles = [
-    { count: summary.ready, label: 'Confirmed', tone: 'ok' },
-    { count: summary.atRisk, label: 'At risk', tone: 'watch' },
-    { count: summary.disrupted, label: 'Needs attention', tone: 'alert', attention: summary.disrupted > 0 },
-    { count: summary.recovering, label: 'Recovery under way', tone: 'active' },
-    { count: summary.unknown, label: 'Unconfirmed', tone: 'neutral' },
-  ];
-  return tiles
-    .map(
-      (tile) =>
-        `<div class="tile tone-${tile.tone}${tile.attention ? ' is-attention' : ''}" data-test="summary-${tile.tone}"><div class="tile-count">${tile.count}</div><div class="tile-label">${escapeHtml(tile.label)}</div></div>`,
-    )
+  return SUMMARY_TILES
+    .map(({ key, status }) => {
+      const count = view.summary[key];
+      const { label, tone } = presentOperationalStatus(status);
+      const attention = status === 'DISRUPTED' && count > 0;
+      return `<div class="tile tone-${tone}${attention ? ' is-attention' : ''}" data-test="summary-${tone}"><div class="tile-count">${count}</div><div class="tile-label">${escapeHtml(label)}</div></div>`;
+    })
     .join('');
 }
 
 function fleetDot(item: OperatorOverviewItem, index: number): string {
-  const tone = operationalStatusTone(item.status);
-  const dotClass =
-    tone === 'ok'
-      ? 'd-ok'
-      : tone === 'watch'
-        ? 'd-watch'
-        : tone === 'alert'
-          ? 'd-bad'
-          : tone === 'active'
-            ? 'd-active'
-            : 'd-unconfirmed';
+  const dotClass = semanticToneDotClass(operationalStatusTone(item.status));
   const label = `${item.travellerLabel} — ${operationalStatusLabel(item.status)}`;
   return `<i class="${dotClass}" style="--i:${index}" title="${escapeHtml(label)}" data-trip-ref="${escapeHtml(item.tripRef)}"></i>`;
 }
 
-function queueGlyph(item: OperatorOverviewItem): string {
-  if (item.decisionRequired) return 'g-bad';
-  if (item.status === 'DISRUPTED') return 'g-bad';
-  if (item.status === 'AT_RISK') return 'g-warn';
-  if (item.status === 'UNKNOWN') return 'g-unk';
-  return 'g-ok';
-}
+// Keyed by boundary tone so RECOVERING (active) is never drawn as a confirmed check.
+const QUEUE_GLYPH: Record<VisualTone, { className: string; char: string }> = {
+  ok: { className: 'g-ok', char: '✓' },
+  watch: { className: 'g-warn', char: '▲' },
+  alert: { className: 'g-bad', char: '✕' },
+  active: { className: 'g-active', char: '…' },
+  neutral: { className: 'g-unk', char: '?' },
+};
 
-function queueGlyphChar(item: OperatorOverviewItem): string {
-  if (item.decisionRequired) return '✕';
-  if (item.status === 'UNKNOWN') return '?';
-  if (item.status === 'AT_RISK') return '▲';
-  if (item.status === 'DISRUPTED') return '✕';
-  return '✓';
+function queueGlyph(item: OperatorOverviewItem): { className: string; char: string } {
+  // decisionRequired is a supplied read-model flag, not an inferred state.
+  return item.decisionRequired ? QUEUE_GLYPH.alert : QUEUE_GLYPH[operationalStatusTone(item.status)];
 }
 
 function overviewItemRow(item: OperatorOverviewItem): string {
@@ -136,14 +98,15 @@ function overviewItemRow(item: OperatorOverviewItem): string {
     item.whatChanged ??
     item.recoveryActivity ??
     (item.decisionRequired ? 'Decision required before recovery can continue.' : 'No open issues reported.');
-  const viability = `<span class="badge tone-${remainderViabilityTone(item.remainderViability)}">${escapeHtml(VIABILITY_LABEL[item.remainderViability])}</span>`;
+  const viability = `<span class="badge tone-${remainderViabilityTone(item.remainderViability)}">${escapeHtml(remainderViabilityLabel(item.remainderViability))}</span>`;
+  const glyph = queueGlyph(item);
   const uncertainty =
     item.unresolvedUncertainty.length > 0
       ? `<p class="b-extra">${escapeHtml(item.unresolvedUncertainty.join(' · '))}</p>`
       : '';
   return `
     <div class="qrow" data-trip-ref="${escapeHtml(item.tripRef)}" data-test="overview-item">
-      <span class="q-glyph ${queueGlyph(item)}" aria-hidden="true">${queueGlyphChar(item)}</span>
+      <span class="q-glyph ${glyph.className}" aria-hidden="true">${glyph.char}</span>
       <div>
         <div class="q-name">${escapeHtml(item.travellerLabel)}</div>
         <div class="q-issue">${escapeHtml(issue)}</div>
