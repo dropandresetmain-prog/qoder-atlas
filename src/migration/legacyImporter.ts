@@ -997,7 +997,23 @@ async function importOneRecord(
     });
     return 'recordsQuarantined';
   }
-  if (outcome.kind === 'DEFERRED') return 'recordsDeferred';
+  // A handler that defers has already said why. Dropping that reason on the
+  // floor would leave the same anonymous counter the no-handler path used to
+  // produce, so the stated reason becomes the exception.
+  if (outcome.kind === 'DEFERRED') {
+    await appendReconciliationException(ctx.pool, ctx.runId, {
+      classification: 'DEFERRED_NO_HANDLER',
+      categoryId: category.categoryId,
+      sourceType: record.sourceType,
+      sourceId: record.sourceId,
+      reason: outcome.reason,
+      affectedScope: `${category.categoryId} ${record.sourceId}`,
+      safetyImpact: 'whatever this row represented is absent from the target and nothing in the target refers to it',
+      owner: 'migration owner',
+      blocksCutover: true,
+    });
+    return 'recordsDeferred';
+  }
 
   // An archived record still earns a mapping row, keyed to the evidence it
   // became. Without one, a replay would see no prior mapping and redo the
