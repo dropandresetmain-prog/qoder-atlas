@@ -29,6 +29,23 @@ FIG-1 edge id, FIG-2 edge authority + changed edge ids, FIG-3 monotonic revision
 FIG-4 subject-keyed node refs, FIG-6 producer fidelity, FIG-7 assessment lifecycle.
 See `docs/FRONTEND_SEMANTIC_CONTRACT.md` for the smallest additive change per gap.
 
+Review verdict: PASS WITH TARGETED FIXES. The frontend boundary is a safe base to continue
+from. Live `LiveDependencyGraph` wiring stays blocked on the backend prerequisites above.
+
+Review verification (fix commit `bf66455`):
+
+- Focused `ui-semantic-contract` + `m9-product-surfaces`: 25/25. The 6 new/changed
+  defect tests fail against `20b9b61` (checked in a throwaway detached worktree).
+- Relevant M9/read-model/UI files (15 files): 122/122.
+- `typecheck`, `lint`, `build` exit 0; `gate:anti-hardcoding` CLEAN; a word-bounded scan
+  of added lines finds no persona, flight, airport or timer literals.
+- Rendered HTML for every legal status/viability/state/verdict combination differs
+  from `20b9b61` only in operator viability wording, the RECOVERING queue glyph and
+  the ACTIVE/UNKNOWN commitment dots.
+- Full suite at `20b9b61`: 1134 tests, 1131 pass, 3 fail. At review head: 1140 tests,
+  1137 pass, the identical 3 failures (R1 determinism, Jordan S2 browser approval,
+  AiT seed promotion). No regression.
+
 ## Goal
 
 Implement the accepted-M9 presentation contract, one adapter boundary, shared
