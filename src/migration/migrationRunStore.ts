@@ -43,6 +43,26 @@ export function derivedUuid(namespace: string, name: string): string {
 }
 
 /**
+ * The target id a given source record's `step` always produces.
+ *
+ * Exported because reconciliation needs to recompute the *same* id the importer
+ * wrote, so it can check the one specific row a source fact became rather than
+ * counting rows and hoping the totals line up. The importer's `ImportContext`
+ * delegates here, so there is exactly one derivation and the two cannot drift.
+ */
+export function migrationTargetId(params: {
+  datasetHash: string;
+  sourceType: string;
+  sourceId: string;
+  step: string;
+}): string {
+  return derivedUuid(
+    `northstar:migration:${params.step}`,
+    `${params.datasetHash}:${params.sourceType}:${params.sourceId}`,
+  );
+}
+
+/**
  * Classification vocabulary for a reconciliation exception. Every exception
  * must say what kind of problem it is — a count delta is not a finding.
  */

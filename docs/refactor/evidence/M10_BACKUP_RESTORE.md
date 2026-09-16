@@ -69,7 +69,7 @@ Run on branch `milestone-m10-migration-rehearsal` at the C5 remediation candidat
 | --- | --- |
 | Dataset identity | `legacy-deployment-m10-restore-rehearsal` |
 | Dataset hash | `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d` |
-| Migration run | `39a112d5-dc51-4b61-b1da-74cebcee6404`, status `COMPLETED` |
+| Migration run | `18953aa8-8086-4dba-bf76-585f186bc3cf`, status `COMPLETED` |
 | Tooling | exporter `1.1.0`, importer `1.0.0`, reconciler `1.0.0` |
 | Import outcome | imported 10, quarantined 1, deferred 0, exceptions 2 |
 | Pre-backup state | 11 `legacy_id_map` mappings; organisations 1, travellers 3, trips 1, journeys 1, constraint_definitions 1, evidence_records 5, source_records 2, assessments 1 |

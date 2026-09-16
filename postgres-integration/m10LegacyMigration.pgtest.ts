@@ -24,13 +24,14 @@ import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed } from './m2Seed.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { exportLegacyDataset } from '../src/migration/legacyExporter.ts';
+import { bundleRecordsInReplayOrder } from '../src/migration/legacyExportBundle.ts';
 import {
   importLegacyBundle,
   LEGACY_CONSTRAINT_STATUS_ASSERTION,
   MIGRATION_PROVENANCE_ASSERTION,
   MigrationInterrupted,
 } from '../src/migration/legacyImporter.ts';
-import { readMigrationRun } from '../src/migration/migrationRunStore.ts';
+import { migrationTargetId, readMigrationRun } from '../src/migration/migrationRunStore.ts';
 import { recomputeMigratedState } from '../src/migration/recomputeMigratedState.ts';
 import { reconcileMigration, renderReconciliationReport } from '../src/migration/reconcileMigration.ts';
 import { collectUncertainSourceFacts } from '../src/migration/legacyUncertainty.ts';
@@ -1041,6 +1042,189 @@ test('C5 blocker 2: falsely resolving a migrated UNKNOWN makes UNCERTAINTY_PRESE
   const failing = after.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
   assert.ok(failing);
   assert.equal(failing.status, 'FAIL', 'resolving an unknown the source never observed must fail the check');
-  assert.match(failing.detail, /resolved to a status the source never observed/);
+  assert.match(failing.detail, /now reads CONFIRMED/);
   assert.equal(after.verdict, 'BLOCKED', 'a failed semantic check blocks the verdict');
+});
+
+/**
+ * The check must be identity-bound, not aggregate.
+ *
+ * A workspace-wide "how many UNKNOWN lines are there" comparison can be
+ * satisfied by the wrong row: falsely resolve uncertain element A, let some
+ * unrelated line B be UNKNOWN, and the totals still balance. This test builds
+ * exactly that compensation and requires a FAIL anyway.
+ */
+test('C5 blocker 2: an unrelated UNKNOWN line cannot mask a specific falsely-resolved one', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+
+  const reconcileArgs = { workspaceId, runId: result.runId, bundle, now: NOW, importStartedAt: NOW };
+  const before = await reconcileMigration(pool, reconcileArgs);
+  assert.equal(before.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED')?.status, 'PASS');
+
+  // The two lines to swap: the uncertain CHANGED stay, and the known CONFIRMED
+  // arrival. Both ids are recomputed exactly as the importer derived them.
+  const uncertainLineId = migrationTargetId({
+    datasetHash: bundle.datasetHash,
+    sourceType: 'trips',
+    sourceId: 'trip-solo:el-solo-stay',
+    step: 'reservation-line',
+  });
+  const knownLineId = migrationTargetId({
+    datasetHash: bundle.datasetHash,
+    sourceType: 'trips',
+    sourceId: 'trip-solo:el-solo-arrival',
+    step: 'reservation-line',
+  });
+  const uncertainBefore = await pool.query<{ observed_status: string }>(
+    'SELECT observed_status FROM reservation_lines WHERE workspace_id = $1 AND id = $2',
+    [workspaceId, uncertainLineId],
+  );
+  assert.equal(uncertainBefore.rows[0]?.observed_status, 'UNKNOWN', 'the CHANGED element migrated as UNKNOWN');
+
+  const evidence = await pool.query<{ id: string }>(
+    'SELECT id FROM evidence_records WHERE workspace_id = $1 LIMIT 1',
+    [workspaceId],
+  );
+  const unknownTotalBefore = await pool.query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM reservation_lines
+     WHERE workspace_id = $1 AND observed_status = 'UNKNOWN'`,
+    [workspaceId],
+  );
+
+  // A: falsely resolved. B: an unrelated line made UNKNOWN to compensate.
+  await pool.query(
+    `UPDATE reservation_lines
+     SET observed_status = 'CONFIRMED', observed_status_at = $3, observation_evidence_id = $4
+     WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, uncertainLineId, NOW, evidence.rows[0]?.id],
+  );
+  await pool.query(
+    `UPDATE reservation_lines
+     SET observed_status = 'UNKNOWN', observed_status_at = NULL, observation_evidence_id = NULL
+     WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, knownLineId],
+  );
+
+  // The aggregate is now indistinguishable from the honest state, which is the
+  // whole point: a count-based check would pass here.
+  const unknownTotalAfter = await pool.query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM reservation_lines
+     WHERE workspace_id = $1 AND observed_status = 'UNKNOWN'`,
+    [workspaceId],
+  );
+  assert.equal(
+    unknownTotalAfter.rows[0]?.count,
+    unknownTotalBefore.rows[0]?.count,
+    'the workspace-wide UNKNOWN count is unchanged, so only identity binding can detect the loss',
+  );
+
+  const after = await reconcileMigration(pool, reconcileArgs);
+  const failing = after.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(failing);
+  assert.equal(failing.status, 'FAIL', 'a compensating unrelated UNKNOWN must not mask the resolved fact');
+  assert.match(failing.detail, /el-solo-stay/, 'the failure names the specific source fact that lost its uncertainty');
+  assert.match(failing.detail, new RegExp(uncertainLineId), 'and the specific target row');
+  assert.equal(after.verdict, 'BLOCKED');
+});
+
+/**
+ * The same masking problem for provider deliveries: one delivery's archive must
+ * not stand in as evidence for a different delivery's lost uncertainty.
+ *
+ * The mismatch is built through a real failure mode rather than by tampering,
+ * because `evidence_records` is append-only and correctly refuses deletion. An
+ * import interrupted between the two deliveries leaves exactly the state in
+ * question: the settled delivery archived, the *unsettled* one never reached and
+ * so carrying neither an archive nor a named exception.
+ */
+test('C5 blocker 2: another delivery archive cannot mask an unaccounted uncertain delivery', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+
+  // Deliveries are ordered by receipt time, so the settled one precedes the
+  // unsettled one; stop immediately after it.
+  const order = bundleRecordsInReplayOrder(bundle).map((entry) => entry.record);
+  const handledIndex = order.findIndex(
+    (record) => record.sourceType === 'provider_event_inbox' && record.sourceId === 'atlas:evt-handled',
+  );
+  const pendingIndex = order.findIndex(
+    (record) => record.sourceType === 'provider_event_inbox' && record.sourceId === 'atlas:evt-pending',
+  );
+  assert.ok(handledIndex >= 0 && pendingIndex > handledIndex, 'the settled delivery is replayed first');
+
+  const interrupted = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    failAfterRecords: handledIndex + 1,
+    now: () => NOW,
+  });
+  assert.equal(interrupted.status, 'IN_PROGRESS');
+
+  const archiveIdFor = (sourceId: string) =>
+    migrationTargetId({
+      datasetHash: bundle.datasetHash,
+      sourceType: 'provider_event_inbox',
+      sourceId,
+      step: 'archive-evidence',
+    });
+  const handled = await pool.query('SELECT 1 FROM evidence_records WHERE workspace_id = $1 AND id = $2', [
+    workspaceId,
+    archiveIdFor('atlas:evt-handled'),
+  ]);
+  assert.equal(handled.rowCount, 1, 'the settled delivery is archived and remains available to do the masking');
+  const pending = await pool.query('SELECT 1 FROM evidence_records WHERE workspace_id = $1 AND id = $2', [
+    workspaceId,
+    archiveIdFor('atlas:evt-pending'),
+  ]);
+  assert.equal(pending.rowCount, 0, 'the unsettled delivery has no archive of its own');
+  const run = await readMigrationRun(pool, interrupted.runId);
+  assert.ok(
+    !run.reconciliationExceptions.some((entry) => entry.sourceId === 'atlas:evt-pending'),
+    'and no named exception accounts for it either',
+  );
+
+  const report = await reconcileMigration(pool, {
+    workspaceId,
+    runId: interrupted.runId,
+    bundle,
+    now: NOW,
+    importStartedAt: NOW,
+  });
+  const failing = report.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(failing);
+  assert.equal(failing.status, 'FAIL', 'a different delivery archive must not account for this one');
+  assert.match(failing.detail, /evt-pending/, 'the failure names the delivery that lost its accounting');
+  assert.match(failing.detail, /no archived capture of its own and no named exception/);
+  assert.equal(report.verdict, 'BLOCKED');
+
+  // Resuming completes the accounting, so the FAIL was about the real gap
+  // rather than an artefact of reconciling a partial run.
+  const resumed = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(resumed.status, 'COMPLETED');
+  const healed = await reconcileMigration(pool, {
+    workspaceId,
+    runId: resumed.runId,
+    bundle,
+    now: NOW,
+    importStartedAt: NOW,
+  });
+  assert.equal(
+    healed.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED')?.status,
+    'PASS',
+    'once the delivery is archived under its own id the fact is accounted for',
+  );
 });

@@ -17,22 +17,23 @@ isolated environments.
 | | |
 | --- | --- |
 | Branch | `milestone-m10-migration-rehearsal` |
-| **Candidate under review** | tag **`m10-candidate-c5-remediation`** |
-| Superseded candidates | `m10-candidate-final` (`eff19a9`), `m10-candidate` (`1d81dd7`) |
+| **Candidate under review** | tag **`m10-candidate-c5-remediation-2`** |
+| Superseded candidates | `m10-candidate-c5-remediation` (`9486fc5`), `m10-candidate-final` (`eff19a9`), `m10-candidate` (`1d81dd7`) |
 | Accepted M9/C4 base | `c45a9289b7f7ff730cdce97ced6124b1a9332bf8` |
 
 The candidate is identified by an annotated tag rather than a SHA written into this file, because a
 document cannot contain the hash of the commit that contains it. Resolve it with
-`git rev-list -n 1 m10-candidate-c5-remediation` (`git rev-parse` on an annotated tag returns the
+`git rev-list -n 1 m10-candidate-c5-remediation-2` (`git rev-parse` on an annotated tag returns the
 tag object, not the commit).
 
-Three tags exist deliberately. Earlier tags are never moved, so their history stays honest:
+Four tags exist deliberately. Earlier tags are never moved, so their history stays honest:
 
 | tag | what it marks |
 | --- | --- |
 | `m10-candidate` | `1d81dd7` — implementation complete. |
 | `m10-candidate-final` | `eff19a9` — plus an evidence-consistency pass. **Failed C5** on the two blockers in §12. |
-| **`m10-candidate-c5-remediation`** | **the commit under review** — both C5 blockers fixed, with new focused tests and regenerated rehearsal evidence. |
+| `m10-candidate-c5-remediation` | `9486fc5` — currency fixed and accepted, but the replacement uncertainty check was count-based. **Failed C5 re-review** on that. |
+| **`m10-candidate-c5-remediation-2`** | **the commit under review** — uncertainty reconciliation is now identity-bound per source fact. |
 
 Unlike the previous pass, this one **changes executable code**, so every result in §9 was re-run on
 this candidate rather than carried forward.
@@ -62,7 +63,7 @@ migrated target. So one dataset and one hash cover both.
 | Source identity | `legacy-deployment-m10-restore-rehearsal` |
 | **Dataset hash** | **`6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`** |
 | Export cutoff | `2026-03-01T00:00:00Z` |
-| Migration run | `39a112d5-dc51-4b61-b1da-74cebcee6404` |
+| Migration run | `18953aa8-8086-4dba-bf76-585f186bc3cf` |
 | Produced at | this candidate, by `scripts/m10-cutover-and-restore-rehearsal.mjs` |
 
 The hash is deterministic: re-exporting the same frozen source produces the same hash, and the same
@@ -219,7 +220,7 @@ isolated, **volume-backed** instance — deliberately not the shared tmpfs test 
 restoring into a RAM-backed non-durable data directory would prove nothing.
 
 Run at this candidate, over the same single dataset `6ebf05ce…` as §3 and §4, migration run
-`39a112d5-dc51-4b61-b1da-74cebcee6404`. **10/10 checks PASS**, including that the instance really is
+`18953aa8-8086-4dba-bf76-585f186bc3cf`. **10/10 checks PASS**, including that the instance really is
 volume-backed, that the database is genuinely destroyed before restore (0 tables remaining), that
 all 11 `legacy_id_map` tuples and the migration run identity survive, that the recomputed assessment
 survives, and that the append-only trigger is restored with the data rather than just the rows. Both
@@ -243,10 +244,10 @@ the real `src/main.ts`) and `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`
 | `postgres-integration/m9SarahTargetE2E.pgtest.ts` | PASS |
 | `postgres-integration/m9JordanMultiActionRecovery.pgtest.ts` | PASS |
 | `postgres-integration/m9JordanReplacementFlightViability.pgtest.ts` | PASS |
-| `postgres-integration/m10LegacyMigration.pgtest.ts` | **9/9 PASS** (7 + both new C5 blocker tests) |
+| `postgres-integration/m10LegacyMigration.pgtest.ts` | **11/11 PASS** (7 + four C5 blocker tests) |
 | `postgres-integration/m10RuntimePurgeBoot.pgtest.ts` | PASS |
 | `test/m10-legacy-exporter.test.ts` + `test/m10-runtime-purge.test.ts` | 10/10 PASS |
-| `npm run test:postgres` on a **fresh** database | **470/470 PASS**, exit 0 |
+| `npm run test:postgres` on a **fresh** database | **472/472 PASS**, exit 0 |
 | `npx tsc --noEmit` | clean |
 | `npm run build` | clean |
 | `npm run lint` | clean |
@@ -255,7 +256,7 @@ the real `src/main.ts`) and `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`
 Sarah and Jordan were not modified to accommodate migration tooling; they remain independent
 target-runtime regression evidence.
 
-470 is the previous 468 plus the two new C5 blocker tests. Every result in this table was produced
+472 is the original 468 plus the four C5 blocker tests. Every result in this table was produced
 on **this** candidate; unlike the previous evidence pass, nothing is carried forward, because this
 candidate changes executable code.
 
@@ -283,18 +284,19 @@ The boundary is observable rather than a judgement call: Zone B begins at the fi
 
 ## 11. Suite behaviour on an accumulated database, disclosed rather than hidden
 
-The gate above was run on a freshly created `northstar_test` database and is 470/470, exit 0.
+The gate above was run on a freshly created `northstar_test` database and is 472/472, exit 0.
 
 This suite has a low-rate, non-deterministic single-file failure that a reviewer should expect and
-not mistake for a regression. Across four full runs it has landed on a **different file every
-time** and never twice on the same one:
+not mistake for a regression. Across five full runs it has landed on a **different file every
+time**, never twice on the same one, and the last two runs were clean:
 
 | run | database | result |
 | --- | --- | --- |
 | 1 | shared, accumulated | 1 failure: `m3IdentityMoney.pgtest.ts` |
 | 2 | shared, accumulated | 1 failure: `m2Travel.pgtest.ts` |
 | 3 | fresh | 1 failure: `m2SubtypeIntegrity.pgtest.ts` |
-| 4 | fresh | **470/470 PASS** |
+| 4 | fresh | 470/470 PASS |
+| 5 | fresh | **472/472 PASS** (this candidate, after the identity-bound uncertainty fix) |
 
 Two distinct causes are visible. The `m2Travel` failure is plan-sensitivity: it asserts a specific
 query uses a specific index, and on an accumulated database the planner chose a *different* index
@@ -358,16 +360,50 @@ read it**, so the two cannot drift into different interpretations of the same le
 this also closed a real inconsistency: the importer previously raised its preserved-unknown
 exception only for `CHANGED`, silently treating a legacy `UNKNOWN` as unremarkable.
 
-For each uncertain source fact the reconciler requires one of: an explicitly `UNKNOWN` target
-representation, a named exception, or archived evidence. It returns `FAIL` when a fact is
-unaccounted for, and when the count of target `UNKNOWN` reservation lines falls below the number of
-migrated uncertain elements — that second arm is what catches an unknown being resolved to a status
-nobody observed.
+#### Identity-bound, not aggregate
 
-Proven by `C5 blocker 2: falsely resolving a migrated UNKNOWN makes UNCERTAINTY_PRESERVED fail`,
-which imports the bundle, confirms the check passes honestly, then updates a migrated `UNKNOWN`
-line to `CONFIRMED` — satisfying the table's CHECK constraints so the row looks superficially
-complete — and asserts the check flips to `FAIL` and the verdict to `BLOCKED`.
+The first remediation attempt replaced the hard-coded `PASS` with a **count** comparison, and the
+C5 re-review correctly rejected it: comparing the number of workspace-wide `UNKNOWN` reservation
+lines against the number of migrated uncertain elements lets the wrong row satisfy the check.
+Falsely resolve element A, leave an unrelated line B `UNKNOWN`, and the totals still balance. The
+same hole existed for provider deliveries, where a single global "some delivery was archived" count
+could stand in for a different delivery's lost accounting. A sensor that can be satisfied by
+compensation is the exact class of aggregate reasoning M10 is built not to trust.
+
+Each uncertain fact is now traced to **its own** target row. The importer derives every target id
+from the source record (`migrationTargetId`, now exported from `migrationRunStore.ts` and used by
+both sides so there is one derivation), and a trip element's rows are written under the
+element-scoped source id `tripId:elementId`. So reconciliation recomputes the exact id and reads
+that one row:
+
+| uncertain source fact | accounted for only by |
+| --- | --- |
+| migrated reservation element | **that element's own** reservation line still reading `UNKNOWN` |
+| element whose scope was held back | a named exception covering that scope |
+| provider delivery | **that delivery's own** archived evidence id, or its own named exception |
+
+`FAIL` is returned when a fact's own line exists but no longer reads `UNKNOWN`, when a fact has
+neither a target row nor an exception holding it back, or when a delivery has neither its own
+archive nor its own named exception. No other row can compensate, and the failure detail names the
+specific source fact and the specific target id.
+
+The PASS detail is correspondingly specific rather than a tally — the canonical rehearsal reports
+`1 uncertain source fact(s) in the bundle, each traced to its own preservation:
+trips/trip-single#el-single-return=target-line-UNKNOWN`.
+
+Three negative tests, because a FAIL path alone was not enough:
+
+| test | proves |
+| --- | --- |
+| falsely resolving a migrated `UNKNOWN` | the check has a real `FAIL` path at all |
+| an unrelated `UNKNOWN` line cannot mask a specific falsely-resolved one | resolving element A while making unrelated line B `UNKNOWN` leaves the workspace-wide count **identical** — asserted in the test — and still `FAIL`s |
+| another delivery archive cannot mask an unaccounted uncertain delivery | the settled delivery's archive does not account for the unsettled one |
+
+The third builds its mismatch through a real failure mode rather than tampering: `evidence_records`
+is append-only and correctly refuses deletion, so the test interrupts the import between the two
+deliveries, leaving the settled one archived and the unsettled one with neither archive nor
+exception. It then resumes and asserts the check returns to `PASS`, so the `FAIL` is attributable to
+the real gap rather than to reconciling a partial run.
 
 ### Deliberately not changed
 

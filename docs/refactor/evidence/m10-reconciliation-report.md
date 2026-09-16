@@ -2,7 +2,7 @@
 
 **Verdict: BLOCKED.** 1 exception(s) block cutover for their scope. Cutover must not proceed for the affected scope until an owner resolves these.
 
-- Run `39a112d5-dc51-4b61-b1da-74cebcee6404` (COMPLETED), generated 2026-03-02T09:00:00Z
+- Run `18953aa8-8086-4dba-bf76-585f186bc3cf` (COMPLETED), generated 2026-03-02T09:00:00Z
 - Dataset hash `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`
 - Exporter `northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`, reconciler `northstar-migration-reconciler/1.0.0`
 - 11 exported record(s), 11 mapping(s), 2 exception(s), 1 blocking cutover
@@ -26,7 +26,7 @@
 - **PROVIDER_REFS_PRESERVED — PASS.** 2 legacy booking reference(s) in the bundle; 2 preserved as evidence against a migrated reservation; 2 element-level exception(s) account for the rest. Binding references as target external identity remains a documented open seam.
 - **EVIDENCE_LINEAGE_INTACT — PASS.** all 11 mappings cite an evidence record that exists
 - **OBLIGATIONS_COMPLETE — PASS.** 2 reservation(s), 0 holding no line
-- **UNCERTAINTY_PRESERVED — PASS.** 1 uncertain source fact(s) in the bundle, all accounted for: 1 migrated uncertain reservation(s) against 1 target UNKNOWN line(s), 1 named PRESERVED_UNKNOWN_EXTERNAL_OUTCOME exception(s), 0 archived provider delivery record(s)
+- **UNCERTAINTY_PRESERVED — PASS.** 1 uncertain source fact(s) in the bundle, each traced to its own preservation: trips/trip-single#el-single-return=target-line-UNKNOWN
 - **MONEY_ACCOUNTED — PASS.** no budget commitment migrated: the legacy dataset held no priced, held or settled commitment. 0 legacy FX observation(s) are archived as dated history and are never used as a current conversion rate.
 - **DERIVED_TRUTH_RECOMPUTED — PASS.** 1/1 assessment(s) were evaluated after the import began; legacy verdicts are archived as LEGACY_CONSTRAINT_STATUS evidence and are not assessments
 - **NO_PROVIDER_DISPATCH — PASS.** no execution attempt exists in this workspace: the migration is provider-side-effect-free

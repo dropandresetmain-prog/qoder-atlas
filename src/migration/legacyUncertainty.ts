@@ -49,6 +49,13 @@ export interface UncertainSourceFact {
   recordKey: string;
   sourceType: string;
   sourceId: string;
+  /**
+   * The source id of the *fact itself*, which for a trip element is the
+   * element-scoped `tripId:elementId` the importer writes its rows under. This
+   * is what lets reconciliation recompute the one specific target row this fact
+   * became, instead of comparing totals.
+   */
+  factSourceId: string;
   /** Unique within a bundle; an element-level fact is narrower than its record. */
   factId: string;
   /** The legacy value that makes this uncertain, for the report. */
@@ -96,6 +103,9 @@ export function collectUncertainSourceFacts(bundle: MigrationBundle): UncertainS
           recordKey,
           sourceType: record.sourceType,
           sourceId: record.sourceId,
+          // Mirrors the importer's `elementRecord`: `{ ...record, sourceId:
+          // `${record.sourceId}:${elementId}` }`.
+          factSourceId: `${record.sourceId}:${elementId}`,
           factId: `${recordKey}#${elementId}`,
           legacyValue: state ?? 'UNRECORDED',
           detail:
@@ -113,6 +123,8 @@ export function collectUncertainSourceFacts(bundle: MigrationBundle): UncertainS
             recordKey,
             sourceType: record.sourceType,
             sourceId: record.sourceId,
+            // A delivery is archived under its own record id, not an element scope.
+            factSourceId: record.sourceId,
             factId: recordKey,
             legacyValue: status ?? 'UNRECORDED',
             detail:

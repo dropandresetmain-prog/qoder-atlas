@@ -67,6 +67,7 @@ import {
   finishMigrationRun,
   IMPORTER_VERSION,
   derivedUuid,
+  migrationTargetId,
   insertLegacyMapping,
   lookupLegacyMapping,
   readMigrationRun,
@@ -852,10 +853,12 @@ export async function importLegacyBundle(
       return `migration:${bundle.datasetHash}:${record.sourceType}:${record.sourceId}:${step}`;
     },
     targetId(record, step) {
-      return derivedUuid(
-        `northstar:migration:${step}`,
-        `${bundle.datasetHash}:${record.sourceType}:${record.sourceId}`,
-      );
+      return migrationTargetId({
+        datasetHash: bundle.datasetHash,
+        sourceType: record.sourceType,
+        sourceId: record.sourceId,
+        step,
+      });
     },
     uow() {
       return new PgUnitOfWork(pool, request.workspaceId);

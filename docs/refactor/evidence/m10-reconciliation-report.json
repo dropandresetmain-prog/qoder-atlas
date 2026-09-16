@@ -1,7 +1,7 @@
 {
   "reconcilerVersion": "northstar-migration-reconciler/1.0.0",
   "generatedAt": "2026-03-02T09:00:00Z",
-  "runId": "39a112d5-dc51-4b61-b1da-74cebcee6404",
+  "runId": "18953aa8-8086-4dba-bf76-585f186bc3cf",
   "sourceDataset": "legacy-deployment-m10-restore-rehearsal",
   "datasetHash": "6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d",
   "exporterVersion": "northstar-legacy-exporter/1.1.0",
@@ -170,7 +170,7 @@
       "id": "UNCERTAINTY_PRESERVED",
       "question": "Did anything the old system did not know become certainty in the new one?",
       "status": "PASS",
-      "detail": "1 uncertain source fact(s) in the bundle, all accounted for: 1 migrated uncertain reservation(s) against 1 target UNKNOWN line(s), 1 named PRESERVED_UNKNOWN_EXTERNAL_OUTCOME exception(s), 0 archived provider delivery record(s)"
+      "detail": "1 uncertain source fact(s) in the bundle, each traced to its own preservation: trips/trip-single#el-single-return=target-line-UNKNOWN"
     },
     {
       "id": "MONEY_ACCOUNTED",

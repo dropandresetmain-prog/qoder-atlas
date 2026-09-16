@@ -316,7 +316,8 @@ seam. After Phase 1's named gaps close, start Phase 3 (legacy exporter) per
 | EVIDENCE-SQLITE-FALLBACK | **Closed** (final evidence pass) | Rollback Zone A said "point traffic back at the legacy runtime", contradicting the frozen single-runtime rule. Rewritten as abort/freeze/restore-pre-import-backup/re-import/retry, with an explicit statement that neither zone permits reactivating the SQLite application. Historical M1/M2/M5/M7/M9 evidence left unedited — it described its own moment accurately. |
 | DOC-ENCODING-DAMAGE | **Closed** (final evidence pass) | `M10_ACTIVE_TASK.md` had been written through a lossy single-byte encoding: 5 section signs decoded as U+FFFD and ~72 em dashes, 5 arrows and 2 ellipses flattened to literal `?`. Repaired to real UTF-8; the URL query and `?? 1` operator references were preserved. Meaning unchanged. |
 | C5-ORG-CURRENCY | **Closed** (C5 remediation) | Blocker 1. The importer read `payload.defaultCurrencyCode` — a *target* field name absent from the legacy model — and fell back to `'USD'`, so every migrated organisation got a fabricated currency. Now maps legacy `homeCurrency` exactly when it matches /^[A-Z]{3}$/, and otherwise fails closed: no organisation row, payload archived as `LEGACY_ORGANISATION` evidence, `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` exception blocking that scope. Target schema unchanged (`default_currency_code NOT NULL` is what forces the honest answer). |
-| C5-UNCERTAINTY-FAIL-OPEN | **Closed** (C5 remediation) | Blocker 2. `UNCERTAINTY_PRESERVED` passed a literal `'PASS'` with counts only in the detail string, so a dataset that lost or falsely resolved uncertainty still reconciled green. Now computed from the source bundle via the shared `legacyUncertainty.ts`, which the importer reads too so the two cannot drift. Returns FAIL on an unaccounted fact or when target UNKNOWN lines fall below migrated uncertain elements. Negative proof: tamper a migrated UNKNOWN to CONFIRMED, check flips to FAIL and verdict to BLOCKED. |
+| C5-UNCERTAINTY-FAIL-OPEN | **Closed** (superseded by C5-UNCERTAINTY-AGGREGATE) | Blocker 2. `UNCERTAINTY_PRESERVED` passed a literal `'PASS'` with counts only in the detail string, so a dataset that lost or falsely resolved uncertainty still reconciled green. Now computed from the source bundle via the shared `legacyUncertainty.ts`, which the importer reads too so the two cannot drift. Returns FAIL on an unaccounted fact or when target UNKNOWN lines fall below migrated uncertain elements. Negative proof: tamper a migrated UNKNOWN to CONFIRMED, check flips to FAIL and verdict to BLOCKED. |
+| C5-UNCERTAINTY-AGGREGATE | **Closed** (C5 re-review remediation) | The first fix for blocker 2 removed the hard-coded PASS but replaced it with a *count* comparison: workspace-wide UNKNOWN reservation lines against migrated uncertain elements, plus a single global archived-delivery count. The C5 re-review correctly rejected it — falsely resolve element A, leave unrelated line B UNKNOWN, totals balance, check passes. Same hole for deliveries, where one archive stood in for another. Now identity-bound: `migrationTargetId` is exported from `migrationRunStore.ts` and used by both the importer and the reconciler, so reconciliation recomputes each fact's own target id and reads that one row. Two further negative tests prove compensation cannot mask a loss. |
 | C5-LEGACY-UNKNOWN-UNNAMED | **Closed** (C5 remediation) | Found while sharing the uncertainty definition: the importer raised `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` only for legacy `CHANGED`, treating a legacy `UNKNOWN` reservation as unremarkable even though it is equally an unresolved external outcome. Both now earn a named exception. |
 | PGTEST-FILE-STARTUP-RACE | Ignore / Accept Risk | A full `test:postgres` run intermittently fails exactly one file, a different one each time (`m3IdentityMoney`, then `m2Travel`, then `m2SubtypeIntegrity`). The third failed at file level in 547ms with no subtest executed — a startup/connection failure, not an assertion — and passed 15/15 alone, 61/61 with its predecessor, and in the next full run (470/470). Two causes: planner plan-sensitivity on an accumulated database, and a connection-setup race under a long sequential suite. Neither is an M10 regression; chasing a harness race is out of scope. Re-run the affected file in isolation before treating it as a finding. |
 | MIG-VERIFY-DUP | Park for Later | The rehearsal script's `snapshotMigratedState` and `reconcileMigration` each hand-roll their own mapping-tuple and run-identity reads. They check genuinely different invariants (restore fidelity vs. migration semantics), so this is duplication of SQL rather than of meaning — but a shared `summariseMigratedDataset` read would stop them drifting. Revisit if a third caller appears, or before M11 cutover verification is written. |
@@ -327,23 +328,24 @@ seam. After Phase 1's named gaps close, start Phase 3 (legacy exporter) per
 
 ## Exact candidate state
 
-**Candidate under review: tag `m10-candidate-c5-remediation` on
+**Candidate under review: tag `m10-candidate-c5-remediation-2` on
 `milestone-m10-migration-rehearsal`** (resolve with
-`git rev-list -n 1 m10-candidate-c5-remediation`), base
+`git rev-list -n 1 m10-candidate-c5-remediation-2`), base
 `c45a9289b7f7ff730cdce97ced6124b1a9332bf8`.
 
-Three tags, none ever moved, so each stays honest: `m10-candidate` = `1d81dd7`
+Four tags, none ever moved, so each stays honest: `m10-candidate` = `1d81dd7`
 (implementation complete); `m10-candidate-final` = `eff19a9` (evidence pass,
-**failed C5**); `m10-candidate-c5-remediation` = this candidate, with both C5
-blockers fixed. Unlike the evidence pass, this one changes executable code, so
-all gates were re-run here rather than carried forward.
+**failed C5**); `m10-candidate-c5-remediation` = `9486fc5` (currency fixed and
+accepted, but the replacement uncertainty check was count-based — **failed the
+C5 re-review** on that); `m10-candidate-c5-remediation-2` = this candidate,
+where uncertainty reconciliation is identity-bound per source fact.
 
 Phases 3-10 are implemented and rehearsed. **One** canonical rehearsal dataset,
 covering cutover and restore in a single run of
 `scripts/m10-cutover-and-restore-rehearsal.mjs`: identity
 `legacy-deployment-m10-restore-rehearsal`, hash
 `6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`, run
-`39a112d5-dc51-4b61-b1da-74cebcee6404`, exporter
+`18953aa8-8086-4dba-bf76-585f186bc3cf`, exporter
 `northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`,
 reconciler `northstar-migration-reconciler/1.0.0`.
 
@@ -360,8 +362,8 @@ no uncertainty at all, so `UNCERTAINTY_PRESERVED` was evaluating an empty set.
 Everything else in the category matrix is a *policy that did not apply* to this
 dataset. C5 §5A/§5B keeps those two lists apart.
 
-Evidence on this candidate: `npm run test:postgres` **on a fresh database**;
-migration suite 9/9 including both new C5 blocker tests; cutover + restore
+Evidence on this candidate: `npm run test:postgres` **472/472 on a fresh database**;
+migration suite 11/11 including all four C5 blocker tests; cutover + restore
 rehearsal 10/10; 9/9 semantic checks PASS with verdict BLOCKED (correct while
 one scope is quarantined); Sarah and both Jordan PG regressions PASS;
 exporter + runtime-purge 10/10; purge boot PASS; typecheck, build, lint and

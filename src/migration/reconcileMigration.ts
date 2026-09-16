@@ -19,7 +19,7 @@ import type { Pool } from '../persistence/postgres/pool.ts';
 import type { MigrationBundle } from './legacyExportBundle.ts';
 import { bundleRecordsInReplayOrder } from './legacyExportBundle.ts';
 import { collectUncertainSourceFacts } from './legacyUncertainty.ts';
-import { readMigrationRun, type MigrationReconciliationException } from './migrationRunStore.ts';
+import { migrationTargetId, readMigrationRun, type MigrationReconciliationException } from './migrationRunStore.ts';
 
 export const RECONCILER_VERSION = 'northstar-migration-reconciler/1.0.0';
 
@@ -229,69 +229,82 @@ export async function reconcileMigration(pool: Pool, request: ReconcileRequest):
   // --- 6. Uncertainty: nothing unknown was resolved by migrating it ---
   //
   // Driven from the SOURCE bundle, because only the source can say what the old
-  // system did not know. For each uncertain source fact the target must hold one
-  // of: an explicitly UNKNOWN representation, a named exception, or archived
-  // evidence. A fact with none of those has had its uncertainty silently
-  // resolved, and this check fails.
+  // system did not know, and resolved **per fact against its own target row**.
+  // Counting workspace-wide UNKNOWN rows would let an unrelated unknown mask a
+  // specific one that was falsely resolved, so each fact is traced to the exact
+  // id the importer derived for it: either that row still reads UNKNOWN, or the
+  // fact carries its own named exception, or its own archived evidence.
   const uncertainFacts = collectUncertainSourceFacts(bundle);
-  const unknownLines = await scalar(
-    pool,
-    `SELECT count(*)::text AS value FROM reservation_lines
-     WHERE workspace_id = $1 AND observed_status = 'UNKNOWN'`,
-    [workspaceId],
-  );
-  const unknownPreserved = run.reconciliationExceptions.filter(
-    (entry) => entry.classification === 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
-  );
-  const preservedKeys = new Set(unknownPreserved.map((entry) => `${entry.sourceType}/${entry.sourceId}`));
-  const archivedDeliveries = await scalar(
-    pool,
-    `SELECT count(*)::text AS value FROM evidence_records
-     WHERE workspace_id = $1 AND assertion_type = 'LEGACY_PROVIDER_EVENT_DELIVERY'`,
-    [workspaceId],
+  const preservedFactKeys = new Set(
+    run.reconciliationExceptions
+      .filter((entry) => entry.classification === 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME')
+      .map((entry) => `${entry.sourceType}/${entry.sourceId}`),
   );
 
-  // A fact whose whole record was held back is accounted for by that quarantine:
-  // nothing was asserted about it either way.
   const unaccountedFacts: string[] = [];
-  let reservationFactsMigrated = 0;
+  const accountedBy: string[] = [];
   for (const fact of uncertainFacts) {
-    const recordExcepted = exceptionKeys.has(fact.recordKey);
-    const namedAsPreserved = preservedKeys.has(fact.recordKey);
+    // An exception filed against this fact's own record names it directly.
+    const namedAsPreserved = preservedFactKeys.has(fact.recordKey);
+
     if (fact.kind === 'PROVIDER_DELIVERY_OUTCOME') {
-      // The importer archives every delivery and raises an exception for the
-      // unsettled ones; either proves the unknown outcome was kept.
-      if (!namedAsPreserved && archivedDeliveries === 0) unaccountedFacts.push(fact.factId);
+      // This delivery's own archive, by the evidence id the importer derived
+      // for it — not "some delivery somewhere was archived".
+      const evidenceId = migrationTargetId({
+        datasetHash: bundle.datasetHash,
+        sourceType: fact.sourceType,
+        sourceId: fact.factSourceId,
+        step: 'archive-evidence',
+      });
+      const ownArchive = await scalar(
+        pool,
+        `SELECT count(*)::text AS value FROM evidence_records
+         WHERE workspace_id = $1 AND id = $2 AND assertion_type = 'LEGACY_PROVIDER_EVENT_DELIVERY'`,
+        [workspaceId, evidenceId],
+      );
+      if (ownArchive > 0) accountedBy.push(`${fact.factId}=own-archive`);
+      else if (namedAsPreserved) accountedBy.push(`${fact.factId}=named-exception`);
+      else unaccountedFacts.push(`${fact.factId} (no archived capture of its own and no named exception)`);
       continue;
     }
-    // Reservation-level uncertainty: if the trip migrated, the target must
-    // carry an UNKNOWN line for it; if it did not migrate, it must be excepted.
-    if (mappedKeys.has(fact.recordKey)) reservationFactsMigrated += 1;
-    else if (!recordExcepted) unaccountedFacts.push(fact.factId);
-  }
-  // Every migrated uncertain element must still read UNKNOWN in the target.
-  // Fewer UNKNOWN lines than uncertain facts means one was resolved to a
-  // status nobody observed.
-  const unknownShortfall = Math.max(0, reservationFactsMigrated - unknownLines);
 
-  const uncertaintyStatus: CheckStatus =
-    unaccountedFacts.length > 0 || unknownShortfall > 0 ? 'FAIL' : 'PASS';
+    // Reservation uncertainty: the importer writes this element's line under a
+    // derived id, so recompute that id and read that one row.
+    const lineId = migrationTargetId({
+      datasetHash: bundle.datasetHash,
+      sourceType: fact.sourceType,
+      sourceId: fact.factSourceId,
+      step: 'reservation-line',
+    });
+    const line = await pool.query<{ observed_status: string }>(
+      'SELECT observed_status FROM reservation_lines WHERE workspace_id = $1 AND id = $2',
+      [workspaceId, lineId],
+    );
+    const status = line.rows[0]?.observed_status;
+    if (status === 'UNKNOWN') {
+      accountedBy.push(`${fact.factId}=target-line-UNKNOWN`);
+    } else if (status !== undefined) {
+      // The row exists and no longer says UNKNOWN: uncertainty was resolved to
+      // something the source never observed. No other row can compensate.
+      unaccountedFacts.push(`${fact.factId} (its reservation line ${lineId} now reads ${status})`);
+    } else if (namedAsPreserved || exceptionKeys.has(fact.recordKey)) {
+      // Never migrated, and the scope that holds it back is named.
+      accountedBy.push(`${fact.factId}=quarantined-scope`);
+    } else {
+      unaccountedFacts.push(`${fact.factId} (no target reservation line and no exception holding it back)`);
+    }
+  }
+
+  const uncertaintyStatus: CheckStatus = unaccountedFacts.length > 0 ? 'FAIL' : 'PASS';
   check(
     'UNCERTAINTY_PRESERVED',
     'Did anything the old system did not know become certainty in the new one?',
     uncertaintyStatus,
     uncertaintyStatus === 'PASS'
-      ? `${uncertainFacts.length} uncertain source fact(s) in the bundle, all accounted for: ` +
-        `${reservationFactsMigrated} migrated uncertain reservation(s) against ${unknownLines} target ` +
-        `UNKNOWN line(s), ${unknownPreserved.length} named PRESERVED_UNKNOWN_EXTERNAL_OUTCOME exception(s), ` +
-        `${archivedDeliveries} archived provider delivery record(s)`
-      : `${uncertainFacts.length} uncertain source fact(s) in the bundle and ` +
-        `${unaccountedFacts.length + unknownShortfall} not accounted for. ` +
-        (unknownShortfall > 0
-          ? `${reservationFactsMigrated} migrated uncertain reservation(s) but only ${unknownLines} target ` +
-            `UNKNOWN line(s): ${unknownShortfall} were resolved to a status the source never observed. `
-          : '') +
-        (unaccountedFacts.length > 0 ? `unaccountedFacts: ${unaccountedFacts.join(', ')}.` : ''),
+      ? `${uncertainFacts.length} uncertain source fact(s) in the bundle, each traced to its own ` +
+        `preservation: ${accountedBy.length === 0 ? 'none required' : accountedBy.join(', ')}`
+      : `${uncertainFacts.length} uncertain source fact(s) in the bundle; ${unaccountedFacts.length} ` +
+        `lost their preserved uncertainty: ${unaccountedFacts.join('; ')}`,
   );
 
   // --- 7. Money: no priced obligation migrated without its evidence ---
