@@ -30,6 +30,39 @@ function isoNow(at?: string): string {
   return at ?? new Date().toISOString();
 }
 
+/**
+ * FIG-3 revision source. `EVALUATION_LIFECYCLE` (migrations 0121/0122) is a
+ * scope_generations family bumped only by the assessments/
+ * scheduled_reassessments triggers (per subject) and the recovery_cases
+ * triggers (per case) — deliberately never read by assessment_inputs so it
+ * cannot feed the M6 invalidation triggers. Reads `last_advanced_xact`
+ * (`pg_current_xact_id()`, written by every `m6_bump_scope` call, 0090), not
+ * the small per-scope `generation` counter: xid8 is a per-database, globally
+ * unique, strictly increasing value, so two different real changes can never
+ * tie — a `MAX` across many subjects' values, and a caller-supplied
+ * `sinceRevision` compared against each of them, both stay correct. A small
+ * per-scope counter could tie (subject B catching up to, not passing,
+ * subject A's already-observed value) and mask a real change to B. Read
+ * directly here (not through PgScopeGenerationLedger/ScopeGenerationRef,
+ * which is typed to the general invalidation-scope enum) to keep the
+ * isolation from assessment_inputs explicit and unreachable from the general
+ * scope API.
+ */
+export async function readEvaluationLifecycleRevision(
+  pool: Pool,
+  workspaceId: string,
+  subjectKind: string,
+  subjectId: string,
+  assessmentKind: string,
+): Promise<number> {
+  const result = await pool.query<{ xact: string }>(
+    `SELECT last_advanced_xact::text::bigint AS xact FROM scope_generations
+      WHERE workspace_id = $1 AND scope_kind = 'EVALUATION_LIFECYCLE' AND scope_id = $2`,
+    [workspaceId, `${subjectKind}:${subjectId}:${assessmentKind}`],
+  );
+  return result.rows[0] ? Number(result.rows[0].xact) : 0;
+}
+
 export async function loadRecoveryActionFacts(
   pool: Pool,
   workspaceId: string,
@@ -212,6 +245,14 @@ export async function loadRecoveryCaseFacts(
   workspaceId: string,
   caseId: string,
   at?: string,
+  /**
+   * FIG-3: when supplied, changedVisibleRefs names exactly the refs whose own
+   * revision source (see readEvaluationLifecycleRevision) exceeds this value
+   * — never "every ref" or an unrelated id list. Omitted on a first read,
+   * which honestly reports nothing changed (no prior revision to compare
+   * against) rather than everything.
+   */
+  sinceRevision?: number,
 ): Promise<RecoveryCaseFacts | null> {
   const caseRow = await pool.query<{
     id: string;
@@ -225,6 +266,9 @@ export async function loadRecoveryCaseFacts(
   const row = caseRow.rows[0];
   if (!row) return null;
 
+  // FIG-3: the case's own revision source (0122's recovery_cases trigger),
+  // on the same global scale as each subject's (see readEvaluationLifecycleRevision).
+  const caseRevision = await readEvaluationLifecycleRevision(pool, workspaceId, 'RECOVERY_CASE', caseId, 'CASE');
   const recoveryActions = await loadRecoveryActionFacts(pool, workspaceId, caseId);
   const generatedAt = isoNow(at);
 
@@ -280,7 +324,7 @@ export async function loadRecoveryCaseFacts(
   // explicit staleness note (see M9 C4 current-assessment finding). Each
   // subject keeps its own tone/evaluation status (FIG-6/FIG-7) — the case's
   // aggregate verdict below must never be copied back onto every subject node.
-  interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus }
+  interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; revision: number }
   const subjectFacts: SubjectFact[] = [];
   // M9 3A: derive connection viability from the real m6.connection dimension
   // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
@@ -289,6 +333,7 @@ export async function loadRecoveryCaseFacts(
   let connectionViability: ConnectionViabilityHint | undefined;
   for (const s of subjects.rows) {
     const ref = `${s.subject_kind}:${s.subject_id}`;
+    const revision = await readEvaluationLifecycleRevision(pool, workspaceId, s.subject_kind, s.subject_id, 'VIABILITY');
     const view = await currentAssessmentView(
       pool,
       workspaceId,
@@ -299,7 +344,7 @@ export async function loadRecoveryCaseFacts(
     if (view.status === 'CURRENT' && view.assessment) {
       const verdict = view.assessment.overallVerdict;
       const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
-      subjectFacts.push({ ref, tone, evaluation: view.status });
+      subjectFacts.push({ ref, tone, evaluation: view.status, revision });
       if (tone === 'UNKNOWN') {
         uncertainty.push(`${ref} current assessment verdict ${verdict}`);
       }
@@ -314,7 +359,7 @@ export async function loadRecoveryCaseFacts(
         }
       }
     } else {
-      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status });
+      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status, revision });
       uncertainty.push(`${ref} assessment ${view.status.toLowerCase()}`);
     }
   }
@@ -340,14 +385,35 @@ export async function loadRecoveryCaseFacts(
 
   const subjectFactByRef = new Map(subjectFacts.map((f) => [f.ref, f]));
   const TONE_TO_STATE = { PASS: 'HEALTHY', FAIL: 'FAILED', UNKNOWN: 'UNKNOWN' } as const;
+  // FIG-3: a per-node source revision — the case node's own EVALUATION_LIFECYCLE
+  // xact stamp, each subject node's own — taken as their maximum. This is
+  // safe (unlike maxing small per-scope counters) because every stamp is a
+  // globally unique, strictly increasing xid8: two different real changes
+  // can never tie, so the max always moves when any component does, and a
+  // caller-supplied sinceRevision compares correctly against every component
+  // on that same scale (see readEvaluationLifecycleRevision).
+  const caseRefStr = `case:${caseId}`;
+  const projectionRevision = Math.max(caseRevision, ...subjectFacts.map((f) => f.revision), 0);
+  // Exactly the refs whose own revision source exceeds sinceRevision — never
+  // "every case" or an action-id list that doesn't match a node. Omitted
+  // sinceRevision (first read) honestly reports nothing changed, not everything.
+  const changedVisibleRefs = sinceRevision === undefined
+    ? []
+    : [
+        ...(caseRevision > sinceRevision ? [caseRefStr] : []),
+        ...subjectFacts.filter((f) => f.revision > sinceRevision).map((f) => f.ref),
+      ];
   return {
     generatedAt,
-    projectionRevision: recoveryActions.length + subjects.rows.length,
-    changedVisibleRefs: recoveryActions.map((a) => a.actionRef),
+    projectionRevision,
+    changedVisibleRefs,
+    // These AFFECTED_BY edges carry no independent state (fixed kind,
+    // AUTHORITATIVE authority) — their own presented fields never change, so
+    // they are never marked changed even when an endpoint is (FIG-2/FIG-3).
     changedEdgeIds: [],
     currentSemanticState: tripVerdict === 'FAIL' ? 'FAILED' : tripVerdict === 'PASS' ? 'RECOVERED' : 'AFFECTED',
     nodes: [
-      { ref: `case:${caseId}`, kind: 'RECOVERY_PROPOSAL', label: 'Recovery case', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
+      { ref: caseRefStr, kind: 'RECOVERY_PROPOSAL', label: 'Recovery case', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
       ...subjects.rows.map((s) => {
         const ref = `${s.subject_kind}:${s.subject_id}`;
         // FIG-6: each subject's own CURRENT verdict decides its node, never the
@@ -369,9 +435,9 @@ export async function loadRecoveryCaseFacts(
     edges: subjects.rows.map((s) => ({
       // FIG-1: derived from the canonical relation, never array position —
       // stable across revisions and unique per (subject, case) pair.
-      id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:case:${caseId}`,
+      id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:${caseRefStr}`,
       fromRef: `${s.subject_kind}:${s.subject_id}`,
-      toRef: `case:${caseId}`,
+      toRef: caseRefStr,
       kind: 'AFFECTED_BY' as const,
       authority: 'AUTHORITATIVE' as const,
     })),
@@ -408,6 +474,8 @@ export async function loadOperatorOverviewFacts(
   pool: Pool,
   workspaceId: string,
   at?: string,
+  /** FIG-3: see loadRecoveryCaseFacts — same "changed since" semantics, applied per listed case. */
+  sinceRevision?: number,
 ): Promise<OperatorOverviewFacts> {
   const generatedAt = isoNow(at);
   const cases = await pool.query<{ id: string; lifecycle_status: string }>(
@@ -416,6 +484,7 @@ export async function loadOperatorOverviewFacts(
   );
 
   const items = [];
+  const itemRevisions = new Map<string, number>();
   for (const c of cases.rows) {
     const facts = await loadRecoveryCaseFacts(pool, workspaceId, c.id, generatedAt);
     if (!facts) continue;
@@ -463,15 +532,30 @@ export async function loadOperatorOverviewFacts(
       unresolvedUncertainty: facts.uncertainty ?? [],
       ...(primaryEvaluation ? { evaluation: primaryEvaluation } : {}),
     });
+    // FIG-3: each listed case's own revision (the same source loadRecoveryCaseFacts
+    // computed for it), reused rather than re-derived.
+    itemRevisions.set(c.id, facts.projectionRevision);
   }
 
   const STATUS_TO_STATE = {
     READY: 'HEALTHY', AT_RISK: 'AFFECTED', DISRUPTED: 'FAILED', RECOVERING: 'ACTIVE', UNKNOWN: 'UNKNOWN',
   } as const;
+  // Each case's own revision is already a xid8-based max (loadRecoveryCaseFacts),
+  // globally unique and tie-proof, so maxing across cases here stays safe and
+  // keeps this scalar on the same scale each item's revision is compared against.
+  const projectionRevision = Math.max(0, ...itemRevisions.values());
+  // Exactly the trip refs whose underlying case revision exceeds sinceRevision.
+  // Omitted sinceRevision (first read) honestly reports nothing changed.
+  const changedVisibleRefs = sinceRevision === undefined
+    ? []
+    : items
+        .filter((i) => (itemRevisions.get(i.caseRef!) ?? 0) > sinceRevision)
+        .map((i) => i.tripRef);
   return {
     generatedAt,
-    projectionRevision: items.length,
-    changedVisibleRefs: items.map((i) => i.caseRef!).filter(Boolean) as string[],
+    projectionRevision,
+    changedVisibleRefs,
+    // The overview producer emits no edges, so there is nothing to mark changed.
     changedEdgeIds: [],
     currentSemanticState: items.some((i) => i.status === 'DISRUPTED') ? 'FAILED' : 'HEALTHY',
     nodes: items.map((i) => ({

@@ -48,6 +48,20 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
+/**
+ * FIG-3: `?sinceRevision=<n>` opts a GET into the "changed since" comparison
+ * (see loadRecoveryCaseFacts/loadOperatorOverviewFacts). Omitted or invalid
+ * is treated as a first read, never as "since revision 0" — a caller that
+ * doesn't supply a real prior revision gets an honestly empty changed set,
+ * not a synthetic "everything changed".
+ */
+function parseSinceRevision(url: URL): number | undefined {
+  const raw = url.searchParams.get('sinceRevision');
+  if (raw === null) return undefined;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
 function sendHtml(res: ServerResponse, status: number, html: string): void {
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
@@ -92,7 +106,8 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'GET' && pathname === '/api/v2/operator/overview') {
-      const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId);
+      const sinceRevision = parseSinceRevision(url);
+      const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId, undefined, sinceRevision);
       const view = projectOperatorOverview(facts);
       if (url.searchParams.get('format') === 'html') {
         sendHtml(res, 200, renderProductOperatorOverview(view));
@@ -105,7 +120,8 @@ export async function handleTargetProductHttp(
     const caseMatch = pathname.match(/^\/api\/v2\/cases\/([^/]+)$/);
     if (req.method === 'GET' && caseMatch) {
       const caseId = decodeURIComponent(caseMatch[1]!);
-      const facts = await loadRecoveryCaseFacts(ctx.app.pool, ctx.app.workspaceId, caseId);
+      const sinceRevision = parseSinceRevision(url);
+      const facts = await loadRecoveryCaseFacts(ctx.app.pool, ctx.app.workspaceId, caseId, undefined, sinceRevision);
       if (!facts) {
         sendJson(res, 404, { error: 'CASE_NOT_FOUND' });
         return true;
