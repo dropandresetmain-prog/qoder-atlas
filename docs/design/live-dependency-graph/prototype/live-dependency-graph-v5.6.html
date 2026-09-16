@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NORTHSTAR — Dependency Map v5.6</title>
+<style>
+:root{
+  --bg:#f5f7fb;--panel:#fff;--ink:#10203a;--muted:#6e7d92;--line:#dce3ec;--navy:#17345f;
+  --green:#1f9d78;--green-line:#74bfa7;--green-bg:#eaf8f3;
+  --amber:#d58a13;--amber-line:#d7a043;--amber-bg:#fff4d9;
+  --red:#df3b49;--red-line:#df6670;--red-bg:#fff0f2;
+  --grey:#9aa8bb;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+body{padding:16px}button{font:inherit}
+.app{max-width:1260px;margin:auto}
+.top{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;margin-bottom:12px}
+.brand{font-weight:900;letter-spacing:.08em;font-size:15px}.brand:before{content:"✦";color:var(--navy);margin-right:8px}
+.ctx{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}.ctx b{color:var(--ink)}
+.sep{width:1px;height:16px;background:var(--line)}
+.trip-state{display:flex;gap:8px;align-items:center;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:900;white-space:nowrap}
+.trip-state i{font-style:normal;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:10px}
+.trip-state.red{border:1px solid #f2c1c6;background:#fff8f9;color:var(--red)}.trip-state.red i{background:var(--red)}
+.trip-state.green{border:1px solid #bde3d6;background:#f6fcfa;color:var(--green)}.trip-state.green i{background:var(--green)}
+
+.frame{background:#fff;border:1px solid var(--line);border-radius:17px;box-shadow:0 12px 32px rgba(18,38,68,.055);overflow:hidden}
+.head{display:flex;justify-content:space-between;gap:16px;padding:14px 16px 12px;border-bottom:1px solid #edf1f5}
+.eye{font-size:10px;letter-spacing:.08em;color:#7c899b;font-weight:900;margin-bottom:4px}
+h1{font-size:23px;line-height:1.15;letter-spacing:-.02em;margin:0 0 3px}.sub{font-size:12px;color:var(--muted)}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;gap:4px;padding:3px;border:1px solid var(--line);background:#f8fafc;border-radius:10px}
+.seg button{border:0;background:transparent;padding:7px 9px;border-radius:7px;color:#607089;font-size:11px;font-weight:850;cursor:pointer}
+.seg button.active{background:var(--navy);color:#fff}
+.state-seg button.active{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(20,38,68,.08)}
+.seg button:disabled{opacity:.34;cursor:not-allowed}
+
+.viewport{position:relative;height:445px;overflow:hidden;background:#fbfcfe;touch-action:none;user-select:none}
+.toolbar{position:absolute;top:12px;right:12px;z-index:60;display:flex;gap:4px;align-items:center;padding:4px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:10px;box-shadow:0 7px 20px rgba(18,38,68,.07)}
+.toolbar button{border:0;background:#fff;height:30px;min-width:30px;border-radius:7px;font-weight:850;cursor:pointer}
+.toolbar button:hover{background:#f2f5f9}.zoom{font-size:10px;color:#748196;font-weight:800;min-width:42px;text-align:center}
+.hint{position:absolute;left:12px;bottom:10px;z-index:50;background:#fff;border:1px solid #e4eaf1;border-radius:8px;padding:6px 8px;font-size:10px;color:#8290a3}
+
+.stage{position:absolute;width:1500px;height:650px;transform-origin:0 0;will-change:transform}
+.event{position:absolute;left:800px;top:58px;width:510px;height:420px;border:1px solid #d3ddeb;border-radius:21px;background:rgba(246,249,254,.72);z-index:2;pointer-events:none}
+.event-title{position:absolute;left:17px;top:14px;font-size:11px;letter-spacing:.07em;font-weight:900;color:#526784}
+.event-sub{position:absolute;left:17px;top:32px;font-size:10px;color:#8a96a7}
+
+.programme-context{position:absolute;left:886px;top:118px;width:250px;height:300px;z-index:6;pointer-events:none}
+.context-card{position:absolute;left:35px;width:180px;min-height:48px;border:1px solid #e0e6ee;background:#f7f9fc;border-radius:10px;padding:8px 10px;color:#8793a4;opacity:.72}
+.context-card.before{top:0}.context-card.after{top:198px}
+.context-card .when{font-size:9px;font-weight:900;letter-spacing:.05em}.context-card .what{font-size:11px;font-weight:800;margin-top:2px;color:#7f8b9b}.context-card .why{font-size:8.5px;margin-top:3px;color:#9aa5b3}
+.context-spine{position:absolute;left:124px;top:48px;height:198px;width:1px;background:#dbe3ec}
+.context-dot{position:absolute;left:121px;width:7px;height:7px;border-radius:50%;background:#c7d0dc;border:2px solid #f8fbff}
+.context-dot.top{top:58px}.context-dot.mid{top:118px;background:var(--red);box-shadow:0 0 0 4px rgba(223,59,73,.08)}.context-dot.bottom{top:238px}
+
+svg.edges{position:absolute;inset:0;width:1500px;height:650px;z-index:4;pointer-events:none;overflow:visible}
+.edge{fill:none;stroke:#aab6c6;stroke-width:2}
+.edge.green{stroke:var(--green-line)}.edge.amber{stroke:var(--amber-line)}
+.edge.red{stroke:var(--red-line);stroke-width:2.5;filter:drop-shadow(0 0 4px rgba(223,59,73,.34))}
+.edge.context{stroke:#c7d0dc;stroke-width:1.5;stroke-dasharray:6 7}
+.edge.dim{opacity:.11}
+.halo{fill:none;stroke:rgba(223,59,73,.13);stroke-width:9;filter:blur(2px)}
+.pulse.green{fill:var(--green)}.pulse.amber{fill:var(--amber)}
+.pulse.dim{opacity:.08}
+
+.node{position:absolute;z-index:10;width:164px;min-height:84px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px 12px;box-shadow:0 5px 14px rgba(18,38,68,.042);cursor:pointer;transition:width .18s ease,min-height .18s ease,padding .18s ease,opacity .18s ease,box-shadow .18s ease,border-color .18s ease,transform .18s ease}
+.node:hover{transform:translateY(-1px) scale(1.035);box-shadow:0 10px 22px rgba(18,38,68,.08);z-index:28}
+.node.focus{box-shadow:0 0 0 4px rgba(23,52,95,.065),0 10px 22px rgba(18,38,68,.08);z-index:27}
+.node.dim{opacity:.14;filter:saturate(.3)}
+.node.small{width:152px;min-height:70px;background:#fbfcfe;padding:9px 11px}
+.node.person{width:138px;min-height:68px}
+.node.health-green{border-color:#91d1bd}
+.node.health-amber{border-color:#edc477}
+.node.health-red{border-color:#eca7ae;background:#fffafb}
+.node.attention-focus{width:226px;min-height:108px;padding:13px 15px;border:1.7px solid var(--amber);box-shadow:0 0 0 5px rgba(213,138,19,.12),0 0 32px 15px rgba(213,138,19,.20),0 12px 28px rgba(18,38,68,.10);z-index:19}.node.attention-focus .nh{margin-bottom:7px}.node.attention-focus .type{font-size:9.5px}.node.attention-focus .title{font-size:17px;line-height:1.12}.node.attention-focus .date{font-size:10.5px;margin-top:5px}.node.attention-focus .focus-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:9px}.node.attention-focus .time{margin:0;font-size:14px;white-space:nowrap}.node.attention-focus .time .old{font-size:14px}.node.attention-focus .time .current-time{font-size:22px;line-height:1;font-weight:900;letter-spacing:-.025em}.node.attention-focus .time .arrow{color:#8793a5;margin:0 6px}.node.attention-focus .badge{margin:0 0 1px;font-size:9.5px;padding:5px 7px}
+.node.attention-secondary{width:182px;min-height:98px;padding:12px 13px;box-shadow:0 0 0 4px rgba(223,59,73,.04),0 10px 23px rgba(18,38,68,.07);z-index:18}
+.node.attention-secondary .title{font-size:15.5px}
+
+.nh{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.type{font-size:8.5px;letter-spacing:.09em;color:#7a879a;font-weight:900}
+.dot{width:8px;height:8px;border-radius:50%;background:#a7b2c0}.dot.green{background:var(--green)}.dot.amber{background:var(--amber)}.dot.red{background:var(--red)}
+.title{font-size:14px;line-height:1.15;font-weight:850;letter-spacing:-.01em}
+.date{font-size:9.5px;color:#8793a5;margin-top:4px;font-weight:700;line-height:1.25}.meta{font-size:10.5px;color:#778498;margin-top:4px;line-height:1.28}
+.time{font-size:12.5px;font-weight:850;margin-top:5px}.old{text-decoration:line-through;color:#9ba6b5;font-weight:600}
+.badge{display:inline-block;border-radius:999px;padding:4px 6px;margin-top:7px;font-size:8.5px;font-weight:900;white-space:nowrap}
+.badge.green{background:var(--green-bg);color:var(--green)}.badge.amber{background:var(--amber-bg);color:#a56800}.badge.red{background:var(--red-bg);color:var(--red)}
+.detail{font-size:8.5px;color:#7d899a;margin-top:5px}
+
+.stage.overview .meta,.stage.overview .badge,.stage.overview .detail,.stage.overview .event-sub,.stage.overview .type{display:none}
+.stage.overview .node{min-height:58px;width:142px;padding:9px 10px}.stage.overview .node.small{min-height:54px;width:130px}
+.stage.overview .node.attention-focus{width:184px;min-height:78px}.stage.overview .node.attention-secondary{width:158px;min-height:72px}
+.stage:not(.detailzoom) .detail{display:none}
+
+/* graph positions */
+#sarah{left:80px;top:220px}
+#flight{left:265px;top:194px}
+#arrival{left:485px;top:168px}
+#hotel{left:510px;top:370px}
+#transfer{left:685px;top:355px}
+#keynote{left:920px;top:190px}
+#objective{left:1118px;top:205px;width:175px}
+#dinner{left:1110px;top:365px}
+
+@media(max-width:920px){
+  body{padding:9px}.ctx{display:none}.top{grid-template-columns:auto 1fr}.head{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">NORTHSTAR</div>
+    <div class="ctx"><b>Sarah Chen</b><span class="sep"></span><span>Singapore · 12–15 Mar 2025</span><span class="sep"></span><span>AI in Travel Summit</span></div>
+    <div id="tripState" class="trip-state red"><i>×</i><span>TRIP DISRUPTED</span></div>
+  </div>
+
+  <section class="frame">
+    <header class="head">
+      <div>
+        <div class="eye">LIVE TRIP STATE</div>
+        <h1>Dependency map</h1>
+        <div id="subline" class="sub"></div>
+      </div>
+      <div class="controls">
+        <div class="seg">
+          <button id="pathBtn" class="active">Disruption path</button>
+          <button id="tripBtn">Trip overview</button>
+          <button id="progBtn">Programme</button>
+        </div>
+        <div class="seg state-seg" title="Prototype state preview">
+          <button id="badBtn" class="active">Disrupted</button>
+          <button id="okBtn">All clear</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="viewport" class="viewport">
+      <div class="toolbar">
+        <button id="minus">−</button><button id="home" title="Return to current view">⌂</button><button id="plus">+</button>
+        <div id="zoomReadout" class="zoom">100%</div>
+      </div>
+      <div class="hint">Drag to pan · scroll to zoom · click a node to trace dependencies</div>
+
+      <div id="stage" class="stage">
+        <div class="event">
+          <div class="event-title">AI IN TRAVEL SUMMIT</div>
+          <div class="event-sub">Programme context · Singapore</div>
+        </div>
+
+        <div class="programme-context">
+          <div class="context-spine"></div>
+          <div class="context-dot top"></div><div class="context-dot mid"></div><div class="context-dot bottom"></div>
+          <div class="context-card before">
+            <div class="when">12 Mar 2025 · 08:45 SGT</div><div class="what">Speaker briefing</div><div class="why">Immediately before Sarah’s keynote</div>
+          </div>
+          <div class="context-card after">
+            <div class="when">12 Mar 2025 · 11:00 SGT</div><div class="what">Panel discussion</div><div class="why">Immediately after Sarah’s keynote</div>
+          </div>
+        </div>
+
+        <svg class="edges" viewBox="0 0 1500 650" aria-hidden="true">
+          <path id="e-sarah-flight" class="edge"></path>
+          <path id="e-flight-arrival" class="edge"></path>
+          <path id="halo-arrival-keynote" class="halo"></path>
+          <path id="e-arrival-keynote" class="edge"></path>
+          <path id="halo-keynote-objective" class="halo"></path>
+          <path id="e-keynote-objective" class="edge"></path>
+          <path id="e-arrival-hotel" class="edge"></path>
+          <path id="e-arrival-transfer" class="edge"></path>
+          <path id="e-arrival-dinner" class="edge"></path>
+          <path id="e-arrival-programme" class="edge context"></path>
+
+          <g id="pulseLayer"></g>
+        </svg>
+
+        <div class="node person" id="sarah"></div>
+        <div class="node" id="flight"></div>
+        <div class="node" id="arrival"></div>
+        <div class="node small" id="hotel"></div>
+        <div class="node small" id="transfer"></div>
+        <div class="node" id="keynote"></div>
+        <div class="node" id="objective"></div>
+        <div class="node small" id="dinner"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  // -------------------------------------------------------------------------
+  // SINGLE SOURCE OF TRUTH
+  // Nothing in the renderer owns business state. Every label, color, size,
+  // edge health, pulse, and trip status is derived from this scenario model.
+  // -------------------------------------------------------------------------
+  const GRAPH = {
+    entities: {
+      sarah:     { type:'TRAVELLER', title:'Sarah Chen', meta:'Speaker', size:'person' },
+      flight:    { type:'FLIGHT', title:'Batik Air OD-157' },
+      arrival:   { type:'ARRIVAL', title:'Singapore arrival' },
+      hotel:     { type:'HOTEL', title:'Marina Bay hotel', size:'small' },
+      transfer:  { type:'GROUND', title:'Airport transfer', size:'small' },
+      keynote:   { type:'COMMITMENT', title:'Keynote', meta:'AI in Travel Summit' },
+      objective: { type:'TRIP PURPOSE', title:'Deliver keynote' },
+      dinner:    { type:'PROGRAMME', title:'VIP dinner', size:'small' }
+    },
+    relations: {
+      // State says WHAT is connected. Geometry is calculated from rendered cards.
+      sarahFlight:       { from:'sarah', to:'flight', kind:'dependency', route:'sideCurve' },
+      flightArrival:     { from:'flight', to:'arrival', kind:'dependency', route:'sideCurve' },
+
+      // Arrival has multiple independent children. Source anchors are deliberately
+      // distributed across its surface; there is no junction and no child-child relation.
+      arrivalKeynote:    { from:'arrival', to:'keynote', kind:'dependency', route:'sideCurve', sourceFraction:0.34 },
+      arrivalDinner:     { from:'arrival', to:'dinner', kind:'dependency', route:'diagonalCurve', sourceFraction:0.72 },
+      arrivalHotel:      { from:'arrival', to:'hotel', kind:'dependency', route:'bottomCurve', branchIndex:0, branchCount:2 },
+      arrivalTransfer:   { from:'arrival', to:'transfer', kind:'dependency', route:'bottomCurve', branchIndex:1, branchCount:2 },
+
+      keynoteObjective:  { from:'keynote', to:'objective', kind:'dependency', route:'sideCurve' },
+      arrivalProgramme:  { from:'arrival', to:'keynote', kind:'context', route:'programmeContext' }
+    },
+    scenarios: {
+      disrupted: {
+        trip: {
+          color:'red', label:'TRIP DISRUPTED', icon:'×',
+          subline:'Batik Air rebooked OD-157. Sarah now arrives at 10:20, after her 09:30 keynote.'
+        },
+        nodes: {
+          sarah:     { health:'neutral', label:'', date:'12–15 Mar 2025', attention:'none' },
+          flight:    { health:'green', label:'REBOOKED', date:'12 Mar 2025', meta:'Booking updated by airline', attention:'none' },
+          arrival:   { health:'amber', label:'LATE', date:'12 Mar 2025 · SGT', previous:'08:10', current:'10:20', attention:'focus' },
+          hotel:     { health:'green', label:'CONFIRMED', date:'12–15 Mar 2025', attention:'none' },
+          transfer:  { health:'amber', label:'RESCHEDULED', date:'12 Mar 2025 · 10:45 SGT', attention:'none' },
+          keynote:   { health:'red', label:'MISSED', date:'12 Mar 2025 · 09:30 SGT', attention:'secondary' },
+          objective: { health:'red', label:'UNMET', date:'12 Mar 2025 · 09:30 SGT', attention:'none' },
+          dinner:    { health:'green', label:'SCHEDULED', date:'12 Mar 2025 · 19:00 SGT', attention:'none' }
+        },
+        relations: {
+          sarahFlight:      { health:'green', live:true },
+          flightArrival:    { health:'amber', live:true },
+          arrivalKeynote:   { health:'red', live:false, glow:true },
+          keynoteObjective: { health:'red', live:false, glow:true },
+          arrivalHotel:     { health:'green', live:true },
+          arrivalTransfer:  { health:'amber', live:true },
+          arrivalDinner:    { health:'green', live:true },
+          arrivalProgramme: { health:'neutral', live:false }
+        }
+      },
+      clear: {
+        trip: {
+          color:'green', label:'TRIP ON TRACK', icon:'✓',
+          subline:'All critical trip dependencies are on schedule for Sarah’s 09:30 keynote.'
+        },
+        nodes: {
+          sarah:     { health:'neutral', label:'', date:'12–15 Mar 2025', attention:'none' },
+          flight:    { health:'green', label:'CONFIRMED', date:'12 Mar 2025', meta:'Batik Air OD-157', attention:'none' },
+          arrival:   { health:'green', label:'ON TIME', date:'12 Mar 2025 · SGT', current:'08:10', attention:'none' },
+          hotel:     { health:'green', label:'CONFIRMED', date:'12–15 Mar 2025', attention:'none' },
+          transfer:  { health:'green', label:'SCHEDULED', date:'12 Mar 2025 · 08:35 SGT', attention:'none' },
+          keynote:   { health:'green', label:'SCHEDULED', date:'12 Mar 2025 · 09:30 SGT', attention:'none' },
+          objective: { health:'green', label:'ON TRACK', date:'12 Mar 2025 · 09:30 SGT', attention:'none' },
+          dinner:    { health:'green', label:'SCHEDULED', date:'12 Mar 2025 · 19:00 SGT', attention:'none' }
+        },
+        relations: {
+          sarahFlight:      { health:'green', live:true },
+          flightArrival:    { health:'green', live:true },
+          arrivalKeynote:   { health:'green', live:true },
+          keynoteObjective: { health:'green', live:true },
+          arrivalHotel:     { health:'green', live:true },
+          arrivalTransfer:  { health:'green', live:true },
+          arrivalDinner:    { health:'green', live:true },
+          arrivalProgramme: { health:'neutral', live:false }
+        }
+      }
+    }
+  };
+
+  const relationEls = {
+    sarahFlight: document.getElementById('e-sarah-flight'),
+    flightArrival: document.getElementById('e-flight-arrival'),
+    arrivalKeynote: document.getElementById('e-arrival-keynote'),
+    keynoteObjective: document.getElementById('e-keynote-objective'),
+    arrivalHotel: document.getElementById('e-arrival-hotel'),
+    arrivalTransfer: document.getElementById('e-arrival-transfer'),
+    arrivalDinner: document.getElementById('e-arrival-dinner'),
+    arrivalProgramme: document.getElementById('e-arrival-programme')
+  };
+  const haloEls = {
+    arrivalKeynote: document.getElementById('halo-arrival-keynote'),
+    keynoteObjective: document.getElementById('halo-keynote-objective')
+  };
+
+  function validateGraphModel(){
+    const entityIds=Object.keys(GRAPH.entities).sort();
+    const relationIds=Object.keys(GRAPH.relations).sort();
+
+    Object.entries(GRAPH.relations).forEach(([id,rel])=>{
+      if(!GRAPH.entities[rel.from] || !GRAPH.entities[rel.to]){
+        throw new Error(`Relation ${id} references a missing entity`);
+      }
+    });
+
+    Object.entries(GRAPH.scenarios).forEach(([scenarioName,scenario])=>{
+      const scenarioNodes=Object.keys(scenario.nodes).sort();
+      const scenarioRelations=Object.keys(scenario.relations).sort();
+
+      if(JSON.stringify(entityIds)!==JSON.stringify(scenarioNodes)){
+        throw new Error(`Node-state drift in scenario: ${scenarioName}`);
+      }
+      if(JSON.stringify(relationIds)!==JSON.stringify(scenarioRelations)){
+        throw new Error(`Relation-state drift in scenario: ${scenarioName}`);
+      }
+
+      entityIds.forEach(id=>{
+        const state=scenario.nodes[id];
+        if(!state.health || !('attention' in state)){
+          throw new Error(`Incomplete node state for ${id} in ${scenarioName}`);
+        }
+      });
+
+      relationIds.forEach(id=>{
+        const rel=GRAPH.relations[id];
+        const state=scenario.relations[id];
+        if(!state.health || typeof state.live!=='boolean'){
+          throw new Error(`Incomplete relation state for ${id} in ${scenarioName}`);
+        }
+        if(rel.kind==='dependency' && scenarioName==='clear' && (state.health!=='green' || !state.live)){
+          throw new Error(`All-clear dependency is not green/live: ${id}`);
+        }
+        if(state.health==='red' && state.live){
+          throw new Error(`Red dependency cannot pulse/live: ${id}`);
+        }
+      });
+    });
+  }
+
+  validateGraphModel();
+
+  const nodeIds = Object.keys(GRAPH.entities);
+  const nodeEls = Object.fromEntries(nodeIds.map(id => [id, document.getElementById(id)]));
+  const pulseLayer = document.getElementById('pulseLayer');
+
+  let scenarioName = 'disrupted';
+  let viewName = 'path';
+
+  function healthClass(health){ return health === 'neutral' ? '' : `health-${health}`; }
+  function dotClass(health){ return health === 'neutral' ? '' : health; }
+  function badgeClass(health){ return health === 'neutral' ? 'green' : health; }
+
+  function renderNode(id, nodeState){
+    const def = GRAPH.entities[id];
+    const el = nodeEls[id];
+
+    el.className = `node ${def.size || ''} ${healthClass(nodeState.health)} ${
+      nodeState.attention === 'focus' ? 'attention-focus' :
+      nodeState.attention === 'secondary' ? 'attention-secondary' : ''
+    }`.trim();
+
+    let valueHtml = '';
+    if(id === 'arrival'){
+      if(nodeState.previous && nodeState.current && nodeState.previous !== nodeState.current){
+        valueHtml = `<div class="time"><span class="old">${nodeState.previous}</span><span class="arrow">→</span><span class="current-time">${nodeState.current}</span></div>`;
+      } else if(nodeState.current){
+        valueHtml = `<div class="time"><span class="current-time">${nodeState.current}</span></div>`;
+      }
+    }
+
+    const meta = nodeState.meta ?? def.meta ?? '';
+    const date = nodeState.date ?? '';
+    const badge = nodeState.label ? `<div class="badge ${badgeClass(nodeState.health)}">${nodeState.label}</div>` : '';
+
+    const focusBottom = id === 'arrival' && nodeState.attention === 'focus'
+      ? `<div class="focus-row">${valueHtml}${badge}</div>`
+      : `${valueHtml}${badge}`;
+
+    el.innerHTML = `
+      <div class="nh"><div class="type">${def.type}</div><span class="dot ${dotClass(nodeState.health)}"></span></div>
+      <div class="title">${def.title}</div>
+      ${date ? `<div class="date">${date}</div>` : ''}
+      ${meta ? `<div class="meta">${meta}</div>` : ''}
+      ${focusBottom}
+    `;
+  }
+
+  function renderRelations(scenario){
+    pulseLayer.innerHTML = '';
+
+    Object.entries(GRAPH.relations).forEach(([relId, relDef]) => {
+      const state = scenario.relations[relId];
+      const el = relationEls[relId];
+      if(relDef.kind === 'context'){
+        el.setAttribute('class','edge context');
+      } else {
+        el.setAttribute('class',`edge ${state.health}`);
+      }
+
+      if(haloEls[relId]){
+        haloEls[relId].style.display = state.glow ? '' : 'none';
+      }
+
+      if(state.live && relDef.kind !== 'context'){
+        const ns='http://www.w3.org/2000/svg';
+        const circle=document.createElementNS(ns,'circle');
+        circle.setAttribute('r', relId.includes('Hotel') || relId.includes('Transfer') || relId.includes('Dinner') ? '2.7' : '3.05');
+        circle.setAttribute('class',`pulse ${state.health}`);
+        const anim=document.createElementNS(ns,'animateMotion');
+        const durations={sarahFlight:'2.6s',flightArrival:'2.45s',arrivalKeynote:'2.4s',keynoteObjective:'2.5s',arrivalHotel:'3.0s',arrivalTransfer:'3.1s',arrivalDinner:'3.2s'};
+        anim.setAttribute('dur',durations[relId]||'2.7s');
+        anim.setAttribute('repeatCount','indefinite');
+        anim.setAttribute('begin',`-${(Math.random()*1.8).toFixed(2)}s`);
+        const mpath=document.createElementNS(ns,'mpath');
+        mpath.setAttribute('href',`#${el.id}`);
+        anim.appendChild(mpath); circle.appendChild(anim); pulseLayer.appendChild(circle);
+      }
+    });
+  }
+
+
+  // -------------------------------------------------------------------------
+  // EDGE GEOMETRY
+  // Graph state says WHAT is connected. The renderer calculates WHERE each
+  // connector attaches from the actual current card dimensions.
+  // -------------------------------------------------------------------------
+  const programmeContextEl = document.querySelector('.programme-context');
+  const eventRegionEl = document.querySelector('.event');
+
+  function nodeBox(id){
+    const el = nodeEls[id];
+    return { x:el.offsetLeft, y:el.offsetTop, w:el.offsetWidth, h:el.offsetHeight };
+  }
+
+  function sideCurve(source, target, sourceFraction=.5, targetFraction=.5){
+    const sx=source.x+source.w, sy=source.y+source.h*sourceFraction;
+    const tx=target.x, ty=target.y+target.h*targetFraction;
+    const dx=Math.max(1,tx-sx);
+
+    // Handle length is proportional to the ACTUAL horizontal gap.
+    // It can never consume enough of the gap for control points to cross,
+    // so short relationships stay as a shallow, clean curve rather than an S-kink.
+    const handle=Math.max(4,Math.min(72,dx*0.36));
+
+    return `M${sx} ${sy} C${sx+handle} ${sy},${tx-handle} ${ty},${tx} ${ty}`;
+  }
+
+  function bottomCurve(source, target, branchIndex, branchCount){
+    // Independent branches; evenly distributed across the parent's bottom surface.
+    const fraction=(branchIndex+1)/(branchCount+1);
+    const sx=source.x+source.w*fraction, sy=source.y+source.h;
+    const tx=target.x+target.w/2, ty=target.y;
+    const dy=Math.max(1,ty-sy);
+    const handle=Math.max(24,Math.min(72,dy*0.46));
+    return `M${sx} ${sy} C${sx} ${sy+handle},${tx} ${ty-handle},${tx} ${ty}`;
+  }
+
+  function diagonalCurve(source, target, sourceFraction=.72){
+    // A tight monotonic curve for a downstream item to the right and below.
+    const sx=source.x+source.w, sy=source.y+source.h*sourceFraction;
+    const tx=target.x, ty=target.y+target.h/2;
+    const dx=Math.max(1,tx-sx);
+    const handle=Math.max(30,Math.min(110,dx*0.30));
+    return `M${sx} ${sy} C${sx+handle} ${sy},${tx-handle} ${ty},${tx} ${ty}`;
+  }
+
+  function programmeContextPath(source){
+    const sx=source.x+source.w, sy=source.y+source.h*0.35;
+    const tx=eventRegionEl.offsetLeft, ty=eventRegionEl.offsetTop+88;
+    const span=Math.max(42,(tx-sx)*0.48);
+    return `M${sx} ${sy} C${sx+span} ${sy-24},${tx-span} ${ty},${tx} ${ty}`;
+  }
+
+  function positionProgrammeContext(){
+    // Keep before/after programme cards centered on the keynote regardless
+    // of the keynote's current rendered width.
+    const k=nodeBox('keynote');
+    programmeContextEl.style.left=`${k.x+k.w/2-programmeContextEl.offsetWidth/2}px`;
+  }
+
+  function updateGeometry(){
+    positionProgrammeContext();
+
+    Object.entries(GRAPH.relations).forEach(([relId, rel])=>{
+      const source=nodeBox(rel.from);
+      const target=nodeBox(rel.to);
+      let d='';
+
+      if(rel.route==='sideCurve') d=sideCurve(source,target,rel.sourceFraction,rel.targetFraction);
+      else if(rel.route==='bottomCurve') d=bottomCurve(source,target,rel.branchIndex,rel.branchCount);
+      else if(rel.route==='diagonalCurve') d=diagonalCurve(source,target,rel.sourceFraction);
+      else if(rel.route==='programmeContext') d=programmeContextPath(source);
+
+      relationEls[relId].setAttribute('d',d);
+      if(haloEls[relId]) haloEls[relId].setAttribute('d',d);
+    });
+  }
+
+  // Node dimensions change between disrupted/all-clear states and semantic zoom.
+  // Recalculate geometry whenever the actual rendered boxes change.
+  const geometryObserver = new ResizeObserver(()=>requestAnimationFrame(updateGeometry));
+  nodeIds.forEach(id=>geometryObserver.observe(nodeEls[id]));
+
+  function renderScenario(name){
+    scenarioName = name;
+    const scenario = GRAPH.scenarios[name];
+
+    // Trip-level state is rendered from scenario, not inferred from stale DOM.
+    const tripState = document.getElementById('tripState');
+    tripState.className = `trip-state ${scenario.trip.color}`;
+    tripState.querySelector('i').textContent = scenario.trip.icon;
+    tripState.querySelector('span').textContent = scenario.trip.label;
+    document.getElementById('subline').textContent = scenario.trip.subline;
+
+    nodeIds.forEach(id => renderNode(id, scenario.nodes[id]));
+    renderRelations(scenario);
+    requestAnimationFrame(updateGeometry);
+
+    const pathBtn = document.getElementById('pathBtn');
+    if(name === 'clear'){
+      pathBtn.disabled = true;
+      if(viewName === 'path') setView('trip');
+    } else {
+      pathBtn.disabled = false;
+    }
+    resetViewEmphasis();
+  }
+
+  // -----------------------------
+  // View / camera state
+  // -----------------------------
+  const viewport=document.getElementById('viewport'), stage=document.getElementById('stage'), zoomReadout=document.getElementById('zoomReadout');
+  const viewBtns={path:document.getElementById('pathBtn'),trip:document.getElementById('tripBtn'),prog:document.getElementById('progBtn')};
+  const views={
+    path:{x1:65,y1:95,x2:1320,y2:445},
+    trip:{x1:45,y1:70,x2:1325,y2:510},
+    prog:{x1:780,y1:45,x2:1365,y2:500}
+  };
+  let x=0,y=0,scale=1,targetX=0,targetY=0,targetScale=1,dragging=false,sx=0,sy=0,stx=0,sty=0;
+
+  function rect(){return viewport.getBoundingClientRect()}
+  let lastSemanticMode='';
+  function semantic(){
+    const next=scale<.76?'overview':scale>1.14?'detail':'normal';
+    stage.classList.toggle('overview',next==='overview');
+    stage.classList.toggle('detailzoom',next==='detail');
+    if(next!==lastSemanticMode){lastSemanticMode=next;requestAnimationFrame(updateGeometry);}
+  }
+  function renderCamera(){
+    x+=(targetX-x)*(dragging?.42:.18); y+=(targetY-y)*(dragging?.42:.18); scale+=(targetScale-scale)*.16;
+    stage.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
+    zoomReadout.textContent=Math.round(scale*100)+'%'; semantic(); requestAnimationFrame(renderCamera);
+  }
+  function frame(bounds,pad=46){
+    const r=rect(),bw=bounds.x2-bounds.x1,bh=bounds.y2-bounds.y1;
+    targetScale=Math.max(.5,Math.min(Math.min((r.width-pad*2)/bw,(r.height-pad*2)/bh),1.45));
+    targetX=(r.width-bw*targetScale)/2-bounds.x1*targetScale;
+    targetY=(r.height-bh*targetScale)/2-bounds.y1*targetScale;
+  }
+  function setView(name){
+    if(name==='path' && scenarioName==='clear') name='trip';
+    viewName=name;
+    Object.entries(viewBtns).forEach(([k,b])=>b.classList.toggle('active',k===name));
+    frame(views[name],name==='prog'?58:46);
+    resetViewEmphasis();
+  }
+
+  function resetViewEmphasis(){
+    nodeIds.forEach(id=>nodeEls[id].classList.remove('focus','dim'));
+    Object.values(relationEls).forEach(el=>el.classList.remove('dim'));
+
+    if(viewName==='path' && scenarioName==='disrupted'){
+      ['hotel','transfer','dinner'].forEach(id=>nodeEls[id].classList.add('dim'));
+      ['arrivalHotel','arrivalTransfer','arrivalDinner'].forEach(id=>relationEls[id].classList.add('dim'));
+    }
+    if(viewName==='prog'){
+      ['sarah','flight','hotel','transfer'].forEach(id=>nodeEls[id].classList.add('dim'));
+      ['sarahFlight','flightArrival','arrivalHotel','arrivalTransfer'].forEach(id=>relationEls[id].classList.add('dim'));
+    }
+  }
+
+  Object.entries(viewBtns).forEach(([name,btn])=>btn.onclick=()=>setView(name));
+  document.getElementById('home').onclick=()=>setView(viewName);
+
+  // Prototype scenario switch; both states use the same model + renderer.
+  const badBtn=document.getElementById('badBtn'),okBtn=document.getElementById('okBtn');
+  badBtn.onclick=()=>{badBtn.classList.add('active');okBtn.classList.remove('active');renderScenario('disrupted');setView('path')};
+  okBtn.onclick=()=>{okBtn.classList.add('active');badBtn.classList.remove('active');renderScenario('clear');setView('trip')};
+
+  function zoomAt(cx,cy,f){
+    const r=rect(),px=cx-r.left,py=cy-r.top,wx=(px-targetX)/targetScale,wy=(py-targetY)/targetScale;
+    const ns=Math.max(.5,Math.min(1.55,targetScale*f));
+    targetX=px-wx*ns;targetY=py-wy*ns;targetScale=ns;
+  }
+  viewport.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.00115))},{passive:false});
+  document.getElementById('plus').onclick=()=>{const r=rect();zoomAt(r.left+r.width/2,r.top+r.height/2,1.16)};
+  document.getElementById('minus').onclick=()=>{const r=rect();zoomAt(r.left+r.width/2,r.top+r.height/2,1/1.16)};
+
+  viewport.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.toolbar')||e.target.closest('.node')) return;
+    dragging=true;viewport.setPointerCapture(e.pointerId);sx=e.clientX;sy=e.clientY;stx=targetX;sty=targetY;viewport.style.cursor='grabbing';
+  });
+  viewport.addEventListener('pointermove',e=>{if(dragging){targetX=stx+e.clientX-sx;targetY=sty+e.clientY-sy}});
+  viewport.addEventListener('pointerup',e=>{dragging=false;viewport.style.cursor='';try{viewport.releasePointerCapture(e.pointerId)}catch{}});
+
+  // Selection only changes focus display; it never mutates scenario state.
+  nodeIds.forEach(id=>{
+    nodeEls[id].onclick=(e)=>{
+      e.stopPropagation();
+      const neighbours=new Set([id]);
+      Object.entries(GRAPH.relations).forEach(([relId,rel])=>{
+        if(rel.from===id||rel.to===id){neighbours.add(rel.from);neighbours.add(rel.to)}
+      });
+      nodeIds.forEach(n=>{nodeEls[n].classList.toggle('focus',n===id);nodeEls[n].classList.toggle('dim',!neighbours.has(n))});
+      Object.entries(GRAPH.relations).forEach(([relId,rel])=>{
+        relationEls[relId].classList.toggle('dim',!(rel.from===id||rel.to===id));
+      });
+    };
+  });
+
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')resetViewEmphasis()});
+  viewport.ondblclick=e=>{if(!e.target.closest('.node'))setView(viewName)};
+  window.onresize=()=>{setView(viewName);requestAnimationFrame(updateGeometry)};
+
+  // Initial paint
+  requestAnimationFrame(()=>{
+    const r=rect(),b=views.path,bw=b.x2-b.x1,bh=b.y2-b.y1;
+    scale=targetScale=Math.max(.5,Math.min(Math.min((r.width-92)/bw,(r.height-92)/bh),1.45));
+    x=targetX=(r.width-bw*scale)/2-b.x1*scale;y=targetY=(r.height-bh*scale)/2-b.y1*scale;
+    renderCamera(); renderScenario('disrupted'); setView('path');
+  });
+})();
+</script>
+</body>
+</html>
