@@ -1,7 +1,7 @@
 {
   "reconcilerVersion": "northstar-migration-reconciler/1.0.0",
   "generatedAt": "2026-03-02T09:00:00Z",
-  "runId": "18953aa8-8086-4dba-bf76-585f186bc3cf",
+  "runId": "c06305bc-204c-4e81-985d-764fab26a5be",
   "sourceDataset": "legacy-deployment-m10-restore-rehearsal",
   "datasetHash": "6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d",
   "exporterVersion": "northstar-legacy-exporter/1.1.0",
@@ -197,6 +197,7 @@
       "categoryId": "TRIP",
       "sourceType": "trips",
       "sourceId": "trip-single",
+      "factSourceId": "trip-single:el-single-return",
       "reason": "legacy element el-single-return stood at CHANGED — the supplier state was never reconciled by the legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED would assert something never observed, so it migrated as UNKNOWN",
       "affectedScope": "element el-single-return on trip trip-single, reservation d60b6843-2537-542b-844c-5af62cf77ce0",
       "safetyImpact": "the real supplier state must be re-observed before anyone relies on this booking; until then the target correctly reports that it does not know",

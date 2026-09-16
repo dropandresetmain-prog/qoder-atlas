@@ -44,6 +44,33 @@ export const MigrationSourceRecordSchema = z.strictObject({
 });
 export type MigrationSourceRecord = z.infer<typeof MigrationSourceRecordSchema>;
 
+/**
+ * The source identity of one legacy trip element: a fact carried *inside* a
+ * trip record rather than a record of its own.
+ *
+ * This is the element-scoped identity the importer writes the element's target
+ * rows under, the identity an exception about that element names, and the
+ * identity reconciliation recomputes to find the one row the fact became. It is
+ * defined once here because all three must agree exactly: if the importer and
+ * the reconciler each built the string themselves, a missing reservation line
+ * could be reasoned about under two different names and reconciliation would
+ * bless an import that silently lost an unknown.
+ */
+export function legacyTripElementSourceId(tripSourceId: string, elementId: string): string {
+  return `${tripSourceId}:${elementId}`;
+}
+
+/**
+ * The record an element's own rows are written under: the trip record with its
+ * source id narrowed to {@link legacyTripElementSourceId}.
+ */
+export function legacyTripElementRecord(
+  record: MigrationSourceRecord,
+  elementId: string,
+): MigrationSourceRecord {
+  return { ...record, sourceId: legacyTripElementSourceId(record.sourceId, elementId) };
+}
+
 export const MigrationBundleCategorySchema = z.strictObject({
   categoryId: z.string().min(1),
   sourceTable: z.string().min(1),

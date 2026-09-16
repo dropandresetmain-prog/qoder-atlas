@@ -12,6 +12,7 @@
  */
 
 import type { MigrationBundle } from './legacyExportBundle.ts';
+import { legacyTripElementSourceId } from './legacyExportBundle.ts';
 
 /**
  * Legacy `ReservationState` values whose real-world outcome was unresolved.
@@ -103,9 +104,9 @@ export function collectUncertainSourceFacts(bundle: MigrationBundle): UncertainS
           recordKey,
           sourceType: record.sourceType,
           sourceId: record.sourceId,
-          // Mirrors the importer's `elementRecord`: `{ ...record, sourceId:
-          // `${record.sourceId}:${elementId}` }`.
-          factSourceId: `${record.sourceId}:${elementId}`,
+          // The same element-scoped identity the importer writes this
+          // element's rows under, from the one shared helper.
+          factSourceId: legacyTripElementSourceId(record.sourceId, elementId),
           factId: `${recordKey}#${elementId}`,
           legacyValue: state ?? 'UNRECORDED',
           detail:

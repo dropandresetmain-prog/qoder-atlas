@@ -20,6 +20,7 @@
  */
 
 import type { MigrationSourceRecord } from './legacyExportBundle.ts';
+import { legacyTripElementRecord, legacyTripElementSourceId } from './legacyExportBundle.ts';
 import { isSettledProviderStatus, isUncertainReservationState } from './legacyUncertainty.ts';
 import {
   archiveLegacyRecord,
@@ -28,6 +29,7 @@ import {
   str,
   unreadable,
   type ImportContext,
+  type RecordException,
   type RecordOutcome,
 } from './legacyImportContext.ts';
 import { createPlace } from '../persistence/postgres/commands/geographyCommands.ts';
@@ -726,7 +728,7 @@ function reservationStatus(legacy: string | undefined): {
 export interface TripElementMigration {
   imported: number;
   notes: string[];
-  exceptions: Omit<import('./migrationRunStore.ts').MigrationReconciliationException, 'categoryId' | 'sourceType' | 'sourceId'>[];
+  exceptions: RecordException[];
 }
 
 /**
@@ -746,10 +748,20 @@ export async function migrateTripElements(
   const result: TripElementMigration = { imported: 0, notes: [], exceptions: [] };
   const observedAt = record.sourceTimestamp ?? ctx.now;
 
+  // An element-scoped finding must carry the same fact identity the
+  // reconciler derives, so the two cannot drift and so "this element was held
+  // back" can never be answered by a finding about a different element.
+  const forElement = (elementId: string, exception: RecordException): RecordException => ({
+    ...exception,
+    factSourceId: legacyTripElementSourceId(record.sourceId, elementId),
+  });
+
   for (const raw of params.elements) {
     const element = asObject(raw);
     const elementId = str(element?.id);
     if (element === undefined || elementId === undefined) {
+      // Deliberately unbound: there is no element id to name, so this finding
+      // is about the trip row, not about a provable fact.
       result.exceptions.push({
         classification: 'QUARANTINED_UNREADABLE_SOURCE',
         reason: 'legacy trip element is unreadable or has no id',
@@ -770,48 +782,53 @@ export async function migrateTripElements(
     // NONE is an unbooked intent, not an arrangement. There is nothing for a
     // Reservation to be about, so the need is archived rather than invented.
     if (legacyState === 'NONE' || legacyState === undefined) {
-      const archived = await archiveLegacyRecord(ctx, { ...record, sourceId: `${record.sourceId}:${elementId}` }, {
+      const archived = await archiveLegacyRecord(ctx, legacyTripElementRecord(record, elementId), {
         assertionType: LEGACY_UNBOOKED_ELEMENT_ASSERTION,
         subject: { kind: 'JOURNEY', id: params.journeyTargetId },
         provenance:
           `legacy ${kind ?? 'element'} ${elementId} on trip ${record.sourceId} had no reservation ` +
           `(${legacyState ?? 'unrecorded'}); archived as an unbooked need rather than migrated as an arrangement`,
       });
-      if (!archived.ok && archived.outcome.kind === 'QUARANTINED') result.exceptions.push(archived.outcome.exception);
-      else result.notes.push(`${elementId}: unbooked need archived`);
+      if (!archived.ok && archived.outcome.kind === 'QUARANTINED') {
+        result.exceptions.push(forElement(elementId, archived.outcome.exception));
+      } else result.notes.push(`${elementId}: unbooked need archived`);
       continue;
     }
 
     if (kind === 'ENGAGEMENT') {
-      result.exceptions.push({
-        classification: 'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
-        reason:
-          `legacy ENGAGEMENT ${elementId} links this trip to an anchor commitment; the target expresses that as ` +
-          'Participation against a migrated ProgrammeItem, which requires the commitment to have migrated and ' +
-          'the obligation level to be known — the legacy engagement records neither reliably',
-        affectedScope: `element ${elementId} on trip ${record.sourceId}`,
-        safetyImpact:
-          'the traveller is not linked to the programme item they are attending, so programme-driven readiness ' +
-          'does not consider them',
-        owner: 'migration owner',
-        blocksCutover: true,
-      });
+      result.exceptions.push(
+        forElement(elementId, {
+          classification: 'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
+          reason:
+            `legacy ENGAGEMENT ${elementId} links this trip to an anchor commitment; the target expresses that as ` +
+            'Participation against a migrated ProgrammeItem, which requires the commitment to have migrated and ' +
+            'the obligation level to be known — the legacy engagement records neither reliably',
+          affectedScope: `element ${elementId} on trip ${record.sourceId}`,
+          safetyImpact:
+            'the traveller is not linked to the programme item they are attending, so programme-driven readiness ' +
+            'does not consider them',
+          owner: 'migration owner',
+          blocksCutover: true,
+        }),
+      );
       continue;
     }
 
     if (kind !== 'TRANSPORT_LEG' && kind !== 'STAY') {
-      result.exceptions.push({
-        classification: 'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
-        reason: `legacy element ${elementId} has unrecognised kind "${kind ?? 'absent'}"`,
-        affectedScope: `element ${elementId} on trip ${record.sourceId}`,
-        safetyImpact: 'an obligation of unknown type is not represented in the target',
-        owner: 'migration owner',
-        blocksCutover: true,
-      });
+      result.exceptions.push(
+        forElement(elementId, {
+          classification: 'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
+          reason: `legacy element ${elementId} has unrecognised kind "${kind ?? 'absent'}"`,
+          affectedScope: `element ${elementId} on trip ${record.sourceId}`,
+          safetyImpact: 'an obligation of unknown type is not represented in the target',
+          owner: 'migration owner',
+          blocksCutover: true,
+        }),
+      );
       continue;
     }
 
-    const elementRecord = { ...record, sourceId: `${record.sourceId}:${elementId}` };
+    const elementRecord = legacyTripElementRecord(record, elementId);
     let transportServiceId: string | undefined;
 
     if (kind === 'TRANSPORT_LEG') {
@@ -821,16 +838,18 @@ export async function migrateTripElements(
       const destination =
         legacyDestination === undefined ? undefined : await ctx.resolve('entities.PLACE', legacyDestination);
       if (origin === undefined || destination === undefined) {
-        result.exceptions.push({
-          classification: 'QUARANTINED_AMBIGUOUS_IDENTITY',
-          reason:
-            `legacy transport leg ${elementId} runs ${legacyOrigin ?? 'unknown'} -> ${legacyDestination ?? 'unknown'}; ` +
-            'at least one place has no migrated target identity, and a service must name real endpoints',
-          affectedScope: `element ${elementId} on trip ${record.sourceId}`,
-          safetyImpact: 'a booked journey leg is absent from the target and will not be monitored or recovered',
-          owner: 'migration owner',
-          blocksCutover: true,
-        });
+        result.exceptions.push(
+          forElement(elementId, {
+            classification: 'QUARANTINED_AMBIGUOUS_IDENTITY',
+            reason:
+              `legacy transport leg ${elementId} runs ${legacyOrigin ?? 'unknown'} -> ${legacyDestination ?? 'unknown'}; ` +
+              'at least one place has no migrated target identity, and a service must name real endpoints',
+            affectedScope: `element ${elementId} on trip ${record.sourceId}`,
+            safetyImpact: 'a booked journey leg is absent from the target and will not be monitored or recovered',
+            owner: 'migration owner',
+            blocksCutover: true,
+          }),
+        );
         continue;
       }
 
@@ -858,14 +877,16 @@ export async function migrateTripElements(
         evidenceRefs: [ctx.runEvidenceId],
       });
       if (!service.ok) {
-        result.exceptions.push({
-          classification: 'TARGET_REJECTED_WRITE',
-          reason: `target rejected TRANSPORT_SERVICE_CREATED for element ${elementId} — ${conflictText(service.conflict)}`,
-          affectedScope: `element ${elementId} on trip ${record.sourceId}`,
-          safetyImpact: 'a booked journey leg is absent from the target',
-          owner: 'migration owner',
-          blocksCutover: true,
-        });
+        result.exceptions.push(
+          forElement(elementId, {
+            classification: 'TARGET_REJECTED_WRITE',
+            reason: `target rejected TRANSPORT_SERVICE_CREATED for element ${elementId} — ${conflictText(service.conflict)}`,
+            affectedScope: `element ${elementId} on trip ${record.sourceId}`,
+            safetyImpact: 'a booked journey leg is absent from the target',
+            owner: 'migration owner',
+            blocksCutover: true,
+          }),
+        );
         continue;
       }
       transportServiceId = service.value.id;
@@ -886,14 +907,16 @@ export async function migrateTripElements(
       evidenceRefs: [ctx.runEvidenceId],
     });
     if (!reservation.ok) {
-      result.exceptions.push({
-        classification: 'TARGET_REJECTED_WRITE',
-        reason: `target rejected RESERVATION_CREATED for element ${elementId} — ${conflictText(reservation.conflict)}`,
-        affectedScope: `element ${elementId} on trip ${record.sourceId}`,
-        safetyImpact: 'a live booking obligation is absent from the target',
-        owner: 'migration owner',
-        blocksCutover: true,
-      });
+      result.exceptions.push(
+        forElement(elementId, {
+          classification: 'TARGET_REJECTED_WRITE',
+          reason: `target rejected RESERVATION_CREATED for element ${elementId} — ${conflictText(reservation.conflict)}`,
+          affectedScope: `element ${elementId} on trip ${record.sourceId}`,
+          safetyImpact: 'a live booking obligation is absent from the target',
+          owner: 'migration owner',
+          blocksCutover: true,
+        }),
+      );
       continue;
     }
 
@@ -936,14 +959,16 @@ export async function migrateTripElements(
       evidenceRefs: [ctx.runEvidenceId],
     });
     if (!line.ok) {
-      result.exceptions.push({
-        classification: 'TARGET_REJECTED_WRITE',
-        reason: `target rejected RESERVATION_LINE_ADDED for element ${elementId} — ${conflictText(line.conflict)}`,
-        affectedScope: `element ${elementId} on trip ${record.sourceId}`,
-        safetyImpact: 'the reservation exists but holds nothing, so what was actually booked is unrecorded',
-        owner: 'migration owner',
-        blocksCutover: true,
-      });
+      result.exceptions.push(
+        forElement(elementId, {
+          classification: 'TARGET_REJECTED_WRITE',
+          reason: `target rejected RESERVATION_LINE_ADDED for element ${elementId} — ${conflictText(line.conflict)}`,
+          affectedScope: `element ${elementId} on trip ${record.sourceId}`,
+          safetyImpact: 'the reservation exists but holds nothing, so what was actually booked is unrecorded',
+          owner: 'migration owner',
+          blocksCutover: true,
+        }),
+      );
       continue;
     }
 
@@ -962,26 +987,32 @@ export async function migrateTripElements(
           'the migrated reservation. Binding it as target external identity requires external-identity ' +
           'resolution, which is a documented open seam, so it is not asserted as a correlated provider record',
       });
-      if (!archived.ok && archived.outcome.kind === 'QUARANTINED') result.exceptions.push(archived.outcome.exception);
+      if (!archived.ok && archived.outcome.kind === 'QUARANTINED') {
+        result.exceptions.push(forElement(elementId, archived.outcome.exception));
+      }
     }
 
     // Every uncertain legacy state earns its own named exception, not just
     // CHANGED: a legacy UNKNOWN is equally an unresolved external outcome, and
-    // the reconciler holds both to the same standard.
+    // the reconciler holds both to the same standard. Bound to the fact on
+    // purpose: this finding asserts the element DID migrate, so the
+    // reconciler must be able to tell that from a hold-back for the same fact.
     if (isUncertainReservationState(legacyState)) {
-      result.exceptions.push({
-        classification: 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
-        reason:
-          `legacy element ${elementId} stood at ${legacyState} — the supplier state was never reconciled by the ` +
-          'legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED ' +
-          'would assert something never observed, so it migrated as UNKNOWN',
-        affectedScope: `element ${elementId} on trip ${record.sourceId}, reservation ${reservation.value.id}`,
-        safetyImpact:
-          'the real supplier state must be re-observed before anyone relies on this booking; until then the ' +
-          'target correctly reports that it does not know',
-        owner: 'operations owner',
-        blocksCutover: false,
-      });
+      result.exceptions.push(
+        forElement(elementId, {
+          classification: 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
+          reason:
+            `legacy element ${elementId} stood at ${legacyState} — the supplier state was never reconciled by the ` +
+            'legacy runtime. The target has no such status, and both CONFIRMED and CANCELLED ' +
+            'would assert something never observed, so it migrated as UNKNOWN',
+          affectedScope: `element ${elementId} on trip ${record.sourceId}, reservation ${reservation.value.id}`,
+          safetyImpact:
+            'the real supplier state must be re-observed before anyone relies on this booking; until then the ' +
+            'target correctly reports that it does not know',
+          owner: 'operations owner',
+          blocksCutover: false,
+        }),
+      );
     }
 
     result.imported += 1;

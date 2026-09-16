@@ -55,7 +55,9 @@ after(async () => {
  * maps to a registered target evaluator type, and one multi-traveller trip
  * whose element ownership is genuinely unprovable.
  */
-function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): string {
+function buildLegacyDataset(
+  options: { renameSingleTrip?: boolean; addUnresolvableUncertainLeg?: boolean } = {},
+): string {
   const dir = mkdtempSync(join(tmpdir(), 'm10-at23-'));
   workDirs.push(dir);
   const path = join(dir, 'legacy.db');
@@ -236,6 +238,24 @@ function buildLegacyDataset(options: { renameSingleTrip?: boolean } = {}): strin
           status: 'UNKNOWN',
           data: { mode: 'ROAD', originPlaceId: 'place-venue', destinationPlaceId: 'place-origin' },
         },
+        ...(options.addUnresolvableUncertainLeg === true
+          ? [
+              {
+                // Uncertain like `el-solo-stay`, but genuinely unbindable: one
+                // endpoint never migrated, so the leg is held back whole and
+                // correctly leaves no reservation line behind. Appended last so
+                // the default dataset hashes byte-identically.
+                id: 'el-solo-ghostleg',
+                tripId: 'trip-solo',
+                elementKind: 'TRANSPORT_LEG',
+                importance: 'IMPORTANT',
+                flexibility: 'FLEXIBLE',
+                reservationState: 'CHANGED',
+                status: 'UNKNOWN',
+                data: { mode: 'RAIL', originPlaceId: 'place-nozone', destinationPlaceId: 'place-venue' },
+              },
+            ]
+          : []),
       ],
       updatedAt: '2026-02-10T10:00:00Z',
     }),
@@ -1227,4 +1247,165 @@ test('C5 blocker 2: another delivery archive cannot mask an unaccounted uncertai
     'PASS',
     'once the delivery is archived under its own id the fact is accounted for',
   );
+});
+
+// ---------------------------------------------------------------------------
+// C5 remediation 3 — an absent line must be excused by its own fact
+//
+// Every element-scoped finding shares its parent trip's `sourceType`/`sourceId`,
+// so matching an uncertain element against "any exception on the same record"
+// lets one element's finding answer for another's missing row — including
+// `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME`, which asserts the element *did* migrate.
+// The exception's `factSourceId` is what makes the answer specific.
+// ---------------------------------------------------------------------------
+
+/** The reservation-line id the importer derives for one element of `trip-solo`. */
+function lineIdFor(datasetHash: string, elementSourceId: string): string {
+  return migrationTargetId({ datasetHash, sourceType: 'trips', sourceId: elementSourceId, step: 'reservation-line' });
+}
+
+/** Make a migrated line genuinely absent, detail row and all. */
+async function removeLine(pool: Pool, workspaceId: string, lineId: string): Promise<void> {
+  await pool.query('DELETE FROM stay_line_details WHERE workspace_id = $1 AND line_id = $2', [workspaceId, lineId]);
+  await pool.query('DELETE FROM reservation_lines WHERE workspace_id = $1 AND id = $2', [workspaceId, lineId]);
+}
+
+test('C5 remediation 3: an absent uncertain line fails even while its own PRESERVED_UNKNOWN exception stands', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset());
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+
+  const run = await readMigrationRun(pool, result.runId);
+  const preserved = run.reconciliationExceptions.filter(
+    (entry) => entry.classification === 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME',
+  );
+  assert.deepEqual(
+    preserved
+      .filter((entry) => entry.sourceType === 'trips')
+      .map((entry) => [entry.sourceType, entry.sourceId, entry.factSourceId]),
+    [['trips', 'trip-solo', 'trip-solo:el-solo-stay']],
+    'the element finding keeps the parent record identity and additionally names its own fact',
+  );
+  assert.deepEqual(
+    preserved
+      .filter((entry) => entry.sourceType !== 'trips')
+      .map((entry) => [entry.sourceType, entry.sourceId, entry.factSourceId]),
+    [['provider_event_inbox', 'atlas:evt-pending', undefined]],
+    'a finding about a whole record stays record-level; only element facts earn a fact identity',
+  );
+
+  const reconcileArgs = { workspaceId, runId: result.runId, bundle, now: NOW, importStartedAt: NOW };
+  const before = await reconcileMigration(pool, reconcileArgs);
+  assert.equal(before.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED')?.status, 'PASS');
+
+  const lineId = lineIdFor(bundle.datasetHash, 'trip-solo:el-solo-stay');
+  await removeLine(pool, workspaceId, lineId);
+
+  const after = await reconcileMigration(pool, reconcileArgs);
+  const failing = after.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(failing);
+  assert.equal(
+    failing.status,
+    'FAIL',
+    'a finding that says the element migrated as UNKNOWN cannot also explain its row being absent',
+  );
+  assert.match(failing.detail, /trip-solo#el-solo-stay/, 'the failure names the fact that is unaccounted');
+  assert.match(failing.detail, new RegExp(lineId), 'and the exact target row that is gone');
+  assert.match(
+    failing.detail,
+    /PRESERVED_UNKNOWN_EXTERNAL_OUTCOME\) say it migrated, not that it was held back/,
+    'and spells out why the bound exception is the wrong kind of answer',
+  );
+  assert.equal(after.verdict, 'BLOCKED');
+});
+
+/**
+ * The fix must not become "absent line always fails". When the importer really
+ * did hold an element back and said so against that element, the absence is
+ * accounted for — established here through the handler's own control flow, not
+ * by hand-written exceptions.
+ */
+test('C5 remediation 3: a fact-scoped hold-back accounts for an absent line', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset({ addUnresolvableUncertainLeg: true }));
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+
+  const ghostLineId = lineIdFor(bundle.datasetHash, 'trip-solo:el-solo-ghostleg');
+  const line = await pool.query('SELECT 1 FROM reservation_lines WHERE workspace_id = $1 AND id = $2', [
+    workspaceId,
+    ghostLineId,
+  ]);
+  assert.equal(line.rowCount, 0, 'the leg whose endpoints never migrated wrote no reservation line');
+
+  const run = await readMigrationRun(pool, result.runId);
+  const bound = run.reconciliationExceptions.filter((entry) => entry.factSourceId === 'trip-solo:el-solo-ghostleg');
+  assert.deepEqual(
+    bound.map((entry) => entry.classification),
+    ['QUARANTINED_AMBIGUOUS_IDENTITY'],
+    'and that fact carries its own reason for having no row',
+  );
+
+  const report = await reconcileMigration(pool, {
+    workspaceId,
+    runId: result.runId,
+    bundle,
+    now: NOW,
+    importStartedAt: NOW,
+  });
+  const passing = report.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(passing);
+  assert.equal(passing.status, 'PASS', 'a held-back element is a legitimate answer for an absent row');
+  assert.match(passing.detail, /el-solo-ghostleg=fact-held-back/);
+});
+
+test('C5 remediation 3: a sibling element hold-back cannot mask a different missing line', async () => {
+  const { workspaceId, actorId } = await freshWorkspace(pool);
+  const bundle = exportDataset(buildLegacyDataset({ addUnresolvableUncertainLeg: true }));
+  const result = await importLegacyBundle(pool, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    bundle,
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'COMPLETED');
+
+  const reconcileArgs = { workspaceId, runId: result.runId, bundle, now: NOW, importStartedAt: NOW };
+  const before = await reconcileMigration(pool, reconcileArgs);
+  assert.equal(before.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED')?.status, 'PASS');
+
+  // Both findings are stamped `trips/trip-solo`; only their fact identities
+  // differ, which is exactly what a record-level match cannot use.
+  const run = await readMigrationRun(pool, result.runId);
+  const onTrip = run.reconciliationExceptions.filter(
+    (entry) => entry.sourceType === 'trips' && entry.sourceId === 'trip-solo' && entry.factSourceId !== undefined,
+  );
+  assert.deepEqual(
+    onTrip.map((entry) => entry.factSourceId).sort(),
+    ['trip-solo:el-solo-ghostleg', 'trip-solo:el-solo-stay'],
+    'two facts of the same trip each have their own bound finding',
+  );
+
+  await removeLine(pool, workspaceId, lineIdFor(bundle.datasetHash, 'trip-solo:el-solo-stay'));
+
+  const after = await reconcileMigration(pool, reconcileArgs);
+  const failing = after.checks.find((entry) => entry.id === 'UNCERTAINTY_PRESERVED');
+  assert.ok(failing);
+  assert.equal(failing.status, 'FAIL', 'the sibling hold-back must not answer for this element');
+  assert.match(failing.detail, /; 1 lost their preserved uncertainty/, 'and only this element is unaccounted');
+  const [, lost = ''] = failing.detail.split('lost their preserved uncertainty:');
+  assert.match(lost, /el-solo-stay/);
+  assert.doesNotMatch(lost, /el-solo-ghostleg/, 'the accounted-for sibling is not reported as a loss');
+  assert.equal(after.verdict, 'BLOCKED');
 });

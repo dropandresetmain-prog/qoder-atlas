@@ -114,6 +114,18 @@ export const MigrationReconciliationExceptionSchema = z.strictObject({
   categoryId: z.string().min(1),
   sourceType: z.string().min(1),
   sourceId: z.string().min(1),
+  /**
+   * Set when the finding is about one *fact inside* the source record rather
+   * than the record as a whole — for a legacy trip element, its element-scoped
+   * identity from `legacyTripElementSourceId`. `sourceType`/`sourceId` can only
+   * ever name the parent (a trip), so without this field an exception about one
+   * element is indistinguishable from an exception about a sibling, and
+   * reconciliation cannot tell which specific fact was held back.
+   *
+   * Optional and deliberately not inferred from `affectedScope`: most findings
+   * genuinely apply to a whole record, and free text is not an identity.
+   */
+  factSourceId: z.string().min(1).optional(),
   reason: z.string().min(1),
   /** What is affected if this is never resolved — scope, not a row count. */
   affectedScope: z.string().min(1),

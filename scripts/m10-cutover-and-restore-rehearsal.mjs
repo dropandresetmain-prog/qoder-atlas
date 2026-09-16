@@ -446,6 +446,13 @@ async function snapshotMigratedState(pool, workspaceId, runId) {
       status: runRow.status,
       exceptionCount: exceptions.length,
       classifications: exceptions.map((entry) => entry.classification).sort(),
+      // An exception that accounts for one element is only useful if that binding
+      // survives the restore too — a classification alone cannot be traced back to
+      // the fact it names. Record-level findings render explicitly so a dropped
+      // binding cannot compare equal to an absent one.
+      factBindings: exceptions
+        .map((entry) => `${entry.classification}=${entry.factSourceId ?? '(record-level)'}`)
+        .sort(),
     },
     counts,
     assessments: await countRows(pool, 'assessments', workspaceId),
@@ -755,13 +762,16 @@ async function rehearse() {
     after.run.importerVersion === before.run.importerVersion &&
     after.run.status === before.run.status &&
     after.run.exceptionCount === before.run.exceptionCount &&
-    after.run.classifications.join(',') === before.run.classifications.join(',');
+    after.run.classifications.join(',') === before.run.classifications.join(',') &&
+    after.run.factBindings.join(',') === before.run.factBindings.join(',');
   check(
     'migration_run_identity_survives',
     runIdentical,
     `run ${after.run.id} status=${after.run.status} dataset_hash=${after.run.datasetHash} ` +
       `exporter=${after.run.exporterVersion} importer=${after.run.importerVersion} ` +
-      `exceptions=${after.run.exceptionCount}/${before.run.exceptionCount} [${after.run.classifications.join(', ')}]`,
+      `exceptions=${after.run.exceptionCount}/${before.run.exceptionCount} ` +
+      `[${after.run.factBindings.join(', ')}]` +
+      `${runIdentical ? '' : `; before had [${before.run.factBindings.join(', ')}]`}`,
   );
 
   const countMismatches = DOMAIN_TABLES.filter((table) => after.counts[table] !== before.counts[table]);

@@ -10,30 +10,33 @@ isolated environments.
 ## 1. Candidate identity
 
 > **C5 re-review.** An independent C5 review of `m10-candidate-final` found two blockers:
-> a fabricated organisation currency, and a fail-open `UNCERTAINTY_PRESERVED` check. Both are
-> fixed in this candidate, which supersedes `m10-candidate-final`. §12 records what changed and
-> what the previous candidate got wrong. The rest of M10 is unchanged.
+> a fabricated organisation currency, and a fail-open `UNCERTAINTY_PRESERVED` check. Both were fixed,
+> but the fix for the second one was itself incomplete: `m10-candidate-c5-remediation-2` **failed C5
+> re-review** because, when an uncertain element's reservation line was absent, it accepted any
+> exception stamped at parent-record level rather than one bound to that fact. §12 records all three
+> findings and what each candidate got wrong. The rest of M10 is unchanged.
 
 | | |
 | --- | --- |
 | Branch | `milestone-m10-migration-rehearsal` |
-| **Candidate under review** | tag **`m10-candidate-c5-remediation-2`** |
-| Superseded candidates | `m10-candidate-c5-remediation` (`9486fc5`), `m10-candidate-final` (`eff19a9`), `m10-candidate` (`1d81dd7`) |
+| **Candidate under review** | tag **`m10-candidate-c5-remediation-3`** |
+| Superseded candidates | `m10-candidate-c5-remediation-2` (`b65a526`), `m10-candidate-c5-remediation` (`9486fc5`), `m10-candidate-final` (`eff19a9`), `m10-candidate` (`1d81dd7`) |
 | Accepted M9/C4 base | `c45a9289b7f7ff730cdce97ced6124b1a9332bf8` |
 
 The candidate is identified by an annotated tag rather than a SHA written into this file, because a
 document cannot contain the hash of the commit that contains it. Resolve it with
-`git rev-list -n 1 m10-candidate-c5-remediation-2` (`git rev-parse` on an annotated tag returns the
+`git rev-list -n 1 m10-candidate-c5-remediation-3` (`git rev-parse` on an annotated tag returns the
 tag object, not the commit).
 
-Four tags exist deliberately. Earlier tags are never moved, so their history stays honest:
+Five tags exist deliberately. Earlier tags are never moved, so their history stays honest:
 
 | tag | what it marks |
 | --- | --- |
 | `m10-candidate` | `1d81dd7` — implementation complete. |
 | `m10-candidate-final` | `eff19a9` — plus an evidence-consistency pass. **Failed C5** on the two blockers in §12. |
 | `m10-candidate-c5-remediation` | `9486fc5` — currency fixed and accepted, but the replacement uncertainty check was count-based. **Failed C5 re-review** on that. |
-| **`m10-candidate-c5-remediation-2`** | **the commit under review** — uncertainty reconciliation is now identity-bound per source fact. |
+| `m10-candidate-c5-remediation-2` | `b65a526` — uncertainty reconciliation identity-bound per source fact. **Failed C5 re-review**: the absent-line case fell back to parent-record exceptions (Blocker 3). |
+| **`m10-candidate-c5-remediation-3`** | **the commit under review** — element findings carry an explicit fact identity, and absent-line accounting is bound to it. |
 
 Unlike the previous pass, this one **changes executable code**, so every result in §9 was re-run on
 this candidate rather than carried forward.
@@ -63,12 +66,13 @@ migrated target. So one dataset and one hash cover both.
 | Source identity | `legacy-deployment-m10-restore-rehearsal` |
 | **Dataset hash** | **`6ebf05ce47554d8929a793d64882828d0cee895158ebb72047380827f528002d`** |
 | Export cutoff | `2026-03-01T00:00:00Z` |
-| Migration run | `18953aa8-8086-4dba-bf76-585f186bc3cf` |
+| Migration run | `c06305bc-204c-4e81-985d-764fab26a5be` |
 | Produced at | this candidate, by `scripts/m10-cutover-and-restore-rehearsal.mjs` |
 
-The hash is deterministic: re-exporting the same frozen source produces the same hash, and the same
-hash produces the same target ids, which is what makes a re-import a replay rather than a second
-divergent world.
+The hash is **byte-identical to the one `m10-candidate-c5-remediation-2` produced**, because this
+fix changed no fixture and no migrated row: the same source exports the same dataset, so the same
+target ids. What differs is how exceptions are named and how the absent-line case is answered, both
+of which the report shows. A migration that changed state would have changed this hash.
 
 ### Superseded hashes, named so they cannot be confused
 
@@ -220,11 +224,19 @@ isolated, **volume-backed** instance — deliberately not the shared tmpfs test 
 restoring into a RAM-backed non-durable data directory would prove nothing.
 
 Run at this candidate, over the same single dataset `6ebf05ce…` as §3 and §4, migration run
-`18953aa8-8086-4dba-bf76-585f186bc3cf`. **10/10 checks PASS**, including that the instance really is
+`c06305bc-204c-4e81-985d-764fab26a5be`. **10/10 checks PASS**, including that the instance really is
 volume-backed, that the database is genuinely destroyed before restore (0 tables remaining), that
 all 11 `legacy_id_map` tuples and the migration run identity survive, that the recomputed assessment
-survives, and that the append-only trigger is restored with the data rather than just the rows. Both
-reconciliation exceptions survive the restore with their classifications intact.
+survives, and that the append-only trigger is restored with the data rather than just the rows.
+
+Both reconciliation exceptions survive, and the check that judges them now compares the *fact
+binding* as well as the classification: `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME=trip-single:el-single-return`
+and `QUARANTINED_MULTI_TRAVELLER_ALLOCATION=(record-level)`. That addition was necessary rather than
+cosmetic. Blocker 3's whole fix is an exception-to-fact binding, and the rehearsal writes its
+reconciliation report *before* the destroy/restore phase — so a classification-only comparison would
+have left "the binding survives a restore" true in the data and unasserted in the evidence, which is
+the same gap the blocker is about. A record-level finding renders explicitly as `(record-level)` so a
+binding silently dropped by the restore cannot compare equal to an absent one.
 
 Because the script rehearses cutover and restore in one pass, the reconciliation evidence in §4 and
 the restore evidence here describe the **same** migrated target, not two separately built ones.
@@ -244,10 +256,10 @@ the real `src/main.ts`) and `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`
 | `postgres-integration/m9SarahTargetE2E.pgtest.ts` | PASS |
 | `postgres-integration/m9JordanMultiActionRecovery.pgtest.ts` | PASS |
 | `postgres-integration/m9JordanReplacementFlightViability.pgtest.ts` | PASS |
-| `postgres-integration/m10LegacyMigration.pgtest.ts` | **11/11 PASS** (7 + four C5 blocker tests) |
+| `postgres-integration/m10LegacyMigration.pgtest.ts` | **14/14 PASS** (7 + four C5 blocker tests + three fact-identity tests) |
 | `postgres-integration/m10RuntimePurgeBoot.pgtest.ts` | PASS |
 | `test/m10-legacy-exporter.test.ts` + `test/m10-runtime-purge.test.ts` | 10/10 PASS |
-| `npm run test:postgres` on a **fresh** database | **472/472 PASS**, exit 0 |
+| `npm run test:postgres` on a **fresh** database | **475/475 PASS**, exit 0 |
 | `npx tsc --noEmit` | clean |
 | `npm run build` | clean |
 | `npm run lint` | clean |
@@ -256,9 +268,9 @@ the real `src/main.ts`) and `postgres-integration/m10RuntimePurgeBoot.pgtest.ts`
 Sarah and Jordan were not modified to accommodate migration tooling; they remain independent
 target-runtime regression evidence.
 
-472 is the original 468 plus the four C5 blocker tests. Every result in this table was produced
-on **this** candidate; unlike the previous evidence pass, nothing is carried forward, because this
-candidate changes executable code.
+475 is the previous candidate's 472 plus exactly the three new fact-identity tests — no other test
+counted, dropped or changed. Every result in this table was produced on **this** candidate; nothing
+is carried forward, because this candidate changes executable code.
 
 ## 10. Cutover steps and rollback boundaries
 
@@ -284,11 +296,11 @@ The boundary is observable rather than a judgement call: Zone B begins at the fi
 
 ## 11. Suite behaviour on an accumulated database, disclosed rather than hidden
 
-The gate above was run on a freshly created `northstar_test` database and is 472/472, exit 0.
+The gate above was run on a freshly created `northstar_test` database and is 475/475, exit 0.
 
 This suite has a low-rate, non-deterministic single-file failure that a reviewer should expect and
-not mistake for a regression. Across five full runs it has landed on a **different file every
-time**, never twice on the same one, and the last two runs were clean:
+not mistake for a regression. Across six full runs it has landed on a **different file every
+time**, never twice on the same one, and the last three runs were clean:
 
 | run | database | result |
 | --- | --- | --- |
@@ -296,7 +308,8 @@ time**, never twice on the same one, and the last two runs were clean:
 | 2 | shared, accumulated | 1 failure: `m2Travel.pgtest.ts` |
 | 3 | fresh | 1 failure: `m2SubtypeIntegrity.pgtest.ts` |
 | 4 | fresh | 470/470 PASS |
-| 5 | fresh | **472/472 PASS** (this candidate, after the identity-bound uncertainty fix) |
+| 5 | fresh | 472/472 PASS (after the identity-bound uncertainty fix) |
+| 6 | fresh | **475/475 PASS** (this candidate, after the fact-bound absent-line fix) |
 
 Two distinct causes are visible. The `m2Travel` failure is plan-sensitivity: it asserts a specific
 query uses a specific index, and on an accumulated database the planner chose a *different* index
@@ -379,8 +392,12 @@ that one row:
 | uncertain source fact | accounted for only by |
 | --- | --- |
 | migrated reservation element | **that element's own** reservation line still reading `UNKNOWN` |
-| element whose scope was held back | a named exception covering that scope |
+| element whose scope was held back | a named exception covering that scope <sup>†</sup> |
 | provider delivery | **that delivery's own** archived evidence id, or its own named exception |
+
+<sup>†</sup> *This row is remediation-2 as reviewed. "A named exception covering that scope" was
+implemented at **parent-record** granularity, and C5 re-review rejected it — see Blocker 3 below.
+The rule as it now stands requires the exception to name the **fact**, not merely its trip.*
 
 `FAIL` is returned when a fact's own line exists but no longer reads `UNKNOWN`, when a fact has
 neither a target row nor an exception holding it back, or when a delivery has neither its own
@@ -405,15 +422,87 @@ deliveries, leaving the settled one archived and the unsettled one with neither 
 exception. It then resumes and asserts the check returns to `PASS`, so the `FAIL` is attributable to
 the real gap rather than to reconciling a partial run.
 
+### Blocker 3 — C5 re-review of `m10-candidate-c5-remediation-2`
+
+That candidate made each **present** row identity-bound, which was accepted. It left the **absent**
+row case answering at the parent record: when the reservation line an uncertain element should have
+written was missing, reconciliation passed the fact if *any* exception carried
+`sourceType=trips, sourceId=<tripId>`.
+
+Every element-level finding is stamped with its parent trip's identity, because
+`importOneRecord()` re-stamps `categoryId`/`sourceType`/`sourceId` over whatever a handler returned.
+So the fallback could be satisfied by `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` — an exception whose
+entire meaning is *"this element migrated and stayed UNKNOWN."* Used to excuse a **missing** line,
+it asserts the exact opposite of what the state shows. One unrelated trip-level exception could make
+a silently-dropped uncertain element look accounted for, in the same class as the aggregate
+reasoning re-review had already rejected.
+
+**Fix — an explicit fact identity, not a reinterpretation of free text.**
+
+`MigrationReconciliationExceptionSchema` gained an optional `factSourceId`, whose value is the same
+`tripId:elementId` used to write the element's rows. The field is deliberately **not** inferred from
+`affectedScope`, which is operator-facing free text and not an identity; parent-level exceptions are
+left unbound rather than converted. Because exceptions live in `migration_runs.reconciliation_exceptions`
+as JSONB under a `strictObject` schema, an optional key needs no database migration and rows written
+by the previous candidate still parse.
+
+One helper, `legacyTripElementSourceId()` in `legacyExportBundle.ts`, is now the only place that
+format is built — importer target-id derivation, element exception stamping, uncertain-fact
+collection and reconciliation all read it, so the four cannot drift apart.
+
+`migrateTripElements()` stamps the identity on every element-scoped finding that means "this element
+did not become the row you expected": `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME`, element-level
+`TARGET_REJECTED_WRITE`, `QUARANTINED_AMBIGUOUS_IDENTITY` and
+`QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING`. Findings about the trip as a whole keep no
+`factSourceId` — inventing one for `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` would be the same
+fabrication in a new costume.
+
+**Absent-line semantics, matched to granularity.** The check now consults two allowlists derived
+from the control flow of `migrateTripElements()` rather than from the reviewer's example list: every
+classification in them is emitted on a path that `continue`s **before** any line is written.
+
+| when the line is absent, PASS requires | classes |
+| --- | --- |
+| an exception bound to **that exact** `factSourceId` | `QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING`, `QUARANTINED_AMBIGUOUS_IDENTITY`, `TARGET_REJECTED_WRITE` |
+| or a trip-level exception **and** that the trip itself never migrated | `QUARANTINED_MULTI_TRAVELLER_ALLOCATION`, `QUARANTINED_AMBIGUOUS_IDENTITY`, `QUARANTINED_UNREADABLE_SOURCE`, `TARGET_REJECTED_WRITE` |
+
+`PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` is absent from both, by design: it is evidence the line
+*exists*, so it can never excuse its absence. The second row keeps the accepted multi-traveller
+quarantine working — a trip held back wholesale writes no reservation line and no id-map row — while
+the `!mappedKeys.has(...)` guard closes the residual hole where a successfully-migrated trip's
+unboundable parent exception excused one of its elements. When the line **is** present, `UNKNOWN`
+passes and any other status fails with no exception able to override it.
+
+**Evidence.** Three tests, and the third is what stops the fix being "absent line ⇒ always FAIL":
+
+| test | proves |
+| --- | --- |
+| absent line while its own `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` stands | `UNCERTAINTY_PRESERVED` is `FAIL`, and the detail names the fact, the expected target line id and the reason the exception does not excuse it |
+| a sibling element's legitimate hold-back | element B's fact-bound exception cannot account for element A's missing line — the ids differ, and the test asserts that |
+| a genuinely fact-scoped hold-back | a real migration path (`QUARANTINED_AMBIGUOUS_IDENTITY` on a leg whose place has no zone) still yields `PASS` |
+
+Non-vacuity was checked by mutation, not by reading: re-inserting the pre-fix parent-level fallback
+makes all three new tests fail with their intended assertion messages. The mutation was reverted and
+the suite re-run clean.
+
+The canonical rehearsal exercises the persistence path end to end: the fact identity survives
+append → JSONB → `readMigrationRun` → report MD/JSON → `pg_dump` → destroy → restore, and the report
+still shows the trip-level quarantine with **no** `factSourceId`, i.e. no fabricated identities.
+
 ### Deliberately not changed
 
 `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` remains, as C5 accepted, and was not "solved" by guessing
 traveller ownership. Provider-reference correlation, RecoveryCase/Signal/preference/rule-set
 archive decisions, and the old SQLite UI routes were untouched.
 
+Provider-delivery reconciliation stayed as remediation-2 left it: a delivery is accounted for by its
+own archived evidence id, and those records have no element children, so the new optional
+`factSourceId` forced no mechanical change there. One test pins the resulting asymmetry — delivery
+findings are deliberately record-level with no fact binding, trip element findings are bound.
+
 ## 13. What a reviewer should probe
 
-Three judgement calls deserve independent scrutiny more than the code does:
+Five judgement calls deserve independent scrutiny more than the code does:
 
 1. **Revising two frozen category decisions.** `RECOVERY_CASE` moved to `ARCHIVE_AND_REGENERATE` and
    `SIGNAL` to `ARCHIVE_AS_IMMUTABLE_HISTORY`, both on the evidence that the target has no authoring
@@ -425,13 +514,20 @@ Three judgement calls deserve independent scrutiny more than the code does:
 3. **Provider references preserved but not correlated.** Binding them as target external identity
    needs the M3 external-identity resolution seam. Is deferring that acceptable for the M10
    candidate?
-4. **The organisation-currency disposition (new).** A legacy organisation with no `homeCurrency`
+4. **The organisation-currency disposition.** A legacy organisation with no `homeCurrency`
    now blocks its own scope rather than migrating. Is `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` with
    archived evidence the right disposition, or should M11 carry an operator-supplied currency input
    so such organisations can migrate? The deliberate choice here was *not* to invent a migration
    input mechanism for this one field.
+5. **Whole-record hold-backs may still excuse an absent element line (new).** The trip-level
+   allowlist accounts for a fact only when the trip itself never migrated, so a wholesale
+   `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` still covers every element of that trip without naming
+   them individually. That is what keeps the accepted multi-traveller quarantine passing, and the
+   alternative — requiring an element-level exception per held-back trip — would mean fabricating
+   per-element findings the importer never actually made. Is the granularity boundary drawn in the
+   right place?
 
-### Verifying the two C5 fixes directly
+### Verifying the three C5 fixes directly
 
 ```bash
 # Blocker 1: the fabricated default is gone, and the real field is read.
@@ -440,11 +536,17 @@ rg -n "USD" src/migration/            # expect no match
 
 # Blocker 2: the status is computed, and one definition is shared.
 rg -n "uncertaintyStatus" src/migration/reconcileMigration.ts
-rg -n "legacyUncertainty" src/migration/   # importer and reconciler both read it
+rg -n "legacyUncertainty" src/migration/   # the trip handlers and the reconciler both read it
 
-# Both, executed:
-node --test postgres-integration/m10LegacyMigration.pgtest.ts   # 9/9
+# Blocker 3: the fact identity exists as its own field, is stamped once from one helper,
+# and PRESERVED_UNKNOWN_EXTERNAL_OUTCOME is not in either hold-back allowlist.
+rg -n "factSourceId" src/migration/                     # schema, stamping, facts, reconciliation
+rg -n "legacyTripElementSourceId" src/                  # one definition, three call sites
+rg -n "PRESERVED_UNKNOWN" src/migration/reconcileMigration.ts   # only the delivery preserved-set + the comments; never in either allowlist
+
+# All three, executed:
+node --test postgres-integration/m10LegacyMigration.pgtest.ts   # 14/14
 ```
 
-The second test deliberately falsifies target state and asserts the check turns `FAIL`, so it is
+The negative tests deliberately falsify target state and assert the check turns `FAIL`, so they are
 also the proof that the check *can* fail.

@@ -77,6 +77,35 @@ async function scalar(pool: Pool, sql: string, params: unknown[]): Promise<numbe
   return Number(result.rows[0]?.value ?? '0');
 }
 
+/**
+ * Findings that mean "this element was deliberately held back, so it has no
+ * reservation line" — as distinct from "its line exists and reads UNKNOWN".
+ *
+ * Derived from the control flow of `migrateTripElements()`: every
+ * classification here is emitted on a path that `continue`s before any line is
+ * written. `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` is deliberately absent — it is
+ * emitted only after a reservation *and* its line exist, so it asserts the
+ * opposite of a hold-back and can never explain a missing row.
+ */
+const FACT_SCOPED_HOLD_BACK_CLASSIFICATIONS: ReadonlySet<string> = new Set([
+  'QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING',
+  'QUARANTINED_AMBIGUOUS_IDENTITY',
+  'TARGET_REJECTED_WRITE',
+]);
+
+/**
+ * Findings that hold back an entire record, and so cover every uncertain
+ * element hanging off it. Only honoured when the record itself never became
+ * target state — otherwise a finding about one unnamed part of a migrated
+ * record could stand in for a different part of it.
+ */
+const RECORD_SCOPED_HOLD_BACK_CLASSIFICATIONS: ReadonlySet<string> = new Set([
+  'QUARANTINED_MULTI_TRAVELLER_ALLOCATION',
+  'QUARANTINED_AMBIGUOUS_IDENTITY',
+  'QUARANTINED_UNREADABLE_SOURCE',
+  'TARGET_REJECTED_WRITE',
+]);
+
 export interface ReconcileRequest {
   workspaceId: string;
   runId: string;
@@ -234,10 +263,33 @@ export async function reconcileMigration(pool: Pool, request: ReconcileRequest):
   // specific one that was falsely resolved, so each fact is traced to the exact
   // id the importer derived for it: either that row still reads UNKNOWN, or the
   // fact carries its own named exception, or its own archived evidence.
+  //
+  // When the row is absent, the hold-back must be named at the same
+  // granularity. An exception sharing only the parent record is not evidence
+  // about this element — otherwise a leg rejected for one trip element would
+  // quietly account for a different element's missing line, and
+  // `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME`, which asserts the element DID
+  // migrate, would read as if it explained the row's absence.
   const uncertainFacts = collectUncertainSourceFacts(bundle);
   const preservedFactKeys = new Set(
     run.reconciliationExceptions
       .filter((entry) => entry.classification === 'PRESERVED_UNKNOWN_EXTERNAL_OUTCOME')
+      .map((entry) => `${entry.sourceType}/${entry.sourceId}`),
+  );
+  const factHoldBacks = new Set(
+    run.reconciliationExceptions
+      .filter(
+        (entry) =>
+          entry.factSourceId !== undefined && FACT_SCOPED_HOLD_BACK_CLASSIFICATIONS.has(entry.classification),
+      )
+      .map((entry) => `${entry.sourceType}/${entry.sourceId}|${entry.factSourceId}`),
+  );
+  const recordHoldBacks = new Set(
+    run.reconciliationExceptions
+      .filter(
+        (entry) =>
+          entry.factSourceId === undefined && RECORD_SCOPED_HOLD_BACK_CLASSIFICATIONS.has(entry.classification),
+      )
       .map((entry) => `${entry.sourceType}/${entry.sourceId}`),
   );
 
@@ -281,17 +333,32 @@ export async function reconcileMigration(pool: Pool, request: ReconcileRequest):
       [workspaceId, lineId],
     );
     const status = line.rows[0]?.observed_status;
+    // A whole-record quarantine only covers this element if the record itself
+    // never became target state. Once it has, a finding stamped against the
+    // record describes one unnamed part of it, not this fact.
+    const heldBackAsWholeRecord = recordHoldBacks.has(fact.recordKey) && !mappedKeys.has(fact.recordKey);
     if (status === 'UNKNOWN') {
       accountedBy.push(`${fact.factId}=target-line-UNKNOWN`);
     } else if (status !== undefined) {
       // The row exists and no longer says UNKNOWN: uncertainty was resolved to
       // something the source never observed. No other row can compensate.
       unaccountedFacts.push(`${fact.factId} (its reservation line ${lineId} now reads ${status})`);
-    } else if (namedAsPreserved || exceptionKeys.has(fact.recordKey)) {
-      // Never migrated, and the scope that holds it back is named.
-      accountedBy.push(`${fact.factId}=quarantined-scope`);
+    } else if (factHoldBacks.has(`${fact.recordKey}|${fact.factSourceId}`)) {
+      accountedBy.push(`${fact.factId}=fact-held-back`);
+    } else if (heldBackAsWholeRecord) {
+      accountedBy.push(`${fact.factId}=record-quarantined-unmigrated`);
     } else {
-      unaccountedFacts.push(`${fact.factId} (no target reservation line and no exception holding it back)`);
+      const bound = run.reconciliationExceptions.filter((entry) => entry.factSourceId === fact.factSourceId);
+      const why =
+        bound.length === 0
+          ? 'no exception names this fact at all'
+          : `its only bound exception(s) (${bound.map((entry) => entry.classification).join(', ')}) ` +
+            'say it migrated, not that it was held back';
+      const scope =
+        recordHoldBacks.has(fact.recordKey) && !heldBackAsWholeRecord
+          ? '; the record has an exception but the record itself migrated, so it covers one part of it, not this fact'
+          : '';
+      unaccountedFacts.push(`${fact.factId}: expected reservation line ${lineId} is absent and ${why}${scope}`);
     }
   }
 
@@ -454,10 +521,19 @@ export function renderReconciliationReport(report: ReconciliationReport): string
       lines.push('');
     }
     for (const entry of report.exceptions) {
-      lines.push(`### ${entry.classification} — \`${entry.sourceType}/${entry.sourceId}\``);
+      lines.push(
+        `### ${entry.classification} — \`${entry.sourceType}/${entry.sourceId}\`` +
+          (entry.factSourceId === undefined ? '' : ` / \`${entry.factSourceId}\``),
+      );
       lines.push('');
       lines.push(`- **Blocks cutover:** ${entry.blocksCutover ? 'yes' : 'no'}`);
       lines.push(`- **Owner:** ${entry.owner}`);
+      if (entry.factSourceId !== undefined) {
+        lines.push(
+          `- **Fact scope:** \`${entry.factSourceId}\` — this finding is about that one fact, ` +
+            'not about the record as a whole',
+        );
+      }
       lines.push(`- **Reason:** ${entry.reason}`);
       lines.push(`- **Affected scope:** ${entry.affectedScope}`);
       lines.push(`- **Safety impact:** ${entry.safetyImpact}`);
