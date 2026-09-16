@@ -14,6 +14,10 @@ export const SEMANTIC_GLYPHS: Record<SemanticIndicator['glyph'], string> = {
 export const TONE_CLASS: Record<VisualTone, string> = {
   ok: 'sem-ok', watch: 'sem-watch', alert: 'sem-alert', active: 'sem-active', neutral: 'sem-neutral',
 };
+/** Existing theme status-dot classes, keyed by tone so no surface re-collapses tones. */
+export const TONE_DOT_CLASS: Record<VisualTone, string> = {
+  ok: 'd-ok', watch: 'd-watch', alert: 'd-bad', active: 'd-active', neutral: 'd-unconfirmed',
+};
 export const TRUTH_LABEL: Record<TruthMode, string> = {
   current: 'Current · authoritative', proposed: 'Proposed · not committed', unspecified: 'Authority not supplied',
 };

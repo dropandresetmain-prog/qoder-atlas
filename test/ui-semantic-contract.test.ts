@@ -92,21 +92,87 @@ test('node truth, change and category come only from supplied fields', () => {
   assert.equal(b?.indicator.tone, 'watch');
 });
 
-test('edge truth and change stay distinct; authority is never invented for edges', () => {
+test('edge truth and change are never promoted from edge kind or edge semantic state', () => {
   const presented = presentDependencyGraph(sampleGraph);
-  const [proposedByKind, changed, proposedByState] = presented.edges;
-  // No state supplied + PROPOSED_CHANGE kind => proposed truth, change not supplied.
-  assert.equal(proposedByKind?.truthMode, 'proposed');
-  assert.equal(proposedByKind?.changeState, 'not-supplied');
-  assert.equal(proposedByKind?.indicator.label, 'State not supplied');
-  assert.equal(proposedByKind?.relationshipKind, 'PROPOSED_CHANGE');
-  assert.equal(proposedByKind?.label, 'Proposed change');
-  // CHANGED state marks change but does not assert current/proposed authority.
-  assert.equal(changed?.changeState, 'marked');
-  assert.equal(changed?.truthMode, 'unspecified');
-  // PROPOSED state asserts proposed truth without a change mark.
-  assert.equal(proposedByState?.truthMode, 'proposed');
-  assert.equal(proposedByState?.changeState, 'not-supplied');
+  const [proposedKind, changedState, proposedState] = presented.edges;
+  // M9 edges carry no authority and no changed-edge set (FIG-2): every edge is
+  // unspecified / not-supplied, while kind and state stay visible on their own.
+  for (const edge of presented.edges) {
+    assert.equal(edge.truthMode, 'unspecified');
+    assert.equal(edge.changeState, 'not-supplied');
+  }
+  assert.equal(proposedKind?.relationshipKind, 'PROPOSED_CHANGE');
+  assert.equal(proposedKind?.label, 'Proposed change');
+  assert.equal(proposedKind?.semanticState, undefined);
+  assert.equal(proposedKind?.indicator.label, 'State not supplied');
+  assert.equal(changedState?.semanticState, 'CHANGED');
+  assert.equal(changedState?.indicator.glyph, 'change');
+  assert.equal(proposedState?.semanticState, 'PROPOSED');
+  assert.equal(proposedState?.indicator.glyph, 'proposal');
+});
+
+test('node and edge apply the same no-promotion rule to PROPOSED and CHANGED states', () => {
+  const graph: LiveDependencyGraph = {
+    scope: 'FOCUSED_CASE',
+    nodes: [
+      // Proposal-related semantic state on an authoritative record stays current.
+      { ref: 'p', kind: 'RECOVERY_PROPOSAL', label: 'P', semanticState: 'PROPOSED', authority: 'AUTHORITATIVE' },
+      // CHANGED semantic state without changedVisibleRefs membership is not marked.
+      { ref: 'c', kind: 'TIMING', label: 'C', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' },
+      // A proposed record can be healthy; health never implies commitment.
+      { ref: 'h', kind: 'PROGRAMME_COMMITMENT', label: 'H', semanticState: 'HEALTHY', authority: 'PROPOSED' },
+    ],
+    edges: [{ fromRef: 'p', toRef: 'c', kind: 'PROPOSED_CHANGE', semanticState: 'CHANGED' }],
+    change: { projectionRevision: 1, changedVisibleRefs: ['h'], currentSemanticState: 'CHANGED' },
+  };
+  const presented = presentDependencyGraph(graph);
+  const byRef = new Map(presented.nodes.map((node) => [node.ref, node]));
+  assert.equal(byRef.get('p')?.truthMode, 'current');
+  assert.equal(byRef.get('p')?.semanticState, 'PROPOSED');
+  assert.equal(byRef.get('c')?.changeState, 'not-marked');
+  assert.equal(byRef.get('c')?.semanticState, 'CHANGED');
+  assert.equal(byRef.get('h')?.truthMode, 'proposed');
+  assert.equal(byRef.get('h')?.changeState, 'marked');
+  assert.equal(byRef.get('h')?.indicator.tone, 'ok');
+  assert.equal(presented.edges[0]?.truthMode, 'unspecified');
+  assert.equal(presented.edges[0]?.changeState, 'not-supplied');
+});
+
+test('HEALTHY and RECOVERED stay distinguishable in the presentation model', () => {
+  const graph: LiveDependencyGraph = {
+    scope: 'FOCUSED_CASE',
+    nodes: [
+      { ref: 'h', kind: 'SERVICE_BOOKING', label: 'H', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+      { ref: 'r', kind: 'SERVICE_BOOKING', label: 'R', semanticState: 'RECOVERED', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [],
+    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+  };
+  const [healthy, recovered] = presentDependencyGraph(graph).nodes;
+  assert.notEqual(healthy?.semanticState, recovered?.semanticState);
+  assert.notEqual(healthy?.indicator.label, recovered?.indicator.label);
+  assert.ok(semanticNode(recovered!).includes('data-state="RECOVERED"'));
+});
+
+test('UNKNOWN edge state and an omitted edge state remain distinct', () => {
+  const graph: LiveDependencyGraph = {
+    scope: 'FOCUSED_CASE',
+    nodes: [
+      { ref: 'a', kind: 'SERVICE_BOOKING', label: 'A', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+      { ref: 'b', kind: 'TIMING', label: 'B', semanticState: 'UNKNOWN', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [
+      { fromRef: 'a', toRef: 'b', kind: 'RELIES_ON', semanticState: 'UNKNOWN' },
+      { fromRef: 'a', toRef: 'b', kind: 'RELIES_ON' },
+    ],
+    change: { projectionRevision: 0, changedVisibleRefs: [], currentSemanticState: 'UNKNOWN' },
+  };
+  const [unknownEdge, omittedEdge] = presentDependencyGraph(graph).edges;
+  assert.equal(unknownEdge?.semanticState, 'UNKNOWN');
+  assert.equal(omittedEdge?.semanticState, undefined);
+  assert.notEqual(unknownEdge?.indicator.label, omittedEdge?.indicator.label);
+  assert.ok(semanticEdge(unknownEdge!).includes('data-state="UNKNOWN"'));
+  assert.ok(semanticEdge(omittedEdge!).includes('data-state="NOT_SUPPLIED"'));
 });
 
 test('edge renderKey is snapshot-local position, not a stable identity', () => {
@@ -181,7 +247,7 @@ test('semanticEdge emits relationship and truth/change dimensions', () => {
   const presented = presentDependencyGraph(sampleGraph);
   const html = semanticEdge(presented.edges[0]!);
   assert.ok(html.includes('data-relationship="PROPOSED_CHANGE"'));
-  assert.ok(html.includes('data-truth="proposed"'));
+  assert.ok(html.includes('data-truth="unspecified"'));
   assert.ok(html.includes('data-change="not-supplied"'));
 });
 

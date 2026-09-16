@@ -131,11 +131,14 @@ change marker and focus. A proposed HEALTHY node must still have a brass dashed
 boundary and proposal label; it cannot look committed. M9 allows proposal-related
 semantic state on a current record; preserve both dimensions without promotion.
 
-Edges can explicitly signal proposal via PROPOSED state or PROPOSED_CHANGE kind;
-otherwise their truth mode is **unspecified**, even with HEALTHY/RECOVERED state.
+M9 edges carry no authority, so every edge truth mode is **unspecified**. A PROPOSED
+edge state or the PROPOSED_CHANGE kind is not promoted to proposed truth: the same
+no-promotion rule as nodes applies (a relationship *about* a proposal can itself be an
+authoritative record). Kind and state stay visible as their own label and badge.
 Do not infer authority from endpoints. Unspecified authority keeps a dotted grey
 connector plus the separately supplied state badge. Solid-green/solid-vermilion
-**authoritative** edge examples cannot honestly be produced from this M9 DTO.
+**authoritative** and dashed-brass **proposed** edges cannot honestly be produced
+from this M9 DTO (FIG-2).
 
 IncidentProgrammeView has separate currentProgrammeState/proposedProgrammeState
 strings; the bilateral preview has current/proposed windows and participant verdicts
@@ -149,17 +152,47 @@ retired edges or generic graph-overlay lifecycle. No counterfactual engine is ad
 - Edge: snapshot-local renderKey, sourceRef/targetRef, relationshipKind,
   optional semanticState, indicator, truthMode, changeState, focusRole and label.
 - Graph: scope, unchanged source change metadata, nodes, edges.
-- Focus: primary / causal / context, from explicit UI selections only. Edge focus
+- Focus: primary / causal / context, from explicit selections only. Edge focus
   is explicitly supplied by snapshot index; no path-finding or impact inference.
-- Node change: marked / not-marked. Edge change: marked only for supplied CHANGED,
-  otherwise not-supplied. AFFECTED stays a separate state, so affected+changed works.
+  `primary` may come from operator selection. `causal` asserts causality, so a product
+  surface may populate it only from a backend-supplied path or a backend-scoped causal
+  projection, never from adjacency (FIG-5b). The Lab populates it from fixtures only.
+- Node change: marked / not-marked, from `changedVisibleRefs` only. Edge change: always
+  not-supplied (no changed-edge set, FIG-2). A CHANGED semantic state never sets the
+  change marker on nodes or edges; AFFECTED stays a separate state.
 - Indicator: label + glyph + tone; graph states retain their raw accepted values.
+- No evaluation/processing dimension exists yet. It must not be emulated with
+  `semanticState`, `changeState` or tone (FIG-7).
+
+### LdgSemanticState is a mixed vocabulary
+
+Three of its eight values overlap other dimensions: PROPOSED (truth), CHANGED (change)
+and ACTIVE (processing; the case assembler emits ACTIVE for the case node). The adapter
+preserves them as supplied semantic states and never derives truth, change or lifecycle
+from them. Producers must not use ACTIVE, AFFECTED or UNKNOWN to signal "being evaluated"
+(FIG-8).
+
+### Evaluation lifecycle vs semantic truth (live demo)
+
+The live demo needs potentially affected entities to read as *under evaluation*, then
+clear or settle. The engine already has that truth: `currentAssessmentView`
+(`persistence/postgres/world/pgAssessments.ts`) returns CURRENT, STALE,
+PENDING_REASSESSMENT, UNAVAILABLE or NONE, backed by `scheduled_reassessments` work that
+the M6 triggers enqueue for exactly the assessments that read a changed input. No read
+model exposes it: `loadRecoveryCaseFacts` collapses every non-CURRENT status into
+AssessmentTone UNKNOWN plus a free-text uncertainty string, and the overview/cohort
+producers drop it. The frontend therefore cannot show "under evaluation" without
+inventing it, and must not. See FIG-7.
 
 `ui/semantics/adapter.ts` is the single mapping boundary, including exhaustive typed
 records for accepted unions. Unknown future enum values throw visibly with
 `UNMAPPED SEMANTIC STATE`; schema-invalid graphs fail before rendering. No neutral
-fallback for an unrecognized authoritative value. Existing M9 tone helpers delegate
-to this boundary rather than maintaining another state palette.
+fallback for an unrecognized authoritative value. Existing M9 operator surfaces
+(overview, incident programme) take tone **and** label from this boundary, and map tone
+to theme dot/queue classes through exhaustive tone-keyed tables (`TONE_DOT_CLASS`,
+overview `QUEUE_GLYPH`). They no longer use traveller copy that asserts a lifecycle
+("Still checking", "May be affected") and no longer re-collapse ACTIVE/UNKNOWN into
+brass or RECOVERING into a confirmed check.
 
 `ui/semantics/grammar.ts` uses the existing theme's green/brass/vermilion/grey/ink
 variables. Borders/connector patterns express truth; textual markers express change;
@@ -168,29 +201,52 @@ large coloured fills. No perpetual effects or artificial activity.
 
 ## Frontend Integration Contract Gaps
 
-No backend change is made. These are bounded follow-up requirements, not permission
-to redesign the read model. All permit the static Lab to continue.
+No backend change is made in this lane. The original FIG-1..6 were all triaged Park for
+Later before the live-demo choreography was frozen. The independent review re-triaged
+each against that sequence (baseline -> disruption -> scope identified -> under
+evaluation -> clear or settle failed -> escalate -> open case), asking: *can the UI
+be driven through it without frontend invention if this stays unresolved?*
 
-| ID / triage | Missing contract and minimal additive follow-up | Needed before |
+"Act Now (prerequisite)" means it blocks live graph wiring and is owned by the read-model
+producer, not by this frontend lane. The static Lab can continue without any of them.
+
+| ID / triage | Evidence and smallest change | Blocks |
 |---|---|---|
-| FIG-1 — Park for Later | `LdgEdge` lacks stable ID and tuple uniqueness. Add producer-owned stable `id`, with uniqueness scoped to projection; keep parallel edges distinct. | Edge reconciliation/transitions |
-| FIG-2 — Park for Later | `LdgEdge` lacks authority and change identity. Add explicit authority and `changedEdgeRefs` keyed to FIG-1, only from backend evidence. | Authoritative edge styling/change animation |
-| FIG-3 — Park for Later | `ChangeAwareness`/assemblers lack monotonic content revision and guaranteed visible changed refs. Define producer revision/delta semantics; optionally separate action refs from node refs. | Revision-driven live updates |
-| FIG-4 — Park for Later | `LdgNode.ref` lacks cross-scope stability/uniqueness guarantee. Document/enforce projection scope + canonical identity, or add canonical subject reference separately. | Cross-view selection/transitions |
-| FIG-5 — Park for Later | Graph has no paired overlay/current mapping, affected-ref set or backend focus path. Add only fields required by the next scoped graph use case. Existing preview API remains separate. | Runtime comparison/blast-radius focus |
-| FIG-6 — Park for Later | Pg overview maps non-DISRUPTED nodes to HEALTHY; case subject nodes reuse aggregate verdict; sparse categories/relations lack per-entity detail. Preserve DTO here; correct producer fidelity and test UNKNOWN/mixed subjects before live graph use. | Live graph wiring, not this fixture contract |
+| FIG-1 — Act Now (prerequisite) | `LdgEdge` has no id; the case producer's `case_subjects` query has no ORDER BY, so edge order (and every `renderKey`/`causalEdgeIndices`) can change between reads with no content change, causing false delete/recreate. Add a producer-owned `id` per edge, unique within the graph and stable across revisions for the same relation. Parallel edges keep distinct ids. | Any edge transition across revisions |
+| FIG-2 — Act Now (prerequisite) | No edge authority and no changed-edge set, so every edge is dotted grey "authority not supplied". The frozen graph needs solid green/vermilion authoritative edges and dashed brass proposed edges. Add `authority: AUTHORITATIVE \| PROPOSED` to `LdgEdge` (mirroring nodes) and `changedEdgeIds` to `ChangeAwareness`, keyed by FIG-1. | Authoritative edge styling; edge change marking |
+| FIG-3 — Act Now (prerequisite) | `projectionRevision` is a count (case: actions + subjects; overview: items; cohort: travellers; traveller: 1). Re-evaluation changes content without changing counts, so polled snapshots cannot be ordered or discarded as stale. Overview `changedVisibleRefs` lists every case on every read, so every node is permanently marked; case `changedVisibleRefs` are action ids that never match nodes. Define a monotonic per-scope revision from real sources, and define `changedVisibleRefs` as refs whose presented fields differ from the previous revision. | Revision-driven updates and settle transitions |
+| FIG-4 — Act Now (prerequisite) | Overview node `ref` is the bare case id, and only cases produce overview nodes. A participant has no node before escalation and a different ref after it, so baseline -> escalate cannot keep one entity. Case graph uses `<SUBJECT_KIND>:<id>`; cohort refs are caller strings. Key dashboard and incident nodes by the canonical subject ref used by the case graph, and carry case linkage as a separate optional field (for example `caseRef`) instead of as identity. That field is also the escalation marker. | Baseline -> escalation continuity; open-case selection |
+| FIG-5a — Act Now (merged into FIG-7) | "Affected dependency scope identified" needs a backend candidate set. The M6 invalidation enqueue is that set (the subjects whose assessments read the changed input), so FIG-7 supplies it. Do not derive it from graph topology. | Under-evaluation scope |
+| FIG-5b — Investigate Now | No backend focus/causal path. If the FOCUSED_CASE producer emits only the causal chain (frozen Sarah geometry), scope is the evidence and no `focusPath` is needed; if it emits a wider graph, add `focusPathEdgeIds` (FIG-1 ids). Until decided, product surfaces must not populate `causal`. | Focused causal emphasis |
+| FIG-5c — Investigate Now | No paired current/proposed overlay. Needed only if the counterfactual is drawn on the graph rather than the existing mutation-free preview surface. If so, add `replacesEdgeId` pairing on proposed edges (requires FIG-1/FIG-2). | Counterfactual graph overlay |
+| FIG-6 — Act Now (prerequisite) | Producer fidelity, not additive. Overview nodes are FAILED only for DISRUPTED, otherwise HEALTHY, so UNKNOWN, AT_RISK and RECOVERING render green. Case subject nodes all take the aggregate (FAILED if any subject fails, else AFFECTED), so a PASS subject can never clear to HEALTHY and an unassessed subject reads AFFECTED. Use each subject's own CURRENT verdict; non-CURRENT stays UNKNOWN plus FIG-7. DTO unchanged. | Clear-to-healthy / settle-to-failed truth |
+| FIG-7 — Act Now (prerequisite, new) | Assessment lifecycle is not in any read model (see *Evaluation lifecycle vs semantic truth*). Add an optional, non-domain `evaluation` on `LdgNode` (and `OperatorOverviewItem`) that passes through `AssessmentViewStatus` for that node's subject. The backend decides whether `semanticState` keeps the last CURRENT verdict or reads UNKNOWN while PENDING_REASSESSMENT. The frontend then adds an independent `evaluationState` presentation dimension (`not-supplied` when absent) and never changes `semanticState` to animate. No push channel exists (plain GET handlers; the demo event returns 202 and the worker reassesses asynchronously), so progress is visible only through polled revisions (FIG-3). | "Under evaluation" treatment |
+| FIG-8 — Investigate Now (new) | `LdgSemanticState` mixes PROPOSED (truth), CHANGED (change) and ACTIVE (processing) with health. Once FIG-2/3/7 exist, decide per value whether node producers may still emit it; the frontend will not reinterpret it. | Long-term dimension hygiene |
+| FIG-9 — Investigate Now (new) | Traveller-facing copy (`ui/copy.ts` `VIABILITY_LABEL`, `product-traveller-trip.ts`, `app/presentation.ts`) renders UNKNOWN as "Still checking", which asserts a lifecycle. Operator surfaces are fixed; decide traveller wording once FIG-7 can say whether checking is actually happening. | Traveller surface in the live demo |
 
-Act Now: replace silent M9 graph/assessment/viability mapping defaults and test failure
-(closed — `operatorOverviewAdapter.ts` now delegates to the single boundary).
-Investigate Now: `HEALTHY` and `RECOVERED` both map to tone `ok` and glyph `check`, so
-the two are distinguishable only by their text label. Because "recovered" is the state
-the product thesis turns on, a shared encoding with ordinary "healthy" is a weakness
-worth resolving. This is a visual-grammar / design-authority question, not a backend
-contract gap, so it is deliberately not a FIG entry; the never-colour-only rule still
-holds since the labels differ. Adding a distinct glyph means extending the frozen
-`SemanticIndicator['glyph']` set, which belongs to DESIGN.md authority.
-Ignore / Accept Risk: schema-supported static fixtures
-are not evidence that every kind/state is populated by a PostgreSQL producer.
+Other triage:
+
+- Act Now (closed in this lane): silent M9 mapping defaults (original lane); edge truth/change
+  promotion from edge state/kind; operator surfaces bypassing the boundary for viability
+  labels; tone re-collapse in the overview queue glyph and incident commitment dot.
+- Park for Later: `HEALTHY` and `RECOVERED` share tone `ok` and glyph `check`. They remain
+  distinct in the model (`semanticState`, label, `data-state`), so design can separate
+  them by changing only `GRAPH_STATES`/`SemanticIndicator['glyph']` under DESIGN.md
+  authority, with no read-model change.
+- Park for Later: `projectLiveDependencyGraph` defaults an omitted fact authority to
+  AUTHORITATIVE. Every current producer sets it explicitly; make it required before any
+  proposed-node producer exists.
+- Park for Later: `PresentationGraph.change` passes `previous/currentSemanticState` through
+  raw. No surface renders it; map through `presentGraphState` if one ever does.
+- Park for Later: Lab lacks panels for proposed+marked, recovered+marked and UNKNOWN vs
+  omitted edge state. Unit tests now cover these combinations.
+- Ignore / Accept Risk: focus refs or indices absent from a snapshot are ignored. This
+  under-claims emphasis and never asserts state.
+- Ignore / Accept Risk: the strict schema rejects additive backend fields until the shared
+  schema is updated, which is the intended lockstep.
+- Ignore / Accept Risk: legacy v1 `presentationState.ts` buckets are outside the M9 boundary.
+- Ignore / Accept Risk: schema-supported static fixtures are not evidence that every
+  kind/state is populated by a PostgreSQL producer.
 
 ## Contract Lab and verification
 

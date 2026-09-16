@@ -38,8 +38,10 @@ export interface PresentationEdge {
   readonly relationshipKind: LdgEdgeKind;
   readonly semanticState?: LdgSemanticState;
   readonly indicator: SemanticIndicator;
-  readonly truthMode: Exclude<TruthMode, 'current'>;
-  readonly changeState: Exclude<ChangeMarker, 'not-marked'>;
+  // M9 edges carry no authority and no changed-edge set (FIG-2). A PROPOSED or
+  // CHANGED edge state, or the PROPOSED_CHANGE kind, is not a truth/change signal.
+  readonly truthMode: Extract<TruthMode, 'unspecified'>;
+  readonly changeState: Extract<ChangeMarker, 'not-supplied'>;
   readonly focusRole: FocusRole;
   readonly label: string;
 }

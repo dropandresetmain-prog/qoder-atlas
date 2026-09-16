@@ -532,6 +532,7 @@ a.qrow:focus-visible, .brow.brow-actionable .brow-case-hit:focus-visible { outli
 .g-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-border); }
 .g-warn { background: var(--watch-bg); color: var(--watch); border: 1px solid var(--watch-border); }
 .g-unk { background: var(--neutral-bg); color: var(--neutral); border: 1px solid var(--neutral-border); }
+.g-active { background: var(--active-bg); color: var(--active); border: 1px solid var(--active-border); }
 .q-name, .b-name { font-weight: 650; font-size: 15.5px; min-width: 0; }
 .q-issue { color: var(--text-soft); font-size: 14.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .b-issue { color: var(--text); font-size: 14.5px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
@@ -981,6 +982,8 @@ a.brow.brow-actionable:focus-visible,
 .tl-item .dot.d-ok { background: var(--ok-f); }
 .tl-item .dot.d-watch { background: var(--watch-f); }
 .tl-item .dot.d-bad { background: var(--alert-f); }
+.tl-item .dot.d-active { background: var(--active-f); }
+.tl-item .dot.d-unconfirmed { background: var(--neutral-f); }
 .tl-item.endangered .t, .tl-item.endangered .ttl { color: var(--alert); }
 .tl-item.endangered .dot { background: var(--alert-f); }
 .tl-item .tag {

@@ -115,8 +115,8 @@ export function presentDependencyGraph(input: unknown, focus: PresentationFocus 
       relationshipKind: edge.kind, semanticState: edge.semanticState,
       indicator: edge.semanticState === undefined
         ? indicator('State not supplied', 'neutral', 'question') : presentGraphState(edge.semanticState),
-      truthMode: edge.semanticState === 'PROPOSED' || edge.kind === 'PROPOSED_CHANGE' ? 'proposed' : 'unspecified',
-      changeState: edge.semanticState === 'CHANGED' ? 'marked' : 'not-supplied',
+      truthMode: 'unspecified',
+      changeState: 'not-supplied',
       focusRole: causalEdges.has(index) ? 'causal' : 'context',
       label: mapped(RELATIONSHIPS, edge.kind),
     })),

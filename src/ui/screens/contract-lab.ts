@@ -159,7 +159,7 @@ function sectionTruth(): string {
   );
   const presented = presentDependencyGraph(input);
   return section('lab-truth', 'C', 'Current versus proposed',
-    'Node authority is always supplied, so a node is current or proposed. M9 edges carry no authority, so an edge is proposed only when its kind/state says so, otherwise unspecified — never silently treated as current (gap FIG-2).',
+    'Node authority is always supplied, so a node is current or proposed. M9 edges carry no authority, so every edge truth mode is unspecified — a PROPOSED state or PROPOSED_CHANGE kind stays visible as its own state/relationship, never promoted to proposed or current truth (gap FIG-2).',
     `<div class="lab-grid">${presented.nodes.map(semanticNode).join('')}</div>
      <h3 class="lab-sub">Edge truth modes</h3>
      <div class="lab-grid">${presented.edges.map(semanticEdge).join('')}</div>`);
@@ -195,7 +195,7 @@ function sectionRelationships(): string {
   ];
   const presented = presentDependencyGraph(graphOf(nodes, edges), { causalEdgeIndices: [1] });
   return section('lab-relationships', 'E', 'Relationships',
-    'Every real LdgEdgeKind rendered once, across supplied-state, changed, proposed and state-not-supplied variants. Edges have no stable identity in M9; renderKey is snapshot-local position only (gap FIG-1).',
+    'Every real LdgEdgeKind rendered once, across HEALTHY, CHANGED, PROPOSED and state-not-supplied semantic states. Edge state never sets edge truth or change marking. Edges have no stable identity in M9; renderKey is snapshot-local position only (gap FIG-1).',
     `<h3 class="lab-sub">Edge kinds and states</h3>
      <div class="lab-grid">${presented.edges.map(semanticEdge).join('')}</div>
      <h3 class="lab-sub">Endpoints</h3>
