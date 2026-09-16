@@ -70,6 +70,14 @@ export type LdgEdgeKind = z.infer<typeof LdgEdgeKindSchema>;
 /** Deterministic change-awareness metadata for truthful settle transitions. */
 export const ChangeAwarenessSchema = z.strictObject({
   projectionRevision: z.number().int().min(0),
+  /**
+   * Node refs the producer reports as changed since the caller's `sinceCursor`
+   * — an at-least-once hint for transition/emphasis, never an exact
+   * transactional diff. A ref already seen may be reported again; a ref that
+   * really changed is never silently omitted. Absence is not proof of
+   * unchanged: a client applies every complete snapshot it receives and reads
+   * a node's actual presented fields for truth.
+   */
   changedVisibleRefs: z.array(z.string().min(1)),
   /** Edge ids (FIG-1) whose presented fields differ from the compared revision (FIG-2/3). */
   changedEdgeIds: z.array(z.string().min(1)),
@@ -84,8 +92,11 @@ export const ChangeAwarenessSchema = z.strictObject({
    * dashboard); omitted on pure/count-based producers (cohort, traveller
    * trip), which have no durable revision source to draw one from. Carried as
    * a string so the 64-bit xid8 value is never coerced through a JS number.
-   * Equal `projectionRevision` values do NOT prove nothing changed — only the
-   * changed sets, compared against a previously returned `changeCursor`, do.
+   * Equal `projectionRevision` values do NOT prove nothing changed, and
+   * neither does an empty changed set: a changed set compared against a
+   * previously returned `changeCursor` is an at-least-once hint, so a client
+   * applies every complete snapshot it receives and uses the changed set only
+   * to decide what to emphasise.
    */
   changeCursor: z.string().min(1).optional(),
 });

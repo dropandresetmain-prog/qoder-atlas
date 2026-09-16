@@ -128,8 +128,11 @@ relations. Rendering arrows does not perform propagation or blast-radius analysi
   not guarantee unchanged content. Preserve these metadata values; do not
   manufacture an animation/diff clock.
   **FIG-3 resolved** for case/overview/incident-programme/dashboard (see the gap
-  table): real per-node source revisions, `changedVisibleRefs` now names exactly
-  what changed relative to a supplied cursor. Cohort/traveller producers are
+  table): real per-node source revisions, `changedVisibleRefs` is now derived from
+  each ref's own source revision relative to a supplied cursor — an *at-least-once*
+  hint for transition/emphasis, never an exact transactional diff (see the
+  `>=`/at-least-once rule below; a renderer must still apply every complete
+  snapshot it receives). Cohort/traveller producers are
   unchanged (still counts; they are pure/caller-fed, not Postgres-backed, so no DB
   revision source exists for them — a known limit, not closed by this lane).
   **Corrected (post-review) on `lane/wit-live-readmodel-contract`:** the original

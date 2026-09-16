@@ -296,6 +296,56 @@ Park for Later: `LIMIT 200` silent population truncation; graph-level
 Renderer rule for the next milestone: apply every snapshot; changed sets are at-least-once
 hints; animate a node only when its presented fields differ between two backend snapshots.
 
+### Act Now closure R1/R2/R3 (on `3a45558`)
+
+Scope: only R1/R2/R3. The Investigate Now / Park for Later items above stay open, and the
+test-suite convergence lane is handled elsewhere.
+
+- **R1 — exact changed-set assertions removed.** `witLiveReadModelContract.pgtest.ts` no
+  longer asserts changed-set equality or cardinality on any cursor read. Expected refs are
+  still proven present (`includes`); "unchanged" is now proven through each subject's own
+  presented `evaluation`/`semanticState`; the reported set is additionally proven to contain
+  only refs the projection actually presents. The two remaining `deepEqual(..., [])`
+  assertions are on the *no-cursor* branch, which never compares stamps and so is
+  deterministic. The late-commit / overlapping-transaction proof is retained unchanged.
+- **R2 — escalation now reported as a change.** A DASHBOARD population node's effective
+  stamp is `max(subject VIABILITY stamp, linked case CASE stamp)` in `pgFactAssembler.ts`.
+  Opening/attaching a case bumps `RECOVERY_CASE:<id>:CASE` (0122/0123), not the subject's
+  scope, so previously the next snapshot carried the new `caseRef` while the subject was
+  absent from `changedVisibleRefs`. No business semantics changed: tone/evaluation still
+  come only from the subject's own CURRENT assessment.
+- **R3 — authoritative traveller labels.** The population query now carries
+  `traveller_names.display_value` through the same `travellers`/`display_name_ref` join the
+  overview queue already uses (both columns `NOT NULL`, 0012's subtype trigger guarantees
+  exactly one name row per traveller, so it stays an inner join with no fabricated
+  fallback and no second lookup path). The literal `JOURNEY` placeholder is gone.
+
+Wording corrected (not reopened): `ChangeAwarenessSchema.changedVisibleRefs`/`changeCursor`
+and the FIG-3 bullet in `FRONTEND_SEMANTIC_CONTRACT.md` had implied the changed set proves
+what changed. Both now state the reviewed rule — apply every complete snapshot; the changed
+set is an at-least-once hint for emphasis, and absence is not proof of unchanged.
+
+Evidence (isolated database `witcloseout` on the shared test cluster):
+
+- Failing-before, passing-after, proven separately per fix: R3's label assertion failed on
+  `3a45558` (`actual: 'JOURNEY'`); with only the label fix applied, R2's escalation
+  assertion then failed (`changedVisibleRefs` did not include the escalated subject); with
+  the stamp fix applied, the test passes.
+- R1 flake reproduced deterministically rather than by repetition: a concurrent *writing*
+  transaction left open pins the cluster snapshot xmin (observed 114275), which is what
+  lets unrelated refs satisfy `stamp >= sinceCursor`. Under that pinned xmin the pre-fix
+  assertions fail exactly as the reviewer described (a third, untouched journey appears in
+  "changed refs name exactly the dependent subjects"); the corrected test passes under the
+  same pinned xmin. A read-only holder does not reproduce it — it is never assigned a real
+  xid and so never holds the horizon back.
+- `witLiveReadModelContract.pgtest.ts`: 8 consecutive passes (plus 8 earlier consecutive
+  passes during the tally fix, and the two pinned-xmin runs).
+- Focused units 36/36: `ui-semantic-contract`, `m9-product-readmodels`,
+  `m9-product-surfaces`, `m9-target-http`. `npm run typecheck` clean. `eslint` clean on the
+  three changed source/test files.
+- Not run, deliberately: full unit suite, full Postgres suite, legacy suites, build,
+  anti-hardcoding. No broad or unrelated failure was investigated.
+
 ## Independent review checkpoint (Opus, 2026-09-17)
 
 - Reviewed: `lane/wit-frontend-semantic-contract` @ `20b9b61c34f3f2d526dbe4e143aba6c8304adc9b`

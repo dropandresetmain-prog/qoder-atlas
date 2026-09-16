@@ -651,9 +651,19 @@ async function loadOperatorOverviewFactsInner(
   // default), not an out-of-scope state, and evaluation/assessment do not
   // gate on it elsewhere in this producer. LIMIT mirrors the existing
   // cases-query page size.
-  const population = await client.query<{ journey_id: string }>(
-    `SELECT DISTINCT j.id AS journey_id
+  //
+  // `traveller_label` is the node's label: the authoritative traveller
+  // display name, taken through the exact join the overview queue above
+  // already treats as the display-identity source (`travellers` ->
+  // `traveller_names.display_value` via `display_name_ref`). Both columns are
+  // NOT NULL and 0012's subtype trigger guarantees the ref selects exactly
+  // one row for that traveller, so this stays an inner join with no
+  // fabricated fallback — and no second lookup path.
+  const population = await client.query<{ journey_id: string; traveller_label: string }>(
+    `SELECT DISTINCT j.id AS journey_id, n.display_value AS traveller_label
        FROM journeys j
+       JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
+       JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
        JOIN participations p ON p.workspace_id = j.workspace_id AND p.traveller_id = j.traveller_id
        JOIN programme_items pi ON pi.workspace_id = p.workspace_id AND pi.id = p.programme_item_id
        JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
@@ -671,9 +681,7 @@ async function loadOperatorOverviewFactsInner(
   const changedNodeRefs: string[] = [];
   for (const p of population.rows) {
     const ref = `JOURNEY:${p.journey_id}`;
-    const stamp = await readEvaluationLifecycleStamp(client, workspaceId, 'JOURNEY', p.journey_id, 'VIABILITY');
-    subjectStamps.push(stamp);
-    if (sinceCursorBig !== undefined && stamp >= sinceCursorBig) changedNodeRefs.push(ref);
+    const subjectStamp = await readEvaluationLifecycleStamp(client, workspaceId, 'JOURNEY', p.journey_id, 'VIABILITY');
     const view = await currentAssessmentView(
       client,
       workspaceId,
@@ -694,13 +702,33 @@ async function loadOperatorOverviewFactsInner(
         ORDER BY rc.opened_at DESC LIMIT 1`,
       [workspaceId, p.journey_id],
     );
+    const linkedCaseId = caseLink.rows[0]?.recovery_case_id;
+    // R2: this node presents two authoritative things that move
+    // independently — the subject's own evaluation (bumped in the subject's
+    // `VIABILITY` scope) and its linkage to a case (opening the case and
+    // attaching `case_subjects` bump `RECOVERY_CASE:<id>:CASE`, migrations
+    // 0122/0123, never the subject's scope). Taking only the subject stamp
+    // meant the next snapshot carried the new `caseRef` while the subject was
+    // absent from `changedVisibleRefs`, so a renderer deciding what to
+    // emphasise from the changed set missed the escalation. The node's
+    // effective stamp is therefore the newer of the two authoritative stamps
+    // it actually presents. Safe to max (see readEvaluationLifecycleStamp):
+    // both are globally unique, strictly increasing xid8 values on one scale.
+    // No business semantics change — the subject's tone/evaluation still come
+    // only from its own CURRENT assessment.
+    const linkedCaseStamp = linkedCaseId
+      ? await readEvaluationLifecycleStamp(client, workspaceId, 'RECOVERY_CASE', linkedCaseId, 'CASE')
+      : 0n;
+    const stamp = linkedCaseStamp > subjectStamp ? linkedCaseStamp : subjectStamp;
+    subjectStamps.push(stamp);
+    if (sinceCursorBig !== undefined && stamp >= sinceCursorBig) changedNodeRefs.push(ref);
     dashboardNodes.push({
       ref,
       kind: 'TRAVELLER' as const,
-      label: 'JOURNEY',
+      label: p.traveller_label,
       semanticState: TONE_TO_STATE[tone],
       authority: 'AUTHORITATIVE' as const,
-      ...(caseLink.rows[0] ? { caseRef: caseLink.rows[0].recovery_case_id } : {}),
+      ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
       evaluation: view.status,
     });
   }

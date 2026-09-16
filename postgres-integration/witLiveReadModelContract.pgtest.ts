@@ -235,6 +235,20 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7, defects 1-5 corrected)'
     assert.equal(dashNodeByRef1.get(j2Ref)?.semanticState, 'HEALTHY');
     assert.equal(dashNodeByRef1.get(j3Ref)?.semanticState, 'HEALTHY');
     assert.equal(dashNodeByRef1.get(j1Ref)?.caseRef, undefined, 'no case exists yet, so no caseRef');
+    // R3: the population node's label is the authoritative traveller display
+    // name the overview queue already joins (travellers -> traveller_names.
+    // display_value), never the literal subject-kind placeholder — the
+    // frontend must never have to invent or infer a traveller's name.
+    assert.equal(dashNodeByRef1.get(j1Ref)?.label, 'Dependent Tight');
+    assert.equal(dashNodeByRef1.get(j2Ref)?.label, 'Dependent Safe');
+    assert.equal(dashNodeByRef1.get(j3Ref)?.label, 'Independent');
+    for (const node of dash1.nodes) {
+      assert.notEqual(node.label, 'JOURNEY', `population node ${node.ref} still carries the placeholder label`);
+    }
+    // A first read has no prior cursor to compare against, so it honestly
+    // reports nothing changed rather than everything. Deterministic: this
+    // branch never compares stamps.
+    assert.deepEqual(dash1.changedVisibleRefs, [], 'a first read (no sinceCursor) reports nothing changed');
     let dashCursor = dash1.changeCursor!;
     assert.ok(dashCursor, 'the dashboard read returns a changeCursor');
 
@@ -266,24 +280,52 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7, defects 1-5 corrected)'
     assert.equal(dashNodeByRef2.get(j1Ref)?.evaluation, 'PENDING_REASSESSMENT');
     assert.equal(dashNodeByRef2.get(j2Ref)?.evaluation, 'PENDING_REASSESSMENT');
     assert.equal(dashNodeByRef2.get(j3Ref)?.evaluation, 'CURRENT');
-    assert.deepEqual([...dash2.changedVisibleRefs].sort(), [j1Ref, j2Ref].sort(), 'changed refs name exactly the dependent subjects');
+    // R1: `changedVisibleRefs` is an at-least-once hint, not an exact
+    // transactional diff. The cursor is a cluster-wide snapshot xmin, so
+    // unrelated concurrent activity can legitimately leave extra refs
+    // satisfying `stamp >= sinceCursor`. What the contract guarantees, and
+    // what is asserted here: every subject that really changed IS reported.
+    // The independent subject is proven untouched through its own presented
+    // evaluation state (asserted above), never through absence from the
+    // changed set.
+    for (const ref of [j1Ref, j2Ref]) {
+      assert.ok(dash2.changedVisibleRefs.includes(ref), `${ref} depends on the disrupted service and must be reported changed`);
+    }
+    assert.ok(
+      dash2.changedVisibleRefs.every((ref) => dashNodeByRef2.has(ref)),
+      'every reported changed ref must be a ref this projection actually presents',
+    );
     dashCursor = dash2.changeCursor!;
 
     // --- Requirement 1a (cont'd): the real worker, one claim at a time —
     // changed refs reported since the previous cursor are correct at every step. ---
     const worker = new PgReassessmentWorker(pool, { actorId: 'm-lane-worker' });
     const settled: Record<string, 'HEALTHY' | 'FAILED'> = {};
+    const stillPending = new Set([j1Ref, j2Ref]);
     for (let step = 0; step < 2; step++) {
       const outcome = await worker.runOnce(NOW, pipeline(pool), seed.workspaceId);
       assert.equal(outcome.claimed, true, `expected a claim on step ${step}`);
       assert.equal(outcome.result, 'COMPLETED', JSON.stringify(outcome));
 
       const dash = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW, dashCursor);
-      assert.equal(dash.changedVisibleRefs.length, 1, `exactly one subject should have settled on step ${step}`);
-      const settledRef = dash.changedVisibleRefs[0]!;
-      const node = dash.nodes.find((n) => n.ref === settledRef)!;
-      assert.equal(node.evaluation, 'CURRENT', 'a settled subject reads CURRENT, not still-pending');
+      const nodeByRef = new Map(dash.nodes.map((n) => [n.ref, n]));
+      // R1: which subject settled is decided by the subjects' own presented
+      // evaluation state, not by the size of the at-least-once changed set
+      // (which unrelated concurrent activity may legitimately inflate).
+      const newlySettled = [...stillPending].filter((ref) => nodeByRef.get(ref)?.evaluation === 'CURRENT');
+      assert.equal(newlySettled.length, 1, `exactly one subject should have settled on step ${step}, got ${JSON.stringify(newlySettled)}`);
+      const settledRef = newlySettled[0]!;
+      stillPending.delete(settledRef);
+      const node = nodeByRef.get(settledRef)!;
       assert.ok(node.semanticState === 'HEALTHY' || node.semanticState === 'FAILED', `settled subject must clear or fail, got ${node.semanticState}`);
+      // The settlement itself must still be reported — that is the half of
+      // the contract that is guaranteed (at-least-once, never a silent miss).
+      assert.ok(dash.changedVisibleRefs.includes(settledRef), `${settledRef} settled on step ${step} and must be reported changed`);
+      // Anything not yet reassessed is proven still-pending by its own
+      // presented state, not by absence from the changed set.
+      for (const ref of stillPending) {
+        assert.equal(nodeByRef.get(ref)?.evaluation, 'PENDING_REASSESSMENT', `${ref} has not been reassessed yet on step ${step}`);
+      }
       settled[settledRef] = node.semanticState as 'HEALTHY' | 'FAILED';
       dashCursor = dash.changeCursor!;
     }
@@ -294,6 +336,9 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7, defects 1-5 corrected)'
     const dashNodeByRefFinal = new Map(dashFinal.nodes.map((n) => [n.ref, n]));
     assert.equal(dashNodeByRefFinal.get(j3Ref)?.evaluation, 'CURRENT', 'the independent subject was never touched');
     assert.equal(dashNodeByRefFinal.get(j3Ref)?.semanticState, 'HEALTHY');
+    // R2: a cursor taken before any case exists, carried across the real
+    // escalation below.
+    const preEscalationCursor = dashFinal.changeCursor!;
 
     // --- Requirement 2: escalation — create the case through the real
     // escalation command (openRecoveryCase), attach subjects (the codebase
@@ -318,10 +363,25 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7, defects 1-5 corrected)'
     assert.equal(failedCaseNode.ref, j1Ref, 'the failed subject keeps the exact ref used before escalation');
     assert.equal(failedCaseNode.caseRef, caseId);
 
-    const dashAfterEscalation = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW);
+    // R2: the escalation beat must reach a renderer that decides what to
+    // emphasise from the changed set. Read with the pre-escalation cursor:
+    // the same stable subject ref is still there, it now carries the linked
+    // caseRef, and it is reported as changed. Opening/attaching the case
+    // bumps `RECOVERY_CASE:<id>:CASE`, not the subject's `VIABILITY` scope,
+    // so this only holds when a population node's effective stamp includes
+    // its linked case's lifecycle stamp.
+    const dashAfterEscalation = await loadOperatorOverviewFacts(pool, seed.workspaceId, NOW, preEscalationCursor);
     const dashNodeAfterEscalation = new Map(dashAfterEscalation.nodes.map((n) => [n.ref, n]));
     assert.equal(dashNodeAfterEscalation.get(j1Ref)?.ref, j1Ref, 'same ref on the DASHBOARD population node after escalation');
     assert.equal(dashNodeAfterEscalation.get(j1Ref)?.caseRef, caseId, 'the DASHBOARD node now carries caseRef');
+    assert.equal(dashNodeAfterEscalation.get(j1Ref)?.label, 'Dependent Tight', 'the authoritative traveller label survives escalation');
+    for (const ref of [j1Ref, j2Ref, j3Ref]) {
+      assert.equal(dashNodeAfterEscalation.get(ref)?.caseRef, caseId, `${ref} is attached to the case`);
+      assert.ok(
+        dashAfterEscalation.changedVisibleRefs.includes(ref),
+        `${ref} was escalated into a case and must be reported in changedVisibleRefs`,
+      );
+    }
 
     // Defect-3: the incident/programme (PostgreSQL) projection uses the same
     // canonical ref as the case graph, and now carries a real `evaluation` —
@@ -338,10 +398,30 @@ describe('WiT live read-model contract (FIG-1/2/3/4/6/7, defects 1-5 corrected)'
       [j1Ref, j2Ref, j3Ref].sort(),
       'defect-3: canonical JOURNEY refs, not raw traveller UUIDs',
     );
-    // Defect-3: a quiet second read must not claim every traveller changed.
+    // Defect-3: the changed set must be a real cursor comparison, never
+    // "every traveller on every read". R1: a quiet read's changed set cannot
+    // be asserted empty — the cursor is a cluster-wide snapshot xmin, which
+    // unrelated concurrent activity can legitimately hold below these
+    // subjects' stamps. What is guaranteed, and asserted here: a read with no
+    // cursor claims nothing changed, every ref a cursor read does report is
+    // one this projection actually presents, and the subjects are proven
+    // unchanged through their own presented state.
+    assert.deepEqual(
+      incidentFacts!.changedVisibleRefs,
+      [],
+      'defect-3: a read with no cursor reports nothing changed, not "every traveller"',
+    );
     const incidentCursor = incidentFacts!.changeCursor!;
     const incidentQuiet = await loadIncidentProgrammeFacts(pool, seed.workspaceId, caseId, NOW, incidentCursor);
-    assert.deepEqual(incidentQuiet!.changedVisibleRefs, [], 'a quiet read reports nothing changed, not "every traveller"');
+    const incidentPresentedRefs = new Set(incidentQuiet!.nodes.map((n) => n.ref));
+    for (const ref of incidentQuiet!.changedVisibleRefs) {
+      assert.ok(incidentPresentedRefs.has(ref), `changed ref ${ref} must be a ref this projection presents, never a raw traveller UUID`);
+    }
+    assert.deepEqual(
+      incidentQuiet!.nodes.map((n) => [n.ref, n.semanticState, n.evaluation]),
+      incidentFacts!.nodes.map((n) => [n.ref, n.semanticState, n.evaluation]),
+      'a quiet read presents identical per-subject state',
+    );
 
     // --- Requirement 3: overlapping transactions. T1 (subject A = J1) starts
     // first (first write assigns the lower xid) but commits last; T2
