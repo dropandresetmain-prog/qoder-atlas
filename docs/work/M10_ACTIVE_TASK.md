@@ -317,12 +317,23 @@ seam. After Phase 1's named gaps close, start Phase 3 (legacy exporter) per
 
 ## Exact candidate state
 
-Not yet finalized — M10 is not complete, Phases 3-10 remain. Current head
-of `milestone-m10-migration-rehearsal`: `ea15a3a` (base
-`c45a9289b7f7ff730cdce97ced6124b1a9332bf8`). This SHA closes Phase 2 in
-full (real PostgreSQL evidence, 456/456 `npm run test:postgres` on a fresh
-database, clean typecheck/build/lint/anti-hardcoding/diff-check) and
-documents Phase 1's scope decision, but is **not** a candidate for C5 —
-no migration rehearsal has been performed. Will record the final M10
-candidate SHA, dataset/config identity, and migration tooling versions once
-Phase 9 rehearsal actually completes in a future session.
+**Candidate: tag `m10-candidate` on `milestone-m10-migration-rehearsal`**
+(resolve with `git rev-list -n 1 m10-candidate`), base
+`c45a9289b7f7ff730cdce97ced6124b1a9332bf8`.
+
+Phases 3-10 are implemented and rehearsed. Dataset identity
+`legacy-deployment-m10-restore-rehearsal`, hash
+`5da1d341b6067123ddebfaee1347599f0efaa1396a1776cb04be8fe844820c18`, exporter
+`northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`,
+reconciler `northstar-migration-reconciler/1.0.0`.
+
+Evidence on the exact candidate: `npm run test:postgres` **468/468 on a fresh
+database**; cutover + restore rehearsal 10/10; Sarah and both Jordan PG
+regressions PASS; typecheck, build, lint and anti-hardcoding all clean. The C5
+request package is `docs/refactor/evidence/C5_REQUEST_PACKAGE.md`.
+
+**C5 is not claimed** � it is an independent review and owner gate. **No
+production cutover occurred.**
+
+The previous checkpoint (`ea15a3a`) closed Phase 2 and is superseded by this
+candidate.
