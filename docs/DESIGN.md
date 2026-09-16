@@ -192,7 +192,10 @@ decorates for its own sake.
    rows. Nothing bounces; nothing eases longer than 200ms.
 4. **Banned.** Scroll-jacking, parallax, cinematic entrances, autoplaying
    carousels, perpetual pulsing (a `LIVE` dot may breathe at 2.4s; nothing
-   else loops).
+   else loops). Exception, accepted separately: the Live Dependency Graph
+   uses continuous subtle pulse as its liveness channel — see
+   `docs/design/live-dependency-graph/README.md`. Do not enforce this clause
+   against that surface.
 5. **Reduced motion.** `prefers-reduced-motion: reduce` disables all
    keyframe animation and shortens transitions to 0.01ms. State is always
    legible without motion.

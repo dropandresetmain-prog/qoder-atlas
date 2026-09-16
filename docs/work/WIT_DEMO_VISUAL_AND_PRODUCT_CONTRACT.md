@@ -421,6 +421,8 @@ Only if one of the two heroes fails: classify the issue as fixture/data drift, r
 
 **This appendix is non-binding. It is not the product contract and must not override the main sections above.**
 
+The current accepted graph visual direction is `docs/design/live-dependency-graph/README.md` (v5.6). The `media/seq06-live-dependency-graph/` material below is older optional inspiration, not the accepted reference.
+
 Older NORTHSTAR System World / hackathon-video work may be consulted as optional visual inspiration for motion/composition, especially:
 
 - `docs/MOTION_DESIGN.md`
