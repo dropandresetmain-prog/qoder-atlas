@@ -1838,31 +1838,81 @@ describe('M2 lane T: read-query access paths', () => {
     await queries.intendedVisitsInJurisdictionWindow(f.workspaceId, referencedJurisdiction, WINDOW_EARLY);
     assert.equal(statements.length, 4, 'each read model method is exactly one statement');
 
-    const expectedByMethod: string[][] = [
-      ['idx_journeys_traveller'],
-      ['idx_journeys_trip'],
+    /**
+     * One measurement of one statement: the incidental alternatives to remove
+     * (inside a transaction that is rolled back) and the access paths the plan
+     * must then be able to use.
+     *
+     * With a handful of rows the planner will use ANY index that starts with
+     * `workspace_id`, so "can this statement use the access path its port
+     * names" can only be answered by taking the incidental alternatives away.
+     * Each measurement gets its own transaction because the drops must not
+     * leak into the next one.
+     *
+     * A statement may need MORE THAN ONE measurement. `itemsReferencingPlace`
+     * is a four-branch `UNION ALL` whose first two branches read the same
+     * table through different place columns, so
+     * `idx_transport_item_details_origin` and `_destination` are each other's
+     * incidental alternative: both lead with `workspace_id`, both cost the
+     * same on a small table, and the planner will happily serve the ORIGIN
+     * branch from the destination index with `Filter: desired_origin_place_id`
+     * once statistics exist. A single measurement therefore cannot prove both
+     * branches — it proves whichever index the planner happened to pick and
+     * reports the other as missing (`M2-ACCESS-PATH-PLANNER`). Each transport
+     * branch is measured with its sibling removed instead; the two
+     * single-place-index tables are proven in either measurement.
+     */
+    interface AccessPathProbe {
+      readonly drop: readonly string[];
+      readonly expect: readonly string[];
+    }
+
+    const probesByMethod: AccessPathProbe[][] = [
       [
-        'idx_transport_item_details_origin',
-        'idx_transport_item_details_destination',
-        'idx_stay_item_details_place',
-        'idx_resource_use_item_details_place',
+        {
+          drop: ['idx_journeys_traveller_window', 'idx_journeys_trip', 'idx_journeys_trip_window'],
+          expect: ['idx_journeys_traveller'],
+        },
       ],
-      ['idx_intended_visits_jurisdiction_window'],
+      [
+        {
+          drop: ['idx_journeys_trip_window', 'idx_journeys_traveller', 'idx_journeys_traveller_window'],
+          expect: ['idx_journeys_trip'],
+        },
+      ],
+      [
+        {
+          drop: ['idx_transport_item_details_destination'],
+          expect: [
+            'idx_transport_item_details_origin',
+            'idx_stay_item_details_place',
+            'idx_resource_use_item_details_place',
+          ],
+        },
+        {
+          drop: ['idx_transport_item_details_origin'],
+          expect: ['idx_transport_item_details_destination'],
+        },
+      ],
+      [
+        {
+          drop: ['idx_intended_visits_journey'],
+          expect: ['idx_intended_visits_jurisdiction_window'],
+        },
+      ],
     ];
 
     /**
-     * Alternatives to remove (inside a transaction that is rolled back) before
-     * measuring one statement. With a handful of rows the planner will use ANY
-     * index that starts with `workspace_id`, so "can this statement use the
-     * access path its port names" can only be answered by taking the incidental
-     * alternatives away. Each statement gets its own transaction because the
-     * drops must not leak into the next statement's measurement.
+     * Tables to `ANALYZE` before measuring, so the plan depends on the rows
+     * this test actually wrote rather than on whether autovacuum happened to
+     * reach the shared test database first. Without it the same assertion is
+     * green on a cold database and red on a warm one, which is not a contract.
      */
-    const alternativesByMethod: string[][] = [
-      ['idx_journeys_traveller_window', 'idx_journeys_trip', 'idx_journeys_trip_window'],
-      ['idx_journeys_trip_window', 'idx_journeys_traveller', 'idx_journeys_traveller_window'],
-      [],
-      ['idx_intended_visits_journey'],
+    const analyzeTablesByMethod: string[][] = [
+      ['journeys'],
+      ['journeys'],
+      ['transport_item_details', 'stay_item_details', 'resource_use_item_details', 'journey_items'],
+      ['intended_visits', 'journeys'],
     ];
 
     /**
@@ -1889,32 +1939,38 @@ describe('M2 lane T: read-query access paths', () => {
     ];
 
     for (const [index, statement] of statements.entries()) {
-      const client = await f.pool.connect();
-      let plan = '';
-      try {
-        await client.query('BEGIN');
-        await client.query('SET LOCAL enable_seqscan = off');
-        await client.query("SET LOCAL lock_timeout = '30s'");
-        for (const name of alternativesByMethod[index] ?? []) {
-          await client.query(`DROP INDEX IF EXISTS ${name}`);
+      for (const [probeIndex, probe] of (probesByMethod[index] ?? []).entries()) {
+        const client = await f.pool.connect();
+        let plan = '';
+        try {
+          await client.query('BEGIN');
+          await client.query('SET LOCAL enable_seqscan = off');
+          await client.query("SET LOCAL lock_timeout = '30s'");
+          for (const table of analyzeTablesByMethod[index] ?? []) {
+            await client.query(`ANALYZE ${table}`);
+          }
+          for (const name of probe.drop) {
+            await client.query(`DROP INDEX IF EXISTS ${name}`);
+          }
+          for (const table of incidentalPrimaryKeysByMethod[index] ?? []) {
+            await client.query(`ALTER TABLE ${table} DROP CONSTRAINT ${table}_pkey CASCADE`);
+          }
+          // Plain EXPLAIN returns one column literally named "QUERY PLAN".
+          const rows = await client.query<{ 'QUERY PLAN': string }>(
+            `EXPLAIN ${statement.text}`,
+            statement.values as unknown[],
+          );
+          plan = rows.rows.map((row) => row['QUERY PLAN']).join('\n');
+        } finally {
+          await client.query('ROLLBACK').catch(() => undefined);
+          client.release();
         }
-        for (const table of incidentalPrimaryKeysByMethod[index] ?? []) {
-          await client.query(`ALTER TABLE ${table} DROP CONSTRAINT ${table}_pkey CASCADE`);
+        const where = `statement ${index} probe ${probeIndex}`;
+        assert.ok(plan.length > 0, `${where} produced an empty plan`);
+        assert.doesNotMatch(plan, /Seq Scan/, `${where} fell back to a sequential scan:\n${plan}`);
+        for (const name of probe.expect) {
+          assert.ok(plan.includes(name), `${where} cannot use ${name}:\n${plan}`);
         }
-        // Plain EXPLAIN returns one column literally named "QUERY PLAN".
-        const rows = await client.query<{ 'QUERY PLAN': string }>(
-          `EXPLAIN ${statement.text}`,
-          statement.values as unknown[],
-        );
-        plan = rows.rows.map((row) => row['QUERY PLAN']).join('\n');
-      } finally {
-        await client.query('ROLLBACK').catch(() => undefined);
-        client.release();
-      }
-      assert.ok(plan.length > 0, `statement ${index} produced an empty plan`);
-      assert.doesNotMatch(plan, /Seq Scan/, `statement ${index} fell back to a sequential scan:\n${plan}`);
-      for (const name of expectedByMethod[index] ?? []) {
-        assert.ok(plan.includes(name), `statement ${index} cannot use ${name}:\n${plan}`);
       }
     }
   });
