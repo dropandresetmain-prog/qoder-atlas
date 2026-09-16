@@ -7,10 +7,10 @@ There is exactly one line that changes what rollback means:
 > **Has the target performed its first externally consequential action?**
 
 Before that line, the target holds a *copy* of the world's state and nothing outside NORTHSTAR knows
-it exists. Restoring the legacy database loses nothing, because nothing new happened.
+it exists. Discarding that copy and rebuilding it loses nothing, because nothing new happened.
 
 After that line, the target has changed something a supplier also believes — a booking held, changed
-or cancelled; a ticket exchanged; money committed. Restoring the legacy database does **not** undo
+or cancelled; a ticket exchanged; money committed. Restoring an earlier database does **not** undo
 that. It produces a NORTHSTAR that is confidently wrong about the world, which is more dangerous
 than being down, because recovery decisions would then be made against a state the supplier has
 already moved past.
@@ -18,15 +18,35 @@ already moved past.
 Anyone who says "we can always roll back" after this line is mistaken, and the runbook below is
 written so that nobody has to rely on remembering it.
 
+**Neither zone permits reactivating the old SQLite application.** PostgreSQL is the sole NORTHSTAR
+runtime; the frozen SQLite file is protected read-only migration input and evidence, never a
+fallback runtime. Rollback here always means *rolling back the migration attempt*, never *rolling
+back to the previous system*. Anyone looking for a legacy runtime to fail over to will not find one,
+by design — see `M10_RUNTIME_RETIREMENT.md`.
+
 ## Rollback model
 
 ### Zone A — before the first target-side external action
 
+Recovery here means abandoning the *migration attempt*, not returning to a previous system. In
+order of escalation:
+
+1. **Abort activation.** Do not point the product at the migrated scope.
+2. **Stop target consequential processing.** Freeze dispatch so no external action can start while
+   the decision is open. While `execution_attempts` is empty you are still in Zone A.
+3. **Restore the verified pre-import PostgreSQL backup** taken at runbook step 3, if the import
+   itself left the target in a state you do not want to keep.
+4. **Rebuild deterministically.** Re-export from the frozen read-only source and re-import. The same
+   frozen source yields the same dataset hash and therefore the same target ids.
+5. **Correct the migration or reconciliation issue** that caused the abort — mapping, policy input,
+   or an owner decision on a quarantined scope.
+6. **Retry activation** only after the runbook gates pass again.
+
 | | |
 | --- | --- |
-| **Rollback** | Point traffic back at the legacy runtime; abandon the target database. |
-| **Safe?** | Yes. |
-| **Cost** | The migration run is discarded. Re-running it is cheap and deterministic: the same bundle yields the same dataset hash and the same target ids. |
+| **Safe?** | Yes — nothing outside NORTHSTAR has observed the target yet. |
+| **Cost** | The migration run is discarded. Re-running it is cheap and deterministic. |
+| **What stays untouched** | The frozen SQLite source, which is read-only input throughout and is never brought back into service as a runtime. |
 | **Evidence it works** | `scripts/m10-cutover-and-restore-rehearsal.mjs` — backup, genuine destruction, restore, with mappings, run identity, obligations and recomputed state all verified intact. |
 
 Deliberate property: the target's ids are **derived from the dataset hash**, not random. Re-importing
@@ -37,8 +57,8 @@ second, divergent world.
 
 | | |
 | --- | --- |
-| **Rollback** | **Not available as a return to the legacy runtime.** |
-| **Why** | Restoring an older database cannot retract a supplier-side change. The legacy runtime has no record of actions the target took, so it would present stale bookings as current truth. |
+| **Rollback** | **No database restore is available as a recovery path.** |
+| **Why** | Restoring an earlier database cannot retract a supplier-side change. Any database that predates the action has no record of it, so it would present stale bookings as current truth while the supplier has already moved on. |
 | **What you do instead** | Forward-recover on the target: freeze new consequential actions, re-observe affected external records, reconcile observed supplier state, and resume. |
 | **Partial option** | Scope-level suspension. Because every reconciliation exception names its `affectedScope`, a single Journey or Trip can be held back without stopping the rest. |
 
@@ -72,20 +92,31 @@ a warning.
 9. **Watch.** Confirm the first consequential actions observe and reconcile as expected before
    releasing the held-back scopes.
 
-## Activation blockers carried into C5
+## Activation blockers
 
-These are the categories that, on current evidence, hold back their own scope rather than the whole
-cutover. Each needs an owner decision, not more engineering discovery.
+Two separate lists. Conflating them would overstate what the rehearsal found.
+
+### Observed in the final rehearsal — one
 
 | finding | scope held back | owner | what unblocks it |
 | --- | --- | --- | --- |
-| `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` | multi-traveller legacy trips | migration owner | source evidence proving element → traveller ownership, or an accepted manual allocation |
+| `QUARANTINED_MULTI_TRAVELLER_ALLOCATION` | multi-traveller legacy trips (`trip-multi`, 2 travellers, 2 elements) | migration owner | source evidence proving element → traveller ownership, or an accepted manual allocation |
+
+### Policies that will apply only if the real final export contains such rows
+
+None of these fired in the final rehearsal — those categories exported zero rows. Each behaviour is
+proven by `postgres-integration/m10LegacyMigration.pgtest.ts` against a richer fixture, so the
+handling is decided and tested; what remains is an owner decision at M11, not engineering discovery.
+
+| finding | scope it would hold back | owner | what unblocks it |
+| --- | --- | --- | --- |
 | `ARCHIVED_NOT_REPLAYED_AS_LIVE_STATE` (open cases) | journeys with unfinished recovery | operations owner | let the target re-derive the case from migrated state, and confirm it matches |
 | `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` (explicit preferences) | travellers with standing instructions | migration owner | an effective-window policy for migrated preferences |
 | `ARCHIVED_REQUIRES_TARGET_POLICY_INPUT` (rule sets) | supplier/operational policy checks | policy owner | registered rule expressions authored against the predicate registry |
 | `QUARANTINED_NO_DETERMINISTIC_TARGET_MAPPING` (engagements) | programme participation | migration owner | obligation level per participant, which the legacy engagement did not record |
 | `ARCHIVED_REQUIRES_PROTECTED_CONTENT_STORE` (dossier PII) | traveller contact/payment | data protection owner | a real protected-content store to hold the values a `ProtectedDataRef` points at |
 | `PRESERVED_UNKNOWN_EXTERNAL_OUTCOME` | specific bookings and deliveries | operations owner | re-observation of actual supplier state |
+| `DEFERRED_NO_HANDLER` | any category with no registered handler | migration owner | a handler, or an accepted decision to exclude that category |
 
 Note that none of these is a defect to fix in the migration. Each is a place where the legacy data
 does not contain what the target needs, and the migration's job was to say so precisely rather than

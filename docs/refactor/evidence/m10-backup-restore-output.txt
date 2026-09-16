@@ -1,17 +1,17 @@
 M10 / C5 backup + restore rehearsal
-started at            2026-09-16T11:25:58.867Z
+started at            2026-09-16T12:35:41.065Z
 isolated container    northstar-postgres-m10-restore (postgis/postgis:16-3.4)
 isolated endpoint     127.0.0.1:55433/northstar_m10_restore
 named docker volume   northstar-m10-restore-data -> /var/lib/postgresql/data
 shared tmpfs instance northstar-postgres-test: untouched by this script
 
 PASS  isolated_instance_is_volume_backed — container mounts: volume:northstar-m10-restore-data:/var/lib/postgresql/data tmpfs=map[]
-server stable after 28 readiness attempt(s) (two consecutive connections required)
+server stable after 30 readiness attempt(s) (two consecutive connections required)
 runMigrations applied 93 migration(s) from src/persistence/postgres/migrations/
-workspace 2e06616f-b0d2-4e7f-8fe1-56bd7b7d6fff created (actor principal:m10-restore-rehearsal)
+workspace bd60ee16-e944-4769-830f-14f84df6fbf5 created (actor principal:m10-restore-rehearsal)
 exportLegacyDataset produced datasetHash 3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596 (northstar-legacy-exporter/1.1.0)
-importLegacyBundle run fcaafe52-7143-48ed-a8da-00c78b6d30df: imported=10 quarantined=1 deferred=0 exceptions=1
-recomputeMigratedState assessed 1 migrated Journey(s), 1 assessment(s); witness a1887ecd-00e7-4191-b08b-40f29438fd5f
+importLegacyBundle run d5d72775-8b49-4157-8809-868cd8e6b298: imported=10 quarantined=1 deferred=0 exceptions=1
+recomputeMigratedState assessed 1 migrated Journey(s), 1 assessment(s); witness c9d8d223-299b-4cca-adf3-16bbf1003e12
 
 reconcileMigration verdict BLOCKED (northstar-migration-reconciler/1.0.0)
   PASS      IDENTITY_ACCOUNTED
@@ -34,7 +34,7 @@ activation blockers: 1
 
 pre-backup state
   legacy_id_map mappings   11
-  migration run            fcaafe52-7143-48ed-a8da-00c78b6d30df COMPLETED 3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596
+  migration run            d5d72775-8b49-4157-8809-868cd8e6b298 COMPLETED 3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596
   reconciliation exceptions 1 [QUARANTINED_MULTI_TRAVELLER_ALLOCATION]
   organisations            1
   travellers               3
@@ -45,14 +45,14 @@ pre-backup state
   source_records           2
   assessments              1
 
-pg_dump -Fc wrote 785068 bytes to /tmp/m10-target.dump inside the container
+pg_dump -Fc wrote 785055 bytes to /tmp/m10-target.dump inside the container
 database northstar_m10_restore dropped and recreated empty
 PASS  target_database_destroyed_before_restore — legacy_id_map gone=true, migration_runs gone=true, public tables remaining=0
 PASS  pg_restore_completed_without_error — pg_restore exited 0
 PASS  legacy_id_map_mappings_survive_identically — 11/11 (source_dataset, source_type, source_id, target_kind, target_id) tuples identical
-PASS  migration_run_identity_survives — run fcaafe52-7143-48ed-a8da-00c78b6d30df status=COMPLETED dataset_hash=3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596 exporter=northstar-legacy-exporter/1.1.0 importer=northstar-legacy-importer/1.0.0 exceptions=1/1 [QUARANTINED_MULTI_TRAVELLER_ALLOCATION]
+PASS  migration_run_identity_survives — run d5d72775-8b49-4157-8809-868cd8e6b298 status=COMPLETED dataset_hash=3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596 exporter=northstar-legacy-exporter/1.1.0 importer=northstar-legacy-importer/1.0.0 exceptions=1/1 [QUARANTINED_MULTI_TRAVELLER_ALLOCATION]
 PASS  imported_domain_state_row_counts_survive — organisations=1 travellers=3 trips=1 journeys=1 constraint_definitions=1 evidence_records=4 source_records=2
-PASS  recomputed_assessment_survives — assessments=1/1, witness a1887ecd-00e7-4191-b08b-40f29438fd5f present=true
+PASS  recomputed_assessment_survives — assessments=1/1, witness c9d8d223-299b-4cca-adf3-16bbf1003e12 present=true
 PASS  append_only_trigger_survives — legacy_id_map_immutable on legacy_id_map (tgenabled=O)
 
 SUMMARY

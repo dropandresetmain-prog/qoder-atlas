@@ -19,10 +19,15 @@ No target row is hand-written, because a hand-written row proves nothing about t
 ## How to run it
 
 ```powershell
-node scripts/m10-backup-restore-rehearsal.mjs            # exits 0 on pass, 1 on any failed check
+node scripts/m10-cutover-and-restore-rehearsal.mjs       # exits 0 on pass, 1 on any failed check
 $env:M10_KEEP_RESTORE_ENV = '1'                          # leave the container+volume up afterwards
 $env:M10_RESTORE_PORT = '55434'                          # if 55433 is taken
 ```
+
+One script covers both Phase 9 (cutover rehearsal) and Phase 7 (backup/restore) because both need
+the same isolated, freshly migrated target. That is why **there is exactly one final rehearsal
+dataset**, not one per phase: the cutover sequence and the restore proof run against the same
+imported state in a single pass.
 
 Requires Docker. Takes ~60s. Output goes to stdout and to
 `docs/refactor/evidence/m10-backup-restore-output.txt`. The container and its named volume are
@@ -57,33 +62,46 @@ single ping before the real server is up.
 
 ## Observed result
 
-Run on branch `milestone-m10-migration-rehearsal` at `edfe0fc` (Phase 5 head), 2026-09-16T10:22Z.
-Pre-backup state: 9 `legacy_id_map` mappings, run `COMPLETED` with dataset hash
-`5da1d341b6067123ddebfaee1347599f0efaa1396a1776cb04be8fe844820c18`, exporter
-`northstar-legacy-exporter/1.1.0`, importer `northstar-legacy-importer/1.0.0`, 1 reconciliation
-exception (`QUARANTINED_MULTI_TRAVELLER_ALLOCATION`), and counts organisations=1, travellers=3,
-trips=1, journeys=1, constraint_definitions=1, evidence_records=4, source_records=2, assessments=1.
-`pg_dump -Fc` produced 782,073 bytes.
+Run on branch `milestone-m10-migration-rehearsal` at the final candidate `1d81dd7`,
+2026-09-16T12:35Z. Raw transcript: `m10-backup-restore-output.txt`.
+
+| | |
+| --- | --- |
+| Dataset identity | `legacy-deployment-m10-restore-rehearsal` |
+| Dataset hash | `3077f43e0d05f2c622b952a5227a7547ab0366427c85e6961273514d279a1596` |
+| Migration run | `d5d72775-8b49-4157-8809-868cd8e6b298`, status `COMPLETED` |
+| Tooling | exporter `1.1.0`, importer `1.0.0`, reconciler `1.0.0` |
+| Import outcome | imported 10, quarantined 1, deferred 0, exceptions 1 |
+| Pre-backup state | 11 `legacy_id_map` mappings; organisations 1, travellers 3, trips 1, journeys 1, constraint_definitions 1, evidence_records 4, source_records 2, assessments 1 |
+| Dump size | `pg_dump -Fc` produced 785,055 bytes |
 
 ```
-SUMMARY
-check                                       result
-------------------------------------------  ------
-isolated_instance_is_volume_backed          PASS
-target_database_destroyed_before_restore    PASS
-pg_restore_completed_without_error          PASS
-legacy_id_map_mappings_survive_identically  PASS
-migration_run_identity_survives             PASS
-imported_domain_state_row_counts_survive    PASS
-recomputed_assessment_survives              PASS
-append_only_trigger_survives                PASS
-
-VERDICT: PASS — 8/8 checks passed; migrated target state survived backup, destruction and restore
+VERDICT: PASS — 10/10 checks passed; migrated target state survived backup, destruction and restore
 ```
 
-An earlier run of this rehearsal (at `ed99079`, before Phase 5) recorded `recordsDeferred=1` with no
-reconciliation exception naming it — a counter said something was skipped without saying what, which
-from the restored state is indistinguishable from data loss. Both halves are now closed: Phase 5
-registered handlers for every exported category, and a record with no handler now raises a
-`DEFERRED_NO_HANDLER` exception rather than only incrementing a counter. This run shows
-`recordsDeferred=0` and the single expected quarantine.
+All ten: `isolated_instance_is_volume_backed`, `reconciliation_semantic_checks_pass`,
+`every_exception_is_owned`, `target_database_destroyed_before_restore`,
+`pg_restore_completed_without_error`, `legacy_id_map_mappings_survive_identically`,
+`migration_run_identity_survives`, `imported_domain_state_row_counts_survive`,
+`recomputed_assessment_survives`, `append_only_trigger_survives`.
+
+### Superseded runs, recorded so the hashes are not confused
+
+Two earlier runs of this rehearsal exist in the history and are **not** the final evidence:
+
+- At `ed99079` (before Phase 5) the run recorded `recordsDeferred=1` with no reconciliation
+  exception naming it — a counter said something was skipped without saying what, which from the
+  restored state is indistinguishable from data loss. Both halves are now closed: Phase 5 registered
+  handlers for every exported category, and a record with no handler now raises a
+  `DEFERRED_NO_HANDLER` exception rather than only incrementing a counter.
+- At `edfe0fc` (Phase 5 head) the run covered backup/restore only, over a smaller fixture: 9
+  mappings and dataset hash `5da1d341b6067123ddebfaee1347599f0efaa1396a1776cb04be8fe844820c18`.
+  That hash is **obsolete**. It changed because the script was later extended to also rehearse the
+  cutover sequence, which required enriching the fixture with places and a booked transport leg so
+  the reconciliation checks were not vacuous. A different fixture is a different dataset and
+  therefore a different hash — by design, since the hash is the dataset's identity.
+
+Re-running at the final candidate reproduced dataset hash `3077f43e…` exactly, which is the
+determinism property the migration depends on: the importer changed between `0c5015a` and
+`1d81dd7`, and the dataset hash did not, because the hash identifies the *source dataset* rather
+than the tooling that reads it.
