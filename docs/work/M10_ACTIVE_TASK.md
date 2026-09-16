@@ -176,7 +176,11 @@ assertion describes the *dataset*, not the run, for the same reason.
   BOOKING_DOSSIER, PREFERENCE, FX_RATE_EVIDENCE, PROVIDER_EVENT_INBOX, and
   legacy trip **elements** (the obligations, money and provider refs) into real
   Reservation/ReservationLine/TransportService state under the owning Journey.
-- [ ] Machine-readable + human-readable reconciliation report (next).
+- [x] `src/migration/reconcileMigration.ts` — nine semantic checks (identity
+  accounted, journey ownership, provider refs, evidence lineage, obligations,
+  uncertainty, money, derived truth, no provider dispatch), machine-readable
+  JSON plus a report written for the cutover decision-maker. A check that
+  cannot be evaluated reports ATTENTION rather than passing by default.
 
 **Two frozen decisions revised on repo evidence, not preference:**
 
@@ -218,11 +222,33 @@ wall-clock.
   `failAfterRecords` is a real code path that leaves the run `IN_PROGRESS`
   with accurate `progress`; the resumed run adopts the same `runId` and the
   final state matches a clean single-pass run table-for-table.
-- [ ] Backup/restore rehearsal on a volume-backed instance
+- [x] Backup/restore rehearsal on an isolated volume-backed instance —
+  `scripts/m10-cutover-and-restore-rehearsal.mjs`, 10/10 PASS. Deliberately not
+  the shared tmpfs test DB: restoring into a RAM-backed non-durable data
+  directory would prove nothing. Evidence in
+  `docs/refactor/evidence/M10_BACKUP_RESTORE.md`.
 
 ### Phase 8 — Legacy retirement rehearsal
+- [x] `docs/refactor/evidence/M10_RUNTIME_RETIREMENT.md`. Every SQLite-touching
+  module has exactly one disposition: retired, replaced by target capability, or
+  offline migration-only. The four legacy stores (dossier, preferences, FX,
+  provider inbox) are migration source categories, not subsystems to rebuild.
+
 ### Phase 9 — Exact cutover rehearsal
+- [x] The same script runs the documented sequence on isolated data — freeze,
+  final export, import, reconcile, recompute, verify, identify activation
+  blockers — then proves restore against the same target. No production switch,
+  no paid provider action.
+
 ### Phase 10 — Rollback model + runbook
+- [x] `docs/refactor/evidence/M10_ROLLBACK_AND_CUTOVER.md`. Rollback is modelled
+  around the one boundary that governs it: before the target's first externally
+  consequential action, restoring the legacy DB is safe; after it, restoring
+  does **not** retract supplier-side effects and would leave NORTHSTAR
+  confidently wrong about the world. The boundary is observable (first
+  `execution_attempts` row), not a judgement call.
+- [x] `docs/refactor/evidence/C5_REQUEST_PACKAGE.md` — request for review, not a
+  PASS claim.
 
 ## Environment hazard found (not a product defect)
 
