@@ -56,6 +56,7 @@ import {
   prepareParams,
   seedStoredExecutionAuthority,
   seedMinimalCurrentAssessment,
+  bootstrapTestGrantIssuer,
 } from './m8ExecutionGateHelpers.ts';
 
 const NOW = '2031-06-02T00:00:00.000Z';
@@ -521,8 +522,18 @@ describe('M9 Sarah target PG E2E (composeTargetApplication)', () => {
       });
     }
 
-    for (const intent of plan.intents) {
-      const scope = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, intent.id);
+    // ISSUER-POL: bootstrap once for this workspace, scoped to cover every
+    // intent's required authority scope, then reuse below — bootstrap only
+    // satisfies a workspace's very first grant.
+    const intentScopes = await Promise.all(
+      plan.intents.map((intent) => loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, intent.id)),
+    );
+    const issuerPrincipalId = await bootstrapTestGrantIssuer(
+      pool, seed.workspaceId, seed.actorId, EXEC_NOW, intentScopes.flat(),
+    );
+    for (let i = 0; i < plan.intents.length; i++) {
+      const intent = plan.intents[i]!;
+      const scope = intentScopes[i]!;
       await seedStoredExecutionAuthority({
         pool,
         workspaceId: seed.workspaceId,
@@ -536,6 +547,7 @@ describe('M9 Sarah target PG E2E (composeTargetApplication)', () => {
         now: EXEC_NOW,
         assessmentSubject: { kind: 'JOURNEY', id: travellers[0]!.journeyId },
         assessmentTripId: travellers[0]!.tripId,
+        issuerPrincipalId,
       });
     }
 

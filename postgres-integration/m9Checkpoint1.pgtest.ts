@@ -200,7 +200,6 @@ describe('M9 R-10 practical grant issuance', () => {
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
       proposedScopes: required,
       requiredScopes: required,
-      pool,
     }));
     assert.ok(okGrant.grantId);
 
@@ -215,7 +214,6 @@ describe('M9 R-10 practical grant issuance', () => {
       actions: ['action.intent.dispatch'],
       proposedScopes: [{ kind: 'JOURNEY', id: randomUUID() }],
       requiredScopes: required,
-      pool,
     });
     assert.equal(weak.ok, false);
     if (!weak.ok) assert.match(weak.conflict.message, /GRANT_SCOPE_INSUFFICIENT/);
@@ -254,7 +252,6 @@ describe('M9 R-10 practical grant issuance', () => {
       actions: ['action.intent.dispatch'],
       proposedScopes: required,
       requiredScopes: required,
-      pool,
     });
     assert.equal(selfMint.ok, false);
     if (!selfMint.ok) assert.match(selfMint.conflict.message, /ISSUER_SELF_ISSUANCE_FORBIDDEN/);
@@ -281,7 +278,6 @@ describe('M9 R-10 practical grant issuance', () => {
       actions: ['action.intent.dispatch'],
       proposedScopes: required,
       requiredScopes: required,
-      pool,
     });
     assert.equal(unauthorised.ok, false);
     if (!unauthorised.ok) assert.match(unauthorised.conflict.message, /ISSUER_UNAUTHORISED/);
@@ -310,7 +306,6 @@ describe('M9 R-10 practical grant issuance', () => {
       actions: ['action.intent.dispatch'],
       proposedScopes: required,
       requiredScopes: required,
-      pool,
     }));
     assert.ok(authorised.grantId);
 

@@ -444,6 +444,24 @@ export async function evaluateStoredExecutionGate(
     // Allow only when every such reason is explained by that durable
     // observation matching the current head/generation. External concurrent
     // advances still fail closed.
+    //
+    // STALE_BASE hardening (M10): this is provably attributable to the same
+    // valid execution chain, not merely "observed == current head" by
+    // coincidence, because `observedProgrammeRevisionFromPrerequisites`
+    // requires an actual `action_dependencies` edge into this intent from
+    // the prerequisite — and migration 0113's `action_dependencies_same_plan`
+    // trigger makes it impossible for that edge to reference an intent
+    // outside this intent's own `action_plan_id` (raises at INSERT/UPDATE).
+    // Combined with CAS-protected revision increments (a given revision
+    // number is produced by exactly one committed write, ever), "the
+    // prerequisite's own recorded observation equals the current head" can
+    // only be true if that prerequisite's write was in fact the write that
+    // produced the current head. A replanned/superseded plan gets fresh
+    // action_intents rows, so old dependency edges can never satisfy a new
+    // plan's lookup (`d.to_action_intent_id` never matches). An external or
+    // unrelated concurrent mutation has no corresponding plan-scoped
+    // dependency edge at all, so `observed` stays `undefined` and the reason
+    // is left unexplained below.
     const unexplained: typeof currentness.reasons = [];
     for (const reason of currentness.reasons) {
       if (reason.kind === 'AGGREGATE_ADVANCED' && reason.aggregateRef.kind === 'PROGRAMME') {

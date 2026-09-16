@@ -24,7 +24,13 @@ import { appendAuditTrail, buildReceipt } from '../commandSupport.ts';
 interface StoredProgrammeSchedule {
   programmeId: string;
   programmeItemId: string;
-  expectedProgrammeRevision: number;
+  /**
+   * `undefined` when no source (prerequisite observation, the intent's own
+   * captured `expectedRevisions`, or the strategy's base manifest) supplies
+   * one. No `?? 1` fallback: a missing expected revision is an explicit
+   * typed conflict at the caller, never a guessed CAS baseline.
+   */
+  expectedProgrammeRevision: number | undefined;
   schedule: {
     window?: { start: string; end: string };
     placeId?: string | null;
@@ -104,7 +110,7 @@ async function loadStoredProgrammeSchedule(
   const fromPrereq = await observedProgrammeRevisionFromPrerequisites(
     db, workspaceId, intentId, programmeId,
   );
-  const expectedProgrammeRevision = fromPrereq ?? fromIntent ?? fromManifest ?? 1;
+  const expectedProgrammeRevision = fromPrereq ?? fromIntent ?? fromManifest;
 
   return {
     programmeId,
@@ -158,6 +164,18 @@ export async function executeInternalProgrammeItemSchedule(
   );
   if (!stored) {
     return { ok: false, conflict: { kind: 'VALIDATION_FAILED', message: 'no stored programme schedule effect for intent', subjectRefs: [] } };
+  }
+  if (stored.expectedProgrammeRevision === undefined) {
+    return {
+      ok: false,
+      conflict: {
+        kind: 'VALIDATION_FAILED',
+        message:
+          'no expected Programme revision available for intent: no prerequisite observation, ' +
+          "captured intent expectedRevisions, or strategy base manifest supplies one — refusing to guess",
+        subjectRefs: [{ kind: 'PROGRAMME', id: stored.programmeId }],
+      },
+    };
   }
 
   const prepared = await createPreparedExecutionAttempt(uow, {

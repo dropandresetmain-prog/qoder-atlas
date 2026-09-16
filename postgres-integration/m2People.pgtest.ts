@@ -48,8 +48,10 @@ import {
   appendCredentialVersion,
   appendProfileAssertion,
   assignResponsibility,
+  bootstrapIssueAuthorityGrant,
   createOrganisation,
   createPrincipal,
+  GRANT_ISSUANCE_ACTION_KIND,
   issueAuthorityGrant,
   linkCredentials,
   mergeTraveller,
@@ -181,6 +183,43 @@ async function peopleFixture(): Promise<PeopleFixture> {
       actorType: 'SERVICE',
       authIssuer: 'https://issuer.invalid/m2-people',
       authSubject: issuedByPrincipalId,
+    }),
+  );
+  // ISSUER-POL: issuedByPrincipalId must actually hold authority.grant.write
+  // (self-issuance/unauthorised issuance is rejected at the command level).
+  // Bootstrap it via a throwaway SYSTEM seed principal, scoped to the
+  // traveller `grantTo` (below) always issues against.
+  const bootstrapSeedPrincipalId = randomUUID();
+  mustOk(
+    await createPrincipal(uow, {
+      workspaceId: base.workspaceId,
+      actorPrincipalId: base.actorId,
+      idempotencyKey: nextKey(base),
+      principalId: bootstrapSeedPrincipalId,
+      actorType: 'SYSTEM',
+      authIssuer: 'urn:northstar:test-bootstrap-seed',
+      authSubject: `test-bootstrap-seed:${bootstrapSeedPrincipalId}`,
+    }),
+  );
+  const issuerGrantIdempotency = nextKey(base);
+  mustOk(
+    await bootstrapIssueAuthorityGrant(uow, {
+      workspaceId: base.workspaceId,
+      actorPrincipalId: base.actorId,
+      idempotencyKey: issuerGrantIdempotency,
+      grantId: randomUUID(),
+      principalId: issuedByPrincipalId,
+      representedPartyRef: { kind: 'TRAVELLER', id: first.travellerId },
+      issuedByPrincipalId: bootstrapSeedPrincipalId,
+      // Earliest possible instant: some tests in this file issue grants with
+      // the default (real wall-clock) `issuedAt` rather than the fixture's
+      // synthetic `at(N)` timeline (T0 = 2030), so the issuer's own grant
+      // must already be effective at any check time, real or synthetic.
+      issuedAt: '1970-01-01T00:00:00.000Z',
+      actions: [GRANT_ISSUANCE_ACTION_KIND],
+      scopes: [{ kind: 'TRAVELLER', id: first.travellerId }],
+      authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: issuerGrantIdempotency },
+      expectedAggregateRevisions: [],
     }),
   );
   assert.equal(organisation.revision, 1);
@@ -1678,8 +1717,10 @@ describe('M2 lane P: a relationship and a responsibility are not authority', () 
     for (const table of ['authority_grants', 'grant_actions', 'grant_scopes']) {
       assert.equal(
         await count(f.pool, `SELECT count(*) AS n FROM ${table} WHERE workspace_id = $1`, [f.workspaceId]),
-        0,
-        `F05: ${table} must stay empty when only a relationship was recorded`,
+        // Baseline of 1 is the fixture's own ISSUER-POL bootstrap grant (one
+        // row in each of these three tables), not a row the relationship wrote.
+        1,
+        `F05: ${table} must gain no row when only a relationship was recorded`,
       );
     }
     for (const travellerId of f.travellerIds) {
@@ -1761,7 +1802,9 @@ describe('M2 lane P: a relationship and a responsibility are not authority', () 
     assert.deepEqual(assigned.subjectRef, travellerRef(subject));
     assert.equal(
       await count(f.pool, 'SELECT count(*) AS n FROM authority_grants WHERE workspace_id = $1', [f.workspaceId]),
-      0,
+      // Baseline of 1 is the fixture's own ISSUER-POL bootstrap grant (the
+      // issuer must hold authority.grant.write before any test can issue one).
+      1,
       'accountability is not permission',
     );
 
@@ -1890,7 +1933,8 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
       await count(f.pool, 'SELECT count(*) AS n FROM authority_grants WHERE workspace_id = $1 AND revoked_at IS NULL', [
         f.workspaceId,
       ]),
-      0,
+      // Baseline of 1 is the fixture's own (never-revoked) ISSUER-POL bootstrap grant.
+      1,
     );
     assert.deepEqual(
       await new PgGovernanceReadQueries(f.pool).principalsHoldingAction(f.workspaceId, 'traveller.profile.write', at(120)),
@@ -2013,7 +2057,8 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
     assert.equal(conflict.kind, 'STALE_AGGREGATE_REVISION');
     assert.equal(
       await count(f.pool, 'SELECT count(*) AS n FROM authority_grants WHERE workspace_id = $1', [f.workspaceId]),
-      0,
+      // Baseline of 1 is the fixture's own ISSUER-POL bootstrap grant.
+      1,
     );
   });
 
@@ -2098,7 +2143,8 @@ describe('M2 lane P: authority exists only because a grant says so', () => {
     }
     assert.equal(
       await count(f.pool, 'SELECT count(*) AS n FROM authority_grants WHERE workspace_id = $1', [f.workspaceId]),
-      0,
+      // Baseline of 1 is the fixture's own ISSUER-POL bootstrap grant.
+      1,
       'an uncitable authorisation is refused before the grant row exists, not repaired at COMMIT',
     );
   });

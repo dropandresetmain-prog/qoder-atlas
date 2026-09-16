@@ -40,6 +40,7 @@ import {
   seedStoredExecutionAuthority,
   tripBaseManifest,
   unionTypedRefs,
+  bootstrapTestGrantIssuer,
 } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
@@ -115,6 +116,8 @@ async function issueApproverGrant(
     representedPartyRef: TypedRef;
     scopes: TypedRef[];
     issuedAt?: string;
+    /** ISSUER-POL: authorised issuer (self-issuance is rejected). */
+    issuerPrincipalId: string;
   },
 ): Promise<void> {
   const idempotencyKey = randomUUID();
@@ -124,7 +127,7 @@ async function issueApproverGrant(
     idempotencyKey,
     principalId: params.principalId,
     representedPartyRef: params.representedPartyRef,
-    issuedByPrincipalId: params.principalId,
+    issuedByPrincipalId: params.issuerPrincipalId,
     issuedAt: params.issuedAt ?? NOW,
     actions: ['action.intent.authorize'],
     scopes: params.scopes,
@@ -189,6 +192,14 @@ async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload
     idempotencyKey: randomUUID(),
     budget: { id: budgetId, organisationId, purpose: 'travel', amount: { amount: '100.00', currency: 'USD' } },
   }));
+  // ISSUER-POL: one authorised issuer for this whole fixture/workspace,
+  // scoped to cover every TypedRef this test's grants will ever target.
+  const issuerPrincipalId = await bootstrapTestGrantIssuer(pool, seed.workspaceId, seed.actorId, NOW, [
+    { kind: 'ORGANISATION', id: organisationId },
+    { kind: 'TRIP', id: tripId },
+    { kind: 'JOURNEY', id: journeyId },
+    { kind: 'ACTION_INTENT', id: persisted.intentIds[0]! },
+  ]);
   await seedStoredExecutionAuthority({
     pool,
     workspaceId: seed.workspaceId,
@@ -203,9 +214,10 @@ async function baseFixture(opts?: { logicalOperationKey?: string; requestPayload
     budgetRevision: 1,
     assessmentSubject: { kind: 'JOURNEY', id: journeyId },
     assessmentTripId: tripId,
+    issuerPrincipalId,
   });
   return {
-    pool, seed, uow, organisationId, principalId, budgetId, tripId, journeyId,
+    pool, seed, uow, organisationId, principalId, budgetId, tripId, journeyId, issuerPrincipalId,
     caseId: opened.caseId, planId: persisted.planId, intentId: persisted.intentIds[0]!,
     recoveryStrategyId, scenarioChangeId,
   };
@@ -305,6 +317,7 @@ async function seedAuthorizedDispatch(
     principalId: f.principalId,
     representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
     scopes: decisionScope,
+    issuerPrincipalId: f.issuerPrincipalId,
   });
   const approval = mustOk(await recordApproval(f.uow(), {
     workspaceId: f.seed.workspaceId,
@@ -515,6 +528,7 @@ describe('M8 execution claim / idempotency / unknown outcome', () => {
       cost: { amount: '40.00', currency: 'USD' },
       budgetId: f.budgetId,
       budgetRevision: 2,
+      issuerPrincipalId: f.issuerPrincipalId,
     });
     const rejected = await createPreparedExecutionAttempt(f.uow(), prepareParams({
       workspaceId: f.seed.workspaceId,
@@ -611,6 +625,7 @@ describe('M8 approval fingerprint binding', () => {
       principalId: f.principalId,
       representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
       scopes: decisionScope,
+      issuerPrincipalId: f.issuerPrincipalId,
     });
     const approval = mustOk(await recordApproval(f.uow(), {
       workspaceId: f.seed.workspaceId,

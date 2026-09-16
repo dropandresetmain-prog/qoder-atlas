@@ -9,7 +9,12 @@ import {
   recordApproval,
   holdBudgetForIntent,
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
-import { issueAuthorityGrant } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import {
+  issueAuthorityGrant,
+  bootstrapIssueAuthorityGrant,
+  createPrincipal,
+  GRANT_ISSUANCE_ACTION_KIND,
+} from '../src/persistence/postgres/commands/peopleCommands.ts';
 import { computeEnvelopeFingerprint, type EnvelopeFingerprintInput } from '../src/resolution/authority/envelope.ts';
 import { loadRequiredAuthorityScope } from '../src/persistence/postgres/execution/storedExecutionGate.ts';
 import { saveAssessment } from '../src/persistence/postgres/world/pgAssessments.ts';
@@ -115,6 +120,75 @@ export async function seedMinimalCurrentAssessment(
   return result;
 }
 
+/**
+ * ISSUER-POL test scaffolding: `issueAuthorityGrant` no longer permits
+ * self-issuance or an issuer with no grant-issuing authority (enforced at
+ * the command itself, not just the application facade). Fixtures need one
+ * real, authorised issuer instead of each principal minting its own grant.
+ *
+ * Bootstraps a dedicated SYSTEM principal holding `authority.grant.write`
+ * scoped to `coverageScopes` — pass every TypedRef this workspace's fixture
+ * will ever need to grant sub-scopes of (e.g. the seeded organisation, trip
+ * and journey), since scope coverage is exact-set containment, not
+ * hierarchical. Call once per workspace (bootstrap only satisfies the
+ * workspace's very first grant); reuse the returned principal id for every
+ * later grant in that same workspace.
+ */
+export async function bootstrapTestGrantIssuer(
+  pool: Pool,
+  workspaceId: string,
+  actorId: string,
+  now: string,
+  coverageScopesIn: TypedRef[],
+): Promise<string> {
+  const coverageScopes = unionTypedRefs(coverageScopesIn);
+  const uow = new PgUnitOfWork(pool, workspaceId);
+  // Self-issuance is forbidden even for the bootstrap path, so a throwaway
+  // SYSTEM seed principal issues the grant and is never used again — the
+  // recipient is the reusable issuer callers get back.
+  const bootstrapSeedPrincipalId = randomUUID();
+  mustOk(await createPrincipal(uow, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    idempotencyKey: randomUUID(),
+    principalId: bootstrapSeedPrincipalId,
+    actorType: 'SYSTEM',
+    authIssuer: 'urn:northstar:test-bootstrap-seed',
+    authSubject: `test-bootstrap-seed:${bootstrapSeedPrincipalId}`,
+  }));
+  const issuerPrincipalId = randomUUID();
+  mustOk(await createPrincipal(uow, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    idempotencyKey: randomUUID(),
+    principalId: issuerPrincipalId,
+    actorType: 'SYSTEM',
+    authIssuer: 'urn:northstar:test-issuer',
+    authSubject: `test-issuer:${issuerPrincipalId}`,
+  }));
+  const idempotencyKey = randomUUID();
+  mustOk(await bootstrapIssueAuthorityGrant(uow, {
+    workspaceId,
+    actorPrincipalId: actorId,
+    idempotencyKey,
+    grantId: randomUUID(),
+    principalId: issuerPrincipalId,
+    // The issuer represents itself, not any of the scopes it's authorised to
+    // grant over — `coverageScopes` entries (JOURNEY/TRIP/ACTION_INTENT/...)
+    // are frequently not valid `represented_party_kind` values at all
+    // (0019's CHECK only allows TRAVELLER/ORGANISATION/
+    // RESPONSIBILITY_ASSIGNMENT/PRINCIPAL); PRINCIPAL always is.
+    representedPartyRef: { kind: 'PRINCIPAL', id: issuerPrincipalId },
+    issuedByPrincipalId: bootstrapSeedPrincipalId,
+    issuedAt: now,
+    actions: [GRANT_ISSUANCE_ACTION_KIND],
+    scopes: coverageScopes,
+    authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
+    expectedAggregateRevisions: [],
+  }));
+  return issuerPrincipalId;
+}
+
 export async function seedStoredExecutionAuthority(opts: {
   pool: Pool;
   workspaceId: string;
@@ -144,6 +218,15 @@ export async function seedStoredExecutionAuthority(opts: {
   approverPrincipalId?: string;
   /** Skip issuing grants (caller already seeded them). */
   skipGrants?: boolean;
+  /**
+   * Authorised issuer for the grants this call issues (ISSUER-POL). Pass a
+   * principal already bootstrapped via `bootstrapTestGrantIssuer` when the
+   * caller needs more than one grant issuance in the same workspace —
+   * bootstrap itself only satisfies a workspace's very first grant. When
+   * omitted, a fresh single-use issuer is bootstrapped scoped exactly to
+   * `grantScopes`.
+   */
+  issuerPrincipalId?: string;
 }): Promise<{ fingerprint: string; grantId: string | undefined }> {
   const now = opts.now ?? GATE_NOW;
   const requirementRole = opts.requirementRole ?? 'PAYER';
@@ -194,6 +277,8 @@ export async function seedStoredExecutionAuthority(opts: {
   const fingerprint = computeEnvelopeFingerprint(envelopeInput);
   let grantId: string | undefined;
   if (!opts.skipGrants) {
+    const issuerPrincipalId = opts.issuerPrincipalId
+      ?? await bootstrapTestGrantIssuer(opts.pool, opts.workspaceId, opts.actorId, now, grantScopes);
     const grantIdempotency = randomUUID();
     const grant = mustOk(await issueAuthorityGrant(uow(), {
       workspaceId: opts.workspaceId,
@@ -201,7 +286,7 @@ export async function seedStoredExecutionAuthority(opts: {
       idempotencyKey: grantIdempotency,
       principalId: opts.principalId,
       representedPartyRef: opts.representedPartyRef,
-      issuedByPrincipalId: opts.principalId,
+      issuedByPrincipalId: issuerPrincipalId,
       issuedAt: now,
       // Dispatcher needs dispatch; same principal often also approves → authorize.
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
@@ -218,7 +303,7 @@ export async function seedStoredExecutionAuthority(opts: {
         idempotencyKey: approverIdempotency,
         principalId: approverPrincipalId,
         representedPartyRef: opts.representedPartyRef,
-        issuedByPrincipalId: approverPrincipalId,
+        issuedByPrincipalId: issuerPrincipalId,
         issuedAt: now,
         actions: ['action.intent.authorize'],
         scopes: grantScopes,

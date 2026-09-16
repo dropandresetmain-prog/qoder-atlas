@@ -48,6 +48,7 @@ import {
 import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { PgTravellerRepository } from '../repositories/pgTravellerRepository.ts';
 import { PgGovernanceRepository } from '../repositories/pgGovernanceRepository.ts';
+import { scopeCoversRequired } from '../../../resolution/authority/authorize.ts';
 
 const SCHEMA_VERSION = '1';
 
@@ -1429,6 +1430,94 @@ export interface IssueAuthorityGrantParams extends PeopleCommandContext {
   expectedAggregateRevisions: ExpectedRevision[];
 }
 
+/** Action kind marking a grant as itself carrying authority to issue further grants (0019 vocabulary; reused, not invented). */
+export const GRANT_ISSUANCE_ACTION_KIND = 'authority.grant.write';
+
+async function assertNotSelfIssuance(
+  issuedByPrincipalId: string,
+  principalId: string,
+  grantRef: TypedRef,
+): Promise<TypedConflict | null> {
+  if (issuedByPrincipalId !== principalId) return null;
+  return typedConflict(
+    'VALIDATION_FAILED',
+    `ISSUER_SELF_ISSUANCE_FORBIDDEN: principal ${principalId} cannot mint its own authority grant`,
+    [grantRef],
+  );
+}
+
+/**
+ * ISSUER-POL command-level enforcement: the issuer must already hold a live
+ * `authority.grant.write` grant whose scope covers every scope about to be
+ * issued. Runs inside the same transaction as the insert (via
+ * `listEffectiveGrants`, which reads on the ambient transaction client), so
+ * there is no window between the check and the write. This is the ordinary
+ * path's only route to authority — no in-process caller can skip it by
+ * calling this command directly instead of going through a facade.
+ */
+async function assertIssuerHoldsGrantIssuanceAuthority(
+  governance: PgGovernanceRepository,
+  workspaceId: string,
+  issuedByPrincipalId: string,
+  targetScopes: readonly TypedRef[],
+  at: string,
+  grantRef: TypedRef,
+): Promise<TypedConflict | null> {
+  const issuerGrants = await governance.listEffectiveGrants(workspaceId, issuedByPrincipalId, at);
+  const issuing = issuerGrants.filter((g) => g.actions.includes(GRANT_ISSUANCE_ACTION_KIND));
+  if (issuing.length === 0) {
+    return typedConflict(
+      'VALIDATION_FAILED',
+      `ISSUER_UNAUTHORISED: ${issuedByPrincipalId} holds no live ${GRANT_ISSUANCE_ACTION_KIND} grant`,
+      [grantRef],
+    );
+  }
+  const covering = issuing.some((g) => scopeCoversRequired(g.scopes as TypedRef[], targetScopes));
+  if (!covering) {
+    return typedConflict(
+      'VALIDATION_FAILED',
+      `ISSUER_SCOPE_INSUFFICIENT: ${issuedByPrincipalId} grant-issuing scope does not cover the scopes being issued`,
+      [grantRef],
+    );
+  }
+  return null;
+}
+
+/**
+ * ISSUER-POL bootstrap exemption: only satisfiable when the issuer is a
+ * `SYSTEM` principal AND this is provably the workspace's very first grant
+ * (no prior `authority_grants` row exists). Checked on the ambient
+ * transaction client, so a concurrent bootstrap race for the same workspace
+ * loses this check rather than silently issuing two "first" grants under
+ * different narratives. Never satisfiable by an ordinary product/HTTP-driven
+ * issuance, because once any real grant exists the workspace already has a
+ * row and this exemption stops applying.
+ */
+async function assertBootstrapSystemSeed(
+  governance: PgGovernanceRepository,
+  workspaceId: string,
+  issuedByPrincipalId: string,
+  grantRef: TypedRef,
+): Promise<TypedConflict | null> {
+  const issuer = await governance.loadPrincipal(workspaceId, issuedByPrincipalId);
+  if (!issuer || issuer.actorType !== 'SYSTEM') {
+    return typedConflict(
+      'VALIDATION_FAILED',
+      `BOOTSTRAP_ISSUER_MUST_BE_SYSTEM: ${issuedByPrincipalId} is not a SYSTEM principal`,
+      [grantRef],
+    );
+  }
+  const existing = await governance.countGrantsInWorkspace(workspaceId);
+  if (existing > 0) {
+    return typedConflict(
+      'VALIDATION_FAILED',
+      `BOOTSTRAP_NOT_FIRST_GRANT: workspace ${workspaceId} already has ${existing} authority grant(s); bootstrap seeds only the first`,
+      [grantRef],
+    );
+  }
+  return null;
+}
+
 export interface AuthorityGrantIssuedResult {
   grantId: string;
   actions: string[];
@@ -1442,10 +1531,16 @@ export interface AuthorityGrantIssuedResult {
  * issuing one does not advance the principal's or the represented party's
  * revision; a caller that computed against those revisions cites them as
  * expectations and a stale one conflicts before anything is written.
+ *
+ * ISSUER-POL is enforced here, at the command itself, not only in an
+ * application-layer facade — every caller of this function (present or
+ * future) gets self-issuance rejection and issuer-authority-coverage
+ * enforcement for free; there is no direct-call bypass.
  */
-export async function issueAuthorityGrant(
+async function issueAuthorityGrantCommand(
   uow: UnitOfWork,
   params: IssueAuthorityGrantParams,
+  issuerCheck: 'REQUIRE_ISSUING_AUTHORITY' | 'BOOTSTRAP_SYSTEM_SEED',
 ): Promise<ExecuteOutcome<AuthorityGrantIssuedResult>> {
   const parsed = IssueAuthorityGrantPayloadSchema.safeParse({
     grantId: params.grantId,
@@ -1482,6 +1577,16 @@ export async function issueAuthorityGrant(
     ...(parsed.data.evidenceId === undefined ? {} : { evidenceRefs: [parsed.data.evidenceId] }),
     body: async ({ envelope }) => {
       const governance = new PgGovernanceRepository(params.workspaceId);
+      const selfIssuanceDenied = await assertNotSelfIssuance(
+        parsed.data.issuedByPrincipalId, parsed.data.principalId, grantRef,
+      );
+      if (selfIssuanceDenied) return { ok: false, conflict: selfIssuanceDenied };
+      const issuerDenied = issuerCheck === 'BOOTSTRAP_SYSTEM_SEED'
+        ? await assertBootstrapSystemSeed(governance, params.workspaceId, parsed.data.issuedByPrincipalId, grantRef)
+        : await assertIssuerHoldsGrantIssuanceAuthority(
+            governance, params.workspaceId, parsed.data.issuedByPrincipalId, parsed.data.scopes, issuedAt, grantRef,
+          );
+      if (issuerDenied) return { ok: false, conflict: issuerDenied };
       if (parsed.data.expiresAt !== undefined && Date.parse(parsed.data.expiresAt) <= Date.parse(issuedAt)) {
         return validationConflict('an authority grant must expire strictly after it was issued', [grantRef]);
       }
@@ -1547,6 +1652,41 @@ export async function issueAuthorityGrant(
       };
     },
   });
+}
+
+/**
+ * Normal (ordinary product/application) grant issuance. The issuer must
+ * already hold a live `authority.grant.write` grant covering every scope
+ * being issued, and a principal can never issue a grant to itself
+ * (ISSUER-POL). Not reachable for a workspace's first-ever grant — that is
+ * `bootstrapIssueAuthorityGrant`'s sole job.
+ */
+export async function issueAuthorityGrant(
+  uow: UnitOfWork,
+  params: IssueAuthorityGrantParams,
+): Promise<ExecuteOutcome<AuthorityGrantIssuedResult>> {
+  return issueAuthorityGrantCommand(uow, params, 'REQUIRE_ISSUING_AUTHORITY');
+}
+
+/**
+ * BOOTSTRAP-ONLY grant issuance (the sole ISSUER-POL exemption). Seeds the
+ * very first `authority.grant.write`-holding principal in a fresh workspace,
+ * so the normal `issueAuthorityGrant` path (which requires the issuer to
+ * already hold that authority) has something to build on. Enforced, not just
+ * documented: the issuing principal must be `SYSTEM`-typed and the workspace
+ * must have zero pre-existing `authority_grants` rows, both checked inside
+ * this command's own transaction. Callers must still route through a
+ * dedicated bootstrap entrypoint (e.g. `provisionOrganiserAuthority`) — this
+ * export exists so that entrypoint is not itself forced to know about
+ * `PgGovernanceRepository` internals, not so ordinary application code has a
+ * second way to issue grants. No `/api/v2/*` HTTP handler may call this
+ * directly or indirectly.
+ */
+export async function bootstrapIssueAuthorityGrant(
+  uow: UnitOfWork,
+  params: IssueAuthorityGrantParams,
+): Promise<ExecuteOutcome<AuthorityGrantIssuedResult>> {
+  return issueAuthorityGrantCommand(uow, params, 'BOOTSTRAP_SYSTEM_SEED');
 }
 
 const RevokeAuthorityGrantPayloadSchema = z.strictObject({

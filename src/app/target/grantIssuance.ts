@@ -10,37 +10,32 @@
  * If product later requires org-wide journey coverage, stop and write an
  * architecture decision — do not silently implement broad inheritance.
  *
- * ISSUER-POL (bounded, M9): migration 0019 flags "Grant issuer must have
- * issuance authority" as an architecture gap with no governing policy table.
- * A full table-enforced policy is left for a later milestone, but the normal
- * M9 issuance path below must not rely on unrestricted self-issuance:
- *  - the issuer must already hold a live `authority.grant.write` grant whose
- *    scope covers every scope being granted (reusing the M2 action-kind
- *    vocabulary — no new action kind invented);
- *  - a principal can never issue a grant to itself;
- *  - the one bootstrap exemption (`provisionOrganiserAuthority` /
- *    `bootstrapIssueAuthorityGrant`) seeds the very first such grant in a
- *    fresh workspace using a dedicated system principal as issuer — never
- *    the organiser itself — and is never reachable from `targetHttpHandlers.ts`
- *    or any ordinary application command.
+ * ISSUER-POL (M10): self-issuance rejection and issuer-authority-coverage
+ * enforcement now live in `issueAuthorityGrant` itself
+ * (`persistence/postgres/commands/peopleCommands.ts`), not only here — any
+ * caller of that command gets the same protection, not just this facade.
+ * This file's own job is narrower: compute/validate the required-vs-proposed
+ * scope union (a product-layer concern, not an authority-policy one), and
+ * route the one legitimate bootstrap case to the command's dedicated
+ * `bootstrapIssueAuthorityGrant` export — never reachable from
+ * `targetHttpHandlers.ts` or any ordinary application command.
  */
 import { randomUUID } from 'node:crypto';
 import type { UnitOfWork } from '../../contracts/v2/command/unitOfWork.ts';
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
 import { typedConflict, type TypedConflict } from '../../domain/v2/shared/errors.ts';
 import { scopeCoversRequired } from '../../resolution/authority/authorize.ts';
-import { loadGrantsForPrincipal } from '../../persistence/postgres/execution/storedExecutionGate.ts';
-import type { Pool } from '../../persistence/postgres/pool.ts';
 import {
   createOrganisation,
   createPrincipal,
   issueAuthorityGrant,
+  bootstrapIssueAuthorityGrant as bootstrapIssueAuthorityGrantCommand,
+  GRANT_ISSUANCE_ACTION_KIND,
   type IssueAuthorityGrantParams,
 } from '../../persistence/postgres/commands/peopleCommands.ts';
 import type { ExecuteOutcome } from '../../persistence/postgres/pgUnitOfWork.ts';
 
-/** Reused M2 action-kind vocabulary (0019) — the marker for grant-issuing authority. */
-export const GRANT_ISSUANCE_ACTION_KIND = 'authority.grant.write';
+export { GRANT_ISSUANCE_ACTION_KIND };
 
 export interface RequiredGrantIssuanceInput {
   workspaceId: string;
@@ -65,8 +60,6 @@ export interface RequiredGrantIssuanceInput {
   grantId?: string;
   evidenceId?: string;
   limits?: IssueAuthorityGrantParams['limits'];
-  /** Read access used to verify the issuer holds grant-issuing authority (ISSUER-POL). */
-  pool: Pool;
 }
 
 export type GrantIssuanceResult = {
@@ -116,51 +109,12 @@ function buildGrantScopesOrConflict(
 }
 
 /**
- * ISSUER-POL: the issuer must already hold a live `authority.grant.write`
- * grant whose scope covers every scope about to be issued, and a principal
- * may never issue a grant to itself. Bounded, application-level check — not
- * yet a table-enforced DB constraint (0019 gap remains recorded as such).
- */
-async function assertIssuerMayIssue(
-  pool: Pool,
-  workspaceId: string,
-  issuedByPrincipalId: string,
-  principalId: string,
-  targetScopes: readonly TypedRef[],
-  now: string,
-): Promise<TypedConflict | null> {
-  if (issuedByPrincipalId === principalId) {
-    return typedConflict(
-      'VALIDATION_FAILED',
-      `ISSUER_SELF_ISSUANCE_FORBIDDEN: principal ${principalId} cannot mint its own authority grant`,
-      [],
-    );
-  }
-  const issuerGrants = await loadGrantsForPrincipal(pool, workspaceId, issuedByPrincipalId, now);
-  const issuing = issuerGrants.filter((g) => g.actions.includes(GRANT_ISSUANCE_ACTION_KIND));
-  if (issuing.length === 0) {
-    return typedConflict(
-      'VALIDATION_FAILED',
-      `ISSUER_UNAUTHORISED: ${issuedByPrincipalId} holds no live ${GRANT_ISSUANCE_ACTION_KIND} grant`,
-      [],
-    );
-  }
-  const covering = issuing.some((g) => scopeCoversRequired(g.scopes, targetScopes));
-  if (!covering) {
-    return typedConflict(
-      'VALIDATION_FAILED',
-      `ISSUER_SCOPE_INSUFFICIENT: ${issuedByPrincipalId} grant-issuing scope does not cover the scopes being issued`,
-      [],
-    );
-  }
-  return null;
-}
-
-/**
  * Issue a grant that is at least as strong as the deterministic required scope.
- * Caller cannot choose a weaker scope than required. Normal M9 issuance path:
- * the issuer must already hold grant-issuing authority (ISSUER-POL) — this is
- * NOT self-issuance and NOT the bootstrap exemption below.
+ * Caller cannot choose a weaker scope than required. Normal M9/M10 issuance
+ * path: `issueAuthorityGrant` (the command) enforces ISSUER-POL itself — the
+ * issuer must already hold grant-issuing authority, self-issuance is
+ * rejected — so this facade no longer duplicates that check; it only builds
+ * the scope union and surfaces whatever conflict the command returns.
  */
 export async function issueRequiredAuthorityGrant(
   uow: UnitOfWork,
@@ -169,16 +123,6 @@ export async function issueRequiredAuthorityGrant(
   const built = buildGrantScopesOrConflict(input);
   if (!built.ok) return built;
   const scopes = built.scopes;
-
-  const issuerDenied = await assertIssuerMayIssue(
-    input.pool,
-    input.workspaceId,
-    input.issuedByPrincipalId,
-    input.principalId,
-    scopes,
-    input.issuedAt,
-  );
-  if (issuerDenied) return { ok: false, conflict: issuerDenied };
 
   const grantId = input.grantId ?? randomUUID();
   const authorisingReceipt = input.authorisingReceipt ?? {
@@ -229,7 +173,7 @@ export async function issueRequiredAuthorityGrant(
  */
 async function bootstrapIssueAuthorityGrant(
   uow: UnitOfWork,
-  input: Omit<RequiredGrantIssuanceInput, 'pool'>,
+  input: RequiredGrantIssuanceInput,
 ): Promise<ExecuteOutcome<GrantIssuanceResult>> {
   const built = buildGrantScopesOrConflict(input);
   if (!built.ok) return built;
@@ -241,7 +185,7 @@ async function bootstrapIssueAuthorityGrant(
     idempotencyKey: input.idempotencyKey,
   };
 
-  const outcome = await issueAuthorityGrant(uow, {
+  const outcome = await bootstrapIssueAuthorityGrantCommand(uow, {
     workspaceId: input.workspaceId,
     actorPrincipalId: input.actorPrincipalId,
     idempotencyKey: input.idempotencyKey,

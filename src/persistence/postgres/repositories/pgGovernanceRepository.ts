@@ -425,6 +425,21 @@ export class PgGovernanceRepository implements GovernanceRepository {
   }
 
   /**
+   * ISSUER-POL bootstrap check: the total count of `authority_grants` rows
+   * ever issued in this workspace, regardless of revocation/expiry — used to
+   * prove "this is provably the workspace's first grant," not "no grant is
+   * currently effective."
+   */
+  async countGrantsInWorkspace(workspaceId: string): Promise<number> {
+    const client = currentTransactionClient();
+    const result = await client.query<{ count: string }>(
+      'SELECT count(*)::text AS count FROM authority_grants WHERE workspace_id = $1',
+      [workspaceId],
+    );
+    return Number(result.rows[0]?.count ?? '0');
+  }
+
+  /**
    * One EXISTS over the registered action vocabulary and the exact scope
    * TypedRef. An action kind absent from `authority_action_kinds` can never have
    * a `grant_actions` row (0019's FK), so it is reported as not-authorised

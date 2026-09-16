@@ -34,6 +34,7 @@ import {
   seedStoredExecutionAuthority,
   seedMinimalCurrentAssessment,
   prepareParams,
+  bootstrapTestGrantIssuer,
 } from './m8ExecutionGateHelpers.ts';
 
 after(async () => {
@@ -213,8 +214,18 @@ async function seedBilateralWorld() {
 
   await seedMinimalCurrentAssessment(pool, seed.workspaceId, { kind: 'JOURNEY', id: j1 }, EXEC_NOW);
   await seedMinimalCurrentAssessment(pool, seed.workspaceId, { kind: 'JOURNEY', id: j2 }, EXEC_NOW);
-  for (const intent of plan.intents) {
-    const scope = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, intent.id);
+  // ISSUER-POL: bootstrap once for this workspace, scoped to cover every
+  // intent's required authority scope, then reuse across the loop below —
+  // bootstrap only satisfies a workspace's very first grant.
+  const allRequiredScopes = await Promise.all(
+    plan.intents.map((intent) => loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, intent.id)),
+  );
+  const issuerPrincipalId = await bootstrapTestGrantIssuer(
+    pool, seed.workspaceId, seed.actorId, EXEC_NOW, allRequiredScopes.flat(),
+  );
+  for (let i = 0; i < plan.intents.length; i++) {
+    const intent = plan.intents[i]!;
+    const scope = allRequiredScopes[i]!;
     await seedStoredExecutionAuthority({
       pool,
       workspaceId: seed.workspaceId,
@@ -226,6 +237,7 @@ async function seedBilateralWorld() {
       representedPartyRef: { kind: 'TRAVELLER', id: t1.travellerId },
       requirementRole: 'CASE_OWNER',
       now: EXEC_NOW,
+      issuerPrincipalId,
     });
   }
 
