@@ -12,9 +12,13 @@ isolated environments.
 | | |
 | --- | --- |
 | Branch | `milestone-m10-migration-rehearsal` |
-| Candidate SHA | `0c5015a4ad33595257bb8833162af35313bfa546` |
+| Candidate | tag **`m10-candidate`** |
 | Accepted M9/C4 base | `c45a9289b7f7ff730cdce97ced6124b1a9332bf8` |
-| Commits since base | 12 |
+
+The candidate is identified by an annotated tag rather than a SHA written into this file, because a
+document cannot contain the hash of the commit that contains it. Resolve it with
+`git rev-parse m10-candidate`; the tag is pushed alongside the branch and is what every result below
+was produced against.
 
 ## 2. Tooling versions
 
