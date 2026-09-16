@@ -25,6 +25,7 @@ import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecu
 import { executeInternalProgrammeItemSchedule } from '../src/persistence/postgres/execution/internalProgrammeExecutor.ts';
 import { INTERNAL_PROGRAMME_SCHEDULE_CAPABILITY } from '../src/persistence/postgres/execution/storedExecutionGate.ts';
 import {
+  bootstrapTestGrantIssuer,
   GATE_NOW,
   mustOk,
   persistStrategyChangeRow,
@@ -158,7 +159,15 @@ async function seedAuthorityForFixture(f: Awaited<ReturnType<typeof baseC3Fixtur
   cost?: boolean;
   now?: string;
   overrideRequestFingerprint?: string;
+  /** ISSUER-POL: reuse an already-bootstrapped issuer instead of bootstrapping a new one (bootstrap only satisfies a workspace's first grant). */
+  issuerPrincipalId?: string;
 }) {
+  // ISSUER-POL: bootstrap this call's own authorised issuer by default,
+  // rather than relying on seedStoredExecutionAuthority's internal
+  // self-bootstrap fallback (which orders coverageScopes via unionTypedRefs
+  // and can put a non-representable kind like JOURNEY first — see
+  // bootstrapC3Issuer's comment for why that CHECK-constraint trap matters).
+  const issuerPrincipalId = opts?.issuerPrincipalId ?? await bootstrapC3Issuer(f);
   return seedStoredExecutionAuthority({
     pool: f.pool, workspaceId: f.seed.workspaceId, actorId: f.seed.actorId, principalId: f.principalId,
     planId: f.planId, intentId: f.intentId,
@@ -166,6 +175,7 @@ async function seedAuthorityForFixture(f: Awaited<ReturnType<typeof baseC3Fixtur
     representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
     assessmentSubject: { kind: 'JOURNEY', id: f.journeyId },
     assessmentTripId: f.tripId,
+    issuerPrincipalId,
     ...(opts?.cost !== false && f.budgetId
       ? { cost: { amount: '40.00', currency: 'USD' }, budgetId: f.budgetId }
       : {}),
@@ -714,6 +724,34 @@ async function coveringDecisionScope(
   return unionTypedRefs(extra, required as TypedRef[], [{ kind: 'ORGANISATION', id: f.organisationId }]);
 }
 
+/**
+ * ISSUER-POL: bootstrap ONE authorised issuer for this fixture's workspace,
+ * covering the fixture's own org plus whatever `coveringDecisionScope`
+ * resolves (required authority scope + org), plus any test-specific `extra`
+ * refs (e.g. a second organisation a test seeds for a "wrong scope" denial
+ * case). Bootstrap only satisfies a workspace's very first grant, so callers
+ * must bootstrap once per test/workspace and reuse the returned id for every
+ * subsequent grant issuance in that workspace — never call this twice for
+ * the same `f`.
+ *
+ * `unionTypedRefs` (used by `coveringDecisionScope`) sorts refs
+ * alphabetically by kind, so the result frequently does NOT start with a
+ * kind `bootstrapTestGrantIssuer` can use as its own represented party
+ * (TRAVELLER/ORGANISATION/RESPONSIBILITY_ASSIGNMENT/PRINCIPAL only — see the
+ * authority_grants_represented_party_kind_known CHECK). The fixture's own
+ * organisation is always a valid, already-seeded choice, so it is placed
+ * first explicitly and de-duplicated against the rest.
+ */
+async function bootstrapC3Issuer(
+  f: Awaited<ReturnType<typeof baseC3Fixture>>,
+  extra: TypedRef[] = [],
+): Promise<string> {
+  const orgRef: TypedRef = { kind: 'ORGANISATION', id: f.organisationId };
+  const rest = await coveringDecisionScope(f, extra);
+  const coverage = [orgRef, ...rest.filter((r) => !(r.kind === orgRef.kind && r.id === orgRef.id))];
+  return bootstrapTestGrantIssuer(f.pool, f.seed.workspaceId, f.seed.actorId, GATE_NOW, coverage);
+}
+
 describe('AN-7 grant scope, approver authority, gating principal', () => {
   test('approver with zero grants → recordApproval rejected; direct approval row denied at gate', async () => {
     const f = await baseC3Fixture({ withCost: false });
@@ -727,11 +765,12 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: randomUUID(),
       principalId: approverId, actorType: 'HUMAN', authIssuer: 'https://issuer.invalid/an7-a', authSubject: approverId,
     }));
+    const issuerPrincipalId = await bootstrapC3Issuer(f);
     const dispatchKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch'],
       scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
@@ -808,11 +847,12 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       { tripId: f.tripId, tripRevision: 1 },
     );
     const decisionScope = await coveringDecisionScope(f);
+    const issuerPrincipalId = await bootstrapC3Issuer(f, [{ kind: 'ORGANISATION', id: orgB }]);
     const dispatchKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch'],
       scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
@@ -822,7 +862,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: orgB },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.authorize'],
       scopes: [{ kind: 'ORGANISATION', id: orgB }],
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },
@@ -864,11 +904,12 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       { tripId: f.tripId, tripRevision: 1 },
     );
     const decisionScope = await coveringDecisionScope(f);
+    const issuerPrincipalId = await bootstrapC3Issuer(f);
     const grantKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
       scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
@@ -918,11 +959,12 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
       { tripId: f.tripId, tripRevision: 1 },
     );
     const decisionScope = await coveringDecisionScope(f);
+    const issuerPrincipalId = await bootstrapC3Issuer(f, [{ kind: 'ORGANISATION', id: orgB }]);
     const authorizeKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.authorize'],
       scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },
@@ -932,7 +974,7 @@ describe('AN-7 grant scope, approver authority, gating principal', () => {
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: orgB },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch'],
       scopes: [{ kind: 'ORGANISATION', id: orgB }],
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
@@ -1017,11 +1059,12 @@ describe('AN-7R decision scope bound to required intent subjects', () => {
     assert.ok(!('allowed' in required));
     assert.ok((required as TypedRef[]).some((r) => r.kind === 'JOURNEY' && r.id === f.journeyId));
 
+    const issuerPrincipalId = await bootstrapC3Issuer(f, [{ kind: 'ORGANISATION', id: unrelatedOrg }]);
     const grantKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: unrelatedOrg },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
       scopes: [{ kind: 'ORGANISATION', id: unrelatedOrg }],
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
@@ -1119,12 +1162,13 @@ describe('AN-7R decision scope bound to required intent subjects', () => {
       { tripId: f.tripId, tripRevision: 1 },
     );
     const decisionScope = await coveringDecisionScope(f);
+    const issuerPrincipalId = await bootstrapC3Issuer(f);
     // Grant only ORGANISATION, missing JOURNEY from required set.
     const grantKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: grantKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'],
       scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: grantKey },
@@ -1194,11 +1238,12 @@ describe('AN-7R decision scope bound to required intent subjects', () => {
       { tripId: f.tripId, tripRevision: 1 },
     );
     const decisionScope = await coveringDecisionScope(f);
+    const issuerPrincipalId = await bootstrapC3Issuer(f);
     const dispatchKey = randomUUID();
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: dispatchKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.dispatch'],
       scopes: decisionScope,
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: dispatchKey },
@@ -1208,7 +1253,7 @@ describe('AN-7R decision scope bound to required intent subjects', () => {
     mustOk(await issueAuthorityGrant(f.uow(), {
       workspaceId: f.seed.workspaceId, actorPrincipalId: f.seed.actorId, idempotencyKey: authorizeKey,
       principalId: f.principalId, representedPartyRef: { kind: 'ORGANISATION', id: f.organisationId },
-      issuedByPrincipalId: f.principalId, issuedAt: GATE_NOW,
+      issuedByPrincipalId: issuerPrincipalId, issuedAt: GATE_NOW,
       actions: ['action.intent.authorize'],
       scopes: [{ kind: 'ORGANISATION', id: f.organisationId }],
       authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey: authorizeKey },

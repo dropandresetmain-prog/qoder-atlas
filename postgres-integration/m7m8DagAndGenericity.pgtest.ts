@@ -58,6 +58,7 @@ import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { ActionIntent } from '../src/contracts/v2/action/actionPlan.ts';
 import {
+  bootstrapTestGrantIssuer,
   loadRequiredAuthorityScopesOrFail,
   persistStrategyChangeRow,
   prepareParams,
@@ -90,6 +91,8 @@ async function issueApproverGrant(
     representedPartyRef: { kind: 'TRAVELLER'; id: string };
     scopes: EnvelopeFingerprintInput['scope'];
     issuedAt?: string;
+    /** ISSUER-POL: authorised issuer (self-issuance is rejected at the command level). */
+    issuerPrincipalId: string;
   },
 ): Promise<void> {
   const idempotencyKey = randomUUID();
@@ -99,7 +102,7 @@ async function issueApproverGrant(
     idempotencyKey,
     principalId: params.principalId,
     representedPartyRef: params.representedPartyRef,
-    issuedByPrincipalId: params.principalId,
+    issuedByPrincipalId: params.issuerPrincipalId,
     issuedAt: params.issuedAt ?? NOW,
     actions: ['action.intent.dispatch', 'action.intent.authorize'],
     scopes: params.scopes,
@@ -146,6 +149,8 @@ async function runViableScenarioToAuthorizedDispatch(params: {
   world: CapturedWorld;
   scenarioChange: ScenarioChange;
   scope: TypedRef[];
+  /** ISSUER-POL: authorised issuer for this workspace's grant issuance (self-issuance is rejected at the command level). */
+  issuerPrincipalId: string;
 }): Promise<{ compiledIntent: ActionIntent }> {
   const uow = () => new PgUnitOfWork(params.pool, params.workspaceId);
 
@@ -189,6 +194,7 @@ async function runViableScenarioToAuthorizedDispatch(params: {
     workspaceId: params.workspaceId, actorId: params.actorId, principalId: params.principalId,
     representedPartyRef: { kind: 'TRAVELLER', id: params.travellerId },
     scopes: decisionScope,
+    issuerPrincipalId: params.issuerPrincipalId,
   });
   const approval = mustOk(await recordApproval(uow(), {
     workspaceId: params.workspaceId, actorPrincipalId: params.principalId, idempotencyKey: randomUUID(),
@@ -357,6 +363,34 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
     assert.equal(depRows.rows[0]?.to_action_intent_id, programmeIntent.id);
     // The DAG is real, persisted data — not merely compiler in-memory output.
 
+    // --- ISSUER-POL: bootstrap ONE authorised issuer for this workspace,
+    // covering BOTH grants issued below (upstream + downstream) — bootstrap
+    // only satisfies a workspace's very first grant, so it cannot run twice.
+    // Both required-authority-scope loads are cheap DB reads and safe to do
+    // early since both intent ids already exist post-persist.
+    const upstreamRequiredForBootstrap = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, allocIntent.id);
+    const downstreamRequiredForBootstrap = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, programmeIntent.id);
+    // Manually dedupe (not unionTypedRefs, which sorts alphabetically) so the
+    // valid represented-party kind (TRAVELLER) is guaranteed first —
+    // bootstrapTestGrantIssuer uses coverageScopes[0] for that field.
+    const bootstrapSeen = new Set<string>();
+    const bootstrapCoverage: TypedRef[] = [];
+    for (const ref of [
+      { kind: 'TRAVELLER' as const, id: traveller.travellerId },
+      { kind: 'RESERVATION_LINE' as const, id: reservationLineId },
+      { kind: 'PROGRAMME_ITEM' as const, id: programmeItemId },
+      { kind: 'TRIP' as const, id: tripId },
+      { kind: 'JOURNEY' as const, id: journeyId },
+      ...upstreamRequiredForBootstrap,
+      ...downstreamRequiredForBootstrap,
+    ]) {
+      const key = `${ref.kind}:${ref.id}`;
+      if (bootstrapSeen.has(key)) continue;
+      bootstrapSeen.add(key);
+      bootstrapCoverage.push(ref);
+    }
+    const issuerPrincipalId = await bootstrapTestGrantIssuer(pool, seed.workspaceId, seed.actorId, NOW, bootstrapCoverage);
+
     // --- Authorize + prepare the UPSTREAM (allocation) intent, and leave its
     // execution_attempts row at PREPARED (never claimed/dispatched/observed). ---
     const upstreamRequired = await loadRequiredAuthorityScopesOrFail(pool, seed.workspaceId, allocIntent.id);
@@ -374,6 +408,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       scopes: upstreamScope,
+      issuerPrincipalId,
     });
     const upstreamApproval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
@@ -455,6 +490,7 @@ describe('acceptance #5: multi-intent DAG dependencies persist as real data and 
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       scopes: downstreamScope,
+      issuerPrincipalId,
     });
     const downstreamApproval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
@@ -638,16 +674,36 @@ describe('acceptance #10: two materially different scenarios, persisted and auth
       disposition: 'ACTIVE',
     }));
 
+    // --- ISSUER-POL: bootstrap ONE authorised issuer for this workspace,
+    // covering BOTH scenario A and scenario B grants below — bootstrap only
+    // satisfies a workspace's very first grant, and both scenarios share this
+    // workspace, so it cannot be bootstrapped twice. Both scenarios' plans
+    // are not persisted yet at this point, so their exact
+    // loadRequiredAuthorityScopesOrFail results cannot be pre-read; both
+    // scenarios' candidateSummaries cite the same journey (below), which is
+    // how that helper's required-scope resolution pulls in JOURNEY, so the
+    // journey/trip/traveller plus each scenario's own affected subject cover
+    // it.
+    const issuerPrincipalId = await bootstrapTestGrantIssuer(pool, seed.workspaceId, seed.actorId, NOW, [
+      { kind: 'TRAVELLER', id: traveller.travellerId },
+      { kind: 'JOURNEY', id: journeyId },
+      { kind: 'TRIP', id: tripId },
+      { kind: 'PROGRAMME_ITEM', id: programmeItemId },
+      { kind: 'OBJECTIVE', id: lossObjectiveId },
+    ]);
+
     // --- Same helper, same call sequence, zero branching on scenario kind. ---
     const resultA = await runViableScenarioToAuthorizedDispatch({
       pool, workspaceId: seed.workspaceId, actorId: seed.actorId, recoveryCaseId: openedA.caseId,
       principalId, travellerId: traveller.travellerId, tripId, journeyId, world: worldA, scenarioChange: scenarioChangeA,
       scope: [{ kind: 'PROGRAMME_ITEM', id: programmeItemId }],
+      issuerPrincipalId,
     });
     const resultB = await runViableScenarioToAuthorizedDispatch({
       pool, workspaceId: seed.workspaceId, actorId: seed.actorId, recoveryCaseId: openedB.caseId,
       principalId, travellerId: traveller.travellerId, tripId, journeyId, world: worldB, scenarioChange: scenarioChangeB,
       scope: [{ kind: 'OBJECTIVE', id: lossObjectiveId }],
+      issuerPrincipalId,
     });
 
     // --- Prove they are materially different AND both landed for real. ---

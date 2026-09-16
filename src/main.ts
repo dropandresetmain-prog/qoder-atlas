@@ -6,6 +6,15 @@
  * disruption/reset flow — see src/app/compose.ts), and serves it over HTTP.
  * No scenario-specific endpoints.
  *
+ * Runtime note (M10): `composeAppRuntime` below is the LEGACY SQLite
+ * composition — the frozen migration source per docs/AGENTS.md and the M10
+ * migration decision matrix (docs/IMPLEMENTATION_PLAN.md §14/§16), not the
+ * approved target architecture. The PostgreSQL target runtime
+ * (`composeTargetApplication`/`/api/v2/*`) is composed alongside it, opt-in,
+ * inside `composeAppRuntime` when `NORTHSTAR_ENABLE_TARGET_V2=1` — see the
+ * comment there for why the default boot path isn't flipped yet (M11 owns
+ * that controlled cutover).
+ *
  * Railway: bind `PORT` on `0.0.0.0` as early as possible so platform health
  * checks succeed while composition/seeding is still running.
  */

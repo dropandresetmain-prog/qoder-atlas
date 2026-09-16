@@ -58,6 +58,7 @@ import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/cont
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import {
+  bootstrapTestGrantIssuer,
   loadRequiredAuthorityScopesOrFail,
   prepareParams,
   persistStrategyChangeRow,
@@ -89,6 +90,8 @@ async function issueApproverGrant(
     representedPartyRef: { kind: 'TRAVELLER'; id: string };
     scopes: EnvelopeFingerprintInput['scope'];
     issuedAt?: string;
+    /** ISSUER-POL: authorised issuer (self-issuance is rejected at the command level). */
+    issuerPrincipalId: string;
   },
 ): Promise<void> {
   const idempotencyKey = randomUUID();
@@ -98,13 +101,37 @@ async function issueApproverGrant(
     idempotencyKey,
     principalId: params.principalId,
     representedPartyRef: params.representedPartyRef,
-    issuedByPrincipalId: params.principalId,
+    issuedByPrincipalId: params.issuerPrincipalId,
     issuedAt: params.issuedAt ?? NOW,
     actions: ['action.intent.dispatch', 'action.intent.authorize'],
     scopes: params.scopes,
     authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
     expectedAggregateRevisions: [],
   }));
+}
+
+/**
+ * ISSUER-POL: bootstrap one authorised issuer for a workspace, scoped to
+ * cover `decisionScope` (plus itself). The bootstrap grant's own
+ * represented-party must be a kind the authority_grants_represented_party_kind_known
+ * CHECK allows (TRAVELLER/ORGANISATION/RESPONSIBILITY_ASSIGNMENT/PRINCIPAL) —
+ * `decisionScope` often starts with something else (OBJECTIVE,
+ * PROGRAMME_ITEM, …), so the seeded traveller ref is put first explicitly and
+ * de-duplicated against decisionScope (coverage is exact-set containment, so
+ * the extra/reordered entry is harmless to the requirement check).
+ */
+async function bootstrapIssuerFor(
+  pool: import('pg').Pool,
+  workspaceId: string,
+  actorId: string,
+  travellerId: string,
+  decisionScope: EnvelopeFingerprintInput['scope'],
+): Promise<string> {
+  const representedParty = { kind: 'TRAVELLER' as const, id: travellerId };
+  return bootstrapTestGrantIssuer(pool, workspaceId, actorId, NOW, [
+    representedParty,
+    ...decisionScope.filter((r) => !(r.kind === representedParty.kind && r.id === representedParty.id)),
+  ]);
 }
 
 function emptyManifest(): WorldSnapshotManifest {
@@ -280,10 +307,12 @@ describe('acceptance #1 + #4: real M7 ActionIntent shape, objective-loss authori
     assert.equal(deniedNoApproval.allowed, false);
     if (!deniedNoApproval.allowed) assert.equal(deniedNoApproval.reason, 'APPROVALS_INCOMPLETE');
 
+    const issuerPrincipalId1 = await bootstrapIssuerFor(pool, seed.workspaceId, seed.actorId, traveller.travellerId, decisionScope);
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       scopes: decisionScope,
+      issuerPrincipalId: issuerPrincipalId1,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
@@ -405,8 +434,19 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
     const compiledIntent = plan.intents[0]!;
     assert.equal(compiledIntent.capabilityRef, 'internal:programme.schedule');
 
+    // A PROGRAMME aggregate read must be present here, not only a TRIP one:
+    // the compiler captures the intent's expected PROGRAMME revision from
+    // this manifest, and the executor no longer falls back to guessing `1`
+    // when nothing supplies one (M10 expectedProgrammeRevision hardening).
+    const baseManifestWithProgramme: WorldSnapshotManifest = {
+      ...tripBaseManifest(tripId, 1),
+      aggregateReads: [
+        ...tripBaseManifest(tripId, 1).aggregateReads,
+        { aggregateRef: { kind: 'PROGRAMME', id: programmeId }, revision: 1 },
+      ],
+    };
     await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
-      baseManifest: tripBaseManifest(tripId, 1),
+      baseManifest: baseManifestWithProgramme,
       candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
     });
     const persisted = mustOk(await persistActionPlan(uow(), {
@@ -427,10 +467,12 @@ describe('acceptance #3: programme recovery end-to-end (proposal -> candidate vi
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    const issuerPrincipalId2 = await bootstrapIssuerFor(pool, seed.workspaceId, seed.actorId, traveller.travellerId, decisionScope);
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       scopes: decisionScope,
+      issuerPrincipalId: issuerPrincipalId2,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),

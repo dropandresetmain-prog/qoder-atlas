@@ -563,8 +563,23 @@ export async function composeAppRuntime(
   const programmeService = bootProgrammeService;
   const now = clock ?? ((): IsoDateTime => new Date().toISOString());
 
-  // Optional M9 target PostgreSQL product surface (`/api/v2/*`).
-  // Opt-in only — default SQLite boot must remain credential-free and PG-free.
+  // Target PostgreSQL product surface (`/api/v2/*`) — the forward-development
+  // runtime from C4/M10 onward (docs/AGENTS.md "Current runtime versus target
+  // persistence"; docs/refactor/evidence/C4_ACCEPTANCE.md). `composeTargetApplication`/
+  // `composeTargetEndpoints` never call the legacy SQLite path (verified: no
+  // import of `persistence/database.ts` or the Sqlite*Repository classes
+  // anywhere under `src/app/target/` or `src/persistence/postgres/`).
+  //
+  // Still opt-in behind `NORTHSTAR_ENABLE_TARGET_V2` here: `composeAppRuntime`
+  // above it is the LEGACY SQLite composition — a frozen migration
+  // input/read-only compatibility source per the M10 migration decision
+  // matrix (docs/IMPLEMENTATION_PLAN.md §14/§16), retained only for existing
+  // demo/product HTTP routes that do not yet have a target-runtime
+  // equivalent, and for the M10 legacy exporter to read from. Making the
+  // target runtime the unconditional default boot path is deferred to M11's
+  // controlled cutover (docs/IMPLEMENTATION_PLAN.md §15) once that route
+  // parity gap closes — flipping it here now would silently break demo/
+  // product routes with no PG equivalent yet, not merely rename something.
   let targetV2: AppEndpoints['targetV2'];
   if ((process.env.NORTHSTAR_ENABLE_TARGET_V2 ?? '').trim() === '1') {
     const workspaceId = (process.env.PG_TARGET_WORKSPACE_ID ?? '').trim();

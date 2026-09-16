@@ -75,6 +75,7 @@ import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/cont
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import {
+  bootstrapTestGrantIssuer,
   loadRequiredAuthorityScopesOrFail,
   persistStrategyChangeRow,
   prepareParams,
@@ -107,6 +108,8 @@ async function issueApproverGrant(
     representedPartyRef: { kind: 'TRAVELLER'; id: string };
     scopes: EnvelopeFingerprintInput['scope'];
     issuedAt?: string;
+    /** ISSUER-POL: authorised issuer (self-issuance is rejected at the command level). */
+    issuerPrincipalId: string;
   },
 ): Promise<void> {
   const idempotencyKey = randomUUID();
@@ -116,7 +119,7 @@ async function issueApproverGrant(
     idempotencyKey,
     principalId: params.principalId,
     representedPartyRef: params.representedPartyRef,
-    issuedByPrincipalId: params.principalId,
+    issuedByPrincipalId: params.issuerPrincipalId,
     issuedAt: params.issuedAt ?? NOW,
     actions: ['action.intent.dispatch', 'action.intent.authorize'],
     scopes: params.scopes,
@@ -274,10 +277,29 @@ describe('acceptance #6: shared-resource strategy considers every affected Journ
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    // ISSUER-POL: one authorised issuer for this workspace's fixture, scoped
+    // to cover the decision scope the approver grant is about to target. The
+    // bootstrap grant's own represented-party must be a kind the
+    // authority_grants_represented_party_kind_known CHECK allows (TRAVELLER/
+    // ORGANISATION/RESPONSIBILITY_ASSIGNMENT/PRINCIPAL) — decisionScope's
+    // first entry is PROGRAMME_ITEM/JOURNEY, so a seeded TRAVELLER is
+    // prepended; coverage is exact-set containment so this extra entry is
+    // harmless to the requirement check below.
+    const issuerRepresentedParty = { kind: 'TRAVELLER' as const, id: travellerA.travellerId };
+    const issuerPrincipalId = await bootstrapTestGrantIssuer(
+      pool, seed.workspaceId, seed.actorId, NOW,
+      // bootstrapTestGrantIssuer uses coverageScopes[0] as the grant's own
+      // represented party, so the valid-kind ref must be first, not merely
+      // present (unionTypedRefs would re-sort it out of position).
+      [issuerRepresentedParty, ...decisionScope.filter(
+        (r) => !(r.kind === issuerRepresentedParty.kind && r.id === issuerRepresentedParty.id),
+      )],
+    );
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: travellerA.travellerId },
       scopes: decisionScope,
+      issuerPrincipalId,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
@@ -538,10 +560,21 @@ describe('acceptance #8: unsupported provider capability — planner compiles, e
       workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(),
       envelopeInput, requirements: [{ actorRole: 'CASE_OWNER' }], issuedAt: NOW,
     }));
+    // ISSUER-POL: one authorised issuer for this workspace's fixture, scoped
+    // to cover the decision scope the approver grant is about to target (see
+    // the other acceptance test's comment on the represented-party kind).
+    const issuerRepresentedParty = { kind: 'TRAVELLER' as const, id: travellerId };
+    const issuerPrincipalId = await bootstrapTestGrantIssuer(
+      pool, seed.workspaceId, seed.actorId, NOW,
+      [issuerRepresentedParty, ...decisionScope.filter(
+        (r) => !(r.kind === issuerRepresentedParty.kind && r.id === issuerRepresentedParty.id),
+      )],
+    );
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: travellerId },
       scopes: decisionScope,
+      issuerPrincipalId,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),

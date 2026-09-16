@@ -87,6 +87,7 @@ import type { AuthorityEnvelope, AuthorityDecision, Approval } from '../src/cont
 import type { AssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 import type { AuthorityGrant } from '../src/domain/v2/people/traveller.ts';
 import {
+  bootstrapTestGrantIssuer,
   loadRequiredAuthorityScopesOrFail,
   persistStrategyChangeRow,
   prepareParams,
@@ -119,6 +120,8 @@ async function issueApproverGrant(
     representedPartyRef: { kind: 'TRAVELLER'; id: string };
     scopes: EnvelopeFingerprintInput['scope'];
     issuedAt?: string;
+    /** ISSUER-POL: authorised issuer (self-issuance is rejected at the command level). */
+    issuerPrincipalId: string;
   },
 ): Promise<void> {
   const idempotencyKey = randomUUID();
@@ -128,13 +131,36 @@ async function issueApproverGrant(
     idempotencyKey,
     principalId: params.principalId,
     representedPartyRef: params.representedPartyRef,
-    issuedByPrincipalId: params.principalId,
+    issuedByPrincipalId: params.issuerPrincipalId,
     issuedAt: params.issuedAt ?? NOW,
     actions: ['action.intent.dispatch', 'action.intent.authorize'],
     scopes: params.scopes,
     authorisingReceipt: { commandNamespace: 'AUTHORITY_GRANT_ISSUED', idempotencyKey },
     expectedAggregateRevisions: [],
   }));
+}
+
+/**
+ * ISSUER-POL: bootstrap one authorised issuer for a workspace, scoped to
+ * cover `decisionScope` (plus itself). See m7m8IntegrationSeam.pgtest.ts's
+ * identical helper for why the seeded traveller ref must be placed first and
+ * de-duplicated (bootstrapTestGrantIssuer uses coverageScopes[0] as its own
+ * represented party, which must be a TRAVELLER/ORGANISATION/
+ * RESPONSIBILITY_ASSIGNMENT/PRINCIPAL kind; decisionScope here often starts
+ * with OBJECTIVE/JOURNEY_ITEM instead).
+ */
+async function bootstrapIssuerFor(
+  pool: import('pg').Pool,
+  workspaceId: string,
+  actorId: string,
+  travellerId: string,
+  decisionScope: EnvelopeFingerprintInput['scope'],
+): Promise<string> {
+  const representedParty = { kind: 'TRAVELLER' as const, id: travellerId };
+  return bootstrapTestGrantIssuer(pool, workspaceId, actorId, NOW, [
+    representedParty,
+    ...decisionScope.filter((r) => !(r.kind === representedParty.kind && r.id === representedParty.id)),
+  ]);
 }
 
 function emptyManifest(): WorldSnapshotManifest {
@@ -267,10 +293,12 @@ describe('acceptance #2: approved dispatch is blocked once more when the world c
       issuedByPrincipalId: principalId, issuedAt: NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: decisionScope,
     };
+    const issuerPrincipalId1 = await bootstrapIssuerFor(pool, seed.workspaceId, seed.actorId, traveller.travellerId, decisionScope);
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       scopes: decisionScope,
+      issuerPrincipalId: issuerPrincipalId1,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
@@ -502,10 +530,12 @@ describe('acceptance #9: unknown provider outcome on a real compiled external in
       issuedByPrincipalId: principalId, issuedAt: NOW,
       actions: ['action.intent.dispatch', 'action.intent.authorize'], scopes: decisionScope,
     };
+    const issuerPrincipalId2 = await bootstrapIssuerFor(pool, seed.workspaceId, seed.actorId, traveller.travellerId, decisionScope);
     await issueApproverGrant(uow(), {
       workspaceId: seed.workspaceId, actorId: seed.actorId, principalId,
       representedPartyRef: { kind: 'TRAVELLER', id: traveller.travellerId },
       scopes: decisionScope,
+      issuerPrincipalId: issuerPrincipalId2,
     });
     const approval = mustOk(await recordApproval(uow(), {
       workspaceId: seed.workspaceId, actorPrincipalId: principalId, idempotencyKey: randomUUID(),
