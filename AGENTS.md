@@ -119,7 +119,9 @@ The **current baseline runtime still uses SQLite** and the legacy aggregate mode
 
 The **approved target is PostgreSQL + PostGIS** behind explicit repository/unit-of-work boundaries, with relational ownership/integrity, expected revisions, idempotency receipts, durable work and typed domain tables.
 
-During M0-M10, keep current and target authority boundaries explicit. Do not dual-write routine production state unless the approved migration plan changes. M11 is the controlled switch where the target becomes the sole application authority.
+Since M10/C5, **PostgreSQL is the sole NORTHSTAR runtime.** SQLite exists only as explicit offline, read-only migration input. It is not a fallback runtime, not an alternate runtime, not a demo runtime and not a normal application runtime. `test/m10-runtime-purge.test.ts` proves the runtime import graph cannot reach it; `npm run gate:test-boundary` proves the current test suites cannot either.
+
+M11 remains the controlled operational switch where the target becomes the sole application authority.
 
 ## Anti-hardcoding
 
@@ -165,12 +167,27 @@ For long-horizon work, use `docs/work/ACTIVE_TASK.md` as working memory when the
 
 Follow `docs/TESTING.md` plus AT01-AT24/checkpoint requirements in `docs/IMPLEMENTATION_PLAN.md`.
 
-- **Implementation:** scoped checks for changed behaviour and failures.
+- **Implementation:** focused relevant unit/integration test -> focused PG seam test -> typecheck/build/lint only when relevant. Do **not** run the broad suite after every edit.
 - **Integration:** seam/conflict/new-interaction checks; reuse valid lane evidence.
 - **Review:** inspect existing evidence first; execute more only for concrete uncertainty.
-- **Candidate/cutover:** broad gates on the exact candidate/data state required by the relevant checkpoint.
+- **Candidate/cutover:** the full canonical CURRENT target gate once, on a fresh database.
 
 Never claim a check passed unless it ran successfully. Do not use paid/live provider calls in routine verification unless explicitly needed and authorised.
+
+### Test suites
+
+Every test file is classified in `test/suites.json`; commands run explicit file lists, never directory globs.
+
+| Command | What it proves | Gating |
+|---|---|---|
+| `npm test` | boundary gate + current NORTHSTAR surface (no DB, no browser) | yes |
+| `npm run test:postgres` | current PostgreSQL integration gate | yes |
+| `npm run test:migration` | M10 migration boundary, where SQLite is read-only input | yes |
+| `npm run test:legacy` | retired SQLite runtime — **NON-GATING / HISTORICAL / MANUAL ONLY** | no |
+
+`npm run gate:test-boundary` walks the real import graph and fails if a current test reaches the retired SQLite runtime, `node:sqlite` or `src/migration/**`, or if any test file is unclassified.
+
+**Historical SQLite runtime failures are never a release blocker and are not current product correctness.** Do not run `test:legacy` during normal implementation and do not repair what it reports unless you were explicitly assigned historical/migration investigation.
 
 ## Issue and scope discipline
 

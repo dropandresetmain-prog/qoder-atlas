@@ -11,7 +11,12 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "dev": "node src/main.ts",
-    "test": "node --test --test-concurrency=1",
+    "test": "npm run gate:test-boundary && node scripts/run-suite.mjs current",
+    "test:current": "node scripts/run-suite.mjs current",
+    "test:migration": "node scripts/run-suite.mjs migration",
+    "test:legacy": "node scripts/run-suite.mjs legacy",
+    "test:suites": "node scripts/test-boundary-gate.mjs --report",
+    "gate:test-boundary": "node scripts/test-boundary-gate.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "acceptance:preflight": "node --experimental-strip-types scripts/acceptance-preflight.ts --manifest fixtures/acceptance/manifests/s1-airline-schedule-change.json",
@@ -20,7 +25,7 @@
     "gate:anti-hardcoding": "node scripts/anti-hardcoding-gate.mjs",
     "db:postgres:up": "docker compose -f docker-compose.postgres-test.yml up -d --wait",
     "db:postgres:down": "docker compose -f docker-compose.postgres-test.yml down -v",
-    "test:postgres": "node --test --test-concurrency=1 postgres-integration/*.pgtest.ts"
+    "test:postgres": "node scripts/run-suite.mjs postgres"
   },
   "dependencies": {
     "pg": "^8.23.0",

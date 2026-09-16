@@ -5,12 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+# PostgreSQL is the sole NORTHSTAR runtime. CI runs the CURRENT_TARGET and
+# MIGRATION_BOUNDARY suites only. The retired SQLite application runtime
+# (`npm run test:legacy`) is HISTORICAL / NON-GATING and is deliberately never
+# run here — see docs/TESTING.md "Suite classification".
 jobs:
   verify:
     runs-on: ubuntu-latest
-    # The authoritative full-suite run is serial (see docs/TESTING.md), so the
-    # test step is the long pole; this only guards against a hung browser.
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -21,16 +23,58 @@ jobs:
 
       - run: npm ci
 
-      # The e2e suite drives a real Chromium against the in-process server.
-      # `npm ci` installs the playwright library but not its browser build.
-      - run: npx playwright install --with-deps chromium
-
       - run: npm run typecheck
 
       - run: npm run lint
 
+      # Fails if any test file is unclassified, or if a current test reaches
+      # the retired SQLite runtime / node:sqlite / src/migration.
+      - run: npm run gate:test-boundary
+
+      # Default current NORTHSTAR surface: no database, no browser.
       - run: npm test
+
+      - run: npm run build
 
       - run: npm run gate:anti-hardcoding
 
       - run: npm run acceptance:secret-scan
+
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: northstar_test
+          POSTGRES_PASSWORD: northstar_test
+          POSTGRES_DB: northstar_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U northstar_test -d northstar_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      PGTEST_HOST: localhost
+      PGTEST_PORT: '55432'
+      PGTEST_DB: northstar_test
+      PGTEST_USER: northstar_test
+      PGTEST_PASSWORD: northstar_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Fresh database: the service container starts empty, so migrations run
+      # from nothing on every CI run.
+      - run: npm run test:postgres
+
+      - run: npm run test:migration

@@ -14,15 +14,63 @@ Verification is **cumulative evidence**, not a ritual where every stage reruns e
 
 Work-package test-ID assignment and model selection for implementation/review are owned by internal planning documents that are not part of this published set; this document defines **when and what to review**, not which model must do it.
 
-## Full-suite runner
+## Suite classification
 
-The authoritative full local regression run is:
+**PostgreSQL is the sole NORTHSTAR runtime.** SQLite survives only as offline, read-only migration input. The test topology encodes that: every test file under `test/**` and `postgres-integration/**` is classified into exactly one suite in [`test/suites.json`](../test/suites.json), and no command discovers tests by directory glob.
 
-```
-node --test --test-concurrency=1
-```
+| Class | Suites | Meaning | Gating? |
+|---|---|---|---|
+| `CURRENT_TARGET` | `current`, `postgres` | Current PostgreSQL/runtime/product/domain/contract/UI behaviour. Active engineering evidence. | **Yes** |
+| `MIGRATION_BOUNDARY` | `migration` | Tests that intentionally use SQLite because M10 tooling must read historical SQLite sources — read-only exporter, deterministic migration bundle, SQLite source fixtures, import/reconciliation/restore. | **Yes** |
+| `HISTORICAL_LEGACY` | `legacy` | Tests of the **retired** SQLite application runtime. Archaeology. | **No** |
 
-Unconstrained parallel execution starts every test file at once and can exhaust local browser/test-process resources, producing whole-file crashes even though the affected files pass when run on their own. Report that condition as test-runner resource contention, and rerun serially before drawing any conclusion; it is not evidence that assertions are unreliable. Assertion failures are never classified as flakiness.
+Historical legacy failures are **not** current product correctness and **never** a release blocker. Do not fix them unless you were explicitly assigned historical/migration investigation.
+
+### Commands
+
+| Command | Suite | Notes |
+|---|---|---|
+| `npm test` | boundary gate + `current` | Default NORTHSTAR surface. No database, no browser. Cannot reach retired SQLite runtime tests. |
+| `npm run test:postgres` | `postgres` | Full PostgreSQL integration gate. Needs `npm run db:postgres:up`. |
+| `npm run test:migration` | `migration` | Migration-boundary tests, including the allowed SQLite source tests. Needs PostgreSQL for the migration pgtest. |
+| `npm run test:legacy` | `legacy` | **NON-GATING / HISTORICAL / MANUAL ONLY.** Retired SQLite runtime. Needs `npx playwright install chromium`. |
+| `npm run gate:test-boundary` | — | Enforces the classification (see below). |
+| `npm run test:suites` | — | Prints the computed classification and reachability per file. |
+
+`--test-concurrency=1` is applied by the runner. Unconstrained parallel execution starts every test file at once and can exhaust local browser/test-process resources, producing whole-file crashes even though the affected files pass when run on their own. Report that condition as test-runner resource contention, and rerun serially before drawing any conclusion; it is not evidence that assertions are unreliable. Assertion failures are never classified as flakiness.
+
+### The boundary is enforced, not documented
+
+`npm run gate:test-boundary` (`scripts/test-boundary-gate.mjs`, run as the first step of `npm test`) walks the **real transitive import graph** of every test file and fails when:
+
+- a test file is not classified in `test/suites.json`, or is classified twice, or no longer exists;
+- a `CURRENT_TARGET` test reaches the retired SQLite application runtime — `src/persistence/database.ts`, `repositories.ts`, `entityStore.ts`, `src/app/{compose,runtime,bootstrap,preferenceStore,dossierStore,fxStore,eventInboxStore}.ts`;
+- a `CURRENT_TARGET` test imports `node:sqlite`;
+- a `CURRENT_TARGET` test reaches `src/migration/**` (that is what the migration suite is for).
+
+`MIGRATION_BOUNDARY` is exempt because SQLite is its input boundary. `HISTORICAL_LEGACY` is exempt because it is historical. The forbidden-module set mirrors `test/m10-runtime-purge.test.ts`, which proves the same boundary for the *runtime* import graph.
+
+Adding a test file without classifying it fails the gate rather than silently joining a suite.
+
+### Physical organisation
+
+Suites are currently separated by explicit manifest rather than by directory. Moving ~76 historical files would be large mechanical churn for no additional safety: the manifest plus the import-graph gate already make it impossible for a command or CI job to conflate the suites. Incremental physical moves (`test/legacy-sqlite/**`, `test/migration/**`) remain welcome but are not a precondition for anything.
+
+## Verification rhythm
+
+**During implementation** — focused, not broad:
+
+1. the focused relevant unit/integration test for the behaviour you changed;
+2. the focused PostgreSQL seam test for the same behaviour;
+3. typecheck/build/lint only when the change plausibly affects them.
+
+Do **not** run the broad suite after every edit. Using broad suites as the debugging loop is the failure mode this topology exists to prevent.
+
+**At a coherent checkpoint** — the appropriate broader PostgreSQL gate for what changed.
+
+**Final candidate** — the full canonical CURRENT target gate once, on a **fresh database**: `npm test`, `npm run test:postgres`, `npm run test:migration`, build, typecheck, lint, `gate:anti-hardcoding`, and a normal PostgreSQL boot smoke.
+
+`npm run test:legacy` is never part of acceptance.
 
 ## Test IDs
 

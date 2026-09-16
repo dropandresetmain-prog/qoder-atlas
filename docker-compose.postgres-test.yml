@@ -1,5 +1,5 @@
-# Isolated PostgreSQL + PostGIS instance for M1 persistence-foundation
-# integration tests. Never used by the default SQLite runtime composition.
+# Isolated PostgreSQL + PostGIS instance for the NORTHSTAR integration suites
+# (`npm run test:postgres`, `npm run test:migration`).
 #
 # Usage:
 #   docker compose -f docker-compose.postgres-test.yml up -d
