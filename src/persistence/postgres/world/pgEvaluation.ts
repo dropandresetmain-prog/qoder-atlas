@@ -29,11 +29,26 @@ export interface EvaluationRun {
 
 export async function evaluateImpact(
   pool: Pool,
-  params: { workspaceId: string; focus: TypedRef[]; now: Instant; registry: EvaluatorRegistry; persist?: { actorId: string } },
+  params: {
+    workspaceId: string;
+    focus: TypedRef[];
+    now: Instant;
+    registry: EvaluatorRegistry;
+    persist?: { actorId: string };
+    /**
+     * R0: assess only the focus Journeys instead of every Journey the capture
+     * reached. A per-subject baseline uses this so each assessment's manifest
+     * is bound to its own subject's closure — the same shape the reassessment
+     * worker produces — rather than to whichever slice it happened to share.
+     */
+    assessFocusOnly?: boolean;
+  },
 ): Promise<EvaluationRun> {
   const world = await captureWorld(pool, { workspaceId: params.workspaceId, focus: params.focus, at: params.now, informationTopics: params.registry.informationTopics });
   const effective = projectEffectiveWorld(world);
+  const focusJourneyIds = new Set(params.focus.filter((f) => f.kind === 'JOURNEY').map((f) => f.id));
   const assessments = [...world.journeys]
+    .filter((journey) => !params.assessFocusOnly || focusJourneyIds.has(journey.id))
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((journey) => assessSubject({ registry: params.registry, world, effective, subject: { kind: 'JOURNEY', id: journey.id }, now: params.now, assessmentId: randomUUID() }).result);
   if (params.persist) {

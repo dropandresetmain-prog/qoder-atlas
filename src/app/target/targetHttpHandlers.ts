@@ -147,6 +147,8 @@ export async function handleTargetProductHttp(
         kind: ctx.app.kind,
         workspaceId: ctx.app.workspaceId,
         sqliteAuthoritativeFallback: ctx.app.sqliteAuthoritativeFallback,
+        // R0: what is actually running, from the one runtime-services root.
+        runtimeServices: ctx.app.runtimeServices?.health() ?? [],
       });
       return true;
     }

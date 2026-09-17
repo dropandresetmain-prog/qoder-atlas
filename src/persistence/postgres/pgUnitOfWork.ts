@@ -73,14 +73,33 @@ export class PgUnitOfWork implements UnitOfWork {
   private readonly pool: Pool;
   private readonly workspaceId: string;
   private readonly maxSerializationRetries: number;
+  /**
+   * R0 consequence provenance (migration 0124): when set, every transaction
+   * this unit of work runs carries the transaction-local setting
+   * `northstar.change_signal_id`, which `change_records` and the M6
+   * reassessment-enqueue trigger record. Nothing else in the command
+   * protocol changes; commands do not need to know they run under a signal.
+   */
+  private readonly changeSignalId: string | undefined;
 
-  constructor(pool: Pool, workspaceId: string, maxSerializationRetries: number = DEFAULT_MAX_SERIALIZATION_RETRIES) {
+  constructor(
+    pool: Pool,
+    workspaceId: string,
+    maxSerializationRetries: number = DEFAULT_MAX_SERIALIZATION_RETRIES,
+    options: { changeSignalId?: string } = {},
+  ) {
     this.pool = pool;
     this.workspaceId = workspaceId;
     this.maxSerializationRetries = maxSerializationRetries;
+    this.changeSignalId = options.changeSignalId;
     this.heads = new PgAggregateHeadReader(pool, workspaceId);
     this.idempotency = new PgIdempotencyLedger();
     this.scopes = new PgScopeGenerationLedger(workspaceId);
+  }
+
+  /** A unit of work whose commands execute as consequences of `changeSignalId` (see migration 0124). */
+  underChangeSignal(changeSignalId: string): PgUnitOfWork {
+    return new PgUnitOfWork(this.pool, this.workspaceId, this.maxSerializationRetries, { changeSignalId });
   }
 
   async execute<T>(envelope: DomainCommandEnvelope, fn: ExecuteFn<T>): Promise<ExecuteOutcome<T>> {
@@ -134,6 +153,11 @@ export class PgUnitOfWork implements UnitOfWork {
     fn: ExecuteFn<T>,
   ): Promise<ExecuteOutcome<T>> {
     const commandNamespace = envelope.commandType;
+    if (this.changeSignalId !== undefined) {
+      // Transaction-local (is_local = true): cleared at COMMIT/ROLLBACK, so a
+      // pooled connection never leaks a signal into an unrelated command.
+      await client.query("SELECT set_config('northstar.change_signal_id', $1, true)", [this.changeSignalId]);
+    }
     await client.query('SELECT pg_advisory_xact_lock($1)', [
       idempotencyLockKey(envelope.workspaceId, commandNamespace, envelope.idempotencyKey).toString(),
     ]);

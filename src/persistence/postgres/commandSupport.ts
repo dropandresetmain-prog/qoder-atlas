@@ -135,8 +135,8 @@ export async function appendAuditTrail(params: {
     await client.query(
       `INSERT INTO change_records
          (workspace_id, command_namespace, idempotency_key, actor_principal_id, represented_party_id,
-          subject_kind, subject_id, before_revision, after_revision, evidence_refs, reason)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          subject_kind, subject_id, before_revision, after_revision, evidence_refs, reason, change_signal_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, northstar_current_change_signal())`,
       [
         params.envelope.workspaceId,
         params.envelope.commandType,

@@ -20,11 +20,9 @@ import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
 import { createM6Registry } from '../resolution/evaluation/registry.ts';
 import { assessSubject } from '../resolution/evaluation/assess.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
-import {
-  startReassessmentDrainLoop,
-  type ReassessmentPipeline,
-} from '../persistence/postgres/world/pgAssessments.ts';
+import type { ReassessmentPipeline } from '../persistence/postgres/world/pgAssessments.ts';
 import type { Pool } from '../persistence/postgres/pool.ts';
+import { composeRuntimeServices, createReassessmentService } from './runtimeServices.ts';
 
 export interface TargetBootConfig {
   environment: AppConfig['environment'];
@@ -76,11 +74,6 @@ export interface ComposedTargetBoot {
 
 export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): Promise<ComposedTargetBoot> {
   const config = loadTargetBootConfig(env);
-  // `composeTargetApplication`'s own startReassessmentWorker option needs the
-  // pipeline at composition time, but the pipeline needs the pool that
-  // composition itself produces — compose without it, then drain the already-
-  // constructed `reassessmentWorker` on the idle cadence (same loop
-  // `composeTargetApplication` starts internally).
   const endpoints = await composeTargetEndpoints({ workspaceId: config.workspaceId, env });
   // Idempotent boot-time provisioning (same category as composeTargetRuntime
   // already running schema migrations at boot) — not a data/authority
@@ -126,15 +119,34 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
     console.log(`[atlas] baseline evaluation assessed ${baseline.evaluated} journeys ${JSON.stringify(baseline.verdicts)}`);
   }
 
+  // Background workers: one composition root, one lifecycle, one health
+  // surface (src/app/runtimeServices.ts). The reassessment service enqueues
+  // clock-expiry work and drains runnable work on every wake.
   const pipeline = buildReassessmentPipeline(endpoints.app.pool);
-  const stopDrain = startReassessmentDrainLoop(endpoints.app.reassessmentWorker, pipeline, {
-    workspaceId: config.workspaceId,
-  });
+  const services = composeRuntimeServices([
+    createReassessmentService({
+      worker: endpoints.app.reassessmentWorker,
+      pipeline,
+      workspaceId: config.workspaceId,
+      onWake(wake) {
+        if (wake.error) {
+          console.error(`[atlas] reassessment wake failed: ${wake.error}`);
+        } else if (wake.drain && wake.drain.processed > 0) {
+          console.log(
+            `[atlas] reassessment drained ${wake.drain.processed} unit(s) in ${wake.drain.elapsedMs}ms ` +
+              `(${wake.drain.stoppedReason}; due=${wake.dueEnqueued}; outcomes=${JSON.stringify(wake.drain.outcomes)})`,
+          );
+        }
+      },
+    }),
+  ]);
+  endpoints.app.runtimeServices = services;
+  services.start();
   return {
     config,
     endpoints,
     async close() {
-      stopDrain();
+      services.stop();
       await endpoints.close();
     },
   };

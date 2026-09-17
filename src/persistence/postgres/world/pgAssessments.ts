@@ -86,7 +86,7 @@ async function latestAssessmentId(client: Pool | PoolClient, workspaceId: string
   return result.rows[0]?.id ?? null;
 }
 
-async function manifestStillCurrent(client: PoolClient, workspaceId: string, manifest: WorldSnapshotManifest): Promise<boolean> {
+async function manifestStaleness(client: PoolClient, workspaceId: string, manifest: WorldSnapshotManifest): Promise<{ current: boolean; reasons: StalenessReason[] }> {
   const heads = await client.query<{ kind: string; id: string; revision: string }>(
     `SELECT ds.kind, h.aggregate_id AS id, h.revision FROM aggregate_heads h JOIN domain_subjects ds ON ds.workspace_id = h.workspace_id AND ds.id = h.aggregate_id
       WHERE h.workspace_id = $1 AND h.aggregate_id = ANY($2::uuid[])`,
@@ -105,7 +105,7 @@ async function manifestStillCurrent(client: PoolClient, workspaceId: string, man
     },
     manifest.evaluatedAt,
   );
-  return verdict.current;
+  return { current: verdict.current, reasons: verdict.reasons };
 }
 
 /** Persists a result as the new latest assessment of its subject+kind. */
@@ -227,16 +227,22 @@ export async function currentAssessmentView(
   return { status: open ? 'PENDING_REASSESSMENT' : 'STALE', assessment, staleness: verdict.reasons, ...(openWork ? { openWork } : {}) };
 }
 
-/** Enqueues CLOCK_EXPIRY work for every latest assessment due at `now` (catches up after downtime). */
-export async function enqueueDueReassessments(pool: Pool, now: Instant): Promise<number> {
+/**
+ * Enqueues CLOCK_EXPIRY work for every latest assessment due at `now` (catches
+ * up after downtime). Optionally bounded to one workspace. Called on every
+ * worker wake by the runtime drain loop (R0): time alone can stale an
+ * assessment, so time alone must be able to schedule its reassessment.
+ */
+export async function enqueueDueReassessments(pool: Pool, now: Instant, workspaceId?: string): Promise<number> {
   const result = await pool.query(
     `INSERT INTO scheduled_reassessments (workspace_id, subject_kind, subject_id, assessment_kind, reason, cause_assessment_id, invalidate_at, next_run_at)
      SELECT a.workspace_id, a.subject_kind, a.subject_id, a.kind, 'CLOCK_EXPIRY', a.id, a.next_invalidation_at, $1::timestamptz
        FROM assessments a
       WHERE a.next_invalidation_at IS NOT NULL AND a.next_invalidation_at <= $1::timestamptz
+        AND ($2::uuid IS NULL OR a.workspace_id = $2::uuid)
         AND NOT EXISTS (SELECT 1 FROM assessments s WHERE s.workspace_id = a.workspace_id AND s.supersedes_assessment_id = a.id)
      ON CONFLICT (workspace_id, subject_kind, subject_id, assessment_kind) WHERE state IN ('PENDING', 'CLAIMED') DO NOTHING`,
-    [now],
+    [now, workspaceId ?? null],
   );
   return result.rowCount ?? 0;
 }
@@ -250,6 +256,8 @@ export interface ReassessmentClaim {
   attempts: number;
   claimToken: string;
   fencingToken: number;
+  /** The change signal whose consequence opened this unit of work (migration 0124), when known. */
+  changeSignalId: string | null;
 }
 
 /** Produces a fresh AssessmentResult for a claimed subject (capture -> project -> evaluate). */
@@ -309,7 +317,7 @@ export class PgReassessmentWorker {
 
   async claim(now: Instant, workspaceId?: string): Promise<ReassessmentClaim | undefined> {
     const claimToken = randomUUID();
-    const result = await this.pool.query<{ id: string; workspace_id: string; subject_kind: string; subject_id: string; assessment_kind: string; reason: string; attempts: number; fencing_token: string }>(
+    const result = await this.pool.query<{ id: string; workspace_id: string; subject_kind: string; subject_id: string; assessment_kind: string; reason: string; attempts: number; fencing_token: string; change_signal_id: string | null }>(
       `UPDATE scheduled_reassessments
           SET state = 'CLAIMED', claim_token = $1, fencing_token = fencing_token + 1, attempts = attempts + 1,
               lease_expires_at = $2::timestamptz + ($3 * interval '1 second'), updated_at = now()
@@ -320,7 +328,7 @@ export class PgReassessmentWorker {
            ORDER BY next_run_at, id
            FOR UPDATE SKIP LOCKED
            LIMIT 1)
-        RETURNING id, workspace_id, subject_kind, subject_id, assessment_kind, reason, attempts, fencing_token`,
+        RETURNING id, workspace_id, subject_kind, subject_id, assessment_kind, reason, attempts, fencing_token, change_signal_id`,
       [claimToken, now, this.leaseSeconds, workspaceId ?? null],
     );
     const row = result.rows[0];
@@ -328,6 +336,7 @@ export class PgReassessmentWorker {
     return {
       id: row.id, workspaceId: row.workspace_id, subject: { kind: row.subject_kind as SubjectKind, id: row.subject_id },
       kind: row.assessment_kind as AssessmentKind, reason: row.reason, attempts: row.attempts, claimToken, fencingToken: Number(row.fencing_token),
+      changeSignalId: row.change_signal_id,
     };
   }
 
@@ -376,12 +385,23 @@ export class PgReassessmentWorker {
       // An input may have changed after the pipeline captured its world: that change's
       // trigger coalesced into this (then still open) claim. Re-check inside this
       // transaction and leave durable work behind rather than a silently stale latest.
-      if (!(await manifestStillCurrent(client, claim.workspaceId, result.manifest))) {
+      const stale = await manifestStaleness(client, claim.workspaceId, result.manifest);
+      if (!stale.current) {
+        // The trigger that raised the mid-flight change coalesced into this
+        // (then open) claim and its signal was dropped with it; recover the
+        // provenance from the newest change record on a stale aggregate.
+        const staleAggregateIds = stale.reasons.flatMap((r) => (r.kind === 'AGGREGATE_ADVANCED' || r.kind === 'AGGREGATE_MISSING' ? [r.aggregateRef.id] : []));
+        const latestSignal = staleAggregateIds.length === 0 ? undefined : await client.query<{ change_signal_id: string | null }>(
+          `SELECT change_signal_id FROM change_records
+            WHERE workspace_id = $1 AND subject_id = ANY($2::uuid[]) AND change_signal_id IS NOT NULL
+            ORDER BY occurred_at DESC LIMIT 1`,
+          [claim.workspaceId, staleAggregateIds],
+        );
         await client.query(
-          `INSERT INTO scheduled_reassessments (workspace_id, subject_kind, subject_id, assessment_kind, reason, cause_assessment_id, cause_input_key)
-           VALUES ($1, $2, $3, $4, 'INPUT_CHANGED', $5, 'changed-during-reassessment')
+          `INSERT INTO scheduled_reassessments (workspace_id, subject_kind, subject_id, assessment_kind, reason, cause_assessment_id, cause_input_key, change_signal_id)
+           VALUES ($1, $2, $3, $4, 'INPUT_CHANGED', $5, 'changed-during-reassessment', $6)
            ON CONFLICT (workspace_id, subject_kind, subject_id, assessment_kind) WHERE state IN ('PENDING', 'CLAIMED') DO NOTHING`,
-          [claim.workspaceId, claim.subject.kind, claim.subject.id, claim.kind, result.id],
+          [claim.workspaceId, claim.subject.kind, claim.subject.id, claim.kind, result.id, latestSignal?.rows[0]?.change_signal_id ?? null],
         );
       }
       await client.query('COMMIT');
@@ -426,6 +446,11 @@ export class PgReassessmentWorker {
     );
     if ((result.rowCount ?? 0) === 0) return 'FENCED';
     return exhausted ? 'UNAVAILABLE' : 'RETRY_SCHEDULED';
+  }
+
+  /** Schedules CLOCK_EXPIRY work due at `now` (see `enqueueDueReassessments`). */
+  async enqueueDue(now: Instant, workspaceId?: string): Promise<number> {
+    return enqueueDueReassessments(this.pool, now, workspaceId);
   }
 
   /** Claims and processes at most one unit of work. */
@@ -529,6 +554,17 @@ export interface ReassessmentDrainLoopOptions {
   maxMs?: number;
   concurrency?: number;
   now?: () => Instant;
+  /** Enqueue CLOCK_EXPIRY work due at each wake before draining (default true). */
+  enqueueDue?: boolean;
+  /** Observes every wake; the runtime services layer records health from it. Never throws into the loop. */
+  observe?: (wake: ReassessmentWake) => void;
+}
+
+export interface ReassessmentWake {
+  at: Instant;
+  dueEnqueued: number;
+  drain?: ReassessmentDrainResult;
+  error?: string;
 }
 
 /**
@@ -543,23 +579,35 @@ export function startReassessmentDrainLoop(
   options: ReassessmentDrainLoopOptions = {},
 ): () => void {
   const pollMs = options.pollMs ?? REASSESSMENT_IDLE_POLL_MS;
+  const enqueueDue = options.enqueueDue ?? true;
   let inFlight = false;
   let stopped = false;
-  const timer = setInterval(() => {
-    if (stopped || inFlight) return;
-    inFlight = true;
+  const wake = async (): Promise<void> => {
     const now = options.now?.() ?? new Date().toISOString();
-    void worker
-      .drainAvailable(now, pipeline, {
+    const report: ReassessmentWake = { at: now, dueEnqueued: 0 };
+    try {
+      if (enqueueDue) report.dueEnqueued = await worker.enqueueDue(now, options.workspaceId);
+      report.drain = await worker.drainAvailable(now, pipeline, {
         workspaceId: options.workspaceId,
         maxItems: options.maxItems ?? REASSESSMENT_DRAIN_MAX_ITEMS,
         maxMs: options.maxMs ?? REASSESSMENT_DRAIN_MAX_MS,
         concurrency: options.concurrency ?? REASSESSMENT_DRAIN_CONCURRENCY,
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        inFlight = false;
       });
+    } catch (error) {
+      report.error = error instanceof Error ? error.message : String(error);
+    }
+    try {
+      options.observe?.(report);
+    } catch {
+      // An observer fault must never stop the worker.
+    }
+  };
+  const timer = setInterval(() => {
+    if (stopped || inFlight) return;
+    inFlight = true;
+    void wake().finally(() => {
+      inFlight = false;
+    });
   }, pollMs);
   timer.unref?.();
   return () => {

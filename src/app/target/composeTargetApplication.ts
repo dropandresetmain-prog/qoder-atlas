@@ -15,11 +15,8 @@ import {
 import type { PostgresTargetConfig } from '../../persistence/postgres/config.ts';
 import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
-import {
-  PgReassessmentWorker,
-  startReassessmentDrainLoop,
-  type ReassessmentPipeline,
-} from '../../persistence/postgres/world/pgAssessments.ts';
+import { PgReassessmentWorker } from '../../persistence/postgres/world/pgAssessments.ts';
+import type { RuntimeServices } from '../runtimeServices.ts';
 import { M9_REPLAN_IDENTITY } from './replanIdentity.ts';
 import { M9_OBJECTIVE_DISPOSITION_API_EXPOSED } from './objectiveDispositionBoundary.ts';
 
@@ -28,13 +25,6 @@ export interface TargetApplicationOptions {
   actorId?: string;
   postgres?: Partial<PostgresTargetConfig>;
   env?: NodeJS.ProcessEnv;
-  /**
-   * Optional reassessment pipeline. When provided with startReassessmentWorker,
-   * the worker drains runnable work each idle poll instead of one claim per wake.
-   */
-  reassessmentPipeline?: ReassessmentPipeline;
-  startReassessmentWorker?: boolean;
-  reassessmentPollMs?: number;
 }
 
 export interface TargetApplication {
@@ -44,6 +34,14 @@ export interface TargetApplication {
   runtime: TargetRuntime;
   unitOfWork(): PgUnitOfWork;
   reassessmentWorker: PgReassessmentWorker;
+  /**
+   * Background workers (R0): composed and started by the boot root
+   * (`composeTargetBoot` -> `src/app/runtimeServices.ts`), never here —
+   * composition stays harness-agnostic and there is exactly one place a
+   * worker loop can be started. Absent in test compositions that drive the
+   * worker directly. `/api/v2/health` reports whatever is attached.
+   */
+  runtimeServices?: RuntimeServices;
   replanIdentity: typeof M9_REPLAN_IDENTITY;
   objectiveDispositionApiExposed: typeof M9_OBJECTIVE_DISPOSITION_API_EXPOSED;
   /** True when this process must not use SQLite for authoritative product paths. */
@@ -62,14 +60,6 @@ export async function composeTargetApplication(
   const actorId = options.actorId ?? `m9-app:${options.workspaceId}`;
   const reassessmentWorker = new PgReassessmentWorker(runtime.pool, { actorId });
 
-  let stopDrain: (() => void) | undefined;
-  if (options.startReassessmentWorker && options.reassessmentPipeline) {
-    stopDrain = startReassessmentDrainLoop(reassessmentWorker, options.reassessmentPipeline, {
-      workspaceId: options.workspaceId,
-      pollMs: options.reassessmentPollMs,
-    });
-  }
-
   return {
     kind: 'TARGET_POSTGRES',
     workspaceId: options.workspaceId,
@@ -81,7 +71,6 @@ export async function composeTargetApplication(
     objectiveDispositionApiExposed: M9_OBJECTIVE_DISPOSITION_API_EXPOSED,
     sqliteAuthoritativeFallback: false,
     async close() {
-      stopDrain?.();
       await runtime.close();
     },
   };
