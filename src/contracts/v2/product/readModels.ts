@@ -222,6 +222,19 @@ export const OperatorOverviewSchema = z.strictObject({
     /** Subjects holding no current assessment — honest, not counted as ready. */
     notAssessed: z.number().int().min(0),
   }),
+  /**
+   * Aggregate assessment lifecycle over `population` (FIG-7).
+   *
+   * `RECONCILING` means at least one in-scope subject currently reports
+   * `PENDING_REASSESSMENT` — open scheduled reassessment work, not a guessed
+   * timer. Presentation may hold the last SETTLED snapshot while this is
+   * RECONCILING; it must not invent readiness, blast radius or affected set.
+   */
+  populationAssessmentLifecycle: z.strictObject({
+    state: z.enum(['SETTLED', 'RECONCILING']),
+    /** Subjects whose evaluation is currently PENDING_REASSESSMENT. */
+    pendingCount: z.number().int().min(0),
+  }),
   /** The event the operator is working, when the workspace holds one. */
   eventContext: z.strictObject({
     eventRef: z.string().min(1),

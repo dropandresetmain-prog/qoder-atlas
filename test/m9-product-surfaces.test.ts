@@ -47,6 +47,7 @@ function fivePersonOverview(): OperatorOverview {
     ],
     population: [],
     populationSummary: { total: 0, ready: 0, atRisk: 0, disrupted: 0, recovering: 0, unknown: 0, notAssessed: 0 },
+    populationAssessmentLifecycle: { state: 'SETTLED', pendingCount: 0 },
     ldg,
     change: changeAwareness,
   };

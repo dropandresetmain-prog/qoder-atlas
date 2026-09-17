@@ -51,6 +51,14 @@ export function projectOperatorOverview(input: OperatorOverviewFacts): OperatorO
     unknown: population.filter((entry) => entry.status === 'UNKNOWN').length,
     notAssessed: population.filter((entry) => entry.evaluation === 'NONE').length,
   };
+  // Aggregate FIG-7 lifecycle only — count subjects already carrying
+  // PENDING_REASSESSMENT from currentAssessmentView. Never infer completeness
+  // from readiness counts or timers.
+  const pendingCount = population.filter((entry) => entry.evaluation === 'PENDING_REASSESSMENT').length;
+  const populationAssessmentLifecycle = {
+    state: pendingCount > 0 ? ('RECONCILING' as const) : ('SETTLED' as const),
+    pendingCount,
+  };
   const ldg = projectLiveDependencyGraph({
     ...input,
     scope: 'DASHBOARD',
@@ -61,6 +69,7 @@ export function projectOperatorOverview(input: OperatorOverviewFacts): OperatorO
     summary,
     population,
     populationSummary,
+    populationAssessmentLifecycle,
     ...(input.eventContext ? { eventContext: input.eventContext } : {}),
     ldg,
     change: buildChangeAwareness(input),

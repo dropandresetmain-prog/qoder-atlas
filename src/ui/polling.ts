@@ -2,16 +2,20 @@
  * Auto-refresh polling for the operator Overview surface.
  *
  * Renders an inline <script> that periodically fetches the authoritative
- * HTML shell for the Overview and swaps the <main> and topbar regions
- * wholesale. No business logic, no status inference — the server response
- * wins completely.
+ * HTML shell for the Overview. No business logic, no status inference —
+ * readiness/affected-set truth comes only from authoritative snapshots.
+ *
+ * Presentation rules (Founder T2):
+ * - While `data-assessment-lifecycle="RECONCILING"` (backend aggregate of
+ *   PENDING_REASSESSMENT subjects), hold the last SETTLED DOM and show the
+ *   quiet reconciling indicator. Do not paint transient UNKNOWN collapses.
+ * - When SETTLED, swap only if `data-stable-revision` (projectionRevision)
+ *   changed. Unchanged settled polls must not visibly redraw.
  *
  * Cursor note: the JSON OperatorOverview view exposes changeCursor and
- * changedVisibleRefs, but the HTML rendering path (renderInShell →
- * renderPage → renderProductOperatorOverview) does NOT embed the cursor
- * in the markup. Rather than build a JSON+HTML hybrid, this script does
- * plain full fetches without sinceCursor. The server always returns the
- * complete authoritative snapshot, so this is truthful and correct.
+ * changedVisibleRefs, but the HTML rendering path embeds stable-revision +
+ * assessment-lifecycle markers instead. Plain full fetches remain truthful;
+ * sinceCursor is not required for the hold/skip-swap behaviour.
  */
 
 /**
@@ -37,6 +41,11 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
   var inFlight = false;
   var pollUrl = '/api/v2/operator/overview?format=html';
 
+  // Last SETTLED snapshot's stable revision that was applied to the DOM.
+  // Used only to skip no-op redraws — never to invent readiness.
+  var lastAppliedRevision = marker.getAttribute('data-stable-revision');
+  var lastAppliedLifecycle = marker.getAttribute('data-assessment-lifecycle') || 'SETTLED';
+
   // The simulated-airline-update trigger's last response-derived status text
   // (set only from real HTTP outcomes of the operator's own click). It is
   // re-applied to the fresh DOM after each swap so the operator's latest
@@ -51,6 +60,13 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
     if (status) status.textContent = lastTriggerStatus;
     var button = box ? box.querySelector('[data-test="simulated-airline-update-apply"]') : null;
     if (button && triggerApplyInFlight) button.disabled = true;
+  }
+
+  function setReconcilingIndicator(active) {
+    var el = document.querySelector('[data-test="overview-reconciling"]');
+    if (!el) return;
+    if (active) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
   }
 
   function swapRegions(doc) {
@@ -99,10 +115,42 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
         var doc = parser.parseFromString(html, 'text/html');
         var parsedMain = doc.querySelector('main[data-test="product-operator-overview"]');
         if (!parsedMain) throw new Error('No overview main in response');
+
+        var lifecycle = parsedMain.getAttribute('data-assessment-lifecycle') || 'SETTLED';
+        var revision = parsedMain.getAttribute('data-stable-revision');
+
+        // Authoritative RECONCILING: hold the last SETTLED presentation and
+        // surface only the lifecycle indicator. Do not paint partial UNKNOWN
+        // readiness collapses while reassessment work is open.
+        if (lifecycle === 'RECONCILING') {
+          setReconcilingIndicator(true);
+          lastAppliedLifecycle = 'RECONCILING';
+          applyTriggerStatus();
+          var held = document.querySelector('main[data-test="product-operator-overview"]');
+          if (held) held.classList.remove('is-stale');
+          return;
+        }
+
+        // SETTLED + same stable revision as last applied paint → no DOM swap.
+        if (
+          lastAppliedLifecycle === 'SETTLED' &&
+          revision !== null &&
+          lastAppliedRevision !== null &&
+          revision === lastAppliedRevision
+        ) {
+          setReconcilingIndicator(false);
+          applyTriggerStatus();
+          var same = document.querySelector('main[data-test="product-operator-overview"]');
+          if (same) same.classList.remove('is-stale');
+          return;
+        }
+
         swapRegions(doc);
         restoreProfileMenuState(profileWasOpen);
         applyTriggerStatus();
-        // Clear stale marker if it was set from a prior failure.
+        setReconcilingIndicator(false);
+        lastAppliedRevision = revision;
+        lastAppliedLifecycle = 'SETTLED';
         var m = document.querySelector('main[data-test="product-operator-overview"]');
         if (m) m.classList.remove('is-stale');
       })

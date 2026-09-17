@@ -60,6 +60,10 @@ class StubElement {
     this.attrs.set(name, String(value));
   }
 
+  removeAttribute(name: string): void {
+    this.attrs.delete(name);
+  }
+
   querySelector(sel: string): StubElement | null {
     for (const c of this.children) {
       if (matchFull(c, sel)) return c;
@@ -221,10 +225,22 @@ function matchFull(el: StubElement, sel: string): boolean {
 
 // ── Test environment ────────────────────────────────────────────────────────
 
-function responseHTML(opts: { disclosureOpen?: boolean; statusText?: string } = {}): string {
+function responseHTML(opts: {
+  disclosureOpen?: boolean;
+  statusText?: string;
+  lifecycle?: 'SETTLED' | 'RECONCILING';
+  pendingCount?: number;
+  revision?: string;
+  readyCount?: string;
+} = {}): string {
   const openAttr = opts.disclosureOpen ? ' open' : '';
   const statusText = opts.statusText ?? '';
-  return `<main data-test="product-operator-overview"><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply">Apply</button></details></main><header class="topbar">Nav</header>`;
+  const lifecycle = opts.lifecycle ?? 'SETTLED';
+  const pending = opts.pendingCount ?? 0;
+  const revision = opts.revision ?? '1';
+  const ready = opts.readyCount ?? '50';
+  const reconcilingHidden = lifecycle === 'RECONCILING' ? '' : ' hidden';
+  return `<main data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle}" data-assessment-pending-count="${pending}" data-stable-revision="${revision}"><p data-test="overview-reconciling"${reconcilingHidden}>Reconciling changes…</p><div data-test="ready-count">${ready}</div><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply">Apply</button></details></main><header class="topbar">Nav</header>`;
 }
 
 interface TriggerResponseShape {
@@ -247,10 +263,30 @@ interface Env {
   intervals: Array<{ cb: () => void; ms: number }>;
 }
 
-function createEnv(domOpts: { disclosureOpen?: boolean; statusText?: string } = {}): Env {
+function createEnv(domOpts: {
+  disclosureOpen?: boolean;
+  statusText?: string;
+  lifecycle?: 'SETTLED' | 'RECONCILING';
+  pendingCount?: number;
+  revision?: string;
+  readyCount?: string;
+} = {}): Env {
   // Build initial DOM.
   const doc = new StubElement('document');
-  const main = new StubElement('main', { 'data-test': 'product-operator-overview' });
+  const lifecycle = domOpts.lifecycle ?? 'SETTLED';
+  const main = new StubElement('main', {
+    'data-test': 'product-operator-overview',
+    'data-assessment-lifecycle': lifecycle,
+    'data-assessment-pending-count': String(domOpts.pendingCount ?? 0),
+    'data-stable-revision': domOpts.revision ?? '1',
+  });
+  const reconciling = new StubElement('p', { 'data-test': 'overview-reconciling' });
+  if (lifecycle !== 'RECONCILING') reconciling.setAttribute('hidden', '');
+  reconciling.text = 'Reconciling changes…';
+  main.appendChild(reconciling);
+  const ready = new StubElement('div', { 'data-test': 'ready-count' });
+  ready.text = domOpts.readyCount ?? '50';
+  main.appendChild(ready);
   const detailsAttrs: Record<string, string> = {
     'data-test': 'simulated-airline-update',
     'data-configured': 'true',
@@ -271,7 +307,12 @@ function createEnv(domOpts: { disclosureOpen?: boolean; statusText?: string } = 
   doc.appendChild(topbar);
 
   const win: WindowStub = {};
-  let overviewHTML = responseHTML();
+  let overviewHTML = responseHTML({
+    lifecycle: domOpts.lifecycle,
+    pendingCount: domOpts.pendingCount,
+    revision: domOpts.revision,
+    readyCount: domOpts.readyCount,
+  });
   let triggerResp = { ok: true, status: 200, raw: '{}' };
 
   const fetchStub = (url: string) => {
@@ -345,9 +386,9 @@ test('setInterval captures default 2000ms interval', () => {
 });
 
 test('Scenario A: user-opened disclosure survives the main swap', async () => {
-  const env = createEnv({ disclosureOpen: true });
-  // Response HTML has details WITHOUT open attribute.
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false }));
+  const env = createEnv({ disclosureOpen: true, revision: '1' });
+  // Response HTML has details WITHOUT open attribute; new revision forces apply.
+  env.setOverviewHTML(responseHTML({ disclosureOpen: false, revision: '2' }));
   env.window.__northstarRefreshOverview!();
   await flush();
   const details = env.doc.querySelector('[data-test="simulated-airline-update"]');
@@ -356,14 +397,14 @@ test('Scenario A: user-opened disclosure survives the main swap', async () => {
 });
 
 test('Scenario B1: APPLIED status re-applied after swap', async () => {
-  const env = createEnv({ disclosureOpen: true });
+  const env = createEnv({ disclosureOpen: true, revision: '1' });
   // Simulate click on apply button.
   const button = env.doc.querySelector('[data-test="simulated-airline-update-apply"]')!;
   env.doc.dispatchEvent({ type: 'click', target: button, preventDefault() {} });
   // Trigger response: APPLIED.
   env.setTriggerResponse({ ok: true, status: 200, body: { status: 'APPLIED' } });
   // Overview response (from refresh after apply) has empty status text.
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: '' }));
+  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: '', revision: '2' }));
   await flush();
   const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
   assert.ok(status);
@@ -374,11 +415,11 @@ test('Scenario B1: APPLIED status re-applied after swap', async () => {
 });
 
 test('Scenario B2: ALREADY_APPLIED status re-applied after swap', async () => {
-  const env = createEnv({ disclosureOpen: true });
+  const env = createEnv({ disclosureOpen: true, revision: '1' });
   const button = env.doc.querySelector('[data-test="simulated-airline-update-apply"]')!;
   env.doc.dispatchEvent({ type: 'click', target: button, preventDefault() {} });
   env.setTriggerResponse({ ok: true, status: 200, body: { status: 'ALREADY_APPLIED' } });
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: '' }));
+  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: '', revision: '2' }));
   await flush();
   const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
   assert.ok(status);
@@ -405,10 +446,71 @@ test('Scenario C2: no invented business state on plain refresh', async () => {
   const serverStatusText = 'Server-provided status';
   const env = createEnv({ disclosureOpen: false, statusText: 'Initial' });
   // No click — lastTriggerStatus stays null.
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: serverStatusText }));
+  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: serverStatusText, revision: '2' }));
   env.window.__northstarRefreshOverview!();
   await flush();
   const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
   assert.ok(status);
   assert.equal(status.textContent, serverStatusText, 'status must come from server HTML, not invented');
+});
+
+test('Founder defect: RECONCILING holds settled ready count (no 0 rebuild)', async () => {
+  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
+  env.setOverviewHTML(responseHTML({
+    lifecycle: 'RECONCILING',
+    pendingCount: 5,
+    revision: '11',
+    readyCount: '0',
+  }));
+  env.window.__northstarRefreshOverview!();
+  await flush();
+  const ready = env.doc.querySelector('[data-test="ready-count"]');
+  assert.ok(ready);
+  assert.equal(ready.textContent, '50', 'must hold last SETTLED ready count during RECONCILING');
+  const indicator = env.doc.querySelector('[data-test="overview-reconciling"]');
+  assert.ok(indicator);
+  assert.equal(indicator.hasAttribute('hidden'), false, 'reconciling indicator must be visible');
+});
+
+test('Founder defect: SETTLED result replaces held content once', async () => {
+  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
+  env.setOverviewHTML(responseHTML({
+    lifecycle: 'RECONCILING',
+    pendingCount: 5,
+    revision: '11',
+    readyCount: '0',
+  }));
+  env.window.__northstarRefreshOverview!();
+  await flush();
+  env.setOverviewHTML(responseHTML({
+    lifecycle: 'SETTLED',
+    pendingCount: 0,
+    revision: '12',
+    readyCount: '49',
+  }));
+  env.window.__northstarRefreshOverview!();
+  await flush();
+  const ready = env.doc.querySelector('[data-test="ready-count"]');
+  assert.ok(ready);
+  assert.equal(ready.textContent, '49', 'SETTLED snapshot must apply after reconciliation');
+  const indicator = env.doc.querySelector('[data-test="overview-reconciling"]');
+  assert.ok(indicator);
+  assert.equal(indicator.hasAttribute('hidden'), true, 'reconciling indicator must hide when SETTLED');
+});
+
+test('Founder defect: unchanged SETTLED poll does not rewrite DOM', async () => {
+  const env = createEnv({ revision: '10', readyCount: '49', lifecycle: 'SETTLED' });
+  const before = env.doc.querySelector('main[data-test="product-operator-overview"]');
+  assert.ok(before);
+  env.setOverviewHTML(responseHTML({
+    lifecycle: 'SETTLED',
+    pendingCount: 0,
+    revision: '10',
+    readyCount: '49',
+    statusText: 'Generated later',
+  }));
+  env.window.__northstarRefreshOverview!();
+  await flush();
+  const after = env.doc.querySelector('main[data-test="product-operator-overview"]');
+  assert.equal(after, before, 'identical stable revision must keep the same main node');
 });

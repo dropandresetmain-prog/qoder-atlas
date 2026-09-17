@@ -13,12 +13,15 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
   const surface = adaptOperatorOverviewToDashboard(view);
   const demoIngress = (view as { demoIngress?: { airlineRebookingConfigured?: boolean } }).demoIngress;
   const airlineConfigured = demoIngress?.airlineRebookingConfigured === true;
+  const lifecycle = view.populationAssessmentLifecycle;
+  const reconciling = lifecycle.state === 'RECONCILING';
   return `
-<main class="shell product-operator-overview" data-test="product-operator-overview">
+<main class="shell product-operator-overview" data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle.state}" data-assessment-pending-count="${lifecycle.pendingCount}" data-stable-revision="${view.change.projectionRevision}">
   <div class="page-head">
     <h1>${escapeHtml(surface.title)}</h1>
     <p class="sub">Managed travel readiness across the programme — state colour follows status meaning.</p>
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
+    <p class="sub" data-test="overview-reconciling"${reconciling ? '' : ' hidden'}>Reconciling changes…</p>
   </div>
   ${surface.summaryHtml}
   <details class="section" data-test="simulated-airline-update" data-configured="${airlineConfigured ? "true" : "false"}">

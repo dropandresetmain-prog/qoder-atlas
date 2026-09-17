@@ -64,6 +64,7 @@
       "test/northstar-v2-m8-checkpoint0-authority-gates.test.ts",
       "test/northstar-v2-m8-checkpoint0-money.test.ts",
       "test/overviewPollingSwap.test.ts",
+      "test/overviewPopulationLifecycle.test.ts",
       "test/presentation-lane.test.ts",
       "test/providerDisruptionValidation.test.ts",
       "test/providers.atlas.test.ts",
