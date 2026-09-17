@@ -109,9 +109,11 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})
  * the service's own identity — never from the provider event identity.
  *
  * Order of resolution:
- *   1. If the connection already links the replacement's recordType/externalId
- *      to a canonical TRANSPORT_SERVICE, that linked subject IS the service
- *      (a later event referencing the same real service reuses it).
+ *   1. If an external record in the workspace (any connection — the lookup is
+ *      not connection-scoped) already links the replacement's
+ *      recordType/externalId to a canonical TRANSPORT_SERVICE, that linked
+ *      subject IS the service (a later event referencing the same real service
+ *      reuses it).
  *   2. Otherwise mint deterministically from the service's schedule identity
  *      using the SAME derivation the provisioning materializer uses
  *      (`transport-service` id kind over
@@ -124,16 +126,18 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})
  *
  * Because this id can resolve to an existing transport_services row (a real
  * service being rediscovered, or this same event retrying), and Step 5 below
- * reuses that row on a create conflict, corridor/schedule safety is enforced
- * separately by a guard immediately before Step 3: when a row already exists
- * for this id, it must match the CURRENT event's original (cancelled)
- * service's origin, destination and mode, and its stored published
- * departure/arrival must match this event's stated replacement schedule.
- * A mismatch returns VALIDATION_FAILED with no mutation instead of silently
- * reusing an unrelated service.
+ * reuses that row on a create conflict, corridor/operator/schedule safety is
+ * enforced separately by the N1 guard immediately before Step 3: when a row
+ * already exists for this id, it must match the CURRENT event's original
+ * (cancelled) service's origin, destination and mode, the event's stated
+ * operator, and its stored published departure/arrival (non-null) must match
+ * this event's stated replacement schedule. A mismatch returns
+ * VALIDATION_FAILED with no mutation instead of silently reusing an unrelated
+ * service.
  *
- * The mint uses a workspace+connection-scoped minter prefix so two events in
- * the same workspace resolve identically without knowing the dataset key.
+ * The mint uses a workspace-scoped minter prefix (not connection-scoped) so
+ * two events in the same workspace resolve identically without knowing the
+ * dataset key.
  */
 async function canonicalReplacementServiceId(
   ctx: TargetCommandContext,

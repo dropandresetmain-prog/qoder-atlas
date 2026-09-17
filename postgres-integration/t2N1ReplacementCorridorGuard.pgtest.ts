@@ -1,7 +1,8 @@
 /**
  * N1 — reusing an existing replacement TransportService row requires it to
  * match the CURRENT event's original (cancelled) service on corridor (origin,
- * destination, mode) and on the event's stated replacement schedule.
+ * destination, mode), the event's stated operator, and the event's stated
+ * replacement schedule (a null stored published time never matches).
  *
  * Before this fix, `canonicalReplacementServiceId` could resolve to an
  * existing transport_services row (via external identity, or via the
@@ -12,8 +13,7 @@
  * event, and travellers from a completely different corridor would be
  * reprotected onto it.
  *
- * Both scenarios below are proven against real PostgreSQL, each in its own
- * fresh workspace:
+ * Proven against real PostgreSQL in two fresh workspaces (one per test):
  *
  *   1. Corridor mismatch: event A reprotections ID7159 (CGK->SIN, air) onto a
  *      new replacement service ID7153. Event B then reprotections TR883
@@ -22,13 +22,18 @@
  *      stating the SAME schedule as event A. VALIDATION_FAILED, zero
  *      mutation anywhere, TR883's own reservation lines untouched.
  *
- *   2. Schedule mismatch: event A reprotections a 3-traveller subset of
- *      ID7159's cohort onto ID7153 with a given schedule. Event C then
- *      reprotections the REMAINING (still-CONFIRMED) traveller of ID7159's
- *      cohort — same corridor, by construction — onto the SAME replacement
- *      external identity ID7153, but states a DIFFERENT scheduledArrival than
- *      what event A caused to be stored. VALIDATION_FAILED, zero mutation,
- *      the remaining traveller's original line untouched.
+ *   2. Same corridor, one workspace, sequential rejections: event A
+ *      reprotections a 3-traveller subset of ID7159's cohort
+ *      (IDSYN03/10/11) onto ID7153, leaving IDSYN14 and IDSYN30 CONFIRMED.
+ *      Each later event targets the SAME real original ID7159 and the SAME
+ *      replacement external identity ID7153, differing in exactly one way:
+ *        C (IDSYN14): a different scheduledArrival than the stored row;
+ *        D (IDSYN30): a different operator than the stored row;
+ *        E (IDSYN30): correct operator/schedule, but the stored row's
+ *          published_arrival has been nulled via SQL (test setup).
+ *      Each → VALIDATION_FAILED, table counts unchanged, and ID7159's
+ *      reservation lines byte-for-byte unchanged (the targeted booking's line
+ *      is resolved by its PNR and asserted still CONFIRMED).
  */
 import { before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -120,7 +125,24 @@ async function linesForService(workspaceId: string, serviceId: string): Promise<
   return rows.rows;
 }
 
-describe('N1 — replacement service reuse requires matching corridor and schedule', () => {
+/** The single reservation line on `serviceId` held by booking reference `pnr`. */
+async function lineForBooking(workspaceId: string, serviceId: string, pnr: string): Promise<LineSnapshot> {
+  const rows = await pool.query<LineSnapshot>(
+    `SELECT DISTINCT l.id, l.observed_status, l.observed_status_at::text AS observed_status_at, l.observation_evidence_id
+       FROM reservation_lines l
+       JOIN transport_line_details t ON t.workspace_id = l.workspace_id AND t.line_id = l.id
+       JOIN reservations res ON res.workspace_id = l.workspace_id AND res.id = l.reservation_id
+       JOIN external_record_links rl ON rl.workspace_id = res.workspace_id AND rl.canonical_subject_id = res.id AND rl.superseded_at IS NULL
+       JOIN external_records r ON r.workspace_id = rl.workspace_id AND r.id = rl.external_record_id
+        AND r.record_type = 'SOURCE_BOOKING_REFERENCE'
+      WHERE l.workspace_id = $1 AND t.transport_service_id = $2 AND r.external_id = $3`,
+    [workspaceId, serviceId, pnr],
+  );
+  assert.equal(rows.rowCount, 1, `exactly one line on the service for booking ${pnr}`);
+  return rows.rows[0]!;
+}
+
+describe('N1 — replacement service reuse requires matching corridor, operator and schedule', () => {
   before(async () => {
     pool = await sharedTestPool();
     dataset = await loadDataset(BUNDLE_DIR);
@@ -248,7 +270,7 @@ describe('N1 — replacement service reuse requires matching corridor and schedu
     assert.ok(original, 'original service ID7159 resolves');
 
     // -- Event A: reprotections a 3-traveller SUBSET of ID7159's cohort,
-    // leaving IDSYN14 CONFIRMED (untouched) for event C below.
+    // leaving IDSYN14 (event C) and IDSYN30 (events D, E) CONFIRMED.
     const eventA: TransportServiceCancelledWithReprotectionEvent = {
       kind: 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION',
       providerId: 'sim-airline-id',
@@ -279,8 +301,8 @@ describe('N1 — replacement service reuse requires matching corridor and schedu
     // -- Snapshot BEFORE event C: table counts + IDSYN14's own line (still CONFIRMED).
     const countsBefore = await tableCounts(workspaceId);
     const originalLinesBefore = await linesForService(workspaceId, original!.subject.id);
-    const idsyn14Before = originalLinesBefore.find((l) => l.observed_status === 'CONFIRMED');
-    assert.ok(idsyn14Before, 'IDSYN14 line is still CONFIRMED before event C');
+    const idsyn14Before = await lineForBooking(workspaceId, original!.subject.id, 'IDSYN14');
+    assert.equal(idsyn14Before.observed_status, 'CONFIRMED', 'IDSYN14 line is still CONFIRMED before event C');
 
     // -- Event C: SAME corridor (same real original service ID7159, by
     // construction), SAME replacement external identity ID7153, but a
@@ -323,11 +345,11 @@ describe('N1 — replacement service reuse requires matching corridor and schedu
     // -- Event D: SAME corridor and schedule as what event A caused to be
     // stored, but a DIFFERENT stated operator — isolating the operator
     // mismatch. Reuses this same workspace/replacement row rather than
-    // provisioning a second one (~2min each); IDSYN30 is the one ID7159
-    // booking left CONFIRMED by both event A (which only cancelled
-    // IDSYN03/10/11) and the rejected event C (zero mutation).
-    const idsyn30Before = originalLinesAfter.find((l) => l.id !== idsyn14Before!.id && l.observed_status === 'CONFIRMED');
-    assert.ok(idsyn30Before, 'IDSYN30 line is still CONFIRMED before event D');
+    // provisioning a second one (~2min each); IDSYN30 was left CONFIRMED by
+    // event A (which only cancelled IDSYN03/10/11) and is untargeted by the
+    // rejected event C.
+    const idsyn30Before = await lineForBooking(workspaceId, original!.subject.id, 'IDSYN30');
+    assert.equal(idsyn30Before.observed_status, 'CONFIRMED', 'IDSYN30 line is still CONFIRMED before event D');
 
     const mismatchedOperator = 'ZZ';
     assert.notEqual(mismatchedOperator, 'ID', 'sanity: the stated operator really differs from what is stored');
