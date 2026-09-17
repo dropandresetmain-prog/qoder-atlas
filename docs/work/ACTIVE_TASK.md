@@ -158,23 +158,56 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
     in the page-level polling script (event delegation on document), not in
     the swapped `<main>` markup — swapped-in inline scripts never execute.
 
+## Founder T2 test procedure (founder-visible, 5 minutes)
+
+1. Provision PostgreSQL 16 + PostGIS at `localhost:55432` (db/user/password
+   `northstar_test`, superuser) and ensure migrations apply.
+2. Boot the target app with the dataset and the disclosed event configured:
+   ```
+   NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026
+   NORTHSTAR_DEMO_DISRUPTION_EVENT_FILE=data/ait-demo-input-pack/scenarios/s1-supplier-disruption/inputs/airline-schedule-change-id7159.json
+   PG_TARGET_WORKSPACE_ID=<fresh uuid>
+   npm run build && node dist/main.js
+   ```
+   Boot logs the T1 baseline (67 journeys; 50 PASS / 14 UNKNOWN / 3 FAIL).
+3. Open `/operator` → Overview. Under the population, open the disclosure
+   **"Simulated airline update"** (labelled demo admin affordance, not a hero
+   button). Status reads "Ready…" when `demoIngress.airlineRebookingConfigured`
+   is true (requires a provisioning connection + the disclosed event file).
+4. Click **Apply simulated airline update**. Truthful outcomes only:
+   "Applied. Authoritative state will refresh automatically." — the overview
+   re-renders within ~2s from the next authoritative poll snapshot (no manual
+   reload). Clicking again yields "Already applied. No duplicate incident
+   created." (idempotent, 202 ALREADY_APPLIED).
+5. Expected truth after the trigger: the five disclosed travellers
+   (IDSYN14/03/10/11/30) show the replacement service (1 Oct 07:45→10:30) on
+   their journey; Sarah's Day-1 headline interview shows FAIL
+   `insufficient_arrival_readiness` (60 min available vs 150 required); the
+   four peers stay viable; the sixth co-traveller on the original service is
+   untouched. No RecoveryCase appears anywhere in the product (T3 boundary).
+6. Duplicate/restart safety: re-clicking the trigger never duplicates
+   services/bookings; restarting the app and re-reading shows identical
+   state; the same event re-delivered with different substance is refused
+   (409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH`).
+
 ## Phase checklist
 
 - [x] P0 branch from authoritative base + ledger (archived T1 ledger preserved)
-- [ ] P1 investigation + frozen contract (this ledger) — checkpoint commit
-- [ ] P2 generic provider-event union + cancellation/reprotection ingress application command
-- [ ] P3 canonical mutation path (displaced lines, replacement service, reprotection bookings/allocations) with focused tests
-- [ ] P4 focused PostgreSQL T2 test: full ingress → mutation → invalidation → real worker → Sarah FAIL / 4 peers PASS / Nadia sixth-traveller question resolved → idempotent replay → restart/re-read → no case
-- [ ] P5 HTTP handler extension + founder trigger affordance + auto-refresh polling
-- [ ] P6 affected regressions (m9DemoIngress, productBaselineWorld, typecheck/lint/build/gates) + broader PG gate once at candidate checkpoint
-- [ ] P7 final candidate commit + push; founder T2 test procedure documented
+- [x] P1 investigation + frozen contract (this ledger) — checkpoint commit
+- [x] P2 generic provider-event union + cancellation/reprotection ingress application command
+- [x] P3 canonical mutation path (displaced lines, replacement service, reprotection bookings/allocations) with focused tests
+- [x] P4 focused PostgreSQL T2 test: full ingress → mutation → invalidation → real worker → Sarah FAIL / 4 peers PASS / Nadia sixth-traveller question resolved → idempotent replay → restart/re-read → no case
+- [x] P5 HTTP handler extension + founder trigger affordance + auto-refresh polling
+- [x] P6 affected regressions (m9DemoIngress, productBaselineWorld, typecheck/lint/build/gates) + broader PG gate once at candidate checkpoint
+- [x] P7 final candidate commit + push; founder T2 test procedure documented
 
 ## Checkpoints pushed (branch `feature/sarah-provider-disruption`)
 
 | Checkpoint | Commit | Evidence |
 |---|---|---|
 | 1. Investigation + ledger + T1 archive | `b6b7250` (pushed) | T2-1 six-vs-five resolution; frozen decisions 1-7 |
-| 2. Domain + ingress + HTTP + UI trigger + focused PG test | (this commit) | T2 test 12/12; baseline/m6 regressions 23/23; units 749/749; typecheck/lint/build/gate clean; live boot: bodyless trigger APPLIED → ALREADY_APPLIED, verdicts 50P/3F/14U → 49P/4F/14U (exactly Sarah flipped) |
+| 2. Domain + ingress + HTTP + UI trigger + focused PG test | `bafdceb` (pushed) | T2 test 12/12; baseline/m6 regressions 23/23; units 749/749; typecheck/lint/build/gate clean; live boot: bodyless trigger APPLIED → ALREADY_APPLIED, verdicts 50P/3F/14U → 49P/4F/14U (exactly Sarah flipped) |
+| 3. Final candidate: founder procedure documented, broad PG gate | (this commit) | Full postgres suite 488/488 pass (incl. T2 test); founder T2 test procedure section in this ledger |
 
 ## Findings / triage
 
