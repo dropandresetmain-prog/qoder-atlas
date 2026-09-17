@@ -67,7 +67,8 @@ const COUNTED_TABLES = [
   'reservation_lines',
   'reservation_allocations',
   'external_records',
-  'information_records',
+  'change_signals',
+  'change_signal_completions',
   'command_receipts',
 ] as const;
 

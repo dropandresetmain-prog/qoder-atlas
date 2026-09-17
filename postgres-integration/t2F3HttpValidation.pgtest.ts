@@ -162,7 +162,8 @@ describe('F3 HTTP validation boundary', () => {
     const reservationLinesBefore = await count(workspaceId, 'reservation_lines');
     const reservationAllocationsBefore = await count(workspaceId, 'reservation_allocations');
     const externalRecordsBefore = await count(workspaceId, 'external_records');
-    const informationRecordsBefore = await count(workspaceId, 'information_records');
+    const changeSignalsBefore = await count(workspaceId, 'change_signals');
+    const changeSignalCompletionsBefore = await count(workspaceId, 'change_signal_completions');
     const commandReceiptsBefore = await count(workspaceId, 'command_receipts');
 
     // POST malformed body (non-JSON string).
@@ -179,7 +180,8 @@ describe('F3 HTTP validation boundary', () => {
     assert.equal(await count(workspaceId, 'reservation_lines'), reservationLinesBefore, 'no reservation lines mutated');
     assert.equal(await count(workspaceId, 'reservation_allocations'), reservationAllocationsBefore, 'no reservation allocations mutated');
     assert.equal(await count(workspaceId, 'external_records'), externalRecordsBefore, 'no external records mutated');
-    assert.equal(await count(workspaceId, 'information_records'), informationRecordsBefore, 'no information records mutated');
+    assert.equal(await count(workspaceId, 'change_signals'), changeSignalsBefore, 'no change signals mutated');
+    assert.equal(await count(workspaceId, 'change_signal_completions'), changeSignalCompletionsBefore, 'no change signal completions mutated');
     assert.equal(await count(workspaceId, 'command_receipts'), commandReceiptsBefore, 'no command receipts mutated');
   });
 
@@ -193,7 +195,8 @@ describe('F3 HTTP validation boundary', () => {
     const reservationLinesBefore = await count(workspaceId, 'reservation_lines');
     const reservationAllocationsBefore = await count(workspaceId, 'reservation_allocations');
     const externalRecordsBefore = await count(workspaceId, 'external_records');
-    const informationRecordsBefore = await count(workspaceId, 'information_records');
+    const changeSignalsBefore = await count(workspaceId, 'change_signals');
+    const changeSignalCompletionsBefore = await count(workspaceId, 'change_signal_completions');
     const commandReceiptsBefore = await count(workspaceId, 'command_receipts');
 
     // POST valid JSON but wrong kind.
@@ -214,7 +217,8 @@ describe('F3 HTTP validation boundary', () => {
     assert.equal(await count(workspaceId, 'reservation_lines'), reservationLinesBefore, 'no reservation lines mutated');
     assert.equal(await count(workspaceId, 'reservation_allocations'), reservationAllocationsBefore, 'no reservation allocations mutated');
     assert.equal(await count(workspaceId, 'external_records'), externalRecordsBefore, 'no external records mutated');
-    assert.equal(await count(workspaceId, 'information_records'), informationRecordsBefore, 'no information records mutated');
+    assert.equal(await count(workspaceId, 'change_signals'), changeSignalsBefore, 'no change signals mutated');
+    assert.equal(await count(workspaceId, 'change_signal_completions'), changeSignalCompletionsBefore, 'no change signal completions mutated');
     assert.equal(await count(workspaceId, 'command_receipts'), commandReceiptsBefore, 'no command receipts mutated');
   });
 

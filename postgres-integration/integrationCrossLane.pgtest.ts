@@ -107,7 +107,7 @@ async function committedSeed(pool: Pool, build: (seed: SeedSession) => Promise<v
 }
 
 describe('M2-M5 integration: migration chain from an empty database', () => {
-  test('0001-0123 domain lanes plus M6/M7/M8/M9 apply in exact lane order; unused allocations stay unused', async () => {
+  test('0001-0124 domain lanes plus M6/M7/M8/M9 apply in exact lane order; unused allocations stay unused', async () => {
     const db = await createEphemeralDatabase();
     try {
       const applied = await runMigrations(db.pool, MIGRATIONS_DIR);
@@ -133,8 +133,8 @@ describe('M2-M5 integration: migration chain from an empty database', () => {
       assert.deepEqual(inLane('M8'), contiguous(109, 114), 'M8 used 0109-0114; 0115-0119 reserved');
       assert.deepEqual(
         inLane('M9'),
-        [120, 121, 122, 123],
-        'M9 additive extensions: 0120 re-plan identity; 0121/0122/0123 FIG-3 evaluation-lifecycle revision (lane/wit-live-readmodel-contract) — 0123 extends the same EVALUATION_LIFECYCLE scope family to the remaining case-content tables',
+        [120, 121, 122, 123, 124],
+        'M9 additive extensions: 0120 re-plan identity; 0121/0122/0123 FIG-3 evaluation-lifecycle revision (lane/wit-live-readmodel-contract) — 0123 extends the same EVALUATION_LIFECYCLE scope family to the remaining case-content tables; 0124 R0 change signals + consequence provenance (runtime composition closure)',
       );
       assert.ok(versions.every((v) => LANE_RANGES.some((r) => v >= r.from && v <= r.to)), 'no migration outside an allocated range');
 

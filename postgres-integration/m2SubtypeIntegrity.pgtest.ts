@@ -107,6 +107,9 @@ const M8_ACTIVATED_KINDS = [
   'EXECUTION_ATTEMPT',
 ];
 
+/** Kinds R0 activates (0124 change signals) — installed_by 'R0'. */
+const R0_ACTIVATED_KINDS = ['CHANGE_SIGNAL'] as const;
+
 /** M2-M8 integration: every activated kind, checked together. */
 const INTEGRATED_ACTIVATED_KINDS = [
   ...M2_ACTIVATED_KINDS,
@@ -116,6 +119,7 @@ const INTEGRATED_ACTIVATED_KINDS = [
   ...M6_ACTIVATED_KINDS,
   ...M7_ACTIVATED_KINDS,
   ...M8_ACTIVATED_KINDS,
+  ...R0_ACTIVATED_KINDS,
 ];
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
@@ -564,6 +568,9 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'approvals.scope',
       'execution_observations.source_owned_fields',
       'execution_observations.owned_subject_refs',
+      // R0 (0124): bounded, immutable, typed-by-caller change-signal summary —
+      // size-checked (<=65536 bytes) and object-shaped, never a state dumping ground.
+      'change_signals.summary',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

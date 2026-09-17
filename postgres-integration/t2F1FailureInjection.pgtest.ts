@@ -18,10 +18,10 @@
  *   3. The full canonical state is verified complete (cancelled original
  *      lines, replacement service, replacement reservations/lines/
  *      allocations, journey selected-service updates, source/evidence,
- *      external records/links, completion marker).
+ *      external records/links, ChangeSignal registered + completed).
  *   4. Duplicate delivery of the same event → status ALREADY_APPLIED
- *      (granted ONLY by the durable completion marker written last), zero
- *      duplicate rows of any counted kind.
+ *      (granted ONLY by the durable ChangeSignal completion written last),
+ *      zero duplicate rows of any counted kind.
  *
  * No test-only branch in production code: the crash seam is a wrapper over
  * the real PgUnitOfWork keyed on command idempotency keys, which are part of
@@ -85,10 +85,23 @@ class Mint {
  * inside `uow.execute`, so "receipt missing but rows exist" is unreachable —
  * a command either fully committed or did not run, exactly like a real crash
  * between transactions.
+ *
+ * The ingress (R0) derives its own `signalUow = () => ctx.uow().underChangeSignal(id)`
+ * for Steps 4-7 — a FRESH real `PgUnitOfWork` instance, not this proxy. Left
+ * unhandled, `underChangeSignal` would silently escape the crash injection
+ * (every command from Step 4 on would stop being interceptable), so the trap
+ * below also intercepts `underChangeSignal` and re-wraps its result with the
+ * SAME seam, keeping every derived unit of work crash-injectable.
  */
 function crashingUnitOfWork(real: PgUnitOfWork, seam: { exact?: string; prefix?: string }): PgUnitOfWork {
   const proxy = new Proxy(real, {
     get(target, prop, receiver) {
+      if (prop === 'underChangeSignal') {
+        return (changeSignalId: string): PgUnitOfWork => {
+          const inner = (Reflect.get(target, 'underChangeSignal', target) as (id: string) => PgUnitOfWork).call(target, changeSignalId);
+          return crashingUnitOfWork(inner, seam);
+        };
+      }
       if (prop !== 'execute') {
         return Reflect.get(target, prop, receiver);
       }
@@ -195,7 +208,8 @@ interface CountsSnapshot {
   reservationAllocations: number;
   externalRecords: number;
   externalRecordLinks: number;
-  informationRecords: number;
+  changeSignals: number;
+  changeSignalCompletions: number;
   scheduledReassessments: number;
 }
 
@@ -207,7 +221,8 @@ async function snapshotCounts(w: CrashWorkspace): Promise<CountsSnapshot> {
     reservationAllocations: await count(pool, w.workspaceId, 'reservation_allocations'),
     externalRecords: await count(pool, w.workspaceId, 'external_records'),
     externalRecordLinks: await count(pool, w.workspaceId, 'external_record_links'),
-    informationRecords: await count(pool, w.workspaceId, 'information_records'),
+    changeSignals: await count(pool, w.workspaceId, 'change_signals'),
+    changeSignalCompletions: await count(pool, w.workspaceId, 'change_signal_completions'),
     scheduledReassessments: await count(pool, w.workspaceId, 'scheduled_reassessments'),
   };
 }
@@ -228,9 +243,29 @@ function idsFor(w: CrashWorkspace) {
     sourceId: minter.id('source', w.event.providerEventId),
     evidenceId: minter.id('evidence', w.event.providerEventId),
     replacementServiceId,
-    completionMarkerId: minter.id('completion-marker', w.event.providerEventId),
+    changeSignalId: minter.id('change-signal', w.event.providerEventId),
     replacementReservationId: (pnr: string) => minter.id('reservation', pnr),
   };
+}
+
+/**
+ * All three crash seams below sit AFTER Step 3.5 (ChangeSignal
+ * registration) and BEFORE Step 8 (ChangeSignal completion): the signal
+ * itself must exist (registered before the crash point), but it must not
+ * yet be completed.
+ */
+async function assertSignalRegisteredButNotCompleted(w: CrashWorkspace): Promise<void> {
+  const ids = idsFor(w);
+  const signalRows = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM change_signals WHERE workspace_id = $1 AND id = $2`,
+    [w.workspaceId, ids.changeSignalId],
+  );
+  assert.equal(Number(signalRows.rows[0]!.n), 1, 'change signal registered before the crash point');
+  const completionRows = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM change_signal_completions WHERE workspace_id = $1 AND change_signal_id = $2`,
+    [w.workspaceId, ids.changeSignalId],
+  );
+  assert.equal(Number(completionRows.rows[0]!.n), 0, 'no change signal completion after crash');
 }
 
 /**
@@ -354,12 +389,19 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
     assert.equal(bookingRecord.rows[0]!.canonical_subject_id, replacementReservationId, `synthetic booking record for ${pnr} links to the replacement reservation`);
   }
 
-  // Step 8: completion marker present exactly once (only-after-every-step truth).
-  const markerRows = await pool.query<{ n: string }>(
-    `SELECT count(*)::text AS n FROM information_records WHERE workspace_id = $1 AND id = $2`,
-    [workspaceId, ids.completionMarkerId],
+  // Step 8: ChangeSignal registered once and completed exactly once
+  // (only-after-every-step truth; migration 0124 replaces the old
+  // information-record completion marker one-for-one).
+  const signalRows = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM change_signals WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, ids.changeSignalId],
   );
-  assert.equal(Number(markerRows.rows[0]!.n), 1, 'exactly one completion marker exists after retry');
+  assert.equal(Number(signalRows.rows[0]!.n), 1, 'exactly one change signal exists after retry');
+  const completionRows = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM change_signal_completions WHERE workspace_id = $1 AND change_signal_id = $2`,
+    [workspaceId, ids.changeSignalId],
+  );
+  assert.equal(Number(completionRows.rows[0]!.n), 1, 'exactly one change signal completion exists after retry');
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +421,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
   });
 
   // -- Crash point 1: before replacement service creation, after cancellations
-  test('point 1 first attempt: crash BEFORE the replacement service step — all five cancellations committed, replacement service NOT created, no completion marker', async () => {
+  test('point 1 first attempt: crash BEFORE the replacement service step — all five cancellations committed, replacement service NOT created, change signal not completed', async () => {
     const w = points.beforeReplacementService.workspace!;
     const ids = idsFor(w);
 
@@ -410,17 +452,13 @@ describe('F1 failure injection — provider disruption ingress survives partial 
       }
     }
 
-    // Replacement service NOT created, no completion marker.
+    // Replacement service NOT created, change signal not completed.
     const serviceRows = await pool.query<{ id: string }>(
       `SELECT id FROM transport_services WHERE workspace_id = $1 AND id = $2`,
       [w.workspaceId, ids.replacementServiceId],
     );
     assert.equal(serviceRows.rowCount, 0, 'replacement service row absent after crash');
-    const marker = await pool.query<{ id: string }>(
-      `SELECT id FROM information_records WHERE workspace_id = $1 AND id = $2`,
-      [w.workspaceId, ids.completionMarkerId],
-    );
-    assert.equal(marker.rowCount, 0, 'no completion marker after crash');
+    await assertSignalRegisteredButNotCompleted(w);
   });
 
   test('point 1 retry: same event re-delivered → APPLIED with complete canonical state; duplicate → ALREADY_APPLIED with zero duplicates', async () => {
@@ -442,7 +480,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
   });
 
   // -- Crash point 2: after replacement reservations exist, before final line/allocation/selection
-  test('point 2 first attempt: crash AFTER reservation creation but BEFORE the first replacement line — reservations exist with no lines/allocations, no marker', async () => {
+  test('point 2 first attempt: crash AFTER reservation creation but BEFORE the first replacement line — reservations exist with no lines/allocations, change signal not completed', async () => {
     const w = points.afterReservationsBeforeLines.workspace!;
     const ids = idsFor(w);
     const firstPnr = w.affectedPnrs[0]!;
@@ -476,11 +514,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
       assert.equal(Number(allocations.rows[0]!.n), 0, `replacement reservation for ${pnr} has zero allocations after crash`);
     }
 
-    const marker = await pool.query<{ id: string }>(
-      `SELECT id FROM information_records WHERE workspace_id = $1 AND id = $2`,
-      [w.workspaceId, ids.completionMarkerId],
-    );
-    assert.equal(marker.rowCount, 0, 'no completion marker after crash');
+    await assertSignalRegisteredButNotCompleted(w);
   });
 
   test('point 2 retry: same event re-delivered → APPLIED with complete canonical state; duplicate → ALREADY_APPLIED with zero duplicates', async () => {
@@ -502,7 +536,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
   });
 
   // -- Crash point 3: before external-record/link creation
-  test('point 3 first attempt: crash BEFORE external-record/link creation — reservations, lines, allocations, selection all committed; no external records for the event, no marker', async () => {
+  test('point 3 first attempt: crash BEFORE external-record/link creation — reservations, lines, allocations, selection all committed; no external records for the event, change signal not completed', async () => {
     const w = points.beforeExternalRecords.workspace!;
     const ids = idsFor(w);
 
@@ -535,11 +569,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
     );
     assert.equal(Number(externalForEvent.rows[0]!.n), 0, 'no external records for this event after crash');
 
-    const marker = await pool.query<{ id: string }>(
-      `SELECT id FROM information_records WHERE workspace_id = $1 AND id = $2`,
-      [w.workspaceId, ids.completionMarkerId],
-    );
-    assert.equal(marker.rowCount, 0, 'no completion marker after crash');
+    await assertSignalRegisteredButNotCompleted(w);
   });
 
   test('point 3 retry: same event re-delivered → APPLIED with complete canonical state; duplicate → ALREADY_APPLIED with zero duplicates', async () => {

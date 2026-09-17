@@ -119,6 +119,7 @@ interface TestState {
   replacementReservationIds: string[];
   baselineAssessmentCount: number;
   reassessmentCountBeforeIngress: number;
+  changeSignalId: string;
 }
 
 const state: Partial<TestState> = {};
@@ -274,9 +275,11 @@ describe('T2 provider disruption + reprotection ingress', () => {
     state.ingressEvidenceId = result.evidenceId;
     state.replacementServiceId = result.replacementServiceId;
     state.replacementReservationIds = result.replacementReservationIds ?? [];
+    state.changeSignalId = result.changeSignalId;
 
     assert.ok(state.ingressEvidenceId, 'ingress returned an evidenceId');
     assert.ok(state.replacementServiceId, 'ingress returned a replacementServiceId');
+    assert.ok(state.changeSignalId, 'ingress returned a changeSignalId');
   });
 
   test('step 3: displacement truth — each of the five PNRs original reservation line on the original service now observedStatus CANCELLED with observationEvidenceId = ingress evidence id; original reservation rows still exist', async () => {
@@ -529,8 +532,8 @@ describe('T2 provider disruption + reprotection ingress', () => {
   });
 
   test('step 7: reassessment enqueued by the normal invalidation pipeline — scheduled_reassessments rows exist for the affected subjects after ingress, BEFORE any worker run', async () => {
-    const { workspaceId, affectedPnrs, connectionId, reassessmentCountBeforeIngress } = state;
-    if (!workspaceId || !affectedPnrs || !connectionId) return;
+    const { workspaceId, affectedPnrs, connectionId, reassessmentCountBeforeIngress, changeSignalId } = state;
+    if (!workspaceId || !affectedPnrs || !connectionId || !changeSignalId) return;
 
     const mapping = await resolveSourceSubjects(pool, workspaceId, connectionId);
 
@@ -576,13 +579,30 @@ describe('T2 provider disruption + reprotection ingress', () => {
       reason: string;
       cause_input_key: string | null;
       state: string;
+      change_signal_id: string | null;
     }>(
-      `SELECT id, subject_kind, assessment_kind, reason, cause_input_key, state
+      `SELECT id, subject_kind, assessment_kind, reason, cause_input_key, state, change_signal_id
          FROM scheduled_reassessments
         WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')
         ORDER BY subject_kind, subject_id, assessment_kind`,
       [workspaceId],
     );
+
+    // R0 truth: every pending unit enqueued by THIS ingress is tagged with its
+    // ChangeSignal (migration 0124's consequence provenance), and none of them
+    // came from the old unregistered-topic bug (which invalidated all 67
+    // journeys via `INFORMATION_TOPIC:m6:unregistered-topic` on every
+    // ingress).
+    for (const row of pending.rows) {
+      assert.ok(
+        !(row.cause_input_key ?? '').includes('m6:unregistered-topic'),
+        `pending unit ${row.id} cause_input_key must not reference the unregistered topic: ${row.cause_input_key}`,
+      );
+      if (row.subject_kind === 'JOURNEY') {
+        assert.equal(row.change_signal_id, changeSignalId, `pending JOURNEY unit ${row.id} is tagged with the ingress's change signal`);
+      }
+    }
+
     const byReason = new Map<string, number>();
     const byCauseKind = new Map<string, number>();
     const causeKeys = new Map<string, number>();
@@ -636,18 +656,51 @@ describe('T2 provider disruption + reprotection ingress', () => {
       }).result;
     };
 
-    // Run the worker until all work is processed. The dataset materializes 67
-    // journeys, so reservation-head reverse lookup enqueues 67 reassessment
-    // units for this ingress; drain ALL of them (plus any later waves from
-    // cross-journey manifest reads) before asserting views — a partial drain
-    // leaves legitimately-stale views for journeys re-assessed before peers'
-    // heads settled.
+    // Run the worker until all work is processed. Before the ChangeSignal fix
+    // (migration 0124), an unregistered information-record completion-marker
+    // topic bumped `INFORMATION_TOPIC:m6:unregistered-topic` on every
+    // ingress, which every assessment manifest reads — invalidating all 67
+    // journeys in the dataset regardless of whether they were actually
+    // affected. With the fix, only the journeys truly reached by this
+    // disruption (via allocations on the displaced original lines or the new
+    // replacement lines) should be enqueued. Compute that set from the
+    // database rather than hardcoding a count, and require the pending count
+    // to equal it exactly — a partial drain would leave legitimately-stale
+    // views for journeys re-assessed before peers' heads settled, so drain
+    // ALL of them (plus any later waves from cross-journey manifest reads)
+    // before asserting views.
+    const originalReservationIds = affectedPnrs.map((pnr) => {
+      const m = mapping.get(`${SOURCE_RECORD_TYPES.RESERVATION}:${pnr}`);
+      assert.ok(m, `PNR ${pnr} resolves`);
+      return m!.subject.id;
+    });
+    const allReservationIdsForAffectedSet = [...originalReservationIds, ...(state.replacementReservationIds ?? [])];
+    const expectedAffectedJourneys = await pool.query<{ journey_id: string }>(
+      `SELECT DISTINCT ji.journey_id
+         FROM reservation_allocations ra
+         JOIN journey_items ji ON ji.workspace_id = ra.workspace_id AND ji.id = ra.journey_item_id
+        WHERE ra.workspace_id = $1 AND ra.reservation_id = ANY($2::uuid[])`,
+      [workspaceId, allReservationIdsForAffectedSet],
+    );
+    const expectedAffectedJourneyCount = expectedAffectedJourneys.rowCount ?? 0;
+
     const worker = new PgReassessmentWorker(pool, { actorId: 'principal:t2-worker' });
     const pendingBefore = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM scheduled_reassessments WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
       [workspaceId],
     );
     const pendingCount = Number(pendingBefore.rows[0]!.n);
+    console.log(
+      JSON.stringify({
+        tag: 'T2-EXPECTED-AFFECTED-JOURNEYS',
+        expectedAffectedJourneyCount,
+        pendingCount,
+      }),
+    );
+    assert.equal(
+      pendingCount, expectedAffectedJourneyCount,
+      `pending reassessment count (${pendingCount}) must equal the computed affected-journey set size (${expectedAffectedJourneyCount}) — a mismatch means either under- or over-invalidation`,
+    );
     const drainStarted = Date.now();
     const drain = await worker.drainAvailable(now, pipeline, {
       workspaceId,

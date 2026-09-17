@@ -5,13 +5,15 @@
  * setSarahDisrupted, setTravellerRecovered, approveWithoutAuthority,
  * mutateProgrammeForDemo, markCaseResolved, direct state-setting UI APIs.
  */
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import { openRecoveryCase, persistActionPlan } from '../../persistence/postgres/commands/m8AuthorityCommands.ts';
 import { persistRecoveryStrategy } from '../../persistence/postgres/commands/m7StrategyCommands.ts';
 import { resolveRecoveryCase } from '../../persistence/postgres/commands/m9CaseResolutionCommands.ts';
 import { recordTransportObservation } from '../../persistence/postgres/commands/arrangementCommands.ts';
+import { recordChangeSignal, completeChangeSignal } from '../../persistence/postgres/commands/changeSignalCommands.ts';
+import { canonicalPayloadHash } from '../../persistence/postgres/canonicalHash.ts';
 import { evaluateRecoveryCaseResolution } from './recoveryCaseResolution.ts';
 import { denyDirectObjectiveDisposition, M9_OBJECTIVE_DISPOSITION_API_EXPOSED } from './objectiveDispositionBoundary.ts';
 import { issueRequiredAuthorityGrant } from './grantIssuance.ts';
@@ -31,6 +33,26 @@ import { ApplicationErrorSchema } from '../../contracts/v2/product/readModels.ts
 
 export function applicationError(code: ApplicationError['code'], message: string): ApplicationError {
   return ApplicationErrorSchema.parse({ code, message, mutatesState: false });
+}
+
+// Deterministic UUIDv5 minting for the ChangeSignal id below — same
+// construction as providerDisruptionIngress.ts's IdentityMinter (a fixed
+// namespace, sha1 over namespace+name, RFC 4122 version/variant bits), kept
+// local here since this event kind is minted from a different key shape
+// (`${workspaceId}|change-signal|${providerId}|${providerEventId}`, no
+// per-workspace dataset scoping).
+const CHANGE_SIGNAL_NAMESPACE = '6f6a1d4c-1b2e-4d3a-9c7f-2a5b8e0d4c11';
+
+function uuidV5(namespace: string, name: string): string {
+  const hash = createHash('sha1')
+    .update(Buffer.from(namespace.replace(/-/g, ''), 'hex'))
+    .update(Buffer.from(name, 'utf8'))
+    .digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x50;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export interface TargetCommandContext {
@@ -206,6 +228,7 @@ export type DemoIngressResult =
       subjectRef: TypedRef;
       mutationStatus: 'APPLIED' | 'STALE';
       revision: number;
+      changeSignalId: string;
     }
   | { ok: false; error: ApplicationError };
 
@@ -239,8 +262,58 @@ export async function acceptProviderShapedDemoEvent(
     };
   }
 
+  // ChangeSignal (migration 0124): register once per provider event
+  // identity, run the consequential mutation under it, complete it last.
+  // "Has this provider event been applied" is application bookkeeping — it
+  // lives on the ChangeSignal spine, never as ad-hoc world state. Registering
+  // unconditionally on every call is safe: recordChangeSignal is idempotent
+  // by origin (same key + same hash replays); the existing replay behaviour
+  // of recordTransportObservation below already makes duplicate delivery
+  // safe, so no ALREADY_APPLIED short-circuit is added here.
+  const changeSignalId = uuidV5(
+    CHANGE_SIGNAL_NAMESPACE,
+    `${ctx.workspaceId}|change-signal|${event.providerId}|${event.providerEventId}`,
+  );
+  const contentHash = canonicalPayloadHash(payload);
+
+  const evidenceCheck = await ctx.pool.query<{ id: string }>(
+    'SELECT id FROM evidence_records WHERE workspace_id = $1 AND id = $2',
+    [ctx.workspaceId, payload.evidenceId],
+  );
+  const evidenceIdForSignal = evidenceCheck.rows.length > 0 ? payload.evidenceId : undefined;
+
+  const subjectCheck = await ctx.pool.query<{ id: string }>(
+    `SELECT id FROM domain_subjects WHERE workspace_id = $1 AND id = $2 AND kind = 'TRANSPORT_SERVICE'`,
+    [ctx.workspaceId, payload.subjectId],
+  );
+  const signalSubjects: Array<{ kind: 'TRANSPORT_SERVICE'; id: string; role: string }> =
+    subjectCheck.rows.length > 0 ? [{ kind: 'TRANSPORT_SERVICE', id: payload.subjectId, role: 'OBSERVED_SERVICE' }] : [];
+
+  const signalResult = await recordChangeSignal(ctx.uow(), {
+    workspaceId: ctx.workspaceId,
+    actorPrincipalId: ctx.actorPrincipalId,
+    idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:change-signal`,
+    changeSignalId,
+    originKind: 'PROVIDER_EVENT',
+    originKey: `${event.providerId}:${event.providerEventId}`,
+    changeType: 'TRANSPORT_SCHEDULE_OBSERVED',
+    contentHash,
+    receivedAt: event.receivedAt,
+    ...(evidenceIdForSignal ? { evidenceId: evidenceIdForSignal } : {}),
+    subjects: signalSubjects,
+  });
+  if (!signalResult.ok) {
+    return {
+      ok: false,
+      error: applicationError(
+        'PROVIDER_INFO_UNAVAILABLE',
+        `${signalResult.conflict.kind}: ${signalResult.conflict.message}`,
+      ),
+    };
+  }
+
   // Real canonical mutation — never a direct traveller/case status write.
-  const outcome = await recordTransportObservation(ctx.uow(), {
+  const outcome = await recordTransportObservation(ctx.uow().underChangeSignal(changeSignalId), {
     workspaceId: ctx.workspaceId,
     actorPrincipalId: ctx.actorPrincipalId,
     idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}`,
@@ -264,6 +337,30 @@ export async function acceptProviderShapedDemoEvent(
       ),
     };
   }
+
+  const completionResult = await completeChangeSignal(ctx.uow(), {
+    workspaceId: ctx.workspaceId,
+    actorPrincipalId: ctx.actorPrincipalId,
+    idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:completion`,
+    changeSignalId,
+    // Deterministic, not wall-clock: this path has no ALREADY_APPLIED
+    // short-circuit (recordTransportObservation's own replay makes repeat
+    // delivery safe), so completeChangeSignal runs on EVERY call, including
+    // true replays, through this SAME idempotency key. A wall-clock
+    // completedAt would make each call's payload hash differ, turning a
+    // legitimate replay into a spurious IDEMPOTENCY_KEY_PAYLOAD_MISMATCH.
+    completedAt: event.receivedAt,
+  });
+  if (!completionResult.ok) {
+    return {
+      ok: false,
+      error: applicationError(
+        'PROVIDER_INFO_UNAVAILABLE',
+        `${completionResult.conflict.kind}: ${completionResult.conflict.message}`,
+      ),
+    };
+  }
+
   return {
     ok: true,
     accepted: true,
@@ -271,6 +368,7 @@ export async function acceptProviderShapedDemoEvent(
     subjectRef: { kind: 'TRANSPORT_SERVICE', id: outcome.value.id },
     mutationStatus: outcome.value.status,
     revision: outcome.value.revision,
+    changeSignalId,
   };
 }
 

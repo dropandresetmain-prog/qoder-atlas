@@ -169,3 +169,76 @@ than re-running the handler.
 
 Evidence and the exact test that pins replay-without-re-execution:
 [`evidence/M2.md`](evidence/M2.md) and `postgres-integration/idempotency.pgtest.ts`.
+
+## 9. Additive post-C5 runtime-closure contracts (R0/T3)
+
+Recorded per §7 (additive only; no existing field, enum member or variant
+repurposed). Evidence: `postgres-integration/changeSignals.pgtest.ts`,
+`postgres-integration/caseEscalation.pgtest.ts`, `test/runtime-services.test.ts`.
+
+- **`CHANGE_SIGNAL` subject activation (migration 0124).** The kind was
+  pre-registered at M0/M1; 0124 installs its subtype checker and the tables the
+  logical schema §7 already named (`change_signals`, `signal_subjects`) plus
+  `change_signal_completions`. A signal is immutable; "applied" is a separate
+  durable row. `case_signals.change_signal_id` gains its FK.
+- **Consequence provenance.** `PgUnitOfWork.underChangeSignal(id)` sets the
+  transaction-local setting `northstar.change_signal_id`; `change_records`
+  and `scheduled_reassessments` record it (`change_signal_id`, nullable).
+  Coalescing of open reassessment work is unchanged (first signal owns the
+  unit). The `DomainCommandEnvelope` is untouched.
+- **Manifest binding rule.** An assessment's `aggregateReads`/`scopeReads` are
+  the closure of its own subject. Batch capture may only be an optimisation
+  when the manifest is projected per subject; the baseline captures per
+  Journey (`evaluateImpact({ assessFocusOnly: true })`).
+- **Information topics.** Application bookkeeping never goes through
+  `information_records`; an unregistered topic advances the workspace-wide
+  sentinel scope and invalidates every assessment, by design.
+- **Escalation policy port.** `decideEscalation(assessment, status, cases)`
+  (`src/resolution/escalation/policy.ts`) is pure: CURRENT + overall FAIL +
+  an applicable blocking FAIL dimension escalates; UNKNOWN never opens; an
+  open non-terminal case ATTACHes. Applied by the reconcile-from-state pass
+  `runCaseEscalation` with deterministic case identity and idempotency key
+  `escalation:<kind>:<subjectId>:<assessmentId>`.
+- **Case linkage command.** `attachCaseSubjects` (`RECOVERY_CASE_LINKED`) is
+  the only writer of `case_subjects`/`case_signals`; tests must not insert
+  those rows directly.
+- **Runtime services.** `src/app/runtimeServices.ts` is the one composition
+  root for background workers (`start/stop/health`); `/api/v2/health` reports
+  `runtimeServices`.
+- **`RecoveryCaseView` additive fields.** `cause?: CaseCauseView` (the linked
+  change signal) and `causalPath: CausalPathStep[]` (the evaluator's own
+  blocking FAIL explanations); the focused graph gains a `DISRUPTION` node
+  `CHANGE_SIGNAL:<id>` with `AFFECTED_BY` edges from each subject.
+- **StrategyProposer port (B1).** `src/resolution/planning/proposer.ts`:
+  `propose(ProposerInput) -> ProposalCandidate[]`; output is re-validated by
+  `validateProposalCandidates` against the closed `ScenarioEffectSchema`
+  before evaluation; a proposer never asserts viability, authority or
+  observed truth. First implementation: `programmeTimeSwapProposer`.
+- **Planning/approval composition (B1).** `POST /api/v2/cases/:id/strategies`
+  (`recoveryPlanning.ts`) persists VIABLE strategies only and reports the
+  rest with failing subjects + reason codes;
+  `POST /api/v2/cases/:id/strategies/:sid/approve` (`recoveryApproval.ts`)
+  compiles the plan at approval time (deterministic plan id), issues the
+  decision with the envelope `storedExecutionGate.buildEnvelopeInput`
+  rebuilds, and records the approval by the request principal
+  (`x-northstar-principal`, else the workspace operator). Costed intents are
+  refused (`BUDGET_HOLD_REQUIRED`) until budget holds are composed.
+- **Case phase transitions (B1).** `transitionRecoveryCase`
+  (`RECOVERY_CASE_PHASE_CHANGED`) permits OPEN→PLANNING→AWAITING_AUTHORITY→
+  EXECUTING with backward steps to PLANNING/AWAITING_AUTHORITY; terminal
+  states only through their own commands.
+- **Workspace authority (B1).** `workspaceAuthority.ts` provisions
+  root/issuer/operator/executor principals (deterministic ids) with
+  enumerated coverage over PROGRAMME/PROGRAMME_ITEM/TRIP/JOURNEY; exact
+  TypedRef authority, no inheritance. Coverage is fixed at provisioning.
+- **`ApplicationErrorCode` additive members (B1):** CASE_NOT_FOUND,
+  CASE_NOT_OPEN, STRATEGY_NOT_FOUND, STRATEGY_NOT_VIABLE, STRATEGY_BASE_STALE,
+  PLAN_COMPILE_FAILED, PLAN_PERSIST_FAILED, BUDGET_HOLD_REQUIRED,
+  AUTHORITY_SCOPE_UNRESOLVED, APPROVER_UNAUTHORIZED, DISPATCHER_UNAUTHORIZED,
+  INTENT_MISSING, AUTHORITY_DECISION_FAILED, APPROVAL_FAILED,
+  PRINCIPAL_UNRESOLVED.
+- **Open contract question (RC-6, not changed here):** `StrategyViability`
+  currently vetoes a candidate on any reached FAIL/UNKNOWN subject, including
+  subjects the candidate leaves unchanged; on real data this rejects every
+  programme change. A "no regression versus the current world" rule needs an
+  architecture decision — see `docs/work/ACTIVE_TASK.md` STOP finding.

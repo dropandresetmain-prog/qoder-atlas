@@ -12,10 +12,15 @@
  * 1. Resolve the original service and affected bookings via external identity links
  * 2. Validate that each booking has a CONFIRMED transport line for the original service
  * 3. Record provenance (source + evidence) for the cancellation event
+ * 3.5. Register a ChangeSignal for this event (migration 0124) — every
+ *      consequential command from here on runs under it, so change_records
+ *      and enqueued reassessments carry its id
  * 4. Mark displaced reservation lines as CANCELLED
  * 5. Create the replacement transport service
  * 6. Per affected booking: create replacement reservation with lines + allocations
  * 7. Observe external identity links for the replacement service and synthetic booking refs
+ * 8. Complete the ChangeSignal — the durable "applied" fact, written only
+ *    after every required mutation above has committed
  *
  * Idempotency: each command uses a deterministic idempotency key derived from
  * (providerId, providerEventId, sub-key). Replay short-circuits before revision checks,
@@ -38,7 +43,7 @@ import {
   observeExternalRecord,
   linkExternalRecord,
 } from '../../persistence/postgres/commands/arrangementCommands.ts';
-import { recordInformationRecord } from '../../persistence/postgres/commands/knowledgeCommands.ts';
+import { recordChangeSignal, completeChangeSignal, findChangeSignalByOrigin } from '../../persistence/postgres/commands/changeSignalCommands.ts';
 import { updateJourneyItem } from '../../persistence/postgres/commands/travelCommands.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 
@@ -224,6 +229,7 @@ export type ProviderDisruptionResult =
       affectedBookingCount: number;
       evidenceId: string;
       sourceId: string;
+      changeSignalId: string;
     }
   | {
       ok: false;
@@ -316,28 +322,28 @@ export async function acceptProviderDisruptionDemoEvent(
 
     // Deterministic id + idempotency keys for this event's own writes.
     const minter = new IdentityMinter(ctx.workspaceId, `disruption:${event.providerId}:${event.providerEventId}`);
+    const changeSignalId = minter.id('change-signal', event.providerEventId);
+    const originKey = `${event.providerId}:${event.providerEventId}`;
 
-    // ALREADY_APPLIED is decided ONLY by the durable completion marker (an
-    // information record minted with a deterministic id for this provider
-    // event, written by the LAST step after every required mutation has
-    // committed). Marker present + same substance → ALREADY_APPLIED. Marker
-    // absent → the run is still in progress, whatever partial state exists;
-    // fall through to the full retry path below, which replays completed
-    // steps and executes the missing ones.
+    // ALREADY_APPLIED is decided ONLY by the durable ChangeSignal completion
+    // (migration 0124): the signal is registered once, right after source +
+    // evidence exist and before the first consequential mutation (Step 4),
+    // and completed as the LAST step (Step 8), after every required mutation
+    // has committed. Application bookkeeping — "has this provider event been
+    // fully applied" — lives in the ChangeSignal spine, not as an
+    // information_records row (that mistake invalidated every assessment in
+    // the workspace; see migration 0124's header). Signal absent → first
+    // delivery, nothing to replay. Signal present with a DIFFERENT content
+    // hash → the same provider event identity stating different substance, a
+    // genuine conflict. Signal present, same hash, not yet completed → the
+    // run is still in progress, whatever partial state exists; fall through
+    // to the full retry path below, which replays completed steps and
+    // executes the missing ones. Signal present, same hash, completed →
+    // ALREADY_APPLIED.
     const sourceId = minter.id('source', event.providerEventId);
-    const completionMarkerId = minter.id('completion-marker', event.providerEventId);
-    const completionMarker = await ctx.pool.query<{ id: string }>(
-      'SELECT id FROM information_records WHERE workspace_id = $1 AND id = $2',
-      [ctx.workspaceId, completionMarkerId]
-    );
-    if (completionMarker.rows.length > 0) {
-      // Same event identity must always carry the same substance: compare
-      // against the content hash recorded with the event's own provenance.
-      const recordedSource = await ctx.pool.query<{ content_hash: string }>(
-        'SELECT content_hash FROM source_records WHERE workspace_id = $1 AND id = $2',
-        [ctx.workspaceId, sourceId]
-      );
-      if (recordedSource.rows.length > 0 && recordedSource.rows[0]!.content_hash !== eventContentHash) {
+    const existingSignal = await findChangeSignalByOrigin(ctx.pool, ctx.workspaceId, 'PROVIDER_EVENT', originKey);
+    if (existingSignal) {
+      if (existingSignal.contentHash !== eventContentHash) {
         return {
           ok: false,
           error: {
@@ -346,32 +352,38 @@ export async function acceptProviderDisruptionDemoEvent(
           },
         };
       }
-      // Resolve original service ID for the response
-      const originalServiceResolution = await ctx.pool.query<{ canonical_subject_id: string }>(
-        `SELECT l.canonical_subject_id
-         FROM external_records r
-         JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id
-         WHERE r.workspace_id = $1 AND r.record_type = $2 AND r.external_id = $3 AND l.superseded_at IS NULL`,
-        [ctx.workspaceId, event.originalService.recordType, event.originalService.externalId]
-      );
+      if (existingSignal.completedAt !== null) {
+        // Resolve original service ID for the response
+        const originalServiceResolution = await ctx.pool.query<{ canonical_subject_id: string }>(
+          `SELECT l.canonical_subject_id
+           FROM external_records r
+           JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id
+           WHERE r.workspace_id = $1 AND r.record_type = $2 AND r.external_id = $3 AND l.superseded_at IS NULL`,
+          [ctx.workspaceId, event.originalService.recordType, event.originalService.externalId]
+        );
 
-      const originalServiceId = originalServiceResolution.rows[0]?.canonical_subject_id ?? '';
-      const evidenceId = minter.id('evidence', event.providerEventId);
-      const replacementReservationIds = event.affectedBookings.map(booking =>
-        minter.id('reservation', booking.externalId)
-      );
+        const originalServiceId = originalServiceResolution.rows[0]?.canonical_subject_id ?? '';
+        const evidenceId = minter.id('evidence', event.providerEventId);
+        const replacementReservationIds = event.affectedBookings.map(booking =>
+          minter.id('reservation', booking.externalId)
+        );
 
-      return {
-        ok: true,
-        status: 'ALREADY_APPLIED',
-        originalServiceId,
-        replacementServiceId,
-        cancelledLineIds: [],
-        replacementReservationIds,
-        affectedBookingCount: event.affectedBookings.length,
-        evidenceId,
-        sourceId,
-      };
+        return {
+          ok: true,
+          status: 'ALREADY_APPLIED',
+          originalServiceId,
+          replacementServiceId,
+          cancelledLineIds: [],
+          replacementReservationIds,
+          affectedBookingCount: event.affectedBookings.length,
+          evidenceId,
+          sourceId,
+          changeSignalId,
+        };
+      }
+      // Registered but not (yet) completed: an in-progress retry of THIS
+      // event. Fall through to the normal retry path exactly as if no signal
+      // existed — the idempotent commands below replay their own receipts.
     }
 
     // Mint replacement reservation ids for the main flow
@@ -604,6 +616,58 @@ export async function acceptProviderDisruptionDemoEvent(
       return conflictError('failed to record evidence', evidenceResult.conflict);
     }
 
+    // Step 3.5: Register the ChangeSignal — now that source + evidence exist
+    // (their FKs hold) and before the first consequential mutation (Step 4).
+    // Every command from here through Step 7 runs under this signal
+    // (`signalUow`), so `change_records` and the M6 reassessment-enqueue
+    // trigger tag their rows with it (migration 0124) — a walkable
+    // signal -> change records -> scheduled reassessment -> assessment chain,
+    // never an unregistered information-record topic.
+    const signalSubjects: Array<{ kind: 'TRANSPORT_SERVICE' | 'RESERVATION'; id: string; role: string }> = [];
+    if (originalServiceId) {
+      signalSubjects.push({ kind: 'TRANSPORT_SERVICE', id: originalServiceId, role: 'ORIGINAL_SERVICE' });
+    }
+    for (const booking of affectedBookingSubjects) {
+      if (booking.reservationId) {
+        signalSubjects.push({ kind: 'RESERVATION', id: booking.reservationId, role: 'AFFECTED_BOOKING' });
+      }
+    }
+    const signalResult = await recordChangeSignal(ctx.uow(), {
+      workspaceId: ctx.workspaceId,
+      actorPrincipalId: ctx.actorPrincipalId,
+      idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:change-signal`,
+      changeSignalId,
+      originKind: 'PROVIDER_EVENT',
+      originKey,
+      changeType: 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION',
+      contentHash: eventContentHash,
+      receivedAt: event.receivedAt,
+      sourceConnectionId: connectionId,
+      sourceRecordId: sourceId,
+      evidenceId,
+      subjects: signalSubjects,
+      summary: {
+        affectedBookingCount: event.affectedBookings.length,
+        replacementServiceExternalId: event.replacementService.externalId,
+      },
+    });
+
+    if (!signalResult.ok) {
+      if (signalResult.conflict.kind === 'DUPLICATE_REGISTRATION') {
+        return {
+          ok: false,
+          error: {
+            code: 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
+            message: `provider event ${event.providerEventId} was already ingested with a different payload`,
+          },
+        };
+      }
+      return conflictError('failed to record change signal', signalResult.conflict);
+    }
+
+    // Every consequential command below runs under this signal.
+    const signalUow = () => ctx.uow().underChangeSignal(changeSignalId);
+
     // Step 4: Displacement — mark CONFIRMED original lines as CANCELLED.
     // On retry, lines this event already cancelled are skipped (their state is
     // the truthful in-progress displacement recorded above); only lines still
@@ -617,7 +681,7 @@ export async function acceptProviderDisruptionDemoEvent(
         }
 
         const reservationRevision = await readAggregateRevision(ctx.pool, ctx.workspaceId, booking.reservationId);
-        const obsResult = await recordReservationLineObservation(ctx.uow(), {
+        const obsResult = await recordReservationLineObservation(signalUow(), {
           workspaceId: ctx.workspaceId,
           actorPrincipalId: ctx.actorPrincipalId,
           idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:displace:${line.id}`,
@@ -645,7 +709,7 @@ export async function acceptProviderDisruptionDemoEvent(
     // replacement service on a later event resolves to the same canonical
     // service, and an already-existing service row is reused below; F6: mode
     // is derived from the original service, not hardcoded).
-    const serviceResult = await createTransportService(ctx.uow(), {
+    const serviceResult = await createTransportService(signalUow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
       idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:replacement-service`,
@@ -713,7 +777,7 @@ export async function acceptProviderDisruptionDemoEvent(
 
       const originalReservationRow = originalReservation.rows[0]!;
 
-      const reservationResult = await createReservation(ctx.uow(), {
+      const reservationResult = await createReservation(signalUow(), {
         workspaceId: ctx.workspaceId,
         actorPrincipalId: ctx.actorPrincipalId,
         idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:reservation:${booking.externalId}`,
@@ -765,7 +829,7 @@ export async function acceptProviderDisruptionDemoEvent(
       for (const allocation of displacedAllocations.rows) {
         // Add reservation line
         const lineId = minter.id('reservation-line', booking.externalId, allocation.traveller_id, allocation.journey_item_id ?? 'none');
-        const lineResult = await addReservationLine(ctx.uow(), {
+        const lineResult = await addReservationLine(signalUow(), {
           workspaceId: ctx.workspaceId,
           actorPrincipalId: ctx.actorPrincipalId,
           idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:line:${booking.externalId}:${allocation.traveller_id}:${allocation.journey_item_id ?? 'none'}`,
@@ -793,7 +857,7 @@ export async function acceptProviderDisruptionDemoEvent(
         currentReservationRevision = lineResult.value.reservationRevision;
 
         // Allocate reservation line
-        const allocResult = await allocateReservationLine(ctx.uow(), {
+        const allocResult = await allocateReservationLine(signalUow(), {
           workspaceId: ctx.workspaceId,
           actorPrincipalId: ctx.actorPrincipalId,
           idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:allocation:${booking.externalId}:${allocation.traveller_id}:${allocation.journey_item_id ?? 'none'}`,
@@ -831,7 +895,7 @@ export async function acceptProviderDisruptionDemoEvent(
 
           if (journeyItem.rows.length > 0) {
             const journeyRevision = await readAggregateRevision(ctx.pool, ctx.workspaceId, journeyItem.rows[0]!.journey_id);
-            const selectionResult = await updateJourneyItem(ctx.uow(), {
+            const selectionResult = await updateJourneyItem(signalUow(), {
               workspaceId: ctx.workspaceId,
               actorPrincipalId: ctx.actorPrincipalId,
               idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:journey-item:${allocation.journey_item_id}`,
@@ -875,7 +939,7 @@ export async function acceptProviderDisruptionDemoEvent(
     const replacementServiceRecordId = minter.id('external-record', event.replacementService.recordType, event.replacementService.externalId);
     const observeServiceResult = serviceIdentityAlreadyHolds
       ? null
-      : await observeExternalRecord(ctx.uow(), {
+      : await observeExternalRecord(signalUow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
       idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:external-service`,
@@ -901,7 +965,7 @@ export async function acceptProviderDisruptionDemoEvent(
 
     const linkServiceResult = serviceIdentityAlreadyHolds
       ? null
-      : await linkExternalRecord(ctx.uow(), {
+      : await linkExternalRecord(signalUow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
       idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:external-link-service`,
@@ -933,7 +997,7 @@ export async function acceptProviderDisruptionDemoEvent(
       const syntheticExternalId = `REPROTECTED:${event.providerEventId}:${booking.externalId}`;
 
       const syntheticRecordId = minter.id('external-record', 'SOURCE_BOOKING_REFERENCE', syntheticExternalId);
-      const observeBookingResult = await observeExternalRecord(ctx.uow(), {
+      const observeBookingResult = await observeExternalRecord(signalUow(), {
         workspaceId: ctx.workspaceId,
         actorPrincipalId: ctx.actorPrincipalId,
         idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:external-booking:${booking.externalId}`,
@@ -955,7 +1019,7 @@ export async function acceptProviderDisruptionDemoEvent(
 
       connectionRevision = observeBookingResult.value.connectionRevision;
 
-      const linkBookingResult = await linkExternalRecord(ctx.uow(), {
+      const linkBookingResult = await linkExternalRecord(signalUow(), {
         workspaceId: ctx.workspaceId,
         actorPrincipalId: ctx.actorPrincipalId,
         idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:external-link-booking:${booking.externalId}`,
@@ -979,22 +1043,27 @@ export async function acceptProviderDisruptionDemoEvent(
       connectionRevision = linkBookingResult.value.connectionRevision;
     }
 
-    // Step 8: Completion marker (F1) — the LAST required step. Only after
-    // every mutation above has committed does this durable receipt get
-    // written through its own idempotent M5 command; from then on, duplicate
-    // deliveries of the same provider event resolve ALREADY_APPLIED from this
-    // marker, never from "things exist".
-    const markerResult = await recordInformationRecord(ctx.uow(), {
+    // Step 8: Complete the ChangeSignal (F1) — the LAST required step. Only
+    // after every mutation above has committed does this durable "applied"
+    // fact get written through its own idempotent command (migration 0124);
+    // from then on, duplicate deliveries of the same provider event resolve
+    // ALREADY_APPLIED from the signal's completion, never from "things
+    // exist".
+    const completionResult = await completeChangeSignal(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
-      idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:completion-marker`,
-      informationRecordId: completionMarkerId,
-      externalPublicationKey: `provider-disruption:${event.providerId}:${event.providerEventId}`,
-      topic: `provider-disruption-completion:${event.providerId}:${event.providerEventId}`,
-      sourceConnectionIdentity: `provider-disruption:${event.providerId}:${event.providerEventId}`,
+      idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:completion`,
+      changeSignalId,
+      // Deterministic, not wall-clock: two calls with this same idempotency
+      // key (a genuine crash-retry, or a race between concurrent deliveries)
+      // must hash identically to replay safely. A wall-clock completedAt
+      // would make the second call's payload hash differ from the first's,
+      // turning a legitimate replay into a spurious
+      // IDEMPOTENCY_KEY_PAYLOAD_MISMATCH.
+      completedAt: event.receivedAt,
     });
-    if (!markerResult.ok) {
-      return conflictError('failed to write disruption completion marker', markerResult.conflict);
+    if (!completionResult.ok) {
+      return conflictError('failed to record disruption completion', completionResult.conflict);
     }
 
     return {
@@ -1007,6 +1076,7 @@ export async function acceptProviderDisruptionDemoEvent(
       affectedBookingCount: event.affectedBookings.length,
       evidenceId,
       sourceId,
+      changeSignalId,
     };
   } catch (error) {
     return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: error instanceof Error ? error.message : String(error) } };

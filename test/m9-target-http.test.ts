@@ -62,9 +62,11 @@ describe('M9 target HTTP route dispatch', () => {
     );
     assert.equal(handled, true);
     assert.equal(res.statusCode, 200);
-    const body = JSON.parse(res.body) as { kind: string; sqliteAuthoritativeFallback: boolean };
+    const body = JSON.parse(res.body) as { kind: string; sqliteAuthoritativeFallback: boolean; runtimeServices: unknown[] };
     assert.equal(body.kind, 'TARGET_POSTGRES');
     assert.equal(body.sqliteAuthoritativeFallback, false);
+    // R0: no runtime services are attached in this composition (no `runtimeServices` on the mock app).
+    assert.deepEqual(body.runtimeServices, []);
   });
 
   test('demo provider-event ingress refuses undisclosed mutation shortcuts', async () => {

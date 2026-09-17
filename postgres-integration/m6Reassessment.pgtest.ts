@@ -27,7 +27,9 @@ import {
   enqueueDueReassessments,
   loadAssessment,
   saveAssessment,
+  startReassessmentDrainLoop,
   type ReassessmentPipeline,
+  type ReassessmentWake,
 } from '../src/persistence/postgres/world/pgAssessments.ts';
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
 import { assessSubject, createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
@@ -205,6 +207,7 @@ describe('M6 reassessment worker', () => {
     const fast = new PgReassessmentWorker(f.pool, { actorId: 'principal:fast', leaseSeconds: 60 });
     const staleClaim = await slow.claim(NOW, f.seed.workspaceId);
     assert.ok(staleClaim);
+    assert.equal(staleClaim.changeSignalId, null, 'no signal is involved in a plain aggregate-change reassessment');
     const later = '2031-05-01T00:05:00.000Z';
     const freshClaim = await fast.claim(later, f.seed.workspaceId);
     assert.ok(freshClaim);
@@ -347,5 +350,49 @@ describe('M6 reassessment worker drain', () => {
     assert.equal(drain.processed, 0);
     assert.equal(drain.stoppedReason, 'EMPTY');
     assert.deepEqual(drain.outcomes, {});
+  });
+
+  test('the drain loop schedules CLOCK_EXPIRY on wake and drains it, superseding the expired assessment', async () => {
+    const f = await fixture();
+    const first = await assessNow(f);
+    // EXPIRES ('2031-05-01T12:00:00.000Z') is the manifest's nextInvalidationAt;
+    // this is well past it, so the wake's own enqueueDue must raise the work.
+    const NOW_AFTER_EXPIRY = '2031-05-01T13:00:00.000Z';
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain-loop' });
+    const wakes: ReassessmentWake[] = [];
+    const stop = startReassessmentDrainLoop(worker, pipeline(f, NOW_AFTER_EXPIRY), {
+      workspaceId: f.seed.workspaceId,
+      pollMs: 20,
+      now: () => NOW_AFTER_EXPIRY,
+      observe: (wake) => wakes.push(wake),
+    });
+    try {
+      const started = Date.now();
+      while (!wakes.some((w) => w.dueEnqueued >= 1 && (w.drain?.processed ?? 0) >= 1)) {
+        if (Date.now() - started > 5_000) {
+          throw new Error(`timed out waiting for a wake that enqueued and drained CLOCK_EXPIRY work; wakes=${JSON.stringify(wakes)}`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } finally {
+      stop();
+    }
+
+    // The test evaluator's nextInvalidationAt is a fixed timestamp already in the
+    // past of NOW_AFTER_EXPIRY, so every successor is immediately due again once
+    // the loop keeps waking — stop() already ran, but assert supersession
+    // happened rather than a settled CURRENT status (which this fixture can
+    // never reach while the loop keeps running).
+    const successor = await f.pool.query<{ id: string }>(
+      'SELECT id FROM assessments WHERE workspace_id = $1 AND supersedes_assessment_id = $2',
+      [f.seed.workspaceId, first.id],
+    );
+    assert.ok(successor.rows.length >= 1, 'the clock-expired assessment must have been superseded');
+
+    const scheduled = await f.pool.query<{ reason: string }>(
+      'SELECT reason FROM scheduled_reassessments WHERE workspace_id = $1 AND subject_id = $2 ORDER BY created_at',
+      [f.seed.workspaceId, f.journey.id],
+    );
+    assert.ok(scheduled.rows.length > 0 && scheduled.rows.every((r) => r.reason === 'CLOCK_EXPIRY'), 'every scheduled row raised by the wake is CLOCK_EXPIRY');
   });
 });

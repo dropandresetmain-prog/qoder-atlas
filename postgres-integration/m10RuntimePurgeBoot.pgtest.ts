@@ -53,10 +53,17 @@ test('normal boot works end-to-end with no SQLite database reachable', async () 
       kind: string;
       sqliteAuthoritativeFallback: boolean;
       workspaceId: string;
+      runtimeServices: Array<{ name: string; state: string }>;
     };
     assert.equal(targetHealthBody.kind, 'TARGET_POSTGRES');
     assert.equal(targetHealthBody.sqliteAuthoritativeFallback, false);
     assert.equal(targetHealthBody.workspaceId, boot.config.workspaceId);
+    // R0: the real runtime composition root actually started its background
+    // services — this boots the real composition, not a stub health payload.
+    assert.ok(
+      targetHealthBody.runtimeServices.some((service) => service.name === 'reassessment' && service.state === 'RUNNING'),
+      `expected a running "reassessment" runtime service, got ${JSON.stringify(targetHealthBody.runtimeServices)}`,
+    );
 
     const root = await fetch(`${base}/`, { redirect: 'manual' });
     assert.equal(root.status, 302);

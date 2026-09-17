@@ -7,7 +7,7 @@
  * A later, DIFFERENT provider event that references the SAME real replacement
  * service must therefore resolve to the same canonical TransportService row
  * (F5: no duplicate), and the duplicate path must still terminate in the
- * completion-marker-granted ALREADY_APPLIED.
+ * ChangeSignal-completion-granted ALREADY_APPLIED (migration 0124).
  *
  * N1 note on fixture coverage: this positive proof needs a second event that
  * legitimately reuses the SAME replacement service (ID7153) from a DIFFERENT
@@ -38,7 +38,7 @@
  *      the REMAINING 2 travellers of its cohort, SAME replacement external
  *      identity ID7153@...) → APPLIED, and event B's replacementServiceId
  *      equals event A's — one canonical service, reused, not duplicated.
- *   3. Duplicate delivery of event B → ALREADY_APPLIED (marker-granted).
+ *   3. Duplicate delivery of event B → ALREADY_APPLIED (ChangeSignal-completion-granted).
  */
 import { before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -182,7 +182,7 @@ describe('F5 — replacement service identity resolves via external identity, no
     );
     assert.equal(Number(serviceRows.rows[0]!.n), 1, 'exactly one canonical TransportService for the ID7153 external identity');
 
-    // Duplicate delivery of event B → marker-granted ALREADY_APPLIED.
+    // Duplicate delivery of event B → ChangeSignal-completion-granted ALREADY_APPLIED.
     const dup = await acceptProviderDisruptionDemoEvent(ctx, eventB);
     assert.equal(dup.ok, true, 'duplicate event B resolves ok');
     if (!dup.ok) return;
