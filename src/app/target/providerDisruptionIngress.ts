@@ -118,9 +118,19 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})
  *      carrierRef|departureInstant|originRef|destinationRef), so an event that
  *      names a service the dataset materialized lands on the same id the
  *      materializer would have given it. The externalId form is
- *      `carrier@departureInstant`; the origin/destination come from the
- *      original service's canonical row, matching the like-for-like
- *      reprotection (same corridor) that Step 2 enforces.
+ *      `carrier@departureInstant`; origin/destination are NOT part of this
+ *      mint key (they are workspace-scoped wildcards, `*`/`*`), so the minted
+ *      id alone does not encode — and cannot be used to verify — a corridor.
+ *
+ * Because this id can resolve to an existing transport_services row (a real
+ * service being rediscovered, or this same event retrying), and Step 5 below
+ * reuses that row on a create conflict, corridor/schedule safety is enforced
+ * separately by a guard immediately before Step 3: when a row already exists
+ * for this id, it must match the CURRENT event's original (cancelled)
+ * service's origin, destination and mode, and its stored published
+ * departure/arrival must match this event's stated replacement schedule.
+ * A mismatch returns VALIDATION_FAILED with no mutation instead of silently
+ * reusing an unrelated service.
  *
  * The mint uses a workspace+connection-scoped minter prefix so two events in
  * the same workspace resolve identically without knowing the dataset key.
@@ -498,6 +508,57 @@ export async function acceptProviderDisruptionDemoEvent(
       return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `no CONFIRMED transport line for service ${originalServiceId} and no in-progress cancellation from this event` } };
     }
 
+    // N1 guard: the replacement service id (resolved above) may already have
+    // a transport_services row — a real service being rediscovered, an
+    // in-progress retry of THIS event, or (the bug this guards against) an
+    // UNRELATED event that happens to mint/link the same id for a different
+    // corridor. Nothing upstream ties the replacement id to a corridor (the
+    // schedule-derived mint uses wildcard origin/destination; see the doc
+    // comment on canonicalReplacementServiceId), so before any mutation is
+    // allowed, an existing row must match THIS event's original (cancelled)
+    // service on origin, destination and mode, and its stored published
+    // departure/arrival must match this event's stated replacement schedule
+    // — compared as instants, not strings, since the same instant can be
+    // written in different offsets. A retry of the SAME event always passes:
+    // Step 5 would create (or already created) the row from these exact
+    // values, so it matches by construction. A mismatch is a truthful
+    // conflict, not a create-time detail — no mutation happens below it.
+    const existingReplacementService = await ctx.pool.query<{
+      origin_place_id: string;
+      destination_place_id: string;
+      mode: string;
+      published_departure: Date;
+      published_arrival: Date;
+    }>(
+      'SELECT origin_place_id, destination_place_id, mode, published_departure, published_arrival FROM transport_services WHERE workspace_id = $1 AND id = $2',
+      [ctx.workspaceId, replacementServiceId]
+    );
+    if (existingReplacementService.rows.length > 0) {
+      const existingRow = existingReplacementService.rows[0]!;
+      const statedDeparture = new Date(event.replacementService.scheduledDeparture).getTime();
+      const statedArrival = new Date(event.replacementService.scheduledArrival).getTime();
+      const corridorMatches =
+        existingRow.origin_place_id === originalServiceRow.origin_place_id &&
+        existingRow.destination_place_id === originalServiceRow.destination_place_id &&
+        existingRow.mode === replacementMode;
+      const scheduleMatches =
+        existingRow.published_departure.getTime() === statedDeparture &&
+        existingRow.published_arrival.getTime() === statedArrival;
+      if (!corridorMatches || !scheduleMatches) {
+        return {
+          ok: false,
+          error: {
+            code: 'VALIDATION_FAILED',
+            message:
+              `replacement service ${replacementServiceId} already exists as a different ` +
+              `${!corridorMatches ? 'corridor/mode' : 'schedule'} than event ${event.providerEventId}'s ` +
+              `original service ${originalServiceId} and stated replacement schedule ` +
+              `(${event.replacementService.scheduledDeparture} -> ${event.replacementService.scheduledArrival})`,
+          },
+        };
+      }
+    }
+
     // Step 3: Provenance - record source + evidence. The idempotent commands
     // below replay their receipts when already applied.
     const sourceResult = await recordSource(ctx.uow(), {
@@ -600,8 +661,11 @@ export async function acceptProviderDisruptionDemoEvent(
       // service identity, so a service row that already exists for it is the
       // SAME canonical service being discovered again (later event targeting
       // the same real service, or this event retrying after a partial run) —
-      // reuse it rather than failing. Any conflict other than that duplicate
-      // is still surfaced.
+      // reuse it rather than failing. This is safe because the N1 guard above
+      // (before Step 3) already proved any pre-existing row matches this
+      // event's corridor/mode/schedule; it would have returned
+      // VALIDATION_FAILED before any mutation if it didn't. Any conflict
+      // other than that duplicate is still surfaced.
       const existing = await ctx.pool.query<{ id: string }>(
         'SELECT id FROM transport_services WHERE workspace_id = $1 AND id = $2',
         [ctx.workspaceId, replacementServiceId]
