@@ -82,25 +82,27 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
    `REPROTECTED:<providerEventId>:<originalPnr>` (record type
    `SOURCE_BOOKING_REFERENCE`, UNVERIFIED → LINKED on the provisioning
    connection) bound to each new reservation. No provider PNR is fabricated.
-9. **ALREADY_APPLIED is derived by existence check, not by executing commands.**
-   Replacement identities are minted deterministically (UUIDv5 from provider
-   identity: service from `SOURCE_TRANSPORT_SERVICE` external id of the
-   replacement; reservations from `providerId|providerEventId|<originalPnr>`).
-   On re-delivery the ingress resolves the replacement service + reservations
-   first; if all exist it returns `ALREADY_APPLIED` without executing any
-   command. First-delivery failures surface as command conflicts → HTTP 409.
-   Result enum: `APPLIED | ALREADY_APPLIED` only (no STALE).
+9. **ALREADY_APPLIED is granted ONLY by a durable completion marker (F1,
+   supersedes the earlier "existence check" contract).** An information
+   record is minted with a deterministic id for this provider event and
+   written through the idempotent M5 command as the LAST ingress step, after
+   every required mutation has committed. Marker present + same canonical
+   substance → `ALREADY_APPLIED`. Marker absent → the run is in progress
+   whatever partial state exists; re-delivery replays completed commands
+   through their receipts and executes the missing ones. Existence of partial
+   state never produces ALREADY_APPLIED. Result enum: `APPLIED |
+   ALREADY_APPLIED` only (no STALE).
 10. **Effective-itinerary flip = two verified code changes, nothing else.**
     (a) `updateJourneyItem` gains `selectedServiceId` support (Params →
     `JourneyItemMutationSchema` travelCommands.ts:167-172 → parsed spread →
     `PgJourneyRepository.updateItem` SQL CASE) — the ingress sets the journey
     item's selection to the replacement service. (b) `projectItem`
-    (effectiveItinerary.ts:74-107) excludes lines whose `observedStatus ===
-    'CANCELLED'` from the TRANSPORT `lines` set BEFORE computing
-    `bookedServiceIds`/`bookings` — required because `m6.booking`
-    `supplier_fulfilment` (booking.ts:64-71) FAILs on ANY invalid booking
-    (`invalidCount > 0`); filtering only service resolution would leave all 5
-    affected travellers blocked by their displaced lines. The displaced lines
+    (effectiveItinerary.ts:74-107) computes TRANSPORT bookings/booked services
+    from ACTIVE (non-CANCELLED) lines when at least one active line exists,
+    falling back to all lines only for the all-cancelled case — a booking
+    displaced by this incident but holding a CONFIRMED replacement line
+    evaluates on the replacement; a only-cancelled booking stays INVALID so
+    `supplier_fulfilment` FAILs (F2, per-item semantics). The displaced lines
     remain observable in canonical state, audit trail, and read models.
 11. **Readiness arithmetic re-verified (evaluator memo corrected).**
     `participation.ts:174-177` uses `scheduledArrival: reach.arrival ??
@@ -157,6 +159,27 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
 17. **Click wiring survives the poll swap.** The trigger button handler lives
     in the page-level polling script (event delegation on document), not in
     the swapped `<main>` markup — swapped-in inline scripts never execute.
+18. **F1 crash-retry boundaries are real step boundaries.** Step 6 is split
+    into 6a (ALL replacement reservations) and 6b (lines → allocations →
+    journey selection per booking), so "all reservations exist but no line
+    does" is a reachable, retryable state. Step 6b chains reservation
+    revisions from the CURRENT committed head (`readAggregateRevision`), not
+    from the reservation command's replayed receipt value, and allocation
+    commands pass a deterministic allocation id (payload-hash member) so
+    replay never mismatches.
+19. **Replacement service identity is connection-scoped, not event-scoped
+    (F5).** `canonicalReplacementServiceId` resolves (1) the service's own
+    external identity link on the connection when present, else (2) a
+    deterministic UUIDv5 mint over the service's schedule identity
+    (carrier|departureInstant, workspace+`disruption-replacement-service`
+    scope) using the materializer's `transport-service` id kind. Two events
+    naming the same real service resolve to ONE canonical TransportService;
+    Step 7 skips the observe/link pair when the record is already live-linked
+    to that same service (F08 guard forbids re-observing a LINKED record).
+20. **F6 mode derivation.** The replacement service mode is derived from the
+    original canonical service's `mode` column; a provider MAY state a
+    validated `mode` on `replacementService` (vocabulary-checked by
+    `validateProviderDisruptionEvent` before any work). No hardcoded 'AIR'.
 
 ## Founder T2 test procedure (founder-visible, 5 minutes)
 
@@ -207,7 +230,24 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
 |---|---|---|
 | 1. Investigation + ledger + T1 archive | `b6b7250` (pushed) | T2-1 six-vs-five resolution; frozen decisions 1-7 |
 | 2. Domain + ingress + HTTP + UI trigger + focused PG test | `bafdceb` (pushed) | T2 test 12/12; baseline/m6 regressions 23/23; units 749/749; typecheck/lint/build/gate clean; live boot: bodyless trigger APPLIED → ALREADY_APPLIED, verdicts 50P/3F/14U → 49P/4F/14U (exactly Sarah flipped) |
-| 3. Final candidate: founder procedure documented, broad PG gate | (this commit) | Full postgres suite 488/488 pass (incl. T2 test); founder T2 test procedure section in this ledger |
+| 3. Final candidate: founder procedure documented, broad PG gate | `82131bd` (pushed) | Full postgres suite 488/488 pass (incl. T2 test); founder T2 test procedure section in this ledger |
+| 4. Review fixes F1+F2: completion-marker retry + truthful cancelled-booking semantics | `d104f5a` (pushed) | T2 12/12; m6 units 31/31; typecheck clean |
+| 5. Review fixes F1 crash-injection proof + F5 service identity + Nadia test truth (Phase B, in progress) | (this commit) | F1 failure-injection 7/7 (3 crash seams: crash → retry APPLIED → complete canonical state → duplicate ALREADY_APPLIED → zero duplicates); F5 reuse test 1/1; T2 12/12 with corrected Nadia stay-only truth and full-drain assertions (67 units); two real retry bugs found & fixed (evidenceId TDZ on retry path; random allocation id replay mismatch); ledger contracts 9/10/18/19/20 updated |
+
+## Nadia six-vs-five resolution (Phase B, supersedes finding T2-1)
+
+The pack SSOT (`data/ait-demo-input-pack/scenarios/s1-supplier-disruption/...`
+manifest + traveller drafts) always names exactly FIVE ticketed travellers;
+`ait-draft-19` (Nadia Rahman) declares a CONFIRMED STAY only — no
+TRANSPORT_LEG, no PNR. The sixth ticket (IDSYN19) was an artifact of the
+fixture generator's corridor sweep (`pnrFor()` minting synthetic PNRs for
+every co-occupant of a swept service), not upstream truth. Fixed deliberately
+in `scripts/reconcile-final-demo-content.mjs` (cohort-scoped legs) and the
+regenerated `fixtures/programmes/ait-summit-2026/programme.json` (IDSYN19
+count 0; ID7159 exactly the five cohort travellers; generator re-run proven
+idempotent). Test truth updated accordingly: the T2 suite now asserts Nadia
+has NO reservation/external record/no TRANSPORT journey item (step 5) and her
+post-ingress view is CURRENT with her baseline verdict (step 8).
 
 ## Findings / triage
 

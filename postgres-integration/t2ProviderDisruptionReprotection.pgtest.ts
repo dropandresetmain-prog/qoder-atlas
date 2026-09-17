@@ -219,7 +219,7 @@ describe('T2 provider disruption + reprotection ingress', () => {
 
     // Affected PNRs from the event payload.
     state.affectedPnrs = ['IDSYN14', 'IDSYN03', 'IDSYN10', 'IDSYN11', 'IDSYN30'];
-    state.unaffectedPnr = 'IDSYN19'; // Nadia Rahman — on ID7159 but NOT in affectedBookings
+    state.unaffectedPnr = 'IDSYN19'; // Nadia Rahman (ait-draft-19) — stay-only draft, NOT in affectedBookings and holding no ticket
 
     // Compose the target application for HTTP driving.
     state.app = await composeTargetApplication({ workspaceId });
@@ -342,7 +342,7 @@ describe('T2 provider disruption + reprotection ingress', () => {
     assert.equal(replacement.destination_place_id, orig.destination_place_id, 'replacement destination = original destination');
   });
 
-  test('step 5: exactly five reprotections — five new reservations (ids ≠ originals), each with a CONFIRMED TRANSPORT line on the replacement service and allocations binding the SAME (travellerId, journeyItemId) pairs as the displaced lines; the sixth traveller (PNR IDSYN19, draft ait-draft-19) is NOT affected', async () => {
+  test('step 5: exactly five reprotections — five new reservations (ids ≠ originals), each with a CONFIRMED TRANSPORT line on the replacement service and allocations binding the SAME (travellerId, journeyItemId) pairs as the displaced lines; the sixth traveller (draft ait-draft-19, stay-only) is NOT affected and holds no ticket', async () => {
     const { workspaceId, affectedPnrs, unaffectedPnr, replacementServiceId, connectionId, originalServiceId } = state;
     if (!workspaceId || !affectedPnrs || !unaffectedPnr || !replacementServiceId || !connectionId || !originalServiceId) return;
 
@@ -422,22 +422,40 @@ describe('T2 provider disruption + reprotection ingress', () => {
       );
     }
 
-    // Verify the sixth traveller (PNR IDSYN19, Nadia Rahman) is NOT affected.
+    // Verify the sixth traveller (draft ait-draft-19, Nadia Rahman) is NOT affected.
+    // Corrected fixture truth: Nadia's draft declares a CONFIRMED STAY only —
+    // no TRANSPORT_LEG, hence no PNR and no reservation. The earlier
+    // "IDSYN19 resolves" assertion enforced a phantom ticket minted by a
+    // corridor-sweep bug in the fixture generator (fixed deliberately; the
+    // regenerated programme.json contains zero IDSYN19 references).
     const nadiaPnrMapping = mapping.get(`${SOURCE_RECORD_TYPES.RESERVATION}:${unaffectedPnr}`);
-    assert.ok(nadiaPnrMapping, `unaffected PNR ${unaffectedPnr} resolves`);
-    const nadiaReservationId = nadiaPnrMapping.subject.id;
-
-    // Nadia's original line on ID7159 should still be CONFIRMED (not cancelled).
-    const nadiaLines = await pool.query<{ line_id: string; observed_status: string; transport_service_id: string }>(
-      `SELECT l.id AS line_id, l.observed_status, tld.transport_service_id
-         FROM reservation_lines l
-         JOIN transport_line_details tld ON tld.workspace_id = l.workspace_id AND tld.line_id = l.id
-        WHERE l.workspace_id = $1 AND l.reservation_id = $2 AND l.product_type = 'TRANSPORT'`,
-      [workspaceId, nadiaReservationId],
+    assert.equal(nadiaPnrMapping, undefined, `stay-only draft maps to no reservation (no ${unaffectedPnr} external record)`);
+    const nadiaPnrRecord = await pool.query<{ id: string }>(
+      `SELECT id FROM external_records WHERE workspace_id = $1 AND connection_id = $2 AND record_type = $3 AND external_id = $4`,
+      [workspaceId, connectionId, SOURCE_RECORD_TYPES.RESERVATION, unaffectedPnr],
     );
-    const nadiaOriginalLine = nadiaLines.rows.find((r) => r.transport_service_id === originalServiceId);
-    assert.ok(nadiaOriginalLine, 'Nadia has a transport line on the original service');
-    assert.equal(nadiaOriginalLine.observed_status, 'CONFIRMED', 'Nadia original line is still CONFIRMED (not cancelled)');
+    assert.equal(nadiaPnrRecord.rowCount, 0, `no ${unaffectedPnr} external record exists at all`);
+
+    // Her traveller/journey still resolve, and her only declared travel is the stay.
+    const nadiaJourneyRow = await pool.query<{ journey_id: string }>(
+      `SELECT j.id AS journey_id
+         FROM journeys j
+         JOIN travellers tr ON tr.workspace_id = j.workspace_id AND tr.id = j.traveller_id
+         JOIN external_record_links l ON l.workspace_id = tr.workspace_id AND l.canonical_subject_kind = 'TRAVELLER' AND l.canonical_subject_id = tr.id
+         JOIN external_records r ON r.workspace_id = l.workspace_id AND r.id = l.external_record_id
+        WHERE j.workspace_id = $1 AND r.record_type = $2 AND r.external_id = $3 AND l.superseded_at IS NULL`,
+      [workspaceId, SOURCE_RECORD_TYPES.TRAVELLER, 'ait-draft-19'],
+    );
+    assert.equal(nadiaJourneyRow.rowCount, 1, 'Nadia still has exactly one journey');
+    const nadiaJourneyId = nadiaJourneyRow.rows[0]!.journey_id;
+    const nadiaJourneyItems = await pool.query<{ kind: string }>(
+      `SELECT kind FROM journey_items WHERE workspace_id = $1 AND journey_id = $2`,
+      [workspaceId, nadiaJourneyId],
+    );
+    assert.ok(
+      !nadiaJourneyItems.rows.some((r) => r.kind === 'TRANSPORT'),
+      'Nadia journey has no TRANSPORT journey item (stay-only draft)',
+    );
 
     // No replacement reservation exists for Nadia.
     const nadiaReprotectedExternalId = `REPROTECTED:sim-id-evt-20260921-cgk-001:${unaffectedPnr}`;
@@ -569,15 +587,32 @@ describe('T2 provider disruption + reprotection ingress', () => {
       }).result;
     };
 
-    // Run the worker until all work is processed.
+    // Run the worker until all work is processed. The dataset materializes 67
+    // journeys, so the m6_aggregate_head_changed trigger enqueues 67 reassess-
+    // ment units for this ingress; drain ALL of them (plus any later waves from
+    // cross-journey manifest reads) before asserting views — a partial drain
+    // leaves legitimately-stale views for journeys re-assessed before peers'
+    // heads settled.
     const worker = new PgReassessmentWorker(pool, { actorId: 'principal:t2-worker' });
+    const pendingBefore = await pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM scheduled_reassessments WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
+      [workspaceId],
+    );
+    const budget = Number(pendingBefore.rows[0]!.n) + 20;
     let iterations = 0;
-    const maxIterations = 50;
-    while (iterations < maxIterations) {
+    while (iterations < budget) {
       const outcome = await worker.runOnce(now, pipeline, workspaceId);
       if (!outcome.claimed) break;
       iterations++;
     }
+    const openAfterDrain = await pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM scheduled_reassessments WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
+      [workspaceId],
+    );
+    assert.equal(
+      Number(openAfterDrain.rows[0]!.n), 0,
+      'all reassessment units drained before asserting views',
+    );
     assert.ok(iterations > 0, 'worker processed at least one unit of work');
 
     // Now assert the authoritative assessment view for each affected traveller.

@@ -105,6 +105,56 @@ export type TransportMode = (typeof TRANSPORT_MODES)[number];
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/u;
 
 /**
+ * F5: resolve the replacement service's CANONICAL TransportService id from
+ * the service's own identity — never from the provider event identity.
+ *
+ * Order of resolution:
+ *   1. If the connection already links the replacement's recordType/externalId
+ *      to a canonical TRANSPORT_SERVICE, that linked subject IS the service
+ *      (a later event referencing the same real service reuses it).
+ *   2. Otherwise mint deterministically from the service's schedule identity
+ *      using the SAME derivation the provisioning materializer uses
+ *      (`transport-service` id kind over
+ *      carrierRef|departureInstant|originRef|destinationRef), so an event that
+ *      names a service the dataset materialized lands on the same id the
+ *      materializer would have given it. The externalId form is
+ *      `carrier@departureInstant`; the origin/destination come from the
+ *      original service's canonical row, matching the like-for-like
+ *      reprotection (same corridor) that Step 2 enforces.
+ *
+ * The mint uses a workspace+connection-scoped minter prefix so two events in
+ * the same workspace resolve identically without knowing the dataset key.
+ */
+async function canonicalReplacementServiceId(
+  ctx: TargetCommandContext,
+  replacement: ProviderDisruptionEvent['replacementService'],
+): Promise<string> {
+  // 1. External-identity resolution wins: the linked subject is the service.
+  const linked = await ctx.pool.query<{ canonical_subject_id: string }>(
+    `SELECT l.canonical_subject_id
+     FROM external_records r
+     JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id AND l.superseded_at IS NULL
+     WHERE r.workspace_id = $1 AND r.record_type = $2 AND r.external_id = $3
+     LIMIT 1`,
+    [ctx.workspaceId, replacement.recordType, replacement.externalId]
+  );
+  if (linked.rows.length > 0) return linked.rows[0]!.canonical_subject_id;
+
+  // 2. Schedule-derived mint: same id kind + key composition as the
+  // provisioning materializer's serviceKey, derived from the externalId the
+  // provider states (`carrier@departureInstant`).
+  const at = replacement.externalId.lastIndexOf('@');
+  const carrier = at === -1 ? replacement.externalId : replacement.externalId.slice(0, at);
+  const departureInstant = at === -1 ? replacement.scheduledDeparture : replacement.externalId.slice(at + 1);
+  const normalizedDeparture = new Date(departureInstant).toISOString();
+  if (Number.isNaN(new Date(normalizedDeparture).getTime())) {
+    throw new Error(`replacement service externalId does not carry a parsable departure instant: ${replacement.externalId}`);
+  }
+  const scopeMinter = new IdentityMinter(ctx.workspaceId, 'disruption-replacement-service');
+  return scopeMinter.id('transport-service', carrier, normalizedDeparture, '*', '*');
+}
+
+/**
  * F3: schema validation of the provider event before any canonical work.
  * Returns a field-path message on the first violation; undefined when valid.
  * Instants are additionally checked to be real datetimes (zod-free here to
@@ -230,16 +280,28 @@ export async function acceptProviderDisruptionDemoEvent(
       return { ok: false, error: { code: 'VALIDATION_FAILED', message: validated.message } };
     }
 
-    const minter = new IdentityMinter(ctx.workspaceId, `disruption:${event.providerId}:${event.providerEventId}`);
-
     // Canonical fingerprint of THIS delivery: identity fields with normalized
     // instants, excluding receipt metadata (receivedAt). The same provider
     // event identity must always carry the same substance, however the
     // instant was written; a different substance is a real mismatch.
     const eventContentHash = canonicalDisruptionEventHash(event);
 
-    // Mint replacement service id
-    const replacementServiceId = minter.id('transport-service', event.replacementService.externalId);
+    // Replacement service identity (F5): the canonical TransportService id is
+    // NOT keyed to this provider event. It is derived from the replacement
+    // service's own identity, using the SAME derivation the provisioning
+    // materializer uses (`transport-service` id kind over
+    // carrierRef|departureInstant|origin|destination), so two events that name
+    // the same real service resolve to one canonical service. When the
+    // provider event carries the service's own recordType/externalId we
+    // resolve it through external identity before falling back to the
+    // schedule-derived mint below.
+    const replacementServiceId = await canonicalReplacementServiceId(
+      ctx,
+      event.replacementService,
+    );
+
+    // Deterministic id + idempotency keys for this event's own writes.
+    const minter = new IdentityMinter(ctx.workspaceId, `disruption:${event.providerId}:${event.providerEventId}`);
 
     // ALREADY_APPLIED is decided ONLY by the durable completion marker (an
     // information record minted with a deterministic id for this provider
@@ -372,6 +434,10 @@ export async function acceptProviderDisruptionDemoEvent(
     //     and the intended replacement state may already partially exist.
     // A line cancelled by anything OTHER than this event's evidence is not
     // progress — it is a conflict (the provider story doesn't hold).
+    // The evidence id is minted HERE because Step 2's in-progress recognition
+    // compares line stamps against it: it is the deterministic mark that
+    // distinguishes THIS event's own displacement from any other cancellation.
+    const evidenceId = minter.id('evidence', event.providerEventId);
     const originalService = await ctx.pool.query<{
       origin_place_id: string;
       destination_place_id: string;
@@ -432,12 +498,8 @@ export async function acceptProviderDisruptionDemoEvent(
       return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `no CONFIRMED transport line for service ${originalServiceId} and no in-progress cancellation from this event` } };
     }
 
-    // Step 3: Provenance - record source + evidence.
-    // The evidence id was minted before Step 2's validation reads (it is the
-    // deterministic stamp that distinguishes THIS event's in-progress
-    // cancellations from any other line state), and the idempotent commands
+    // Step 3: Provenance - record source + evidence. The idempotent commands
     // below replay their receipts when already applied.
-    const evidenceId = minter.id('evidence', event.providerEventId);
     const sourceResult = await recordSource(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
@@ -549,7 +611,11 @@ export async function acceptProviderDisruptionDemoEvent(
       }
     }
 
-    // Step 6: Per displaced PNR - create replacement reservations
+    // Step 6a: create ALL replacement reservations first. Splitting this from
+    // line/allocation work makes "all reservations exist but no line does" a
+    // real crash-retry boundary (F1 failure-injection point 2): on retry the
+    // reservation commands replay their receipts and the remaining steps
+    // execute fresh.
     for (let i = 0; i < affectedBookingSubjects.length; i++) {
       const booking = affectedBookingSubjects[i]!;
       const replacementReservationId = replacementReservationIds[i]!;
@@ -589,6 +655,12 @@ export async function acceptProviderDisruptionDemoEvent(
       if (!reservationResult.ok) {
         return conflictError('failed to create replacement reservation', reservationResult.conflict);
       }
+    }
+
+    // Step 6b: per displaced PNR — lines, allocations, journey selection.
+    for (let i = 0; i < affectedBookingSubjects.length; i++) {
+      const booking = affectedBookingSubjects[i]!;
+      const replacementReservationId = replacementReservationIds[i]!;
 
       // Read the allocations that bind THIS reservation to the displaced lines:
       // scoping to the cancelled lines is the truthful displacement boundary —
@@ -609,7 +681,9 @@ export async function acceptProviderDisruptionDemoEvent(
         [ctx.workspaceId, booking.reservationId, originalServiceId]
       );
 
-      let currentReservationRevision = reservationResult.value.revision;
+      // Replay returns the reservation's CURRENT committed revision, so the
+      // line commands below always chain from the real head on a retry.
+      let currentReservationRevision = await readAggregateRevision(ctx.pool, ctx.workspaceId, replacementReservationId);
 
       for (const allocation of displacedAllocations.rows) {
         // Add reservation line
@@ -649,6 +723,10 @@ export async function acceptProviderDisruptionDemoEvent(
           reservationId: replacementReservationId,
           expectedRevision: currentReservationRevision,
           allocation: {
+            // Deterministic id: the command hashes this payload into its
+            // idempotency receipt, so a random id would make every replay of
+            // this command a payload mismatch instead of a replay.
+            id: minter.id('allocation', booking.externalId, allocation.traveller_id, allocation.journey_item_id ?? 'none'),
             reservationLineId: lineId,
             travellerId: allocation.traveller_id,
             ...(allocation.journey_item_id ? { journeyItemId: allocation.journey_item_id } : {}),
@@ -697,9 +775,30 @@ export async function acceptProviderDisruptionDemoEvent(
     // Step 7: External identity on the connection
     let connectionRevision = await readAggregateRevision(ctx.pool, ctx.workspaceId, connectionId);
 
-    // Observe and link replacement service
+    // Observe and link replacement service.
+    // F5: if the service's external record already exists AND is live-linked
+    // to the canonical replacement service, this event is re-discovering the
+    // same real service — the required end state already holds, so the
+    // observe/link pair is skipped (re-observing a LINKED record is rejected
+    // by the F08 identity-state guard). On this event's own retry the command
+    // keys replay through receipts instead, so no state is skipped there.
+    const existingServiceRecord = await ctx.pool.query<{ id: string; identity_state: string; canonical_subject_id: string | null }>(
+      `SELECT r.id, r.identity_state, l.canonical_subject_id
+       FROM external_records r
+       LEFT JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id AND l.superseded_at IS NULL
+       WHERE r.workspace_id = $1 AND r.connection_id = $2 AND r.record_type = $3 AND r.external_id = $4`,
+      [ctx.workspaceId, connectionId, event.replacementService.recordType, event.replacementService.externalId]
+    );
+    const serviceRecordRow = existingServiceRecord.rows[0];
+    const serviceIdentityAlreadyHolds =
+      serviceRecordRow !== undefined &&
+      serviceRecordRow.identity_state === 'LINKED' &&
+      serviceRecordRow.canonical_subject_id === replacementServiceId;
+
     const replacementServiceRecordId = minter.id('external-record', event.replacementService.recordType, event.replacementService.externalId);
-    const observeServiceResult = await observeExternalRecord(ctx.uow(), {
+    const observeServiceResult = serviceIdentityAlreadyHolds
+      ? null
+      : await observeExternalRecord(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
       idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:external-service`,
@@ -715,13 +814,17 @@ export async function acceptProviderDisruptionDemoEvent(
       evidenceRefs: [evidenceId],
     });
 
-    if (!observeServiceResult.ok) {
+    if (observeServiceResult !== null && !observeServiceResult.ok) {
       return conflictError('failed to observe replacement service external record', observeServiceResult.conflict);
     }
 
-    connectionRevision = observeServiceResult.value.connectionRevision;
+    if (observeServiceResult !== null) {
+      connectionRevision = observeServiceResult.value.connectionRevision;
+    }
 
-    const linkServiceResult = await linkExternalRecord(ctx.uow(), {
+    const linkServiceResult = serviceIdentityAlreadyHolds
+      ? null
+      : await linkExternalRecord(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
       idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:external-link-service`,
@@ -738,11 +841,13 @@ export async function acceptProviderDisruptionDemoEvent(
       evidenceRefs: [evidenceId],
     });
 
-    if (!linkServiceResult.ok) {
+    if (linkServiceResult !== null && !linkServiceResult.ok) {
       return conflictError('failed to link replacement service external record', linkServiceResult.conflict);
     }
 
-    connectionRevision = linkServiceResult.value.connectionRevision;
+    if (linkServiceResult !== null) {
+      connectionRevision = linkServiceResult.value.connectionRevision;
+    }
 
     // Observe and link synthetic booking references
     for (let i = 0; i < affectedBookingSubjects.length; i++) {
