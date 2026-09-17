@@ -281,7 +281,7 @@ test('booking-valid / journey-invalid: SELECT_OFFER can leave objective FAIL whi
   assert.ok(dims.some((d) => d.dimension === 'hard_objectives' && d.verdict === 'FAIL'));
 });
 
-test('ProgrammeItem move strategy: one participant can improve while another worsens; viability requires all mandatory PASS', () => {
+test('ProgrammeItem move strategy: one participant can improve while another worsens; a reached FAIL still vetoes when it is a named or regressing subject', () => {
   const programmeId = id();
   const itemId = id();
   const travellerEarly = id();

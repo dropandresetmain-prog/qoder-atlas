@@ -68,41 +68,14 @@ async function loadAssessableSubjects(
   workspaceId: string,
   recoveryCaseId: string,
 ): Promise<TypedRef[]> {
+  // Resolution judges the case's blocking subjects. Overlay-reached extras
+  // were compared for regression at planning time; unchanged co-participants
+  // must not keep a recovered case open.
   const subjects = await loadCaseSubjects(db, workspaceId, recoveryCaseId);
-  const fromCase = subjects
-    .filter((s) => s.kind === 'JOURNEY' || s.kind === 'TRIP')
-    .map((s) => ({ kind: s.kind as 'JOURNEY' | 'TRIP', id: s.id }));
-
-  // Also pull from latest selected/evaluated strategy affected subjects.
-  const strategy = await db.query<{ affected_subjects: unknown }>(
-    `SELECT sc.affected_subjects
-       FROM recovery_strategies rs
-       JOIN strategy_changes sc
-         ON sc.workspace_id = rs.workspace_id AND sc.recovery_strategy_id = rs.id
-      WHERE rs.workspace_id = $1 AND rs.recovery_case_id = $2
-        AND rs.status IN ('SELECTED', 'EVALUATED', 'PROPOSED')
-      ORDER BY rs.strategy_version DESC
-      LIMIT 1`,
-    [workspaceId, recoveryCaseId],
-  );
-  const fromStrategy: TypedRef[] = [];
-  const raw = strategy.rows[0]?.affected_subjects;
-  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? JSON.parse(raw) as unknown[] : [];
-  for (const item of list) {
-    if (
-      item &&
-      typeof item === 'object' &&
-      'kind' in item &&
-      'id' in item &&
-      (item.kind === 'JOURNEY' || item.kind === 'TRIP') &&
-      typeof item.id === 'string'
-    ) {
-      fromStrategy.push({ kind: item.kind, id: item.id });
-    }
-  }
-
   const map = new Map<string, TypedRef>();
-  for (const ref of [...fromCase, ...fromStrategy]) {
+  for (const subject of subjects) {
+    if (subject.kind !== 'JOURNEY' && subject.kind !== 'TRIP') continue;
+    const ref: TypedRef = { kind: subject.kind as 'JOURNEY' | 'TRIP', id: subject.id };
     map.set(`${ref.kind}:${ref.id}`, ref);
   }
   return [...map.values()];
@@ -324,7 +297,7 @@ export async function evaluateRecoveryCaseResolution(
   return {
     allowed: true,
     resolutionKind: 'RECOVERED',
-    summary: `All ${subjectVerdicts.length} affected JOURNEY/TRIP subjects CURRENT+PASS after observation/reassessment`,
+    summary: `All ${subjectVerdicts.length} case JOURNEY/TRIP subjects CURRENT+PASS after observation/reassessment`,
     subjectVerdicts: subjectVerdicts.map((v) => ({
       subjectRef: v.subjectRef,
       verdict: v.verdict,

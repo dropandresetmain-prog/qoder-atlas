@@ -237,8 +237,11 @@ repurposed). Evidence: `postgres-integration/changeSignals.pgtest.ts`,
   AUTHORITY_SCOPE_UNRESOLVED, APPROVER_UNAUTHORIZED, DISPATCHER_UNAUTHORIZED,
   INTENT_MISSING, AUTHORITY_DECISION_FAILED, APPROVAL_FAILED,
   PRINCIPAL_UNRESOLVED.
-- **Open contract question (RC-6, not changed here):** `StrategyViability`
-  currently vetoes a candidate on any reached FAIL/UNKNOWN subject, including
-  subjects the candidate leaves unchanged; on real data this rejects every
-  programme change. A "no regression versus the current world" rule needs an
-  architecture decision — see `docs/work/ACTIVE_TASK.md` STOP finding.
+- **Strategy viability (RC-6).** `strategyViabilityFromSubjectVerdicts`
+  compares overlay assessments to the same subjects on the un-overlaid
+  captured world. A candidate is VIABLE when every blocking (case FAIL)
+  subject is PASS, no reached subject's overall verdict worsens, and no
+  required/newly introduced UNKNOWN remains. Unchanged pre-existing
+  FAIL/UNKNOWN does not veto and is not treated as healed. Closure still
+  decides who is reassessed; it does not require every reached subject to
+  PASS.

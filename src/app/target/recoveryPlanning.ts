@@ -11,7 +11,9 @@
  *   -> StrategyProposer port (deterministic proposers; an LLM proposer would
  *      enter here and nowhere else)
  *   -> schema validation of every candidate (validateProposalCandidates)
- *   -> evaluateRecoveryStrategy: M6 overlay viability with base currentness
+ *   -> evaluateRecoveryStrategy: overlay vs current-world comparison (blocking
+ *      subjects must PASS; no reached subject may worsen; unchanged FAIL/UNKNOWN
+ *      does not veto)
  *   -> persistRecoveryStrategy for VIABLE candidates only (real command)
  *   -> case phase OPEN -> PLANNING -> AWAITING_AUTHORITY when something is
  *      viable.
@@ -193,6 +195,7 @@ export async function proposeRecoveryStrategies(ctx: PlanningContext, input: { c
         registry,
         currentState,
         assumptions: candidate.assumptions,
+        resolveSubjectRefs: failing.map((f) => f.subject),
       });
       if (!evaluated.ok) {
         report.candidates.push({ key: candidate.key, proposerId: proposer.id, strategyId, viability: 'REJECTED', persisted: false, rejectionReason: `${evaluated.conflict.kind}: ${evaluated.conflict.message}` });
@@ -200,8 +203,13 @@ export async function proposeRecoveryStrategies(ctx: PlanningContext, input: { c
       }
       const strategy = evaluated.value.strategy;
       if (strategy.viability !== 'VIABLE') {
+        const vetoKeys = new Set(
+          evaluated.value.viabilityDecisions
+            .filter((d) => d.subjectRef)
+            .map((d) => `${d.subjectRef!.kind}:${d.subjectRef!.id}`),
+        );
         const failedSubjects = strategy.candidateAssessments
-          .filter((c) => c.overallVerdict !== 'PASS')
+          .filter((c) => vetoKeys.has(`${c.subjectRef.kind}:${c.subjectRef.id}`))
           .map((c) => {
             const full = strategy.candidateAssessmentResults.find((r) => r.id === c.assessmentId);
             const blocking = full

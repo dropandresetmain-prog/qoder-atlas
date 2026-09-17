@@ -427,38 +427,66 @@ STOP after B1; no B2 / Jordan / external provider execution.
 | Fan-out | Real boot + trigger: **5 units drained in 2.4s** (was 67 / ~17s), incident-linked case visible after **11s** |
 | T3 escalation | `caseEscalation.pgtest.ts` 3/3; `test/escalation-policy.test.ts` 6/6; real boot: 2 baseline-FAIL cases at boot, Sarah case opened with `cause = CHANGE_SIGNAL:…`, `causalPath` = `programme_participation:insufficient_arrival_readiness` with `availableMinutes: 60, requiredMinutes: 150` |
 | B1 loop | `b1RecoveryLoop.pgtest.ts` 1/1: seeded programme world → ingress → drain → escalate → HTTP propose (2 candidates, 1 VIABLE, peer swap NOT_VIABLE) → HTTP approve (unregistered principal 403; operator 200; 2 internal intents; case EXECUTING) → execution pass (1 executed, dependent deferred) → drain → execution pass (1 executed) → drain → resolution pass → RESOLVED, all PASS, 2 COMPLETED actions |
+| B1 Sarah world (RC-6) | `b1SarahWorldRecovery.pgtest.ts` 1/1 in ~117–155s: real AiT bundle → baseline → disruption HTTP → drain → escalate → HTTP propose (VIABLE persisted) → HTTP approve → internal execution until intents complete → drain → incident case RESOLVED, blocking subject PASS. Units: `test/strategy-viability.test.ts` 14/14 + M7 overlay regressions. Broad CURRENT PG gate **522/522**. |
 | Overview after trigger | 49 ready / 3 disrupted / 15 unknown, SETTLED; items: Sarah (incident-linked), Mei Chen, Farah Hussein (baseline) |
 
-## STOP finding — B1 on the Sarah world (Investigate Now, architecture decision required)
+## STOP finding — B1 on the Sarah world (CLOSED, RC-6)
 
-On the real AiT world `POST /api/v2/cases/<sarah>/strategies` evaluates six
-same-programme swap candidates and reports every one **NOT_VIABLE**, truthfully:
+On the real AiT world `POST /api/v2/cases/<incident>/strategies` previously
+evaluated six same-programme swap candidates and reported every one
+**NOT_VIABLE**, truthfully under the frozen M7 aggregator:
 
-- the overlay closure reaches ~18 journeys per candidate through
-  `RESOURCE_ASSIGNED_TO_ACTIVITY` (BOTH) room resources — including Mei Chen
-  and Farah Hussein (baseline FAIL on a 30 Sep item) and the fifteen baseline
-  UNKNOWN self-arranged travellers (`no_route_to_place`);
-- the headline item itself has a self-arranged co-participant (Elena Tan,
-  UNKNOWN `no_route_to_place`);
-- the frozen M7 rule (`strategyViabilityFromSubjectVerdicts`: any FAIL →
-  NOT_VIABLE, any UNKNOWN → NOT_EXECUTABLE) therefore rejects every option.
+- overlay/dependency closure reaches ~18 journeys per candidate through
+  `RESOURCE_ASSIGNED_TO_ACTIVITY` (BOTH) room resources — including baseline
+  FAIL journeys and baseline UNKNOWN self-arranged travellers;
+- the headline item itself has a self-arranged co-participant (UNKNOWN
+  `no_route_to_place`);
+- `strategyViabilityFromSubjectVerdicts` required every reached subject to
+  PASS / forbade any UNKNOWN.
 
-This predates the increment: the accepted preview route
-`POST /api/v2/programme/time-swap/preview` for the intended headline ↔
-"Founders and Futures" swap returns `strategyViability: NOT_EXECUTABLE`
-(Elena Tan UNKNOWN) on the same world. No scenario logic was added to route
-around it. The generalized loop is proven on a seeded world; the Sarah
-acceptance flow stops at truthful planning until one of these is decided:
+**Decision (not the abbreviated ledger recommendation, and not a narrower
+graph):** the overlay/dependency closure is the correct blast radius — a
+shared-resource coupling can create a real capacity regression, so those
+subjects must be reassessed. "All reached subjects must PASS" is the wrong
+aggregation. Viability is a counterfactual comparison of the same subjects
+on the un-overlaid captured world vs the overlay:
 
-1. **Viability as no-regression** (recommended): a candidate is VIABLE when
-   the case's failing subjects become PASS and no reached subject's verdict
-   worsens versus the current world (PASS→FAIL/UNKNOWN vetoes; an unchanged
-   FAIL/UNKNOWN does not). Material change to the M7 contract text; keeps
-   deterministic viability, authority and execution gating intact.
-2. **Data/coverage**: give self-arranged participants the transport/route
-   evidence the evaluator needs so they are not UNKNOWN (Roadmap
-   "Daniel/Elena participants" question).
-3. Both.
+1. **Blocking case conditions must resolve.** Every `resolveSubjectRef`
+   (the case's currently FAIL JOURNEY/TRIP subjects) must be PASS in the
+   candidate. Remaining FAIL → `NOT_VIABLE`. Remaining UNKNOWN →
+   `NOT_EXECUTABLE`.
+2. **No reached subject may be made worse.** PASS/UNKNOWN → FAIL is
+   `NOT_VIABLE`. PASS/FAIL → UNKNOWN, or a newly assessed UNKNOWN, is
+   `NOT_EXECUTABLE`.
+3. **Action-critical UNKNOWN still blocks.** `requiredUnknowns` →
+   `NOT_EXECUTABLE`.
+4. **Unchanged pre-existing FAIL/UNKNOWN does not veto and is not healed.**
+   Those subjects stay visible on the overlay assessments; they do not
+   decide strategy viability; they keep their own cases if they have them.
+
+Resolution follows the same scope: the gate requires the *case's*
+JOURNEY/TRIP subjects CURRENT+PASS, not every overlay-affected journey.
+A genuine post-execution regression on someone else escalates a new case.
+
+No Sarah-specific branch and no fixture patch was added to force success.
+
+## Founder B1 retest (canonical world — do not start B2)
+
+1. Provision PostgreSQL 16 + PostGIS at `localhost:55432` and boot the target
+   app with the AiT bundle and disclosed disruption event (same as Founder T2).
+2. Open `/operator` → Overview. Confirm baseline 50 / 2 / 15 SETTLED.
+3. Apply **Simulated airline update**. Wait until SETTLED 49 / 3 / 15. Open
+   the incident-linked disrupted traveller (the one whose Day-1 headline
+   failed after the 10:30 arrival). The focused case must show a change-signal
+   cause and `programme_participation:insufficient_arrival_readiness`.
+4. From the case, request strategies (`POST /api/v2/cases/:id/strategies` or
+   the product affordance that does). At least one option must persist as
+   VIABLE. Unchanged UNKNOWN co-participants and unrelated baseline FAIL
+   travellers must not be the veto.
+5. Approve as the workspace operator. Execution is internal programme-schedule
+   only. After reconciliation the incident case is RESOLVED and that traveller
+   is PASS. Baseline FAIL travellers keep their own open cases. No Jordan /
+   external provider dispatch.
 
 ## Phase checklist
 
@@ -469,8 +497,8 @@ acceptance flow stops at truthful planning until one of these is decided:
 - [x] T3 change signal spine + escalation pass + case cause/causal path
 - [x] T4 verification: case view carries cause/causal path/DISRUPTION node from rows; reload is a re-read
 - [x] B1 generalized loop through normal paths (seeded world, PG proof)
-- [ ] B1 on the Sarah world — **stopped at the viability contradiction above**
-- [ ] Checkpoint commit + push; broad PG gate at candidate
+- [x] B1 on the Sarah world — RC-6 comparison contract; incident case VIABLE → RESOLVED
+- [x] Checkpoint commit + push; broad PG gate at candidate
 
 ## Findings / triage
 
@@ -481,7 +509,7 @@ acceptance flow stops at truthful planning until one of these is decided:
 | RC-3 | Clock expiry never scheduled | **Act Now — fixed** |
 | RC-4 | Two worker loops, silent errors | **Act Now — fixed** (runtime services) |
 | RC-5 | No escalation seam / no change identity | **Act Now — fixed** (T3) |
-| RC-6 | Strategy viability vetoed by unchanged, unrelated subjects (resource coupling) and by UNKNOWN self-arranged co-participants | **Investigate Now — decision required** (see STOP finding) |
+| RC-6 | Strategy viability vetoed by unchanged, unrelated subjects (resource coupling) and by UNKNOWN self-arranged co-participants | **Act Now — fixed.** Closure kept; aggregator is overlay-vs-current comparison (blocking subjects must PASS; no worsening; new/required UNKNOWN blocks; unchanged FAIL/UNKNOWN does not veto). |
 | RC-7 | Authority coverage enumerated at provisioning; new subjects uncovered until re-provisioning | **Park for Later** (reported in boot log) |
 | RC-8 | Costed intents (budget holds) not composed in approval | **Park for Later** (`BUDGET_HOLD_REQUIRED` refusal) |
 | RC-9 | Outbox still write-only | **Park for Later** |

@@ -3,8 +3,9 @@
  *
  * There is no planner-specific viability engine. Overlay worlds are projected
  * with the same effectiveItinerary helpers and assessed with createM6Registry().
- * Whole-strategy viability considers every affected Journey reached through
- * registered dependency semantics on the proposed world.
+ * Reached subjects (registered dependency closure + programme participation)
+ * are reassessed on both the un-overlaid captured world and the overlay;
+ * viability is the comparison, not "every reached subject is PASS".
  */
 import { randomUUID } from 'node:crypto';
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
@@ -18,6 +19,8 @@ import {
   type RecoveryStrategy,
   type StrategyAssumption,
   type RequiredUnknown,
+  type StrategySubjectVerdict,
+  type StrategyViabilityDecision,
 } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { WorldSnapshotManifest } from '../../contracts/v2/scope/readScope.ts';
 import { assessSubject, type EvaluatorRegistry } from '../evaluation/assess.ts';
@@ -47,6 +50,13 @@ export interface EvaluateStrategyInput {
    * evaluation. A stale base yields STALE_BASE and does not compile.
    */
   currentState?: CurrentState;
+  /**
+   * Subjects whose blocking recovery condition this candidate must resolve
+   * (typically the case's currently FAIL JOURNEY/TRIP subjects). When omitted,
+   * overlay-affected JOURNEY/TRIP subjects that FAIL on the un-overlaid world
+   * must become PASS.
+   */
+  resolveSubjectRefs?: readonly TypedRef[];
 }
 
 export interface EvaluateStrategyResult {
@@ -54,6 +64,10 @@ export interface EvaluateStrategyResult {
   proposedWorld: CapturedWorld;
   /** True when baseWorld JSON equals the pre-overlay snapshot (canonical untouched). */
   canonicalUntouched: boolean;
+  /** Same subjects assessed on the un-overlaid captured world. */
+  baselineAssessments: RecoveryStrategy['candidateAssessments'];
+  /** Closed-code vetoes that produced `strategy.viability`. Empty when VIABLE. */
+  viabilityDecisions: StrategyViabilityDecision[];
 }
 
 function journeySubjectsToAssess(world: CapturedWorld, seeds: readonly TypedRef[]): TypedRef[] {
@@ -89,6 +103,57 @@ function journeySubjectsToAssess(world: CapturedWorld, seeds: readonly TypedRef[
   return [...journeys.values()].sort((a, b) => refKey(a).localeCompare(refKey(b)));
 }
 
+function explicitResolveSubjects(input: EvaluateStrategyInput): TypedRef[] {
+  const named = input.resolveSubjectRefs;
+  if (!named || named.length === 0) return [];
+  const out = new Map<string, TypedRef>();
+  for (const ref of named) {
+    if (ref.kind === 'JOURNEY' || ref.kind === 'TRIP') out.set(refKey(ref), ref);
+  }
+  return [...out.values()];
+}
+
+function assessSubjects(params: {
+  registry: EvaluatorRegistry;
+  world: CapturedWorld;
+  subjects: readonly TypedRef[];
+  now: Instant;
+}): AssessmentResult[] {
+  const effective = projectEffectiveWorld(params.world);
+  const results: AssessmentResult[] = [];
+  for (const subject of params.subjects) {
+    const { result } = assessSubject({
+      registry: params.registry,
+      world: params.world,
+      effective,
+      subject,
+      now: params.now,
+      assessmentId: randomUUID(),
+      kind: 'VIABILITY',
+    });
+    results.push(result);
+  }
+  return results;
+}
+
+function summaryOf(result: AssessmentResult) {
+  return {
+    subjectRef: result.subjects[0]!.subjectRef,
+    assessmentId: result.id,
+    overallVerdict: result.overallVerdict,
+  };
+}
+
+function rejectionReasonFor(viability: RecoveryStrategy['viability']): string | undefined {
+  if (viability === 'NOT_EXECUTABLE') {
+    return 'candidate assessment is UNKNOWN or required unknowns remain; UNKNOWN is not executable viability';
+  }
+  if (viability === 'NOT_VIABLE') {
+    return 'candidate assessment failed mandatory constraints for one or more affected subjects';
+  }
+  return undefined;
+}
+
 /**
  * Build and evaluate an immutable RecoveryStrategy version against an isolated
  * overlay world using the M6 evaluator registry.
@@ -118,7 +183,7 @@ export function evaluateRecoveryStrategy(input: EvaluateStrategyInput): TypedRes
         evaluatedAt: input.now,
         rejectionReason: `base manifest is stale: ${currentness.reasons.map((r) => r.kind).join(',')}`,
       });
-      return ok({ strategy, proposedWorld: input.baseWorld, canonicalUntouched: true });
+      return ok({ strategy, proposedWorld: input.baseWorld, canonicalUntouched: true, baselineAssessments: [], viabilityDecisions: [] });
     }
   }
 
@@ -138,27 +203,40 @@ export function evaluateRecoveryStrategy(input: EvaluateStrategyInput): TypedRes
     ).values(),
   ];
 
-  const effective = projectEffectiveWorld(proposedWorld);
-  const subjects = journeySubjectsToAssess(proposedWorld, overlay.value.affectedSubjectRefs);
-  const results: AssessmentResult[] = [];
-  for (const subject of subjects) {
-    const { result } = assessSubject({
-      registry,
-      world: proposedWorld,
-      effective,
-      subject,
-      now: input.now,
-      assessmentId: randomUUID(),
-      kind: 'VIABILITY',
-    });
-    results.push(result);
-  }
+  const explicitResolve = explicitResolveSubjects(input);
+  const subjects = journeySubjectsToAssess(proposedWorld, [...overlay.value.affectedSubjectRefs, ...explicitResolve]);
+  const results = assessSubjects({ registry, world: proposedWorld, subjects, now: input.now });
+  const baselineResults = assessSubjects({ registry, world: input.baseWorld, subjects, now: input.now });
+  const baselineBySubject = new Map(baselineResults.map((r) => [refKey(r.subjects[0]!.subjectRef), r]));
 
-  const unknowns = [...(input.requiredUnknowns ?? [])];
-  const viability = strategyViabilityFromSubjectVerdicts(
-    results.map((r) => r.overallVerdict),
-    unknowns.length,
+  const overlayResolveKeys = new Set(
+    overlay.value.affectedSubjectRefs
+      .filter((r) => r.kind === 'JOURNEY' || r.kind === 'TRIP')
+      .map((r) => refKey(r)),
   );
+  const explicitKeys = new Set(explicitResolve.map((r) => refKey(r)));
+  const unknowns = [...(input.requiredUnknowns ?? [])];
+  const pairs: StrategySubjectVerdict[] = results.map((r) => {
+    const subjectRef = r.subjects[0]!.subjectRef;
+    const key = refKey(subjectRef);
+    const baseline = baselineBySubject.get(key)?.overallVerdict;
+    const mustPass = explicitKeys.size > 0
+      ? explicitKeys.has(key)
+      : overlayResolveKeys.has(key) && baseline === 'FAIL';
+    return { subjectRef, baseline, candidate: r.overallVerdict, mustPass };
+  });
+  const assessedKeys = new Set(pairs.map((p) => refKey(p.subjectRef as TypedRef)));
+  const decisionsExtra: StrategyViabilityDecision[] = [];
+  for (const ref of explicitResolve) {
+    if (!assessedKeys.has(refKey(ref))) {
+      decisionsExtra.push({ code: 'MISSING_MUST_PASS_SUBJECT', subjectRef: ref });
+    }
+  }
+  const compared = strategyViabilityFromSubjectVerdicts(pairs, unknowns.length);
+  const viabilityDecisions = [...compared.decisions, ...decisionsExtra];
+  const viability = decisionsExtra.length > 0 && compared.viability === 'VIABLE'
+    ? 'NOT_EXECUTABLE'
+    : compared.viability;
 
   const strategy = RecoveryStrategySchema.parse({
     id: input.strategyId ?? randomUUID(),
@@ -171,24 +249,13 @@ export function evaluateRecoveryStrategy(input: EvaluateStrategyInput): TypedRes
     scenarioChange: input.scenarioChange,
     assumptions: [...(input.assumptions ?? [])],
     requiredUnknowns: unknowns,
-    candidateAssessments: results.map((r) => ({
-      subjectRef: r.subjects[0]!.subjectRef,
-      assessmentId: r.id,
-      overallVerdict: r.overallVerdict,
-    })),
+    candidateAssessments: results.map(summaryOf),
     candidateAssessmentResults: results,
     viability,
     requiredAuthorityScopes: overlay.value.requiredAuthorityScopes,
     createdAt: input.now,
     evaluatedAt: input.now,
-    ...(viability === 'VIABLE'
-      ? {}
-      : {
-          rejectionReason:
-            viability === 'NOT_EXECUTABLE'
-              ? 'candidate assessment is UNKNOWN or required unknowns remain; UNKNOWN is not executable viability'
-              : 'candidate assessment failed mandatory constraints for one or more affected subjects',
-        }),
+    ...(viability === 'VIABLE' ? {} : { rejectionReason: rejectionReasonFor(viability) }),
   });
 
   const canonicalUntouched = JSON.stringify(baseSnapshot) === JSON.stringify(input.baseWorld);
@@ -196,5 +263,11 @@ export function evaluateRecoveryStrategy(input: EvaluateStrategyInput): TypedRes
     return conflict(typedConflict('VALIDATION_FAILED', 'canonical world was mutated during candidate evaluation'));
   }
 
-  return ok({ strategy, proposedWorld, canonicalUntouched });
+  return ok({
+    strategy,
+    proposedWorld,
+    canonicalUntouched,
+    baselineAssessments: baselineResults.map(summaryOf),
+    viabilityDecisions,
+  });
 }

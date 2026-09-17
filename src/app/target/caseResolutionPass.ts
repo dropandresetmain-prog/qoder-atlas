@@ -3,12 +3,13 @@
  * deterministic resolution gate.
  *
  * For every non-terminal case, `evaluateRecoveryCaseResolution` decides —
- * every assessable subject CURRENT and PASS, no unreconciled execution, no
- * incomplete mandatory action, no proposed-only state — and only an allowed
- * gate commits `resolveRecoveryCase`. A case whose subjects recovered
- * without action (passive resolution) resolves the same way. A case that
- * cannot resolve stays where it is with the gate's reason on record; nothing
- * here relaxes the gate.
+ * every *case* JOURNEY/TRIP subject CURRENT and PASS, no unreconciled
+ * execution, no incomplete mandatory action, no proposed-only state — and
+ * only an allowed gate commits `resolveRecoveryCase`. Overlay-reached
+ * extras are not re-required here. A case whose subjects recovered without
+ * action (passive resolution) resolves the same way. A case that cannot
+ * resolve stays where it is with the gate's reason on record; nothing here
+ * relaxes the gate.
  */
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
