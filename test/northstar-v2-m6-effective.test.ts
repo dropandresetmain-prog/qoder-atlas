@@ -55,12 +55,67 @@ test('booking validity is independent of the Journey: a confirmed booking stays 
   world.allocations.push({ id: id(), reservationId, lineId, travellerId, journeyItemId: item.id, role: 'PASSENGER', quantity: 1 });
   const booked = effectiveOf(world).journeys[0]!.items[0]!;
   assert.equal(booked.bookings[0]!.bookingValid, 'VALID');
-  // CANCELLED lines are excluded from effective bookings (displaced lines don't block evaluation)
+  // A cancelled booking is INVALID whenever nothing active supersedes it.
   world.reservationLines[0]!.observedStatus = 'CANCELLED';
-  assert.equal(effectiveOf(world).journeys[0]!.items[0]!.bookings.length, 0);
+  assert.equal(effectiveOf(world).journeys[0]!.items[0]!.bookings[0]!.bookingValid, 'INVALID');
   // HELD lines are included with UNKNOWN validity
   world.reservationLines[0]!.observedStatus = 'HELD';
   assert.equal(effectiveOf(world).journeys[0]!.items[0]!.bookings[0]!.bookingValid, 'UNKNOWN');
+});
+
+test('a displaced (cancelled) booking with a confirmed replacement uses the active booking for current state', () => {
+  const { world, journeyId, travellerId, serviceId } = baseWorld();
+  const replacementServiceId = id();
+  world.transportServices.push({
+    id: replacementServiceId, revision: 1, mode: 'AIR', operator: 'op', originPlaceId: 'p-origin', destinationPlaceId: 'p-dest',
+    published: { departure: null, arrival: null }, estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
+  });
+  const item = transportItem(journeyId, { selectedServiceId: replacementServiceId });
+  const originalReservationId = id();
+  const originalLineId = id();
+  const replacementReservationId = id();
+  const replacementLineId = id();
+  world.journeyItems.push(item);
+  world.reservations.push(
+    { id: originalReservationId, revision: 1, reservationType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: '2030-01-01T00:00:00.000Z', responsibleOrganisationId: null, responsibleTravellerId: travellerId },
+    { id: replacementReservationId, revision: 1, reservationType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: '2030-01-01T00:00:00.000Z', responsibleOrganisationId: null, responsibleTravellerId: travellerId },
+  );
+  world.reservationLines.push(
+    { id: originalLineId, reservationId: originalReservationId, productType: 'TRANSPORT', observedStatus: 'CANCELLED', observedStatusAt: '2030-01-01T01:00:00.000Z', evidenceId: 'e-cancel', transportServiceId: serviceId, resourceId: null, placeId: null, interval: null },
+    { id: replacementLineId, reservationId: replacementReservationId, productType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: '2030-01-01T02:00:00.000Z', evidenceId: 'e-reprotect', transportServiceId: replacementServiceId, resourceId: null, placeId: null, interval: null },
+  );
+  world.allocations.push(
+    { id: id(), reservationId: originalReservationId, lineId: originalLineId, travellerId, journeyItemId: item.id, role: 'PASSENGER', quantity: 1 },
+    { id: id(), reservationId: replacementReservationId, lineId: replacementLineId, travellerId, journeyItemId: item.id, role: 'PASSENGER', quantity: 1 },
+  );
+  const effective = effectiveOf(world).journeys[0]!.items[0]!;
+  // Current booking state comes from the active replacement line (the
+  // cancelled original stays canonically observable in reservation_lines —
+  // proven at the persistence boundary by the T2 PG suite).
+  assert.equal(effective.bookings.length, 1);
+  assert.equal(effective.bookings[0]!.bookingValid, 'VALID');
+  assert.equal(effective.bookings[0]!.lineRef.id, replacementLineId);
+  assert.equal(effective.bookings[0]!.reservationRef.id, replacementReservationId);
+  // The item projects the replacement service with no selection divergence.
+  assert.deepEqual(effective.serviceRef, { kind: 'TRANSPORT_SERVICE', id: replacementServiceId });
+  assert.equal(effective.divergences.includes('selected_service_differs_from_booked_service'), false);
+});
+
+test('an item whose ONLY bookings are cancelled keeps them: bookings INVALID (non-flexible and flexible)', () => {
+  for (const flexible of [false, true]) {
+    const { world, journeyId, travellerId, serviceId } = baseWorld();
+    const item = transportItem(journeyId, { flexible, selectedServiceId: serviceId });
+    const reservationId = id();
+    const lineId = id();
+    world.journeyItems.push(item);
+    world.reservations.push({ id: reservationId, revision: 1, reservationType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: '2030-01-01T00:00:00.000Z', responsibleOrganisationId: null, responsibleTravellerId: travellerId });
+    world.reservationLines.push({ id: lineId, reservationId, productType: 'TRANSPORT', observedStatus: 'CANCELLED', observedStatusAt: '2030-01-01T01:00:00.000Z', evidenceId: 'e-cancel', transportServiceId: serviceId, resourceId: null, placeId: null, interval: null });
+    world.allocations.push({ id: id(), reservationId, lineId, travellerId, journeyItemId: item.id, role: 'PASSENGER', quantity: 1 });
+    const effective = effectiveOf(world).journeys[0]!.items[0]!;
+    assert.equal(effective.bookings.length, 1, `cancelled-only item retains its booking (flexible=${flexible})`);
+    assert.equal(effective.bookings[0]!.bookingValid, 'INVALID', `cancelled-only booking is INVALID (flexible=${flexible})`);
+    assert.equal(effective.bookings[0]!.reasonCodes.includes('line_cancelled'), true, `cancelled history observable (flexible=${flexible})`);
+  }
 });
 
 test('an engagement takes the canonical programme schedule; intent is not copied', () => {

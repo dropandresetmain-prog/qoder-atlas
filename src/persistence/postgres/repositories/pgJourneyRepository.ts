@@ -401,6 +401,21 @@ export class PgJourneyRepository implements JourneyRepository {
       );
     }
     if (params.selectedServiceId !== undefined) {
+      // selected_service_id is a TRANSPORT-only detail column. A caller
+      // attempting to select a service on a non-TRANSPORT item is a real
+      // command failure: the write must not no-op silently while the command
+      // envelope reports success and advances the revision.
+      const existing = await this.loadItem(params.workspaceId, params.journeyItemId);
+      if (!existing) {
+        throw new Error(
+          `journey item ${params.journeyItemId} not found under journey ${params.journeyId} in workspace ${params.workspaceId}`,
+        );
+      }
+      if (existing.kind !== 'TRANSPORT') {
+        throw new Error(
+          `JOURNEY_ITEM_UPDATED_VALIDATION_FAILED: selectedServiceId is only valid on TRANSPORT journey items; item ${params.journeyItemId} has kind ${existing.kind}`,
+        );
+      }
       await this.client().query(
         `UPDATE ${DETAIL_TABLE_BY_KIND.TRANSPORT} SET selected_service_id = $1
          WHERE workspace_id = $2 AND journey_item_id = $3`,

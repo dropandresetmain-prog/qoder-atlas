@@ -38,6 +38,7 @@ import {
   observeExternalRecord,
   linkExternalRecord,
 } from '../../persistence/postgres/commands/arrangementCommands.ts';
+import { recordInformationRecord } from '../../persistence/postgres/commands/knowledgeCommands.ts';
 import { updateJourneyItem } from '../../persistence/postgres/commands/travelCommands.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 
@@ -90,6 +91,62 @@ export interface ProviderDisruptionEvent {
   }>;
   reason: string;
   provenanceKind: string;
+}
+
+/**
+ * F6: the replacement's transport mode. It is derived from the original
+ * canonical service (a like-for-like involuntary reprotection keeps the same
+ * mode); a provider MAY state a different mode explicitly and it is validated
+ * against the mode vocabulary before any work happens.
+ */
+export const TRANSPORT_MODES = ['AIR', 'RAIL', 'ROAD', 'SEA'] as const;
+export type TransportMode = (typeof TRANSPORT_MODES)[number];
+
+const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/u;
+
+/**
+ * F3: schema validation of the provider event before any canonical work.
+ * Returns a field-path message on the first violation; undefined when valid.
+ * Instants are additionally checked to be real datetimes (zod-free here to
+ * keep the ingress's HTTP boundary dependency-light and its errors exact).
+ */
+export function validateProviderDisruptionEvent(event: unknown): { ok: true; event: ProviderDisruptionEvent } | { ok: false; message: string } {
+  const fail = (message: string): { ok: false; message: string } => ({ ok: false, message });
+  if (typeof event !== 'object' || event === null) return fail('provider event must be a JSON object');
+  const e = event as Record<string, unknown>;
+  if (e.kind !== 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION') return fail('unsupported event kind');
+  if (e.disclosedAsSimulatedDemoInput !== true) return fail('demo ingress requires disclosed simulated demo input');
+  if (typeof e.providerId !== 'string' || e.providerId.length === 0) return fail('providerId must be a non-empty string');
+  if (typeof e.providerEventId !== 'string' || e.providerEventId.length === 0) return fail('providerEventId must be a non-empty string');
+  if (typeof e.receivedAt !== 'string' || Number.isNaN(new Date(e.receivedAt).getTime())) return fail('receivedAt must be a valid datetime');
+  for (const [label, section] of [['originalService', e.originalService], ['replacementService', e.replacementService]] as const) {
+    if (typeof section !== 'object' || section === null) return fail(`${label} must be an object`);
+    const s = section as Record<string, unknown>;
+    if (s.recordType !== 'SOURCE_TRANSPORT_SERVICE') return fail(`${label}.recordType must be SOURCE_TRANSPORT_SERVICE`);
+    if (typeof s.externalId !== 'string' || s.externalId.length === 0) return fail(`${label}.externalId must be a non-empty string`);
+  }
+  const replacement = e.replacementService as Record<string, unknown>;
+  if (typeof replacement.operator !== 'string' || replacement.operator.length === 0) return fail('replacementService.operator must be a non-empty string');
+  for (const field of ['scheduledDeparture', 'scheduledArrival'] as const) {
+    if (typeof replacement[field] !== 'string' || !INSTANT.test(replacement[field] as string) || Number.isNaN(new Date(replacement[field] as string).getTime())) {
+      return fail(`replacementService.${field} must be a valid instant`);
+    }
+  }
+  if (replacement.mode !== undefined) {
+    if (typeof replacement.mode !== 'string' || !(TRANSPORT_MODES as readonly string[]).includes(replacement.mode)) {
+      return fail(`replacementService.mode must be one of ${TRANSPORT_MODES.join(', ')}`);
+    }
+  }
+  if (!Array.isArray(e.affectedBookings) || e.affectedBookings.length === 0) return fail('affectedBookings must be a non-empty array');
+  for (const [index, booking] of e.affectedBookings.entries()) {
+    if (typeof booking !== 'object' || booking === null) return fail(`affectedBookings[${index}] must be an object`);
+    const b = booking as Record<string, unknown>;
+    if (b.recordType !== 'SOURCE_BOOKING_REFERENCE') return fail(`affectedBookings[${index}].recordType must be SOURCE_BOOKING_REFERENCE`);
+    if (typeof b.externalId !== 'string' || b.externalId.length === 0) return fail(`affectedBookings[${index}].externalId must be a non-empty string`);
+  }
+  if (typeof e.reason !== 'string' || e.reason.length === 0) return fail('reason must be a non-empty string');
+  if (typeof e.provenanceKind !== 'string' || e.provenanceKind.length === 0) return fail('provenanceKind must be a non-empty string');
+  return { ok: true, event: e as unknown as ProviderDisruptionEvent };
 }
 
 export type ProviderDisruptionResult =
@@ -165,15 +222,12 @@ export async function acceptProviderDisruptionDemoEvent(
   event: ProviderDisruptionEvent
 ): Promise<ProviderDisruptionResult> {
   try {
-    // Validate input
-    if (!event.disclosedAsSimulatedDemoInput) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED', message: 'demo ingress requires disclosed simulated demo input' } };
-    }
-    if (!event.providerId || !event.providerEventId) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED', message: 'provider event identity required' } };
-    }
-    if (event.kind !== 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION') {
-      return { ok: false, error: { code: 'VALIDATION_FAILED', message: 'unsupported event kind' } };
+    // F3/F6: schema-validate the whole event BEFORE any work — invalid
+    // provider input must fail with VALIDATION_FAILED and no canonical
+    // mutation, not surface later as a mid-flow conflict.
+    const validated = validateProviderDisruptionEvent(event);
+    if (!validated.ok) {
+      return { ok: false, error: { code: 'VALIDATION_FAILED', message: validated.message } };
     }
 
     const minter = new IdentityMinter(ctx.workspaceId, `disruption:${event.providerId}:${event.providerEventId}`);
@@ -187,68 +241,67 @@ export async function acceptProviderDisruptionDemoEvent(
     // Mint replacement service id
     const replacementServiceId = minter.id('transport-service', event.replacementService.externalId);
 
-    // Mint replacement reservation ids
+    // ALREADY_APPLIED is decided ONLY by the durable completion marker (an
+    // information record minted with a deterministic id for this provider
+    // event, written by the LAST step after every required mutation has
+    // committed). Marker present + same substance → ALREADY_APPLIED. Marker
+    // absent → the run is still in progress, whatever partial state exists;
+    // fall through to the full retry path below, which replays completed
+    // steps and executes the missing ones.
+    const sourceId = minter.id('source', event.providerEventId);
+    const completionMarkerId = minter.id('completion-marker', event.providerEventId);
+    const completionMarker = await ctx.pool.query<{ id: string }>(
+      'SELECT id FROM information_records WHERE workspace_id = $1 AND id = $2',
+      [ctx.workspaceId, completionMarkerId]
+    );
+    if (completionMarker.rows.length > 0) {
+      // Same event identity must always carry the same substance: compare
+      // against the content hash recorded with the event's own provenance.
+      const recordedSource = await ctx.pool.query<{ content_hash: string }>(
+        'SELECT content_hash FROM source_records WHERE workspace_id = $1 AND id = $2',
+        [ctx.workspaceId, sourceId]
+      );
+      if (recordedSource.rows.length > 0 && recordedSource.rows[0]!.content_hash !== eventContentHash) {
+        return {
+          ok: false,
+          error: {
+            code: 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
+            message: `provider event ${event.providerEventId} was already ingested with a different payload`,
+          },
+        };
+      }
+      // Resolve original service ID for the response
+      const originalServiceResolution = await ctx.pool.query<{ canonical_subject_id: string }>(
+        `SELECT l.canonical_subject_id
+         FROM external_records r
+         JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id
+         WHERE r.workspace_id = $1 AND r.record_type = $2 AND r.external_id = $3 AND l.superseded_at IS NULL`,
+        [ctx.workspaceId, event.originalService.recordType, event.originalService.externalId]
+      );
+
+      const originalServiceId = originalServiceResolution.rows[0]?.canonical_subject_id ?? '';
+      const evidenceId = minter.id('evidence', event.providerEventId);
+      const replacementReservationIds = event.affectedBookings.map(booking =>
+        minter.id('reservation', booking.externalId)
+      );
+
+      return {
+        ok: true,
+        status: 'ALREADY_APPLIED',
+        originalServiceId,
+        replacementServiceId,
+        cancelledLineIds: [],
+        replacementReservationIds,
+        affectedBookingCount: event.affectedBookings.length,
+        evidenceId,
+        sourceId,
+      };
+    }
+
+    // Mint replacement reservation ids for the main flow
     const replacementReservationIds = event.affectedBookings.map(booking =>
       minter.id('reservation', booking.externalId)
     );
-
-    // ALREADY_APPLIED check: verify replacement service + all reservations exist
-    const serviceCheck = await ctx.pool.query<{ id: string }>(
-      'SELECT id FROM transport_services WHERE workspace_id = $1 AND id = $2',
-      [ctx.workspaceId, replacementServiceId]
-    );
-    if (serviceCheck.rows.length > 0) {
-      const reservationChecks = await Promise.all(
-        replacementReservationIds.map(id =>
-          ctx.pool.query<{ id: string }>(
-            'SELECT id FROM reservations WHERE workspace_id = $1 AND id = $2',
-            [ctx.workspaceId, id]
-          )
-        )
-      );
-      const allReservationsExist = reservationChecks.every(r => r.rows.length > 0);
-      if (allReservationsExist) {
-        // Same event identity must always carry the same payload: compare
-        // against the content hash recorded with the event's own provenance.
-        const sourceId = minter.id('source', event.providerEventId);
-        const recordedSource = await ctx.pool.query<{ content_hash: string }>(
-          'SELECT content_hash FROM source_records WHERE workspace_id = $1 AND id = $2',
-          [ctx.workspaceId, sourceId]
-        );
-        if (recordedSource.rows.length > 0 && recordedSource.rows[0]!.content_hash !== eventContentHash) {
-          return {
-            ok: false,
-            error: {
-              code: 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
-              message: `provider event ${event.providerEventId} was already ingested with a different payload`,
-            },
-          };
-        }
-        // Resolve original service ID for the response
-        const originalServiceResolution = await ctx.pool.query<{ canonical_subject_id: string }>(
-          `SELECT l.canonical_subject_id
-           FROM external_records r
-           JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id
-           WHERE r.workspace_id = $1 AND r.record_type = $2 AND r.external_id = $3 AND l.superseded_at IS NULL`,
-          [ctx.workspaceId, event.originalService.recordType, event.originalService.externalId]
-        );
-
-        const originalServiceId = originalServiceResolution.rows[0]?.canonical_subject_id ?? '';
-        const evidenceId = minter.id('evidence', event.providerEventId);
-
-        return {
-          ok: true,
-          status: 'ALREADY_APPLIED',
-          originalServiceId,
-          replacementServiceId,
-          cancelledLineIds: [],
-          replacementReservationIds,
-          affectedBookingCount: event.affectedBookings.length,
-          evidenceId,
-          sourceId,
-        };
-      }
-    }
 
     // Step 1: Resolve provisioning connection + canonical subjects
     const originalServiceResolution = await ctx.pool.query<{
@@ -309,26 +362,82 @@ export async function acceptProviderDisruptionDemoEvent(
       });
     }
 
-    // Step 2: Validate truth - each reservation has ≥1 CONFIRMED transport line for original service
+    // Step 2: Validate truth — for each booking, collect ALL transport lines on
+    // the original service. Two states are acceptable, and which one applies
+    // depends on whether this event has already started mutating the world
+    // (partial-failure retry):
+    //   • first delivery: ≥1 CONFIRMED original line to displace;
+    //   • in-progress retry of THIS event: its original lines are already
+    //     CANCELLED (evidence-stamped by this event's own idempotent commands)
+    //     and the intended replacement state may already partially exist.
+    // A line cancelled by anything OTHER than this event's evidence is not
+    // progress — it is a conflict (the provider story doesn't hold).
+    const originalService = await ctx.pool.query<{
+      origin_place_id: string;
+      destination_place_id: string;
+      mode: string;
+    }>(
+      'SELECT origin_place_id, destination_place_id, mode FROM transport_services WHERE workspace_id = $1 AND id = $2',
+      [ctx.workspaceId, originalServiceId]
+    );
+
+    if (originalService.rows.length === 0) {
+      return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `original service ${originalServiceId} not found` } };
+    }
+    const originalServiceRow = originalService.rows[0]!;
+    // F6: a like-for-like involuntary reprotection keeps the original's mode
+    // unless the provider explicitly validated a different one.
+    const replacementMode = (event.replacementService as { mode?: string }).mode ?? originalServiceRow.mode;
+
+    interface DisplacedLine { id: string; reservationId: string; observedStatus: string; observationEvidenceId: string | null }
+    const displacedLinesByBooking: Map<string, DisplacedLine[]> = new Map();
+    let anyConfirmed = false;
+    let anyCancelledByThisEvent = false;
+
     for (const booking of affectedBookingSubjects) {
-      const lineCheck = await ctx.pool.query<{ id: string }>(
-        `SELECT l.id
+      const lineCheck = await ctx.pool.query<{ id: string; observed_status: string; observation_evidence_id: string | null }>(
+        `SELECT l.id, l.observed_status, l.observation_evidence_id
          FROM reservation_lines l
          JOIN transport_line_details t ON t.workspace_id = l.workspace_id AND t.line_id = l.id
          WHERE l.workspace_id = $1 AND l.reservation_id = $2
          AND l.product_type = 'TRANSPORT'
-         AND t.transport_service_id = $3
-         AND l.observed_status = 'CONFIRMED'`,
+         AND t.transport_service_id = $3`,
         [ctx.workspaceId, booking.reservationId, originalServiceId]
       );
 
       if (lineCheck.rows.length === 0) {
-        return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `booking ${booking.externalId} has no CONFIRMED transport line for service ${originalServiceId}` } };
+        return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `booking ${booking.externalId} has no transport line for service ${originalServiceId}` } };
       }
+
+      const cancelledByOtherEvidence = lineCheck.rows.some(
+        (line) => line.observed_status === 'CANCELLED' && line.observation_evidence_id !== evidenceId
+      );
+      if (cancelledByOtherEvidence) {
+        return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `booking ${booking.externalId} original service line was cancelled outside this disruption` } };
+      }
+
+      const confirmed = lineCheck.rows.filter((line) => line.observed_status === 'CONFIRMED');
+      const cancelledByThisEvent = lineCheck.rows.filter((line) => line.observed_status === 'CANCELLED' && line.observation_evidence_id === evidenceId);
+      if (confirmed.length > 0) anyConfirmed = true;
+      if (cancelledByThisEvent.length > 0) anyCancelledByThisEvent = true;
+      displacedLinesByBooking.set(booking.externalId, lineCheck.rows.map((line) => ({
+        id: line.id,
+        reservationId: booking.reservationId,
+        observedStatus: line.observed_status,
+        observationEvidenceId: line.observation_evidence_id,
+      })));
     }
 
-    // Step 3: Provenance - record source + evidence
-    const sourceId = minter.id('source', event.providerEventId);
+    if (!anyConfirmed && !anyCancelledByThisEvent) {
+      return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `no CONFIRMED transport line for service ${originalServiceId} and no in-progress cancellation from this event` } };
+    }
+
+    // Step 3: Provenance - record source + evidence.
+    // The evidence id was minted before Step 2's validation reads (it is the
+    // deterministic stamp that distinguishes THIS event's in-progress
+    // cancellations from any other line state), and the idempotent commands
+    // below replay their receipts when already applied.
+    const evidenceId = minter.id('evidence', event.providerEventId);
     const sourceResult = await recordSource(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
@@ -343,7 +452,6 @@ export async function acceptProviderDisruptionDemoEvent(
       return conflictError('failed to record source', sourceResult.conflict);
     }
 
-    const evidenceId = minter.id('evidence', event.providerEventId);
     const evidenceResult = await recordEvidence(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
@@ -360,21 +468,18 @@ export async function acceptProviderDisruptionDemoEvent(
       return conflictError('failed to record evidence', evidenceResult.conflict);
     }
 
-    // Step 4: Displacement - mark displaced lines as CANCELLED
+    // Step 4: Displacement — mark CONFIRMED original lines as CANCELLED.
+    // On retry, lines this event already cancelled are skipped (their state is
+    // the truthful in-progress displacement recorded above); only lines still
+    // CONFIRMED get the cancellation observation, each through its own
+    // idempotent command.
     const cancelledLineIds: string[] = [];
     for (const booking of affectedBookingSubjects) {
-      const lines = await ctx.pool.query<{ id: string; reservation_id: string }>(
-        `SELECT l.id, l.reservation_id
-         FROM reservation_lines l
-         JOIN transport_line_details t ON t.workspace_id = l.workspace_id AND t.line_id = l.id
-         WHERE l.workspace_id = $1 AND l.reservation_id = $2
-         AND l.product_type = 'TRANSPORT'
-         AND t.transport_service_id = $3
-         AND l.observed_status = 'CONFIRMED'`,
-        [ctx.workspaceId, booking.reservationId, originalServiceId]
-      );
+      for (const line of displacedLinesByBooking.get(booking.externalId) ?? []) {
+        if (line.observedStatus !== 'CONFIRMED') {
+          continue;
+        }
 
-      for (const line of lines.rows) {
         const reservationRevision = await readAggregateRevision(ctx.pool, ctx.workspaceId, booking.reservationId);
         const obsResult = await recordReservationLineObservation(ctx.uow(), {
           workspaceId: ctx.workspaceId,
@@ -399,27 +504,18 @@ export async function acceptProviderDisruptionDemoEvent(
       }
     }
 
-    // Step 5: Create replacement transport service
-    const originalService = await ctx.pool.query<{
-      origin_place_id: string;
-      destination_place_id: string;
-    }>(
-      'SELECT origin_place_id, destination_place_id FROM transport_services WHERE workspace_id = $1 AND id = $2',
-      [ctx.workspaceId, originalServiceId]
-    );
-
-    if (originalService.rows.length === 0) {
-      return { ok: false, error: { code: 'PROVIDER_INFO_UNAVAILABLE', message: `original service ${originalServiceId} not found` } };
-    }
-
-    const originalServiceRow = originalService.rows[0]!;
+    // Step 5: Create replacement transport service (F5: identity is minted
+    // from the provider service identity on the connection — the same
+    // replacement service on a later event resolves to the same canonical
+    // service, and an already-existing service row is reused below; F6: mode
+    // is derived from the original service, not hardcoded).
     const serviceResult = await createTransportService(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
       idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:replacement-service`,
       service: {
         id: replacementServiceId,
-        mode: 'AIR',
+        mode: replacementMode as 'AIR' | 'RAIL' | 'ROAD' | 'SEA',
         operator: event.replacementService.operator,
         originPlaceId: originalServiceRow.origin_place_id,
         destinationPlaceId: originalServiceRow.destination_place_id,
@@ -438,7 +534,19 @@ export async function acceptProviderDisruptionDemoEvent(
     });
 
     if (!serviceResult.ok) {
-      return conflictError('failed to create replacement service', serviceResult.conflict);
+      // F5: the replacement service identity is derived from the provider's
+      // service identity, so a service row that already exists for it is the
+      // SAME canonical service being discovered again (later event targeting
+      // the same real service, or this event retrying after a partial run) —
+      // reuse it rather than failing. Any conflict other than that duplicate
+      // is still surfaced.
+      const existing = await ctx.pool.query<{ id: string }>(
+        'SELECT id FROM transport_services WHERE workspace_id = $1 AND id = $2',
+        [ctx.workspaceId, replacementServiceId]
+      );
+      if (existing.rows.length === 0) {
+        return conflictError('failed to create replacement service', serviceResult.conflict);
+      }
     }
 
     // Step 6: Per displaced PNR - create replacement reservations
@@ -687,6 +795,24 @@ export async function acceptProviderDisruptionDemoEvent(
       }
 
       connectionRevision = linkBookingResult.value.connectionRevision;
+    }
+
+    // Step 8: Completion marker (F1) — the LAST required step. Only after
+    // every mutation above has committed does this durable receipt get
+    // written through its own idempotent M5 command; from then on, duplicate
+    // deliveries of the same provider event resolve ALREADY_APPLIED from this
+    // marker, never from "things exist".
+    const markerResult = await recordInformationRecord(ctx.uow(), {
+      workspaceId: ctx.workspaceId,
+      actorPrincipalId: ctx.actorPrincipalId,
+      idempotencyKey: `demo-ingress:${event.providerId}:${event.providerEventId}:completion-marker`,
+      informationRecordId: completionMarkerId,
+      externalPublicationKey: `provider-disruption:${event.providerId}:${event.providerEventId}`,
+      topic: `provider-disruption-completion:${event.providerId}:${event.providerEventId}`,
+      sourceConnectionIdentity: `provider-disruption:${event.providerId}:${event.providerEventId}`,
+    });
+    if (!markerResult.ok) {
+      return conflictError('failed to write disruption completion marker', markerResult.conflict);
     }
 
     return {

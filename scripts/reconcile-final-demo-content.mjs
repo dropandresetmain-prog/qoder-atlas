@@ -402,7 +402,9 @@ for (const ruleSet of prog.context.ruleSets || []) {
     if (rule.buffer) {
       rule.buffer.expectedMinutes = 150;
       rule.buffer.minimumMinutes = 150;
-      rule.buffer.conservativeMinutes = 150;
+      // conservativeMinutes is pack-stated (180) and is NOT overridden here:
+      // the fixture mirrors the pack's policy numbers; materialization reads
+      // minimumMinutes first, which is the 150-minute engine rule.
     }
   }
 }
@@ -679,6 +681,21 @@ for (const draftId of ['ait-draft-11', 'ait-draft-30']) {
 }
 
 // Assign declared travel for all NORTHSTAR_ARRANGED
+//
+// S1 supplier-disruption SSOT: exactly five CGK travellers are ticketed on the
+// synthetic Batik ID7159 baseline (data/ait-demo-input-pack/scenarios/
+// s1-supplier-disruption/inputs/baseline-itineraries.json, and the schedule
+// change lists exactly those five ticketedManagedTravellers). The CGK corridor
+// template must NOT sweep in every Jakarta-origin managed traveller — a sixth
+// phantom ticket would contradict the disruption event's blast radius.
+const CGK_ID7159_COHORT = new Set([
+  'ait-draft-14', // Sarah Lim — Day-1 headline interview (S1 critical)
+  'ait-draft-03', // Felix Hartono — Day-1 agentic provocation
+  'ait-draft-10', // Arjun Mehta — India fireside
+  'ait-draft-11', // Siti Rahman — payments panel
+  'ait-draft-30', // Mei Chen — payments panel
+]);
+
 let managed = 0;
 let withFlights = 0;
 let withStays = 0;
@@ -697,26 +714,30 @@ for (const t of travellers) {
 
   // Preserve hero-specific multi-leg if already richer and matching origin
   const existingLegs = (t.declaredTravel || []).filter((x) => x.itemKind === 'TRANSPORT_LEG');
-  let legs = corridor.legs(pnr);
-  if (t.draftId === 'ait-draft-09') {
+  let legs;
+  if (origin === 'CGK' && !CGK_ID7159_COHORT.has(t.draftId)) {
+    // CGK-origin but outside the ticketed cohort: no captured flight. The
+    // traveller keeps only their stay; no synthetic PNR is minted for them.
+    legs = [];
+  } else if (t.draftId === 'ait-draft-09') {
     legs = CORRIDORS.LAX.legs('ZGSYN09');
-  }
-  if (t.draftId === 'ait-draft-38' && existingLegs.length >= 2) {
+  } else if (t.draftId === 'ait-draft-38' && existingLegs.length >= 2) {
     legs = existingLegs.map((l) => ({
       ...l,
       bookingRef: l.bookingRef || { system: 'pnr', reference: pnr },
     }));
-  }
-  if (t.draftId === 'ait-draft-35' && existingLegs.length >= 2) {
+  } else if (t.draftId === 'ait-draft-35' && existingLegs.length >= 2) {
     legs = existingLegs.map((l) => ({
       ...l,
       bookingRef: l.bookingRef || { system: 'pnr', reference: pnr },
     }));
+  } else {
+    legs = corridor.legs(pnr);
   }
 
-  t.declaredTravel = [...legs, stay({ placeId, ...sw })];
-  withFlights++;
+  t.declaredTravel = legs.length > 0 ? [...legs, stay({ placeId, ...sw })] : [stay({ placeId, ...sw })];
   withStays++;
+  if (legs.length > 0) withFlights++;
 }
 
 const self = travellers.filter((t) => t.travelArrangement !== 'NORTHSTAR_ARRANGED').length;
@@ -754,7 +775,14 @@ function writeJson(file, value) {
 
 function replaceStrings(value, replacements) {
   if (typeof value === 'string') {
-    return replacements.reduce((result, [from, to]) => result.split(from).join(to), value);
+    return replacements.reduce(
+      (result, [from, to]) =>
+        // Regex entries are whole-word guards (e.g. /\bRESCHEDULE\b/g) so
+        // re-running the reconciliation cannot corrupt enum values like
+        // changeKind: 'RESCHEDULED'.
+        typeof from === 'string' ? result.split(from).join(to) : result.replace(from, to),
+      value,
+    );
   }
   if (Array.isArray(value)) return value.map((item) => replaceStrings(item, replacements));
   if (value && typeof value === 'object') {
@@ -1013,7 +1041,10 @@ for (const file of [
   const timeline = readJson(file);
   const impossible = timeline.stages.find((stage) => stage.id === 'zg053_impossible');
   if (impossible) impossible.phase = 'D3';
-  timeline.stages.push({
+  // Upsert, never append: re-running this reconciliation must not
+  // accumulate duplicate D4 stages.
+  const d4Index = timeline.stages.findIndex((stage) => stage.id === 'D4_connection_missed');
+  const d4 = {
     id: 'D4_connection_missed',
     at: '2026-09-29T17:20:00+09:00',
     eventId: 'sim-zg-evt-s2-delay-04',
@@ -1024,7 +1055,9 @@ for (const file of [
       connectionRemainingMinutes: -65,
     },
     narrative: 'D4: transfer is missed; reported TR867 airline default and TR885 Northstar recovery are evaluated against the 20:45 finals.',
-  });
+  };
+  if (d4Index >= 0) timeline.stages[d4Index] = d4;
+  else timeline.stages.push(d4);
   writeJson(file, timeline);
 }
 
@@ -1061,7 +1094,9 @@ for (const fileName of ['s1-airline-schedule-change.json', 's1-s3-continuity.jso
     ['09:20', '11:30'],
     ['360min', '150min'],
     ['360 minutes', '150 minutes'],
-    ['RESCHEDULE', 'bilateral Sarah↔Daniel swap'],
+    // Whole-word only: a bare 'RESCHEDULE' replace corrupts the
+    // 'changeKind' enum value 'RESCHEDULED' into nonsense on re-runs.
+    [/\bRESCHEDULE\b/g, 'bilateral Sarah↔Daniel swap'],
   ]);
   const ids = value.expect?.travellerIds ?? [];
   const trips = value.expect?.tripIds ?? [];
@@ -1090,7 +1125,7 @@ for (const fileName of ['s2-missed-connection.json', 's2-missed-connection-recor
 for (const fileName of ['s3-organiser-preview.json', 's3-organiser-preview-record.json']) {
   const file = path.join(MANIFEST_ROOT, fileName);
   const value = replaceStrings(readJson(file), [
-    ['RESCHEDULE', 'bilateral Sarah↔Daniel swap'],
+    [/\bRESCHEDULE\b/g, 'bilateral Sarah↔Daniel swap'],
     ['15:30', '14:30'],
     ['09:20', '11:30'],
     ['360min', '150min'],

@@ -86,9 +86,19 @@ function projectItem(world: CapturedWorld, travellerId: string, item: WJourneyIt
   };
 
   if (item.kind === 'TRANSPORT') {
+    // Cancelled-booking semantics (per item, truthful in both directions):
+    //   • cancelled lines superseded by ≥1 active booking for this item use the
+    //     active lines for CURRENT booking state — the traveller holds a live
+    //     booking, and the replacement is what the rest of the item projects;
+    //   • an item whose ONLY lines are cancelled keeps them, so its bookings
+    //     are INVALID and evaluation FAILs — a displaced booking with nothing
+    //     in its place is a real, blocking supplier-fulfilment failure;
+    //   • cancelled history is never erased: booking_validity keeps failing
+    //     explanations observable canonically (evaluators read this projection).
     const activeLines = lines.filter((l) => l.observedStatus !== 'CANCELLED');
-    const bookedServiceIds = [...new Set(activeLines.map((l) => l.transportServiceId).filter((id): id is string => id !== null))].sort();
-    const bookings = [...new Map(activeLines.map((l) => [l.id, bookingState(world, l)])).values()].sort((a, b) => a.lineRef.id.localeCompare(b.lineRef.id));
+    const currentLines = activeLines.length > 0 ? activeLines : lines;
+    const bookedServiceIds = [...new Set(currentLines.map((l) => l.transportServiceId).filter((id): id is string => id !== null))].sort();
+    const bookings = [...new Map(currentLines.map((l) => [l.id, bookingState(world, l)])).values()].sort((a, b) => a.lineRef.id.localeCompare(b.lineRef.id));
     if (item.selectedServiceId && bookedServiceIds.length > 0 && !bookedServiceIds.includes(item.selectedServiceId)) divergences.push('selected_service_differs_from_booked_service');
     if (bookedServiceIds.length > 1) divergences.push('multiple_booked_services_for_one_item');
     const serviceId = item.selectedServiceId ?? bookedServiceIds[0] ?? null;

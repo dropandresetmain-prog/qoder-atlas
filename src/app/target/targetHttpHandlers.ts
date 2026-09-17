@@ -52,6 +52,24 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
 }
 
+/**
+ * Distinguishes "no body at all" (zero bytes — e.g. the founder trigger's
+ * bodyless POST) from "a body that failed to parse as JSON". A non-empty
+ * body that isn't JSON is a malformed direct delivery and must surface as a
+ * validation failure, never silently fall back to file-driven behavior.
+ */
+async function readJsonOrMalformed(req: IncomingMessage): Promise<{ kind: 'empty' } | { kind: 'json'; body: unknown } | { kind: 'malformed'; message: string }> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  if (chunks.length === 0) return { kind: 'empty' };
+  const text = Buffer.concat(chunks).toString('utf8');
+  try {
+    return { kind: 'json', body: JSON.parse(text) as unknown };
+  } catch (error) {
+    return { kind: 'malformed', message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -327,20 +345,32 @@ export async function handleTargetProductHttp(
 
     if (req.method === 'POST' && pathname === '/api/v2/demo/provider-event/airline-rebooking') {
       // Two truthful delivery modes for the same provider-event boundary:
-      // a provider-shaped JSON body (direct delivery), or a bodyless POST
-      // from the founder trigger, which applies the organiser-disclosed
-      // input file configured for this runtime.
-      const body = (await readJson(req)) as ProviderShapedDemoEvent;
+      //   • zero body bytes — the founder trigger; applies the
+      //     organiser-disclosed input file configured for this runtime;
+      //   • a JSON body — a direct provider event delivery. It must carry the
+      //     disclosed event kind; anything else (malformed JSON, a different
+      //     event kind, a schema-invalid event) is a 400 VALIDATION_FAILED
+      //     with no mutation. A non-empty body never falls back to the file.
+      const read = await readJsonOrMalformed(req);
       let event: TransportServiceCancelledWithReprotectionEvent;
-      if (body && body.kind === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION') {
-        event = body;
-      } else {
+      if (read.kind === 'empty') {
         const eventFile = disruptionEventFileFromEnv();
         if (eventFile === undefined) {
           sendJson(res, 400, { code: 'VALIDATION_FAILED', message: 'no disclosed simulated airline event is configured on this runtime' });
           return true;
         }
         event = await loadDisclosedDisruptionEvent(eventFile);
+      } else if (read.kind === 'malformed') {
+        sendJson(res, 400, { code: 'VALIDATION_FAILED', message: `request body is not valid JSON: ${read.message}` });
+        return true;
+      } else if (
+        typeof read.body === 'object' && read.body !== null
+        && (read.body as { kind?: unknown }).kind === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION'
+      ) {
+        event = read.body as TransportServiceCancelledWithReprotectionEvent;
+      } else {
+        sendJson(res, 400, { code: 'VALIDATION_FAILED', message: 'direct provider event delivery requires kind TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION' });
+        return true;
       }
       const result = await acceptProviderDisruptionDemoEvent(commandCtx(ctx.app), event);
       if (!result.ok) {

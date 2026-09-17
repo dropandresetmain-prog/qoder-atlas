@@ -51,6 +51,7 @@ function addBooking(world: World, item: WJourneyItem, travellerId: string, opts:
   world.reservations.push({ id: reservationId, revision: 1, reservationType: 'TRANSPORT', observedStatus: opts.reservationStatus ?? 'CONFIRMED', observedStatusAt: NOW, responsibleOrganisationId: null, responsibleTravellerId: travellerId });
   world.reservationLines.push({ id: lineId, reservationId, productType: 'TRANSPORT', observedStatus: opts.lineStatus, observedStatusAt: NOW, evidenceId: `evid-${lineId}`, transportServiceId: opts.serviceId ?? null, resourceId: null, placeId: null, interval: null });
   world.allocations.push({ id: id(), reservationId, lineId, travellerId, journeyItemId: item.id, role: 'PASSENGER', quantity: 1 });
+  return { reservationId, lineId };
 }
 
 function numOperand(key: string, value: number): WConstraintDefinition['operands'][number] {
@@ -91,24 +92,48 @@ test('booking: all VALID bookings PASS supplier_fulfilled, each booking PASSes b
   assert.deepEqual(validity?.explanations[0]?.evidenceRefs, [{ kind: 'SUPPLIER_OBSERVATION', id: `evid-${world.reservationLines[0]!.id}`, detail: 'reservation_line_status' }]);
 });
 
-test('booking: a CANCELLED line is excluded from effective bookings (displaced lines do not block evaluation)', () => {
+test('booking: a CANCELLED-only item FAILs both supplier_fulfilment (booking_invalid) and booking_validity (booking_invalid), flexible or not', () => {
+  for (const flexible of [false, true]) {
+    const journeyId = id();
+    const travellerId = id();
+    const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+    const item = transportItem(journeyId, { flexible });
+    world.journeyItems.push(item);
+    addBooking(world, item, travellerId, { lineStatus: 'CANCELLED' });
+    const effective = effectiveOf(world);
+    // Cancelled history stays in the projection as an INVALID booking.
+    assert.equal(effective.journeys[0]!.items[0]!.bookings.length, 1);
+    const out = bookingEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective });
+    const supplier = out.dimensions.find((d) => d.dimension === 'supplier_fulfilment');
+    const validity = out.dimensions.find((d) => d.dimension === 'booking_validity');
+    assert.equal(supplier?.verdict, 'FAIL', `supplier_fulfilment FAILs (flexible=${flexible})`);
+    assert.equal(supplier?.explanations[0]?.reasonCode, 'booking_invalid');
+    assert.equal(validity?.verdict, 'FAIL', `booking_validity FAILs (flexible=${flexible})`);
+    assert.equal(validity?.explanations[0]?.reasonCode, 'booking_invalid');
+  }
+});
+
+test('booking: a cancelled original superseded by a confirmed replacement PASSes supplier_fulfilment with the replacement as the current booking', () => {
   const journeyId = id();
   const travellerId = id();
   const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
   const item = transportItem(journeyId);
   world.journeyItems.push(item);
-  addBooking(world, item, travellerId, { lineStatus: 'CANCELLED' });
+  addBooking(world, item, travellerId, { lineStatus: 'CANCELLED', serviceId: null });
+  const replacement = addBooking(world, item, travellerId, { lineStatus: 'CONFIRMED', serviceId: null });
   const effective = effectiveOf(world);
-  // CANCELLED lines are filtered out before computing effective bookings
-  assert.equal(effective.journeys[0]!.items[0]!.bookings.length, 0);
-  // With no bookings, supplier_fulfilment returns UNKNOWN (not FAIL)
+  // Current booking state is the active replacement; the cancelled original
+  // is no longer part of the item's effective bookings (superseded), while
+  // its history remains canonically observable in reservation_lines.
+  assert.equal(effective.journeys[0]!.items[0]!.bookings.length, 1);
+  assert.equal(effective.journeys[0]!.items[0]!.bookings[0]!.lineRef.id, replacement.lineId);
   const out = bookingEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective });
   const supplier = out.dimensions.find((d) => d.dimension === 'supplier_fulfilment');
   const validity = out.dimensions.find((d) => d.dimension === 'booking_validity');
-  assert.equal(supplier?.verdict, 'UNKNOWN');
-  assert.equal(supplier?.explanations[0]?.reasonCode, 'booking_missing');
-  assert.equal(validity?.verdict, 'UNKNOWN');
-  assert.equal(validity?.applicable, false);
+  assert.equal(supplier?.verdict, 'PASS');
+  assert.equal(supplier?.explanations[0]?.reasonCode, 'supplier_fulfilled');
+  assert.equal(validity?.verdict, 'PASS');
+  assert.equal(validity?.explanations[0]?.reasonCode, 'booking_valid');
 });
 
 test('booking: a HELD line UNKNOWNs both dimensions with booking_state_unknown', () => {

@@ -37,11 +37,35 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
   var inFlight = false;
   var pollUrl = '/api/v2/operator/overview?format=html';
 
+  // The simulated-airline-update trigger's last response-derived status text
+  // (set only from real HTTP outcomes of the operator's own click). It is
+  // re-applied to the fresh DOM after each swap so the operator's latest
+  // truthful feedback stays visible; it is never invented from business state.
+  var lastTriggerStatus = null;
+  var triggerApplyInFlight = false;
+
+  function applyTriggerStatus() {
+    if (lastTriggerStatus === null) return;
+    var box = document.querySelector('[data-test="simulated-airline-update"]');
+    var status = box ? box.querySelector('[data-test="simulated-airline-update-status"]') : null;
+    if (status) status.textContent = lastTriggerStatus;
+    var button = box ? box.querySelector('[data-test="simulated-airline-update-apply"]') : null;
+    if (button && triggerApplyInFlight) button.disabled = true;
+  }
+
   function swapRegions(doc) {
     var newMain = doc.querySelector('main[data-test="product-operator-overview"]');
     var curMain = document.querySelector('main[data-test="product-operator-overview"]');
     if (newMain && curMain) {
+      // User-opened disclosures must survive the swap: remember the airline
+      // update section's open state and restore it on the fresh node.
+      var curUpdate = curMain.querySelector('[data-test="simulated-airline-update"]');
+      var updateWasOpen = curUpdate ? curUpdate.hasAttribute('open') : false;
       curMain.outerHTML = newMain.outerHTML;
+      if (updateWasOpen) {
+        var newUpdate = document.querySelector('main[data-test="product-operator-overview"] [data-test="simulated-airline-update"]');
+        if (newUpdate) newUpdate.setAttribute('open', '');
+      }
     }
     // Swap the topbar so the decision count in nav stays current.
     var newTopbar = doc.querySelector('header.topbar');
@@ -77,6 +101,7 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
         if (!parsedMain) throw new Error('No overview main in response');
         swapRegions(doc);
         restoreProfileMenuState(profileWasOpen);
+        applyTriggerStatus();
         // Clear stale marker if it was set from a prior failure.
         var m = document.querySelector('main[data-test="product-operator-overview"]');
         if (m) m.classList.remove('is-stale');
@@ -110,7 +135,11 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
     var configured = box ? box.getAttribute('data-configured') === 'true' : false;
     if (!configured) return;
     button.disabled = true;
-    if (status) status.textContent = 'Applying…';
+    triggerApplyInFlight = true;
+    if (status) {
+      lastTriggerStatus = 'Applying…';
+      status.textContent = lastTriggerStatus;
+    }
     fetch('/api/v2/demo/provider-event/airline-rebooking', { method: 'POST', headers: { 'Accept': 'application/json' } })
       .then(function(r) {
         return r.text().then(function(text) {
@@ -120,24 +149,25 @@ export function renderOverviewPollingScript(options?: { intervalMs?: number }): 
         });
       })
       .then(function(r) {
+        triggerApplyInFlight = false;
         if (r.ok) {
-          if (status) {
-            status.textContent = r.body && r.body.status === 'ALREADY_APPLIED'
-              ? 'Already applied. No duplicate incident created.'
-              : 'Applied. Authoritative state will refresh automatically.';
-          }
+          lastTriggerStatus = r.body && r.body.status === 'ALREADY_APPLIED'
+            ? 'Already applied. No duplicate incident created.'
+            : 'Applied. Authoritative state will refresh automatically.';
+          if (status) status.textContent = lastTriggerStatus;
           refresh();
         } else {
           var code = r.body && r.body.code ? r.body.code + ': ' : '';
           var message = r.body && r.body.message ? r.body.message : r.raw;
-          if (status) {
-            status.textContent = 'The simulated update was not applied. ' + code + message;
-          }
+          lastTriggerStatus = 'The simulated update was not applied. ' + code + message;
+          if (status) status.textContent = lastTriggerStatus;
           button.disabled = false;
         }
       })
       .catch(function() {
-        if (status) status.textContent = 'The simulated update was not applied. Network error.';
+        triggerApplyInFlight = false;
+        lastTriggerStatus = 'The simulated update was not applied. Network error.';
+        if (status) status.textContent = lastTriggerStatus;
         button.disabled = false;
       });
   });

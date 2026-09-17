@@ -3227,30 +3227,6 @@
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
           {
-            "itemKind": "TRANSPORT_LEG",
-            "mode": "FLIGHT",
-            "originRef": {
-              "system": "airport-code",
-              "value": "CGK"
-            },
-            "destinationRef": {
-              "system": "airport-code",
-              "value": "SIN"
-            },
-            "scheduledDeparture": "2026-09-30T17:45:00+07:00",
-            "scheduledArrival": "2026-09-30T20:30:00+08:00",
-            "carrierRef": {
-              "system": "flight-number",
-              "value": "ID7159"
-            },
-            "bookingRef": {
-              "system": "pnr",
-              "reference": "IDSYN19"
-            },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
-          },
-          {
             "itemKind": "STAY",
             "stayPlaceRef": {
               "system": "place-id",
