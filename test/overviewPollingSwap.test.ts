@@ -10,6 +10,8 @@ import { renderOverviewPollingScript } from '../src/ui/polling.ts';
 
 // ── Minimal DOM stub ────────────────────────────────────────────────────────
 
+type TriggerEvent = { type: string; target: StubElement; preventDefault: () => void };
+
 class StubElement {
   tagName: string;
   attrs: Map<string, string>;
@@ -18,7 +20,7 @@ class StubElement {
   parent: StubElement | null = null;
   text = '';
   disabled = false;
-  private _listeners = new Map<string, Function[]>();
+  private _listeners = new Map<string, Array<(ev: TriggerEvent) => void>>();
 
   constructor(tag: string, attrs: Record<string, string> = {}) {
     this.tagName = tag;
@@ -68,19 +70,14 @@ class StubElement {
   }
 
   closest(sel: string): StubElement | null {
-    let n: StubElement | null = this;
-    while (n) {
-      if (matchFull(n, sel)) return n;
-      n = n.parent;
-    }
-    return null;
+    if (matchFull(this, sel)) return this;
+    return this.parent?.closest(sel) ?? null;
   }
 
   get classList() {
-    const s = this;
     return {
-      add(c: string) { s.classes.add(c); },
-      remove(c: string) { s.classes.delete(c); },
+      add: (c: string) => { this.classes.add(c); },
+      remove: (c: string) => { this.classes.delete(c); },
     };
   }
 
@@ -93,7 +90,7 @@ class StubElement {
     this.children = [];
   }
 
-  addEventListener(type: string, fn: Function) {
+  addEventListener(type: string, fn: (ev: TriggerEvent) => void) {
     if (!this._listeners.has(type)) this._listeners.set(type, []);
     this._listeners.get(type)!.push(fn);
   }
@@ -126,7 +123,7 @@ function parse(html: string): StubElement[] {
         }
         pos++;
         let tag = '';
-        while (pos < html.length && !/[\s>\/]/.test(html[pos]!)) {
+        while (pos < html.length && !/[\s>/]/.test(html[pos]!)) {
           tag += html[pos];
           pos++;
         }
@@ -136,7 +133,7 @@ function parse(html: string): StubElement[] {
           while (pos < html.length && /\s/.test(html[pos]!)) pos++;
           if (html[pos] === '>' || html[pos] === '/') break;
           let name = '';
-          while (pos < html.length && !/[\s=>\/]/.test(html[pos]!)) {
+          while (pos < html.length && !/[\s=>/]/.test(html[pos]!)) {
             name += html[pos];
             pos++;
           }
@@ -230,12 +227,24 @@ function responseHTML(opts: { disclosureOpen?: boolean; statusText?: string } = 
   return `<main data-test="product-operator-overview"><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply">Apply</button></details></main><header class="topbar">Nav</header>`;
 }
 
+interface TriggerResponseShape {
+  ok: boolean;
+  status: number;
+  body?: unknown;
+  raw?: string;
+}
+
+interface WindowStub {
+  __northstarRefreshOverview?: () => void;
+  [key: string]: unknown;
+}
+
 interface Env {
-  window: Record<string, any>;
+  window: WindowStub;
   doc: StubElement;
   setOverviewHTML: (html: string) => void;
-  setTriggerResponse: (r: { ok: boolean; status: number; body?: any; raw?: string }) => void;
-  intervals: Array<{ cb: Function; ms: number }>;
+  setTriggerResponse: (r: TriggerResponseShape) => void;
+  intervals: Array<{ cb: () => void; ms: number }>;
 }
 
 function createEnv(domOpts: { disclosureOpen?: boolean; statusText?: string } = {}): Env {
@@ -261,7 +270,7 @@ function createEnv(domOpts: { disclosureOpen?: boolean; statusText?: string } = 
   topbar.text = 'Nav';
   doc.appendChild(topbar);
 
-  const win: Record<string, any> = {};
+  const win: WindowStub = {};
   let overviewHTML = responseHTML();
   let triggerResp = { ok: true, status: 200, raw: '{}' };
 
@@ -279,8 +288,8 @@ function createEnv(domOpts: { disclosureOpen?: boolean; statusText?: string } = 
     return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('') });
   };
 
-  const intervals: Array<{ cb: Function; ms: number }> = [];
-  const setIntervalStub = (cb: Function, ms: number) => {
+  const intervals: Array<{ cb: () => void; ms: number }> = [];
+  const setIntervalStub = (cb: () => void, ms: number) => {
     intervals.push({ cb, ms });
     return intervals.length;
   };
@@ -303,7 +312,9 @@ function createEnv(domOpts: { disclosureOpen?: boolean; statusText?: string } = 
 
   const script = renderOverviewPollingScript();
   const body = script.replace(/<\/?script>/g, '');
-  const fn = new Function('window', 'document', 'DOMParser', 'fetch', 'setInterval', 'console', body);
+  const fn = new Function(
+    'window', 'document', 'DOMParser', 'fetch', 'setInterval', 'console', body,
+  ) as (w: Record<string, unknown>, d: StubElement, p: unknown, f: unknown, s: unknown, c: unknown) => void;
   fn(win, doc, StubDOMParser, fetchStub, setIntervalStub, { warn() {} });
 
   return {
@@ -337,7 +348,7 @@ test('Scenario A: user-opened disclosure survives the main swap', async () => {
   const env = createEnv({ disclosureOpen: true });
   // Response HTML has details WITHOUT open attribute.
   env.setOverviewHTML(responseHTML({ disclosureOpen: false }));
-  env.window.__northstarRefreshOverview();
+  env.window.__northstarRefreshOverview!();
   await flush();
   const details = env.doc.querySelector('[data-test="simulated-airline-update"]');
   assert.ok(details, 'details element must exist after swap');
@@ -395,7 +406,7 @@ test('Scenario C2: no invented business state on plain refresh', async () => {
   const env = createEnv({ disclosureOpen: false, statusText: 'Initial' });
   // No click — lastTriggerStatus stays null.
   env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: serverStatusText }));
-  env.window.__northstarRefreshOverview();
+  env.window.__northstarRefreshOverview!();
   await flush();
   const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
   assert.ok(status);
