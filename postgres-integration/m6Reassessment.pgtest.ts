@@ -229,3 +229,123 @@ describe('M6 reassessment worker', () => {
     assert.equal((await currentAssessmentView(f.pool, f.seed.workspaceId, f.journey, 'VIABILITY', NOW)).status, 'PENDING_REASSESSMENT');
   });
 });
+
+async function pendingCount(pool: Pool, workspaceId: string): Promise<number> {
+  const result = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM scheduled_reassessments WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
+    [workspaceId],
+  );
+  return Number(result.rows[0]!.n);
+}
+
+describe('M6 reassessment worker drain', () => {
+  async function manyJourneys(count: number): Promise<{
+    pool: Pool;
+    workspaceId: string;
+    journeys: TypedRef[];
+    serviceId: string;
+  }> {
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'M6 drain fixture');
+    const geo = await seedJurisdictionWithPlaces(seed, { name: 'Regime', places: [{ name: 'A', placeType: 'STATION' }, { name: 'B', placeType: 'STATION' }] });
+    const tripId = await seedTrip(seed);
+    const serviceId = await seedService(seed, { mode: 'RAIL', operator: 'Operator', originPlaceId: geo.placeIds[0]!, destinationPlaceId: geo.placeIds[1]!, published: { departure: '2031-05-02T08:00:00.000Z', arrival: '2031-05-02T09:00:00.000Z' } });
+    const journeys: TypedRef[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const travellerId = (await seedTraveller(seed)).travellerId;
+      const journeyId = await seedJourney(seed, { tripId, travellerId });
+      await seedTransportIntent(seed, { journeyId, orderKey: '010', originPlaceId: geo.placeIds[0]!, destinationPlaceId: geo.placeIds[1]!, selectedServiceId: serviceId });
+      journeys.push({ kind: 'JOURNEY', id: journeyId });
+    }
+    await commitSeed(seed);
+    for (const journey of journeys) {
+      const world = await captureWorld(pool, { workspaceId: seed.workspaceId, focus: [journey], at: NOW, informationTopics: registry.informationTopics });
+      const { result } = assessSubject({ registry, world, effective: projectEffectiveWorld(world), subject: journey, now: NOW, assessmentId: randomUUID() });
+      await saveAssessment(pool, seed.workspaceId, result, 'principal:m6-drain');
+    }
+    await pool.query('UPDATE aggregate_heads SET revision = revision + 1 WHERE workspace_id = $1 AND aggregate_id = $2', [seed.workspaceId, serviceId]);
+    return { pool, workspaceId: seed.workspaceId, journeys, serviceId };
+  }
+
+  const drainPipeline = (pool: Pool): ReassessmentPipeline => async (claim, assessmentId) => {
+    const world = await captureWorld(pool, { workspaceId: claim.workspaceId, focus: [claim.subject], at: NOW, informationTopics: registry.informationTopics });
+    return assessSubject({ registry, world, effective: projectEffectiveWorld(world), subject: claim.subject, now: NOW, assessmentId }).result;
+  };
+
+  test('drains every runnable item in one wake without sleeping between claims', async () => {
+    const f = await manyJourneys(8);
+    assert.equal(await pendingCount(f.pool, f.workspaceId), 8);
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain' });
+    const started = Date.now();
+    const drain = await worker.drainAvailable(NOW, drainPipeline(f.pool), { workspaceId: f.workspaceId, concurrency: 1 });
+    const elapsed = Date.now() - started;
+    assert.equal(drain.stoppedReason, 'EMPTY');
+    assert.equal(drain.processed, 8);
+    assert.equal(drain.outcomes.COMPLETED, 8);
+    assert.equal(await pendingCount(f.pool, f.workspaceId), 0);
+    assert.ok(elapsed < 8_000, `continuous drain must not pay the 2s idle cadence per item; elapsed=${elapsed}ms`);
+  });
+
+  test('claims a concurrent batch in one wake and still drains to empty', async () => {
+    const f = await manyJourneys(8);
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain-batch' });
+    const drain = await worker.drainAvailable(NOW, drainPipeline(f.pool), { workspaceId: f.workspaceId, concurrency: 4 });
+    assert.equal(drain.stoppedReason, 'EMPTY');
+    assert.ok(drain.processed >= 8, `processed ${drain.processed} claims for 8 subjects`);
+    assert.equal(await pendingCount(f.pool, f.workspaceId), 0);
+    for (const journey of f.journeys) {
+      assert.equal((await currentAssessmentView(f.pool, f.workspaceId, journey, 'VIABILITY', NOW)).status, 'CURRENT');
+    }
+  });
+
+  test('stops at maxItems while leaving remaining work pending', async () => {
+    const f = await manyJourneys(6);
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain-budget' });
+    const drain = await worker.drainAvailable(NOW, drainPipeline(f.pool), { workspaceId: f.workspaceId, concurrency: 2, maxItems: 3 });
+    assert.equal(drain.stoppedReason, 'MAX_ITEMS');
+    assert.equal(drain.processed, 3);
+    assert.equal(await pendingCount(f.pool, f.workspaceId), 3);
+  });
+
+  test('stops at maxMs rather than spinning', async () => {
+    const f = await manyJourneys(4);
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain-time' });
+    const slow: ReassessmentPipeline = async (claim, assessmentId) => {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return drainPipeline(f.pool)(claim, assessmentId);
+    };
+    const drain = await worker.drainAvailable(NOW, slow, { workspaceId: f.workspaceId, concurrency: 1, maxMs: 50 });
+    assert.equal(drain.stoppedReason, 'MAX_MS');
+    assert.equal(drain.processed, 1);
+    assert.ok((await pendingCount(f.pool, f.workspaceId)) >= 3);
+  });
+
+  test('one failed assessment does not drop remaining runnable work', async () => {
+    const f = await manyJourneys(5);
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain-fail', maxAttempts: 3 });
+    let failed = 0;
+    const mixed: ReassessmentPipeline = async (claim, assessmentId) => {
+      if (failed === 0) {
+        failed += 1;
+        throw new Error('source reader unavailable');
+      }
+      return drainPipeline(f.pool)(claim, assessmentId);
+    };
+    const drain = await worker.drainAvailable(NOW, mixed, { workspaceId: f.workspaceId, concurrency: 1 });
+    assert.equal(drain.stoppedReason, 'EMPTY');
+    assert.equal(drain.processed, 5);
+    assert.equal(drain.outcomes.RETRY_SCHEDULED, 1);
+    assert.equal(drain.outcomes.COMPLETED, 4);
+    assert.equal(await pendingCount(f.pool, f.workspaceId), 1, 'the failed unit remains pending with backoff; the rest completed');
+  });
+
+  test('an empty queue returns EMPTY and claims nothing', async () => {
+    const f = await fixture();
+    await assessNow(f);
+    const worker = new PgReassessmentWorker(f.pool, { actorId: 'principal:m6-drain-empty' });
+    const drain = await worker.drainAvailable(NOW, pipeline(f), { workspaceId: f.seed.workspaceId });
+    assert.equal(drain.processed, 0);
+    assert.equal(drain.stoppedReason, 'EMPTY');
+    assert.deepEqual(drain.outcomes, {});
+  });
+});

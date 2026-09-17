@@ -23,7 +23,13 @@ import { composeTargetApplication, type TargetApplication } from '../src/app/tar
 import { handleTargetProductHttp } from '../src/app/target/targetHttpHandlers.ts';
 import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from '../src/app/demo/externalIdentity.ts';
-import { currentAssessmentView, PgReassessmentWorker, type ReassessmentClaim } from '../src/persistence/postgres/world/pgAssessments.ts';
+import {
+  currentAssessmentView,
+  PgReassessmentWorker,
+  REASSESSMENT_DRAIN_CONCURRENCY,
+  REASSESSMENT_DRAIN_MAX_MS,
+  type ReassessmentClaim,
+} from '../src/persistence/postgres/world/pgAssessments.ts';
 import { captureWorld } from '../src/persistence/postgres/world/pgCurrentState.ts';
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
 import { assessSubject } from '../src/resolution/evaluation/assess.ts';
@@ -562,6 +568,46 @@ describe('T2 provider disruption + reprotection ingress', () => {
       reassessmentCountAfter > reassessmentCountBeforeIngress!,
       'scheduled_reassessments count increased after ingress',
     );
+
+    const pending = await pool.query<{
+      id: string;
+      subject_kind: string;
+      assessment_kind: string;
+      reason: string;
+      cause_input_key: string | null;
+      state: string;
+    }>(
+      `SELECT id, subject_kind, assessment_kind, reason, cause_input_key, state
+         FROM scheduled_reassessments
+        WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')
+        ORDER BY subject_kind, subject_id, assessment_kind`,
+      [workspaceId],
+    );
+    const byReason = new Map<string, number>();
+    const byCauseKind = new Map<string, number>();
+    const causeKeys = new Map<string, number>();
+    for (const row of pending.rows) {
+      byReason.set(row.reason, (byReason.get(row.reason) ?? 0) + 1);
+      const cause = row.cause_input_key ?? '(null)';
+      causeKeys.set(cause, (causeKeys.get(cause) ?? 0) + 1);
+      const pipe = cause.indexOf('|');
+      const kindAndKey = pipe >= 0 ? cause.slice(pipe + 1) : cause;
+      const colon = kindAndKey.indexOf(':');
+      const causeKind = colon >= 0 ? `${cause.slice(0, Math.max(pipe, 0))}|${kindAndKey.slice(0, colon)}` : cause;
+      byCauseKind.set(causeKind, (byCauseKind.get(causeKind) ?? 0) + 1);
+    }
+    const topCauses = [...causeKeys.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12);
+    console.log(
+      JSON.stringify({
+        tag: 'T2-DRAIN-MEASURE-ENQUEUE',
+        pending: pending.rowCount,
+        subjectKinds: [...new Set(pending.rows.map((r) => r.subject_kind))],
+        byReason: Object.fromEntries(byReason),
+        byCauseKind: Object.fromEntries([...byCauseKind.entries()].sort((a, b) => b[1] - a[1])),
+        distinctCauseKeys: causeKeys.size,
+        topCauses: topCauses.map(([key, n]) => ({ key, n })),
+      }),
+    );
   });
 
   test('step 8: real worker processes them — run PgReassessmentWorker.runOnce with the real pipeline, then assert the authoritative assessment view', async () => {
@@ -591,8 +637,8 @@ describe('T2 provider disruption + reprotection ingress', () => {
     };
 
     // Run the worker until all work is processed. The dataset materializes 67
-    // journeys, so the m6_aggregate_head_changed trigger enqueues 67 reassess-
-    // ment units for this ingress; drain ALL of them (plus any later waves from
+    // journeys, so reservation-head reverse lookup enqueues 67 reassessment
+    // units for this ingress; drain ALL of them (plus any later waves from
     // cross-journey manifest reads) before asserting views — a partial drain
     // leaves legitimately-stale views for journeys re-assessed before peers'
     // heads settled.
@@ -601,13 +647,26 @@ describe('T2 provider disruption + reprotection ingress', () => {
       `SELECT count(*)::text AS n FROM scheduled_reassessments WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
       [workspaceId],
     );
-    const budget = Number(pendingBefore.rows[0]!.n) + 20;
-    let iterations = 0;
-    while (iterations < budget) {
-      const outcome = await worker.runOnce(now, pipeline, workspaceId);
-      if (!outcome.claimed) break;
-      iterations++;
-    }
+    const pendingCount = Number(pendingBefore.rows[0]!.n);
+    const drainStarted = Date.now();
+    const drain = await worker.drainAvailable(now, pipeline, {
+      workspaceId,
+      concurrency: REASSESSMENT_DRAIN_CONCURRENCY,
+      maxItems: pendingCount + 20,
+      maxMs: REASSESSMENT_DRAIN_MAX_MS,
+    });
+    const drainMs = Date.now() - drainStarted;
+    console.log(
+      JSON.stringify({
+        tag: 'T2-DRAIN-MEASURE-WORKER-AFTER',
+        pendingBefore: pendingCount,
+        processed: drain.processed,
+        stoppedReason: drain.stoppedReason,
+        outcomes: drain.outcomes,
+        drainMs,
+        elapsedMs: drain.elapsedMs,
+      }),
+    );
     const openAfterDrain = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM scheduled_reassessments WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
       [workspaceId],
@@ -616,7 +675,12 @@ describe('T2 provider disruption + reprotection ingress', () => {
       Number(openAfterDrain.rows[0]!.n), 0,
       'all reassessment units drained before asserting views',
     );
-    assert.ok(iterations > 0, 'worker processed at least one unit of work');
+    assert.ok(drain.processed > 0, 'worker processed at least one unit of work');
+    assert.equal(drain.stoppedReason, 'EMPTY', 'drain stopped because the queue was empty');
+    assert.ok(
+      drain.elapsedMs < pendingCount * 2_000,
+      `drain must not pay the 2s idle cadence per item; elapsed=${drain.elapsedMs}ms pending=${pendingCount}`,
+    );
 
     // Now assert the authoritative assessment view for each affected traveller.
     // Sarah (IDSYN14): FAIL insufficient_arrival_readiness with 60 min available vs 150 required.

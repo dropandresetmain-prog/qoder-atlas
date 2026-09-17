@@ -92,18 +92,11 @@ async function overallVerdict(
 async function drainReassessment(
   app: TargetApplication,
   pipeline: ReassessmentPipeline,
-  maxRounds = 30,
 ): Promise<void> {
-  for (let i = 0; i < maxRounds; i++) {
-    await app.reassessmentWorker.runOnce(NOW, pipeline, app.workspaceId);
-    const pending = await app.pool.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM scheduled_reassessments
-        WHERE workspace_id = $1 AND state IN ('PENDING', 'CLAIMED')`,
-      [app.workspaceId],
-    );
-    if (pending.rows[0]!.n === '0') return;
+  const drain = await app.reassessmentWorker.drainAvailable(NOW, pipeline, { workspaceId: app.workspaceId });
+  if (drain.stoppedReason !== 'EMPTY') {
+    assert.fail(`reassessment worker did not drain pending work: ${JSON.stringify(drain)}`);
   }
-  assert.fail('reassessment worker did not drain pending work');
 }
 
 describe('M9 Sarah target PG E2E (composeTargetApplication)', () => {

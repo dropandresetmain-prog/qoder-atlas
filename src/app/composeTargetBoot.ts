@@ -20,7 +20,10 @@ import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
 import { createM6Registry } from '../resolution/evaluation/registry.ts';
 import { assessSubject } from '../resolution/evaluation/assess.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
-import type { ReassessmentPipeline } from '../persistence/postgres/world/pgAssessments.ts';
+import {
+  startReassessmentDrainLoop,
+  type ReassessmentPipeline,
+} from '../persistence/postgres/world/pgAssessments.ts';
 import type { Pool } from '../persistence/postgres/pool.ts';
 
 export interface TargetBootConfig {
@@ -71,15 +74,13 @@ export interface ComposedTargetBoot {
   close(): Promise<void>;
 }
 
-const REASSESSMENT_POLL_MS = 2_000;
-
 export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): Promise<ComposedTargetBoot> {
   const config = loadTargetBootConfig(env);
   // `composeTargetApplication`'s own startReassessmentWorker option needs the
   // pipeline at composition time, but the pipeline needs the pool that
-  // composition itself produces — compose without it, then poll the already-
-  // constructed `reassessmentWorker` directly (same call
-  // `composeTargetApplication` would have made internally).
+  // composition itself produces — compose without it, then drain the already-
+  // constructed `reassessmentWorker` on the idle cadence (same loop
+  // `composeTargetApplication` starts internally).
   const endpoints = await composeTargetEndpoints({ workspaceId: config.workspaceId, env });
   // Idempotent boot-time provisioning (same category as composeTargetRuntime
   // already running schema migrations at boot) — not a data/authority
@@ -126,17 +127,14 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
   }
 
   const pipeline = buildReassessmentPipeline(endpoints.app.pool);
-  const pollTimer = setInterval(() => {
-    void endpoints.app.reassessmentWorker
-      .runOnce(new Date().toISOString(), pipeline, config.workspaceId)
-      .catch(() => undefined);
-  }, REASSESSMENT_POLL_MS);
-  pollTimer.unref?.();
+  const stopDrain = startReassessmentDrainLoop(endpoints.app.reassessmentWorker, pipeline, {
+    workspaceId: config.workspaceId,
+  });
   return {
     config,
     endpoints,
     async close() {
-      clearInterval(pollTimer);
+      stopDrain();
       await endpoints.close();
     },
   };

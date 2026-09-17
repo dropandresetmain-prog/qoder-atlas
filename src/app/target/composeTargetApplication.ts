@@ -17,6 +17,7 @@ import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import {
   PgReassessmentWorker,
+  startReassessmentDrainLoop,
   type ReassessmentPipeline,
 } from '../../persistence/postgres/world/pgAssessments.ts';
 import { M9_REPLAN_IDENTITY } from './replanIdentity.ts';
@@ -29,7 +30,7 @@ export interface TargetApplicationOptions {
   env?: NodeJS.ProcessEnv;
   /**
    * Optional reassessment pipeline. When provided with startReassessmentWorker,
-   * the worker polls via runOnce.
+   * the worker drains runnable work each idle poll instead of one claim per wake.
    */
   reassessmentPipeline?: ReassessmentPipeline;
   startReassessmentWorker?: boolean;
@@ -61,14 +62,12 @@ export async function composeTargetApplication(
   const actorId = options.actorId ?? `m9-app:${options.workspaceId}`;
   const reassessmentWorker = new PgReassessmentWorker(runtime.pool, { actorId });
 
-  let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let stopDrain: (() => void) | undefined;
   if (options.startReassessmentWorker && options.reassessmentPipeline) {
-    const pipeline = options.reassessmentPipeline;
-    const ms = options.reassessmentPollMs ?? 2_000;
-    pollTimer = setInterval(() => {
-      void reassessmentWorker.runOnce(new Date().toISOString(), pipeline, options.workspaceId).catch(() => undefined);
-    }, ms);
-    pollTimer.unref?.();
+    stopDrain = startReassessmentDrainLoop(reassessmentWorker, options.reassessmentPipeline, {
+      workspaceId: options.workspaceId,
+      pollMs: options.reassessmentPollMs,
+    });
   }
 
   return {
@@ -82,7 +81,7 @@ export async function composeTargetApplication(
     objectiveDispositionApiExposed: M9_OBJECTIVE_DISPOSITION_API_EXPOSED,
     sqliteAuthoritativeFallback: false,
     async close() {
-      if (pollTimer) clearInterval(pollTimer);
+      stopDrain?.();
       await runtime.close();
     },
   };

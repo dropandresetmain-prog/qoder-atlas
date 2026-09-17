@@ -262,6 +262,29 @@ export interface WorkerOutcome {
   error?: string;
 }
 
+export interface ReassessmentDrainBudget {
+  workspaceId?: string;
+  /** Max claims to process in this wake. Prevents a hot loop if work keeps being re-enqueued. */
+  maxItems?: number;
+  /** Wall-clock budget in ms for this wake. */
+  maxMs?: number;
+  /** Concurrent in-flight claims. Each claim still has its own lease/transaction. */
+  concurrency?: number;
+}
+
+export interface ReassessmentDrainResult {
+  processed: number;
+  stoppedReason: 'EMPTY' | 'MAX_ITEMS' | 'MAX_MS';
+  elapsedMs: number;
+  outcomes: Partial<Record<NonNullable<WorkerOutcome['result']>, number>>;
+}
+
+/** Idle cadence once a wake finds no runnable work (or hits its budget). */
+export const REASSESSMENT_IDLE_POLL_MS = 2_000;
+export const REASSESSMENT_DRAIN_MAX_ITEMS = 250;
+export const REASSESSMENT_DRAIN_MAX_MS = 30_000;
+export const REASSESSMENT_DRAIN_CONCURRENCY = 4;
+
 const COMPLETE_RETRYABLE_CODES = new Set(['40001', '40P01', '23505']);
 
 function isCompleteRetryableError(error: unknown): boolean {
@@ -409,15 +432,138 @@ export class PgReassessmentWorker {
   async runOnce(now: Instant, pipeline: ReassessmentPipeline, workspaceId?: string): Promise<WorkerOutcome> {
     const claim = await this.claim(now, workspaceId);
     if (!claim) return { claimed: false };
+    const processed = await this.processClaim(claim, pipeline, now);
+    return { claimed: true, ...processed };
+  }
+
+  /**
+   * Drain runnable work in this wake: claim a bounded batch, process it, and
+   * immediately claim another batch while work remains. Stops when the queue
+   * is empty or the work/time budget is reached — never an infinite hot loop.
+   * One failed assessment does not abort remaining claims.
+   */
+  async drainAvailable(
+    now: Instant,
+    pipeline: ReassessmentPipeline,
+    budget: ReassessmentDrainBudget = {},
+  ): Promise<ReassessmentDrainResult> {
+    const maxItems = budget.maxItems ?? REASSESSMENT_DRAIN_MAX_ITEMS;
+    const maxMs = budget.maxMs ?? REASSESSMENT_DRAIN_MAX_MS;
+    const concurrency = Math.max(1, budget.concurrency ?? 1);
+    const started = Date.now();
+    const outcomes: ReassessmentDrainResult['outcomes'] = {};
+    let processed = 0;
+
+    const tally = (result: WorkerOutcome['result']): void => {
+      if (!result) return;
+      outcomes[result] = (outcomes[result] ?? 0) + 1;
+    };
+
+    while (processed < maxItems && Date.now() - started < maxMs) {
+      const batchSize = Math.min(concurrency, maxItems - processed);
+      const claims: ReassessmentClaim[] = [];
+      for (let i = 0; i < batchSize; i += 1) {
+        const claim = await this.claim(now, budget.workspaceId);
+        if (!claim) break;
+        claims.push(claim);
+      }
+      if (claims.length === 0) {
+        return { processed, stoppedReason: 'EMPTY', elapsedMs: Date.now() - started, outcomes };
+      }
+      // Capture/evaluate may run concurrently. Complete/fail stay serial so
+      // SERIALIZABLE assessment writes do not fence each other out.
+      const prepared = await Promise.all(claims.map(async (claim) => {
+        const assessmentId = randomUUID();
+        try {
+          const result = await pipeline(claim, assessmentId);
+          return { claim, ok: true as const, result };
+        } catch (error) {
+          return { claim, ok: false as const, error };
+        }
+      }));
+      for (const item of prepared) {
+        processed += 1;
+        try {
+          if (!item.ok) {
+            tally(await this.fail(item.claim, item.error, now));
+          } else {
+            tally(await this.complete(item.claim, item.result));
+          }
+        } catch {
+          // A non-retryable complete() error must not abort remaining claims.
+          // The row stays CLAIMED until lease expiry, matching runOnce.
+        }
+      }
+    }
+
+    return {
+      processed,
+      stoppedReason: processed >= maxItems ? 'MAX_ITEMS' : 'MAX_MS',
+      elapsedMs: Date.now() - started,
+      outcomes,
+    };
+  }
+
+  private async processClaim(
+    claim: ReassessmentClaim,
+    pipeline: ReassessmentPipeline,
+    now: Instant,
+  ): Promise<Omit<WorkerOutcome, 'claimed'>> {
     const assessmentId = randomUUID();
     let result: AssessmentResult;
     try {
       result = await pipeline(claim, assessmentId);
     } catch (error) {
       const outcome = await this.fail(claim, error, now);
-      return { claimed: true, result: outcome, error: error instanceof Error ? error.message : String(error) };
+      return { result: outcome, error: error instanceof Error ? error.message : String(error) };
     }
     const done = await this.complete(claim, result);
-    return { claimed: true, result: done, ...(done === 'COMPLETED' ? { assessmentId } : {}) };
+    return { result: done, ...(done === 'COMPLETED' ? { assessmentId } : {}) };
   }
+}
+
+export interface ReassessmentDrainLoopOptions {
+  workspaceId?: string;
+  pollMs?: number;
+  maxItems?: number;
+  maxMs?: number;
+  concurrency?: number;
+  now?: () => Instant;
+}
+
+/**
+ * Idle-poll the reassessment queue. When work is available, drain it in this
+ * wake (bounded batch + time budget) without sleeping between claims, then
+ * return to the idle cadence. Overlapping wakes are skipped so one in-flight
+ * drain cannot stack unbounded concurrent processors.
+ */
+export function startReassessmentDrainLoop(
+  worker: PgReassessmentWorker,
+  pipeline: ReassessmentPipeline,
+  options: ReassessmentDrainLoopOptions = {},
+): () => void {
+  const pollMs = options.pollMs ?? REASSESSMENT_IDLE_POLL_MS;
+  let inFlight = false;
+  let stopped = false;
+  const timer = setInterval(() => {
+    if (stopped || inFlight) return;
+    inFlight = true;
+    const now = options.now?.() ?? new Date().toISOString();
+    void worker
+      .drainAvailable(now, pipeline, {
+        workspaceId: options.workspaceId,
+        maxItems: options.maxItems ?? REASSESSMENT_DRAIN_MAX_ITEMS,
+        maxMs: options.maxMs ?? REASSESSMENT_DRAIN_MAX_MS,
+        concurrency: options.concurrency ?? REASSESSMENT_DRAIN_CONCURRENCY,
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        inFlight = false;
+      });
+  }, pollMs);
+  timer.unref?.();
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
 }
