@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build NORTHSTAR as a generalized travel-resolution product without scenario-specific hardcoding or false capability claims.
+Build Northstar as a generalized travel-resolution product without scenario-specific hardcoding or false capability claims.
 
 The graph/state model is central. Chat, dashboards and traveller surfaces are interfaces over authoritative state; they are not the source of truth.
 
@@ -16,13 +16,13 @@ Review is a risk-control step, not a ritual.
 
 The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository convergence is also complete.
 
-**PostgreSQL is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and exists only as explicit offline, read-only migration input or historical test/code archaeology. It is not a fallback runtime, alternate runtime, demo runtime or current product authority.
+**PostgreSQL is the sole normal Northstar runtime.** SQLite is retired as an application runtime and exists only as explicit offline, read-only migration input or historical test/code archaeology. It is not a fallback runtime, alternate runtime, demo runtime or current product authority.
 
 The current delivery sequence is:
 
-`Slice A -> Founder Test A -> Slice B -> Founder Test B -> submission rehearsal / M11 operational activation -> polish/stretch`
+`finish Slice A -> integrated Slice A review -> Founder Test A -> Slice B / Sarah full recovery -> major recovery-loop review -> Founder Test B -> Jordan through the same engine -> focused generalisation review -> Astra planning-only reconciliation -> post-E2E observability + accepted Overview implementation -> final hardening / M11 -> final release review`
 
-Slice A is the next product milestone. Do not reopen broad architecture unless implementation exposes a concrete requirement the frozen ontology cannot express.
+Current Slice A status: T1 is founder-accepted; T2 is the active disruption/reprotection increment; T3 is incident-scoped assessment-to-case orchestration; T4 is the minimal authoritative Case View using the accepted V5.6 focused-graph visual language. Do not reopen broad architecture unless implementation exposes a concrete requirement the frozen ontology cannot express.
 
 ## Source-of-truth order
 
@@ -38,7 +38,7 @@ Before broad implementation, inspect the actual branch/head and read the relevan
 8. `docs/work/ACTIVE_TASK.md` — current working-memory ledger for the active delivery slice.
 9. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
 10. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
-11. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for milestones/checkpoints.
+11. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for historical milestones and current post-C5 delivery stages/reviews.
 12. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
 
 Historical milestone evidence under `docs/refactor/evidence/**` is evidence of what was true at that checkpoint. Do not rewrite it to match the current runtime.
@@ -95,6 +95,8 @@ Independent model review is **uncertainty-driven**, not automatically attached t
 - Classify every finding exactly: `Act Now`, `Investigate Now`, `Park for Later`, or `Ignore / Accept Risk`.
 - Targeted fixes need targeted closure evidence; they do not automatically trigger a full re-review.
 
+Current planned independent reviews are intentionally sparse: T2 targeted review/re-review, one integrated Slice A review after T3+T4, one major Slice B recovery-loop review, one Jordan/generalisation review, and one final release review. Do not add routine model-review ceremonies after every milestone.
+
 ## Architectural invariants
 
 - One generalized recovery engine supports solo, family/group, corporate/TMC, organiser and future direct-traveller use cases.
@@ -106,7 +108,7 @@ Independent model review is **uncertainty-driven**, not automatically attached t
 - Proposed recovery state is isolated from current world state until an internally authoritative commit or external observation establishes the result.
 - `UNKNOWN` is valid. Missing, stale, conflicting or incomplete information must not become certainty.
 - Explicit instructions outrank latent preferences; inferred preferences remain soft signals.
-- Externally owned state is not changed merely because NORTHSTAR submitted a request.
+- Externally owned state is not changed merely because Northstar submitted a request.
 
 ## Implemented refactor foundation
 
@@ -136,21 +138,42 @@ M11 is no longer a database-runtime migration. It is the final **operational act
 
 ## Product delivery discipline
 
-The current critical path is two founder-testable vertical slices.
+The current critical path protects a working demo floor before adding richer product surfaces.
 
-### Slice A
+### Slice A — change becomes a real case
 
-Known Sarah baseline -> normal product UI -> controlled provider-shaped disruption -> authoritative PostgreSQL mutation -> incident-linked affected cohort -> four cleared / Sarah disrupted -> one Sarah RecoveryCase -> click Sarah -> authoritative focused case.
+- **T1:** accepted full AiT PostgreSQL baseline.
+- **T2:** truthful provider-shaped disruption/reprotection -> canonical mutation -> invalidation -> reassessment. Critical partial-failure/idempotency semantics must pass the targeted independent review before merge.
+- **T3:** incident-scoped current failure -> exactly one RecoveryCase with normal subject/signal attachment.
+- **T4:** minimal authoritative Case View + accepted V5.6 focused graph. Keep the current Overview functional; do not add observability timeline scope here.
 
-Stop and founder-test at this point. Do not require Slice B before testing Slice A.
+After T4, run one integrated Slice A review, then Founder Test A. Do not require Slice B before testing Slice A.
 
-### Slice B
+### Slice B — Sarah case becomes truthfully recovered
 
-Real recovery strategy -> mutation-free preview -> complete affected participation -> real authority/approval -> ordered execution -> observation -> reassessment -> same Sarah trip/Journey viable -> truthful recovered state.
+Slice B remains **one product milestone**. Engineering checkpoints may separately prove target capability composition/LIVE smoke, target-native Qwen proposal, deterministic viability, authority, execution and observation/reassessment, but those checkpoints are not separate roadmap milestones or automatic review events.
 
-Stop and founder-test again before polish/stretch.
+End state:
 
-The Event Overview final visual design is unresolved. Do not overfit backend contracts to a rejected prototype. Build only the minimum truthful operational projection required for Slice A.
+`real RecoveryCase -> schema-bound AI proposal -> deterministic counterfactual viability -> persisted strategy/action basis -> authority/approval -> ordered action -> observation/state update -> reassessment -> same Sarah trip/Journey viable -> truthful case resolution`
+
+Run one major independent recovery-loop review only after the full chain converges, then Founder Test B.
+
+### Jordan — prove generality
+
+After Sarah works end to end, run Jordan through the same engine/application code. Add provider-heavy Atlas/search/execution/reconciliation seams only where the scenario genuinely requires them. Run one focused generalisation review after convergence.
+
+### Astra reconciliation — planning only
+
+After Sarah/Jordan expose the real remaining backend/product requirements, use one Astra planning pass to reconcile those requirements into the implementation plan through 30 September. Astra is not the default implementer; normal coding agents execute the resulting plan.
+
+### Post-E2E product milestones
+
+- **Observability:** one semantic operational history feeding Case timeline, Activity journal and compressed Overview feed. Northstar/provider/human actions, determinations, observations and outcomes are first-class; this must project authoritative state/events rather than create a second state machine.
+- **Event Overview:** design work continues in parallel, but production implementation is design-gated and post-E2E. Keep the current Overview until the accepted direction is ready.
+- **Whole-event graph / semantic zoom:** still stretch unless accepted Overview work proves it should become the same visual at another semantic zoom level.
+
+Nothing in observability/Overview/polish may destabilize the latest protected Sarah/Jordan demo floor.
 
 ## Anti-hardcoding
 
@@ -174,7 +197,7 @@ If the approved ontology/contracts cannot express a requirement, report an **arc
 
 ## Agent routing
 
-Follow `docs/AGENT_MODEL_SELECTION.md` and `docs/IMPLEMENTATION_AGENT_ROUTING.md`. Load `docs/MODELS_ARSENAL.md` only when the routing decision itself needs deeper/updated evidence.
+Follow `docs/AGENT_MODEL_SELECTION.md`, `docs/MODELS_ARSENAL.md` when deeper roster evidence is needed, and `docs/IMPLEMENTATION_AGENT_ROUTING.md` for the current three-option stage/review routes.
 
 There is no single default implementation harness. Route in this order:
 
@@ -186,7 +209,7 @@ Important current observations:
 - Cursor/Codex/Claude Code are preferred for time-sensitive local write/run/fix loops.
 - Qwen3.8-Flash and GLM-5.3-Flash are legitimate defined-task implementers, not merely cheap subagents.
 - Qoder remains useful for Qwen/Kimi/GLM work; harness latency is a harness constraint, not a model-quality judgement.
-- Astra is a model, not a harness, and belongs in Complex/Critical architecture/investigation rather than Normal implementation.
+- Astra is a model, not a harness, and belongs in Complex/Critical architecture/investigation/planning rather than Normal implementation.
 - Sol/Opus/Astra-class use is escalation for concrete ambiguity/risk, not a tax on every milestone.
 - Model choice stays separate from the execution prompt.
 
@@ -210,7 +233,7 @@ Every test file is classified in `test/suites.json`; commands run explicit file 
 
 | Command | What it proves | Gating |
 |---|---|---|
-| `npm test` | boundary gate + current NORTHSTAR surface (no DB, no browser) | yes |
+| `npm test` | boundary gate + current Northstar surface (no DB, no browser) | yes |
 | `npm run test:postgres` | current PostgreSQL integration gate | yes |
 | `npm run test:migration` | M10 migration boundary, where SQLite is read-only input | yes |
 | `npm run test:legacy` | retired SQLite runtime — **NON-GATING / HISTORICAL / MANUAL ONLY** | no |
@@ -218,39 +241,3 @@ Every test file is classified in `test/suites.json`; commands run explicit file 
 `npm run gate:test-boundary` walks the real import graph and fails if a current test reaches the retired SQLite runtime, `node:sqlite` or `src/migration/**`, or if any test file is unclassified.
 
 Historical SQLite runtime failures are never a release blocker and are not current product correctness. Do not run `test:legacy` during normal implementation and do not repair what it reports unless explicitly assigned historical/migration investigation.
-
-## Issue and scope discipline
-
-Every discovered issue/risk must be classified:
-
-- Act Now
-- Investigate Now
-- Park for Later
-- Ignore / Accept Risk
-
-Every intentionally excluded capability remains visible in `docs/ROADMAP.md` with reason/revisit condition. Never silently drop scope.
-
-## Git and worktrees
-
-- Verify actual branch/head before implementation/integration.
-- New product work branches from the current authoritative `main` unless an explicit integration plan says otherwise.
-- Parallel lanes must not share uncommitted state or a shared mutable test database.
-- Use exact-path staging; do not default to `git add .` / `git add -A`.
-- Commit coherent, testable checkpoints and push them.
-- Before claiming pushed/integrated state, verify actual branch/commit/remote.
-
-## Completion report / handoff
-
-After an implementation package, report material evidence only:
-
-1. What now works and what intentionally did not change.
-2. Branch/worktree and exact head.
-3. Milestone/package ID.
-4. Files changed.
-5. Behaviour/schema changed.
-6. Checks actually run and results.
-7. Failure/fallback behaviour verified.
-8. Findings and triage.
-9. Documentation/evidence updated.
-10. Commit/push state.
-11. Exact next dependency/checkpoint.
