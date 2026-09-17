@@ -62,7 +62,7 @@ no Event Overview redesign, no M11, no SQLite, no database-wipe reset.
 - [x] P6 read-model population contract + operator shell routes
 - [x] P7 focused tests — 14/14 `postgres-integration/productBaselineWorld.pgtest.ts`; 749/749 `npm test`; 17/17 Sarah/Jordan/read-model PG regressions
 - [x] P8 typecheck / lint / build / anti-hardcoding / boundary gate — all clean
-- [ ] P9 commit + push + completion report
+- [x] P9 commit + push — `feature/ait-baseline-product-integration` @ `57bcf06367097768164f0faf39c4909ceea4179d`, pushed and verified equal to `origin/feature/ait-baseline-product-integration`. Not merged to `main`.
 
 ## Executed evidence
 
