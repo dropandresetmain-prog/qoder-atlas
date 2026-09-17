@@ -155,7 +155,7 @@ test('final-demo content: Tier A people have required detail fields', () => {
   }
 });
 
-test('final-demo content: all 42 managed have flights + provider-backed hotels', () => {
+test('final-demo content: 41 managed flights + the guarded S1 stay-only exception (ait-draft-19)', () => {
   const prog = load();
   const places = new Map(prog.context.places.map((p) => [p.id, p]));
   for (const id of PROVIDER_HOTELS) {
@@ -172,19 +172,45 @@ test('final-demo content: all 42 managed have flights + provider-backed hotels',
     (t) => t.travelArrangement === 'NORTHSTAR_ARRANGED',
   );
   assert.equal(managed.length, 42);
+
+  // S1 blast-radius truth (data/ait-demo-input-pack is the authority): exactly
+  // FIVE CGK travellers are ticketed on ID7159 (baseline-itineraries.json +
+  // the schedule-change ticketed manifest). ait-draft-19 (Nadia Rahman) is
+  // travel-managed and REQUIRED at the Day-0 14:10 founder fireside-b, which
+  // the ID7159 geometry (lands 20:30 on Sep 30) could never have served — the
+  // pack gives her NO flight and NO PNR; her Bayview stay (check-in Sep 29)
+  // is her on-site arrangement. The generator no longer sweeps her into a
+  // phantom ticket, and this gate guards that truth instead of a count.
+  const STAY_ONLY_MANAGED = new Set(['ait-draft-19']);
+
   for (const t of managed) {
     const legs = (t.declaredTravel ?? []).filter((x) => x.itemKind === 'TRANSPORT_LEG');
     const stays = (t.declaredTravel ?? []).filter((x) => x.itemKind === 'STAY');
+    assert.ok(stays.length >= 1, `${t.draftId} missing stay`);
+    for (const s of stays) {
+      assert.ok(PROVIDER_HOTELS.has(s.stayPlaceRef?.value ?? ''), `${t.draftId} non-portfolio hotel`);
+    }
+    if (STAY_ONLY_MANAGED.has(t.draftId)) {
+      assert.equal(legs.length, 0, `${t.draftId} is the documented stay-only managed exception (no ticket in the pack)`);
+      continue;
+    }
     assert.ok(legs.length >= 1, `${t.draftId} missing flight`);
     assert.ok(
       legs.every((l) => l.carrierRef?.value && l.originRef?.value && l.destinationRef?.value),
       `${t.draftId} incomplete flight`,
     );
-    assert.ok(stays.length >= 1, `${t.draftId} missing stay`);
-    for (const s of stays) {
-      assert.ok(PROVIDER_HOTELS.has(s.stayPlaceRef?.value ?? ''), `${t.draftId} non-portfolio hotel`);
-    }
   }
+
+  // The stay-only exception must remain exactly that: no PNR anywhere for her,
+  // and she is not among the ID7159 ticketed cohort.
+  const raw = fs.readFileSync(PROGRAMME, 'utf8');
+  assert.equal(raw.includes('IDSYN19'), false, 'no phantom IDSYN19 PNR may exist in the fixture');
+  const nadia = managed.find((t) => t.draftId === 'ait-draft-19');
+  assert.ok(nadia, 'ait-draft-19 present');
+  const nadiaLegs = (nadia.declaredTravel ?? []).filter((x) => x.itemKind === 'TRANSPORT_LEG');
+  assert.equal(nadiaLegs.some((l) => l.carrierRef?.value === 'ID7159'), false, 'ait-draft-19 not ticketed on ID7159');
+  const nadiaStay = (nadia.declaredTravel ?? []).find((x) => x.itemKind === 'STAY');
+  assert.equal(nadiaStay?.checkIn, '2026-09-29T15:00:00+08:00', 'stay-only exception is on-site before her Day-0 commitment');
 });
 
 test('final-demo content: hero baselines viable before disruption; no impossible overlaps', () => {

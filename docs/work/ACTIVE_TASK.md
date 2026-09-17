@@ -232,7 +232,8 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
 | 2. Domain + ingress + HTTP + UI trigger + focused PG test | `bafdceb` (pushed) | T2 test 12/12; baseline/m6 regressions 23/23; units 749/749; typecheck/lint/build/gate clean; live boot: bodyless trigger APPLIED → ALREADY_APPLIED, verdicts 50P/3F/14U → 49P/4F/14U (exactly Sarah flipped) |
 | 3. Final candidate: founder procedure documented, broad PG gate | `82131bd` (pushed) | Full postgres suite 488/488 pass (incl. T2 test); founder T2 test procedure section in this ledger |
 | 4. Review fixes F1+F2: completion-marker retry + truthful cancelled-booking semantics | `d104f5a` (pushed) | T2 12/12; m6 units 31/31; typecheck clean |
-| 5. Review fixes F1 crash-injection proof + F5 service identity + Nadia test truth (Phase B, in progress) | (this commit) | F1 failure-injection 7/7 (3 crash seams: crash → retry APPLIED → complete canonical state → duplicate ALREADY_APPLIED → zero duplicates); F5 reuse test 1/1; T2 12/12 with corrected Nadia stay-only truth and full-drain assertions (67 units); two real retry bugs found & fixed (evidenceId TDZ on retry path; random allocation id replay mismatch); ledger contracts 9/10/18/19/20 updated |
+| 5. Review fixes F1 crash-injection proof + F5 service identity + Nadia test truth (Phase B) | `38cc115` (pushed) | F1 failure-injection 7/7 (3 crash seams: crash → retry APPLIED → complete canonical state → duplicate ALREADY_APPLIED → zero duplicates); F5 reuse test 1/1; T2 12/12 with corrected Nadia stay-only truth and full-drain assertions (67 units); two real retry bugs found & fixed (evidenceId TDZ on retry path; random allocation id replay mismatch); ledger contracts 9/10/18/19/20 updated |
+| 6. Review fixes F3/F4/F6/F7 + coherence-gate correction (Phase B) | (this commit) | F3 HTTP validation 5/5 PG + 10/10 unit (empty-body→demo only when demo env configured; malformed/wrong-kind→400 zero mutation; valid direct body→APPLIED); F4 polling-swap DOM test 6/6 (detail open state + trigger status preserved across 2s polls; server text authoritative); F6 mode derivation asserted `replacement.mode === original.mode` in T2 suite (no hardcoded 'AIR'); F7 selection guard 3/3 PG (non-TRANSPORT + selectedServiceId → validation failure, revision unchanged, no receipt); coherence gate rewritten with documented ait-draft-19 stay-only exception; suites.json registers all 5 new files; units 768/768; boundary gate 187 files clean |
 
 ## Nadia six-vs-five resolution (Phase B, supersedes finding T2-1)
 
@@ -248,6 +249,54 @@ count 0; ID7159 exactly the five cohort travellers; generator re-run proven
 idempotent). Test truth updated accordingly: the T2 suite now asserts Nadia
 has NO reservation/external record/no TRANSPORT journey item (step 5) and her
 post-ingress view is CURRENT with her baseline verdict (step 8).
+
+## Coherence-gate correction (Phase B, complements the Nadia resolution)
+
+`test/final-demo-content-coherence.test.ts` still carried a generator-era
+over-assertion ("every managed traveller has >= 1 flight leg"), which flagged
+`ait-draft-19 missing flight` at line 178. Investigated against the pack SSOT
+before touching anything: `roster.json` has 67 travellers / 42
+NORTHSTAR_ARRANGED / 25 self, and ALL 42 arranged travellers have empty
+`declaredTravel` (the generator assigns stays); Nadia is a REQUIRED FIXED
+SPEAKER at the Day-0 14:10 `founder-fireside-b` (`global/anchor-event.json`),
+which the ID7159 geometry (lands 20:30 on 30 Sep) could never have served; her
+Bayview stay check-in is 29 Sep 15:00+08 (on-site before the incident); and no
+`IDSYN19` or `ID7157` ticket exists anywhere in the pack. Conclusion: the
+fixture is truthful; the coherence test was wrong. It was rewritten with a
+documented `STAY_ONLY_MANAGED = { 'ait-draft-19' }` exception plus
+anti-regression guards (no `IDSYN19` substring anywhere in the fixture, no
+ID7159 leg for Nadia, her stay check-in pinned to `2026-09-29T15:00:00+08:00`).
+8/8 pass.
+
+## F8 disposition: `selected_service_differs_from_booked_service` (Phase B)
+
+**Park with documented evidence — no runtime protection added.** Investigation
+(found in `src/resolution/world/effectiveItinerary.ts:102`, emitted when
+`selectedServiceId` is not among the booking's active-line booked service ids):
+
+1. The T2 ingress cannot produce a persistent divergence. During partial runs
+   the selection (Step 6b) can temporarily point at the replacement service
+   while the FINAL line swap (Step 6c) has not yet committed — this is exactly
+   the transient state the F1 failure-injection tests exercise. The retry
+   reruns the same deterministic steps and completes the swap, after which the
+   flag clears. Empirically: a crashed partial run left 5 transient divergence
+   rows (one per cohort booking) + 1 test-only row; zero after retry.
+2. Every non-ingress writer of `selectedServiceId` sits behind the M2–M6
+   command surface (`updateJourneyItem`), which is unreachable from the
+   product HTTP surface without a valid operator command — i.e. the flag would
+   only persist if an operator deliberately selected a service outside the
+   booking's active lines. That is a truthful data-conflict observation, not a
+   defect: silently hiding it would be worse.
+3. Smallest available protection (NOT implemented): `updateJourneyItem`
+   validation rejecting `selectedServiceId` values outside active booked
+   lines. Rejected for now because the ingress itself performs a transient
+   out-of-line selection mid-flight (Step 6b before Step 6c), so the guard
+   would need an ingress-internal carve-out — more risk than value at this
+   point. Recorded for a future increment.
+
+Per the F8 mandate, the flag is never silently ignored: it is surfaced through
+the normal effective-itinerary divergence channel and its only persistence
+path (deliberate operator selection) is a genuine data conflict worth showing.
 
 ## Findings / triage
 

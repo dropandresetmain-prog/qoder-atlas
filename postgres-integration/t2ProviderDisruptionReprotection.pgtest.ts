@@ -316,8 +316,8 @@ describe('T2 provider disruption + reprotection ingress', () => {
     assert.notEqual(replacementServiceId, originalServiceId, 'replacement service id ≠ original service id');
 
     // Exactly one new transport service with the replacement schedule.
-    const replacementServices = await pool.query<{ id: string; published_departure: Date; published_arrival: Date; origin_place_id: string; destination_place_id: string }>(
-      `SELECT id, published_departure, published_arrival, origin_place_id, destination_place_id
+    const replacementServices = await pool.query<{ id: string; published_departure: Date; published_arrival: Date; origin_place_id: string; destination_place_id: string; mode: string }>(
+      `SELECT id, published_departure, published_arrival, origin_place_id, destination_place_id, mode
          FROM transport_services
         WHERE workspace_id = $1 AND id = $2`,
       [workspaceId, replacementServiceId],
@@ -332,14 +332,17 @@ describe('T2 provider disruption + reprotection ingress', () => {
     assert.equal(replacement.published_arrival.toISOString(), '2026-10-01T02:30:00.000Z', 'replacement arrival matches');
 
     // Same origin/destination places as original.
-    const original = await pool.query<{ origin_place_id: string; destination_place_id: string }>(
-      `SELECT origin_place_id, destination_place_id FROM transport_services WHERE workspace_id = $1 AND id = $2`,
+    const original = await pool.query<{ origin_place_id: string; destination_place_id: string; mode: string }>(
+      `SELECT origin_place_id, destination_place_id, mode FROM transport_services WHERE workspace_id = $1 AND id = $2`,
       [workspaceId, originalServiceId],
     );
     assert.equal(original.rowCount, 1);
     const orig = original.rows[0]!;
     assert.equal(replacement.origin_place_id, orig.origin_place_id, 'replacement origin = original origin');
     assert.equal(replacement.destination_place_id, orig.destination_place_id, 'replacement destination = original destination');
+
+    // F6: replacement mode derived from original (like-for-like reprotection).
+    assert.equal(replacement.mode, orig.mode, 'replacement mode = original mode (derive-from-original truth)');
   });
 
   test('step 5: exactly five reprotections — five new reservations (ids ≠ originals), each with a CONFIRMED TRANSPORT line on the replacement service and allocations binding the SAME (travellerId, journeyItemId) pairs as the displaced lines; the sixth traveller (draft ait-draft-19, stay-only) is NOT affected and holds no ticket', async () => {
