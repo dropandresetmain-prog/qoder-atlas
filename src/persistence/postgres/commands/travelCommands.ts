@@ -169,6 +169,7 @@ const JourneyItemMutationSchema = z.strictObject({
   lifecycleStatus: JourneyItemLifecycleSchema.optional(),
   flexible: z.boolean().optional(),
   intendedWindow: WindowSchema.optional(),
+  selectedServiceId: PersistedId.optional(),
 });
 
 // --- envelope / conflict plumbing -------------------------------------------
@@ -1057,6 +1058,7 @@ export interface UpdateJourneyItemParams extends CommandIdentity {
   lifecycleStatus?: JourneyItemLifecycle;
   flexible?: boolean;
   intendedWindow?: OptionalWindow;
+  selectedServiceId?: string;
   evidenceRefs?: string[];
 }
 
@@ -1069,6 +1071,7 @@ export async function updateJourneyItem(
     ...(params.lifecycleStatus === undefined ? {} : { lifecycleStatus: params.lifecycleStatus }),
     ...(params.flexible === undefined ? {} : { flexible: params.flexible }),
     ...(params.intendedWindow ? { intendedWindow: params.intendedWindow } : {}),
+    ...(params.selectedServiceId === undefined ? {} : { selectedServiceId: params.selectedServiceId }),
   });
   if (!parsed.success) return rejectedPayload('JOURNEY_ITEM_UPDATED', parsed.error);
   const changes = parsed.data;
@@ -1139,6 +1142,7 @@ export async function updateJourneyItem(
         ...(changes.lifecycleStatus === undefined ? {} : { lifecycleStatus: changes.lifecycleStatus }),
         ...(changes.flexible === undefined ? {} : { flexible: changes.flexible }),
         ...(changes.intendedWindow === undefined ? {} : { intendedWindow: changes.intendedWindow }),
+        ...(changes.selectedServiceId === undefined ? {} : { selectedServiceId: changes.selectedServiceId }),
         actor,
       });
       const advancedHead = await advanceOrConflict(journeyRef, params.workspaceId, head.revision);

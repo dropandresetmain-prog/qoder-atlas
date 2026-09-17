@@ -231,6 +231,10 @@ export const OperatorOverviewSchema = z.strictObject({
   }).optional(),
   ldg: LiveDependencyGraphSchema,
   change: ChangeAwarenessSchema,
+  /** Demo ingress configuration flags */
+  demoIngress: z.strictObject({
+    airlineRebookingConfigured: z.boolean(),
+  }).optional(),
 });
 export type OperatorOverview = z.infer<typeof OperatorOverviewSchema>;
 

@@ -91,7 +91,7 @@ test('booking: all VALID bookings PASS supplier_fulfilled, each booking PASSes b
   assert.deepEqual(validity?.explanations[0]?.evidenceRefs, [{ kind: 'SUPPLIER_OBSERVATION', id: `evid-${world.reservationLines[0]!.id}`, detail: 'reservation_line_status' }]);
 });
 
-test('booking: a CANCELLED line FAILs both supplier_fulfilment (booking_invalid) and booking_validity (booking_invalid)', () => {
+test('booking: a CANCELLED line is excluded from effective bookings (displaced lines do not block evaluation)', () => {
   const journeyId = id();
   const travellerId = id();
   const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
@@ -99,13 +99,16 @@ test('booking: a CANCELLED line FAILs both supplier_fulfilment (booking_invalid)
   world.journeyItems.push(item);
   addBooking(world, item, travellerId, { lineStatus: 'CANCELLED' });
   const effective = effectiveOf(world);
+  // CANCELLED lines are filtered out before computing effective bookings
+  assert.equal(effective.journeys[0]!.items[0]!.bookings.length, 0);
+  // With no bookings, supplier_fulfilment returns UNKNOWN (not FAIL)
   const out = bookingEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective });
   const supplier = out.dimensions.find((d) => d.dimension === 'supplier_fulfilment');
   const validity = out.dimensions.find((d) => d.dimension === 'booking_validity');
-  assert.equal(supplier?.verdict, 'FAIL');
-  assert.equal(supplier?.explanations[0]?.reasonCode, 'booking_invalid');
-  assert.equal(validity?.verdict, 'FAIL');
-  assert.equal(validity?.explanations[0]?.reasonCode, 'booking_invalid');
+  assert.equal(supplier?.verdict, 'UNKNOWN');
+  assert.equal(supplier?.explanations[0]?.reasonCode, 'booking_missing');
+  assert.equal(validity?.verdict, 'UNKNOWN');
+  assert.equal(validity?.applicable, false);
 });
 
 test('booking: a HELD line UNKNOWNs both dimensions with booking_state_unknown', () => {

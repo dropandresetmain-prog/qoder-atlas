@@ -369,6 +369,7 @@ export class PgJourneyRepository implements JourneyRepository {
     lifecycleStatus?: JourneyItemLifecycle;
     flexible?: boolean;
     intendedWindow?: OptionalWindow | undefined;
+    selectedServiceId?: string | undefined;
     actor: ActorContext;
   }): Promise<void> {
     // `order_key` is text while `id`/`journey_id` are uuid: a COALESCE that
@@ -397,6 +398,13 @@ export class PgJourneyRepository implements JourneyRepository {
     if (result.rowCount !== 1) {
       throw new Error(
         `journey item ${params.journeyItemId} not found under journey ${params.journeyId} in workspace ${params.workspaceId}`,
+      );
+    }
+    if (params.selectedServiceId !== undefined) {
+      await this.client().query(
+        `UPDATE ${DETAIL_TABLE_BY_KIND.TRANSPORT} SET selected_service_id = $1
+         WHERE workspace_id = $2 AND journey_item_id = $3`,
+        [params.selectedServiceId, params.workspaceId, params.journeyItemId],
       );
     }
   }

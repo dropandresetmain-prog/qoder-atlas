@@ -99,6 +99,10 @@ export interface OperatorOverviewFacts extends ProductWorldFacts {
    */
   population?: readonly OperatorPopulationFact[];
   eventContext?: EventContextFact;
+  /** Demo ingress configuration flags */
+  demoIngress?: {
+    airlineRebookingConfigured: boolean;
+  };
 }
 
 export interface ProgrammeCommitmentFact {

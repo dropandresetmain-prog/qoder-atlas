@@ -25,6 +25,7 @@ import {
   type CohortTravellerEvaluationInput,
 } from '../cohortDisruption.ts';
 import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
+import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
 function isoNow(at?: string): string {
@@ -822,6 +823,16 @@ async function loadOperatorOverviewFactsInner(
   );
   const eventRow = eventRows.rowCount === 1 ? eventRows.rows[0] : undefined;
 
+  // Demo ingress configuration: the trigger is configurable only when the
+  // workspace has a provisioning connection AND a disclosed disruption event
+  // file is configured for this runtime.
+  const connectionCheck = await client.query<{ count: string }>(
+    'SELECT COUNT(*)::text AS count FROM external_connections WHERE workspace_id = $1 LIMIT 1',
+    [workspaceId],
+  );
+  const hasExternalConnection = connectionCheck.rows[0]?.count !== '0';
+  const hasDisclosedDisruptionEvent = disruptionEventFileFromEnv() !== undefined;
+
   return {
     generatedAt,
     projectionRevision,
@@ -843,6 +854,9 @@ async function loadOperatorOverviewFactsInner(
         },
       }
       : {}),
+    demoIngress: {
+      airlineRebookingConfigured: hasExternalConnection && hasDisclosedDisruptionEvent,
+    },
   };
 }
 

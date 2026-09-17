@@ -23,7 +23,11 @@ import {
   commandResolveCase,
   type ProviderShapedDemoEvent,
   type TargetCommandContext,
+  type TransportScheduleObservedEvent,
 } from './applicationCommands.ts';
+import { acceptProviderDisruptionDemoEvent } from './providerDisruptionIngress.ts';
+import type { TransportServiceCancelledWithReprotectionEvent } from './applicationCommands.ts';
+import { disruptionEventFileFromEnv, loadDisclosedDisruptionEvent } from '../demo/providerDisruptionEventSource.ts';
 import { seedDemoWorld } from './demoSeed.ts';
 import { importProgrammeBundle } from './programmeImport.ts';
 import { loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
@@ -309,8 +313,42 @@ export async function handleTargetProductHttp(
 
     if (req.method === 'POST' && pathname === '/api/v2/demo/provider-event') {
       const body = (await readJson(req)) as ProviderShapedDemoEvent;
-      const result = await acceptProviderShapedDemoEvent(commandCtx(ctx.app), body);
+      // Discriminate on kind field; absent kind = existing TRANSPORT_SCHEDULE_OBSERVED behavior
+      if (body.kind === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION') {
+        // This event type should go to the dedicated route
+        sendJson(res, 400, { error: 'VALIDATION_FAILED', message: 'airline rebooking events must use /api/v2/demo/provider-event/airline-rebooking' });
+        return true;
+      }
+      // After the kind check, body is a TransportScheduleObservedEvent
+      const result = await acceptProviderShapedDemoEvent(commandCtx(ctx.app), body as TransportScheduleObservedEvent);
       sendJson(res, result.ok ? 202 : 400, result);
+      return true;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/demo/provider-event/airline-rebooking') {
+      // Two truthful delivery modes for the same provider-event boundary:
+      // a provider-shaped JSON body (direct delivery), or a bodyless POST
+      // from the founder trigger, which applies the organiser-disclosed
+      // input file configured for this runtime.
+      const body = (await readJson(req)) as ProviderShapedDemoEvent;
+      let event: TransportServiceCancelledWithReprotectionEvent;
+      if (body && body.kind === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION') {
+        event = body;
+      } else {
+        const eventFile = disruptionEventFileFromEnv();
+        if (eventFile === undefined) {
+          sendJson(res, 400, { code: 'VALIDATION_FAILED', message: 'no disclosed simulated airline event is configured on this runtime' });
+          return true;
+        }
+        event = await loadDisclosedDisruptionEvent(eventFile);
+      }
+      const result = await acceptProviderDisruptionDemoEvent(commandCtx(ctx.app), event);
+      if (!result.ok) {
+        const status = result.error.code === 'PROVIDER_INFO_UNAVAILABLE' ? 404 : 409;
+        sendJson(res, status, result.error);
+        return true;
+      }
+      sendJson(res, 202, result);
       return true;
     }
 

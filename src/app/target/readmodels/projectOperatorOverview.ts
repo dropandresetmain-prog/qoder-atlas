@@ -64,5 +64,6 @@ export function projectOperatorOverview(input: OperatorOverviewFacts): OperatorO
     ...(input.eventContext ? { eventContext: input.eventContext } : {}),
     ldg,
     change: buildChangeAwareness(input),
+    ...(input.demoIngress ? { demoIngress: input.demoIngress } : {}),
   });
 }

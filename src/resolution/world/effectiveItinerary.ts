@@ -86,7 +86,9 @@ function projectItem(world: CapturedWorld, travellerId: string, item: WJourneyIt
   };
 
   if (item.kind === 'TRANSPORT') {
-    const bookedServiceIds = [...new Set(lines.map((l) => l.transportServiceId).filter((id): id is string => id !== null))].sort();
+    const activeLines = lines.filter((l) => l.observedStatus !== 'CANCELLED');
+    const bookedServiceIds = [...new Set(activeLines.map((l) => l.transportServiceId).filter((id): id is string => id !== null))].sort();
+    const bookings = [...new Map(activeLines.map((l) => [l.id, bookingState(world, l)])).values()].sort((a, b) => a.lineRef.id.localeCompare(b.lineRef.id));
     if (item.selectedServiceId && bookedServiceIds.length > 0 && !bookedServiceIds.includes(item.selectedServiceId)) divergences.push('selected_service_differs_from_booked_service');
     if (bookedServiceIds.length > 1) divergences.push('multiple_booked_services_for_one_item');
     const serviceId = item.selectedServiceId ?? bookedServiceIds[0] ?? null;
@@ -97,6 +99,7 @@ function projectItem(world: CapturedWorld, travellerId: string, item: WJourneyIt
     }
     return {
       ...base,
+      bookings,
       start: service ? serviceTime(service, 'departure') : intended(item, 'start'),
       end: service ? serviceTime(service, 'arrival') : intended(item, 'end'),
       startPlaceId: service?.originPlaceId ?? item.desiredOriginPlaceId,

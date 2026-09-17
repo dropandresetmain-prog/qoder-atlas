@@ -126,6 +126,7 @@
       "postgres-integration/productBaselineWorld.pgtest.ts",
       "postgres-integration/revisionConflicts.pgtest.ts",
       "postgres-integration/serializableRetry.pgtest.ts",
+      "postgres-integration/t2ProviderDisruptionReprotection.pgtest.ts",
       "postgres-integration/tenantIntegrity.pgtest.ts",
       "postgres-integration/witLiveReadModelContract.pgtest.ts"
     ],

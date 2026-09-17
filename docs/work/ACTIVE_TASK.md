@@ -73,6 +73,91 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
    `/api/v2/operator/overview` (no overlapping requests, authoritative
    snapshot wins, `changedVisibleRefs` hint-only).
 
+## Frozen implementation contracts (verified against source 2026-09-17)
+
+8. **Replacement booking references are synthetic, deterministically derived.**
+   The upstream fixture (`airline-schedule-change-id7159.json`) does NOT state
+   replacement PNRs (segment notation only: `CGK-SIN ID7159 ? ID7153`). The
+   ingress observes/links external booking references
+   `REPROTECTED:<providerEventId>:<originalPnr>` (record type
+   `SOURCE_BOOKING_REFERENCE`, UNVERIFIED → LINKED on the provisioning
+   connection) bound to each new reservation. No provider PNR is fabricated.
+9. **ALREADY_APPLIED is derived by existence check, not by executing commands.**
+   Replacement identities are minted deterministically (UUIDv5 from provider
+   identity: service from `SOURCE_TRANSPORT_SERVICE` external id of the
+   replacement; reservations from `providerId|providerEventId|<originalPnr>`).
+   On re-delivery the ingress resolves the replacement service + reservations
+   first; if all exist it returns `ALREADY_APPLIED` without executing any
+   command. First-delivery failures surface as command conflicts → HTTP 409.
+   Result enum: `APPLIED | ALREADY_APPLIED` only (no STALE).
+10. **Effective-itinerary flip = two verified code changes, nothing else.**
+    (a) `updateJourneyItem` gains `selectedServiceId` support (Params →
+    `JourneyItemMutationSchema` travelCommands.ts:167-172 → parsed spread →
+    `PgJourneyRepository.updateItem` SQL CASE) — the ingress sets the journey
+    item's selection to the replacement service. (b) `projectItem`
+    (effectiveItinerary.ts:74-107) excludes lines whose `observedStatus ===
+    'CANCELLED'` from the TRANSPORT `lines` set BEFORE computing
+    `bookedServiceIds`/`bookings` — required because `m6.booking`
+    `supplier_fulfilment` (booking.ts:64-71) FAILs on ANY invalid booking
+    (`invalidCount > 0`); filtering only service resolution would leave all 5
+    affected travellers blocked by their displaced lines. The displaced lines
+    remain observable in canonical state, audit trail, and read models.
+11. **Readiness arithmetic re-verified (evaluator memo corrected).**
+    `participation.ts:174-177` uses `scheduledArrival: reach.arrival ??
+    reach.readyAt` (ARRIVAL first). Sarah: 10:30 arrival → 11:30 obligation =
+    60 min < 150 required → FAIL `insufficient_arrival_readiness`. Arjun 200,
+    Siti 210, Mei 210 PASS; Felix Day-1 16:30 → 360 min PASS. The memo's
+    readyAt-based arithmetic (35/175/185/335) and its "readiness skipped"
+    claim are both wrong (materializer sets `requiresPhysicalPresence:
+    commitment.placeId !== undefined`, materializeDataset.ts:456-461).
+12. **Idempotency mechanics (memo §1.4, verified pgUnitOfWork.ts:141-158).**
+    Per-command keys `demo-ingress:<providerId>:<providerEventId>:<sub-key>`;
+    REPLAY short-circuits BEFORE revision validation → stale expectedRevisions
+    are harmless on replay; different payload under same key →
+    `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` → 409. Retry-safe across partial
+    failure: committed commands replay, remainder execute.
+
+13. **External-id mappings verified (materializer truth).** Original service
+    external id = `externalRefValue(carrierRef) + '@' + toInstant(departure)`
+    → `ID7159@2026-09-30T10:45:00.000Z` (materializeDataset.ts:631;
+    datasetMapping.ts:22-39 normalizes to UTC ISO). PNRs are observed/linked as
+    record type `SOURCE_BOOKING_REFERENCE` (constant
+    `SOURCE_RECORD_TYPES.RESERVATION`, externalIdentity.ts:22-35, 860-884).
+    Selected service persists on `transport_item_details.selected_service_id`
+    (migration 0023; world capture pgWorldReader.ts:115) — updateJourneyItem
+    writes it via the detail table.
+14. **Domain checkpoint verified (agent, spot-checked).** updateJourneyItem
+    accepts `selectedServiceId` (PersistedId.optional; travelCommands.ts:172,
+    1061, 1074, 1145; pgJourneyRepository.ts:364-410 writes the detail table).
+    effectiveItinerary.ts:88-94 excludes CANCELLED lines from the TRANSPORT
+    branch's `lines` set (bookedServiceIds + bookings) — non-TRANSPORT kinds
+    unchanged. Two existing unit tests updated where they asserted the old
+    INVALID-booking behavior (a cancelled line now yields no effective
+    booking). typecheck PASS; current unit suite 749/749 with node 24.
+
+15. **Founder-trigger delivery modes + canonical event fingerprint.** The
+    overview trigger POSTs `/api/v2/demo/provider-event/airline-rebooking`
+    WITHOUT a body; the route then derives the event from the runtime's
+    disclosed input file (`NORTHSTAR_DEMO_DISRUPTION_EVENT_FILE`, read by the
+    generic mapper `src/app/demo/providerDisruptionEventSource.ts` — provenance
+    must be `SIMULATED_EXTERNAL_EVENT`; replacement flight read from the
+    manifest's own segment notation `ORIG-DEST <orig> ? <repl>`; providerId
+    from the document's `sourceIds[0]`). A provider-shaped JSON body on the
+    same route is a direct delivery. Duplicate detection hashes CANONICAL
+    substance (`canonicalDisruptionEventHash`: identity fields, UTC-normalized
+    instants, sorted bookings, receivedAt excluded) — the same disruption in a
+    different surface formatting replays; a different substance is
+    `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` → 409. `airlineRebookingConfigured`
+    = workspace has ≥1 external connection AND the event file is configured.
+16. **Evaluator fact shape (verified live).** `programme_participation` stores
+    readiness minutes (`availableMinutes`/`requiredMinutes`) only on the FAIL
+    path; PASS explanations carry reach facts (arrival/readyAt/slack). Sarah's
+    FAIL row is the 60-vs-150 evidence; peers prove viability via dimension
+    verdict + overall verdict.
+17. **Click wiring survives the poll swap.** The trigger button handler lives
+    in the page-level polling script (event delegation on document), not in
+    the swapped `<main>` markup — swapped-in inline scripts never execute.
+
 ## Phase checklist
 
 - [x] P0 branch from authoritative base + ledger (archived T1 ledger preserved)
@@ -88,7 +173,8 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
 
 | Checkpoint | Commit | Evidence |
 |---|---|---|
-| (pending) | | |
+| 1. Investigation + ledger + T1 archive | `b6b7250` (pushed) | T2-1 six-vs-five resolution; frozen decisions 1-7 |
+| 2. Domain + ingress + HTTP + UI trigger + focused PG test | (this commit) | T2 test 12/12; baseline/m6 regressions 23/23; units 749/749; typecheck/lint/build/gate clean; live boot: bodyless trigger APPLIED → ALREADY_APPLIED, verdicts 50P/3F/14U → 49P/4F/14U (exactly Sarah flipped) |
 
 ## Findings / triage
 

@@ -146,7 +146,8 @@ export async function commandResolveCase(
  * produce the resulting assessments; this command's job stops at "signal
  * accepted and normalised into canonical state".
  */
-export interface ProviderShapedDemoEvent {
+export interface TransportScheduleObservedEvent {
+  kind?: 'TRANSPORT_SCHEDULE_OBSERVED';
   providerId: string;
   providerEventId: string;
   receivedAt: string;
@@ -168,6 +169,35 @@ export interface ProviderShapedDemoEvent {
   disclosedAsSimulatedDemoInput: true;
 }
 
+export interface TransportServiceCancelledWithReprotectionEvent {
+  kind: 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION';
+  providerId: string;
+  providerEventId: string;
+  receivedAt: string;
+  disclosedAsSimulatedDemoInput: true;
+  originalService: {
+    recordType: 'SOURCE_TRANSPORT_SERVICE';
+    externalId: string;
+  };
+  replacementService: {
+    recordType: 'SOURCE_TRANSPORT_SERVICE';
+    externalId: string;
+    operator: string;
+    scheduledDeparture: string;
+    scheduledArrival: string;
+  };
+  affectedBookings: Array<{
+    recordType: 'SOURCE_BOOKING_REFERENCE';
+    externalId: string;
+  }>;
+  reason: string;
+  provenanceKind: string;
+}
+
+export type ProviderShapedDemoEvent =
+  | TransportScheduleObservedEvent
+  | TransportServiceCancelledWithReprotectionEvent;
+
 export type DemoIngressResult =
   | {
       ok: true;
@@ -181,7 +211,7 @@ export type DemoIngressResult =
 
 export async function acceptProviderShapedDemoEvent(
   ctx: TargetCommandContext,
-  event: ProviderShapedDemoEvent,
+  event: TransportScheduleObservedEvent,
 ): Promise<DemoIngressResult> {
   if (!event.disclosedAsSimulatedDemoInput) {
     return {

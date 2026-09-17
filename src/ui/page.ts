@@ -16,6 +16,7 @@ import { escapeHtml } from './html.ts';
 import { renderFormEnhancementScript } from './interaction.ts';
 import { renderProgrammeChangeEnhancementScript } from './programme-change-interaction.ts';
 import { renderCaseResolutionEnhancementScript } from './case-resolution-interaction.ts';
+import { renderOverviewPollingScript } from './polling.ts';
 
 export type NavTarget = 'dashboard' | 'programme' | 'case' | 'decisions' | 'activity' | 'traveller';
 
@@ -68,6 +69,9 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
   const caseResolutionScript = isOperator
     ? renderCaseResolutionEnhancementScript()
     : '';
+  const pollingScript = isOperator && options.active === 'dashboard'
+    ? renderOverviewPollingScript()
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -82,6 +86,7 @@ ${banner}
 ${bodyHtml}
 ${programmeChangeScript}
 ${caseResolutionScript}
+${pollingScript}
 ${renderFormEnhancementScript()}
 ${isOperator ? renderProfileMenuScript() : ''}
 </body>

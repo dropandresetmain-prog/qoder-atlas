@@ -55,8 +55,10 @@ test('booking validity is independent of the Journey: a confirmed booking stays 
   world.allocations.push({ id: id(), reservationId, lineId, travellerId, journeyItemId: item.id, role: 'PASSENGER', quantity: 1 });
   const booked = effectiveOf(world).journeys[0]!.items[0]!;
   assert.equal(booked.bookings[0]!.bookingValid, 'VALID');
+  // CANCELLED lines are excluded from effective bookings (displaced lines don't block evaluation)
   world.reservationLines[0]!.observedStatus = 'CANCELLED';
-  assert.equal(effectiveOf(world).journeys[0]!.items[0]!.bookings[0]!.bookingValid, 'INVALID');
+  assert.equal(effectiveOf(world).journeys[0]!.items[0]!.bookings.length, 0);
+  // HELD lines are included with UNKNOWN validity
   world.reservationLines[0]!.observedStatus = 'HELD';
   assert.equal(effectiveOf(world).journeys[0]!.items[0]!.bookings[0]!.bookingValid, 'UNKNOWN');
 });
