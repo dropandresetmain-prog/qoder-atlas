@@ -516,21 +516,27 @@ export async function acceptProviderDisruptionDemoEvent(
     // schedule-derived mint uses wildcard origin/destination; see the doc
     // comment on canonicalReplacementServiceId), so before any mutation is
     // allowed, an existing row must match THIS event's original (cancelled)
-    // service on origin, destination and mode, and its stored published
-    // departure/arrival must match this event's stated replacement schedule
-    // — compared as instants, not strings, since the same instant can be
-    // written in different offsets. A retry of the SAME event always passes:
-    // Step 5 would create (or already created) the row from these exact
-    // values, so it matches by construction. A mismatch is a truthful
-    // conflict, not a create-time detail — no mutation happens below it.
+    // service on origin, destination and mode, must match this event's
+    // stated operator, and its stored published departure/arrival must match
+    // this event's stated replacement schedule — compared as instants, not
+    // strings, since the same instant can be written in different offsets.
+    // published_departure/published_arrival are nullable columns (a service
+    // row can carry an incomplete published schedule); a null stored value
+    // can never equal a stated instant, so it is treated as a schedule
+    // mismatch rather than risking a TypeError off `.getTime()` on null. A
+    // retry of the SAME event always passes: Step 5 would create (or already
+    // created) the row from these exact values, so it matches by
+    // construction. A mismatch is a truthful conflict, not a create-time
+    // detail — no mutation happens below it.
     const existingReplacementService = await ctx.pool.query<{
       origin_place_id: string;
       destination_place_id: string;
       mode: string;
-      published_departure: Date;
-      published_arrival: Date;
+      operator: string;
+      published_departure: Date | null;
+      published_arrival: Date | null;
     }>(
-      'SELECT origin_place_id, destination_place_id, mode, published_departure, published_arrival FROM transport_services WHERE workspace_id = $1 AND id = $2',
+      'SELECT origin_place_id, destination_place_id, mode, operator, published_departure, published_arrival FROM transport_services WHERE workspace_id = $1 AND id = $2',
       [ctx.workspaceId, replacementServiceId]
     );
     if (existingReplacementService.rows.length > 0) {
@@ -540,8 +546,11 @@ export async function acceptProviderDisruptionDemoEvent(
       const corridorMatches =
         existingRow.origin_place_id === originalServiceRow.origin_place_id &&
         existingRow.destination_place_id === originalServiceRow.destination_place_id &&
-        existingRow.mode === replacementMode;
+        existingRow.mode === replacementMode &&
+        existingRow.operator === event.replacementService.operator;
       const scheduleMatches =
+        existingRow.published_departure !== null &&
+        existingRow.published_arrival !== null &&
         existingRow.published_departure.getTime() === statedDeparture &&
         existingRow.published_arrival.getTime() === statedArrival;
       if (!corridorMatches || !scheduleMatches) {
@@ -551,9 +560,9 @@ export async function acceptProviderDisruptionDemoEvent(
             code: 'VALIDATION_FAILED',
             message:
               `replacement service ${replacementServiceId} already exists as a different ` +
-              `${!corridorMatches ? 'corridor/mode' : 'schedule'} than event ${event.providerEventId}'s ` +
-              `original service ${originalServiceId} and stated replacement schedule ` +
-              `(${event.replacementService.scheduledDeparture} -> ${event.replacementService.scheduledArrival})`,
+              `${!corridorMatches ? 'corridor/mode/operator' : 'schedule'} than event ${event.providerEventId}'s ` +
+              `original service ${originalServiceId} and stated replacement operator/schedule ` +
+              `(${event.replacementService.operator}, ${event.replacementService.scheduledDeparture} -> ${event.replacementService.scheduledArrival})`,
           },
         };
       }

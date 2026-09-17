@@ -239,7 +239,7 @@ describe('N1 — replacement service reuse requires matching corridor and schedu
     assert.deepEqual(tr883LinesAfter, tr883LinesBefore, "TR883's original reservation lines are unchanged");
   });
 
-  test('mismatched replacement schedule on the same corridor cannot reuse an existing replacement → VALIDATION_FAILED, zero mutation', async () => {
+  test('mismatched replacement schedule, operator, or a null stored published time on the same corridor cannot reuse an existing replacement → VALIDATION_FAILED, zero mutation', async () => {
     const { workspaceId, connectionId } = await freshWorkspace('schedule');
     const ctx = ctxFor(workspaceId);
     const mapping = await resolveSourceSubjects(pool, workspaceId, connectionId);
@@ -319,5 +319,88 @@ describe('N1 — replacement service reuse requires matching corridor and schedu
     // -- IDSYN14's own line is byte-for-byte unchanged (still CONFIRMED).
     const originalLinesAfter = await linesForService(workspaceId, original!.subject.id);
     assert.deepEqual(originalLinesAfter, originalLinesBefore, "ID7159's reservation lines (including IDSYN14) are unchanged");
+
+    // -- Event D: SAME corridor and schedule as what event A caused to be
+    // stored, but a DIFFERENT stated operator — isolating the operator
+    // mismatch. Reuses this same workspace/replacement row rather than
+    // provisioning a second one (~2min each); IDSYN30 is the one ID7159
+    // booking left CONFIRMED by both event A (which only cancelled
+    // IDSYN03/10/11) and the rejected event C (zero mutation).
+    const idsyn30Before = originalLinesAfter.find((l) => l.id !== idsyn14Before!.id && l.observed_status === 'CONFIRMED');
+    assert.ok(idsyn30Before, 'IDSYN30 line is still CONFIRMED before event D');
+
+    const mismatchedOperator = 'ZZ';
+    assert.notEqual(mismatchedOperator, 'ID', 'sanity: the stated operator really differs from what is stored');
+    const eventD: TransportServiceCancelledWithReprotectionEvent = {
+      kind: 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION',
+      providerId: 'sim-airline-id',
+      providerEventId: `sim-id-evt-n1-operator-d-${randomUUID()}`,
+      receivedAt: '2026-09-21T02:20:00.000Z',
+      disclosedAsSimulatedDemoInput: true,
+      originalService: { recordType: 'SOURCE_TRANSPORT_SERVICE', externalId: ORIGINAL_EXTERNAL_ID },
+      replacementService: {
+        recordType: 'SOURCE_TRANSPORT_SERVICE',
+        externalId: REPLACEMENT_EXTERNAL_ID,
+        operator: mismatchedOperator,
+        scheduledDeparture: REPLACEMENT_DEPARTURE,
+        scheduledArrival: REPLACEMENT_ARRIVAL,
+      },
+      affectedBookings: [{ recordType: 'SOURCE_BOOKING_REFERENCE' as const, externalId: 'IDSYN30' }],
+      reason: 'N1 operator-guard scenario, event D (wrong operator, must be rejected).',
+      provenanceKind: 'SCHEDULE_CHANGE',
+    };
+
+    const countsBeforeD = await tableCounts(workspaceId);
+    const resultD = await acceptProviderDisruptionDemoEvent(ctx, eventD);
+    assert.equal(resultD.ok, false, `event D (mismatched operator) must be rejected, got: ${JSON.stringify(resultD)}`);
+    if (resultD.ok) return;
+    assert.equal(resultD.error.code, 'VALIDATION_FAILED', `error code is VALIDATION_FAILED, got ${resultD.error.code}: ${resultD.error.message}`);
+
+    const countsAfterD = await tableCounts(workspaceId);
+    assert.deepEqual(countsAfterD, countsBeforeD, 'no table mutated by the rejected event D');
+
+    const originalLinesAfterD = await linesForService(workspaceId, original!.subject.id);
+    assert.deepEqual(originalLinesAfterD, originalLinesAfter, "ID7159's reservation lines (including IDSYN30) are unchanged after event D");
+
+    // -- Event E: a stored NULL published_arrival must be treated as a
+    // schedule mismatch (VALIDATION_FAILED), never as a `.getTime()`
+    // TypeError. Corrupts the stored ID7153 row directly via SQL (test setup
+    // only — not itself asserted as part of the guard's own behaviour) since
+    // no code path in this ingress otherwise nulls a published time once set.
+    await pool.query(
+      `UPDATE transport_services SET published_arrival = NULL WHERE workspace_id = $1 AND id = $2`,
+      [workspaceId, appliedA.replacementServiceId],
+    );
+
+    const eventE: TransportServiceCancelledWithReprotectionEvent = {
+      kind: 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION',
+      providerId: 'sim-airline-id',
+      providerEventId: `sim-id-evt-n1-null-arrival-e-${randomUUID()}`,
+      receivedAt: '2026-09-21T02:30:00.000Z',
+      disclosedAsSimulatedDemoInput: true,
+      originalService: { recordType: 'SOURCE_TRANSPORT_SERVICE', externalId: ORIGINAL_EXTERNAL_ID },
+      replacementService: {
+        recordType: 'SOURCE_TRANSPORT_SERVICE',
+        externalId: REPLACEMENT_EXTERNAL_ID,
+        operator: 'ID',
+        scheduledDeparture: REPLACEMENT_DEPARTURE,
+        scheduledArrival: REPLACEMENT_ARRIVAL,
+      },
+      affectedBookings: [{ recordType: 'SOURCE_BOOKING_REFERENCE' as const, externalId: 'IDSYN30' }],
+      reason: 'N1 null-published-time guard scenario, event E (stored arrival is NULL, must be rejected).',
+      provenanceKind: 'SCHEDULE_CHANGE',
+    };
+
+    const countsBeforeE = await tableCounts(workspaceId);
+    const resultE = await acceptProviderDisruptionDemoEvent(ctx, eventE);
+    assert.equal(resultE.ok, false, `event E (null stored published_arrival) must be rejected, got: ${JSON.stringify(resultE)}`);
+    if (resultE.ok) return;
+    assert.equal(resultE.error.code, 'VALIDATION_FAILED', `error code is VALIDATION_FAILED, got ${resultE.error.code}: ${resultE.error.message}`);
+
+    const countsAfterE = await tableCounts(workspaceId);
+    assert.deepEqual(countsAfterE, countsBeforeE, 'no table mutated by the rejected event E');
+
+    const originalLinesAfterE = await linesForService(workspaceId, original!.subject.id);
+    assert.deepEqual(originalLinesAfterE, originalLinesAfterD, "ID7159's reservation lines are unchanged after event E");
   });
 });
