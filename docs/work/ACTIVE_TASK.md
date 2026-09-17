@@ -192,7 +192,10 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
    PG_TARGET_WORKSPACE_ID=<fresh uuid>
    npm run build && node dist/main.js
    ```
-   Boot logs the T1 baseline (67 journeys; 50 PASS / 14 UNKNOWN / 3 FAIL).
+   Boot logs the T1 baseline (67 journeys; 50 PASS / 15 UNKNOWN / 2 FAIL). Note: the
+   pre-Phase-B accepted T1 record was 50 PASS / 14 UNKNOWN / 3 FAIL; after the fixture
+   change removing Nadia's displaced leg (ait-draft-19, stay-only), the baseline
+   updated to 50 PASS / 15 UNKNOWN / 2 FAIL as Nadia transitioned to UNKNOWN.
 3. Open `/operator` → Overview. Under the population, open the disclosure
    **"Simulated airline update"** (labelled demo admin affordance, not a hero
    button). Status reads "Ready…" when `demoIngress.airlineRebookingConfigured`
@@ -206,8 +209,10 @@ reload). **Stops before automatic RecoveryCase creation** — that is T3.
    (IDSYN14/03/10/11/30) show the replacement service (1 Oct 07:45→10:30) on
    their journey; Sarah's Day-1 headline interview shows FAIL
    `insufficient_arrival_readiness` (60 min available vs 150 required); the
-   four peers stay viable; the sixth co-traveller on the original service is
-   untouched. No RecoveryCase appears anywhere in the product (T3 boundary).
+   four peers stay viable; Nadia (ait-draft-19, stay-only) is untouched and stays
+   UNKNOWN. Journey verdicts after the trigger: 49 PASS / 3 FAIL / 15 UNKNOWN
+   (exactly Sarah flipped PASS→FAIL). No RecoveryCase appears anywhere in the
+   product (T3 boundary).
 6. Duplicate/restart safety: re-clicking the trigger never duplicates
    services/bookings; restarting the app and re-reading shows identical
    state; the same event re-delivered with different substance is refused
@@ -305,6 +310,7 @@ path (deliberate operator selection) is a genuine data conflict worth showing.
 | ID | Finding | Triage |
 |---|---|---|
 | T2-1 | The accepted T1 world's shared `ID7159` service carries **six** travellers, not five: the sixth is `ait-draft-19` (Nadia Rahman, PNR IDSYN19), genuinely booked on the same service in the canonical fixture. The upstream disclosed airline event's ticketed manifest names exactly five PNRs and does not include IDSYN19; Nadia's only REQUIRED obligation is Day 0 (14:10 fireside on 30 Sep), which the 1 Oct 07:45 departure does not affect. Resolution: the incident-affected booking cohort is derived from the disclosed provider booking references (booking-level truth: reservations whose external record = the provider PNR references), NOT from service co-occupancy; the sixth traveller keeps her original (displaced) booking per the disclosed manifest, is re-derivable from evaluator truth (her Day-0 obligation precedes the cancelled departure), and this is recorded as a source/architecture contradiction to surface rather than special-case logic. | **Act Now — resolved as disclosed-manifest scoping; contradiction surfaced in final report** |
+| D1 | Founder procedure baseline counts stale after Nadia fixture change (Phase B). Step 2 baseline and step 5 verdict description out of sync with post-Phase-B truth (50P/15U/2F baseline; 49P/3F/15U after trigger, exactly Sarah flipped). | Fixed (docs) |
 
 ## Critical constraints
 
