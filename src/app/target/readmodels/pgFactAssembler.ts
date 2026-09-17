@@ -14,6 +14,7 @@ import type {
 import type {
   IncidentProgrammeFacts,
   OperatorOverviewFacts,
+  OperatorPopulationFact,
   RecoveryActionFact,
   RecoveryCaseFacts,
   TravellerTripFacts,
@@ -659,8 +660,37 @@ async function loadOperatorOverviewFactsInner(
   // NOT NULL and 0012's subtype trigger guarantees the ref selects exactly
   // one row for that traveller, so this stays an inner join with no
   // fabricated fallback — and no second lookup path.
-  const population = await client.query<{ journey_id: string; traveller_label: string }>(
-    `SELECT DISTINCT j.id AS journey_id, n.display_value AS traveller_label
+  // One query now serves both collections, because both are the same
+  // authoritative membership question asked at two widths, and asking it
+  // twice on the same snapshot would just double the work:
+  //
+  //  - `population` (additive): every Journey whose traveller holds ANY
+  //    accepted participation in an ACTIVE programme. This is "whose travel
+  //    am I responsible for", which is what the baseline operator surface
+  //    must show before any case exists.
+  //  - `ldg.nodes` (unchanged): the REQUIRED+accepted subset, exactly the
+  //    scope described below. Widening the graph would change an accepted
+  //    contract; the wider population gets its own collection instead.
+  //
+  // `has_required` carries that distinction, and `obligation` reports the
+  // strongest accepted obligation so the surface can say why a subject is in
+  // scope rather than inferring it.
+  const population = await client.query<{
+    journey_id: string;
+    trip_id: string;
+    traveller_label: string;
+    has_required: boolean;
+    obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED';
+  }>(
+    `SELECT j.id AS journey_id,
+            j.trip_id,
+            n.display_value AS traveller_label,
+            bool_or(p.obligation = 'REQUIRED') AS has_required,
+            CASE
+              WHEN bool_or(p.obligation = 'REQUIRED') THEN 'REQUIRED'
+              WHEN bool_or(p.obligation = 'OPTIONAL') THEN 'OPTIONAL'
+              ELSE 'INFORMED'
+            END AS obligation
        FROM journeys j
        JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
        JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
@@ -669,14 +699,16 @@ async function loadOperatorOverviewFactsInner(
        JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
       WHERE j.workspace_id = $1
         AND j.lifecycle_status <> 'CANCELLED'
-        AND p.obligation = 'REQUIRED' AND p.accepted = true
+        AND p.accepted = true
         AND prog.lifecycle_status = 'ACTIVE'
+      GROUP BY j.id, j.trip_id, n.display_value
       ORDER BY j.id
       LIMIT 200`,
     [workspaceId],
   );
 
   const dashboardNodes: OperatorOverviewFacts['nodes'][number][] = [];
+  const populationFacts: OperatorPopulationFact[] = [];
   const subjectStamps: bigint[] = [];
   const changedNodeRefs: string[] = [];
   for (const p of population.rows) {
@@ -722,6 +754,24 @@ async function loadOperatorOverviewFactsInner(
     const stamp = linkedCaseStamp > subjectStamp ? linkedCaseStamp : subjectStamp;
     subjectStamps.push(stamp);
     if (sinceCursorBig !== undefined && stamp >= sinceCursorBig) changedNodeRefs.push(ref);
+
+    // The population entry reports the same authoritative tone in the
+    // product vocabulary `items` already uses, so the frontend compares like
+    // with like and computes neither. A subject whose assessment is not
+    // CURRENT reads UNKNOWN with its real lifecycle in `evaluation` — it is
+    // never optimistically presented as ready.
+    populationFacts.push({
+      journeyRef: ref,
+      tripRef: `TRIP:${p.trip_id}`,
+      travellerLabel: p.traveller_label,
+      obligation: p.obligation,
+      status: tone === 'PASS' ? 'READY' : tone === 'FAIL' ? 'DISRUPTED' : 'UNKNOWN',
+      remainderViability: tone === 'PASS' ? 'VIABLE' : tone === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN',
+      evaluation: view.status,
+      ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
+    });
+
+    if (!p.has_required) continue;
     dashboardNodes.push({
       ref,
       kind: 'TRAVELLER' as const,
@@ -751,6 +801,27 @@ async function loadOperatorOverviewFactsInner(
   const projectionRevision = checkedRevisionNumber(maxStamp);
   const changedVisibleRefs = sinceCursorBig === undefined ? [] : changedNodeRefs;
 
+  // Event context for the product shell: the ACTIVE programme's event, with
+  // its organiser. A workspace can legitimately hold several events, so this
+  // is reported only when exactly one ACTIVE programme identifies one — no
+  // arbitrary "first row" is promoted to "the event you are working".
+  const eventRows = await client.query<{
+    event_id: string;
+    title: string;
+    programme_id: string;
+    organiser_label: string | null;
+  }>(
+    `SELECT e.id AS event_id, e.title, prog.id AS programme_id, o.legal_name AS organiser_label
+       FROM programmes prog
+       JOIN events e ON e.workspace_id = prog.workspace_id AND e.id = prog.event_id
+       LEFT JOIN organisations o
+              ON o.workspace_id = e.workspace_id AND o.id = e.organiser_organisation_id
+      WHERE prog.workspace_id = $1 AND prog.lifecycle_status = 'ACTIVE'
+      LIMIT 2`,
+    [workspaceId],
+  );
+  const eventRow = eventRows.rowCount === 1 ? eventRows.rows[0] : undefined;
+
   return {
     generatedAt,
     projectionRevision,
@@ -761,6 +832,17 @@ async function loadOperatorOverviewFactsInner(
     nodes: dashboardNodes,
     edges: dashboardEdges,
     items,
+    population: populationFacts,
+    ...(eventRow
+      ? {
+        eventContext: {
+          eventRef: `EVENT:${eventRow.event_id}`,
+          title: eventRow.title,
+          programmeRef: `PROGRAMME:${eventRow.programme_id}`,
+          ...(eventRow.organiser_label ? { organiserLabel: eventRow.organiser_label } : {}),
+        },
+      }
+      : {}),
   };
 }
 

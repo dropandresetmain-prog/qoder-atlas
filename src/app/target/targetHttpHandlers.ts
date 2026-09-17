@@ -26,12 +26,19 @@ import {
 } from './applicationCommands.ts';
 import { seedDemoWorld } from './demoSeed.ts';
 import { importProgrammeBundle } from './programmeImport.ts';
+import { loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
+import { renderInShell } from './productShell.ts';
+import { datasetDirectoryFromEnv } from '../demo/datasetLoader.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
+import { renderProductProgrammeSchedule } from '../../ui/screens/product-programme-schedule.ts';
+import { renderProductDecisionQueue } from '../../ui/screens/product-decision-queue.ts';
+import { renderProductActivityFeed } from '../../ui/screens/product-activity-feed.ts';
 import { renderProductRecoveryCase } from '../../ui/screens/product-recovery-case.ts';
 import { renderProductProgrammePreview } from '../../ui/screens/product-programme-preview.ts';
 import { toLegacyRenderableShape } from './programmeTimeSwapPreview.ts';
 import { renderProductIncidentProgramme } from '../../ui/screens/product-incident-programme.ts';
 import { renderProductTravellerTrip } from '../../ui/screens/product-traveller-trip.ts';
+import type { OperatorOverview } from '../../contracts/v2/product/readModels.ts';
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
@@ -89,6 +96,18 @@ export interface TargetHttpContext {
 }
 
 /**
+ * Shell chrome values taken from the overview read model. `eventName` is
+ * present only when the backend identified one event for this workspace, so
+ * the event select is either true or absent.
+ */
+function shellContext(view: OperatorOverview): { eventName?: string; decisionCount: number } {
+  return {
+    ...(view.eventContext ? { eventName: view.eventContext.title } : {}),
+    decisionCount: view.items.filter((item) => item.decisionRequired).length,
+  };
+}
+
+/**
  * Handle `/api/v2/*` product routes. Returns true when handled.
  */
 export async function handleTargetProductHttp(
@@ -115,7 +134,49 @@ export async function handleTargetProductHttp(
       const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId, undefined, sinceCursor);
       const view = projectOperatorOverview(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductOperatorOverview(view));
+        // The shell's own chrome, not a second one: brand, event context and
+        // the nav the operator navigates with. The decision count is the
+        // read model's own `decisionRequired` total.
+        sendHtml(
+          res,
+          200,
+          renderInShell('dashboard', 'Operations overview', shellContext(view), renderProductOperatorOverview(view)),
+        );
+      } else {
+        sendJson(res, 200, view);
+      }
+      return true;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/operator/programme') {
+      const view = await loadProgrammeSchedule(ctx.app.pool, ctx.app.workspaceId);
+      if (url.searchParams.get('format') === 'html') {
+        sendHtml(
+          res,
+          200,
+          renderInShell('programme', 'Programme', { eventName: view.eventTitle }, renderProductProgrammeSchedule(view)),
+        );
+      } else {
+        sendJson(res, 200, view);
+      }
+      return true;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/operator/decisions') {
+      const view = await loadDecisionQueue(ctx.app.pool, ctx.app.workspaceId);
+      if (url.searchParams.get('format') === 'html') {
+        const decisionCount = view.decisions.filter((decision) => decision.awaitingAuthority).length;
+        sendHtml(res, 200, renderInShell('decisions', 'Decisions', { decisionCount }, renderProductDecisionQueue(view)));
+      } else {
+        sendJson(res, 200, view);
+      }
+      return true;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/operator/activity') {
+      const view = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId);
+      if (url.searchParams.get('format') === 'html') {
+        sendHtml(res, 200, renderInShell('activity', 'Activity', {}, renderProductActivityFeed(view)));
       } else {
         sendJson(res, 200, view);
       }
@@ -265,6 +326,21 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'POST' && pathname === '/api/v2/demo/reset') {
+      // `seedDemoWorld` mints a fresh small world every call; it is not
+      // idempotent by dataset identity. Once a dataset has been provisioned
+      // into this workspace, calling it would add a second, unrelated world
+      // alongside the provisioned one — so the route refuses instead, and
+      // names the bounded way to get a clean baseline. Resetting a
+      // provisioned world is the next increment's work, not a table wipe.
+      if (datasetDirectoryFromEnv() !== undefined) {
+        sendJson(res, 409, {
+          error: 'DEMO_DATASET_PROVISIONED',
+          message:
+            'This runtime is configured with a demo dataset, so seeding a second world here would corrupt it. '
+            + 'Start from a fresh demo workspace or database instead (see docs/TESTING.md).',
+        });
+        return true;
+      }
       try {
         const result = await seedDemoWorld(ctx.app.pool, ctx.app.workspaceId, commandCtx(ctx.app).actorPrincipalId);
         sendJson(res, 200, result);

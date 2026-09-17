@@ -74,6 +74,26 @@ Do **not** run the broad suite after every edit. Using broad suites as the debug
 
 `npm run test:legacy` is never part of acceptance.
 
+## Demo dataset provisioning and fresh baselines
+
+A normal PostgreSQL boot materializes a demo dataset only when `NORTHSTAR_DEMO_DATASET_DIR` points at a runtime bundle directory. Boot then resolves one of three outcomes and logs which one:
+
+| Outcome | Meaning |
+|---|---|
+| `MATERIALIZED` | No capture of this dataset identity existed, so the bundle was materialized once through the normal M2–M6 commands and the in-scope journeys were assessed by the real evaluator. |
+| `ALREADY_PROVISIONED` | A capture with the same dataset identity **and** the same content hash exists, so the existing world is reused untouched. |
+| `DEMO_DATASET_CONTENT_CONFLICT` | The same dataset identity is already captured with a different content hash. Boot fails loudly rather than layering a second world over the first. |
+
+Because provisioning is keyed on dataset identity plus content hash, restarting the process against the same database is a no-op, and a browser can never provision anything.
+
+**Starting from a clean baseline** is therefore a matter of choosing a clean target, never of deleting rows. There is deliberately no reset endpoint and no table-wipe path in application code. Use whichever of these is cheaper:
+
+- **Fresh workspace in the same database** — set a new `PG_TARGET_WORKSPACE_ID`. Every table is workspace-partitioned, so the new workspace provisions its own copy of the dataset and the old one is left intact for comparison.
+- **Fresh database** — set a new `PG_TARGET_DATABASE`. Boot creates and migrates it, then provisions the dataset into it.
+- **Fresh container** — `npm run db:postgres:down` then `npm run db:postgres:up` for a completely clean volume.
+
+`POST /api/v2/demo/reset` (the two-traveller placeholder world) returns `409 DEMO_DATASET_PROVISIONED` whenever a demo dataset is configured, so it cannot be used to append a second world to a provisioned one. An operator-facing "reset scenario" control needs lifecycle semantics — replaying a world forward rather than mutating observed history backwards — and is intentionally not implemented yet.
+
 ## Test IDs
 
 ### T-DOM — Domain/schema contracts

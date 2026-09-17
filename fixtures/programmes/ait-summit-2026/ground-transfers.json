@@ -1,0 +1,103 @@
+{
+  "provenance": "RECONCILED_FROM_INPUT_PACK",
+  "provenanceNote": "Verbatim copy of groundTransfers from data/ait-demo-input-pack/global/operational-constraints.json. Values, source ids and observation instants are unchanged; only the file boundary moved so the runtime bundle is self-contained.",
+  "sourceIds": [
+    "src-syn-ait-event",
+    "src-syn-ait-policy"
+  ],
+  "anchorEventId": "evt-ait-2026",
+  "note": "Estimated door-to-door durations used for transfer scheduling. Shapes mirror DurationEstimateSchema (src/domain/common.ts) so deterministic buffer checks can consume them directly.",
+  "estimates": [
+    {
+      "from": "place-sin-changi",
+      "to": "place-mbs",
+      "estimate": {
+        "expectedMinutes": 25,
+        "minimumMinutes": 20,
+        "conservativeMinutes": 40,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "PRIVATE_CAR"
+    },
+    {
+      "from": "place-sin-changi",
+      "to": "place-panpacific",
+      "estimate": {
+        "expectedMinutes": 25,
+        "minimumMinutes": 20,
+        "conservativeMinutes": 40,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "PRIVATE_CAR"
+    },
+    {
+      "from": "place-sin-changi",
+      "to": "place-hotel-bayview",
+      "estimate": {
+        "expectedMinutes": 30,
+        "minimumMinutes": 25,
+        "conservativeMinutes": 45,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "PRIVATE_CAR"
+    },
+    {
+      "from": "place-sin-changi",
+      "to": "place-hotel-harbourline",
+      "estimate": {
+        "expectedMinutes": 30,
+        "minimumMinutes": 25,
+        "conservativeMinutes": 45,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "PRIVATE_CAR"
+    },
+    {
+      "from": "place-hotel-bayview",
+      "to": "place-mbs",
+      "estimate": {
+        "expectedMinutes": 12,
+        "minimumMinutes": 8,
+        "conservativeMinutes": 20,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "SHUTTLE"
+    },
+    {
+      "from": "place-hotel-harbourline",
+      "to": "place-mbs",
+      "estimate": {
+        "expectedMinutes": 15,
+        "minimumMinutes": 10,
+        "conservativeMinutes": 25,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "SHUTTLE"
+    },
+    {
+      "from": "place-panpacific",
+      "to": "place-mbs",
+      "estimate": {
+        "expectedMinutes": 15,
+        "minimumMinutes": 10,
+        "conservativeMinutes": 25,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "PRIVATE_CAR"
+    }
+  ]
+}

@@ -30,6 +30,14 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 /** Allowlisted static presentation assets — never resolves outside fixtures/ui. */
 const UI_ASSETS = ['northstar-logo.png'];
 
+/** Product route -> the read-only handler that renders it. GET only. */
+const SHELL_ROUTES: Record<string, string | undefined> = {
+  '/': '/api/v2/operator/overview',
+  '/programme': '/api/v2/operator/programme',
+  '/decisions': '/api/v2/operator/decisions',
+  '/activity': '/api/v2/operator/activity',
+};
+
 async function serveStaticAsset(res: ServerResponse, assetName: string): Promise<boolean> {
   if (!UI_ASSETS.includes(assetName)) return false;
   try {
@@ -73,8 +81,12 @@ async function handle(
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/') {
-    res.writeHead(302, { location: '/api/v2/operator/overview?format=html' });
+  // Clean product routes for the shell's nav. Each is a GET that redirects to
+  // the read-only handler which renders the same surface inside the shell, so
+  // the chrome's links and the API surface can never drift apart.
+  const shellRoute = SHELL_ROUTES[url.pathname];
+  if (req.method === 'GET' && shellRoute) {
+    res.writeHead(302, { location: `${shellRoute}?format=html` });
     res.end();
     return;
   }

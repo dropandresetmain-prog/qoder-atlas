@@ -3,7 +3,10 @@
  * Structural, truthful rendering using the approved state palette (DESIGN.md).
  */
 import type { OperatorOverview } from '../../contracts/v2/product/readModels.ts';
-import { adaptOperatorOverviewToDashboard } from '../../app/target/adapters/operatorOverviewAdapter.ts';
+import {
+  adaptOperatorOverviewToDashboard,
+  overviewCountedTotal,
+} from '../../app/target/adapters/operatorOverviewAdapter.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 
 export function renderProductOperatorOverview(view: OperatorOverview): string {
@@ -17,7 +20,7 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
   </div>
   ${surface.summaryHtml}
   <section class="section" aria-label="Trips">
-    <h2>All participants <span class="count">${view.items.length}</span></h2>
+    <h2>All participants <span class="count">${overviewCountedTotal(view)}</span></h2>
     ${surface.itemsHtml}
   </section>
 </main>`;

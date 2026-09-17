@@ -168,6 +168,37 @@ export const OperatorOverviewItemSchema = z.strictObject({
 });
 export type OperatorOverviewItem = z.infer<typeof OperatorOverviewItemSchema>;
 
+/**
+ * One in-scope subject of the operator's world, present whether or not a
+ * RecoveryCase exists for it.
+ *
+ * `items` answers "what needs me right now" and is case-driven, so it is
+ * legitimately empty in a healthy world. That made the baseline product
+ * surface look like it had no world at all. This collection answers the
+ * different, prior question — "whose travel am I responsible for" — and is
+ * therefore additive rather than a replacement: nothing about `items` or
+ * `summary` changes.
+ *
+ * Every field is an authoritative backend value. `status` and
+ * `remainderViability` use the same product vocabulary as `items`, and
+ * `evaluation` carries the assessment lifecycle, so a subject with no
+ * assessment yet reads as `UNKNOWN` + `NONE` instead of being presented as
+ * healthy or hidden.
+ */
+export const OperatorPopulationEntrySchema = z.strictObject({
+  journeyRef: z.string().min(1),
+  tripRef: z.string().min(1),
+  travellerLabel: z.string().min(1),
+  /** Strongest accepted programme obligation this subject holds. */
+  obligation: z.enum(['REQUIRED', 'OPTIONAL', 'INFORMED']),
+  status: ProductOperationalStatusSchema,
+  remainderViability: RemainderViabilitySchema,
+  evaluation: AssessmentViewStatusSchema,
+  /** Escalation marker when a case already covers this subject. Never identity. */
+  caseRef: z.string().min(1).optional(),
+});
+export type OperatorPopulationEntry = z.infer<typeof OperatorPopulationEntrySchema>;
+
 export const OperatorOverviewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   items: z.array(OperatorOverviewItemSchema),
@@ -178,6 +209,26 @@ export const OperatorOverviewSchema = z.strictObject({
     recovering: z.number().int().min(0),
     unknown: z.number().int().min(0),
   }),
+  /** The in-scope subject population; see OperatorPopulationEntrySchema. */
+  population: z.array(OperatorPopulationEntrySchema),
+  /** Counts over `population`, not over `items`. */
+  populationSummary: z.strictObject({
+    total: z.number().int().min(0),
+    ready: z.number().int().min(0),
+    atRisk: z.number().int().min(0),
+    disrupted: z.number().int().min(0),
+    recovering: z.number().int().min(0),
+    unknown: z.number().int().min(0),
+    /** Subjects holding no current assessment — honest, not counted as ready. */
+    notAssessed: z.number().int().min(0),
+  }),
+  /** The event the operator is working, when the workspace holds one. */
+  eventContext: z.strictObject({
+    eventRef: z.string().min(1),
+    title: z.string().min(1),
+    organiserLabel: z.string().min(1).optional(),
+    programmeRef: z.string().min(1).optional(),
+  }).optional(),
   ldg: LiveDependencyGraphSchema,
   change: ChangeAwarenessSchema,
 });
@@ -343,6 +394,60 @@ export const TravellerTripViewSchema = z.strictObject({
   change: ChangeAwarenessSchema,
 });
 export type TravellerTripView = z.infer<typeof TravellerTripViewSchema>;
+
+/**
+ * The three secondary operator surfaces the accepted shell navigates to.
+ *
+ * Each is a read-only projection of authoritative state and each is
+ * legitimately empty in a baseline world. They exist so the shell's nav is
+ * honest — a link that 404s is worse than no link — and they present only
+ * values the backend supplied.
+ */
+export const ProgrammeScheduleSchema = z.strictObject({
+  generatedAt: z.string().datetime({ offset: true }),
+  eventTitle: z.string().min(1),
+  items: z.array(z.strictObject({
+    itemRef: z.string().min(1),
+    label: z.string().min(1),
+    itemType: z.string().min(1),
+    windowLabel: z.string().min(1).optional(),
+    placeLabel: z.string().min(1).optional(),
+    lifecycleStatus: z.string().min(1),
+    /** Accepted participation counts — authoritative, never inferred from names. */
+    requiredParticipants: z.number().int().min(0),
+    optionalParticipants: z.number().int().min(0),
+    requiresPhysicalPresence: z.boolean(),
+  })),
+});
+export type ProgrammeSchedule = z.infer<typeof ProgrammeScheduleSchema>;
+
+export const DecisionQueueSchema = z.strictObject({
+  generatedAt: z.string().datetime({ offset: true }),
+  decisions: z.array(z.strictObject({
+    caseRef: z.string().min(1),
+    status: z.string().min(1),
+    openedAtLabel: z.string().min(1),
+    subjectLabels: z.array(z.string().min(1)),
+    /** Only cases the backend reports as awaiting authority require a decision. */
+    awaitingAuthority: z.boolean(),
+  })),
+});
+export type DecisionQueue = z.infer<typeof DecisionQueueSchema>;
+
+export const ActivityFeedSchema = z.strictObject({
+  generatedAt: z.string().datetime({ offset: true }),
+  entries: z.array(z.strictObject({
+    entryRef: z.string().min(1),
+    atLabel: z.string().min(1),
+    actorLabel: z.string().min(1),
+    subjectLabel: z.string().min(1),
+    what: z.string().min(1),
+    reason: z.string().min(1).optional(),
+  })),
+  /** True when older entries exist beyond the page returned. */
+  truncated: z.boolean(),
+});
+export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
 
 export const ApplicationErrorCodeSchema = z.enum([
   'LOADING',

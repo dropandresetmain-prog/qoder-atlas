@@ -1,0 +1,167 @@
+{
+  "schema": "northstar/demo-jurisdiction-attribution/1",
+  "provenance": "AUTHORED_DEMO_DATA",
+  "provenanceNote": "Authored for the AiT Summit 2026 runtime bundle. Neither programme.json nor the upstream data/ait-demo-input-pack carries any place->jurisdiction attribution, so m6.information (advisories) and m6.entry (entry_feasibility / transit_feasibility) could only ever answer UNKNOWN for every travelling Journey. This file declares (a) the jurisdictions the bundle's places sit in, (b) a coarse bounding geometry per jurisdiction, (c) an explicit place->area membership per place, and (d) what advisory / entry knowledge this demo dataset actually covers. It declares source facts only. No verdict, readiness label or viability judgement is stated here: the real M6 evaluators still compute every dimension from this evidence.",
+  "geometryNote": "Bounding boxes are deliberately coarse (WGS84 lon/lat), and AREA_MEMBERSHIP is the authoritative attribution basis. The boxes exist because area_versions.geometry is mandatory; they are drawn so that no box contains a bundle place belonging to another jurisdiction, which keeps the spatial-containment basis consistent with the declared memberships.",
+  "coverageNote": "Coverage is a statement about this synthetic dataset's own knowledge, not about the real world: within the AiT demo dataset, the advisory, condition, entry-requirement and transit-requirement knowledge for these jurisdictions is exactly what this bundle contains. That is what lets m6 reach a real PASS on those dimensions for a Journey whose travel evidence is complete, instead of an untruthful blanket UNKNOWN.",
+
+  "anchorEventId": "evt-ait-2026",
+  "sourceId": "src-syn-ait-geography",
+  "observedAt": "2026-08-25T09:00:00+00:00",
+  "validFrom": "2000-01-01",
+
+  "coverage": {
+    "edition": "ait-summit-2026-demo-bundle",
+    "queryBoundsVersion": "knowledge-coverage/1",
+    "completeness": "COMPLETE",
+    "expiresAt": "2026-10-31T00:00:00.000Z",
+    "topics": ["ADVISORY", "CONDITION", "ENTRY_REQUIREMENT", "TRANSIT_REQUIREMENT"]
+  },
+
+  "jurisdictions": [
+    {
+      "id": "jur-sg",
+      "name": "Singapore",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "SG",
+      "area": { "id": "area-sg", "name": "Singapore", "areaType": "COUNTRY", "boundingBoxes": [[103.60, 1.13, 104.10, 1.48]] },
+      "placeIds": ["place-sin-changi", "place-mbs", "place-panpacific", "place-hotel-bayview", "place-hotel-harbourline"]
+    },
+    {
+      "id": "jur-my",
+      "name": "Malaysia",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "MY",
+      "area": { "id": "area-my", "name": "Malaysia", "areaType": "COUNTRY", "boundingBoxes": [[99.60, 1.45, 104.40, 6.75], [109.50, 0.85, 119.30, 7.40]] },
+      "placeIds": ["place-kul"]
+    },
+    {
+      "id": "jur-th",
+      "name": "Thailand",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "TH",
+      "area": { "id": "area-th", "name": "Thailand", "areaType": "COUNTRY", "boundingBoxes": [[97.30, 5.55, 105.70, 20.50]] },
+      "placeIds": ["place-bkk", "place-cnx"]
+    },
+    {
+      "id": "jur-ph",
+      "name": "Philippines",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "PH",
+      "area": { "id": "area-ph", "name": "Philippines", "areaType": "COUNTRY", "boundingBoxes": [[116.90, 4.55, 126.65, 21.20]] },
+      "placeIds": ["place-mnl"]
+    },
+    {
+      "id": "jur-hk",
+      "name": "Hong Kong SAR",
+      "regimeKind": "SUBNATIONAL",
+      "isoAlpha2": "HK",
+      "area": { "id": "area-hk", "name": "Hong Kong SAR", "areaType": "TERRITORY", "boundingBoxes": [[113.80, 22.13, 114.45, 22.58]] },
+      "placeIds": ["place-hkg"]
+    },
+    {
+      "id": "jur-id",
+      "name": "Indonesia",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "ID",
+      "area": { "id": "area-id", "name": "Indonesia", "areaType": "COUNTRY", "boundingBoxes": [[95.00, -11.10, 141.10, 1.00]] },
+      "placeIds": ["place-cgk"]
+    },
+    {
+      "id": "jur-au",
+      "name": "Australia",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "AU",
+      "area": { "id": "area-au", "name": "Australia", "areaType": "COUNTRY", "boundingBoxes": [[112.90, -43.75, 154.00, -9.10]] },
+      "placeIds": ["place-syd"]
+    },
+    {
+      "id": "jur-jp",
+      "name": "Japan",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "JP",
+      "area": { "id": "area-jp", "name": "Japan", "areaType": "COUNTRY", "boundingBoxes": [[122.90, 24.00, 146.00, 45.60]] },
+      "placeIds": ["place-hnd", "place-nrt", "place-hotel-narita-gateway"]
+    },
+    {
+      "id": "jur-kr",
+      "name": "Republic of Korea",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "KR",
+      "area": { "id": "area-kr", "name": "Republic of Korea", "areaType": "COUNTRY", "boundingBoxes": [[125.00, 33.10, 129.65, 38.65]] },
+      "placeIds": ["place-icn"]
+    },
+    {
+      "id": "jur-vn",
+      "name": "Viet Nam",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "VN",
+      "area": { "id": "area-vn", "name": "Viet Nam", "areaType": "COUNTRY", "boundingBoxes": [[102.10, 8.15, 109.50, 23.40]] },
+      "placeIds": ["place-sgn"]
+    },
+    {
+      "id": "jur-in",
+      "name": "India",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "IN",
+      "area": { "id": "area-in", "name": "India", "areaType": "COUNTRY", "boundingBoxes": [[68.10, 6.70, 97.45, 35.55]] },
+      "placeIds": ["place-del", "place-bom"]
+    },
+    {
+      "id": "jur-us",
+      "name": "United States of America",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "US",
+      "area": { "id": "area-us", "name": "United States of America", "areaType": "COUNTRY", "boundingBoxes": [[-125.00, 24.40, -66.90, 49.40]] },
+      "placeIds": ["place-lax"]
+    },
+    {
+      "id": "jur-gb",
+      "name": "United Kingdom",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "GB",
+      "area": { "id": "area-gb", "name": "United Kingdom", "areaType": "COUNTRY", "boundingBoxes": [[-8.70, 49.85, 1.80, 60.90]] },
+      "placeIds": ["place-lhr"]
+    },
+    {
+      "id": "jur-fr",
+      "name": "France",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "FR",
+      "area": { "id": "area-fr", "name": "France", "areaType": "COUNTRY", "boundingBoxes": [[-5.15, 41.30, 9.60, 51.15]] },
+      "placeIds": ["place-cdg"]
+    },
+    {
+      "id": "jur-de",
+      "name": "Germany",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "DE",
+      "area": { "id": "area-de", "name": "Germany", "areaType": "COUNTRY", "boundingBoxes": [[5.85, 47.25, 15.05, 55.10]] },
+      "placeIds": ["place-fra"]
+    },
+    {
+      "id": "jur-nl",
+      "name": "Netherlands",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "NL",
+      "area": { "id": "area-nl", "name": "Netherlands", "areaType": "COUNTRY", "boundingBoxes": [[3.30, 50.75, 7.25, 53.60]] },
+      "placeIds": ["place-ams"]
+    },
+    {
+      "id": "jur-es",
+      "name": "Spain",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "ES",
+      "area": { "id": "area-es", "name": "Spain", "areaType": "COUNTRY", "boundingBoxes": [[-9.40, 35.95, 3.35, 43.80]] },
+      "placeIds": ["place-mad"]
+    },
+    {
+      "id": "jur-nz",
+      "name": "New Zealand",
+      "regimeKind": "COUNTRY",
+      "isoAlpha2": "NZ",
+      "area": { "id": "area-nz", "name": "New Zealand", "areaType": "COUNTRY", "boundingBoxes": [[166.40, -47.30, 178.60, -34.35]] },
+      "placeIds": ["place-akl"]
+    }
+  ]
+}

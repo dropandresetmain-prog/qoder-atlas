@@ -1,279 +1,115 @@
-# ACTIVE TASK — Slice A: Earliest Testable NORTHSTAR
+# ACTIVE TASK — AiT baseline product integration (first post-C5 product increment)
 
-Working-memory ledger for the current delivery slice. Keep it short, reread before major phases, and close items only with evidence.
+Working-memory ledger (AGENTS.md "long-horizon work"). Reread before each major
+phase and before declaring completion. Close an item only with evidence. The
+completed post-C5 convergence ledger is archived at
+`docs/work/POST_C5_CONVERGENCE_ACTIVE_TASK.md`, and the wider Slice A ledger this
+increment is the first step of is at `docs/work/SLICE_A_ACTIVE_TASK.md`.
 
 ## Goal
 
-Get the founder onto a real, repeatable NORTHSTAR product path as fast as safely possible:
+`canonical AiT runtime bundle` -> `real PostgreSQL normalized state` ->
+`real deterministic baseline evaluation where evidence permits` ->
+`authoritative live read model` -> `integrated operator product shell` ->
+`browser refresh/restart preserves the same world`.
 
-`known Sarah baseline -> normal product UI -> provider-shaped disruption -> authoritative PostgreSQL mutation/evaluation -> five incident-linked outcomes -> four cleared / Sarah failed -> one Sarah RecoveryCase -> click/reload Sarah`
+**Stops before the Sarah disruption.** No recovery/case orchestration, no V5.6,
+no Event Overview redesign, no M11, no SQLite, no database-wipe reset.
 
-Stop and founder-test at that point before building Slice B.
+## Exact identity
 
-## Current authoritative state
+- Repo `dropandresetmain-prog/qoder-atlas`; primary worktree `C:/Dev/qoder-atlas`
+- Branch `feature/ait-baseline-product-integration`
+- Base = authoritative `main` `8b02f1e4572d95071b15f59270ec97bdba36a6f2` (verified `origin/main` is exactly this SHA)
 
-- Repository: `dropandresetmain-prog/qoder-atlas`
-- Branch: `main`
-- Post-C5 convergence complete.
-- C5 accepted backend/refactor SHA: `87783c0bcbdc12cf263851a36e06b9d5255289ce`
-- Accepted frontend handoff: `6a655ddc0d57d64595e7c8ab207ae8c6ebbb37ab`
-- Accepted live read-model lane: `cbe5f837c3c4c45bec576f5ea1022b8a26871520`
-- PostgreSQL + PostGIS is the sole normal runtime.
-- SQLite is offline read-only migration input / historical only.
-- Test topology converged: CURRENT_TARGET / MIGRATION_BOUNDARY / HISTORICAL_LEGACY.
-- M11 readiness audit: **A — no meaningful legacy state identified**; bounded external legacy-file inventory is required only before final M11 activation.
+## Architecture decisions (frozen for this increment)
 
-## Delivery sequence
+1. **Generic dataset boundary, not an AiT module.** A new demo/input-boundary
+   tier `src/app/demo/**` loads a *configured* dataset directory
+   (`NORTHSTAR_DEMO_DATASET_DIR`). No AiT/persona/place/carrier literal enters
+   `src/`. The anti-hardcoding gate forbids `fixtures/programmes` in the
+   strict/app tiers, so configuration is the only correct path anyway.
+2. **`ProgrammeImportBundle` is NOT widened.** It stays the narrow generic
+   intake contract. The rich runtime bundle gets its own boundary schema and
+   materializer that calls the same real M2–M6 commands.
+3. **Source identity -> UUID mapping uses the accepted F08 external-identity
+   mechanism**: `external_connections` -> `external_records` (record_type +
+   external_id) -> `external_record_links` (canonical subject kind+id,
+   evidence-backed). No deterministic-UUID guessing, no display-name identity.
+4. **Provisioning identity/consistency uses `source_records`**: one dataset
+   capture row keyed `sourceIdentity = northstar:dataset:<datasetKey>` with
+   `content_hash` = sha256 of the canonical bundle bytes. Same identity + same
+   hash => already provisioned, reuse. Same identity + different hash => fail
+   visibly (`DEMO_DATASET_CONTENT_CONFLICT`). Absent => materialize once.
+5. **Baseline evaluation uses the real M6 pipeline** (`captureWorld` +
+   `createM6Registry` + `assessSubject`) persisted through the accepted
+   assessment path. No seeded verdicts.
+6. **Overview population** is an additive `population[]` collection on
+   `OperatorOverviewSchema`, fed from the read model's existing authoritative
+   ACTIVE-programme population query (the one already producing `ldg.nodes`).
+   `items` keeps its case-driven meaning.
+7. **Operator shell** = existing `renderPage(...)`. Target HTML routes only.
 
-1. **Slice A** — current task.
-2. **Founder Test A** — T1-T4 below.
-3. **Slice B** — preview/approval/execution/recovery.
-4. **Founder Test B** — T5-T6.
-5. Submission rehearsal / repeatability / replay / failure recovery.
-6. M11 operational activation / retirement.
-7. UI polish/stretch.
+## Phase checklist
 
-Do not skip founder testing between slices.
+- [x] P0 branch from authoritative main + ledger
+- [x] P0b bundle inspection + gap analysis (AB-1, AB-8 closed by reconciled/authored fixture data)
+- [x] P1 bundle schema + loader + content hash — `src/app/demo/{datasetSchema,datasetLoader}.ts`
+- [x] P2 source/external identity mapping + resolution — `src/app/demo/{externalIdentity,datasetIds}.ts`
+- [x] P3 materializer — `src/app/demo/{datasetMapping,materializeDataset}.ts`
+- [x] P4 idempotent provisioning gate + boot wiring — `src/app/demo/provisionDataset.ts`, `composeTargetBoot.ts`
+- [x] P5 baseline evaluation over materialized journeys — `src/app/demo/baselineEvaluation.ts`
+- [x] P6 read-model population contract + operator shell routes
+- [x] P7 focused tests — 14/14 `postgres-integration/productBaselineWorld.pgtest.ts`; 749/749 `npm test`; 17/17 Sarah/Jordan/read-model PG regressions
+- [x] P8 typecheck / lint / build / anti-hardcoding / boundary gate — all clean
+- [ ] P9 commit + push + completion report
 
-## Slice A acceptance
+## Executed evidence
 
-From a clean supported baseline, without SQL intervention, manual case creation, legacy SQLite runtime or manual browser reload:
+Materialization into a fresh workspace, and identically after a process restart:
+67 travellers / 67 trips / 67 journeys / 1 event / 1 programme / 61 programme items /
+84 reservations / 67 assessments. Re-provisioning logs `ALREADY_PROVISIONED` and
+changes no counts; a mid-way interrupted provision completes the same world rather
+than a second one.
 
-1. Founder restores/loads the real Sarah demo baseline.
-2. Founder opens the real product surface.
-3. Founder triggers the disclosed simulated/provider-shaped airline update through normal HTTP.
-4. Canonical PostgreSQL state changes through accepted commands.
-5. Evaluation/reassessment runs or is observed through normal application orchestration.
-6. Exactly five incident-linked affected people are accounted for.
-7. Four are viable/cleared and Sarah is disrupted.
-8. Sarah's failure is backed by the real quantitative requirement (e.g. available vs required readiness), not frontend inference.
-9. Exactly one Sarah RecoveryCase is opened/attached idempotently by backend/application orchestration.
-10. Founder clicks Sarah and the focused case loads from authoritative state.
-11. Reloading the page preserves the same case/outcome.
-12. Repeating the same event does not create duplicate cases.
+Baseline verdicts from the real M6 evaluator: **50 PASS / 14 UNKNOWN / 3 FAIL** over
+67 journeys. Dimension spread is honestly mixed, e.g. `booking_validity` 42 PASS /
+25 UNKNOWN, `connection_feasibility` 8 PASS / 59 UNKNOWN, `programme_participation`
+22 PASS / 3 FAIL / 42 UNKNOWN, `credential_selection` and `overnight_accommodation`
+67 UNKNOWN. No dimension is uniformly PASS by construction.
 
-## Founder checkpoints
+Constraints materialized: 7 `transfer_minutes`, 1 `minimum_connection_minutes`,
+1 `programme_arrival_readiness_minutes`. Sarah resolves through source identity to a
+shared inbound service carrying 6 travellers plus a required commitment; Jordan
+resolves to a 3-leg journey governed by the connection constraint.
 
-### T1 — Real baseline
+Operator shell on a real boot: `/` shows the AiT event context and a 50/67 readout,
+`/programme` 61 items, `/decisions` 0 (no case exists), `/activity` 50 entries — all
+inside the existing `renderPage` chrome. Three consecutive refreshes left
+`change_records` at 1757, so refresh is read-only.
 
-Founder action:
+## Findings / triage
 
-`Restore demo baseline -> Open product/Event Overview surface`
-
-Must prove:
-
-- correct event/workspace;
-- exact relevant programme/service/people membership;
-- no pre-created Sarah disruption case;
-- current assessments/unknowns are honest;
-- reset/reseed is repeatable and does not accumulate duplicate state.
-
-Known issue: current `/api/v2/demo/reset` historically seeded a generic two-traveller programme. Slice A must establish the real Sarah world through supported paths rather than assuming the endpoint name means the job is done.
-
-### T2 — Trigger reaches canonical state
-
-Founder action:
-
-`Simulate airline update`
-
-Must prove:
-
-- command goes through normal HTTP/provider-event boundary;
-- event identity/idempotency is real;
-- UI acknowledgement matches the actual state change;
-- page updates automatically via authoritative refetch/polling;
-- no frontend timer manufactures business state.
-
-If the UI says `ID7159 cancelled -> moved to ID7153`, the backend input/state must actually establish cancellation + replacement/current service semantics rather than merely changing an arrival timestamp.
-
-### T3 — Correct cohort and escalation
-
-Must prove:
-
-- exactly five people were in the disruption's affected/evaluation scope;
-- each displayed outcome incorporates the changed input;
-- baseline PASS is not reused as checked-by-this-incident evidence;
-- four are current PASS/viable;
-- Sarah is current FAIL/disrupted with authoritative causal/quantitative reason;
-- pending/UNKNOWN is never counted as cleared;
-- exactly one Sarah case exists/attaches idempotently.
-
-### T4 — Open and reload Sarah
-
-Founder action:
-
-`Click Sarah -> inspect case -> reload`
-
-Must prove:
-
-- navigation uses backend `caseRef`/stable identity;
-- real traveller/service/commitment/current assessment state loads;
-- causal focus/reason comes from backend/read model, not graph traversal guesswork;
-- no dependency on cached prototype data;
-- stay/hotel branch is shown only if target truth supports its state.
-
-**T4 completes Slice A. Stop and founder-test before Slice B.**
-
-## Required implementation work
-
-### A1 — Reproducible Sarah baseline
-
-Establish a supported PostgreSQL baseline containing the exact approved Sarah demo world.
-
-Requirements:
-
-- data/config/fixtures may contain Sarah/demo facts;
-- domain/recovery code may not branch on Sarah/event IDs/routes;
-- reset/reseed must return or expose actual event/person/service refs;
-- establish baseline current assessments;
-- no incident-created cases before the trigger;
-- five displayed passengers/participants must be backed by actual membership/dependency truth.
-
-### A2 — Truthful provider-shaped disruption
-
-Use the existing external-input boundary where possible.
-
-Requirements:
-
-- provider/source evidence retained;
-- idempotent event identity;
-- exact affected/current service facts are represented;
-- explicit target identity is acceptable for this disclosed simulation;
-- do not invent generalized provider-reference auto-correlation merely for the demo.
-
-### A3 — Application orchestration
-
-Engine E2E tests currently prove components that test code helps assemble. Slice A must make the normal product lifecycle do the work.
-
-At minimum:
-
-- ingest event;
-- schedule/run or observe reassessment;
-- discover affected scope;
-- persist current assessments;
-- idempotently create/attach Sarah's RecoveryCase from the failed assessment;
-- expose stable case identity to the UI.
-
-Browser/frontend must not decide who deserves a case.
-
-### A4 — Minimum event operational projection
-
-The initial event/product surface must not depend on a RecoveryCase already existing.
-
-Minimum truthful projection:
-
-- event identity/timezone;
-- relevant programme items;
-- relevant transport/service groups;
-- people/participation/service membership;
-- current assessment state;
-- incident/change identity;
-- incident-linked affected membership;
-- per-person current outcome;
-- Sarah quantitative failure reason;
-- `caseRef` when escalation exists.
-
-Do not build a generic whole-event graph API.
-
-### A5 — Frontend integration
-
-Use the accepted semantic boundary:
-
-`authoritative read model -> semantic adapter -> normalized presentation -> shared grammar -> UI`
-
-Requirements:
-
-- automatic sequential full-snapshot polling/refetch is acceptable;
-- complete snapshot is authoritative;
-- `changedVisibleRefs` is only an at-least-once emphasis hint;
-- render PASS/FAIL/UNKNOWN/pending honestly;
-- surface command/loading/stale-data failures;
-- navigate to Sarah via backend identity;
-- no business reasoning in components.
-
-The final Event Overview layout remains unresolved. Use the thinnest presentable surface that allows founder testing; do not block the integrated spine on a perfect overview design.
-
-## Investigate during Slice A
-
-| Item | Triage | Required decision |
+| ID | Finding | Triage |
 |---|---|---|
-| Exact five-person incident provenance | **Investigate Now** | Prove all five are actually affected/evaluated because of the disruption. |
-| Rebooking semantics | **Investigate Now** | Confirm actual commands/state behind any cancellation/rebooking UI claim. |
-| Sarah stay consequence | **Investigate Now** | Query real target state/evaluator; expose truth, do not force green. |
-| Felix programme linkage | **Investigate Now** | Use canonical PostgreSQL programme/requirement relationship, not old fixture assumptions. |
-| Live read-model `LIMIT 200` / noisy changed sets / graph state simplification | **Park unless Slice A hits it** | Do not widen scope unless the actual slice fails because of it. |
+| AB-1 | The runtime bundle carries no ground-transfer durations and no minimum-connection minutes, but `reachPlaceBy`/`connection` need registered `transfer_minutes` / `minimum_connection_minutes` constraints. Without them every inbound traveller's `programme_participation` is UNKNOWN (`transfer_time_unknown`) — an all-UNKNOWN population, not a truthful mixed one. The values exist verbatim in the upstream provenance material `data/ait-demo-input-pack/global/operational-constraints.json` (`groundTransfers.estimates`) and in the bundle's own `rule-ait-connection-buffer`. | **Act Now — CLOSED.** Reconciled the upstream `groundTransfers` block into the runtime bundle as `fixtures/programmes/ait-summit-2026/ground-transfers.json` (verbatim values + provenance header). Not invented data: same source ids, same numbers. Materialized as generic `transfer_minutes` constraint definitions. Connection minutes come from the bundle's own `CONNECTION_BUFFER` rule. |
+| AB-2 | Clickable admin/profile "Reset scenario" control: `renderPage` already supports `profileResetAction`, but a truthful reset needs lifecycle semantics this increment deliberately does not own (no table wipe, no backwards mutation of observed history). | **Investigate Now** — next increment. Documented bounded developer path (fresh workspace id / fresh database) in `docs/TESTING.md`; no reset action wired. |
+| AB-3 | `POST /api/v2/demo/reset` currently calls `seedDemoWorld` (the two-traveller placeholder world) and is named "reset" while actually appending a second world. | **Act Now — CLOSED.** Route removed; the placeholder `seedDemoWorld`/`demoSeed.ts` stays for `m10DemoSeed.pgtest.ts` but is no longer HTTP-reachable, so a browser can never provision. |
+| AB-4 | 25 of 67 travellers carry no declared travel (self/other-arranged locals). Their `programme_participation` evaluates UNKNOWN (`no_route_to_place`). | **Ignore / Accept Risk** — this is the correct honest answer. The fixture supplies no travel evidence for them; inventing filler travel is explicitly forbidden. |
+| AB-5 | `fx-rates.json` and `booking-dossiers.json` in the bundle hold one row each (Jordan FX, Jordan/Sarah dossiers) and describe money/contact detail whose target home is `cost_allocations`/`ProtectedDataRef`. Materializing dossier plaintext would fabricate custody (same reason M10 quarantined it). | **Park for Later** — not required by this baseline; recorded so it is not silently dropped. FX/dossier files are read and hashed into the dataset identity but not materialized as domain state. |
+| AB-6 | The overview's population query uses `LIMIT 200`, inherited from the read-model lane (CV-7). 67 travellers is well inside it, but the truncation is still silent. | **Park for Later** — inherited item, unchanged by this increment. |
+| AB-8 | Neither the runtime bundle nor the upstream input pack carries any place->jurisdiction attribution, and there are no jurisdictions, geographic areas or knowledge-coverage records. `m6.information` (`advisories`) and `m6.entry` (`entry_feasibility` / `transit_feasibility`) are blocking dimensions that can never be anything but UNKNOWN without it: an unresolved place always contributes its own UNKNOWN, and even with jurisdictions resolved, "no applicable advisory / no applicable requirement" only reaches PASS when unexpired **knowledge coverage** exists for the topic and jurisdiction. So every travelling Journey would be UNKNOWN regardless of how good its travel evidence is — an all-UNKNOWN population, not the truthful mixed one. | **Act Now — decided by product owner.** Author `fixtures/programmes/ait-summit-2026/jurisdictions.json` as new demo data: the jurisdictions the bundle's places sit in, coarse bounding geometry per jurisdiction, explicit place->area membership, and the demo dataset's own knowledge-coverage declaration for `ADVISORY`/`CONDITION`/`ENTRY_REQUIREMENT`/`TRANSIT_REQUIREMENT`. Demo facts stay in `fixtures/`; the materializer consumes it generically through `createJurisdiction`/`createGeographicArea`/`addAreaVersion`/`addJurisdictionArea`/`addAreaMembership`/`recordKnowledgeCoverage`. No verdict is seeded — the real evaluator still computes every dimension. |
+| AB-9 | The bundle's `engagementImportance` has three tiers (`CRITICAL`/`PREFERRED`/`OPTIONAL`); the target `Participation.obligation` has `REQUIRED`/`OPTIONAL`/`INFORMED`. `PREFERRED` and `OPTIONAL` both map to `OPTIONAL`, losing the middle tier. | **Park for Later** — the distinction is presentational today and nothing in M6 reads it. Recorded so it is not mistaken for a faithful round-trip. |
+| AB-10 | `entry_feasibility` and `credential_selection` are UNKNOWN for all 67 journeys: the dataset declares no intended visits/transit intent and no traveller credentials, so ENTRY encounters are not derivable at all. | **Ignore / Accept Risk** — UNKNOWN is the honest answer for absent evidence. Fabricating visits or passports to turn these green is exactly what the brief forbids. |
+| AB-11 | Three travellers FAIL `programme_participation` (`arrives_after_deadline` / `insufficient_arrival_readiness`) against the organiser's own 150-minute buffer rule. | **Ignore / Accept Risk** — real evaluator output over real fixture data, not a defect. Notably these are *not* Sarah, so the baseline is not pre-disrupting the hero. |
+| AB-12 | Travellers with no declared travel but only `PREFERRED`/`OPTIONAL` participation reach PASS, because no dimension has anything to fail on. Verdict is truthful per the current rules but arguably generous: "nothing required of them" reads as "ready". | **Park for Later** — changing it means changing evaluator semantics for empty requirement sets, which is M6 scope and out of bounds here. |
+| AB-13 | An earlier step in this session overwrote `docs/work/POST_C5_CONVERGENCE_ACTIVE_TASK.md` with the previous Slice A ledger, re-encoded as UTF-16. | **Act Now — CLOSED.** Convergence archive restored from HEAD; the Slice A ledger it displaced is now preserved at `docs/work/SLICE_A_ACTIVE_TASK.md` in UTF-8. |
+| AB-7 | `rule-ait-transport-concentration`, `rule-ait-*-spend-limit`, `APPROVAL_*`, `CHANGE_TERMS`, `CANCELLATION_TERMS`, `NO_SHOW_TERMS`, `INSURANCE_COVERAGE` and `ENTRY_REQUIREMENT` rules are materialized as real published `RuleSet` editions with their rules, but only `MIN_BUFFER` and `CONNECTION_BUFFER` additionally become evaluator-visible `ConstraintDefinition`s, because those are the only two registered constraint types the M6 registry reads today. | **Park for Later** — the policy survives with lineage; wiring spend/approval rules into authority evaluation is M7/M8 scope, not this baseline. |
 
-## Prepare early for Slice B, but do not implement before Founder Test A
+## Critical constraints
 
-Investigate the no-Journey participant seam (Daniel/Elena equivalents):
-
-- Participation may exist without Journey.
-- Preview/strategy evaluation must not omit these people.
-- Empty participant subsets must not create false `.every(...)` success.
-- If omission is confirmed, classify **Act Now in Slice B**.
-
-Do not create fake Journeys for local participants.
-
-## Test discipline
-
-During implementation:
-
-1. smallest focused relevant test;
-2. focused PostgreSQL seam test;
-3. typecheck/build/lint only when the changed seam makes them useful.
-
-Do **not** repeatedly run the broad suite as the debugging loop.
-
-At the coherent Slice A checkpoint:
-
-- relevant Slice A integration/E2E tests;
-- Sarah/Jordan regressions where the changed seam could affect them;
-- current target gate appropriate to the slice;
-- fresh PostgreSQL broader gate once if this is the candidate for Founder Test A;
-- anti-hardcoding.
-
-Never run `npm run test:legacy` for Slice A acceptance.
-
-## Hard constraints
-
-- No SQLite runtime/fallback.
-- No scenario-specific branches in domain/recovery/application logic.
-- No frontend timers manufacturing recovery progress.
-- No UI-derived viability/blast radius/causality/policy/authority.
-- No `LLM -> irreversible/money-moving API`.
-- No M11 activation before the product slices are proven unless the owner explicitly narrows activation scope.
-- No whole-event LDG/semantic zoom/multi-focus stretch work before Slice A/B.
-- Do not reopen F01-F18 absent a real architecture contradiction.
-
-## Current parked scope
-
-- progressive evaluation telemetry;
-- rich rejected-option history;
-- polished provider/tool activity;
-- Before/After history;
-- full whole-event LDG;
-- deep Participants/Decisions/Activity functionality;
-- traveller phone view;
-- physical legacy-test directory reorganisation;
-- retired SQLite dead-code deletion before M11/submission.
-
-## Completion report for Slice A implementation
-
-Return:
-
-1. branch/worktree/base/head;
-2. exact baseline/reset behaviour;
-3. exact provider-shaped input used;
-4. application orchestration added/changed;
-5. event/read-model contract added/changed;
-6. frontend integration added/changed;
-7. T1/T2/T3/T4 evidence;
-8. focused tests run;
-9. broader checkpoint tests run, if any;
-10. anti-hardcoding result;
-11. all findings triaged;
-12. exact instructions for the founder to perform Founder Test A manually.
-
-## Next action
-
-Implement the smallest integrated Slice A path from current `main` and get to T1/T2 as early as possible. Do not spend a multi-day backend stretch before the first founder-visible interaction.
+- PostgreSQL is the sole runtime. No SQLite.
+- No Sarah/Jordan/persona/carrier/route branching in domain or application code.
+- Do not seed viability labels; use the real evaluator.
+- Browser refresh performs reads only.
+- Exact-path staging; no `git add .`.

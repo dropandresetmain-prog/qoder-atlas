@@ -123,6 +123,7 @@
       "postgres-integration/m9SarahProgrammeLoop.pgtest.ts",
       "postgres-integration/m9SarahTargetE2E.pgtest.ts",
       "postgres-integration/migrate.pgtest.ts",
+      "postgres-integration/productBaselineWorld.pgtest.ts",
       "postgres-integration/revisionConflicts.pgtest.ts",
       "postgres-integration/serializableRetry.pgtest.ts",
       "postgres-integration/tenantIntegrity.pgtest.ts",

@@ -45,6 +45,8 @@ function fivePersonOverview(): OperatorOverview {
       { tripRef: 'trip-4', travellerLabel: 'Traveller four', status: 'RECOVERING', remainderViability: 'AT_RISK', affectedPeople: [], affectedItems: [], decisionRequired: false, unresolvedUncertainty: [] },
       { tripRef: 'trip-5', travellerLabel: 'Traveller five', status: 'UNKNOWN', remainderViability: 'UNKNOWN', affectedPeople: [], affectedItems: [], decisionRequired: false, unresolvedUncertainty: [] },
     ],
+    population: [],
+    populationSummary: { total: 0, ready: 0, atRisk: 0, disrupted: 0, recovering: 0, unknown: 0, notAssessed: 0 },
     ldg,
     change: changeAwareness,
   };

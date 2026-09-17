@@ -14,6 +14,8 @@
  */
 import { loadConfig, type AppConfig } from '../config/config.ts';
 import { composeTargetEndpoints, type TargetEndpoints } from './target/composeTargetEndpoints.ts';
+import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
+import { runBaselineEvaluation } from './demo/baselineEvaluation.ts';
 import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
 import { createM6Registry } from '../resolution/evaluation/registry.ts';
 import { assessSubject } from '../resolution/evaluation/assess.ts';
@@ -87,6 +89,42 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
     `INSERT INTO workspaces (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
     [config.workspaceId, `northstar:${config.workspaceId}`],
   );
+
+  // Idempotent dataset provisioning. Absent configuration this does nothing;
+  // an already-provisioned dataset is reused; the same dataset identity with
+  // different content fails the boot rather than layering a second world.
+  // Nothing a browser can request reaches this path.
+  const actorPrincipalId = `northstar-boot:${config.workspaceId}`;
+  const provisioning = await provisionConfiguredDataset({
+    pool: endpoints.app.pool,
+    workspaceId: config.workspaceId,
+    actorPrincipalId,
+    env,
+  });
+  if (provisioning.status === 'MATERIALIZED') {
+    console.log(
+      `[atlas] provisioned dataset ${provisioning.datasetKey} ` +
+        `content=${provisioning.contentHash.slice(0, 16)} ` +
+        `counts=${JSON.stringify(provisioning.report.counts)}`,
+    );
+  } else if (provisioning.status === 'ALREADY_PROVISIONED') {
+    console.log(
+      `[atlas] dataset ${provisioning.datasetKey} already provisioned ` +
+        `content=${provisioning.contentHash.slice(0, 16)} — reusing existing state`,
+    );
+  }
+
+  // Baseline assessments come from the real evaluator, and only for subjects
+  // that hold none. A restart against the same database evaluates nothing.
+  const baseline = await runBaselineEvaluation({
+    pool: endpoints.app.pool,
+    workspaceId: config.workspaceId,
+    actorPrincipalId,
+  });
+  if (baseline.evaluated > 0) {
+    console.log(`[atlas] baseline evaluation assessed ${baseline.evaluated} journeys ${JSON.stringify(baseline.verdicts)}`);
+  }
+
   const pipeline = buildReassessmentPipeline(endpoints.app.pool);
   const pollTimer = setInterval(() => {
     void endpoints.app.reassessmentWorker

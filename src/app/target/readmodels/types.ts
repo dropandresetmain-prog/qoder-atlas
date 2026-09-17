@@ -68,8 +68,37 @@ export interface OperatorItemFact {
   evaluation?: AssessmentViewStatus;
 }
 
+/**
+ * One in-scope subject, independent of whether a case exists for it. See
+ * `OperatorPopulationEntrySchema` for why this is additive to `items`.
+ */
+export interface OperatorPopulationFact {
+  journeyRef: string;
+  tripRef: string;
+  travellerLabel: string;
+  obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED';
+  status: ProductOperationalStatus;
+  remainderViability: RemainderViability;
+  evaluation: AssessmentViewStatus;
+  caseRef?: string;
+}
+
+export interface EventContextFact {
+  eventRef: string;
+  title: string;
+  organiserLabel?: string;
+  programmeRef?: string;
+}
+
 export interface OperatorOverviewFacts extends ProductWorldFacts {
   items: readonly OperatorItemFact[];
+  /**
+   * Optional because only a store-backed producer can answer "who is in
+   * scope" — the pure in-memory producers build a specific case's facts and
+   * have no population to report, and must not fabricate one.
+   */
+  population?: readonly OperatorPopulationFact[];
+  eventContext?: EventContextFact;
 }
 
 export interface ProgrammeCommitmentFact {
