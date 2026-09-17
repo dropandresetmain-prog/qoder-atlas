@@ -341,9 +341,42 @@ export const DuplicateBookingExposureViewSchema = z.strictObject({
 });
 export type DuplicateBookingExposureView = z.infer<typeof DuplicateBookingExposureViewSchema>;
 
+/**
+ * T3 — the authoritative cause of a case: the change signal (migration 0124)
+ * whose consequence produced the escalating assessment. Absent when the case
+ * was opened without a signal (e.g. a baseline failure or a manual open).
+ */
+export const CaseCauseViewSchema = z.strictObject({
+  changeSignalRef: z.string().min(1),
+  originKind: z.string().min(1),
+  changeType: z.string().min(1),
+  receivedAt: z.string().datetime({ offset: true }),
+  /** Whether the signal's application completed (all consequential commands committed). */
+  applied: z.boolean(),
+});
+export type CaseCauseView = z.infer<typeof CaseCauseViewSchema>;
+
+/**
+ * T3 — one step of the deterministic causal path behind a failing subject:
+ * the evaluator's own typed explanation (dimension, registered reason code,
+ * facts), never prose parsed by a frontend. Ordered as the evaluator
+ * reported it; the first entry is the first operational breakpoint.
+ */
+export const CausalPathStepSchema = z.strictObject({
+  subjectRef: z.string().min(1),
+  dimension: z.string().min(1),
+  reasonCode: z.string().min(1),
+  evaluatorId: z.string().min(1),
+  facts: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}),
+  relatedSubjectRefs: z.array(z.string().min(1)).default([]),
+});
+export type CausalPathStep = z.infer<typeof CausalPathStepSchema>;
+
 export const RecoveryCaseViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   caseRef: z.string().min(1),
+  cause: CaseCauseViewSchema.optional(),
+  causalPath: z.array(CausalPathStepSchema).default([]),
   status: z.enum([
     'OPEN', 'PLANNING', 'AWAITING_AUTHORITY', 'EXECUTING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED',
   ]),
@@ -482,6 +515,23 @@ export const ApplicationErrorCodeSchema = z.enum([
   'OBJECTIVE_DISPOSITION_FORBIDDEN',
   'GRANT_SCOPE_INSUFFICIENT',
   'RESOLUTION_DENIED',
+  // B1 additive: planning / approval / principal outcomes of the normal
+  // application paths. Truthful refusals, never silent fallbacks.
+  'CASE_NOT_FOUND',
+  'CASE_NOT_OPEN',
+  'STRATEGY_NOT_FOUND',
+  'STRATEGY_NOT_VIABLE',
+  'STRATEGY_BASE_STALE',
+  'PLAN_COMPILE_FAILED',
+  'PLAN_PERSIST_FAILED',
+  'BUDGET_HOLD_REQUIRED',
+  'AUTHORITY_SCOPE_UNRESOLVED',
+  'APPROVER_UNAUTHORIZED',
+  'DISPATCHER_UNAUTHORIZED',
+  'INTENT_MISSING',
+  'AUTHORITY_DECISION_FAILED',
+  'APPROVAL_FAILED',
+  'PRINCIPAL_UNRESOLVED',
 ]);
 export type ApplicationErrorCode = z.infer<typeof ApplicationErrorCodeSchema>;
 

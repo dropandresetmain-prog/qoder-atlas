@@ -8,6 +8,8 @@ import type { Pool, PoolClient } from '../../../persistence/postgres/pool.ts';
 import type {
   AssessmentTone,
   AssessmentViewStatus,
+  CaseCauseView,
+  CausalPathStep,
   ConnectionProgression,
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
@@ -400,6 +402,9 @@ async function loadRecoveryCaseFactsInner(
   // aggregate verdict below must never be copied back onto every subject node.
   interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; stamp: bigint }
   const subjectFacts: SubjectFact[] = [];
+  // T3: the deterministic causal path — every applicable blocking FAIL
+  // explanation of every failing subject, exactly as the evaluator typed it.
+  const causalPath: CausalPathStep[] = [];
   // M9 3A: derive connection viability from the real m6.connection dimension
   // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
   // case subjects — one broken connection is enough to flag the case.
@@ -422,6 +427,22 @@ async function loadRecoveryCaseFactsInner(
       if (tone === 'UNKNOWN') {
         uncertainty.push(`${ref} current assessment verdict ${verdict}`);
       }
+      if (tone === 'FAIL') {
+        for (const dim of view.assessment.dimensions) {
+          if (!dim.applicable || !dim.blocking || dim.verdict !== 'FAIL') continue;
+          for (const explanation of dim.explanations) {
+            if (explanation.status !== 'FAIL') continue;
+            causalPath.push({
+              subjectRef: `${explanation.affectedSubject.kind}:${explanation.affectedSubject.id}`,
+              dimension: dim.dimension,
+              reasonCode: explanation.reasonCode,
+              evaluatorId: explanation.evaluatorId,
+              facts: { ...explanation.facts },
+              relatedSubjectRefs: explanation.relatedSubjects.map((r) => `${r.kind}:${r.id}`),
+            });
+          }
+        }
+      }
       const connectionDim = view.assessment.dimensions.find((d) => d.dimension === 'connection_feasibility' && d.applicable);
       if (connectionDim) {
         const derived = deriveConnectionViabilityFromEvaluator({
@@ -440,6 +461,29 @@ async function loadRecoveryCaseFactsInner(
   const subjectTones = subjectFacts.map((f) => f.tone);
   if (subjectTones.some((t) => t === 'FAIL')) tripVerdict = 'FAIL';
   else if (subjectTones.length > 0 && subjectTones.every((t) => t === 'PASS')) tripVerdict = 'PASS';
+
+  // T3: the case's cause is the change signal linked through case_signals
+  // (migration 0124) — the latest received one when several are linked.
+  const signalRows = await client.query<{ id: string; origin_kind: string; change_type: string; received_at: Date; completed_at: Date | null }>(
+    `SELECT s.id, s.origin_kind, s.change_type, s.received_at, c.completed_at
+       FROM case_signals cs
+       JOIN change_signals s ON s.workspace_id = cs.workspace_id AND s.id = cs.change_signal_id
+       LEFT JOIN change_signal_completions c ON c.workspace_id = s.workspace_id AND c.change_signal_id = s.id
+      WHERE cs.workspace_id = $1 AND cs.recovery_case_id = $2
+      ORDER BY s.received_at DESC, s.id`,
+    [workspaceId, caseId],
+  );
+  const causeRow = signalRows.rows[0];
+  const cause: CaseCauseView | undefined = causeRow
+    ? {
+        changeSignalRef: `CHANGE_SIGNAL:${causeRow.id}`,
+        originKind: causeRow.origin_kind,
+        changeType: causeRow.change_type,
+        receivedAt: causeRow.received_at.toISOString(),
+        applied: causeRow.completed_at !== null,
+      }
+    : undefined;
+  const firstBreak = causalPath[0];
 
   const partialIncomplete = recoveryActions.some((a) =>
     a.executionState === 'FAILED' || a.executionState === 'OUTCOME_UNKNOWN' || a.executionState === 'PENDING' || a.executionState === 'EXECUTING' || a.executionState === 'RECONCILING' || a.executionState === 'PROPOSED',
@@ -490,6 +534,12 @@ async function loadRecoveryCaseFactsInner(
     currentSemanticState: tripVerdict === 'FAIL' ? 'FAILED' : tripVerdict === 'PASS' ? 'RECOVERED' : 'AFFECTED',
     nodes: [
       { ref: caseRefStr, kind: 'RECOVERY_PROPOSAL', label: 'Recovery case', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
+      // T3: the cause is a first-class node (same DISRUPTION kind the
+      // incident/programme producer uses), so the focal chain
+      // change -> subject -> case is graph truth, not adjacency guesswork.
+      ...(cause
+        ? [{ ref: cause.changeSignalRef, kind: 'DISRUPTION' as const, label: cause.changeType, semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const, detail: `${cause.originKind} received ${cause.receivedAt}` }]
+        : []),
       ...subjects.rows.map((s) => {
         const ref = `${s.subject_kind}:${s.subject_id}`;
         // FIG-6: each subject's own CURRENT verdict decides its node, never the
@@ -508,18 +558,34 @@ async function loadRecoveryCaseFactsInner(
         };
       }),
     ],
-    edges: subjects.rows.map((s) => ({
-      // FIG-1: derived from the canonical relation, never array position —
-      // stable across revisions and unique per (subject, case) pair.
-      id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:${caseRefStr}`,
-      fromRef: `${s.subject_kind}:${s.subject_id}`,
-      toRef: caseRefStr,
-      kind: 'AFFECTED_BY' as const,
-      authority: 'AUTHORITATIVE' as const,
-    })),
+    edges: [
+      ...subjects.rows.map((s) => ({
+        // FIG-1: derived from the canonical relation, never array position —
+        // stable across revisions and unique per (subject, case) pair.
+        id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:${caseRefStr}`,
+        fromRef: `${s.subject_kind}:${s.subject_id}`,
+        toRef: caseRefStr,
+        kind: 'AFFECTED_BY' as const,
+        authority: 'AUTHORITATIVE' as const,
+      })),
+      ...(cause
+        ? subjects.rows.map((s) => ({
+            id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:${cause.changeSignalRef}`,
+            fromRef: `${s.subject_kind}:${s.subject_id}`,
+            toRef: cause.changeSignalRef,
+            kind: 'AFFECTED_BY' as const,
+            authority: 'AUTHORITATIVE' as const,
+          }))
+        : []),
+    ],
     caseRef: caseId,
+    ...(cause ? { cause } : {}),
+    causalPath,
     status,
-    changeSummary: 'Recovery case assembled from authoritative PostgreSQL state',
+    changeSummary: cause
+      ? `${cause.changeType} (${cause.originKind}) received ${cause.receivedAt}`
+      : 'Recovery case assembled from authoritative PostgreSQL state',
+    ...(firstBreak ? { causalFailureReason: `${firstBreak.dimension}: ${firstBreak.reasonCode}` } : {}),
     bookingServiceState: {
       label: 'Bookings / actions',
       state: recoveryActions.some((a) => a.executionState === 'COMPLETED') ? 'RECOVERED' : 'AFFECTED',
@@ -626,6 +692,7 @@ async function loadOperatorOverviewFactsInner(
       status,
       remainderViability: remainder,
       caseRef: c.id,
+      ...(facts.cause ? { incidentRef: facts.cause.changeSignalRef } : {}),
       whatChanged: facts.changeSummary,
       affectedPeople: affected,
       affectedItems: affected,

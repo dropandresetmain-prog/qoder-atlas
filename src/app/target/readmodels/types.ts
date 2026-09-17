@@ -1,6 +1,8 @@
 import type {
   AssessmentTone,
   AssessmentViewStatus,
+  CaseCauseView,
+  CausalPathStep,
   ChangeAwareness,
   LdgEdgeKind,
   LdgNodeKind,
@@ -157,6 +159,10 @@ export interface RecoveryActionFact {
 
 export interface RecoveryCaseFacts extends ProductWorldFacts {
   caseRef: string;
+  /** T3: the linked change signal (latest by receipt) that caused this case, when one is linked. */
+  cause?: CaseCauseView;
+  /** T3: blocking FAIL explanations of the case's failing subjects, in evaluator order. */
+  causalPath?: readonly CausalPathStep[];
   status: 'OPEN' | 'PLANNING' | 'AWAITING_AUTHORITY' | 'EXECUTING' | 'RESOLVED' | 'CLOSED' | 'CANCELLED' | 'SUPERSEDED';
   changeSummary: string;
   bookingServiceState: BookingServiceFact;

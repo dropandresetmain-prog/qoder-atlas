@@ -57,6 +57,7 @@ function recoveryCaseView(): RecoveryCaseView {
   return {
     generatedAt,
     caseRef: 'case-1',
+    causalPath: [],
     status: 'EXECUTING',
     changeSummary: 'A booked service changed and recovery is under way.',
     bookingServiceState: { label: 'Transport booking', state: 'AFFECTED', detail: 'Replacement confirmed' },

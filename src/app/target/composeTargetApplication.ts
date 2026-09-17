@@ -42,6 +42,18 @@ export interface TargetApplication {
    * worker directly. `/api/v2/health` reports whatever is attached.
    */
   runtimeServices?: RuntimeServices;
+  /**
+   * B1: what the HTTP layer needs from the boot root to compose the
+   * consequential path without owning workers: the runtime's dispatch
+   * principal, and "run now" hooks so an approval is executed without waiting
+   * for the next idle poll. Absent in test compositions, which drive the
+   * passes directly.
+   */
+  runtimeHooks?: {
+    executorPrincipalId: string;
+    afterApproval?: () => Promise<void>;
+    afterExecution?: () => Promise<void>;
+  };
   replanIdentity: typeof M9_REPLAN_IDENTITY;
   objectiveDispositionApiExposed: typeof M9_OBJECTIVE_DISPOSITION_API_EXPOSED;
   /** True when this process must not use SQLite for authoritative product paths. */

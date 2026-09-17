@@ -82,7 +82,7 @@ function parseJsonArray<T>(value: unknown): T[] {
   }
 }
 
-async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: string): Promise<StoredActionIntentRow | undefined> {
+export async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: string): Promise<StoredActionIntentRow | undefined> {
   const result = await db.query<{
     id: string; action_plan_id: string; plan_version: number; operation_namespace: string;
     logical_operation_key: string | null; request_fingerprint: string | null; capability_ref: string;
@@ -115,7 +115,7 @@ async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: st
   };
 }
 
-function buildEnvelopeInput(
+export function buildEnvelopeInput(
   intent: StoredActionIntentRow,
   decision: { scope: TypedRef[]; grantRefs: string[]; ruleInputs: string[]; limits: Record<string, unknown> | null },
   requirements: { actorRole: string }[],

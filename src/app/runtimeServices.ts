@@ -112,6 +112,90 @@ export function createReassessmentService(options: ReassessmentServiceOptions): 
   };
 }
 
+export interface PeriodicServiceOptions<R> {
+  name: string;
+  /** One pass. Must be idempotent and safe to run concurrently with itself across processes. */
+  run: (now: Instant) => Promise<R>;
+  /** Idle cadence between passes. */
+  pollMs: number;
+  now?: () => Instant;
+  /** Bounded, JSON-safe summary of a pass for health. */
+  summarize?: (result: R) => Record<string, unknown>;
+  onRun?: (result: R) => void;
+}
+
+export interface PeriodicService extends RuntimeService {
+  /** Run one pass now (e.g. right after upstream work completes) instead of waiting for the idle cadence. Overlapping calls coalesce. */
+  runNow(): Promise<void>;
+}
+
+/**
+ * A durable "reconcile from state" pass on an idle cadence, e.g. case
+ * escalation. Overlapping passes are skipped (one in flight), a pass error is
+ * recorded and never stops the loop, and `runNow()` lets an upstream wake
+ * trigger a pass immediately.
+ */
+export function createPeriodicService<R>(options: PeriodicServiceOptions<R>): PeriodicService {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let inFlight: Promise<void> | undefined;
+  let wakes = 0;
+  let lastWakeAt: Instant | undefined;
+  let lastError: string | undefined;
+  let lastSummary: Record<string, unknown> | null = null;
+
+  const pass = async (): Promise<void> => {
+    const now = options.now?.() ?? new Date().toISOString();
+    wakes += 1;
+    lastWakeAt = now;
+    try {
+      const result = await options.run(now);
+      lastError = undefined;
+      lastSummary = options.summarize ? options.summarize(result) : null;
+      try {
+        options.onRun?.(result);
+      } catch {
+        // An observer fault must never stop the service.
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+  };
+  const runNow = (): Promise<void> => {
+    if (!inFlight) {
+      inFlight = pass().finally(() => {
+        inFlight = undefined;
+      });
+    }
+    return inFlight;
+  };
+
+  return {
+    name: options.name,
+    start() {
+      if (timer) return;
+      timer = setInterval(() => {
+        void runNow();
+      }, options.pollMs);
+      timer.unref?.();
+    },
+    stop() {
+      if (timer) clearInterval(timer);
+      timer = undefined;
+    },
+    runNow,
+    health() {
+      return {
+        name: options.name,
+        state: timer ? 'RUNNING' : 'STOPPED',
+        wakes,
+        ...(lastWakeAt ? { lastWakeAt } : {}),
+        ...(lastError ? { lastError } : {}),
+        detail: { pollMs: options.pollMs, lastRun: lastSummary },
+      };
+    },
+  };
+}
+
 /** Composes the runtime's background services. Order is start order; stop runs in reverse. */
 export function composeRuntimeServices(services: readonly RuntimeService[]): RuntimeServices {
   const names = new Set<string>();

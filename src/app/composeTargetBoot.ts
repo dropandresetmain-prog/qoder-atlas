@@ -22,7 +22,16 @@ import { assessSubject } from '../resolution/evaluation/assess.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
 import type { ReassessmentPipeline } from '../persistence/postgres/world/pgAssessments.ts';
 import type { Pool } from '../persistence/postgres/pool.ts';
-import { composeRuntimeServices, createReassessmentService } from './runtimeServices.ts';
+import { composeRuntimeServices, createPeriodicService, createReassessmentService } from './runtimeServices.ts';
+import { runCaseEscalation } from './target/caseEscalation.ts';
+import { runCaseResolutionPass } from './target/caseResolutionPass.ts';
+import { runInternalExecutionPass } from './target/executionPass.ts';
+import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
+
+/** Idle cadence of the case lifecycle pass (escalation + resolution); a reassessment drain also triggers it immediately. */
+const CASE_LIFECYCLE_POLL_MS = 5_000;
+/** Idle cadence of the internal execution pass; an approval triggers it immediately. */
+const EXECUTION_POLL_MS = 5_000;
 
 export interface TargetBootConfig {
   environment: AppConfig['environment'];
@@ -119,10 +128,79 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
     console.log(`[atlas] baseline evaluation assessed ${baseline.evaluated} journeys ${JSON.stringify(baseline.verdicts)}`);
   }
 
+  // B1: the workspace's operating principals and their enumerated authority
+  // coverage (approver: authorize; runtime executor: dispatch). Idempotent;
+  // never a decision or an approval. See workspaceAuthority.ts for the
+  // coverage-at-provisioning limit it reports.
+  const authority = await provisionWorkspaceAuthority({
+    pool: endpoints.app.pool,
+    uow: () => endpoints.app.unitOfWork(),
+    workspaceId: config.workspaceId,
+    actorPrincipalId,
+    now: new Date().toISOString(),
+    operatorAuthSubject: env.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
+  });
+  console.log(
+    `[atlas] workspace authority ${authority.status} coverage=${authority.coverageCount} ` +
+      `operator=${authority.principals.operator} executor=${authority.principals.executor}` +
+      (authority.uncoveredSubjectCount > 0 ? ` UNCOVERED=${authority.uncoveredSubjectCount} (re-provision a fresh workspace to cover new subjects)` : ''),
+  );
+  const executorPrincipalId = workspacePrincipalId(config.workspaceId, 'executor');
+
   // Background workers: one composition root, one lifecycle, one health
   // surface (src/app/runtimeServices.ts). The reassessment service enqueues
   // clock-expiry work and drains runnable work on every wake.
   const pipeline = buildReassessmentPipeline(endpoints.app.pool);
+  // T3/B1: case lifecycle = assessment -> RecoveryCase (escalation) and
+  // reassessed truth -> RESOLVED (resolution gate). One reconcile-from-state
+  // pass (idempotent, durable) on its own cadence, and run immediately after
+  // any drain that produced assessments so lifecycle latency is not a second
+  // idle poll.
+  const lifecycleActor = `northstar-lifecycle:${config.workspaceId}`;
+  const lifecycle = createPeriodicService({
+    name: 'caseLifecycle',
+    pollMs: CASE_LIFECYCLE_POLL_MS,
+    run: async (now) => {
+      const escalation = await runCaseEscalation({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), now });
+      const resolution = await runCaseResolutionPass({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), now });
+      return { escalation, resolution };
+    },
+    summarize: ({ escalation, resolution }) => ({
+      escalation: { candidates: escalation.candidates, opened: escalation.opened, attached: escalation.attached, none: escalation.none, failed: escalation.failed },
+      resolution: { candidates: resolution.candidates, resolved: resolution.resolved, blocked: resolution.blocked, failed: resolution.failed },
+    }),
+    onRun({ escalation, resolution }) {
+      if (escalation.opened > 0 || escalation.attached > 0 || escalation.failed > 0) {
+        console.log(`[atlas] case escalation: opened=${escalation.opened} attached=${escalation.attached} failed=${escalation.failed} candidates=${escalation.candidates}`);
+        for (const outcome of escalation.outcomes) {
+          if (outcome.error) console.error(`[atlas] case escalation failed for ${outcome.subject.kind}:${outcome.subject.id}: ${outcome.error}`);
+        }
+      }
+      if (resolution.resolved > 0 || resolution.failed > 0) {
+        console.log(`[atlas] case resolution: resolved=${resolution.resolved} blocked=${resolution.blocked} failed=${resolution.failed}`);
+        for (const outcome of resolution.outcomes) {
+          if (outcome.result !== 'BLOCKED') console.log(`[atlas] case ${outcome.caseId}: ${outcome.result}${outcome.detail ? ` (${outcome.detail})` : ''}`);
+        }
+      }
+    },
+  });
+  // B1: authorised internal intents -> durable execution -> observation ->
+  // canonical update (M6 triggers then reassess). Runs on its own cadence and
+  // immediately after an approval (targetHttpHandlers.ts calls runNow()).
+  const execution = createPeriodicService({
+    name: 'execution',
+    pollMs: EXECUTION_POLL_MS,
+    run: (now) =>
+      runInternalExecutionPass({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: `northstar-execution:${config.workspaceId}`, uow: () => endpoints.app.unitOfWork(), executorPrincipalId, now }),
+    summarize: (report) => ({ candidates: report.candidates, executed: report.executed, deferred: report.deferred, failed: report.failed }),
+    onRun(report) {
+      for (const outcome of report.outcomes) {
+        if (outcome.result === 'DEFERRED') continue;
+        console.log(`[atlas] execution ${outcome.result} intent=${outcome.intentId} attempt=${outcome.attemptNumber}${outcome.detail ? ` (${outcome.detail})` : ''}`);
+      }
+    },
+  });
+  const escalation = lifecycle;
   const services = composeRuntimeServices([
     createReassessmentService({
       worker: endpoints.app.reassessmentWorker,
@@ -136,11 +214,22 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
             `[atlas] reassessment drained ${wake.drain.processed} unit(s) in ${wake.drain.elapsedMs}ms ` +
               `(${wake.drain.stoppedReason}; due=${wake.dueEnqueued}; outcomes=${JSON.stringify(wake.drain.outcomes)})`,
           );
+          // Fresh assessments: escalate/resolve now, and let a deferred
+          // dependent intent proceed now that its gate can see CURRENT truth.
+          void escalation.runNow();
+          void execution.runNow();
         }
       },
     }),
+    lifecycle,
+    execution,
   ]);
   endpoints.app.runtimeServices = services;
+  endpoints.app.runtimeHooks = {
+    executorPrincipalId,
+    afterApproval: () => execution.runNow(),
+    afterExecution: () => lifecycle.runNow(),
+  };
   services.start();
   return {
     config,

@@ -2,6 +2,9 @@
  * Target PostgreSQL HTTP handlers for M9 product read models and commands.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { proposeRecoveryStrategies } from './recoveryPlanning.ts';
+import { approveRecoveryStrategy } from './recoveryApproval.ts';
+import { resolveRequestPrincipal, workspacePrincipalId } from './workspaceAuthority.ts';
 import type { TargetApplication } from './composeTargetApplication.ts';
 import {
   loadIncidentProgrammeFacts,
@@ -297,6 +300,50 @@ export async function handleTargetProductHttp(
         ...(body.idempotencyKey ? { idempotencyKey: body.idempotencyKey } : {}),
       });
       sendJson(res, outcome.ok ? 200 : 409, outcome);
+      return true;
+    }
+
+    // B1: proposal -> validation -> deterministic viability -> persisted strategies.
+    const strategiesMatch = pathname.match(/^\/api\/v2\/cases\/([^/]+)\/strategies$/);
+    if (req.method === 'POST' && strategiesMatch) {
+      const caseId = decodeURIComponent(strategiesMatch[1]!);
+      const body = (await readJson(req)) as { now?: string } | null;
+      const outcome = await proposeRecoveryStrategies(
+        { pool: ctx.app.pool, workspaceId: ctx.app.workspaceId, actorPrincipalId: commandCtx(ctx.app).actorPrincipalId, uow: () => ctx.app.unitOfWork(), ...(body?.now ? { now: body.now } : {}) },
+        { caseId },
+      );
+      sendJson(res, outcome.ok ? 200 : outcome.error.code === 'CASE_NOT_FOUND' ? 404 : 409, outcome);
+      return true;
+    }
+
+    // B1: persisted strategy -> plan -> authority decision -> approval by a
+    // real principal (header `x-northstar-principal`, else the workspace
+    // operator) -> execution pass runs now.
+    const approveMatch = pathname.match(/^\/api\/v2\/cases\/([^/]+)\/strategies\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && approveMatch) {
+      const caseId = decodeURIComponent(approveMatch[1]!);
+      const strategyId = decodeURIComponent(approveMatch[2]!);
+      const body = (await readJson(req)) as { now?: string } | null;
+      const header = req.headers['x-northstar-principal'];
+      const principal = await resolveRequestPrincipal(ctx.app.pool, ctx.app.workspaceId, Array.isArray(header) ? header[0] : header);
+      if (!principal.ok) {
+        sendJson(res, 403, { ok: false, error: { code: 'PRINCIPAL_UNRESOLVED', message: principal.reason, mutatesState: false } });
+        return true;
+      }
+      const executorPrincipalId = ctx.app.runtimeHooks?.executorPrincipalId ?? workspacePrincipalId(ctx.app.workspaceId, 'executor');
+      const outcome = await approveRecoveryStrategy(
+        { pool: ctx.app.pool, workspaceId: ctx.app.workspaceId, actorPrincipalId: commandCtx(ctx.app).actorPrincipalId, uow: () => ctx.app.unitOfWork(), executorPrincipalId, ...(body?.now ? { now: body.now } : {}) },
+        { caseId, strategyId, approverPrincipalId: principal.principalId },
+      );
+      if (outcome.ok) {
+        // Execute now rather than on the next idle poll; the pass is idempotent.
+        await ctx.app.runtimeHooks?.afterApproval?.();
+      }
+      const status = outcome.ok ? 200
+        : outcome.error.code === 'CASE_NOT_FOUND' || outcome.error.code === 'STRATEGY_NOT_FOUND' ? 404
+        : outcome.error.code === 'APPROVER_UNAUTHORIZED' || outcome.error.code === 'DISPATCHER_UNAUTHORIZED' ? 403
+        : 409;
+      sendJson(res, status, { ...outcome, principal: { id: principal.principalId, source: principal.source } });
       return true;
     }
 

@@ -333,3 +333,156 @@ path (deliberate operator selection) is a genuine data conflict worth showing.
 - No RecoveryCase creation in T2.
 - Browser refresh and duplicate triggers stay idempotent.
 - Exact-path staging; no `git add .`; checkpoint + push at every coherent milestone.
+
+---
+
+# ACTIVE TASK — Runtime composition closure: R0 → T3 → T4 → B1
+
+Working-memory ledger for the runtime closure increment that follows the
+independent runtime architecture audit (2026-09-18). Same branch
+`feature/sarah-provider-disruption`; base = Founder T2 candidate `c20228c`.
+The Founder T2 ledger above stays as the T2 record. Reread before each
+phase; close items only with evidence.
+
+## Goal
+
+The shortest sound path from the audited state to a generalized runtime:
+`R0 runtime composition closure` → `T3 change signal + escalation` →
+`T4 verification` → `B1 first complete generalized internal recovery loop`.
+STOP after B1; no B2 / Jordan / external provider execution.
+
+## Architecture decisions (frozen for this increment)
+
+1. **ChangeSignal lands as accepted architecture (migration 0124).** Closure
+   §4.6 / schema §7 already named it; `case_signals.change_signal_id` had
+   referenced it since 0100. Immutable `change_signals` + `signal_subjects`
+   + separate `change_signal_completions` (applied = durable row, never an
+   in-place mutation). The T2 ingress completion marker moves off
+   `information_records` (its per-event topic tripped the workspace-wide
+   `m6:unregistered-topic` sentinel and invalidated all 67 journeys).
+2. **Consequence provenance without touching the command envelope.**
+   `PgUnitOfWork.underChangeSignal(id)` sets the transaction-local setting
+   `northstar.change_signal_id`; `change_records` and the 0091 reassessment
+   enqueue trigger record it. Coalescing unchanged (first signal owns an open
+   unit); the worker's changed-during-reassessment requeue recovers the
+   newest signal from `change_records`.
+3. **Manifest binding rule.** An assessment's inputs are its own subject's
+   closure. Baseline captures one Journey per capture (bounded concurrency,
+   serial persistence) — the same shape the worker produces — instead of
+   20-Journey slices stamped with a slice-wide manifest.
+4. **One runtime-services root.** `src/app/runtimeServices.ts`; boot composes
+   `reassessment` (drain + CLOCK_EXPIRY per wake), `caseLifecycle`
+   (escalation + resolution passes) and `execution` (internal pass); a drain
+   with results triggers lifecycle and execution immediately; `/api/v2/health`
+   reports them. The duplicate loop in `composeTargetApplication` is gone.
+5. **Escalation = pure policy + reconcile-from-state pass.** CURRENT overall
+   FAIL with an applicable blocking FAIL dimension opens a case (deterministic
+   id per subject+assessment; idempotency key
+   `escalation:<kind>:<id>:<assessmentId>`); an open non-terminal case
+   ATTACHes; UNKNOWN never opens. Pre-existing baseline failures open cases
+   at boot — truthful, not incident-created.
+6. **Case linkage/lifecycle commands.** `attachCaseSubjects`
+   (`RECOVERY_CASE_LINKED`) is the only writer of `case_subjects`/`case_signals`;
+   `transitionRecoveryCase` (`RECOVERY_CASE_PHASE_CHANGED`) guards
+   OPEN→PLANNING→AWAITING_AUTHORITY→EXECUTING; RESOLVED only via the gate.
+7. **Read model.** `RecoveryCaseView.cause` (linked signal) + `causalPath`
+   (evaluator explanations, facts verbatim); DISRUPTION node
+   `CHANGE_SIGNAL:<id>` with AFFECTED_BY edges; overview `incidentRef`.
+8. **StrategyProposer port** (`src/resolution/planning/proposer.ts`):
+   canonical world in, schema-validated `ScenarioChange` effects out; viability
+   only from the M6 overlay; deterministic `programmeTimeSwapProposer` first
+   (same-programme later-item swaps from canonical programme state — no
+   names, no fixture logic). An LLM proposer would be another instance.
+9. **Plans are minted at approval, not at planning.** The resolution gate
+   counts every intent of every plan of the case, so an unchosen option must
+   never own a plan. `POST /cases/:id/strategies` persists VIABLE strategies
+   only (non-viable candidates are reported with the failing subjects and
+   evaluator reason codes); `POST /cases/:id/strategies/:sid/approve`
+   compiles+persists the plan (deterministic id, retry-safe), issues the
+   decision with the envelope the stored gate rebuilds, records the approval
+   by the request principal, and moves the case to EXECUTING.
+10. **Principals are real.** `workspaceAuthority.ts` provisions root/issuer/
+    operator/executor principals per workspace with enumerated coverage
+    (PROGRAMME, PROGRAMME_ITEM, TRIP, JOURNEY) at boot — exact TypedRef
+    authority, no inheritance. HTTP principal = header `x-northstar-principal`
+    (must be registered) else the workspace operator. Known limit: coverage
+    is enumerated at provisioning; later subjects need a fresh workspace.
+11. **Execution pass.** Authorised internal intents with successful
+    prerequisites run through `executeInternalProgrammeItemSchedule` (stored
+    gate, durable attempt, observation, canonical update in one transaction).
+    One candidate set per pass; a dependent intent is DEFERRED (never failed)
+    until reassessment has settled; bounded attempts.
+12. **Resolution pass.** Non-terminal cases resolve only when
+    `evaluateRecoveryCaseResolution` allows (every subject CURRENT+PASS, no
+    unreconciled execution, no incomplete mandatory intent).
+
+## Evidence
+
+| Item | Evidence |
+|---|---|
+| R0.1 marker off information records | Lane A: ingress records/completes a change signal; T2 PG suite green; `changeSignals.pgtest.ts` |
+| R0.2 per-subject baseline | `productBaselineWorld.pgtest.ts` 14/14 (67 journeys 50/15/2 in ~12s); boot log identical baseline |
+| R0.3 clock expiry | `m6Reassessment.pgtest.ts` drain-loop CLOCK_EXPIRY test |
+| R0.4 runtime services | `test/runtime-services.test.ts` 7/7; `m10RuntimePurgeBoot` asserts `reassessment RUNNING` |
+| Fan-out | Real boot + trigger: **5 units drained in 2.4s** (was 67 / ~17s), incident-linked case visible after **11s** |
+| T3 escalation | `caseEscalation.pgtest.ts` 3/3; `test/escalation-policy.test.ts` 6/6; real boot: 2 baseline-FAIL cases at boot, Sarah case opened with `cause = CHANGE_SIGNAL:…`, `causalPath` = `programme_participation:insufficient_arrival_readiness` with `availableMinutes: 60, requiredMinutes: 150` |
+| B1 loop | `b1RecoveryLoop.pgtest.ts` 1/1: seeded programme world → ingress → drain → escalate → HTTP propose (2 candidates, 1 VIABLE, peer swap NOT_VIABLE) → HTTP approve (unregistered principal 403; operator 200; 2 internal intents; case EXECUTING) → execution pass (1 executed, dependent deferred) → drain → execution pass (1 executed) → drain → resolution pass → RESOLVED, all PASS, 2 COMPLETED actions |
+| Overview after trigger | 49 ready / 3 disrupted / 15 unknown, SETTLED; items: Sarah (incident-linked), Mei Chen, Farah Hussein (baseline) |
+
+## STOP finding — B1 on the Sarah world (Investigate Now, architecture decision required)
+
+On the real AiT world `POST /api/v2/cases/<sarah>/strategies` evaluates six
+same-programme swap candidates and reports every one **NOT_VIABLE**, truthfully:
+
+- the overlay closure reaches ~18 journeys per candidate through
+  `RESOURCE_ASSIGNED_TO_ACTIVITY` (BOTH) room resources — including Mei Chen
+  and Farah Hussein (baseline FAIL on a 30 Sep item) and the fifteen baseline
+  UNKNOWN self-arranged travellers (`no_route_to_place`);
+- the headline item itself has a self-arranged co-participant (Elena Tan,
+  UNKNOWN `no_route_to_place`);
+- the frozen M7 rule (`strategyViabilityFromSubjectVerdicts`: any FAIL →
+  NOT_VIABLE, any UNKNOWN → NOT_EXECUTABLE) therefore rejects every option.
+
+This predates the increment: the accepted preview route
+`POST /api/v2/programme/time-swap/preview` for the intended headline ↔
+"Founders and Futures" swap returns `strategyViability: NOT_EXECUTABLE`
+(Elena Tan UNKNOWN) on the same world. No scenario logic was added to route
+around it. The generalized loop is proven on a seeded world; the Sarah
+acceptance flow stops at truthful planning until one of these is decided:
+
+1. **Viability as no-regression** (recommended): a candidate is VIABLE when
+   the case's failing subjects become PASS and no reached subject's verdict
+   worsens versus the current world (PASS→FAIL/UNKNOWN vetoes; an unchanged
+   FAIL/UNKNOWN does not). Material change to the M7 contract text; keeps
+   deterministic viability, authority and execution gating intact.
+2. **Data/coverage**: give self-arranged participants the transport/route
+   evidence the evaluator needs so they are not UNKNOWN (Roadmap
+   "Daniel/Elena participants" question).
+3. Both.
+
+## Phase checklist
+
+- [x] R0.1 completion marker → change signal (Lane A)
+- [x] R0.2 per-subject baseline manifests
+- [x] R0.3 clock-expiry scheduling in the drain loop
+- [x] R0.4 runtime services root + health
+- [x] T3 change signal spine + escalation pass + case cause/causal path
+- [x] T4 verification: case view carries cause/causal path/DISRUPTION node from rows; reload is a re-read
+- [x] B1 generalized loop through normal paths (seeded world, PG proof)
+- [ ] B1 on the Sarah world — **stopped at the viability contradiction above**
+- [ ] Checkpoint commit + push; broad PG gate at candidate
+
+## Findings / triage
+
+| ID | Finding | Triage |
+|---|---|---|
+| RC-1 | Completion marker stored as world knowledge; workspace-wide fan-out | **Act Now — fixed** (0124 + ingress) |
+| RC-2 | Slice-wide baseline manifests | **Act Now — fixed** |
+| RC-3 | Clock expiry never scheduled | **Act Now — fixed** |
+| RC-4 | Two worker loops, silent errors | **Act Now — fixed** (runtime services) |
+| RC-5 | No escalation seam / no change identity | **Act Now — fixed** (T3) |
+| RC-6 | Strategy viability vetoed by unchanged, unrelated subjects (resource coupling) and by UNKNOWN self-arranged co-participants | **Investigate Now — decision required** (see STOP finding) |
+| RC-7 | Authority coverage enumerated at provisioning; new subjects uncovered until re-provisioning | **Park for Later** (reported in boot log) |
+| RC-8 | Costed intents (budget holds) not composed in approval | **Park for Later** (`BUDGET_HOLD_REQUIRED` refusal) |
+| RC-9 | Outbox still write-only | **Park for Later** |
+| RC-10 | Ingress remains an in-request saga (not inbox work) | **Park for Later** |

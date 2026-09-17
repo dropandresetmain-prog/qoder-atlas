@@ -36,6 +36,8 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
   return RecoveryCaseViewSchema.parse({
     generatedAt: input.generatedAt,
     caseRef: input.caseRef,
+    ...(input.cause ? { cause: { ...input.cause } } : {}),
+    causalPath: (input.causalPath ?? []).map((step) => ({ ...step, facts: { ...step.facts }, relatedSubjectRefs: [...step.relatedSubjectRefs] })),
     status: input.status,
     changeSummary: input.changeSummary,
     bookingServiceState: { ...input.bookingServiceState },

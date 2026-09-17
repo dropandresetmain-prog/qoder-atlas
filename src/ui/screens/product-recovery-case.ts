@@ -176,6 +176,80 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   const requirementVsActual = view.requirementVsActual
     ? `<div class="callout tone-watch"><p class="callout-title">Requirement vs actual</p><p>Required: ${escapeHtml(view.requirementVsActual.requirement)}</p><p>Actual: ${escapeHtml(view.requirementVsActual.actual)}</p></div>`
     : '';
+  // T3: cause and causal path come from the read model (change signal +
+  // evaluator explanations). Rendered verbatim — no inference here.
+  const cause = view.cause
+    ? `<div class="callout tone-watch" data-test="case-cause"><p class="callout-title">Cause</p><p>${escapeHtml(view.cause.changeType)} · ${escapeHtml(view.cause.originKind)} · received ${escapeHtml(formatInstant(view.cause.receivedAt))}${view.cause.applied ? '' : ' · application in progress'}</p></div>`
+    : '';
+  // B1: operator controls over the normal application routes. The buttons
+  // only POST and re-read; every outcome shown is the server's own response.
+  const terminal = view.status === 'RESOLVED' || view.status === 'CLOSED' || view.status === 'CANCELLED' || view.status === 'SUPERSEDED';
+  const strategyRows = view.strategies
+    .map((strategy) => {
+      const approvable = !terminal && strategy.viability === 'VIABLE' && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED');
+      const people = strategy.projectedPeople.map((p) => `${escapeHtml(p.personLabel)} ${badge(p.verdict, p.verdict === 'PASS' ? 'done' : p.verdict === 'FAIL' ? 'failed' : 'neutral')}`).join(' ');
+      return `<li class="strategy-row" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">
+        <span class="mono">${escapeHtml(strategy.strategyRef.slice(0, 8))}</span> v${strategy.version} ${badge(strategy.viability, strategy.viability === 'VIABLE' ? 'done' : 'neutral')} ${badge(strategy.status, 'neutral')} ${people}
+        ${approvable ? `<button type="button" class="btn" data-test="approve-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">Approve and execute</button>` : ''}
+      </li>`;
+    })
+    .join('');
+  const recoveryControls = `<section class="section" data-test="recovery-controls" data-case-ref="${escapeHtml(view.caseRef)}">
+    <h2>Recovery options</h2>
+    ${terminal ? '' : `<button type="button" class="btn" data-test="propose-strategies">Propose recovery options</button>`}
+    <p class="meta" data-test="recovery-controls-status"></p>
+    <ul class="strategy-list">${strategyRows || '<li class="meta">No options proposed yet.</li>'}</ul>
+  </section>`;
+  const controlsScript = terminal ? '' : `<script>
+(function () {
+  'use strict';
+  var root = document.querySelector('[data-test="recovery-controls"]');
+  if (!root) return;
+  var caseRef = root.getAttribute('data-case-ref');
+  var status = root.querySelector('[data-test="recovery-controls-status"]');
+  function say(text) { if (status) status.textContent = text; }
+  function post(path, done) {
+    fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+      .then(done)
+      .catch(function (e) { say('Request failed: ' + e); });
+  }
+  root.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.getAttribute('data-test') === 'propose-strategies') {
+      target.disabled = true;
+      say('Proposing and evaluating options…');
+      post('/api/v2/cases/' + encodeURIComponent(caseRef) + '/strategies', function (r) {
+        if (!r.ok) { say('Refused (' + r.status + '): ' + (r.body && r.body.error ? r.body.error.message : '')); target.disabled = false; return; }
+        var rep = r.body.report;
+        say('Evaluated ' + rep.candidates.length + ' option(s); ' + rep.candidates.filter(function (c) { return c.viability === 'VIABLE'; }).length + ' viable. Reloading…');
+        window.location.reload();
+      });
+    }
+    if (target.getAttribute('data-test') === 'approve-strategy') {
+      var strategyRef = target.getAttribute('data-strategy-ref');
+      target.disabled = true;
+      say('Recording authority decision and approval…');
+      post('/api/v2/cases/' + encodeURIComponent(caseRef) + '/strategies/' + encodeURIComponent(strategyRef) + '/approve', function (r) {
+        if (!r.ok) { say('Refused (' + r.status + '): ' + (r.body && r.body.error ? r.body.error.message : '')); target.disabled = false; return; }
+        say('Approved by ' + r.body.principal.id.slice(0, 8) + '; execution and reassessment run in the background. Reloading…');
+        window.location.reload();
+      });
+    }
+  });
+})();
+</script>`;
+  const causalPath = view.causalPath.length > 0
+    ? `<section class="section" data-test="case-causal-path"><h2>Why</h2><ul>${view.causalPath
+        .map((step) => {
+          const facts = Object.entries(step.facts)
+            .map(([key, value]) => `${escapeHtml(key)}=${escapeHtml(value === null ? 'null' : String(value))}`)
+            .join(', ');
+          return `<li><strong>${escapeHtml(step.dimension)}</strong> ${escapeHtml(step.reasonCode)} <span class="meta">${escapeHtml(step.subjectRef)}${facts ? ` · ${facts}` : ''}</span></li>`;
+        })
+        .join('')}</ul></section>`
+    : '';
 
   return `
 <main class="shell product-recovery-case" data-test="product-recovery-case">
@@ -186,13 +260,17 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
     ${aggregateCost}
   </div>
   ${progression}
+  ${cause}
   ${viabilityPair(view)}
   ${requirementVsActual}
+  ${causalPath}
+  ${recoveryControls}
   ${partial}
   ${duplicate}
   ${actions}
   ${remaining}
   ${uncertaintyList(view.uncertainty)}
   ${view.resolutionSummary ? `<div class="resolution is-full"><p class="res-title">Resolution</p><p>${escapeHtml(view.resolutionSummary)}</p></div>` : ''}
-</main>`;
+</main>
+${controlsScript}`;
 }
