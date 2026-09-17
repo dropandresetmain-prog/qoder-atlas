@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build NORTHSTAR as a generalized travel-resolution product without scenario-specific hardcoding or false capability claims.
+Build Northstar as a generalized travel-resolution product without scenario-specific hardcoding or false capability claims.
 
 The graph/state model is central. Chat, dashboards and traveller surfaces are interfaces over authoritative state; they are not the source of truth.
 
@@ -14,15 +14,17 @@ Review is a risk-control step, not a ritual.
 
 ## Current project state
 
-The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository convergence is also complete.
+The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository convergence is complete. T1 — the full AiT PostgreSQL baseline — is founder-accepted.
 
-**PostgreSQL is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and exists only as explicit offline, read-only migration input or historical test/code archaeology. It is not a fallback runtime, alternate runtime, demo runtime or current product authority.
+**PostgreSQL is the sole normal Northstar runtime.** SQLite is retired as an application runtime and exists only as explicit offline, read-only migration input or historical test/code archaeology. It is not a fallback runtime, alternate runtime, demo runtime or current product authority.
 
 The current delivery sequence is:
 
-`Slice A -> Founder Test A -> Slice B -> Founder Test B -> submission rehearsal / M11 operational activation -> polish/stretch`
+`T2 acceptance -> T3 -> T4 Case+V5.6 -> Slice A integrated review -> Founder Test A -> Slice B Sarah E2E -> Slice B review -> Founder Test B -> Jordan same-engine E2E -> generalisation review -> Astra planning reconciliation -> post-E2E product milestones -> M11/final candidate`
 
-Slice A is the next product milestone. Do not reopen broad architecture unless implementation exposes a concrete requirement the frozen ontology cannot express.
+T2 is currently being repaired after an independent review found real crash/retry and M6 semantic defects. Do not treat the unmerged T2 branch as accepted runtime truth.
+
+Do not reopen broad architecture unless implementation exposes a concrete requirement the frozen ontology cannot express.
 
 ## Source-of-truth order
 
@@ -33,13 +35,14 @@ Before broad implementation, inspect the actual branch/head and read the relevan
 3. `docs/ARCHITECTURE.md` — concise **current** architecture map after C5/convergence.
 4. `docs/CAPABILITIES_AND_LIMITATIONS.md` — implemented reality and current limitations.
 5. `docs/ROADMAP.md` — milestone status, current delivery sequence and intentionally deferred scope.
-6. `docs/IMPLEMENTATION_PLAN.md` — historical M0-M11 execution decomposition plus the authoritative post-C5 delivery sequence in Section 22. Where old pre-C5 sequencing language conflicts with Section 22/current status docs, Section 22/current status wins.
-7. `docs/TESTING.md` — canonical suite classification and focused-test-first verification rules.
-8. `docs/work/ACTIVE_TASK.md` — current working-memory ledger for the active delivery slice.
-9. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
-10. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
-11. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for milestones/checkpoints.
-12. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
+6. `docs/IMPLEMENTATION_PLAN.md` — authoritative current post-C5 delivery plan in Section 22.
+7. `docs/IMPLEMENTATION_PLAN_HISTORY.md` — preserved historical M0-M11 decomposition and prior post-C5 plan. Historical reference only.
+8. `docs/TESTING.md` — canonical suite classification and focused-test-first verification rules.
+9. `docs/work/ACTIVE_TASK.md` — current working-memory ledger for the active delivery slice.
+10. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
+11. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
+12. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — current alternative model+harness routes for implementation and review checkpoints.
+13. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
 
 Historical milestone evidence under `docs/refactor/evidence/**` is evidence of what was true at that checkpoint. Do not rewrite it to match the current runtime.
 
@@ -95,6 +98,16 @@ Independent model review is **uncertainty-driven**, not automatically attached t
 - Classify every finding exactly: `Act Now`, `Investigate Now`, `Park for Later`, or `Ignore / Accept Risk`.
 - Targeted fixes need targeted closure evidence; they do not automatically trigger a full re-review.
 
+Current planned independent-review boundaries are deliberately sparse:
+
+1. **T2 targeted re-review** — only because the first review proved Critical defects; recheck the fix delta.
+2. **Slice A integrated review** — once T3 + T4 converge; no separate T3 and T4 reviewers by default.
+3. **Slice B major review** — after the complete Sarah recovery loop; no reviewer after every internal Slice B checkpoint.
+4. **Jordan generalisation review** — focused same-engine/anti-hardcoding/shared-world proof, not a new architecture review.
+5. **Final candidate review** — exact candidate + deployment/demo/M11 truthfulness evidence.
+
+Observability and Event Overview milestones do not automatically get premium reviewers. Use founder product/visual testing unless implementation exposes a concrete high-risk seam.
+
 ## Architectural invariants
 
 - One generalized recovery engine supports solo, family/group, corporate/TMC, organiser and future direct-traveller use cases.
@@ -106,7 +119,7 @@ Independent model review is **uncertainty-driven**, not automatically attached t
 - Proposed recovery state is isolated from current world state until an internally authoritative commit or external observation establishes the result.
 - `UNKNOWN` is valid. Missing, stale, conflicting or incomplete information must not become certainty.
 - Explicit instructions outrank latent preferences; inferred preferences remain soft signals.
-- Externally owned state is not changed merely because NORTHSTAR submitted a request.
+- Externally owned state is not changed merely because Northstar submitted a request.
 
 ## Implemented refactor foundation
 
@@ -132,25 +145,61 @@ Do not introduce Neo4j, microservices, Kafka, Kubernetes or another infrastructu
 
 `test/m10-runtime-purge.test.ts` proves the live runtime import graph cannot reach the retired SQLite composition. `npm run gate:test-boundary` proves CURRENT_TARGET tests cannot reach it either.
 
-M11 is no longer a database-runtime migration. It is the final **operational activation / retirement** step: external legacy-source inventory if relevant, final authority/sole-writer verification, reconciliation/provenance closure and retirement of any remaining old operational access. Do not reactivate SQLite as rollback.
+M11 is the final **operational activation / retirement** step: external legacy-source inventory if relevant, final authority/sole-writer verification, reconciliation/provenance closure and retirement of any remaining old operational access. Do not reactivate SQLite as rollback.
 
 ## Product delivery discipline
 
-The current critical path is two founder-testable vertical slices.
+### T2 — finish disruption truth first
 
-### Slice A
+The active T2 lane owns truthful cancellation/reprotection, crash/retry safety, canonical identity/provenance, deterministic reassessment and authoritative polling. It **stops before automatic RecoveryCase creation**.
 
-Known Sarah baseline -> normal product UI -> controlled provider-shaped disruption -> authoritative PostgreSQL mutation -> incident-linked affected cohort -> four cleared / Sarah disrupted -> one Sarah RecoveryCase -> click Sarah -> authoritative focused case.
+After targeted fixes, the same independent reviewer rechecks the fix delta; then run Founder T2 and merge only if accepted.
 
-Stop and founder-test at this point. Do not require Slice B before testing Slice A.
+### T3 — case orchestration
 
-### Slice B
+Take the accepted T2 incident/assessments and idempotently create exactly one incident-scoped RecoveryCase. Add real command/application seams for case subjects/signals. Do not sweep unrelated baseline failures into the case. No Qwen/provider recovery yet.
 
-Real recovery strategy -> mutation-free preview -> complete affected participation -> real authority/approval -> ordered execution -> observation -> reassessment -> same Sarah trip/Journey viable -> truthful recovered state.
+### T4 — minimal authoritative Case + V5.6
 
-Stop and founder-test again before polish/stretch.
+Render the real case and quantitative failure reason from authoritative state. Integrate the accepted V5.6 focused graph here. Do not add observability timeline/final Overview/whole-event graph to T4.
 
-The Event Overview final visual design is unresolved. Do not overfit backend contracts to a rejected prototype. Build only the minimum truthful operational projection required for Slice A.
+### Slice A checkpoint
+
+After T3+T4 converge, run **one integrated Slice A review**, close findings, then Founder Test A. Preserve the working current Overview + Case V5.6 path as the first protected demo floor.
+
+### Slice B — Sarah Case -> recovered
+
+Slice B is one product milestone. Internal sequencing may include:
+
+`target capability composition -> harmless LIVE Qwen/Atlas smoke -> target-native Qwen proposal/research -> deterministic viability -> strategy/ActionPlan -> authority/approval -> programme execution -> observation -> reassessment -> resolution`
+
+Do not treat those as separate roadmap milestones. Do not port the retired `RuntimeOrchestrator`, old planner contract or old executor wholesale.
+
+After the complete Sarah recovery exists, run **one major independent review**, close targeted findings, then Founder Test B.
+
+### Jordan — same engine
+
+Only after Sarah E2E, run Jordan through the same application/domain code. Atlas Search/Verify becomes materially useful here. Settle `external:offer.select` semantics and provider observation -> canonical-state reconciliation before consequential external execution. Add hotel/ground/FX only where the actual scenario needs them.
+
+Then run one focused generalisation review. No fresh architecture review unless the ontology truly fails to express the scenario.
+
+### Astra reconciliation — planning only
+
+After Sarah + Jordan E2E, use one Astra planning pass to reconcile all remaining backend/product/demo requirements through 30 Sep. Astra does not need to implement the plan. Normal implementation agents execute bounded work from the reconciled plan.
+
+### Post-E2E observability and Overview
+
+Observability is its own milestone after the vertical loop works. Build one semantic operational-history projection over authoritative records and project it as:
+
+- richest timeline below the Case graph;
+- broader Activity journal;
+- compressed event-scoped feed below the Overview visualisation.
+
+It must include meaningful provider/external events, Northstar actions, determinations, human decisions, observations and outcomes — not merely raw audit rows and not private model chain-of-thought.
+
+The Event Overview visual direction may be designed/prototyped in parallel, but the **current Overview remains the protected functional UI through Slice A, Slice B and Jordan**. Production implementation follows accepted design + protected E2Es unless it is demonstrably presentation-only with no new backend contract.
+
+Whole-event graph/semantic zoom/multiple simultaneous focuses remain Stretch.
 
 ## Anti-hardcoding
 
@@ -166,15 +215,18 @@ If the approved ontology/contracts cannot express a requirement, report an **arc
 
 - Atlas is a flight adapter, not the architecture.
 - Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio and future providers are adapters/capabilities, not domain owners by default.
+- The current PostgreSQL target application does not yet compose the full live provider/intelligence stack; Slice B owns that composition.
+- Reuse provider transports/adapters where correct; do not resurrect retired SQLite composition/planner/executor wholesale.
 - Mocks are allowed only at external provider/action boundaries.
 - Internal ingestion, mutation, propagation, planning, viability, authority, observation and lifecycle logic stay real.
 - LIVE / RECORD / REPLAY should share normalisation/downstream paths where practical.
+- Final demo is LIVE-first; REPLAY is emergency fallback and must never be presented as LIVE.
 - Record/replay external boundary inputs/results, not precomputed internal assessments/cases/UI outcomes.
-- A new provider, GDS/TMC system, advisory source, entry-data source or weather source must enter through the approved ownership/information/capability boundaries rather than force scenario logic into the engine.
+- A new provider/source must enter through approved ownership/information/capability boundaries rather than force scenario logic into the engine.
 
 ## Agent routing
 
-Follow `docs/AGENT_MODEL_SELECTION.md` and `docs/IMPLEMENTATION_AGENT_ROUTING.md`. Load `docs/MODELS_ARSENAL.md` only when the routing decision itself needs deeper/updated evidence.
+Follow `docs/AGENT_MODEL_SELECTION.md` and the current post-C5 routes in `docs/IMPLEMENTATION_AGENT_ROUTING.md`. Load `docs/MODELS_ARSENAL.md` only when the routing decision itself needs deeper/updated evidence.
 
 There is no single default implementation harness. Route in this order:
 
@@ -182,13 +234,15 @@ There is no single default implementation harness. Route in this order:
 
 Important current observations:
 
-- The frozen architecture means much remaining work is bounded product integration, not fresh architecture design.
 - Cursor/Codex/Claude Code are preferred for time-sensitive local write/run/fix loops.
 - Qwen3.8-Flash and GLM-5.3-Flash are legitimate defined-task implementers, not merely cheap subagents.
 - Qoder remains useful for Qwen/Kimi/GLM work; harness latency is a harness constraint, not a model-quality judgement.
-- Astra is a model, not a harness, and belongs in Complex/Critical architecture/investigation rather than Normal implementation.
+- Astra is a model, not a harness. Use it for Complex/Critical architecture/investigation/planning, not Normal implementation.
+- The planned Astra post-E2E pass is **planning only**.
 - Sol/Opus/Astra-class use is escalation for concrete ambiguity/risk, not a tax on every milestone.
 - Model choice stays separate from the execution prompt.
+
+Three model+harness routes listed in the implementation/routing docs are **alternatives**. Choose one; do not run all three.
 
 For long-horizon work, use `docs/work/ACTIVE_TASK.md` as working memory. Re-read it before major phases, after compaction/delegation and before completion; close checklist items only with evidence.
 
@@ -210,14 +264,14 @@ Every test file is classified in `test/suites.json`; commands run explicit file 
 
 | Command | What it proves | Gating |
 |---|---|---|
-| `npm test` | boundary gate + current NORTHSTAR surface (no DB, no browser) | yes |
+| `npm test` | boundary gate + current Northstar surface (no DB, no browser) | yes |
 | `npm run test:postgres` | current PostgreSQL integration gate | yes |
 | `npm run test:migration` | M10 migration boundary, where SQLite is read-only input | yes |
 | `npm run test:legacy` | retired SQLite runtime — **NON-GATING / HISTORICAL / MANUAL ONLY** | no |
 
 `npm run gate:test-boundary` walks the real import graph and fails if a current test reaches the retired SQLite runtime, `node:sqlite` or `src/migration/**`, or if any test file is unclassified.
 
-Historical SQLite runtime failures are never a release blocker and are not current product correctness. Do not run `test:legacy` during normal implementation and do not repair what it reports unless explicitly assigned historical/migration investigation.
+Historical SQLite runtime failures are never a release blocker. Do not run `test:legacy` during normal implementation and do not repair what it reports unless explicitly assigned historical/migration investigation.
 
 ## Issue and scope discipline
 

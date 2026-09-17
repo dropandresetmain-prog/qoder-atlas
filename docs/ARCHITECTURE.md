@@ -31,22 +31,29 @@ An LLM cannot directly mutate authoritative state or invoke an irreversible or m
 
 The M0-M10 data/state refactor is implemented and accepted through **C5**. Post-C5 repository convergence is complete.
 
-**PostgreSQL + PostGIS is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and survives only as explicit offline, read-only migration input plus historical code/test evidence.
+**PostgreSQL + PostGIS is the sole normal Northstar runtime.** SQLite is retired as an application runtime and survives only as explicit offline, read-only migration input plus historical code/test evidence.
 
-The remaining work is no longer a persistence-architecture migration. It is product delivery and operational activation:
+The remaining work is no longer a persistence-architecture migration. It is product delivery, composition and operational activation:
 
-1. Slice A — baseline -> disruption -> authoritative affected outcomes -> Sarah case.
-2. Founder Test A.
-3. Slice B — preview -> approval -> execution -> observation -> reassessment -> recovery.
-4. Founder Test B.
-5. Submission rehearsal and M11 operational activation/retirement.
-6. Polish/stretch.
+1. finish T2 truthful disruption/reprotection and targeted re-review;
+2. T3 incident-scoped assessment -> RecoveryCase orchestration;
+3. T4 authoritative Case View + accepted V5.6 focused graph;
+4. one integrated Slice A review, then Founder Test A;
+5. Slice B — full Sarah recovery from live AI proposal through deterministic viability, authority, execution, observation and reassessment;
+6. one major Slice B review, then Founder Test B;
+7. Jordan through the same generalized engine, followed by one focused generalisation review;
+8. one Astra planning-only reconciliation of all remaining requirements through 30 Sep;
+9. post-E2E observability + accepted Event Overview implementation/provider hardening;
+10. M11/final candidate/submission hardening.
+
+Independent review is intentionally sparse: T2 gets a targeted re-review because real Critical defects were found; Slice A, Slice B, Jordan generalisation and the final candidate are the planned review boundaries. T3/T4 and Slice-B internal checkpoints do not each get ceremonial reviewers.
 
 Normative architecture documents:
 
 - [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) — F01-F18, canonical ontology, ownership, lifecycles and extension semantics.
 - [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational schema, integrity, transaction and persistence contracts.
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — historical M0-M11 execution decomposition plus the current post-C5 delivery sequence in Section 22.
+- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — authoritative current delivery plan in Section 22.
+- [`IMPLEMENTATION_PLAN_HISTORY.md`](IMPLEMENTATION_PLAN_HISTORY.md) — preserved historical M0-M11 decomposition/prior plan.
 - [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — current implementation truth and limitations.
 - [`ROADMAP.md`](ROADMAP.md) — current milestone status and deferred scope.
 
@@ -80,7 +87,7 @@ Legacy aggregate/SQLite modules remain in-tree only for migration/historical evi
 
 ## One owner for each kind of truth
 
-NORTHSTAR distinguishes five classes of information:
+Northstar distinguishes five classes of information:
 
 1. **Observed** — what a provider, publisher, person or external system reports.
 2. **Intended** — what the traveller/organisation plans to do.
@@ -100,7 +107,7 @@ Examples:
 
 ## Relationships and the operational graph
 
-NORTHSTAR does not require a graph database. Most relationships are normal relational/domain references.
+Northstar does not require a graph database. Most relationships are normal relational/domain references.
 
 Use explicit executable dependency semantics only where ordinary ownership/reference links are insufficient. The generic dependency vocabulary starts with:
 
@@ -133,7 +140,7 @@ The architecture does not attempt to predict every future travel-data category. 
 - deterministic consumer/evaluator semantics;
 - reverse applicability/dependency discovery;
 - assessment invalidation rules;
-- optional action capability if NORTHSTAR can do something about it.
+- optional action capability if Northstar can do something about it.
 
 Weather, new regulatory publications, resource availability and future trip-relevant information can therefore add typed modules/subtypes/evaluators without changing what Trip, Journey, Programme, Reservation, Assessment or RecoveryCase mean.
 
@@ -204,16 +211,18 @@ Atlas, Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio and future GDS/
 Where practical:
 
 ```text
-LIVE   -> provider/source -> normalization -> NORTHSTAR
-RECORD -> provider/source -> sanitized provider-shaped recording -> normalization -> NORTHSTAR
-REPLAY -> recording -> normalization -> NORTHSTAR
+LIVE   -> provider/source -> normalization -> Northstar
+RECORD -> provider/source -> sanitized provider-shaped recording -> normalization -> Northstar
+REPLAY -> recording -> normalization -> Northstar
 ```
 
 LIVE and REPLAY share downstream semantics. Mocks remain at external boundaries; internal state, evaluation, authority and reconciliation stay real.
 
+The existing provider transports/adapters are largely reusable, but the PostgreSQL target application does **not yet compose all live intelligence/provider capabilities into its normal product lifecycle**. Slice B owns the missing target composition and target-native planning bridge. Do not port the retired `RuntimeOrchestrator` or legacy planner/executor wholesale merely because their provider wiring exists.
+
 Future external systems may be observation-only, serviceable through a partner, or authoritative owners of specific field groups. Observability never implies mutability.
 
-## Read models and interfaces
+## Read models, graph views and observability
 
 Operator and traveller surfaces project from the same canonical state and assessment currency. UI terminology should answer operational questions without exposing internal graph/agent jargon.
 
@@ -223,16 +232,37 @@ The accepted frontend semantic boundary is:
 
 The accepted live read-model contract supplies stable relation identity/authority, monotonic change cursor, assessment lifecycle exposure, subject-keyed refs and authoritative traveller naming. Frontends apply the **complete authoritative snapshot**; `changedVisibleRefs` is an at-least-once transition/emphasis hint, not an exact diff.
 
-The focused V5.6 case graph is an accepted visual reference, not an authoritative data fixture.
+There is one authoritative world state. Overview, focused Case, Programme and any future whole-event graph are **projections/lenses**, not independent state machines. View filters, aggregation, camera and selection may differ; viability, causal truth, affected scope, authority and recovery truth may not.
 
-The final Event Overview visual design is unresolved. Do not create backend-specific semantics solely to satisfy a rejected prototype.
+The focused V5.6 case graph is the accepted visual reference and belongs in T4. Its production data must come from authoritative case/read-model state rather than mock facts.
+
+The final Event Overview visual design is unresolved and may continue to be prototyped in parallel. The current Overview remains the protected functional surface through Slice A, Slice B and Jordan. Do not create backend-specific semantics solely to satisfy an unaccepted visual prototype.
+
+Post-E2E, Northstar should add a semantic operational-history projection over authoritative changes/assessments/cases/actions/observations. That same history should feed:
+
+- the richest timeline on Case;
+- the broader operational journal on Activity;
+- a compressed event-scoped feed below the edge-to-edge Overview visualisation.
+
+This is observability of real lifecycle actions/determinations/outcomes, not a parallel source of truth and not exposure of private model chain-of-thought.
 
 ## Current delivery boundary
 
-The next product proof is Slice A:
+The immediate path is:
 
-`known Sarah baseline -> provider-shaped disruption through normal HTTP -> PostgreSQL mutation/evaluation -> incident-linked five-person outcome -> four cleared/Sarah failed -> one Sarah case -> click/reload authoritative case`
+```text
+T2 accepted
+-> T3 automatic incident-scoped case
+-> T4 authoritative Case View + V5.6
+-> integrated Slice A review
+-> Founder Test A
+-> Slice B full Sarah recovery
+-> major Slice B review
+-> Founder Test B
+-> Jordan same-engine E2E
+-> focused generalisation review
+```
 
-Only after founder testing that slice should Slice B add strategy/preview/approval/execution/observation/recovery.
+Only after Sarah + Jordan prove the generalized vertical loop should the one-shot Astra planning reconciliation sequence the remaining backend/product requirements through 30 Sep. Observability and final Event Overview implementation then improve a protected E2E rather than block it.
 
-M11 follows proven product slices as an **operational activation/retirement** milestone, not a return to or migration from an active SQLite runtime.
+M11 remains a final **operational activation/retirement** milestone, not a return to or migration from an active SQLite runtime.
