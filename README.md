@@ -6,7 +6,7 @@
 
 *A booking gets you a ticket. Northstar gets you there.*
 
-[Quickstart](#quickstart) · [How it works](#how-it-works) · [Current capability truth](docs/CAPABILITIES_AND_LIMITATIONS.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
+[Quickstart](#quickstart) · [How it works](#how-it-works) · [Capability truth](docs/CAPABILITIES_AND_LIMITATIONS.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
 
 </div>
 
@@ -14,181 +14,227 @@
 
 ## The problem
 
-When a flight moves, a booking system can repair the booking without checking whether the **journey still achieves its purpose**.
+A booking can be repaired while the **trip is still broken**.
 
-A disruption can affect flights, hotels, ground transport, programme commitments, objectives, policies, approvals, entry feasibility, shared travellers and downstream dependencies. A replacement flight is therefore not necessarily a recovered trip.
+A disruption can affect flights, hotels, ground transport, programme commitments,
+traveller objectives, shared resources, entry context, policies, approvals and other
+travellers. A replacement flight is therefore not necessarily a recovered trip.
+
+Northstar maintains live operational state, evaluates the consequences of change, plans
+whole-trip recovery, checks deterministic viability and authority, executes only permitted
+actions, observes what actually happened and continues until the trip is valid or
+explicitly escalated.
 
 ## How it works
 
-Northstar maintains operational state for the journey and the things it depends on. When a supplier, traveller, organiser or external condition changes, Northstar determines what is affected, proposes recovery strategies, evaluates them deterministically, checks authority, executes only permitted actions and reconciles observed outcomes back into state.
-
 ```mermaid
 flowchart LR
-  C["Change / new information"] --> S["Authoritative state update"]
-  S --> P["Consequence propagation"]
-  P --> R["Recovery strategies"]
+  C["Change / new information"] --> S["Canonical state"]
+  S --> P["Affected scope + reassessment"]
+  P --> RC["RecoveryCase"]
+  RC --> R["Recovery strategies"]
   R --> V["Deterministic viability"]
-  V --> A["Policy & authority"]
+  V --> A["Authority / approval"]
   A --> E["Execution"]
-  E --> O["Observation"]
-  O --> RC["Reconciliation"]
-  RC -.-> S
+  E --> O["Observation / reconciliation"]
+  O --> S
 ```
 
-A candidate strategy is hypothetical. It cannot rewrite the current world merely because a model proposed it.
+The consequential-action boundary is non-negotiable:
 
-**No LLM directly invokes an irreversible or money-moving action.**
+```text
+proposal -> schema validation -> deterministic viability -> authority
+         -> executor -> observation -> canonical state update
+```
 
-## Architecture transition
+No LLM directly invokes an irreversible or money-moving API.
 
-Northstar currently has a working **legacy runtime** from the Atlas × Alibaba Cloud hackathon and an **approved production-oriented target refactor**.
+## Current architecture
 
-Do not confuse them:
+**PostgreSQL + PostGIS is the sole normal Northstar runtime.**
 
-- **Current runtime:** TypeScript/Node, SQLite-backed legacy Trip/RecoveryCase aggregates, current provider adapters and existing acceptance scenarios.
-- **Approved target:** PostgreSQL + PostGIS; stable Traveller identity; shared Trip + per-person Journey; independent services/reservations; real Programme/ProgrammeItem/Participation state; explicit external-information/advisory/entry semantics; multi-object Assessments and durable authority/execution/reconciliation.
+SQLite is retired from normal application operation. It remains only as offline,
+read-only migration input plus historical code/test evidence.
 
-The target is frozen in:
+The accepted F01-F18 data/state architecture is implemented through M10/C5. A later
+operational-runtime audit closed the missing runtime composition through R0/T3/T4/B1.
 
+The current generalized internal recovery path is:
+
+```text
+ChangeSignal
+-> canonical mutation
+-> targeted invalidation
+-> deterministic reassessment
+-> escalation / RecoveryCase
+-> StrategyProposer
+-> counterfactual viability
+-> ActionPlan
+-> authority / approval
+-> durable internal execution
+-> observation
+-> canonical update
+-> reassessment
+-> resolution
+```
+
+B1 is proven on the real AiT/Sarah world at
+`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
+
+See:
+
+- [Architecture](docs/ARCHITECTURE.md)
 - [Architecture closure](docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md)
 - [Logical schema](docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md)
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Current implementation plan §22](docs/IMPLEMENTATION_PLAN.md)
+- [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md)
 
-The target is **not implemented merely because it is documented**. [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md) remains the source for what works today.
+## Current delivery status
 
-## Current Live Dependency Graph
+Next product gate:
 
-The current application assembles an operational dependency graph from typed domain aggregates and relationships. It is not a dedicated graph database.
+**Founder B1 physical acceptance**
 
-The approved refactor keeps the same product principle while changing ownership boundaries: ordinary relationships become relational references; explicit executable dependencies are used only where propagation semantics require them; applicability matching handles geography/population/time-wide information such as advisories and future weather conditions.
+Then:
 
-See [Architecture](docs/ARCHITECTURE.md) for the current/target distinction.
+`B2 generalized external recovery / Jordan
+-> Founder + generalisation verification
+-> post-E2E observability / accepted Event Overview / provider hardening
+-> M11 / C6 candidate`.
 
-## Where AI sits — and where it does not
+Jordan is not a second hardcoded runtime. It is the materially different proof that the
+same lifecycle works with external-provider recovery.
 
-```mermaid
-flowchart TD
-  subgraph AI["AI proposes and interprets"]
-    A1["Interpret unstructured input"]
-    A2["Extract into typed candidates"]
-    A3["Identify uncertainty / soft preferences"]
-    A4["Generate and compare strategies"]
-  end
-  subgraph DET["Deterministic core decides"]
-    D1["Schema/business validation"]
-    D2["Time, currency and applicability"]
-    D3["Requirement/dependency evaluation"]
-    D4["Viability / assessment"]
-    D5["Policy and authority"]
-  end
-  subgraph EXEC["Execution acts"]
-    E1["Authority-gated action"]
-    E2["Internal/provider executor"]
-    E3["Observation and reconciliation"]
-  end
-  AI --> DET
-  DET --> EXEC
-  EXEC -.->|observed truth| DET
-```
+See [Roadmap](docs/ROADMAP.md).
 
-AI output is never enough to establish provider success, legal certainty or recovered-trip status.
+## Counterfactual recovery semantics
 
-## Quickstart — current runtime
+The dependency closure answers who must be reassessed. It is not a requirement that every
+reached subject become perfect.
 
-Requires **Node.js 24+**.
+A viable recovery must:
+
+- heal the blocking case subjects it is responsible for;
+- introduce no regression to reached subjects;
+- introduce no new/action-critical UNKNOWN;
+- satisfy explicit required unknowns.
+
+Unchanged unrelated pre-existing FAIL/UNKNOWN remains truthful but does not automatically
+veto the candidate or become falsely healed.
+
+Provider/API success alone never means recovered. Case resolution still requires
+reconciled execution and fresh passing assessment of the required case subjects.
+
+## Where AI sits
+
+AI is used for messy interpretation, schema extraction, uncertainty detection, soft
+preference inference, semantic consequence judgement, research and strategy proposal.
+
+Deterministic code owns validation, authoritative mutation, arithmetic/timezone,
+dependency/applicability propagation, policy thresholds, authority, state transitions,
+viability, execution validation and reconciliation.
+
+AI output is proposal/evidence transformation, never final provider truth or execution
+authority.
+
+## Quickstart
+
+Requires Node.js 24+, PostgreSQL/PostGIS and the target runtime environment.
 
 ```bash
 npm install
+npm run db:postgres:up
+
+export PG_TARGET_WORKSPACE_ID=<stable-local-uuid>
+export NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026
+
 npm run dev
 ```
 
 Open `http://localhost:8787`.
 
-The current application defaults to credential-free `REPLAY` against committed provider recordings and a local SQLite file, allowing the existing runtime to run reproducibly without provider credentials. `npm run build && npm start` runs the compiled build.
+For daily development, **reuse the same workspace ID**. A new workspace intentionally
+re-materializes the full AiT world and reruns the baseline, which can add about a minute
+to startup. Use a fresh UUID only when you explicitly need a clean independent world.
 
-Optional provider configuration is documented in [Environment](docs/ENVIRONMENT.md). Never commit `.env` files or provider credentials.
+Current target/demo variables are read directly from `process.env`; see
+[Environment](docs/ENVIRONMENT.md) for details.
 
-The refactor implementation will add PostgreSQL/PostGIS setup through M0-M11; do not infer those runtime instructions before the corresponding milestones land.
+## Verify
 
-## Current provider boundaries
-
-| Area | Current implementation | Boundary |
-|---|---|---|
-| AI | Alibaba Cloud Model Studio / Qwen | Schema-bound; LIVE when configured, deterministic fallback otherwise. |
-| Flights | Atlas | Sandbox-constrained search/servicing/transaction seams. |
-| Hotels | Nuitée / liteAPI | Search/quote/book/retrieve/cancel; date change is cancel/rebook. |
-| Ground context | Google Routes | Optional routing context; no booking action. |
-| FX | Frankfurter / ECB-reference data | Comparison evidence, not payment FX. |
-| Deployment | Railway | Hosting evidence, not domain functionality. |
-
-Provider adapters are not the architecture. Future GDS/TMC, advisory, entry, weather and other sources must enter through the approved ownership/capability/information boundaries.
-
-## Current scenarios
-
-| # | Scenario | What it exercises |
-|---|---|---|
-| S1 | Airline schedule change | Supplier disruption and downstream impact |
-| S2 | Missed connection | Multi-step overnight recovery and authority stop |
-| S3 | Organiser programme change | Shared commitment fan-out |
-| S4 | Thursday morning arrival | Traveller-initiated change against policy/funding |
-| S5 | Stay until Sunday | Stay extension and downstream impact |
-| S6 | Switch hotels | Hotel/provider change and shared effects |
-| S7 | Origin change to Tokyo | Re-origination and dated FX normalization |
-| S8 | Travel with the speakers | Shared-travel/group change and disclosure |
-
-These are current-runtime acceptance/demo assets, not target-domain hardcoding. The refactor acceptance set additionally covers families/groups, shared bookings, entry/advisory changes, programme consequences, concurrency/migration and unprecedented-data extensibility through AT01-AT24.
-
-## LIVE / RECORD / REPLAY
-
-Where supported, the current adapters use one normalization/downstream path:
-
-```mermaid
-flowchart LR
-  L["LIVE provider/source"] --> N["Normalization"]
-  R["RECORD provider/source"] --> SR["Sanitized recording"] --> N
-  P["REPLAY recording"] --> N
-  N --> ENG["Northstar engine"]
-```
-
-REPLAY is an external-boundary fallback, not a second fake internal engine.
-
-## Verify the current runtime
+Use the manifest-backed commands; do not run raw `node --test` as the canonical gate.
 
 ```bash
-node --test --test-concurrency=1
+npm test                         # boundary + CURRENT_TARGET
+npm run test:postgres            # full PostgreSQL integration checkpoint gate
+npm run test:migration           # migration boundary
 npm run typecheck
 npm run lint
 npm run gate:anti-hardcoding
 ```
 
-Use [Testing](docs/TESTING.md) for current-runtime verification rules. Refactor-specific M0-M11/C0-C6/AT01-AT24 requirements are in the [Implementation plan](docs/IMPLEMENTATION_PLAN.md).
+The full PostgreSQL gate is intentionally heavy (~21 minutes on the B1 code line) and is
+not a debugging loop. Use focused tests first.
+
+See [Testing](docs/TESTING.md).
+
+## Provider boundaries
+
+| Area | Current boundary |
+|---|---|
+| AI | Alibaba Cloud Model Studio/Qwen-capable proposal/extraction boundary; deterministic gates remain authoritative. |
+| Flights | Atlas LIVE/RECORD/REPLAY adapter seams; B2 will compose external recovery through the normal lifecycle. |
+| Hotels | Nuitée/liteAPI search/quote/book/retrieve/cancel provider seams. |
+| Ground context | Google Routes optional routing context, no booking action. |
+| FX | Frankfurter/ECB-reference comparison evidence, not payment FX. |
+| Deployment | Railway hosting; readiness semantics still need final-candidate hardening. |
+
+Provider adapters are not the architecture.
+
+## Scenario proofs
+
+The repository contains eight frozen scenario narratives in
+[SCENARIOS.md](docs/SCENARIOS.md). Demo facts live in data/fixtures/config, never in
+domain/application branches.
+
+Current critical proofs:
+
+- **Sarah** — generalized internal programme recovery after a provider-shaped disruption.
+- **Jordan** — planned B2 materially different external-provider recovery through the same
+  engine.
+
+The broader acceptance corpus covers families/groups, shared bookings, programme changes,
+entry/advisory context, provider failure, concurrency and extensibility.
 
 ## Repository map
 
 ```text
-src/domain, src/engine        current domain + deterministic core
-src/intelligence              schema-bound model integration / fallback planner
-src/providers                 provider adapters and recording seams
-src/app, src/server, src/ui   orchestration and current surfaces
-src/persistence               current SQLite persistence; target Postgres work lands by milestones
-fixtures/                     versioned scenarios and sanitized recordings
-docs/                         current truth + approved target architecture/refactor plan
+src/domain, src/resolution       typed domain + deterministic evaluation/planning
+src/persistence/postgres        sole normal runtime persistence
+src/app, src/server, src/ui     product/runtime composition and surfaces
+src/providers                   provider adapters and LIVE/RECORD/REPLAY seams
+src/intelligence                schema-bound model integration
+fixtures/, data/                scenario/source/demo facts
+postgres-integration/           current PostgreSQL integration/acceptance tests
+docs/                           architecture, current plan, evidence and handoffs
 ```
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
+Start at [docs/README.md](docs/README.md).
+
+The main sources are:
+
 - [Architecture](docs/ARCHITECTURE.md)
-- [Architecture closure](docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md)
-- [Logical schema](docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md)
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Capabilities and limitations](docs/CAPABILITIES_AND_LIMITATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Implementation plan §22](docs/IMPLEMENTATION_PLAN.md)
 - [Testing](docs/TESTING.md)
-- [Agent model selection](docs/AGENT_MODEL_SELECTION.md)
-- [Implementation agent routing](docs/IMPLEMENTATION_AGENT_ROUTING.md)
 - [Environment](docs/ENVIRONMENT.md)
+- [Agent model selection](docs/AGENT_MODEL_SELECTION.md)
 
 ---
 
-Originally built for the **Atlas × Alibaba Cloud Agentic AI Hackathon**. The current refactor is moving the same generalized recovery thesis toward a production-oriented data/state foundation.
+Originally built for the **Atlas × Alibaba Cloud Agentic AI Hackathon**. The current code
+preserves that generalized recovery thesis while using the accepted PostgreSQL operational
+model and deterministic safety boundaries.
