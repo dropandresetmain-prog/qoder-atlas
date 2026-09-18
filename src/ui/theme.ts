@@ -518,6 +518,17 @@ a.chip:hover { border-color: var(--text-faint); }
   align-items: start;
 }
 a.qrow, .brow.brow-actionable { color: inherit; text-decoration: none; cursor: pointer; }
+.strategy-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 12px; }
+.opt-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface);
+}
+.opt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.opt-title { margin: 0; font-size: 15px; }
+.opt-changes, .opt-resolves { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; }
+.opt-ref { opacity: 0.7; word-break: break-all; }
 a.qrow:focus-visible, .brow.brow-actionable .brow-case-hit:focus-visible { outline: 2px solid var(--watch-f); outline-offset: -2px; }
 .qrow:first-child, .brow:first-child { border-top: 0; }
 .qrow:hover, .brow.brow-actionable:hover { background: var(--surface-2); transform: translateY(-1px); }

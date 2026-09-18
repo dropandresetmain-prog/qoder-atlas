@@ -19,6 +19,8 @@ import type {
   OperatorPopulationFact,
   RecoveryActionFact,
   RecoveryCaseFacts,
+  RecoveryStrategyChangeFact,
+  RecoveryStrategyFact,
   TravellerTripFacts,
 } from './types.ts';
 import { mapConnectionProgression, deriveConnectionViabilityFromEvaluator, type ConnectionViabilityHint } from './mapConnectionProgression.ts';
@@ -308,6 +310,224 @@ function mapIntentExecutionState(
 }
 
 /**
+ * Which field of each closed `ScenarioEffect` variant names the subject the
+ * effect acts on, and what kind that subject is.
+ *
+ * This is driven by the ScenarioChange contract's own discriminated union —
+ * not by any scenario. An effect kind that is not listed still projects, with
+ * its typed ref omitted, rather than being silently dropped.
+ */
+const EFFECT_SUBJECT: Readonly<Record<string, { field: string; kind: string }>> = {
+  CHANGE_PROGRAMME_ITEM_TIME: { field: 'programmeItemId', kind: 'PROGRAMME_ITEM' },
+  ALTER_JOURNEY_ITEM_INTENT: { field: 'journeyItemId', kind: 'JOURNEY_ITEM' },
+  SELECT_OFFER: { field: 'journeyItemId', kind: 'JOURNEY_ITEM' },
+  PROPOSE_ALLOCATION: { field: 'reservationLineId', kind: 'RESERVATION_LINE' },
+  CHANGE_SUPPORT_ASSIGNMENT: { field: 'constraintDefinitionId', kind: 'CONSTRAINT_DEFINITION' },
+  WAIVE_OBJECTIVE: { field: 'objectiveId', kind: 'OBJECTIVE' },
+};
+
+/** `{kind,id}` -> `KIND:id`, or undefined when the value is not a typed ref. */
+function typedRefString(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { kind, id } = value as { kind?: unknown; id?: unknown };
+  if (typeof kind !== 'string' || kind.length === 0) return undefined;
+  if (typeof id !== 'string' || id.length === 0) return undefined;
+  return `${kind}:${id}`;
+}
+
+function asTone(value: unknown): AssessmentTone {
+  return value === 'PASS' || value === 'FAIL' ? value : 'UNKNOWN';
+}
+
+function windowOf(value: unknown): { start: string; end: string } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { start, end } = value as { start?: unknown; end?: unknown };
+  if (typeof start !== 'string' || typeof end !== 'string') return undefined;
+  return { start, end };
+}
+
+/**
+ * Project the case's persisted recovery strategies into options an operator
+ * can actually choose between.
+ *
+ * Two things the raw records cannot do alone:
+ *
+ *  - **Identity.** Candidate summaries store `subjectRef` only, because a
+ *    strategy is an evaluation record, not a presentation record. Human names
+ *    are resolved here through the same authoritative
+ *    `journeys -> travellers -> traveller_names` join the overview queue uses.
+ *    A subject that is not a Journey, or whose traveller cannot be resolved,
+ *    keeps its typed ref as its label — never a fabricated "Traveller".
+ *  - **Meaning.** What an option *does* lives in `strategy_changes.effects`.
+ *    Joined against canonical programme state, a bilateral programme swap can
+ *    be stated as the schedule move it is, with current and proposed windows,
+ *    instead of a UUID and a version number.
+ */
+async function projectCaseStrategies(
+  client: Queryable,
+  workspaceId: string,
+  rows: readonly {
+    id: string;
+    strategy_version: number;
+    viability: string;
+    status: string;
+    candidate_assessment_summaries: unknown;
+  }[],
+  subjectFacts: readonly { ref: string; tone: AssessmentTone }[],
+  uncertainty: string[],
+): Promise<RecoveryStrategyFact[]> {
+  if (rows.length === 0) return [];
+  const strategyIds = rows.map((r) => r.id);
+
+  // 1. Candidate summaries, read as they are actually persisted.
+  const summariesByStrategy = new Map<string, { subjectRef: string; verdict: AssessmentTone }[]>();
+  const journeyIds = new Set<string>();
+  let unreadableSummaries = 0;
+  for (const row of rows) {
+    const raw = Array.isArray(row.candidate_assessment_summaries)
+      ? (row.candidate_assessment_summaries as { subjectRef?: unknown; overallVerdict?: unknown }[])
+      : [];
+    const parsed: { subjectRef: string; verdict: AssessmentTone }[] = [];
+    for (const entry of raw) {
+      const ref = typedRefString(entry?.subjectRef);
+      if (ref === undefined) {
+        unreadableSummaries += 1;
+        continue;
+      }
+      parsed.push({ subjectRef: ref, verdict: asTone(entry?.overallVerdict) });
+      if (ref.startsWith('JOURNEY:')) journeyIds.add(ref.slice('JOURNEY:'.length));
+    }
+    summariesByStrategy.set(row.id, parsed);
+  }
+  if (unreadableSummaries > 0) {
+    // Surfaced rather than swallowed: a summary that cannot be read is
+    // missing information about the option, not a subject that happens to
+    // be UNKNOWN.
+    uncertainty.push(
+      `${unreadableSummaries} candidate assessment summar${unreadableSummaries === 1 ? 'y' : 'ies'} could not be read`,
+    );
+  }
+
+  // 2. Authoritative display identity for the Journey subjects.
+  const labelByJourney = new Map<string, string>();
+  if (journeyIds.size > 0) {
+    const named = await client.query<{ journey_id: string; display_value: string }>(
+      `SELECT j.id AS journey_id, n.display_value
+         FROM journeys j
+         JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
+         JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+        WHERE j.workspace_id = $1 AND j.id = ANY($2::uuid[])`,
+      [workspaceId, [...journeyIds]],
+    );
+    for (const r of named.rows) labelByJourney.set(r.journey_id, r.display_value);
+  }
+  const personLabel = (ref: string): string =>
+    ref.startsWith('JOURNEY:') ? labelByJourney.get(ref.slice('JOURNEY:'.length)) ?? ref : ref;
+
+  // 3. What each option changes, from its own persisted effects.
+  const effectRows = await client.query<{ recovery_strategy_id: string; effects: unknown }>(
+    `SELECT recovery_strategy_id, effects
+       FROM strategy_changes
+      WHERE workspace_id = $1 AND recovery_strategy_id = ANY($2::uuid[])
+      ORDER BY recovery_strategy_id, strategy_version`,
+    [workspaceId, strategyIds],
+  );
+  interface EffectFact { effectKind: string; subjectRef?: string; proposedWindow?: { start: string; end: string } }
+  const effectsByStrategy = new Map<string, EffectFact[]>();
+  const programmeItemIds = new Set<string>();
+  for (const row of effectRows.rows) {
+    const list = effectsByStrategy.get(row.recovery_strategy_id) ?? [];
+    const raw = Array.isArray(row.effects) ? (row.effects as Record<string, unknown>[]) : [];
+    for (const effect of raw) {
+      const effectKind = typeof effect?.effectKind === 'string' ? effect.effectKind : 'UNKNOWN_EFFECT';
+      const mapping = EFFECT_SUBJECT[effectKind];
+      const id = mapping ? effect[mapping.field] : undefined;
+      const subjectRef = mapping && typeof id === 'string' && id.length > 0 ? `${mapping.kind}:${id}` : undefined;
+      if (subjectRef?.startsWith('PROGRAMME_ITEM:')) {
+        programmeItemIds.add(subjectRef.slice('PROGRAMME_ITEM:'.length));
+      }
+      const proposedWindow = windowOf(effect.proposedWindow);
+      list.push({
+        effectKind,
+        ...(subjectRef ? { subjectRef } : {}),
+        ...(proposedWindow ? { proposedWindow } : {}),
+      });
+    }
+    effectsByStrategy.set(row.recovery_strategy_id, list);
+  }
+
+  // 4. Canonical programme state for the items those effects move, so the
+  //    option can state current-vs-proposed timing rather than an id.
+  const programmeItems = new Map<string, { title: string; window?: { start: string; end: string } }>();
+  if (programmeItemIds.size > 0) {
+    const items = await client.query<{ id: string; title: string; window_start: Date | null; window_end: Date | null }>(
+      `SELECT id, title, window_start, window_end
+         FROM programme_items
+        WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
+      [workspaceId, [...programmeItemIds]],
+    );
+    for (const item of items.rows) {
+      programmeItems.set(item.id, {
+        title: item.title,
+        ...(item.window_start && item.window_end
+          ? { window: { start: item.window_start.toISOString(), end: item.window_end.toISOString() } }
+          : {}),
+      });
+    }
+  }
+
+  // 5. The case subjects that are blocking right now. "Who does this fix" is
+  //    only meaningful against today's authoritative verdict.
+  const blocking = subjectFacts.filter((f) => f.tone === 'FAIL');
+
+  return rows.map((row, index) => {
+    const summaries = summariesByStrategy.get(row.id) ?? [];
+    const verdictByRef = new Map(summaries.map((entry) => [entry.subjectRef, entry.verdict]));
+    const changes: RecoveryStrategyChangeFact[] = (effectsByStrategy.get(row.id) ?? []).map((effect) => {
+      const item = effect.subjectRef?.startsWith('PROGRAMME_ITEM:')
+        ? programmeItems.get(effect.subjectRef.slice('PROGRAMME_ITEM:'.length))
+        : undefined;
+      const subjectRef = effect.subjectRef ?? `${row.id}:${effect.effectKind}`;
+      return {
+        effectKind: effect.effectKind,
+        subjectRef,
+        subjectLabel: item?.title ?? subjectRef,
+        ...(item?.window ? { currentWindow: item.window } : {}),
+        ...(effect.proposedWindow ? { proposedWindow: effect.proposedWindow } : {}),
+      };
+    });
+    const projectedPeople = summaries.map((entry) => ({
+      subjectRef: entry.subjectRef,
+      personLabel: personLabel(entry.subjectRef),
+      verdict: entry.verdict,
+    }));
+    return {
+      strategyRef: row.id,
+      version: row.strategy_version,
+      viability: row.viability,
+      status: row.status,
+      optionNumber: index + 1,
+      changes,
+      resolves: blocking.map((subject) => ({
+        subjectRef: subject.ref,
+        personLabel: personLabel(subject.ref),
+        currentVerdict: subject.tone,
+        // The option was assessed against this subject, or it was not; an
+        // absent summary is UNKNOWN, never an optimistic PASS.
+        projectedVerdict: verdictByRef.get(subject.ref) ?? 'UNKNOWN',
+      })),
+      projectedSummary: {
+        total: projectedPeople.length,
+        pass: projectedPeople.filter((p) => p.verdict === 'PASS').length,
+        fail: projectedPeople.filter((p) => p.verdict === 'FAIL').length,
+        unknown: projectedPeople.filter((p) => p.verdict === 'UNKNOWN').length,
+      },
+      projectedPeople,
+    };
+  });
+}
+
+/**
  * Defect-1 fix: the actual query/join logic, run against a client already
  * inside the caller's `withProjectionSnapshot` transaction. Never call this
  * directly against a bare `Pool` — use `loadRecoveryCaseFacts` below, or (for
@@ -348,6 +568,10 @@ async function loadRecoveryCaseFactsInner(
   const recoveryActions = await loadRecoveryActionFacts(client, workspaceId, caseId);
   const generatedAt = isoNow(at);
 
+  // Ascending, so option 1 is the first option this case produced. The
+  // strategies themselves are projected further down, once each case
+  // subject's CURRENT verdict is known — an option can only say who it fixes
+  // by comparing its own projection against today's authoritative verdict.
   const strategyRows = await client.query<{
     id: string;
     strategy_version: number;
@@ -358,26 +582,9 @@ async function loadRecoveryCaseFactsInner(
     `SELECT id, strategy_version, viability, status, candidate_assessment_summaries
        FROM recovery_strategies
       WHERE workspace_id = $1 AND recovery_case_id = $2
-      ORDER BY strategy_version DESC`,
+      ORDER BY strategy_version ASC`,
     [workspaceId, caseId],
   );
-  const strategies = strategyRows.rows.map((s) => {
-    const summaries = Array.isArray(s.candidate_assessment_summaries)
-      ? (s.candidate_assessment_summaries as { personLabel?: string; verdict?: string }[])
-      : [];
-    return {
-      strategyRef: s.id,
-      version: s.strategy_version,
-      viability: s.viability,
-      status: s.status,
-      projectedPeople: summaries.map((row) => ({
-        personLabel: row.personLabel ?? 'Traveller',
-        verdict: (row.verdict === 'PASS' || row.verdict === 'FAIL' || row.verdict === 'UNKNOWN'
-          ? row.verdict
-          : 'UNKNOWN') as AssessmentTone,
-      })),
-    };
-  });
 
   // Assessments for case subjects — best-effort. ORDER BY is required (FIG-1):
   // without it, edge/node array order (and any position-derived key) can
@@ -461,6 +668,20 @@ async function loadRecoveryCaseFactsInner(
   const subjectTones = subjectFacts.map((f) => f.tone);
   if (subjectTones.some((t) => t === 'FAIL')) tripVerdict = 'FAIL';
   else if (subjectTones.length > 0 && subjectTones.every((t) => t === 'PASS')) tripVerdict = 'PASS';
+
+  // ---------------------------------------------------------------------
+  // Recovery options, as an operator has to read them.
+  //
+  // `RecoveryStrategy` is a domain/evaluation record. It persists candidate
+  // summaries as `subjectRef` / `assessmentId` / `overallVerdict` and keeps
+  // its proposed effects in `strategy_changes` — it deliberately carries no
+  // display names, and must not start carrying them just so a screen can
+  // render. So the product read model does the resolving: it reads the
+  // verdict that is actually stored, joins human identity from authoritative
+  // canonical state, and explains each option from its own stored effects.
+  // Nothing here is generated prose or inferred intent.
+  // ---------------------------------------------------------------------
+  const strategies = await projectCaseStrategies(client, workspaceId, strategyRows.rows, subjectFacts, uncertainty);
 
   // T3: the case's cause is the change signal linked through case_signals
   // (migration 0124) — the latest received one when several are linked.

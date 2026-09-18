@@ -150,6 +150,78 @@ export const LiveDependencyGraphSchema = z.strictObject({
 });
 export type LiveDependencyGraph = z.infer<typeof LiveDependencyGraphSchema>;
 
+/**
+ * One recovery option as the operator reads it.
+ *
+ * The persisted `RecoveryStrategy` is a domain/evaluation record: it stores
+ * `subjectRef` / `assessmentId` / `overallVerdict` per assessed subject and
+ * keeps its proposed effects in `strategy_changes`. It deliberately carries
+ * no display names — so this view resolves human identity from authoritative
+ * canonical state instead, and explains the option from the strategy's own
+ * stored effects. Nothing here is generated prose; every field is a
+ * projection of persisted data.
+ */
+export const RecoveryStrategyChangeViewSchema = z.strictObject({
+  /** The persisted ScenarioChange effect kind, verbatim. */
+  effectKind: z.string().min(1),
+  /** Typed ref of the subject the effect changes, e.g. `PROGRAMME_ITEM:<id>`. */
+  subjectRef: z.string().min(1),
+  /**
+   * The subject's authoritative title. Falls back to `subjectRef` when
+   * canonical state has no title for it — never an invented name.
+   */
+  subjectLabel: z.string().min(1),
+  /** Canonical window before the change, when the subject has one. */
+  currentWindow: z.strictObject({ start: z.string().min(1), end: z.string().min(1) }).optional(),
+  /** Window this option proposes, when the effect carries one. */
+  proposedWindow: z.strictObject({ start: z.string().min(1), end: z.string().min(1) }).optional(),
+});
+export type RecoveryStrategyChangeView = z.infer<typeof RecoveryStrategyChangeViewSchema>;
+
+/** A subject this option was assessed against, with its resolved identity. */
+export const RecoveryStrategySubjectViewSchema = z.strictObject({
+  subjectRef: z.string().min(1),
+  /**
+   * Authoritative traveller display name when the subject is a Journey whose
+   * traveller is known; otherwise the typed ref itself. Never `Traveller`.
+   */
+  personLabel: z.string().min(1),
+  /** The verdict this option projects — the persisted `overallVerdict`. */
+  verdict: AssessmentToneSchema,
+});
+export type RecoveryStrategySubjectView = z.infer<typeof RecoveryStrategySubjectViewSchema>;
+
+export const RecoveryStrategyViewSchema = z.strictObject({
+  strategyRef: z.string(),
+  version: z.number().int().min(1),
+  viability: z.string(),
+  status: z.string(),
+  /** Stable 1-based option number within this case, ascending by version. */
+  optionNumber: z.number().int().min(1),
+  /** What this option changes, from its own persisted effects. */
+  changes: z.array(RecoveryStrategyChangeViewSchema).default([]),
+  /**
+   * The case subjects that are currently blocking, and the verdict this
+   * option projects for them. This is "who the option fixes".
+   */
+  resolves: z.array(z.strictObject({
+    subjectRef: z.string().min(1),
+    personLabel: z.string().min(1),
+    currentVerdict: AssessmentToneSchema,
+    projectedVerdict: AssessmentToneSchema,
+  })).default([]),
+  /** Counts over every subject the option was assessed against. */
+  projectedSummary: z.strictObject({
+    total: z.number().int().min(0),
+    pass: z.number().int().min(0),
+    fail: z.number().int().min(0),
+    unknown: z.number().int().min(0),
+  }).default({ total: 0, pass: 0, fail: 0, unknown: 0 }),
+  /** Every assessed subject, as persisted. Complete, and usually large. */
+  projectedPeople: z.array(RecoveryStrategySubjectViewSchema),
+});
+export type RecoveryStrategyView = z.infer<typeof RecoveryStrategyViewSchema>;
+
 export const OperatorOverviewItemSchema = z.strictObject({
   tripRef: z.string().min(1),
   travellerLabel: z.string().min(1),
@@ -400,16 +472,7 @@ export const RecoveryCaseViewSchema = z.strictObject({
     requirement: z.string(),
     actual: z.string(),
   }).optional(),
-  strategies: z.array(z.strictObject({
-    strategyRef: z.string(),
-    version: z.number().int().min(1),
-    viability: z.string(),
-    status: z.string(),
-    projectedPeople: z.array(z.strictObject({
-      personLabel: z.string(),
-      verdict: AssessmentToneSchema,
-    })),
-  })),
+  strategies: z.array(RecoveryStrategyViewSchema),
   authorityState: z.string(),
   executionState: z.string(),
   reconciliationState: z.string(),

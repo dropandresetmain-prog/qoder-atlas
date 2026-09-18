@@ -134,12 +134,32 @@ export interface BookingServiceFact {
   detail?: string;
 }
 
+export interface RecoveryStrategyChangeFact {
+  effectKind: string;
+  subjectRef: string;
+  subjectLabel: string;
+  currentWindow?: { start: string; end: string };
+  proposedWindow?: { start: string; end: string };
+}
+
 export interface RecoveryStrategyFact {
   strategyRef: string;
   version: number;
   viability: string;
   status: string;
-  projectedPeople: readonly { personLabel: string; verdict: AssessmentTone }[];
+  /** 1-based option number within the case, ascending by version. */
+  optionNumber: number;
+  /** Projected from the strategy's own persisted ScenarioChange effects. */
+  changes: readonly RecoveryStrategyChangeFact[];
+  /** Currently-blocking case subjects and the verdict this option projects. */
+  resolves: readonly {
+    subjectRef: string;
+    personLabel: string;
+    currentVerdict: AssessmentTone;
+    projectedVerdict: AssessmentTone;
+  }[];
+  projectedSummary: { total: number; pass: number; fail: number; unknown: number };
+  projectedPeople: readonly { subjectRef: string; personLabel: string; verdict: AssessmentTone }[];
 }
 
 export interface RecoveryActionFact {

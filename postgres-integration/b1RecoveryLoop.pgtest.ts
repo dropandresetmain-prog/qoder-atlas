@@ -189,6 +189,76 @@ describe('B1 generalized internal recovery loop (real PostgreSQL, normal runtime
     const proposedAgain = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies`, { now: NOW });
     assert.equal((proposedAgain.json as { report: PlanningReport }).report.persistedCount, 0, 'a rerun recognises the persisted candidate instead of duplicating it');
 
+    // --- FB1-5/FB1-6: the option as the operator actually reads it.
+    //
+    // `RecoveryStrategy` persists candidate summaries as subjectRef /
+    // assessmentId / overallVerdict and keeps its effects in
+    // strategy_changes. The focused read model used to look for personLabel /
+    // verdict on those summaries, so every subject fell back to
+    // "Traveller UNKNOWN" — the founder saw dozens of them and could not tell
+    // what they were approving. These assertions pin the projection to what
+    // is actually stored, and to identity resolved from canonical state.
+    const planned = projectRecoveryCase((await loadRecoveryCaseFacts(pool, seed.workspaceId, caseId, NOW))!);
+    const option = planned.strategies.find((s) => s.strategyRef === strategyId);
+    assert.ok(option, `the persisted strategy is projected: ${JSON.stringify(planned.strategies.map((s) => s.strategyRef))}`);
+    assert.deepEqual(
+      planned.strategies.map((s) => s.optionNumber),
+      planned.strategies.map((_, i) => i + 1),
+      'options are numbered 1..N in ascending version order',
+    );
+
+    // Identity comes from the authoritative journey -> traveller join, never
+    // from the strategy record and never from a placeholder.
+    assert.ok(option.projectedPeople.length > 0, 'the option was assessed against reached subjects');
+    assert.equal(
+      option.projectedPeople.filter((p) => p.personLabel === 'Traveller').length,
+      0,
+      `no fabricated "Traveller" labels: ${JSON.stringify(option.projectedPeople.slice(0, 5))}`,
+    );
+    const blockingRef = `JOURNEY:${people[0]!.journeyId}`;
+    const blockingProjection = option.projectedPeople.find((p) => p.subjectRef === blockingRef);
+    assert.ok(blockingProjection, 'the blocked subject is among the assessed subjects');
+    assert.equal(blockingProjection.personLabel, 'Participant 1', 'known Journey resolves to its authoritative traveller display name');
+    // The persisted overallVerdict is projected as-is. A viable option heals
+    // the blocking subject, so this is PASS here — read from the record, not
+    // assumed by the projector.
+    assert.equal(blockingProjection.verdict, 'PASS');
+    assert.equal(
+      option.projectedSummary.total,
+      option.projectedPeople.length,
+      'the summary counts the subjects it actually projected',
+    );
+    assert.equal(
+      option.projectedSummary.pass + option.projectedSummary.fail + option.projectedSummary.unknown,
+      option.projectedSummary.total,
+    );
+    assert.ok(option.projectedSummary.pass > 0, 'a viable option projects at least one passing subject');
+
+    // "Who does this fix": the currently-blocking case subject, with today's
+    // verdict and the verdict this option projects for it.
+    const resolves = option.resolves.find((r) => r.subjectRef === blockingRef);
+    assert.ok(resolves, `the blocking case subject is named: ${JSON.stringify(option.resolves)}`);
+    assert.equal(resolves.personLabel, 'Participant 1');
+    assert.equal(resolves.currentVerdict, 'FAIL');
+    assert.equal(resolves.projectedVerdict, 'PASS');
+
+    // "What does this change": the option's own stored ScenarioChange effects,
+    // joined to canonical programme state — titles and real windows, not ids.
+    assert.equal(option.changes.length, 2, `a bilateral swap states both moves: ${JSON.stringify(option.changes)}`);
+    assert.ok(option.changes.every((c) => c.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME'));
+    assert.deepEqual(
+      option.changes.map((c) => c.subjectLabel).sort(),
+      ['Early required item', 'Later item'],
+      'each changed programme item is named from canonical state',
+    );
+    const movedEarly = option.changes.find((c) => c.subjectRef === `PROGRAMME_ITEM:${earlyItem.programmeItemId}`);
+    const movedLate = option.changes.find((c) => c.subjectRef === `PROGRAMME_ITEM:${lateItem.programmeItemId}`);
+    assert.ok(movedEarly && movedLate, 'both sides of the swap are projected');
+    assert.deepEqual(movedEarly.currentWindow, EARLY_WINDOW, 'current timing is canonical, not proposed');
+    assert.deepEqual(movedEarly.proposedWindow, LATE_WINDOW, 'the blocked item takes the later window');
+    assert.deepEqual(movedLate.currentWindow, LATE_WINDOW);
+    assert.deepEqual(movedLate.proposedWindow, EARLY_WINDOW, 'the counterpart takes the earlier window');
+
     // --- approval through HTTP by the workspace operator (no header -> operator principal).
     const denied = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies/${strategyId}/approve`, { now: NOW }, { 'x-northstar-principal': randomUUID() });
     assert.equal(denied.status, 403, 'an unregistered principal cannot approve');

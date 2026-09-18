@@ -10,12 +10,14 @@ import type {
   PartialRecoveryView,
   RecoveryActionView,
   RecoveryCaseView,
+  RecoveryStrategyChangeView,
+  RecoveryStrategyView,
 } from '../../contracts/v2/product/readModels.ts';
 import {
   assessmentToneClass,
   ldgSemanticTone,
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
-import { escapeHtml, formatInstant, formatMoney } from '../html.ts';
+import { escapeHtml, formatInstant, formatMoney, formatShort } from '../html.ts';
 import { bulletList, uncertaintyList } from '../components.ts';
 
 const CONNECTION_PROGRESSION_LABEL: Record<ConnectionProgression, string> = {
@@ -153,6 +155,81 @@ function connectionProgressionBlock(progression: ConnectionProgression): string 
     </div>`;
 }
 
+/**
+ * One line of "what this option actually changes", built from the strategy's
+ * own persisted ScenarioChange effect joined to canonical programme state.
+ *
+ * FB1-6: the founder saw two VIABLE options rendered as a truncated UUID and
+ * a version number and could not tell them apart. They were never duplicates
+ * — the deterministic proposer emits one option per distinct programme swap
+ * pair, so two options genuinely move the same blocked item into two
+ * different slots. Saying which slot is the whole difference, so that is what
+ * this renders. Nothing is generated or inferred: when the read model has no
+ * window for a subject, the line simply says less.
+ */
+function strategyChangeLine(change: RecoveryStrategyChangeView): string {
+  const label = `<strong>${escapeHtml(change.subjectLabel)}</strong>`;
+  if (change.proposedWindow && change.currentWindow) {
+    return `<li data-test="strategy-change" data-subject-ref="${escapeHtml(change.subjectRef)}">
+      Move ${label} from ${escapeHtml(formatShort(change.currentWindow.start))} to ${escapeHtml(formatShort(change.proposedWindow.start))}
+      <span class="meta">(${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))})</span>
+    </li>`;
+  }
+  if (change.proposedWindow) {
+    return `<li data-test="strategy-change" data-subject-ref="${escapeHtml(change.subjectRef)}">
+      Set ${label} to ${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))}
+    </li>`;
+  }
+  return `<li data-test="strategy-change" data-subject-ref="${escapeHtml(change.subjectRef)}">
+    ${escapeHtml(change.effectKind.toLowerCase().split('_').join(' '))} · ${label}
+  </li>`;
+}
+
+/** "Sarah Lim: at risk -> confirmed" — who the option fixes, per case subject. */
+function strategyResolveLine(resolve: RecoveryStrategyView['resolves'][number]): string {
+  const tone = resolve.projectedVerdict === 'PASS' ? 'done' : resolve.projectedVerdict === 'FAIL' ? 'failed' : 'neutral';
+  return `<li data-test="strategy-resolves" data-subject-ref="${escapeHtml(resolve.subjectRef)}">
+    ${escapeHtml(resolve.personLabel)} ${badge(resolve.currentVerdict, 'failed')} → ${badge(resolve.projectedVerdict, tone)}
+  </li>`;
+}
+
+/**
+ * One recovery option as a card the operator can read and choose.
+ *
+ * The real `strategyRef` remains the value the Approve control carries — the
+ * option number is presentation only, and internal refs/version stay as
+ * secondary metadata rather than the headline.
+ */
+function strategyCard(strategy: RecoveryStrategyView, terminal: boolean): string {
+  const approvable = !terminal
+    && strategy.viability === 'VIABLE'
+    && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED');
+  const changes = strategy.changes.length > 0
+    ? `<ul class="opt-changes">${strategy.changes.map(strategyChangeLine).join('')}</ul>`
+    : '<p class="meta">This option records no programme change.</p>';
+  const resolves = strategy.resolves.length > 0
+    ? `<ul class="opt-resolves">${strategy.resolves.map(strategyResolveLine).join('')}</ul>`
+    : '';
+  // The full reached set is large by design (it is the dependency closure the
+  // evaluator actually assessed), so it is summarised rather than listed. The
+  // complete per-subject list stays available on the JSON read model.
+  const summary = strategy.projectedSummary;
+  const reach = summary.total > 0
+    ? `<p class="meta" data-test="strategy-reach">Assessed against ${summary.total} reached ${summary.total === 1 ? 'subject' : 'subjects'}: ${summary.pass} pass · ${summary.fail} fail · ${summary.unknown} unknown.</p>`
+    : '';
+  return `<li class="strategy-row opt-card" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
+    <div class="opt-head">
+      <h3 class="opt-title">Option ${strategy.optionNumber}</h3>
+      <div class="opt-flags">${badge(strategy.viability, strategy.viability === 'VIABLE' ? 'done' : 'neutral')}${badge(strategy.status, 'neutral')}</div>
+    </div>
+    ${changes}
+    ${resolves}
+    ${reach}
+    <p class="meta opt-ref">Strategy <span class="mono">${escapeHtml(strategy.strategyRef)}</span> · v${strategy.version}</p>
+    ${approvable ? `<button type="button" class="btn" data-test="approve-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">Approve Option ${strategy.optionNumber} and execute</button>` : ''}
+  </li>`;
+}
+
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   const actions =
     view.recoveryActions.length > 0
@@ -184,20 +261,19 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   // B1: operator controls over the normal application routes. The buttons
   // only POST and re-read; every outcome shown is the server's own response.
   const terminal = view.status === 'RESOLVED' || view.status === 'CLOSED' || view.status === 'CANCELLED' || view.status === 'SUPERSEDED';
-  const strategyRows = view.strategies
-    .map((strategy) => {
-      const approvable = !terminal && strategy.viability === 'VIABLE' && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED');
-      const people = strategy.projectedPeople.map((p) => `${escapeHtml(p.personLabel)} ${badge(p.verdict, p.verdict === 'PASS' ? 'done' : p.verdict === 'FAIL' ? 'failed' : 'neutral')}`).join(' ');
-      return `<li class="strategy-row" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">
-        <span class="mono">${escapeHtml(strategy.strategyRef.slice(0, 8))}</span> v${strategy.version} ${badge(strategy.viability, strategy.viability === 'VIABLE' ? 'done' : 'neutral')} ${badge(strategy.status, 'neutral')} ${people}
-        ${approvable ? `<button type="button" class="btn" data-test="approve-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">Approve and execute</button>` : ''}
-      </li>`;
-    })
-    .join('');
+  const strategyRows = view.strategies.map((strategy) => strategyCard(strategy, terminal)).join('');
+  // Several viable options are alternatives, not revisions of one another:
+  // each is a different change to the programme. Say so, so the operator
+  // knows they are choosing rather than looking at duplicates.
+  const viableCount = view.strategies.filter((strategy) => strategy.viability === 'VIABLE').length;
+  const choiceNote = viableCount > 1
+    ? `<p class="meta" data-test="strategy-choice-note">${viableCount} viable options — each changes the programme differently. Choose one.</p>`
+    : '';
   const recoveryControls = `<section class="section" data-test="recovery-controls" data-case-ref="${escapeHtml(view.caseRef)}">
     <h2>Recovery options</h2>
     ${terminal ? '' : `<button type="button" class="btn" data-test="propose-strategies">Propose recovery options</button>`}
     <p class="meta" data-test="recovery-controls-status"></p>
+    ${choiceNote}
     <ul class="strategy-list">${strategyRows || '<li class="meta">No options proposed yet.</li>'}</ul>
   </section>`;
   const controlsScript = terminal ? '' : `<script>

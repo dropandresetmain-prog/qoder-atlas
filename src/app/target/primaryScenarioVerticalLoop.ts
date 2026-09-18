@@ -206,7 +206,21 @@ export function runPrimaryScenarioVerticalLoop(input: PrimaryScenarioLoopInput):
       version: 1,
       viability: preview.previewAccepted ? 'VIABLE' : 'NOT_VIABLE',
       status: 'PROPOSED',
+      optionNumber: 1,
+      // This loop projects an in-memory preview, not a persisted
+      // ScenarioChange, so it has no stored effects to explain and no
+      // authoritative current verdict to compare against. Both stay empty
+      // rather than being invented here.
+      changes: [],
+      resolves: [],
+      projectedSummary: {
+        total: preview.proposed.projections.length,
+        pass: preview.proposed.projections.filter((p) => p.verdict === 'PASS').length,
+        fail: preview.proposed.projections.filter((p) => p.verdict === 'FAIL').length,
+        unknown: preview.proposed.projections.filter((p) => p.verdict === 'UNKNOWN').length,
+      },
       projectedPeople: preview.proposed.projections.map((p) => ({
+        subjectRef: p.travellerRef,
         personLabel: p.personLabel,
         verdict: p.verdict,
       })),
