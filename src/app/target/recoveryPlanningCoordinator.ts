@@ -1,0 +1,274 @@
+/**
+ * NORTHSTAR R1 — Recovery Planning Coordinator ADAPTER (freeze C1), the thin
+ * application binding of the pure coordinator core to PostgreSQL.
+ *
+ * This is NOT a second engine. It implements the frozen
+ * `RecoveryPlanningCoordinator.planCase` port by:
+ *   1. reading the CURRENT planning basis from canonical PostgreSQL exactly as
+ *      the accepted B1 seam does (case status -> failing subjects -> captured
+ *      world -> current-state reader), using the same public read helpers;
+ *   2. delegating ALL decision logic to the pure `runRecoveryPlanning` core
+ *      (domain registry, proposers, REAL RC-6 evaluation, decision evidence,
+ *      comparator, outcome mapping). The adapter adds no viability semantics;
+ *   3. persisting the core's outputs through REAL commands: each VIABLE
+ *      RecoveryStrategy via `persistRecoveryStrategy`, then the ONE immutable
+ *      `RecoveryPlanningAttempt` via `persistRecoveryPlanningAttempt` (migration
+ *      0125), then advancing the case phase with the existing lifecycle command;
+ *   4. returning the frozen `RecoveryPlanningResult`.
+ *
+ * Ownership boundaries are preserved: the coordinator owns planning-artefact
+ * persistence ONLY. It does not own canonical mutation (that stays with the
+ * strategy/case commands), hard viability (RC-6), authority, consequential
+ * execution, provider-observed truth or case resolution. Deterministic identity
+ * is minted the same way as the B1 seam (`deterministicUuid`) so retries/replays
+ * are idempotent per (case, basis, candidate).
+ *
+ * Cloud status: this adapter requires PostgreSQL and is therefore typechecked
+ * and linted in Cloud but NOT executed here; its runtime acceptance is a LOCAL
+ * integration-acceptance item (see docs/work/ACTIVE_TASK.md). The pure core it
+ * delegates to IS executed and generality-proven in Cloud.
+ */
+import type { Pool } from '../../persistence/postgres/pool.ts';
+import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
+import type { TypedRef, SubjectId } from '../../domain/v2/shared/identity.ts';
+import type { ApplicationError } from '../../contracts/v2/product/readModels.ts';
+import type { CapturedWorld } from '../../resolution/world/world.ts';
+import type { EffectiveWorld } from '../../resolution/world/effectiveTypes.ts';
+import type { CurrentState } from '../../resolution/world/currentness.ts';
+import type { EvaluatorRegistry } from '../../resolution/evaluation/assess.ts';
+import type {
+  RecoveryPlanningCoordinator,
+  RecoveryPlanningInput,
+  RecoveryPlanningResult,
+} from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
+import type { RecoveryDomainId } from '../../contracts/v2/planning/recoveryDomain.ts';
+import type { StrategyProposer } from '../../resolution/planning/proposer.ts';
+import type { CapabilityFamily } from '../../operational/strategy.ts';
+import { captureWorld, PgCurrentStateReader } from '../../persistence/postgres/world/pgCurrentState.ts';
+import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
+import { persistRecoveryStrategy } from '../../persistence/postgres/commands/m7StrategyCommands.ts';
+import { persistRecoveryPlanningAttempt } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
+import { createM6Registry } from '../../resolution/evaluation/registry.ts';
+import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary.ts';
+import { unmetProgrammeItems, type FailingSubject } from '../../resolution/planning/proposer.ts';
+import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
+import { defaultRecoveryDomainRegistry } from '../../resolution/planning/recoveryDomains.ts';
+import {
+  runRecoveryPlanning,
+  type CoordinatorMinters,
+  type DomainProposerBinding,
+} from '../../resolution/planning/coordinatorCore.ts';
+import { advanceCasePhase } from './recoveryPlanning.ts';
+import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
+import { applicationError } from './applicationCommands.ts';
+
+export const R1_COORDINATOR_VERSION = 'r1-coordinator/1';
+export const R1_COMPARATOR_VERSION = 'r1-comparator/1';
+
+const TERMINAL = new Set(['RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED']);
+
+/** Dependencies of the coordinator adapter, all injected by the composition root. */
+export interface RecoveryPlanningCoordinatorDeps {
+  pool: Pool;
+  workspaceId: string;
+  actorPrincipalId: string;
+  uow: () => PgUnitOfWork;
+  now?: string;
+  /** Domain-bound proposers; defaults to the shipped deterministic PROGRAMME proposer. */
+  proposers?: readonly DomainProposerBinding[];
+  /** Capability families actually available to this composition (drives fail-closed domain selection). */
+  availableCapabilities?: readonly CapabilityFamily[];
+  /** Domain registry; defaults to the frozen initial registry. */
+  domainRegistry?: ReturnType<typeof defaultRecoveryDomainRegistry>;
+  coordinatorVersion?: string;
+  comparatorVersion?: string;
+}
+
+/** The default domain-bound proposers shipped with the runtime (the PROGRAMME time-swap). */
+export function defaultDomainProposers(): DomainProposerBinding[] {
+  return [{ domain: 'PROGRAMME' as RecoveryDomainId, proposer: createProgrammeTimeSwapProposer() as StrategyProposer }];
+}
+
+const DEFAULT_CAPABILITIES: readonly CapabilityFamily[] = ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'];
+
+interface BasisCapture {
+  failing: FailingSubject[];
+  world: CapturedWorld;
+  effective: EffectiveWorld;
+  currentState: CurrentState;
+  registry: EvaluatorRegistry;
+  basisAssessmentId: string;
+}
+
+async function caseStatus(pool: Pool, workspaceId: string, caseId: string): Promise<string | undefined> {
+  const row = await pool.query<{ lifecycle_status: string }>(
+    'SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2',
+    [workspaceId, caseId],
+  );
+  return row.rows[0]?.lifecycle_status;
+}
+
+/**
+ * Read the CURRENT planning basis from canonical PostgreSQL. Mirrors the
+ * accepted B1 seam's basis capture exactly (same reads, same order) so the two
+ * planning entry points cannot diverge on what "the current basis" means.
+ */
+async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseId: string, now: string): Promise<BasisCapture | undefined> {
+  const subjects = await deps.pool.query<{ subject_kind: string; subject_id: string }>(
+    `SELECT subject_kind, subject_id FROM case_subjects WHERE workspace_id = $1 AND recovery_case_id = $2 AND subject_kind IN ('JOURNEY', 'TRIP') ORDER BY subject_kind, subject_id`,
+    [deps.workspaceId, caseId],
+  );
+  const failing: FailingSubject[] = [];
+  for (const row of subjects.rows) {
+    const subject: TypedRef = { kind: row.subject_kind as TypedRef['kind'], id: row.subject_id };
+    const view = await currentAssessmentView(deps.pool, deps.workspaceId, subject, 'VIABILITY', now);
+    if (view.status === 'CURRENT' && view.assessment && view.assessment.overallVerdict === 'FAIL') {
+      failing.push({ subject, assessment: view.assessment });
+    }
+  }
+  if (failing.length === 0) return undefined;
+
+  const unmetItemIds = [...new Set(failing.flatMap((f) => unmetProgrammeItems(f.assessment).map((r) => r.id)))];
+  const programmeRefs: TypedRef[] = unmetItemIds.length === 0 ? [] : (await deps.pool.query<{ programme_id: string }>(
+    'SELECT DISTINCT programme_id FROM programme_items WHERE workspace_id = $1 AND id = ANY($2::uuid[]) ORDER BY programme_id',
+    [deps.workspaceId, unmetItemIds],
+  )).rows.map((r) => ({ kind: 'PROGRAMME' as const, id: r.programme_id }));
+
+  const registry = createM6Registry();
+  const world = await captureWorld(deps.pool, {
+    workspaceId: deps.workspaceId,
+    focus: [...failing.map((f) => f.subject), ...programmeRefs],
+    at: now,
+    informationTopics: registry.informationTopics,
+  });
+  const effective = projectEffectiveWorld(world);
+  const currentState = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, world.manifest);
+  return { failing, world, effective, currentState, registry, basisAssessmentId: failing[0]!.assessment.id };
+}
+
+/** Deterministic id/version minters, mirroring the B1 seam's planning namespace. */
+function planningMinters(deps: RecoveryPlanningCoordinatorDeps, caseId: string, basisAssessmentId: string, now: string, baseStrategyVersion: number): CoordinatorMinters {
+  const attemptId = deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|planning-attempt|${caseId}|${basisAssessmentId}`);
+  return {
+    attemptId: attemptId as SubjectId,
+    startedAt: now,
+    mintStrategyId: (candidateKey) =>
+      deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|strategy|${caseId}|${basisAssessmentId}|${candidateKey}`) as SubjectId,
+    mintScenarioChangeId: (strategyId) =>
+      deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${strategyId}|scenario-change`) as SubjectId,
+    baseStrategyVersion,
+  };
+}
+
+async function nextStrategyVersion(pool: Pool, workspaceId: string, caseId: string): Promise<number> {
+  const existing = await pool.query<{ max: string | null }>(
+    'SELECT MAX(strategy_version)::text AS max FROM recovery_strategies WHERE workspace_id = $1 AND recovery_case_id = $2',
+    [workspaceId, caseId],
+  );
+  return Number(existing.rows[0]?.max ?? 0) + 1;
+}
+
+export type CoordinatorPlanOutcome =
+  | { ok: true; result: RecoveryPlanningResult }
+  | { ok: false; error: ApplicationError };
+
+/**
+ * The concrete C1 coordinator. Composed once under the application; every heavy
+ * dependency is injected, never model-controlled.
+ */
+export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordinatorDeps): RecoveryPlanningCoordinator & {
+  planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome>;
+} {
+  const coordinator: RecoveryPlanningCoordinator & {
+    planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome>;
+  } = {
+    async planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome> {
+      const now = deps.now ?? new Date().toISOString();
+      const status = await caseStatus(deps.pool, deps.workspaceId, input.recoveryCaseId);
+      if (!status) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.recoveryCaseId} does not exist`) };
+      if (TERMINAL.has(status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.recoveryCaseId} is ${status}`) };
+
+      const basis = await capturePlanningBasis(deps, input.recoveryCaseId, now);
+      if (!basis) {
+        // No currently-failing subject: nothing to plan. This is an honest empty
+        // result, not an error — the case simply has no recovery basis right now.
+        const attemptId = deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|planning-attempt|${input.recoveryCaseId}|empty`);
+        return {
+          ok: true,
+          result: {
+            planningAttemptRef: attemptId as SubjectId,
+            basisAssessmentId: '' as SubjectId,
+            viableStrategyRefs: [],
+            outcome: 'NO_RECOVERY_FOUND',
+          },
+        };
+      }
+
+      const baseStrategyVersion = await nextStrategyVersion(deps.pool, deps.workspaceId, input.recoveryCaseId);
+      await advanceCasePhase(deps, input.recoveryCaseId, 'PLANNING', 'planning started');
+
+      // 2. Delegate ALL decision logic to the pure core.
+      const core = await runRecoveryPlanning(
+        {
+          workspaceId: deps.workspaceId,
+          recoveryCaseId: input.recoveryCaseId,
+          basisAssessmentId: basis.basisAssessmentId as SubjectId,
+          reason: input.reason,
+          now,
+          world: basis.world,
+          effective: basis.effective,
+          failing: basis.failing,
+          registry: basis.registry,
+          currentState: basis.currentState,
+        },
+        {
+          domainRegistry: deps.domainRegistry ?? defaultRecoveryDomainRegistry(),
+          availableCapabilities: deps.availableCapabilities ?? DEFAULT_CAPABILITIES,
+          proposers: deps.proposers ?? defaultDomainProposers(),
+          minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
+          coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
+          comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
+        },
+      );
+
+      // 3a. Persist each VIABLE strategy through the real command (idempotent per strategy id).
+      for (const strategy of core.viableStrategies) {
+        const persisted = await persistRecoveryStrategy(deps.uow(), {
+          workspaceId: deps.workspaceId,
+          actorPrincipalId: deps.actorPrincipalId,
+          idempotencyKey: `planning:persist:${strategy.id}`,
+          strategy: { ...strategy, status: 'EVALUATED', candidateAssessmentResults: [] },
+        });
+        if (!persisted.ok) {
+          return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `strategy ${strategy.id}: ${persisted.conflict.kind}: ${persisted.conflict.message}`) };
+        }
+      }
+
+      // 3b. Persist the ONE immutable attempt (migration 0125), idempotent per (case, basis).
+      const attemptPersisted = await persistRecoveryPlanningAttempt(deps.uow(), {
+        workspaceId: deps.workspaceId,
+        actorPrincipalId: deps.actorPrincipalId,
+        idempotencyKey: `planning:attempt:${input.recoveryCaseId}:${basis.basisAssessmentId}`,
+        attempt: core.attempt,
+        outcome: core.result.outcome,
+      });
+      if (!attemptPersisted.ok) {
+        return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `attempt: ${attemptPersisted.conflict.kind}: ${attemptPersisted.conflict.message}`) };
+      }
+
+      // 3c. Advance the case phase only when a viable recommendation exists.
+      if (core.result.outcome === 'AWAITING_AUTHORITY') {
+        await advanceCasePhase(deps, input.recoveryCaseId, 'AWAITING_AUTHORITY', 'viable strategies persisted');
+      }
+
+      return { ok: true, result: { ...core.result, planningAttemptRef: attemptPersisted.value.attemptId as SubjectId } };
+    },
+
+    async planCase(input: RecoveryPlanningInput): Promise<RecoveryPlanningResult> {
+      const detailed = await coordinator.planCaseDetailed(input);
+      if (!detailed.ok) throw new Error(`${detailed.error.code}: ${detailed.error.message}`);
+      return detailed.result;
+    },
+  };
+  return coordinator;
+}
