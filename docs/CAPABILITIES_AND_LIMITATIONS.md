@@ -6,53 +6,57 @@ This is the technical truth sheet for the **currently implemented NORTHSTAR runt
 
 ## Current runtime truth
 
-- **PostgreSQL + PostGIS is the sole normal NORTHSTAR runtime.**
-- SQLite is retired as an application runtime and survives only as explicit offline, read-only migration input plus historical test/code evidence.
+- **PostgreSQL + PostGIS is the sole normal Northstar runtime.**
+- SQLite is retired as an application runtime and survives only as explicit offline,
+  read-only migration input plus historical test/code evidence.
 - The M0-M10 data/state refactor is accepted through C5.
-- Post-C5 repository convergence is complete: accepted frontend semantic foundation + accepted live read models + PostgreSQL runtime + converged test topology now coexist on `main`.
-- Current delivery is product integration: Slice A, Founder Test A, Slice B, Founder Test B, then M11 operational activation/retirement.
+- The post-C5 operational runtime closure is implemented through R0/T3/T4/B1.
+- Current implementation candidate:
+  `feature/sarah-provider-disruption` @
+  `82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
+- The first complete generalized **internal** recovery loop is proven on the real AiT/Sarah
+  world through normal application/runtime paths.
+- Next product gate: **Founder B1 physical acceptance**. Next implementation milestone after
+  acceptance: **B2 generalized external recovery / Jordan**.
 
-The latest convergence evidence on the current code line established:
+Latest evidence on this code line:
 
-- `npm test`: **749/749** current tests passing;
-- fresh-database `npm run test:postgres`: **462/462** passing;
-- `npm run test:migration`: **23/23** passing;
-- typecheck, lint, build, anti-hardcoding and secret scan clean;
-- built PostgreSQL runtime boot smoke green;
-- historical SQLite runtime tests deliberately excluded from acceptance.
+- CURRENT suite: **802/802** in ~30.4s, plus ~7.1s boundary gate;
+- clean `npm run test:postgres`: **522/522** in ~21.4 min;
+- `b1SarahWorldRecovery.pgtest.ts`: PASS, ~117-155s across recorded runs;
+- `b1RecoveryLoop.pgtest.ts`: PASS;
+- typecheck, build, lint, boundary and anti-hardcoding checks clean at B1 closure;
+- historical SQLite runtime tests remain deliberately excluded from acceptance.
 
 ## Current runtime capability matrix
 
 | Capability | Current status | Provider / modes | Current limitation / direction |
 |---|---|---|---|
-| Persistence / state ownership | **IMPLEMENTED.** PostgreSQL + PostGIS current runtime with typed relational ownership, expected revisions, durable work and migrations. | PostgreSQL target composition. | M11 is operational activation/retirement, not a future switch away from SQLite. |
-| People / Trip / Journey model | **IMPLEMENTED CORE.** Stable Traveller, shared Trip, per-person Journey, relationships/support/coordination foundations. | Internal PostgreSQL domain. | Product UI still needs to prove the real Sarah baseline and exact five-person incident scope through normal HTTP. |
-| Services / reservations / allocations | **IMPLEMENTED CORE.** Independent service/reservation/allocation/entitlement ownership and provider references. | Internal + provider adapters. | Automatic provider-reference correlation is not required for the first disclosed demo path; explicit subject identity remains acceptable where the command contract requires it. |
-| Programme / participation | **IMPLEMENTED CORE.** Mutable Event -> Programme -> ProgrammeItem with Participation independent of travel. | Internal programme state. | Slice B must prove affected people without Journeys are not omitted or falsely cleared. |
-| Signals and authoritative mutation | **IMPLEMENTED.** Provider-shaped inputs and typed commands reach PostgreSQL state with idempotency/concurrency controls. | Internal inputs + provider normalization. | Browser-facing evaluation-to-case orchestration is not yet proven end to end. |
-| Impact / assessment / viability | **IMPLEMENTED.** Revision/evidence/time-bound deterministic assessments, relevant-scope propagation, stale invalidation and PASS/FAIL/UNKNOWN semantics. | Internal deterministic evaluators. | Slice A must prove five incident-linked outcomes from one normal product run rather than relying on test-helper assembly. |
-| Live read models | **IMPLEMENTED / ACCEPTED FOUNDATION.** Stable edge identity/authority, change cursor, assessment lifecycle, subject-keyed refs and authoritative traveller names. | PostgreSQL projections. | Full-snapshot polling is the safe first live-update mechanism. `changedVisibleRefs` is at-least-once emphasis, not exact diff. Event Overview final design remains unresolved. |
-| Flight context | **IMPLEMENTED.** Search, verify, fare rules and provider-state observation. | Atlas LIVE/RECORD/REPLAY. | Atlas is sandbox constrained and not universal airline/GDS servicing. Sarah/Batik demo facts are simulated/organiser-supplied where documented, not Atlas market truth. |
-| Flight transactions | **IMPLEMENTED, sandbox constrained.** Order/create, pay, retrieve and supported cancellation/void seams are authority-gated. | Atlas sandbox LIVE + recordings/replay. | Production servicing/refund breadth remains provider-limited. |
-| Hotel lifecycle | **IMPLEMENTED.** Search, quote/prebook, book, retrieve and cancel with target execution/reconciliation boundaries. | Nuitée/liteAPI LIVE/RECORD/REPLAY. | No universal in-place date modification; changes may require cancel/rebook. Sarah's actual stay consequence still needs Slice A/B truth verification before the UI presents it. |
-| Ground routing context | **PARTIAL.** Routing can inform deterministic transfer windows. | Google Routes LIVE-capable / replay/fallback. | No transactional ground provider; non-blocking to core recovery. |
-| FX and costs | **IMPLEMENTED.** Dated evidence normalizes comparable recovery costs and authority amounts. | Frankfurter ECB-reference LIVE/RECORD/REPLAY + internal evidence. | Reference FX evidence is not a payment FX service. |
-| Preferences / policy / rules | **IMPLEMENTED CORE.** Explicit/latent preferences, policy/rule inputs, spend/authority thresholds and deterministic precedence. | Internal/supplied sources. | Source coverage remains deployment-specific; explicit instructions always outrank latent preferences. |
-| Recovery planning | **IMPLEMENTED CORE.** Typed strategies/action plans with AI proposal capability and deterministic fallback. | Model Studio/Qwen when configured; deterministic fallback/replay otherwise. | Normal browser/API path for candidate creation/selection is not yet proven as a complete Slice B interaction. |
-| Counterfactual preview | **IMPLEMENTED CORE / PRODUCT INTEGRATION INCOMPLETE.** Overlay evaluation remains mutation-free. | Internal deterministic overlay. | Slice B must prove complete affected participation and current/proposed separation through the product surface. |
-| Authority / approvals | **IMPLEMENTED CORE.** Scoped authority, reviewed basis, spend/policy checks and approval gating. | Internal authority engine. | Slice B must expose a real operator principal/approval path through normal HTTP; UI booleans do not count. |
-| Execution / observation / reconciliation | **IMPLEMENTED CORE.** Typed action intents, durable attempts, observations, reassessment and case-resolution gating. | Internal + provider adapters. | Slice B must prove browser-accessible orchestration, duplicate/stale protection and truthful partial failure/recovery. |
-| Documents / email / web material | **PARTIAL.** Supplied text/structured material can be ingested with provenance and optional schema-bound extraction. | Internal source contracts / Model Studio. | No general Gmail/arbitrary crawler/legal document product claim. |
-| Entry / visa / transit | **IMPLEMENTED ARCHITECTURE + EVALUATOR FOUNDATION; SOURCE COVERAGE PARTIAL.** Credentials/intended visits/document selection and three-valued assessment are represented. | Internal/sourced requirements. | Not a legal-grade live eligibility product without authoritative source coverage. Missing/stale coverage remains `UNKNOWN`. |
-| Advisories / external conditions | **IMPLEMENTED FOUNDATION; LIVE SOURCE INTEGRATION PARTIAL.** Versioned information/applicability/coverage model exists. | Supplied/fixture sources; future dedicated providers. | No universal authoritative advisory provider is claimed. |
-| Geographic applicability | **IMPLEMENTED FOUNDATION.** Place/Area/Jurisdiction and PostgreSQL/PostGIS applicability support target reasoning. | Internal + provider/source context. | Breadth depends on actual source coverage and evaluators. |
-| Insurance | **PARTIAL policy context.** Clauses/coverage terms can inform rules. | Supplied sources. | No insurer connection, claim decision or payment automation. |
-| Notifications | **DEFERRED / NOT INTEGRATED.** | None. | Add only with auditable delivery/consent state and a validated product requirement. |
-| Frontend semantic layer | **IMPLEMENTED / ACCEPTED FOUNDATION.** Authoritative read model -> semantic adapter -> normalized presentation -> shared grammar. | Internal UI layer. | The polished product path is not complete. Old timer/fixture progress must not return. |
-| Focused Sarah graph | **DESIGN REFERENCE ACCEPTED.** V5.6 visual language is the basis for the focused case. | UI/design reference. | V5.6 data is mock/reference only and must be replaced by authoritative runtime facts. |
-| Event Overview | **NOT YET ACCEPTED AS A FINAL DESIGN.** Product intent is clear; first visual prototype was rejected. | Future Slice A UI work. | Do not build backend semantics around the rejected prototype. Minimum truthful operational projection comes first. |
+| Persistence / state ownership | **IMPLEMENTED.** PostgreSQL + PostGIS with typed ownership, revisions, durable work and migrations. | PostgreSQL target composition. | M11 is operational activation/retirement, not a future database cutover. |
+| People / Trip / Journey | **IMPLEMENTED CORE.** Stable Traveller, shared Trip, per-person Journey, support/coordination. | Internal PostgreSQL domain. | No known B1 blocker. |
+| Services / reservations / allocations | **IMPLEMENTED CORE.** Independent service/reservation/allocation/entitlement ownership and provider references. | Internal + provider adapters. | Broad provider-reference auto-correlation remains deferred. |
+| Programme / participation | **IMPLEMENTED CORE.** Mutable Event -> Programme -> ProgrammeItem + Participation independent of travel. | Internal programme state. | B1 uses generalized programme recovery; broader no-Journey cases remain covered by domain tests and should stay regression-protected. |
+| Change signals / canonical mutation | **IMPLEMENTED.** Provider-shaped changes create durable ChangeSignals linked to canonical commands, invalidated subjects and cases. | Internal inputs + provider normalization. | External inbox orchestration remains deferred (RC-10). |
+| Impact / reassessment | **IMPLEMENTED.** Subject-bound manifests, targeted invalidation, deterministic PASS/FAIL/UNKNOWN and clock expiry. | Internal evaluator registry. | R0 reduced Sarah incident fan-out 67 -> 5; do not broaden manifests for batching convenience. |
+| Escalation / case lifecycle | **IMPLEMENTED.** Deterministic idempotent OPEN/ATTACH/NONE with authoritative cause/causalPath. | Internal application/domain. | Founder B1 physical UX verification still pending. |
+| Recovery planning | **IMPLEMENTED FOR INTERNAL LOOP.** Generic StrategyProposer port + deterministic programme recovery proposer; validated ScenarioChange candidates persist only after deterministic viability. | Internal deterministic proposer. | Optional Qwen/LLM proposer remains future; B2 needs a flight-recovery proposer on the same port. |
+| Counterfactual viability | **IMPLEMENTED / RC-6 CLOSED.** Overlay compares against current world: blocking subjects must heal; no regression/new critical UNKNOWN; unchanged unrelated FAIL/UNKNOWN does not veto. | Internal deterministic evaluator. | Older preview rollup still needs reconciliation if it can present stricter truth than planning. |
+| Authority / approvals | **IMPLEMENTED FOR B1.** Request-scoped principal, reviewed basis, authority decision and approval gate on normal HTTP path. | Internal authority engine. | RC-7 coverage snapshot and RC-8 budget holds remain parked/revisit for B2 money actions. |
+| Internal execution | **IMPLEMENTED.** Durable internal programme action execution through runtime services, observations, canonical updates and reassessment. | Internal programme executor. | B1 has no external provider side effect. |
+| External execution / reconciliation | **FOUNDATION EXISTS; NORMAL B2 LOOP NOT YET COMPOSED.** | Atlas/provider adapters + execution contracts. | B2 must add provider-neutral dispatcher, partial/unknown outcome reconciliation and same-engine recovery. |
+| Resolution | **IMPLEMENTED.** Case resolves only after completed/reconciled execution and fresh PASS for required case subjects. | Internal resolution gate. | Provider/API success alone never resolves. |
+| Live read models | **IMPLEMENTED / ACCEPTED FOUNDATION.** Stable identity/authority, change cursor, evaluation lifecycle, cause/causalPath. | PostgreSQL projections. | Event Overview final design remains unresolved. |
+| Flight context | **IMPLEMENTED.** Search, verify, fare rules and provider-state observation. | Atlas LIVE/RECORD/REPLAY. | B2 must compose the relevant read capabilities into the normal recovery loop. |
+| Flight transactions | **IMPLEMENTED ADAPTER/SANDBOX SEAMS; NOT YET B2-COMPOSED.** | Atlas sandbox LIVE/REPLAY where supported. | Production servicing breadth remains provider-limited; consequential calls remain authority-gated. |
+| Hotel lifecycle | **IMPLEMENTED PROVIDER SEAMS.** Search, quote/prebook, book, retrieve and cancel. | Nuitée/liteAPI LIVE/RECORD/REPLAY. | Not required for B1; only pull into B2 if the generalized recovery actually needs it. |
+| Ground routing | **PARTIAL / NON-BLOCKING.** | Google Routes LIVE-capable / replay. | Context only; no transactional ground provider. |
+| FX / cost evidence | **IMPLEMENTED FOUNDATION.** | Frankfurter + internal evidence. | Not a payment FX service. |
+| Entry/advisory/conditions | **IMPLEMENTED ARCHITECTURE + PARTIAL SOURCE COVERAGE.** | Internal/supplied sources. | Missing/stale coverage remains UNKNOWN; no legal-grade universal claim. |
+| Frontend semantic layer | **IMPLEMENTED / ACCEPTED FOUNDATION.** | Internal UI adapter/grammar. | Founder B1 must verify the complete real product loop; final Event Overview still pending design acceptance. |
+| Focused Sarah graph | **DESIGN REFERENCE ACCEPTED + BACKEND CAUSAL INPUTS IMPLEMENTED.** | UI/design + authoritative read model. | V5.6 mock facts are not runtime truth. |
+| Event Overview | **DESIGN UNRESOLVED.** | Future post-E2E product work. | Do not shape backend semantics around rejected concepts. |
 
-## Provider evidence matrix
+## Provider evidence matrix## Provider evidence matrix
 
 | Provider / service | Purpose | Implemented | LIVE proven | RECORD proven | REPLAY | Important limitation |
 |---|---|:---:|:---:|:---:|:---:|---|
@@ -81,39 +85,54 @@ Proposed state must remain visually and semantically distinct from current autho
 
 ## Current delivery gaps
 
-### Act Now — Slice A
+### Next — Founder B1 physical acceptance
 
-The engine components exist, but the browser/product lifecycle has not yet been proven as one normal run.
+Implementation evidence is green; founder acceptance is not yet claimed. Verify the normal
+product path:
 
-Slice A must establish:
+1. baseline 50 PASS / 2 FAIL / 15 UNKNOWN;
+2. disclosed provider-shaped disruption -> 49 / 3 / 15;
+3. incident-linked case with authoritative cause/causalPath;
+4. generic programme recovery proposal with at least one VIABLE candidate;
+5. workspace-operator approval;
+6. internal programme execution + observation;
+7. reassessment makes the blocking subject PASS;
+8. incident case becomes RESOLVED;
+9. unrelated baseline FAIL/UNKNOWN remains truthful.
 
-1. a reproducible real Sarah demo baseline in PostgreSQL;
-2. a normal HTTP/provider-shaped disruption with truthful service/rebooking semantics;
-3. real incident membership and evaluation against the changed input;
-4. four cleared outcomes and Sarah's failed quantitative reason;
-5. idempotent evaluation-to-RecoveryCase orchestration;
-6. automatic authoritative refetch/polling;
-7. click/reload of the real Sarah case without SQL/test-helper/manual-case intervention.
+### Next implementation — B2 external recovery / Jordan
+
+B2 must use the same lifecycle. Missing composition is primarily:
+
+- flight-recovery StrategyProposer implementation;
+- Atlas Search/Verify or REPLAY evidence where materially useful;
+- external ActionIntent -> provider-neutral dispatcher;
+- external observation/reconciliation, including OUTCOME_UNKNOWN/partial-failure truth;
+- same reassessment and resolution gates.
+
+No Jordan-specific domain/application logic.
 
 ### Investigate Now
 
-- exact five-person incident provenance in the canonical Sarah data;
-- whether Daniel/Elena-equivalent programme participants without Journeys are included correctly in preview/evaluation;
-- Sarah's real stay/hotel consequence after the rebooking;
-- Felix's real programme linkage in the PostgreSQL demo world;
-- exact provider-shaped semantics required if the UI claims `ID7159 cancelled -> moved to ID7153`;
-- bounded external legacy-SQLite inventory before M11 activation (repository audit found no meaningful legacy state, but ignored external files cannot be ruled out from Git alone).
+- preview `previewAccepted` still uses the older all-PASS participant rollup and may look
+  stricter than the B1 planning contract;
+- final demo date/config versus scheduled assessment expiry;
+- test/dev performance H1-H4 and duplicate heavy AiT setup I1-I4 as a parallel engineering
+  lane;
+- bounded external legacy-source inventory before M11 activation.
 
 ### Park for Later
 
+- RC-7 authority coverage refresh semantics;
+- RC-8 budget holds until a money-moving B2 path needs them;
+- RC-9 normal-runtime outbox publication;
+- RC-10 inbox-based provider ingress;
 - progressive per-person evaluation telemetry;
-- rich rejected-option history;
-- polished provider/tool activity panel;
-- authoritative Before/After historical view;
-- whole-event interactive Live Dependency Graph, semantic zoom and multiple simultaneous disruption focuses;
-- physical relocation/deletion of historical SQLite test/code files after M11/submission.
+- rich rejected-option history / semantic activity until after B2;
+- whole-event graph, semantic zoom, SSE/WebSockets;
+- physical deletion of historical SQLite code/files until after M11/submission.
 
-## M11 readiness
+## M11 readiness## M11 readiness
 
 Repository evidence classifies M11 readiness as **A — no meaningful legacy state identified**.
 
