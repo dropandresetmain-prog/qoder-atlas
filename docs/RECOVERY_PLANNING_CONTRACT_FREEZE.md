@@ -499,6 +499,24 @@ Rules:
 - case resolution stays in the existing deterministic resolution gate;
 - implementation must reuse current runnable-work/idempotency patterns instead of an in-memory recursive loop.
 
+### R1 local resolution of C8 (2026-09-19)
+
+- **LangGraph: REJECTED** (runtime-spiked). The Recovery Lifecycle Progression service is a bespoke
+  reconcile-from-PostgreSQL pass, `src/app/target/recoveryProgressionPass.ts`, composed once as part of
+  the `caseLifecycle` runtime service (existing periodic + `runNow` semantics). No cursor, no recursion.
+- **ESCALATE is orthogonal to case phase.** The lifecycle gains no `ESCALATED` phase. A Case-owned
+  `recovery_case_attention` record (migration `0126`) binds (case, basis assessment, closed reason) and is
+  idempotent, visible as `RecoveryCaseView.attention[]`, cleared by a superseding settled basis or by case
+  resolution, and never implies approval, resolution or a canonical change.
+- "Authority pending" holds only while a viable option of the current basis's attempt is still unplanned;
+  in-flight work is the resolution gate's WAIT; a completed plan that leaves the SAME basis failing has
+  exhausted that basis and escalates rather than replanning it.
+- An arrival-readiness deficit on programme participation also activates the TRANSPORT domain
+  (dimension-scoped reason token in the registry) — still generalized, driven by the evaluator's reason code.
+- Known boundary: the runtime approval path composes only internal capabilities; an external provider
+  selection (e.g. `SELECT_OFFER`) can be researched, evaluated and recommended but is refused at approval
+  ("refusing to fabricate provider capability"). External execution composition remains B2 follow-on work.
+
 If implementation proves the existing case lifecycle lacks a truthful state for a required human/escalation condition, report that as a contract gap before adding a new phase.
 
 ## 12. C9 — Case product projection requirements

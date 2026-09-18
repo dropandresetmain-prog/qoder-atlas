@@ -9,6 +9,13 @@ as **CLOUD-NOW** (should be closed in Cloud this lane), **DEFERRED-LANGGRAPH**
 This is a MAPPING deliverable (direction item 5). It does not itself author the
 paused concrete lifecycle runner, and it does not start LangGraph work.
 
+> **LOCAL RECONCILIATION (2026-09-19).** Every `DEFERRED-LANGGRAPH` and `ESCALATE contract gap`
+> classification below is historical: LangGraph was rejected and the composed lifecycle was built and
+> proven locally on PostgreSQL. B1-15..18 and B2-12 (composed lifecycle, ESCALATE surface) are now covered by
+> `postgres-integration/r1ComposedB1.pgtest.ts`, `r1RecoveryProgression.pgtest.ts`, `r1CaseAttention.pgtest.ts`,
+> `r1UnknownOutcome.pgtest.ts` and `r1ConnectionRecovery.pgtest.ts` (see `docs/work/ACTIVE_TASK.md`). The
+> original table is kept unedited as the Cloud-time record.
+
 Sources of truth (verbatim, by line):
 - B1 behavioural path — `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` §13 lines 537-568.
 - B1 minimum acceptance (18) — `docs/PRODUCT_PARITY_TRUTH_REBASE_2026-09-18.md` §12 lines 1013-1030.

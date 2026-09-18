@@ -46,14 +46,55 @@ evidence. The completed truth-rebase/contract-freeze planning ledger is preserve
   attempt facts -> frozen C8 decision -> one dispatch (`resolveRecoveryCase` / `planCase` /
   attention). Unsettled assessment => WAIT. Progression never dispatches or retries execution.
   Focused PG `r1RecoveryProgression.pgtest.ts` 8/8.
-- Composed B1 (L5) / unknown outcome (L6) / second generality: **NOT YET PROVEN.**
+- L5 composed B1: **COMPLETE — commit `e8036bb401f63975b9ed886b77de7047aadc83ff` pushed.**
+  `postgres-integration/r1ComposedB1.pgtest.ts` — one PostgreSQL-backed loop driven only by C4 wakes:
+  provider-shaped change -> whole-trip FAIL -> REPLAN (coordinator) -> TRANSPORT + PROGRAMME investigated
+  (an arrival-readiness deficit now activates TRANSPORT through a dimension-scoped reason token) ->
+  read-only REPLAY flight research (provider/provenance on the Case view) -> RC-6 rejects the boardable
+  flights (none restores readiness in time) and a regressing swap, accepts one programme swap ->
+  viable-only recommendation with the three distinct impact concepts -> operator approval ->
+  two internal intents -> existing internal execution -> canonical programme change -> reassessment ->
+  C4 RESOLVE. The winning strategy was not encoded; it emerged from domains + evidence + RC-6 + comparator.
+  The Case read model now also surfaces the stored `resolution_summary`.
+- L6 unknown outcome / reconciliation: **COMPLETE — commit `de2f5088fbb1e970a8b8497e54606dceb0c92156` pushed.**
+  `r1UnknownOutcome.pgtest.ts` (4/4) on the real stored-execution/provider boundary: LOST_RESPONSE ->
+  OUTCOME_UNKNOWN -> repeated C4 wakes only WAIT; dispatcher (provider mutation) call count stays 1; blind
+  redispatch refused; STILL_UNKNOWN / FOUND_FAILURE keep WAITing with no retry; FOUND_SUCCESS is the only
+  path to RESOLVE (through the gate). Also `r1RecoveryProgression.pgtest.ts`: an approved plan that completed
+  without changing the basis escalates rather than replanning the same basis.
+- Second generality: **COMPLETE (same commit).** `r1ConnectionRecovery.pgtest.ts` — no programme at all: a
+  broken connection (`connection_feasibility`) through the same coordinator/registry/evidence/RC-6/
+  comparator/C4 (TRANSPORT+TRANSFER investigated, PROGRAMME not applicable; one recorded corridor searched,
+  the corridor with an unresolvable airport skipped, not invented; one viable offer recommended, later offers
+  retained as rejected evidence).
+- Known boundary (not an R1 defect): the runtime approval path composes only internal capabilities, so an
+  external provider selection (e.g. a viable `SELECT_OFFER` transport option) is recommended but refused at
+  approval ("refusing to fabricate provider capability"); the L6 proof therefore drives the provider boundary
+  through the M8 stored-execution fixtures. Composing external approval/execution is B2 follow-on work.
 - Test-DB runner note: focused PG files run against the disposable container with
   `PGTEST_PORT=55433 PGTEST_DB=r1local` (create the DB `FROM template_postgis` first) and MUST use
   `--test-concurrency=1` when several files share one DB.
 - Pre-existing, unrelated: `m10RuntimePurgeBoot.pgtest.ts` fails at baseline (expects 404, gets 200).
 - Delegated lanes: none (shared mutable working tree; primary retains integration).
-- Next action: L5 — the full composed PostgreSQL B1 (transport research through the coordinator,
-  approval, execution, C4 wake -> RESOLVED), then L6 unknown outcome, then second generality.
+- Next action: R2.
+
+## R1 local acceptance — 2026-09-19
+
+Status: **R1 ACCEPTED — READY FOR R2**
+
+- C9 real-PG projection proof, truthful durable escalation, C4 focused proof, composed B1 through C4,
+  unknown-outcome safety and a second generality case: all proven on PostgreSQL (L3-L6 above).
+- `CURRENT_TARGET` (`npm test`): 933/933. Typecheck, full ESLint and the anti-hardcoding gate: clean.
+- Full PostgreSQL suite (fresh DB, run once): 552/556. Of the 4 failures: 2 were stale expectations of
+  mine (migration-lane allocation list for 0125/0126; jsonb allowlist for the 0125 attempts table) — fixed and
+  re-verified; 1 was `r1ConnectionRecovery.pgtest.ts` failing at file start in 0.7s with no assertion (the
+  documented PGTEST-FILE-STARTUP-RACE), passing on rerun; 1 is `m10RuntimePurgeBoot.pgtest.ts`, which fails
+  identically at baseline with these changes stashed (pre-existing, unrelated).
+- The fixed/rerun files passed together sequentially (25/25). A second full-suite run was not repeated.
+- Docs reconciled: this ledger, `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` §11 (R1 local resolution of C8) and
+  `docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md` (historical DEFERRED-LANGGRAPH rows preserved, reconciliation note added).
+- Carry-forward for R2/B2 (not R1 defects): external approval/execution composition (external `SELECT_OFFER` is
+  recommended but refused at approval); outcome-delta subject labels are generic ("Journey").
 
 ## Identity
 

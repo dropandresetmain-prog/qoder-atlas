@@ -571,6 +571,14 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // R0 (0124): bounded, immutable, typed-by-caller change-signal summary —
       // size-checked (<=65536 bytes) and object-shaped, never a state dumping ground.
       'change_signals.summary',
+      // R1 (0125): the single immutable, bounded decision-evidence record per planning basis —
+      // every column is object/array-shaped and size-checked in the migration (pg_column_size CHECKs).
+      'recovery_planning_attempts.basis_manifest',
+      'recovery_planning_attempts.domains',
+      'recovery_planning_attempts.evidence',
+      'recovery_planning_attempts.material_candidates',
+      'recovery_planning_attempts.viable_strategy_refs',
+      'recovery_planning_attempts.recommendation',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

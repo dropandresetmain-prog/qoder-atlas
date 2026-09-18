@@ -133,8 +133,8 @@ describe('M2-M5 integration: migration chain from an empty database', () => {
       assert.deepEqual(inLane('M8'), contiguous(109, 114), 'M8 used 0109-0114; 0115-0119 reserved');
       assert.deepEqual(
         inLane('M9'),
-        [120, 121, 122, 123, 124],
-        'M9 additive extensions: 0120 re-plan identity; 0121/0122/0123 FIG-3 evaluation-lifecycle revision (lane/wit-live-readmodel-contract) — 0123 extends the same EVALUATION_LIFECYCLE scope family to the remaining case-content tables; 0124 R0 change signals + consequence provenance (runtime composition closure)',
+        [120, 121, 122, 123, 124, 125, 126],
+        'M9 additive extensions: 0120 re-plan identity; 0121/0122/0123 FIG-3 evaluation-lifecycle revision (lane/wit-live-readmodel-contract) — 0123 extends the same EVALUATION_LIFECYCLE scope family to the remaining case-content tables; 0124 R0 change signals + consequence provenance (runtime composition closure); 0125 R1 recovery planning attempts; 0126 R1 recovery case attention',
       );
       assert.ok(versions.every((v) => LANE_RANGES.some((r) => v >= r.from && v <= r.to)), 'no migration outside an allocated range');
 
