@@ -76,6 +76,7 @@
       "test/r1-comparator.test.ts",
       "test/r1-coordinator-generality.test.ts",
       "test/r1-decision-evidence.test.ts",
+      "test/r1-evidence-seam.test.ts",
       "test/r1-planning-contracts.test.ts",
       "test/r1-planning-foundations.test.ts",
       "test/r1-planning-selection.test.ts",

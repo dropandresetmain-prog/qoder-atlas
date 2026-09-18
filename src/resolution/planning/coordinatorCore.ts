@@ -51,6 +51,11 @@ import {
   type StrategyProposer,
 } from './proposer.ts';
 import {
+  bindDomainProposer,
+  type DomainStrategyProposer,
+  type PlanningEvidenceContext,
+} from '../../contracts/v2/planning/proposerAdaptation.ts';
+import {
   resolveRecoveryDomainDecisions,
   type RecoveryDomainContext,
   type RecoveryDomainDefinition,
@@ -60,6 +65,7 @@ import {
   DEFAULT_PLANNING_RESEARCH_BUDGET,
   type PlanningResearchBudget,
   type PlanningToolRequest,
+  type PlanningToolResult,
 } from '../../contracts/v2/planning/planningTool.ts';
 import type { ComparatorPreference, StrategyRecommendation } from '../../contracts/v2/planning/strategyRecommendation.ts';
 import type {
@@ -79,10 +85,18 @@ import {
 import { selectRecommendation, type CandidateComparisonFacts } from './comparator.ts';
 import { comparisonFactsFromEvidence, planningOutcomeOf } from './planningSelection.ts';
 
-/** A proposer bound to the single recovery domain it serves. */
+/**
+ * A proposer bound to the single recovery domain it serves. The binding accepts
+ * EITHER the base `StrategyProposer` (proposal over canonical state only, e.g.
+ * the deterministic programme time-swap) OR a `DomainStrategyProposer` that also
+ * consumes the domain's normalized read-only evidence (e.g. a transport proposer
+ * reasoning over `flight.search` offers). A domain proposer is adapted to the
+ * base port via `bindDomainProposer` at the propose site, binding the per-domain
+ * evidence context; a base proposer is driven unchanged.
+ */
 export interface DomainProposerBinding {
   domain: RecoveryDomainId;
-  proposer: StrategyProposer;
+  proposer: StrategyProposer | DomainStrategyProposer;
 }
 
 /** The captured planning basis the coordinator plans against. All injected data. */
@@ -140,10 +154,18 @@ export interface CoordinatorCoreOutput {
   researchBudgetExhausted: boolean;
 }
 
-/** One dispatched read, tagged with the domain it was gathered for. */
+/** One dispatched read, tagged with the domain it was gathered for. Carries BOTH
+ * the projected attempt record and the raw normalized result a domain proposer
+ * consumes; the raw payload is never persisted (only the record is). */
 interface DomainEvidence {
   domainId: RecoveryDomainId;
   record: PlanningEvidenceRecord;
+  result: PlanningToolResult;
+}
+
+/** Type guard: a binding whose proposer is domain/evidence-aware (C4). */
+function isDomainProposer(proposer: StrategyProposer | DomainStrategyProposer): proposer is DomainStrategyProposer {
+  return Array.isArray((proposer as DomainStrategyProposer).domains);
 }
 
 interface EvaluatedCandidate {
@@ -166,6 +188,22 @@ export function blockingDimensionCodes(failing: readonly FailingSubject[]): Set<
 
 function evidenceRefsForDomain(evidence: readonly DomainEvidence[], domainId: RecoveryDomainId): string[] {
   return evidence.filter((e) => e.domainId === domainId).map((e) => e.record.evidenceRef);
+}
+
+/**
+ * Build the additive C4 evidence context a `DomainStrategyProposer` consumes for
+ * one domain: the raw normalized read-only tool results (e.g. flight offers) plus
+ * the attempt evidence refs the proposer should cite. Empty when no research was
+ * gathered for the domain — a proposer then proposes from canonical state only or
+ * emits an honest evidence-gap assumption, never a fabricated payload.
+ */
+function evidenceContextForDomain(evidence: readonly DomainEvidence[], domainId: RecoveryDomainId): PlanningEvidenceContext {
+  const forDomain = evidence.filter((e) => e.domainId === domainId);
+  return {
+    domainId,
+    toolResults: forDomain.map((e) => e.result),
+    evidenceRefs: forDomain.map((e) => e.record.evidenceRef),
+  };
 }
 
 /**
@@ -200,7 +238,12 @@ export async function runRecoveryPlanning(
       const rounds = deps.research.requestsByDomain[d.domainId];
       if (!rounds || rounds.length === 0) continue;
       const outcome = await dispatchResearch({ rounds, transport: deps.research.transport, budget });
-      for (const record of outcome.evidence) evidence.push({ domainId: d.domainId, record });
+      // evidence[i] is the projected record for results[i] (dispatcher contract),
+      // so zip them: each DomainEvidence keeps both the record (persisted) and the
+      // raw normalized result (handed to a domain proposer, never persisted).
+      outcome.evidence.forEach((record, i) => {
+        evidence.push({ domainId: d.domainId, record, result: outcome.results[i]! });
+      });
       if (!outcome.ok) researchBudgetExhausted = true;
     }
   }
@@ -211,7 +254,7 @@ export async function runRecoveryPlanning(
   let anyStale = false;
   let nextVersion = deps.minters.baseStrategyVersion;
 
-  const proposersByDomain = new Map<RecoveryDomainId, StrategyProposer[]>();
+  const proposersByDomain = new Map<RecoveryDomainId, (StrategyProposer | DomainStrategyProposer)[]>();
   for (const binding of deps.proposers) {
     const list = proposersByDomain.get(binding.domain) ?? [];
     list.push(binding.proposer);
@@ -221,7 +264,14 @@ export async function runRecoveryPlanning(
   for (const domain of investigated) {
     const domainProposers = proposersByDomain.get(domain.domainId) ?? [];
     const domainEvidenceRefs = evidenceRefsForDomain(evidence, domain.domainId);
-    for (const proposer of domainProposers) {
+    // The additive C4 context for this domain, built once and bound to every
+    // domain-aware proposer. A base StrategyProposer ignores it (the adapter
+    // passes the same base ProposerInput it always received).
+    const evidenceContext = evidenceContextForDomain(evidence, domain.domainId);
+    for (const bound of domainProposers) {
+      const proposer = isDomainProposer(bound)
+        ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences: deps.preferences ?? [] })
+        : bound;
       const raw = await proposer.propose({ workspaceId, recoveryCaseId, now, failing, world, effective });
       const { accepted, rejected } = validateProposalCandidates(raw);
       for (const r of rejected) {

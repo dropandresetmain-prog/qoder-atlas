@@ -51,8 +51,8 @@ export interface DispatchResearchInput {
 }
 
 export type DispatchResearchOutcome =
-  | { ok: true; evidence: PlanningEvidenceRecord[]; dispatched: number }
-  | { ok: false; refusal: PlanningBudgetExceeded; evidence: PlanningEvidenceRecord[] };
+  | { ok: true; evidence: PlanningEvidenceRecord[]; results: PlanningToolResult[]; dispatched: number }
+  | { ok: false; refusal: PlanningBudgetExceeded; evidence: PlanningEvidenceRecord[]; results: PlanningToolResult[] };
 
 /**
  * Dispatch deduped read requests round-by-round under the finite budget. Within
@@ -60,10 +60,17 @@ export type DispatchResearchOutcome =
  * total-request cap returns a structured refusal carrying the evidence already
  * gathered — bounded planning never loops unbounded and never silently drops
  * what it already learned.
+ *
+ * `results` carries the raw provider-normalized `PlanningToolResult` payloads
+ * (e.g. `flight.search` offers) INDEX-ALIGNED with `evidence` — `evidence[i]` is
+ * the projected attempt record for `results[i]`. A proposer consumes the raw
+ * normalized results (via the coordinator's PlanningEvidenceContext); the attempt
+ * persists only the projected records, never the raw payload.
  */
 export async function dispatchResearch(input: DispatchResearchInput): Promise<DispatchResearchOutcome> {
   const budget = input.budget ?? DEFAULT_PLANNING_RESEARCH_BUDGET;
   const evidence: PlanningEvidenceRecord[] = [];
+  const results: PlanningToolResult[] = [];
   const seen = new Set<string>();
   let dispatched = 0;
 
@@ -71,6 +78,7 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
     return {
       ok: false,
       evidence,
+      results,
       refusal: {
         kind: 'PLANNING_BUDGET_EXCEEDED',
         budget: { maxRounds: budget.maxRounds, maxRequests: budget.maxRequests },
@@ -90,6 +98,7 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
         return {
           ok: false,
           evidence,
+          results,
           refusal: {
             kind: 'PLANNING_BUDGET_EXCEEDED',
             budget: { maxRounds: budget.maxRounds, maxRequests: budget.maxRequests },
@@ -101,11 +110,13 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
       seen.add(planningToolRequestFingerprint(request));
       const result = await input.transport(request);
       dispatched += 1;
+      // Pushed together so evidence[i] is the record for results[i].
       evidence.push(toEvidenceRecord(request, result));
+      results.push(result);
     }
   }
 
-  return { ok: true, evidence, dispatched };
+  return { ok: true, evidence, results, dispatched };
 }
 
 /**
