@@ -72,8 +72,12 @@ All under `src/contracts/v2/planning/`, exported via `src/contracts/v2/index.ts`
 - [x] C8 `recoveryProgression.ts` — single post-reassessment progression decision
       (RuntimeOrchestrator stays retired).
 - [x] barrel `index.ts`.
-- [ ] C9 Case projection — owned by lane X (static review) in Phase C.
-- [ ] C10 B1/B2 acceptance — owned by lane V (tests) + final report in Phase C.
+- [x] C9 Case projection — decision-time planning evidence surfaced on the
+      PostgreSQL Case read model (human labels primary, typed refs/codes
+      secondary; `phase:'DECISION_TIME'`+`asOf` visibly separate it from current
+      authoritative state). Part 9, `a9024c4`.
+- [x] C10 B1/B2 acceptance — coverage map + PRIMARY gap reconciliation
+      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`). Part 10, `ac668e6`.
 
 ## Ownership map (PRIMARY retains)
 
@@ -255,6 +259,45 @@ reconciles and integrates.
       network/credentials/PG.
       Commit `feat(r1): concrete provider-assisted TRANSPORT proposer over REPLAY evidence`.
       - SHA: `adc805367de10c8a9f05712b75bd251b0247b455` (local == origin)
+- [x] Lane P (part 9) — C9 Case projection (decision-time planning evidence)
+      (`contracts/v2/product/readModels.ts` additive `PlanningEvidenceViewSchema`
+      block + optional field on `RecoveryCaseViewSchema`;
+      `app/target/readmodels/projectPlanningEvidence.ts` PURE projector;
+      additive `planningAttempt` fact in `types.ts`; conditional spread in
+      `projectRecoveryCase.ts`; barrel export; authored
+      `findLatestRecoveryPlanningAttemptForCase` loader in
+      `r1PlanningAttemptCommands.ts` + wired into `loadRecoveryCaseFactsInner`).
+      Surfaces freeze §12 Q4-Q12 (domains investigated, read-only tools +
+      provenance/uncertainty, material candidates + rejection reasons, the three
+      distinct impact projections kept SEPARATE, viable refs, recommendation +
+      human basis). Human labels PRIMARY, typed refs/closed-vocab codes
+      SECONDARY (line 529: no uuid is ever the primary explanation);
+      `phase:'DECISION_TIME'`+`asOf` make planning-time evidence visibly
+      distinct from current authoritative state. Closed vocabularies labelled
+      via exhaustive `Record<Enum,string>` maps (a new member fails typecheck
+      rather than mislabeling); open codes humanized generically. A case that
+      never planned carries NO evidence (never fabricated). The projector +
+      schema + loader are Cloud-authored/typechecked/linted/tested; the LOADER
+      RUNTIME (real PG read of `recovery_planning_attempts`) is a LOCAL
+      acceptance item. `test/r1-case-projection.test.ts` 5/5 pure Cloud (labels
+      primary; three impact semantics separate; no bare-uuid explanation;
+      no-recommendation case; end-to-end spread via `projectRecoveryCase`).
+      Commit `feat(r1): C9 Case projection — decision-time planning evidence in the read model`.
+      - SHA: `a9024c4621813ac4c5ecaeafd320db7bdb09f0c2` (local == origin)
+- [x] Lane V (part 10) — C10 B1/B2 acceptance ↔ test coverage map
+      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`): every B1 (rebase §12, 18
+      criteria + freeze §13 structural) and B2 (rebase §13, 12 items + freeze
+      §14 structural) criterion mapped to REAL passing test titles, or the gap
+      classified CLOUD-NOW / DEFERRED-LANGGRAPH / LOCAL-RUNTIME. PRIMARY
+      reconciliation of the recon finding ("no test composes the lifecycle
+      through the coordinator"): the individual deterministic units ARE
+      Cloud-tested; the COMPOSITION is the concrete C4 outer runner that
+      direction item 1 PAUSES pending the LangGraph spike, so it is
+      DEFERRED-LANGGRAPH (+ LOCAL-RUNTIME for the canonical-PG stages + the open
+      ESCALATE-surface contract gap), NOT a plain Cloud gap and NOT silently
+      downgraded. No criterion left unclassified. Commit
+      `docs(r1): C10 B1/B2 acceptance ↔ test coverage map + PRIMARY gap reconciliation`.
+      - SHA: `ac668e614153ed1b87ceabb15f84a658225c4b19` (local == origin)
 
 ### Contract-milestone status (Phase C)
 
@@ -299,21 +342,48 @@ reconciles and integrates.
       orchestration decision continues below.
 - [x] C5 — integration + generality proof: THREE materially different situations
       through ONE `runRecoveryPlanning` (part 4, `9740c18`), no scenario branch.
+- [x] C9 — Case projection (part 9, `a9024c4`): decision-time planning evidence
+      (freeze §12 Q4-Q12) surfaced on the PostgreSQL Case read model. Additive
+      `PlanningEvidenceViewSchema` + optional field on `RecoveryCaseViewSchema`;
+      PURE `projectPlanningEvidence` projector; additive `planningAttempt` fact +
+      conditional spread through `projectRecoveryCase`; authored
+      `findLatestRecoveryPlanningAttemptForCase` loader wired into
+      `loadRecoveryCaseFactsInner`. Human labels PRIMARY, typed refs/codes
+      SECONDARY (line 529); `phase:'DECISION_TIME'`+`asOf` keep planning-time
+      evidence visibly distinct from current authoritative state; the three
+      impact semantics stay SEPARATE; a case that never planned carries none.
+      Cloud-authored/typechecked/linted + 5 pure tests; LOADER RUNTIME (real PG
+      read) = LOCAL acceptance item (handoff ledger).
+- [x] C10 — B1/B2 acceptance ↔ test coverage map (part 10, `ac668e6`,
+      `docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`): every B1 (rebase §12, 18 +
+      freeze §13 structural) and B2 (rebase §13, 12 + freeze §14 structural)
+      criterion mapped to REAL passing test titles or classified
+      CLOUD-NOW / DEFERRED-LANGGRAPH / LOCAL-RUNTIME. PRIMARY reconciliation: the
+      composed-lifecycle gap is the concrete C4 outer runner (DEFERRED-LANGGRAPH)
+      + canonical-PG stages (LOCAL-RUNTIME) + the ESCALATE-surface contract gap —
+      NOT a plain Cloud gap and NOT silently downgraded. No criterion unclassified.
 
-## Verification — DONE in Cloud (cumulative through `adc8053`)
+## Verification — DONE in Cloud (cumulative through `a9024c4` / `ac668e6`)
 
 - [x] R1 pure test files green under Node v24 type-stripping:
       `r1-planning-contracts`, `r1-decision-evidence`, `r1-comparator` (11),
       `r1-planning-foundations` (13), `r1-planning-selection` (4),
       `r1-coordinator-generality` (3), `r1-progression-facts` (9),
-      `r1-evidence-seam` (4), `r1-transport-proposer` (4).
-- [x] Full `current` suite via `run-suite.mjs current`: 924/924 pass, 0 fail.
-- [x] `npm run gate:test-boundary`: CLEAN — 209 test files classified.
-- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 417 files scanned.
+      `r1-evidence-seam` (4), `r1-transport-proposer` (4),
+      `r1-case-projection` (5).
+- [x] Full `current` suite via `run-suite.mjs current`: 929/929 pass, 0 fail.
+- [x] `npm run gate:test-boundary`: CLEAN — 210 test files classified.
+- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 418 files scanned.
 - [x] `npm run typecheck`: exit 0 (includes the PG-requiring C1 adapter, the C8
-      mapper's resolution->app type import, and the three new transport modules +
-      the transport test with NO `as never`/type-suppression casts).
+      mapper's resolution->app type import, the three transport modules, the C9
+      projector + the authored C9 loader, and the C9/transport tests with NO
+      `as never`/type-suppression casts).
 - [x] `eslint` on every new/changed path: clean.
+- [x] C9 projector + schema proven end-to-end in pure Cloud (no PG): a frozen
+      `RecoveryPlanningAttempt` -> `projectPlanningEvidence` -> human-label-
+      primary decision-time view, and the conditional spread through
+      `projectRecoveryCase` (planning evidence present only when an attempt
+      exists; current authoritative state untouched and kept separate).
 - [x] TRANSPORT SPINE proven end-to-end in pure Cloud (read-only smoke, no file
       written): corridor derivation (departureDate 2026-09-05 at Asia/Manila,
       MNL->CEB) -> `flight.search` PlanningToolRequest -> `createPlanningToolTransport`
@@ -403,6 +473,39 @@ integration acceptance. It is NOT claimed as passed here:
          `flightSearchRequestFor`, and supply `resolveOffersForDomain` from
          `resolveTransportOffers`. The pure seam is already typed + tested; this is
          composition-root wiring requiring PG + provider capabilities.
+- [ ] **C9 Case-projection LOADER RUNTIME (PG).** The `PlanningEvidenceView`
+      schema, the PURE `projectPlanningEvidence` projector, the additive
+      `planningAttempt` fact + conditional spread through `projectRecoveryCase`,
+      and the authored `findLatestRecoveryPlanningAttemptForCase` query are all
+      Cloud-authored/typechecked/linted + pure-tested at `a9024c4`. What Cloud
+      CANNOT run is the real PostgreSQL read that feeds them. LOCAL: against a
+      migrated PG (0125), persist a coordinator attempt via
+      `persistRecoveryPlanningAttempt`, then load a Case view and assert
+      `planningEvidence` is populated from the LATEST completed attempt
+      (`completed_at DESC`), is decision-time-distinct from current authoritative
+      state, and is absent for a case that never planned. Verify the
+      `(workspace_id, recovery_case_id, completed_at DESC)` index serves the
+      query. (Add to `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts`
+      or a sibling pg test.)
+- [ ] **Composed lifecycle (B1-15..18 / B2 full-lifecycle) — DEFERRED-LANGGRAPH +
+      LOCAL-RUNTIME.** No single test composes
+      coordinator -> authority -> external dispatch -> observation ->
+      reconciliation -> reassessment -> resolution. Per the C10 map
+      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md` §3) the deterministic UNITS are
+      Cloud-tested (m8 authority/gate, wave3r-dr2 REPLAY dispatch/reconcile/
+      observe, m9-jordan RECORD partial failure, r1-progression-facts pure C8,
+      r1-coordinator-generality planning); the COMPOSITION is the concrete C4
+      outer runner that direction item 1 PAUSES pending the LangGraph spike, and
+      its canonical-state stages also need PG. NOT a plain Cloud gap, NOT
+      downgraded, NOT built on this branch. LOCAL/LangGraph: once the outer-runner
+      decision lands, compose the lifecycle and assert the full B1/B2 path
+      end-to-end (REPLAY/RECORD suffices for the behavioural proof; canonical
+      writes need PG).
+- [ ] **ESCALATE case surface — CONTRACT GAP (reiterated for B2-12).** The
+      composed lifecycle's "explicit escalation" branch cannot ACT until local
+      integration decides the truthful escalated/needs-human surface (new phase
+      vs. reuse of an existing escalation owner); see the dedicated ESCALATE
+      SURFACE item above. Reported per freeze §11/§14, not fabricated.
 
 ## Next action
 
@@ -410,20 +513,24 @@ integration acceptance. It is NOT claimed as passed here:
 2. [HOLD] C4 concrete lifecycle runner — PAUSED PENDING LANGGRAPH SPIKE (see
    Contract-milestone status). Pure mapper kept; concrete runner NOT built here.
    Do NOT start LangGraph work on this branch.
-3. TRANSPORT PROPOSER (OPEN R1 GAP, in-scope, NOT optional): implement the
-   concrete generalized provider-assisted TRANSPORT proposer as far as Cloud
-   truthfully permits (read-tool protocol + Atlas Search/Verify normalization +
-   REPLAY evidence + adapted fallbackPlanner/northstarPlanner algorithms).
-4. C9 Case projection contract/read-model integration needed for R2 (lane X).
-5. C10 B1/B2 acceptance/test mapping.
-6. Remaining Cloud-capable verification; anti-hardcoding audit before handoff;
-   finalize the LOCAL handoff ledger (must explicitly list: concrete lifecycle
-   runner deferred to the LangGraph decision; PostgreSQL/runtime checks for local
-   acceptance; any transport-provider proof requiring a local environment).
+3. [DONE] TRANSPORT PROPOSER (OPEN R1 GAP, in-scope, NOT optional) — concrete
+   generalized provider-assisted proposer implemented as far as Cloud truthfully
+   permits (`adc8053`); three LOCAL integration closures remain (above).
+4. [DONE] C9 Case projection contract/read-model integration for R2 (`a9024c4`);
+   LOADER RUNTIME is a LOCAL acceptance item (above).
+5. [DONE] C10 B1/B2 acceptance/test mapping (`ac668e6`,
+   `docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`); composed-lifecycle gap classified
+   DEFERRED-LANGGRAPH + LOCAL-RUNTIME, not downgraded.
+6. [DONE] Remaining Cloud-capable verification (929/929; typecheck/lint/boundary
+   210/anti-hardcoding 418 clean); anti-hardcoding audit of new C9 production
+   files (no demo token / uuid / route literal); LOCAL handoff ledger finalized
+   (lists: concrete lifecycle runner deferred to the LangGraph decision;
+   PostgreSQL/runtime checks; three transport-provider closures; C9 loader
+   runtime; composed lifecycle; ESCALATE surface contract gap).
 7. Produce the final report ending EXACTLY with
    `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`
    (permitted only if all Cloud-capable R1 work other than the deliberately
-   paused concrete lifecycle runner is complete).
+   paused concrete lifecycle runner is complete). CONDITION MET.
 
 ## Prohibitions (restated)
 
