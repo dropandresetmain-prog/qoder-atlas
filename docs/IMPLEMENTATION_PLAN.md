@@ -1,6 +1,7 @@
 # Northstar implementation plan
 
-Status: **CURRENT DELIVERY PLAN — M0-M10/C5 COMPLETE; R0/T3/T4/B1 IMPLEMENTED**.
+Status: **CURRENT DELIVERY PLAN — M0-M10/C5 COMPLETE; R0/T3/T4/B1 IMPLEMENTED;
+FOUNDER B1 NOT ACCEPTED — current milestone is B1 Product Acceptance Repair (§22.5a)**.
 
 Current implementation candidate:
 `feature/sarah-provider-disruption` @
@@ -1021,16 +1022,29 @@ Key checkpoint commits:
 - `cd620f7` — T3 + initial B1 composition;
 - `82ae9b8` — RC-6 counterfactual-viability closure and real AiT/Sarah B1 proof.
 
+**Founder B1 was physically tested on 2026-09-18 and is NOT ACCEPTED** (see
+`docs/work/FOUNDER_B1_PHYSICAL_FINDINGS.md`). The engine completed the Sarah recovery in
+the background — Sarah READY, incident case RESOLVED, Overview back to 50 / 2 / 15 — but
+the founder could not open, read or operate the focused recovery surface. Engine
+implementation status is unchanged; **product acceptance is not granted**.
+
+Current milestone: **B1 Product Acceptance Repair** (§22.5a).
+Current blocker: **focused recovery product UI / product navigation**.
+**B2 is BLOCKED** until a Founder B1 physical retest passes.
+
 Current forward sequence:
 
-1. **Founder B1 physical acceptance** — manually drive the real Sarah product loop.
-2. **B2 generalized external recovery / Jordan** — add only the external capabilities
-   needed for the same engine to recover a materially different journey.
-3. **B2 Founder + generalisation verification** — physical product test plus one focused
+1. **B1 Product Acceptance Repair** — minimum product-boundary repair so the accepted
+   engine is operable by a human (§22.5a).
+2. **Founder B1 physical retest** — manually drive the real Sarah product loop again.
+3. **B2 generalized external recovery / Jordan** — add only the external capabilities
+   needed for the same engine to recover a materially different journey. Do not start
+   before the retest is accepted.
+4. **B2 Founder + generalisation verification** — physical product test plus one focused
    same-engine/anti-hardcoding review.
-4. **Post-E2E product work** — semantic activity/observability, accepted Event Overview
+5. **Post-E2E product work** — semantic activity/observability, accepted Event Overview
    implementation, provider/LIVE-REPLAY hardening and final demo polish.
-5. **M11 / C6 candidate** — operational activation/retirement, exact-candidate rehearsal,
+6. **M11 / C6 candidate** — operational activation/retirement, exact-candidate rehearsal,
    broad gates and submission evidence.
 
 The old standalone **Founder Test A** gate was not run before B1. Its product checks are
@@ -1090,7 +1104,7 @@ derive blast radius/causality in the browser.
 
 The final Event Overview design remains unresolved and is **not** a prerequisite for B2.
 
-### 22.4 B1 — generalized internal recovery loop — COMPLETE IN IMPLEMENTATION
+### 22.4 B1 — generalized internal recovery loop — ENGINE COMPLETE
 
 The normal application/runtime path now composes:
 
@@ -1156,9 +1170,18 @@ No Sarah-specific logic or fixture patch was added.
 - clean PostgreSQL gate: **522/522**, about **21.4 min**;
 - typecheck/build/lint/boundary/anti-hardcoding checks were clean at B1 closure.
 
-### 22.5 Founder B1 physical acceptance — NEXT
+### 22.5 Founder B1 physical acceptance — NOT ACCEPTED (2026-09-18)
 
-The next product action is a physical test, not more architecture work.
+The physical test ran on 2026-09-18 against `feature/sarah-provider-disruption` @
+`1f9039c` and **failed on the product boundary**. The founder reached baseline
+50 / 2 / 15, applied the disclosed airline update, settled at 49 / 3 / 15, opened Sarah's
+case only by pasting an API HTML URL, saw the authoritative cause, clicked **Propose
+recovery options** — and stopped, because the focused recovery experience was not
+operable. The backend later completed correctly (Sarah READY, case RESOLVED, Overview
+50 / 2 / 15, Farah + Mei still truthfully disrupted). **That is implementation behavior,
+not founder acceptance.**
+
+The flow below is retained as the physical **retest** checklist.
 
 Founder flow:
 
@@ -1178,10 +1201,35 @@ Founder flow:
 Unrelated baseline FAIL/UNKNOWN remains truthful and may keep its own case. No external
 provider dispatch occurs in B1.
 
+The retest additionally requires the product path itself to work: Sarah's case opens by
+clicking her row on Overview, the case renders inside the product shell, and each proposed
+option states in plain language what programme change it makes and who it fixes.
+
 If this passes, preserve B1 as the internal-recovery product floor and proceed to B2.
 If it fails, fix the first broken normal product boundary before expanding scope.
 
-### 22.6 B2 — generalized external recovery / Jordan — PLANNED
+### 22.5a B1 Product Acceptance Repair — CURRENT MILESTONE
+
+Scope is the **minimum generalized fix for the broken product boundary**, not a product
+redesign. Act Now items, each traced to a Founder finding:
+
+| Finding | Root cause | Repair boundary |
+|---|---|---|
+| FB1-3 raw case HTML | `GET /api/v2/cases/:id?format=html` rendered `renderProductRecoveryCase(view)` without `renderInShell(...)`, unlike every other HTML surface | Render the focused case in the same product chrome as Overview. |
+| FB1-4 `/operator` 404 | The normal PostgreSQL target server mapped clean shell routes for `/`, `/programme`, `/decisions`, `/activity` only | Add `/operator` (Overview alias) and `/operator/cases/:id` to the normal target server. Do **not** port or reactivate the retired SQLite composition. |
+| FB1-2 Overview rows not navigable | The overview adapter rendered queue rows as non-clickable elements although the v2 read model already carries an authoritative `caseRef` | Link case-backed rows to `/operator/cases/:caseRef` from that existing `caseRef`. Never derive case identity or ownership in the browser, and never fabricate a link for a row with no case. |
+| FB1-5 `Traveller UNKNOWN` spam | `RecoveryStrategy` persists candidate summaries as `subjectRef` / `assessmentId` / `overallVerdict`, but the focused-case fact assembler read them as `personLabel` / `verdict` and fell back to `Traveller` / `UNKNOWN` | Read the persisted `overallVerdict`, and resolve human identity from authoritative canonical state. Do **not** persist display names into `RecoveryStrategy` — strategies stay domain/evaluation records. |
+| FB1-6 opaque v1/v2 options | The strategy row showed a truncated UUID and a version as the primary explanation | Explain each option from the authoritative `strategy_changes` / ScenarioChange effects: which programme items move, current vs proposed timing, who it fixes, deterministic viability. Refs/versions become secondary metadata. No LLM. |
+
+Investigate Now: whether two VIABLE strategies are legitimate alternative programme swaps,
+repeated proposal versions, or exact semantic duplicates. If they are duplicates, fix
+deduplication at the correct generalized boundary — never with scenario-specific rules.
+
+Explicitly out of scope: B2/Jordan, external recovery, Atlas transactional execution, LLM
+recovery prose, Event Overview redesign, semantic activity, graph/semantic zoom, SSE,
+broad telemetry, generic reset semantics, I1-I4 test optimisation, SQLite cleanup.
+
+### 22.6 B2 — generalized external recovery / Jordan — BLOCKED until Founder B1 retest passes
 
 B2 is **not “build Jordan logic.”** Jordan is the materially different proof that the
 same generalized lifecycle works when recovery depends on an external provider.
@@ -1231,9 +1279,11 @@ Still deferred unless evidence changes:
 
 A read-only performance audit on the B1 code line found that developer/test latency mixes
 required acceptance cost with avoidable harness cost. This is **not a product milestone**
-and must not delay Founder B1 unless the workflow itself blocks delivery.
+and must not delay Founder B1 unless the workflow itself blocks delivery. H1-H4 are now
+**DONE** and reconciled onto the active branch; they do not change Founder B1 status, which
+remains **NOT ACCEPTED** pending the product repair in §22.5a.
 
-Measured current state:
+Measured state **before** H1-H4:
 
 - `npm test`: boundary gate ~7.1s + CURRENT 72 files / 802 tests ~30.4s;
 - clean `npm run test:postgres`: 56 files / 522 tests ~21.4 min;
@@ -1241,6 +1291,16 @@ Measured current state:
   accumulates PENDING outbox rows; one dirty run spent ~22.4 min draining them row-by-row;
 - fresh AiT dev workspace boot pays real materialization (~47s) + 67-journey baseline
   (~11s); same database + same already-provisioned workspace boots in seconds.
+
+Measured state **after** H1-H4, re-verified on `feature/sarah-provider-disruption` after
+the cherry-pick reconciliation (H1 `8e01c59`, H2 `ded3189`, H3/H4 `951adef`):
+
+- `npm test`: **811/811**, 19 suites, ~13.8s as measured by the lane (~15.9s wall on the
+  integration machine, boundary gate included);
+- focused `postgres-integration/inboxOutbox.pgtest.ts`: **7/7**;
+- `npm run typecheck`: clean;
+- `npm run test:postgres` was **not** rerun for this lane. The clean 522/522 / ~21.4 min
+  gate remains historical **B1 checkpoint** evidence and is not restated as current.
 
 Triage after H1-H4:
 

@@ -15,14 +15,24 @@ This is the technical truth sheet for the **currently implemented NORTHSTAR runt
   `feature/sarah-provider-disruption` @
   `82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
 - The first complete generalized **internal** recovery loop is proven on the real AiT/Sarah
-  world through normal application/runtime paths.
-- Next product gate: **Founder B1 physical acceptance**. Next implementation milestone after
-  acceptance: **B2 generalized external recovery / Jordan**.
+  world through normal application/runtime paths. **The engine is complete; the product
+  surface over it is not.**
+- **Founder B1 was physically tested on 2026-09-18 and is NOT ACCEPTED.** The engine
+  completed the Sarah recovery in the background (Sarah READY, case RESOLVED, Overview back
+  to 50 / 2 / 15, Farah + Mei still truthfully disrupted), but the founder could not open,
+  read or operate the focused recovery surface. See
+  [`work/FOUNDER_B1_PHYSICAL_FINDINGS.md`](work/FOUNDER_B1_PHYSICAL_FINDINGS.md).
+- Current milestone: **B1 Product Acceptance Repair**.
+  Current blocker: **focused recovery product UI / product navigation**.
+- **B2 generalized external recovery / Jordan is BLOCKED** until a Founder B1 physical
+  retest passes.
 
 Latest evidence on this code line:
 
-- CURRENT suite: **802/802** in ~30.4s, plus ~7.1s boundary gate;
-- clean `npm run test:postgres`: **522/522** in ~21.4 min;
+- CURRENT suite: **811/811**, `npm test` ~13.8s as measured by the H1-H4 lane (~15.9s wall
+  re-verified on the integration machine, boundary gate included);
+- clean `npm run test:postgres`: **522/522** in ~21.4 min — historical **B1 checkpoint**
+  evidence; **not** rerun for the H1-H4 lane or the product repair;
 - `b1SarahWorldRecovery.pgtest.ts`: PASS, ~117-155s across recorded runs;
 - `b1RecoveryLoop.pgtest.ts`: PASS;
 - typecheck, build, lint, boundary and anti-hardcoding checks clean at B1 closure;
@@ -38,7 +48,7 @@ Latest evidence on this code line:
 | Programme / participation | **IMPLEMENTED CORE.** Mutable Event -> Programme -> ProgrammeItem + Participation independent of travel. | Internal programme state. | B1 uses generalized programme recovery; broader no-Journey cases remain covered by domain tests and should stay regression-protected. |
 | Change signals / canonical mutation | **IMPLEMENTED.** Provider-shaped changes create durable ChangeSignals linked to canonical commands, invalidated subjects and cases. | Internal inputs + provider normalization. | External inbox orchestration remains deferred (RC-10). |
 | Impact / reassessment | **IMPLEMENTED.** Subject-bound manifests, targeted invalidation, deterministic PASS/FAIL/UNKNOWN and clock expiry. | Internal evaluator registry. | R0 reduced Sarah incident fan-out 67 -> 5; do not broaden manifests for batching convenience. |
-| Escalation / case lifecycle | **IMPLEMENTED.** Deterministic idempotent OPEN/ATTACH/NONE with authoritative cause/causalPath. | Internal application/domain. | Founder B1 physical UX verification still pending. |
+| Escalation / case lifecycle | **IMPLEMENTED.** Deterministic idempotent OPEN/ATTACH/NONE with authoritative cause/causalPath. | Internal application/domain. | Backend correct; Founder B1 failed on the product surface over it. |
 | Recovery planning | **IMPLEMENTED FOR INTERNAL LOOP.** Generic StrategyProposer port + deterministic programme recovery proposer; validated ScenarioChange candidates persist only after deterministic viability. | Internal deterministic proposer. | Optional Qwen/LLM proposer remains future; B2 needs a flight-recovery proposer on the same port. |
 | Counterfactual viability | **IMPLEMENTED / RC-6 CLOSED.** Overlay compares against current world: blocking subjects must heal; no regression/new critical UNKNOWN; unchanged unrelated FAIL/UNKNOWN does not veto. | Internal deterministic evaluator. | Older preview rollup still needs reconciliation if it can present stricter truth than planning. |
 | Authority / approvals | **IMPLEMENTED FOR B1.** Request-scoped principal, reviewed basis, authority decision and approval gate on normal HTTP path. | Internal authority engine. | RC-7 coverage snapshot and RC-8 budget holds remain parked/revisit for B2 money actions. |
@@ -52,7 +62,7 @@ Latest evidence on this code line:
 | Ground routing | **PARTIAL / NON-BLOCKING.** | Google Routes LIVE-capable / replay. | Context only; no transactional ground provider. |
 | FX / cost evidence | **IMPLEMENTED FOUNDATION.** | Frankfurter + internal evidence. | Not a payment FX service. |
 | Entry/advisory/conditions | **IMPLEMENTED ARCHITECTURE + PARTIAL SOURCE COVERAGE.** | Internal/supplied sources. | Missing/stale coverage remains UNKNOWN; no legal-grade universal claim. |
-| Frontend semantic layer | **IMPLEMENTED / ACCEPTED FOUNDATION.** | Internal UI adapter/grammar. | Founder B1 must verify the complete real product loop; final Event Overview still pending design acceptance. |
+| Frontend semantic layer | **FOUNDATION IMPLEMENTED; FOCUSED RECOVERY SURFACE NOT FOUNDER-ACCEPTED.** | Internal UI adapter/grammar. | Founder B1 stopped here on 2026-09-18: Overview rows were not navigation, the focused case rendered outside the product shell, and options were unreadable. Current milestone repairs exactly this boundary. Final Event Overview still pending design acceptance. |
 | Focused Sarah graph | **DESIGN REFERENCE ACCEPTED + BACKEND CAUSAL INPUTS IMPLEMENTED.** | UI/design + authoritative read model. | V5.6 mock facts are not runtime truth. |
 | Event Overview | **DESIGN UNRESOLVED.** | Future post-E2E product work. | Do not shape backend semantics around rejected concepts. |
 
@@ -85,10 +95,20 @@ Proposed state must remain visually and semantically distinct from current autho
 
 ## Current delivery gaps
 
-### Next — Founder B1 physical acceptance
+### Current — B1 Product Acceptance Repair (Founder B1 NOT ACCEPTED)
 
-Implementation evidence is green; founder acceptance is not yet claimed. Verify the normal
-product path:
+Implementation evidence is green; **founder acceptance was withheld on 2026-09-18**. The
+gap is the product boundary, not the engine:
+
+| Finding | Gap |
+|---|---|
+| FB1-2 | Overview affected rows were not usable navigation into the case, although the v2 Overview read model already carries an authoritative `caseRef`. |
+| FB1-3 | The focused case rendered as bare HTML because the API HTML branch skipped `renderInShell(...)`. |
+| FB1-4 | The normal PostgreSQL runtime exposed no `/operator` product alias and no clean focused-case route. |
+| FB1-5 | Candidate summaries persist `subjectRef` / `assessmentId` / `overallVerdict`, but the focused fact assembler read `personLabel` / `verdict` and fell back to `Traveller UNKNOWN`. |
+| FB1-6 | Multiple VIABLE strategies were opaque v1/v2 entries with no explanation of how they differ. |
+
+Once repaired, verify the normal product path:
 
 1. baseline 50 PASS / 2 FAIL / 15 UNKNOWN;
 2. disclosed provider-shaped disruption -> 49 / 3 / 15;
@@ -98,11 +118,14 @@ product path:
 6. internal programme execution + observation;
 7. reassessment makes the blocking subject PASS;
 8. incident case becomes RESOLVED;
-9. unrelated baseline FAIL/UNKNOWN remains truthful.
+9. unrelated baseline FAIL/UNKNOWN remains truthful;
+10. the whole path is reachable and readable in the product shell — click Sarah from
+    Overview, read the cause, understand each option in plain language, approve.
 
-### Next implementation — B2 external recovery / Jordan
+### Blocked — B2 external recovery / Jordan
 
-B2 must use the same lifecycle. Missing composition is primarily:
+**Do not start B2 until a Founder B1 physical retest is accepted.** B2 must use the same
+lifecycle. Missing composition is primarily:
 
 - flight-recovery StrategyProposer implementation;
 - Atlas Search/Verify or REPLAY evidence where materially useful;
@@ -117,8 +140,10 @@ No Jordan-specific domain/application logic.
 - preview `previewAccepted` still uses the older all-PASS participant rollup and may look
   stricter than the B1 planning contract;
 - final demo date/config versus scheduled assessment expiry;
-- test/dev performance H1-H4 and duplicate heavy AiT setup I1-I4 as a parallel engineering
-  lane;
+- whether the two VIABLE strategies the founder saw are legitimate alternative programme
+  swaps, repeated proposal versions or exact semantic duplicates (FB1-6);
+- duplicate heavy AiT setup I1-I4 as a parallel engineering lane (H1-H4 are **DONE** and
+  reconciled onto the active branch);
 - bounded external legacy-source inventory before M11 activation.
 
 ### Park for Later
@@ -130,7 +155,9 @@ No Jordan-specific domain/application logic.
 - progressive per-person evaluation telemetry;
 - rich rejected-option history / semantic activity until after B2;
 - whole-event graph, semantic zoom, SSE/WebSockets;
-- physical deletion of historical SQLite code/files until after M11/submission.
+- physical deletion of historical SQLite code/files until after M11/submission;
+- in-product reset UX (FB1-1) — dev ergonomics, handled for now by the sticky `.env.local`
+  workspace workflow plus a fresh workspace UUID for a clean physical test.
 
 ## M11 readiness## M11 readiness
 
