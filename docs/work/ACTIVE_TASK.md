@@ -12,7 +12,7 @@ evidence. The completed truth-rebase/contract-freeze planning ledger is preserve
   `e3598642058e6329e8a7e800d052a15773686488`.
 - PostgreSQL: isolated disposable PostGIS 16 container on port `55433`; migrations through
   `0125_recovery_planning_attempts.sql` apply cleanly through the normal test harness.
-- L1 status: **IN PROGRESS — persistence seam repaired and proven.** The Cloud coordinator
+- L1 status: **COMPLETE — commit `2c46bd4535402db780815de0557a98d1e5e2595e` pushed.** The Cloud coordinator
   committed viable strategies, PlanningAttempt, and final case phase in separate Units of
   Work. It now uses one `RECOVERY_PLANNING_COMPLETED` UnitOfWork command, with fresh basis
   and pending-reassessment guards before promotion. Fault injection proves strategy,
@@ -20,21 +20,22 @@ evidence. The completed truth-rebase/contract-freeze planning ledger is preserve
 - C4 status: **ACT NOW.** LangGraph is rejected by the completed spike; implement a narrow
   reconcile-from-current-PostgreSQL progression pass under `runtimeServices`, with no cursor,
   no LangGraph package/table, and no restored RuntimeOrchestrator.
-- Transport status: **ACT NOW.** Remaining closures are place external refs in `WPlace`,
-  truthful counterfactual offer capture, and PostgreSQL coordinator wiring for research and
-  offer resolution.
+- L2 transport status: **COMPLETE — commit `acc83b45bf24b5cbb75ae6bde01da3d4dbe222dc` pushed.**
+  `PgWorldReader` retains `place_external_refs`; the coordinator optionally composes the
+  read-only transport seam; searched offers become provenance-carrying services only in an
+  isolated planning capture, never bookings or canonical PostgreSQL transport rows.
 - C9 PG status: **ACT NOW.** The Cloud projector/loader is present; verify it against a real
   persisted attempt and current-state drift.
 - Composed lifecycle: **NOT YET PROVEN.** Required for local R1 acceptance.
 - ESCALATE: **Investigate Now.** Existing RecoveryCase lifecycle lacks a truthful explicit
   attention/escalation representation; inspect and reuse an existing durable surface if one
   exists before adding anything.
-- Current evidence: `npm run typecheck` PASS; focused
-  `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts` PASS (7/7, isolated DB); scoped
-  ESLint PASS. L1 checkpoint commit/push pending clean diff review.
+- Current evidence: `npm run typecheck` PASS; `test/r1-transport-proposer.test.ts` PASS
+  (5/5); focused `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts` +
+  `r1TransportWorldCapture.pgtest.ts` PASS (8/8, isolated DB); scoped ESLint PASS.
 - Delegated lanes: none (shared mutable working tree; primary retains integration).
-- Next action: inspect the actual transport reader/provider composition and C9 PG loader, then
-  complete their focused PostgreSQL proofs before designing C4.
+- Next action: close C9's real-PG projection proof, then resolve the C4 ESCALATE surface before
+  composing the narrow reconcile-from-current-PG lifecycle pass.
 
 ## Identity
 
