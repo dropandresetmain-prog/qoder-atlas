@@ -17,6 +17,7 @@ import type { Instant } from '../../domain/v2/shared/time.ts';
 import type { WorldSnapshotManifest } from '../../contracts/v2/scope/readScope.ts';
 import type { DependencyEdge } from '../../contracts/v2/assessment/explanation.ts';
 import type { RuleExpression } from '../../domain/v2/knowledge/information.ts';
+import type { ExternalRef } from '../../contracts/capabilities.ts';
 
 export const WORLD_MODEL_VERSION = 'm6-world/1';
 
@@ -68,6 +69,15 @@ export interface WTransportService {
   published: { departure: WObservedTime | null; arrival: WObservedTime | null };
   estimated: { departure: WObservedTime | null; arrival: WObservedTime | null };
   actual: { departure: WObservedTime | null; arrival: WObservedTime | null };
+  /** Planning-only provider evidence. Never a canonical service or booking. */
+  researchedOffer?: {
+    rawOfferId: string;
+    providerId?: string;
+    provenance: { mode: 'LIVE' | 'RECORD' | 'REPLAY' | 'INTERNAL'; observedAt: Instant; sourceRefs: string[]; recordingRef?: string };
+    commercial: { amount: number; currency: string; availability: 'AVAILABLE' | 'LIMITED' | 'UNKNOWN'; fareFamily?: string; expiresAt?: Instant };
+    segments: readonly { carrierCode?: string; flightNumber?: string; origin: ExternalRef; destination: ExternalRef; departure: Instant; arrival: Instant; cabin?: string }[];
+    uncertainty: readonly { code: string; summary: string }[];
+  };
 }
 export interface WResource { id: string; revision: number; resourceType: string; locationPlaceId: string | null; capacity: number | null }
 export interface WReservation { id: string; revision: number; reservationType: string; observedStatus: string; observedStatusAt: Instant | null; responsibleOrganisationId: string | null; responsibleTravellerId: string | null }
@@ -98,7 +108,8 @@ export interface WProgrammeItem {
 }
 export interface WParticipation { id: string; programmeItemId: string; travellerId: string; obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED'; accepted: boolean; preparationWindow: { start: Instant; end: Instant } | null }
 export interface WResourceAssignment { id: string; activityKind: 'PROGRAMME_ITEM' | 'JOURNEY_ITEM'; activityId: string; resourceId: string; quantity: number; lifecycleStatus: string }
-export interface WPlace { id: string; revision: number; name: string; placeType: string; timeZone: string; hasCoordinates: boolean }
+/** Provider-facing location identifiers captured with the canonical place. */
+export interface WPlace { id: string; revision: number; name: string; placeType: string; timeZone: string; hasCoordinates: boolean; externalRefs?: readonly ExternalRef[] }
 export interface WJurisdiction { id: string; revision: number; name: string; regimeKind: string }
 /** Resolved in the snapshot by PostGIS/membership queries; the evaluator cannot recompute geometry. */
 export interface WPlaceJurisdiction { placeId: string; jurisdictionId: string; basis: 'AREA_MEMBERSHIP' | 'SPATIAL_CONTAINMENT'; areaVersionId: string; evidenceId: string | null }

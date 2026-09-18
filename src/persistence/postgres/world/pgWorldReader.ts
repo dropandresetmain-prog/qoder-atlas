@@ -396,8 +396,16 @@ export class PgWorldReader {
       ...lines.map((l) => str(l.place_id)),
     ]);
     const places = await q(
-      `SELECT id, name, place_type, time_zone, (latitude IS NOT NULL) AS has_coordinates FROM places
-        WHERE workspace_id = $1 AND id = ANY($2::uuid[]) ORDER BY id`,
+      `SELECT p.id, p.name, p.place_type, p.time_zone, (p.latitude IS NOT NULL) AS has_coordinates,
+              COALESCE(refs.external_refs, '[]'::jsonb) AS external_refs
+         FROM places p
+         LEFT JOIN LATERAL (
+           SELECT jsonb_agg(jsonb_build_object('system', r.provider_namespace, 'value', r.external_key)
+                            ORDER BY r.provider_namespace, r.external_key) AS external_refs
+             FROM place_external_refs r
+            WHERE r.workspace_id = p.workspace_id AND r.place_id = p.id
+         ) refs ON true
+        WHERE p.workspace_id = $1 AND p.id = ANY($2::uuid[]) ORDER BY p.id`,
       [placeIds],
     );
     const atDate = request.at.slice(0, 10);
@@ -689,7 +697,14 @@ export class PgWorldReader {
         id: String(a.id), activityKind: String(a.activity_kind) as 'PROGRAMME_ITEM' | 'JOURNEY_ITEM', activityId: String(a.activity_id), resourceId: String(a.resource_id),
         quantity: Number(a.quantity), lifecycleStatus: String(a.lifecycle_status),
       })),
-      places: places.map((p) => ({ id: String(p.id), revision: 0, name: String(p.name), placeType: String(p.place_type), timeZone: String(p.time_zone), hasCoordinates: Boolean(p.has_coordinates) })),
+      places: places.map((p) => ({
+        id: String(p.id), revision: 0, name: String(p.name), placeType: String(p.place_type), timeZone: String(p.time_zone), hasCoordinates: Boolean(p.has_coordinates),
+        externalRefs: Array.isArray(p.external_refs)
+          ? p.external_refs.flatMap((externalRef) => externalRef && typeof externalRef === 'object' && typeof (externalRef as Row).system === 'string' && typeof (externalRef as Row).value === 'string'
+            ? [{ system: String((externalRef as Row).system), value: String((externalRef as Row).value) }]
+            : [])
+          : [],
+      })),
       jurisdictions: [],
       placeJurisdictions: placeJurisdictions.map((pj) => ({
         placeId: String(pj.place_id), jurisdictionId: String(pj.jurisdiction_id), basis: String(pj.basis) as 'AREA_MEMBERSHIP' | 'SPATIAL_CONTAINMENT',

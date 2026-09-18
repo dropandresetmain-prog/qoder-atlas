@@ -23,6 +23,21 @@ import type { FailingSubject } from './proposer.ts';
 /** Resolves a place id to a provider airport ExternalRef, or undefined. INJECTED — this module never hardcodes an airport code or ref system. Fail-closed: undefined means "no honest airport for this place". */
 export type AirportResolver = (placeId: string) => ExternalRef | undefined;
 
+/**
+ * Standard resolver over captured Place references. Historical `airport-code`
+ * is normalized to the flight provider's IATA reference system; unknown refs
+ * fail closed rather than guessing an airport.
+ */
+export function airportResolverFromCapturedWorld(world: CapturedWorld): AirportResolver {
+  const places = indexPlaces(world);
+  return (placeId) => {
+    const found = places.get(placeId)?.externalRefs?.find((ref) =>
+      ref.value.trim().length > 0 && (ref.system.toUpperCase() === 'IATA' || ref.system.toLowerCase() === 'airport-code'),
+    );
+    return found ? { system: 'IATA', value: found.value.trim() } : undefined;
+  };
+}
+
 export interface TransportPassengers {
   adults: number;
   children?: number;
@@ -38,6 +53,8 @@ export interface TransportCorridorOpts {
 export interface TransportCorridor {
   journeyItemId: string;
   journeyId: string;
+  originPlaceId: string;
+  destinationPlaceId: string;
   origin: ExternalRef;
   destination: ExternalRef;
   /** Local YYYY-MM-DD departure date at the origin place timezone, derived from the item's intendedWindow.start. */
@@ -185,6 +202,8 @@ export function transportCorridors(
     corridors.push({
       journeyItemId: item.id,
       journeyId: item.journeyId,
+      originPlaceId: item.desiredOriginPlaceId,
+      destinationPlaceId: item.desiredDestinationPlaceId,
       origin,
       destination,
       departureDate,

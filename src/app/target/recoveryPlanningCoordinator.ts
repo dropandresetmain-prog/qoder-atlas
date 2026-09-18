@@ -44,6 +44,7 @@ import type {
 import type { RecoveryDomainId } from '../../contracts/v2/planning/recoveryDomain.ts';
 import type { StrategyProposer } from '../../resolution/planning/proposer.ts';
 import type { CapabilityFamily } from '../../operational/strategy.ts';
+import type { PlanningToolTransport } from '../../resolution/planning/researchDispatcher.ts';
 import { captureWorld, PgCurrentStateReader } from '../../persistence/postgres/world/pgCurrentState.ts';
 import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
 import { persistRecoveryPlanningCompletion } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
@@ -51,6 +52,9 @@ import { createM6Registry } from '../../resolution/evaluation/registry.ts';
 import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary.ts';
 import { unmetProgrammeItems, type FailingSubject } from '../../resolution/planning/proposer.ts';
 import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
+import { createTransportProposer } from '../../resolution/planning/proposers/transportProposer.ts';
+import { materializeTransportOffers } from '../../resolution/planning/transportOfferMaterialization.ts';
+import { airportResolverFromCapturedWorld, flightSearchRequestFor, transportCorridors, type AirportResolver, type TransportPassengers } from '../../resolution/planning/transportCorridors.ts';
 import { defaultRecoveryDomainRegistry } from '../../resolution/planning/recoveryDomains.ts';
 import {
   runRecoveryPlanning,
@@ -81,6 +85,17 @@ export interface RecoveryPlanningCoordinatorDeps {
   domainRegistry?: ReturnType<typeof defaultRecoveryDomainRegistry>;
   coordinatorVersion?: string;
   comparatorVersion?: string;
+  /**
+   * Optional provider read-only transport capability. Supplying it activates
+   * generalized TRANSPORT research; omitting it leaves the domain unavailable
+   * rather than inventing a provider or passenger count.
+   */
+  transportPlanning?: {
+    transport: PlanningToolTransport;
+    passengers: TransportPassengers;
+    resolveAirport?: AirportResolver;
+    maxOffersPerCorridor?: number;
+  };
 }
 
 /** The default domain-bound proposers shipped with the runtime (the PROGRAMME time-swap). */
@@ -206,6 +221,26 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       const baseStrategyVersion = await nextStrategyVersion(deps.pool, deps.workspaceId, input.recoveryCaseId);
       await advanceCasePhase(deps, input.recoveryCaseId, 'PLANNING', 'planning started');
 
+      const transportPlanning = deps.transportPlanning;
+      const resolveAirport = transportPlanning
+        ? transportPlanning.resolveAirport ?? airportResolverFromCapturedWorld(basis.world)
+        : undefined;
+      const proposers = [...(deps.proposers ?? defaultDomainProposers())];
+      if (transportPlanning && !proposers.some((binding) => binding.domain === 'TRANSPORT')) {
+        proposers.push({
+          domain: 'TRANSPORT',
+          proposer: createTransportProposer({
+            resolveAirport: resolveAirport!,
+            passengers: transportPlanning.passengers,
+            ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+          }),
+        });
+      }
+      const transportResearch = transportPlanning
+        ? transportCorridors(basis.world, basis.failing, { resolveAirport: resolveAirport!, passengers: transportPlanning.passengers })
+          .corridors.map((corridor) => flightSearchRequestFor(corridor, { round: 1 }))
+        : [];
+
       // 2. Delegate ALL decision logic to the pure core.
       const core = await runRecoveryPlanning(
         {
@@ -222,11 +257,27 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         },
         {
           domainRegistry: deps.domainRegistry ?? defaultRecoveryDomainRegistry(),
-          availableCapabilities: deps.availableCapabilities ?? DEFAULT_CAPABILITIES,
-          proposers: deps.proposers ?? defaultDomainProposers(),
+          availableCapabilities: deps.availableCapabilities ?? (transportPlanning
+            ? DEFAULT_CAPABILITIES
+            : DEFAULT_CAPABILITIES.filter((capability) => capability !== 'FLIGHT')),
+          proposers,
           minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
+          ...(transportPlanning ? {
+            research: { transport: transportPlanning.transport, requestsByDomain: { TRANSPORT: [transportResearch] } },
+            materializeWorldForDomain: ({ domainId, evidence, basis: domainBasis }) => domainId === 'TRANSPORT'
+              ? materializeTransportOffers({
+                  world: domainBasis.world,
+                  failing: domainBasis.failing,
+                  toolResults: evidence.toolResults,
+                  now: domainBasis.now,
+                  resolveAirport: resolveAirport!,
+                  passengers: transportPlanning.passengers,
+                  ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+                })
+              : undefined,
+          } : {}),
         },
       );
 

@@ -40,6 +40,7 @@ import type { CapabilityFamily } from '../../operational/strategy.ts';
 import type { EvaluatorRegistry } from '../evaluation/assess.ts';
 import type { CapturedWorld } from '../world/world.ts';
 import type { EffectiveWorld } from '../world/effectiveTypes.ts';
+import { projectEffectiveWorld } from '../world/effectiveItinerary.ts';
 import type { CurrentState } from '../world/currentness.ts';
 import { ScenarioChangeSchema } from '../../contracts/v2/scenario/scenarioChange.ts';
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
@@ -157,6 +158,16 @@ export interface CoordinatorCoreDeps {
     evidence: PlanningEvidenceContext;
     basis: PlanningBasis;
   }) => readonly ResolvedOffer[];
+  /**
+   * Optional planning-local evidence materialization. It may enrich only an
+   * isolated captured-world copy (for example a searched flight offer) before
+   * RC-6; it cannot mutate canonical state or create a reservation.
+   */
+  materializeWorldForDomain?: (ctx: {
+    domainId: RecoveryDomainId;
+    evidence: PlanningEvidenceContext;
+    basis: PlanningBasis;
+  }) => { world: CapturedWorld; resolvedOffers?: readonly ResolvedOffer[] } | undefined;
 }
 
 export interface CoordinatorCoreOutput {
@@ -269,6 +280,8 @@ export async function runRecoveryPlanning(
   const rejectedEvidence: MaterialCandidateEvidence[] = [];
   let anyStale = false;
   let nextVersion = deps.minters.baseStrategyVersion;
+  let planningWorld = world;
+  let planningEffective = effective;
 
   const proposersByDomain = new Map<RecoveryDomainId, (StrategyProposer | DomainStrategyProposer)[]>();
   for (const binding of deps.proposers) {
@@ -284,18 +297,29 @@ export async function runRecoveryPlanning(
     // domain-aware proposer. A base StrategyProposer ignores it (the adapter
     // passes the same base ProposerInput it always received).
     const evidenceContext = evidenceContextForDomain(evidence, domain.domainId);
+    const domainBasis: PlanningBasis = { ...basis, world: planningWorld, effective: planningEffective };
+    const materialized = deps.materializeWorldForDomain?.({
+      domainId: domain.domainId,
+      evidence: evidenceContext,
+      basis: domainBasis,
+    });
+    if (materialized) {
+      planningWorld = materialized.world;
+      planningEffective = projectEffectiveWorld(planningWorld);
+    }
+    const evaluationBasis: PlanningBasis = { ...basis, world: planningWorld, effective: planningEffective };
     // Domain-agnostic offer resolution for the overlay. Only a domain whose
     // proposer can emit a `SELECT_OFFER` effect needs it; the composition supplies
     // the resolver (e.g. transport). Empty when no resolver is wired, so domains
     // that emit no offer-selecting effect are unaffected.
-    const resolvedOffers = deps.resolveOffersForDomain
-      ? deps.resolveOffersForDomain({ domainId: domain.domainId, evidence: evidenceContext, basis })
-      : [];
+    const resolvedOffers = materialized?.resolvedOffers ?? (deps.resolveOffersForDomain
+      ? deps.resolveOffersForDomain({ domainId: domain.domainId, evidence: evidenceContext, basis: evaluationBasis })
+      : []);
     for (const bound of domainProposers) {
       const proposer = isDomainProposer(bound)
         ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences: deps.preferences ?? [] })
         : bound;
-      const raw = await proposer.propose({ workspaceId, recoveryCaseId, now, failing, world, effective });
+      const raw = await proposer.propose({ workspaceId, recoveryCaseId, now, failing, world: planningWorld, effective: planningEffective });
       const { accepted, rejected } = validateProposalCandidates(raw);
       for (const r of rejected) {
         rejectedEvidence.push(materialCandidateFromValidationRejection({
@@ -318,7 +342,7 @@ export async function runRecoveryPlanning(
         });
         const evaluatedResult = evaluateRecoveryStrategy({
           recoveryCaseId, strategyId, strategyVersion: nextVersion,
-          baseWorld: world, baseManifest: world.manifest, basisAssessmentId,
+          baseWorld: planningWorld, baseManifest: world.manifest, basisAssessmentId,
           scenarioChange, now, registry,
           ...(basis.currentState ? { currentState: basis.currentState } : {}),
           ...(resolvedOffers.length > 0 ? { resolvedOffers } : {}),

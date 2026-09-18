@@ -58,6 +58,7 @@ import {
 import type { DomainProposerInput } from '../src/contracts/v2/planning/proposerAdaptation.ts';
 import type { PlanningToolResult } from '../src/contracts/v2/planning/planningTool.ts';
 import { createPlanningToolTransport } from '../src/resolution/planning/replayPlanningTransport.ts';
+import { materializeTransportOffers } from '../src/resolution/planning/transportOfferMaterialization.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import type { FlightSearchOutcome } from '../src/contracts/capabilities.ts';
@@ -361,4 +362,43 @@ test('anti-fabrication: an uncaptured selected offer is rejected by the overlay 
     rejected.some((m) => m.validationReasonCodes.some((c) => /fabricate|not resolved|not in captured world/i.test(c))),
     'the rejection reason names the overlay anti-fabrication boundary',
   );
+});
+
+test('researched transport offers materialize only into an isolated planning world with provenance', async () => {
+  const { basis, world, itemId } = await transportBasis({ materializeOffers: false });
+  const { corridors } = transportCorridors(world, basis.failing, { resolveAirport, passengers: PASSENGERS });
+  const result = await replayTransport()(flightSearchRequestFor(corridors[0]!, { round: 1 }));
+  const materialized = materializeTransportOffers({
+    world,
+    failing: basis.failing,
+    toolResults: [result],
+    now: NOW,
+    resolveAirport,
+    passengers: PASSENGERS,
+  });
+
+  assert.equal(world.transportServices.length, 0, 'the captured canonical basis is not mutated');
+  assert.ok(materialized.capturedServices.length > 0, 'a boardable searched offer becomes a planning-local service');
+  assert.equal(materialized.world.reservations.length, 0, 'research never creates a reservation');
+  const captured = materialized.capturedServices[0]!;
+  assert.equal(captured.originPlaceId, ORIGIN_PLACE);
+  assert.equal(captured.destinationPlaceId, DEST_PLACE);
+  assert.ok(captured.researchedOffer?.rawOfferId, 'opaque provider offer reference is retained');
+  assert.equal(captured.researchedOffer?.provenance.mode, 'REPLAY');
+  assert.ok(captured.researchedOffer?.segments.length, 'provider segments are retained for later re-verification');
+  assert.ok(materialized.resolvedOffers.some((offer) => offer.transportServiceId === captured.id));
+
+  const out = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(),
+    availableCapabilities: ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'],
+    proposers: [{ domain: 'TRANSPORT', proposer: createTransportProposer({ resolveAirport, passengers: PASSENGERS }) }],
+    minters: minters(), coordinatorVersion: COORDINATOR_VERSION, comparatorVersion: COMPARATOR_VERSION,
+    research: { transport: replayTransport(), requestsByDomain: { TRANSPORT: [[flightSearchRequestFor(corridors[0]!, { round: 1 })]] } },
+    materializeWorldForDomain: ({ domainId, evidence, basis: domainBasis }) => domainId === 'TRANSPORT'
+      ? materializeTransportOffers({ world: domainBasis.world, failing: domainBasis.failing, toolResults: evidence.toolResults, now: NOW, resolveAirport, passengers: PASSENGERS })
+      : undefined,
+  });
+  assert.ok(out.viableStrategies.length > 0, 'the same materialized evidence lets RC-6 evaluate a viable selection');
+  assert.equal(out.result.outcome, 'AWAITING_AUTHORITY');
+  assert.ok(out.viableStrategies.some((strategy) => strategy.scenarioChange.effects.some((effect) => effect.effectKind === 'SELECT_OFFER' && effect.journeyItemId === itemId)));
 });
