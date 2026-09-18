@@ -66,6 +66,34 @@ export interface JourneyItemRow {
   selectedServiceId?: string | null;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Human window text for a node card: `19 Sep 11:30 → 12:00 UTC` (same day) or
+ * `19 Sep 22:00 → 20 Sep 01:00 UTC`. Accepts the driver's Date or ISO string; never
+ * emits a runtime `Date#toString` (host-timezone text).
+ */
+export function formatWindowUtc(start: unknown, end: unknown): string {
+  const parse = (v: unknown): Date | undefined => {
+    const d = v instanceof Date ? v : new Date(String(v));
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  };
+  const a = parse(start);
+  const b = parse(end);
+  if (!a || !b) return `${String(start)} → ${String(end)}`;
+  const day = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  const clock = (d: Date) => `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  const sameDay = day(a) === day(b);
+  return sameDay ? `${day(a)} ${clock(a)} → ${clock(b)} UTC` : `${day(a)} ${clock(a)} → ${day(b)} ${clock(b)} UTC`;
+}
+
+/** `19 Sep 22:00 UTC` for a single instant (Date or ISO string). */
+export function formatInstantUtc(value: unknown): string {
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+}
+
 /** Minimal transport service row shape (from transport_services table, migration 0030). */
 export interface TransportServiceRow {
   id: string;
@@ -73,6 +101,9 @@ export interface TransportServiceRow {
   operator: string;
   origin_place_id: string;
   destination_place_id: string;
+  /** Human place names (LEFT JOIN places); absent => no place text is invented. */
+  origin_place_name?: string | null;
+  destination_place_name?: string | null;
   published_departure: string | null;
   published_arrival: string | null;
 }
@@ -228,17 +259,19 @@ export function projectFocusedCaseGraphEnrichment(
         const service = serviceById.get(serviceId);
         if (service) {
           label = `${service.mode} ${service.operator}`;
-          detail = `${service.origin_place_id.slice(0, 8)} → ${service.destination_place_id.slice(0, 8)}`;
+          if (service.origin_place_name && service.destination_place_name) {
+            detail = `${service.origin_place_name} → ${service.destination_place_name}`;
+          }
         } else {
-          label = `Transport service ${serviceId.slice(0, 8)}`;
+          label = 'Transport service';
         }
       } else if (item.kind === 'STAY') {
         // TRANSFER_STAY: ref is TRANSFER_STAY:<item_id>.
         kind = 'TRANSFER_STAY';
         ref = `TRANSFER_STAY:${item.id}`;
-        label = `Stay ${item.id.slice(0, 8)}`;
+        label = 'Stay';
         if (item.intended_window_start && item.intended_window_end) {
-          detail = `${item.intended_window_start} → ${item.intended_window_end}`;
+          detail = formatWindowUtc(item.intended_window_start, item.intended_window_end);
         }
       } else if (item.kind === 'ENGAGEMENT') {
         // ENGAGEMENT items link to programme_items via engagement_item_details.participation_id.
@@ -317,7 +350,7 @@ export function projectFocusedCaseGraphEnrichment(
     const programmeItemRef = `PROGRAMME_ITEM:${programmeItem.id}`;
     const label = programmeItem.title;
     const detail = programmeItem.window_start && programmeItem.window_end
-      ? `${programmeItem.window_start} → ${programmeItem.window_end}`
+      ? formatWindowUtc(programmeItem.window_start, programmeItem.window_end)
       : undefined;
 
     // semanticState: from assessment view if available, else UNKNOWN.

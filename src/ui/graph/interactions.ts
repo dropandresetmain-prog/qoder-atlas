@@ -239,11 +239,21 @@ export const INTERACTIONS_SCRIPT = `
   window.__northstarInitGraphs = function() {
     document.querySelectorAll('.fg-canvas').forEach(initCanvas);
   };
+  // Initialise anything not yet initialised (e.g. the Original canvas, which is
+  // emitted without a script of its own), then tell the canvases under root that
+  // they are visible so a hidden-at-load canvas fits.
   window.__northstarShowGraphs = function(root) {
+    window.__northstarInitGraphs();
     (root || document).querySelectorAll('.fg-canvas').forEach(function(canvas) {
       canvas.dispatchEvent(new Event('fg:show'));
     });
   };
   window.__northstarInitGraphs();
+  // At parse time layout may not be settled: fit once the document is ready.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { window.__northstarShowGraphs(); });
+  } else {
+    window.__northstarShowGraphs();
+  }
 })();
 `;

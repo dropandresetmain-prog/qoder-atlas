@@ -30,6 +30,8 @@ import {
 } from '../cohortDisruption.ts';
 import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
 import { findLatestRecoveryPlanningAttemptForCase } from '../../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
+import { humanizeCode } from '../../../domain/v2/shared/humanize.ts';
+import { formatInstantUtc } from './projectFocusedCaseGraph.ts';
 import { listRecoveryCaseAttention } from '../../../persistence/postgres/commands/caseAttentionCommands.ts';
 import { loadOriginalCaseGraphSnapshot } from '../../../persistence/postgres/commands/caseGraphSnapshotCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
@@ -716,10 +718,14 @@ async function loadRecoveryCaseFactsInner(
   // Transport service rows referenced by TRANSPORT items.
   const serviceIds = journeyItems.rows.filter((i) => i.kind === 'TRANSPORT' && i.selected_service_id).map((i) => i.selected_service_id!);
   const transportServices = serviceIds.length > 0
-    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; published_departure: string | null; published_arrival: string | null }>(
-        `SELECT id, mode, operator, origin_place_id, destination_place_id, published_departure, published_arrival
-           FROM transport_services
-          WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
+    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; origin_place_name: string | null; destination_place_name: string | null; published_departure: string | null; published_arrival: string | null }>(
+        `SELECT ts.id, ts.mode, ts.operator, ts.origin_place_id, ts.destination_place_id,
+                po.name AS origin_place_name, pd.name AS destination_place_name,
+                ts.published_departure, ts.published_arrival
+           FROM transport_services ts
+           LEFT JOIN places po ON po.workspace_id = ts.workspace_id AND po.id = ts.origin_place_id
+           LEFT JOIN places pd ON pd.workspace_id = ts.workspace_id AND pd.id = ts.destination_place_id
+          WHERE ts.workspace_id = $1 AND ts.id = ANY($2::uuid[])`,
         [workspaceId, serviceIds],
       )
     : { rows: [] };
@@ -826,6 +832,8 @@ async function loadRecoveryCaseFactsInner(
       operator: s.operator,
       origin_place_id: s.origin_place_id,
       destination_place_id: s.destination_place_id,
+      origin_place_name: s.origin_place_name,
+      destination_place_name: s.destination_place_name,
       published_departure: s.published_departure,
       published_arrival: s.published_arrival,
     })),
@@ -931,7 +939,7 @@ async function loadRecoveryCaseFactsInner(
       // incident/programme producer uses), so the focal chain
       // change -> subject -> case is graph truth, not adjacency guesswork.
       ...(cause
-        ? [{ ref: cause.changeSignalRef, kind: 'DISRUPTION' as const, label: cause.changeType, semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const, detail: `${cause.originKind} received ${cause.receivedAt}` }]
+        ? [{ ref: cause.changeSignalRef, kind: 'DISRUPTION' as const, label: humanizeCode(cause.changeType), semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const, detail: `${humanizeCode(cause.originKind)} · received ${formatInstantUtc(cause.receivedAt)}` }]
         : []),
       ...subjects.rows.map((s) => {
         const ref = `${s.subject_kind}:${s.subject_id}`;

@@ -34,10 +34,10 @@ export interface LayoutResult {
   readonly height: number;
 }
 
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 100;
-const COLUMN_GAP = 120;
-const ROW_GAP = 40;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 140;
+const COLUMN_GAP = 110;
+const ROW_GAP = 32;
 const PADDING = 60;
 
 /**

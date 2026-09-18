@@ -70,6 +70,7 @@ export function renderNodeCard(ctx: CardContext): string {
     data-tone="${node.indicator.tone}"
     data-focus="${node.focusRole}"
     data-evaluation="${node.evaluationState}"
+    title="${esc(node.secondaryLabel ? `${node.label} — ${node.secondaryLabel}` : node.label)}"
     role="button"
     tabindex="0"
     aria-label="${esc(node.label)} — ${esc(node.indicator.label)}"

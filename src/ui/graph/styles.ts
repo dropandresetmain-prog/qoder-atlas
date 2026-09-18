@@ -48,7 +48,9 @@ export const FOCUSED_GRAPH_CSS = `
   transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, opacity 0.15s ease-out;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .fg-node:hover {
@@ -85,9 +87,7 @@ export const FOCUSED_GRAPH_CSS = `
 
 /* Focal emphasis (firstBreakpoint) */
 .fg-node.fg-focal {
-  width: 240px !important;
-  height: auto !important;
-  min-height: 120px;
+  /* Same footprint as every card (layout owns geometry); emphasis is ring + weight. */
   border: 2px solid var(--watch);
   box-shadow: 0 0 0 4px rgba(217, 162, 74, 0.12), 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 20;
@@ -110,7 +110,7 @@ export const FOCUSED_GRAPH_CSS = `
 
 /* Context de-emphasis */
 .fg-node.fg-context {
-  opacity: 0.6;
+  opacity: 0.86;
   background: var(--surface-2);
 }
 
@@ -134,6 +134,10 @@ export const FOCUSED_GRAPH_CSS = `
   font-weight: 600;
   line-height: 1.3;
   color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .fg-detail {
@@ -141,6 +145,10 @@ export const FOCUSED_GRAPH_CSS = `
   font-size: 12px;
   color: var(--text-soft);
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .fg-footer {

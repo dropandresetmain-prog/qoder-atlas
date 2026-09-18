@@ -156,8 +156,8 @@ describe('R2 Case workspace composition', () => {
     assert.match(html, /data-test="focused-graph-first-breakpoint"/);
     assert.match(html, /First break point/);
     assert.match(html, /Traveller one/);
-    assert.match(html, /arrival/);
-    assert.match(html, /too_late/);
+    assert.match(html, /Arrival: Too late/, 'human wording, not raw codes');
+    assert.doesNotMatch(html.slice(html.indexOf('focused-graph-first-breakpoint'), html.indexOf('focused-graph-first-breakpoint') + 300), /too_late/);
   });
 
   test('surfaces unmapped causal steps explicitly instead of dropping them', () => {

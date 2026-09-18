@@ -18,6 +18,7 @@ import {
   assessmentToneClass,
   ldgSemanticTone,
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
+import { humanizeCode } from '../../domain/v2/shared/humanize.ts';
 import { escapeHtml, formatInstant, formatMoney, formatShort } from '../html.ts';
 import { bulletList, uncertaintyList } from '../components.ts';
 import { renderFocusedCaseGraph } from '../graph/index.ts';
@@ -240,6 +241,7 @@ function strategyCard(strategy: RecoveryStrategyView, terminal: boolean): string
     ${changes}
     ${resolves}
     ${reach}
+    
     <p class="meta opt-ref">Strategy <span class="mono">${escapeHtml(strategy.strategyRef)}</span> · v${strategy.version}</p>
     ${approvable ? `<button type="button" class="btn" data-test="approve-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">Approve Option ${strategy.optionNumber} and execute</button>` : ''}
   </li>`;
@@ -255,6 +257,11 @@ function strategyCard(strategy: RecoveryStrategyView, terminal: boolean): string
  * AROUND the graph (banner via caseStatus PLANNING inside the renderer), never as
  * graph nodes. Current-world causal map only.
  */
+/** Human label for a typed subject ref from the read model's own labels; never the bare id. */
+function subjectDisplay(view: RecoveryCaseView, ref: string): string {
+  return view.subjectLabels[ref] ?? ref.split(':')[0]!.toLowerCase().replace(/_/g, ' ');
+}
+
 function focusedGraphSection(view: RecoveryCaseView): string {
   const graphHtml = renderFocusedCaseGraph({
     ldg: view.ldg,
@@ -267,7 +274,7 @@ function focusedGraphSection(view: RecoveryCaseView): string {
   const firstBreak = view.focusedGraph?.firstBreakpoint
     ? `<div class="callout tone-alert" data-test="focused-graph-first-breakpoint">
          <p class="callout-title">First break point</p>
-         <p><strong>${escapeHtml(view.focusedGraph.firstBreakpoint.label)}</strong> · ${escapeHtml(view.focusedGraph.firstBreakpoint.dimension)} · ${escapeHtml(view.focusedGraph.firstBreakpoint.reasonCode)}</p>
+         <p><strong>${escapeHtml(view.focusedGraph.firstBreakpoint.label)}</strong> — ${escapeHtml(humanizeCode(view.focusedGraph.firstBreakpoint.dimension))}: ${escapeHtml(humanizeCode(view.focusedGraph.firstBreakpoint.reasonCode))}</p>
        </div>`
     : '';
 
@@ -342,6 +349,11 @@ function planningEvidenceSection(evidence: PlanningEvidenceView): string {
   </section>`;
 }
 
+function caseHeading(view: RecoveryCaseView): string {
+  const traveller = Object.entries(view.subjectLabels).find(([key]) => key.startsWith('JOURNEY:'))?.[1];
+  return traveller ? `Recovery case · ${traveller}` : 'Recovery case';
+}
+
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   const actions =
     view.recoveryActions.length > 0
@@ -368,7 +380,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   // T3: cause and causal path come from the read model (change signal +
   // evaluator explanations). Rendered verbatim — no inference here.
   const cause = view.cause
-    ? `<div class="callout tone-watch" data-test="case-cause"><p class="callout-title">Cause</p><p>${escapeHtml(view.cause.changeType)} · ${escapeHtml(view.cause.originKind)} · received ${escapeHtml(formatInstant(view.cause.receivedAt))}${view.cause.applied ? '' : ' · application in progress'}</p></div>`
+    ? `<div class="callout tone-watch" data-test="case-cause"><p class="callout-title">Cause</p><p>${escapeHtml(humanizeCode(view.cause.changeType))} · ${escapeHtml(humanizeCode(view.cause.originKind))} · received ${escapeHtml(formatInstant(view.cause.receivedAt))}${view.cause.applied ? '' : ' · application in progress'}</p></div>`
     : '';
   // B1: operator controls over the normal application routes. The buttons
   // only POST and re-read; every outcome shown is the server's own response.
@@ -434,7 +446,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
           const facts = Object.entries(step.facts)
             .map(([key, value]) => `${escapeHtml(key)}=${escapeHtml(value === null ? 'null' : String(value))}`)
             .join(', ');
-          return `<li><strong>${escapeHtml(step.dimension)}</strong> ${escapeHtml(step.reasonCode)} <span class="meta">${escapeHtml(step.subjectRef)}${facts ? ` · ${facts}` : ''}</span></li>`;
+          return `<li><strong>${escapeHtml(humanizeCode(step.dimension))}</strong>: ${escapeHtml(humanizeCode(step.reasonCode))} <span class="meta">${escapeHtml(subjectDisplay(view, step.subjectRef))}</span>${facts ? `<details class="meta" data-details-ref="why-evidence-${escapeHtml(step.dimension)}"><summary>Evidence</summary>${facts}</details>` : ''}</li>`;
         })
         .join('')}</ul></section>`
     : '';
@@ -459,7 +471,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   return `
 <main class="shell product-recovery-case" data-test="product-recovery-case" ${changeAttrs}>
   <div class="page-head">
-    <h1>Recovery case ${escapeHtml(view.caseRef)} ${badge(view.status, view.status === 'RESOLVED' || view.status === 'CLOSED' ? 'done' : view.status === 'EXECUTING' ? 'active' : view.status === 'OPEN' || view.status === 'PLANNING' ? 'watch' : 'neutral')}</h1>
+    <h1>${escapeHtml(caseHeading(view))} ${badge(view.status, view.status === 'RESOLVED' || view.status === 'CLOSED' ? 'done' : view.status === 'EXECUTING' ? 'active' : view.status === 'OPEN' || view.status === 'PLANNING' ? 'watch' : 'neutral')}</h1>
     <p class="sub">${escapeHtml(view.changeSummary)}</p>
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))} · Authority ${escapeHtml(view.authorityState)} · Execution ${escapeHtml(view.executionState)} · Reconciliation ${escapeHtml(view.reconciliationState)}</p>
     ${aggregateCost}

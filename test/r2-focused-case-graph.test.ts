@@ -15,7 +15,7 @@ test('R2 enrichment: creates SERVICE_BOOKING node for transport item with servic
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
     journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-1' }],
-    transportServices: [{ id: 'service-1', mode: 'FLIGHT', operator: 'Airline X', origin_place_id: 'CDG', destination_place_id: 'JFK', published_departure: null, published_arrival: null }],
+    transportServices: [{ id: 'service-1', mode: 'FLIGHT', operator: 'Airline X', origin_place_id: 'CDG', destination_place_id: 'JFK', origin_place_name: 'Paris CDG', destination_place_name: 'New York JFK', published_departure: null, published_arrival: null }],
     participations: [],
     programmeItems: [],
     objectives: [],
@@ -29,7 +29,7 @@ test('R2 enrichment: creates SERVICE_BOOKING node for transport item with servic
   assert.equal(node.kind, 'SERVICE_BOOKING');
   assert.equal(node.ref, 'SERVICE_BOOKING:service-1');
   assert.equal(node.label, 'FLIGHT Airline X');
-  assert.equal(node.detail, 'CDG → JFK');
+  assert.equal(node.detail, 'Paris CDG → New York JFK', 'human place names, never place ids');
   assert.equal(node.semanticState, 'UNKNOWN');
   assert.equal(node.caseRef, 'case-1');
 });
@@ -141,7 +141,7 @@ test('R2 enrichment: creates TRANSFER_STAY node for stay item', () => {
   const node = result.nodes[0]!;
   assert.equal(node.kind, 'TRANSFER_STAY');
   assert.equal(node.ref, 'TRANSFER_STAY:item-1');
-  assert.equal(node.detail, '2026-01-15T14:00:00Z → 2026-01-16T10:00:00Z');
+  assert.equal(node.detail, '15 Jan 14:00 → 16 Jan 10:00 UTC');
 });
 
 test('R2 enrichment: creates PROGRAMME_COMMITMENT node for accepted participation', () => {
@@ -163,7 +163,7 @@ test('R2 enrichment: creates PROGRAMME_COMMITMENT node for accepted participatio
   assert.equal(node.kind, 'PROGRAMME_COMMITMENT');
   assert.equal(node.ref, 'PROGRAMME_ITEM:programme-item-1');
   assert.equal(node.label, 'Conference Keynote');
-  assert.equal(node.detail, '2026-01-15T09:00:00Z → 2026-01-15T10:00:00Z');
+  assert.equal(node.detail, '15 Jan 09:00 → 10:00 UTC');
 });
 
 test('R2 enrichment: creates PARTICIPATES_IN edge from journey to programme item', () => {
