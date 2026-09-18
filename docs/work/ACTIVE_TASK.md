@@ -121,6 +121,18 @@ reconciles and integrates.
       contract round-trip read helpers. Authored pg integration test
       `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts` (classified
       `postgres`; NOT executed in Cloud). Typecheck/lint/boundary clean.
+      Commit `feat(r1): persist RecoveryPlanningAttempt over migration 0125`.
+      - SHA: `4aefbd0` (local == origin)
+- [x] Lane P (part 1) — C6 comparator
+      (`src/resolution/planning/comparator.ts`): pure viable-only ranking —
+      precedence-ordered preference alignment, then deterministic facts
+      (regressions, improvements, blast radius, declared cost; absent cost sorts
+      last), then stable ref tiebreak; refusal (undefined) when no usable
+      candidate; semantic notes explain but never rank; output re-validated via
+      `validateStrategyRecommendation`. `test/r1-comparator.test.ts` 11/11 pass;
+      full `current` suite 887/887; typecheck/lint/boundary/anti-hardcoding clean.
+      Commit `feat(r1): select viable-only recommendation deterministically (C6 comparator)`.
+      - SHA: `b6ed62ee0c4d595c1b027c054df099325ddc0da2` (local == origin)
 - [ ] C2 — planner core (lane P integrated): coordinator extending
       `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
 - [ ] C3 — decision evidence end-to-end at the seam (coordinator persists attempt).
