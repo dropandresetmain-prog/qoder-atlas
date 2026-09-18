@@ -1,3 +1,66 @@
+# ACTIVE TASK — R2 LOCAL ACCEPTANCE (durable Original + PG + browser)
+
+Ledger for the R2 LOCAL integration/product-acceptance lane. The R2 Cloud ledger and the
+R1 history below are preserved unchanged.
+
+- Branch: `feat/r2-local-acceptance`, created from the exact R2 Cloud HEAD
+  `1ace8fc4408970673a9c378683a41e1617f86191` (accepted R1 base `dc73aa9a51abf80a6e3b65abacf6bc5929223638`);
+  ancestry verified, clean tree, user's untracked `.founder-b1-*`/`.claude`/`.worktrees` untouched.
+- PG environment: `northstar-postgres-test` (PostGIS 16) on `localhost:55432`; browser harness DB `northstar_r2dev`.
+  Node v24.15.0. Migrations apply through **0127**.
+
+## Product decision (2026-09-19): Original = immutable persisted first truthful focused Case graph
+
+Supersedes the Cloud interim "Original = first graph seen this browser session" (kept below as history).
+- **Table** `recovery_case_graph_snapshots` (migration 0127): PK (workspace, case, `snapshot_kind='ORIGINAL'`), case FK, optional
+  basis-assessment FK, `snapshot jsonb` (object, `pg_column_size <= 262144`), `captured_at`, actor. Insert-once
+  (`ON CONFLICT DO NOTHING`); UPDATE/DELETE refused by trigger; INSERT bumps the case read-model cursor (EVALUATION_LIFECYCLE).
+  No CURRENT rows, no timeline.
+- **Payload** (strict typed `OriginalGraphSnapshotPayloadSchema`, v1): `caseStatusAtCapture`, `ldg` (nodes<=200, edges<=400, poll-relative
+  change hints neutralised), `focusedGraph`, `subjectLabels`(<=200). No HTML/SVG/layout/camera/animation. Unknown keys refused; causal refs must resolve.
+- **Trigger**: the case-lifecycle progression pass (`progressCase`) calls `ensureOriginalCaseGraph` at the FIRST SETTLED FAILING basis, **before**
+  any dispatch (resolve/plan/attention). Capture requires: active case, trip verdict FAIL, mapped causal path, no PENDING_REASSESSMENT node.
+  Otherwise nothing is stored ("not yet truthful"). A capture failure never blocks recovery (retried next wake).
+  Truthful because it is exactly the first projection where the failing graph is settled, recorded with exact `capturedAt` + basis.
+- **Read path**: `RecoveryCaseView.originalFocusedGraph?` (historical evidence). CURRENT = `view.ldg`/`view.focusedGraph`, never reads it.
+  Cases with no stored Original show an honest unavailable state (Current is never a substitute).
+- **UI**: `src/ui/originalCurrent.ts` rewritten (display-only, delegated listener); Original rendered by the same V5.6 renderer.
+
+## Checkpoints (all pushed)
+
+| Checkpoint | Scope | SHA |
+| --- | --- | --- |
+| L1 | migration 0127 + typed snapshot contract + commands + capture at first settled failing basis + PG tests | `ba393fe94f1c677731c7679332aaec4d0eb3b0ac` |
+| L2 | read model + Original/Current UI + multi-canvas/swap-safe graph script | `6c9b11945c0bc1d911c21104c9ac8c08093553cf` |
+| L4 | real-browser acceptance fixes (cards, wording, canvas init) | `f6dc3f9ee1a0cc17dcf13c9f4ccde5b5177824b9` |
+| FINAL | docs / acceptance record | see final report (docs-only commit on top of L4) |
+
+## Real-browser findings and generic fixes (Playwright/Chromium against live PG, real product HTTP)
+
+Found: overlapping/clipped cards; raw place ids and host-timezone `Date` strings on cards; raw codes/uuids in case heading, first-breakpoint
+callout and Why; **Original canvas never initialised** (no script emitted for it) and initial fit ran at zero size; polling swap killed pan/zoom
+and the toggle (scripts in swapped markup do not run; listeners bound to replaced nodes). Fixed: uniform card footprint + clamped text + hover
+title; place names + UTC windows; `humanizeCode` + subject labels; init-on-show/DOMContentLoaded; per-canvas state kept across swaps; delegated toggle.
+
+## Acceptance evidence
+
+- Focused PG: `r2OriginalGraphSnapshot` 7/7, `r2FocusedCaseGraph` 6/6 (incl. connection-world Original), R1 trio 7/7, cross-lane/subtype allowlists 24/24.
+- Full PostgreSQL suite (run ONCE): 568/569 pass; the single failure is `m10RuntimePurgeBoot.pgtest.ts:88` (`200 !== 404`), the identical documented historical baseline failure (not re-proven on the R1 base in this run); no other failures, no file-start races.
+- CURRENT_TARGET 1016/1016; typecheck, eslint, boundary gate (227 files), anti-hardcoding: clean.
+- Browser (`accept.mjs`, 31/31): stored Original renders; pan/zoom/home/views/selection; alert no pulse, watch 3.6s, reduced-motion none;
+  polling ~4s with `sinceCursor`, no swap when unchanged, hidden pauses, terminal stops; Original tab + graph state survive swaps;
+  Original byte-identical after approve/execute/resolve, page refresh and full browser restart; Current becomes healthy; no WS/SSE; no console errors.
+- Generality: connection world (no programme) renders through the same code — no programme/objective nodes, no Sarah geometry.
+
+## R3 / carry-forward (not R2)
+
+Stale `POST /strategies` -> RecoveryPlanningCoordinator routing; boot-time transport research composition; external SELECT_OFFER approval and
+provider execution; B2; Event Overview redesign; semantic Activity redesign. Presentation debts noted: graph orients by producer edge direction
+(traveller-rooted star, not a causal chain left-to-right); Partial recovery / Recovery actions blocks still show raw uuids (pre-existing M9 surfaces);
+header subtitle is backend `changeSummary` prose with raw codes.
+
+---
+
 # ACTIVE TASK — R2 Case Decision Surface + Focused Graph (CLOUD)
 
 Live working-memory ledger for the R2 Cloud implementation lane. Reread before every

@@ -235,3 +235,14 @@ the documented pre-existing `m10RuntimePurgeBoot` baseline failure reconciled) i
 locally accepted. The Cloud terminal status remains
 **R2 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE** until
 then.
+
+
+---
+
+## LOCAL RECONCILIATION (2026-09-19) — durable Original supersedes the session-local interim
+
+The "session-local capture ACCEPTED as the truthful interim" verdict above is preserved as Cloud history. Product has since decided
+**Original = immutable persisted first truthful focused Case graph snapshot** (migration 0127, `recovery_case_graph_snapshots`,
+captured by the progression pass at the first settled failing basis). R2 therefore DOES add a migration (0127) — the "R2 adds no migration"
+statements and R3-carry-forward item 1 are superseded. Proofs 13/14 were executed with the durable Original: it survives refresh, browser
+restart and later Case changes. See `docs/work/ACTIVE_TASK.md` (R2 LOCAL ACCEPTANCE) for evidence.

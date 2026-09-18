@@ -420,3 +420,11 @@ Pure/read-model-shaped proofs, typecheck, lint, anti-hardcoding and test-boundar
 gates run in Cloud. Terminal status is
 `R2 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE` unless
 real PG AND browser acceptance actually executed.
+
+
+## Reconciliation (2026-09-19, local acceptance): §8.2 Original / Current
+
+§8.2 above described a session-local interim. It is superseded: **Original = immutable persisted first truthful focused Case graph
+snapshot** (`recovery_case_graph_snapshots`, migration 0127; semantic payload only — no HTML/SVG/layout; one per case; captured at the
+first settled failing basis before any planning dispatch; exposed as `RecoveryCaseView.originalFocusedGraph`; rendered by the same
+renderer; CURRENT never reads it; absent => honest unavailable state). No graph history, no CURRENT rows.
