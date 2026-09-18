@@ -173,6 +173,21 @@ reconciles and integrates.
       typecheck/lint/boundary/anti-hardcoding clean.
       Commit `feat(r1): generalized recovery planning coordinator core (C1)`.
       - SHA: `9740c1818ee6832bffdfcdbefa01561746632327` (local == origin)
+- [x] Lane P (part 5) — C1 PostgreSQL ADAPTER
+      (`src/app/target/recoveryPlanningCoordinator.ts`): implements the frozen
+      `RecoveryPlanningCoordinator.planCase` port. Reads the CURRENT basis from
+      canonical PG with the SAME public helpers the accepted B1 seam uses, then
+      delegates ALL decision logic to the pure core, then persists via REAL
+      commands (persistRecoveryStrategy per VIABLE strategy + the ONE immutable
+      attempt over migration 0125) and advances the case phase only on
+      AWAITING_AUTHORITY. Deterministic id/version minting mirrors the B1
+      planning namespace (idempotent per case/basis/candidate). Reuses
+      `advanceCasePhase` from the existing seam — no second engine, no
+      RuntimeOrchestrator. Requires PG: TYPECHECKED + LINTED in Cloud, NOT
+      executed here (LOCAL integration-acceptance item). Typecheck/lint/boundary/
+      anti-hardcoding clean; full `current` suite 907/907.
+      Commit `feat(r1): bind recovery planning coordinator core to PostgreSQL (C1 adapter)`.
+      - SHA: `f0fe4489d1d8e6328ba5d91e98d71a227b9400d4` (local == origin)
 - [ ] C2 — planner core (lane P integrated): coordinator extending
       `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
 - [ ] C3 — decision evidence end-to-end at the seam (coordinator persists attempt).
