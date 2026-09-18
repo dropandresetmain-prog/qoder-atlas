@@ -136,6 +136,25 @@ async function candidateCases(ctx: ProgressionPassContext, limit: number): Promi
   return rows.rows;
 }
 
+/**
+ * Is a human approval still outstanding for the plan made against THIS basis? True
+ * only while at least one viable strategy of the attempt has not been planned for
+ * execution yet. Once every viable option has been approved (and executed or in
+ * flight) the attempt no longer "awaits authority": in-flight work is the
+ * resolution gate's WAIT, and completed work that left the SAME basis failing has
+ * exhausted this basis's options.
+ */
+async function approvalStillOutstanding(pool: Pool, workspaceId: string, strategyRefs: readonly string[]): Promise<boolean> {
+  if (strategyRefs.length === 0) return false;
+  const open = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM recovery_strategies s
+      WHERE s.workspace_id = $1 AND s.id = ANY($2::uuid[])
+        AND NOT EXISTS (SELECT 1 FROM action_plans ap WHERE ap.workspace_id = s.workspace_id AND ap.recovery_strategy_id = s.id)`,
+    [workspaceId, strategyRefs],
+  );
+  return Number(open.rows[0]!.n) > 0;
+}
+
 function attentionReasonFor(reasonCode: string, planningOutcome: string | undefined): RecoveryCaseAttentionReason {
   // The coordinator's own verdict that it needs a person outranks the generic mapping.
   if (planningOutcome === 'NEEDS_EVIDENCE_OR_DECISION') return 'human_evidence_or_decision_required';
@@ -171,9 +190,10 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
     recoveryCaseId: row.id as SubjectId,
     basisAssessmentId: basis.assessmentId as SubjectId,
     gate,
-    // A plan already produced for THIS basis that awaits a human approval is
-    // pending authority; a plan for an older basis is not.
-    authorityOrExecutionPending: basis.verdict === 'FAIL' && attempt?.outcome === 'AWAITING_AUTHORITY',
+    // A plan already produced for THIS basis that still awaits a human approval is
+    // pending authority; a plan for an older basis, or one already approved, is not.
+    authorityOrExecutionPending: basis.verdict === 'FAIL' && attempt?.outcome === 'AWAITING_AUTHORITY'
+      && await approvalStillOutstanding(ctx.pool, ctx.workspaceId, attempt.attempt.viableStrategyRefs),
     // One planning attempt per basis: a settled attempt for this basis is never redone.
     recoveryRemainsPossible: basis.verdict === 'FAIL' && attempt === undefined,
     currentAssessmentVerdict: basis.verdict,

@@ -271,6 +271,44 @@ describe('C4 progression — real coordinator, duplicate wakes, execution safety
     }
   });
 
+  test('an approved plan that completed without changing the basis has exhausted it: ESCALATE, never a replan of the same basis', async () => {
+    const c = await openDisruptionCase('R1 progression exhausted basis');
+    try {
+      const planner = realPlanner(c);
+      assert.equal((await worldPass(c, planner)).planned, 1);
+      const attempt = await c.pool.query<{ recommendation: { recommendedStrategyRef: string } }>('SELECT recommendation FROM recovery_planning_attempts WHERE workspace_id = $1', [c.world.workspaceId]);
+      const approved = await approveRecoveryStrategy(
+        { pool: c.pool, workspaceId: c.world.workspaceId, actorPrincipalId: c.world.actorId, uow: () => c.app.unitOfWork(), now: R1_NOW, executorPrincipalId: c.executorPrincipalId },
+        { caseId: c.caseId, strategyId: attempt.rows[0]!.recommendation.recommendedStrategyRef, approverPrincipalId: c.operatorPrincipalId },
+      );
+      assert.equal(approved.ok, true);
+      if (!approved.ok) return;
+      // Work in flight (approved, not yet executed) is the resolution gate's WAIT.
+      assert.equal((await worldPass(c, planner)).outcomes[0]!.decision, 'WAIT');
+
+      // Simulate observed provider success for every intent that left canonical state
+      // (and therefore the assessed basis) untouched.
+      for (const [i, intent] of approved.report.intents.entries()) {
+        await c.pool.query(
+          `INSERT INTO execution_attempts (workspace_id, id, action_intent_id, attempt_number, logical_operation_key, request_fingerprint, status, created_by_actor_id)
+           SELECT ai.workspace_id, $3, ai.id, 1, ai.logical_operation_key, ai.request_fingerprint, 'OBSERVED_SUCCESS', $4
+             FROM action_intents ai WHERE ai.workspace_id = $1 AND ai.id = $2`,
+          [c.world.workspaceId, intent.intentId, randomUUID(), `r1-progression-test-${i}`],
+        );
+      }
+      const escalated = await worldPass(c, planner);
+      assert.equal(escalated.outcomes[0]!.decision, 'ESCALATE', JSON.stringify(escalated.outcomes));
+      assert.equal(escalated.outcomes[0]!.reasonCode, 'no_safe_recovery_remaining');
+      assert.equal(escalated.planned, 0);
+      assert.equal((await worldPass(c, planner)).planned, 0);
+      const attention = await listRecoveryCaseAttention(c.pool, c.world.workspaceId, c.caseId);
+      assert.deepEqual(attention.map((a) => [a.reasonCode, a.status]), [['no_safe_recovery_remaining', 'OPEN']]);
+      assert.equal(await count(c, 'recovery_planning_attempts'), 1);
+    } finally {
+      await c.app.close();
+    }
+  });
+
   test('a basis that goes stale mid-planning cannot advance the case; the next wake plans the new basis', async () => {
     const c = await openDisruptionCase('R1 progression stale');
     try {

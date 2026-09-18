@@ -44,21 +44,26 @@ export interface WorldSpec {
 export const DEFAULT_WORLD_SPEC: WorldSpec = { day: '2031-06-02', now: R1_NOW };
 export const worldAt = (spec: WorldSpec, hhmm: string): string => `${spec.day}T${hhmm}:00.000Z`;
 
-export interface ProgrammeWorld {
+/** What the disruption driver needs from ANY seeded world: whose journeys exist and which service is delayed. */
+export interface DisruptedWorld {
   spec: WorldSpec;
   seed: SeedSession;
   workspaceId: string;
   actorId: string;
+  /** The first entry is the traveller expected to fail after the delay. */
   people: { travellerId: string; journeyId: string; tripId: string }[];
   sharedServiceId: string;
+}
+
+export interface ProgrammeWorld extends DisruptedWorld {
   earlyItemId: string;
   lateItemId: string;
   peerItemId: string;
 }
 
-export interface OpenCase {
+export interface OpenCase<W extends DisruptedWorld = ProgrammeWorld> {
   now: string;
-  world: ProgrammeWorld;
+  world: W;
   app: TargetApplication;
   pool: Pool;
   caseId: string;
@@ -138,7 +143,7 @@ export async function seedProgrammeWorld(label: string, spec: WorldSpec = DEFAUL
  * change signal id. Reassessment still has to be drained by the caller.
  */
 let observationTick = 0;
-export async function applyProviderDelay(c: Pick<OpenCase, 'world' | 'app' | 'pool'>, arrival: string): Promise<string> {
+export async function applyProviderDelay(c: Pick<OpenCase<DisruptedWorld>, 'world' | 'app' | 'pool'>, arrival: string): Promise<string> {
   const { world, app, pool } = c;
   const revision = await pool.query<{ revision: string }>('SELECT revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2', [world.workspaceId, world.sharedServiceId]);
   const ingress = await acceptProviderShapedDemoEvent(
@@ -157,9 +162,13 @@ export async function applyProviderDelay(c: Pick<OpenCase, 'world' | 'app' | 'po
  * provider-shaped delay and escalate: returns an OPEN RecoveryCase whose
  * subject Journey is currently FAIL.
  */
-export async function openDisruptionCase(label: string, spec: WorldSpec = DEFAULT_WORLD_SPEC): Promise<OpenCase> {
+export async function openDisruptionCase<W extends DisruptedWorld = ProgrammeWorld>(
+  label: string,
+  spec: WorldSpec = DEFAULT_WORLD_SPEC,
+  options: { seed?: (label: string, spec: WorldSpec) => Promise<W>; delayedArrival?: string } = {},
+): Promise<OpenCase<W>> {
   const NOW = spec.now;
-  const world = await seedProgrammeWorld(label, spec);
+  const world = options.seed ? await options.seed(label, spec) : (await seedProgrammeWorld(label, spec)) as unknown as W;
   const app = await composeTargetApplication({ workspaceId: world.workspaceId, actorId: world.actorId });
   const pool = app.pool;
   const registry = createM6Registry();
@@ -183,14 +192,14 @@ export async function openDisruptionCase(label: string, spec: WorldSpec = DEFAUL
   const lifecycleCtx = { pool, workspaceId: world.workspaceId, actorPrincipalId: world.actorId, uow: () => app.unitOfWork(), now: NOW };
 
   const baseline = await runBaselineEvaluation({ pool, workspaceId: world.workspaceId, actorPrincipalId: world.actorId, now: NOW });
-  assert.equal(baseline.evaluated, 5, JSON.stringify(baseline));
+  assert.equal(baseline.evaluated, world.people.length, JSON.stringify(baseline));
   assert.equal((await runCaseEscalation(lifecycleCtx)).opened, 0, 'healthy baseline opens nothing');
 
   const authority = await provisionWorkspaceAuthority({ pool, uow: () => app.unitOfWork(), workspaceId: world.workspaceId, actorPrincipalId: world.actorId, now: NOW });
   assert.equal(authority.status, 'PROVISIONED', JSON.stringify(authority));
   app.runtimeHooks = { executorPrincipalId: authority.principals.executor };
 
-  const changeSignalId = await applyProviderDelay({ world, app, pool }, worldAt(spec, '10:30'));
+  const changeSignalId = await applyProviderDelay({ world, app, pool }, options.delayedArrival ?? worldAt(spec, '10:30'));
   await drain();
   assert.equal(await verdict(world.people[0]!.journeyId), 'FAIL');
 

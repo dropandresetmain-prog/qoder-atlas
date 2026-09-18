@@ -153,6 +153,8 @@
       "postgres-integration/r1CaseAttention.pgtest.ts",
       "postgres-integration/r1RecoveryProgression.pgtest.ts",
       "postgres-integration/r1ComposedB1.pgtest.ts",
+      "postgres-integration/r1UnknownOutcome.pgtest.ts",
+      "postgres-integration/r1ConnectionRecovery.pgtest.ts",
       "postgres-integration/revisionConflicts.pgtest.ts",
       "postgres-integration/serializableRetry.pgtest.ts",
       "postgres-integration/t2F1FailureInjection.pgtest.ts",
