@@ -84,7 +84,10 @@ describe('C9 planning evidence on the PostgreSQL Case read model (coordinator-pr
     const programme = pe.domains.find((d) => d.domain.code === 'PROGRAMME');
     assert.equal(programme?.disposition.code, 'INVESTIGATED');
     assert.equal(programme?.domain.label, 'Programme');
-    assert.ok(pe.domains.filter((d) => d.domain.code !== 'PROGRAMME').every((d) => d.disposition.code === 'NOT_APPLICABLE'));
+    // An arrival-readiness deficit also makes TRANSPORT relevant, but this composition has no flight
+    // capability, so it fails CLOSED to UNAVAILABLE instead of being silently skipped or investigated.
+    assert.equal(pe.domains.find((d) => d.domain.code === 'TRANSPORT')?.disposition.code, 'UNAVAILABLE');
+    assert.ok(pe.domains.filter((d) => d.domain.code !== 'PROGRAMME' && d.domain.code !== 'TRANSPORT').every((d) => d.disposition.code === 'NOT_APPLICABLE'));
 
     // Candidates: one recommended viable, at least one deterministic rejection with reasons.
     const recommended = pe.candidates.find((cand) => cand.disposition.code === 'RECOMMENDED');

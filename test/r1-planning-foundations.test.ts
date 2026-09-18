@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveRecoveryDomainDecisions } from '../src/contracts/v2/planning/recoveryDomain.ts';
 import {
+  dimensionReasonToken,
   defaultRecoveryDomainRegistry,
   recoveryDomainContext,
 } from '../src/resolution/planning/recoveryDomains.ts';
@@ -183,4 +184,15 @@ test('dispatcher: a request type cannot represent a consequential operation (str
     purpose: 'book it', evidenceGapCode: 'none', round: 1,
   });
   assert.equal(bad.success, false);
+});
+
+test('registry: an arrival-readiness deficit on programme participation ALSO makes movement recovery relevant', () => {
+  const token = dimensionReasonToken('programme_participation', 'insufficient_arrival_readiness');
+  const decisions = new Map(resolveRecoveryDomainDecisions(defaultRecoveryDomainRegistry(), contextFor(['programme_participation', token])).map((d) => [d.domainId, d]));
+  assert.equal(decisions.get('PROGRAMME')?.disposition, 'INVESTIGATED');
+  assert.equal(decisions.get('TRANSPORT')?.disposition, 'INVESTIGATED');
+  assert.equal(decisions.get('TRANSPORT')?.reasonCode, `blocking_${token}`);
+  // Another reason on the same dimension does not.
+  const other = new Map(resolveRecoveryDomainDecisions(defaultRecoveryDomainRegistry(), contextFor(['programme_participation', dimensionReasonToken('programme_participation', 'other_reason')])).map((d) => [d.domainId, d]));
+  assert.equal(other.get('TRANSPORT')?.disposition, 'NOT_APPLICABLE');
 });

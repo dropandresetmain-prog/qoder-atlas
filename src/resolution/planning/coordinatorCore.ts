@@ -78,6 +78,7 @@ import type {
   RecoveryPlanningReason,
   RecoveryPlanningResult,
 } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
+import { dimensionReasonToken } from './recoveryDomains.ts';
 import { dispatchResearch, type PlanningToolTransport } from './researchDispatcher.ts';
 import {
   materialCandidateFromEvaluation,
@@ -202,12 +203,21 @@ interface EvaluatedCandidate {
   result: EvaluateStrategyResult;
 }
 
-/** Extract the real blocking M6 dimension codes from the failing subjects' assessments. */
+/**
+ * Extract the real blocking M6 dimension codes from the failing subjects'
+ * assessments, plus the dimension-scoped reason tokens of their failing
+ * explanations (see `dimensionReasonToken`) for activators that need the reason.
+ */
 export function blockingDimensionCodes(failing: readonly FailingSubject[]): Set<string> {
   const codes = new Set<string>();
   for (const f of failing) {
     for (const dim of f.assessment.dimensions) {
-      if (dim.applicable && dim.blocking && dim.verdict !== 'PASS') codes.add(dim.dimension);
+      if (dim.applicable && dim.blocking && dim.verdict !== 'PASS') {
+        codes.add(dim.dimension);
+        for (const explanation of dim.explanations) {
+          if (explanation.status !== 'PASS') codes.add(dimensionReasonToken(dim.dimension, explanation.reasonCode));
+        }
+      }
     }
   }
   return codes;

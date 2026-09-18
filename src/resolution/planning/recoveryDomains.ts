@@ -20,8 +20,23 @@ import {
   type RecoveryDomainId,
 } from '../../contracts/v2/planning/recoveryDomain.ts';
 
+/**
+ * A dimension-scoped reason token (`<dimension>__<reasonCode>`), for the cases
+ * where a dimension alone is too coarse to say which recovery lever is relevant.
+ * Derived only from the evaluator's own closed reason codes on a failing
+ * explanation — never from a scenario. Kept snake_case so it can also serve as a
+ * decision `reasonCode`.
+ */
+export function dimensionReasonToken(dimension: string, reasonCode: string): string {
+  return `${dimension}__${reasonCode}`.replace(/[^a-z0-9_]/g, '_');
+}
+
 /** Real M6 blocking dimension codes that make movement/fulfilment recovery relevant. */
 const TRANSPORT_DIMENSIONS: ReadonlySet<string> = new Set([
+  // A programme obligation the traveller cannot reach ready in time is also a
+  // movement problem: an earlier arrival is a legitimate recovery lever, to be
+  // researched and judged by RC-6 alongside the programme lever.
+  dimensionReasonToken('programme_participation', 'insufficient_arrival_readiness'),
   'connection_feasibility',
   'supplier_fulfilment',
   'booking_validity',

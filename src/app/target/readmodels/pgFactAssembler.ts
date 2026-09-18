@@ -556,8 +556,9 @@ async function loadRecoveryCaseFactsInner(
     lifecycle_status: string;
     opened_at: string;
     closed_at: string | null;
+    resolution_summary: string | null;
   }>(
-    `SELECT id, lifecycle_status, opened_at, closed_at FROM recovery_cases WHERE workspace_id = $1 AND id = $2`,
+    `SELECT id, lifecycle_status, opened_at, closed_at, resolution_summary FROM recovery_cases WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, caseId],
   );
   const row = caseRow.rows[0];
@@ -842,6 +843,7 @@ async function loadRecoveryCaseFactsInner(
     subjectFacts,
     ...(planningAttempt ? { planningAttempt } : {}),
     attention,
+    ...(row.resolution_summary ? { resolutionSummary: row.resolution_summary } : {}),
   };
 }
 
