@@ -25,11 +25,12 @@ test('normal boot works end-to-end with no SQLite database reachable', async () 
   const env = { ...process.env };
   delete env.SQLITE_PATH;
   env.PG_TARGET_WORKSPACE_ID = randomUUID();
+  env.NORTHSTAR_DEMO_DATASET_DIR = '';
   // Route the target config at the already-migrated shared test database
   // rather than requiring a fresh one for this focused boot proof.
   await sharedTestPool(); // ensures migrations have run on PGTEST_DB before boot reuses it
 
-  const boot = await composeTargetBoot(env);
+  const boot = await composeTargetBoot(env, { applyDotenvFiles: false });
   const server = createTargetAppServer(
     { environment: boot.config.environment, workspaceId: boot.config.workspaceId },
     boot.endpoints,

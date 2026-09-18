@@ -12,7 +12,7 @@
  * composition (`src/app/compose.ts`) is not imported here or transitively
  * from anything this module imports.
  */
-import { loadConfig, type AppConfig } from '../config/config.ts';
+import { loadConfig, mergeEnvWithDotenvFiles, type AppConfig } from '../config/config.ts';
 import { composeTargetEndpoints, type TargetEndpoints } from './target/composeTargetEndpoints.ts';
 import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
 import { runBaselineEvaluation } from './demo/baselineEvaluation.ts';
@@ -37,6 +37,17 @@ export interface TargetBootConfig {
   environment: AppConfig['environment'];
   httpPort: number;
   workspaceId: string;
+}
+
+export interface ComposeTargetBootOptions {
+  cwd?: string;
+  /**
+   * When true (default), merge `.env` / `.env.local` so daily `npm run dev`
+   * can persist `PG_TARGET_*` and `NORTHSTAR_DEMO_DATASET_DIR`. PostgreSQL
+   * tests that boot the composition should pass `false` so a developer file
+   * cannot steal the test database or provision an unexpected dataset.
+   */
+  applyDotenvFiles?: boolean;
 }
 
 /** Resolve boot configuration strictly from env — never touches SQLite config/paths. */
@@ -81,9 +92,16 @@ export interface ComposedTargetBoot {
   close(): Promise<void>;
 }
 
-export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): Promise<ComposedTargetBoot> {
-  const config = loadTargetBootConfig(env);
-  const endpoints = await composeTargetEndpoints({ workspaceId: config.workspaceId, env });
+export async function composeTargetBoot(
+  env: NodeJS.ProcessEnv = process.env,
+  options: ComposeTargetBootOptions = {},
+): Promise<ComposedTargetBoot> {
+  const resolved: NodeJS.ProcessEnv =
+    options.applyDotenvFiles === false
+      ? env
+      : mergeEnvWithDotenvFiles(env, options.cwd ?? process.cwd());
+  const config = loadTargetBootConfig(resolved);
+  const endpoints = await composeTargetEndpoints({ workspaceId: config.workspaceId, env: resolved });
   // Idempotent boot-time provisioning (same category as composeTargetRuntime
   // already running schema migrations at boot) — not a data/authority
   // decision. A workspace row must exist before any command referencing it
@@ -102,7 +120,7 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
     pool: endpoints.app.pool,
     workspaceId: config.workspaceId,
     actorPrincipalId,
-    env,
+    env: resolved,
   });
   if (provisioning.status === 'MATERIALIZED') {
     console.log(
@@ -138,7 +156,7 @@ export async function composeTargetBoot(env: NodeJS.ProcessEnv = process.env): P
     workspaceId: config.workspaceId,
     actorPrincipalId,
     now: new Date().toISOString(),
-    operatorAuthSubject: env.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
+    operatorAuthSubject: resolved.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
   });
   console.log(
     `[atlas] workspace authority ${authority.status} coverage=${authority.coverageCount} ` +
