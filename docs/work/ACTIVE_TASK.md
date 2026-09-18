@@ -216,21 +216,37 @@ reconciles and integrates.
 
 - [x] C2 — planner core integrated: generalized coordinator CORE (part 4) + PG
       ADAPTER (part 5); read-only bounded research dispatch (part 2); viable-only
-      comparator (part 1). NOTE: no transport-SPECIFIC proposer was authored — the
-      domain registry activates TRANSPORT from real M6 dimension codes and proposers
-      are injected at the seam; the generality proof uses the REAL shipped
-      programme-time-swap proposer plus a seam-injected STAY proposer. A concrete
-      transport proposer is a LOCAL/product follow-up, not an R1 Cloud blocker.
+      comparator (part 1). **TRANSPORT PROPOSER = OPEN R1 GAP, NOT OPTIONAL.**
+      The domain registry already activates TRANSPORT from real M6 dimension codes
+      and proposers are injected at the seam, but NO concrete provider-assisted
+      TRANSPORT proposer has been authored yet. R1 product truth REQUIRES
+      provider-assisted travel reasoning, so this is an in-scope R1 Cloud
+      deliverable (implement as far as Cloud truthfully permits via the
+      provider-neutral read-tool protocol + Atlas Search/Verify normalization +
+      checked-in REPLAY evidence + algorithms adapted from historical
+      fallbackPlanner/northstarPlanner), NOT a deferred product follow-up. It must
+      contain no Sarah/Jordan logic, no hardcoded demo routes, no consequential
+      provider calls, no viability declaration, and no LIVE-credential requirement
+      to function structurally. Any concrete Cloud blocker is documented with its
+      required local closure — the capability is never reclassified as optional.
 - [x] C3 — decision evidence end-to-end at the seam: the coordinator assembles the
       three separate impact projections + material candidate evidence and persists
       the ONE immutable attempt over migration 0125 (parts 3-5).
-- [~] C4 — Recovery Lifecycle Progression (PRIMARY): pure fact mapper DONE +
-      tested (part 6, `e3cd300`). REMAINING: the concrete PG PASS under
-      `runtimeServices`/`composeTargetBoot` that gathers observed facts from PG
-      owners, applies `decideProgressionFromFacts`, and acts through EXISTING owners
-      (RESOLVE via `resolveRecoveryCase`; REPLAN via the C1 coordinator from the NEW
-      basis; WAIT = no-op; ESCALATE = recorded, gap reported). Typecheck/lint-only in
-      Cloud (requires PG); LOCAL runtime acceptance item.
+- [HOLD] C4 — Recovery Lifecycle Progression (PRIMARY): pure fact mapper DONE +
+      tested (part 6, `e3cd300`) and KEPT. **CONCRETE LIFECYCLE RUNNER = PAUSED
+      PENDING LANGGRAPH SPIKE** (intentional architecture hold, NOT a Cloud
+      limitation). A separate accepted architecture investigation concluded
+      "SPIKE REQUIRED BEFORE DECISION": LangGraph may replace ONLY the concrete
+      outer durable progression runner (the `runtimeServices`/`composeTargetBoot`
+      long-running WAIT/REPLAN/RESOLVE/ESCALATE loop). It does NOT replace the
+      coordinator, domain identification, read-only research, proposers, RC-6, the
+      attempt record, recommendation, impact semantics, authority/execution,
+      observation/reconciliation, or the PURE C8 decision. Per direction, the
+      concrete runner is NOT implemented on this branch; a LangGraph outer-workflow
+      spike determines it separately. (A draft runner `caseProgressionPass.ts` was
+      authored during recon then REMOVED uncommitted to honour the hold; the pure
+      mapper it depended on is unchanged.) All R1 work that survives either
+      orchestration decision continues below.
 - [x] C5 — integration + generality proof: THREE materially different situations
       through ONE `runRecoveryPlanning` (part 4, `9740c18`), no scenario branch.
 
@@ -297,12 +313,23 @@ integration acceptance. It is NOT claimed as passed here:
 ## Next action
 
 1. [DONE] C8 pure fact mapper committed + pushed (`e3cd300`); ledger current.
-2. C4 concrete PG progression PASS (PRIMARY) — author under `runtimeServices`,
-   typecheck/lint in Cloud, defer runtime to LOCAL; keep the ESCALATE gap reported.
-3. C9 Case projection static review (lane X) + C10 B1/B2 acceptance.
-4. Anti-hardcoding audit before handoff; finalize this LOCAL handoff ledger;
-   produce the final report ending EXACTLY with
-   `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`.
+2. [HOLD] C4 concrete lifecycle runner — PAUSED PENDING LANGGRAPH SPIKE (see
+   Contract-milestone status). Pure mapper kept; concrete runner NOT built here.
+   Do NOT start LangGraph work on this branch.
+3. TRANSPORT PROPOSER (OPEN R1 GAP, in-scope, NOT optional): implement the
+   concrete generalized provider-assisted TRANSPORT proposer as far as Cloud
+   truthfully permits (read-tool protocol + Atlas Search/Verify normalization +
+   REPLAY evidence + adapted fallbackPlanner/northstarPlanner algorithms).
+4. C9 Case projection contract/read-model integration needed for R2 (lane X).
+5. C10 B1/B2 acceptance/test mapping.
+6. Remaining Cloud-capable verification; anti-hardcoding audit before handoff;
+   finalize the LOCAL handoff ledger (must explicitly list: concrete lifecycle
+   runner deferred to the LangGraph decision; PostgreSQL/runtime checks for local
+   acceptance; any transport-provider proof requiring a local environment).
+7. Produce the final report ending EXACTLY with
+   `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`
+   (permitted only if all Cloud-capable R1 work other than the deliberately
+   paused concrete lifecycle runner is complete).
 
 ## Prohibitions (restated)
 
