@@ -4,7 +4,20 @@ Date: 2026-09-18
 
 Scope: read-only investigation on the B1 code line. No implementation was performed.
 
-Status: **ACCEPTED FINDINGS / ENGINEERING-PRODUCTIVITY LANE**
+Status: **H1-H4 IMPLEMENTED** on `fix/test-dev-performance-h1-h4`. I1-I4 remain Investigate Now.
+
+## Implementation measurements (H1-H4)
+
+| Item | Before | After |
+|---|---:|---:|
+| CURRENT serial (`--test-concurrency=1`) | ~30.4s audit / 25.8s this machine (811 tests) | n/a (still available as override) |
+| CURRENT bounded (`concurrency=4`) | n/a | **6.5s** duration / 811 pass |
+| `npm test` wall (boundary + CURRENT) | ~37.5s (7.1s + 30.4s) | **13.8s** (198 files classified) |
+| inboxOutbox claim/publish (clean) | drain-then-claim | **25ms** round-trip |
+| inboxOutbox + 2000 residue rows | pathological row-by-row drain (~22.4 min at ~40k) | **592ms** isolate + real claim/publish |
+| Same already-provisioned workspace boot | seconds (audit) | **230-382ms** |
+| Fresh AiT workspace boot | ~1-2 min (audit) | **73.6s** materialize + 67-journey baseline |
+| Repeat boot of that same new workspace | n/a | **377ms** |
 
 This is not a product milestone. Current product sequencing remains Founder B1 -> B2.
 

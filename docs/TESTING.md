@@ -44,14 +44,13 @@ Historical legacy failures are **not** current product correctness and **never**
 
 ### Current runner-performance note
 
-The suite runner currently applies `--test-concurrency=1` to **every** manifest suite.
-That is current harness behavior, not a universal correctness requirement.
+`scripts/run-suite.mjs` applies bounded `--test-concurrency=4` to the CURRENT no-DB /
+no-browser suite and keeps PostgreSQL, migration, and historical legacy suites serial
+(`--test-concurrency=1`). Pass an explicit `--test-concurrency=` extra arg to override.
 
-A 2026-09-18 read-only audit measured the CURRENT suite at 72 files / 802 tests in
-~30.4s plus ~7.1s for the boundary gate. CURRENT has no PostgreSQL and no browser. The
-serial default is historical carry-over from the older globbed/browser-heavy test topology
-and is now classified **Act Now / H3**: introduce bounded concurrency (target 4-8) for the
-CURRENT suite only after a focused harness change.
+A 2026-09-18 audit measured the serial CURRENT suite at 72 files / 802 tests in ~30.4s
+plus ~7.1s for the boundary gate. CURRENT has no PostgreSQL and no browser; the old
+always-serial default was historical carry-over, not a correctness requirement.
 
 Do **not** infer that PostgreSQL should also be parallelized. The PG suite shares one schema
 and includes global queue claims, concurrency/fencing tests and heavy AiT E2Es. It remains
@@ -59,7 +58,8 @@ serial until its isolation/connection-budget constraints are explicitly changed.
 
 Do not use raw `node --test` as a substitute for the manifest commands: it can discover
 PostgreSQL, migration and historical suites together. `npm test` is the canonical current
-no-DB command.
+no-DB command. Focused single-file runs may still pass explicit file paths to Node's test
+runner; that is not a substitute for a classified suite.
 
 Assertion failures are never classified as flakiness merely because resource contention
 also exists.
@@ -86,16 +86,19 @@ workspace-isolated, but `claimNextOutboxRow` is a global FIFO claim. Normal comm
 transactional outbox rows and there is currently no normal-runtime publisher, so repeated
 PG gates on a long-lived container accumulate PENDING rows.
 
-`inboxOutbox.pgtest.ts` currently drains unrelated PENDING rows one-by-one before testing
-its own claim/publish row. A dirty database with ~40k PENDING rows has spent ~22 minutes in
-that single drain. This is **test-harness residue**, not evidence that normal Northstar
-recovery takes 22 minutes.
+`inboxOutbox.pgtest.ts` isolates the shared test database from unrelated PENDING/CLAIMED
+queue residue with a test-only set-based cleanup, then exercises the real
+`claimNextOutboxRow` + `markOutboxPublished` (and inbox claim) protocol. Production global
+FIFO claim semantics are unchanged. This is **test-harness residue**, not evidence that
+normal Northstar recovery takes minutes.
 
-Current triage:
+Current triage after H1-H4:
 
-- **Act Now H1:** isolate the inbox/outbox test from unrelated queue residue with test-only
-  queue hygiene or an ephemeral DB; do not change production claim semantics merely for
-  speed.
+- **Done H1:** inbox/outbox tests no longer drain unrelated residue one-by-one.
+- **Done H2:** daily boot merges `.env` / `.env.local` for `PG_TARGET_*` and
+  `NORTHSTAR_DEMO_DATASET_DIR`; a fresh workspace remains an explicit reset.
+- **Done H3:** CURRENT suite concurrency is 4; PostgreSQL/migration/legacy stay serial.
+- **Done H4:** living docs and scripts name `npm test` / `run-suite.mjs` as canonical.
 - **Investigate I1/I2:** duplicated full-AiT setup in narrow F3/F5/F7 and
   `productBaselineWorld`.
 - **Investigate I3:** consider a separate heavy `postgres-world` checkpoint list without
@@ -104,9 +107,9 @@ Current triage:
 - **Park:** limited PG-file parallelism until queue isolation and connection budgets are
   proven.
 
-Until H1 lands, if a checkpoint gate is run on a long-lived local test container, inspect
-queue residue first or use a clean disposable container/database. Do not “fix” a slow gate
-by weakening B1/T2/F1 assertions.
+If a checkpoint gate is run on a long-lived local test container, inspect queue residue
+only if a *new* global-claim test lacks isolation. Do not “fix” a slow gate by weakening
+B1/T2/F1 assertions.
 
 ### The boundary is enforced, not documented
 
@@ -155,9 +158,9 @@ A normal PostgreSQL boot materializes a demo dataset only when `NORTHSTAR_DEMO_D
 
 Because provisioning is keyed on dataset identity plus content hash, restarting the process against the same database is a no-op, and a browser can never provision anything.
 
-For **daily development**, prefer a sticky workspace in a persistent local PostgreSQL
-container. Same database + same already-provisioned `PG_TARGET_WORKSPACE_ID` reuses the
-dataset and existing baseline and should boot in seconds.
+For **daily development**, persist a sticky workspace in `.env.local` against a persistent
+local PostgreSQL container. Same database + same already-provisioned `PG_TARGET_WORKSPACE_ID`
+reuses the dataset and existing baseline and should boot in seconds.
 
 A fresh workspace is an **explicit reset/proof operation**, not the default restart recipe.
 A new workspace pays the full AiT materialization (~47s in the 2026-09-18 audit), the
@@ -172,11 +175,10 @@ domain rows:
 - **Fresh container** — `npm run db:postgres:down` then `npm run db:postgres:up` for a
   completely clean disposable volume.
 
-Current configuration caveat: PostgreSQL target variables and
-`NORTHSTAR_DEMO_DATASET_DIR` are read from `process.env` by the target boot/config path;
-the auxiliary application `.env.local` merge does not currently make those target
-variables available. Until H2 is implemented, export them in the shell/dev launcher and
-reuse the same workspace value for normal restarts.
+Normal `npm run dev` merges `.env` then `.env.local` into the target boot env, so
+`PG_TARGET_*` and `NORTHSTAR_DEMO_DATASET_DIR` can live in `.env.local`. Process
+environment still wins. PostgreSQL tests do not apply that file merge, so a developer
+sticky workspace cannot steal the test database.
 
 `POST /api/v2/demo/reset` (the two-traveller placeholder world) returns `409 DEMO_DATASET_PROVISIONED` whenever a demo dataset is configured, so it cannot be used to append a second world to a provisioned one. An operator-facing "reset scenario" control needs lifecycle semantics — replaying a world forward rather than mutating observed history backwards — and is intentionally not implemented yet.
 

@@ -135,13 +135,16 @@ logic.
 The 2026-09-18 read-only test/dev-startup audit is a **parallel engineering lane**, not a
 product milestone.
 
-### Act Now
+### Done (engineering-productivity, 2026-09-18)
 
-- **H1 / very high:** isolate the inbox/outbox queue test from unrelated global test residue.
-- **H2 / very high:** use a sticky daily dev workspace; fresh workspace becomes an explicit
-  reset.
-- **H3 / high:** bounded parallelism for CURRENT no-DB/no-browser tests only.
-- **H4 / medium:** remove misleading raw-`node --test` documentation/footguns.
+- **H1:** isolate the inbox/outbox queue test from unrelated global test residue
+  without changing the production global claim contract.
+- **H2:** sticky daily `.env.local` workspace/demo loading; a fresh workspace is an
+  explicit reset.
+- **H3:** bounded parallelism (`--test-concurrency=4`) for CURRENT no-DB/no-browser
+  tests only. PostgreSQL/migration/legacy remain serial.
+- **H4:** living docs and scripts no longer imply raw `node --test` is the canonical
+  suite.
 
 ### Investigate Now
 

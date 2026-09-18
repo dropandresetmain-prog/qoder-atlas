@@ -1242,16 +1242,15 @@ Measured current state:
 - fresh AiT dev workspace boot pays real materialization (~47s) + 67-journey baseline
   (~11s); same database + same already-provisioned workspace boots in seconds.
 
-Triage:
+Triage after H1-H4:
 
-**Act Now**
+**Done**
 - H1: isolate `inboxOutbox.pgtest.ts` from unrelated global queue residue with test-only
-  queue hygiene or an ephemeral DB; do not change production claim semantics merely for
-  speed.
-- H2: make daily dev use a sticky workspace/config path; a fresh UUID is an explicit reset,
-  not the default restart behavior.
-- H3: allow bounded concurrency for the CURRENT no-DB/no-browser suite only.
-- H4: correct documentation that implies raw `node --test` is the canonical suite.
+  set-based cleanup; production claim semantics unchanged.
+- H2: daily `composeTargetBoot` merges `.env` / `.env.local` for `PG_TARGET_*` and
+  `NORTHSTAR_DEMO_DATASET_DIR`; a fresh UUID is an explicit reset.
+- H3: bounded concurrency for the CURRENT no-DB/no-browser suite only (`4`).
+- H4: living docs/scripts name `npm test` / `run-suite.mjs` as the canonical suite.
 
 **Investigate Now**
 - I1: F3/F5/F7 each pay a full AiT provision for narrow assertions;
