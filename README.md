@@ -32,9 +32,12 @@ flowchart LR
   C["Change / new information"] --> S["Canonical state"]
   S --> P["Affected scope + reassessment"]
   P --> RC["RecoveryCase"]
-  RC --> R["Recovery strategies"]
+  RC --> D["Recovery domains + evidence gaps"]
+  D --> T["Read-only research"]
+  T --> R["Recovery candidates"]
   R --> V["Deterministic viability"]
-  V --> A["Authority / approval"]
+  V --> M["Viable-only comparison / recommendation"]
+  M --> A["Authority / approval"]
   A --> E["Execution"]
   E --> O["Observation / reconciliation"]
   O --> S
@@ -51,38 +54,40 @@ No LLM directly invokes an irreversible or money-moving API.
 
 ## Current architecture
 
-**PostgreSQL + PostGIS is the sole normal Northstar runtime.**
+**PostgreSQL + PostGIS is the sole normal Northstar runtime.** SQLite is retained only as
+offline/read-only migration input and historical evidence.
 
-SQLite is retired from normal application operation. It remains only as offline,
-read-only migration input plus historical code/test evidence.
+The M0-M10/C5 state, evaluation, authority and durable-execution refactor remains accepted.
+The 2026-09-18 product-parity rebase found that generalized planning/reasoning and the rich
+decision surface were partially disconnected during convergence. NORTHSTAR is therefore
+**not** being rebuilt.
 
-The accepted F01-F18 data/state architecture is implemented through M10/C5. A later
-operational-runtime audit closed the missing runtime composition through R0/T3/T4/B1.
-
-The current generalized internal recovery path is:
+The frozen forward loop is:
 
 ```text
-ChangeSignal
--> canonical mutation
--> targeted invalidation
--> deterministic reassessment
--> escalation / RecoveryCase
--> StrategyProposer
--> counterfactual viability
--> ActionPlan
--> authority / approval
--> durable internal execution
--> observation
--> canonical update
+ChangeSignal / request / new information
+-> canonical state + deterministic reassessment
+-> RecoveryCase
+-> recovery-domain identification
+-> bounded provider-neutral read-only evidence
+-> StrategyProposer candidates
+-> schema validation
+-> RC-6 deterministic counterfactual viability
+-> material planning/decision evidence
+-> compare/recommend among VIABLE strategies
+-> ActionPlan + authority / approval
+-> execution
+-> observation / canonical update
 -> reassessment
--> resolution
+-> resolve, continue planning from new state, or escalate
 ```
 
-B1 is proven on the real AiT/Sarah world at
-`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
+The existing internal programme loop and product-boundary repair are useful implemented
+slices, not the complete rebased B1 acceptance proof.
 
 See:
 
+- [Recovery planning contract freeze](docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Architecture closure](docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md)
 - [Logical schema](docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md)
@@ -91,19 +96,19 @@ See:
 
 ## Current delivery status
 
-Next product gate:
+Current sequence:
 
-**Founder B1 physical acceptance**
+`R1 planning/evidence parity
+-> R2 Case decision surface
+-> R3 full rebased B1
+-> B2 consequential external execution / Jordan
+-> post-E2E product + provider hardening
+-> M11/C6`.
 
-Then:
-
-`B2 generalized external recovery / Jordan
--> Founder + generalisation verification
--> post-E2E observability / accepted Event Overview / provider hardening
--> M11 / C6 candidate`.
-
-Jordan is not a second hardcoded runtime. It is the materially different proof that the
-same lifecycle works with external-provider recovery.
+B1 includes read-only travel investigation/evaluation and cross-domain recommendation, but
+does not require consequential external booking/payment execution. B2 proves the same
+generalized engine when the selected strategy crosses an externally owned consequential
+boundary.
 
 See [Roadmap](docs/ROADMAP.md).
 
@@ -179,7 +184,7 @@ See [Testing](docs/TESTING.md).
 | Area | Current boundary |
 |---|---|
 | AI | Alibaba Cloud Model Studio/Qwen-capable proposal/extraction boundary; deterministic gates remain authoritative. |
-| Flights | Atlas LIVE/RECORD/REPLAY adapter seams; B2 will compose external recovery through the normal lifecycle. |
+| Flights | Atlas LIVE/RECORD/REPLAY search/verify/rules seams already exist; R1 composes read-only evidence into planning, while B2 adds consequential external dispatch. |
 | Hotels | Nuitée/liteAPI search/quote/book/retrieve/cancel provider seams. |
 | Ground context | Google Routes optional routing context, no booking action. |
 | FX | Frankfurter/ECB-reference comparison evidence, not payment FX. |
@@ -195,9 +200,8 @@ domain/application branches.
 
 Current critical proofs:
 
-- **Sarah** — generalized internal programme recovery after a provider-shaped disruption.
-- **Jordan** — planned B2 materially different external-provider recovery through the same
-  engine.
+- **Sarah** — rebased B1: provider reprotection, travel investigation/evaluation, programme alternatives, viable-only recommendation, internal execution and final recovery through one generalized planner.
+- **Jordan** — B2: materially different proof of the same planner/lifecycle under consequential external-provider execution.
 
 The broader acceptance corpus covers families/groups, shared bookings, programme changes,
 entry/advisory context, provider failure, concurrency and extensibility.

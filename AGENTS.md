@@ -14,51 +14,50 @@ Review is a risk-control step, not a ritual.
 
 ## Current project state
 
-The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository
-convergence is complete.
+The PostgreSQL/PostGIS data/state refactor through M10/C5 remains accepted. PostgreSQL is
+the sole normal NORTHSTAR runtime; SQLite is migration/historical input only and is never a
+fallback.
 
-A later read-only frontier runtime audit identified an operational-composition gap rather
-than a need to reopen the ontology. Its accepted R0 -> T3 -> T4 -> B1 sequence has now been
-implemented.
+The accepted 2026-09-18 product-parity audit established that the refactor also disconnected
+material generalized planning and product-decision capabilities. The existing
+state/evaluation/authority/execution spine is retained; the missing work is **planning
+composition and product parity**, not another engine rewrite.
 
-**PostgreSQL is the sole normal Northstar runtime.** SQLite is retired as an application
-runtime and exists only as explicit offline, read-only migration input or historical
-test/code archaeology. It is not a fallback, alternate or demo runtime.
-
-Current implementation candidate:
-
-`feature/sarah-provider-disruption` @
-`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
-
-The first complete generalized internal recovery loop is proven on the real AiT/Sarah
-world. The next gate is **Founder B1 physical acceptance**. After acceptance, the next
-implementation milestone is **B2 generalized external recovery / Jordan** through the
-same lifecycle.
+Forward architecture is frozen in
+`docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
 
 Current sequence:
 
-`Founder B1 -> B2 external/Jordan -> Founder + generalisation verification ->
-post-E2E observability/Event Overview/provider hardening -> M11/C6 candidate`.
+`R1 planning + decision-evidence parity
+-> R2 Case decision surface
+-> R3 full rebased B1
+-> B2 consequential external execution
+-> post-E2E product/observability/provider hardening
+-> M11/C6`.
 
-Do not reopen broad architecture unless implementation exposes a concrete requirement the
-frozen ontology cannot express.
+The earlier internal programme loop and B1 product-boundary repair remain valid implemented
+slices, but they are **not accepted as the complete B1 product reasoning proof**.
 
-## Source-of-truth order## Source-of-truth order
+Do not reopen the ontology, RC-6, M8 authority/execution, Atlas adapters or PostgreSQL
+runtime absent a concrete contradiction. Do not begin B2 before full rebased B1 acceptance.
+
+## Source-of-truth order
 
 Before broad implementation, inspect the actual branch/head and read the relevant parts of:
 
 1. `docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md` — frozen F01-F18 architecture decisions, ownership/cardinality/lifecycle semantics.
 2. `docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md` — approved persistence and transaction model.
-3. `docs/ARCHITECTURE.md` — concise **current** architecture map after C5/convergence.
-4. `docs/CAPABILITIES_AND_LIMITATIONS.md` — implemented reality and current limitations.
-5. `docs/ROADMAP.md` — milestone status, current delivery sequence and intentionally deferred scope.
-6. `docs/IMPLEMENTATION_PLAN.md` — historical M0-M11 execution decomposition plus the authoritative post-C5 delivery sequence in Section 22. Where old pre-C5 sequencing language conflicts with Section 22/current status docs, Section 22/current status wins.
-7. `docs/TESTING.md` — canonical suite classification and focused-test-first verification rules.
-8. `docs/work/ACTIVE_TASK.md` — current working-memory ledger for the active delivery slice.
-9. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
-10. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
-11. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for milestones/checkpoints.
-12. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
+3. `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` — frozen forward recovery-planning, evidence, recommendation, blast-radius, continuation and B1/B2 contracts.
+4. `docs/ARCHITECTURE.md` — concise **current** architecture map.
+5. `docs/CAPABILITIES_AND_LIMITATIONS.md` — implemented reality and current limitations.
+6. `docs/ROADMAP.md` — milestone status, current delivery sequence and intentionally deferred scope.
+7. `docs/IMPLEMENTATION_PLAN.md` — historical M0-M11 decomposition plus the authoritative current programme in Section 22.
+8. `docs/TESTING.md` — canonical suite classification, focused-test-first rules and foundational parity gate.
+9. `docs/work/ACTIVE_TASK.md` — current working-memory ledger.
+10. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
+11. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
+12. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for current phases/checkpoints.
+13. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
 
 Historical milestone evidence under `docs/refactor/evidence/**` is evidence of what was true at that checkpoint. Do not rewrite it to match the current runtime.
 
@@ -155,40 +154,59 @@ M11 is no longer a database-runtime migration. It is the final **operational act
 
 ## Product delivery discipline
 
-Forward planning no longer uses the old Slice A/Slice B umbrella labels as milestones.
+### R1 — planning + decision-evidence parity
 
-### Founder B1 — immediate gate
+Extend the current target planning composition; do not create another engine.
 
-Physically verify the real AiT product loop:
+Required path:
 
-`baseline -> disclosed disruption -> ChangeSignal/case -> recovery proposal ->
-deterministic viability -> operator approval -> internal execution -> observation ->
-reassessment -> resolved case`.
+`RecoveryCase/current failure
+-> recovery-domain identification
+-> bounded read-only evidence gathering
+-> StrategyProposer candidates
+-> schema validation
+-> RC-6 deterministic viability
+-> material decision evidence
+-> viable-only recommendation`.
 
-Implementation tests are not founder acceptance. Fix the first broken normal-product
-boundary if the physical flow fails.
+Read tools cannot express consequential operations. Material rejected alternatives remain
+explainable without being promoted into executable RecoveryStrategy rows.
 
-### B2 — next implementation milestone after Founder B1
+### R2 — Case decision surface
 
-B2 proves that the **same generalized engine** can recover a materially different trip
-through external-provider work.
+Adapt the rich pre-refactor Case information architecture onto PostgreSQL read models. The
+backend must explicitly project what changed, investigated/rejected/viable options,
+recommendation, immediate proposed-change blast radius, reassessment closure, outcome
+delta, approval, execution/observation and current recovery truth.
 
-Add only the minimum generalized capabilities required: flight-recovery proposer on the
-existing StrategyProposer port, provider-neutral external dispatch, Atlas read/transaction
-seams where supported, observation/reconciliation and truthful partial/unknown outcomes.
+Do not redesign Event Overview in this phase.
 
-Do not create Jordan-specific application/domain logic. Scenario data may change; engine
-code must not.
+### R3 — full rebased B1
+
+B1 proves Sarah's complete recovery **reasoning** plus internal programme execution:
+provider reprotection -> whole-trip FAIL -> travel research/evaluation -> programme-side
+candidates where relevant -> RC-6 -> comparison/recommendation -> operator approval ->
+internal execution -> observation -> reassessment -> PASS/resolution.
+
+This must emerge from generalized state/domains/evidence. No Sarah branch and no global
+flight-first/programme-second pipeline.
+
+A second materially different planning case must use the same coordinator/contracts before
+B1 acceptance. B1 does not require consequential external booking/payment execution.
+
+### B2 — consequential external execution
+
+B2 uses the same coordinator/evidence/proposer/RC-6/recommendation/ActionPlan/authority
+path and adds external ActionIntent dispatch, durable attempt-before-network, uncertain and
+partial outcomes, reconciliation before retry, provider observation, reassessment and
+continued recovery. Jordan is proof of generality, not a Jordan engine.
 
 ### After B2
 
-Run one focused generalisation review + founder verification, then proceed to semantic
-activity/observability, an accepted Event Overview design, provider hardening and M11/C6.
+Proceed to accepted Event Overview implementation, semantic operational history/provider
+hardening, final demo polish and M11/C6.
 
-The test/dev performance audit is a parallel engineering-productivity lane. It may improve
-feedback loops, but it is not a product milestone and must not silently weaken coverage.
-
-## Anti-hardcoding## Anti-hardcoding
+## Anti-hardcoding
 
 Never add scenario-specific branches, fixture IDs, traveller/event names, cities, routes, suppliers or demo dates to domain/recovery logic.
 
@@ -265,6 +283,18 @@ Every discovered issue/risk must be classified:
 - Ignore / Accept Risk
 
 Every intentionally excluded capability remains visible in `docs/ROADMAP.md` with reason/revisit condition. Never silently drop scope.
+
+
+## Foundational refactor parity gate
+
+For foundational migration/cutover work only, every pre-existing product capability must map:
+
+`OLD CAPABILITY -> NEW HOME -> PRESERVE | ADAPT | SUPERSEDED | RETIRE -> BEHAVIOURAL PROOF`.
+
+`RETIRE` requires an explicit product decision. `SUPERSEDED` requires behavioural proof,
+not merely a replacement class/module. A foundational milestone cannot silently retire a
+working product capability because its previous implementation was legacy-bound. Ordinary
+small refactors do not need this bureaucracy.
 
 ## Git and worktrees
 

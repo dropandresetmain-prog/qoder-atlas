@@ -9,9 +9,12 @@ flowchart TD
   I[Inputs / observations / requests] --> N[Normalisation + validation]
   N --> S[Authoritative current state]
   S --> C[Relevant-scope discovery + consequence evaluation]
-  C --> P[Recovery strategies]
+  C --> D[Recovery domains + evidence gaps]
+  D --> T[Bounded read-only evidence]
+  T --> P[Recovery candidates]
   P --> V[Deterministic scenario viability]
-  V --> A[Policy + authority]
+  V --> M[Viable-only comparison + recommendation]
+  M --> A[Policy + authority]
   A --> E[Typed execution]
   E --> O[Receipt / provider observation]
   O --> R[Reconciliation]
@@ -27,98 +30,97 @@ AI proposal -> validation -> deterministic viability -> authority
 
 An LLM cannot directly mutate authoritative state or invoke an irreversible or money-moving action.
 
-## Architecture status: runtime closure through B1
+## Architecture status: truth-rebased recovery loop
 
-The M0-M10 data/state refactor is implemented and accepted through **C5**. Post-C5
-repository convergence is complete.
+The M0-M10 data/state refactor is implemented and accepted through **C5**. PostgreSQL +
+PostGIS is the sole normal runtime; SQLite is migration/historical input only.
 
-**PostgreSQL + PostGIS is the sole normal Northstar runtime.** SQLite is retired as an
-application runtime and survives only as explicit offline, read-only migration input plus
-historical code/test evidence.
+The post-C5 R0/T3/T4/internal-programme work materially improved runtime composition and
+proved the deterministic internal execution slice. The accepted 2026-09-18 product-parity
+audit then established that this slice had been over-interpreted as the complete NORTHSTAR
+recovery engine. Useful pre-refactor planning/reasoning and Case capabilities had no
+equivalent new home.
 
-A 2026-09-18 read-only frontier runtime audit (Fable) found no reason to reopen F01-F18,
-but did find that operational runtime composition had emerged incrementally rather than
-being closed as a coherent lifecycle. T2 latency provided the concrete symptom: safe
-worker semantics combined with broad manifests and periodic scheduling produced poor
-end-to-end behavior.
+The forward recovery contract is now frozen in
+[`RECOVERY_PLANNING_CONTRACT_FREEZE.md`](RECOVERY_PLANNING_CONTRACT_FREEZE.md).
 
-That audit is now implemented through **R0 -> T3 -> T4 -> B1** on
-`feature/sarah-provider-disruption` at
-`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
+Current delivery:
 
-Current delivery is therefore:
+1. R1 — generalized planning + decision-evidence parity;
+2. R2 — PostgreSQL Case decision projection/surface;
+3. R3 — full rebased B1 (Sarah reasoning + internal execution);
+4. B2 — same engine with consequential external execution/reconciliation;
+5. post-E2E product/observability/provider hardening;
+6. M11/C6.
 
-1. Founder B1 physical acceptance;
-2. B2 generalized external recovery / Jordan through the same engine;
-3. Founder/generalisation verification;
-4. post-E2E observability, accepted Event Overview implementation and provider hardening;
-5. M11 / C6 exact-candidate rehearsal and operational activation.
+Historical R0/T3/T4/B1 evidence remains valid for what those checkpoints proved. It no
+longer defines the complete B1 product boundary.
 
 Normative/current architecture documents:
 
 - [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) —
-  frozen F01-F18, canonical ontology, ownership, lifecycles and extension semantics.
-- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational
-  schema, integrity, transaction and persistence contracts.
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) §22 — authoritative current
-  delivery plan after the runtime-closure reconciliation.
-- [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — current
-  implementation truth and limitations.
-- [`ROADMAP.md`](ROADMAP.md) — current milestone status and deferred scope.
+  frozen F01-F18 ontology/ownership/lifecycle decisions;
+- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — persistence
+  and transaction model;
+- [`RECOVERY_PLANNING_CONTRACT_FREEZE.md`](RECOVERY_PLANNING_CONTRACT_FREEZE.md) —
+  forward planning/evidence/recommendation/blast/continuation/B1-B2 contracts;
+- [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — implemented
+  capability truth;
+- [`ROADMAP.md`](ROADMAP.md) and [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
+  §22 — delivery sequence.
 
-Historical milestone evidence under `docs/refactor/evidence/**` records what was true at
-each checkpoint and should not be rewritten to match the present runtime.
+Historical milestone evidence under `docs/refactor/evidence/**` remains historical truth
+and is not rewritten.
 
-## Operational runtime closure
+## Recovery architecture
 
-The normal generalized lifecycle now exists as a composed runtime path:
+The deterministic PostgreSQL spine already exists. The missing composition sits between a
+RecoveryCase/current failure and the existing candidate-validation/RC-6 path:
 
 ```text
-external/state change
- -> ChangeSignal
- -> canonical mutation
- -> targeted invalidation
- -> deterministic reassessment
- -> deterministic escalation
- -> RecoveryCase
- -> StrategyProposer
- -> schema validation
- -> deterministic counterfactual viability
- -> RecoveryStrategy / ActionPlan
+authoritative change / request / new information
+ -> ChangeSignal + canonical state
+ -> targeted invalidation / M6 reassessment
+ -> deterministic escalation / RecoveryCase
+ -> Recovery Planning Coordinator
+      -> relevant recovery domains
+      -> evidence gaps
+      -> bounded read-only capability calls
+      -> StrategyProposers
+      -> ProposalCandidates
+ -> schema/business validation
+ -> RC-6 counterfactual evaluation
+      -> material deterministic rejection evidence
+      -> VIABLE RecoveryStrategies
+ -> viable-only strategy comparison / recommendation
+ -> ActionPlan
  -> authority / approval
- -> durable executor
- -> observation
- -> canonical state update
+ -> executor
+ -> observation / reconciliation
+ -> canonical state
  -> reassessment
- -> resolution / continue
+ -> Recovery Lifecycle Progression
+      -> resolve
+      -> re-enter planning from the new current basis
+      -> or escalate / await decision
 ```
 
-The important operational decisions are:
+Key boundaries:
 
-- **ChangeSignal is the causal/provenance spine.** A disruption is not inferred later from
-  UI adjacency; the signal links change, invalidated subjects, assessment consequences and
-  case cause.
-- **Assessment manifests are subject-bound.** Capture batching is an implementation detail,
-  not an input-dependency claim. Shared dependencies remain shared where the subject
-  actually reads them.
-- **One runtime-services root owns background work.** Reassessment, case lifecycle and
-  execution scheduling are not started from competing composition roots.
-- **Known time expiry is runnable work.** `nextInvalidationAt` is scheduled through the
-  normal reassessment path rather than silently allowing stale CURRENT state.
-- **Escalation is deterministic.** UI does not decide when FAIL/UNKNOWN becomes recovery
-  work.
-- **StrategyProposer proposes; it never decides viability.** Deterministic validation and
-  counterfactual evaluation remain authoritative.
-- **Internal and external execution share the same safety boundary.** B1 proves the
-  internal programme executor; B2 adds provider dispatch without bypassing the same plan,
-  authority, observation and reassessment semantics.
-- **Provider/API success is never recovered-trip proof.** Resolution requires reconciled
-  execution and fresh passing case-subject assessment.
+- **StrategyProposer proposes; RC-6 decides viability.**
+- **Read-only planning tools cannot represent consequential operations.**
+- **Viable executable alternatives remain RecoveryStrategy objects.** Material rejected
+  alternatives are bounded planning evidence, not fake executable strategies.
+- **Recommendation sees only current VIABLE strategies** and cannot override RC-6.
+- **RuntimeServices remains the single composition root.** One recovery-lifecycle
+  progression owner restores continued recovery without restoring RuntimeOrchestrator.
+- **Provider/API success is not recovery.** Resolution still requires reconciled execution
+  and fresh required-subject PASS.
 
 ### Counterfactual viability (RC-6)
 
-The dependency closure answers **who must be reassessed**. It does not mean every reached
-subject must become PASS for a candidate to be viable.
+The dependency closure answers **what must be reassessed**. It does not mean every reached
+subject must become PASS.
 
 A strategy is viable only when:
 
@@ -128,14 +130,22 @@ A strategy is viable only when:
 4. explicit `requiredUnknowns` are absent.
 
 Unchanged pre-existing unrelated FAIL/UNKNOWN remains visible and truthful but does not
-automatically veto the strategy. It is not treated as healed.
+automatically veto the strategy.
 
-Case resolution is narrower than overlay evaluation: it requires the case's required
-subjects to be current PASS and execution to be completed/reconciled. A regression on
-another subject opens/updates its own recovery work instead of being hidden inside the
-original case.
+### Three distinct impact semantics
 
-## Current implemented architecture## Current implemented architecture
+Backend/read models must keep these separate:
+
+1. **`immediateChangeBlastRadius`** — direct changed/affected objects and subjects from
+   validated ScenarioChange effects plus deterministic direct-impact projection;
+2. **`reassessmentClosure`** — broader M6/RC-6 dependency/applicability scope actually
+   reevaluated;
+3. **`outcomeDelta`** — decision-time baseline -> candidate subject verdicts classified
+   better/worse/unchanged.
+
+The browser never infers or collapses these meanings.
+
+## Current implemented architecture
 
 The current runtime is a PostgreSQL-backed modular monolith with deterministic domain/evaluation code separated from persistence, provider adapters and delivery workers.
 
@@ -312,10 +322,9 @@ The final Event Overview visual design is unresolved. Do not create backend-spec
 
 ## Current delivery boundary
 
-The next product proof is Slice A:
+Implementation proceeds against the frozen recovery-planning contract:
 
-`known Sarah baseline -> provider-shaped disruption through normal HTTP -> PostgreSQL mutation/evaluation -> incident-linked five-person outcome -> four cleared/Sarah failed -> one Sarah case -> click/reload authoritative case`
+`R1 planning/evidence parity -> R2 Case decision surface -> R3 full rebased B1 -> B2 external execution`.
 
-Only after founder testing that slice should Slice B add strategy/preview/approval/execution/observation/recovery.
-
-M11 follows proven product slices as an **operational activation/retirement** milestone, not a return to or migration from an active SQLite runtime.
+Event Overview redesign remains separate. M11 remains operational activation/retirement,
+not a return to an active SQLite runtime.

@@ -30,6 +30,7 @@ implementation plan.
   fallbacks appear with the scenario table below.
 - Cases A/B/C remain frozen **engine acceptance cases** (historical proof
   paths); they are not the current final scenario source of truth.
+- `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` — current generalized planning/evidence/B1-B2 behavioural contract; scenario choreography cannot override it.
 - `docs/ROADMAP.md` — capability scope/status, including the MVP vs
   High-Priority Stretch recording of this catalogue.
 - The earlier S1–S4 scenario families from superseded demo-readiness planning
@@ -102,17 +103,18 @@ The airline may already have automatically proposed replacement travel.
 For the critical traveller, that replacement gets them to the destination but
 violates downstream requirements such as rehearsal, rest or keynote timing.
 
-Northstar evaluates alternatives across:
+Northstar evaluates recovery possibilities across relevant domains rather than jumping
+straight to a programme change. The generalized planning coordinator may investigate:
 
-- transport;
-- connections;
-- arrival buffers;
-- hotel;
-- transfer;
-- event commitments;
+- transport alternatives and provider reprotection quality;
+- connections and arrival buffers;
+- hotel/transfer consequences where applicable;
+- event commitments and programme-side alternatives;
 - fare/change rules;
-- policy;
-- authority.
+- policy, preferences and authority context.
+
+Which domains are investigated and in what order must emerge from current state,
+dependencies, evidence gaps and registered capabilities — never from an S1/Sarah branch.
 
 **Core thesis:** Provider rebooked does not necessarily mean trip recovered.
 
@@ -140,12 +142,12 @@ CGK→SIN).
 | **Initial state** | Post-booking. Five CGK→SIN speakers share synthetic Batik ID7159 (30 Sep 17:45→20:30). Sarah’s hard commitment is Day-1 headline **11:30**. The 150-minute buffer is initially clear. |
 | **Trigger** | Simulated airline schedule change / retime enters via the real flight-event ingress (`SIMULATED SOURCE EVENT` disclosed — not LIVE). |
 | **Successive state changes** | Synthetic ID7159 is cancelled; all five tickets are involuntarily reprotected to synthetic ID7153 (1 Oct 07:45→10:30). Blast radius fans out per traveller. |
-| **Provider/AI/tool evidence** | Organiser-supplied synthetic Batik inputs; no Atlas evidence is claimed. Deterministic constraint eval uses `MIN_BUFFER` 150 and the programme commitment graph. |
-| **Deterministic viability** | Felix’s 16:30 REQUIRED slot is **VIABLE** (360 minutes after arrival); Sarah’s 11:30 slot is **NOT_VIABLE** (60 minutes against the 150-minute buffer). S3 provides the bilateral Sarah↔Daniel programme swap. |
-| **Authority/decision** | Organiser-facing recovery case; programme-side options may be **proposed** but not auto-committed. |
-| **Surfaces** | Organiser blast-radius / case view; traveller trip view for Sarah. |
-| **Action/observation** | No money-moving auto-act that “fixes” the headline; hand-off into **S3** on the **same trip** (no reset). |
-| **Final state (of S1 alone)** | Critical case remains open / not fully resolved pending programme change. |
+| **Provider/AI/tool evidence** | The provider reprotection remains truthfully sourced from the scenario input. Once Sarah still fails whole-trip assessment, the generalized coordinator gathers provider-neutral read-only travel evidence (LIVE/RECORD/REPLAY provenance stated truthfully) for materially relevant alternatives; no consequential provider action occurs in B1. |
+| **Deterministic viability** | Felix’s later REQUIRED slot remains viable while Sarah’s 11:30 slot fails. Travel alternatives are evaluated through RC-6; material rejected/inferior travel-only alternatives remain explainable. Programme candidates are generated only when current evidence/dependencies make PROGRAMME applicable. |
+| **Comparison/decision** | Only deterministically VIABLE strategies enter comparison. NORTHSTAR records a structured recommendation/trade-offs; organiser approval remains required for programme mutation. |
+| **Surfaces** | Organiser Case shows investigated domains/evidence, rejected and viable material alternatives, recommendation, immediate proposed-change blast radius, broader reassessment closure and outcome delta; traveller surface shows current trip truth. |
+| **Action/observation** | If the recommended B1 strategy is programme-side, approval executes through the existing internal ActionPlan/authority path, observes the canonical programme update and reassesses. No money-moving provider action occurs. |
+| **Final state** | S1→S3 is one continuous RecoveryCase lifecycle. B1 closes only after Sarah is current PASS and the case resolution gate succeeds; unrelated FAIL/UNKNOWN remains truthful. |
 
 ## S2 — Traveller misses a connection; airline recovery is not good enough
 
@@ -281,19 +283,26 @@ Do **not** treat VietJet VJ823 as a direct NRT→SIN 12:55 hero option (recordin
 - **Provenance:** REPLAY expected for routine demo runs, backed by existing
   LIVE/SANDBOX integration evidence where applicable.
 
-**S1 → S3 Continuity:** S3 continues directly from S1 without reset.
+**S1 → S3 Continuity:** S3 continues directly from S1 without reset and is the programme
+domain of the same generalized planning lifecycle, not a second engine/stage hardcoded
+after flight recovery.
 
-Northstar may PROPOSE programme/non-travel recovery options but cannot autonomously mutate the programme.
+Northstar may PROPOSE programme/non-travel recovery options but cannot autonomously mutate
+the programme.
 
-Preferred resolution:
-- critical traveller's existing airline rebooking does not satisfy current speaking slot
-- Northstar proposes moving/swapping the slot with a later commitment held by a local/non-travel-dependent participant
-- organiser previews impact with zero authoritative mutation
-- organiser approves/commits
-- programme state updates
-- affected S1 case re-runs/re-evaluates
-- previously insufficient airline rebooking becomes viable
-- case resolves
+B1 acceptance requires:
+- existing provider reprotection still fails Sarah's current whole-trip assessment;
+- the coordinator identifies relevant domains/evidence gaps from current state;
+- materially relevant travel alternatives are researched/evaluated first **only when the
+  evidence gap requires that work** — there is no globally fixed travel-first order;
+- material rejected/inferior travel-only alternatives remain explainable;
+- programme candidates are generated and RC-6 evaluated;
+- immediate programme-change blast radius, reassessment closure and outcome delta are
+  separate;
+- viable strategies are compared and a preferred strategy is recommended/explained;
+- organiser previews/approves the exact selected change;
+- programme state updates through the normal internal ActionPlan/authority/execution path;
+- observation and reassessment establish Sarah PASS before the case resolves.
 
 A headline speaker's availability changes because of another commitment.
 
