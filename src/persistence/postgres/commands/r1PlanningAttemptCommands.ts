@@ -279,6 +279,32 @@ export async function findRecoveryPlanningAttemptForBasis(
   return rowToAttempt(result.rows[0]);
 }
 
+/**
+ * Read helper: the most recently COMPLETED attempt for a case, if any. Serves
+ * the C9 Case projection (freeze §12), which surfaces the latest decision-time
+ * planning evidence. Orders by `completed_at DESC` (never by insertion/uuid) and
+ * is backed by `idx_recovery_planning_attempts_case`
+ * `(workspace_id, recovery_case_id, completed_at DESC)`; ties are broken by the
+ * unique `(recovery_case_id, basis_assessment_id)` row so the result is stable.
+ */
+export async function findLatestRecoveryPlanningAttemptForCase(
+  db: Queryable,
+  workspaceId: string,
+  recoveryCaseId: string,
+): Promise<RecoveryPlanningAttemptRow | undefined> {
+  const result = await db.query<RecoveryPlanningAttemptRawRow>(
+    `SELECT id, recovery_case_id, basis_assessment_id, basis_manifest, started_at, completed_at,
+            coordinator_version, domains, evidence, material_candidates, viable_strategy_refs,
+            recommendation, outcome
+       FROM recovery_planning_attempts
+      WHERE workspace_id = $1 AND recovery_case_id = $2
+      ORDER BY completed_at DESC, basis_assessment_id DESC
+      LIMIT 1`,
+    [workspaceId, recoveryCaseId],
+  );
+  return rowToAttempt(result.rows[0]);
+}
+
 /** The driver row shape for one `recovery_planning_attempts` row. */
 interface RecoveryPlanningAttemptRawRow {
   id: string;

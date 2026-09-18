@@ -29,6 +29,7 @@ import {
   type CohortTravellerEvaluationInput,
 } from '../cohortDisruption.ts';
 import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
+import { findLatestRecoveryPlanningAttemptForCase } from '../../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
@@ -568,6 +569,12 @@ async function loadRecoveryCaseFactsInner(
   const recoveryActions = await loadRecoveryActionFacts(client, workspaceId, caseId);
   const generatedAt = isoNow(at);
 
+  // C9: the latest completed planning attempt (frozen C1 record + outcome) for
+  // this case, surfaced as decision-time evidence in the projection. A case that
+  // has never run the coordinator has no attempt row and carries none here —
+  // never a fabricated planning record. Requires PG at runtime (LOCAL acceptance).
+  const planningAttempt = await findLatestRecoveryPlanningAttemptForCase(client, workspaceId, caseId);
+
   // Ascending, so option 1 is the first option this case produced. The
   // strategies themselves are projected further down, once each case
   // subject's CURRENT verdict is known — an option can only say who it fixes
@@ -830,6 +837,7 @@ async function loadRecoveryCaseFactsInner(
     connectionProgression,
     recoveryActions,
     subjectFacts,
+    ...(planningAttempt ? { planningAttempt } : {}),
   };
 }
 

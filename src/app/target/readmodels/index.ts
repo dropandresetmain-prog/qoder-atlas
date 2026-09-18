@@ -4,6 +4,7 @@ export * from './mapConnectionProgression.ts';
 export * from './pgFactAssembler.ts';
 export * from './projectIncidentProgramme.ts';
 export * from './projectOperatorOverview.ts';
+export * from './projectPlanningEvidence.ts';
 export * from './projectRecoveryCase.ts';
 export * from './projectTravellerTrip.ts';
 export * from './recoveryActionProjection.ts';

@@ -73,6 +73,7 @@
       "test/providers.atlas.test.ts",
       "test/providers.foundation.test.ts",
       "test/providers.google.test.ts",
+      "test/r1-case-projection.test.ts",
       "test/r1-comparator.test.ts",
       "test/r1-coordinator-generality.test.ts",
       "test/r1-decision-evidence.test.ts",

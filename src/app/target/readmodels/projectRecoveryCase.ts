@@ -4,6 +4,7 @@ import {
 } from '../../../contracts/v2/product/readModels.ts';
 import { buildChangeAwareness } from './changeAwareness.ts';
 import { projectLiveDependencyGraph } from './liveDependencyGraph.ts';
+import { projectPlanningEvidence } from './projectPlanningEvidence.ts';
 import {
   deriveDuplicateBookingExposure,
   derivePartialRecovery,
@@ -32,6 +33,13 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     const note = exposure.detail ?? 'duplicate booking/cost exposure';
     if (!uncertainty.includes(note)) uncertainty.push(note);
   }
+
+  // C9: decision-time planning evidence, derived purely from the frozen attempt
+  // record when one exists. Structurally separate from the current-state fields
+  // above (its `phase`/`asOf` mark it as planning-time, freeze §12 line 529).
+  const planningEvidence = input.planningAttempt
+    ? projectPlanningEvidence(input.planningAttempt.attempt, input.planningAttempt.outcome)
+    : undefined;
 
   return RecoveryCaseViewSchema.parse({
     generatedAt: input.generatedAt,
@@ -68,6 +76,7 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     remainingRecoveryWork: [...remainingRecoveryWork],
     ...(partialRecovery ? { partialRecovery } : {}),
     duplicateBookingExposure: duplicateBookingExposure.map((e) => ({ ...e })),
+    ...(planningEvidence ? { planningEvidence } : {}),
     ldg,
     change: buildChangeAwareness(input),
   });

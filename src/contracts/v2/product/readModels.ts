@@ -444,6 +444,126 @@ export const CausalPathStepSchema = z.strictObject({
 });
 export type CausalPathStep = z.infer<typeof CausalPathStepSchema>;
 
+/**
+ * C9 — a human-label-primary presentation of one decision-time fact, with the
+ * typed ref / closed-vocab code kept as SECONDARY metadata (freeze §12: "human
+ * labels plus typed refs as secondary metadata"; line 529: "Internal
+ * UUIDs/capability codes are never the primary product explanation"). `label`
+ * is always present and human-readable; `ref`/`code` are optional and machine.
+ */
+export const PlanningEvidenceLabelSchema = z.strictObject({
+  /** Human-readable explanation — PRIMARY. Never an internal UUID. */
+  label: z.string().min(1),
+  /** Typed subject/strategy ref — SECONDARY. */
+  ref: z.string().min(1).optional(),
+  /** Closed-vocabulary code — SECONDARY. */
+  code: z.string().min(1).optional(),
+});
+export type PlanningEvidenceLabel = z.infer<typeof PlanningEvidenceLabelSchema>;
+
+/** C9 Q4 — one recovery domain NORTHSTAR investigated (or did not), and why. */
+export const PlanningDomainEvidenceViewSchema = z.strictObject({
+  domain: PlanningEvidenceLabelSchema,
+  disposition: PlanningEvidenceLabelSchema,
+  /** Human-readable reason derived from the domain's closed reason code. */
+  reason: z.string().min(1).optional(),
+});
+export type PlanningDomainEvidenceView = z.infer<typeof PlanningDomainEvidenceViewSchema>;
+
+/** C9 Q5 — one read-only tool/evidence result with provenance + uncertainty. */
+export const PlanningToolEvidenceViewSchema = z.strictObject({
+  tool: PlanningEvidenceLabelSchema,
+  status: PlanningEvidenceLabelSchema,
+  provenanceMode: PlanningEvidenceLabelSchema,
+  /** Human provider label when the result carried one; never required. */
+  provider: z.string().min(1).optional(),
+  observedAt: z.string().datetime({ offset: true }).optional(),
+  /** Bounded factual summary carried by the evidence record. */
+  summary: z.string().min(1),
+  uncertainties: z.array(z.string().min(1)).default([]),
+  evidenceRef: z.string().min(1),
+});
+export type PlanningToolEvidenceView = z.infer<typeof PlanningToolEvidenceViewSchema>;
+
+/** C9 Q12 — one subject's decision-time baseline -> candidate movement. */
+export const PlanningOutcomeDeltaViewSchema = z.strictObject({
+  subject: PlanningEvidenceLabelSchema,
+  direction: PlanningEvidenceLabelSchema,
+  baseline: z.string().min(1).optional(),
+  candidate: z.string().min(1),
+});
+export type PlanningOutcomeDeltaView = z.infer<typeof PlanningOutcomeDeltaViewSchema>;
+
+/**
+ * C9 Q10/Q11 — the three distinct impact semantics, kept separate (never
+ * collapsed): what the proposal directly changes/affects versus the broader
+ * closure RC-6 reassessed.
+ */
+export const PlanningBlastRadiusViewSchema = z.strictObject({
+  changed: z.array(PlanningEvidenceLabelSchema).default([]),
+  directlyAffected: z.array(PlanningEvidenceLabelSchema).default([]),
+  reassessed: z.array(PlanningEvidenceLabelSchema).default([]),
+});
+export type PlanningBlastRadiusView = z.infer<typeof PlanningBlastRadiusViewSchema>;
+
+/** C9 Q6/Q7 — one material alternative considered, and its disposition/reasons. */
+export const PlanningCandidateViewSchema = z.strictObject({
+  candidateKey: z.string().min(1),
+  domain: PlanningEvidenceLabelSchema,
+  proposer: PlanningEvidenceLabelSchema,
+  disposition: PlanningEvidenceLabelSchema,
+  /** Present only when the candidate was promoted to a viable RecoveryStrategy. */
+  strategyRef: z.string().min(1).optional(),
+  /** Human-readable rejection / viability reasons (never the primary uuid). */
+  reasons: z.array(z.string().min(1)).default([]),
+  outcomeDelta: z.array(PlanningOutcomeDeltaViewSchema).default([]),
+  blastRadius: PlanningBlastRadiusViewSchema.optional(),
+});
+export type PlanningCandidateView = z.infer<typeof PlanningCandidateViewSchema>;
+
+/** C9 Q9 — the recommended viable strategy and the human "why" behind it. */
+export const PlanningRecommendationViewSchema = z.strictObject({
+  recommended: PlanningEvidenceLabelSchema,
+  alternatives: z.array(PlanningEvidenceLabelSchema).default([]),
+  basis: z.array(z.strictObject({
+    kind: PlanningEvidenceLabelSchema,
+    summary: z.string().min(1),
+  })).default([]),
+  provenance: PlanningEvidenceLabelSchema,
+});
+export type PlanningRecommendationView = z.infer<typeof PlanningRecommendationViewSchema>;
+
+/**
+ * C9 — the planning-time decision-evidence block. `phase` is a hard literal and
+ * `asOf` is the attempt's completion instant, so this evidence is VISIBLY
+ * distinguishable from the current authoritative state presented elsewhere in
+ * `RecoveryCaseView` (freeze §12 line 529). It answers Q4-Q12: domains
+ * investigated, read-only tools/evidence + provenance, material alternatives and
+ * their rejection reasons, the recommendation and its human basis, and the three
+ * distinct impact projections. Q1-Q3 and Q13-Q17 are already answered by the
+ * current-state fields of `RecoveryCaseView`.
+ */
+export const PlanningEvidenceViewSchema = z.strictObject({
+  /** Decision-time discriminator — never current authoritative state. */
+  phase: z.literal('DECISION_TIME'),
+  /** When this planning attempt completed (its evidence horizon). */
+  asOf: z.string().datetime({ offset: true }),
+  attemptRef: z.string().min(1),
+  coordinatorVersion: z.string().min(1),
+  outcome: PlanningEvidenceLabelSchema,
+  domains: z.array(PlanningDomainEvidenceViewSchema).default([]),
+  tools: z.array(PlanningToolEvidenceViewSchema).default([]),
+  candidates: z.array(PlanningCandidateViewSchema).default([]),
+  /**
+   * Decision-time viable strategy refs (Q8). Their rich human detail (option
+   * number, who they fix, cost) lives in the current-state `strategies[]` block;
+   * these are the refs the attempt promoted, labeled so a uuid is never primary.
+   */
+  viableStrategies: z.array(PlanningEvidenceLabelSchema).default([]),
+  recommendation: PlanningRecommendationViewSchema.optional(),
+});
+export type PlanningEvidenceView = z.infer<typeof PlanningEvidenceViewSchema>;
+
 export const RecoveryCaseViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   caseRef: z.string().min(1),
@@ -489,6 +609,12 @@ export const RecoveryCaseViewSchema = z.strictObject({
   remainingRecoveryWork: z.array(z.string().min(1)).default([]),
   partialRecovery: PartialRecoveryViewSchema.optional(),
   duplicateBookingExposure: z.array(DuplicateBookingExposureViewSchema).default([]),
+  /**
+   * C9 — planning-time decision evidence (Q4-Q12), structurally distinguishable
+   * from the current authoritative state above via its `phase`/`asOf` fields.
+   * Optional: a case that has not yet run a planning attempt carries none.
+   */
+  planningEvidence: PlanningEvidenceViewSchema.optional(),
   ldg: LiveDependencyGraphSchema,
   change: ChangeAwarenessSchema,
 });

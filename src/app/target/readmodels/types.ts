@@ -205,6 +205,17 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
   partialRecovery?: import('../../../contracts/v2/product/readModels.ts').PartialRecoveryView;
   duplicateBookingExposure?: readonly import('../../../contracts/v2/product/readModels.ts').DuplicateBookingExposureView[];
   /**
+   * C9 — the latest completed recovery planning attempt for this case (raw
+   * frozen C1 record + its closed outcome), when one exists. `projectRecoveryCase`
+   * derives the decision-time `planningEvidence` view from it; the record is
+   * passed through UNMODIFIED so the projector stays a pure function of frozen
+   * contract types. Optional: a case that has not planned carries none.
+   */
+  planningAttempt?: {
+    attempt: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningAttempt;
+    outcome: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningOutcome;
+  };
+  /**
    * Internal only — never parsed into `RecoveryCaseView`. Each case subject's
    * own tone/evaluation status (and, defect-1, its raw EVALUATION_LIFECYCLE
    * xid8 `stamp`), so callers building other projections (e.g. the overview,
