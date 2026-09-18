@@ -144,21 +144,17 @@ Requires Node.js 24+, PostgreSQL/PostGIS and the target runtime environment.
 ```bash
 npm install
 npm run db:postgres:up
-
-export PG_TARGET_WORKSPACE_ID=<stable-local-uuid>
-export NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026
-
 npm run dev
 ```
 
-Open `http://localhost:8787`.
+Put a stable `PG_TARGET_WORKSPACE_ID` and `NORTHSTAR_DEMO_DATASET_DIR` in `.env.local`
+(see `.env.example`). Open `http://localhost:8787`.
 
 For daily development, **reuse the same workspace ID**. A new workspace intentionally
 re-materializes the full AiT world and reruns the baseline, which can add about a minute
 to startup. Use a fresh UUID only when you explicitly need a clean independent world.
 
-Current target/demo variables are read directly from `process.env`; see
-[Environment](docs/ENVIRONMENT.md) for details.
+See [Environment](docs/ENVIRONMENT.md) for target/demo variable loading.
 
 ## Verify
 

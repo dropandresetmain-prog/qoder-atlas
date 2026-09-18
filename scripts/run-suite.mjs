@@ -7,6 +7,10 @@
  * required to stay away from. Adding a test file without classifying it makes
  * `npm run gate:test-boundary` fail rather than silently joining a suite.
  *
+ * Canonical verification is `npm test` / `npm run test:*`, which call this
+ * runner. Do not treat raw `node --test` as the suite command: without the
+ * manifest it can discover PostgreSQL, migration and historical files together.
+ *
  * Usage: node scripts/run-suite.mjs <current|postgres|migration|legacy> [--list] [extra node --test args]
  */
 
@@ -14,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveTestConcurrencyArg, suiteTestConcurrency } from './suite-concurrency.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(repoRoot, 'test/suites.json'), 'utf8'));
@@ -47,12 +52,16 @@ if (classification === 'HISTORICAL_LEGACY') {
   console.warn('');
 }
 
-console.log(`suite "${suiteName}" (${classification}): ${files.length} file(s)`);
+const extra = rest.filter((a) => a !== '--list');
+const concurrencyArg = resolveTestConcurrencyArg(suiteName, extra);
+const nodeArgs = ['--test'];
+if (concurrencyArg) nodeArgs.push(concurrencyArg);
+nodeArgs.push(...extra, ...files);
 
-const result = spawnSync(
-  process.execPath,
-  ['--test', '--test-concurrency=1', ...rest.filter((a) => a !== '--list'), ...files],
-  { cwd: repoRoot, stdio: 'inherit' },
+console.log(
+  `suite "${suiteName}" (${classification}): ${files.length} file(s) concurrency=${suiteTestConcurrency(suiteName)}${concurrencyArg ? '' : ' (overridden)'}`,
 );
+
+const result = spawnSync(process.execPath, nodeArgs, { cwd: repoRoot, stdio: 'inherit' });
 
 process.exit(result.status ?? 1);
