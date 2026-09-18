@@ -77,18 +77,18 @@ See `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
 
 ### Checkpoint 2 — forward SSOT reconciliation
 
-- [ ] Reconcile AGENTS/README/ARCHITECTURE/CAPABILITIES/ROADMAP/SCENARIOS.
-- [ ] Preserve historical evidence unchanged.
-- [ ] Verify only docs changed.
+- [x] Reconcile AGENTS/README/ARCHITECTURE/CAPABILITIES/ROADMAP/SCENARIOS.
+- [x] Preserve historical evidence unchanged.
+- [x] Verify checkpoint diff contains documentation only.
 
 ### Checkpoint 3 — implementation/test programme
 
-- [ ] Rebase `IMPLEMENTATION_PLAN.md` §22.
-- [ ] Rebase `IMPLEMENTATION_AGENT_ROUTING.md`.
-- [ ] Add foundational parity rules/behavioural tests to `TESTING.md`.
-- [ ] Reconcile this ledger against final docs.
-- [ ] Verify no production source changed.
-- [ ] Record final branch/SHAs.
+- [x] Rebase `IMPLEMENTATION_PLAN.md` §22.
+- [x] Rebase `IMPLEMENTATION_AGENT_ROUTING.md`.
+- [x] Add foundational parity rules/behavioural tests to `TESTING.md`.
+- [x] Reconcile this ledger against final docs.
+- [x] Verify no production source is intentionally modified; final Git compare is the closing check.
+- [ ] Record final branch/SHAs in the completion report.
 
 ## Next implementation after this planning branch is accepted
 

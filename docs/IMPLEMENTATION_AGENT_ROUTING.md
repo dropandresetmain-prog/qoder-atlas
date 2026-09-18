@@ -6,23 +6,40 @@ This file gives **three viable model + harness routes** for every M0-M11 milesto
 
 Last routing review: **2026-09-13**.
 
-## Current delivery routing addendum — 2026-09-18
+## Current delivery routing addendum — truth-rebased 2026-09-18
 
-The M0-M11/C0-C6 table below is retained for historical/provider-risk context. Current
-delivery follows `IMPLEMENTATION_PLAN.md` §22 and `ROADMAP.md`.
+The M0-M11/C0-C6 table below remains useful historical/provider-risk context. Current
+delivery is now R1 -> R2 -> R3/B1 -> B2 per `IMPLEMENTATION_PLAN.md` §22 and
+`RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
 
-Current routing:
+The three routes are alternatives, not a committee.
 
-| Work | Class | Preferred route | Notes |
-|---|---|---|---|
-| Founder B1 physical acceptance | Owner product gate | **Owner-run** with planner support only | Do not insert another implementation/review cycle before the physical test. |
-| Test/dev performance H1-H4 | Hard Bounded | **Cursor + Grok 4.6 High** | Harness/test-only changes; focused evidence; no product-semantic edits. Sonnet High is a reasonable alternate. |
-| B2 planning/integration | Complex / Critical at external side effects | **ChatGPT + GPT-5.6 Sol High** for planning/reconciliation, then **Cursor + Grok 4.6 High** as primary implementer/integrator | Freeze external dispatcher/proposer/reconciliation contracts before parallel lanes. Keep provider actions behind deterministic viability/authority. |
-| B2 independent review | Critical boundary review | Different model family from implementer; **Sonnet High / Sol High** depending implementer | One focused review after the same-engine external loop exists; do not review every micro-checkpoint. |
-| Post-E2E observability/UI | Bounded product integration | Cursor/Claude/Codex according to UI/browser needs | Event Overview only after design acceptance. |
+| Work | Class | Route 1 | Route 2 | Route 3 | Notes |
+|---|---|---|---|---|---|
+| R1 coordinator/read tools/travel proposer/comparator | Complex / contract-driven | **Cursor + Grok 4.6 High** | **Codex + GPT-5.6 Terra High** | **Qoder + Qwen3.8-Max** | Shared contracts are frozen first. Mine old planning algorithms; do not restore old engine composition. |
+| R1 evidence/persistence/read-model lane | Hard Bounded | **Codex + GPT-5.6 Luna xHigh** | **Cursor + Composer 2.5** | **Qoder + Qwen3.8-Max** | One bounded PlanningAttempt shape; primary integrator retains migration/shared schema ownership. |
+| R1 verification lane | Hard Bounded / independent | **Qoder + Qwen3.8-Flash** | **Codex + GPT-5.6 Luna High** | **Cursor + Auto Cost** | Behaviour-first tests, anti-hardcoding and second-scenario proof. No product implementation. |
+| R2 Case read model + product adaptation | Product integration | **Cursor + Composer 2.5** | **Cursor + Auto Intelligence** | **Claude Code + Sonnet High** | Adapt rich old Case IA onto frozen PG projection; no Event Overview redesign. |
+| R2 focused review | Product/read-model review | **Claude Code + Sonnet High** | **ChatGPT + GPT-5.6 Sol High** | **Qoder + Qwen3.8-Max** | One review after complete projection/surface, not every UI patch. Use a different family where practical. |
+| R3 full B1 integration | Complex / cross-lane | **Cursor + Grok 4.6 High** | **Codex + GPT-5.6 Terra High** | **Qoder + Qwen3.8-Max** | Primary retains continued-recovery owner, cross-lane integration and final B1 evidence. |
+| R3/B1 independent generality review | High-value checkpoint | **Claude Code + Sonnet High** | **ChatGPT + GPT-5.6 Sol High** | **Qoder + Qwen3.8-Max** | Review same-engine/anti-hardcoding/product truth after integrated B1, not before. |
+| B2 consequential external execution | Critical | **Cursor + Grok 4.6 High** | **Claude Code + Sonnet High** | **Codex + GPT-5.6 Terra High** | Provider side effects stay behind deterministic viability/authority, durable attempt and reconciliation. |
+| B2 independent review | Critical boundary | Different family from implementer; **Sol High / Sonnet High** where justified | **Qwen3.8-Max** | **Grok/Terra** if independent from implementer | One focused authority/attempt/reconciliation/no-blind-retry review. |
+| Post-E2E product/observability | Bounded product integration | Cursor/Claude/Codex according to UI/browser need |  |  | Event Overview only after design acceptance. |
 
-The accepted Fable runtime audit is historical architecture evidence, not an ongoing model
-dependency. Its R0/T3/T4/B1 plan has been implemented.
+### Safe delegation after contract freeze
+
+Bounded lanes may use cheaper subagents for file mapping, fixtures, isolated tests,
+projection transforms and documentation. Subagents return only finding, affected files,
+recommended action and evidence.
+
+The primary architect/integrator keeps:
+
+- shared contracts and schema/migrations;
+- orchestration/continuation ownership;
+- cross-lane integration;
+- irreversible/provider side-effect changes;
+- final acceptance.
 
 ## Core routing correction
 

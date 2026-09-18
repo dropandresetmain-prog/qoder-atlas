@@ -15,7 +15,7 @@ Verification is **cumulative evidence**, not a ritual where every stage reruns e
 - the final candidate runs the canonical broad gate on the exact candidate SHA and clean
   appropriate test state.
 
-Current delivery checkpoints are defined by `IMPLEMENTATION_PLAN.md` §22 and
+Current delivery checkpoints are defined by `IMPLEMENTATION_PLAN.md` §22, the frozen recovery-planning contract by `RECOVERY_PLANNING_CONTRACT_FREEZE.md`, and
 `ROADMAP.md`; historical Checkpoint A/B/C or M0-M10 wording does not create new review
 rituals.
 
@@ -145,6 +145,45 @@ Do **not** run the broad suite after every edit. Using broad suites as the debug
 **Final candidate** — the full canonical CURRENT target gate once, on a **fresh database**: `npm test`, `npm run test:postgres`, `npm run test:migration`, build, typecheck, lint, `gate:anti-hardcoding`, and a normal PostgreSQL boot smoke.
 
 `npm run test:legacy` is never part of acceptance.
+
+## Foundational capability-parity gate
+
+This gate applies to **foundational migrations/cutovers/refactors**, not ordinary local
+refactors.
+
+Before such a milestone can retire old product behaviour, maintain:
+
+```text
+OLD CAPABILITY
+-> NEW HOME
+-> PRESERVE | ADAPT | SUPERSEDED | RETIRE
+-> BEHAVIOURAL PROOF
+```
+
+Rules:
+
+- `RETIRE` requires an explicit product decision/reason;
+- `SUPERSEDED` requires behavioural proof that the new home actually replaces the old
+  capability;
+- replacing a persistence technology/class/module is not itself evidence that product
+  behaviour was superseded;
+- useful legacy algorithms may be adapted without restoring legacy composition;
+- historical tests are evidence sources, not automatic current gates.
+
+For recovery-planning parity, behaviour-first tests must cover:
+
+1. current failure identifies relevant recovery domains;
+2. evidence gap causes a typed read-only tool request;
+3. normalized evidence changes candidate generation;
+4. multiple domains/candidates coexist;
+5. RC-6 rejects a material candidate;
+6. actual deterministic rejection evidence survives reload;
+7. viable candidates continue as RecoveryStrategies;
+8. recommendation only names/explains current viable strategies;
+9. recommendation cannot override deterministic rejection/staleness;
+10. immediate-change blast radius, reassessment closure and outcome delta remain distinct;
+11. successful-but-insufficient execution re-enters planning from new canonical state;
+12. at least two materially different planning situations use the same coordinator/contracts.
 
 ## Demo dataset provisioning and fresh baselines
 
@@ -279,7 +318,7 @@ Validate:
 - deterministic fixture/reset/reseed creates known demo state.
 
 ### T-GEN — Generalisation / anti-hardcoding
-At least two materially different scenarios pass through the same application code:
+At least two materially different scenarios pass through the same application code. For current recovery planning, they must additionally use the same Recovery Planning Coordinator, domain registry, StrategyProposer boundary, RC-6 and recommendation contract:
 
 **Scenario A — AnchorEvent speaker**
 Event obligations, organiser policy, traveller interaction, disrupted flight, downstream transfer/hotel/event objectives.
@@ -330,7 +369,7 @@ Contract baseline: `test/northstar-contracts.test.ts` at `NORTHSTAR_CONTRACT_BAS
 ### T-E2E — Integrated recovery loop
 Prove:
 
-`source/profile -> validated persistent state -> TripSignal -> mutation -> ImpactAssessment -> RecoveryPlanner -> capability results -> scenario overlays -> deterministic viability -> authority -> action/simulation -> observation -> resolved state/read models`
+`source/profile -> validated persistent state -> ChangeSignal/request -> mutation -> deterministic assessment -> RecoveryCase -> Recovery Planning Coordinator -> recovery domains/evidence gaps -> bounded read-only capability results -> ProposalCandidates -> schema validation -> RC-6 deterministic viability -> material decision evidence -> viable-only recommendation -> authority -> ActionPlan/execution -> observation/reconciliation -> canonical update -> reassessment -> resolve/continue/escalate -> read models`
 
 No manual state edits are allowed between stages.
 
@@ -386,6 +425,9 @@ The integrator:
 - does not rerun every historical test after each merge by habit.
 
 ## Independent review checkpoints
+
+Current R1/R2/R3/B2 review placement follows `IMPLEMENTATION_PLAN.md` §22. Reviews are sparse: R2 gets one product/read-model review, R3/B1 gets owner acceptance plus a focused same-engine review where warranted, and B2 gets one high-risk execution/reconciliation review. The older gates below remain useful evidence patterns but do not redefine current milestone scope.
+
 
 Independent review is mandatory at the four historical formal gates below (A/B/C/Final). In addition, the Northstar programme adds bounded post-Checkpoint-C execution gates — NS-G1 as an internal integration gate (no scheduled Review 1), NS-G2 with mandatory different-family Review 2, the NS-G3 human product/demo evaluation, and Wave 4 stabilisation before the Final Candidate Review (internal implementation plan Section 13; reviewer routing in the internal model-selection guide). This is deliberate risk control, not a request to re-review every package or every historical line of code.
 

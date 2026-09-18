@@ -1,11 +1,14 @@
 # Northstar implementation plan
 
-Status: **CURRENT DELIVERY PLAN — M0-M10/C5 COMPLETE; R0/T3/T4/B1 IMPLEMENTED;
-FOUNDER B1 NOT ACCEPTED — current milestone is B1 Product Acceptance Repair (§22.5a)**.
+Status: **CURRENT DELIVERY PLAN — M0-M10/C5 FOUNDATION ACCEPTED; PRODUCT-PARITY TRUTH
+REBASE ACCEPTED; RECOVERY-PLANNING CONTRACTS FROZEN; NEXT IMPLEMENTATION = R1**.
 
-Current implementation candidate:
+Authoritative truth-rebase input:
 `feature/sarah-provider-disruption` @
-`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
+`4f48c75af41bc79874470900c76f8a2dc7b0238f`.
+
+Planning/contract branch:
+`plan/truth-rebase-contract-freeze`.
 
 Sections 1-21 preserve the original data-structure-refactor decomposition and are retained
 for architecture/provenance context. They describe the plan that produced the accepted
@@ -23,9 +26,10 @@ Normative companions:
    ontology, ownership, cardinalities, lifecycles and semantics.
 2. [Logical schema](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational ownership, integrity,
    indexes and command/execution protocols.
-3. [Architecture](ARCHITECTURE.md) — current implemented runtime, including the
-   post-C5 operational closure and RC-6 viability contract.
-4. [Roadmap](ROADMAP.md) — current milestone status and deferred scope.
+3. [Recovery planning contract freeze](RECOVERY_PLANNING_CONTRACT_FREEZE.md) — current
+   planning/evidence/recommendation/blast/continuation/B1-B2 contracts.
+4. [Architecture](ARCHITECTURE.md) — current implemented/runtime architecture and RC-6.
+5. [Roadmap](ROADMAP.md) — current milestone status and deferred scope.
 
 Historical implementation language below does not authorize production actions and does
 not override current runtime/code/schema truth or Section 22.
@@ -981,367 +985,469 @@ Parallel lanes start after **C0 + M1**; high-risk shared integration remains und
 one architectural owner. Old state stops being authoritative only at the approved
 **M11 cutover**. This commit records the plan; it does not implement that path.
 
-## 22. Current delivery sequence — runtime-closure reconciled
+## 22. Current delivery sequence — product-parity truth rebase
 
-M0-M10/C5 and the PostgreSQL data/state architecture are accepted. Post-C5 product
-delivery exposed one additional architectural fact: the refactor had adapted enough
-runtime to execute the new model, but the operational runtime itself had never received
-a dedicated end-to-end composition closure.
+This section supersedes the earlier forward interpretation that the implemented
+programme-only internal loop constituted complete B1.
 
-T2 physical testing made that visible. A safe one-item reassessment worker combined
-with a periodic scheduler produced unacceptable propagation latency. After the obvious
-scheduler defect was fixed, a read-only frontier runtime audit (Fable, 2026-09-18,
-base `c20228c`) inspected the actual code/schema/docs rather than prescribing a new
-engine. It concluded:
+The accepted product-parity audit is
+`PRODUCT_PARITY_TRUTH_REBASE_2026-09-18.md`. The frozen forward contracts are
+`RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
 
-- preserve F01-F18, the PostgreSQL ownership model, trigger-based invalidation,
-  deterministic evaluation, stored execution gate and resolution gate;
-- close the missing operational seams before further product expansion;
-- fix invalidation breadth at its input/manifest semantics rather than masking it with
-  batching;
-- add durable ChangeSignal identity and deterministic escalation;
-- compose one generalized strategy/authority/execution lifecycle;
-- prove the first complete loop with internal programme execution, then prove
-  generality with an external-provider scenario.
+### 22.0 Current truth
 
-The accepted implementation sequence from that audit was:
+Keep:
 
-`R0 runtime composition closure -> T3 change signal/escalation -> T4 verification ->
-B1 generalized internal recovery -> B2 generalized external recovery -> C6/final`.
+- PostgreSQL/PostGIS as sole normal runtime;
+- F01-F18 ontology/ownership;
+- M6 assessment and RC-6 counterfactual viability;
+- ChangeSignal/escalation/case lifecycle;
+- StrategyProposer proposal-only port;
+- M8 authority/approval/durable execution;
+- internal programme executor;
+- execution observation/reconciliation and M9 resolution gate;
+- provider-neutral capabilities/Atlas normalization;
+- Overview population + work/attention semantics.
 
-### 22.0 Current status and authoritative sequence
+Adapt/reconnect:
 
-Implementation through **B1 is complete on
-`feature/sarah-provider-disruption` @
-`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`**.
+- bounded read-only planning research;
+- travel/stay candidate generation where applicable;
+- recovery-domain identification;
+- material rejected/considered decision evidence;
+- viable-only strategy recommendation;
+- generalized continued recovery;
+- rich Case decision projection.
 
-Key checkpoint commits:
+Do not restore SQLite, RuntimeOrchestrator or a second engine.
 
-- `6a96ee6` — R0 shared runtime-closure pieces;
-- `41a2d58` — R0 ingress/composition tests;
-- `cd620f7` — T3 + initial B1 composition;
-- `82ae9b8` — RC-6 counterfactual-viability closure and real AiT/Sarah B1 proof.
+Authoritative implementation sequence:
 
-**Founder B1 was physically tested on 2026-09-18 and is NOT ACCEPTED** (see
-`docs/work/FOUNDER_B1_PHYSICAL_FINDINGS.md`). The engine completed the Sarah recovery in
-the background — Sarah READY, incident case RESOLVED, Overview back to 50 / 2 / 15 — but
-the founder could not open, read or operate the focused recovery surface. Engine
-implementation status is unchanged; **product acceptance is not granted**.
+```text
+R1 — planning + decision-evidence parity
+-> R2 — Case decision surface
+-> R3 — integrated full rebased B1
+-> B2 — consequential external execution
+-> post-E2E product/observability/provider hardening
+-> M11/C6
+```
 
-Current milestone: **B1 Product Acceptance Repair** (§22.5a).
-Current blocker: **focused recovery product UI / product navigation**.
-**B2 is BLOCKED** until a Founder B1 physical retest passes.
+Shared contracts are frozen before R1 in
+`RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
 
-Current forward sequence:
+### 22.1 R1 — planning + decision-evidence parity
 
-1. **B1 Product Acceptance Repair** — minimum product-boundary repair so the accepted
-   engine is operable by a human (§22.5a).
-2. **Founder B1 physical retest** — manually drive the real Sarah product loop again.
-3. **B2 generalized external recovery / Jordan** — add only the external capabilities
-   needed for the same engine to recover a materially different journey. Do not start
-   before the retest is accepted.
-4. **B2 Founder + generalisation verification** — physical product test plus one focused
-   same-engine/anti-hardcoding review.
-5. **Post-E2E product work** — semantic activity/observability, accepted Event Overview
-   implementation, provider/LIVE-REPLAY hardening and final demo polish.
-6. **M11 / C6 candidate** — operational activation/retirement, exact-candidate rehearsal,
-   broad gates and submission evidence.
+**Objective**
 
-The old standalone **Founder Test A** gate was not run before B1. Its product checks are
-not silently claimed as accepted; they are now subsumed into the broader Founder B1
-physical test because the implementation advanced through the same boundaries. Do not
-recreate it as a blocker unless Founder B1 exposes a Slice-A-specific defect.
+Turn the current PostgreSQL deterministic spine into the generalized planning loop without
+creating another engine:
 
-The old umbrella labels “Slice A” and “Slice B” remain historical references. Forward work
-uses explicit **B1** and **B2** names so internal and external recovery are not conflated.
+`RecoveryCase/current failure
+-> relevant recovery domains/evidence gaps
+-> bounded read-only research
+-> StrategyProposers
+-> ProposalCandidates
+-> validation
+-> RC-6
+-> material decision evidence
+-> VIABLE RecoveryStrategies
+-> viable-only recommendation`.
 
-### 22.1 R0 — runtime composition closure — COMPLETE
+**Owned components**
 
-Accepted changes:
+Primary/integrator owns:
 
-- provider-ingress completion bookkeeping no longer masquerades as arbitrary world
-  information or trips the unregistered-topic sentinel;
-- baseline assessment manifests bind to each subject's own dependency closure rather than
-  the batching/capture slice;
-- known clock-expiry invalidation is scheduled during normal worker wakes;
-- `runtimeServices.ts` is the single normal ownership point for background workers and
-  health; duplicate reassessment-loop composition was removed;
-- the reassessment drain keeps claim/lease/fencing/idempotency semantics and drains bounded
-  runnable work continuously.
+- `src/app/target/recoveryPlanning.ts` composition;
+- shared current/v2 planning contracts;
+- any additive planning-evidence migration/command;
+- orchestration integration and final acceptance.
 
-Measured result on the real T2 world:
+Planner lane may own:
 
-- invalidation fan-out: **67 -> 5** journey units;
-- drain: roughly **17s -> 2.4s**;
-- final truth remains **49 PASS / 3 FAIL / 15 UNKNOWN** after the disruption.
+- current planning coordinator composition;
+- domain registry/activators;
+- adapted read-only ToolRequest/result dispatcher;
+- transport/travel proposer mined from historical planner algorithms;
+- comparator/recommendation implementation.
 
-This is a semantic precision fix, not a Sarah-specific cohort filter.
+Evidence lane may own:
 
-### 22.2 T3 — ChangeSignal and deterministic escalation — COMPLETE
+- one immutable `RecoveryPlanningAttempt` persistence shape;
+- material-candidate evidence;
+- immediate-change blast / reassessment closure / outcome-delta projection helpers.
 
-The normal runtime now has durable change identity/provenance:
+Verification lane may own tests only.
 
-`external/state change -> ChangeSignal -> canonical command/change records ->
-invalidated subjects -> assessments -> RecoveryCase linkage`.
+**Dependencies**
 
-Implemented:
+- frozen C1-C10 contracts;
+- current StrategyProposer/ScenarioChange;
+- current provider-neutral capability interfaces;
+- RC-6;
+- current PostgreSQL UnitOfWork/persistence patterns.
 
-- `change_signals`, signal subjects/completions and the deferred
-  `case_signals.change_signal_id` relationship;
-- command/reassessment provenance under the current ChangeSignal;
-- pure deterministic escalation with idempotent OPEN / ATTACH / NONE outcomes;
-- case read models exposing authoritative cause and `causalPath`;
-- incident-linked AFFECTED_BY semantics without frontend causal inference.
+**Acceptance**
 
-The Sarah disruption opens the appropriate incident-linked case; viable peers do not gain
-false incident cases; duplicate delivery remains idempotent.
+1. failing state activates relevant recovery domain(s);
+2. evidence gap emits typed read-only request;
+3. provider-normalized evidence changes candidate generation;
+4. multiple domains/candidates coexist;
+5. RC-6 rejects a material candidate;
+6. actual deterministic rejection evidence survives persistence/reload;
+7. viable candidates persist as RecoveryStrategies;
+8. recommendation names/explains only viable current strategies;
+9. recommendation cannot override rejection/staleness;
+10. all three impact semantics are separately available;
+11. equivalent tool requests deduplicate and research is bounded;
+12. tool failures/uncertainty remain visible;
+13. a second materially different planning situation uses the same coordinator/contracts.
 
-### 22.3 T4 — authoritative focused-case backend — IMPLEMENTED
+**Focused tests first**
 
-The accepted frontend semantic/read-model foundation can now receive the authoritative
-cause and causal path needed by the focused case. Do not invent continuous liveness or
-derive blast radius/causality in the browser.
+- coordinator domain activation;
+- read-tool request/result validation + no consequential vocabulary;
+- research-round bound/dedupe;
+- travel proposer evidence-to-candidate test;
+- RC-6 material rejection persistence/reload;
+- recommendation non-viable/stale rejection;
+- blast/closure/delta separation;
+- same-coordinator second scenario.
 
-The final Event Overview design remains unresolved and is **not** a prerequisite for B2.
+Broaden to relevant PostgreSQL planning tests only after focused behaviour is green. Do not
+run the full PostgreSQL suite as the iteration loop.
 
-### 22.4 B1 — generalized internal recovery loop — ENGINE COMPLETE
+**Review checkpoint**
 
-The normal application/runtime path now composes:
+One focused R1 integration review only if shared-contract/persistence ambiguity remains.
+Otherwise primary acceptance + behavioural evidence is sufficient.
 
-`provider/state change
+**Explicit exclusions**
+
+Case visual redesign, Event Overview, external provider dispatch, budget holds unless B1
+truly needs a money boundary, SSE, graph zoom, SQLite cleanup.
+
+### 22.2 R2 — product decision surface
+
+**Objective**
+
+Adapt the useful rich pre-refactor Case information architecture onto current PostgreSQL
+read models and the frozen decision-evidence contract.
+
+**Owned components**
+
+Evidence/read-model lane:
+
+- Case projection contract;
+- planning attempt/evidence projection;
+- recommendation;
+- three impact semantics;
+- authority/execution/observation/current-assessment projection.
+
+Product lane:
+
+- focused Case workspace adaptation against that frozen projection;
+- human labels and clear current/proposed/observed separation.
+
+Primary/integrator retains shared read-model contracts and semantic conflict resolution.
+
+**Dependencies**
+
+R1 contracts and persisted evidence must be stable. UI must not invent planning/viability
+semantics.
+
+**Acceptance**
+
+The Case surface can answer:
+
+- what changed;
+- why the trip/person is not okay;
+- affected dependencies;
+- investigated domains/evidence and provenance;
+- material rejected options and actual deterministic reasons;
+- remaining viable options;
+- recommendation and trade-offs;
+- immediate proposed-change blast radius;
+- broader reassessment closure;
+- better/worse/unchanged outcome delta;
+- exact approval target;
+- authority state;
+- execution/observation/reconciliation;
+- current recovery/resolution truth.
+
+UUIDs/internal capability codes remain secondary metadata.
+
+**Focused tests first**
+
+Read-model contract tests before browser rendering; then focused Case semantic/UI tests.
+
+**Review checkpoint**
+
+One product/read-model review after the complete R2 projection is wired. No review per
+component.
+
+**Explicit exclusions**
+
+Event Overview redesign, whole-event graph, semantic zoom, SSE/WebSockets, broad activity
+journal redesign.
+
+### 22.3 R3 — integrated full rebased B1
+
+**Objective**
+
+Prove the complete Sarah recovery reasoning story plus internal execution through the same
+generalized coordinator.
+
+**Required acceptance path**
+
+```text
+provider/airline reprotection evidence
+-> current whole-trip assessment FAIL
+-> coordinator identifies relevant recovery possibilities
+-> provider-neutral read-only travel evidence
+-> travel candidate(s)
+-> deterministic travel evaluation
+-> material rejected/inferior travel alternative explainable
+-> programme candidate(s) where evidence/state makes PROGRAMME relevant
+-> immediate programme-change blast radius
+-> RC-6 reassessment closure
+-> outcome delta
+-> viable-only comparison
+-> preferred strategy recommendation/explanation
+-> operator sees exact proposed change/affected people
+-> approval
+-> current ActionPlan/authority path
+-> internal programme execution
+-> observation
 -> canonical update
 -> reassessment
--> RecoveryCase
--> StrategyProposer
--> schema validation
--> deterministic counterfactual viability
--> persisted RecoveryStrategy
--> ActionPlan
--> authority / approval
--> durable internal execution
--> observation
--> canonical programme mutation
--> reassessment
--> resolution gate`.
-
-Important boundaries:
-
-- `StrategyProposer` is a generic port. The deterministic programme proposer searches
-  canonical programme state; it does not encode Sarah/Daniel names or fixture IDs.
-- request-scoped principals bind approval/authority to the reviewed basis;
-- `PgExecutionWorker`/runtime execution uses the stored deterministic gate and internal
-  programme executor;
-- execution success alone never resolves a case;
-- all consequential state still follows proposal -> validation -> deterministic viability
-  -> authority -> executor -> observation -> state update.
-
-#### RC-6 — counterfactual viability contract — RESOLVED
-
-The reached dependency closure remains the correct reassessment/blast radius. What changed
-is the **aggregator**: reached scope is not a requirement that every subject become perfect.
-
-A recovery candidate must:
-
-1. resolve the blocking case subjects it is responsible for — currently failing
-   JOURNEY/TRIP case subjects must be PASS on the overlay;
-2. not worsen any reached subject;
-3. not introduce new or action-critical UNKNOWN state;
-4. remain blocked by explicit `requiredUnknowns`;
-5. leave unchanged pre-existing unrelated FAIL/UNKNOWN truthful rather than treating them
-   as healed or as automatic vetoes.
-
-When a caller does not explicitly provide resolve subjects, overlay-affected journeys that
-already FAIL still have to heal, preserving conservative default planning semantics.
-
-Case resolution judges the case's required subjects plus reconciled execution, not every
-subject reached during counterfactual evaluation.
-
-No Sarah-specific logic or fixture patch was added.
-
-#### B1 evidence
-
-- real AiT/Sarah world: full normal-path recovery reaches **RESOLVED** and the blocking
-  subject becomes PASS;
-- `b1SarahWorldRecovery.pgtest.ts`: PASS, roughly 117-155s depending on run;
-- `b1RecoveryLoop.pgtest.ts`: PASS on a small generalized seeded world;
-- strategy-viability unit coverage includes unresolved blocking FAIL, new UNKNOWN,
-  regression and unchanged pre-existing FAIL/UNKNOWN;
-- CURRENT suite after B1/test investigation: **802/802**;
-- clean PostgreSQL gate: **522/522**, about **21.4 min**;
-- typecheck/build/lint/boundary/anti-hardcoding checks were clean at B1 closure.
-
-### 22.5 Founder B1 physical acceptance — NOT ACCEPTED (2026-09-18)
-
-The physical test ran on 2026-09-18 against `feature/sarah-provider-disruption` @
-`1f9039c` and **failed on the product boundary**. The founder reached baseline
-50 / 2 / 15, applied the disclosed airline update, settled at 49 / 3 / 15, opened Sarah's
-case only by pasting an API HTML URL, saw the authoritative cause, clicked **Propose
-recovery options** — and stopped, because the focused recovery experience was not
-operable. The backend later completed correctly (Sarah READY, case RESOLVED, Overview
-50 / 2 / 15, Farah + Mei still truthfully disrupted). **That is implementation behavior,
-not founder acceptance.**
-
-The flow below is retained as the physical **retest** checklist.
-
-Founder flow:
-
-`50 PASS / 2 FAIL / 15 UNKNOWN baseline
--> apply disclosed airline update
--> settle at 49 / 3 / 15
--> open incident-linked Sarah case
--> inspect cause/causalPath
--> propose recovery
--> at least one generic programme option persists VIABLE
--> approve as workspace operator
--> internal programme execution
--> observation/reassessment
 -> Sarah PASS
--> incident case RESOLVED`.
+-> case RESOLVED
+```
 
-Unrelated baseline FAIL/UNKNOWN remains truthful and may keep its own case. No external
-provider dispatch occurs in B1.
+Unrelated pre-existing FAIL/UNKNOWN remains truthful.
 
-The retest additionally requires the product path itself to work: Sarah's case opens by
-clicking her row on Overview, the case renders inside the product shell, and each proposed
-option states in plain language what programme change it makes and who it fixes.
+**Continued recovery**
 
-If this passes, preserve B1 as the internal-recovery product floor and proceed to B2.
-If it fails, fix the first broken normal product boundary before expanding scope.
+R3 composes one Recovery Lifecycle Progression service under `runtimeServices`. After
+execution/observation/reassessment:
 
-### 22.5a B1 Product Acceptance Repair — CURRENT MILESTONE
+- resolve only if current required subjects PASS and execution is reconciled;
+- wait if authority/execution is still pending;
+- re-enter the generalized planner from the **new** canonical basis when still failing and
+  recovery remains possible;
+- otherwise escalate/await a human decision using the existing truthful lifecycle.
 
-Scope is the **minimum generalized fix for the broken product boundary**, not a product
-redesign. Act Now items, each traced to a Founder finding:
+Do not restore RuntimeOrchestrator and do not recurse from an execution worker.
 
-| Finding | Root cause | Repair boundary |
-|---|---|---|
-| FB1-3 raw case HTML | `GET /api/v2/cases/:id?format=html` rendered `renderProductRecoveryCase(view)` without `renderInShell(...)`, unlike every other HTML surface | Render the focused case in the same product chrome as Overview. |
-| FB1-4 `/operator` 404 | The normal PostgreSQL target server mapped clean shell routes for `/`, `/programme`, `/decisions`, `/activity` only | Add `/operator` (Overview alias) and `/operator/cases/:id` to the normal target server. Do **not** port or reactivate the retired SQLite composition. |
-| FB1-2 Overview rows not navigable | The overview adapter rendered queue rows as non-clickable elements although the v2 read model already carries an authoritative `caseRef` | Link case-backed rows to `/operator/cases/:caseRef` from that existing `caseRef`. Never derive case identity or ownership in the browser, and never fabricate a link for a row with no case. |
-| FB1-5 `Traveller UNKNOWN` spam | `RecoveryStrategy` persists candidate summaries as `subjectRef` / `assessmentId` / `overallVerdict`, but the focused-case fact assembler read them as `personLabel` / `verdict` and fell back to `Traveller` / `UNKNOWN` | Read the persisted `overallVerdict`, and resolve human identity from authoritative canonical state. Do **not** persist display names into `RecoveryStrategy` — strategies stay domain/evaluation records. |
-| FB1-6 opaque v1/v2 options | The strategy row showed a truncated UUID and a version as the primary explanation | Explain each option from the authoritative `strategy_changes` / ScenarioChange effects: which programme items move, current vs proposed timing, who it fixes, deterministic viability. Refs/versions become secondary metadata. No LLM. |
+**Anti-hardcoding acceptance**
 
-Investigate Now: whether two VIABLE strategies are legitimate alternative programme swaps,
-repeated proposal versions, or exact semantic duplicates. If they are duplicates, fix
-deduplication at the correct generalized boundary — never with scenario-specific rules.
+- no Sarah/person/event/route/supplier/fixture IDs in domain/application recovery logic;
+- no `if Sarah -> programme`;
+- no global `flight first -> programme second` pipeline;
+- the recommended programme solution emerges from current state, research, RC-6 and
+  comparison;
+- a second materially different planning situation passes through the same coordinator and
+  contracts without B2 external dispatch.
 
-Explicitly out of scope: B2/Jordan, external recovery, Atlas transactional execution, LLM
-recovery prose, Event Overview redesign, semantic activity, graph/semantic zoom, SSE,
-broad telemetry, generic reset semantics, I1-I4 test optimisation, SQLite cleanup.
+**Focused tests first**
 
-### 22.6 B2 — generalized external recovery / Jordan — BLOCKED until Founder B1 retest passes
+Use the planner/blast/continuation tests from R1, then one focused Sarah B1 PostgreSQL path,
+then the second-situation proof, then the coherent B1 package gate. Run broad/full gates
+only at the B1 milestone checkpoint.
 
-B2 is **not “build Jordan logic.”** Jordan is the materially different proof that the
-same generalized lifecycle works when recovery depends on an external provider.
+**Review checkpoint**
 
-Minimum intended path:
+R3/B1 is a meaningful checkpoint: owner product acceptance plus one focused independent
+same-engine/anti-hardcoding review where warranted.
 
-`progressive external observations / ChangeSignals
--> same case lifecycle
--> StrategyProposer implementation for flight recovery
--> Atlas Search/Verify or REPLAY provider-shaped evidence where useful
--> same ScenarioChange validation
--> same deterministic counterfactual viability
--> same ActionPlan / authority / approval
--> provider-neutral external dispatcher
--> execution attempt / OUTCOME_UNKNOWN semantics where applicable
--> provider observation / canonical reconciliation
--> same reassessment
--> same resolution gate`.
+**Explicit exclusions**
 
-Provider-specific mechanics stay in adapters/dispatchers. No Jordan names, route constants,
-offer IDs or scenario conditions enter domain/application logic.
+Consequential external booking/payment execution. Read-only provider evidence is in scope;
+provider mode/provenance must be reported truthfully.
 
-B2 acceptance must preserve truthful partial failure and uncertain external outcomes.
+### 22.4 B2 — consequential external execution / Jordan
 
-### 22.7 Post-E2E product work
+**Objective**
 
-Only after B1 Founder acceptance and B2/generalisation proof:
+Prove the same generalized planning/lifecycle when the selected strategy requires an
+externally owned consequential action.
 
-- semantic activity projection feeding Case timeline, broader Activity journal and a
-  compressed Overview feed;
-- implementation of an **accepted** Event Overview design;
-- focused graph proposed/current overlay pairing where the approved design needs it;
-- LIVE/REPLAY/provider-mode visibility and final provider hardening;
-- reset/rehearsal and failure-path polish;
-- submission/demo capture.
+**Reuse unchanged**
 
-Still deferred unless evidence changes:
+- Recovery Planning Coordinator;
+- PlanningAttempt evidence;
+- StrategyProposer boundary;
+- RC-6;
+- viable-only recommendation;
+- RecoveryStrategy / ActionPlan;
+- authority/approval;
+- reassessment/resolution.
 
-- SSE/WebSockets;
-- whole-event graph / semantic zoom;
-- broker/Kafka/microservices;
-- provider-reference auto-correlation as a broad platform project;
-- retired SQLite deletion;
-- unbounded autonomous provider/refund actions.
+**Add**
 
-### 22.8 Parallel engineering-productivity lane — test/dev performance
+```text
+external ActionIntent
+-> deterministic stored execution gate
+-> durable attempt before network
+-> provider-neutral dispatch
+-> success / partial / lost response / OUTCOME_UNKNOWN
+-> observation / reconciliation
+-> no blind retry
+-> canonical provider-owned state
+-> reassessment
+-> continued recovery if needed
+-> resolve or escalate
+```
 
-A read-only performance audit on the B1 code line found that developer/test latency mixes
-required acceptance cost with avoidable harness cost. This is **not a product milestone**
-and must not delay Founder B1 unless the workflow itself blocks delivery. H1-H4 are now
-**DONE** and reconciled onto the active branch; they do not change Founder B1 status, which
-remains **NOT ACCEPTED** pending the product repair in §22.5a.
+Jordan is the materially different proof, not a separate planner or engine.
 
-Measured state **before** H1-H4:
+**Owned components**
 
-- `npm test`: boundary gate ~7.1s + CURRENT 72 files / 802 tests ~30.4s;
-- clean `npm run test:postgres`: 56 files / 522 tests ~21.4 min;
-- repeated PG gates can become pathological because the shared long-lived test DB
-  accumulates PENDING outbox rows; one dirty run spent ~22.4 min draining them row-by-row;
-- fresh AiT dev workspace boot pays real materialization (~47s) + 67-journey baseline
-  (~11s); same database + same already-provisioned workspace boots in seconds.
+External-execution lane:
 
-Measured state **after** H1-H4, re-verified on `feature/sarah-provider-disruption` after
-the cherry-pick reconciliation (H1 `8e01c59`, H2 `ded3189`, H3/H4 `951adef`):
+- provider-neutral dispatcher/executor composition;
+- reconciliation/lookup-before-retry;
+- observation -> canonical provider-owned state.
 
-- `npm test`: **811/811**, 19 suites, ~13.8s as measured by the lane (~15.9s wall on the
-  integration machine, boundary gate included);
-- focused `postgres-integration/inboxOutbox.pgtest.ts`: **7/7**;
-- `npm run typecheck`: clean;
-- `npm run test:postgres` was **not** rerun for this lane. The clean 522/522 / ~21.4 min
-  gate remains historical **B1 checkpoint** evidence and is not restated as current.
+Planner lane only adds provider-specific proposal/read support if the generalized contracts
+actually require it; no Jordan conditions.
 
-Triage after H1-H4:
+Primary/integrator retains external side-effect gates, shared contracts and final
+integration.
 
-**Done**
-- H1: isolate `inboxOutbox.pgtest.ts` from unrelated global queue residue with test-only
-  set-based cleanup; production claim semantics unchanged.
-- H2: daily `composeTargetBoot` merges `.env` / `.env.local` for `PG_TARGET_*` and
-  `NORTHSTAR_DEMO_DATASET_DIR`; a fresh UUID is an explicit reset.
-- H3: bounded concurrency for the CURRENT no-DB/no-browser suite only (`4`).
-- H4: living docs/scripts name `npm test` / `run-suite.mjs` as the canonical suite.
+**Dependencies**
+
+Full rebased B1 accepted first. Settle any money/budget/authority gaps before crossing the
+relevant provider boundary.
+
+**Focused tests first**
+
+- durable attempt before provider call;
+- timeout/lost response -> OUTCOME_UNKNOWN;
+- reconcile/lookup before resend;
+- partial success remains truthful;
+- provider success without canonical observation cannot resolve;
+- post-observation still-failing case re-enters planning;
+- Jordan same-coordinator proof.
+
+**Review checkpoint**
+
+One independent high-risk authority/execution/reconciliation review after the complete B2
+boundary exists. Do not review every micro-step.
+
+### 22.5 Behavioural contract map
+
+Before implementation, write/freeze tests for:
+
+**Planner parity**
+
+1. domain identification from current failure;
+2. evidence gap -> typed read request;
+3. evidence changes candidates;
+4. multiple domains/candidates;
+5. deterministic material rejection;
+6. rejection remains inspectable;
+7. viable candidates continue;
+8. viable-only recommendation;
+9. recommendation cannot override deterministic rejection.
+
+**Blast semantics**
+
+1. precise immediate change blast;
+2. broader reassessment closure;
+3. separate better/worse/unchanged outcome delta;
+4. UI projection does not conflate them.
+
+**Continuation**
+
+1. successful action that does not recover re-enters planning;
+2. new canonical state/basis is used;
+3. old candidate truth is not assumed current;
+4. resolution requires current PASS + reconciled execution.
+
+**Foundational parity gate**
+
+For foundational migration/cutover work:
+
+`OLD CAPABILITY -> NEW HOME -> PRESERVE | ADAPT | SUPERSEDED | RETIRE -> BEHAVIOURAL PROOF`.
+
+`RETIRE` requires explicit product justification. `SUPERSEDED` requires proof of
+behavioural replacement. This gate does not burden ordinary small refactors.
+
+### 22.6 Safe parallelisation
+
+Parallelise only after shared contracts are frozen.
+
+| Lane | Ownership | Inputs | Output | Dependency |
+|---|---|---|---|---|
+| Planner | coordinator/read tools/domain registry/travel proposer/comparator | C1-C6 | generalized planning behaviour | contract freeze |
+| Evidence/read-model | PlanningAttempt + impact projections | C5/C7 | durable evidence + projection data | contract freeze |
+| Product | Case workspace adaptation | C9 projection | operator decision surface | R1/R2 read contract |
+| Verification | behavioural/anti-hardcoding tests | C10/test map | independent evidence | contracts; may precede implementation |
+| External execution (B2 only) | dispatcher/reconciliation | accepted B1 + C10 B2 | consequential external loop | R3 acceptance |
+
+Primary architect/integrator retains shared contracts, migrations/schema ownership,
+orchestration loop, cross-lane integration and final acceptance.
+
+### 22.7 Issue triage
+
+**Act Now**
+
+- R1 coordinator/read tools/travel proposer/recommendation/evidence;
+- three impact projections;
+- R2 Case projection;
+- continued recovery;
+- rebased B1;
+- behavioural tests;
+- foundational parity gate.
 
 **Investigate Now**
-- I1: F3/F5/F7 each pay a full AiT provision for narrow assertions;
-- I2: `productBaselineWorld` rematerializes for interrupt/replay proof;
-- I3: consider a separate heavy `postgres-world` checkpoint list without deleting coverage;
-- I4: per-file `waitUntilReady` costs roughly 1s x 56 files.
 
-**Park**
-- limited PG-file parallelism until queue isolation/connection budgets are proven;
-- materializer/SERIALIZABLE tuning;
-- a production outbox publisher as an architecture feature rather than a test-speed patch.
+- cheapest fixture-ready second B1 planning proof;
+- implementation-time migration/index/JSON bounds for PlanningAttempt;
+- exact existing preference/rule projections needed by comparator.
+
+**Park for Later**
+
+- B2 consequential dispatch until B1 acceptance;
+- budget holds unless a money-moving path requires them;
+- Event Overview redesign;
+- graph/semantic zoom;
+- SSE/WebSockets;
+- final presenter polish;
+- physical historical-SQLite deletion.
 
 **Ignore / Accept Risk**
-- B1 Sarah, F1 crash-world, N1 corridor-world, real evaluator work, SERIALIZABLE semantics,
-  checksum migrations and isolated migration DBs remain legitimate expensive evidence.
 
-Follow `docs/TESTING.md`: focused -> adjacent -> relevant package/service -> broad PG at a
-coherent checkpoint -> full candidate gates only when justified.
+- PostgreSQL ontology rewrite;
+- SQLite resurrection;
+- RC-6 replacement;
+- M8 authority/execution rebuild;
+- Atlas adapter rebuild;
+- another engine rewrite.
 
-### 22.9 M11 / C6 final candidate
+### 22.8 Review / milestone closure
 
-M11 is operational activation/retirement, not another database migration. Before C6:
+A phase closes only when:
 
-- perform the bounded external legacy-source inventory;
-- verify sole-writer/authority/reconciliation/provenance state;
-- harden readiness so HTTP 200 cannot falsely imply the full product is ready;
-- rehearse restart/replay/failure paths;
-- run the exact-candidate CURRENT + PostgreSQL + migration/build/type/lint/anti-hardcoding
-  gates on appropriate clean test state;
-- capture exact SHA, deployment modes, remaining limitations and submission evidence.
+- its acceptance criteria pass;
+- appropriate focused -> adjacent -> package tests are green;
+- build/typecheck/lint are run where the changed scope warrants them;
+- anti-hardcoding/fallback behaviour is checked;
+- living SSOT is updated;
+- diff/status contain no unrelated changes;
+- a coherent checkpoint is committed and pushed.
 
-No source document or old milestone label may resurrect the retired SQLite application
-runtime as a fallback.
+The full suite is reserved for meaningful integration/candidate checkpoints, not debugging.
 
+### 22.9 Post-E2E and M11
+
+After B2/generalisation:
+
+- semantic operational history for Case timeline/Activity/Overview feed;
+- implement an **accepted** Event Overview design;
+- provider-mode/readiness hardening;
+- demo/submission polish;
+- M11/C6 operational activation/retirement and exact-candidate evidence.
+
+M11 never reactivates SQLite as rollback.
