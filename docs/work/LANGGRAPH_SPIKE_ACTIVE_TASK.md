@@ -16,15 +16,17 @@ business source of truth.
 ## Checklist
 
 - [x] S1 durable graph, separate Postgres checkpointer, restart skeleton.
-- [ ] S2 approval interrupt and stale-approval refusal.
-- [ ] S3 lost-response execution safety / reconciliation.
-- [ ] S4 stale-basis refusal.
-- [ ] S5 concurrent same-case wakes.
-- [ ] S6 both checkpoint/business dual-write windows.
-- [ ] S7 version upgrade behaviour.
-- [ ] S8 checkpoint privacy and retention.
-- [ ] S9 graceful and hard restart evidence.
-- [ ] Compare complexity and issue final verdict.
+- [x] S2 approval interrupt and stale-approval refusal (graph boundary).
+- [ ] S3 lost-response execution safety / reconciliation — NORTHSTAR seam
+  proven; graph crash/resume composition incomplete, counts against adoption.
+- [ ] S4 stale-basis refusal — partial graph evidence only, counts against adoption.
+- [ ] S5 concurrent same-case wakes — saver has no per-thread serialization.
+- [ ] S6 both checkpoint/business dual-write windows — not completed.
+- [x] S7 version upgrade behaviour — renamed node silently loses intended work.
+- [x] S8 checkpoint privacy and retention — refs clean, interrupt/error payload
+  leakage and no pruning add unacceptable ownership.
+- [ ] S9 graceful and hard restart evidence — graceful approval restart only.
+- [x] Compare complexity and issue final verdict: REJECT.
 
 ## Intended graph
 
@@ -50,5 +52,5 @@ references, current cursor metadata and wait reason.
 
 ## Next action
 
-Commit/push S1, then extend the same graph test with actual stored-execution
-lost-response/reconciliation evidence rather than a graph-owned dispatcher.
+Spike closed: retain bespoke outer workflow. See
+`docs/investigations/LANGGRAPH_OUTER_WORKFLOW_SPIKE_2026-09-19.md`.
