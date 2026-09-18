@@ -19,6 +19,17 @@ export interface RenderFocusedCaseGraphInput {
   readonly ldg: LiveDependencyGraph;
   readonly focusedGraph?: FocusedGraphView;
   readonly caseStatus: RecoveryCaseView['status'];
+  /**
+   * Which graph of the Original/Current pair this is (`data-graph-role`). The
+   * interaction script keys each canvas's pan/zoom/view/selection by it so a
+   * polling swap can restore what the operator was looking at. Default `current`.
+   */
+  readonly role?: 'current' | 'original';
+  /**
+   * Emit the stylesheet + interaction script with the graph (default true). A page
+   * that renders two graphs emits them once, with the first.
+   */
+  readonly includeAssets?: boolean;
 }
 
 /**
@@ -168,7 +179,7 @@ ${edgeElements.map((edge) => {
 
   // Canvas
   const canvasHtml = `
-<div class="fg-canvas" data-test="focused-case-graph">
+<div class="fg-canvas" data-test="focused-case-graph" data-graph-role="${input.role ?? 'current'}">
   ${viewsHtml}
   ${toolbarHtml}
   ${viewportHtml}
@@ -183,7 +194,8 @@ ${edgeElements.map((edge) => {
 </div>`
     : canvasHtml;
 
-  // Full output with styles and script
+  // Full output with styles and script (once per page when two graphs are rendered)
+  if (input.includeAssets === false) return graphContent;
   return `
 <style>
 ${FOCUSED_GRAPH_CSS}

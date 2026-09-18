@@ -36,6 +36,7 @@ import {
 import { openDisruptionCase, worldAt, type DisruptedWorld, type OpenCase, type WorldSpec } from './r1ProgrammeWorld.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
+import { ensureOriginalCaseGraph } from '../src/app/target/originalCaseGraphCapture.ts';
 import type { RecoveryCaseView } from '../src/contracts/v2/product/readModels.ts';
 
 after(async () => {
@@ -218,5 +219,17 @@ describe('R2 focused Case graph generality — connection world, no programme (r
     assert.ok(fg, 'focusedGraph present');
     const visibleRefs = new Set(v.ldg.nodes.map((n) => n.ref));
     for (const ref of fg.causalNodeRefs) assert.ok(visibleRefs.has(ref), `causal ref visible: ${ref}`);
+  });
+
+  test('the SAME capture code freezes a truthful Original for the connection world, with no programme structure', async () => {
+    const ctx = { pool: c.pool, workspaceId: c.world.workspaceId, actorPrincipalId: c.world.actorId, uow: () => c.app.unitOfWork() };
+    assert.equal((await ensureOriginalCaseGraph(ctx, { caseId: c.caseId, now: c.now })).status, 'CAPTURED');
+    assert.equal((await ensureOriginalCaseGraph(ctx, { caseId: c.caseId, now: c.now })).status, 'EXISTS');
+    const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
+    const original = v.originalFocusedGraph;
+    assert.ok(original, 'Original present on the Case read model');
+    assert.ok(original.ldg.nodes.some((n) => n.kind === 'SERVICE_BOOKING'));
+    assert.ok(!original.ldg.nodes.some((n) => n.kind === 'PROGRAMME_COMMITMENT'), 'no programme node fabricated in the stored Original');
+    assert.ok(original.focusedGraph?.firstBreakpoint, 'first breakpoint frozen');
   });
 });

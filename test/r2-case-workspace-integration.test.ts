@@ -98,13 +98,45 @@ describe('R2 Case workspace composition', () => {
     assert.doesNotMatch(html, /WebSocket|EventSource/);
   });
 
-  test('wraps the graph in the Original/Current toggle with honest empty state', () => {
+  test('wraps the graph in the Original/Current toggle; no stored Original => honest unavailable state', () => {
     const html = renderProductRecoveryCase(baseCase());
     assert.match(html, /data-test="original-current-toggle"/);
     assert.match(html, /data-test="current-panel"/);
     assert.match(html, /data-test="original-panel"/);
-    assert.match(html, /Original snapshot not available/);
+    assert.match(html, /data-test="original-unavailable"/);
     assert.match(html, /__northstarOriginalCurrentStarted/);
+    assert.doesNotMatch(html, /first seen this session/);
+  });
+
+  test('a persisted Original renders from its stored snapshot, distinct from Current, with one asset set', () => {
+    const storedLdg = {
+      scope: 'FOCUSED_CASE' as const,
+      nodes: [
+        { ref: 'JOURNEY:j-1', kind: 'TRAVELLER' as const, label: 'Stored Traveller', semanticState: 'FAILED' as const, authority: 'AUTHORITATIVE' as const },
+      ],
+      edges: [],
+      change: { projectionRevision: 2, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'FAILED' as const },
+    };
+    const html = renderProductRecoveryCase(baseCase({
+      status: 'RESOLVED',
+      originalFocusedGraph: {
+        capturedAt: '2031-09-14T10:00:00.000Z',
+        schemaVersion: 1,
+        caseStatusAtCapture: 'OPEN',
+        ldg: storedLdg,
+        subjectLabels: {},
+      },
+    }));
+    const originalPanel = html.slice(html.indexOf('data-test="original-panel"'));
+    assert.match(originalPanel, /Stored Traveller/, 'the Original panel renders the stored graph');
+    assert.match(originalPanel, /data-graph-role="original"/);
+    assert.match(html, /data-graph-role="current"/);
+    assert.doesNotMatch(html, /data-test="original-unavailable"/);
+    assert.equal(html.split('.fg-canvas {').length - 1, 1, 'renderer stylesheet is emitted once for two graphs');
+    // Current renders the live graph, never the stored one.
+    const currentPanel = html.slice(html.indexOf('data-test="current-panel"'), html.indexOf('data-test="original-panel"'));
+    assert.doesNotMatch(currentPanel, /Stored Traveller/);
+    assert.match(currentPanel, /Traveller one/);
   });
 
   test('renders the backend-mapped first breakpoint verbatim, never traversed', () => {

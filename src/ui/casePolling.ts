@@ -75,6 +75,12 @@ export function casePollingScript(options: { caseRef: string; intervalMs?: numbe
       // Swap the entire main region (complete snapshot discipline).
       curMain.outerHTML = newMain.outerHTML;
 
+      // Scripts inside swapped markup do not run: re-initialise the graph canvases
+      // (they restore each canvas's pan/zoom/view/selection) and re-apply the
+      // operator's Original/Current tab. Both are display state only.
+      if (window.__northstarInitGraphs) window.__northstarInitGraphs();
+      if (window.__northstarApplyOriginalCurrent) window.__northstarApplyOriginalCurrent();
+
       // Restore open state for matching details elements.
       for (var j = 0; j < openDetailsRefs.length; j++) {
         var ref = openDetailsRefs[j];

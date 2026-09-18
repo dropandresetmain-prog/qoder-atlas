@@ -282,8 +282,28 @@ function focusedGraphSection(view: RecoveryCaseView): string {
        </details>`
     : '';
 
-  // Original/Current is a workspace toggle around the same graph component.
-  const region = buildOriginalCurrentRegion(graphHtml);
+  // Original/Current is a workspace toggle around the same graph component. The
+  // Original is the persisted immutable snapshot, rendered by the SAME renderer
+  // (assets already emitted with Current); absent => honest unavailable state.
+  const stored = view.originalFocusedGraph;
+  const region = buildOriginalCurrentRegion({
+    currentHtml: graphHtml,
+    ...(stored
+      ? {
+          original: {
+            graphHtml: renderFocusedCaseGraph({
+              ldg: stored.ldg,
+              ...(stored.focusedGraph ? { focusedGraph: stored.focusedGraph } : {}),
+              caseStatus: stored.caseStatusAtCapture,
+              role: 'original',
+              includeAssets: false,
+            }),
+            capturedAt: stored.capturedAt,
+            capturedLabel: formatInstant(stored.capturedAt),
+          },
+        }
+      : {}),
+  });
 
   return `<section class="section" data-test="focused-case-graph-section">
     <h2>What broke and why</h2>

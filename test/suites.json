@@ -89,6 +89,7 @@
       "test/r2-focused-graph-projection.test.ts",
       "test/r2-graph-renderer.test.ts",
       "test/r2-original-current.test.ts",
+      "test/r2-original-snapshot.test.ts",
       "test/r2-outcome-delta-labels.test.ts",
       "test/r3d-user-contracts.test.ts",
       "test/runtime-services.test.ts",
