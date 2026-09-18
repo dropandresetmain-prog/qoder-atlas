@@ -79,6 +79,7 @@
       "test/r1-planning-contracts.test.ts",
       "test/r1-planning-foundations.test.ts",
       "test/r1-planning-selection.test.ts",
+      "test/r1-progression-facts.test.ts",
       "test/r3d-user-contracts.test.ts",
       "test/runtime-services.test.ts",
       "test/strategy-viability.test.ts",
