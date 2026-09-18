@@ -24,7 +24,7 @@
  */
 import { z } from 'zod';
 import { SubjectIdSchema, type SubjectId } from '../../../domain/v2/shared/identity.ts';
-import { InstantSchema } from '../../../domain/v2/shared/time.ts';
+import { compareInstants, InstantSchema } from '../../../domain/v2/shared/time.ts';
 import { WorldSnapshotManifestSchema } from '../scope/readScope.ts';
 import { StrategyViabilitySchema, type StrategyViability } from '../scenario/recoveryStrategy.ts';
 import {
@@ -122,7 +122,14 @@ export const RecoveryPlanningAttemptSchema = z.strictObject({
   /** Viable strategies promoted to RecoveryStrategy rows during this attempt. */
   viableStrategyRefs: z.array(SubjectIdSchema).default([]),
   recommendation: StrategyRecommendationSchema.optional(),
-});
+}).refine(
+  // Parity with migration 0125's `recovery_planning_attempts_interval_chk`
+  // (completed_at >= started_at): a completed attempt spans a non-empty,
+  // correctly ordered interval, so an inverted interval is rejected here in
+  // application code as well as at the database CHECK.
+  (v) => compareInstants(v.startedAt, v.completedAt) <= 0,
+  { message: 'completedAt must not precede startedAt', path: ['completedAt'] },
+);
 export type RecoveryPlanningAttempt = z.infer<typeof RecoveryPlanningAttemptSchema>;
 
 /**

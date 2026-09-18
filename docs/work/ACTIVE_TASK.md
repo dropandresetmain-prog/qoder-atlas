@@ -100,18 +100,30 @@ reconciles and integrates.
 
 - [x] Phase A recon (A1-A5 read-only) — complete.
 - [x] Phase B contracts materialized + typecheck clean.
-- [ ] C1 checkpoint: contracts + migration 0125 authored + pure tests green +
+- [x] C1 checkpoint: contracts + migration 0125 authored + pure tests green +
       suites.json classification + ACTIVE_TASK ledger + this doc.
-      Commit `feat(r1): materialize recovery planning contracts`. PUSH. Record SHA.
-- [ ] C2 — planner core (lane P integrated).
-- [ ] C3 — decision evidence end-to-end at the seam.
+      Commit `feat(r1): materialize recovery planning contracts`. PUSHED.
+      - branch: `feat/r1-planning-parity-cloud`
+      - C1 SHA: `c7bb86a740b2370f97998e14b3fe3fa7fe13e9ef` (local == origin)
+      - Phase C lanes branch from this SHA.
+- [x] C3 foundation — pure decision-evidence assembly
+      (`src/resolution/planning/decisionEvidence.ts`): the bridge from real RC-6
+      `EvaluateStrategyResult` + closure to the three frozen impact projections
+      (C7) and MaterialCandidateEvidence (C5), validated against the contract.
+      Added `RecoveryPlanningAttemptSchema` interval refine (app/DB parity with
+      migration 0125 CHECK). 46 pure tests pass; full `current` suite 876/876.
+- [ ] C2 — planner core (lane P integrated): coordinator extending
+      `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
+- [ ] C3 — decision evidence end-to-end at the seam (persist attempt via lane E).
 - [ ] C4 — Recovery Lifecycle Progression service (PRIMARY).
 - [ ] C5 — integration + generality proof (>=2 materially different situations).
 
-## Verification — DONE in Cloud (C1)
+## Verification — DONE in Cloud (C1 + C3 foundation)
 
-- [x] `test/r1-planning-contracts.test.ts`: 33/33 pass (Node v24 type-stripping).
-- [x] `npm run gate:test-boundary`: CLEAN — 200 test files classified.
+- [x] `test/r1-planning-contracts.test.ts` + `test/r1-decision-evidence.test.ts`:
+      46/46 pass (Node v24 type-stripping).
+- [x] Full `current` suite via `run-suite.mjs current`: 876/876 pass, 0 fail.
+- [x] `npm run gate:test-boundary`: CLEAN — 201 test files classified.
 - [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 405 files scanned.
 - [x] `npm run typecheck`: exit 0.
 - [x] `eslint` on new/changed paths: clean.
