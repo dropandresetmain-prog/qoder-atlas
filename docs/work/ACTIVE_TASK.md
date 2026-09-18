@@ -133,6 +133,28 @@ reconciles and integrates.
       full `current` suite 887/887; typecheck/lint/boundary/anti-hardcoding clean.
       Commit `feat(r1): select viable-only recommendation deterministically (C6 comparator)`.
       - SHA: `b6ed62ee0c4d595c1b027c054df099325ddc0da2` (local == origin)
+- [x] Lane P (part 2) — C3 domain registry + C2 research dispatcher foundations
+      (`src/resolution/planning/recoveryDomains.ts`,
+      `src/resolution/planning/researchDispatcher.ts`): deterministic domain
+      activation from REAL M6 blocking dimension codes only (no scenario
+      branch), fail-closed on missing capability; bounded read-only dispatch
+      with canonical-fingerprint dedupe across rounds, structured
+      PLANNING_BUDGET_EXCEEDED refusal that retains prior evidence, and
+      external failure kept as visible data. `test/r1-planning-foundations.test.ts`
+      13/13 pass; full `current` suite 900/900; typecheck/lint/boundary/
+      anti-hardcoding clean.
+      Commit `feat(r1): deterministic recovery-domain registry and bounded read-only research dispatcher`.
+      - SHA: `8101ced6a49ba7740472a62a38d792fc2e971c81` (local == origin)
+- [x] Lane P (part 3) — pure selection layer
+      (`src/resolution/planning/planningSelection.ts`): comparator-fact
+      derivation from the frozen impact projections (worseCount/betterCount from
+      outcomeDelta, blastRadiusSize from immediate blast radius; no facts for a
+      validation rejection that never reached RC-6) + closed-vocabulary
+      `planningOutcomeOf` mapping (returns the contract's own
+      `RecoveryPlanningOutcome`, so the mapping cannot drift from the frozen
+      enum). `test/r1-planning-selection.test.ts` 4/4 pass (fact derivation
+      exercised through REAL RC-6 output); full `current` suite 904/904;
+      typecheck/lint/boundary/anti-hardcoding clean.
 - [ ] C2 — planner core (lane P integrated): coordinator extending
       `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
 - [ ] C3 — decision evidence end-to-end at the seam (coordinator persists attempt).
