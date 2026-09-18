@@ -14,17 +14,36 @@ Review is a risk-control step, not a ritual.
 
 ## Current project state
 
-The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository convergence is also complete.
+The data/state refactor through M10/C5 is complete and accepted. Post-C5 repository
+convergence is complete.
 
-**PostgreSQL is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and exists only as explicit offline, read-only migration input or historical test/code archaeology. It is not a fallback runtime, alternate runtime, demo runtime or current product authority.
+A later read-only frontier runtime audit identified an operational-composition gap rather
+than a need to reopen the ontology. Its accepted R0 -> T3 -> T4 -> B1 sequence has now been
+implemented.
 
-The current delivery sequence is:
+**PostgreSQL is the sole normal Northstar runtime.** SQLite is retired as an application
+runtime and exists only as explicit offline, read-only migration input or historical
+test/code archaeology. It is not a fallback, alternate or demo runtime.
 
-`Slice A -> Founder Test A -> Slice B -> Founder Test B -> submission rehearsal / M11 operational activation -> polish/stretch`
+Current implementation candidate:
 
-Slice A is the next product milestone. Do not reopen broad architecture unless implementation exposes a concrete requirement the frozen ontology cannot express.
+`feature/sarah-provider-disruption` @
+`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
 
-## Source-of-truth order
+The first complete generalized internal recovery loop is proven on the real AiT/Sarah
+world. The next gate is **Founder B1 physical acceptance**. After acceptance, the next
+implementation milestone is **B2 generalized external recovery / Jordan** through the
+same lifecycle.
+
+Current sequence:
+
+`Founder B1 -> B2 external/Jordan -> Founder + generalisation verification ->
+post-E2E observability/Event Overview/provider hardening -> M11/C6 candidate`.
+
+Do not reopen broad architecture unless implementation exposes a concrete requirement the
+frozen ontology cannot express.
+
+## Source-of-truth order## Source-of-truth order
 
 Before broad implementation, inspect the actual branch/head and read the relevant parts of:
 
@@ -136,23 +155,40 @@ M11 is no longer a database-runtime migration. It is the final **operational act
 
 ## Product delivery discipline
 
-The current critical path is two founder-testable vertical slices.
+Forward planning no longer uses the old Slice A/Slice B umbrella labels as milestones.
 
-### Slice A
+### Founder B1 — immediate gate
 
-Known Sarah baseline -> normal product UI -> controlled provider-shaped disruption -> authoritative PostgreSQL mutation -> incident-linked affected cohort -> four cleared / Sarah disrupted -> one Sarah RecoveryCase -> click Sarah -> authoritative focused case.
+Physically verify the real AiT product loop:
 
-Stop and founder-test at this point. Do not require Slice B before testing Slice A.
+`baseline -> disclosed disruption -> ChangeSignal/case -> recovery proposal ->
+deterministic viability -> operator approval -> internal execution -> observation ->
+reassessment -> resolved case`.
 
-### Slice B
+Implementation tests are not founder acceptance. Fix the first broken normal-product
+boundary if the physical flow fails.
 
-Real recovery strategy -> mutation-free preview -> complete affected participation -> real authority/approval -> ordered execution -> observation -> reassessment -> same Sarah trip/Journey viable -> truthful recovered state.
+### B2 — next implementation milestone after Founder B1
 
-Stop and founder-test again before polish/stretch.
+B2 proves that the **same generalized engine** can recover a materially different trip
+through external-provider work.
 
-The Event Overview final visual design is unresolved. Do not overfit backend contracts to a rejected prototype. Build only the minimum truthful operational projection required for Slice A.
+Add only the minimum generalized capabilities required: flight-recovery proposer on the
+existing StrategyProposer port, provider-neutral external dispatch, Atlas read/transaction
+seams where supported, observation/reconciliation and truthful partial/unknown outcomes.
 
-## Anti-hardcoding
+Do not create Jordan-specific application/domain logic. Scenario data may change; engine
+code must not.
+
+### After B2
+
+Run one focused generalisation review + founder verification, then proceed to semantic
+activity/observability, an accepted Event Overview design, provider hardening and M11/C6.
+
+The test/dev performance audit is a parallel engineering-productivity lane. It may improve
+feedback loops, but it is not a product milestone and must not silently weaken coverage.
+
+## Anti-hardcoding## Anti-hardcoding
 
 Never add scenario-specific branches, fixture IDs, traveller/event names, cities, routes, suppliers or demo dates to domain/recovery logic.
 
