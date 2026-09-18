@@ -32,6 +32,34 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 ## R2 lane status
 
 - Phase 0 recon (A1-A5 read-only): COMPLETE. Findings reconciled by PRIMARY.
+- R2-C1 part 1 (contract + pure causal mapping): DONE — SHA
+  `333615dcb8030d181dad3dffec10843ed0ff2f2b` (pushed). `FocusedGraphView` frozen;
+  `projectFocusedGraph` pure; 8/8 focused tests; current suite 941/941.
+
+### Frozen cross-lane seams (PRIMARY-owned; do not fork)
+
+- **Lane B renderer entry** (`src/ui/graph/index.ts`):
+  `renderFocusedCaseGraph(input: { ldg: LiveDependencyGraph; focusedGraph?: FocusedGraphView; caseStatus: RecoveryCaseView['status']; }): string`
+  — server-rendered HTML/SVG string. B internally calls the EXISTING
+  `presentDependencyGraph` (single semantic mapping layer) with `causalRefs`
+  from `focusedGraph.causalNodeRefs` and `causalEdgeIndices` looked up from
+  `focusedGraph.causalEdgeIds` (index lookup, never traversal). Pulse = CSS
+  only, derived from tone. No backend liveness fields.
+- **Lane D modules**: `src/ui/casePolling.ts` exporting
+  `casePollingScript(options: { caseRef: string; intervalMs?: number }): string`
+  (inline `<script>`, complete-snapshot HTML swap, revision-gated like overview
+  polling) and `src/ui/originalCurrent.ts` for the non-mutating Original/Current
+  toggle presentation. D does NOT edit screens; PRIMARY wires.
+- **Lane C** consumes B + D via PRIMARY integration after wave 1 lands.
+- Children never commit; PRIMARY reviews every diff, runs gates, commits/pushes
+  per lane. New test files must be reported for `test/suites.json` classification
+  (shared file — PRIMARY edits only).
+- Test runtime in Cloud: `/opt/playwright-driver/node --test <files>` (v24).
+  Default `node` is v20 and cannot strip TS types.
+
+## R2 lane status (detail)
+
+- Phase 0 recon (A1-A5 read-only): COMPLETE. Findings reconciled by PRIMARY.
   - A1 backend map: `RecoveryCaseView` already carries `causalPath`, `planningEvidence`,
     `attention`, `strategies`, `recoveryActions`, `connectionProgression`, `ldg`,
     `change`. Missing: explicit causal-ref mapping, first-breakpoint pointer, Original
