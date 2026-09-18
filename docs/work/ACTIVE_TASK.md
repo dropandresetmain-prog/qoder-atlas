@@ -75,20 +75,44 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
   - A4 conflict audit: 10 statements; all resolved in C0 §9.
   - A5 test map: pure tests run on v24 binary; PG/browser deferred. New pure tests
     proposed under `test/r2-*.test.ts` (classify in `test/suites.json`).
-- LANE A (focused projection): NOT STARTED.
-- LANE B (renderer): NOT STARTED.
-- LANE C (Case workspace): NOT STARTED.
-- LANE D (Original/Current + polling): NOT STARTED.
-- LANE V (verification): NOT STARTED.
+- LANE A (focused projection): COMPLETE — integrated C1 part 2, SHA
+  `8d434e1` (pushed). `projectFocusedCaseGraph.ts` pure enrichment +
+  `pgFactAssembler.ts` wiring; SERVICE_BOOKING/TRANSFER_STAY/PROGRAMME_COMMITMENT
+  nodes + RELIES_ON/MUST_HAPPEN_BEFORE/PARTICIPATES_IN edges; traveller display
+  names -> `subjectHumanLabels`. PRIMARY fixed the boundary keying to
+  `JOURNEY:<id>` (matches contract + refLabel). **OBJECTIVE contract gap: PRIMARY
+  VERDICT = DO NOT add an OBJECTIVE LdgNodeKind in R2.** Trip purpose stays in the
+  existing `objectives` ontology and is presented AROUND the graph (planning
+  evidence / first-breakpoint wording), never as a causal-map node — consistent with
+  frozen decisions 002/006 (current-world causal map only). `objectiveContractGap`
+  is retained as an honest uncertainty note, not a defect.
+- LANE B (renderer): COMPLETE — C2, SHA `62dda44` (pushed). `src/ui/graph/*`
+  (1520 lines) `renderFocusedCaseGraph` via `presentDependencyGraph` single
+  semantic layer; deterministic layout; CSS-only pulse from tone; no backend
+  liveness; 29 tests.
+- LANE C (Case workspace): COMPLETE — C3, SHA `545e8d7` (pushed).
+  `product-recovery-case.ts` composes graph + Original/Current toggle + planning
+  evidence AROUND the graph + change-awareness data attrs + polling/toggle scripts;
+  12 integration tests (`r2-case-workspace-integration.test.ts`).
+- LANE D (Original/Current + polling): COMPLETE — C4, SHA `144c951` (pushed).
+  `casePolling.ts` (4s complete-snapshot, sinceCursor echo, revision-gated, no
+  WS/SSE) + `originalCurrent.ts` (session-local memory-only capture, honest
+  labels/empty state); 31 tests. PRIMARY VERDICT: durable disruption-time
+  snapshot deferred (R3 schema candidate), NOT implied by the session capture.
+- LANE V (verification): current suite 1013/1013; typecheck, lint, boundary
+  (224 files), anti-hardcoding gates all CLEAN.
 
 ## R2 checkpoint SHAs
 
 - R2-C0 contract freeze: DONE — SHA `df3d8bffaf477da04d5b802104fa3356b7304816` (pushed, local == origin).
-- R2-C1 focused projector: —
-- R2-C2 renderer: —
-- R2-C3 Case workspace: —
-- R2-C4 Original/Current + polling: —
-- R2-C5 Cloud integration: —
+- R2-C1 focused projector: DONE — part 1 `333615d` (pure causal mapping + contract);
+  part 2 `8d434e1` (Lane A backend enrichment + subjectHumanLabels). Both pushed.
+- R2-C2 renderer: DONE — `62dda44` (pushed).
+- R2-C3 Case workspace: DONE — `545e8d7` (pushed).
+- R2-C4 Original/Current + polling: DONE — `144c951` (pushed).
+- R2-C5 Cloud integration: IN PROGRESS — all lanes integrated into one workspace;
+  remaining: PG integration tests (authored/typechecked, NOT executed — no PG in
+  Cloud), `R2_LOCAL_ACCEPTANCE_HANDOFF.md`, final doc reconciliation, 24-item report.
 
 ## R2 Cloud limitations
 
