@@ -213,6 +213,8 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
    */
   /** R1 — durable case attention records (migration 0126), oldest first. */
   attention?: readonly import('../../../contracts/v2/planning/recoveryCaseAttention.ts').RecoveryCaseAttentionRecord[];
+  /** R2 — the persisted immutable Original focused graph (migration 0127), when captured. */
+  originalFocusedGraph?: import('../../../contracts/v2/product/readModels.ts').OriginalFocusedGraphView;
   planningAttempt?: {
     attempt: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningAttempt;
     outcome: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningOutcome;

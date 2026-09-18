@@ -90,6 +90,7 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     ...(planningEvidence ? { planningEvidence } : {}),
     attention: (input.attention ?? []).map(projectCaseAttention),
     ldg,
+    ...(input.originalFocusedGraph ? { originalFocusedGraph: input.originalFocusedGraph } : {}),
     change: buildChangeAwareness(input),
   });
 }

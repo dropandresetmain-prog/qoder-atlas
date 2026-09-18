@@ -31,6 +31,7 @@ import {
 import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
 import { findLatestRecoveryPlanningAttemptForCase } from '../../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { listRecoveryCaseAttention } from '../../../persistence/postgres/commands/caseAttentionCommands.ts';
+import { loadOriginalCaseGraphSnapshot } from '../../../persistence/postgres/commands/caseGraphSnapshotCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
 import { projectFocusedCaseGraphEnrichment } from './projectFocusedCaseGraph.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
@@ -579,6 +580,9 @@ async function loadRecoveryCaseFactsInner(
   const planningAttempt = await findLatestRecoveryPlanningAttemptForCase(client, workspaceId, caseId);
   // R1: durable human attention (C8 ESCALATE) — orthogonal to the case phase.
   const attention = await listRecoveryCaseAttention(client, workspaceId, caseId);
+  // R2: the immutable Original focused graph (historical presentation evidence;
+  // CURRENT never reads it). Absent until the first truthful focused graph.
+  const originalFocusedGraph = await loadOriginalCaseGraphSnapshot(client, workspaceId, caseId);
 
   // Ascending, so option 1 is the first option this case produced. The
   // strategies themselves are projected further down, once each case
@@ -1014,6 +1018,7 @@ async function loadRecoveryCaseFactsInner(
     ),
     ...(planningAttempt ? { planningAttempt } : {}),
     attention,
+    ...(originalFocusedGraph ? { originalFocusedGraph } : {}),
     ...(row.resolution_summary ? { resolutionSummary: row.resolution_summary } : {}),
   };
 }

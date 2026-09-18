@@ -626,6 +626,69 @@ export const FocusedGraphViewSchema = z.strictObject({
 });
 export type FocusedGraphView = z.infer<typeof FocusedGraphViewSchema>;
 
+/**
+ * R2 — the ONE immutable ORIGINAL focused-graph snapshot of a RecoveryCase
+ * (table `recovery_case_graph_snapshots`, migration 0127).
+ *
+ * It is the first truthful focused Case graph, frozen once, so the operator can
+ * compare Original <-> Current. It is SEMANTIC only — exactly the inputs the
+ * focused renderer consumes (`ldg`, `focusedGraph`, `caseStatus`) plus the human
+ * subject labels — never HTML/SVG/layout/camera/animation state. CURRENT always
+ * comes from authoritative state (`RecoveryCaseView.ldg`) and never from this.
+ * It is case-owned presentation history: not trip truth, not an assessment, not
+ * planning evidence. Change-awareness hints inside the stored `ldg` are neutral
+ * (they are poll-relative, not semantic).
+ */
+export const ORIGINAL_GRAPH_SNAPSHOT_SCHEMA_VERSION = 1;
+export const ORIGINAL_GRAPH_MAX_NODES = 200;
+export const ORIGINAL_GRAPH_MAX_EDGES = 400;
+export const ORIGINAL_GRAPH_MAX_LABELS = 200;
+
+const OriginalGraphLdgSchema = z.strictObject({
+  scope: z.literal('FOCUSED_CASE'),
+  nodes: z.array(LdgNodeSchema).max(ORIGINAL_GRAPH_MAX_NODES),
+  edges: z.array(LdgEdgeSchema).max(ORIGINAL_GRAPH_MAX_EDGES),
+  change: ChangeAwarenessSchema,
+});
+
+/** The stored JSONB payload (capture time and basis live in dedicated columns). */
+export const OriginalGraphSnapshotPayloadSchema = z.strictObject({
+  schemaVersion: z.literal(ORIGINAL_GRAPH_SNAPSHOT_SCHEMA_VERSION),
+  /** The case's lifecycle status when captured — the renderer's only non-graph input. */
+  caseStatusAtCapture: z.enum([
+    'OPEN', 'PLANNING', 'AWAITING_AUTHORITY', 'EXECUTING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED',
+  ]),
+  ldg: OriginalGraphLdgSchema,
+  focusedGraph: FocusedGraphViewSchema.optional(),
+  subjectLabels: z.record(z.string().min(1), z.string().min(1)).default({}).refine(
+    (labels) => Object.keys(labels).length <= ORIGINAL_GRAPH_MAX_LABELS,
+    { message: 'too many subject labels' },
+  ),
+}).superRefine((payload, ctx) => {
+  const refs = new Set(payload.ldg.nodes.map((n) => n.ref));
+  const edgeIds = new Set(payload.ldg.edges.map((e) => e.id));
+  for (const ref of payload.focusedGraph?.causalNodeRefs ?? []) {
+    if (!refs.has(ref)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `causal node ref ${ref} is not in the snapshot graph`, path: ['focusedGraph'] });
+  }
+  for (const id of payload.focusedGraph?.causalEdgeIds ?? []) {
+    if (!edgeIds.has(id)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `causal edge id ${id} is not in the snapshot graph`, path: ['focusedGraph'] });
+  }
+});
+export type OriginalGraphSnapshotPayload = z.infer<typeof OriginalGraphSnapshotPayloadSchema>;
+
+/** What the Case read path exposes: the payload plus its capture provenance. */
+export const OriginalFocusedGraphViewSchema = z.strictObject({
+  capturedAt: z.string().datetime({ offset: true }),
+  /** The settled failing assessment the Original was captured against, when known. */
+  basisAssessmentRef: z.string().min(1).optional(),
+  schemaVersion: z.literal(ORIGINAL_GRAPH_SNAPSHOT_SCHEMA_VERSION),
+  caseStatusAtCapture: OriginalGraphSnapshotPayloadSchema.shape.caseStatusAtCapture,
+  ldg: OriginalGraphLdgSchema,
+  focusedGraph: FocusedGraphViewSchema.optional(),
+  subjectLabels: z.record(z.string().min(1), z.string().min(1)).default({}),
+});
+export type OriginalFocusedGraphView = z.infer<typeof OriginalFocusedGraphViewSchema>;
+
 export const RecoveryCaseViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   caseRef: z.string().min(1),
@@ -694,6 +757,12 @@ export const RecoveryCaseViewSchema = z.strictObject({
   /** Durable human-attention records (open first-class, resolved kept as history). */
   attention: z.array(RecoveryCaseAttentionViewSchema).default([]),
   ldg: LiveDependencyGraphSchema,
+  /**
+   * R2 — the persisted immutable Original focused graph (historical presentation
+   * evidence). Absent when the case has no captured Original (honest unavailable
+   * state); never derived from `ldg` and never read by CURRENT.
+   */
+  originalFocusedGraph: OriginalFocusedGraphViewSchema.optional(),
   change: ChangeAwarenessSchema,
 });
 export type RecoveryCaseView = z.infer<typeof RecoveryCaseViewSchema>;

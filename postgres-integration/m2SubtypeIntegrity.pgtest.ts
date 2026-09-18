@@ -579,6 +579,9 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'recovery_planning_attempts.material_candidates',
       'recovery_planning_attempts.viable_strategy_refs',
       'recovery_planning_attempts.recommendation',
+      // R2 (0127): the single immutable semantic Original Case graph — object-shaped and size-checked
+      // (pg_column_size CHECK) in the migration, strictly validated at the application boundary; never HTML/SVG.
+      'recovery_case_graph_snapshots.snapshot',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

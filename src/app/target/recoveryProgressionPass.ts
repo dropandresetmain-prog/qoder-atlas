@@ -47,6 +47,7 @@ import {
   findRecoveryPlanningAttemptForBasis,
 } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { evaluateRecoveryCaseResolution } from './recoveryCaseResolution.ts';
+import { ensureOriginalCaseGraph } from './originalCaseGraphCapture.ts';
 
 /** Upper bound on cases inspected per wake; the report says when it truncated. */
 export const PROGRESSION_CANDIDATE_LIMIT = 200;
@@ -172,6 +173,19 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
   }
   const { basis } = settled;
   outcome.basisAssessmentId = basis.assessmentId;
+
+  // R2: the first settled FAILING basis is the first truthful focused Case graph.
+  // Freeze it as the immutable Original BEFORE anything is dispatched below, so
+  // planning/approval/execution can never precede or mutate it. Idempotent
+  // (insert-once); presentation history only — it never feeds a decision here.
+  if (basis.verdict === 'FAIL') {
+    try {
+      await ensureOriginalCaseGraph(ctx, { caseId: row.id, basisAssessmentId: basis.assessmentId, now });
+    } catch (error) {
+      // Presentation history must never block recovery: report it and retry next wake.
+      outcome.detail = `original graph capture failed: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
 
   // A newer settled basis supersedes attention raised against an older one.
   const attention = await listRecoveryCaseAttention(ctx.pool, ctx.workspaceId, row.id);
