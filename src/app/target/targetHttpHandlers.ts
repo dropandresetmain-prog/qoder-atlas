@@ -221,7 +221,17 @@ export async function handleTargetProductHttp(
       }
       const view = projectRecoveryCase(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductRecoveryCase(view));
+        // FB1-3: the focused case is a product surface, so it renders in the
+        // same chrome as Overview. It previously returned the bare fragment,
+        // which is why the founder landed on browser-default HTML. No shell
+        // context is invented here: the case read model knows its own case,
+        // not the workspace's event or open-decision count, and the shell
+        // omits what it is not given.
+        sendHtml(
+          res,
+          200,
+          renderInShell('case', 'Recovery case', {}, renderProductRecoveryCase(view)),
+        );
       } else {
         sendJson(res, 200, view);
       }

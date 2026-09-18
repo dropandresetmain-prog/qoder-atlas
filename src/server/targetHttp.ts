@@ -30,13 +30,34 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 /** Allowlisted static presentation assets — never resolves outside fixtures/ui. */
 const UI_ASSETS = ['northstar-logo.png'];
 
-/** Product route -> the read-only handler that renders it. GET only. */
+/**
+ * Product route -> the read-only handler that renders it. GET only.
+ *
+ * `/operator` is an alias of `/`: Founder B1 (FB1-4) went looking for the
+ * operator surface at the name the docs and the legacy runtime used, and got
+ * a 404 from the normal PostgreSQL runtime. Both names now reach the same
+ * authoritative handler.
+ */
 const SHELL_ROUTES: Record<string, string | undefined> = {
   '/': '/api/v2/operator/overview',
+  '/operator': '/api/v2/operator/overview',
   '/programme': '/api/v2/operator/programme',
   '/decisions': '/api/v2/operator/decisions',
   '/activity': '/api/v2/operator/activity',
 };
+
+/**
+ * The clean focused-case product route (FB1-2/FB1-3). It maps onto the same
+ * read-only case handler every other product route uses, which renders the
+ * case inside the product shell — so the operator never has to navigate to
+ * an `/api/v2/...` URL to work a case. The API route stays available for API
+ * and debug use.
+ *
+ * The retired SQLite composition has its own `/operator/cases/:id` behaviour.
+ * That runtime is not imported, reactivated or ported here: this is the
+ * equivalent route implemented in the normal PostgreSQL target server.
+ */
+const CASE_ROUTE = /^\/operator\/cases\/([^/]+)$/;
 
 async function serveStaticAsset(res: ServerResponse, assetName: string): Promise<boolean> {
   if (!UI_ASSETS.includes(assetName)) return false;
@@ -87,6 +108,14 @@ async function handle(
   const shellRoute = SHELL_ROUTES[url.pathname];
   if (req.method === 'GET' && shellRoute) {
     res.writeHead(302, { location: `${shellRoute}?format=html` });
+    res.end();
+    return;
+  }
+
+  const caseRoute = CASE_ROUTE.exec(url.pathname);
+  if (req.method === 'GET' && caseRoute) {
+    const caseRef = decodeURIComponent(caseRoute[1]!);
+    res.writeHead(302, { location: `/api/v2/cases/${encodeURIComponent(caseRef)}?format=html` });
     res.end();
     return;
   }

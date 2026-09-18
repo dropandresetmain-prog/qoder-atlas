@@ -12,6 +12,7 @@ import type {
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
 import { escapeHtml } from '../../../ui/html.ts';
+import { caseHref } from '../productShell.ts';
 import {
   presentAssessment, presentGraphState, presentOperationalStatus, presentViability,
 } from '../../../ui/semantics/adapter.ts';
@@ -137,6 +138,26 @@ function queueGlyph(item: OperatorOverviewItem): { className: string; char: stri
   return item.decisionRequired ? QUEUE_GLYPH.alert : QUEUE_GLYPH[operationalStatusTone(item.status)];
 }
 
+/**
+ * A queue row, made navigable when — and only when — the read model already
+ * knows which case owns it.
+ *
+ * FB1-2: the founder could see a disrupted traveller on Overview and had no
+ * way to open their case; the only route in was a hand-pasted API URL. The
+ * `caseRef` used here is the authoritative case id the v2 read model already
+ * carries. Nothing derives case ownership in the browser, and a row with no
+ * case stays a plain row rather than growing an invented link.
+ */
+function queueRowShell(
+  caseRef: string | undefined,
+  attributes: string,
+  bodyHtml: string,
+): string {
+  return caseRef === undefined
+    ? `<div class="qrow" ${attributes}>${bodyHtml}</div>`
+    : `<a class="qrow" href="${escapeHtml(caseHref(caseRef))}" ${attributes} data-test-case-link="${escapeHtml(caseRef)}">${bodyHtml}</a>`;
+}
+
 function overviewItemRow(item: OperatorOverviewItem): string {
   const issue =
     item.whatChanged ??
@@ -148,16 +169,18 @@ function overviewItemRow(item: OperatorOverviewItem): string {
     item.unresolvedUncertainty.length > 0
       ? `<p class="b-extra">${escapeHtml(item.unresolvedUncertainty.join(' · '))}</p>`
       : '';
-  return `
-    <div class="qrow" data-trip-ref="${escapeHtml(item.tripRef)}" data-test="overview-item">
+  return queueRowShell(
+    item.caseRef,
+    `data-trip-ref="${escapeHtml(item.tripRef)}" data-test="overview-item"`,
+    `
       <span class="q-glyph ${glyph.className}" aria-hidden="true">${glyph.char}</span>
       <div>
         <div class="q-name">${escapeHtml(item.travellerLabel)}</div>
         <div class="q-issue">${escapeHtml(issue)}</div>
         ${uncertainty}
       </div>
-      <div class="b-right">${viability}</div>
-    </div>`;
+      <div class="b-right">${viability}</div>`,
+  );
 }
 
 function readoutBlock(counted: ReturnType<typeof countedSet>): string {
@@ -196,16 +219,18 @@ function populationRow(entry: OperatorOverview['population'][number]): string {
   const evaluationNote = entry.evaluation === 'CURRENT'
     ? ''
     : `<p class="b-extra">Assessment ${escapeHtml(entry.evaluation.toLowerCase().split('_').join(' '))}</p>`;
-  return `
-    <div class="qrow" data-test="population-row" data-journey-ref="${escapeHtml(entry.journeyRef)}">
+  return queueRowShell(
+    entry.caseRef,
+    `data-test="population-row" data-journey-ref="${escapeHtml(entry.journeyRef)}"`,
+    `
       <span class="q-glyph" aria-hidden="true"><i class="${dotClass}"></i></span>
       <div>
         <div class="q-name">${escapeHtml(entry.travellerLabel)}</div>
         <div class="q-issue">${escapeHtml(operationalStatusLabel(entry.status))} · ${escapeHtml(entry.obligation === 'REQUIRED' ? 'Required commitment' : 'Optional commitment')}</div>
         ${evaluationNote}
       </div>
-      <div class="b-right"><span class="badge tone-${remainderViabilityTone(entry.remainderViability)}">${escapeHtml(remainderViabilityLabel(entry.remainderViability))}</span></div>
-    </div>`;
+      <div class="b-right"><span class="badge tone-${remainderViabilityTone(entry.remainderViability)}">${escapeHtml(remainderViabilityLabel(entry.remainderViability))}</span></div>`,
+  );
 }
 
 /** Adapt OperatorOverview into dashboard HTML fragments for product surfaces. */
