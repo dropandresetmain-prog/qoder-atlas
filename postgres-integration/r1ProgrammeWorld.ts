@@ -109,6 +109,26 @@ export async function seedProgrammeWorld(label: string): Promise<ProgrammeWorld>
 }
 
 /**
+ * A provider-shaped ACTUAL-arrival change on the shared inbound service, through
+ * the normal ingress command (canonical mutation + change signal). Returns the
+ * change signal id. Reassessment still has to be drained by the caller.
+ */
+let observationTick = 0;
+export async function applyProviderDelay(c: Pick<OpenCase, 'world' | 'app' | 'pool'>, arrival: string): Promise<string> {
+  const { world, app, pool } = c;
+  const revision = await pool.query<{ revision: string }>('SELECT revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2', [world.workspaceId, world.sharedServiceId]);
+  const ingress = await acceptProviderShapedDemoEvent(
+    { workspaceId: world.workspaceId, actorPrincipalId: world.actorId, uow: () => app.unitOfWork(), pool },
+    { providerId: 'test-supplier', providerEventId: `evt-${randomUUID()}`, receivedAt: new Date(Date.parse('2031-06-01T23:00:00.000Z') + (observationTick++) * 60_000).toISOString(), disclosedAsSimulatedDemoInput: true,
+      payload: { subjectKind: 'TRANSPORT_SERVICE', subjectId: world.sharedServiceId, expectedRevision: Number(revision.rows[0]!.revision), field: 'ACTUAL', arrival, evidenceId: takeSeedEvidence(world.seed) } },
+  );
+  assert.equal(ingress.ok, true, JSON.stringify(ingress));
+  const changeSignalId = (ingress as { changeSignalId?: string }).changeSignalId;
+  assert.ok(changeSignalId, 'ingress records a change signal');
+  return changeSignalId;
+}
+
+/**
  * Seed the world, compose the application, provision authority, apply the
  * provider-shaped delay and escalate: returns an OPEN RecoveryCase whose
  * subject Journey is currently FAIL.
@@ -142,15 +162,7 @@ export async function openDisruptionCase(label: string): Promise<OpenCase> {
   assert.equal(authority.status, 'PROVISIONED', JSON.stringify(authority));
   app.runtimeHooks = { executorPrincipalId: authority.principals.executor };
 
-  const revision = await pool.query<{ revision: string }>('SELECT revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2', [world.workspaceId, world.sharedServiceId]);
-  const ingress = await acceptProviderShapedDemoEvent(
-    { workspaceId: world.workspaceId, actorPrincipalId: world.actorId, uow: () => app.unitOfWork(), pool },
-    { providerId: 'test-supplier', providerEventId: `evt-${randomUUID()}`, receivedAt: '2031-06-01T23:00:00.000Z', disclosedAsSimulatedDemoInput: true,
-      payload: { subjectKind: 'TRANSPORT_SERVICE', subjectId: world.sharedServiceId, expectedRevision: Number(revision.rows[0]!.revision), field: 'ACTUAL', arrival: DELAYED_ARRIVAL, evidenceId: takeSeedEvidence(world.seed) } },
-  );
-  assert.equal(ingress.ok, true, JSON.stringify(ingress));
-  const changeSignalId = (ingress as { changeSignalId?: string }).changeSignalId;
-  assert.ok(changeSignalId, 'ingress records a change signal');
+  const changeSignalId = await applyProviderDelay({ world, app, pool }, DELAYED_ARRIVAL);
   await drain();
   assert.equal(await verdict(world.people[0]!.journeyId), 'FAIL');
 

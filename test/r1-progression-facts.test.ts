@@ -133,3 +133,26 @@ test('mapper re-derives nothing: executionReconciled is false ONLY for a genuine
   assert.equal(blocking.executionReconciled, true);
   assert.equal(blocking.currentStillFailing, true);
 });
+
+test('explicit current verdict: a stale proposal never hides a newly failing basis behind PROPOSED_STATE_ONLY', () => {
+  const stale = facts({
+    gate: { allowed: false, reason: 'PROPOSED_STATE_ONLY', detail: 'old proposal' },
+    currentAssessmentVerdict: 'FAIL',
+    recoveryRemainsPossible: true,
+  });
+  assert.equal(decideProgressionFromFacts(stale).decision, 'REPLAN');
+  // Once the owner flags authority pending for THIS basis, it waits instead.
+  assert.equal(decideProgressionFromFacts({ ...stale, authorityOrExecutionPending: true }).decision, 'WAIT');
+  // In-flight execution is pending regardless of the verdict.
+  const inFlight = facts({ gate: { allowed: false, reason: 'EXECUTION_NOT_RECONCILED', detail: 'open attempt' }, currentAssessmentVerdict: 'FAIL', recoveryRemainsPossible: true });
+  assert.equal(decideProgressionFromFacts(inFlight).decision, 'WAIT');
+});
+
+test('explicit current verdict: UNKNOWN escalates for human evidence; FAIL with no recovery escalates as no-safe-recovery', () => {
+  const unknown = decideProgressionFromFacts(facts({ gate: { allowed: false, reason: 'BLOCKING_UNKNOWN', detail: 'unknown' }, currentAssessmentVerdict: 'UNKNOWN' }));
+  assert.equal(unknown.decision, 'ESCALATE');
+  assert.equal(unknown.reasonCode, 'human_evidence_or_decision_required');
+  const failing = decideProgressionFromFacts(facts({ currentAssessmentVerdict: 'FAIL', recoveryRemainsPossible: false }));
+  assert.equal(failing.decision, 'ESCALATE');
+  assert.equal(failing.reasonCode, 'no_safe_recovery_remaining');
+});

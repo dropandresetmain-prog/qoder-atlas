@@ -17,14 +17,11 @@
  *     basisAssessmentId);
  *   - RESOLVE/WAIT/REPLAN/ESCALATE come only from the frozen precedence.
  *
- * ESCALATE SURFACE — CONTRACT GAP (reported, not papered over): the existing
- * case lifecycle has phases OPEN -> PLANNING -> AWAITING_AUTHORITY -> EXECUTING
- * and terminal RESOLVED/CLOSED/CANCELLED/SUPERSEDED, but NO dedicated
- * "escalated / needs human evidence or decision" state or command. Per the C8
- * contract's own instruction, this is reported as a gap for PRIMARY/local
- * resolution rather than fabricating a new phase here. This mapper still returns
- * the truthful ESCALATE decision; the pass records it without mutating the case
- * into an invented state.
+ * ESCALATE SURFACE — RESOLVED (R1 local, migration 0126): the case lifecycle has
+ * no "escalated" phase and does not gain one. ESCALATE is recorded as durable,
+ * Case-owned human attention (`recovery_case_attention`), orthogonal to phase;
+ * see `src/contracts/v2/planning/recoveryCaseAttention.ts`. This mapper only
+ * returns the truthful decision.
  *
  * Pure: no PostgreSQL, no provider, no model.
  */
@@ -70,6 +67,14 @@ export interface ObservedProgressionFacts {
    * current failure is one recovery can address.
    */
   recoveryRemainsPossible: boolean;
+  /**
+   * The CURRENT settled overall verdict the pass read from the assessment owner.
+   * When supplied it is authoritative for "still failing": the resolution gate
+   * checks execution/proposal state BEFORE verdicts, so a stale proposal must not
+   * hide a newly failing basis behind PROPOSED_STATE_ONLY. Omitted => the mapper
+   * falls back to the gate's own denial reason.
+   */
+  currentAssessmentVerdict?: 'PASS' | 'FAIL' | 'UNKNOWN';
 }
 
 /**
@@ -90,8 +95,13 @@ export function toProgressionInput(facts: ObservedProgressionFacts): RecoveryPro
     basisAssessmentId: facts.basisAssessmentId,
     resolutionGatePassed: gate.allowed,
     executionReconciled: gate.allowed || !isUnreconciledExecution(reason),
-    authorityOrExecutionPending: facts.authorityOrExecutionPending || (reason !== undefined && PENDING_EXECUTION_REASONS.has(reason)),
-    currentStillFailing: reason === 'BLOCKING_FAIL',
+    authorityOrExecutionPending: facts.authorityOrExecutionPending
+      || (reason !== undefined && (facts.currentAssessmentVerdict === undefined
+        ? PENDING_EXECUTION_REASONS.has(reason)
+        // Explicit verdict: only in-flight execution is pending by itself; a
+        // proposal awaiting authority is the owner flag's call (per basis).
+        : isUnreconciledExecution(reason))),
+    currentStillFailing: facts.currentAssessmentVerdict === undefined ? reason === 'BLOCKING_FAIL' : facts.currentAssessmentVerdict === 'FAIL',
     recoveryRemainsPossible: facts.recoveryRemainsPossible,
   };
 }

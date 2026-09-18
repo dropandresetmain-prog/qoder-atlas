@@ -24,7 +24,8 @@ import type { ReassessmentPipeline } from '../persistence/postgres/world/pgAsses
 import type { Pool } from '../persistence/postgres/pool.ts';
 import { composeRuntimeServices, createPeriodicService, createReassessmentService } from './runtimeServices.ts';
 import { runCaseEscalation } from './target/caseEscalation.ts';
-import { runCaseResolutionPass } from './target/caseResolutionPass.ts';
+import { runRecoveryProgressionPass } from './target/recoveryProgressionPass.ts';
+import { createRecoveryPlanningCoordinator } from './target/recoveryPlanningCoordinator.ts';
 import { runInternalExecutionPass } from './target/executionPass.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
 
@@ -175,17 +176,26 @@ export async function composeTargetBoot(
   // any drain that produced assessments so lifecycle latency is not a second
   // idle poll.
   const lifecycleActor = `northstar-lifecycle:${config.workspaceId}`;
+  // C4: the ONE post-reassessment progression owner (freeze C8). Composed once
+  // here; it dispatches to existing owners only (resolution command, the C1
+  // planning coordinator, case attention) and never executes or approves.
+  const planner = createRecoveryPlanningCoordinator({
+    pool: endpoints.app.pool,
+    workspaceId: config.workspaceId,
+    actorPrincipalId: lifecycleActor,
+    uow: () => endpoints.app.unitOfWork(),
+  });
   const lifecycle = createPeriodicService({
     name: 'caseLifecycle',
     pollMs: CASE_LIFECYCLE_POLL_MS,
     run: async (now) => {
       const escalation = await runCaseEscalation({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), now });
-      const resolution = await runCaseResolutionPass({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), now });
+      const resolution = await runRecoveryProgressionPass({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), planner, now });
       return { escalation, resolution };
     },
     summarize: ({ escalation, resolution }) => ({
       escalation: { candidates: escalation.candidates, opened: escalation.opened, attached: escalation.attached, none: escalation.none, failed: escalation.failed },
-      resolution: { candidates: resolution.candidates, resolved: resolution.resolved, blocked: resolution.blocked, failed: resolution.failed },
+      progression: { candidates: resolution.candidates, truncated: resolution.truncated, resolved: resolution.resolved, planned: resolution.planned, escalated: resolution.escalated, waiting: resolution.waiting, failed: resolution.failed },
     }),
     onRun({ escalation, resolution }) {
       if (escalation.opened > 0 || escalation.attached > 0 || escalation.failed > 0) {
@@ -194,10 +204,10 @@ export async function composeTargetBoot(
           if (outcome.error) console.error(`[atlas] case escalation failed for ${outcome.subject.kind}:${outcome.subject.id}: ${outcome.error}`);
         }
       }
-      if (resolution.resolved > 0 || resolution.failed > 0) {
-        console.log(`[atlas] case resolution: resolved=${resolution.resolved} blocked=${resolution.blocked} failed=${resolution.failed}`);
+      if (resolution.resolved > 0 || resolution.planned > 0 || resolution.escalated > 0 || resolution.failed > 0) {
+        console.log(`[atlas] case progression: resolved=${resolution.resolved} planned=${resolution.planned} escalated=${resolution.escalated} waiting=${resolution.waiting} failed=${resolution.failed}`);
         for (const outcome of resolution.outcomes) {
-          if (outcome.result !== 'BLOCKED') console.log(`[atlas] case ${outcome.caseId}: ${outcome.result}${outcome.detail ? ` (${outcome.detail})` : ''}`);
+          if (outcome.dispatch !== 'NONE') console.log(`[atlas] case ${outcome.caseId}: ${outcome.decision}/${outcome.reasonCode} -> ${outcome.dispatch}${outcome.detail ? ` (${outcome.detail})` : ''}`);
         }
       }
     },

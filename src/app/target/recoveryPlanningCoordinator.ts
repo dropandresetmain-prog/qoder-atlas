@@ -127,19 +127,30 @@ async function caseStatus(pool: Pool, workspaceId: string, caseId: string): Prom
  * accepted B1 seam's basis capture exactly (same reads, same order) so the two
  * planning entry points cannot diverge on what "the current basis" means.
  */
-async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseId: string, now: string): Promise<BasisCapture | undefined> {
-  const subjects = await deps.pool.query<{ subject_kind: string; subject_id: string }>(
+/**
+ * The case's CURRENT failing JOURNEY/TRIP subjects in the canonical order
+ * (kind, id). The first one's assessment id IS the planning basis; the lifecycle
+ * progression pass uses this same function so "the current basis" has exactly
+ * one definition.
+ */
+export async function loadFailingCaseSubjects(pool: Pool, workspaceId: string, caseId: string, now: string): Promise<FailingSubject[]> {
+  const subjects = await pool.query<{ subject_kind: string; subject_id: string }>(
     `SELECT subject_kind, subject_id FROM case_subjects WHERE workspace_id = $1 AND recovery_case_id = $2 AND subject_kind IN ('JOURNEY', 'TRIP') ORDER BY subject_kind, subject_id`,
-    [deps.workspaceId, caseId],
+    [workspaceId, caseId],
   );
   const failing: FailingSubject[] = [];
   for (const row of subjects.rows) {
     const subject: TypedRef = { kind: row.subject_kind as TypedRef['kind'], id: row.subject_id };
-    const view = await currentAssessmentView(deps.pool, deps.workspaceId, subject, 'VIABILITY', now);
+    const view = await currentAssessmentView(pool, workspaceId, subject, 'VIABILITY', now);
     if (view.status === 'CURRENT' && view.assessment && view.assessment.overallVerdict === 'FAIL') {
       failing.push({ subject, assessment: view.assessment });
     }
   }
+  return failing;
+}
+
+async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseId: string, now: string): Promise<BasisCapture | undefined> {
+  const failing = await loadFailingCaseSubjects(deps.pool, deps.workspaceId, caseId, now);
   if (failing.length === 0) return undefined;
 
   const unmetItemIds = [...new Set(failing.flatMap((f) => unmetProgrammeItems(f.assessment).map((r) => r.id)))];
