@@ -45,6 +45,7 @@ import { ScenarioChangeSchema } from '../../contracts/v2/scenario/scenarioChange
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { EvaluateStrategyResult } from '../scenarios/evaluate.ts';
 import { evaluateRecoveryStrategy } from '../scenarios/evaluate.ts';
+import type { ResolvedOffer } from '../scenarios/overlay.ts';
 import {
   validateProposalCandidates,
   type FailingSubject,
@@ -141,6 +142,21 @@ export interface CoordinatorCoreDeps {
     requestsByDomain: Readonly<Partial<Record<RecoveryDomainId, readonly (readonly PlanningToolRequest[])[]>>>;
     budget?: PlanningResearchBudget;
   };
+  /**
+   * Optional, DOMAIN-AGNOSTIC resolver of the offers an overlay needs to honor a
+   * `SELECT_OFFER` effect. Given one investigated domain's gathered evidence
+   * context plus the basis, it returns the `ResolvedOffer[]` (offerId ->
+   * transportServiceId) the RC-6 overlay requires; the core never knows these are
+   * flight offers and never fabricates one. Absent for domains that emit no
+   * offer-selecting effect (e.g. the programme time-swap), so existing behavior is
+   * unchanged. The composition supplies the transport resolver
+   * (`resolveTransportOffers`) for the TRANSPORT domain.
+   */
+  resolveOffersForDomain?: (ctx: {
+    domainId: RecoveryDomainId;
+    evidence: PlanningEvidenceContext;
+    basis: PlanningBasis;
+  }) => readonly ResolvedOffer[];
 }
 
 export interface CoordinatorCoreOutput {
@@ -268,6 +284,13 @@ export async function runRecoveryPlanning(
     // domain-aware proposer. A base StrategyProposer ignores it (the adapter
     // passes the same base ProposerInput it always received).
     const evidenceContext = evidenceContextForDomain(evidence, domain.domainId);
+    // Domain-agnostic offer resolution for the overlay. Only a domain whose
+    // proposer can emit a `SELECT_OFFER` effect needs it; the composition supplies
+    // the resolver (e.g. transport). Empty when no resolver is wired, so domains
+    // that emit no offer-selecting effect are unaffected.
+    const resolvedOffers = deps.resolveOffersForDomain
+      ? deps.resolveOffersForDomain({ domainId: domain.domainId, evidence: evidenceContext, basis })
+      : [];
     for (const bound of domainProposers) {
       const proposer = isDomainProposer(bound)
         ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences: deps.preferences ?? [] })
@@ -298,6 +321,7 @@ export async function runRecoveryPlanning(
           baseWorld: world, baseManifest: world.manifest, basisAssessmentId,
           scenarioChange, now, registry,
           ...(basis.currentState ? { currentState: basis.currentState } : {}),
+          ...(resolvedOffers.length > 0 ? { resolvedOffers } : {}),
           assumptions: candidate.assumptions,
           resolveSubjectRefs: failing.map((f) => f.subject),
         });
