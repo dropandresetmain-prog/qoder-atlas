@@ -12,3 +12,4 @@ export * from './strategyRecommendation.ts';
 export * from './recoveryPlanningAttempt.ts';
 export * from './proposerAdaptation.ts';
 export * from './recoveryProgression.ts';
+export * from './recoveryCaseAttention.ts';

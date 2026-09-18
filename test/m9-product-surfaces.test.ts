@@ -96,6 +96,7 @@ function recoveryCaseView(): RecoveryCaseView {
       },
     ],
     partialRecovery: { succeeded: ['act-book'], failed: ['act-cancel'], pending: [] },
+    attention: [],
     duplicateBookingExposure: [
       {
         replacementActionRef: 'act-book',

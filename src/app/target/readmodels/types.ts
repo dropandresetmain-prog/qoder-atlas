@@ -211,6 +211,8 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
    * passed through UNMODIFIED so the projector stays a pure function of frozen
    * contract types. Optional: a case that has not planned carries none.
    */
+  /** R1 — durable case attention records (migration 0126), oldest first. */
+  attention?: readonly import('../../../contracts/v2/planning/recoveryCaseAttention.ts').RecoveryCaseAttentionRecord[];
   planningAttempt?: {
     attempt: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningAttempt;
     outcome: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningOutcome;

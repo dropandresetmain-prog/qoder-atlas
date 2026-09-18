@@ -5,6 +5,7 @@ import {
 import { buildChangeAwareness } from './changeAwareness.ts';
 import { projectLiveDependencyGraph } from './liveDependencyGraph.ts';
 import { projectPlanningEvidence } from './projectPlanningEvidence.ts';
+import { projectCaseAttention } from './projectCaseAttention.ts';
 import {
   deriveDuplicateBookingExposure,
   derivePartialRecovery,
@@ -77,6 +78,7 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     ...(partialRecovery ? { partialRecovery } : {}),
     duplicateBookingExposure: duplicateBookingExposure.map((e) => ({ ...e })),
     ...(planningEvidence ? { planningEvidence } : {}),
+    attention: (input.attention ?? []).map(projectCaseAttention),
     ldg,
     change: buildChangeAwareness(input),
   });

@@ -30,6 +30,7 @@ import {
 } from '../cohortDisruption.ts';
 import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
 import { findLatestRecoveryPlanningAttemptForCase } from '../../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
+import { listRecoveryCaseAttention } from '../../../persistence/postgres/commands/caseAttentionCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
@@ -574,6 +575,8 @@ async function loadRecoveryCaseFactsInner(
   // has never run the coordinator has no attempt row and carries none here —
   // never a fabricated planning record. Requires PG at runtime (LOCAL acceptance).
   const planningAttempt = await findLatestRecoveryPlanningAttemptForCase(client, workspaceId, caseId);
+  // R1: durable human attention (C8 ESCALATE) — orthogonal to the case phase.
+  const attention = await listRecoveryCaseAttention(client, workspaceId, caseId);
 
   // Ascending, so option 1 is the first option this case produced. The
   // strategies themselves are projected further down, once each case
@@ -838,6 +841,7 @@ async function loadRecoveryCaseFactsInner(
     recoveryActions,
     subjectFacts,
     ...(planningAttempt ? { planningAttempt } : {}),
+    attention,
   };
 }
 

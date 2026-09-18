@@ -9,6 +9,7 @@ import { canonicalPayloadHash } from '../canonicalHash.ts';
 import { appendAuditTrail, buildReceipt, type AdvancedRoot } from '../commandSupport.ts';
 import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { currentTransactionClient } from '../transactionContext.ts';
+import { resolveOpenCaseAttention } from './caseAttentionCommands.ts';
 import {
   evaluateRecoveryCaseResolution,
   type ResolutionGateInput,
@@ -81,6 +82,15 @@ export async function resolveRecoveryCase(
           conflict: typedConflict('VALIDATION_FAILED', 'CASE_NOT_OPEN: concurrent close or missing case', [caseRef]),
         };
       }
+
+      // A RESOLVED case never keeps an OPEN human-attention record (0126).
+      await resolveOpenCaseAttention(client, {
+        workspaceId: params.workspaceId,
+        caseId: params.recoveryCaseId,
+        actorPrincipalId: params.actorPrincipalId,
+        resolution: 'case_resolved',
+        resolvedAt: committedAt,
+      });
 
       const value = {
         caseId: params.recoveryCaseId,

@@ -564,6 +564,24 @@ export const PlanningEvidenceViewSchema = z.strictObject({
 });
 export type PlanningEvidenceView = z.infer<typeof PlanningEvidenceViewSchema>;
 
+/**
+ * R1 — durable human attention on a case (C8 ESCALATE). Orthogonal to `status`:
+ * a case may be PLANNING and also need a person. Never implies approval or
+ * resolution. Label/detail are user-safe presentation of the stable reason code.
+ */
+export const RecoveryCaseAttentionViewSchema = z.strictObject({
+  attentionRef: z.string().min(1),
+  reason: z.strictObject({ label: z.string().min(1), code: z.string().min(1) }),
+  detail: z.string().min(1),
+  status: z.strictObject({ label: z.string().min(1), code: z.enum(['OPEN', 'RESOLVED']) }),
+  openedAt: z.string().datetime({ offset: true }),
+  /** The settled assessment this attention was raised against. */
+  basisAssessmentRef: z.string().min(1),
+  resolvedAt: z.string().datetime({ offset: true }).optional(),
+  resolution: z.strictObject({ label: z.string().min(1), code: z.string().min(1) }).optional(),
+});
+export type RecoveryCaseAttentionView = z.infer<typeof RecoveryCaseAttentionViewSchema>;
+
 export const RecoveryCaseViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   caseRef: z.string().min(1),
@@ -615,6 +633,8 @@ export const RecoveryCaseViewSchema = z.strictObject({
    * Optional: a case that has not yet run a planning attempt carries none.
    */
   planningEvidence: PlanningEvidenceViewSchema.optional(),
+  /** Durable human-attention records (open first-class, resolved kept as history). */
+  attention: z.array(RecoveryCaseAttentionViewSchema).default([]),
   ldg: LiveDependencyGraphSchema,
   change: ChangeAwarenessSchema,
 });
