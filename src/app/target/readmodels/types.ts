@@ -218,6 +218,15 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
     outcome: import('../../../contracts/v2/planning/recoveryPlanningAttempt.ts').RecoveryPlanningOutcome;
   };
   /**
+   * R2 carry-forward — authoritative human display labels for typed subject
+   * refs (key `<KIND>:<id>`), resolved by the assembler from canonical
+   * identity state (e.g. a Journey's traveller display name). Used ONLY to
+   * upgrade decision-time planning-evidence subject labels; refs stay
+   * secondary and the generic kind label is the fallback. Never persona
+   * lookup: the map is a projection of stored names.
+   */
+  subjectHumanLabels?: ReadonlyMap<string, string>;
+  /**
    * Internal only — never parsed into `RecoveryCaseView`. Each case subject's
    * own tone/evaluation status (and, defect-1, its raw EVALUATION_LIFECYCLE
    * xid8 `stamp`), so callers building other projections (e.g. the overview,

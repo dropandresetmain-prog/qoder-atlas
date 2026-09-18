@@ -110,8 +110,14 @@ const PROVENANCE_KIND_LABELS: Record<RecommendationProvenance['kind'], string> =
 };
 
 /** A typed subject/strategy ref presented as a human label + secondary ref. */
-function refLabel(ref: TypedRef): PlanningEvidenceLabel {
-  return { label: humanize(ref.kind), ref: `${ref.kind}:${ref.id}` };
+function refLabel(ref: TypedRef, humanLabels?: ReadonlyMap<string, string>): PlanningEvidenceLabel {
+  const typedRef = `${ref.kind}:${ref.id}`;
+  // R2 carry-forward: when authoritative identity supplies a display name for
+  // this subject (e.g. a Journey's traveller name), it becomes the human label.
+  // Generic kind wording is the honest fallback; the typed ref stays secondary.
+  // Never a persona-specific lookup — the map is built from canonical state.
+  const human = humanLabels?.get(typedRef);
+  return { label: human && human.length > 0 ? human : humanize(ref.kind), ref: typedRef };
 }
 
 function dedupe(values: readonly string[]): string[] {
@@ -122,10 +128,16 @@ function dedupe(values: readonly string[]): string[] {
  * Project the frozen attempt + its closed outcome into the decision-time view.
  * Returns undefined only when no attempt exists, so the caller can spread it
  * conditionally and a case that never planned carries no planning evidence.
+ *
+ * `humanLabels` (R2 carry-forward) optionally resolves authoritative display
+ * names for typed subject refs (key `<KIND>:<id>` -> display value), built by
+ * the caller from canonical identity state. It only upgrades the human label;
+ * refs/codes stay secondary and the generic kind label remains the fallback.
  */
 export function projectPlanningEvidence(
   attempt: RecoveryPlanningAttempt,
   outcome: RecoveryPlanningOutcome,
+  humanLabels?: ReadonlyMap<string, string>,
 ): PlanningEvidenceView {
   return {
     phase: 'DECISION_TIME',
@@ -139,7 +151,7 @@ export function projectPlanningEvidence(
       ...(d.reasonCode ? { reason: humanize(d.reasonCode) } : {}),
     })),
     tools: attempt.evidence.map(projectToolEvidence),
-    candidates: attempt.materialCandidates.map(projectCandidate),
+    candidates: attempt.materialCandidates.map((candidate) => projectCandidate(candidate, humanLabels)),
     // Q8: the refs this attempt promoted to viable RecoveryStrategy rows. Their
     // rich human detail (option number, who each fixes, cost) lives in the
     // CURRENT-state `strategies[]` block of the same view; these are the
@@ -168,7 +180,10 @@ function projectToolEvidence(evidence: PlanningEvidenceRecord): PlanningEvidence
   };
 }
 
-function projectCandidate(candidate: MaterialCandidateEvidence): PlanningEvidenceView['candidates'][number] {
+function projectCandidate(
+  candidate: MaterialCandidateEvidence,
+  humanLabels?: ReadonlyMap<string, string>,
+): PlanningEvidenceView['candidates'][number] {
   // Human-readable reasons, deterministically ordered: viability verdict first,
   // then validation reason codes, then RC-6 viability decision codes. Each open
   // code is humanized; the raw codes stay available on the frozen record.
@@ -191,7 +206,7 @@ function projectCandidate(candidate: MaterialCandidateEvidence): PlanningEvidenc
     ...(candidate.strategyRef ? { strategyRef: candidate.strategyRef } : {}),
     reasons: dedupe(reasons),
     outcomeDelta: candidate.outcomeDelta.map((entry) => ({
-      subject: refLabel(entry.subjectRef),
+      subject: refLabel(entry.subjectRef, humanLabels),
       direction: { label: DELTA_DIRECTION_LABELS[entry.delta], code: entry.delta },
       ...(entry.baseline ? { baseline: entry.baseline } : {}),
       candidate: entry.candidate,
@@ -199,9 +214,9 @@ function projectCandidate(candidate: MaterialCandidateEvidence): PlanningEvidenc
     ...(hasBlastRadius
       ? {
           blastRadius: {
-            changed: (candidate.immediateChangeBlastRadius?.changedRefs ?? []).map(refLabel),
-            directlyAffected: (candidate.immediateChangeBlastRadius?.directlyAffectedRefs ?? []).map(refLabel),
-            reassessed: (candidate.reassessmentClosure?.reachedRefs ?? []).map(refLabel),
+            changed: (candidate.immediateChangeBlastRadius?.changedRefs ?? []).map((ref) => refLabel(ref, humanLabels)),
+            directlyAffected: (candidate.immediateChangeBlastRadius?.directlyAffectedRefs ?? []).map((ref) => refLabel(ref, humanLabels)),
+            reassessed: (candidate.reassessmentClosure?.reachedRefs ?? []).map((ref) => refLabel(ref, humanLabels)),
           },
         }
       : {}),

@@ -40,7 +40,7 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
   // record when one exists. Structurally separate from the current-state fields
   // above (its `phase`/`asOf` mark it as planning-time, freeze §12 line 529).
   const planningEvidence = input.planningAttempt
-    ? projectPlanningEvidence(input.planningAttempt.attempt, input.planningAttempt.outcome)
+    ? projectPlanningEvidence(input.planningAttempt.attempt, input.planningAttempt.outcome, input.subjectHumanLabels)
     : undefined;
 
   // R2: backend-supplied mapping of the ordered causalPath onto the visible focused

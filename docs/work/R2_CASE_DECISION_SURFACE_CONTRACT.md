@@ -351,6 +351,17 @@ coordinator ONLY if that is a small, clearly-owned correction; otherwise mark it
 **R3 Act Now dependency** and do not expand into R3 provider/runtime boot
 composition.
 
+**R2 seam investigation result (2026-09-19):** the old seam composes only the
+deterministic programme-time-swap proposer (no research, no transport proposer, no
+`RecoveryPlanningAttempt` persistence), while the accepted R1 coordinator
+(`recoveryPlanningCoordinator.ts`, driven by the C4 progression pass) composes the
+full generalized pipeline. Rerouting the HTTP endpoint means composing the
+coordinator's provider/research dependencies into the runtime boot — that is R3
+provider/runtime boot composition work, NOT a small correction. **Decision: the
+R2 Case workspace does NOT expose a "start/retry planning" control routed through
+the stale seam.** Planning is driven by the accepted C4 progression pass; the Case
+page presents its durable evidence. Classified: **R3 Act Now dependency.**
+
 ---
 
 ## 12. Anti-hardcoding
