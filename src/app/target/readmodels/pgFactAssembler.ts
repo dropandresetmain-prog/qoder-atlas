@@ -1006,7 +1006,12 @@ async function loadRecoveryCaseFactsInner(
     connectionProgression,
     recoveryActions,
     subjectFacts,
-    subjectHumanLabels: travellerLabelsByJourney,
+    // Contract key format is `<KIND>:<id>` (types.ts subjectHumanLabels);
+    // travellerLabelsByJourney is keyed by bare journey id, so re-key here at
+    // the boundary. Same generic rule for any subject kind.
+    subjectHumanLabels: new Map(
+      [...travellerLabelsByJourney].map(([journeyId, label]) => [`JOURNEY:${journeyId}`, label]),
+    ),
     ...(planningAttempt ? { planningAttempt } : {}),
     attention,
     ...(row.resolution_summary ? { resolutionSummary: row.resolution_summary } : {}),

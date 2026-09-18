@@ -8,6 +8,7 @@ import type {
   ConnectionProgression,
   DuplicateBookingExposureView,
   PartialRecoveryView,
+  PlanningEvidenceView,
   RecoveryActionView,
   RecoveryCaseView,
   RecoveryStrategyChangeView,
@@ -19,6 +20,9 @@ import {
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
 import { escapeHtml, formatInstant, formatMoney, formatShort } from '../html.ts';
 import { bulletList, uncertaintyList } from '../components.ts';
+import { renderFocusedCaseGraph } from '../graph/index.ts';
+import { buildOriginalCurrentRegion, originalCurrentToggleScript } from '../originalCurrent.ts';
+import { casePollingScript } from '../casePolling.ts';
 
 const CONNECTION_PROGRESSION_LABEL: Record<ConnectionProgression, string> = {
   HEALTHY: 'Connection healthy',
@@ -241,6 +245,83 @@ function strategyCard(strategy: RecoveryStrategyView, terminal: boolean): string
   </li>`;
 }
 
+/**
+ * R2 — the focused Case graph as one component inside the decision workspace.
+ *
+ * The graph itself is rendered by the single semantic layer (renderFocusedCaseGraph
+ * -> presentDependencyGraph); this wrapper only supplies workspace context AROUND
+ * it: the backend-mapped first breakpoint (FIG-5b, never frontend-traversed), the
+ * honest unmapped-step note, and the Original/Current toggle. Planning is shown
+ * AROUND the graph (banner via caseStatus PLANNING inside the renderer), never as
+ * graph nodes. Current-world causal map only.
+ */
+function focusedGraphSection(view: RecoveryCaseView): string {
+  const graphHtml = renderFocusedCaseGraph({
+    ldg: view.ldg,
+    ...(view.focusedGraph ? { focusedGraph: view.focusedGraph } : {}),
+    caseStatus: view.status,
+  });
+
+  // First breakpoint is backend-supplied (causalPath[0] mapped to a visible ref);
+  // the frontend renders it verbatim and never derives it from topology.
+  const firstBreak = view.focusedGraph?.firstBreakpoint
+    ? `<div class="callout tone-alert" data-test="focused-graph-first-breakpoint">
+         <p class="callout-title">First break point</p>
+         <p><strong>${escapeHtml(view.focusedGraph.firstBreakpoint.label)}</strong> · ${escapeHtml(view.focusedGraph.firstBreakpoint.dimension)} · ${escapeHtml(view.focusedGraph.firstBreakpoint.reasonCode)}</p>
+       </div>`
+    : '';
+
+  // Causal steps with no visible graph object are surfaced explicitly, never
+  // silently dropped (contract §5, FIG-5b honesty).
+  const unmapped = view.focusedGraph && view.focusedGraph.unmappedCausalSteps.length > 0
+    ? `<details class="panel" data-test="focused-graph-unmapped" data-details-ref="focused-graph-unmapped">
+         <summary>${view.focusedGraph.unmappedCausalSteps.length} causal step${view.focusedGraph.unmappedCausalSteps.length === 1 ? '' : 's'} not shown on the graph</summary>
+         <ul>${view.focusedGraph.unmappedCausalSteps
+           .map((step) => `<li><strong>${escapeHtml(step.dimension)}</strong> ${escapeHtml(step.reasonCode)} <span class="meta">${escapeHtml(step.subjectRef)} · ${escapeHtml(step.reason)}</span></li>`)
+           .join('')}</ul>
+       </details>`
+    : '';
+
+  // Original/Current is a workspace toggle around the same graph component.
+  const region = buildOriginalCurrentRegion(graphHtml);
+
+  return `<section class="section" data-test="focused-case-graph-section">
+    <h2>What broke and why</h2>
+    ${firstBreak}
+    ${region}
+    ${unmapped}
+  </section>`;
+}
+
+/**
+ * R2 — planning-time decision evidence, shown AROUND the current-world graph and
+ * structurally separated from it (phase/asOf make decision-time explicit). Never
+ * rendered as graph nodes; the graph stays a current-world causal map.
+ */
+function planningEvidenceSection(evidence: PlanningEvidenceView): string {
+  const domains = evidence.domains.length > 0
+    ? `<ul data-test="planning-domains">${evidence.domains
+        .map((d) => `<li>${escapeHtml(d.domain.label)} — ${escapeHtml(d.disposition.label)}${d.reason ? ` <span class="meta">(${escapeHtml(d.reason)})</span>` : ''}</li>`)
+        .join('')}</ul>`
+    : '';
+  const candidates = evidence.candidates.length > 0
+    ? `<ul data-test="planning-candidates">${evidence.candidates
+        .map((c) => `<li>Option <strong>${escapeHtml(c.disposition.label)}</strong> · ${escapeHtml(c.domain.label)} · ${escapeHtml(c.proposer.label)}${c.reasons.length > 0 ? ` <span class="meta">— ${c.reasons.map(escapeHtml).join('; ')}</span>` : ''}</li>`)
+        .join('')}</ul>`
+    : '';
+  const recommendation = evidence.recommendation
+    ? `<p data-test="planning-recommendation"><strong>${escapeHtml(evidence.recommendation.recommended.label)}</strong> · basis ${evidence.recommendation.basis.map((b) => escapeHtml(b.kind.label)).join(', ')} · ${escapeHtml(evidence.recommendation.provenance.label)}</p>`
+    : '';
+  return `<section class="section" data-test="planning-evidence">
+    <h2>What NORTHSTAR investigated</h2>
+    <p class="meta">Decision-time evidence as of ${escapeHtml(formatInstant(evidence.asOf))} — this is what was weighed then, not current authoritative state.</p>
+    <p data-test="planning-outcome">Outcome: <strong>${escapeHtml(evidence.outcome.label)}</strong></p>
+    ${domains}
+    ${candidates}
+    ${recommendation}
+  </section>`;
+}
+
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   const actions =
     view.recoveryActions.length > 0
@@ -337,9 +418,26 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
         })
         .join('')}</ul></section>`
     : '';
+  // R2: the focused Case graph (one component in the workspace) and the
+  // planning evidence shown around it. Both render only when the projection
+  // supplies them — nothing is fabricated for cases that carry no causal path.
+  const focusedGraph = focusedGraphSection(view);
+  const planningEvidence = view.planningEvidence
+    ? planningEvidenceSection(view.planningEvidence)
+    : '';
+
+  // R2: change-awareness attributes the polling + Original/Current scripts read.
+  // changeCursor/projectionRevision come from the backend ChangeAwareness block;
+  // they drive the no-op redraw guard and sinceCursor echo, never client truth.
+  const changeAttrs = [
+    `data-case-ref="${escapeHtml(view.caseRef)}"`,
+    `data-case-status="${escapeHtml(view.status)}"`,
+    `data-projection-revision="${escapeHtml(String(view.change.projectionRevision))}"`,
+    view.change.changeCursor ? `data-change-cursor="${escapeHtml(view.change.changeCursor)}"` : '',
+  ].filter(Boolean).join(' ');
 
   return `
-<main class="shell product-recovery-case" data-test="product-recovery-case">
+<main class="shell product-recovery-case" data-test="product-recovery-case" ${changeAttrs}>
   <div class="page-head">
     <h1>Recovery case ${escapeHtml(view.caseRef)} ${badge(view.status, view.status === 'RESOLVED' || view.status === 'CLOSED' ? 'done' : view.status === 'EXECUTING' ? 'active' : view.status === 'OPEN' || view.status === 'PLANNING' ? 'watch' : 'neutral')}</h1>
     <p class="sub">${escapeHtml(view.changeSummary)}</p>
@@ -348,9 +446,11 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   </div>
   ${progression}
   ${cause}
+  ${focusedGraph}
   ${viabilityPair(view)}
   ${requirementVsActual}
   ${causalPath}
+  ${planningEvidence}
   ${recoveryControls}
   ${partial}
   ${duplicate}
@@ -359,5 +459,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   ${uncertaintyList(view.uncertainty)}
   ${view.resolutionSummary ? `<div class="resolution is-full"><p class="res-title">Resolution</p><p>${escapeHtml(view.resolutionSummary)}</p></div>` : ''}
 </main>
-${controlsScript}`;
+${controlsScript}
+${originalCurrentToggleScript()}
+${casePollingScript({ caseRef: view.caseRef })}`;
 }

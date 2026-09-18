@@ -1,0 +1,203 @@
+/**
+ * R2 Lane C — Case decision workspace integration.
+ *
+ * Proves the PG-served case surface composes the R2 components as ONE
+ * workspace: the focused Case graph (via the single semantic layer), the
+ * Original/Current toggle around it, planning evidence AROUND the graph (never
+ * inside it), the backend-mapped first breakpoint, honest unmapped-step
+ * disclosure, and the change-awareness data attributes the polling script
+ * requires. No scenario fixtures: hand-built generic views only.
+ */
+import { describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { RecoveryCaseView } from '../src/contracts/v2/product/readModels.ts';
+import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-case.ts';
+
+const generatedAt = '2031-09-15T08:00:00.000Z';
+
+const changeAwareness = {
+  projectionRevision: 7,
+  changedVisibleRefs: ['JOURNEY:j-1'],
+  changedEdgeIds: [],
+  currentSemanticState: 'AFFECTED' as const,
+  changeCursor: '42',
+};
+
+const ldg = {
+  scope: 'FOCUSED_CASE' as const,
+  nodes: [
+    { ref: 'DISRUPTION:d-1', kind: 'DISRUPTION' as const, label: 'Service change', semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const },
+    { ref: 'JOURNEY:j-1', kind: 'TRAVELLER' as const, label: 'Traveller one', semanticState: 'FAILED' as const, authority: 'AUTHORITATIVE' as const, evaluation: 'PENDING_REASSESSMENT' as const },
+    { ref: 'SERVICE_BOOKING:s-1', kind: 'SERVICE_BOOKING' as const, label: 'Rail operator', semanticState: 'UNKNOWN' as const, authority: 'AUTHORITATIVE' as const },
+  ],
+  edges: [
+    { id: 'AFFECTED_BY:d-1:j-1', fromRef: 'DISRUPTION:d-1', toRef: 'JOURNEY:j-1', kind: 'AFFECTED_BY' as const, authority: 'AUTHORITATIVE' as const },
+    { id: 'RELIES_ON:j-1:s-1', fromRef: 'JOURNEY:j-1', toRef: 'SERVICE_BOOKING:s-1', kind: 'RELIES_ON' as const, authority: 'AUTHORITATIVE' as const },
+  ],
+  change: changeAwareness,
+};
+
+function baseCase(overrides: Partial<RecoveryCaseView> = {}): RecoveryCaseView {
+  return {
+    generatedAt,
+    caseRef: 'case-1',
+    causalPath: [],
+    status: 'OPEN',
+    changeSummary: 'A booked service changed.',
+    subjectLabels: {},
+    bookingServiceState: { label: 'Transport booking', state: 'AFFECTED' },
+    tripViability: { label: 'Remaining trip', verdict: 'FAIL' },
+    affectedItems: ['s-1'],
+    strategies: [],
+    recoveryActions: [],
+    authorityState: 'None',
+    executionState: 'None',
+    reconciliationState: 'Settled',
+    uncertainty: [],
+    attention: [],
+    duplicateBookingExposure: [],
+    remainingRecoveryWork: [],
+    ldg,
+    change: changeAwareness,
+    ...overrides,
+  };
+}
+
+describe('R2 Case workspace composition', () => {
+  test('renders the focused Case graph inside the workspace', () => {
+    const html = renderProductRecoveryCase(baseCase());
+    assert.match(html, /data-test="focused-case-graph-section"/);
+    assert.match(html, /data-test="focused-case-graph"/);
+    assert.match(html, /What broke and why/);
+  });
+
+  test('carries the change-awareness attributes the polling contract requires', () => {
+    const html = renderProductRecoveryCase(baseCase());
+    assert.match(html, /data-test="product-recovery-case"/);
+    assert.match(html, /data-case-ref="case-1"/);
+    assert.match(html, /data-case-status="OPEN"/);
+    assert.match(html, /data-projection-revision="7"/);
+    assert.match(html, /data-change-cursor="42"/);
+  });
+
+  test('omits data-change-cursor when the projection supplies none', () => {
+    const html = renderProductRecoveryCase(
+      baseCase({ change: { ...changeAwareness, changeCursor: undefined } }),
+    );
+    // Scope to the <main> tag only; the inline polling script legitimately
+    // references the attribute name when reading it back.
+    const mainTag = html.slice(html.indexOf('<main'), html.indexOf('>', html.indexOf('<main')));
+    assert.doesNotMatch(mainTag, /data-change-cursor/);
+    assert.match(mainTag, /data-projection-revision="7"/);
+  });
+
+  test('includes the polling script with sinceCursor echo and no WS/SSE', () => {
+    const html = renderProductRecoveryCase(baseCase());
+    assert.match(html, /format=html/);
+    assert.match(html, /sinceCursor/);
+    assert.doesNotMatch(html, /WebSocket|EventSource/);
+  });
+
+  test('wraps the graph in the Original/Current toggle with honest empty state', () => {
+    const html = renderProductRecoveryCase(baseCase());
+    assert.match(html, /data-test="original-current-toggle"/);
+    assert.match(html, /data-test="current-panel"/);
+    assert.match(html, /data-test="original-panel"/);
+    assert.match(html, /Original snapshot not available/);
+    assert.match(html, /__northstarOriginalCurrentStarted/);
+  });
+
+  test('renders the backend-mapped first breakpoint verbatim, never traversed', () => {
+    const html = renderProductRecoveryCase(
+      baseCase({
+        causalPath: [
+          { subjectRef: 'JOURNEY:j-1', dimension: 'arrival', reasonCode: 'too_late', evaluatorId: 'ev-1', facts: {}, relatedSubjectRefs: [] },
+        ],
+        focusedGraph: {
+          causalNodeRefs: ['DISRUPTION:d-1', 'JOURNEY:j-1'],
+          causalEdgeIds: ['AFFECTED_BY:d-1:j-1'],
+          firstBreakpoint: { nodeRef: 'JOURNEY:j-1', label: 'Traveller one', dimension: 'arrival', reasonCode: 'too_late' },
+          unmappedCausalSteps: [],
+        },
+      }),
+    );
+    assert.match(html, /data-test="focused-graph-first-breakpoint"/);
+    assert.match(html, /First break point/);
+    assert.match(html, /Traveller one/);
+    assert.match(html, /arrival/);
+    assert.match(html, /too_late/);
+  });
+
+  test('surfaces unmapped causal steps explicitly instead of dropping them', () => {
+    const html = renderProductRecoveryCase(
+      baseCase({
+        causalPath: [
+          { subjectRef: 'OBJECTIVE:o-1', dimension: 'purpose', reasonCode: 'arrival_by', evaluatorId: 'ev-2', facts: {}, relatedSubjectRefs: [] },
+        ],
+        focusedGraph: {
+          causalNodeRefs: [],
+          causalEdgeIds: [],
+          unmappedCausalSteps: [
+            { subjectRef: 'OBJECTIVE:o-1', dimension: 'purpose', reasonCode: 'arrival_by', reason: 'no visible graph node for subject' },
+          ],
+        },
+      }),
+    );
+    assert.match(html, /data-test="focused-graph-unmapped"/);
+    assert.match(html, /1 causal step not shown on the graph/);
+    assert.match(html, /no visible graph node for subject/);
+  });
+
+  test('shows planning evidence AROUND the graph, marked decision-time', () => {
+    const html = renderProductRecoveryCase(
+      baseCase({
+        planningEvidence: {
+          phase: 'DECISION_TIME',
+          asOf: generatedAt,
+          attemptRef: 'attempt-1',
+          coordinatorVersion: 'v1',
+          outcome: { label: 'Awaiting operator authority', code: 'AWAITING_AUTHORITY' },
+          domains: [{ domain: { label: 'Transport', code: 'TRANSPORT' }, disposition: { label: 'Investigated', code: 'INVESTIGATED' } }],
+          tools: [],
+          candidates: [],
+          viableStrategies: [],
+        },
+      }),
+    );
+    assert.match(html, /data-test="planning-evidence"/);
+    assert.match(html, /What NORTHSTAR investigated/);
+    assert.match(html, /Decision-time evidence as of/);
+    assert.match(html, /Awaiting operator authority/);
+    // The graph section must not contain the planning evidence block.
+    const graphSection = html.slice(
+      html.indexOf('data-test="focused-case-graph-section"'),
+      html.indexOf('data-test="planning-evidence"'),
+    );
+    assert.ok(graphSection.length > 0);
+    assert.doesNotMatch(graphSection, /What NORTHSTAR investigated/);
+  });
+
+  test('PLANNING status wraps the graph with the investigating banner', () => {
+    const html = renderProductRecoveryCase(baseCase({ status: 'PLANNING' }));
+    assert.match(html, /fg-planning-wrapper/);
+    assert.match(html, /NORTHSTAR is investigating/);
+  });
+
+  test('CHECKING is presented from evaluation PENDING_REASSESSMENT only', () => {
+    const html = renderProductRecoveryCase(baseCase());
+    // The JOURNEY node carries evaluation PENDING_REASSESSMENT -> checking badge.
+    assert.match(html, /fg-checking-badge|Checking/);
+  });
+
+  test('workspace stays generic — no persona or scenario tokens', () => {
+    const html = renderProductRecoveryCase(baseCase());
+    assert.doesNotMatch(html, /Sarah|Jordan|Batik|Singapore|keynote|headline|CGK|SIN\b/i);
+  });
+
+  test('terminal case omits operator controls but keeps the workspace', () => {
+    const html = renderProductRecoveryCase(baseCase({ status: 'RESOLVED' }));
+    assert.doesNotMatch(html, /data-test="propose-strategies"/);
+    assert.match(html, /data-test="focused-case-graph-section"/);
+    assert.match(html, /data-case-status="RESOLVED"/);
+  });
+});

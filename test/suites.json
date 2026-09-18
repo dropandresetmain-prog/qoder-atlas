@@ -84,6 +84,7 @@
       "test/r1-progression-facts.test.ts",
       "test/r1-transport-proposer.test.ts",
       "test/r2-case-polling.test.ts",
+      "test/r2-case-workspace-integration.test.ts",
       "test/r2-focused-case-graph.test.ts",
       "test/r2-focused-graph-projection.test.ts",
       "test/r2-graph-renderer.test.ts",
