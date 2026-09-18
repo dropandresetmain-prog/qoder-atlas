@@ -47,6 +47,33 @@ Current configuration variables are read by `src/persistence/postgres/config.ts`
 
 `npm run build` copies the SQL migration files required by the built runtime. `npm start` must boot the built PostgreSQL target composition; it must not fall back to SQLite.
 
+### Local developer workspace
+
+For normal local development, use a **stable workspace ID** against the same local
+PostgreSQL container. Dataset provisioning and baseline evaluation are idempotent on that
+workspace, so repeated boots reuse the existing world.
+
+A fresh `PG_TARGET_WORKSPACE_ID` is intentionally expensive: with the full AiT bundle it
+re-materializes the world and re-runs the 67-journey baseline. Use a new workspace only
+when you explicitly need an independent/reset world.
+
+As of the B1 code line, the PostgreSQL target variables and
+`NORTHSTAR_DEMO_DATASET_DIR` are read directly from `process.env`; they are not populated
+by the auxiliary `.env.local` merge used for the application config surface. Until H2
+changes that behavior, export a stable value in the shell/dev launcher, for example:
+
+```bash
+export PG_TARGET_WORKSPACE_ID=<stable-local-uuid>
+export NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026
+npm run dev
+```
+
+Keep the same UUID across ordinary restarts. Generate a new UUID only for an explicit clean
+baseline/Founder rehearsal.
+
+This is a developer-workflow rule, not a change to workspace isolation or provisioning
+semantics.
+
 ### Local PostgreSQL test instance
 
 Requires Docker or another OCI runtime that understands `docker compose`.
