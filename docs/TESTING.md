@@ -2,17 +2,22 @@
 
 ## Purpose
 
-Tests must prove that the application is a generalized trip-resolution engine rather than a scripted demo.
+Tests must prove that the application is a generalized trip-resolution engine rather than
+a scripted demo.
 
 Verification is **cumulative evidence**, not a ritual where every stage reruns every check.
 
-- work packages run scoped tests for changed behavior and justified failure paths;
-- integration reuses valid lane evidence and tests newly created seams;
-- **Checkpoint A, Checkpoint B, Checkpoint C, and Final Candidate each have an explicit independent review gate** with scope proportional to the risk at that stage;
-- independent reviewers inspect existing evidence first and run additional checks only when a concrete uncertainty needs execution;
-- the final candidate runs the canonical broad gate on the exact candidate SHA.
+- implementation runs the smallest focused checks that prove changed behavior;
+- integration reuses valid evidence and tests newly created seams/interactions;
+- broader PostgreSQL gates run at coherent checkpoints, not after every edit;
+- independent review is risk-based, not automatic at every historical milestone label;
+- founder physical tests prove the actual product path where the roadmap names them;
+- the final candidate runs the canonical broad gate on the exact candidate SHA and clean
+  appropriate test state.
 
-Work-package test-ID assignment and model selection for implementation/review are owned by internal planning documents that are not part of this published set; this document defines **when and what to review**, not which model must do it.
+Current delivery checkpoints are defined by `IMPLEMENTATION_PLAN.md` §22 and
+`ROADMAP.md`; historical Checkpoint A/B/C or M0-M10 wording does not create new review
+rituals.
 
 ## Suite classification
 
