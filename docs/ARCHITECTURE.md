@@ -27,32 +27,115 @@ AI proposal -> validation -> deterministic viability -> authority
 
 An LLM cannot directly mutate authoritative state or invoke an irreversible or money-moving action.
 
-## Architecture status: post-C5 implemented foundation
+## Architecture status: runtime closure through B1
 
-The M0-M10 data/state refactor is implemented and accepted through **C5**. Post-C5 repository convergence is complete.
+The M0-M10 data/state refactor is implemented and accepted through **C5**. Post-C5
+repository convergence is complete.
 
-**PostgreSQL + PostGIS is the sole normal NORTHSTAR runtime.** SQLite is retired as an application runtime and survives only as explicit offline, read-only migration input plus historical code/test evidence.
+**PostgreSQL + PostGIS is the sole normal Northstar runtime.** SQLite is retired as an
+application runtime and survives only as explicit offline, read-only migration input plus
+historical code/test evidence.
 
-The remaining work is no longer a persistence-architecture migration. It is product delivery and operational activation:
+A 2026-09-18 read-only frontier runtime audit (Fable) found no reason to reopen F01-F18,
+but did find that operational runtime composition had emerged incrementally rather than
+being closed as a coherent lifecycle. T2 latency provided the concrete symptom: safe
+worker semantics combined with broad manifests and periodic scheduling produced poor
+end-to-end behavior.
 
-1. Slice A — baseline -> disruption -> authoritative affected outcomes -> Sarah case.
-2. Founder Test A.
-3. Slice B — preview -> approval -> execution -> observation -> reassessment -> recovery.
-4. Founder Test B.
-5. Submission rehearsal and M11 operational activation/retirement.
-6. Polish/stretch.
+That audit is now implemented through **R0 -> T3 -> T4 -> B1** on
+`feature/sarah-provider-disruption` at
+`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
 
-Normative architecture documents:
+Current delivery is therefore:
 
-- [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) — F01-F18, canonical ontology, ownership, lifecycles and extension semantics.
-- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational schema, integrity, transaction and persistence contracts.
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — historical M0-M11 execution decomposition plus the current post-C5 delivery sequence in Section 22.
-- [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — current implementation truth and limitations.
+1. Founder B1 physical acceptance;
+2. B2 generalized external recovery / Jordan through the same engine;
+3. Founder/generalisation verification;
+4. post-E2E observability, accepted Event Overview implementation and provider hardening;
+5. M11 / C6 exact-candidate rehearsal and operational activation.
+
+Normative/current architecture documents:
+
+- [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) —
+  frozen F01-F18, canonical ontology, ownership, lifecycles and extension semantics.
+- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational
+  schema, integrity, transaction and persistence contracts.
+- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) §22 — authoritative current
+  delivery plan after the runtime-closure reconciliation.
+- [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — current
+  implementation truth and limitations.
 - [`ROADMAP.md`](ROADMAP.md) — current milestone status and deferred scope.
 
-Historical milestone evidence under `docs/refactor/evidence/**` records what was true at each checkpoint and should not be rewritten to match the present runtime.
+Historical milestone evidence under `docs/refactor/evidence/**` records what was true at
+each checkpoint and should not be rewritten to match the present runtime.
 
-## Current implemented architecture
+## Operational runtime closure
+
+The normal generalized lifecycle now exists as a composed runtime path:
+
+```text
+external/state change
+ -> ChangeSignal
+ -> canonical mutation
+ -> targeted invalidation
+ -> deterministic reassessment
+ -> deterministic escalation
+ -> RecoveryCase
+ -> StrategyProposer
+ -> schema validation
+ -> deterministic counterfactual viability
+ -> RecoveryStrategy / ActionPlan
+ -> authority / approval
+ -> durable executor
+ -> observation
+ -> canonical state update
+ -> reassessment
+ -> resolution / continue
+```
+
+The important operational decisions are:
+
+- **ChangeSignal is the causal/provenance spine.** A disruption is not inferred later from
+  UI adjacency; the signal links change, invalidated subjects, assessment consequences and
+  case cause.
+- **Assessment manifests are subject-bound.** Capture batching is an implementation detail,
+  not an input-dependency claim. Shared dependencies remain shared where the subject
+  actually reads them.
+- **One runtime-services root owns background work.** Reassessment, case lifecycle and
+  execution scheduling are not started from competing composition roots.
+- **Known time expiry is runnable work.** `nextInvalidationAt` is scheduled through the
+  normal reassessment path rather than silently allowing stale CURRENT state.
+- **Escalation is deterministic.** UI does not decide when FAIL/UNKNOWN becomes recovery
+  work.
+- **StrategyProposer proposes; it never decides viability.** Deterministic validation and
+  counterfactual evaluation remain authoritative.
+- **Internal and external execution share the same safety boundary.** B1 proves the
+  internal programme executor; B2 adds provider dispatch without bypassing the same plan,
+  authority, observation and reassessment semantics.
+- **Provider/API success is never recovered-trip proof.** Resolution requires reconciled
+  execution and fresh passing case-subject assessment.
+
+### Counterfactual viability (RC-6)
+
+The dependency closure answers **who must be reassessed**. It does not mean every reached
+subject must become PASS for a candidate to be viable.
+
+A strategy is viable only when:
+
+1. the blocking case subjects it is responsible for resolve to PASS;
+2. no reached subject regresses because of the proposal;
+3. no new/action-critical UNKNOWN is introduced;
+4. explicit `requiredUnknowns` are absent.
+
+Unchanged pre-existing unrelated FAIL/UNKNOWN remains visible and truthful but does not
+automatically veto the strategy. It is not treated as healed.
+
+Case resolution is narrower than overlay evaluation: it requires the case's required
+subjects to be current PASS and execution to be completed/reconciled. A regression on
+another subject opens/updates its own recovery work instead of being hidden inside the
+original case.
+
+## Current implemented architecture## Current implemented architecture
 
 The current runtime is a PostgreSQL-backed modular monolith with deterministic domain/evaluation code separated from persistence, provider adapters and delivery workers.
 
