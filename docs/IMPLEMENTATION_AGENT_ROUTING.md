@@ -6,6 +6,24 @@ This file gives **three viable model + harness routes** for every M0-M11 milesto
 
 Last routing review: **2026-09-13**.
 
+## Current delivery routing addendum — 2026-09-18
+
+The M0-M11/C0-C6 table below is retained for historical/provider-risk context. Current
+delivery follows `IMPLEMENTATION_PLAN.md` §22 and `ROADMAP.md`.
+
+Current routing:
+
+| Work | Class | Preferred route | Notes |
+|---|---|---|---|
+| Founder B1 physical acceptance | Owner product gate | **Owner-run** with planner support only | Do not insert another implementation/review cycle before the physical test. |
+| Test/dev performance H1-H4 | Hard Bounded | **Cursor + Grok 4.6 High** | Harness/test-only changes; focused evidence; no product-semantic edits. Sonnet High is a reasonable alternate. |
+| B2 planning/integration | Complex / Critical at external side effects | **ChatGPT + GPT-5.6 Sol High** for planning/reconciliation, then **Cursor + Grok 4.6 High** as primary implementer/integrator | Freeze external dispatcher/proposer/reconciliation contracts before parallel lanes. Keep provider actions behind deterministic viability/authority. |
+| B2 independent review | Critical boundary review | Different model family from implementer; **Sonnet High / Sol High** depending implementer | One focused review after the same-engine external loop exists; do not review every micro-checkpoint. |
+| Post-E2E observability/UI | Bounded product integration | Cursor/Claude/Codex according to UI/browser needs | Event Overview only after design acceptance. |
+
+The accepted Fable runtime audit is historical architecture evidence, not an ongoing model
+dependency. Its R0/T3/T4/B1 plan has been implemented.
+
 ## Core routing correction
 
 Astra already froze the architecture. Therefore a large amount of difficult implementation is now **Bounded** rather than Complex: the destination, contracts, acceptance criteria and verification path are known even if the code is substantial.
