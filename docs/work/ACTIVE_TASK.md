@@ -110,9 +110,17 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 - R2-C2 renderer: DONE — `62dda44` (pushed).
 - R2-C3 Case workspace: DONE — `545e8d7` (pushed).
 - R2-C4 Original/Current + polling: DONE — `144c951` (pushed).
-- R2-C5 Cloud integration: IN PROGRESS — all lanes integrated into one workspace;
-  remaining: PG integration tests (authored/typechecked, NOT executed — no PG in
-  Cloud), `R2_LOCAL_ACCEPTANCE_HANDOFF.md`, final doc reconciliation, 24-item report.
+- R2-C5 Cloud integration: DONE — all four lanes integrated into ONE Case decision
+  workspace (`product-recovery-case.ts`), PG integration proof authored/typechecked
+  (`2c290ad`), local acceptance handoff written (`f11baab`), and the required
+  `subjectLabels` contract field + `projectRecoveryCase` wiring committed (`19d85bd`,
+  closes the gap that would otherwise break a clean-clone typecheck). Final Cloud
+  verification on committed HEAD `19d85bd`: typecheck clean, full ESLint clean
+  (exit 0), boundary gate 225 files, anti-hardcoding gate clean, `current` suite
+  1013/1013 pass. Working tree clean; local == origin.
+  Terminal status: **R2 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION
+  ACCEPTANCE** (proofs 8–14 in `docs/work/R2_LOCAL_ACCEPTANCE_HANDOFF.md` need real
+  PostgreSQL + a browser, neither available in Cloud).
 
 ## R2 Cloud limitations
 
