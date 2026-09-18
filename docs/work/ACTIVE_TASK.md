@@ -11,31 +11,49 @@ evidence. The completed truth-rebase/contract-freeze planning ledger is preserve
 - Branch: `feat/r1-local-integration`, created directly from accepted Cloud handoff
   `e3598642058e6329e8a7e800d052a15773686488`.
 - PostgreSQL: isolated disposable PostGIS 16 container on port `55433`; migrations through
-  `0125_recovery_planning_attempts.sql` apply cleanly through the normal test harness.
+  `0126_recovery_case_attention.sql` apply cleanly through the normal test harness.
 - L1 status: **COMPLETE — commit `2c46bd4535402db780815de0557a98d1e5e2595e` pushed.** The Cloud coordinator
   committed viable strategies, PlanningAttempt, and final case phase in separate Units of
   Work. It now uses one `RECOVERY_PLANNING_COMPLETED` UnitOfWork command, with fresh basis
   and pending-reassessment guards before promotion. Fault injection proves strategy,
   PlanningAttempt, and `AWAITING_AUTHORITY` roll back together; success commits together.
-- C4 status: **ACT NOW.** LangGraph is rejected by the completed spike; implement a narrow
-  reconcile-from-current-PostgreSQL progression pass under `runtimeServices`, with no cursor,
-  no LangGraph package/table, and no restored RuntimeOrchestrator.
+- LangGraph decision resolved: **REJECTED** (runtime-spiked; history below is preserved and the
+  old DEFERRED-LANGGRAPH classification is superseded). C4: **BESPOKE RECONCILE-FROM-POSTGRES
+  IMPLEMENTED** — see L4B. No LangGraph package/table, no RuntimeOrchestrator, no cursor.
 - L2 transport status: **COMPLETE — commit `acc83b45bf24b5cbb75ae6bde01da3d4dbe222dc` pushed.**
   `PgWorldReader` retains `place_external_refs`; the coordinator optionally composes the
   read-only transport seam; searched offers become provenance-carrying services only in an
   isolated planning capture, never bookings or canonical PostgreSQL transport rows.
-- C9 PG status: **ACT NOW.** The Cloud projector/loader is present; verify it against a real
-  persisted attempt and current-state drift.
-- Composed lifecycle: **NOT YET PROVEN.** Required for local R1 acceptance.
-- ESCALATE: **Investigate Now.** Existing RecoveryCase lifecycle lacks a truthful explicit
-  attention/escalation representation; inspect and reuse an existing durable surface if one
-  exists before adding anything.
-- Current evidence: `npm run typecheck` PASS; `test/r1-transport-proposer.test.ts` PASS
-  (5/5); focused `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts` +
-  `r1TransportWorldCapture.pgtest.ts` PASS (8/8, isolated DB); scoped ESLint PASS.
+- L3 C9 PG status: **COMPLETE — commit `8a78f8c39c136de00be19c3742da7380b72cc15a` pushed.**
+  `postgres-integration/r1PlanningEvidenceProjection.pgtest.ts` (5/5) runs the REAL coordinator on
+  the generic programme world and reads the attempt through `findLatestRecoveryPlanningAttemptForCase
+  -> loadRecoveryCaseFactsInner -> projectRecoveryCase`: no attempt => no planning block; domains,
+  rejected/viable candidates + deterministic reasons, recommendation, the three impact concepts,
+  decision-time `asOf`; a later canonical change (approve/execute/resolve) does not rewrite the
+  attempt. Known R2 gap: outcome-delta subject labels are generic ("Journey") — refs are secondary
+  but the human label does not yet name the traveller (current-state `strategies[]` does).
+- L4A ESCALATE: **COMPLETE — commit `c6791bf6a780fef179d0e9c4dae36dd4eab66b34` pushed.** Design
+  hypothesis confirmed: escalation is ORTHOGONAL to case phase. No ESCALATED phase; migration
+  `0126_recovery_case_attention.sql` adds a Case-owned `recovery_case_attention` record
+  (case + basis assessment + closed reason; OPEN -> RESOLVED only; never deleted), idempotent per
+  (case, basis, reason), cleared by a superseding basis or by `resolveRecoveryCase` (same tx),
+  surfaced as `RecoveryCaseView.attention[]`. Reasons: `no_safe_recovery_remaining`,
+  `human_evidence_or_decision_required`. Not a new ontology entity.
+- L4B C4 progression: **COMPLETE — commit `5fb337b627c2234c9bc75e6c196425e5f16519cf` pushed.**
+  `src/app/target/recoveryProgressionPass.ts`, composed once in the `caseLifecycle` runtime service
+  (replaces the resolve-only pass; existing periodic + `runNow` semantics). Per wake, per
+  non-terminal case with a JOURNEY/TRIP subject: settled current basis -> resolution gate +
+  attempt facts -> frozen C8 decision -> one dispatch (`resolveRecoveryCase` / `planCase` /
+  attention). Unsettled assessment => WAIT. Progression never dispatches or retries execution.
+  Focused PG `r1RecoveryProgression.pgtest.ts` 8/8.
+- Composed B1 (L5) / unknown outcome (L6) / second generality: **NOT YET PROVEN.**
+- Test-DB runner note: focused PG files run against the disposable container with
+  `PGTEST_PORT=55433 PGTEST_DB=r1local` (create the DB `FROM template_postgis` first) and MUST use
+  `--test-concurrency=1` when several files share one DB.
+- Pre-existing, unrelated: `m10RuntimePurgeBoot.pgtest.ts` fails at baseline (expects 404, gets 200).
 - Delegated lanes: none (shared mutable working tree; primary retains integration).
-- Next action: close C9's real-PG projection proof, then resolve the C4 ESCALATE surface before
-  composing the narrow reconcile-from-current-PG lifecycle pass.
+- Next action: L5 — the full composed PostgreSQL B1 (transport research through the coordinator,
+  approval, execution, C4 wake -> RESOLVED), then L6 unknown outcome, then second generality.
 
 ## Identity
 
