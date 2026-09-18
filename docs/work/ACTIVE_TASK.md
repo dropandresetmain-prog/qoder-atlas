@@ -155,6 +155,24 @@ reconciles and integrates.
       enum). `test/r1-planning-selection.test.ts` 4/4 pass (fact derivation
       exercised through REAL RC-6 output); full `current` suite 904/904;
       typecheck/lint/boundary/anti-hardcoding clean.
+- [x] Lane P (part 4) — C1 coordinator CORE + C5 generality proof
+      (`src/resolution/planning/coordinatorCore.ts`): the single generalized
+      `runRecoveryPlanning` pipeline — deterministic domain registry -> optional
+      bounded read-only research -> proposer port per investigated domain ->
+      validate -> REAL `evaluateRecoveryStrategy` (RC-6) -> decision-evidence
+      assembly (three separate projections) -> frozen comparator -> closed
+      outcome mapping -> ONE immutable attempt. PURE: PG/provider/model and id/
+      version minters are injected, so the SAME core is Cloud-executable and
+      generality-provable. `test/r1-coordinator-generality.test.ts` drives THREE
+      materially different situations through it: (A) PROGRAMME via the real
+      shipped time-swap proposer => VIABLE/RECOMMENDED/AWAITING_AUTHORITY;
+      (B) STAY via a seam-injected proposer with a DIFFERENT effect kind
+      (ALTER_JOURNEY_ITEM_INTENT) => AWAITING_AUTHORITY; (C) externally-scheduled
+      item the overlay cannot move => honest NO_RECOVERY_FOUND with rejection
+      evidence retained. 3/3 pass; full `current` suite 907/907;
+      typecheck/lint/boundary/anti-hardcoding clean.
+      Commit `feat(r1): generalized recovery planning coordinator core (C1)`.
+      - SHA: `9740c1818ee6832bffdfcdbefa01561746632327` (local == origin)
 - [ ] C2 — planner core (lane P integrated): coordinator extending
       `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
 - [ ] C3 — decision evidence end-to-end at the seam (coordinator persists attempt).
