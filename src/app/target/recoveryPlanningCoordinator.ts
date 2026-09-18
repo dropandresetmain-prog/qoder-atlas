@@ -46,8 +46,7 @@ import type { StrategyProposer } from '../../resolution/planning/proposer.ts';
 import type { CapabilityFamily } from '../../operational/strategy.ts';
 import { captureWorld, PgCurrentStateReader } from '../../persistence/postgres/world/pgCurrentState.ts';
 import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
-import { persistRecoveryStrategy } from '../../persistence/postgres/commands/m7StrategyCommands.ts';
-import { persistRecoveryPlanningAttempt } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
+import { persistRecoveryPlanningCompletion } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { createM6Registry } from '../../resolution/evaluation/registry.ts';
 import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary.ts';
 import { unmetProgrammeItems, type FailingSubject } from '../../resolution/planning/proposer.ts';
@@ -231,34 +230,18 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         },
       );
 
-      // 3a. Persist each VIABLE strategy through the real command (idempotent per strategy id).
-      for (const strategy of core.viableStrategies) {
-        const persisted = await persistRecoveryStrategy(deps.uow(), {
-          workspaceId: deps.workspaceId,
-          actorPrincipalId: deps.actorPrincipalId,
-          idempotencyKey: `planning:persist:${strategy.id}`,
-          strategy: { ...strategy, status: 'EVALUATED', candidateAssessmentResults: [] },
-        });
-        if (!persisted.ok) {
-          return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `strategy ${strategy.id}: ${persisted.conflict.kind}: ${persisted.conflict.message}`) };
-        }
-      }
-
-      // 3b. Persist the ONE immutable attempt (migration 0125), idempotent per (case, basis).
-      const attemptPersisted = await persistRecoveryPlanningAttempt(deps.uow(), {
+      // 3. One UnitOfWork makes viable strategies, their immutable decision
+      // evidence, and the final case phase mutually visible to operators.
+      const attemptPersisted = await persistRecoveryPlanningCompletion(deps.uow(), {
         workspaceId: deps.workspaceId,
         actorPrincipalId: deps.actorPrincipalId,
-        idempotencyKey: `planning:attempt:${input.recoveryCaseId}:${basis.basisAssessmentId}`,
+        idempotencyKey: `planning:completion:${input.recoveryCaseId}:${basis.basisAssessmentId}`,
         attempt: core.attempt,
         outcome: core.result.outcome,
+        viableStrategies: core.viableStrategies,
       });
       if (!attemptPersisted.ok) {
-        return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `attempt: ${attemptPersisted.conflict.kind}: ${attemptPersisted.conflict.message}`) };
-      }
-
-      // 3c. Advance the case phase only when a viable recommendation exists.
-      if (core.result.outcome === 'AWAITING_AUTHORITY') {
-        await advanceCasePhase(deps, input.recoveryCaseId, 'AWAITING_AUTHORITY', 'viable strategies persisted');
+        return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `planning completion: ${attemptPersisted.conflict.kind}: ${attemptPersisted.conflict.message}`) };
       }
 
       return { ok: true, result: { ...core.result, planningAttemptRef: attemptPersisted.value.attemptId as SubjectId } };

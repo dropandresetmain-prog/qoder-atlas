@@ -35,10 +35,16 @@ import {
   type RecoveryPlanningAttempt,
   type RecoveryPlanningOutcome,
 } from '../../../contracts/v2/planning/index.ts';
+import type { RecoveryStrategy } from '../../../contracts/v2/scenario/recoveryStrategy.ts';
 import { canonicalPayloadHash } from '../canonicalHash.ts';
-import { buildReceipt, type Queryable } from '../commandSupport.ts';
+import { appendAuditTrail, buildReceipt, type Queryable } from '../commandSupport.ts';
 import { currentTransactionClient } from '../transactionContext.ts';
 import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
+import {
+  insertValidatedRecoveryStrategy,
+  validateRecoveryStrategyForPersistence,
+  type ValidatedRecoveryStrategyForPersistence,
+} from './m7StrategyCommands.ts';
 
 const SCHEMA_VERSION = '1';
 const Uuid = z.string().uuid();
@@ -234,6 +240,170 @@ export async function persistRecoveryPlanningAttempt(
         ),
       };
     }
+    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', message, []) };
+  }
+}
+
+/**
+ * Commits one completed planning basis as a single PostgreSQL command.
+ *
+ * A viable strategy without its immutable PlanningAttempt (or the inverse) is
+ * not a truthful operator decision surface. The coordinator therefore uses
+ * this composite command rather than independently committing its strategy,
+ * attempt and AWAITING_AUTHORITY transition. It deliberately does not invent a
+ * distributed transaction: all three records share the existing UnitOfWork.
+ */
+export async function persistRecoveryPlanningCompletion(
+  uow: UnitOfWork,
+  params: PlanningAttemptCommandContext & {
+    attempt: RecoveryPlanningAttempt;
+    outcome: RecoveryPlanningOutcome;
+    viableStrategies: readonly RecoveryStrategy[];
+  },
+): Promise<ExecuteOutcome<RecoveryPlanningAttemptPersistedResult>> {
+  const parsed = attemptInput.safeParse({ attempt: params.attempt, outcome: params.outcome });
+  if (!parsed.success) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', parsed.error.message, []) };
+  const attempt = parsed.data.attempt;
+  const outcome = parsed.data.outcome;
+  for (const check of [
+    uuidIdOrConflict('recovery_planning_attempts.id', attempt.id),
+    uuidIdOrConflict('recovery_planning_attempts.recovery_case_id', attempt.recoveryCaseId),
+    uuidIdOrConflict('recovery_planning_attempts.basis_assessment_id', attempt.basisAssessmentId),
+  ]) {
+    if (check) return { ok: false, conflict: check };
+  }
+
+  const validatedStrategies: ValidatedRecoveryStrategyForPersistence[] = [];
+  for (const strategy of params.viableStrategies) {
+    const validated = validateRecoveryStrategyForPersistence({ ...strategy, status: 'EVALUATED', candidateAssessmentResults: [] });
+    if (!validated.ok) return validated;
+    if (validated.value.strategy.viability !== 'VIABLE') {
+      return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `planning completion may only promote VIABLE strategy ${strategy.id}`, []) };
+    }
+    validatedStrategies.push(validated.value);
+  }
+  const expectedRefs = [...attempt.viableStrategyRefs].sort();
+  const suppliedRefs = validatedStrategies.map((item) => item.strategy.id).sort();
+  if (JSON.stringify(expectedRefs) !== JSON.stringify(suppliedRefs)) {
+    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'attempt viableStrategyRefs must exactly match promoted viable strategies', []) };
+  }
+  if ((outcome === 'AWAITING_AUTHORITY') !== (suppliedRefs.length > 0)) {
+    return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'planning outcome and viable strategy set disagree', []) };
+  }
+
+  const payload = {
+    attemptId: attempt.id,
+    recoveryCaseId: attempt.recoveryCaseId,
+    basisAssessmentId: attempt.basisAssessmentId,
+    outcome,
+    viableStrategyIds: suppliedRefs,
+  };
+  const envelope: DomainCommandEnvelope = DomainCommandEnvelopeSchema.parse({
+    commandType: 'RECOVERY_PLANNING_COMPLETED',
+    schemaVersion: SCHEMA_VERSION,
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorPrincipalId,
+    idempotencyKey: params.idempotencyKey,
+    canonicalPayloadHash: canonicalPayloadHash(payload),
+    basisAssessmentId: attempt.basisAssessmentId,
+    typedPayload: payload,
+    evidenceRefs: [],
+  });
+  const committedAt = new Date().toISOString();
+
+  try {
+    return await uow.execute<RecoveryPlanningAttemptPersistedResult>(envelope, async () => {
+      const client = currentTransactionClient();
+      const caseRow = await client.query<{ lifecycle_status: string }>(
+        'SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2 FOR UPDATE',
+        [params.workspaceId, attempt.recoveryCaseId],
+      );
+      const status = caseRow.rows[0]?.lifecycle_status;
+      if (!status) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `recovery case ${attempt.recoveryCaseId} not found`, []) };
+      if (!['PLANNING', 'AWAITING_AUTHORITY'].includes(status)) {
+        return { ok: false, conflict: typedConflict('STALE_AGGREGATE_REVISION', `recovery case ${attempt.recoveryCaseId} is ${status}, not a promotable planning phase`, []) };
+      }
+      const basis = await client.query<{ id: string; subject_kind: string; subject_id: string }>(
+        `SELECT a.id, a.subject_kind, a.subject_id FROM assessments a
+          WHERE a.workspace_id = $1 AND a.id = $2
+            AND NOT EXISTS (SELECT 1 FROM assessments newer WHERE newer.workspace_id = a.workspace_id AND newer.supersedes_assessment_id = a.id)`,
+        [params.workspaceId, attempt.basisAssessmentId],
+      );
+      if (!basis.rows[0]) {
+        return { ok: false, conflict: typedConflict('STALE_AGGREGATE_REVISION', `planning basis ${attempt.basisAssessmentId} is no longer current`, []) };
+      }
+      const pending = await client.query<{ id: string }>(
+        `SELECT id FROM scheduled_reassessments
+          WHERE workspace_id = $1 AND subject_kind = $2 AND subject_id = $3
+            AND assessment_kind = 'VIABILITY' AND state <> 'DONE' LIMIT 1`,
+        [params.workspaceId, basis.rows[0].subject_kind, basis.rows[0].subject_id],
+      );
+      if (pending.rows[0]) {
+        return { ok: false, conflict: typedConflict('STALE_AGGREGATE_REVISION', `planning basis ${attempt.basisAssessmentId} has pending reassessment work`, []) };
+      }
+
+      const existing = await client.query<{ id: string; outcome: string }>(
+        `SELECT id, outcome FROM recovery_planning_attempts
+          WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3`,
+        [params.workspaceId, attempt.recoveryCaseId, attempt.basisAssessmentId],
+      );
+      if (existing.rows[0]) {
+        return {
+          ok: true,
+          value: { attemptId: existing.rows[0].id, recoveryCaseId: attempt.recoveryCaseId, basisAssessmentId: attempt.basisAssessmentId, outcome: existing.rows[0].outcome as RecoveryPlanningOutcome },
+          receipt: buildReceipt({ envelope, value: { attemptId: existing.rows[0].id, recoveryCaseId: attempt.recoveryCaseId, basisAssessmentId: attempt.basisAssessmentId, outcome: existing.rows[0].outcome as RecoveryPlanningOutcome }, advanced: [], committedAt }),
+        };
+      }
+
+      const advanced = [] as Awaited<ReturnType<typeof insertValidatedRecoveryStrategy>>['advanced'];
+      for (const validated of validatedStrategies) {
+        const prior = await client.query<{ id: string }>(
+          'SELECT id FROM recovery_strategies WHERE workspace_id = $1 AND id = $2',
+          [params.workspaceId, validated.strategy.id],
+        );
+        if (prior.rows[0]) continue;
+        const inserted = await insertValidatedRecoveryStrategy({
+          workspaceId: params.workspaceId,
+          actorPrincipalId: params.actorPrincipalId,
+          validated,
+        });
+        advanced.push(...inserted.advanced);
+      }
+
+      await client.query(
+        `INSERT INTO recovery_planning_attempts (
+           workspace_id, id, recovery_case_id, basis_assessment_id, basis_manifest,
+           started_at, completed_at, coordinator_version, domains, evidence,
+           material_candidates, viable_strategy_refs, recommendation, outcome,
+           created_by_actor_id
+         ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::timestamptz,$7::timestamptz,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15)`,
+        [
+          params.workspaceId, attempt.id, attempt.recoveryCaseId, attempt.basisAssessmentId,
+          JSON.stringify(attempt.basisManifest), attempt.startedAt, attempt.completedAt,
+          attempt.coordinatorVersion, JSON.stringify(attempt.domains), JSON.stringify(attempt.evidence),
+          JSON.stringify(attempt.materialCandidates), JSON.stringify(attempt.viableStrategyRefs),
+          attempt.recommendation === undefined ? null : JSON.stringify(attempt.recommendation),
+          outcome, params.actorPrincipalId,
+        ],
+      );
+      if (outcome === 'AWAITING_AUTHORITY' && status === 'PLANNING') {
+        await client.query(
+          `UPDATE recovery_cases SET lifecycle_status = 'AWAITING_AUTHORITY'
+            WHERE workspace_id = $1 AND id = $2 AND lifecycle_status = 'PLANNING'`,
+          [params.workspaceId, attempt.recoveryCaseId],
+        );
+      }
+      const value: RecoveryPlanningAttemptPersistedResult = {
+        attemptId: attempt.id,
+        recoveryCaseId: attempt.recoveryCaseId,
+        basisAssessmentId: attempt.basisAssessmentId,
+        outcome,
+      };
+      await appendAuditTrail({ envelope, advanced, destinationKind: 'RECOVERY_PLANNING', payload: value });
+      return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced, committedAt }) };
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return { ok: false, conflict: typedConflict('VALIDATION_FAILED', message, []) };
   }
 }

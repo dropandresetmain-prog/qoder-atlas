@@ -1,9 +1,40 @@
-# ACTIVE TASK — R1 Planning + Decision-Evidence Parity (CLOUD IMPLEMENTATION)
+# ACTIVE TASK — R1 Planning + Decision-Evidence Parity (LOCAL INTEGRATION)
 
-Live working-memory ledger for the R1 Cloud implementation lane. Reread this file
-before every major phase, before every checkpoint commit/push, and before the final
-report. The completed truth-rebase/contract-freeze planning ledger is preserved at
+Live working-memory ledger for the R1 local integration and acceptance lane. Reread this
+file before every major phase, before every checkpoint commit/push, and before the final
+report. The completed Cloud implementation record remains below as historical handoff
+evidence. The completed truth-rebase/contract-freeze planning ledger is preserved at
 `docs/work/TRUTH_REBASE_CONTRACT_FREEZE_ACTIVE_TASK.md` and is NOT rewritten here.
+
+## Local integration snapshot — 2026-09-19
+
+- Branch: `feat/r1-local-integration`, created directly from accepted Cloud handoff
+  `e3598642058e6329e8a7e800d052a15773686488`.
+- PostgreSQL: isolated disposable PostGIS 16 container on port `55433`; migrations through
+  `0125_recovery_planning_attempts.sql` apply cleanly through the normal test harness.
+- L1 status: **IN PROGRESS — persistence seam repaired and proven.** The Cloud coordinator
+  committed viable strategies, PlanningAttempt, and final case phase in separate Units of
+  Work. It now uses one `RECOVERY_PLANNING_COMPLETED` UnitOfWork command, with fresh basis
+  and pending-reassessment guards before promotion. Fault injection proves strategy,
+  PlanningAttempt, and `AWAITING_AUTHORITY` roll back together; success commits together.
+- C4 status: **ACT NOW.** LangGraph is rejected by the completed spike; implement a narrow
+  reconcile-from-current-PostgreSQL progression pass under `runtimeServices`, with no cursor,
+  no LangGraph package/table, and no restored RuntimeOrchestrator.
+- Transport status: **ACT NOW.** Remaining closures are place external refs in `WPlace`,
+  truthful counterfactual offer capture, and PostgreSQL coordinator wiring for research and
+  offer resolution.
+- C9 PG status: **ACT NOW.** The Cloud projector/loader is present; verify it against a real
+  persisted attempt and current-state drift.
+- Composed lifecycle: **NOT YET PROVEN.** Required for local R1 acceptance.
+- ESCALATE: **Investigate Now.** Existing RecoveryCase lifecycle lacks a truthful explicit
+  attention/escalation representation; inspect and reuse an existing durable surface if one
+  exists before adding anything.
+- Current evidence: `npm run typecheck` PASS; focused
+  `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts` PASS (7/7, isolated DB); scoped
+  ESLint PASS. L1 checkpoint commit/push pending clean diff review.
+- Delegated lanes: none (shared mutable working tree; primary retains integration).
+- Next action: inspect the actual transport reader/provider composition and C9 PG loader, then
+  complete their focused PostgreSQL proofs before designing C4.
 
 ## Identity
 

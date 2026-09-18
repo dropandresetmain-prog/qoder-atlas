@@ -29,6 +29,7 @@ import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import {
   findRecoveryPlanningAttemptForBasis,
   loadRecoveryPlanningAttempt,
+  persistRecoveryPlanningCompletion,
   persistRecoveryPlanningAttempt,
 } from '../src/persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import {
@@ -37,6 +38,7 @@ import {
 } from '../src/resolution/planning/decisionEvidence.ts';
 import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.ts';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
+import type { RecoveryStrategy } from '../src/contracts/v2/scenario/recoveryStrategy.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -55,6 +57,38 @@ function mustOk<T>(outcome: { ok: boolean; value?: T; conflict?: { kind: string;
 
 function manifest(): WorldSnapshotManifest {
   return { evaluatedAt: NOW, evaluatorVersions: [], aggregateReads: [], scopeReads: [], evidenceReads: [], coverageReads: [], missingCoverage: [] };
+}
+
+function viableStrategy(ctx: { caseId: string; basisAssessmentId: string; journeyId: string }): RecoveryStrategy {
+  const id = randomUUID();
+  return {
+    id,
+    recoveryCaseId: ctx.caseId,
+    strategyVersion: 1,
+    status: 'EVALUATED',
+    viability: 'VIABLE',
+    basisAssessmentId: ctx.basisAssessmentId,
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: ctx.journeyId }],
+    baseManifest: manifest(),
+    scenarioChange: {
+      id: randomUUID(), recoveryStrategyId: id, strategyVersion: 1,
+      affectedSubjectRefs: [{ kind: 'JOURNEY', id: ctx.journeyId }],
+      effects: [{
+        effectKind: 'CHANGE_PROGRAMME_ITEM_TIME', programmeItemId: randomUUID(),
+        proposedWindow: { start: NOW, end: LATER },
+      }],
+      basisAssessmentId: ctx.basisAssessmentId,
+    },
+    assumptions: [],
+    requiredUnknowns: [],
+    candidateAssessments: [{
+      subjectRef: { kind: 'JOURNEY', id: ctx.journeyId }, assessmentId: ctx.basisAssessmentId, overallVerdict: 'PASS',
+    }],
+    candidateAssessmentResults: [],
+    requiredAuthorityScopes: ['programme.schedule'],
+    createdAt: NOW,
+    evaluatedAt: NOW,
+  };
 }
 
 /** Seed a recovery case and a CURRENT assessment row to act as the FK basis. */
@@ -235,6 +269,60 @@ test('read helpers round-trip the contract-parsed attempt', async () => {
   const byBasis = await findRecoveryPlanningAttemptForBasis(pool, ctx.workspaceId, ctx.caseId, ctx.basisAssessmentId);
   assert.ok(byBasis, 'attempt loads by (case, basis)');
   assert.equal(byBasis!.attempt.id, attempt.id);
+});
+
+test('planning completion atomically promotes viable strategies, evidence and case phase', async () => {
+  const pool = await sharedTestPool();
+  const ctx = await seedCaseAndBasis(pool);
+  const uow = new PgUnitOfWork(pool, ctx.workspaceId);
+  const strategy = viableStrategy(ctx);
+  const attempt = assemblePlanningAttempt({
+    id: randomUUID(), recoveryCaseId: ctx.caseId, basisAssessmentId: ctx.basisAssessmentId,
+    basisManifest: manifest(), startedAt: NOW, completedAt: LATER, coordinatorVersion: 'r1/1',
+    domains: [], evidence: [], materialCandidates: [], viableStrategyRefs: [strategy.id],
+    recommendation: {
+      recommendedStrategyRef: strategy.id, alternativeStrategyRefs: [], recommendationBasis: [], tradeoffs: [], uncertainty: [], evidenceRefs: [],
+      provenance: { kind: 'DETERMINISTIC', comparatorVersion: 'r1/1' },
+    },
+  });
+
+  // This database-level fault occurs after the strategy INSERT but before the
+  // enclosing UnitOfWork can commit. It proves the operator cannot observe a
+  // promoted strategy without its corresponding immutable decision evidence.
+  await pool.query(`CREATE FUNCTION r1_test_reject_planning_attempt() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'r1 test fault'; END; $$ LANGUAGE plpgsql`);
+  await pool.query(`CREATE TRIGGER r1_test_reject_planning_attempt BEFORE INSERT ON recovery_planning_attempts FOR EACH ROW EXECUTE FUNCTION r1_test_reject_planning_attempt()`);
+  try {
+    const failed = await persistRecoveryPlanningCompletion(uow, {
+      workspaceId: ctx.workspaceId, actorPrincipalId: ctx.actorId,
+      idempotencyKey: randomUUID(), attempt, outcome: 'AWAITING_AUTHORITY', viableStrategies: [strategy],
+    });
+    assert.equal(failed.ok, false);
+  } finally {
+    await pool.query('DROP TRIGGER IF EXISTS r1_test_reject_planning_attempt ON recovery_planning_attempts');
+    await pool.query('DROP FUNCTION IF EXISTS r1_test_reject_planning_attempt()');
+  }
+  const absent = await pool.query<{ strategies: string; attempts: string; status: string }>(
+    `SELECT
+       (SELECT count(*)::text FROM recovery_strategies WHERE workspace_id = $1 AND recovery_case_id = $2) AS strategies,
+       (SELECT count(*)::text FROM recovery_planning_attempts WHERE workspace_id = $1 AND recovery_case_id = $2) AS attempts,
+       (SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2) AS status`,
+    [ctx.workspaceId, ctx.caseId],
+  );
+  assert.deepEqual(absent.rows[0], { strategies: '0', attempts: '0', status: 'PLANNING' });
+
+  const committed = mustOk(await persistRecoveryPlanningCompletion(uow, {
+    workspaceId: ctx.workspaceId, actorPrincipalId: ctx.actorId,
+    idempotencyKey: randomUUID(), attempt, outcome: 'AWAITING_AUTHORITY', viableStrategies: [strategy],
+  }));
+  assert.equal(committed.attemptId, attempt.id);
+  const visible = await pool.query<{ strategies: string; attempts: string; status: string }>(
+    `SELECT
+       (SELECT count(*)::text FROM recovery_strategies WHERE workspace_id = $1 AND recovery_case_id = $2) AS strategies,
+       (SELECT count(*)::text FROM recovery_planning_attempts WHERE workspace_id = $1 AND recovery_case_id = $2) AS attempts,
+       (SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2) AS status`,
+    [ctx.workspaceId, ctx.caseId],
+  );
+  assert.deepEqual(visible.rows[0], { strategies: '1', attempts: '1', status: 'AWAITING_AUTHORITY' });
 });
 
 test('migration 0125 objects are applied', async () => {
