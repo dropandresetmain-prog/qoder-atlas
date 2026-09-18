@@ -191,11 +191,14 @@ decorates for its own sake.
    `ease-out`: background, border colour, translateY(−1px) on actionable
    rows. Nothing bounces; nothing eases longer than 200ms.
 4. **Banned.** Scroll-jacking, parallax, cinematic entrances, autoplaying
-   carousels, perpetual pulsing (a `LIVE` dot may breathe at 2.4s; nothing
-   else loops). Exception, accepted separately: the Live Dependency Graph
-   uses continuous subtle pulse as its liveness channel — see
-   `docs/design/live-dependency-graph/README.md`. Do not enforce this clause
-   against that surface.
+   carousels, perpetual pulsing driven by a backend liveness field (a `LIVE` dot
+   may breathe at 2.4s; nothing else loops). Exception, accepted separately: the
+   Live Dependency Graph uses continuous subtle pulse as a PURE FRONTEND animation
+   treatment for the HEALTHY/semantic condition (green normal / amber slower / red
+   none) — see `docs/design/live-dependency-graph/README.md` and
+   `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` §5/§9. It is not a backend
+   liveness channel; no `isPulsing`/`pulseSpeed`/`isLive` field exists. Do not
+   enforce this clause against that surface.
 5. **Reduced motion.** `prefers-reduced-motion: reduce` disables all
    keyframe animation and shortens transitions to 0.01ms. State is always
    legible without motion.

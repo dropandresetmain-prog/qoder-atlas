@@ -204,12 +204,14 @@ consolidation.
    reconciliation / active uncertainty. Three different narrowings of one hue;
    the shipped grammar keeps proposed structurally distinct (dashed) but shares
    the `watch` tone.
-2. **Liveness vs revision-driven motion.** The WiT contract says motion follows
-   actual projection revisions so only changed items animate; v5.6 wants a
-   continuous heartbeat pulse on live dependencies even when nothing changed.
-   Continuous liveness is not a revision-derived fact, so it needs its own
-   explicit presentation dimension and must not be derived from health tone.
-   Revision-driven motion is separately blocked by FIG-3.
+2. **Liveness vs revision-driven motion — RESOLVED by R2 (2026-09-19, see
+   `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` §5/§9).** No new backend
+   presentation dimension is added. Ambient pulse is PURE FRONTEND animation
+   derived from the semantic condition (tone): green normal / amber slower / red
+   none. Snapshot-change animation is a separate concept driven by successive
+   complete snapshots / `ChangeAwareness` hints. The v5.6 continuous heartbeat is
+   allowed as frontend animation and is NOT a backend liveness claim. The WiT
+   contract's revision-driven-motion prose is superseded for ambient pulse only.
 3. **Focal card selection.** v5.6 makes the focal object the *first operational
    breakpoint*, which is a causal judgement. The contract and the review both
    forbid inferring that from topology; it requires FIG-5b.

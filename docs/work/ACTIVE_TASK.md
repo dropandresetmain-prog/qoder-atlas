@@ -1,3 +1,81 @@
+# ACTIVE TASK — R2 Case Decision Surface + Focused Graph (CLOUD)
+
+Live working-memory ledger for the R2 Cloud implementation lane. Reread before every
+major phase, before every checkpoint commit/push, and before the final report. The
+completed R1 acceptance/history is preserved below and is NOT rewritten.
+
+## R2 identity
+
+- Repository: `dropandresetmain-prog/qoder-atlas`
+- Working branch: `feat/r2-case-decision-surface-cloud`
+- Base SHA (accepted R1, frozen): `dc73aa9a51abf80a6e3b65abacf6bc5929223638`
+  (`feat/r1-local-integration`). Verified present; branch created directly from it.
+- Ancestry: base SHA IS the branch point (verified). Working tree clean at start.
+- Role: PRIMARY R2 Case-decision-surface + focused-graph implementation lead.
+- Harness: Qoder Cloud sandbox. Node v24 for tests is `/opt/playwright-driver/node`
+  (v24.15.0); the default `node` is v20 and CANNOT strip TS types. Pure `current`
+  tests DO run here via the v24 binary. **No PostgreSQL, no browser** — physical/visual
+  acceptance DEFERRED to local.
+- Authoritative contract: `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` (R2-C0 freeze).
+
+## R2 contract state
+
+- R2-C0 contract freeze: DONE (this commit). Simplified graph decisions reconciled
+  into living SSOT (`live-dependency-graph/README.md`, `WIT_DEMO_VISUAL_AND_PRODUCT_CONTRACT.md`,
+  `WIT_FRONTEND_INTEGRATION_HANDOFF.md`, `DESIGN.md`, `FRONTEND_SEMANTIC_CONTRACT.md`).
+- Minimum additive contract frozen: optional `focusedGraph` block on `RecoveryCaseView`
+  (`causalNodeRefs[]`, `causalEdgeIds[]`, `firstBreakpoint?`, `unmappedCausalSteps[]`).
+  No `focalNodeRef`. No LDG-wide change. No `stateLabel` field unless a concrete need
+  appears (reuse `SemanticIndicator.label`). CHECKING = existing `evaluation:
+  PENDING_REASSESSMENT`. Trip purpose = existing `objectives` ontology (migration 0072).
+
+## R2 lane status
+
+- Phase 0 recon (A1-A5 read-only): COMPLETE. Findings reconciled by PRIMARY.
+  - A1 backend map: `RecoveryCaseView` already carries `causalPath`, `planningEvidence`,
+    `attention`, `strategies`, `recoveryActions`, `connectionProgression`, `ldg`,
+    `change`. Missing: explicit causal-ref mapping, first-breakpoint pointer, Original
+    snapshot. HTTP: `GET /api/v2/cases/:id` (+`?sinceCursor`, `?format=html`).
+  - A2 Case archaeology: TWO case UIs — rich `operator-case.ts` (18 sections, served
+    ONLY by retired SQLite `src/server/http.ts`) and PG-served `product-recovery-case.ts`
+    (poorer). R2 enriches `product-recovery-case.ts` over `RecoveryCaseView`; uses
+    `operator-case.ts` as IA reference ONLY; never rewires SQLite. "blast radius" is a
+    FORBIDDEN_UI_TERM in `copy.ts`. Polling exists for Overview only (`polling.ts`, 2s).
+  - A3 renderer: NO visual graph renderer in `src/ui` (only semantic adapter + grid
+    contract-lab). V5.6 prototype uses manual CSS positions + hardcoded Sarah scenario;
+    production needs a deterministic left-to-right layout, no scenario tokens.
+  - A4 conflict audit: 10 statements; all resolved in C0 §9.
+  - A5 test map: pure tests run on v24 binary; PG/browser deferred. New pure tests
+    proposed under `test/r2-*.test.ts` (classify in `test/suites.json`).
+- LANE A (focused projection): NOT STARTED.
+- LANE B (renderer): NOT STARTED.
+- LANE C (Case workspace): NOT STARTED.
+- LANE D (Original/Current + polling): NOT STARTED.
+- LANE V (verification): NOT STARTED.
+
+## R2 checkpoint SHAs
+
+- R2-C0 contract freeze: (this commit — record SHA after push).
+- R2-C1 focused projector: —
+- R2-C2 renderer: —
+- R2-C3 Case workspace: —
+- R2-C4 Original/Current + polling: —
+- R2-C5 Cloud integration: —
+
+## R2 Cloud limitations
+
+No PostgreSQL, no Docker, no browser, no LIVE providers, no secrets. Cloud MAY author
+PG queries/migrations/tests + typecheck; MUST NOT claim a migration applied / PG test
+passed / transaction behaviour proven / visual acceptance unless it actually ran.
+
+## R2 next action
+
+1. [DONE] R2-C0 contract freeze + living-doc reconciliation; commit + PUSH; record SHA.
+2. Fan out write lanes A/B/C/D/V from the C0 SHA on clearly-owned paths.
+3. R2-C1 integrate Lane A (focused projector + causal mapping + two-case generality).
+
+---
+
 # ACTIVE TASK — R1 Planning + Decision-Evidence Parity (LOCAL INTEGRATION)
 
 Live working-memory ledger for the R1 local integration and acceptance lane. Reread this

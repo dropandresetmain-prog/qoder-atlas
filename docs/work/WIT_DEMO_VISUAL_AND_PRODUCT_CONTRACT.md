@@ -82,6 +82,15 @@ Proposed state must never look authoritative before commit.
 
 ## Revision-driven motion
 
+> **R2 reconciliation (2026-09-19, authoritative — see
+> `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` §5/§9):** the "No decorative
+> perpetual pulsing" clause below is SUPERSEDED for ambient dependency pulse. R2
+> separates two concepts: (1) ambient pulse is PURE FRONTEND animation derived from
+> semantic condition (green normal / amber slower / red none), NOT a backend
+> liveness field and NOT gated on revision events; (2) revision-driven transition
+> animation (only changed items animate on a new snapshot) remains valid and
+> separate. No backend liveness state is added.
+
 Graph motion follows actual projection revisions/state changes.
 
 Prefer `revision`, `changedNodeIds`, `changedEdgeIds` or equivalent semantics so only changed items animate.

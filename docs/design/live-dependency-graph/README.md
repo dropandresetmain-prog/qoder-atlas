@@ -21,6 +21,15 @@ The graph must not resemble a raw database graph, BPMN flow, architecture diagra
 
 ## 1. Core visual principle
 
+> **R2 reconciliation (2026-09-19, authoritative — see
+> `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` §5/§9):** "Motion = liveness"
+> below is SUPERSEDED for the production Case Graph. Pulse is PURE FRONTEND
+> animation derived from the node/edge semantic condition (green → normal pulse,
+> amber → slower, red → none). There is NO backend liveness field (`isPulsing`,
+> `pulseSpeed`, `isLive` are banned). Ambient dependency pulse and revision-change
+> animation are two separate concepts. Do not read this section as requiring a
+> backend liveness state.
+
 The visualization uses three independent visual channels:
 
 - **Motion = liveness.** A moving pulse means a dependency is currently functioning and carrying live state.
@@ -51,6 +60,11 @@ The accepted prototype uses one shared graph/scenario state model containing:
 - trip-level display state;
 - attention state;
 - liveness / pulse state.
+
+> **R2 reconciliation (2026-09-19):** the "liveness / pulse state" bullet is a
+> prototype-local PRESENTATION dimension only. In production there is NO backend
+> liveness field; the renderer derives pulse from the semantic condition (tone).
+> See `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` §5/§9.
 
 The renderer derives all visible output from that shared state.
 
