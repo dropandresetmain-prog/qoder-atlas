@@ -55,7 +55,7 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 
 ## R2 checkpoint SHAs
 
-- R2-C0 contract freeze: (this commit — record SHA after push).
+- R2-C0 contract freeze: DONE — SHA `df3d8bffaf477da04d5b802104fa3356b7304816` (pushed, local == origin).
 - R2-C1 focused projector: —
 - R2-C2 renderer: —
 - R2-C3 Case workspace: —

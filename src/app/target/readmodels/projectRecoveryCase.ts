@@ -4,6 +4,7 @@ import {
 } from '../../../contracts/v2/product/readModels.ts';
 import { buildChangeAwareness } from './changeAwareness.ts';
 import { projectLiveDependencyGraph } from './liveDependencyGraph.ts';
+import { projectFocusedGraph } from './projectFocusedGraph.ts';
 import { projectPlanningEvidence } from './projectPlanningEvidence.ts';
 import { projectCaseAttention } from './projectCaseAttention.ts';
 import {
@@ -42,11 +43,18 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     ? projectPlanningEvidence(input.planningAttempt.attempt, input.planningAttempt.outcome)
     : undefined;
 
+  // R2: backend-supplied mapping of the ordered causalPath onto the visible focused
+  // graph, so the frontend never traverses topology for causality (FIG-5b). Pure
+  // function of the produced `ldg` + `causalPath`; undefined when there is no path.
+  const causalPath = (input.causalPath ?? []).map((step) => ({ ...step, facts: { ...step.facts }, relatedSubjectRefs: [...step.relatedSubjectRefs] }));
+  const focusedGraph = projectFocusedGraph(ldg, causalPath);
+
   return RecoveryCaseViewSchema.parse({
     generatedAt: input.generatedAt,
     caseRef: input.caseRef,
     ...(input.cause ? { cause: { ...input.cause } } : {}),
-    causalPath: (input.causalPath ?? []).map((step) => ({ ...step, facts: { ...step.facts }, relatedSubjectRefs: [...step.relatedSubjectRefs] })),
+    causalPath,
+    ...(focusedGraph ? { focusedGraph } : {}),
     status: input.status,
     changeSummary: input.changeSummary,
     bookingServiceState: { ...input.bookingServiceState },

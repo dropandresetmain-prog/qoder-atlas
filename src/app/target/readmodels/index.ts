@@ -5,6 +5,7 @@ export * from './pgFactAssembler.ts';
 export * from './projectIncidentProgramme.ts';
 export * from './projectOperatorOverview.ts';
 export * from './projectCaseAttention.ts';
+export * from './projectFocusedGraph.ts';
 export * from './projectPlanningEvidence.ts';
 export * from './projectRecoveryCase.ts';
 export * from './projectTravellerTrip.ts';

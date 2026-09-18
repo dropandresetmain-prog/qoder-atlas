@@ -582,11 +582,61 @@ export const RecoveryCaseAttentionViewSchema = z.strictObject({
 });
 export type RecoveryCaseAttentionView = z.infer<typeof RecoveryCaseAttentionViewSchema>;
 
+/**
+ * R2 — the backend-supplied mapping of the ordered authoritative `causalPath`
+ * onto the visible focused Case graph. The frontend must NOT traverse graph
+ * topology to infer causality (FRONTEND_SEMANTIC_CONTRACT FIG-5b); this block is
+ * the backend's answer. Computed purely by `projectRecoveryCase` from the
+ * produced `ldg` visible refs/edge ids and the case's `causalPath`.
+ *
+ * Honest gaps: a causal step whose subject has no visible graph node is reported
+ * in `unmappedCausalSteps`, never silently dropped and never guessed. Optional on
+ * the case view: a case with an empty causal path carries no `focusedGraph`.
+ */
+export const FocusedGraphFirstBreakpointSchema = z.strictObject({
+  /** The visible `ldg` node ref the first operational breakpoint maps to. */
+  nodeRef: z.string().min(1),
+  /** Human operational wording, from the visible node's own label. */
+  label: z.string().min(1),
+  /** The evaluator dimension of `causalPath[0]`. */
+  dimension: z.string().min(1),
+  /** The evaluator reason code of `causalPath[0]`. */
+  reasonCode: z.string().min(1),
+});
+export type FocusedGraphFirstBreakpoint = z.infer<typeof FocusedGraphFirstBreakpointSchema>;
+
+export const FocusedGraphUnmappedStepSchema = z.strictObject({
+  subjectRef: z.string().min(1),
+  dimension: z.string().min(1),
+  reasonCode: z.string().min(1),
+  /** Why it could not be mapped, e.g. `no visible graph node for subject`. */
+  reason: z.string().min(1),
+});
+export type FocusedGraphUnmappedStep = z.infer<typeof FocusedGraphUnmappedStepSchema>;
+
+export const FocusedGraphViewSchema = z.strictObject({
+  /** Ordered subset of `ldg` node refs on the causal chain (may be empty). */
+  causalNodeRefs: z.array(z.string().min(1)).default([]),
+  /** Subset of `ldg` edge ids (FIG-1 producer-owned ids) on the causal chain. */
+  causalEdgeIds: z.array(z.string().min(1)).default([]),
+  /** `causalPath[0]` mapped to a visible ref, when it is mappable. */
+  firstBreakpoint: FocusedGraphFirstBreakpointSchema.optional(),
+  /** Causal steps with no visible graph object — explicit, never dropped. */
+  unmappedCausalSteps: z.array(FocusedGraphUnmappedStepSchema).default([]),
+});
+export type FocusedGraphView = z.infer<typeof FocusedGraphViewSchema>;
+
 export const RecoveryCaseViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   caseRef: z.string().min(1),
   cause: CaseCauseViewSchema.optional(),
   causalPath: z.array(CausalPathStepSchema).default([]),
+  /**
+   * R2 — backend-supplied mapping of `causalPath` onto the visible focused graph
+   * (`ldg`). Optional: absent when the case has no causal path. The frontend reads
+   * this instead of traversing topology (FIG-5b).
+   */
+  focusedGraph: FocusedGraphViewSchema.optional(),
   status: z.enum([
     'OPEN', 'PLANNING', 'AWAITING_AUTHORITY', 'EXECUTING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED',
   ]),
