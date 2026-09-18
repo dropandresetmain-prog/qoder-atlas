@@ -1,131 +1,154 @@
-# ACTIVE TASK — Truth Rebase + Recovery Planning Contract Freeze
+# ACTIVE TASK — R1 Planning + Decision-Evidence Parity (CLOUD IMPLEMENTATION)
 
-Working-memory ledger for the current planning branch. Historical R0/T3/B1/product-repair
-evidence remains in its original documents and is not rewritten here.
+Live working-memory ledger for the R1 Cloud implementation lane. Reread this file
+before every major phase, before every checkpoint commit/push, and before the final
+report. The completed truth-rebase/contract-freeze planning ledger is preserved at
+`docs/work/TRUTH_REBASE_CONTRACT_FREEZE_ACTIVE_TASK.md` and is NOT rewritten here.
 
 ## Identity
 
 - Repository: `dropandresetmain-prog/qoder-atlas`
-- Authoritative input branch: `feature/sarah-provider-disruption`
-- Accepted parity-audit commit: `4f48c75af41bc79874470900c76f8a2dc7b0238f`
-- Planning branch: `plan/truth-rebase-contract-freeze`
-- Authoritative audit: `docs/PRODUCT_PARITY_TRUTH_REBASE_2026-09-18.md`
+- Authoritative base SHA (frozen): `456be3e44b7d4689e6f734c719725848e140dff8`
+- Base branch: `plan/truth-rebase-contract-freeze` (verified identical to base SHA)
+- Working branch: `feat/r1-planning-parity-cloud` (created DIRECTLY from the base SHA)
+- Ancestry: base SHA IS an ancestor of working HEAD (verified `git merge-base --is-ancestor`)
+- Role: PRIMARY R1 Cloud Implementation + Integration Lead
+- Harness: Qoder Cloud sandbox (no Docker, no PostgreSQL, no LIVE providers, no secrets)
 
-The authoritative input branch was verified identical to the accepted audit commit before
-this branch was created.
+Divergence report (NOT merged, per instruction): a docs-only commit `d6c845e`
+exists on a main-only ref and is NOT part of the frozen base. It is reported here
+and left alone; the working branch stays pinned to `456be3e`.
 
-## Goal
+## Goal (R1)
 
-Convert the accepted product-parity audit into:
+Implement as much of R1 "Planning + Decision-Evidence Parity" as can be TRUTHFULLY
+completed in the Cloud sandbox: materialize the frozen recovery-planning contracts,
+author (not execute) the PostgreSQL persistence, build the production coordinator
+that extends the existing `recoveryPlanning.ts` seam, and prove generality — while
+deferring every check that genuinely requires PostgreSQL/LIVE providers to a LOCAL
+integration-acceptance ledger.
 
-- corrected living SSOT;
-- frozen generalized recovery-planning contracts;
-- explicit B1/B2 boundaries;
-- shortest safe implementation programme;
-- behavioural tests to write first;
-- permanent no-silent-retirement rule.
+Terminal status for this task is EXACTLY one of:
+- `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`
+- `R1 CLOUD IMPLEMENTATION BLOCKED — <blocker>`
+NEVER `R1 ACCEPTED — READY FOR R2`.
 
-No production code, runtime, database or provider execution belongs in this task.
+## Product truth (non-negotiable)
 
-## Frozen product truth
+NORTHSTAR is a generalized trip-resolution system. Keep PostgreSQL as the sole
+runtime; keep F01-F18, RC-6, StrategyProposer, ScenarioChange, ChangeSignal, M6,
+M8, durable execution, Atlas adapters, LIVE/RECORD/REPLAY. Do NOT rebuild these,
+do NOT restore RuntimeOrchestrator, do NOT create a second engine, do NOT add
+Sarah/Jordan-specific branches. AI proposes/researches/compares; deterministic code
+owns hard constraints, provider facts, viability (RC-6), authority, execution
+validation, observation/reconciliation and resolution.
 
-NORTHSTAR is a generalized trip-resolution system. The PostgreSQL state/evaluation/
-authority/execution foundation remains. Missing planning/reasoning and product-decision
-capabilities are adapted onto it.
+## Cloud limits honoured
 
-Required consequential boundary:
+Docker, PostgreSQL, authenticated provider CLIs, local secrets and LIVE provider
+execution are UNAVAILABLE. Therefore: no Docker install, no substitute DB, no
+SQLite switch, no mocks in domain logic, no weakened tests, no faked PG/provider
+evidence, and no claim that a test passed which could not run. Cloud MAY: author
+migrations, author PG commands/repositories, run pure/unit/module tests, use
+checked-in credential-free REPLAY recordings, typecheck, lint, run anti-hardcoding
+gates, inspect code, and build production implementation.
 
-`AI proposal -> validation -> deterministic viability -> authority -> executor ->
-observation -> canonical state -> reassessment`.
+## Frozen contracts materialized (Phase B — PRIMARY)
 
-AI may propose/research/compare semantics. Deterministic code owns hard constraints,
-provider facts, viability, authority, execution validation, observation/reconciliation and
-resolution.
+All under `src/contracts/v2/planning/`, exported via `src/contracts/v2/index.ts`:
 
-## Current contract decisions
+- [x] C1 `recoveryPlanningAttempt.ts` — RecoveryPlanningCoordinator port, bounded
+      immutable attempt record, closed outcome/reason vocabularies, materiality rules.
+- [x] C2 `planningTool.ts` — read-only PlanningTool request/result protocol,
+      canonical fingerprint, dedupe, bounded research budget.
+- [x] C3 `recoveryDomain.ts` — recovery-domain registry, hybrid deterministic+AI
+      selection, fail-closed.
+- [x] C4 `proposerAdaptation.ts` — additive domain/evidence context for proposers;
+      base StrategyProposer port unchanged.
+- [x] C5 (with C1) material decision evidence inside the attempt record.
+- [x] C6 `strategyRecommendation.ts` — viable-only recommendation + deterministic
+      validation rejecting non-viable/stale/foreign refs; preference precedence.
+- [x] C7 `impactSemantics.ts` — three distinct impact projections as pure functions.
+- [x] C8 `recoveryProgression.ts` — single post-reassessment progression decision
+      (RuntimeOrchestrator stays retired).
+- [x] barrel `index.ts`.
+- [ ] C9 Case projection — owned by lane X (static review) in Phase C.
+- [ ] C10 B1/B2 acceptance — owned by lane V (tests) + final report in Phase C.
 
-- [x] Current `recoveryPlanning.ts` is extended/adapted; no parallel engine.
-- [x] Historical read-only ToolRequest/planningLoop/dispatch protocol is adapted to current
-      provider-neutral capabilities.
-- [x] Recovery-domain selection is hybrid: deterministic activation + validated AI semantic
-      additions; no scenario branches/order.
-- [x] Current StrategyProposer port survives and remains proposal-only.
-- [x] Material rejected alternatives use a bounded immutable RecoveryPlanningAttempt;
-      viable executable alternatives remain RecoveryStrategy rows.
-- [x] Recommendation receives only current VIABLE strategies and cannot override RC-6.
-- [x] `immediateChangeBlastRadius`, `reassessmentClosure` and `outcomeDelta` are
-      distinct backend semantics.
-- [x] Continued recovery belongs to one post-reassessment Recovery Lifecycle Progression
-      service composed under `runtimeServices`; RuntimeOrchestrator stays retired.
-- [x] Rich old Case workspace is IA reference for a PostgreSQL Case projection, not a code
-      path to restore.
-- [x] B1 = full Sarah reasoning + internal execution; B2 = same engine plus consequential
-      external execution/reconciliation.
+## Ownership map (PRIMARY retains)
 
-See `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
+- Shared architecture + all frozen contracts (C1-C10 shape).
+- Schema/migration authoring and any migration-order/FK decisions.
+- Integration decisions across lanes; cross-lane reconciliation.
+- Recovery Lifecycle Progression service (composed under `runtimeServices`).
+- Final Cloud verification; checkpoint commits and pushes.
 
-## Current planning checkpoints
+## Phase C write lanes (fan out ONLY after C1 push)
 
-### Checkpoint 1 — contract freeze
+- Lane P — planner core: extend `src/app/target/recoveryPlanning.ts` into the C1
+  coordinator; read-only tool dispatch; transport proposer; comparator/preferences.
+- Lane E — persistence: RecoveryPlanningAttempt repository/command over migration
+  0125; impact-projection projections wired into the attempt record.
+- Lane V — verification: pure Cloud-runnable tests (contracts, coordinator with
+  injected fakes at the SEAM only, REPLAY-based) + the LOCAL-required pg list.
+- Lane X — Case projection (C9): static review of the PostgreSQL Case read model.
 
-- [x] Create focused contract-freeze document.
-- [x] Resolve hybrid planning/decision evidence shape.
-- [x] Freeze recommendation boundary.
-- [x] Freeze three impact semantics.
-- [x] Freeze continued-recovery ownership.
-- [x] Freeze B1/B2 acceptance.
+Each lane branches from the C1 SHA and returns exact-path diffs; PRIMARY
+reconciles and integrates.
 
-### Checkpoint 2 — forward SSOT reconciliation
+## Checkpoints
 
-- [x] Reconcile AGENTS/README/ARCHITECTURE/CAPABILITIES/ROADMAP/SCENARIOS.
-- [x] Preserve historical evidence unchanged.
-- [x] Verify checkpoint diff contains documentation only.
+- [x] Phase A recon (A1-A5 read-only) — complete.
+- [x] Phase B contracts materialized + typecheck clean.
+- [ ] C1 checkpoint: contracts + migration 0125 authored + pure tests green +
+      suites.json classification + ACTIVE_TASK ledger + this doc.
+      Commit `feat(r1): materialize recovery planning contracts`. PUSH. Record SHA.
+- [ ] C2 — planner core (lane P integrated).
+- [ ] C3 — decision evidence end-to-end at the seam.
+- [ ] C4 — Recovery Lifecycle Progression service (PRIMARY).
+- [ ] C5 — integration + generality proof (>=2 materially different situations).
 
-### Checkpoint 3 — implementation/test programme
+## Verification — DONE in Cloud (C1)
 
-- [x] Rebase `IMPLEMENTATION_PLAN.md` §22.
-- [x] Rebase `IMPLEMENTATION_AGENT_ROUTING.md`.
-- [x] Add foundational parity rules/behavioural tests to `TESTING.md`.
-- [x] Reconcile this ledger against final docs.
-- [x] Verify no production source is intentionally modified; final Git compare is the closing check.
-- [ ] Record final branch/SHAs in the completion report.
+- [x] `test/r1-planning-contracts.test.ts`: 33/33 pass (Node v24 type-stripping).
+- [x] `npm run gate:test-boundary`: CLEAN — 200 test files classified.
+- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 405 files scanned.
+- [x] `npm run typecheck`: exit 0.
+- [x] `eslint` on new/changed paths: clean.
 
-## Next implementation after this planning branch is accepted
+Note: the sandbox default `node` is v20.18; the project requires `>=24`. Cloud
+verification of TS tests uses the available v24 runtime (`/opt/playwright-driver/node`)
+which matches the documented engine and the `run-suite.mjs` `--test` invocation.
 
-`R1 planning/evidence parity -> R2 Case decision surface -> R3 full B1 -> B2 external`.
+## Verification — UNAVAILABLE in Cloud (LOCAL handoff ledger)
 
-Do not start R1 in this task.
+Every item below genuinely requires PostgreSQL/Docker/LIVE and is DEFERRED to local
+integration acceptance. It is NOT claimed as passed here:
 
-## Issue triage
+- [ ] Apply migration `0125_recovery_planning_attempts.sql` to a live PG test DB.
+- [ ] `npm run db:postgres:up` then `npm run test:postgres` (full pg suite).
+- [ ] New pg integration test for RecoveryPlanningAttempt persistence (immutability
+      trigger, bounded jsonb CHECKs, FKs to recovery_cases + assessments, unique
+      (case, basis) index, interval CHECK).
+- [ ] Coordinator pg integration: attempt written in the same UoW as viable
+      RecoveryStrategy promotion; recommendation references only VIABLE rows.
+- [ ] Recovery Lifecycle Progression pg integration (RESOLVE/WAIT/REPLAN/ESCALATE
+      against real case + assessment state).
+- [ ] Generality proof run against real PG fixtures (>=2 materially different
+      planning situations through the same coordinator).
+- [ ] Any LIVE/RECORD provider evidence (Cloud is REPLAY-only, credential-free).
 
-### Act Now
+## Next action
 
-Contract/SSOT freeze, R1 planner/evidence parity, R2 Case projection, continuation, blast
-semantics, B1 acceptance and permanent parity gate.
+1. Exact-path stage C1 (contracts, migration, test, suites.json, both ACTIVE_TASK
+   docs) and commit `feat(r1): materialize recovery planning contracts`.
+2. PUSH; record branch + SHA here.
+3. ONLY AFTER the push, fan out Phase C lanes P/E/V/X from the C1 SHA.
 
-### Investigate Now
+## Prohibitions (restated)
 
-Choose the cheapest fixture-ready second planning proof; implementation-time migration/index
-details for PlanningAttempt; confirm current preference/rule projections for comparison.
-
-### Park for Later
-
-External consequential dispatch until B2, money holds until needed, Event Overview redesign,
-graph zoom, SSE, final presenter polish, broad provider auto-correlation, physical SQLite
-deletion.
-
-### Ignore / Accept Risk
-
-Ontology rewrite, SQLite resurrection, RC-6 replacement, M8 rebuild, Atlas rebuild, another
-engine rewrite.
-
-## Verification discipline for this task
-
-Static only:
-
-- inspect branch/commit/docs/code;
-- compare branch diff after each checkpoint;
-- confirm changed paths are documentation only;
-- do not run product tests merely to re-prove accepted runtime behaviour.
-
-No product code may change.
+No `git add .` (exact paths only). No secrets/junk/unrelated files in commits. No
+push to source/default branch. No weakened tests, no domain-logic mocks, no faked
+evidence. No claim of a passing check that could not run. No restoring
+RuntimeOrchestrator or building a second engine. If anything is unclear enough to
+require redefining NORTHSTAR, STOP and report instead of guessing.

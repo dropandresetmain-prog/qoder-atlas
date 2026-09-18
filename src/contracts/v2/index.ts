@@ -11,6 +11,7 @@ export * from './assessment/assessmentManifest.ts';
 export * from './ingestion/informationIngestion.ts';
 export * from './scenario/scenarioChange.ts';
 export * from './scenario/recoveryStrategy.ts';
+export * from './planning/index.ts';
 export * from './action/actionPlan.ts';
 export * from './authority/authorityEnvelope.ts';
 export * from './execution/execution.ts';

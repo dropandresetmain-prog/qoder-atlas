@@ -73,6 +73,7 @@
       "test/providers.atlas.test.ts",
       "test/providers.foundation.test.ts",
       "test/providers.google.test.ts",
+      "test/r1-planning-contracts.test.ts",
       "test/r3d-user-contracts.test.ts",
       "test/runtime-services.test.ts",
       "test/strategy-viability.test.ts",
