@@ -1,26 +1,33 @@
-# Northstar data-structure refactor: complete implementation plan
+# Northstar implementation plan
 
-Status: **APPROVED PLAN — IMPLEMENTATION NOT STARTED**.
+Status: **CURRENT DELIVERY PLAN — M0-M10/C5 COMPLETE; R0/T3/T4/B1 IMPLEMENTED**.
 
-Baseline: `dropandresetmain-prog/qoder-atlas`, main
+Current implementation candidate:
+`feature/sarah-provider-disruption` @
+`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`.
+
+Sections 1-21 preserve the original data-structure-refactor decomposition and are retained
+for architecture/provenance context. They describe the plan that produced the accepted
+M0-M10/C5 foundation and must not be read as current milestone status.
+
+**Section 22 is the authoritative current delivery sequence.**
+
+Original planning baseline:
+`dropandresetmain-prog/qoder-atlas` @
 `8b03934dadee20ec7ec271a45c5769de676dc3e7`.
-Documentation branch: `data-structure-refactor`.
-Decision: **GO / PARTIAL REFACTOR**.
 
-Normative companion documents:
+Normative companions:
 
-1. [Approved architecture closure](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md): frozen
-   decisions F01-F18, ontology, ownership, cardinalities, lifecycles and semantics.
-2. [Logical schema and transaction contracts](DATA_STRUCTURE_LOGICAL_SCHEMA.md):
-   table families, integrity, indexes, JSON limits and command/execution protocols.
+1. [Architecture closure](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) — frozen F01-F18,
+   ontology, ownership, cardinalities, lifecycles and semantics.
+2. [Logical schema](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — relational ownership, integrity,
+   indexes and command/execution protocols.
+3. [Architecture](ARCHITECTURE.md) — current implemented runtime, including the
+   post-C5 operational closure and RC-6 viability contract.
+4. [Roadmap](ROADMAP.md) — current milestone status and deferred scope.
 
-This document is an executable work decomposition, not permission to run production
-actions. The current task records these three documents only. No runtime change,
-schema migration, data import or application test execution is claimed by this
-documentation commit. Existing documentation reconciliation is reserved to the
-owner as requested; do not expand this change into README/roadmap/architecture edits.
-Future packages update their new contract/evidence documents and identify any
-owner-managed documentation reconciliation needed at integration.
+Historical implementation language below does not authorize production actions and does
+not override current runtime/code/schema truth or Section 22.
 
 ## 1. Outcome, scope and execution rules
 
