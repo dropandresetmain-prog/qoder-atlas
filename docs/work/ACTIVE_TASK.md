@@ -112,9 +112,18 @@ reconciles and integrates.
       (C7) and MaterialCandidateEvidence (C5), validated against the contract.
       Added `RecoveryPlanningAttemptSchema` interval refine (app/DB parity with
       migration 0125 CHECK). 46 pure tests pass; full `current` suite 876/876.
+      Commit `feat(r1): assemble decision evidence from real RC-6 output`.
+      - SHA: `a183cebf165287dd1093cc606cea1d12cffa7bf0` (local == origin)
+- [x] Lane E — RecoveryPlanningAttempt persistence
+      (`src/persistence/postgres/commands/r1PlanningAttemptCommands.ts`): idempotent
+      command over migration 0125 (not an aggregate root; `advanced: []`, mirrors
+      `completeChangeSignal`), uuid-narrowing at the DB boundary, FK pre-checks,
+      contract round-trip read helpers. Authored pg integration test
+      `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts` (classified
+      `postgres`; NOT executed in Cloud). Typecheck/lint/boundary clean.
 - [ ] C2 — planner core (lane P integrated): coordinator extending
       `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
-- [ ] C3 — decision evidence end-to-end at the seam (persist attempt via lane E).
+- [ ] C3 — decision evidence end-to-end at the seam (coordinator persists attempt).
 - [ ] C4 — Recovery Lifecycle Progression service (PRIMARY).
 - [ ] C5 — integration + generality proof (>=2 materially different situations).
 
@@ -139,9 +148,10 @@ integration acceptance. It is NOT claimed as passed here:
 
 - [ ] Apply migration `0125_recovery_planning_attempts.sql` to a live PG test DB.
 - [ ] `npm run db:postgres:up` then `npm run test:postgres` (full pg suite).
-- [ ] New pg integration test for RecoveryPlanningAttempt persistence (immutability
-      trigger, bounded jsonb CHECKs, FKs to recovery_cases + assessments, unique
-      (case, basis) index, interval CHECK).
+- [ ] Run the AUTHORED `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts`
+      (immutability trigger, bounded jsonb CHECKs, FKs to recovery_cases +
+      assessments, unique (case, basis) index, interval CHECK, command
+      idempotency, read-helper round-trip). Written in Cloud, NOT executed here.
 - [ ] Coordinator pg integration: attempt written in the same UoW as viable
       RecoveryStrategy promotion; recommendation references only VIABLE rows.
 - [ ] Recovery Lifecycle Progression pg integration (RESOLVE/WAIT/REPLAN/ESCALATE
