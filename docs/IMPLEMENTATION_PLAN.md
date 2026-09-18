@@ -973,113 +973,309 @@ Parallel lanes start after **C0 + M1**; high-risk shared integration remains und
 one architectural owner. Old state stops being authoritative only at the approved
 **M11 cutover**. This commit records the plan; it does not implement that path.
 
-## 22. Post-C5 delivery sequence
+## 22. Current delivery sequence — runtime-closure reconciled
 
-M0-M10 and C5 are accepted. What remains before M11 is **product delivery**, and it is
-sequenced as two vertical slices that a founder can actually test, not as a catalogue of
-independent backend packages.
+M0-M10/C5 and the PostgreSQL data/state architecture are accepted. Post-C5 product
+delivery exposed one additional architectural fact: the refactor had adapted enough
+runtime to execute the new model, but the operational runtime itself had never received
+a dedicated end-to-end composition closure.
 
-This section **supersedes the six-package (WP1-WP6) delivery framing** in
-`docs/work/POST_C5_DEMO_BACKEND_COMPLETION_PLAN.md`. That document is retained for its
-technical analysis and provenance; its requirements are distributed below. Do not
-execute it as six milestones.
+T2 physical testing made that visible. A safe one-item reassessment worker combined
+with a periodic scheduler produced unacceptable propagation latency. After the obvious
+scheduler defect was fixed, a read-only frontier runtime audit (Fable, 2026-09-18,
+base `c20228c`) inspected the actual code/schema/docs rather than prescribing a new
+engine. It concluded:
 
-| # | Stage | Ends when |
-|---|---|---|
-| 1 | **Repository + test-suite convergence** | **COMPLETE** — `integration/post-c5-convergence`, tag `wit-post-c5-convergence`. |
-| 2 | **Slice A** — disruption reaches a focused Sarah case | The sequence below is true from authoritative PostgreSQL state alone. |
-| 3 | **Founder Test A** | Founder drives Slice A end to end and accepts or rejects. |
-| 4 | **Slice B** — recovery strategy reaches a recovered trip | The sequence below is true from authoritative PostgreSQL state alone. |
-| 5 | **Founder Test B** | Founder drives Slice B end to end and accepts or rejects. |
-| 6 | **Submission rehearsal / M11 activation** | Repeatability, replay/failure rehearsal, exact candidate gate, operational activation. |
-| 7 | **Polish / stretch** | Only after 1-6. Nothing here may pull work forward. |
+- preserve F01-F18, the PostgreSQL ownership model, trigger-based invalidation,
+  deterministic evaluation, stored execution gate and resolution gate;
+- close the missing operational seams before further product expansion;
+- fix invalidation breadth at its input/manifest semantics rather than masking it with
+  batching;
+- add durable ChangeSignal identity and deterministic escalation;
+- compose one generalized strategy/authority/execution lifecycle;
+- prove the first complete loop with internal programme execution, then prove
+  generality with an external-provider scenario.
 
-A slice is not complete because its parts exist separately. It is complete when the whole
-sequence runs through the normal product path without manual state edits.
+The accepted implementation sequence from that audit was:
 
-### 22.1 Slice A — real baseline to real focused case
+`R0 runtime composition closure -> T3 change signal/escalation -> T4 verification ->
+B1 generalized internal recovery -> B2 generalized external recovery -> C6/final`.
 
-```
-real Sarah baseline -> real product UI -> controlled provider-shaped disruption
--> authoritative PostgreSQL mutation -> affected cohort -> four cleared / Sarah disrupted
--> Sarah RecoveryCase -> founder clicks Sarah -> real focused case
-```
+### 22.0 Current status and authoritative sequence
 
-Required technical content (from the superseded WP2/WP5/WP6 analysis):
+Implementation through **B1 is complete on
+`feature/sarah-provider-disruption` @
+`82ae9b80f62a26d8b7e8e6277aa5bf6183ff44f0`**.
 
-- a **repeatable real Sarah baseline** — deterministic reset/reseed of known demo state
-  through the PostgreSQL command surface;
-- an **event operational projection that does not depend on a RecoveryCase existing** —
-  affected people must be renderable before escalation;
-- **provider-shaped disruption through normal ingress** — the frozen external-event
-  boundary, not a test hook;
-- **real affected-scope discovery** — blast radius computed by the backend, never inferred
-  by the browser from topology;
-- **incident-linked evaluation provenance** — proof that a cleared traveller was evaluated
-  *because of this incident*, not merely that they have no open issue;
-- **evaluation -> case orchestration** — what turns a failed evaluation into a RecoveryCase;
-- the **focused Sarah case** with a structured quantitative reason and causal/breakpoint refs;
-- **automatic authoritative refresh/refetch** in the product UI;
-- the **minimum graph identity/state** the focused case needs.
+Key checkpoint commits:
 
-Already landed, do not re-plan: projection freshness/revision, change cursor,
-stable edge identity and authority, assessment lifecycle and the changed-visible-ref
-contract all shipped with the accepted live read-model lane `cbe5f83`.
+- `6a96ee6` — R0 shared runtime-closure pieces;
+- `41a2d58` — R0 ingress/composition tests;
+- `cd620f7` — T3 + initial B1 composition;
+- `82ae9b8` — RC-6 counterfactual-viability closure and real AiT/Sarah B1 proof.
 
-### 22.2 Slice B — real recovery to truthfully recovered state
+Current forward sequence:
 
-```
-real recovery strategy -> mutation-free preview -> complete affected participants
--> real authority/approval -> ordered execution -> observation -> reassessment
--> same Sarah trip becomes viable
-```
+1. **Founder B1 physical acceptance** — manually drive the real Sarah product loop.
+2. **B2 generalized external recovery / Jordan** — add only the external capabilities
+   needed for the same engine to recover a materially different journey.
+3. **B2 Founder + generalisation verification** — physical product test plus one focused
+   same-engine/anti-hardcoding review.
+4. **Post-E2E product work** — semantic activity/observability, accepted Event Overview
+   implementation, provider/LIVE-REPLAY hardening and final demo polish.
+5. **M11 / C6 candidate** — operational activation/retirement, exact-candidate rehearsal,
+   broad gates and submission evidence.
 
-Required technical content (from the superseded WP4/WP5 analysis):
+The old standalone **Founder Test A** gate was not run before B1. Its product checks are
+not silently claimed as accepted; they are now subsumed into the broader Founder B1
+physical test because the implementation advanced through the same boundaries. Do not
+recreate it as a blocker unless Founder B1 exposes a Slice-A-specific defect.
 
-- a **real typed strategy**, not a presentation-only option list;
-- a **mutation-free preview** — candidate state stays isolated from world state;
-- **complete programme participation, including participants with no Journey**, through
-  existing Programme/Participation concepts (never a "local participant" scenario type);
-- a **real approval principal and authority path**;
-- a **persisted, versioned execution basis** — post-authority mutation cannot raise a ceiling;
-- **ordered programme actions**;
-- **observation** — provider success alone is never a recovered trip;
-- **reassessment**, and a **truthful recovered state** including recovered-with-loss.
+The old umbrella labels “Slice A” and “Slice B” remain historical references. Forward work
+uses explicit **B1** and **B2** names so internal and external recovery are not conflated.
 
-### 22.3 Investigate before the relevant slice
+### 22.1 R0 — runtime composition closure — COMPLETE
 
-These are evidence questions, not build items. Answer them against actual PostgreSQL state
-before the slice that depends on them, and let the answer drive the UI rather than the reverse.
+Accepted changes:
 
-| Question | Needed before |
-|---|---|
-| Participants with no Journey — already representable and evaluated? | Slice B |
-| Sarah stay consequence after the arrival date moves | Slice A/B |
-| Felix's actual authoritative programme requirement linkage | Slice A |
-| Exact rebooking semantics | Slice B |
-| Provider-ref correlation where the flow needs it | Slice B |
-| `M2-ACCESS-PATH-PLANNER` | **RESOLVED** at convergence — the assertion now isolates each named access path and `ANALYZE`s before measuring, so it no longer depends on database warmth. See `docs/TESTING.md`. |
+- provider-ingress completion bookkeeping no longer masquerades as arbitrary world
+  information or trips the unregistered-topic sentinel;
+- baseline assessment manifests bind to each subject's own dependency closure rather than
+  the batching/capture slice;
+- known clock-expiry invalidation is scheduled during normal worker wakes;
+- `runtimeServices.ts` is the single normal ownership point for background workers and
+  health; duplicate reassessment-loop composition was removed;
+- the reassessment drain keeps claim/lease/fencing/idempotency semantics and drains bounded
+  runnable work continuously.
 
-### 22.4 Parked
+Measured result on the real T2 world:
 
-Real, understood, and deliberately not required for Slice A/B or submission. They stay
-visible in `ROADMAP.md` with a revisit condition and must not expand into a slice:
+- invalidation fan-out: **67 -> 5** journey units;
+- drain: roughly **17s -> 2.4s**;
+- final truth remains **49 PASS / 3 FAIL / 15 UNKNOWN** after the disruption.
 
-progressive per-person evaluation telemetry; rich considered-option history; polished tool
-activity projection; authoritative Before/After toggle; whole-event Live Dependency Graph;
-semantic zoom; multiple simultaneous disruption focuses.
+This is a semantic precision fix, not a Sarah-specific cohort filter.
 
-### 22.5 Unresolved design
+### 22.2 T3 — ChangeSignal and deterministic escalation — COMPLETE
 
-The **Event Overview visual design is unresolved**. The first prototype was rejected and is
-deliberately absent from this repository. Convergence froze nothing about it. It must be
-approved as a design before it is mapped to authoritative backend fields — do not implement
-it, and do not treat the V5.6 focused-graph reference or its mock facts as runtime truth.
+The normal runtime now has durable change identity/provenance:
 
-### 22.6 Verification for these stages
+`external/state change -> ChangeSignal -> canonical command/change records ->
+invalidated subjects -> assessments -> RecoveryCase linkage`.
 
-Per `docs/TESTING.md`: focused unit/integration test, then the focused PostgreSQL seam test,
-then typecheck/build/lint only when relevant. Broad gates at coherent checkpoints only. The
-full canonical CURRENT target gate runs once on a fresh database at a candidate.
-`npm run test:legacy` is never part of acceptance and historical SQLite runtime failures are
-never a release blocker.
+Implemented:
+
+- `change_signals`, signal subjects/completions and the deferred
+  `case_signals.change_signal_id` relationship;
+- command/reassessment provenance under the current ChangeSignal;
+- pure deterministic escalation with idempotent OPEN / ATTACH / NONE outcomes;
+- case read models exposing authoritative cause and `causalPath`;
+- incident-linked AFFECTED_BY semantics without frontend causal inference.
+
+The Sarah disruption opens the appropriate incident-linked case; viable peers do not gain
+false incident cases; duplicate delivery remains idempotent.
+
+### 22.3 T4 — authoritative focused-case backend — IMPLEMENTED
+
+The accepted frontend semantic/read-model foundation can now receive the authoritative
+cause and causal path needed by the focused case. Do not invent continuous liveness or
+derive blast radius/causality in the browser.
+
+The final Event Overview design remains unresolved and is **not** a prerequisite for B2.
+
+### 22.4 B1 — generalized internal recovery loop — COMPLETE IN IMPLEMENTATION
+
+The normal application/runtime path now composes:
+
+`provider/state change
+-> canonical update
+-> reassessment
+-> RecoveryCase
+-> StrategyProposer
+-> schema validation
+-> deterministic counterfactual viability
+-> persisted RecoveryStrategy
+-> ActionPlan
+-> authority / approval
+-> durable internal execution
+-> observation
+-> canonical programme mutation
+-> reassessment
+-> resolution gate`.
+
+Important boundaries:
+
+- `StrategyProposer` is a generic port. The deterministic programme proposer searches
+  canonical programme state; it does not encode Sarah/Daniel names or fixture IDs.
+- request-scoped principals bind approval/authority to the reviewed basis;
+- `PgExecutionWorker`/runtime execution uses the stored deterministic gate and internal
+  programme executor;
+- execution success alone never resolves a case;
+- all consequential state still follows proposal -> validation -> deterministic viability
+  -> authority -> executor -> observation -> state update.
+
+#### RC-6 — counterfactual viability contract — RESOLVED
+
+The reached dependency closure remains the correct reassessment/blast radius. What changed
+is the **aggregator**: reached scope is not a requirement that every subject become perfect.
+
+A recovery candidate must:
+
+1. resolve the blocking case subjects it is responsible for — currently failing
+   JOURNEY/TRIP case subjects must be PASS on the overlay;
+2. not worsen any reached subject;
+3. not introduce new or action-critical UNKNOWN state;
+4. remain blocked by explicit `requiredUnknowns`;
+5. leave unchanged pre-existing unrelated FAIL/UNKNOWN truthful rather than treating them
+   as healed or as automatic vetoes.
+
+When a caller does not explicitly provide resolve subjects, overlay-affected journeys that
+already FAIL still have to heal, preserving conservative default planning semantics.
+
+Case resolution judges the case's required subjects plus reconciled execution, not every
+subject reached during counterfactual evaluation.
+
+No Sarah-specific logic or fixture patch was added.
+
+#### B1 evidence
+
+- real AiT/Sarah world: full normal-path recovery reaches **RESOLVED** and the blocking
+  subject becomes PASS;
+- `b1SarahWorldRecovery.pgtest.ts`: PASS, roughly 117-155s depending on run;
+- `b1RecoveryLoop.pgtest.ts`: PASS on a small generalized seeded world;
+- strategy-viability unit coverage includes unresolved blocking FAIL, new UNKNOWN,
+  regression and unchanged pre-existing FAIL/UNKNOWN;
+- CURRENT suite after B1/test investigation: **802/802**;
+- clean PostgreSQL gate: **522/522**, about **21.4 min**;
+- typecheck/build/lint/boundary/anti-hardcoding checks were clean at B1 closure.
+
+### 22.5 Founder B1 physical acceptance — NEXT
+
+The next product action is a physical test, not more architecture work.
+
+Founder flow:
+
+`50 PASS / 2 FAIL / 15 UNKNOWN baseline
+-> apply disclosed airline update
+-> settle at 49 / 3 / 15
+-> open incident-linked Sarah case
+-> inspect cause/causalPath
+-> propose recovery
+-> at least one generic programme option persists VIABLE
+-> approve as workspace operator
+-> internal programme execution
+-> observation/reassessment
+-> Sarah PASS
+-> incident case RESOLVED`.
+
+Unrelated baseline FAIL/UNKNOWN remains truthful and may keep its own case. No external
+provider dispatch occurs in B1.
+
+If this passes, preserve B1 as the internal-recovery product floor and proceed to B2.
+If it fails, fix the first broken normal product boundary before expanding scope.
+
+### 22.6 B2 — generalized external recovery / Jordan — PLANNED
+
+B2 is **not “build Jordan logic.”** Jordan is the materially different proof that the
+same generalized lifecycle works when recovery depends on an external provider.
+
+Minimum intended path:
+
+`progressive external observations / ChangeSignals
+-> same case lifecycle
+-> StrategyProposer implementation for flight recovery
+-> Atlas Search/Verify or REPLAY provider-shaped evidence where useful
+-> same ScenarioChange validation
+-> same deterministic counterfactual viability
+-> same ActionPlan / authority / approval
+-> provider-neutral external dispatcher
+-> execution attempt / OUTCOME_UNKNOWN semantics where applicable
+-> provider observation / canonical reconciliation
+-> same reassessment
+-> same resolution gate`.
+
+Provider-specific mechanics stay in adapters/dispatchers. No Jordan names, route constants,
+offer IDs or scenario conditions enter domain/application logic.
+
+B2 acceptance must preserve truthful partial failure and uncertain external outcomes.
+
+### 22.7 Post-E2E product work
+
+Only after B1 Founder acceptance and B2/generalisation proof:
+
+- semantic activity projection feeding Case timeline, broader Activity journal and a
+  compressed Overview feed;
+- implementation of an **accepted** Event Overview design;
+- focused graph proposed/current overlay pairing where the approved design needs it;
+- LIVE/REPLAY/provider-mode visibility and final provider hardening;
+- reset/rehearsal and failure-path polish;
+- submission/demo capture.
+
+Still deferred unless evidence changes:
+
+- SSE/WebSockets;
+- whole-event graph / semantic zoom;
+- broker/Kafka/microservices;
+- provider-reference auto-correlation as a broad platform project;
+- retired SQLite deletion;
+- unbounded autonomous provider/refund actions.
+
+### 22.8 Parallel engineering-productivity lane — test/dev performance
+
+A read-only performance audit on the B1 code line found that developer/test latency mixes
+required acceptance cost with avoidable harness cost. This is **not a product milestone**
+and must not delay Founder B1 unless the workflow itself blocks delivery.
+
+Measured current state:
+
+- `npm test`: boundary gate ~7.1s + CURRENT 72 files / 802 tests ~30.4s;
+- clean `npm run test:postgres`: 56 files / 522 tests ~21.4 min;
+- repeated PG gates can become pathological because the shared long-lived test DB
+  accumulates PENDING outbox rows; one dirty run spent ~22.4 min draining them row-by-row;
+- fresh AiT dev workspace boot pays real materialization (~47s) + 67-journey baseline
+  (~11s); same database + same already-provisioned workspace boots in seconds.
+
+Triage:
+
+**Act Now**
+- H1: isolate `inboxOutbox.pgtest.ts` from unrelated global queue residue with test-only
+  queue hygiene or an ephemeral DB; do not change production claim semantics merely for
+  speed.
+- H2: make daily dev use a sticky workspace/config path; a fresh UUID is an explicit reset,
+  not the default restart behavior.
+- H3: allow bounded concurrency for the CURRENT no-DB/no-browser suite only.
+- H4: correct documentation that implies raw `node --test` is the canonical suite.
+
+**Investigate Now**
+- I1: F3/F5/F7 each pay a full AiT provision for narrow assertions;
+- I2: `productBaselineWorld` rematerializes for interrupt/replay proof;
+- I3: consider a separate heavy `postgres-world` checkpoint list without deleting coverage;
+- I4: per-file `waitUntilReady` costs roughly 1s x 56 files.
+
+**Park**
+- limited PG-file parallelism until queue isolation/connection budgets are proven;
+- materializer/SERIALIZABLE tuning;
+- a production outbox publisher as an architecture feature rather than a test-speed patch.
+
+**Ignore / Accept Risk**
+- B1 Sarah, F1 crash-world, N1 corridor-world, real evaluator work, SERIALIZABLE semantics,
+  checksum migrations and isolated migration DBs remain legitimate expensive evidence.
+
+Follow `docs/TESTING.md`: focused -> adjacent -> relevant package/service -> broad PG at a
+coherent checkpoint -> full candidate gates only when justified.
+
+### 22.9 M11 / C6 final candidate
+
+M11 is operational activation/retirement, not another database migration. Before C6:
+
+- perform the bounded external legacy-source inventory;
+- verify sole-writer/authority/reconciliation/provenance state;
+- harden readiness so HTTP 200 cannot falsely imply the full product is ready;
+- rehearse restart/replay/failure paths;
+- run the exact-candidate CURRENT + PostgreSQL + migration/build/type/lint/anti-hardcoding
+  gates on appropriate clean test state;
+- capture exact SHA, deployment modes, remaining limitations and submission evidence.
+
+No source document or old milestone label may resurrect the retired SQLite application
+runtime as a fallback.
+
