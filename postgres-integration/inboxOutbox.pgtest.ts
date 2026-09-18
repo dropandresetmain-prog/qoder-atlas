@@ -11,6 +11,29 @@ import {
   markOutboxPublished,
 } from '../src/persistence/postgres/claimQueue.ts';
 
+/**
+ * Test-only isolation from unrelated global queue residue on the shared
+ * PostgreSQL test database. Production `claimNextOutboxRow` /
+ * `claimNextInboxWork` remain global FIFO claims; this file must not change
+ * that contract. A set-based cleanup is the smallest way to keep this file
+ * exercising the real claim/publish protocol without draining tens of
+ * thousands of leftover rows one-by-one.
+ */
+async function isolateSharedQueues(pool: Awaited<ReturnType<typeof sharedTestPool>>): Promise<void> {
+  await pool.query(`
+    UPDATE outbox
+       SET state = 'PUBLISHED',
+           published_at = COALESCE(published_at, now())
+     WHERE state IN ('PENDING', 'CLAIMED')
+  `);
+  await pool.query(`
+    UPDATE inbox_work
+       SET state = 'DONE',
+           updated_at = now()
+     WHERE state IN ('PENDING', 'CLAIMED')
+  `);
+}
+
 describe('M1 durable inbox/outbox (real PostgreSQL)', () => {
   test('duplicate delivery with the same payload is an idempotent no-op', async () => {
     const pool = await sharedTestPool();
@@ -78,15 +101,7 @@ describe('M1 durable inbox/outbox (real PostgreSQL)', () => {
     const pool = await sharedTestPool();
     const workspaceId = freshWorkspaceId();
     await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, 'Race Co']);
-
-    // Drain any runnable work other test cases in this shared database may
-    // have left behind, so the two concurrent claims below have exactly ONE
-    // eligible row to compete over.
-    for (;;) {
-      const stray = await claimNextInboxWork(pool, 0);
-      if (!stray) break;
-      await completeInboxWork(pool, stray);
-    }
+    await isolateSharedQueues(pool);
 
     const delivery = await deliverInboxMessage(pool, {
       workspaceId,
@@ -106,6 +121,7 @@ describe('M1 durable inbox/outbox (real PostgreSQL)', () => {
     const pool = await sharedTestPool();
     const workspaceId = freshWorkspaceId();
     await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, 'Fencing Co']);
+    await isolateSharedQueues(pool);
     await deliverInboxMessage(pool, {
       workspaceId,
       sourceConnectionId: 'conn-fence',
@@ -146,6 +162,7 @@ describe('M1 durable inbox/outbox (real PostgreSQL)', () => {
     const pool = await sharedTestPool();
     const workspaceId = freshWorkspaceId();
     await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, 'Retry Co']);
+    await isolateSharedQueues(pool);
     await deliverInboxMessage(pool, {
       workspaceId,
       sourceConnectionId: 'conn-retry',
@@ -165,16 +182,7 @@ describe('M1 durable inbox/outbox (real PostgreSQL)', () => {
   test('outbox claim/publish round-trip', async () => {
     const pool = await sharedTestPool();
     const workspaceId = freshWorkspaceId();
-
-    // Other test files share this database and leave their own outbox rows
-    // (e.g. registerWorkspace/renameWorkspace's WORKSPACE_REGISTERED/RENAMED
-    // events) — drain them first so the claim below deterministically picks
-    // up THIS test's row rather than the oldest unrelated pending one.
-    for (;;) {
-      const stray = await claimNextOutboxRow(pool, 0);
-      if (!stray) break;
-      await markOutboxPublished(pool, stray);
-    }
+    await isolateSharedQueues(pool);
 
     await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, 'Outbox Co']);
     await pool.query(
@@ -187,5 +195,37 @@ describe('M1 durable inbox/outbox (real PostgreSQL)', () => {
     assert.equal(claim!.workspaceId, workspaceId);
     const published = await markOutboxPublished(pool, claim!);
     assert.equal(published, true);
+  });
+
+  test('outbox claim/publish stays isolated from unrelated residue without a linear drain', async () => {
+    const pool = await sharedTestPool();
+    const residueWorkspaceId = freshWorkspaceId();
+    const workspaceId = freshWorkspaceId();
+    await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [residueWorkspaceId, 'Residue Co']);
+    await pool.query(
+      `INSERT INTO outbox (workspace_id, subject_kind, subject_id, destination_kind, payload)
+       SELECT $1, 'WORKSPACE', $1, 'TEST_EVENT', '{"residue":true}'::jsonb
+         FROM generate_series(1, 2000)`,
+      [residueWorkspaceId],
+    );
+
+    const started = Date.now();
+    await isolateSharedQueues(pool);
+    await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, 'Outbox Co']);
+    await pool.query(
+      `INSERT INTO outbox (workspace_id, subject_kind, subject_id, destination_kind, payload)
+       VALUES ($1, 'WORKSPACE', $1, 'TEST_EVENT', $2)`,
+      [workspaceId, JSON.stringify({ ok: true })],
+    );
+    const claim = await claimNextOutboxRow(pool);
+    const elapsedMs = Date.now() - started;
+    assert.ok(claim);
+    assert.equal(claim!.workspaceId, workspaceId);
+    const published = await markOutboxPublished(pool, claim!);
+    assert.equal(published, true);
+    assert.ok(
+      elapsedMs < 5_000,
+      `set-based isolation plus real claim/publish must stay bounded; took ${elapsedMs}ms`,
+    );
   });
 });
