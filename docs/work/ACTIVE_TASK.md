@@ -211,24 +211,74 @@ reconciles and integrates.
       returns the truthful ESCALATE decision.
       Commit `feat(r1): C8 progression fact mapper — observed gate/authority facts onto frozen decision`.
       - SHA: `e3cd300e35c3ed182a5b067a011360ecc2420945` (local == origin)
+- [x] Lane P (part 7) — evidence-threading seam (C2/C4)
+      Three additive core edits so a `DomainStrategyProposer` receives raw
+      normalized tool results: `researchDispatcher` returns index-aligned
+      `results: PlanningToolResult[]`; `coordinatorCore` zips evidence+results
+      per domain, builds `PlanningEvidenceContext`, and adapts a domain proposer
+      via the previously-DEAD frozen `bindDomainProposer` (base
+      `StrategyProposer` unchanged). `test/r1-evidence-seam.test.ts` 4/4.
+      - SHA: `0761de6` (local == origin)
+- [x] Lane P (part 8) — concrete provider-assisted TRANSPORT PROPOSER
+      (`transportCorridors.ts` + `replayPlanningTransport.ts` +
+      `proposers/transportProposer.ts` + an additive domain-agnostic
+      `resolveOffersForDomain` seam in `coordinatorCore.ts`). Closes the OPEN R1
+      TRANSPORT gap as far as Cloud truthfully permits, fully generalized (no
+      persona/event/route/airport branch, no hardcoded demo data; airport refs +
+      passengers INJECTED, fail-closed). The corridor spine derives provider-neutral
+      `flight.search` corridors from canonical world state (departureDate via the
+      Intl API at the origin place tz, no offset table; deterministic SubjectId-safe
+      request ids). The production `PlanningToolTransport` bridges C2
+      request->result by REUSING `dispatchToolRequest` (no second engine, no direct
+      provider call) — wired over REPLAY Atlas + checked-in recordings in Cloud, the
+      SAME code wires LIVE/RECORD locally. The proposer turns normalized
+      `FlightOffer[]` into ranked, bounded `SELECT_OFFER` candidates (historical
+      northstar ordering segments->price->key); raw Atlas routingIdentifiers are NOT
+      SubjectId-safe so each effect carries a deterministic `transport-offer:<sha>`
+      key, prices convert float Money->exact decimal ExactMoney + re-validate, and
+      boardability drops an offer departing before now. STRICTLY proposal-only:
+      never declares viability/authority/execution; records the honest assumption
+      that the selected service must be CAPTURED first. The coordinator seam exists
+      because the overlay only honors a SELECT_OFFER whose service EXISTS in the
+      captured world ("cannot fabricate supplier selection"); the core stays
+      domain-agnostic and never fabricates one. `test/r1-transport-proposer.test.ts`
+      4/4: replays the checked-in MNL->CEB recording through the REAL transport into
+      4 normalized offers; ranked/bounded/SubjectId-safe SELECT_OFFER + exact prices;
+      boardability drop; end-to-end through `runRecoveryPlanning` the TRANSPORT
+      domain activates from a real M6 blocking dimension and a CAPTURED selected
+      offer flips the journey FAIL->PASS => VIABLE/RECOMMENDED/AWAITING_AUTHORITY
+      (post-materialization state); and anti-fabrication: an uncaptured offer is
+      rejected by the real overlay => honest NO_RECOVERY_FOUND with the rejection
+      retained. Full `current` suite 924/924; typecheck (no test casts)/lint/
+      boundary (209 files)/anti-hardcoding CLEAN. SPINE proven end-to-end:
+      corridor -> flight.search request -> REPLAY -> `rec_ac9fd89b` -> 4 offers, no
+      network/credentials/PG.
+      Commit `feat(r1): concrete provider-assisted TRANSPORT proposer over REPLAY evidence`.
+      - SHA: `adc805367de10c8a9f05712b75bd251b0247b455` (local == origin)
 
 ### Contract-milestone status (Phase C)
 
 - [x] C2 — planner core integrated: generalized coordinator CORE (part 4) + PG
       ADAPTER (part 5); read-only bounded research dispatch (part 2); viable-only
-      comparator (part 1). **TRANSPORT PROPOSER = OPEN R1 GAP, NOT OPTIONAL.**
-      The domain registry already activates TRANSPORT from real M6 dimension codes
-      and proposers are injected at the seam, but NO concrete provider-assisted
-      TRANSPORT proposer has been authored yet. R1 product truth REQUIRES
-      provider-assisted travel reasoning, so this is an in-scope R1 Cloud
-      deliverable (implement as far as Cloud truthfully permits via the
-      provider-neutral read-tool protocol + Atlas Search/Verify normalization +
-      checked-in REPLAY evidence + algorithms adapted from historical
-      fallbackPlanner/northstarPlanner), NOT a deferred product follow-up. It must
-      contain no Sarah/Jordan logic, no hardcoded demo routes, no consequential
-      provider calls, no viability declaration, and no LIVE-credential requirement
-      to function structurally. Any concrete Cloud blocker is documented with its
-      required local closure — the capability is never reclassified as optional.
+      comparator (part 1); evidence-threading seam (part 7); and the **concrete
+      provider-assisted TRANSPORT PROPOSER (part 8, `adc8053`)** — the previously
+      OPEN R1 TRANSPORT gap is now IMPLEMENTED as far as Cloud truthfully permits.
+      It is fully generalized: corridors derived from canonical world state, airport
+      refs + passengers INJECTED, evidence replayed from a CHECKED-IN Atlas recording
+      through the production transport (reusing `dispatchToolRequest`), normalized
+      `FlightOffer[]` -> ranked bounded `SELECT_OFFER` candidates with deterministic
+      SubjectId-safe keys + exact decimal prices, STRICTLY proposal-only (RC-6 owns
+      viability). Proven end-to-end through `runRecoveryPlanning` (TRANSPORT
+      activates from a real M6 blocking dimension; a CAPTURED selected offer flips
+      the journey FAIL->PASS => AWAITING_AUTHORITY) and the overlay anti-fabrication
+      rejection (uncaptured offer => honest NO_RECOVERY_FOUND). It contains no
+      Sarah/Jordan logic, no hardcoded demo route, no consequential provider call, no
+      viability declaration, and no LIVE-credential requirement to function
+      structurally. THREE LOCAL closure items remain (see handoff ledger): thread
+      place->IATA externalRefs from PgWorldReader into WPlace; materialize a net-new
+      researched offer into a captured WTransportService; wire research +
+      resolveOffersForDomain into the PG coordinator adapter. The capability is NOT
+      reclassified optional — these are integration/runtime seams only.
 - [x] C3 — decision evidence end-to-end at the seam: the coordinator assembles the
       three separate impact projections + material candidate evidence and persists
       the ONE immutable attempt over migration 0125 (parts 3-5).
@@ -250,18 +300,25 @@ reconciles and integrates.
 - [x] C5 — integration + generality proof: THREE materially different situations
       through ONE `runRecoveryPlanning` (part 4, `9740c18`), no scenario branch.
 
-## Verification — DONE in Cloud (cumulative through `e3cd300`)
+## Verification — DONE in Cloud (cumulative through `adc8053`)
 
 - [x] R1 pure test files green under Node v24 type-stripping:
       `r1-planning-contracts`, `r1-decision-evidence`, `r1-comparator` (11),
       `r1-planning-foundations` (13), `r1-planning-selection` (4),
-      `r1-coordinator-generality` (3), `r1-progression-facts` (9).
-- [x] Full `current` suite via `run-suite.mjs current`: 916/916 pass, 0 fail.
-- [x] `npm run gate:test-boundary`: CLEAN — 207 test files classified.
-- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 414 files scanned.
-- [x] `npm run typecheck`: exit 0 (includes the PG-requiring C1 adapter +
-      the C8 mapper's resolution->app type import).
+      `r1-coordinator-generality` (3), `r1-progression-facts` (9),
+      `r1-evidence-seam` (4), `r1-transport-proposer` (4).
+- [x] Full `current` suite via `run-suite.mjs current`: 924/924 pass, 0 fail.
+- [x] `npm run gate:test-boundary`: CLEAN — 209 test files classified.
+- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 417 files scanned.
+- [x] `npm run typecheck`: exit 0 (includes the PG-requiring C1 adapter, the C8
+      mapper's resolution->app type import, and the three new transport modules +
+      the transport test with NO `as never`/type-suppression casts).
 - [x] `eslint` on every new/changed path: clean.
+- [x] TRANSPORT SPINE proven end-to-end in pure Cloud (read-only smoke, no file
+      written): corridor derivation (departureDate 2026-09-05 at Asia/Manila,
+      MNL->CEB) -> `flight.search` PlanningToolRequest -> `createPlanningToolTransport`
+      -> REPLAY Atlas adapter -> `rec_ac9fd89bb364d688bbeadef62be55aa5` -> 4
+      normalized `FlightOffer[]`. No network, no credentials, no PostgreSQL.
 
 Note: the sandbox default `node` is v20.18; the project requires `>=24`. Cloud
 verification of TS tests uses the available v24 runtime (`/opt/playwright-driver/node`)
@@ -309,6 +366,43 @@ integration acceptance. It is NOT claimed as passed here:
 - [ ] Generality proof run against real PG fixtures (>=2 materially different
       planning situations through the same coordinator).
 - [ ] Any LIVE/RECORD provider evidence (Cloud is REPLAY-only, credential-free).
+- [ ] **TRANSPORT PROPOSER — three LOCAL integration/runtime closures** (the
+      proposer + corridor + REPLAY transport are Cloud-implemented + tested at
+      `adc8053`; these three are the seams that genuinely need PG/runtime and are
+      NOT papered over with a fabricated mapping or a hardcoded route):
+      1. **place->IATA externalRefs into WPlace.** A production corridor resolver
+         must read canonical geography, not an injected map. The schema ALREADY
+         carries it (`place_external_refs`, migration `0050_places.sql`, cols
+         `provider_namespace`+`external_key`; write path `PgPlaceRepository.
+         addExternalRef`; ingest writes `{system:'IATA'}`), but
+         `PgWorldReader.capture()` (`pgWorldReader.ts:398-402`) selects only from
+         `places` and DROPS the refs, so `WPlace` never surfaces them. LOCAL: extend
+         the places query with a lateral/json_agg over `place_external_refs`, add
+         `externalRefs:{system,value}[]` to `WPlace` (`world.ts:101`) + the reader
+         projection, and build the production `AirportResolver` from it. NOTE the
+         namespace inconsistency: ingest writes `'IATA'` while legacy
+         `src/intelligence` reads `'airport-code'` — the resolver must accept both
+         (cf. `AIRPORT_REF_SYSTEMS` in `app/planningLoop.ts:298`). Cloud-authorable
+         (TS+SQL, no new migration); runtime acceptance is LOCAL (needs PG).
+      2. **materialize a net-new researched offer into a captured
+         `WTransportService`.** The overlay honors a SELECT_OFFER ONLY when its
+         `transportServiceId` already EXISTS in the captured world (overlay.ts:
+         "cannot fabricate supplier selection"); a freshly-searched provider offer
+         is not yet a captured service. LOCAL: persist the selected offer as a
+         `WTransportService` (precedent: `providerDisruptionIngress.ts` replacement
+         service) so RC-6 can make the selection VIABLE, then thread the resulting
+         `ResolvedOffer[]` through `resolveOffersForDomain`. The Cloud test seeds
+         these services to represent the post-materialization state; the proposer
+         itself never fabricates one (proven by the anti-fabrication test).
+      3. **wire research + offer resolution into the PG coordinator adapter.**
+         `src/app/target/recoveryPlanningCoordinator.ts` currently calls
+         `runRecoveryPlanning` WITHOUT `deps.research` / `deps.resolveOffersForDomain`.
+         LOCAL: wire the production `createPlanningToolTransport` (over LIVE/RECORD
+         Atlas capabilities + the production AirportResolver), build
+         `requestsByDomain.TRANSPORT` from `transportCorridors` +
+         `flightSearchRequestFor`, and supply `resolveOffersForDomain` from
+         `resolveTransportOffers`. The pure seam is already typed + tested; this is
+         composition-root wiring requiring PG + provider capabilities.
 
 ## Next action
 
