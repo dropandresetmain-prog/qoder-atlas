@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { loadConfig, parseEnvFile } from '../src/config/config.ts';
+import { loadConfig, mergeEnvWithDotenvFiles, parseEnvFile } from '../src/config/config.ts';
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), 'northstar-config-test-'));
@@ -219,4 +219,69 @@ test('config: full precedence chain — defaults < .env < .env.local < process.e
 test('parseEnvFile: handles empty content gracefully', () => {
   assert.deepEqual(parseEnvFile(''), {});
   assert.deepEqual(parseEnvFile('# only comments\n# nothing else'), {});
+});
+
+test('mergeEnvWithDotenvFiles: sticky workspace and demo dir come from .env.local', () => {
+  const dir = makeTempDir();
+  try {
+    writeFileSync(
+      join(dir, '.env'),
+      [
+        'PG_TARGET_WORKSPACE_ID=',
+        'PG_TARGET_HOST=localhost',
+        'NORTHSTAR_DEMO_DATASET_DIR=',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(dir, '.env.local'),
+      [
+        'PG_TARGET_WORKSPACE_ID=11111111-1111-4111-8111-111111111111',
+        'NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026',
+      ].join('\n'),
+    );
+    const merged = mergeEnvWithDotenvFiles({}, dir);
+    assert.equal(merged.PG_TARGET_WORKSPACE_ID, '11111111-1111-4111-8111-111111111111');
+    assert.equal(merged.NORTHSTAR_DEMO_DATASET_DIR, 'fixtures/programmes/ait-summit-2026');
+    assert.equal(merged.PG_TARGET_HOST, 'localhost');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mergeEnvWithDotenvFiles: process env wins over .env.local', () => {
+  const dir = makeTempDir();
+  try {
+    writeFileSync(
+      join(dir, '.env.local'),
+      [
+        'PG_TARGET_WORKSPACE_ID=11111111-1111-4111-8111-111111111111',
+        'NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026',
+      ].join('\n'),
+    );
+    const merged = mergeEnvWithDotenvFiles(
+      {
+        PG_TARGET_WORKSPACE_ID: '22222222-2222-4222-8222-222222222222',
+        NORTHSTAR_DEMO_DATASET_DIR: 'fixtures/other',
+      },
+      dir,
+    );
+    assert.equal(merged.PG_TARGET_WORKSPACE_ID, '22222222-2222-4222-8222-222222222222');
+    assert.equal(merged.NORTHSTAR_DEMO_DATASET_DIR, 'fixtures/other');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mergeEnvWithDotenvFiles: explicit empty caller value suppresses file dataset dir', () => {
+  const dir = makeTempDir();
+  try {
+    writeFileSync(
+      join(dir, '.env.local'),
+      'NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026\n',
+    );
+    const merged = mergeEnvWithDotenvFiles({ NORTHSTAR_DEMO_DATASET_DIR: '' }, dir);
+    assert.equal(merged.NORTHSTAR_DEMO_DATASET_DIR, '');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

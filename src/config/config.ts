@@ -143,6 +143,28 @@ export function parseProgrammeChangePresets(
   }
 }
 
+function compactEnvValues(record: Record<string, string | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (value === undefined) continue;
+    const trimmed = value.trim();
+    if (trimmed === '') continue;
+    out[key] = trimmed;
+  }
+  return out;
+}
+
+function overlayEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 /** Minimal `.env` parser: KEY=VALUE lines, `#` comments, no interpolation. */
 export function parseEnvFile(content: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -220,6 +242,39 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
 }
 
 /**
+ * Raw `.env` then `.env.local` values, including blanks. Callers that need
+ * boot convenience should use `mergeEnvWithDotenvFiles` so empty file values
+ * do not block a later non-empty `.env.local` or process value.
+ */
+export function readDotenvFiles(cwd: string = process.cwd()): Record<string, string> {
+  let fileEnv: Record<string, string> = {};
+  const envPath = resolve(cwd, '.env');
+  if (existsSync(envPath)) {
+    fileEnv = parseEnvFile(readFileSync(envPath, 'utf8'));
+  }
+  let localEnv: Record<string, string> = {};
+  const envLocalPath = resolve(cwd, '.env.local');
+  if (existsSync(envLocalPath)) {
+    localEnv = parseEnvFile(readFileSync(envLocalPath, 'utf8'));
+  }
+  return { ...fileEnv, ...localEnv };
+}
+
+/**
+ * Merge dotenv files into an env snapshot for target boot (PG_TARGET_* and
+ * NORTHSTAR_DEMO_DATASET_DIR included). Precedence: `.env` < `.env.local` <
+ * caller env. Empty file values are ignored so `.env.example` blanks do not
+ * hide a sticky workspace in `.env.local`. An explicit empty caller value
+ * still wins, so tests can suppress a file-configured dataset directory.
+ */
+export function mergeEnvWithDotenvFiles(
+  env: Record<string, string | undefined> = process.env,
+  cwd: string = process.cwd(),
+): Record<string, string | undefined> {
+  return { ...compactEnvValues(readDotenvFiles(cwd)), ...overlayEnv(env) };
+}
+
+/**
  * Load configuration.
  *
  * Precedence (lowest → highest):
@@ -233,18 +288,8 @@ export function loadConfig(
   env: Record<string, string | undefined> = process.env,
   cwd: string = process.cwd(),
 ): AppConfig {
-  let fileEnv: Record<string, string> = {};
-  const envPath = resolve(cwd, '.env');
-  if (existsSync(envPath)) {
-    fileEnv = parseEnvFile(readFileSync(envPath, 'utf8'));
-  }
-  let localEnv: Record<string, string> = {};
-  const envLocalPath = resolve(cwd, '.env.local');
-  if (existsSync(envLocalPath)) {
-    localEnv = parseEnvFile(readFileSync(envLocalPath, 'utf8'));
-  }
   // Precedence: defaults < .env < .env.local < process env
-  const merged = mapEnv({ ...fileEnv, ...localEnv, ...env });
+  const merged = mapEnv({ ...readDotenvFiles(cwd), ...env });
   return AppConfigSchema.parse(merged);
 }
 
