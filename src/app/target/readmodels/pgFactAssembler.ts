@@ -32,6 +32,7 @@ import { currentAssessmentView } from '../../../persistence/postgres/world/pgAss
 import { findLatestRecoveryPlanningAttemptForCase } from '../../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { listRecoveryCaseAttention } from '../../../persistence/postgres/commands/caseAttentionCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
+import { projectFocusedCaseGraphEnrichment } from './projectFocusedCaseGraph.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
 function isoNow(at?: string): string {
@@ -680,6 +681,162 @@ async function loadRecoveryCaseFactsInner(
   if (subjectTones.some((t) => t === 'FAIL')) tripVerdict = 'FAIL';
   else if (subjectTones.length > 0 && subjectTones.every((t) => t === 'PASS')) tripVerdict = 'PASS';
 
+  // ---------------------------------------------------------------------------
+  // R2: Load enrichment data for the focused case graph (journey composition,
+  // programme commitments, human labels).
+  // ---------------------------------------------------------------------------
+  // Journey rows for the case's JOURNEY subjects.
+  const journeyIds = subjects.rows.filter((s) => s.subject_kind === 'JOURNEY').map((s) => s.subject_id);
+  const journeys = journeyIds.length > 0
+    ? await client.query<{ id: string; trip_id: string; traveller_id: string; lifecycle_status: string; intended_window_start: string | null; intended_window_end: string | null }>(
+        `SELECT id, trip_id, traveller_id, lifecycle_status, intended_window_start, intended_window_end
+           FROM journeys
+          WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
+        [workspaceId, journeyIds],
+      )
+    : { rows: [] };
+
+  // Journey item rows for those journeys.
+  const journeyItems = journeys.rows.length > 0
+    ? await client.query<{ id: string; journey_id: string; kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE'; order_key: string; lifecycle_status: string; intended_window_start: string | null; intended_window_end: string | null; selected_service_id: string | null }>(
+        `SELECT ji.id, ji.journey_id, ji.kind, ji.order_key, ji.lifecycle_status, ji.intended_window_start, ji.intended_window_end,
+                tid.selected_service_id
+           FROM journey_items ji
+           LEFT JOIN transport_item_details tid ON tid.workspace_id = ji.workspace_id AND tid.journey_item_id = ji.id
+          WHERE ji.workspace_id = $1 AND ji.journey_id = ANY($2::uuid[])
+          ORDER BY ji.journey_id, ji.order_key, ji.id`,
+        [workspaceId, journeys.rows.map((j) => j.id)],
+      )
+    : { rows: [] };
+
+  // Transport service rows referenced by TRANSPORT items.
+  const serviceIds = journeyItems.rows.filter((i) => i.kind === 'TRANSPORT' && i.selected_service_id).map((i) => i.selected_service_id!);
+  const transportServices = serviceIds.length > 0
+    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; published_departure: string | null; published_arrival: string | null }>(
+        `SELECT id, mode, operator, origin_place_id, destination_place_id, published_departure, published_arrival
+           FROM transport_services
+          WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
+        [workspaceId, serviceIds],
+      )
+    : { rows: [] };
+
+  // Traveller display names for the journeys (for human labels).
+  const travellerIds = journeys.rows.map((j) => j.traveller_id);
+  const travellerLabelsByJourney = new Map<string, string>();
+  if (travellerIds.length > 0) {
+    const travellerNames = await client.query<{ journey_id: string; display_value: string }>(
+      `SELECT j.id AS journey_id, n.display_value
+         FROM journeys j
+         JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
+         JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+        WHERE j.workspace_id = $1 AND j.id = ANY($2::uuid[])`,
+      [workspaceId, journeyIds],
+    );
+    for (const r of travellerNames.rows) {
+      travellerLabelsByJourney.set(r.journey_id, r.display_value);
+    }
+  }
+
+  // Participation rows for the case's travellers.
+  const participations = travellerIds.length > 0
+    ? await client.query<{ id: string; programme_item_id: string; traveller_id: string; obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED'; accepted: boolean }>(
+        `SELECT id, programme_item_id, traveller_id, obligation, accepted
+           FROM participations
+          WHERE workspace_id = $1 AND traveller_id = ANY($2::uuid[])`,
+        [workspaceId, travellerIds],
+      )
+    : { rows: [] };
+
+  // Programme item rows referenced by participations.
+  const programmeItemIds = participations.rows.map((p) => p.programme_item_id);
+  const programmeItems = programmeItemIds.length > 0
+    ? await client.query<{ id: string; programme_id: string; title: string; item_type: string; window_start: string | null; window_end: string | null; lifecycle_status: string }>(
+        `SELECT id, programme_id, title, item_type, window_start, window_end, lifecycle_status
+           FROM programme_items
+          WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
+        [workspaceId, [...new Set(programmeItemIds)]],
+      )
+    : { rows: [] };
+
+  // Objective rows owned by the case's JOURNEY or TRIP subjects.
+  const objectiveOwnerRefs = subjects.rows.filter((s) => s.subject_kind === 'JOURNEY' || s.subject_kind === 'TRIP');
+  const objectives = objectiveOwnerRefs.length > 0
+    ? await client.query<{ id: string; owner_kind: string; owner_id: string; success_predicate: string; success_predicate_kind: string; hardness: string; priority: number }>(
+        `SELECT id, owner_kind, owner_id, success_predicate, success_predicate_kind, hardness, priority
+           FROM objectives
+          WHERE workspace_id = $1 AND (owner_kind, owner_id) IN (SELECT unnest($2::text[]), unnest($3::uuid[]))`,
+        [workspaceId, objectiveOwnerRefs.map((r) => r.subject_kind), objectiveOwnerRefs.map((r) => r.subject_id)],
+      )
+    : { rows: [] };
+
+  // Build assessment views map for enrichment (reuse subjectFacts + add item assessments).
+  const assessmentViews = new Map<string, { status: AssessmentViewStatus; tone: AssessmentTone }>();
+  for (const fact of subjectFacts) {
+    assessmentViews.set(fact.ref, { status: fact.evaluation, tone: fact.tone });
+  }
+  // Add assessments for journey items (if any are assessed).
+  for (const item of journeyItems.rows) {
+    const itemRef = item.kind === 'TRANSPORT' && item.selected_service_id
+      ? `SERVICE_BOOKING:${item.selected_service_id}`
+      : item.kind === 'STAY'
+        ? `TRANSFER_STAY:${item.id}`
+        : null;
+    if (!itemRef) continue;
+    const view = await currentAssessmentView(
+      client,
+      workspaceId,
+      { kind: 'JOURNEY_ITEM', id: item.id } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    if (view.status !== 'NONE') {
+      const tone: AssessmentTone = view.assessment?.overallVerdict === 'PASS' ? 'PASS' : view.assessment?.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
+      assessmentViews.set(itemRef, { status: view.status, tone });
+    }
+  }
+
+  // Call the pure enrichment projector.
+  const enrichment = projectFocusedCaseGraphEnrichment({
+    caseSubjects: subjects.rows,
+    journeys: journeys.rows.map((j) => ({
+      id: j.id,
+      trip_id: j.trip_id,
+      traveller_id: j.traveller_id,
+      lifecycle_status: j.lifecycle_status,
+      intended_window_start: j.intended_window_start,
+      intended_window_end: j.intended_window_end,
+    })),
+    journeyItems: journeyItems.rows.map((i) => ({
+      id: i.id,
+      journey_id: i.journey_id,
+      kind: i.kind,
+      order_key: i.order_key,
+      lifecycle_status: i.lifecycle_status,
+      intended_window_start: i.intended_window_start,
+      intended_window_end: i.intended_window_end,
+      selectedServiceId: i.selected_service_id,
+    })),
+    transportServices: transportServices.rows.map((s) => ({
+      id: s.id,
+      mode: s.mode,
+      operator: s.operator,
+      origin_place_id: s.origin_place_id,
+      destination_place_id: s.destination_place_id,
+      published_departure: s.published_departure,
+      published_arrival: s.published_arrival,
+    })),
+    participations: participations.rows,
+    programmeItems: programmeItems.rows,
+    objectives: objectives.rows,
+    assessmentViews,
+    travellerLabelsByJourney,
+    caseId,
+  });
+
+  if (enrichment.objectiveContractGap) {
+    uncertainty.push('objectives exist but no LdgNodeKind can carry them (contract gap)');
+  }
+
   // ---------------------------------------------------------------------
   // Recovery options, as an operator has to read them.
   //
@@ -779,16 +936,22 @@ async function loadRecoveryCaseFactsInner(
         // when another subject fails the whole case).
         const fact = subjectFactByRef.get(ref);
         const semanticState = fact ? TONE_TO_STATE[fact.tone] : 'UNKNOWN' as const;
+        // R2: use human label for JOURNEY subjects (traveller display name)
+        const label = s.subject_kind === 'JOURNEY' 
+          ? (travellerLabelsByJourney.get(s.subject_id) ?? s.subject_kind)
+          : s.subject_kind;
         return {
           ref,
           kind: 'TRAVELLER' as const,
-          label: s.subject_kind,
+          label,
           semanticState,
           authority: 'AUTHORITATIVE' as const,
           caseRef: caseId,
           ...(fact ? { evaluation: fact.evaluation } : {}),
         };
       }),
+      // R2: append enrichment nodes (SERVICE_BOOKING, TRANSFER_STAY, PROGRAMME_COMMITMENT, etc.)
+      ...enrichment.nodes,
     ],
     edges: [
       ...subjects.rows.map((s) => ({
@@ -809,6 +972,8 @@ async function loadRecoveryCaseFactsInner(
             authority: 'AUTHORITATIVE' as const,
           }))
         : []),
+      // R2: append enrichment edges (RELIES_ON, MUST_HAPPEN_BEFORE, PARTICIPATES_IN, etc.)
+      ...enrichment.edges,
     ],
     caseRef: caseId,
     ...(cause ? { cause } : {}),
@@ -841,6 +1006,7 @@ async function loadRecoveryCaseFactsInner(
     connectionProgression,
     recoveryActions,
     subjectFacts,
+    subjectHumanLabels: travellerLabelsByJourney,
     ...(planningAttempt ? { planningAttempt } : {}),
     attention,
     ...(row.resolution_summary ? { resolutionSummary: row.resolution_summary } : {}),
