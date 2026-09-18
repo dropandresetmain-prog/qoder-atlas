@@ -16,6 +16,7 @@
     "current": [
       "test/a2-evaluators.test.ts",
       "test/anti-hardcoding-gate.test.ts",
+      "test/b1-product-acceptance.test.ts",
       "test/case-lifecycle-state.test.ts",
       "test/canonical-test-commands.test.ts",
       "test/config-env-local.test.ts",
