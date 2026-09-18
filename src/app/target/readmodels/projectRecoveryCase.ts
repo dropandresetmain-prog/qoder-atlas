@@ -57,6 +57,8 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     ...(focusedGraph ? { focusedGraph } : {}),
     status: input.status,
     changeSummary: input.changeSummary,
+    // R2: authoritative human labels for subject refs, presentation-only.
+    subjectLabels: Object.fromEntries(input.subjectHumanLabels ?? []),
     bookingServiceState: { ...input.bookingServiceState },
     tripViability: { ...input.tripViability },
     affectedItems: [...(input.affectedItems ?? [])],

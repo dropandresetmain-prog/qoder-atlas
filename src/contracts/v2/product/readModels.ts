@@ -641,6 +641,14 @@ export const RecoveryCaseViewSchema = z.strictObject({
     'OPEN', 'PLANNING', 'AWAITING_AUTHORITY', 'EXECUTING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED',
   ]),
   changeSummary: z.string().min(1),
+  /**
+   * R2 — authoritative human display labels for the case's typed subject refs
+   * (key `<KIND>:<id>`), resolved from canonical identity state (e.g. a
+   * Journey's traveller display name). Presentation-only: refs stay secondary,
+   * and refs the map does not cover simply have no entry (the UI falls back to
+   * its existing generic wording). Never persona lookup, never identity.
+   */
+  subjectLabels: z.record(z.string().min(1), z.string().min(1)).default({}),
   /** Booking/service state — independent of whole-trip viability. */
   bookingServiceState: z.strictObject({
     label: z.string(),

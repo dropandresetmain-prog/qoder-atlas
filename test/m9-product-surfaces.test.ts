@@ -60,6 +60,7 @@ function recoveryCaseView(): RecoveryCaseView {
     causalPath: [],
     status: 'EXECUTING',
     changeSummary: 'A booked service changed and recovery is under way.',
+    subjectLabels: {},
     bookingServiceState: { label: 'Transport booking', state: 'AFFECTED', detail: 'Replacement confirmed' },
     tripViability: { label: 'Remaining trip', verdict: 'FAIL', detail: 'Commitment still at risk' },
     affectedItems: ['booking-1'],
