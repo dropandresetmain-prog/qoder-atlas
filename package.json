@@ -28,6 +28,8 @@
     "test:postgres": "node scripts/run-suite.mjs postgres"
   },
   "dependencies": {
+    "@langchain/langgraph": "1.4.15",
+    "@langchain/langgraph-checkpoint-postgres": "1.0.5",
     "pg": "^8.23.0",
     "zod": "^4.1.0"
   },

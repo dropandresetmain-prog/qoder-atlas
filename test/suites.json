@@ -35,6 +35,7 @@
       "test/intelligence-client.test.ts",
       "test/intelligence-planner.test.ts",
       "test/intelligence-semantics.test.ts",
+      "test/langgraph-outer-workflow-spike.test.ts",
       "test/m10-runtime-purge.test.ts",
       "test/m9-checkpoint1-unit.test.ts",
       "test/m9-checkpoint2-unit.test.ts",
