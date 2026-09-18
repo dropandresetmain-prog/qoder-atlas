@@ -22,6 +22,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { caseHref, renderInShell, SHELL_LINKS } from '../src/app/target/productShell.ts';
+import { loadPostgresTargetConfig } from '../src/persistence/postgres/config.ts';
 import { adaptOperatorOverviewToDashboard } from '../src/app/target/adapters/operatorOverviewAdapter.ts';
 import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-case.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
@@ -244,6 +245,20 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     assert.match(html, /Strategy <span class="mono">a51540b2-59ee-574f-99a2-d99bc84fbf59<\/span> · v1/);
   });
 
+  test('an option whose change already executed says so instead of a no-op move', () => {
+    // After an approved option executes, canonical state has caught up with
+    // what that option proposed, so current == proposed.
+    const facts = caseFacts() as unknown as { status: string; strategies: { changes: { currentWindow: unknown; proposedWindow: unknown }[] }[] };
+    facts.status = 'RESOLVED';
+    for (const change of facts.strategies[1]!.changes) change.currentWindow = change.proposedWindow;
+    const executedHtml = renderProductRecoveryCase(projectRecoveryCase(facts as unknown as RecoveryCaseFacts));
+    assert.match(executedHtml, /<strong>Headline interview<\/strong> is already at 1 Oct, 06:30–1 Oct, 07:00/);
+    assert.equal(/from 1 Oct, 06:30 to 1 Oct, 06:30/.test(executedHtml), false, 'no "from X to X" move');
+    assert.match(executedHtml, /data-change-state="IN_EFFECT"/);
+    // Option 1 was never executed, so it still reads as a proposal.
+    assert.match(executedHtml, /data-change-state="PROPOSED"/);
+  });
+
   test('a terminal case offers no approval control', () => {
     const resolved = projectRecoveryCase({ ...caseFacts(), status: 'RESOLVED' } as unknown as RecoveryCaseFacts);
     const resolvedHtml = renderProductRecoveryCase(resolved);
@@ -338,6 +353,35 @@ describe('B1 product acceptance — clean product routes (FB1-4)', () => {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+});
+
+describe('B1 retest readiness — PG_TARGET_SSL means what it says', () => {
+  // `.env.example` documents `PG_TARGET_SSL=false`, and the config used
+  // `z.coerce.boolean()`, which reads every non-empty string as true. Copying
+  // the documented recipe therefore turned SSL ON and failed normal boot with
+  // "The server does not support SSL connections" — which would have blocked
+  // the founder's fresh-workspace retest before it started.
+  const ssl = (value?: string): boolean =>
+    loadPostgresTargetConfig(value === undefined ? {} : { PG_TARGET_SSL: value }).ssl;
+
+  test('documented off values disable SSL', () => {
+    for (const value of ['false', 'FALSE', ' false ', '0', 'no', 'off', '']) {
+      assert.equal(ssl(value), false, `PG_TARGET_SSL=${JSON.stringify(value)}`);
+    }
+    assert.equal(ssl(undefined), false, 'unset defaults to off');
+  });
+
+  test('on values enable SSL', () => {
+    for (const value of ['true', 'TRUE', '1', 'yes', 'on']) {
+      assert.equal(ssl(value), true, `PG_TARGET_SSL=${JSON.stringify(value)}`);
+    }
+  });
+
+  test('an ambiguous value is refused, never silently guessed', () => {
+    // Whether the connection is encrypted must not be decided by a typo.
+    assert.throws(() => ssl('flase'), /true\/false/);
+    assert.throws(() => ssl('maybe'));
   });
 });
 

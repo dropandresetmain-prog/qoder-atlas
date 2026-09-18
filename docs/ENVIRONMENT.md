@@ -39,7 +39,10 @@ Current configuration variables are read by `src/persistence/postgres/config.ts`
 - `PG_TARGET_DATABASE` (local test default `northstar_test`)
 - `PG_TARGET_USER`
 - `PG_TARGET_PASSWORD`
-- `PG_TARGET_SSL`
+- `PG_TARGET_SSL` — an explicit flag: `true`/`1`/`yes`/`on` enable SSL, `false`/`0`/`no`/`off`/unset
+  disable it, and anything else is refused at boot rather than guessed. (Until 2026-09-18 this
+  was coerced, so the documented `PG_TARGET_SSL=false` switched SSL **on** and failed local boot
+  with `The server does not support SSL connections`.)
 - `PG_TARGET_POOL_MAX`
 - `PG_TARGET_MIGRATIONS_DIR` when an explicit migration directory override is required.
 
@@ -69,6 +72,24 @@ NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026
 
 Keep the same UUID across ordinary restarts. Generate a new UUID only for an explicit clean
 baseline/Founder rehearsal.
+
+### Product routes on the normal PostgreSQL runtime
+
+The target server serves these clean product routes; each maps onto the same read-only
+handler that renders it inside the product shell:
+
+| Route | Surface |
+|---|---|
+| `/` | Operations overview |
+| `/operator` | Operations overview (alias) |
+| `/programme` | Programme |
+| `/decisions` | Decisions |
+| `/activity` | Activity |
+| `/operator/cases/:caseId` | Focused recovery case |
+
+Overview rows for a subject that has a case link to `/operator/cases/:caseId`, so a case is
+opened by clicking, never by hand-assembling an API URL. The `/api/v2/**` routes remain
+available for API and debug use.
 
 PostgreSQL integration tests do **not** apply that dotenv merge, so a local sticky
 workspace cannot redirect the shared test database.

@@ -106,7 +106,7 @@ gap is the product boundary, not the engine:
 | FB1-3 | The focused case rendered as bare HTML because the API HTML branch skipped `renderInShell(...)`. |
 | FB1-4 | The normal PostgreSQL runtime exposed no `/operator` product alias and no clean focused-case route. |
 | FB1-5 | Candidate summaries persist `subjectRef` / `assessmentId` / `overallVerdict`, but the focused fact assembler read `personLabel` / `verdict` and fell back to `Traveller UNKNOWN`. |
-| FB1-6 | Multiple VIABLE strategies were opaque v1/v2 entries with no explanation of how they differ. |
+| FB1-6 | Multiple VIABLE strategies were opaque v1/v2 entries with no explanation of how they differ. **Answered:** they are legitimate alternatives — one candidate per distinct programme swap pair — and `strategy_version` is a per-case ordinal, not a revision. No deduplication was warranted. |
 
 Once repaired, verify the normal product path:
 
@@ -140,8 +140,6 @@ No Jordan-specific domain/application logic.
 - preview `previewAccepted` still uses the older all-PASS participant rollup and may look
   stricter than the B1 planning contract;
 - final demo date/config versus scheduled assessment expiry;
-- whether the two VIABLE strategies the founder saw are legitimate alternative programme
-  swaps, repeated proposal versions or exact semantic duplicates (FB1-6);
 - duplicate heavy AiT setup I1-I4 as a parallel engineering lane (H1-H4 are **DONE** and
   reconciled onto the active branch);
 - bounded external legacy-source inventory before M11 activation.

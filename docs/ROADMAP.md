@@ -71,7 +71,7 @@ explicitly.
 | T4 focused-case backend | **IMPLEMENTED** | Cause/causalPath and accepted semantic/read-model inputs available. |
 | B1 generalized internal recovery (engine) | **COMPLETE** | Real AiT/Sarah normal-path proposal -> viability -> approval -> internal execution -> observation -> reassessment -> resolution proven at `82ae9b8` and re-confirmed by the 2026-09-18 physical session's backend outcome. |
 | Founder B1 | **NOT ACCEPTED** (physically tested 2026-09-18) | Engine completed; product path unusable. Blocked on focused recovery UI / product navigation. Findings: `work/FOUNDER_B1_PHYSICAL_FINDINGS.md`. |
-| B1 Product Acceptance Repair | **CURRENT MILESTONE** | Minimum product-boundary repair: clean `/operator` + `/operator/cases/:id` routes in the product shell, Overview -> case navigation from authoritative `caseRef`, correct strategy candidate projection, human-readable option summaries. No broad redesign. |
+| B1 Product Acceptance Repair | **IMPLEMENTED — awaiting Founder retest** | Minimum product-boundary repair: clean `/operator` + `/operator/cases/:id` routes in the product shell, Overview -> case navigation from authoritative `caseRef`, correct strategy candidate projection, human-readable option summaries. No broad redesign. |
 | B2 generalized external recovery / Jordan | **BLOCKED until Founder B1 physical retest passes** | Same lifecycle, external dispatcher/Atlas evidence/reconciliation, no Jordan-specific runtime. Do not start before retest acceptance. |
 | B2 Founder + generalisation verification | **PLANNED** | Physical product test plus focused same-engine/anti-hardcoding review. |
 | Post-E2E product work | **PLANNED** | Semantic activity, accepted Event Overview implementation, provider-mode hardening, final demo polish. |
@@ -123,6 +123,12 @@ needed to make the accepted recovery loop operable by a human:
 | FB1-4 `/operator` 404s on the normal PostgreSQL runtime | `/operator` is an Overview alias and `/operator/cases/:id` is the clean focused-case route, both in the normal target server. The retired SQLite composition stays unreachable. |
 | FB1-5 strategies render `Traveller UNKNOWN` spam | The focused read model reads the actually persisted `overallVerdict` and resolves known Journey subjects to authoritative traveller display names; `UNKNOWN` survives only when the evaluation verdict really is UNKNOWN. |
 | FB1-6 multiple opaque VIABLE v1/v2 entries | Options are presented as distinguishable alternatives explained from stored `strategy_changes` / ScenarioChange effects, not UUID/version soup. |
+
+**FB1-6 answered:** the multiple VIABLE strategies are legitimate alternatives, not
+duplicates. The deterministic proposer emits one candidate per distinct programme swap pair,
+so several options move the same blocked item into different slots; `strategy_version` is a
+per-case ordinal, not a revision, so showing "v1 / v2" was itself the defect. No
+deduplication was added.
 
 Out of scope for this milestone: B2, external recovery, Event Overview redesign, semantic
 activity, LLM recovery prose, reset UX, I1-I4 test optimisation.

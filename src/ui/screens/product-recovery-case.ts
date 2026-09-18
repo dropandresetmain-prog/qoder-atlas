@@ -170,7 +170,18 @@ function connectionProgressionBlock(progression: ConnectionProgression): string 
 function strategyChangeLine(change: RecoveryStrategyChangeView): string {
   const label = `<strong>${escapeHtml(change.subjectLabel)}</strong>`;
   if (change.proposedWindow && change.currentWindow) {
-    return `<li data-test="strategy-change" data-subject-ref="${escapeHtml(change.subjectRef)}">
+    // `currentWindow` is canonical state read now, and `proposedWindow` is
+    // what this option asked for. Once an approved option has executed, the
+    // two are equal — so say the change is already in effect rather than
+    // printing a "from 06:30 to 06:30" move that reads like a bug.
+    const alreadyInEffect = change.currentWindow.start === change.proposedWindow.start
+      && change.currentWindow.end === change.proposedWindow.end;
+    if (alreadyInEffect) {
+      return `<li data-test="strategy-change" data-change-state="IN_EFFECT" data-subject-ref="${escapeHtml(change.subjectRef)}">
+        ${label} is already at ${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))}
+      </li>`;
+    }
+    return `<li data-test="strategy-change" data-change-state="PROPOSED" data-subject-ref="${escapeHtml(change.subjectRef)}">
       Move ${label} from ${escapeHtml(formatShort(change.currentWindow.start))} to ${escapeHtml(formatShort(change.proposedWindow.start))}
       <span class="meta">(${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))})</span>
     </li>`;

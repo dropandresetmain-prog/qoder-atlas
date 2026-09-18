@@ -9,13 +9,37 @@
  */
 import { z } from 'zod';
 
+/**
+ * An environment flag is a string, and `z.coerce.boolean()` reads every
+ * non-empty string as `true` — so `PG_TARGET_SSL=false`, exactly as
+ * `.env.example` documents it, turned SSL **on** and failed normal boot with
+ * "The server does not support SSL connections" against a plain local
+ * PostgreSQL.
+ *
+ * This parses the value the way an operator means it, and refuses anything
+ * ambiguous rather than guessing: a typo must not silently decide whether the
+ * connection is encrypted.
+ */
+const TRUE_FLAGS = new Set(['true', '1', 'yes', 'y', 'on']);
+const FALSE_FLAGS = new Set(['false', '0', 'no', 'n', 'off', '']);
+
+const EnvFlagSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return value;
+  const normalized = value.trim().toLowerCase();
+  if (TRUE_FLAGS.has(normalized)) return true;
+  if (FALSE_FLAGS.has(normalized)) return false;
+  return value;
+}, z.boolean({ message: 'expected one of true/false/1/0/yes/no/on/off' }));
+
 export const PostgresTargetConfigSchema = z.object({
   host: z.string().min(1).default('localhost'),
   port: z.coerce.number().int().positive().max(65535).default(55432),
   database: z.string().min(1).default('northstar_test'),
   user: z.string().min(1).default('northstar_test'),
   password: z.string().min(1).default('northstar_test'),
-  ssl: z.coerce.boolean().default(false),
+  ssl: EnvFlagSchema.default(false),
   poolMax: z.coerce.number().int().positive().default(10),
   migrationsDir: z.string().min(1).optional(),
 });

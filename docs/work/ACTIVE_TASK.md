@@ -88,31 +88,69 @@ These are implementation evidence, **not Founder physical acceptance** — and t
 2026-09-18 physical session confirmed the difference: the backend finished correctly while
 the product path was unusable.
 
-## Current checkpoint — B1 Product Acceptance Repair
+## Current checkpoint — B1 Product Acceptance Repair — IMPLEMENTED
 
 Act Now scope, each traced to a Founder finding. Smallest generalized fix only.
 
-- [ ] **FB1-4 / clean routing** — normal PostgreSQL target server serves `/` and `/operator`
+- [x] **FB1-4 / clean routing** — normal PostgreSQL target server serves `/` and `/operator`
       as Overview and `/operator/cases/:id` as the focused case, all inside the product
       shell. API routes stay available; the retired SQLite composition stays unreachable.
-- [ ] **FB1-3 / product shell** — focused case renders through `renderInShell(...)`, the
+- [x] **FB1-3 / product shell** — focused case renders through `renderInShell(...)`, the
       same chrome as Overview.
-- [ ] **FB1-2 / Overview navigation** — case-backed rows link to `/operator/cases/:caseRef`
+- [x] **FB1-2 / Overview navigation** — case-backed rows link to `/operator/cases/:caseRef`
       from the read model's existing authoritative `caseRef`. No case identity invented, no
       case routing derived in the browser, no link fabricated for a healthy row.
-- [ ] **FB1-5 / strategy projection** — read the persisted `overallVerdict`; resolve known
+- [x] **FB1-5 / strategy projection** — read the persisted `overallVerdict`; resolve known
       Journey subjects to the authoritative Traveller display name; preserve genuine
       `UNKNOWN`. Do **not** persist display names into `RecoveryStrategy`.
-- [ ] **FB1-6 / readable options** — explain each option from authoritative
+- [x] **FB1-6 / readable options** — explain each option from authoritative
       `strategy_changes` / ScenarioChange effects: which programme items move, current vs
       proposed timing, who it fixes, deterministic viability. Refs/version stay secondary.
       No LLM, no ranking.
-- [ ] **FB1-6 / investigate** — are the two VIABLE strategies legitimate alternatives,
+- [x] **FB1-6 / investigate** — are the two VIABLE strategies legitimate alternatives,
       repeated proposal versions, or exact semantic duplicates? Fix duplication only at a
       generalized boundary if it is real.
 
 Protect: B1 deterministic recovery engine, RC-6 viability, authority/approval behavior,
 PostgreSQL-only runtime, generalized logic, focused-test-first discipline.
+
+### FB1-6 investigation — answered
+
+The two VIABLE strategies were **legitimate alternatives, not duplicates**. The
+deterministic proposer emits one candidate per distinct programme swap pair, keyed
+`proposer.programme-time-swap:<unmetItem>:<counterpart>`, so several options move the same
+blocked item into several different slots. `strategy_version` is a per-case ordinal
+assigned as each candidate persists — not a revision of the same option — so presenting it
+as "v1 / v2" was itself the defect. No deduplication was added, and none is warranted.
+
+Re-proposing stays idempotent: a deterministic `strategyId` short-circuits an
+already-persisted candidate.
+
+### Found in passing and fixed
+
+`PG_TARGET_SSL` used `z.coerce.boolean()`, which reads every non-empty string as `true`.
+`PG_TARGET_SSL=false` — exactly as `.env.example` documents it — therefore enabled SSL and
+failed normal boot against local PostgreSQL. It now parses an explicit flag and refuses an
+ambiguous value. This would have blocked the fresh-workspace retest before it started.
+
+### Verified on a real running runtime
+
+Booted the normal PostgreSQL target composition against the founder's 2026-09-18 workspace
+(`3e7f3d56-62f1-4a16-8fb3-8150e276bdd0`) and drove the product surfaces:
+
+- `/operator` reaches Overview (was a 404);
+- exactly the three case-backed rows link to `/operator/cases/:caseRef`; the other 64
+  population rows carry no link;
+- clicking Sarah's row opens her case in the Northstar shell;
+- options render as, e.g., `Move Next Gen Leaders - Coach Breakouts from 30 Sep, 02:30 to
+  30 Sep, 05:00` / `Move AiT Bootcamp - Opening Remarks from 30 Sep, 05:00 to 30 Sep,
+  02:30` / `Farah Hussein FAIL -> PASS` / `Assessed against 67 reached subjects: 52 pass ·
+  0 fail · 15 unknown`, with `Approve Option 1 and execute`;
+- an already-executed option reads `... is already at ...` rather than a no-op move.
+
+Note: that dev workspace now carries five **proposed** (never approved, never executed)
+strategies on Farah's open case from this verification. The retest uses a fresh workspace
+UUID, so it is unaffected.
 
 ## Founder B1 retest — expected physical flow
 
@@ -223,10 +261,26 @@ contains intentionally expensive real-world acceptance tests.
   daily development and a fresh workspace UUID for a clean physical test. Not B1 semantics.
 - Fresh-boot SERIALIZABLE conflict that retried successfully — no correctness impact.
 
+## Founder B1 retest procedure
+
+1. Start local PostgreSQL: `npm run db:postgres:up`.
+2. Generate a **fresh** workspace UUID — a new UUID is the explicit reset, and it pays the
+   full AiT materialization plus the 67-journey baseline (roughly 1-2 minutes).
+3. Put it in `.env.local` with the dataset directory:
+   `PG_TARGET_WORKSPACE_ID=<fresh-uuid>` and
+   `NORTHSTAR_DEMO_DATASET_DIR=fixtures/programmes/ait-summit-2026`.
+   Leave `PG_TARGET_SSL` unset (or `false`) for local PostgreSQL.
+4. `npm run dev`, then open **`http://127.0.0.1:8787/operator`** (`/` works too).
+5. Confirm baseline 50 / 2 / 15, apply **Simulated airline update**, settle at 49 / 3 / 15.
+6. **Click Sarah's row on Overview** — no URL typing. The case opens in the product shell.
+7. Read cause and Why, click **Propose recovery options**, read each option, then
+   **Approve Option N and execute**.
+8. Confirm Sarah READY, case RESOLVED, Overview back to 50 / 2 / 15, Farah + Mei still
+   truthfully disrupted.
+
 ## Next action
 
-**B1 Product Acceptance Repair**, then hand back for **Founder B1 physical retest** on a
-fresh workspace UUID.
+Hand back for **Founder B1 physical retest** on a fresh workspace UUID.
 
 If the retest PASSES:
 freeze the observed product floor and create the B2 implementation ledger/plan from the
