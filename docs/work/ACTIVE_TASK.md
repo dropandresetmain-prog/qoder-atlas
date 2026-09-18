@@ -188,21 +188,64 @@ reconciles and integrates.
       anti-hardcoding clean; full `current` suite 907/907.
       Commit `feat(r1): bind recovery planning coordinator core to PostgreSQL (C1 adapter)`.
       - SHA: `f0fe4489d1d8e6328ba5d91e98d71a227b9400d4` (local == origin)
-- [ ] C2 — planner core (lane P integrated): coordinator extending
-      `recoveryPlanning.ts`; read-only tool dispatch; transport proposer; comparator.
-- [ ] C3 — decision evidence end-to-end at the seam (coordinator persists attempt).
-- [ ] C4 — Recovery Lifecycle Progression service (PRIMARY).
-- [ ] C5 — integration + generality proof (>=2 materially different situations).
+- [x] Lane P (part 6) — C8 progression FACT MAPPER (pure)
+      (`src/resolution/planning/progressionFacts.ts`): honest projection from what
+      EXISTING owners OBSERVE — the deterministic resolution gate result
+      (`ResolutionGateResult`), an explicit authority/execution-pending flag,
+      recovery-remains-possible and the settled basis assessment id — onto the
+      frozen `RecoveryProgressionInput`, then through the already-frozen
+      `decideRecoveryProgression` precedence. Re-derives no gate verdict, invents
+      no progress. `test/r1-progression-facts.test.ts` 9/9 pass (RESOLVE; the three
+      pending-execution denials -> WAIT; explicit pending flag -> WAIT even on
+      BLOCKING_FAIL; BLOCKING_FAIL + recovery possible -> REPLAN bound to the NEW
+      basis; BLOCKING_FAIL without recovery -> ESCALATE no_safe_recovery_remaining;
+      non-failing denials -> ESCALATE human_evidence_or_decision_required; terminal
+      CASE_NOT_OPEN -> ESCALATE; idempotency; executionReconciled false ONLY for a
+      genuine unreconciled-execution denial). Full `current` suite 916/916;
+      typecheck/lint/boundary (207 files)/anti-hardcoding (414 files) clean.
+      **ESCALATE SURFACE — CONTRACT GAP reported (not papered over):** the existing
+      case lifecycle has OPEN->PLANNING->AWAITING_AUTHORITY->EXECUTING plus terminal
+      RESOLVED/CLOSED/CANCELLED/SUPERSEDED but NO dedicated escalated/needs-human
+      state or command. Per the C8 contract's own instruction this is reported for
+      PRIMARY/local resolution rather than fabricating a new phase; the mapper still
+      returns the truthful ESCALATE decision.
+      Commit `feat(r1): C8 progression fact mapper — observed gate/authority facts onto frozen decision`.
+      - SHA: `e3cd300e35c3ed182a5b067a011360ecc2420945` (local == origin)
 
-## Verification — DONE in Cloud (C1 + C3 foundation)
+### Contract-milestone status (Phase C)
 
-- [x] `test/r1-planning-contracts.test.ts` + `test/r1-decision-evidence.test.ts`:
-      46/46 pass (Node v24 type-stripping).
-- [x] Full `current` suite via `run-suite.mjs current`: 876/876 pass, 0 fail.
-- [x] `npm run gate:test-boundary`: CLEAN — 201 test files classified.
-- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 405 files scanned.
-- [x] `npm run typecheck`: exit 0.
-- [x] `eslint` on new/changed paths: clean.
+- [x] C2 — planner core integrated: generalized coordinator CORE (part 4) + PG
+      ADAPTER (part 5); read-only bounded research dispatch (part 2); viable-only
+      comparator (part 1). NOTE: no transport-SPECIFIC proposer was authored — the
+      domain registry activates TRANSPORT from real M6 dimension codes and proposers
+      are injected at the seam; the generality proof uses the REAL shipped
+      programme-time-swap proposer plus a seam-injected STAY proposer. A concrete
+      transport proposer is a LOCAL/product follow-up, not an R1 Cloud blocker.
+- [x] C3 — decision evidence end-to-end at the seam: the coordinator assembles the
+      three separate impact projections + material candidate evidence and persists
+      the ONE immutable attempt over migration 0125 (parts 3-5).
+- [~] C4 — Recovery Lifecycle Progression (PRIMARY): pure fact mapper DONE +
+      tested (part 6, `e3cd300`). REMAINING: the concrete PG PASS under
+      `runtimeServices`/`composeTargetBoot` that gathers observed facts from PG
+      owners, applies `decideProgressionFromFacts`, and acts through EXISTING owners
+      (RESOLVE via `resolveRecoveryCase`; REPLAN via the C1 coordinator from the NEW
+      basis; WAIT = no-op; ESCALATE = recorded, gap reported). Typecheck/lint-only in
+      Cloud (requires PG); LOCAL runtime acceptance item.
+- [x] C5 — integration + generality proof: THREE materially different situations
+      through ONE `runRecoveryPlanning` (part 4, `9740c18`), no scenario branch.
+
+## Verification — DONE in Cloud (cumulative through `e3cd300`)
+
+- [x] R1 pure test files green under Node v24 type-stripping:
+      `r1-planning-contracts`, `r1-decision-evidence`, `r1-comparator` (11),
+      `r1-planning-foundations` (13), `r1-planning-selection` (4),
+      `r1-coordinator-generality` (3), `r1-progression-facts` (9).
+- [x] Full `current` suite via `run-suite.mjs current`: 916/916 pass, 0 fail.
+- [x] `npm run gate:test-boundary`: CLEAN — 207 test files classified.
+- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 414 files scanned.
+- [x] `npm run typecheck`: exit 0 (includes the PG-requiring C1 adapter +
+      the C8 mapper's resolution->app type import).
+- [x] `eslint` on every new/changed path: clean.
 
 Note: the sandbox default `node` is v20.18; the project requires `>=24`. Cloud
 verification of TS tests uses the available v24 runtime (`/opt/playwright-driver/node`)
@@ -221,18 +264,45 @@ integration acceptance. It is NOT claimed as passed here:
       idempotency, read-helper round-trip). Written in Cloud, NOT executed here.
 - [ ] Coordinator pg integration: attempt written in the same UoW as viable
       RecoveryStrategy promotion; recommendation references only VIABLE rows.
+      Specifically the C1 PG ADAPTER (`src/app/target/recoveryPlanningCoordinator.ts`,
+      `f0fe448`) — typechecked + linted in Cloud, NEVER executed here: verify
+      `capturePlanningBasis` reads the real CURRENT/FAIL basis, `persistRecoveryStrategy`
+      + `persistRecoveryPlanningAttempt` commit as separate idempotent commands,
+      `advanceCasePhase(PLANNING)` / `advanceCasePhase(AWAITING_AUTHORITY)` transition
+      legally, and the deterministic minters are idempotent under retry/replay.
 - [ ] Recovery Lifecycle Progression pg integration (RESOLVE/WAIT/REPLAN/ESCALATE
-      against real case + assessment state).
+      against real case + assessment state). The pure C8 fact mapper
+      (`src/resolution/planning/progressionFacts.ts`, `e3cd300`) is DONE + tested in
+      Cloud; the CONCRETE C4 PASS that gathers observed facts from PG owners
+      (`evaluateRecoveryCaseResolution`, pending authority/execution,
+      recovery-remains-possible, current basis assessment), applies
+      `decideProgressionFromFacts`, and acts through EXISTING owners (RESOLVE via
+      `resolveRecoveryCase`; REPLAN via the C1 coordinator from the NEW basis;
+      WAIT = no-op; ESCALATE = recorded) is NOT yet authored — it is PRIMARY-owned
+      and requires PG to run. Must be idempotent per settled basis, must NOT create a
+      second status machine, must NOT restore RuntimeOrchestrator.
+- [ ] **ESCALATE SURFACE — CONTRACT GAP (needs PRIMARY/local decision, NOT a Cloud
+      guess):** the existing case lifecycle (OPEN->PLANNING->AWAITING_AUTHORITY->
+      EXECUTING + terminal RESOLVED/CLOSED/CANCELLED/SUPERSEDED) has NO dedicated
+      "escalated / needs human evidence or decision" state or command. The frozen C8
+      contract itself instructs this be reported rather than papered over with an
+      invented phase. Local integration must decide the truthful ESCALATE surface
+      (new phase vs. reuse of an existing escalation owner) before the C4 pass can
+      ACT on an ESCALATE decision; until then the pass records the decision without
+      mutating the case into a fabricated state.
 - [ ] Generality proof run against real PG fixtures (>=2 materially different
       planning situations through the same coordinator).
 - [ ] Any LIVE/RECORD provider evidence (Cloud is REPLAY-only, credential-free).
 
 ## Next action
 
-1. Exact-path stage C1 (contracts, migration, test, suites.json, both ACTIVE_TASK
-   docs) and commit `feat(r1): materialize recovery planning contracts`.
-2. PUSH; record branch + SHA here.
-3. ONLY AFTER the push, fan out Phase C lanes P/E/V/X from the C1 SHA.
+1. [DONE] C8 pure fact mapper committed + pushed (`e3cd300`); ledger current.
+2. C4 concrete PG progression PASS (PRIMARY) — author under `runtimeServices`,
+   typecheck/lint in Cloud, defer runtime to LOCAL; keep the ESCALATE gap reported.
+3. C9 Case projection static review (lane X) + C10 B1/B2 acceptance.
+4. Anti-hardcoding audit before handoff; finalize this LOCAL handoff ledger;
+   produce the final report ending EXACTLY with
+   `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`.
 
 ## Prohibitions (restated)
 
