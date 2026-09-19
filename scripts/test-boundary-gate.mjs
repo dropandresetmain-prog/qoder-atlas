@@ -126,9 +126,25 @@ function analyse(absFile) {
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 const classOf = new Map();
 const suiteOf = new Map();
+const subsetOf = manifest.subsetOf ?? {};
 for (const [suite, files] of Object.entries(manifest.suites)) {
   const cls = manifest.classification[suite];
   if (cls === undefined) throw new Error(`test/suites.json: suite "${suite}" has no classification`);
+  const parent = subsetOf[suite];
+  if (parent !== undefined) {
+    const parentFiles = manifest.suites[parent];
+    if (parentFiles === undefined) throw new Error(`test/suites.json: subset suite "${suite}" has no parent suite "${parent}"`);
+    if (manifest.classification[parent] !== cls) {
+      throw new Error(`test/suites.json: subset suite "${suite}" must share classification with parent suite "${parent}"`);
+    }
+    const parentSet = new Set(parentFiles);
+    for (const f of files) {
+      if (!parentSet.has(f)) {
+        throw new Error(`test/suites.json: subset suite "${suite}" contains ${f}, which is not in parent suite "${parent}"`);
+      }
+    }
+    continue;
+  }
   for (const f of files) {
     if (classOf.has(f)) throw new Error(`test/suites.json: ${f} appears in more than one suite`);
     classOf.set(f, cls);

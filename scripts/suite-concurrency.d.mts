@@ -1,6 +1,7 @@
 export const DEFAULT_SUITE_CONCURRENCY: Readonly<{
   current: number;
   postgres: number;
+  postgresFast: number;
   migration: number;
   legacy: number;
 }>;

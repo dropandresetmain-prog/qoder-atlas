@@ -15,7 +15,7 @@
  * database is built once, exposed via NORTHSTAR_AIT_FIXTURE_DB, and dropped
  * after the suite. Explicit NORTHSTAR_PG_AIT_WORLD=fresh skips fixture build.
  *
- * Usage: node scripts/run-suite.mjs <current|postgres|migration|legacy> [--list] [extra node --test args]
+ * Usage: node scripts/run-suite.mjs <current|postgres|postgresFast|migration|legacy> [--list] [extra node --test args]
  */
 
 import { readFileSync } from 'node:fs';
