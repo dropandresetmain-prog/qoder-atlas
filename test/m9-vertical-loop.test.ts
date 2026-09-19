@@ -90,7 +90,9 @@ describe('M9 primary scenario vertical loop (generic)', () => {
     assert.equal(result.travellerView.amIOkay, 'NO');
 
     const htmlCase = renderProductRecoveryCase(result.recoveryCasePreview);
-    assert.match(htmlCase, /Whole-trip|trip viability|Journey viability/i);
+    // R4 F1: case HTML is plain language — no "Journey viability" / "Whole-trip" jargon.
+    assert.match(htmlCase, /Trip recovery|Checking the trip|How the trip is affected/i);
+    assert.ok(!/Journey viability|Whole-trip/i.test(htmlCase));
     assert.match(renderProductOperatorOverview(result.operatorOverview), /Traveller/);
     assert.match(renderProductIncidentProgramme(result.incidentView), /Traveller One/);
     assert.match(renderProductTravellerTrip(result.travellerView), /programme/i);

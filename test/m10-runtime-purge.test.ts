@@ -48,13 +48,28 @@ const FORBIDDEN_MODULES = [
   resolve(ROOT, 'src/migration/legacyUncertainty.ts'),
 ];
 
-const IMPORT_SPECIFIER_RE = /(?:import|export)\s[^;]*?\sfrom\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+/**
+ * Value-edge extractors aligned with `scripts/test-boundary-gate.mjs`:
+ * `import type` / `export type` are erased at emit (no runtime dependency).
+ * Inline `import { type A }` still emits under verbatimModuleSyntax and counts.
+ */
+const FROM_RE = /(?:^|[\s;{(])(?:import|export)\s+(type\s+)?([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
+const DYNAMIC_RE = /(?:^|[\s;{(])import\s*\(\s*['"]([^'"]+)['"]\s*\)/gm;
+const BARE_RE = /(?:^|[\s;{(])import\s*['"]([^'"]+)['"]/gm;
 
 function extractImportSpecifiers(sourceText: string): string[] {
   const specifiers: string[] = [];
-  for (const match of sourceText.matchAll(IMPORT_SPECIFIER_RE)) {
-    const specifier = match[1] ?? match[2];
+  for (const match of sourceText.matchAll(FROM_RE)) {
+    const isTypeOnly = Boolean(match[1]);
+    if (isTypeOnly) continue;
+    const specifier = match[3];
     if (specifier) specifiers.push(specifier);
+  }
+  for (const match of sourceText.matchAll(DYNAMIC_RE)) {
+    if (match[1]) specifiers.push(match[1]);
+  }
+  for (const match of sourceText.matchAll(BARE_RE)) {
+    if (match[1]) specifiers.push(match[1]);
   }
   return specifiers;
 }

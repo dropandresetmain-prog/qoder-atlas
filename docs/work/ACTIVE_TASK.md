@@ -1,7 +1,7 @@
 # R4 FINAL INTEGRATION + ACCEPTANCE (integration/r4-final-acceptance)
 
 - Base R4 `8c44c30`; merged PG-perf `2534175` (common main `07c3c79`). Worktree `.worktrees/r4-final`.
-- **Run counters:** postgres:fast runs = **0**; CURRENT_TARGET runs = **0**; full canonical PG runs = **0**.
+- **Run counters:** postgres:fast runs = **1** (533 pass / 2 fail @ 786.9s; both fixed focused — m2 allowlist + m10 reset shape; **do not re-run fast**); CURRENT_TARGET runs = **0**; full canonical PG runs = **0**.
 - R4-F0 merge: ACTIVE_TASK conflict resolved (R4 ledger on top, PG-perf record kept below as history); `test/suites.json` auto-merged = union; R4's `eventOverview` + `r4PlanningPreferences` pgtests added to `postgresFast` (contract test demanded canonical-minus-heavyweights).
 - Focused checks PASS: canonical-test-commands, postgres-fast contract, ait-fixture-suite contract, suite-concurrency (13/13), `gate:test-boundary` (243 files), `aitFixtureClone.pgtest` (7/7).
 
@@ -10,7 +10,7 @@
 ## HANDOFF STATE (2026-09-20, primary continuing — physical Sarah programme GREEN)
 
 **Branch:** `integration/r4-final-acceptance`. Merged: F0 PG-perf, F1 UI language/overlay/dup-cards, F3 baseline/pool/reset, F2 Atlas exec, F2 safety N1-N4, stale tests, F4a presenter `85aaeba`, transport-card presentation fix (this continuation).
-**Broad-run counters:** postgres:fast = **0**; CURRENT_TARGET = **0**; full canonical PG = **0**. Run only after findings closed (now closed/parked — see `docs/work/r4-evidence/open-findings-dispositions.md`).
+**Broad-run counters:** postgres:fast = **1** (see above); CURRENT_TARGET = **0**; full canonical PG = **0**.
 
 **Physical evidence (port 4110, DB `r4final`, ADAPTER_MODE=LIVE, Qwen LIVE, Atlas LIVE research + sandbox execution):**
 - Reset: overlay shown, **~78–85 s**, baseline **52/67**.

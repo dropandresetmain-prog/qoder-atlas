@@ -281,7 +281,7 @@ describe('R4 transport option cards: leg label and strategy-scoped cost', () => 
       status: 'AWAITING_AUTHORITY',
       strategies: [transportStrategy(1)],
       ldg: ldgWithLeg,
-    } as Partial<RecoveryCaseView>));
+    } as unknown as Partial<RecoveryCaseView>));
     const option = model.recommended!;
     assert.match(option.title, /Replace travel \(FLIGHT Z2 · Manila → Cebu\)/);
     assert.match(option.changes[0]!.phrase!, /Book replacement travel \(FLIGHT Z2 · Manila → Cebu\)/);
@@ -306,7 +306,9 @@ describe('R4 transport option cards: leg label and strategy-scoped cost', () => 
         cost: actionCost,
         authorityState: 'awaiting',
         dependencyOrder: 0,
+        dependsOnActionRefs: [],
         executionState: 'PENDING',
+        uncertainty: [],
       }],
       ldg: {
         ...ldg,
@@ -318,7 +320,7 @@ describe('R4 transport option cards: leg label and strategy-scoped cost', () => 
           authority: 'AUTHORITATIVE' as const,
         }],
       },
-    } as Partial<RecoveryCaseView>));
+    } as unknown as Partial<RecoveryCaseView>));
     const priced = [model.recommended, ...model.alternatives].find((o) => o!.strategyRef === 'transport-a')!;
     const other = [model.recommended, ...model.alternatives].find((o) => o!.strategyRef === 'transport-b')!;
     assert.equal(priced.costLine, 'Added cost: US$20.95');

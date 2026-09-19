@@ -76,10 +76,14 @@ describe('originalCurrentToggleScript (display-only)', () => {
 
 describe('polling swap keeps display state', () => {
   test('after a swap the graphs re-initialise and the Original/Current tab is re-applied', () => {
-    const script = casePollingScript({ caseRef: 'c' });
-    assert.ok(script.includes('__northstarInitGraphs'));
-    assert.ok(script.includes('__northstarApplyOriginalCurrent'));
-    assert.ok(script.indexOf('window.__northstarInitGraphs()') < script.indexOf('window.__northstarApplyOriginalCurrent()'));
+    // Case polling only configures the shell poller; graph re-init lives in shellRuntime.
+    const caseCfg = casePollingScript({ caseRef: 'c' });
+    assert.ok(caseCfg.includes('__northstarPollConfig'));
+    assert.ok(caseCfg.includes('/api/v2/cases/'));
+    const shell = readFileSync(join('src', 'ui', 'shellRuntime.ts'), 'utf8');
+    assert.ok(shell.includes('__northstarInitGraphs'));
+    assert.ok(shell.includes('__northstarApplyOriginalCurrent'));
+    assert.ok(shell.indexOf('__northstarInitGraphs') < shell.indexOf('__northstarApplyOriginalCurrent'));
   });
 
   test('the graph interaction script is multi-canvas, idempotent and hidden-panel safe', () => {
