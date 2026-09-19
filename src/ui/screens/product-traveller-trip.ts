@@ -68,10 +68,11 @@ function commitmentSection(view: TravellerSurfaceView): string {
     <p class="cc-title">No required commitment is on file yet.</p>
   </div>`;
   }
+  const timeZone = resolveCommitmentTimeZone(view.commitment.timeZone);
   const meta = [
-    view.commitment.windowStart ? formatInstant(view.commitment.windowStart) : '',
-    view.commitment.windowEnd ? formatInstant(view.commitment.windowEnd) : '',
-    view.commitment.timeZone ?? '',
+    view.commitment.windowStart ? formatCommitmentInstant(view.commitment.windowStart, timeZone) : '',
+    view.commitment.windowEnd ? formatCommitmentInstant(view.commitment.windowEnd, timeZone) : '',
+    timeZone,
     view.commitment.placeLabel ?? '',
   ].filter(Boolean).join(' · ');
   return `
@@ -80,6 +81,31 @@ function commitmentSection(view: TravellerSurfaceView): string {
     <p class="cc-title">${escapeHtml(view.commitment.label)}</p>
     ${meta ? `<p class="cc-meta">${escapeHtml(meta)}</p>` : '<p class="cc-meta">Time and place are not confirmed yet.</p>'}
   </div>`;
+}
+
+function resolveCommitmentTimeZone(timeZone: string | undefined): string {
+  if (!timeZone?.trim()) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone }).format();
+    return timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
+
+function formatCommitmentInstant(iso: string, timeZone: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return `${iso} UTC`;
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+    timeZoneName: 'short',
+  }).format(date);
 }
 
 export function renderTravellerSurface(view: TravellerSurfaceView, eventName?: string): string {
