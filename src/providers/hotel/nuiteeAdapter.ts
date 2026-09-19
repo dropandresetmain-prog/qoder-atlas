@@ -41,6 +41,9 @@ import type {
   HotelActionQuery,
   HotelBookQuery,
   HotelBookingOutcome,
+  HotelBookingLookupOutcome,
+  HotelBookingLookupQuery,
+  HotelBookingReference,
   HotelBookingStatusView,
   HotelCapability,
   HotelPropertyView,
@@ -202,6 +205,14 @@ export interface NuiteeRetrieveRaw {
   };
 }
 
+/** GET /bookings?clientReference=... response: matching booking records. */
+export interface NuiteeBookingLookupRaw {
+  data?: Array<{
+    bookingId?: unknown;
+    clientReference?: unknown;
+  }>;
+}
+
 /** PUT /bookings/{bookingId} (cancel) response. */
 export interface NuiteeCancelRaw {
   data?: {
@@ -338,6 +349,30 @@ export class NuiteeAdapter implements HotelCapability {
     };
     return runAdapter(adapter, this.store, query, {
       operation: 'retrieve',
+      secrets: this.secrets(),
+    });
+  }
+
+  async findBookingsByClientReference(query: HotelBookingLookupQuery): Promise<CapabilityResult<HotelBookingLookupOutcome>> {
+    const requestedAt = new Date().toISOString();
+    if (typeof query.clientReference !== 'string' || query.clientReference.trim().length === 0) {
+      return capabilityError(
+        {
+          category: 'INVALID_REQUEST',
+          code: 'nuitee_client_reference_required',
+          message: 'Nuitée booking lookup requires a non-empty client reference',
+        },
+        { providerId: NUITEE_PROVIDER_ID, mode: this.mode, requestedAt },
+      );
+    }
+    const adapter: ProviderAdapter<HotelBookingLookupQuery, NuiteeBookingLookupRaw, HotelBookingLookupOutcome> = {
+      providerId: NUITEE_PROVIDER_ID,
+      mode: this.mode,
+      obtainRaw: async (request) => this.fetchBookingsByClientReferenceRaw(request),
+      normalize: (raw) => normalizeBookingLookup(raw, query.clientReference),
+    };
+    return runAdapter(adapter, this.store, query, {
+      operation: 'booking_lookup',
       secrets: this.secrets(),
     });
   }
@@ -529,6 +564,15 @@ export class NuiteeAdapter implements HotelCapability {
   private fetchRetrieveRaw(query: HotelRetrieveQuery): Promise<NuiteeRetrieveRaw> {
     const { bookingBaseUrl } = this.liveConfigured();
     return this.request<NuiteeRetrieveRaw>('GET', bookingBaseUrl, `/bookings/${encodeURIComponent(query.bookingId)}`);
+  }
+
+  private fetchBookingsByClientReferenceRaw(query: HotelBookingLookupQuery): Promise<NuiteeBookingLookupRaw> {
+    const { bookingBaseUrl } = this.liveConfigured();
+    return this.request<NuiteeBookingLookupRaw>(
+      'GET',
+      bookingBaseUrl,
+      `/bookings?clientReference=${encodeURIComponent(query.clientReference)}`,
+    );
   }
 
   private fetchCancelRaw(query: HotelActionQuery): Promise<NuiteeCancelRaw> {
@@ -803,6 +847,64 @@ export function normalizeRetrieve(raw: NuiteeRetrieveRaw): HotelBookingStatusVie
   const posture = cancellationPosture(data.cancellationPolicies?.cancelPolicyInfos);
   if (posture.fee) view.cancellationFee = posture.fee;
   return view;
+}
+
+const MAX_BOOKING_LOOKUP_RESULTS = 100;
+
+export function normalizeBookingLookup(raw: NuiteeBookingLookupRaw, expectedClientReference: string): HotelBookingLookupOutcome {
+  if (typeof expectedClientReference !== 'string' || expectedClientReference.trim().length === 0) {
+    throw capabilityFailure(
+      'INVALID_REQUEST',
+      'nuitee_client_reference_required',
+      'Nuitée booking lookup requires a non-empty client reference',
+    );
+  }
+  if (!Array.isArray(raw.data)) {
+    throw capabilityFailure(
+      'PROVIDER_ERROR',
+      'nuitee_booking_lookup_malformed',
+      'Nuitée booking lookup returned no bounded booking list',
+    );
+  }
+  if (raw.data.length > MAX_BOOKING_LOOKUP_RESULTS) {
+    throw capabilityFailure(
+      'PROVIDER_ERROR',
+      'nuitee_booking_lookup_unbounded',
+      `Nuitée booking lookup returned more than ${MAX_BOOKING_LOOKUP_RESULTS} records`,
+    );
+  }
+
+  const seenBookingIds = new Set<string>();
+  const bookings: HotelBookingReference[] = [];
+  for (const record of raw.data) {
+    if (typeof record !== 'object' || record === null
+      || typeof record.bookingId !== 'string' || record.bookingId.trim().length === 0
+      || record.bookingId.trim() !== record.bookingId
+      || typeof record.clientReference !== 'string' || record.clientReference.trim().length === 0) {
+      throw capabilityFailure(
+        'PROVIDER_ERROR',
+        'nuitee_booking_lookup_malformed',
+        'Nuitée booking lookup contained a record without a booking ID and client reference',
+      );
+    }
+    if (record.clientReference !== expectedClientReference) {
+      throw capabilityFailure(
+        'PROVIDER_ERROR',
+        'nuitee_booking_lookup_mismatched_reference',
+        'Nuitée booking lookup returned a record for a different client reference',
+      );
+    }
+    if (seenBookingIds.has(record.bookingId)) {
+      throw capabilityFailure(
+        'PROVIDER_ERROR',
+        'nuitee_booking_lookup_ambiguous',
+        'Nuitée booking lookup returned the same booking ID more than once',
+      );
+    }
+    seenBookingIds.add(record.bookingId);
+    bookings.push({ bookingId: record.bookingId, clientReference: record.clientReference });
+  }
+  return { bookings: bookings.sort((a, b) => a.bookingId.localeCompare(b.bookingId)) };
 }
 
 export function normalizeCancel(raw: NuiteeCancelRaw, mode: AdapterMode): HotelActionOutcome {

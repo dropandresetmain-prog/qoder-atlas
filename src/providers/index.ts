@@ -35,6 +35,7 @@ export {
   NuiteeAdapter,
   mapBookingStatus,
   normalizeBook,
+  normalizeBookingLookup,
   normalizeCancel,
   normalizeQuote,
   normalizeRetrieve,
@@ -45,6 +46,7 @@ export {
 export type {
   NuiteeAdapterOptions,
   NuiteeBookRaw,
+  NuiteeBookingLookupRaw,
   NuiteeCancelPolicyInfoRaw,
   NuiteeCancelRaw,
   NuiteeMoneyRaw,
