@@ -1,6 +1,6 @@
 # A3 new-stay proposal — architecture gap and next seam
 
-Status: investigated, implementation contract not yet frozen. 2026-09-20.
+Status: proposed-stay contract frozen for stage 1; entry/composite/observation integration remains open. 2026-09-20.
 Required by [hero depth](ASTRA_HERO_DEPTH_SCOPE.md), not general hotel parity.
 
 **WHAT WE KNOW**
@@ -116,3 +116,60 @@ Prepared data closure (not integrated into A2): `codex/a3-canonical-dossier-reco
 Windows path normalization fixes silently skipped dossier discovery; `--dossiers-only`
 regenerates SG nationality and source stay dates without touching `programme.json`.
 The contradictory overnight-baseline note is corrected; no gender/contact facts invented.
+## Stage 1 frozen implementation boundary
+
+**WHAT WE KNOW:** a proposed stay is a Journey-owned itinerary intention; its provider
+confirmation belongs to observed reservation state. Current WJourneyItem already supports
+STAY, intended place/window and required nights. A hotel search result must not fabricate
+reservation, allocation or observed-status rows merely to make an overlay pass.
+
+**KEY ASSUMPTION:** ADD_JOURNEY_STAY carries proposedJourneyItemId, existing journeyId,
+orderKey, offerId and exact offerPrice. A separate resolvedStayOffers collection supplies
+existing captured placeId, stayWindow and price. Validate identity/ownership, exact price,
+positive interval and canonical-timezone nights; no proposed ID collision. The cloned overlay
+adds only the proposed STAY. Action compilation uses existing JOURNEY + OFFER scope,
+journey.stay authority, captured Journey revision, exact effect fingerprint and explicitly
+composed external:stay.book capability. Missing capability/revision refuses compilation.
+
+**WHAT WE DO NOT KNOW:** the final proposed IntendedVisit/document-selection attachment and
+atomic observed-stay command. An accommodation PASS alone does not establish entry legality.
+These remain integration prerequisites; stage1 is not A3 acceptance or dispatch permission.
+
+**WHAT SHOULD BE TESTED NEXT:** synthetic flight-only FAIL versus flight+stay accommodation
+PASS, input rejection and immutable base world; then the full composite remains UNKNOWN
+without exact current entry evidence. Terra owns isolated stage1 implementation. Luna owns
+separate explicit sandbox identity/budget provisioning (CLI only, no invented production
+values) and exact Journey/visit coverage matching. Root owns integration and acceptance.
+
+**Act Now:** scope legal coverage to the researched Journey/visit. Existing entry coverage
+lookup checks only topic/jurisdiction; a narrow complete answer must not confer completeness
+to another traveller. Existing synthetic broad ENTRY coverage in the dataset is not live legal
+research and must not be used to certify the added overnight entry.
+
+**Investigate Now:** express the overnight requirement as explicit Journey-scoped source data.
+Do not make every destination hotel cover every minute between arrival and return departure.
+The current Jordan journey has two outbound transport items plus its Singapore stay; its
+connection overnight requirement can use the existing evaluator without changing Sarah.
+
+## Updated Nuitée documentation evidence
+
+Current official [booking API](https://docs.liteapi.travel/reference/post_rates-book) documents
+clientReference duplicate protection and sandbox ACC_CREDIT_CARD simulation. The official
+[booking-list API](https://docs.liteapi.travel/reference/listbookings) supports clientReference
+lookup. This is newly verified provider documentation, not proof our current adapter implements
+it or that a live lost-response path has been exercised. Add bounded read-only lookup and verify
+exact returned booking terms before reconciliation. Empty/ambiguous lookup never licenses blind
+redispatch. Cancel/rebook remains separate authority and observation for each action.
+
+**Act Now:** compose lookup for unknown booking outcomes before A4. **Park for Later:** general
+hotel booking administration/history UI and unsupported in-place modify. Root reviewed the
+external/reset lease and guard; integrated at94454f4, preparation checkpointb9c7af3. Any external
+attempt/observation blocks destructive demo reset; future repeats retain prior workspaces.
+Official-document retrieval foundation: `OfficialDocumentReader` accepts only configured
+source IDs, bounds size/time, rejects redirects/unsupported content, and retains publisher,
+URL, observation time and sanitized-content hash through shared LIVE/RECORD/REPLAY normalization.
+It emits evidence text, never a legal verdict or published rule. Four focused tests and
+TypeScript passed. Actual RECORD reads on2026-09-19 at23:32UTC fetched both catalog sources;
+local ignored proof is `output/playwright/a3-official-source-proof.json` with sanitized recordings.
+This is adapter/source proof, not normal-boot Jordan entry acceptance. No private model
+reasoning, provider credentials or legal source assertions were fabricated.

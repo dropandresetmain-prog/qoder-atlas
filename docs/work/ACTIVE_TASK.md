@@ -35,7 +35,7 @@
 - A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, `codex/a3-jordan-connection-foundation`: real PG baseline160mPASS→D195mPASS→D230mFAIL opensCase→D3-65mFAIL sameCase. Integrated; focused PG test registered in canonical/fast and fixture consumer lists.
 - A3 data pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`: SG/source dates; safe dossiers-only generation;4focused+TypeScript. Integrated after A2.
 - A3 external/reset safety pushed `8939a491fc94610d90c70fec61cded92eb37e21a`, `codex/a3-external-reset-safety`: shared session lease, refuse any external execution history, no blind reset; PG9/9, reset focused tests,TypeScript. Root reviewed guard/composition/unlock eviction. Integrated after A2.
-- Luna building isolated explicit sandbox input provisioner (CLI only; no invented fixture facts or boot wiring). Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
+- Luna building isolated explicit sandbox input provisioner (CLI only); Terra proposed-STAY lane rebasing its isolated implementation onto accepted primary5f01302; Luna Nuitée client-reference lookup lane starting from5f01302. Entry coverage5f01302 integrated (49focused,TypeScript), root-reviewed exact Journey/visit scope. Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
 - Preserve, never merge as-is: request plannerbe69d056, partial `codex/astra-a1-request-gates`, two-file `codex/a1-request-authority`, rejected importer namespace7b8236ed. Root worktree remains untouched.
 ## Runtime and triage
 
@@ -48,6 +48,6 @@
 
 ## Exact next action / stop-safe handoff
 
-A2 checkpoint pushed clean atf0c79f2. Jordan foundation/data/reset integrated; integrated11focused tests,TypeScript,boundary261passed. Push this preparatory slice. Freeze new-STAY/composite/entry contracts before parallel implementation. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
+A2 checkpoint pushed clean atf0c79f2. Jordan foundation/data/reset integrated; integrated11focused tests,TypeScript,boundary261passed. Push this preparatory slice. Stage1 proposed-STAY contract frozen in stay decision; composite/entry/observed canonical contract remains root-owned. Official document reader4focused+TypeScript, real RECORD retrieval of both configured Japanese official sources passed; not normal-runtime entry acceptance. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
 
 Root worktree remains untouched. No merge to main. Preserve isolated drafts and local visual/log artifacts; never commit secrets/generated junk. Continue same task while context is clean; this ledger and linked evidence are the compact fresh-chat handoff.
