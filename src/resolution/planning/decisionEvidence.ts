@@ -45,6 +45,7 @@ import {
   type MaterialCandidateDisposition,
   type MaterialCandidateEvidence,
   type PlanningEvidenceRecord,
+  type PlanningModelActivity,
   type RecoveryDomainDecision,
   type RecoveryDomainId,
   type RecoveryPlanningAttempt,
@@ -229,6 +230,7 @@ export interface AssemblePlanningAttemptInput {
   coordinatorVersion: string;
   domains: readonly RecoveryDomainDecision[];
   evidence: readonly PlanningEvidenceRecord[];
+  modelActivities?: readonly PlanningModelActivity[];
   materialCandidates: readonly MaterialCandidateEvidence[];
   viableStrategyRefs: readonly SubjectId[];
   recommendation?: StrategyRecommendation;
@@ -252,6 +254,7 @@ export function assemblePlanningAttempt(
     coordinatorVersion: input.coordinatorVersion,
     domains: [...input.domains],
     evidence: [...input.evidence],
+    modelActivities: [...(input.modelActivities ?? [])],
     materialCandidates: [...input.materialCandidates],
     viableStrategyRefs: [...input.viableStrategyRefs],
     ...(input.recommendation !== undefined ? { recommendation: input.recommendation } : {}),

@@ -29,8 +29,15 @@ export type DomainSuggestionInput = {
 
 export type DomainSuggestionResult = {
   suggestedDomains: readonly RecoveryDomainId[];
-  /** Provider/model identity for planning evidence / logs (never chain-of-thought). */
-  meta?: { providerId: string; model: string; mode: 'LIVE' | 'REPLAY' };
+  /** Bounded call outcome for durable planning provenance; never prompt or output text. */
+  activity: {
+    providerId: string;
+    model: string;
+    mode: 'LIVE' | 'REPLAY';
+    status: 'SUCCEEDED' | 'FAILED';
+    latencyMs?: number;
+    errorCategory?: 'NOT_CONFIGURED' | 'AUTH' | 'NETWORK' | 'TIMEOUT' | 'RATE_LIMITED' | 'PROVIDER_ERROR' | 'INVALID_OUTPUT' | 'UNAVAILABLE';
+  };
   rationale?: string;
 };
 
@@ -65,16 +72,28 @@ export async function suggestRecoveryDomains(
   });
 
   if (!result.ok) {
-    return { suggestedDomains: [] };
+    return {
+      suggestedDomains: [],
+      activity: {
+        providerId: result.meta.providerId,
+        model: result.meta.model,
+        mode: result.meta.mode,
+        status: 'FAILED',
+        ...(result.meta.latencyMs === undefined ? {} : { latencyMs: result.meta.latencyMs }),
+        errorCategory: result.error.category,
+      },
+    };
   }
 
   const suggested = result.value.suggestedDomains.filter((d) => !already.has(d));
   return {
     suggestedDomains: suggested,
-    meta: {
+    activity: {
       providerId: result.meta.providerId,
       model: result.meta.model,
       mode: result.meta.mode,
+      status: 'SUCCEEDED',
+      ...(result.meta.latencyMs === undefined ? {} : { latencyMs: result.meta.latencyMs }),
     },
     ...(result.value.rationale ? { rationale: result.value.rationale } : {}),
   };

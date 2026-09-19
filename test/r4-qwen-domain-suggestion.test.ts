@@ -12,6 +12,7 @@ import { composeTargetIntelligence } from '../src/app/composeTargetIntelligence.
 import { suggestRecoveryDomains } from '../src/app/target/planningDomainSuggestion.ts';
 import {
   IntelligenceClient,
+  ModelTransportError,
   ScriptedModelTransport,
 } from '../src/intelligence/client.ts';
 import { resolveRecoveryDomainDecisions } from '../src/contracts/v2/planning/recoveryDomain.ts';
@@ -62,10 +63,49 @@ test('suggestRecoveryDomains: scripted additive domain is registry-validated; un
   // registry re-validation happens in resolveRecoveryDomainDecisions when AI source is applied.
   assert.ok(suggestion.suggestedDomains.includes('SUPPORT_COORDINATION') || suggestion.suggestedDomains.includes('TRANSPORT'));
   assert.ok(!suggestion.suggestedDomains.includes('PROGRAMME'), 'already-investigated domains are not re-suggested');
+  assert.equal(suggestion.activity.status, 'SUCCEEDED');
+  assert.equal(suggestion.activity.providerId, 'model-studio');
+  assert.equal(suggestion.activity.model, 'qwen-flash');
+  assert.equal(suggestion.activity.mode, 'REPLAY');
+  assert.equal(suggestion.activity.errorCategory, undefined);
 
   const withAi = resolveRecoveryDomainDecisions(defaultRecoveryDomainRegistry(), context, suggestion.suggestedDomains);
   const support = withAi.find((d) => d.domainId === 'SUPPORT_COORDINATION');
   // support_continuity dimension absent => NOT_APPLICABLE fail-closed even if AI suggested
   assert.ok(support);
   assert.notEqual(support.disposition, 'INVESTIGATED');
+});
+
+test('suggestRecoveryDomains retains only bounded failure metadata', async () => {
+  const client = new IntelligenceClient({
+    providerId: 'model-studio',
+    apiKey: 'scripted',
+    model: 'qwen-flash',
+    transport: new ScriptedModelTransport([
+      new ModelTransportError('TIMEOUT', 'script_timeout', 'test-only transport timeout', true),
+      new ModelTransportError('TIMEOUT', 'script_timeout', 'test-only transport timeout', false),
+    ]),
+    maxAttempts: 2,
+  });
+  const suggestion = await suggestRecoveryDomains(client, {
+    context: recoveryDomainContext({
+      failingSubjectKinds: ['JOURNEY'],
+      blockingDimensionCodes: ['connection_feasibility'],
+      affectedObjectKinds: [],
+      availableCapabilities: [],
+    }),
+    alreadyInvestigated: [],
+  });
+
+  assert.deepEqual(suggestion.suggestedDomains, []);
+  assert.deepEqual(suggestion.activity, {
+    providerId: 'model-studio',
+    model: 'qwen-flash',
+    mode: 'REPLAY',
+    status: 'FAILED',
+    errorCategory: 'TIMEOUT',
+    latencyMs: suggestion.activity.latencyMs,
+  });
+  assert.equal(typeof suggestion.activity.latencyMs, 'number');
+  assert.equal('rationale' in suggestion, false);
 });

@@ -103,6 +103,32 @@ export const MaterialCandidateEvidenceSchema = z.strictObject({
 export type MaterialCandidateEvidence = z.infer<typeof MaterialCandidateEvidenceSchema>;
 
 /**
+ * Bounded factual provenance for an optional model call made while planning.
+ * Prompts, raw responses, rationales and hidden reasoning never belong here.
+ */
+export const PlanningModelActivitySchema = z.strictObject({
+  operation: z.literal('recovery.domain_suggestion'),
+  providerId: z.string().min(1).max(128),
+  model: z.string().min(1).max(256),
+  mode: z.enum(['LIVE', 'REPLAY']),
+  status: z.enum(['SUCCEEDED', 'FAILED']),
+  /** Recorded only after the model call has completed. */
+  observedAt: InstantSchema,
+  latencyMs: z.number().int().nonnegative().optional(),
+  errorCategory: z.enum([
+    'NOT_CONFIGURED',
+    'AUTH',
+    'NETWORK',
+    'TIMEOUT',
+    'RATE_LIMITED',
+    'PROVIDER_ERROR',
+    'INVALID_OUTPUT',
+    'UNAVAILABLE',
+  ]).optional(),
+});
+export type PlanningModelActivity = z.infer<typeof PlanningModelActivitySchema>;
+
+/**
  * ONE immutable bounded record per completed planning basis. Persisted as a
  * single `recovery_planning_attempts` row with bounded typed JSON columns plus
  * FKs to the case and basis assessment; viable strategy detail stays normalized
@@ -118,6 +144,7 @@ export const RecoveryPlanningAttemptSchema = z.strictObject({
   coordinatorVersion: z.string().min(1),
   domains: z.array(RecoveryDomainDecisionSchema).default([]),
   evidence: z.array(PlanningEvidenceRecordSchema).default([]),
+  modelActivities: z.array(PlanningModelActivitySchema).max(8).default([]),
   materialCandidates: z.array(MaterialCandidateEvidenceSchema).default([]),
   /** Viable strategies promoted to RecoveryStrategy rows during this attempt. */
   viableStrategyRefs: z.array(SubjectIdSchema).default([]),
