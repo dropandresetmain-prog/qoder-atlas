@@ -19,7 +19,8 @@
       "postgres-integration/t2F5ServiceIdentity.pgtest.ts",
       "postgres-integration/t2F7SelectionGuard.pgtest.ts",
       "postgres-integration/t2F1FailureInjection.pgtest.ts",
-      "postgres-integration/t2N1ReplacementCorridorGuard.pgtest.ts"
+      "postgres-integration/t2N1ReplacementCorridorGuard.pgtest.ts",
+      "postgres-integration/b1SarahWorldRecovery.pgtest.ts"
     ]
   },
   "suites": {

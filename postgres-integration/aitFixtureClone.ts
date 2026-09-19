@@ -575,6 +575,8 @@ export async function obtainAitSummitWorld(params: {
   actorPrincipalId: string;
   /** When true (default), run baseline on fresh path / require it on clone. */
   includeBaseline?: boolean;
+  /** Optional pinned evaluation instant for fresh-path baseline (B1 uses a fixed NOW). */
+  baselineNow?: string;
   /** Shared pool used only for fresh mode (existing test pattern). */
   sharedPool?: Pool;
   dataset?: LoadedDataset;
@@ -666,6 +668,7 @@ export async function obtainAitSummitWorld(params: {
       pool,
       workspaceId,
       actorPrincipalId: params.actorPrincipalId,
+      ...(params.baselineNow ? { now: params.baselineNow } : {}),
     });
     baselineEvaluated = baseline.evaluated;
   }

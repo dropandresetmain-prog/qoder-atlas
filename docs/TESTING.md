@@ -56,6 +56,19 @@ Do **not** infer that PostgreSQL should also be parallelized. The PG suite share
 and includes global queue claims, concurrency/fencing tests and heavy AiT E2Es. It remains
 serial until its isolation/connection-budget constraints are explicitly changed.
 
+### Canonical AiT fixture clones (test infrastructure)
+
+Heavyweight AiT consumers listed in `test/suites.json` → `aitFixtureCloneConsumers`
+receive an isolated PostgreSQL database cloned from a suite-scoped TEMPLATE fixture
+(`CREATE DATABASE … TEMPLATE`). The fixture is rebuilt once per `npm run test:postgres`
+invocation (migrate + real materialize + 67-journey baseline), then discarded.
+
+- Clone accelerates **setup only**; assertions are unchanged.
+- Fresh forever: `productBaselineWorld`, migration-from-empty, materialization/idempotency/
+  replay proofs, and `t2ProviderDisruptionReprotection` step-1 baseline proofs.
+- Override: `NORTHSTAR_PG_AIT_WORLD=fresh` skips fixture construction for diagnostics.
+- PG concurrency remains `1`. Parallelism is Park for Later.
+
 Do not use raw `node --test` as a substitute for the manifest commands: it can discover
 PostgreSQL, migration and historical suites together. `npm test` is the canonical current
 no-DB command. Focused single-file runs may still pass explicit file paths to Node's test

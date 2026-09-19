@@ -11,14 +11,11 @@
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset } from '../src/app/demo/datasetLoader.ts';
-import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
 import { composeTargetApplication, type TargetApplication } from '../src/app/target/composeTargetApplication.ts';
 import { handleTargetProductHttp } from '../src/app/target/targetHttpHandlers.ts';
-import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
 import { captureWorld } from '../src/persistence/postgres/world/pgCurrentState.ts';
 import { currentAssessmentView, type ReassessmentPipeline } from '../src/persistence/postgres/world/pgAssessments.ts';
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
@@ -34,6 +31,7 @@ import { createRecoveryPlanningCoordinator } from '../src/app/target/recoveryPla
 import type { RecoveryPlanningResult } from '../src/contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type { ApprovalReport } from '../src/app/target/recoveryApproval.ts';
 import type { TransportServiceCancelledWithReprotectionEvent } from '../src/app/target/providerDisruptionIngress.ts';
+import { aitWorldModeFromEnv, obtainAitSummitWorld } from './aitFixtureClone.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:b1-canonical-world-recovery';
@@ -73,25 +71,53 @@ async function callHandler(
 
 describe('B1 internal recovery loop on the canonical programme world', () => {
   let app: TargetApplication | undefined;
+  let disposeWorld: (() => Promise<void>) | undefined;
+  let sharedPool: Awaited<ReturnType<typeof sharedTestPool>> | undefined;
+
   after(async () => {
-    if (app) await app.close();
-    const pool = await sharedTestPool();
-    await pool.end();
+    if (app) await app.close().catch(() => undefined);
+    await disposeWorld?.().catch(() => undefined);
+    await sharedPool?.end().catch(() => undefined);
   });
 
   test('disruption -> escalate -> propose VIABLE -> approve -> execute -> reassess -> resolve', async () => {
-    const pool = await sharedTestPool();
+    const t0 = performance.now();
+    if (aitWorldModeFromEnv() === 'fresh') {
+      sharedPool = await sharedTestPool();
+    }
     const dataset = await loadDataset(BUNDLE_DIR);
-    const workspaceId = randomUUID();
-    await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, `b1-world:${workspaceId}`]);
-    const provisioned = await provisionDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
-    assert.equal(provisioned.status, 'MATERIALIZED', JSON.stringify(provisioned));
+    const world = await obtainAitSummitWorld({
+      actorPrincipalId: ACTOR,
+      includeBaseline: true,
+      baselineNow: NOW,
+      sharedPool,
+      dataset,
+    });
+    disposeWorld = world.dispose;
+    const pool = world.pool;
+    const workspaceId = world.workspaceId;
+    assert.ok(
+      world.provisionStatus === 'MATERIALIZED' || world.provisionStatus === 'CLONED',
+      `world ready via ${world.provisionStatus}`,
+    );
+    // Clone path already ran baseline at fixture NOW; fresh path ran it inside obtainAitSummitWorld
+    // without pinned NOW. Align B1's evaluated-count expectation either way.
+    assert.equal(
+      world.baselineEvaluated,
+      dataset.programme.importDraft.travellers.length,
+      `baseline evaluated ${world.baselineEvaluated}`,
+    );
+    console.log(`[timing] B1 setup mode=${world.mode} setupMs=${world.setupMs.toFixed(0)}`);
 
-    app = await composeTargetApplication({ workspaceId, actorId: ACTOR });
+    app = await composeTargetApplication({
+      workspaceId,
+      actorId: ACTOR,
+      postgres: world.postgresOverrides,
+    });
     const registry = createM6Registry();
     const pipeline: ReassessmentPipeline = async (claim, assessmentId) => {
-      const world = await captureWorld(pool, { workspaceId: claim.workspaceId, focus: [claim.subject], at: NOW, informationTopics: registry.informationTopics });
-      return assessSubject({ registry, world, effective: projectEffectiveWorld(world), subject: claim.subject, now: NOW, assessmentId }).result;
+      const captured = await captureWorld(pool, { workspaceId: claim.workspaceId, focus: [claim.subject], at: NOW, informationTopics: registry.informationTopics });
+      return assessSubject({ registry, world: captured, effective: projectEffectiveWorld(captured), subject: claim.subject, now: NOW, assessmentId }).result;
     };
     const drain = async () => {
       const result = await app!.reassessmentWorker.drainAvailable(NOW, pipeline, { workspaceId, maxMs: 180_000, maxItems: 500 });
@@ -100,8 +126,6 @@ describe('B1 internal recovery loop on the canonical programme world', () => {
     };
     const lifecycleCtx = { pool, workspaceId, actorPrincipalId: ACTOR, uow: () => app!.unitOfWork(), now: NOW };
 
-    const baseline = await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId: ACTOR, now: NOW });
-    assert.equal(baseline.evaluated, dataset.programme.importDraft.travellers.length, JSON.stringify(baseline));
     const authority = await provisionWorkspaceAuthority({ pool, uow: () => app!.unitOfWork(), workspaceId, actorPrincipalId: ACTOR, now: NOW });
     assert.equal(authority.status, 'PROVISIONED', JSON.stringify(authority));
     // R3: the product planning endpoint now requires the shared coordinator
@@ -112,6 +136,8 @@ describe('B1 internal recovery loop on the canonical programme world', () => {
     });
     app.runtimeHooks = { executorPrincipalId: authority.principals.executor, planner };
     await runCaseEscalation(lifecycleCtx);
+
+    console.log(`[timing] B1 total-so-far-ms=${(performance.now() - t0).toFixed(0)}`);
 
     const originalServiceExternalId = 'ID7159@2026-09-30T10:45:00.000Z';
     const event: TransportServiceCancelledWithReprotectionEvent = {
