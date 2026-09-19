@@ -130,3 +130,27 @@ runtime change. Unfinished checkpoint files remain to be run after focused closu
   Protected identity/budget reset inputs and contradictory nationality need reconciliation.
   Keep these distinct from A1 acceptance. Jordan multi-domain depth, relevant LIVE research
   and supported selected sandbox actions are required under the latest hero contract.
+
+## A1 checkpoint acceptance — 2026-09-20
+
+A1 desktop scope is accepted on source/test head `474f95d580c59638e5d5cfbbcdfd989d50c4a0b8`.
+The checkpoint commit containing this section records acceptance; verify the pushed branch
+SHA in Git. Explicit deferrals above remain visible and do not claim full legacy parity.
+
+- Demo-seed test closure `581cf82`: 1/1 focused PG, TypeScript, workspace-scoped identity,
+  exact retry counts and independent mutation. No importer production change.
+- Final unfinished 33-file PG segment: 131 pass / 0 fail / 0 skip, exit0, 457.7 seconds.
+  Local log `output/playwright/a1-postgres-checkpoint-remainder.log` and `.exit`.
+- Counters: postgres:fast 3 (third is suffix only), CURRENT_TARGET 1, full canonical PG0.
+  This is cumulative passing segments plus focused failure closure, not a claimed single
+  all-green broad rerun. No broad debugging loop or weakened runtime invariants.
+- Final desktop recovery, graph interactions and canonical timezone evidence above are
+  accepted for A1. The earlier pending/no-execution descriptions are chronological states;
+  the final A1 state is REPLAY RESOLVED and 52/67 with nobody needing attention.
+- Existing programme nodes without an independent assessment retain UNKNOWN. Do not
+  manufacture PASS from a parent journey; retain R4 classification unless hero readability
+  provides evidence that a stronger authoritative projection is needed.
+
+Next: fresh Reset under the already composed LIVE boot, followed by Sarah live research,
+recommendation, authority, execution, observation and whole-trip reassessment. A2 requires
+actual live provider/model evidence, not only boot configuration.
