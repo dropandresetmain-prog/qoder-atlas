@@ -597,13 +597,27 @@ function buildTechnical(view: RecoveryCaseView): CaseWorkspaceModel['technical']
   if (evidence) {
     planning.push(`Planning outcome: ${evidence.outcome.label} (attempt ${evidence.attemptRef}, as of ${evidence.asOf})`);
     for (const d of evidence.domains) planning.push(`Domain ${d.domain.label}: ${d.disposition.label}${d.reason ? ` — ${d.reason}` : ''}`);
-    for (const t of evidence.tools) planning.push(`Research ${t.tool.label}: ${t.status.label} · ${t.provenanceMode.label}${t.provider ? ` · ${t.provider}` : ''} — ${t.summary}`);
+    for (const t of evidence.tools) {
+      // UNAVAILABLE tools make no provenance claim (R3 honesty).
+      const provenance = t.status.code === 'UNAVAILABLE'
+        ? 'no provider evidence obtained'
+        : `${t.provenanceMode.label}${t.provider ? ` · ${t.provider}` : ''}`;
+      planning.push(`Research: ${t.tool.label} — ${t.status.label} · ${provenance}`);
+    }
     for (const c of evidence.candidates) {
       planning.push(`Candidate ${c.domain.label} · ${c.proposer.label}: ${c.disposition.label}${c.reasons.length > 0 ? ` — ${c.reasons.join('; ')}` : ''}`);
-      const changed = c.outcomeDelta.filter((d) => d.direction.code !== 'UNCHANGED');
-      for (const d of changed.slice(0, 8)) planning.push(`  ${d.subject.label}: ${d.baseline ?? 'unknown'} → ${d.candidate}`);
-      const unchanged = c.outcomeDelta.length - changed.length;
-      if (unchanged > 0) planning.push(`  (${unchanged} unchanged subject${unchanged === 1 ? '' : 's'} not listed)`);
+      const outcomeWord = (v: string | undefined): string => {
+        if (!v) return 'unknown';
+        const lower = v.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      };
+      // Cap outcome-delta dump: show a few concrete subject lines, summarise the rest.
+      for (const d of c.outcomeDelta.slice(0, 6)) {
+        planning.push(`  ${d.subject.label}: ${outcomeWord(d.baseline)} → ${outcomeWord(d.candidate)}`);
+      }
+      if (c.outcomeDelta.length > 6) {
+        planning.push(`  (${c.outcomeDelta.length - 6} further subjects not listed)`);
+      }
     }
     if (evidence.recommendation) {
       planning.push(`Recommendation provenance: ${evidence.recommendation.provenance.label}`);
