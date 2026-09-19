@@ -65,6 +65,7 @@ export const FOCUSED_GRAPH_CSS = `
   overflow: hidden;
   transition: opacity 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.2;
 }
 .fg-node:hover { transform: translateY(-1px) scale(1.03); box-shadow: 0 10px 22px rgba(18, 38, 68, 0.08); z-index: 28; }
 .fg-node:focus-visible { outline: 2px solid var(--fg-navy); outline-offset: 2px; }
@@ -154,6 +155,7 @@ export const FOCUSED_GRAPH_CSS = `
   padding: 4px 7px;
   border-radius: 999px;
   font-size: 9px;
+  line-height: 1.1;
   font-weight: 900;
   letter-spacing: 0.02em;
   white-space: nowrap;

@@ -53,7 +53,7 @@ function stageHtml(scene: GraphScene): string {
     `<article class="${esc(n.cls)}" style="left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;" ${attrsToHtml(n.attrs)}>
 ${n.html}
 </article>`).join('\n');
-  return `<div class="fg-stage" data-view="${scene.defaultView}">
+  return `<div class="fg-stage" data-view="${scene.defaultView}" style="width:${scene.width}px;height:${scene.height}px;">
 ${svg}
 ${nodes}
 </div>`;

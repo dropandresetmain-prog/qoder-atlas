@@ -45,6 +45,10 @@ test('determinism: same input produces identical HTML', () => {
   const html2 = renderFocusedCaseGraph({ ldg, focusedGraph, caseStatus: 'OPEN' });
 
   assert.equal(html1, html2, 'Renderer must be deterministic');
+  const scene = buildGraphScene({ ldg, focusedGraph, role: 'current' });
+  assert.ok(scene.width > 0 && scene.height > 0);
+  assert.ok(html1.includes(`style="width:${scene.width}px;height:${scene.height}px;"`),
+    'Initial stage must give the SVG a viewport before the first changed poll');
 });
 
 test('arrival cards format supplied instants and historical workflow omission does not mutate Original', () => {

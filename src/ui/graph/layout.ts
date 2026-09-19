@@ -53,10 +53,10 @@ export interface LayoutOptions {
 }
 
 export const SIZES: Record<SizeClass, { readonly w: number; readonly h: number }> = {
-  focal: { w: 226, h: 108 },
-  secondary: { w: 184, h: 96 },
-  normal: { w: 168, h: 88 },
-  small: { w: 152, h: 78 },
+  focal: { w: 226, h: 136 },
+  secondary: { w: 184, h: 124 },
+  normal: { w: 168, h: 116 },
+  small: { w: 152, h: 104 },
 };
 
 const SPINE_GAP = 46;
