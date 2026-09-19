@@ -72,6 +72,20 @@ Screenshots/snapshots stay under ignored `output/playwright/`; they are local vi
 evidence, not committed provider recordings. Final desktop screenshot/preview and
 checkpoint-gate results remain to be added.
 
+Final desktop closure on integrated `e63e00ff`:
+
+- Stay window now uses canonical Singapore zone: 29 Sep15:00 ->3Oct11:00GMT+8.
+  Focused closure `f718f20`: 76unit/8PG, TypeScript green.
+- Clicking the staged alternative actually approved/applied it. The old selection-like
+  label was misleading; `780a048` changes it to “Approve and apply this option” with
+  unchanged approval gates, focused B1 20/20. This is a real A1 REPLAY execution,
+  not merely a staged proposal and not A2 LIVE acceptance.
+- Observed Case recovered/resolved after programme actions; Overview52/67, nobody
+  needing attention; Decisions zero waiting and two recorded programme approvals.
+- Local visual artifacts: `a1-final-case-recovered.png`, `a1-final-overview-recovered.png`.
+- Latest boot is now LIVE Atlas research/Qwen plus protected Atlas sandbox execution;
+  the completed recovery above still belongs to the earlier REPLAY run. A2 resets fresh.
+
 CURRENT_TARGET attempt 1 on `154e93f`: 1161 pass / 4 fail in 50 seconds. Three
 failures expected old timezone-free Case copy; the fourth found two new canonical
 PG tests missing from the fast subset. Fast membership corrected and its focused
@@ -82,6 +96,13 @@ rerun as a debugging loop. Final integrated TypeScript and boundary gate pass
 postgres:fast attempt 1 on isolated `astra_a1_checkpoint_20260920` was stopped
 after five failures in `m2SubtypeIntegrity.pgtest.ts`; focused diagnosis is active.
 Do not claim a completed broad pass or count unrun files as verified.
+
+Attempt1 registry failures closed15/15 (`a92fbff`). Attempt2 was stopped after one
+`m10DemoSeed` assertion failure. Diagnosis found an old global-ID inequality assumption
+in the demo-seeder test. The schema identifies roots by `(workspace_id,id)`; changing
+the import namespace now would break existing retries. Primary rejected unintegrated
+`7b8236ed` and requested stronger workspace-isolation/idempotency proof with no importer
+runtime change. Unfinished checkpoint files remain to be run after focused closure.
 
 ## Explicit deferrals and risks
 

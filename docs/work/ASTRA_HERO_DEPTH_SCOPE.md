@@ -23,6 +23,12 @@ modification/cancellation/rebooking where selected recovery requires it, materia
 consequences, finals viability, and insurance reasoning where evidence exists. Entry
 sources retain provenance, freshness and uncertainty. No general immigration platform.
 
+Founder clarification: Nuitée does not support stay modification. A selected Singapore
+change from three to two nights means explicit cancellation and rebooking, with separate
+policy/cost/authority/observation outcomes. Do not advertise a modify operation. Narita
+hotel viability was previously proven with Nuitée; reuse that provider evidence and focus
+new proof on current PostgreSQL composition plus the final live/sandbox hero path.
+
 Programme relocation/cancellation remains in scope for the small typed action set required
 by either hero world. Proposal, deterministic impact/blast, authority, execution,
 observation and reassessment remain mandatory. No generic OTHER mutation escape hatch.
