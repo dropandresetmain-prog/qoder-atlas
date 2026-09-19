@@ -167,7 +167,7 @@ export function buildAtlasOfferDispatcher(
         ...(p.dateOfBirth ? { dateOfBirth: p.dateOfBirth } : {}),
         ...(p.nationality ? { nationality: p.nationality } : {}),
       })),
-      contact: { name: inputs.contactName },
+      contact: { name: inputs.contactName, email: inputs.contactEmail },
       ...(verify.data.workflowState ? { workflowState: verify.data.workflowState } : {}),
       clientReference,
     });

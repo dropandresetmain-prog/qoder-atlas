@@ -53,10 +53,11 @@ export interface BookingPassenger {
   gender: 'MALE' | 'FEMALE';
   dateOfBirth?: string;
   nationality?: string;
+  contactEmail: string;
 }
 
 export type OfferExecutionInputs =
-  | { ready: true; binding: OfferExecutionBinding; passengers: BookingPassenger[]; contactName: string }
+  | { ready: true; binding: OfferExecutionBinding; passengers: BookingPassenger[]; contactName: string; contactEmail: string }
   | { ready: false; reason: OfferExecutionInputGap; detail: string };
 
 export type OfferExecutionInputGap =
@@ -64,7 +65,8 @@ export type OfferExecutionInputGap =
   | 'JOURNEY_ITEM_MISSING'
   | 'PASSENGER_UNRESOLVED'
   | 'PASSENGER_NAME_MISSING'
-  | 'BOOKING_IDENTITY_MISSING';
+  | 'BOOKING_IDENTITY_MISSING'
+  | 'CONTACT_EMAIL_MISSING';
 
 /** Insert immutable bindings for the viable SELECT_OFFER strategies just persisted. Idempotent. */
 export async function persistOfferExecutionBindings(
@@ -187,15 +189,19 @@ export async function resolveOfferExecutionInputsForStrategy(
     if (!name?.given_name || !name.family_name) {
       return { ready: false, reason: 'PASSENGER_NAME_MISSING', detail: `traveller ${travellerId} has no structured given/family name` };
     }
-    const identity = (await db.query<{ gender: 'MALE' | 'FEMALE'; date_of_birth: Date | null; nationality: string | null }>(
-      'SELECT gender, date_of_birth, nationality FROM traveller_booking_identities WHERE workspace_id = $1 AND traveller_id = $2',
+    const identity = (await db.query<{ gender: 'MALE' | 'FEMALE'; date_of_birth: Date | null; nationality: string | null; contact_email: string | null }>(
+      'SELECT gender, date_of_birth, nationality, contact_email FROM traveller_booking_identities WHERE workspace_id = $1 AND traveller_id = $2',
       [workspaceId, travellerId],
     )).rows[0];
     if (!identity) {
       return { ready: false, reason: 'BOOKING_IDENTITY_MISSING', detail: `traveller ${travellerId} has no protected booking identity (gender is required by the provider)` };
     }
+    if (!identity.contact_email) {
+      return { ready: false, reason: 'CONTACT_EMAIL_MISSING', detail: `traveller ${travellerId} has no booking contact email (the provider rejects orders without one)` };
+    }
     passengers.push({
       travellerId,
+      contactEmail: identity.contact_email,
       givenName: name.given_name,
       familyName: name.family_name,
       gender: identity.gender,
@@ -208,6 +214,7 @@ export async function resolveOfferExecutionInputsForStrategy(
     ready: true,
     passengers,
     contactName: `${lead.familyName}/${lead.givenName}`,
+    contactEmail: lead.contactEmail,
     binding: {
       id: bound.id, recoveryStrategyId: selection.strategyId, journeyItemId: selection.journeyItemId, journeyId: item.journey_id,
       offerKey: selection.offerKey, providerId: bound.provider_id, providerOfferRef: bound.provider_offer_ref,
@@ -227,11 +234,11 @@ export async function resolveOfferExecutionInputs(db: Queryable, workspaceId: st
 /** Operator/authoritative booking identity write (idempotent upsert-by-absence: never overwrites). */
 export async function recordTravellerBookingIdentity(
   db: Queryable,
-  params: { workspaceId: string; actorId: string; travellerId: string; gender: 'MALE' | 'FEMALE'; dateOfBirth?: string; nationality?: string },
+  params: { workspaceId: string; actorId: string; travellerId: string; gender: 'MALE' | 'FEMALE'; contactEmail?: string; dateOfBirth?: string; nationality?: string },
 ): Promise<void> {
   await db.query(
-    `INSERT INTO traveller_booking_identities (workspace_id, traveller_id, gender, date_of_birth, nationality, created_by_actor_id)
-     VALUES ($1,$2,$3,$4::date,$5,$6) ON CONFLICT (workspace_id, traveller_id) DO NOTHING`,
-    [params.workspaceId, params.travellerId, params.gender, params.dateOfBirth ?? null, params.nationality ?? null, params.actorId],
+    `INSERT INTO traveller_booking_identities (workspace_id, traveller_id, gender, contact_email, date_of_birth, nationality, created_by_actor_id)
+     VALUES ($1,$2,$3,$4,$5::date,$6,$7) ON CONFLICT (workspace_id, traveller_id) DO NOTHING`,
+    [params.workspaceId, params.travellerId, params.gender, params.contactEmail ?? null, params.dateOfBirth ?? null, params.nationality ?? null, params.actorId],
   );
 }
