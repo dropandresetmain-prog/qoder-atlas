@@ -36,8 +36,17 @@ F3, F5, F7, F1, N1, B1 Sarah.
 `productBaselineWorld`, `migrate.pgtest`, materialization/idempotency proofs,
 `t2ProviderDisruptionReprotection` (step 1 is T1 baseline proof).
 
-## Double-pool
+## Canonical promotion (final)
 
-`composeTargetApplication` still opens its own pool via `postgres` overrides.
-Tests close the app before dropping the clone. No product refactor.
-**Accept Risk** for this milestone.
+| Metric | Value |
+|---|---|
+| Wall clock (`npm run test:postgres`) | **1059.1s** (~17m39s) |
+| Suite fixture build | **74.4s** |
+| Node `--test` duration | **983.0s** |
+| Files | 69 |
+| Tests | 578 (576 pass, 1 fail, 1 skip) |
+| Fail | `m10RuntimePurgeBoot` 200≠404 — **pre-existing** (R3 accepted same) |
+| Skip | fresh↔clone fingerprint under suite fixture (proven standalone) |
+| vs ~1433s baseline | **−374s (−26%)** |
+
+Target: &lt;1100s worthwhile ✓; ~900–950s stretch not reached without T2 split / more consumers.
