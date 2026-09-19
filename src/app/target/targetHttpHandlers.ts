@@ -34,6 +34,7 @@ import { seedDemoWorld } from './demoSeed.ts';
 import { importProgrammeBundle } from './programmeImport.ts';
 import { loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
 import { renderInShell } from './productShell.ts';
+import { renderPage } from '../../ui/page.ts';
 import { datasetDirectoryFromEnv } from '../demo/datasetLoader.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
 import { renderProductProgrammeSchedule } from '../../ui/screens/product-programme-schedule.ts';
@@ -247,7 +248,7 @@ export async function handleTargetProductHttp(
       }
       const view = projectIncidentProgramme(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductIncidentProgramme(view));
+        sendHtml(res, 200, renderInShell('case', 'Programme impact', {}, renderProductIncidentProgramme(view, { caseRef: caseId })));
       } else {
         sendJson(res, 200, view);
       }
@@ -264,7 +265,7 @@ export async function handleTargetProductHttp(
       }
       const view = projectTravellerTrip(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductTravellerTrip(view));
+        sendHtml(res, 200, renderPage({ title: 'Your trip', active: 'dashboard', surface: 'traveller' }, renderProductTravellerTrip(view)));
       } else {
         sendJson(res, 200, view);
       }

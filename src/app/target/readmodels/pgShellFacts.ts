@@ -49,11 +49,29 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
       operating_requirements: { requiresPhysicalPresence?: boolean } | null;
       required_participants: number;
       optional_participants: number;
+      affected_case_id: string | null;
+      affected_case_count: number;
     }>(
       `SELECT pi.id, pi.title, pi.item_type, pi.window_start, pi.window_end,
               pi.lifecycle_status, pl.name AS place_name, pi.operating_requirements,
               count(p.id) FILTER (WHERE p.obligation = 'REQUIRED' AND p.accepted)::int AS required_participants,
-              count(p.id) FILTER (WHERE p.obligation <> 'REQUIRED' AND p.accepted)::int AS optional_participants
+              count(p.id) FILTER (WHERE p.obligation <> 'REQUIRED' AND p.accepted)::int AS optional_participants,
+              (SELECT (array_agg(DISTINCT rc.id::text))[1]
+                 FROM participations pp
+                 JOIN journeys jj ON jj.workspace_id = pp.workspace_id AND jj.traveller_id = pp.traveller_id
+                 JOIN case_subjects cs ON cs.workspace_id = jj.workspace_id AND cs.subject_kind = 'JOURNEY'
+                                       AND cs.subject_id = jj.id
+                 JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
+                WHERE pp.workspace_id = pi.workspace_id AND pp.programme_item_id = pi.id
+                  AND pp.accepted AND rc.closed_at IS NULL) AS affected_case_id,
+              (SELECT count(DISTINCT rc.id)::int
+                 FROM participations pp
+                 JOIN journeys jj ON jj.workspace_id = pp.workspace_id AND jj.traveller_id = pp.traveller_id
+                 JOIN case_subjects cs ON cs.workspace_id = jj.workspace_id AND cs.subject_kind = 'JOURNEY'
+                                       AND cs.subject_id = jj.id
+                 JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
+                WHERE pp.workspace_id = pi.workspace_id AND pp.programme_item_id = pi.id
+                  AND pp.accepted AND rc.closed_at IS NULL) AS affected_case_count
          FROM programme_items pi
          JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
          LEFT JOIN places pl ON pl.workspace_id = pi.workspace_id AND pl.id = pi.place_id
@@ -77,8 +95,12 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
         ...(row.window_start && row.window_end
           ? {
             windowLabel: `${formatShort(row.window_start.toISOString())} – ${formatShort(row.window_end.toISOString())}`,
+            windowStart: row.window_start.toISOString(),
+            windowEnd: row.window_end.toISOString(),
           }
           : {}),
+        ...(row.affected_case_id ? { affectedCaseRef: row.affected_case_id } : {}),
+        ...(row.affected_case_count > 0 ? { affectedCaseCount: row.affected_case_count } : {}),
         ...(row.place_name ? { placeLabel: row.place_name } : {}),
         lifecycleStatus: row.lifecycle_status,
         requiredParticipants: row.required_participants,
@@ -119,6 +141,7 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
         caseRef: row.id,
         status: row.lifecycle_status,
         openedAtLabel: formatInstant(row.opened_at.toISOString()),
+        openedAt: row.opened_at.toISOString(),
         subjectLabels: row.subject_labels ?? [],
         awaitingAuthority: row.lifecycle_status === 'AWAITING_AUTHORITY',
       })),
@@ -139,11 +162,29 @@ export async function loadActivityFeed(pool: Pool, workspaceId: string): Promise
       subject_id: string;
       command_namespace: string;
       reason: string | null;
+      actor_type: 'HUMAN' | 'SERVICE' | 'SYSTEM' | null;
+      subject_name: string | null;
+      case_id: string | null;
     }>(
-      `SELECT id, occurred_at, actor_principal_id, subject_kind, subject_id, command_namespace, reason
-         FROM change_records
-        WHERE workspace_id = $1
-        ORDER BY occurred_at DESC, id DESC
+      `SELECT cr.id, cr.occurred_at, cr.actor_principal_id, cr.subject_kind, cr.subject_id,
+              cr.command_namespace, cr.reason, pr.actor_type,
+              (SELECT n.display_value
+                 FROM travellers t
+                 JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+                WHERE t.workspace_id = cr.workspace_id
+                  AND ((cr.subject_kind = 'TRAVELLER' AND t.id = cr.subject_id)
+                    OR (cr.subject_kind = 'JOURNEY' AND t.id = (
+                          SELECT j.traveller_id FROM journeys j
+                           WHERE j.workspace_id = cr.workspace_id AND j.id = cr.subject_id)))
+                LIMIT 1) AS subject_name,
+              CASE WHEN cr.subject_kind = 'RECOVERY_CASE' THEN cr.subject_id::text
+                   ELSE (SELECT cs.recovery_case_id::text FROM case_subjects cs
+                          WHERE cs.workspace_id = cr.workspace_id AND cs.subject_id = cr.subject_id
+                          LIMIT 1) END AS case_id
+         FROM change_records cr
+         LEFT JOIN principals pr ON pr.workspace_id = cr.workspace_id AND pr.id::text = cr.actor_principal_id
+        WHERE cr.workspace_id = $1
+        ORDER BY cr.occurred_at DESC, cr.id DESC
         LIMIT ${ACTIVITY_PAGE + 1}`,
       [workspaceId],
     );
@@ -157,6 +198,10 @@ export async function loadActivityFeed(pool: Pool, workspaceId: string): Promise
         subjectLabel: `${row.subject_kind}:${row.subject_id}`,
         what: phraseCommand(row.command_namespace),
         ...(row.reason ? { reason: row.reason } : {}),
+        subjectKind: row.subject_kind,
+        ...(row.subject_name ? { subjectName: row.subject_name } : {}),
+        ...(row.actor_type ? { actorKind: row.actor_type } : {}),
+        ...(row.case_id ? { caseRef: row.case_id } : {}),
       })),
       truncated: rows.rows.length > ACTIVITY_PAGE,
     };
