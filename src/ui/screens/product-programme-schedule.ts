@@ -65,7 +65,7 @@ function timeSwapSection(view: ProgrammeSchedule): string {
   return `
   <section class="section" aria-label="Preview a programme time swap" data-programme-time-swap data-test="programme-time-swap">
     <h2>Preview a time swap</h2>
-    <p class="sub">Compare two scheduled sessions by exchanging their current time windows. This preview does not reschedule, relocate, cancel, or commit anything.</p>
+    <p class="sub">See how exchanging these session times would affect attendees. Nothing changes during the preview.</p>
     <div class="panel" style="margin-top:14px">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
         <label class="kv-label" for="programme-time-swap-a">First session
@@ -117,7 +117,7 @@ export function renderProgrammeSurface(view: ProgrammeSurfaceView, schedule?: Pr
     ${tile('days', view.dayCount, 'Days', 'ok')}
     ${tile('watch', view.affected.length, 'Sessions to watch', view.affected.length > 0 ? 'watch' : 'ok', true)}
     ${tile('in-person', inPerson, 'In person', 'neutral')}
-  ${tile('unscheduled', view.sessionCount - scheduledCount, 'Not yet scheduled', 'neutral')}
+    ${tile('unscheduled', view.sessionCount - scheduledCount, 'Not yet scheduled', 'neutral')}
   </div>
   ${attentionSection(view)}
   ${timeline}

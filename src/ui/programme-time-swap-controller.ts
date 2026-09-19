@@ -5,6 +5,12 @@
  * evaluation and the preview result; the browser sends the two selected item
  * references and never applies programme state.
  */
+export function programmeItemCommandRef(itemRef: string): string {
+  return itemRef.startsWith('PROGRAMME_ITEM:')
+    ? itemRef.slice('PROGRAMME_ITEM:'.length)
+    : itemRef;
+}
+
 export function renderProgrammeTimeSwapController(): string {
   return `<script data-programme-time-swap-controller>
 (function () {
@@ -16,11 +22,21 @@ export function renderProgrammeTimeSwapController(): string {
   window.__northstarProgrammeTimeSwapController = true;
 
   function messageFor(data) {
-    var code = data && (data.error || data.message);
+    var error = data && String(data.error || '');
+    var detail = data && String(data.message || '');
+    var code = ['PROGRAMME_ITEM_NOT_FOUND', 'PROGRAMME_ITEM_WINDOW_MISSING', 'VALIDATION_FAILED'].indexOf(detail) >= 0
+      ? detail
+      : error;
     if (code === 'PROGRAMME_ITEM_NOT_FOUND') return 'One of these sessions is no longer available. Refresh the programme and try again.';
     if (code === 'PROGRAMME_ITEM_WINDOW_MISSING') return 'Both sessions need confirmed times before a swap can be previewed.';
     if (code === 'VALIDATION_FAILED') return 'Choose two different scheduled sessions.';
     return 'The time-swap preview could not be completed. Your programme was not changed. Try again.';
+  }
+
+  function commandItemRef(ref) {
+    return ref.indexOf('PROGRAMME_ITEM:') === 0
+      ? ref.slice('PROGRAMME_ITEM:'.length)
+      : ref;
   }
 
   function init(root) {
@@ -34,8 +50,6 @@ export function renderProgrammeTimeSwapController(): string {
     root.__programmeTimeSwapInit = true;
 
     function sync() {
-      var valid = first.value && second.value && first.value !== second.value;
-      button.disabled = !valid;
       Array.prototype.forEach.call(second.options, function (option) {
         option.disabled = option.value === first.value;
       });
@@ -43,6 +57,8 @@ export function renderProgrammeTimeSwapController(): string {
         var replacement = Array.prototype.find.call(second.options, function (option) { return !option.disabled; });
         if (replacement) second.value = replacement.value;
       }
+      var valid = first.value && second.value && first.value !== second.value;
+      button.disabled = !valid;
     }
 
     function run() {
@@ -57,7 +73,7 @@ export function renderProgrammeTimeSwapController(): string {
       fetch('/api/v2/programme/time-swap/preview?format=html', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'text/html' },
-        body: JSON.stringify({ itemARef: first.value, itemBRef: second.value })
+        body: JSON.stringify({ itemARef: commandItemRef(first.value), itemBRef: commandItemRef(second.value) })
       }).then(function (response) {
         return response.text().then(function (body) {
           return { ok: response.ok, body: body };

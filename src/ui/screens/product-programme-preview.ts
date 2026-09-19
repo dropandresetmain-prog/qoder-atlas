@@ -71,7 +71,7 @@ export function renderProductProgrammePreview(preview: BilateralProgrammeTimeSwa
   </div>
   <div class="page-head">
     <h1>Programme time swap preview</h1>
-    <p class="sub">Compare two scheduled sessions after exchanging their current time windows. This is a preview only; it does not reschedule, relocate, cancel, or commit anything.</p>
+    <p class="sub">See how exchanging these session times would affect attendees. Nothing changes during the preview.</p>
   </div>
   <section class="section" data-test="preview-current" data-poll-region="preview-current">
     <h2>Current</h2>

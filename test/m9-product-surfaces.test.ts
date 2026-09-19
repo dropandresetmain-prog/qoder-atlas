@@ -19,6 +19,7 @@ import { renderProductIncidentProgramme } from '../src/ui/screens/product-incide
 import { renderProductTravellerTrip } from '../src/ui/screens/product-traveller-trip.ts';
 import { renderProductProgrammePreview } from '../src/ui/screens/product-programme-preview.ts';
 import { renderProductProgrammeSchedule } from '../src/ui/screens/product-programme-schedule.ts';
+import { programmeItemCommandRef } from '../src/ui/programme-time-swap-controller.ts';
 
 const generatedAt = '2031-09-15T08:00:00.000Z';
 
@@ -184,17 +185,17 @@ function programmeSchedule(): ProgrammeSchedule {
     eventTitle: 'Synthetic programme',
     items: [
       {
-        itemRef: 'item-a', label: 'Morning session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
+        itemRef: 'PROGRAMME_ITEM:item-a', label: 'Morning session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
         requiredParticipants: 2, optionalParticipants: 0, requiresPhysicalPresence: true,
         windowStart: '2031-09-15T09:00:00.000Z', windowEnd: '2031-09-15T10:00:00.000Z',
       },
       {
-        itemRef: 'item-b', label: 'Afternoon session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
+        itemRef: 'PROGRAMME_ITEM:item-b', label: 'Afternoon session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
         requiredParticipants: 2, optionalParticipants: 1, requiresPhysicalPresence: true,
         windowStart: '2031-09-15T14:00:00.000Z', windowEnd: '2031-09-15T15:00:00.000Z',
       },
       {
-        itemRef: 'item-c', label: 'Time to be set', itemType: 'SESSION', lifecycleStatus: 'PLANNED',
+        itemRef: 'PROGRAMME_ITEM:item-c', label: 'Time to be set', itemType: 'SESSION', lifecycleStatus: 'PLANNED',
         requiredParticipants: 1, optionalParticipants: 0, requiresPhysicalPresence: false,
       },
     ],
@@ -273,12 +274,17 @@ describe('M9 product surface renderers', () => {
     assert.match(html, /data-test="programme-time-swap"/);
     assert.match(html, /data-programme-item-a/);
     assert.match(html, /data-programme-item-b/);
-    assert.match(html, /value="item-a"/);
-    assert.match(html, /value="item-b"/);
-    assert.doesNotMatch(html, /value="item-c"/);
+    assert.match(html, /value="PROGRAMME_ITEM:item-a"/);
+    assert.match(html, /value="PROGRAMME_ITEM:item-b"/);
+    assert.doesNotMatch(html, /value="PROGRAMME_ITEM:item-c"/);
     assert.match(html, /api\/v2\/programme\/time-swap\/preview\?format=html/);
-    assert.match(html, /does not reschedule, relocate, cancel, or commit anything/i);
+    assert.match(html, /See how exchanging these session times would affect attendees/i);
     assert.match(html, /Your programme was not changed/);
+  });
+
+  test('programme item refs are normalized for the command while raw ids remain valid', () => {
+    assert.equal(programmeItemCommandRef('PROGRAMME_ITEM:item-a'), 'item-a');
+    assert.equal(programmeItemCommandRef('item-b'), 'item-b');
   });
 });
 
