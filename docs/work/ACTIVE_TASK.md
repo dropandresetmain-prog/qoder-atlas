@@ -2,6 +2,7 @@
 
 - Goal: strong current-product surfaces, faithful V5.6/V7.2, physical Sarah and Jordan through one generalized PostgreSQL recovery engine.
 - Latest founder steering supersedes pause-at-A1: **close A1 with justified deferrals, then immediately A2 Sarah and A3 Jordan**. Healthy-trip requests, broad programme changes and non-critical parity are Park for Later. See ROADMAP.
+- Desktop web only. Mobile UI belongs to a separate post-hackathon milestone; stop mobile work/checks. Use Luna/Terra for bounded work, Sol only for named unresolved critical risk.
 - Immutable accepted R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
 - Primary: `integration/astra-post-r4`; `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Accepted/pushed A0 SHA: `f55899b15200de692dd749bbcfb795c67f6a22e0` (remote verified). Current integration work starts from that checkpoint.

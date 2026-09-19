@@ -298,6 +298,8 @@ describe('M9 product surface renderers', () => {
     assert.match(html, /Northstar Air/);
     assert.match(html, /Origin terminal → Destination terminal/);
     assert.match(html, /Asia\/Singapore → Europe\/London/);
+    assert.match(html, /15 Sept 2031, 17:00 GMT\+8/);
+    assert.match(html, /15 Sept 2031, 16:00 BST/);
     assert.match(html, />Confirmed</);
     assert.match(html, /data-test="traveller-commitment"/);
     assert.match(html, /Opening session/);

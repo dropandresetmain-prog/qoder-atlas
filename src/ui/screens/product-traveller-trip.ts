@@ -24,12 +24,12 @@ function card(title: string, body: string | undefined, testId: string): string {
 }
 
 function qualifiedRange(item: TravellerItineraryView): string {
-  const start = item.startsAt ? formatInstant(item.startsAt) : '';
-  const end = item.endsAt ? formatInstant(item.endsAt) : '';
+  const startZone = resolveTimeZone(item.startTimeZone);
+  const endZone = resolveTimeZone(item.endTimeZone);
+  const start = item.startsAt ? formatZonedInstant(item.startsAt, startZone) : '';
+  const end = item.endsAt ? formatZonedInstant(item.endsAt, endZone) : '';
   const times = start && end ? `${start} – ${end}` : start || end;
-  const zones = item.startTimeZone && item.endTimeZone && item.startTimeZone !== item.endTimeZone
-    ? `${item.startTimeZone} → ${item.endTimeZone}`
-    : item.startTimeZone || item.endTimeZone || '';
+  const zones = startZone !== endZone ? `${startZone} → ${endZone}` : startZone;
   return [times, zones].filter(Boolean).join(' · ') || 'Time not confirmed';
 }
 
@@ -68,10 +68,10 @@ function commitmentSection(view: TravellerSurfaceView): string {
     <p class="cc-title">No required commitment is on file yet.</p>
   </div>`;
   }
-  const timeZone = resolveCommitmentTimeZone(view.commitment.timeZone);
+  const timeZone = resolveTimeZone(view.commitment.timeZone);
   const meta = [
-    view.commitment.windowStart ? formatCommitmentInstant(view.commitment.windowStart, timeZone) : '',
-    view.commitment.windowEnd ? formatCommitmentInstant(view.commitment.windowEnd, timeZone) : '',
+    view.commitment.windowStart ? formatZonedInstant(view.commitment.windowStart, timeZone) : '',
+    view.commitment.windowEnd ? formatZonedInstant(view.commitment.windowEnd, timeZone) : '',
     timeZone,
     view.commitment.placeLabel ?? '',
   ].filter(Boolean).join(' · ');
@@ -83,7 +83,7 @@ function commitmentSection(view: TravellerSurfaceView): string {
   </div>`;
 }
 
-function resolveCommitmentTimeZone(timeZone: string | undefined): string {
+function resolveTimeZone(timeZone: string | undefined): string {
   if (!timeZone?.trim()) return 'UTC';
   try {
     new Intl.DateTimeFormat('en-GB', { timeZone }).format();
@@ -93,7 +93,7 @@ function resolveCommitmentTimeZone(timeZone: string | undefined): string {
   }
 }
 
-function formatCommitmentInstant(iso: string, timeZone: string): string {
+function formatZonedInstant(iso: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return `${iso} UTC`;
   return new Intl.DateTimeFormat('en-GB', {
