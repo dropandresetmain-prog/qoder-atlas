@@ -28,15 +28,13 @@
  * the ingress's own deterministic identity scheme
  * (`demo-ingress:<providerId>:<providerEventId>:<step>`).
  */
-import { before, describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
-import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
-import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from '../src/app/demo/externalIdentity.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import type { DomainCommandEnvelope } from '../src/contracts/v2/command/domainCommand.ts';
@@ -46,6 +44,7 @@ import {
   type TransportServiceCancelledWithReprotectionEvent,
 } from '../src/app/target/providerDisruptionIngress.ts';
 import type { TargetCommandContext } from '../src/app/target/applicationCommands.ts';
+import { aitWorldModeFromEnv, obtainAitSummitWorld } from './aitFixtureClone.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:t2-f1-crash-test';
@@ -130,36 +129,38 @@ async function count(pool: Pool, workspaceId: string, table: string): Promise<nu
 }
 
 interface CrashWorkspace {
+  pool: Pool;
   workspaceId: string;
   connectionId: string;
   originalServiceId: string;
   affectedPnrs: string[];
   event: TransportServiceCancelledWithReprotectionEvent;
+  dispose: () => Promise<void>;
 }
 
-let pool: Pool;
-let dataset: LoadedDataset;
+let sharedPool: Pool | undefined;
+let dataset: LoadedDataset | undefined;
+const disposers: Array<() => Promise<void>> = [];
 
 async function prepareWorkspace(): Promise<CrashWorkspace> {
-  const workspaceId = randomUUID();
-  await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, `t2-f1-crash:${workspaceId}`]);
-  const outcome = await provisionDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
-  assert.equal(outcome.status, 'MATERIALIZED');
-
-  const connectionResult = await pool.query<{ connection_id: string }>(
-    `SELECT DISTINCT connection_id FROM external_records WHERE workspace_id = $1 LIMIT 1`,
-    [workspaceId],
+  const world = await obtainAitSummitWorld({
+    actorPrincipalId: ACTOR,
+    includeBaseline: true,
+    sharedPool,
+    dataset,
+  });
+  disposers.push(world.dispose);
+  assert.ok(
+    world.provisionStatus === 'MATERIALIZED' || world.provisionStatus === 'CLONED',
+    `world ready via ${world.provisionStatus}`,
   );
-  assert.equal(connectionResult.rowCount, 1, 'exactly one provisioning connection');
-  const connectionId = connectionResult.rows[0]!.connection_id;
+  assert.ok((world.baselineEvaluated ?? 0) > 0, 'baseline evaluation assessed at least one journey');
 
-  const mapping = await resolveSourceSubjects(pool, workspaceId, connectionId);
+  const mapping = await resolveSourceSubjects(world.pool, world.workspaceId, world.connectionId);
   const originalServiceExternalId = 'ID7159@2026-09-30T10:45:00.000Z';
   const originalServiceMapping = mapping.get(`${SOURCE_RECORD_TYPES.TRANSPORT_SERVICE}:${originalServiceExternalId}`);
   assert.ok(originalServiceMapping, 'original service resolves');
   const originalServiceId = originalServiceMapping.subject.id;
-
-  await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId: ACTOR });
 
   const affectedPnrs = ['IDSYN14', 'IDSYN03', 'IDSYN10', 'IDSYN11', 'IDSYN30'];
   const event: TransportServiceCancelledWithReprotectionEvent = {
@@ -180,15 +181,23 @@ async function prepareWorkspace(): Promise<CrashWorkspace> {
     reason: 'F1 failure-injection scenario.',
     provenanceKind: 'SCHEDULE_CHANGE',
   };
-  return { workspaceId, connectionId, originalServiceId, affectedPnrs, event };
+  return {
+    pool: world.pool,
+    workspaceId: world.workspaceId,
+    connectionId: world.connectionId,
+    originalServiceId,
+    affectedPnrs,
+    event,
+    dispose: world.dispose,
+  };
 }
 
 function realContext(w: CrashWorkspace): TargetCommandContext {
   return {
     workspaceId: w.workspaceId,
     actorPrincipalId: ACTOR,
-    uow: () => new PgUnitOfWork(pool, w.workspaceId),
-    pool,
+    uow: () => new PgUnitOfWork(w.pool, w.workspaceId),
+    pool: w.pool,
   };
 }
 
@@ -196,8 +205,8 @@ function crashingContext(w: CrashWorkspace, seam: { exact?: string; prefix?: str
   return {
     workspaceId: w.workspaceId,
     actorPrincipalId: ACTOR,
-    uow: () => crashingUnitOfWork(new PgUnitOfWork(pool, w.workspaceId), seam),
-    pool,
+    uow: () => crashingUnitOfWork(new PgUnitOfWork(w.pool, w.workspaceId), seam),
+    pool: w.pool,
   };
 }
 
@@ -215,15 +224,15 @@ interface CountsSnapshot {
 
 async function snapshotCounts(w: CrashWorkspace): Promise<CountsSnapshot> {
   return {
-    transportServices: await count(pool, w.workspaceId, 'transport_services'),
-    reservations: await count(pool, w.workspaceId, 'reservations'),
-    reservationLines: await count(pool, w.workspaceId, 'reservation_lines'),
-    reservationAllocations: await count(pool, w.workspaceId, 'reservation_allocations'),
-    externalRecords: await count(pool, w.workspaceId, 'external_records'),
-    externalRecordLinks: await count(pool, w.workspaceId, 'external_record_links'),
-    changeSignals: await count(pool, w.workspaceId, 'change_signals'),
-    changeSignalCompletions: await count(pool, w.workspaceId, 'change_signal_completions'),
-    scheduledReassessments: await count(pool, w.workspaceId, 'scheduled_reassessments'),
+    transportServices: await count(w.pool, w.workspaceId, 'transport_services'),
+    reservations: await count(w.pool, w.workspaceId, 'reservations'),
+    reservationLines: await count(w.pool, w.workspaceId, 'reservation_lines'),
+    reservationAllocations: await count(w.pool, w.workspaceId, 'reservation_allocations'),
+    externalRecords: await count(w.pool, w.workspaceId, 'external_records'),
+    externalRecordLinks: await count(w.pool, w.workspaceId, 'external_record_links'),
+    changeSignals: await count(w.pool, w.workspaceId, 'change_signals'),
+    changeSignalCompletions: await count(w.pool, w.workspaceId, 'change_signal_completions'),
+    scheduledReassessments: await count(w.pool, w.workspaceId, 'scheduled_reassessments'),
   };
 }
 
@@ -256,12 +265,12 @@ function idsFor(w: CrashWorkspace) {
  */
 async function assertSignalRegisteredButNotCompleted(w: CrashWorkspace): Promise<void> {
   const ids = idsFor(w);
-  const signalRows = await pool.query<{ n: string }>(
+  const signalRows = await w.pool.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM change_signals WHERE workspace_id = $1 AND id = $2`,
     [w.workspaceId, ids.changeSignalId],
   );
   assert.equal(Number(signalRows.rows[0]!.n), 1, 'change signal registered before the crash point');
-  const completionRows = await pool.query<{ n: string }>(
+  const completionRows = await w.pool.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM change_signal_completions WHERE workspace_id = $1 AND change_signal_id = $2`,
     [w.workspaceId, ids.changeSignalId],
   );
@@ -275,17 +284,17 @@ async function assertSignalRegisteredButNotCompleted(w: CrashWorkspace): Promise
 async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
   const { workspaceId } = w;
   const ids = idsFor(w);
-  const mapping = await resolveSourceSubjects(pool, workspaceId, w.connectionId);
+  const mapping = await resolveSourceSubjects(w.pool, workspaceId, w.connectionId);
 
   // Source + evidence provenance (Step 3).
-  const sourceRow = await pool.query<{ content_hash: string }>(
+  const sourceRow = await w.pool.query<{ content_hash: string }>(
     `SELECT content_hash FROM source_records WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, ids.sourceId],
   );
   assert.equal(sourceRow.rowCount, 1, 'source record exists after retry');
   assert.equal(sourceRow.rows[0]!.content_hash, canonicalDisruptionEventHash(w.event), 'source content hash matches the event');
 
-  const evidenceRow = await pool.query<{ assertion_type: string }>(
+  const evidenceRow = await w.pool.query<{ assertion_type: string }>(
     `SELECT assertion_type FROM evidence_records WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, ids.evidenceId],
   );
@@ -293,7 +302,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
   assert.equal(evidenceRow.rows[0]!.assertion_type, 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION', 'evidence assertion type matches');
 
   // Replacement service (Step 5).
-  const serviceRow = await pool.query<{ id: string }>(
+  const serviceRow = await w.pool.query<{ id: string }>(
     `SELECT id FROM transport_services WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, ids.replacementServiceId],
   );
@@ -305,7 +314,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
     const originalReservationId = pnrMapping.subject.id;
 
     // Step 4: original line CANCELLED, stamped with this event's evidence.
-    const originalLines = await pool.query<{ line_id: string; observed_status: string; observation_evidence_id: string }>(
+    const originalLines = await w.pool.query<{ line_id: string; observed_status: string; observation_evidence_id: string }>(
       `SELECT l.id AS line_id, l.observed_status, l.observation_evidence_id
          FROM reservation_lines l
          JOIN transport_line_details tld ON tld.workspace_id = l.workspace_id AND tld.line_id = l.id
@@ -320,7 +329,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
 
     // Step 6: replacement reservation with a CONFIRMED line on the replacement service.
     const replacementReservationId = ids.replacementReservationId(pnr);
-    const replacementLines = await pool.query<{ observed_status: string }>(
+    const replacementLines = await w.pool.query<{ observed_status: string }>(
       `SELECT l.observed_status
          FROM reservation_lines l
          JOIN transport_line_details tld ON tld.workspace_id = l.workspace_id AND tld.line_id = l.id
@@ -334,7 +343,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
 
     // Step 6: allocations bind the SAME (travellerId, journeyItemId) pairs as
     // the displaced (cancelled-on-original-service) lines.
-    const originalPairs = await pool.query<{ traveller_id: string; journey_item_id: string | null }>(
+    const originalPairs = await w.pool.query<{ traveller_id: string; journey_item_id: string | null }>(
       `SELECT DISTINCT a.traveller_id, a.journey_item_id
          FROM reservation_allocations a
          JOIN reservation_lines l ON l.workspace_id = a.workspace_id AND l.id = a.line_id AND l.reservation_id = a.reservation_id
@@ -342,7 +351,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
         WHERE a.workspace_id = $1 AND a.reservation_id = $2 AND t.transport_service_id = $3`,
       [workspaceId, originalReservationId, w.originalServiceId],
     );
-    const replacementPairs = await pool.query<{ traveller_id: string; journey_item_id: string | null }>(
+    const replacementPairs = await w.pool.query<{ traveller_id: string; journey_item_id: string | null }>(
       `SELECT DISTINCT traveller_id, journey_item_id FROM reservation_allocations WHERE workspace_id = $1 AND reservation_id = $2`,
       [workspaceId, replacementReservationId],
     );
@@ -356,7 +365,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
     // Step 6: journey selection flipped to the replacement service.
     for (const pair of originalPairs.rows) {
       if (!pair.journey_item_id) continue;
-      const item = await pool.query<{ selected_service_id: string | null }>(
+      const item = await w.pool.query<{ selected_service_id: string | null }>(
         `SELECT selected_service_id FROM transport_item_details WHERE workspace_id = $1 AND journey_item_id = $2`,
         [workspaceId, pair.journey_item_id],
       );
@@ -365,7 +374,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
     }
 
     // Step 7: external identity — service record + synthetic booking ref, both LINKED.
-    const serviceRecord = await pool.query<{ identity_state: string; canonical_subject_id: string }>(
+    const serviceRecord = await w.pool.query<{ identity_state: string; canonical_subject_id: string }>(
       `SELECT r.identity_state, l.canonical_subject_id
          FROM external_records r
          JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id AND l.superseded_at IS NULL
@@ -377,7 +386,7 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
     assert.equal(serviceRecord.rows[0]!.canonical_subject_id, ids.replacementServiceId, 'replacement service record links to the canonical service');
 
     const syntheticExternalId = `REPROTECTED:${w.event.providerEventId}:${pnr}`;
-    const bookingRecord = await pool.query<{ identity_state: string; canonical_subject_id: string }>(
+    const bookingRecord = await w.pool.query<{ identity_state: string; canonical_subject_id: string }>(
       `SELECT r.identity_state, l.canonical_subject_id
          FROM external_records r
          JOIN external_record_links l ON l.workspace_id = r.workspace_id AND l.external_record_id = r.id AND l.superseded_at IS NULL
@@ -392,12 +401,12 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
   // Step 8: ChangeSignal registered once and completed exactly once
   // (only-after-every-step truth; migration 0124 replaces the old
   // information-record completion marker one-for-one).
-  const signalRows = await pool.query<{ n: string }>(
+  const signalRows = await w.pool.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM change_signals WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, ids.changeSignalId],
   );
   assert.equal(Number(signalRows.rows[0]!.n), 1, 'exactly one change signal exists after retry');
-  const completionRows = await pool.query<{ n: string }>(
+  const completionRows = await w.pool.query<{ n: string }>(
     `SELECT count(*)::text AS n FROM change_signal_completions WHERE workspace_id = $1 AND change_signal_id = $2`,
     [workspaceId, ids.changeSignalId],
   );
@@ -410,14 +419,25 @@ async function assertCompleteCanonicalState(w: CrashWorkspace): Promise<void> {
 
 describe('F1 failure injection — provider disruption ingress survives partial failure', () => {
   before(async () => {
-    pool = await sharedTestPool();
-    dataset = await loadDataset(BUNDLE_DIR);
+    if (aitWorldModeFromEnv() === 'fresh') {
+      sharedPool = await sharedTestPool();
+      dataset = await loadDataset(BUNDLE_DIR);
+    }
+  });
+
+  after(async () => {
+    for (const dispose of disposers.splice(0)) {
+      await dispose().catch(() => undefined);
+    }
+    await sharedPool?.end().catch(() => undefined);
   });
 
   test('setup: three workspaces provisioned, one per crash point', async () => {
+    const t0 = performance.now();
     points.beforeReplacementService.workspace = await prepareWorkspace();
     points.afterReservationsBeforeLines.workspace = await prepareWorkspace();
     points.beforeExternalRecords.workspace = await prepareWorkspace();
+    console.log(`[timing] F1 setup three worlds mode=${aitWorldModeFromEnv()} setupMs=${(performance.now() - t0).toFixed(0)}`);
   });
 
   // -- Crash point 1: before replacement service creation, after cancellations
@@ -434,11 +454,11 @@ describe('F1 failure injection — provider disruption ingress survives partial 
     assert.match(first.error.message, /\[f1-injection\] simulated crash/, 'crash surfaced as the injected error');
 
     // Cancellations committed before the crash.
-    const mapping = await resolveSourceSubjects(pool, w.workspaceId, w.connectionId);
+    const mapping = await resolveSourceSubjects(w.pool, w.workspaceId, w.connectionId);
     for (const pnr of w.affectedPnrs) {
       const pnrMapping = mapping.get(`${SOURCE_RECORD_TYPES.RESERVATION}:${pnr}`);
       assert.ok(pnrMapping, `PNR ${pnr} resolves`);
-      const lines = await pool.query<{ observed_status: string; observation_evidence_id: string }>(
+      const lines = await w.pool.query<{ observed_status: string; observation_evidence_id: string }>(
         `SELECT l.observed_status, l.observation_evidence_id
            FROM reservation_lines l
            JOIN transport_line_details tld ON tld.workspace_id = l.workspace_id AND tld.line_id = l.id
@@ -453,7 +473,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
     }
 
     // Replacement service NOT created, change signal not completed.
-    const serviceRows = await pool.query<{ id: string }>(
+    const serviceRows = await w.pool.query<{ id: string }>(
       `SELECT id FROM transport_services WHERE workspace_id = $1 AND id = $2`,
       [w.workspaceId, ids.replacementServiceId],
     );
@@ -495,19 +515,19 @@ describe('F1 failure injection — provider disruption ingress survives partial 
 
     // Replacement reservations committed; no lines/allocations yet.
     for (const pnr of w.affectedPnrs) {
-      const reservationRow = await pool.query<{ id: string; observed_status: string }>(
+      const reservationRow = await w.pool.query<{ id: string; observed_status: string }>(
         `SELECT id, observed_status FROM reservations WHERE workspace_id = $1 AND id = $2`,
         [w.workspaceId, ids.replacementReservationId(pnr)],
       );
       assert.equal(reservationRow.rowCount, 1, `replacement reservation for ${pnr} exists after crash`);
       assert.equal(reservationRow.rows[0]!.observed_status, 'CONFIRMED', `replacement reservation for ${pnr} is CONFIRMED`);
 
-      const lines = await pool.query<{ n: string }>(
+      const lines = await w.pool.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM reservation_lines WHERE workspace_id = $1 AND reservation_id = $2`,
         [w.workspaceId, ids.replacementReservationId(pnr)],
       );
       assert.equal(Number(lines.rows[0]!.n), 0, `replacement reservation for ${pnr} has zero lines after crash`);
-      const allocations = await pool.query<{ n: string }>(
+      const allocations = await w.pool.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM reservation_allocations WHERE workspace_id = $1 AND reservation_id = $2`,
         [w.workspaceId, ids.replacementReservationId(pnr)],
       );
@@ -550,12 +570,12 @@ describe('F1 failure injection — provider disruption ingress survives partial 
 
     // All reservation-side work committed before the crash.
     for (const pnr of w.affectedPnrs) {
-      const lines = await pool.query<{ n: string }>(
+      const lines = await w.pool.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM reservation_lines WHERE workspace_id = $1 AND reservation_id = $2`,
         [w.workspaceId, ids.replacementReservationId(pnr)],
       );
       assert.ok(Number(lines.rows[0]!.n) > 0, `replacement reservation for ${pnr} has lines after crash`);
-      const allocations = await pool.query<{ n: string }>(
+      const allocations = await w.pool.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM reservation_allocations WHERE workspace_id = $1 AND reservation_id = $2`,
         [w.workspaceId, ids.replacementReservationId(pnr)],
       );
@@ -563,7 +583,7 @@ describe('F1 failure injection — provider disruption ingress survives partial 
     }
 
     // No external records for the replacement service or synthetic booking refs.
-    const externalForEvent = await pool.query<{ n: string }>(
+    const externalForEvent = await w.pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM external_records WHERE workspace_id = $1 AND (external_id = $2 OR external_id LIKE $3)`,
       [w.workspaceId, w.event.replacementService.externalId, `REPROTECTED:${w.event.providerEventId}:%`],
     );

@@ -35,15 +35,13 @@
  *      reservation lines byte-for-byte unchanged (the targeted booking's line
  *      is resolved by its PNR and asserted still CONFIRMED).
  */
-import { before, describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
-import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
-import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from '../src/app/demo/externalIdentity.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import {
@@ -51,6 +49,7 @@ import {
   type TransportServiceCancelledWithReprotectionEvent,
 } from '../src/app/target/providerDisruptionIngress.ts';
 import type { TargetCommandContext } from '../src/app/target/applicationCommands.ts';
+import { aitWorldModeFromEnv, obtainAitSummitWorld } from './aitFixtureClone.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:t2-n1-corridor-guard-test';
@@ -73,7 +72,9 @@ const COUNTED_TABLES = [
 ] as const;
 
 let pool: Pool;
-let dataset: LoadedDataset;
+let dataset: LoadedDataset | undefined;
+let sharedPool: Pool | undefined;
+let disposeWorld: (() => Promise<void>) | undefined;
 
 interface LineSnapshot {
   id: string;
@@ -83,17 +84,25 @@ interface LineSnapshot {
 }
 
 async function freshWorkspace(label: string): Promise<{ workspaceId: string; connectionId: string }> {
-  const workspaceId = randomUUID();
-  await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, `t2-n1:${label}:${workspaceId}`]);
-  const outcome = await provisionDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
-  assert.equal(outcome.status, 'MATERIALIZED');
-  const connectionResult = await pool.query<{ connection_id: string }>(
-    `SELECT DISTINCT connection_id FROM external_records WHERE workspace_id = $1 LIMIT 1`,
-    [workspaceId],
+  // Each scenario gets its own pristine clone / fresh world (never reuse mutated).
+  await disposeWorld?.().catch(() => undefined);
+  disposeWorld = undefined;
+  const t0 = performance.now();
+  const world = await obtainAitSummitWorld({
+    actorPrincipalId: ACTOR,
+    includeBaseline: true,
+    sharedPool,
+    dataset,
+  });
+  disposeWorld = world.dispose;
+  pool = world.pool;
+  assert.ok(
+    world.provisionStatus === 'MATERIALIZED' || world.provisionStatus === 'CLONED',
+    `world ready via ${world.provisionStatus}`,
   );
-  assert.equal(connectionResult.rowCount, 1, 'exactly one provisioning connection');
-  await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId: ACTOR });
-  return { workspaceId, connectionId: connectionResult.rows[0]!.connection_id };
+  assert.ok((world.baselineEvaluated ?? 0) > 0, 'baseline evaluation assessed at least one journey');
+  console.log(`[timing] N1 ${label} setup mode=${world.mode} setupMs=${(performance.now() - t0).toFixed(0)}`);
+  return { workspaceId: world.workspaceId, connectionId: world.connectionId };
 }
 
 function ctxFor(workspaceId: string): TargetCommandContext {
@@ -145,8 +154,16 @@ async function lineForBooking(workspaceId: string, serviceId: string, pnr: strin
 
 describe('N1 — replacement service reuse requires matching corridor, operator and schedule', () => {
   before(async () => {
-    pool = await sharedTestPool();
-    dataset = await loadDataset(BUNDLE_DIR);
+    if (aitWorldModeFromEnv() === 'fresh') {
+      sharedPool = await sharedTestPool();
+      pool = sharedPool;
+      dataset = await loadDataset(BUNDLE_DIR);
+    }
+  });
+
+  after(async () => {
+    await disposeWorld?.().catch(() => undefined);
+    await sharedPool?.end().catch(() => undefined);
   });
 
   test('different-corridor original service cannot reuse an existing replacement → VALIDATION_FAILED, zero mutation', async () => {
