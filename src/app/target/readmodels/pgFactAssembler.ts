@@ -1349,6 +1349,20 @@ async function loadOperatorOverviewFactsInner(
       LIMIT 2000`,
     [workspaceId, overviewJourneyIds],
   );
+  const overviewCommitmentHealth = new Map<string, 'GREEN' | 'AMBER' | 'RED' | 'NEUTRAL'>();
+  for (const item of overviewItems.rows) {
+    const view = await currentAssessmentView(
+      client,
+      workspaceId,
+      { kind: 'PROGRAMME_ITEM', id: item.id } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    const health = view.status === 'CURRENT' && view.assessment
+      ? view.assessment.overallVerdict === 'PASS' ? 'GREEN' : view.assessment.overallVerdict === 'FAIL' ? 'RED' : 'NEUTRAL'
+      : 'NEUTRAL';
+    overviewCommitmentHealth.set(item.id, health);
+  }
   const overviewServices = await client.query<{
     journey_id: string;
     service_id: string;
@@ -1381,6 +1395,23 @@ async function loadOperatorOverviewFactsInner(
       LIMIT 1000`,
     [workspaceId, overviewJourneyIds],
   );
+  const overviewResources = await client.query<{
+    journey_id: string;
+    resource_id: string;
+    resource_type: 'VEHICLE' | 'ROOM' | 'EQUIPMENT';
+  }>(
+    `SELECT DISTINCT ji.journey_id, r.id AS resource_id, r.resource_type
+       FROM journey_items ji
+       JOIN resource_use_item_details rd ON rd.workspace_id = ji.workspace_id AND rd.journey_item_id = ji.id
+       JOIN resources r ON r.workspace_id = rd.workspace_id AND r.id = rd.resource_id
+      WHERE ji.workspace_id = $1
+        AND ji.kind = 'RESOURCE_USE'
+        AND ji.lifecycle_status <> 'DROPPED'
+        AND ji.journey_id = ANY($2::uuid[])
+      ORDER BY r.id, ji.journey_id
+      LIMIT 1000`,
+    [workspaceId, overviewJourneyIds],
+  );
   const eventOverviewSource: EventOverviewSourceFacts = {
     programmeItems: overviewItems.rows.map((r) => ({
       itemRef: `PROGRAMME_ITEM:${r.id}`,
@@ -1388,6 +1419,7 @@ async function loadOperatorOverviewFactsInner(
       localDate: r.local_date,
       localTime: r.local_time,
       windowStart: r.window_start_utc,
+      health: overviewCommitmentHealth.get(r.id) ?? 'NEUTRAL',
     })),
     participations: overviewParticipations.rows.map((r) => ({
       itemRef: `PROGRAMME_ITEM:${r.programme_item_id}`,
@@ -1403,6 +1435,14 @@ async function loadOperatorOverviewFactsInner(
       ...(r.arrival_local_time ? { arrivalLocalTime: r.arrival_local_time } : {}),
       ...(r.published_arrival_local_time ? { publishedArrivalLocalTime: r.published_arrival_local_time } : {}),
       changed: r.changed,
+    })),
+    journeyDependencies: overviewResources.rows.map((r) => ({
+      journeyRef: `JOURNEY:${r.journey_id}`,
+      dependencyRef: `RESOURCE:${r.resource_id}`,
+      kindLabel: r.resource_type === 'ROOM' ? 'Shared room' : r.resource_type === 'VEHICLE' ? 'Shared vehicle' : 'Shared equipment',
+      label: r.resource_type === 'ROOM' ? 'Room resource' : r.resource_type === 'VEHICLE' ? 'Vehicle resource' : 'Equipment resource',
+      health: 'NEUTRAL' as const,
+      changed: false,
     })),
   };
 

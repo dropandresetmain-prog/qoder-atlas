@@ -314,6 +314,14 @@ export type EventOverviewHealth = z.infer<typeof EventOverviewHealthSchema>;
 export const EventOverviewMembershipSchema = z.enum(['CLEARED', 'CHECKING', 'UNRESOLVED', 'ATTENTION']);
 export type EventOverviewMembership = z.infer<typeof EventOverviewMembershipSchema>;
 
+export const EventOverviewRelationKindSchema = z.enum([
+  'DEPENDENCY_TO_COMMITMENT',
+  'DEPENDENCY_TO_TRAVELLER',
+  'TRAVELLER_TO_COMMITMENT',
+  'COHORT_TO_COMMITMENT',
+]);
+export type EventOverviewRelationKind = z.infer<typeof EventOverviewRelationKindSchema>;
+
 export const EventOverviewSchema = z.strictObject({
   /** Programme territories, ascending. `index` is 1-based and dense. */
   days: z.array(z.strictObject({
@@ -349,17 +357,17 @@ export const EventOverviewSchema = z.strictObject({
     /** The landmark this dependency materially feeds, when one is in the projection. */
     feedsLandmarkRef: z.string().min(1).optional(),
   })).max(12),
-  /** Compressed healthy population, one per programme day. */
+  /** Compressed population by programme day, or a date-free unassigned cohort. */
   cohorts: z.array(z.strictObject({
     ref: z.string().min(1),
-    dayIndex: z.number().int().min(1),
+    dayIndex: z.number().int().min(1).optional(),
     label: z.string().min(1),
     total: z.number().int().min(0),
     ready: z.number().int().min(0),
     unknown: z.number().int().min(0),
     attention: z.number().int().min(0),
     landmarkRef: z.string().min(1).optional(),
-  })).max(14),
+  })).max(15),
   /** Travellers promoted out of their cohort by current operational importance. */
   promotedTravellers: z.array(z.strictObject({
     journeyRef: z.string().min(1),
@@ -382,6 +390,14 @@ export const EventOverviewSchema = z.strictObject({
     unresolvedCount: z.number().int().min(0),
     landmarkRefs: z.array(z.string().min(1)).max(12),
   }).optional(),
+  /** Optional for historical projections; current producers supply explicit relation truth. */
+  relations: z.array(z.strictObject({
+    id: z.string().min(1),
+    kind: EventOverviewRelationKindSchema,
+    fromRef: z.string().min(1),
+    toRef: z.string().min(1),
+    health: EventOverviewHealthSchema,
+  })).max(256).optional(),
 });
 export type EventOverview = z.infer<typeof EventOverviewSchema>;
 

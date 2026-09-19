@@ -43,7 +43,8 @@ test('operator overview carries a bounded, schema-valid eventOverview', async ()
   assert.ok(eo.days.length >= 1 && eo.days.length <= 14);
   assert.ok(eo.landmarks.length > 0 && eo.landmarks.length <= 42);
   assert.ok(eo.dependencies.length <= 12);
-  assert.ok(eo.cohorts.length <= 14);
+  assert.ok(eo.cohorts.length <= 15);
+  assert.ok((eo.relations?.length ?? 0) <= 256);
   assert.ok(eo.promotedTravellers.length <= 16);
   assert.equal(
     eo.cohorts.reduce((s, c) => s + c.total, 0) + eo.promotedTravellers.length,
@@ -52,5 +53,15 @@ test('operator overview carries a bounded, schema-valid eventOverview', async ()
   );
   const dayIdx = new Set(eo.days.map((d) => d.index));
   assert.ok(eo.landmarks.every((l) => dayIdx.has(l.dayIndex)));
+  const nodeRefs = new Set([
+    ...eo.dependencies.map((d) => d.ref),
+    ...eo.landmarks.map((l) => l.ref),
+    ...eo.cohorts.map((c) => c.ref),
+    ...eo.promotedTravellers.map((t) => t.journeyRef),
+  ]);
+  for (const relation of eo.relations ?? []) {
+    assert.ok(nodeRefs.has(relation.fromRef), `relation source is projected: ${relation.id}`);
+    assert.ok(nodeRefs.has(relation.toRef), `relation target is projected: ${relation.id}`);
+  }
   console.log(`[evidence] eventOverview ${JSON.stringify(eo)}`);
 });
