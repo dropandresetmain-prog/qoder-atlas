@@ -42,7 +42,8 @@ import { runInternalExecutionPass } from '../src/app/target/executionPass.ts';
 import { provisionWorkspaceAuthority } from '../src/app/target/workspaceAuthority.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
-import type { PlanningReport } from '../src/app/target/recoveryPlanning.ts';
+import { createRecoveryPlanningCoordinator } from '../src/app/target/recoveryPlanningCoordinator.ts';
+import type { RecoveryPlanningResult } from '../src/contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type { ApprovalReport } from '../src/app/target/recoveryApproval.ts';
 
 const NOW = '2031-06-02T00:00:00.000Z';
@@ -147,7 +148,13 @@ describe('B1 generalized internal recovery loop (real PostgreSQL, normal runtime
     // --- workspace authority (boot step): operator approves, executor dispatches.
     const authority = await provisionWorkspaceAuthority({ pool, uow: () => app!.unitOfWork(), workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, now: NOW });
     assert.equal(authority.status, 'PROVISIONED', JSON.stringify(authority));
-    app.runtimeHooks = { executorPrincipalId: authority.principals.executor };
+    // R3: the product planning endpoint now requires the shared coordinator
+    // in runtimeHooks. The test composes its own (same deps composeTargetBoot
+    // uses) and attaches it so the handler can reach planCaseDetailed.
+    const planner = createRecoveryPlanningCoordinator({
+      pool, workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, uow: () => app!.unitOfWork(), now: NOW,
+    });
+    app.runtimeHooks = { executorPrincipalId: authority.principals.executor, planner };
 
     // --- change: the shared inbound arrives late (provider-shaped ingress with a change signal).
     const revision = await pool.query<{ revision: string }>('SELECT revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2', [seed.workspaceId, sharedServiceId]);
@@ -174,20 +181,20 @@ describe('B1 generalized internal recovery loop (real PostgreSQL, normal runtime
     assert.equal(caseView.status, 'OPEN');
     assert.ok(caseView.causalPath.some((s) => s.dimension === 'programme_participation'), JSON.stringify(caseView.causalPath));
 
-    // --- planning through HTTP: deterministic proposer -> validation -> overlay viability -> persisted VIABLE strategies.
+    // --- planning through HTTP: coordinator -> validation -> overlay viability -> persisted VIABLE strategies.
     const proposed = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies`, { now: NOW });
     assert.equal(proposed.status, 200, JSON.stringify(proposed.json));
-    const planning = (proposed.json as { report: PlanningReport }).report;
-    assert.ok(planning.candidates.length >= 2, `swap candidates for both later items: ${JSON.stringify(planning.candidates)}`);
-    const viable = planning.candidates.filter((c) => c.persisted && c.viability === 'VIABLE');
-    assert.equal(viable.length, 1, `exactly the early<->later swap is viable (peer swap fails its own participants): ${JSON.stringify(planning.candidates)}`);
-    assert.ok(planning.candidates.some((c) => c.viability === 'NOT_VIABLE'), 'the non-viable swap is reported, not persisted');
-    assert.equal(planning.caseStatus, 'AWAITING_AUTHORITY');
-    const strategyId = viable[0]!.strategyId;
+    const planningResult = (proposed.json as { result: RecoveryPlanningResult }).result;
+    assert.equal(planningResult.outcome, 'AWAITING_AUTHORITY');
+    assert.ok(planningResult.viableStrategyRefs.length >= 1, `exactly the early<->later swap is viable (peer swap fails its own participants): ${JSON.stringify(planningResult)}`);
+    const strategyId = planningResult.viableStrategyRefs[0]!;
     const strategyRow = await pool.query<{ scenario_change: { effects: { programmeItemId: string }[] } }>('SELECT scenario_change FROM recovery_strategies WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, strategyId]);
     assert.deepEqual(strategyRow.rows[0]!.scenario_change.effects.map((e) => e.programmeItemId).sort(), [earlyItem.programmeItemId, lateItem.programmeItemId].sort());
+    const attemptCountBefore = Number((await pool.query<{ n: string }>('SELECT count(*)::text AS n FROM recovery_planning_attempts WHERE workspace_id = $1 AND recovery_case_id = $2', [seed.workspaceId, caseId])).rows[0]!.n);
     const proposedAgain = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies`, { now: NOW });
-    assert.equal((proposedAgain.json as { report: PlanningReport }).report.persistedCount, 0, 'a rerun recognises the persisted candidate instead of duplicating it');
+    assert.equal(proposedAgain.status, 200, JSON.stringify(proposedAgain.json));
+    const attemptCountAfter = Number((await pool.query<{ n: string }>('SELECT count(*)::text AS n FROM recovery_planning_attempts WHERE workspace_id = $1 AND recovery_case_id = $2', [seed.workspaceId, caseId])).rows[0]!.n);
+    assert.equal(attemptCountAfter, attemptCountBefore, 'a rerun recognises the persisted candidate instead of duplicating it');
 
     // --- FB1-5/FB1-6: the option as the operator actually reads it.
     //

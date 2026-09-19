@@ -30,7 +30,8 @@ import { runInternalExecutionPass } from '../src/app/target/executionPass.ts';
 import { provisionWorkspaceAuthority } from '../src/app/target/workspaceAuthority.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
-import type { PlanningReport } from '../src/app/target/recoveryPlanning.ts';
+import { createRecoveryPlanningCoordinator } from '../src/app/target/recoveryPlanningCoordinator.ts';
+import type { RecoveryPlanningResult } from '../src/contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type { ApprovalReport } from '../src/app/target/recoveryApproval.ts';
 import type { TransportServiceCancelledWithReprotectionEvent } from '../src/app/target/providerDisruptionIngress.ts';
 
@@ -103,7 +104,13 @@ describe('B1 internal recovery loop on the canonical programme world', () => {
     assert.equal(baseline.evaluated, dataset.programme.importDraft.travellers.length, JSON.stringify(baseline));
     const authority = await provisionWorkspaceAuthority({ pool, uow: () => app!.unitOfWork(), workspaceId, actorPrincipalId: ACTOR, now: NOW });
     assert.equal(authority.status, 'PROVISIONED', JSON.stringify(authority));
-    app.runtimeHooks = { executorPrincipalId: authority.principals.executor };
+    // R3: the product planning endpoint now requires the shared coordinator
+    // in runtimeHooks. The test composes its own (same deps composeTargetBoot
+    // uses) and attaches it so the handler can reach planCaseDetailed.
+    const planner = createRecoveryPlanningCoordinator({
+      pool, workspaceId, actorPrincipalId: ACTOR, uow: () => app!.unitOfWork(), now: NOW,
+    });
+    app.runtimeHooks = { executorPrincipalId: authority.principals.executor, planner };
     await runCaseEscalation(lifecycleCtx);
 
     const originalServiceExternalId = 'ID7159@2026-09-30T10:45:00.000Z';
@@ -158,12 +165,14 @@ describe('B1 internal recovery loop on the canonical programme world', () => {
 
     const proposed = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies`, { now: NOW });
     assert.equal(proposed.status, 200, JSON.stringify(proposed.json));
-    const planning = (proposed.json as { report: PlanningReport }).report;
-    assert.ok(planning.candidates.length >= 1, JSON.stringify(planning.candidates));
-    const viable = planning.candidates.filter((c) => c.persisted && c.viability === 'VIABLE');
-    assert.ok(viable.length >= 1, `expected a VIABLE recovery option under the comparison contract: ${JSON.stringify(planning.candidates)}`);
-    assert.equal(planning.caseStatus, 'AWAITING_AUTHORITY');
-    const strategyId = viable[0]!.strategyId;
+    const planningResult = (proposed.json as { result: RecoveryPlanningResult }).result;
+    assert.equal(planningResult.outcome, 'AWAITING_AUTHORITY');
+    assert.ok(planningResult.viableStrategyRefs.length >= 1, `expected a VIABLE recovery option under the comparison contract: ${JSON.stringify(planningResult)}`);
+    // The read model also exposes the planning evidence and strategies.
+    const planned = projectRecoveryCase((await loadRecoveryCaseFacts(pool, workspaceId, caseId, NOW))!);
+    assert.ok(planned.planningEvidence, 'planning evidence visible on the Case read model');
+    assert.ok(planned.planningEvidence!.candidates.length >= 1, JSON.stringify(planned.planningEvidence!.candidates));
+    const strategyId = planned.strategies.find((s) => s.viability === 'VIABLE')?.strategyRef ?? planningResult.viableStrategyRefs[0]!;
 
     const approved = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies/${strategyId}/approve`, { now: NOW });
     assert.equal(approved.status, 200, JSON.stringify(approved.json));

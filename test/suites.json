@@ -92,6 +92,7 @@
       "test/r2-original-snapshot.test.ts",
       "test/r2-outcome-delta-labels.test.ts",
       "test/r3-causal-spine-layout.test.ts",
+      "test/r3-import-guard.test.ts",
       "test/r3-transport-research-composition.test.ts",
       "test/r3d-user-contracts.test.ts",
       "test/runtime-services.test.ts",
@@ -112,6 +113,7 @@
     ],
     "postgres": [
       "postgres-integration/atomicCommit.pgtest.ts",
+      "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/b1RecoveryLoop.pgtest.ts",
       "postgres-integration/b1SarahWorldRecovery.pgtest.ts",
       "postgres-integration/c2InvalidationGaps.pgtest.ts",
