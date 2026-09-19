@@ -341,7 +341,7 @@ function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, ter
   const changes = strategy.changes.map(changeLine);
   const cost = aggregateCost(view);
   const people = [...new Set(strategy.resolves.map((r) => plain(r.personLabel)).filter((n): n is string => n !== undefined))];
-  const approvable = !terminal && strategy.viability === 'VIABLE' && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED');
+  const approvable = !terminal && strategy.viability === 'VIABLE' && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED') && !strategy.executionBlocker;
   return {
     strategyRef: strategy.strategyRef,
     optionNumber: strategy.optionNumber,
@@ -350,7 +350,9 @@ function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, ter
     people,
     why: optionWhy(strategy),
     ...(cost ? { costLine: `Added cost: ${cost}` } : {}),
-    approverLine: approvable ? 'Needs your approval as organiser before anything changes.' : 'Not open for approval.',
+    approverLine: approvable
+      ? 'Needs your approval as organiser before anything changes.'
+      : strategy.executionBlocker ? plain(strategy.executionBlocker.message) ?? 'This option cannot be carried out yet.' : 'Not open for approval.',
     approvable,
   };
 }

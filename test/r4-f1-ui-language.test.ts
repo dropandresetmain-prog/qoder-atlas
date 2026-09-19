@@ -234,3 +234,19 @@ describe('duplicate option cards (F)', () => {
     assert.equal(new Set(titles).size, 2, titles.join(' | '));
   });
 });
+
+describe('R4-F2 execution blocker: a blocked option is never offered as approvable', () => {
+  test('a viable option with an executionBlocker has no approval block and states the reason', () => {
+    const blocked = { ...strategy(1, 1, '05:00', 'p'), executionBlocker: { code: 'EXTERNAL_EXECUTION_NOT_COMPOSED', message: 'Booking through the airline is not switched on for this session.' } } as RecoveryStrategyView;
+    const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [blocked], recommendedStrategyRef: blocked.strategyRef } as Partial<RecoveryCaseView>));
+    const option = [model.recommended, ...model.alternatives].find((o) => o)!;
+    assert.equal(option.approvable, false);
+    assert.equal(model.approval, undefined);
+    assert.match(option.approverLine, /not switched on/);
+  });
+  test('the same option without a blocker stays approvable', () => {
+    const ok = strategy(1, 1, '05:00', 'p');
+    const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [ok], recommendedStrategyRef: ok.strategyRef } as Partial<RecoveryCaseView>));
+    assert.equal([model.recommended, ...model.alternatives].find((o) => o)!.approvable, true);
+  });
+});
