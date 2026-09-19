@@ -38,15 +38,18 @@ Primary workspace was on unrelated `integration/pg-test-perf`; R4 recovered in `
 | --- | --- | --- |
 | R4-C0 | `e94f15addb53ce5dfd33ccb6de895871a7ae3f8a` | contract + lane dispatch |
 | R4-C1a | `18937dee4fea12fe47970b0f3f81bbfb6a39483c` | Lane D: G01 + G09 + Qwen |
-| R4-C1b | (merge A — see HEAD) | Lane A: shell region polling + demo reset |
+| R4-C1b | `5f83d5de4c4195c2d3edb487c69a4068d8fcc2a1` | Lane A: shell region polling + demo reset |
+| docs | `ebdcc1796f15c9a91279ee420eca4d8e1f5795a4` | takeover inventory |
+| R4-C2a | `7493746836b4473008831dd65ee6a78f84556d24` | Lane E1: V5.6 scene runtime |
 
 **Gate counters:** CURRENT_TARGET runs = **0**; full PG suite runs = **0**.
 
 **Lane D:** G01 `deaa710`, G09 `35e607b`, Qwen `f9f1822` — integrated. Focused 10/10 (capability+prefs+qwen).
 **Lane A:** `1a54623` — integrated. Focused shell/polling/demo-reset 22/22 on primary seam.
-**Next:** finish/commit Lane E1 graph, then B.
+**Lane E1:** `92efc03` — integrated. Focused graph/workspace 23/23.
+**Next:** finish/commit Lane B overview (+ parallel finish H/E2/C), then integrate.
 
-**Takeover next:** finish Lane E1 (V5.6 graph scene/runtime), then integrate.
+**Takeover next:** finish Lane B (V7.2 + population), then integrate remaining lanes.
 
 ---
 
