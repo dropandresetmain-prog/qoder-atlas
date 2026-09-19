@@ -185,6 +185,51 @@ test('alert-tone edge has no pulse class, ok-tone has pulse', () => {
   assert.ok(e2Classes.includes('fg-pulse'), 'Ok edge should pulse');
 });
 
+test('edge without semantic state stays neutral and does not pulse', () => {
+  const html = renderFocusedCaseGraph({
+    ldg: makeLdg(),
+    caseStatus: 'OPEN',
+  });
+
+  const edgeMatch = html.match(/class="([^"]*)"[^>]*data-edge-key="e1"[^>]*data-tone="([^"]*)"/);
+  assert.ok(edgeMatch, 'edge path should be present');
+  assert.ok(edgeMatch![1]!.includes('sem-neutral'), 'missing edge state should remain neutral');
+  assert.equal(edgeMatch![2], 'neutral');
+  assert.ok(!edgeMatch![1]!.includes('fg-pulse'), 'neutral edge should not pulse');
+  assert.ok(!html.includes('data-pulse-for="e1"'), 'neutral edge should have no pulse element');
+});
+
+test('Disruption Path frames supplied causal nodes while retaining context nodes', () => {
+  const ldg = makeLdg({
+    nodes: [
+      { ref: 'A', kind: 'TRAVELLER', label: 'A', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+      { ref: 'B', kind: 'SERVICE_BOOKING', label: 'B', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
+      { ref: 'C', kind: 'TRANSFER_STAY', label: 'Context C', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [
+      { id: 'e1', fromRef: 'A', toRef: 'B', kind: 'RELIES_ON', authority: 'AUTHORITATIVE' },
+      { id: 'e2', fromRef: 'B', toRef: 'C', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE' },
+    ],
+  });
+  const focusedGraph: FocusedGraphView = {
+    causalNodeRefs: ['A', 'B'],
+    causalEdgeIds: ['e1'],
+    unmappedCausalSteps: [],
+  };
+
+  const html = renderFocusedCaseGraph({ ldg, focusedGraph, caseStatus: 'OPEN' });
+  const scene = JSON.parse(html.match(/<script type="application\/json" class="fg-scene">([\s\S]*?)<\/script>/)![1]!);
+  assert.ok(scene.nodes.some((node: { ref: string }) => node.ref === 'C'), 'healthy context node remains rendered');
+  assert.ok(scene.views.path.rect.y2 < scene.views.trip.rect.y2, 'path view should exclude context extent from framing');
+  assert.deepEqual(scene.views.path.keepNodes, ['A', 'B']);
+});
+
+test('trip view uses the accepted Trip Overview label', () => {
+  const html = renderFocusedCaseGraph({ ldg: makeLdg(), caseStatus: 'OPEN' });
+  assert.ok(html.includes('data-view="trip">Trip Overview</button>'));
+  assert.ok(!html.includes('>Full trip</button>'));
+});
+
 test('PLANNING status wrapper present, absent for OPEN', () => {
   const ldg = makeLdg();
 
