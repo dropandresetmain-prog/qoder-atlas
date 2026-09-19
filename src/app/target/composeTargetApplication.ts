@@ -17,6 +17,8 @@ import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import { PgReassessmentWorker } from '../../persistence/postgres/world/pgAssessments.ts';
 import type { RuntimeServices } from '../runtimeServices.ts';
+import type { CoordinatorPlanOutcome } from './recoveryPlanningCoordinator.ts';
+import type { RecoveryPlanningCoordinator, RecoveryPlanningInput } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import { M9_REPLAN_IDENTITY } from './replanIdentity.ts';
 import { M9_OBJECTIVE_DISPOSITION_API_EXPOSED } from './objectiveDispositionBoundary.ts';
 
@@ -48,11 +50,18 @@ export interface TargetApplication {
    * principal, and "run now" hooks so an approval is executed without waiting
    * for the next idle poll. Absent in test compositions, which drive the
    * passes directly.
+   *
+   * R3: `planner` is the ONE recovery-planning coordinator instance (also
+   * owned by the C4 progression pass) so the product planning trigger uses
+   * the same planning truth as the lifecycle. Absent in test compositions.
    */
   runtimeHooks?: {
     executorPrincipalId: string;
     afterApproval?: () => Promise<void>;
     afterExecution?: () => Promise<void>;
+    planner?: RecoveryPlanningCoordinator & {
+      planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome>;
+    };
   };
   replanIdentity: typeof M9_REPLAN_IDENTITY;
   objectiveDispositionApiExposed: typeof M9_OBJECTIVE_DISPOSITION_API_EXPOSED;

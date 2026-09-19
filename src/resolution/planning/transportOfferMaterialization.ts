@@ -16,7 +16,7 @@ import {
   transportRequestId,
   type AirportResolver,
   type TransportCorridor,
-  type TransportPassengers,
+  type TransportPassengerSource,
 } from './transportCorridors.ts';
 
 export interface MaterializedTransportOffers {
@@ -78,18 +78,18 @@ function materializeOffer(
  * a deep planning copy. Canonical service rows, reservation state, and the
  * original world object are unchanged.
  */
-export function materializeTransportOffers(input: {
+export function materializeTransportOffers(input: TransportPassengerSource & {
   world: CapturedWorld;
   failing: readonly FailingSubject[];
   toolResults: readonly PlanningToolResult[];
   now: Instant;
   resolveAirport: AirportResolver;
-  passengers: TransportPassengers;
   maxOffersPerCorridor?: number;
 }): MaterializedTransportOffers {
   const { corridors } = transportCorridors(input.world, input.failing, {
     resolveAirport: input.resolveAirport,
-    passengers: input.passengers,
+    ...(input.passengers ? { passengers: input.passengers } : {}),
+    ...(input.passengersFor ? { passengersFor: input.passengersFor } : {}),
   });
   const correlated = correlatedTransportOffers({
     corridors,

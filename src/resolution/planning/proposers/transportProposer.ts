@@ -50,7 +50,7 @@ import {
   journeyItemIdForRequest,
   type AirportResolver,
   type TransportCorridor,
-  type TransportPassengers,
+  type TransportPassengerSource,
 } from '../transportCorridors.ts';
 
 export const TRANSPORT_PROPOSER_ID = 'proposer.transport-offer';
@@ -64,11 +64,9 @@ const SUBJECT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_\-:.]*$/;
 /** Hard bound on offers proposed per corridor; keeps the candidate set finite. */
 const DEFAULT_MAX_OFFERS_PER_CORRIDOR = 6;
 
-export interface TransportProposerOptions {
+export interface TransportProposerOptions extends TransportPassengerSource {
   /** INJECTED place→provider-airport resolver. Never hardcoded here (fail-closed). */
   resolveAirport: AirportResolver;
-  /** INJECTED passenger counts for the corridor research. Never defaulted to a demo value. */
-  passengers: TransportPassengers;
   /** Max ranked offers proposed per corridor (bounded; defaults to 6). */
   maxOffersPerCorridor?: number;
 }
@@ -232,18 +230,18 @@ export function correlatedTransportOffers(input: {
  * service is captured. Pure and deterministic; the SAME derivation the proposer
  * uses, so offer keys always align with the candidates.
  */
-export function resolveTransportOffers(input: {
+export function resolveTransportOffers(input: TransportPassengerSource & {
   world: DomainProposerInput['world'];
   failing: DomainProposerInput['failing'];
   toolResults: readonly PlanningToolResult[];
   now: Instant;
   resolveAirport: AirportResolver;
-  passengers: TransportPassengers;
   maxOffersPerCorridor?: number;
 }): { resolvedOffers: ResolvedOffer[]; corridors: TransportCorridor[] } {
   const { corridors } = transportCorridors(input.world, input.failing, {
     resolveAirport: input.resolveAirport,
-    passengers: input.passengers,
+    ...(input.passengers ? { passengers: input.passengers } : {}),
+    ...(input.passengersFor ? { passengersFor: input.passengersFor } : {}),
   });
   const { resolvedOffers } = correlatedTransportOffers({
     corridors,
@@ -269,9 +267,9 @@ export function createTransportProposer(options: TransportProposerOptions): Doma
     async propose(input: DomainProposerInput): Promise<ProposalCandidate[]> {
       const { corridors } = transportCorridors(input.world, input.failing, {
         resolveAirport: options.resolveAirport,
-        passengers: options.passengers,
-      });
-      const { offers } = correlatedTransportOffers({
+        ...(options.passengers ? { passengers: options.passengers } : {}),
+        ...(options.passengersFor ? { passengersFor: options.passengersFor } : {}),
+      });      const { offers } = correlatedTransportOffers({
         corridors,
         toolResults: input.evidence.toolResults,
         now: input.now,

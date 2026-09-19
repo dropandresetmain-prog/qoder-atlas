@@ -54,7 +54,7 @@ import { unmetProgrammeItems, type FailingSubject } from '../../resolution/plann
 import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
 import { createTransportProposer } from '../../resolution/planning/proposers/transportProposer.ts';
 import { materializeTransportOffers } from '../../resolution/planning/transportOfferMaterialization.ts';
-import { airportResolverFromCapturedWorld, flightSearchRequestFor, transportCorridors, type AirportResolver, type TransportPassengers } from '../../resolution/planning/transportCorridors.ts';
+import { airportResolverFromCapturedWorld, flightSearchRequestFor, transportCorridors, type AirportResolver, type TransportPassengerSource } from '../../resolution/planning/transportCorridors.ts';
 import { defaultRecoveryDomainRegistry } from '../../resolution/planning/recoveryDomains.ts';
 import {
   runRecoveryPlanning,
@@ -89,13 +89,17 @@ export interface RecoveryPlanningCoordinatorDeps {
    * Optional provider read-only transport capability. Supplying it activates
    * generalized TRANSPORT research; omitting it leaves the domain unavailable
    * rather than inventing a provider or passenger count.
+   *
+   * The search party comes from `passengersFor` (derived per corridor from
+   * authoritative state — the R3 shape the composition root supplies) or the
+   * retained pre-R3 static `passengers` value; exactly one is required
+   * (`TransportPassengerSource`). Neither is defaulted here.
    */
   transportPlanning?: {
     transport: PlanningToolTransport;
-    passengers: TransportPassengers;
     resolveAirport?: AirportResolver;
     maxOffersPerCorridor?: number;
-  };
+  } & TransportPassengerSource;
 }
 
 /** The default domain-bound proposers shipped with the runtime (the PROGRAMME time-swap). */
@@ -236,19 +240,27 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       const resolveAirport = transportPlanning
         ? transportPlanning.resolveAirport ?? airportResolverFromCapturedWorld(basis.world)
         : undefined;
+      // The single passenger source for every corridor derivation below (proposer,
+      // research requests, offer materialization). Exactly one arm is present per
+      // TransportPassengerSource; it is never defaulted here.
+      const passengerSource: TransportPassengerSource | undefined = transportPlanning
+        ? (transportPlanning.passengersFor
+          ? { passengersFor: transportPlanning.passengersFor, ...(transportPlanning.passengers ? { passengers: transportPlanning.passengers } : {}) }
+          : { passengers: transportPlanning.passengers! })
+        : undefined;
       const proposers = [...(deps.proposers ?? defaultDomainProposers())];
       if (transportPlanning && !proposers.some((binding) => binding.domain === 'TRANSPORT')) {
         proposers.push({
           domain: 'TRANSPORT',
           proposer: createTransportProposer({
             resolveAirport: resolveAirport!,
-            passengers: transportPlanning.passengers,
+            ...passengerSource!,
             ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
           }),
         });
       }
       const transportResearch = transportPlanning
-        ? transportCorridors(basis.world, basis.failing, { resolveAirport: resolveAirport!, passengers: transportPlanning.passengers })
+        ? transportCorridors(basis.world, basis.failing, { resolveAirport: resolveAirport!, ...passengerSource! })
           .corridors.map((corridor) => flightSearchRequestFor(corridor, { round: 1 }))
         : [];
 

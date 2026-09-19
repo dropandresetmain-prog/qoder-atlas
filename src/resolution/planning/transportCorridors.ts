@@ -9,10 +9,13 @@
  *
  * Provider-neutral and fail-closed: an unresolvable place (no injected
  * airport resolver hit, no IANA tz, no intended window) becomes an honest
- * gap, never a fabricated corridor. No PostgreSQL, no provider call, no
+ * gap, never a fabricated corridor — and so does an underivable search
+ * party (`passengers_unknown`). No PostgreSQL, no provider call, no
  * model, no scenario/persona branch, no hardcoded route/airport/passenger
  * literal — every provider-specific value flows through the injected
- * AirportResolver and the injected passenger counts.
+ * AirportResolver, and every passenger count flows through the injected
+ * `passengersFor` resolver (derived from authoritative state) or the
+ * injected static `passengers` value.
  */
 import { createHash } from 'node:crypto';
 import type { ExternalRef } from '../../contracts/capabilities.ts';
@@ -44,10 +47,80 @@ export interface TransportPassengers {
   infants?: number;
 }
 
-export interface TransportCorridorOpts {
+/**
+ * Resolves the search party for ONE corridor from authoritative state, instead of
+ * accepting a composition-wide constant. Returns an honest `unknown` rather than
+ * inventing a party when the captured world cannot support a count.
+ *
+ * Provider-neutral and persona-neutral: the resolver sees only the corridor's
+ * journey/item ids and the captured world.
+ */
+export type TransportPassengersResolver = (ctx: {
+  journeyId: string;
+  journeyItemId: string;
+  world: CapturedWorld;
+}) => TransportPassengers | { unknown: true; reason: string };
+
+/**
+ * The default state-derived resolver.
+ *
+ * Canonical state encodes NO age category (`travellers` carries identity and
+ * lifecycle only; `reservation_allocations.allocation_role` is a free-form role,
+ * not an age band), so children/infants are never invented and stay absent. Each
+ * DERIVED PERSON maps to `adults`, because the read-only flight.search request
+ * schema requires `adults >= 1` and a known person cannot otherwise be expressed;
+ * that mapping is an explicit, documented uncertainty surfaced in planning
+ * evidence, never a silent assumption.
+ *
+ * Derivation order, both authoritative:
+ *   1. distinct travellers allocated to this journey item — the only place
+ *      canonical state binds people to a journey item, and the capture already
+ *      expands peer travellers on capacity-relevant lines;
+ *   2. otherwise the corridor journey's own single traveller, legitimate because
+ *      a Journey is 1:1 with its Traveller by schema (not by constant);
+ *   3. otherwise fail closed — no fabricated corridor.
+ */
+export function travellersForJourneyItemPassengers(
+  world: CapturedWorld,
+  journeyItemId: string,
+  journeyId: string,
+): TransportPassengers | { unknown: true; reason: string } {
+  const allocated = new Set<string>();
+  for (const allocation of world.allocations) {
+    if (allocation.journeyItemId !== journeyItemId) continue;
+    if (allocation.travellerId.trim().length === 0) continue;
+    allocated.add(allocation.travellerId);
+  }
+  if (allocated.size > 0) return { adults: allocated.size };
+
+  const journey = world.journeys.find((candidate) => candidate.id === journeyId);
+  if (journey && journey.travellerId.trim().length > 0) return { adults: 1 };
+
+  return { unknown: true, reason: 'no_traveller_allocations_and_no_journey_traveller' };
+}
+
+/**
+ * The passenger source for corridor derivation. Both arms are optional so the
+ * pre-R3 static shape keeps compiling unchanged; `passengersFor` (per-corridor
+ * derivation from authoritative state) is the R3 shape and wins when present.
+ *
+ * Neither is ever defaulted inside these modules. Supplying NEITHER is not a
+ * silent `adults: 1` — it fails every corridor closed with a `passengers_unknown`
+ * gap, which is the safer failure: a compile-time requirement to pass *something*
+ * would not guarantee the value passed is truthful, while fail-closed derivation
+ * does. Shared by every corridor-deriving caller (corridor builder, proposer,
+ * offer materialization, coordinator) so resolver-vs-static precedence has one
+ * definition.
+ */
+export interface TransportPassengerSource {
+  /** Composition-wide static search party (pre-R3 shape, retained). */
+  passengers?: TransportPassengers;
+  /** Per-corridor search party derived from authoritative state (R3 shape); wins over `passengers`. */
+  passengersFor?: TransportPassengersResolver;
+}
+
+export interface TransportCorridorOpts extends TransportPassengerSource {
   resolveAirport: AirportResolver;
-  /** Passenger counts for the search. INJECTED — never defaulted to a demo value inside this module. */
-  passengers: TransportPassengers;
 }
 
 export interface TransportCorridor {
@@ -68,7 +141,8 @@ export type TransportGapReason =
   | 'no_destination_place'
   | 'origin_airport_unresolved'
   | 'destination_airport_unresolved'
-  | 'no_departure_window';
+  | 'no_departure_window'
+  | 'passengers_unknown';
 
 export interface TransportCorridorGap {
   journeyItemId: string | null;
@@ -154,6 +228,14 @@ export function transportCorridors(
   const corridors: TransportCorridor[] = [];
   const gaps: TransportCorridorGap[] = [];
 
+  /** Resolve one corridor's search party: the injected resolver wins over a static value. Neither present fails closed. */
+  const passengersFor = (item: WJourneyItem): TransportPassengers | { unknown: true; reason: string } => {
+    if (opts.passengersFor) {
+      return opts.passengersFor({ journeyId: item.journeyId, journeyItemId: item.id, world });
+    }
+    if (opts.passengers) return opts.passengers;
+    return { unknown: true, reason: 'no_passenger_source_supplied' };
+  };
   for (const journeyId of journeysWithoutTransport) {
     gaps.push({ journeyItemId: null, reasonCode: 'no_transport_journey_item' });
     void journeyId;
@@ -192,6 +274,13 @@ export function transportCorridors(
       gaps.push({ journeyItemId: item.id, reasonCode: 'no_departure_window' });
       continue;
     }
+    // Fail closed on an underivable search party: never fabricate a corridor with
+    // an invented passenger count.
+    const resolvedPassengers = passengersFor(item);
+    if ('unknown' in resolvedPassengers) {
+      gaps.push({ journeyItemId: item.id, reasonCode: 'passengers_unknown' });
+      continue;
+    }
     let departureDate: string;
     try {
       departureDate = localDateAtTimeZone(item.intendedWindow.start, originPlace.timeZone);
@@ -207,7 +296,7 @@ export function transportCorridors(
       origin,
       destination,
       departureDate,
-      passengers: opts.passengers,
+      passengers: resolvedPassengers,
     });
   }
 
