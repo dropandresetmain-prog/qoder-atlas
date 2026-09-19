@@ -128,6 +128,8 @@ export type DemoResetOutcome =
       provisioning: string;
       baselineEvaluated: number;
       authority: string;
+      /** Wall-clock milliseconds per reset phase (diagnostic, not truth). */
+      timingsMs: Record<string, number>;
     }
   | { status: 'REFUSED'; code: string; message: string }
   | { status: 'UNSUPPORTED'; code: 'RESET_REQUIRES_TRIGGER_BYPASS'; message: string }
@@ -141,11 +143,38 @@ export interface DemoResetParams {
   now?: () => string;
 }
 
+/**
+ * In-process single-flight: a second reset for the same workspace while one is
+ * running is answered immediately with IN_PROGRESS, without taking a pool
+ * connection (the advisory lock below still guards other processes).
+ */
+const resetsInFlight = new Set<string>();
+
 export async function resetDemoWorkspace(params: DemoResetParams): Promise<DemoResetOutcome> {
   const env = params.env ?? process.env;
   const gate = demoResetGate(env);
   if (!gate.open) return { status: 'REFUSED', code: gate.code, message: gate.message };
+  const { workspaceId } = params;
+  if (resetsInFlight.has(workspaceId)) {
+    return { status: 'IN_PROGRESS', code: 'RESET_IN_PROGRESS', message: 'A demo reset is already running for this workspace.' };
+  }
+  resetsInFlight.add(workspaceId);
+  try {
+    return await runReset(params, env);
+  } finally {
+    resetsInFlight.delete(workspaceId);
+  }
+}
+
+async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promise<DemoResetOutcome> {
   const { pool, workspaceId } = params;
+  const timingsMs: Record<string, number> = {};
+  let phaseStart = Date.now();
+  const mark = (phase: string): void => {
+    const t = Date.now();
+    timingsMs[phase] = t - phaseStart;
+    phaseStart = t;
+  };
 
   const client = await pool.connect();
   let locked = false;
@@ -159,6 +188,7 @@ export async function resetDemoWorkspace(params: DemoResetParams): Promise<DemoR
       return { status: 'IN_PROGRESS', code: 'RESET_IN_PROGRESS', message: 'A demo reset is already running for this workspace.' };
     }
 
+    mark('lock');
     const tables = await listResetTables(client);
     let deletedRows = 0;
     try {
@@ -169,6 +199,7 @@ export async function resetDemoWorkspace(params: DemoResetParams): Promise<DemoR
         deletedRows += result.rowCount ?? 0;
       }
       await client.query('COMMIT');
+      mark('deleteWorkspaceRows');
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       if ((error as { code?: string }).code === '42501') {
@@ -186,7 +217,9 @@ export async function resetDemoWorkspace(params: DemoResetParams): Promise<DemoR
     // Rebuild the healthy baseline with the same deterministic boot steps.
     const actorPrincipalId = `northstar-boot:${workspaceId}`;
     const provisioning = await provisionConfiguredDataset({ pool, workspaceId, actorPrincipalId, env });
+    mark('provisionDataset');
     const baseline = await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId });
+    mark('baselineEvaluation');
     const authority = await provisionWorkspaceAuthority({
       pool,
       uow: params.uow,
@@ -195,6 +228,7 @@ export async function resetDemoWorkspace(params: DemoResetParams): Promise<DemoR
       now: (params.now ?? (() => new Date().toISOString()))(),
       operatorAuthSubject: env.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
     });
+    mark('workspaceAuthority');
     return {
       status: 'RESET',
       workspaceId,
@@ -203,6 +237,7 @@ export async function resetDemoWorkspace(params: DemoResetParams): Promise<DemoR
       provisioning: provisioning.status,
       baselineEvaluated: baseline.evaluated,
       authority: authority.status,
+      timingsMs,
     };
   } finally {
     if (locked) {
