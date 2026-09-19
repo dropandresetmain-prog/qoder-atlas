@@ -30,7 +30,20 @@ export function renderOverviewGraphAssets(): string {
 export function renderEventOverviewGraph(view: OperatorOverview): string {
   const model = buildOverviewGraphModel(view);
   if (!model) return '';
-  const layout = computeOverviewLayout(model);
+  // Semantic zoom: keep the changed dependency and the first backend-ranked
+  // shared groups as cards. Every remaining supplied group stays available in
+  // the adjacent disclosure; population and programme cards are never removed.
+  const dependencyCards = model.nodes.filter((node) => node.kind === 'dependency');
+  const prominent = new Set(model.focus?.incidentIds ?? []);
+  const drawnDependencies = [...dependencyCards]
+    .sort((a, b) => Number(prominent.has(b.id)) - Number(prominent.has(a.id)))
+    .slice(0, 4);
+  const drawnDependencyIds = new Set(drawnDependencies.map((node) => node.id));
+  const remainingDependencies = dependencyCards.filter((node) => !drawnDependencyIds.has(node.id));
+  const drawnNodes = model.nodes.filter((node) => node.kind !== 'dependency' || drawnDependencyIds.has(node.id));
+  const drawnIds = new Set(drawnNodes.map((node) => node.id));
+  const drawnRelations = model.relations.filter((relation) => drawnIds.has(relation.from) && drawnIds.has(relation.to));
+  const layout = computeOverviewLayout({ ...model, nodes: drawnNodes, relations: drawnRelations });
 
   const zonesHtml = layout.zones.map((zone, i) => {
     const day = model.days[i];
@@ -44,13 +57,17 @@ export function renderEventOverviewGraph(view: OperatorOverview): string {
     .join('');
   const lane = `<div class="og-lane" style="left:${layout.lane.x}px;top:${layout.lane.y}px;width:${layout.lane.w}px;height:${layout.lane.h}px">${zonesHtml}${rowLines}</div>`;
 
-  const cards = model.nodes
+  const cards = drawnNodes
     .map((node) => {
       const box = layout.boxes.get(node.id);
       return box ? renderNodeCard(node, box) : '';
     })
     .join('');
-  const edges = renderEdges(model.relations, layout.boxes, layout);
+  const edges = renderEdges(drawnRelations, layout.boxes, layout);
+  const additionalDependencies = remainingDependencies.length === 0 ? '' : `<details class="og-additional">
+    <summary>${remainingDependencies.length} more shared dependencies</summary>
+    <ul>${remainingDependencies.map((node) => `<li><strong>${escapeHtml(node.title)}</strong> · ${escapeHtml([node.type, node.meta, node.badge].filter(Boolean).join(' · '))}</li>`).join('')}</ul>
+  </details>`;
 
   const focus = model.focus;
   const focusPill = focus
@@ -79,7 +96,7 @@ export function renderEventOverviewGraph(view: OperatorOverview): string {
     <header class="og-head">
       <div>
         <h2>Event health</h2>
-        <p class="og-sub">Shared travel services, the programme, and who needs attention.</p>
+        <p class="og-sub">Shared dependencies, the programme, and who needs attention.</p>
       </div>
       <div class="og-controls">${viewSwitch}${pill}</div>
     </header>
@@ -94,6 +111,8 @@ export function renderEventOverviewGraph(view: OperatorOverview): string {
       <div class="og-legend" aria-label="Legend"><span><i style="background:#1f9d78"></i>Healthy</span><span><i style="background:#d58a13"></i>Checking</span><span><i style="background:#df3b49"></i>Needs attention</span><span><i style="background:#bcc6d2"></i>Unconfirmed</span></div>
       <div class="og-world" style="width:${layout.width}px;height:${layout.height}px">${lane}${edges}${cards}</div>
     </div>
+    <p class="og-inspector" data-og-inspector hidden aria-live="polite"></p>
+    ${additionalDependencies}
     ${model.overflowNote ? `<p class="og-note">${escapeHtml(model.overflowNote)}</p>` : ''}
   </div>
 </section>`;

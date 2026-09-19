@@ -14,13 +14,13 @@ import type { OgKind, OgNode, OverviewGraphModel } from './model.ts';
 export interface Box { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 
 export const CARD: Record<OgKind, { readonly w: number; readonly h: number }> = {
-  dependency: { w: 176, h: 82 },
-  landmark: { w: 138, h: 66 },
+  dependency: { w: 160, h: 58 },
+  landmark: { w: 140, h: 58 },
   cohort: { w: 214, h: 60 },
-  traveller: { w: 148, h: 88 },
+  traveller: { w: 148, h: 68 },
 };
 
-export const DAY_W = 330;
+export const DAY_W = 466;
 const MARGIN = 20;
 const GAP = 10;
 const LANE_HEAD = 38;
@@ -131,7 +131,7 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
   // dependency row must clear the programme lane below it.
   const feeds = new Map<string, string>();
   for (const rel of model.relations) {
-    if (rel.id.startsWith('dep:')) feeds.set(rel.from, rel.to);
+    if (rel.kind === 'DEPENDENCY_TO_COMMITMENT') feeds.set(rel.from, rel.to);
   }
   const depTop = deps.length > 0 ? 6 : 0;
   const depItems = deps.map((node) => ({
@@ -142,7 +142,7 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
   const depPack = deps.length > 0
     ? packRow(depItems, CARD.dependency, depTop, MARGIN, width - MARGIN, GAP)
     : null;
-  const laneY = depPack ? depPack.bottom + 34 : 8;
+  const laneY = depPack ? depPack.bottom + 20 : 8;
   const laneH = LANE_HEAD + rowsNeeded * (lm.h + GAP) + 4;
 
   const boxes = new Map<string, Box>();
@@ -174,10 +174,10 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
   // Promoted travellers sit under the landmark (or dependency) they connect to.
   const travellerTarget = new Map<string, string>();
   for (const rel of model.relations) {
-    if (rel.id.startsWith('trav-lm:')) travellerTarget.set(rel.from, rel.to);
-    else if (rel.id.startsWith('trav-dep:') && !travellerTarget.has(rel.to)) travellerTarget.set(rel.to, rel.from);
+    if (rel.kind === 'TRAVELLER_TO_COMMITMENT') travellerTarget.set(rel.from, rel.to);
+    else if (rel.kind === 'DEPENDENCY_TO_TRAVELLER' && !travellerTarget.has(rel.to)) travellerTarget.set(rel.to, rel.from);
   }
-  let below = laneBottom + 36;
+  let below = laneBottom + 20;
   if (travellers.length > 0) {
     const items = travellers.map((node) => ({
       node,
@@ -185,7 +185,7 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
     }));
     const pack = packRow(items, CARD.traveller, below, MARGIN, width - MARGIN, GAP);
     pack.placed.forEach((box, id) => boxes.set(id, box));
-    below = pack.bottom + 26;
+    below = pack.bottom + 14;
   }
   // Cohorts retain their day territory. Multiple cohorts on the same day
   // stack into rows instead of sharing one coordinate and overlapping.

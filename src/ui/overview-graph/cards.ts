@@ -69,7 +69,8 @@ export function renderNodeCard(node: OgNode, box: Box): string {
     node.faded ? 'og-faded' : '',
     node.attention ? 'og-attention' : '',
   ].filter(Boolean).join(' ');
-  return `<div class="${classes}" tabindex="0" role="button" data-og-node="${escapeHtml(node.id)}" data-og-kind="${node.kind}" data-health="${node.health}" style="${styleFor(box)}">${body(node)}</div>`;
+  const description = [node.type, node.title, node.when, node.meta, node.badge].filter(Boolean).join(' · ');
+  return `<div class="${classes}" tabindex="0" role="button" aria-label="${escapeHtml(description)}" data-og-description="${escapeHtml(description)}" data-og-node="${escapeHtml(node.id)}" data-og-kind="${node.kind}" data-health="${node.health}" style="${styleFor(box)}">${body(node)}</div>`;
 }
 
 /** Amber pulses travel slower than green; red and context never pulse. */

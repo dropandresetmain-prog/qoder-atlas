@@ -30,13 +30,14 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-Active A1 lanes: Overview semantics Terra `codex/astra-a1-overview-semantics`; Traveller read restoration Luna `codex/astra-a1-traveller-read`; Decisions history Luna `codex/astra-a1-decision-history`. Shared schema/assembler sections have explicit disjoint ownership. Navigation, Overview layout, programme preview and Case semantics are integrated. Existing R4/PG-perf worktrees and root untracked work remain untouched.
+Active A1 lanes: Terra request-authority correction; Luna programme intake reliability; Luna programme commit seam investigation. Pending integration: Programme `5d0ca246`, Traveller correctness `eb8629b`, Case supplier story `09ba640e`, request persistence `2cfa26d` (authority correction pending). Each uses an isolated worktree/database. Existing R4/PG-perf worktrees and root untracked work remain untouched.
 
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
-- Current pushed primary: `422d3b3` (Case presentation/polling, initial SVG viewport/card spacing, Decisions history and Traveller read lanes integrated). Direct TypeScript passed after both merges.
+- Current pushed primary: `a111d05`; Overview semantic merge `01b5a81` integrated locally. This checkpoint batch adds bounded dependency presentation and provenance-backed replacement change detection.
+- Overview follow-on: 19 focused tests, direct TypeScript, and real PG seam 1/1 on `astra_a1_shell` passed. PG proves all 69 fixture journeys retained, generic shared resource, and supplier replacement footprint 5 even when its current/published schedule agrees. Browser expanded screenshot proves visible source/commitment/traveller relations; final selection/poll/mobile acceptance remains pending.
 - Initial Case SVG had a zero-size viewport: fixed initial stage dimensions; physical screenshot proves visible dependency lines and arrival time. Focused renderer 13/13 passed; supporting-card height increased, final physical check pending.
 - Decisions lane `1c3358ec`: 31 UI tests and isolated PG history proof passed, including distinct revoker attribution. Traveller lane `0ea1acc`: 47 focused tests and 1 real PG test passed (itinerary/commitment, pending/stale, no-case and approval copy); primary found follow-up allocation ambiguity and lifecycle-copy issues to close.
 - Activity: 20-row keyset pagination; focused PG shell file 2/2 passed on `astra_a1_shell` (timestamp ties, microseconds, inserted new row, complete history, invalid/cross-workspace cursor); direct TypeScript passed. Browser proof pending restart.
@@ -61,7 +62,7 @@ Active A1 lanes: Overview semantics Terra `codex/astra-a1-overview-semantics`; T
 
 ## Exact next action / stop-safe handoff
 
-Integrate final Overview semantic correction (lane `9e1a7cb`, resource label/relation proof follow-up active); adapt layout to explicit relation kinds. Complete Programme roster lane, Traveller action-boundary decision and read corrections, graph physical fidelity, then A1 gates. Pause only after A1 is genuinely accepted/pushed; no A2 execution.
+Commit/push Overview follow-on, integrate completed Programme/Traveller/Case corrections, then restore native request and programme action seams. Complete graph interaction/mobile checks and A1 gates. Pause only after A1 is genuinely accepted/pushed; no A2 execution.
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
 Remaining action-seam findings: programme bilateral preview is now wired and integrated; generic programme preview/commit, intake and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope. No retirement/deferral decision has been accepted.

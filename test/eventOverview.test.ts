@@ -10,9 +10,10 @@ import { EventOverviewSchema, OperatorOverviewSchema } from '../src/contracts/v2
 import { adaptOperatorOverviewToDashboard } from '../src/app/target/adapters/operatorOverviewAdapter.ts';
 import { renderProductOperatorOverview } from '../src/ui/screens/product-operator-overview.ts';
 import type { EventOverviewSourceFacts, OperatorOverviewFacts, OperatorPopulationFact } from '../src/app/target/readmodels/types.ts';
-import { computeOverviewLayout } from '../src/ui/overview-graph/layout.ts';
+import { computeOverviewLayout, DAY_W } from '../src/ui/overview-graph/layout.ts';
 import type { OgNode, OverviewGraphModel } from '../src/ui/overview-graph/model.ts';
 import { buildOverviewGraphModel } from '../src/ui/overview-graph/model.ts';
+import { renderEventOverviewGraph } from '../src/ui/overview-graph/index.ts';
 
 type Status = OperatorPopulationFact['status'];
 type Evaluation = OperatorPopulationFact['evaluation'];
@@ -309,6 +310,24 @@ test('projectOperatorOverview includes a schema-valid eventOverview only when so
   assert.ok(view.eventOverview && view.eventOverview.days.length === 3);
 });
 
+test('compact overview preserves all supplied groups through cards and disclosure without claiming unknown is healthy', () => {
+  const source = baseSource(12);
+  source.journeyServices = Array.from({ length: 12 }, (_, i) => svc(i + 1, `group-${Math.floor(i / 2)}`));
+  const view = projectOperatorOverview({
+    generatedAt: '2031-03-10T08:00:00.000Z', projectionRevision: 1,
+    changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'HEALTHY',
+    nodes: [], edges: [], items: [], population: Array.from({ length: 12 }, (_, i) => pop(i + 1)),
+    eventOverviewSource: source,
+  });
+  const html = renderEventOverviewGraph(view);
+  assert.equal((html.match(/data-og-kind="dependency"/g) ?? []).length, 4);
+  assert.match(html, /2 more shared dependencies/);
+  assert.equal((html.match(/data-og-kind="cohort"/g) ?? []).length, view.eventOverview!.cohorts.length);
+  assert.equal((html.match(/data-og-kind="landmark"/g) ?? []).length, view.eventOverview!.landmarks.length);
+  assert.match(html, /unconfirmed/);
+  assert.doesNotMatch(html, /travellers · healthy/);
+});
+
 test('operator overview keeps attention queue and full managed population', () => {
   const population = [
     pop(1, 'DISRUPTED', 'CURRENT', { caseRef: 'CASE:one' }),
@@ -375,6 +394,7 @@ function overviewGeometryFixture(): OverviewGraphModel {
   ];
   const relations = dependencies.map((node, i) => ({
     id: `dep:${node.id}>landmark-${i}`,
+    kind: 'DEPENDENCY_TO_COMMITMENT' as const,
     from: node.id,
     to: `landmark-${i}`,
     health: 'green' as const,
@@ -404,7 +424,7 @@ test('overview layout keeps packed dependencies above the spine and cards disjoi
 
   const dependencyBoxes = entries.filter(([id]) => id.startsWith('dependency-')).map(([, box]) => box);
   assert.ok(dependencyBoxes.every((box) => box.y + box.h <= layout.lane.y), 'all dependency rows clear the programme lane');
-  assert.equal(layout.width, 14 * 330 + 40, 'world width stays bounded by programme territories');
+  assert.equal(layout.width, 14 * DAY_W + 40, 'world width stays bounded by programme territories');
 
   const sameDayCohorts = entries.filter(([id]) => id.startsWith('cohort-')).map(([, box]) => box);
   assert.equal(new Set(sameDayCohorts.map((box) => box.y)).size, sameDayCohorts.length, 'same-day cohorts stack into distinct rows');
@@ -422,6 +442,6 @@ test('late-day dependency targets do not create nearly empty packing rows', () =
   const nodes = Array.from({ length: 12 }, (_, i) => geometryNode(`shared-${i}`, 'dependency', 3));
   const layout = computeOverviewLayout({ days, nodes, relations: [], active: false });
   const boxes = [...layout.boxes.values()];
-  assert.equal(new Set(boxes.map((box) => box.y)).size, 3, 'twelve cards use the three rows available at five cards per row');
+  assert.equal(new Set(boxes.map((box) => box.y)).size, 2, 'twelve compact cards use two rows without wasting horizontal space');
   assert.ok(boxes.every((box) => box.x + box.w <= layout.width));
 });

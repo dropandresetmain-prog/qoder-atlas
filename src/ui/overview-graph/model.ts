@@ -122,12 +122,12 @@ export function buildOverviewGraphModel(view: OperatorOverview): OverviewGraphMo
       ? `${plural(dep.travellerCount, 'traveller', 'travellers')} · ${dep.unresolvedCount > 0 || dep.clearedCount > 0
         ? `${dep.clearedCount} cleared · ${dep.unresolvedCount} need attention`
         : checking ? 'checking' : 'changed'}`
-      : `${plural(dep.travellerCount, 'traveller', 'travellers')} · healthy`;
+      : `${plural(dep.travellerCount, 'traveller', 'travellers')} · ${dep.health === 'GREEN' ? 'healthy' : dep.health === 'RED' ? 'needs attention' : dep.health === 'AMBER' ? 'checking' : 'unconfirmed'}`;
     nodes.push({
       id: dep.ref,
       kind: 'dependency',
       health: HEALTH[dep.health],
-      type: `Shared ${dep.kindLabel.toLowerCase()}`,
+      type: /^shared\b/i.test(dep.kindLabel) ? dep.kindLabel : `Shared ${dep.kindLabel.toLowerCase()}`,
       title: dep.label,
       ...(dep.detailLabel ? { meta: dep.detailLabel } : {}),
       badge,

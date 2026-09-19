@@ -123,6 +123,25 @@ seam reconciliation, checkpoint ledger and final verification.
 Only use Sol if a named consequential/authority/reconciliation uncertainty remains
 after focused execution evidence. No generic review committee.
 
+## A1 presentation decision — Overview density
+
+- **WHAT WE KNOW:** the real bounded read model supplies twelve shared dependencies,
+  nineteen programme cards and the full population. Drawing every dependency at the
+  compact viewport forced roughly half-size text. The accepted visual uses a small
+  number of shared dependency cards. Backend relationship kinds and health remain
+  authoritative; replacement changes now include applied canonical provenance.
+- **WHAT WE DO NOT KNOW:** final mobile and repeated-poll interaction acceptance is
+  still pending; a readable expanded screenshot is evidence, not complete A1 acceptance.
+- **KEY ASSUMPTION:** four shared dependency cards, with the active incident retained
+  first and remaining backend-ranked groups in an adjacent disclosure, is a faithful
+  bounded presentation. Every programme and population/cohort card stays available.
+  Full selected-card text is exposed in an accessible inspector; expansion and Whole
+  event framing provide the wider context. No business assessment is inferred here.
+- **WHAT SHOULD BE TESTED NEXT:** selection/disclosure/camera persistence, Whole event
+  after expansion, narrow viewport, and baseline-to-disruption summary refresh.
+- **Act Now:** complete those checks before A1. Deferral could hide context or impair
+  navigation even though all backend facts exist.
+
 ## Verification
 
 A0 is docs-only: exact base/ancestry, reference provenance, diff/status and whitespace

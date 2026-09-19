@@ -25,7 +25,7 @@ export const OVERVIEW_GRAPH_CSS = `
 .og-seg button { border: 0; background: transparent; padding: 6px 11px; border-radius: 7px; color: var(--text-soft); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .og-seg button.is-active { background: #fff; color: var(--text); box-shadow: 0 1px 4px rgba(20,38,68,.1); }
 
-.og-viewport { position: relative; height: clamp(320px, 40vh, 430px); background: #fbfcfe; overflow: hidden; touch-action: none; user-select: none; transition: height .35s ease; cursor: grab; }
+.og-viewport { position: relative; height: clamp(260px, 31vh, 350px); background: #fbfcfe; overflow: hidden; touch-action: none; user-select: none; transition: height .35s ease; cursor: grab; }
 .og-viewport.is-dragging { cursor: grabbing; }
 .og-viewport.og-expanded { height: clamp(520px, 76vh, 820px); }
 .og-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
@@ -75,6 +75,25 @@ export const OVERVIEW_GRAPH_CSS = `
 .og-m-unk { background: #bcc6d2; }
 .og-m-bad { background: #df3b49; }
 .og-lod-overview .og-type, .og-lod-overview .og-meta { display: none; }
+
+/* Compact cards retain the accepted overview hierarchy. Complete supplied
+   descriptions stay readable at page scale on selection, including on touch. */
+.og-node { box-sizing: border-box; line-height: 1.2; padding: 6px 9px; }
+.og-type { font-size: 8px; }
+.og-name { font-size: 13px; }
+.og-meta { font-size: 10px; }
+.og-badge { font-size: 9px; line-height: 1.1; margin-top: 3px; padding: 2px 5px; }
+.og-dependency .og-meta, .og-traveller .og-meta, .og-landmark .og-badge { display: none; }
+.og-landmark .og-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 12px; }
+.og-when { font-size: 9px; }
+.og-open { font-size: 9px; }
+.og-badge-row { gap: 4px; margin-top: 3px; }
+.og-inspector { margin: 0; padding: 10px 16px; border-top: 1px solid var(--line-soft); color: var(--text); font-size: 13px; }
+.og-inspector[hidden] { display: none; }
+.og-additional { padding: 10px 16px; border-top: 1px solid var(--line-soft); font-size: 12px; }
+.og-additional summary { cursor: pointer; color: var(--text-soft); }
+.og-additional ul { padding-left: 18px; margin: 8px 0 0; }
+.og-additional li { margin-top: 5px; }
 
 .og-toolbar { position: absolute; right: 12px; top: 12px; z-index: 90; display: flex; gap: 4px; padding: 4px; border: 1px solid rgba(220,227,236,.9); background: rgba(255,255,255,.78); backdrop-filter: blur(8px); border-radius: 11px; }
 .og-toolbar button { height: 32px; min-width: 32px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; color: var(--text); }

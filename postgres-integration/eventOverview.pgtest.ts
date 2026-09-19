@@ -16,6 +16,11 @@ import { projectOperatorOverview } from '../src/app/target/readmodels/index.ts';
 import { EventOverviewSchema } from '../src/contracts/v2/product/readModels.ts';
 import { attachSeedSession, commitSeed, seedJourney, seedJourneyItem, seedTraveller, seedTrip } from './m2Seed.ts';
 import { seedResource } from './m3Seed.ts';
+import { loadDisclosedDisruptionEvent } from '../src/app/demo/providerDisruptionEventSource.ts';
+import { acceptProviderDisruptionDemoEvent } from '../src/app/target/providerDisruptionIngress.ts';
+import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
+import { openRecoveryCase } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
+import { attachCaseSubjects } from '../src/persistence/postgres/commands/caseLifecycleCommands.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:event-overview-test';
@@ -93,5 +98,36 @@ test('operator overview carries a bounded, schema-valid eventOverview', async ()
   assert.equal(resourceDependency.travellerCount, 2);
   assert.ok(resourceJourneys.every((id) => resourceView.population.some((member) => member.journeyRef === `JOURNEY:${id}`)), 'no-programme journeys remain in the population');
   assert.ok((resourceOverview.cohorts.find((cohort) => cohort.ref === 'COHORT:unassigned')?.total ?? 0) >= 2, 'no-programme journeys form an unassigned cohort');
-  console.log(`[evidence] eventOverview ${JSON.stringify(eo)}`);
+  // A supplier replacement starts with its own published schedule. It is
+  // still a real change even when estimated and published times are equal.
+  const event = await loadDisclosedDisruptionEvent(fileURLToPath(new URL('../data/ait-demo-input-pack/scenarios/s1-supplier-disruption/inputs/airline-schedule-change-id7159.json', import.meta.url)));
+  const uow = () => new PgUnitOfWork(pool, workspaceId);
+  const applied = await acceptProviderDisruptionDemoEvent({ pool, workspaceId, actorPrincipalId: ACTOR, uow }, event);
+  assert.equal(applied.ok, true, JSON.stringify(applied));
+  if (!applied.ok) return;
+  const signalId = applied.changeSignalId;
+  assert.ok(signalId);
+  const replacement = await pool.query<{ subject_id: string }>(
+    `SELECT subject_id FROM change_records WHERE workspace_id = $1 AND change_signal_id = $2 AND subject_kind = 'TRANSPORT_SERVICE'`,
+    [workspaceId, signalId],
+  );
+  assert.equal(replacement.rowCount, 1);
+  const serviceId = replacement.rows[0]!.subject_id;
+  const clock = await pool.query<{ unchanged: boolean }>(
+    `SELECT COALESCE(actual_arrival, estimated_arrival, published_arrival) = published_arrival AS unchanged FROM transport_services WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, serviceId],
+  );
+  assert.equal(clock.rows[0]!.unchanged, true);
+  const opened = await openRecoveryCase(uow(), { workspaceId, actorPrincipalId: ACTOR, idempotencyKey: randomUUID(), openedAt: event.receivedAt });
+  assert.ok(opened.ok);
+  if (!opened.ok) return;
+  const linked = await attachCaseSubjects(uow(), { workspaceId, actorPrincipalId: ACTOR, idempotencyKey: randomUUID(), caseId: opened.value.caseId, changeSignalIds: [signalId] });
+  assert.ok(linked.ok);
+  const changed = projectOperatorOverview(await loadOperatorOverviewFacts(pool, workspaceId));
+  const changedDependency = changed.eventOverview!.dependencies.find((dependency) => dependency.ref === `SERVICE:${serviceId}`);
+  assert.equal(changedDependency?.changed, true, 'applied canonical provenance marks the replacement as changed');
+  assert.equal(changedDependency?.travellerCount, event.affectedBookings.length);
+  assert.equal(changed.eventOverview!.blastRadius?.affectedCount, event.affectedBookings.length);
+  assert.equal(changed.eventOverview!.cohorts.reduce((sum, cohort) => sum + cohort.total, 0) + changed.eventOverview!.promotedTravellers.length, changed.population.length);
+  console.log(`[evidence] Overview covers ${changed.population.length} journeys; replacement footprint ${changedDependency?.travellerCount}`);
 });

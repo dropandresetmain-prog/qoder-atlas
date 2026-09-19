@@ -1384,7 +1384,19 @@ async function loadOperatorOverviewFactsInner(
     published_arrival_local_time: string | null;
     changed: boolean;
   }>(
-    `SELECT DISTINCT ji.journey_id, s.id AS service_id, s.mode, s.operator,
+    `WITH active_service_changes AS (
+       SELECT DISTINCT cr.subject_id
+         FROM change_records cr
+         JOIN change_signal_completions completed
+           ON completed.workspace_id = cr.workspace_id AND completed.change_signal_id = cr.change_signal_id
+         JOIN case_signals cs
+           ON cs.workspace_id = cr.workspace_id AND cs.change_signal_id = cr.change_signal_id
+         JOIN recovery_cases rc
+           ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
+        WHERE cr.workspace_id = $1 AND cr.subject_kind = 'TRANSPORT_SERVICE'
+          AND rc.closed_at IS NULL
+     )
+     SELECT DISTINCT ji.journey_id, s.id AS service_id, s.mode, s.operator,
             to_char(COALESCE(s.actual_arrival, s.estimated_arrival, s.published_arrival) AT TIME ZONE dp.time_zone, 'YYYY-MM-DD') AS arrival_local_date,
             to_char(COALESCE(s.actual_arrival, s.estimated_arrival, s.published_arrival) AT TIME ZONE dp.time_zone, 'HH24:MI') AS arrival_local_time,
             to_char(s.published_arrival AT TIME ZONE dp.time_zone, 'HH24:MI') AS published_arrival_local_time,
@@ -1393,7 +1405,8 @@ async function loadOperatorOverviewFactsInner(
               AND COALESCE(s.actual_arrival, s.estimated_arrival) IS DISTINCT FROM s.published_arrival)
              OR (COALESCE(s.actual_departure, s.estimated_departure) IS NOT NULL
               AND s.published_departure IS NOT NULL
-              AND COALESCE(s.actual_departure, s.estimated_departure) IS DISTINCT FROM s.published_departure)) AS changed
+              AND COALESCE(s.actual_departure, s.estimated_departure) IS DISTINCT FROM s.published_departure)
+             OR EXISTS (SELECT 1 FROM active_service_changes changed_service WHERE changed_service.subject_id = s.id)) AS changed
        FROM journey_items ji
        JOIN transport_item_details td ON td.workspace_id = ji.workspace_id AND td.journey_item_id = ji.id
        JOIN transport_services s ON s.workspace_id = td.workspace_id AND s.id = td.selected_service_id

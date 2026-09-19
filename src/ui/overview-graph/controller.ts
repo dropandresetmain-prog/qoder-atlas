@@ -37,6 +37,11 @@ export const OVERVIEW_GRAPH_SCRIPT = `
     var saved = store[key];
     var st = saved || { x: 0, y: 0, scale: 1, expanded: false, view: 'event', selected: null, fitted: false };
     store[key] = st;
+    var additional = canvas.querySelector('.og-additional');
+    if (additional) {
+      additional.open = !!st.additionalOpen;
+      additional.addEventListener('toggle', function () { st.additionalOpen = additional.open; });
+    }
     var homeBox = parseBox(canvas.getAttribute('data-og-home'));
     var incidentBox = parseBox(canvas.getAttribute('data-og-incident'));
     var active = canvas.getAttribute('data-og-active') === 'true';
@@ -63,7 +68,7 @@ export const OVERVIEW_GRAPH_SCRIPT = `
     function frame(box, maxScale, pad, animate) {
       var s = size();
       if (!box || s.w <= 0 || s.h <= 0) return false;
-      var scale = Math.max(MIN, Math.min((s.w - pad * 2) / box.w, (s.h - pad * 2) / box.h, maxScale));
+      var scale = Math.max(0.01, Math.min((s.w - pad * 2) / box.w, (s.h - pad * 2) / box.h, maxScale));
       st.scale = scale;
       st.x = (s.w - box.w * scale) / 2 - box.x * scale;
       st.y = (s.h - box.h * scale) / 2 - box.y * scale;
@@ -74,7 +79,7 @@ export const OVERVIEW_GRAPH_SCRIPT = `
 
     function frameCanonical(animate) {
       var pad = st.expanded ? 24 : 10;
-      if (active && incidentBox) return frame(incidentBox, 1.05, pad, animate);
+      if (st.view === 'change' && active && incidentBox) return frame(incidentBox, 1.05, pad, animate);
       return frame(homeBox, 1.05, pad, animate);
     }
 
@@ -103,6 +108,8 @@ export const OVERVIEW_GRAPH_SCRIPT = `
 
     function clearSelection() {
       st.selected = null;
+      var inspector = canvas.querySelector('[data-og-inspector]');
+      if (inspector) { inspector.hidden = true; inspector.textContent = ''; }
       nodes.forEach(function (n) { n.classList.remove('og-focus'); n.classList.toggle('og-dim', baseDim(n)); });
       edges.forEach(function (e) { e.classList.toggle('og-dim', baseDim(e)); });
       syncPulses();
@@ -122,6 +129,8 @@ export const OVERVIEW_GRAPH_SCRIPT = `
       var target = canvas.querySelector('[data-og-node="' + id.replace(/"/g, '') + '"]');
       if (!target) { clearSelection(); return; }
       st.selected = id;
+      var inspector = canvas.querySelector('[data-og-inspector]');
+      if (inspector) { inspector.textContent = target.getAttribute('data-og-description') || ''; inspector.hidden = false; }
       var near = {}; near[id] = true;
       var live = [];
       edges.forEach(function (e) {
@@ -237,6 +246,7 @@ export const OVERVIEW_GRAPH_SCRIPT = `
     setView(st.view);
     function firstFit() {
       if (st.fitted) { apply(false); return true; }
+      setView(active ? 'change' : 'event');
       return frameCanonical(false);
     }
     if (!firstFit() && typeof ResizeObserver !== 'undefined') {
