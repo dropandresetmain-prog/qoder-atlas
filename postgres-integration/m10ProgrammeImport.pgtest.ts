@@ -7,8 +7,56 @@ import type { AddressInfo } from 'node:net';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed } from './m2Seed.ts';
 import { importProgrammeBundle } from '../src/app/target/programmeImport.ts';
+import { loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts.ts';
 import { composeTargetEndpoints } from '../src/app/target/composeTargetEndpoints.ts';
 import { createTargetAppServer } from '../src/server/targetHttp.ts';
+import type { Pool } from '../src/persistence/postgres/pool.ts';
+
+function queryText(args: unknown[]): string {
+  const first = args[0];
+  if (typeof first === 'string') return first;
+  if (first && typeof first === 'object' && 'text' in first && typeof first.text === 'string') return first.text;
+  return '';
+}
+
+/**
+ * Test-only interruption at a real command boundary. The importer owns no
+ * fault hook, so this keeps the production path and transaction boundaries
+ * unchanged while proving a late command can fail and then be retried.
+ */
+async function failOnceOnSecondParticipation<T>(pool: Pool, operation: () => Promise<T>): Promise<T> {
+  let participationInserts = 0;
+  let injected = false;
+  const probe = await pool.connect();
+  const clientPrototype = Object.getPrototypeOf(probe) as { query: (...queryArgs: unknown[]) => unknown };
+  probe.release();
+  const originalQuery = clientPrototype.query;
+  clientPrototype.query = function (...args: unknown[]) {
+    const text = queryText(args);
+    if (!injected && text.includes('INSERT INTO participations')) {
+      participationInserts += 1;
+      if (participationInserts === 2) {
+        injected = true;
+        throw new Error('injected importer interruption at second participation');
+      }
+    }
+    return originalQuery.apply(this, args);
+  };
+  try {
+    return await operation();
+  } finally {
+    clientPrototype.query = originalQuery;
+  }
+}
+
+async function workspaceCounts(pool: Pool, workspaceId: string): Promise<Record<string, number>> {
+  const tables = ['organisations', 'events', 'programmes', 'programme_items', 'travellers', 'trips', 'journeys', 'participations'];
+  const rows = await Promise.all(tables.map(async (table) => {
+    const result = await pool.query<{ count: string }>(`SELECT count(*)::text AS count FROM ${table} WHERE workspace_id = $1`, [workspaceId]);
+    return [table, Number(result.rows[0]!.count)] as const;
+  }));
+  return Object.fromEntries(rows);
+}
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -109,6 +157,98 @@ test('importProgrammeBundle retries by stable import key without duplicate rows'
   for (const [index, result] of counts.entries()) {
     assert.equal(result.rows[0]!.count, '1', `replay count ${index}`);
   }
+});
+
+test('importProgrammeBundle exposes an unknown mid-prefix and converges after a late command retry', async () => {
+  const pool = await sharedTestPool();
+
+  // Keep an already populated, unrelated workspace beside the interrupted
+  // import. A failure in one import must never bleed across workspace scope.
+  const sentinel = await beginSeed(pool, 'M10 programme import sentinel');
+  await commitSeed(sentinel);
+  await importProgrammeBundle(pool, sentinel.workspaceId, sentinel.actorId, {
+    importKey: 'mid-prefix-sentinel',
+    organisationLegalName: 'Sentinel Organisation',
+    eventTitle: 'Sentinel Event',
+    programmeTitle: 'Sentinel Programme',
+    items: [{ title: 'Sentinel Session', itemType: 'SESSION', windowStart: '2031-06-01T09:00:00.000Z', windowEnd: '2031-06-01T10:00:00.000Z' }],
+    travellers: [{ displayName: 'Sentinel Traveller', participatesInItemIndices: [0], obligation: 'REQUIRED' }],
+  });
+  const sentinelBefore = await workspaceCounts(pool, sentinel.workspaceId);
+
+  const target = await beginSeed(pool, 'M10 programme import interrupted');
+  await commitSeed(target);
+  const bundle = {
+    importKey: 'mid-prefix-failure',
+    organisationLegalName: 'Interrupted Organisation',
+    eventTitle: 'Interrupted Event',
+    programmeTitle: 'Interrupted Programme',
+    items: [{ title: 'Interrupted Session', itemType: 'SESSION', windowStart: '2031-06-02T09:00:00.000Z', windowEnd: '2031-06-02T10:00:00.000Z' }],
+    travellers: [
+      { displayName: 'Interrupted Traveller A', participatesInItemIndices: [0], obligation: 'REQUIRED' as const },
+      { displayName: 'Interrupted Traveller B', participatesInItemIndices: [0], obligation: 'OPTIONAL' as const },
+    ],
+  };
+
+  await assert.rejects(
+    () => failOnceOnSecondParticipation(pool, () => importProgrammeBundle(pool, target.workspaceId, target.actorId, bundle)),
+    /injected importer interruption at second participation/,
+  );
+
+  const prefix = await workspaceCounts(pool, target.workspaceId);
+  assert.deepEqual(prefix, {
+    organisations: 1,
+    events: 1,
+    programmes: 1,
+    programme_items: 1,
+    travellers: 2,
+    trips: 2,
+    journeys: 2,
+    participations: 1,
+  }, 'the committed prefix is foreign-key closed at the failed command boundary');
+
+  const prefixSchedule = await loadProgrammeSchedule(pool, target.workspaceId);
+  assert.equal(prefixSchedule.populationSummary?.unknown, 1, 'missing assessment stays unknown');
+  assert.equal(prefixSchedule.travellers?.[0]?.status, 'UNKNOWN', 'partial inventory cannot claim healthy readiness');
+  assert.ok(prefixSchedule.missingInformation?.length, 'the visible prefix explains missing readiness information');
+
+  // The one-shot interruption hook is gone: the exact bundle and deterministic import key
+  // now replay the committed prefix and create only the missing suffix.
+  const completed = await importProgrammeBundle(pool, target.workspaceId, target.actorId, bundle);
+  assert.equal(completed.travellers.length, 2);
+  const completeCounts = await workspaceCounts(pool, target.workspaceId);
+  assert.deepEqual(completeCounts, {
+    organisations: 1,
+    events: 1,
+    programmes: 1,
+    programme_items: 1,
+    travellers: 2,
+    trips: 2,
+    journeys: 2,
+    participations: 2,
+  }, 'retry converges without duplicate canonical rows');
+
+  const membership = await pool.query<{ traveller_id: string; programme_item_id: string; obligation: string; accepted: boolean }>(
+    `SELECT traveller_id, programme_item_id, obligation, accepted
+       FROM participations
+      WHERE workspace_id = $1
+      ORDER BY traveller_id`,
+    [target.workspaceId],
+  );
+  assert.deepEqual(
+    membership.rows.map((row) => ({
+      travellerId: row.traveller_id,
+      itemId: row.programme_item_id,
+      obligation: row.obligation,
+      accepted: row.accepted,
+    })),
+    completed.travellers
+      .map((traveller, index) => ({ travellerId: traveller.travellerId, itemId: completed.itemIds[0]!, obligation: index === 0 ? 'REQUIRED' : 'OPTIONAL', accepted: true }))
+      .sort((a, b) => a.travellerId.localeCompare(b.travellerId)),
+    'retry preserves the intended traveller-to-item memberships',
+  );
+
+  assert.deepEqual(await workspaceCounts(pool, sentinel.workspaceId), sentinelBefore, 'the sentinel workspace is unchanged');
 });
 
 test('POST /api/v2/programme/import is reachable over HTTP and commits real state', async () => {
