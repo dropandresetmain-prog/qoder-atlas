@@ -64,8 +64,8 @@ export function renderFocusedCaseGraph(input: RenderFocusedCaseGraphInput): stri
     causalEdgeIndices,
   });
 
-  // Compute deterministic layout
-  const layout = computeLayout(presentationGraph);
+  // Compute deterministic layout (causal spine when causalRefs present)
+  const layout = computeLayout(presentationGraph, causalRefs);
 
   // Build node map for quick lookup
   const nodeByRef = new Map(presentationGraph.nodes.map((n) => [n.ref, n]));

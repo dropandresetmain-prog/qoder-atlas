@@ -42,10 +42,114 @@ const PADDING = 60;
 
 /**
  * Compute deterministic layout positions for the graph.
- * Algorithm: longest-path ranking from source nodes (nodes with no incoming edges).
- * Within each column, nodes are sorted by ref for stable row assignment.
+ *
+ * Without causalNodeRefs (or empty): longest-path ranking from source nodes
+ * (nodes with no incoming edges). Within each column, nodes sorted by ref.
+ *
+ * With causalNodeRefs: causal refs take monotonically increasing columns in
+ * backend causal order (index 0, 1, 2, …). Context nodes hang off the spine
+ * at the column of their nearest causal neighbour reachable via edges, at a
+ * secondary row. Causal x-order is never broken or reordered.
  */
-export function computeLayout(graph: PresentationGraph): LayoutResult {
+export function computeLayout(
+  graph: PresentationGraph,
+  causalNodeRefs?: readonly string[],
+): LayoutResult {
+  const nodeRefSet = new Set(graph.nodes.map((n) => n.ref));
+
+  // Filter causal refs to those actually present in the graph, preserving order
+  const presentCausalRefs = causalNodeRefs != null
+    ? causalNodeRefs.filter((ref) => nodeRefSet.has(ref))
+    : [];
+
+  if (presentCausalRefs.length > 0) {
+    return computeCausalSpineLayout(graph, presentCausalRefs);
+  }
+
+  return computeLongestPathLayout(graph);
+}
+
+/**
+ * Causal spine layout: causal refs occupy columns 0..N-1 in backend order.
+ * Context nodes hang at the column of their nearest causal neighbour (BFS
+ * over undirected edges), at a secondary row below the causal node.
+ */
+function computeCausalSpineLayout(
+  graph: PresentationGraph,
+  causalRefs: readonly string[],
+): LayoutResult {
+  // Build undirected adjacency for BFS
+  const adjacency = new Map<string, string[]>();
+  for (const node of graph.nodes) {
+    adjacency.set(node.ref, []);
+  }
+  for (const edge of graph.edges) {
+    adjacency.get(edge.sourceRef)?.push(edge.targetRef);
+    adjacency.get(edge.targetRef)?.push(edge.sourceRef);
+  }
+
+  // Assign columns: causal[i] -> column i
+  const causalColumn = new Map<string, number>();
+  for (let i = 0; i < causalRefs.length; i++) {
+    causalColumn.set(causalRefs[i]!, i);
+  }
+
+  const causalSet = new Set(causalRefs);
+
+  // BFS from all causal nodes simultaneously to find nearest causal for each context node
+  const nodeColumn = new Map<string, number>(causalColumn);
+  const queue: string[] = [...causalRefs];
+  const visited = new Set(causalRefs);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentCol = nodeColumn.get(current)!;
+    const neighbors = adjacency.get(current) ?? [];
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        nodeColumn.set(neighbor, currentCol);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  // Any remaining nodes not reached (disconnected) get column 0
+  for (const node of graph.nodes) {
+    if (!nodeColumn.has(node.ref)) {
+      nodeColumn.set(node.ref, 0);
+    }
+  }
+
+  // Group nodes by column: causal first (by causal index), then context (by ref sort)
+  const columns = new Map<number, string[]>();
+  for (const node of graph.nodes) {
+    const col = nodeColumn.get(node.ref)!;
+    if (!columns.has(col)) columns.set(col, []);
+    columns.get(col)!.push(node.ref);
+  }
+
+  // Sort within each column: causal nodes first (by their causal index), then context (by ref)
+  for (const refs of columns.values()) {
+    refs.sort((a, b) => {
+      const aIsCausal = causalSet.has(a);
+      const bIsCausal = causalSet.has(b);
+      if (aIsCausal && bIsCausal) {
+        return causalColumn.get(a)! - causalColumn.get(b)!;
+      }
+      if (aIsCausal) return -1;
+      if (bIsCausal) return 1;
+      return a.localeCompare(b);
+    });
+  }
+
+  return assignPositions(graph, columns);
+}
+
+/**
+ * Original longest-path ranking layout (fallback when no causal refs).
+ */
+function computeLongestPathLayout(graph: PresentationGraph): LayoutResult {
   const incoming = new Map<string, string[]>();
   const outgoing = new Map<string, string[]>();
 
@@ -97,7 +201,17 @@ export function computeLayout(graph: PresentationGraph): LayoutResult {
     refs.sort();
   }
 
-  // Assign positions
+  return assignPositions(graph, columns);
+}
+
+/**
+ * Shared position assignment: given columns (Map<columnIndex, sorted refs>),
+ * compute x/y positions and edge paths.
+ */
+function assignPositions(
+  graph: PresentationGraph,
+  columns: Map<number, string[]>,
+): LayoutResult {
   const layoutNodes: LayoutNode[] = [];
   const nodePositions = new Map<string, { x: number; y: number }>();
 
