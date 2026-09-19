@@ -25,7 +25,7 @@ import {
 } from '../src/app/target/externalOfferExecution.ts';
 import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecutionWorker.ts';
 import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF } from '../src/providers/atlas/transactionAdapter.ts';
-import { capabilityOk } from '../src/contracts/envelope.ts';
+import { capabilityError, capabilityOk } from '../src/contracts/envelope.ts';
 import type { CapabilityMeta } from '../src/contracts/envelope.ts';
 import type { FlightOrderIdentity, FlightOrderOutcome, FlightOrderStatus, FlightTransactionCapability } from '../src/contracts/capabilities.ts';
 
@@ -35,20 +35,23 @@ after(async () => {
 });
 
 /** The provider-side truth that survives a process crash. */
-interface ProviderWorld { orderRef?: string; status: FlightOrderStatus; holdExpiresAt?: string; payable: number; payLandsAs?: FlightOrderStatus;
+interface ProviderWorld { orderRef?: string; status: FlightOrderStatus; holdExpiresAt?: string; payable: number; payLandsAs?: FlightOrderStatus; createTimesOut?: boolean;
   /** N3: the provider answers create with duplicate detection pointing at this existing order. */
   duplicateRef?: string; identity?: FlightOrderIdentity }
 
 function scriptedProvider(world: ProviderWorld, faultAt?: DispatchFaultPoint, onFault?: () => Promise<void>, hang = true) {
   const calls = { verify: 0, create: 0, pay: 0, retrieve: 0 };
+  const lastCreate: { query?: { clientReference?: string } } = {};
   const meta = (): CapabilityMeta => ({ providerId: 'atlas', mode: 'RECORD', requestedAt: new Date().toISOString() });
   const outcome = (status: FlightOrderStatus): FlightOrderOutcome => ({
     status, provenance: 'LIVE', totalPrice: { amount: world.payable, currency: 'USD' }, transactionState: { orderRef: world.orderRef! },
   });
   const transactions: FlightTransactionCapability = {
     descriptor: { family: 'FLIGHT', providerId: 'atlas', mode: 'RECORD', supportedOperations: [], maxSideEffectLevel: 'MONEY_MOVING' },
-    async createOrder() {
+    async createOrder(query) {
       calls.create += 1;
+      lastCreate.query = query;
+      if (world.createTimesOut) return capabilityError({ category: 'TIMEOUT', code: 'timeout', message: 'timed out' }, meta());
       if (world.duplicateRef) {
         world.orderRef = world.duplicateRef;
         return capabilityOk({ status: 'HELD' as const, provenance: 'LIVE' as const, duplicateOfExisting: { orderRefs: [world.duplicateRef] }, transactionState: { orderRef: world.duplicateRef } }, meta());
@@ -88,7 +91,7 @@ function scriptedProvider(world: ProviderWorld, faultAt?: DispatchFaultPoint, on
       },
     } : {}),
   };
-  return { calls, deps, reached };
+  return { calls, deps, reached, lastCreate };
 }
 
 async function setup(label: string) {
@@ -148,6 +151,29 @@ async function duplicateIdentity(t: Awaited<ReturnType<typeof setup>>, over: Par
     ...over,
   };
 }
+
+describe('R4-F2g N2 Atlas create has no provider-side idempotency: a create timeout is OUTCOME_UNKNOWN, never a retry', () => {
+  test('create timeout (no orderRef) => OUTCOME_UNKNOWN keyed by our client reference only; no retry, no lookup, no pay across passes and sweeps', async () => {
+    const t = await setup('R4F2g create timeout');
+    const world: ProviderWorld = { status: 'HELD', payable: t.cost, createTimesOut: true };
+    const provider = scriptedProvider(world);
+    const report = await runExternalOfferExecutionPass(t.f.execCtx(provider.deps));
+    assert.equal(report.unknown, 1, JSON.stringify(report.outcomes));
+    assert.match(provider.lastCreate.query?.clientReference ?? '', /^ns-[0-9a-f]{24}$/, 'the client reference is carried for OUR correlation');
+    const [row] = await t.attempt();
+    assert.equal(row!.status, 'OUTCOME_UNKNOWN');
+    assert.equal(row!.request_ref, `atlas:clientref:${provider.lastCreate.query!.clientReference}`, 'no provider order exists on our side: only our own reference is recorded');
+    for (let i = 0; i < 3; i += 1) {
+      assert.equal((await runExternalOfferExecutionPass(t.f.execCtx(provider.deps))).candidates, 0, 'never redispatched');
+      const swept = await runExternalReconciliation(t.f.execCtx(provider.deps));
+      assert.deepEqual([swept.reconciled, swept.stillUnknown], [0, 1]);
+    }
+    assert.deepEqual(provider.calls, { verify: 1, create: 1, pay: 0, retrieve: 0 }, 'one create ever; reconciliation has nothing to look up (Atlas cannot find an order by client reference)');
+    assert.equal((await t.attempt())[0]!.status, 'RECONCILIATION_REQUIRED', 'left visible for human/provider reconciliation');
+    assert.notEqual(await t.status(), 'RESOLVED');
+    await t.f.c.app.close();
+  });
+});
 
 describe('R4-F2e N3 duplicate detection is a pointer, not proof (real PostgreSQL, real expected-terms loader)', () => {
   test('exact intended duplicate (proven from persisted binding + identities) is adopted, checkpointed and paid exactly once', async () => {

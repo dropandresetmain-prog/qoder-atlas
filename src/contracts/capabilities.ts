@@ -141,10 +141,13 @@ export interface FlightOrderCreateQuery {
   /** Opaque provider workflow state carried from verify, preserved exactly. */
   workflowState?: Record<string, unknown>;
   /**
-   * Caller-owned idempotency key. Required: this is the one operation most
-   * exposed to duplicate-create risk, and it is what lets an executor
-   * retrieve-before-recreate after a timeout instead of blindly re-issuing
-   * create (ADR-042).
+   * Caller-owned reference. Required so an executor can correlate its own
+   * records. It is NOT a provider-side idempotency key: Atlas order.do neither
+   * honours nor echoes it, and has no lookup by it (empirically proven in the
+   * sandbox, docs/work/r4-evidence/atlas-create-idempotency-decision.md).
+   * After an ambiguous create (timeout) with no order reference the only safe
+   * behaviour is OUTCOME_UNKNOWN for human/provider reconciliation — never a
+   * blind re-create (ADR-042).
    */
   clientReference: string;
 }
