@@ -69,6 +69,13 @@ export function effectChangedRefs(effect: ScenarioEffect): TypedRef[] {
         { kind: 'JOURNEY_ITEM', id: effect.journeyItemId },
         { kind: 'OFFER', id: effect.offerId },
       ];
+    case 'ADD_JOURNEY_STAY':
+      // The proposed item id is correlation-only until external observation;
+      // the existing Journey and captured offer are the meaningful subjects.
+      return [
+        { kind: 'JOURNEY', id: effect.journeyId },
+        { kind: 'OFFER', id: effect.offerId },
+      ];
     case 'PROPOSE_ALLOCATION': {
       const refs: TypedRef[] = [
         { kind: 'RESERVATION_LINE', id: effect.reservationLineId },

@@ -11,12 +11,14 @@ import { emptyWorld, effectiveOf, id } from './support/m6World.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type {
   WJourney, WJourneyItem, WObjective, WParticipation, WProgrammeItem,
-  WReservation, WReservationLine, WResource, WTransportService, WAllocation,
+  WReservation, WReservationLine, WResource, WTransportService, WAllocation, WConstraintDefinition,
 } from '../src/resolution/world/world.ts';
 import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.ts';
 import { ScenarioChangeSchema } from '../src/contracts/v2/scenario/scenarioChange.ts';
 import { validateActionPlanAcyclic } from '../src/contracts/v2/action/actionPlan.ts';
 import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
+import { createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
+import { overnightEvaluator } from '../src/resolution/evaluation/evaluators/overnight.ts';
 import { applyScenarioOverlay, assertCanonicalWorldUntouched } from '../src/resolution/scenarios/overlay.ts';
 import { evaluateRecoveryStrategy } from '../src/resolution/scenarios/evaluate.ts';
 import { compileActionPlan, withForcedCycle } from '../src/resolution/planning/compiler.ts';
@@ -66,6 +68,44 @@ function objectiveRow(owner: TypedRef, over: Partial<WObjective> = {}): WObjecti
     id: id(), revision: 1, owner, successPredicateKind: 'ARRIVAL_BY', hardness: 'HARD', priority: 1,
     disposition: 'ACTIVE', dispositionEvidenceId: null, targets: [], ...over,
   };
+}
+
+function overnightRequirement(journeyId: string): WConstraintDefinition {
+  return {
+    id: id(), revision: 1, registeredType: 'overnight_accommodation_required', hardness: 'HARD',
+    owner: { kind: 'JOURNEY', id: journeyId }, provenanceEvidenceId: null,
+    operands: [{ key: 'minimum_gap_hours', kind: 'NUMBER', subject: null, text: null, number: '6', boolean: null, instant: null, localDate: null }],
+  };
+}
+
+function overnightStayWorld() {
+  const travellerId = id();
+  const journey = journeyRow({ travellerId });
+  const placeId = id();
+  const world = emptyWorld({
+    travellers: [{ id: travellerId, revision: 1, lifecycleStatus: 'ACTIVE' }],
+    journeys: [journey],
+    places: [{ id: placeId, revision: 1, name: 'Harbour test place', placeType: 'CITY', timeZone: 'Pacific/Auckland', hasCoordinates: true }],
+  });
+  const arrival = transportItem(journey.id, {
+    orderKey: '010', desiredOriginPlaceId: id(), desiredDestinationPlaceId: placeId,
+    intendedWindow: { start: '2030-06-02T04:00:00.000Z', end: '2030-06-02T08:00:00.000Z' },
+  });
+  const departure = transportItem(journey.id, {
+    orderKey: '030', desiredOriginPlaceId: placeId, desiredDestinationPlaceId: id(),
+    intendedWindow: { start: '2030-06-03T02:00:00.000Z', end: '2030-06-03T06:00:00.000Z' },
+  });
+  world.journeyItems.push(arrival, departure);
+  world.constraints.push(overnightRequirement(journey.id));
+  return { world, journey, travellerId, placeId, arrival };
+}
+
+function addStayChange(journeyId: string, proposedJourneyItemId: string, offerId: string, offerPrice = { amount: '245.00', currency: 'NZD' }) {
+  return ScenarioChangeSchema.parse({
+    id: id(), recoveryStrategyId: id(), strategyVersion: 1,
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: journeyId }], basisAssessmentId: id(),
+    effects: [{ effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId, journeyId, orderKey: '020', offerId, offerPrice }],
+  });
 }
 
 test('overlay: candidate evaluation does not mutate canonical CapturedWorld', () => {
@@ -707,4 +747,171 @@ test('SELECT_OFFER without resolved offer is rejected (no fabrication)', () => {
   assert.equal(overlay.ok, false);
   if (overlay.ok) return;
   assert.match(overlay.conflict.message, /not resolved|fabricate/i);
+});
+
+test('ADD_JOURNEY_STAY overlays one unbooked stay from a resolved offer and closes only the overnight dimension', () => {
+  const { world, journey, travellerId, placeId, arrival } = overnightStayWorld();
+  const before = structuredClone(world);
+  const offerId = id();
+  const proposedJourneyItemId = id();
+  const flightOnly = ScenarioChangeSchema.parse({
+    id: id(), recoveryStrategyId: id(), strategyVersion: 1,
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: journey.id }], basisAssessmentId: id(),
+    effects: [{ effectKind: 'ALTER_JOURNEY_ITEM_INTENT', journeyItemId: arrival.id }],
+  });
+  const flightOverlay = applyScenarioOverlay({ baseWorld: world, scenarioChange: flightOnly });
+  assert.equal(flightOverlay.ok, true);
+  if (!flightOverlay.ok) return;
+  assert.equal(
+    overnightEvaluator.evaluate({ kind: 'JOURNEY', id: journey.id }, { now: NOW, world: flightOverlay.value.proposedWorld, effective: effectiveOf(flightOverlay.value.proposedWorld) }).dimensions[0]?.verdict,
+    'FAIL',
+  );
+
+  const change = addStayChange(journey.id, proposedJourneyItemId, offerId);
+  const overlay = applyScenarioOverlay({
+    baseWorld: world,
+    scenarioChange: change,
+    resolvedStayOffers: [{
+      offerId,
+      placeId,
+      stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+      price: { amount: '245.0', currency: 'NZD' },
+    }],
+  });
+  assert.equal(overlay.ok, true);
+  if (!overlay.ok) return;
+  const proposed = overlay.value.proposedWorld;
+  const stay = proposed.journeyItems.find((item) => item.id === proposedJourneyItemId);
+  assert.deepEqual(stay && {
+    journeyId: stay.journeyId, kind: stay.kind, orderKey: stay.orderKey, lifecycleStatus: stay.lifecycleStatus,
+    intendedPlaceId: stay.intendedPlaceId, requiredNights: stay.requiredNights, intendedWindow: stay.intendedWindow,
+  }, {
+    journeyId: journey.id, kind: 'STAY', orderKey: '020', lifecycleStatus: 'PLANNED',
+    intendedPlaceId: placeId, requiredNights: 1,
+    intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+  });
+  assert.equal(
+    overnightEvaluator.evaluate({ kind: 'JOURNEY', id: journey.id }, { now: NOW, world: proposed, effective: effectiveOf(proposed) }).dimensions[0]?.verdict,
+    'PASS',
+  );
+  assertCanonicalWorldUntouched(before, world);
+  assert.deepEqual(proposed.reservations, before.reservations);
+  assert.deepEqual(proposed.reservationLines, before.reservationLines);
+  assert.deepEqual(proposed.allocations, before.allocations);
+  assert.ok(overlay.value.affectedSubjectRefs.some((ref) => ref.kind === 'JOURNEY' && ref.id === journey.id));
+  assert.ok(overlay.value.affectedSubjectRefs.some((ref) => ref.kind === 'TRAVELLER' && ref.id === travellerId));
+  assert.ok(!overlay.value.affectedSubjectRefs.some((ref) => ref.kind === 'JOURNEY_ITEM' && ref.id === proposedJourneyItemId));
+  assert.deepEqual(overlay.value.requiredAuthorityScopes, ['journey.stay']);
+});
+
+test('ADD_JOURNEY_STAY rejects unbound, inconsistent, and colliding offer facts', () => {
+  const { world, journey, placeId, arrival } = overnightStayWorld();
+  const offerId = id();
+  const baseChange = addStayChange(journey.id, id(), offerId);
+  const resolved = {
+    offerId,
+    placeId,
+    stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+    price: { amount: '245.00', currency: 'NZD' },
+  } as const;
+  const missingOffer = applyScenarioOverlay({ baseWorld: world, scenarioChange: baseChange });
+  assert.equal(missingOffer.ok, false);
+  if (!missingOffer.ok) assert.match(missingOffer.conflict.message, /not resolved/i);
+  const missingPlace = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange, resolvedStayOffers: [{ ...resolved, placeId: id() }],
+  });
+  assert.equal(missingPlace.ok, false);
+  if (!missingPlace.ok) assert.match(missingPlace.conflict.message, /place is not in captured/i);
+  const badWindow = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange,
+    resolvedStayOffers: [{ ...resolved, stayWindow: { start: resolved.stayWindow.end, end: resolved.stayWindow.start } }],
+  });
+  assert.equal(badWindow.ok, false);
+  if (!badWindow.ok) assert.match(badWindow.conflict.message, /valid positive offset-bearing interval/i);
+  const malformedWindow = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange,
+    resolvedStayOffers: [{ ...resolved, stayWindow: { start: 'not-an-instant', end: resolved.stayWindow.end } } as never],
+  });
+  assert.equal(malformedWindow.ok, false);
+  if (!malformedWindow.ok) assert.match(malformedWindow.conflict.message, /valid positive offset-bearing interval/i);
+  const zeroLocalNights = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange,
+    resolvedStayOffers: [{ ...resolved, stayWindow: { start: resolved.stayWindow.start, end: '2030-06-02T09:00:00.000Z' } }],
+  });
+  assert.equal(zeroLocalNights.ok, false);
+  if (!zeroLocalNights.ok) assert.match(zeroLocalNights.conflict.message, /positive number of local nights/i);
+  const badPrice = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange, resolvedStayOffers: [{ ...resolved, price: { amount: '246.00', currency: 'NZD' } }],
+  });
+  assert.equal(badPrice.ok, false);
+  if (!badPrice.ok) assert.match(badPrice.conflict.message, /price does not match/i);
+  const negativeChange = addStayChange(journey.id, id(), offerId, { amount: '-1.00', currency: 'NZD' });
+  const negativePrice = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: negativeChange,
+    resolvedStayOffers: [{ ...resolved, price: { amount: '-1.00', currency: 'NZD' } }],
+  });
+  assert.equal(negativePrice.ok, false);
+  if (!negativePrice.ok) assert.match(negativePrice.conflict.message, /cannot be negative/i);
+  const duplicateOffer = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange, resolvedStayOffers: [resolved, { ...resolved }],
+  });
+  assert.equal(duplicateOffer.ok, false);
+  if (!duplicateOffer.ok) assert.match(duplicateOffer.conflict.message, /duplicate offer id/i);
+  const collision = addStayChange(journey.id, arrival.id, offerId);
+  const colliding = applyScenarioOverlay({ baseWorld: world, scenarioChange: collision, resolvedStayOffers: [resolved] });
+  assert.equal(colliding.ok, false);
+  if (!colliding.ok) assert.match(colliding.conflict.message, /already exists/i);
+});
+
+test('ADD_JOURNEY_STAY compiles only with an explicit capability and captured owning Journey revision', () => {
+  const { world, journey, placeId } = overnightStayWorld();
+  const offerId = id();
+  const change = addStayChange(journey.id, id(), offerId);
+  const manifest = emptyManifest({ aggregateReads: [{ aggregateRef: { kind: 'JOURNEY', id: journey.id }, revision: journey.revision }] });
+  const evaluated = evaluateRecoveryStrategy({
+    recoveryCaseId: id(), strategyId: id(), baseWorld: world, baseManifest: manifest,
+    basisAssessmentId: change.basisAssessmentId, scenarioChange: change, now: NOW,
+    registry: createEvaluatorRegistry([overnightEvaluator]),
+    resolvedStayOffers: [{
+      offerId, placeId, stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+      price: { amount: '245.00', currency: 'NZD' },
+    }],
+    resolveSubjectRefs: [{ kind: 'JOURNEY', id: journey.id }],
+  });
+  assert.equal(evaluated.ok, true);
+  if (!evaluated.ok) return;
+  assert.equal(evaluated.value.strategy.viability, 'VIABLE');
+
+  const unsupported = compileActionPlan({ strategy: evaluated.value.strategy, now: NOW });
+  assert.equal(unsupported.ok, false);
+  if (!unsupported.ok) assert.equal(unsupported.conflict.kind, 'CAPABILITY_UNSUPPORTED');
+  const compiled = compileActionPlan({
+    strategy: evaluated.value.strategy, now: NOW,
+    capabilities: [{ capabilityRef: 'external:stay.book', supported: true }],
+  });
+  assert.equal(compiled.ok, true);
+  if (!compiled.ok) return;
+  const intent = compiled.value.plan.intents[0]!;
+  assert.equal(intent.capabilityRef, 'external:stay.book');
+  assert.deepEqual(intent.subjectRefs, [{ kind: 'JOURNEY', id: journey.id }, { kind: 'OFFER', id: offerId }]);
+  assert.deepEqual(intent.expectedRevisions, [{ aggregateRef: { kind: 'JOURNEY', id: journey.id }, expectedRevision: journey.revision }]);
+  assert.deepEqual(intent.costEstimate, { amount: '245.00', currency: 'NZD' });
+  assert.deepEqual(intent.requiredAuthorityScopes, ['journey.stay']);
+  assert.deepEqual(intent.expectedObservations, ['EXTERNAL_PROVIDER:stay_booking_confirmation']);
+  assert.ok(intent.requestFingerprint);
+
+  const stale = compileActionPlan({
+    strategy: evaluated.value.strategy, now: NOW,
+    currentState: { heads: new Map([[`JOURNEY:${journey.id}`, journey.revision + 1]]), scopes: new Map() },
+    capabilities: [{ capabilityRef: 'external:stay.book', supported: true }],
+  });
+  assert.equal(stale.ok, false);
+  if (!stale.ok) assert.equal(stale.conflict.kind, 'STALE_AGGREGATE_REVISION');
+
+  const noOwningRead = compileActionPlan({
+    strategy: { ...evaluated.value.strategy, baseManifest: emptyManifest() }, now: NOW,
+    capabilities: [{ capabilityRef: 'external:stay.book', supported: true }],
+  });
+  assert.equal(noOwningRead.ok, false);
+  if (!noOwningRead.ok) assert.equal(noOwningRead.conflict.kind, 'STALE_AGGREGATE_REVISION');
 });
