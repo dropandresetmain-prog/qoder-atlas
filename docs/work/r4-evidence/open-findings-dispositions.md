@@ -22,11 +22,13 @@ Physical Sarah programme path (exact `Recover Sarah's trip`) and prior transport
 
 **Revisit when:** the failure recurs without mid-run command injection, with a reproducible log excerpt.
 
-## 3. Transport option card missing flight/time/price — FIXED
+## 3. Transport option card missing flight/time/price — FIXED (with residual PARK)
 
 **Decision:** Fixed at presentation layer (`caseWorkspacePresenter.ts` + copy). SELECT_OFFER titles use disrupted transport labels from the case graph when the journey-item subject label is a typed ref; option/approval cost uses strategy-scoped action costs when present.
 
-**Proof:** `node --test test/r4-f1-ui-language.test.ts` — 30/30 including `R4 transport option cards: leg label and strategy-scoped cost`.
+**Proof:** `node --test test/r4-f1-ui-language.test.ts` — including `R4 transport option cards: leg label and strategy-scoped cost`.
+
+**Residual PARK:** per-offer quoted price and itinerary times live in `offer_execution_bindings` / `ScenarioEffect.offerPrice` but are **not** projected onto `RecoveryStrategyView`, so distinct pre-approval multi-fare cards still cannot show fare/time until read-model enrichment. Revisit when strategy projection carries binding quote + itinerary.
 
 ## 4. Minor UI leftovers — PARK / Accept Risk
 
