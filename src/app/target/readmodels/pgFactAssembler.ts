@@ -36,7 +36,11 @@ import { formatInstantUtc } from './projectFocusedCaseGraph.ts';
 import { listRecoveryCaseAttention } from '../../../persistence/postgres/commands/caseAttentionCommands.ts';
 import { loadOriginalCaseGraphSnapshot } from '../../../persistence/postgres/commands/caseGraphSnapshotCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
-import { projectFocusedCaseGraphEnrichment, type TransportBookingFact } from './projectFocusedCaseGraph.ts';
+import {
+  projectFocusedCaseGraphEnrichment,
+  type ProgrammeParticipationAssessment,
+  type TransportBookingFact,
+} from './projectFocusedCaseGraph.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
 function isoNow(at?: string): string {
@@ -666,6 +670,15 @@ async function loadRecoveryCaseFactsInner(
   // T3: the deterministic causal path — every applicable blocking FAIL
   // explanation of every failing subject, exactly as the evaluator typed it.
   const causalPath: CausalPathStep[] = [];
+  const programmeParticipationViews = new Map<string, {
+    status: AssessmentViewStatus;
+    explanations: ReadonlyArray<{
+      status: 'PASS' | 'FAIL' | 'UNKNOWN';
+      affectedSubject: { kind: string; id: string };
+      cause: { subjectRef?: { kind: string; id: string } };
+      relatedSubjects: ReadonlyArray<{ kind: string; id: string }>;
+    }>;
+  }>();
   // M9 3A: derive connection viability from the real m6.connection dimension
   // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
   // case subjects — one broken connection is enough to flag the case.
@@ -681,6 +694,15 @@ async function loadRecoveryCaseFactsInner(
       'VIABILITY',
       generatedAt,
     );
+    const participationExplanations = view.assessment?.dimensions
+      .filter((dimension) => dimension.dimension === 'programme_participation' || dimension.dimension === 'optional_participation')
+      .flatMap((dimension) => dimension.explanations) ?? [];
+    if (participationExplanations.length > 0 || view.status !== 'NONE') {
+      programmeParticipationViews.set(s.subject_id, {
+        status: view.status,
+        explanations: participationExplanations,
+      });
+    }
     if (view.status === 'CURRENT' && view.assessment) {
       const verdict = view.assessment.overallVerdict;
       const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
@@ -863,6 +885,48 @@ async function loadRecoveryCaseFactsInner(
       )
     : { rows: [] };
 
+  // Retain the exact participant scope from each Journey assessment. A
+  // standalone PROGRAMME_ITEM assessment cannot establish which traveller's
+  // participation it describes, while an aggregate Journey verdict cannot be
+  // copied safely onto all commitments.
+  const programmeParticipationAssessments: ProgrammeParticipationAssessment[] = [];
+  for (const journey of journeys.rows) {
+    const journeyView = programmeParticipationViews.get(journey.id);
+    if (!journeyView || journeyView.status === 'NONE') continue;
+    for (const participation of participations.rows.filter((candidate) => candidate.traveller_id === journey.traveller_id)) {
+      if (!participation.accepted || (participation.obligation !== 'REQUIRED' && participation.obligation !== 'OPTIONAL')) continue;
+      const matching = journeyView.status === 'CURRENT'
+        ? journeyView.explanations.filter((explanation) => {
+            if (explanation.affectedSubject.kind !== 'JOURNEY' || explanation.affectedSubject.id !== journey.id) return false;
+            const refs = [explanation.cause.subjectRef, ...explanation.relatedSubjects].filter(
+              (ref): ref is { kind: string; id: string } => Boolean(ref),
+            );
+            return refs.some((ref) => ref.kind === 'PARTICIPATION' && ref.id === participation.id)
+              && refs.some((ref) => ref.kind === 'PROGRAMME_ITEM' && ref.id === participation.programme_item_id);
+          })
+        : [];
+      if (matching.length > 0) {
+        for (const explanation of matching) {
+          programmeParticipationAssessments.push({
+            journeyId: journey.id,
+            participationId: participation.id,
+            programmeItemId: participation.programme_item_id,
+            status: journeyView.status,
+            tone: explanation.status,
+          });
+        }
+      } else if (journeyView.status !== 'CURRENT') {
+        programmeParticipationAssessments.push({
+          journeyId: journey.id,
+          participationId: participation.id,
+          programmeItemId: participation.programme_item_id,
+          status: journeyView.status,
+          tone: 'UNKNOWN',
+        });
+      }
+    }
+  }
+
   // Objective rows owned by the case's explicit JOURNEY/TRIP subjects, plus the
   // Trip owning every affected Journey. Trip objectives govern their member
   // journeys even when RecoveryCase subjects carry only JOURNEY refs.
@@ -987,6 +1051,7 @@ async function loadRecoveryCaseFactsInner(
     programmeItems: programmeItems.rows,
     objectives: objectives.rows,
     assessmentViews,
+    programmeParticipationAssessments,
     causalPath,
     travellerLabelsByJourney,
     caseId,
