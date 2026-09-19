@@ -28,6 +28,7 @@ import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { stageProgrammeTimeSwap } from '../src/app/target/programmeTimeSwapStaging.ts';
 import { seedRootSubject } from './m2Seed.ts';
 import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
+import { currentAssessmentView } from '../src/persistence/postgres/world/pgAssessments.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -73,6 +74,12 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     });
     await seedBooking(seed, { travellerId: bobId, serviceId: bobService, journeyItemId: bobItem });
 
+    // Elena attends the changed item but has no transport evidence. Her
+    // unchanged UNKNOWN must remain visible without becoming a fabricated
+    // case failure or an RC-6 must-pass subject.
+    const elenaId = (await seedTraveller(seed, { displayName: 'Elena' })).travellerId;
+    const elenaJourney = await seedJourney(seed, { tripId: await seedTrip(seed), travellerId: elenaId });
+
     const eventId = await seedEvent(seed, { lifecycleStatus: 'ACTIVE' });
     const programmeId = await seedProgramme(seed, { eventId, lifecycleStatus: 'ACTIVE' });
     const earlyItem = await seedProgrammeItem(seed, {
@@ -85,6 +92,7 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     });
     await seedParticipation(seed, { programmeItemId: earlyItem.programmeItemId, travellerId: aliceId, obligation: 'REQUIRED', accepted: true });
     await seedParticipation(seed, { programmeItemId: lateItem.programmeItemId, travellerId: bobId, obligation: 'REQUIRED', accepted: true });
+    await seedParticipation(seed, { programmeItemId: earlyItem.programmeItemId, travellerId: elenaId, obligation: 'REQUIRED', accepted: true });
     const recoveryCaseId = await seedRootSubject(seed, { kind: 'RECOVERY_CASE' });
     await seed.client.query(
       `INSERT INTO recovery_cases (workspace_id, id, lifecycle_status, created_by_actor_id)
@@ -131,7 +139,10 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
       }
     }
     const baseline = await runBaselineEvaluation({ pool, workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, now: NOW });
-    assert.equal(baseline.evaluated, 2);
+    assert.equal(baseline.evaluated, 3);
+    const aliceBasis = await currentAssessmentView(pool, seed.workspaceId, { kind: 'JOURNEY', id: aliceJourney }, 'VIABILITY', NOW);
+    assert.equal(aliceBasis.status, 'CURRENT');
+    assert.equal(aliceBasis.assessment?.overallVerdict, 'FAIL');
 
     const beforeWindows = await pool.query<{ id: string; window_start: Date }>(
       `SELECT id, window_start FROM programme_items WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
@@ -152,24 +163,31 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     // 60 of 150 required minutes), Bob PASSes the late one comfortably.
     const aliceProjection = result.projections.find((p) => p.travellerRef === aliceId);
     const bobProjection = result.projections.find((p) => p.travellerRef === bobId);
+    const elenaProjection = result.projections.find((p) => p.travellerRef === elenaId);
     assert.ok(aliceProjection, 'Alice projected');
     assert.ok(bobProjection, 'Bob projected');
+    assert.ok(elenaProjection, 'Elena projected');
     assert.equal(aliceProjection!.side, 'ITEM_A');
     assert.equal(bobProjection!.side, 'ITEM_B');
+    assert.equal(elenaProjection!.side, 'ITEM_A');
 
     assert.equal(aliceProjection!.currentVerdict, 'FAIL');
     assert.equal(bobProjection!.currentVerdict, 'PASS');
+    assert.equal(elenaProjection!.currentVerdict, 'UNKNOWN');
 
     // After the proposed swap (item windows exchanged, participants unchanged):
     // Alice inherits the late window (ample margin) -> PASS; Bob inherits the
-    // early window but still arrives comfortably early -> PASS. Both viable.
+    // early window but still arrives comfortably early -> PASS. Elena's
+    // evidence remains UNKNOWN, which RC-6 treats as unchanged rather than a
+    // fabricated failure or regression.
     assert.equal(aliceProjection!.verdict, 'PASS', JSON.stringify(aliceProjection));
     assert.equal(bobProjection!.verdict, 'PASS', JSON.stringify(bobProjection));
+    assert.equal(elenaProjection!.verdict, 'UNKNOWN', JSON.stringify(elenaProjection));
     assert.equal(result.itemA.timeZone, 'Asia/Singapore');
     assert.equal(result.itemB.timeZone, 'Europe/London');
-    assert.deepEqual(result.itemA.participantLabels, ['Alice']);
+    assert.deepEqual(result.itemA.participantLabels, ['Alice', 'Elena']);
     assert.deepEqual(result.itemB.participantLabels, ['Bob']);
-    assert.equal(result.bothPartiesProjectedViable, true);
+    assert.equal(result.bothPartiesProjectedViable, false, 'the all-pass summary does not erase Elena\'s UNKNOWN');
     assert.equal(result.othersRemainViable, true);
     assert.equal(result.previewAccepted, true);
     assert.equal(result.strategyViability, 'VIABLE');
@@ -202,11 +220,13 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
         },
       );
       assert.deepEqual(replay, staged, 'the same pair/case/revision replays the staged strategy');
-      const stored = await pool.query<{ viability: string; status: string }>(
-        `SELECT viability, status FROM recovery_strategies WHERE workspace_id = $1 AND id = $2`,
+      const stored = await pool.query<{ viability: string; status: string; basis_assessment_id: string }>(
+        `SELECT viability, status, basis_assessment_id FROM recovery_strategies WHERE workspace_id = $1 AND id = $2`,
         [seed.workspaceId, staged.value.strategyId],
       );
-      assert.deepEqual(stored.rows[0], { viability: 'VIABLE', status: 'EVALUATED' });
+      assert.deepEqual(stored.rows[0], {
+        viability: 'VIABLE', status: 'EVALUATED', basis_assessment_id: aliceBasis.assessment!.id,
+      });
     }
 
     const programmeRevision = await pool.query<{ revision: string }>(
