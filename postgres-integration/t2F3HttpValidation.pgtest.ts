@@ -13,36 +13,38 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
-import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
 import { composeTargetApplication, type TargetApplication } from '../src/app/target/composeTargetApplication.ts';
 import { handleTargetProductHttp } from '../src/app/target/targetHttpHandlers.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from '../src/app/demo/externalIdentity.ts';
 import type { TransportServiceCancelledWithReprotectionEvent } from '../src/app/target/providerDisruptionIngress.ts';
+import { aitWorldModeFromEnv, obtainAitSummitWorld } from './aitFixtureClone.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:t2-f3-http-validation-test';
 
 let pool: Pool;
-let dataset: LoadedDataset;
+let dataset: LoadedDataset | undefined;
+let sharedPool: Pool | undefined;
+let disposeWorld: (() => Promise<void>) | undefined;
+let setupMs = 0;
 
 before(async () => {
-  pool = await sharedTestPool();
-  dataset = await loadDataset(BUNDLE_DIR);
+  if (aitWorldModeFromEnv() === 'fresh') {
+    sharedPool = await sharedTestPool();
+    pool = sharedPool;
+    dataset = await loadDataset(BUNDLE_DIR);
+  }
 });
 
 after(async () => {
-  await pool.end();
+  if (state.app) await state.app.close().catch(() => undefined);
+  await disposeWorld?.().catch(() => undefined);
+  await sharedPool?.end().catch(() => undefined);
 });
 
-async function freshWorkspace(): Promise<string> {
-  const workspaceId = randomUUID();
-  await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, `t2-f3:${workspaceId}`]);
-  return workspaceId;
-}
 
 /**
  * Drive the real HTTP handler with req/res stubs.
@@ -117,23 +119,24 @@ const state: Partial<TestState> = {};
 
 describe('F3 HTTP validation boundary', () => {
   test('step 1: provision workspace and compose application', async () => {
-    const workspaceId = await freshWorkspace();
-    state.workspaceId = workspaceId;
-
-    // Provision the canonical dataset.
-    const outcome = await provisionDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
-    assert.equal(outcome.status, 'MATERIALIZED');
-    if (outcome.status !== 'MATERIALIZED') return;
-
-    // Resolve the provisioning connection.
-    const connectionResult = await pool.query<{ connection_id: string }>(
-      `SELECT DISTINCT connection_id FROM external_records WHERE workspace_id = $1 LIMIT 1`,
-      [workspaceId],
+    const world = await obtainAitSummitWorld({
+      actorPrincipalId: ACTOR,
+      includeBaseline: false,
+      sharedPool,
+      dataset,
+    });
+    disposeWorld = world.dispose;
+    pool = world.pool;
+    setupMs = world.setupMs;
+    state.workspaceId = world.workspaceId;
+    state.connectionId = world.connectionId;
+    assert.ok(
+      world.provisionStatus === 'MATERIALIZED' || world.provisionStatus === 'CLONED',
+      `world ready via ${world.provisionStatus}`,
     );
-    assert.equal(connectionResult.rowCount, 1, 'exactly one provisioning connection');
-    state.connectionId = connectionResult.rows[0]!.connection_id;
+    console.log(`[timing] F3 setup mode=${world.mode} setupMs=${setupMs.toFixed(0)}`);
 
-    const mapping = await resolveSourceSubjects(pool, workspaceId, state.connectionId);
+    const mapping = await resolveSourceSubjects(pool, world.workspaceId, world.connectionId);
 
     // Resolve the original service external identity.
     const originalServiceExternalId = 'ID7159@2026-09-30T10:45:00.000Z';
@@ -148,8 +151,11 @@ describe('F3 HTTP validation boundary', () => {
     // This enables the empty-body path to load the event from file.
     process.env.NORTHSTAR_DEMO_DISRUPTION_EVENT_FILE = 'data/ait-demo-input-pack/scenarios/s1-supplier-disruption/inputs/airline-schedule-change-id7159.json';
 
-    // Compose the target application.
-    state.app = await composeTargetApplication({ workspaceId });
+    // Compose the target application (postgres overrides point at clone DB when used).
+    state.app = await composeTargetApplication({
+      workspaceId: world.workspaceId,
+      postgres: world.postgresOverrides,
+    });
   });
 
   test('step 2a: malformed (non-JSON) body → HTTP 400, error code VALIDATION_FAILED, zero mutation', async () => {
