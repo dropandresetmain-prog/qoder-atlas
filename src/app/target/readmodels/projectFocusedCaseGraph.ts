@@ -213,9 +213,26 @@ export function projectFocusedCaseGraphEnrichment(
       ? { semanticState: TONE_TO_STATE[assessment.tone], evaluation: assessment.status }
       : { semanticState: 'UNKNOWN' };
   };
-  const hasCausalReference = (ref: string): boolean => (input.causalPath ?? []).some((step) =>
-    step.causeSubjectRef === ref || step.relatedSubjectRefs.includes(ref),
-  );
+  const hasArrivalExplanation = (itemRef: string, serviceRef: string, currentAt: string): boolean => (input.causalPath ?? []).some((step) => {
+    const referencesArrivalSubject = step.causeSubjectRef === itemRef
+      || step.causeSubjectRef === serviceRef
+      || step.relatedSubjectRefs.includes(itemRef)
+      || step.relatedSubjectRefs.includes(serviceRef);
+    if (!referencesArrivalSubject) return false;
+    const factAt = (...keys: string[]): boolean => keys.some((key) => step.facts[key] === currentAt);
+    // Connection facts explicitly distinguish upstream arrival from downstream
+    // departure. Related refs alone cover both legs and cannot establish which
+    // arrival is operationally responsible.
+    if (step.dimension === 'connection_feasibility') return factAt('upstreamArrival');
+    // Participation/objective arrival checks carry the reach/readiness instant.
+    // A departure-after-engagement failure includes that same arrival context,
+    // but the failed fact is the departure and must not turn arrival red.
+    if ((step.dimension === 'programme_participation' || step.dimension === 'hard_objectives')
+      && step.reasonCode !== 'departs_before_item_ends') {
+      return factAt('arrival', 'readyAt', 'scheduledArrival');
+    }
+    return false;
+  });
   const hasProgrammeFailure = (ref: string): boolean => (input.causalPath ?? []).some((step) =>
     step.dimension === 'programme_participation' && step.causeSubjectRef === ref,
   );
@@ -317,7 +334,7 @@ export function projectFocusedCaseGraphEnrichment(
         ? transportService.actual_arrival ?? transportService.estimated_arrival ?? transportService.published_arrival
         : null;
       const timingImplicated = currentAt !== null && serviceSubjectRef !== undefined && (
-        hasCausalReference(serviceSubjectRef) || hasCausalReference(itemSubjectRef)
+        hasArrivalExplanation(itemSubjectRef, serviceSubjectRef, currentAt)
       );
 
       pushNode({

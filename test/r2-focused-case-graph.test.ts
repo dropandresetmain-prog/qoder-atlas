@@ -358,7 +358,7 @@ test('A1 enrichment: maps service and timing facts one-to-one from canonical tim
     journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-1' }],
     transportServices: [{ id: 'service-1', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: '2031-04-05T10:30:00.000Z', actual_arrival: '2031-04-05T10:45:00.000Z', destination_time_zone: 'Asia/Singapore' }],
     participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
-    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'JOURNEY_ITEM:item-1', dimension: 'connection_feasibility', reasonCode: 'connection_impossible', evaluatorId: 'm6.connection', facts: {}, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'JOURNEY_ITEM:item-1', dimension: 'connection_feasibility', reasonCode: 'connection_impossible', evaluatorId: 'm6.connection', facts: { upstreamArrival: '2031-04-05T10:45:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
     travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
   });
 
@@ -383,7 +383,7 @@ test('A1 enrichment: shows an evaluator-implicated replacement arrival without i
     journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'replacement-service' }],
     transportServices: [{ id: 'replacement-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T10:30:00.000Z', estimated_arrival: null, actual_arrival: null, destination_time_zone: 'Asia/Singapore' }],
     participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
-    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'OBJECTIVE:obj-1', dimension: 'hard_objectives', reasonCode: 'arrival_after_deadline', evaluatorId: 'm6.objective', facts: {}, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'OBJECTIVE:obj-1', dimension: 'hard_objectives', reasonCode: 'arrival_after_deadline', evaluatorId: 'm6.objective', facts: { arrival: '2031-04-05T10:30:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
     travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
   });
 
@@ -393,6 +393,39 @@ test('A1 enrichment: shows an evaluator-implicated replacement arrival without i
   assert.deepEqual(timing.timing, { currentAt: '2031-04-05T10:30:00.000Z', publishedAt: '2031-04-05T10:30:00.000Z', timeZone: 'Asia/Singapore' });
   assert.deepEqual(timing.subjectRefs, ['JOURNEY_ITEM:item-1']);
   assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:replacement-service')?.subjectRefs, ['TRANSPORT_SERVICE:replacement-service']);
+});
+
+test('A1 enrichment: connection facts mark only the upstream arrival, never its related onward service', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [
+      { id: 'inbound', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'inbound-service' },
+      { id: 'onward', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '002', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'onward-service' },
+    ],
+    transportServices: [
+      { id: 'inbound-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'hub', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: '2031-04-05T10:30:00.000Z', actual_arrival: null },
+      { id: 'onward-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'hub', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T12:00:00.000Z', estimated_arrival: '2031-04-05T12:15:00.000Z', actual_arrival: null },
+    ],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'CONSTRAINT_DEFINITION:min-connection', dimension: 'connection_feasibility', reasonCode: 'connection_below_minimum', evaluatorId: 'm6.connection', facts: { upstreamArrival: '2031-04-05T10:30:00.000Z', downstreamDeparture: '2031-04-05T10:40:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:inbound', 'JOURNEY_ITEM:onward'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+  assert.deepEqual(result.nodes.filter((node) => node.kind === 'TIMING').map((node) => node.ref), ['TIMING:inbound:ARRIVAL']);
+});
+
+test('A1 enrichment: departure failure does not mark its arrival context as failed timing', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'inbound', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'inbound-service' }],
+    transportServices: [{ id: 'inbound-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'venue', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: null, actual_arrival: null }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'PROGRAMME_ITEM:session', dimension: 'programme_participation', reasonCode: 'departs_before_item_ends', evaluatorId: 'm6.participation', facts: { arrival: '2031-04-05T08:00:00.000Z', actualDeparture: '2031-04-05T09:00:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:inbound', 'JOURNEY_ITEM:onward'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+  assert.equal(result.nodes.some((node) => node.kind === 'TIMING'), false);
+  assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:inbound-service')?.subjectRefs, ['TRANSPORT_SERVICE:inbound-service', 'JOURNEY_ITEM:inbound']);
 });
 
 test('A1 enrichment: a commitment fails only from its own assessment or participation explanation', () => {
