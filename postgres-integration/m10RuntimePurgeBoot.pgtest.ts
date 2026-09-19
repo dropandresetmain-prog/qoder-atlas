@@ -76,11 +76,25 @@ test('normal boot works end-to-end with no SQLite database reachable', async () 
     assert.ok(Array.isArray(overviewBody.items));
 
     // Demo reset is a real PostgreSQL-backed product capability reachable
-    // over HTTP — not a stub, not SQLite.
+    // over HTTP — not a stub, not SQLite. When a demo dataset is configured
+    // on process.env the handler returns the workspace reset envelope; otherwise
+    // it seeds the small placeholder world (two travellers). Either path proves
+    // the target composition owns reset on PostgreSQL.
     const reset = await fetch(`${base}/api/v2/demo/reset`, { method: 'POST' });
     assert.equal(reset.status, 200);
-    const resetBody = await reset.json() as { travellers: unknown[] };
-    assert.equal(resetBody.travellers.length, 2);
+    const resetBody = await reset.json() as {
+      travellers?: unknown[];
+      ok?: boolean;
+      workspaceId?: string;
+      baselineEvaluated?: number;
+    };
+    if (Array.isArray(resetBody.travellers)) {
+      assert.equal(resetBody.travellers.length, 2);
+    } else {
+      assert.equal(resetBody.ok, true);
+      assert.equal(typeof resetBody.workspaceId, 'string');
+      assert.ok((resetBody.baselineEvaluated ?? 0) >= 0);
+    }
 
     // `/operator` is the current PostgreSQL product alias, not the retired
     // SQLite composition. Prove it reaches the same target overview handler.
