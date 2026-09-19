@@ -1,3 +1,80 @@
+# ACTIVE TASK — R3 LOCAL ACCEPTANCE (real PostgreSQL + normal runtime + browser)
+
+Live ledger for the R3 local acceptance lane. The R3 Cloud, R2 and R1 history below is preserved
+unchanged; Cloud claims are NOT rewritten as local evidence.
+
+## R3 local identity
+
+- Branch: `feat/r3-local-acceptance`, created from the exact R3 Cloud HEAD
+  `7d5c10ae8a2dc27057f6715914f4b42466beec9d` (`feat/r3-full-rebased-b1-cloud`); accepted R2 base
+  `6118f427eb5fdaed4941e918276fa3260acd9d0c` verified as ancestor; tracked tree clean at start;
+  user artifacts (`.founder-b1-*`, `.claude`, `.worktrees`) untouched.
+- Environment: Windows 11, **Node v24.15.0** (default `node`), PostgreSQL 16 + PostGIS container
+  `northstar-r1-postgres-test` on port 55433, disposable DBs from `template_postgis`
+  (`r3local` focused, `r3boot*`/`r3conn` boot runs, `r3full` full suite). Playwright Chromium
+  (full-page screenshots read back and inspected); the in-app browser pane screenshot was flaky.
+- Post-R3 input only (NOT merged here): `design/event-overview-v7-2` @
+  `563320e4e9ef7c2ea7dc4f53f0d07b3045dcfeb1` (docs-only Event Overview Graph v7.2 design).
+
+## Results
+
+| Step | Result |
+| --- | --- |
+| Pure focused R3 + adjacent R1 (9 files) | 54/54 after two hermeticity fixes (below) |
+| `r3ComposedB1Full.pgtest.ts` | PASS (after test fix) |
+| `b1ProductPlanningCoordinator.pgtest.ts` | PASS |
+| `b1RecoveryLoop.pgtest.ts` | PASS |
+| `b1SarahWorldRecovery.pgtest.ts` | PASS |
+| `r1ComposedB1.pgtest.ts` | PASS |
+| `r1ConnectionRecovery.pgtest.ts` | PASS |
+| Normal boot (`src/main.ts`, PG, REPLAY) | log: `[atlas] transport research composed (mode=REPLAY, read-only)`; C4 opens/plans cases; `POST /strategies` returns `{ok,result}` |
+| Typecheck / lint / test-boundary (232) / anti-hardcoding | clean |
+| CURRENT_TARGET (`npm run test:current`) | 1037/1037 |
+| Full PostgreSQL suite (run ONCE, fresh DB `r3full`) | **570/571**; sole failure `m10RuntimePurgeBoot.pgtest.ts:88` (`200 !== 404`) |
+
+## Fixes made locally (all generic, no scenario keys)
+
+1. `test/r3-import-guard.test.ts` — normalise Windows path separators (guard compared `\` vs `/`; product code was correct).
+2. `test/r3-transport-research-composition.test.ts` — the LIVE-without-credentials test read the developer's `.env.local` (holds Atlas creds); now loads config from an empty cwd.
+3. `postgres-integration/r3ComposedB1Full.pgtest.ts` — asserted the Original snapshot existed at case open; by the R2 design the progression pass captures it at the FIRST SETTLED FAILING basis. Assertion moved after wake 1 (and asserts absence before it).
+4. `src/ui/screens/product-recovery-case.ts` — browser finding: planning evidence never rendered researched tools/provenance, and the three rejected transport options were identical lines. Now renders `Research: <tool> — <status> · <provenance>` (an UNAVAILABLE tool makes no provenance claim) and each option's per-subject outcome (`Participant 1: Fail → Fail`). New pure test in `test/r2-case-workspace-integration.test.ts`.
+
+## Real-runtime findings
+
+- **Normal boot, founder dataset (`ait-summit-2026` + disclosed airline event)**: the disruption opens a Case for the reprotected traveller; TRANSPORT + PROGRAMME both investigated; programme time-swap candidates evaluated (one RECOMMENDED, one VIABLE_NOT_RECOMMENDED, rest rejected deterministically). `flight.search` is honestly `UNAVAILABLE: recording_not_found` — the checked-in Atlas REPLAY recordings cover only MNL→CEB on 2026-09-05, not the founder programme's corridors. Not an R3 defect; a **recording-coverage gap** carried to provider restoration. Consequently the founder-dataset browser flow does NOT show a researched travel alternative; that was shown on the recording-matching world below.
+- **Normal boot, recording-matching world (`main.ts`, REPLAY)**: `flight.search SUCCEEDED / REPLAY`; 3 transport alternatives rejected deterministically (retained, visible on the page); programme strategy recommended from VIABLE only. Offers departing before the wall clock are filtered (documented honest filter), so planning used an **acceptance-only JS clock shim in the launch script** (runtime code untouched). The shim breaks reassessment claiming (DB `next_run_at` is real-time), so approval→execution→resolution ran on the real clock after restart.
+- Approve via the page button → one ActionPlan, two `internal:programme.schedule` intents (only internal capabilities; no Atlas mutation) → observation → reassessment → C4 RESOLVE (`resolution_gate_passed_and_reconciled`). Current graph: traveller Healthy, whole-trip PASS. Original tab still shows the failing graph, JSON-identical across approve/execute/resolve. `POST /strategies`: 200 `{ok,result}`, repeat idempotent (same attempt), unknown case 404, RESOLVED case 409.
+- **Second generality, normal boot**: connection world (no programme) → TRANSPORT + TRANSFER investigated, PROGRAMME not applicable, REPLAY flight search, transport option recommended; same coordinator/RC-6/comparator. (External SELECT_OFFER approval remains B2/provider-restoration scope, not approved here.)
+- Passenger derivation: allocations for the journey item → else the journey's 1:1 traveller → else `passengers_unknown` fail-closed (`transportCorridors.ts`); no env variable, no runtime constant.
+
+## Browser findings (physical, Chromium screenshots)
+
+- Disrupted/Planning: first break point + cause clear; Current shows failed traveller; planning section separate from the graph.
+- **Causal spine**: the R3 layout places backend causal refs left-to-right (traveller → programme commitment) with context nodes (disruption, service, case) in a secondary column. The backend causal path currently contains only the failing participation step, so the visual story is NOT the fuller "changed service → arrival consequence → breakpoint → commitment" chain; that requires backend causality (not changed here). Parked.
+- The replacement flight shows "Unknown / unconfirmed", not green, in the seeded worlds (no service-level evaluation). Parked.
+- Known R2 debt still visible: raw UUIDs in Partial Recovery / Recovery Actions and a "Strategy <uuid>" line. Not blocking; left.
+
+## Checkpoints
+
+| Checkpoint | SHA |
+| ---
+
+## FINAL
+
+- Full PG suite ran **exactly once**: 571 tests, 570 pass, 1 fail (`m10RuntimePurgeBoot.pgtest.ts:88`, `/operator` expected 404, got 200).
+- Disposition: PRE-EXISTING, not caused by R3. Re-run alone on this branch (fails identically) AND on an isolated worktree at accepted R2 `6118f427eb5fdaed4941e918276fa3260acd9d0c` (fails identically, actual 200 / expected 404). Cause: the test predates the Founder B1 product repair, which deliberately made `/operator` a product route; the assertion is stale. Left unchanged (out of R3 scope); Park for Later.
+- No other PG failures; no file-start races observed.
+- FINAL SHA: the commit carrying this section (see `git log`); pushed to `origin/feat/r3-local-acceptance`.
+
+---
+
+ | --- |
+| L1 focused PG + test hermeticity | `6eee7333dd95278eb2fd27775429283106c66be0` |
+| L3 planning-evidence tools/provenance UI | `5f972115a200953142ef490fb15ce275869d9d50` |
+| FINAL | see FINAL section |
+
+---
+
 # ACTIVE TASK — R3 FULL-REBASED-B1 INTEGRATION (CLOUD)
 
 Live working-memory ledger for the R3 Cloud lane. Reread before every phase, before every

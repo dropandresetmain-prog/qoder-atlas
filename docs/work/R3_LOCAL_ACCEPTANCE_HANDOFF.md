@@ -5,6 +5,19 @@ R3 ledger for checkpoint SHAs). This file lists the exact local commands and req
 evidence. Local acceptance must prove the **normal product runtime** (composeTargetBoot),
 not test-only injection.
 
+## LOCAL ACCEPTANCE RESULT (2026-09-19, `feat/r3-local-acceptance`)
+
+Local, real-PostgreSQL + normal-boot + browser evidence is recorded in the top section of
+`docs/work/ACTIVE_TASK.md`. Summary: all six focused PG files pass; `composeTargetBoot` logs
+`transport research composed (mode=REPLAY, read-only)`; Atlas REPLAY `flight.search` executed from
+normal boot and its rejected alternatives are visible on the Case page; the approved programme
+strategy executed through internal capabilities only and the case resolved via the deterministic
+gate; Original stayed byte-identical. Local fixes: two Cloud test-hermeticity bugs, one wrong
+Original-capture timing assertion, and the Case page now renders researched tools + provenance.
+Carry-forwards: REPLAY recordings do not cover the founder programme corridors; the backend causal
+path holds only the failing participation step; replacement flight is not shown green.
+The Cloud-limits section below is historical (what Cloud could not prove).
+
 Environment: PostgreSQL 16 + PostGIS on localhost (migrations apply through **0127**),
 Node >= 24 for `--test` type-stripping, a Chromium browser for the Case workspace.
 
