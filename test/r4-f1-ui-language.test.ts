@@ -178,6 +178,70 @@ describe('Overview roster and queue show plain change sentences', () => {
   });
 });
 
+describe('Case planning activity provider evidence', () => {
+  const planningEvidence = (tool: object) => ({
+    phase: 'DECISION_TIME',
+    asOf: generatedAt,
+    attemptRef: 'attempt-1',
+    coordinatorVersion: 'coordinator-1',
+    outcome: { label: 'Waiting on approval', code: 'AWAITING_AUTHORITY' },
+    domains: [],
+    tools: [tool],
+    candidates: [],
+    viableStrategies: [],
+  });
+
+  test('successful live evidence names the provider and provenance mode', () => {
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      planningEvidence: planningEvidence({
+        tool: { label: 'Flight search', code: 'flight.search' },
+        status: { label: 'Succeeded', code: 'SUCCEEDED' },
+        provenanceMode: { label: 'Live provider call', code: 'LIVE' },
+        provider: 'atlas',
+        summary: 'Replacement flights returned.',
+        uncertainties: [],
+        evidenceRef: 'evidence-1',
+      }),
+    } as Partial<RecoveryCaseView>));
+    const row = model.activity.rows.find((entry) => entry.label === 'Checking replacement flights');
+    assert.equal(row?.note, 'Atlas · live provider evidence returned replacement-flight information.');
+  });
+
+  test('partial replay evidence says that the remaining checks are uncertain', () => {
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      planningEvidence: planningEvidence({
+        tool: { label: 'Flight search', code: 'flight.search' },
+        status: { label: 'Partially succeeded', code: 'PARTIAL' },
+        provenanceMode: { label: 'Replayed recording', code: 'REPLAY' },
+        provider: 'atlas',
+        summary: 'Some replacement flights returned.',
+        uncertainties: ['Some fares were not available.'],
+        evidenceRef: 'evidence-2',
+      }),
+    } as Partial<RecoveryCaseView>));
+    const row = model.activity.rows.find((entry) => entry.label === 'Checking replacement flights');
+    assert.equal(row?.note, 'Atlas · saved replay evidence returned some replacement-flight information; other checks remain uncertain.');
+  });
+
+  test('failed evidence without provider or mode makes the missing provenance explicit', () => {
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      planningEvidence: planningEvidence({
+        tool: { label: 'Flight search', code: 'flight.search' },
+        status: { label: 'Failed', code: 'FAILED' },
+        provenanceMode: { label: '', code: '' },
+        summary: 'No result.',
+        uncertainties: [],
+        evidenceRef: 'evidence-3',
+      }),
+    } as Partial<RecoveryCaseView>));
+    const row = model.activity.rows.find((entry) => entry.label === 'Replacement flights could not be checked');
+    assert.equal(row?.note, 'replacement-flight information could not be obtained; provider was not recorded and source mode was not recorded. No flight availability was obtained, so no replacement flight is being suggested.');
+  });
+});
+
 describe('duplicate option cards (F)', () => {
   const repeated = [1, 2, 3].flatMap((attempt) => [
     strategy(1, attempt * 10 + 1, '05:00', 'p'),
