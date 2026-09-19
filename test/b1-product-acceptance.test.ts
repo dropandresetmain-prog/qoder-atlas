@@ -40,6 +40,13 @@ const EARLY = { start: '2026-10-01T03:30:00.000Z', end: '2026-10-01T04:00:00.000
 const LATER = { start: '2026-10-01T05:30:00.000Z', end: '2026-10-01T06:00:00.000Z' };
 const LATEST = { start: '2026-10-01T06:30:00.000Z', end: '2026-10-01T07:00:00.000Z' };
 
+// These fixture windows deliberately omit a canonical zone. The Case presenter
+// must make that fallback explicit rather than silently implying a local time.
+const EARLY_UTC = '1 Oct 2026, 03:30 UTC';
+const LATER_UTC = '1 Oct 2026, 05:30 UTC';
+const LATEST_UTC = '1 Oct 2026, 06:30 UTC';
+const LATEST_END_UTC = '1 Oct 2026, 07:00 UTC';
+
 /** An Overview with one case-backed disrupted row and one healthy row. */
 function overviewView(): OperatorOverview {
   return {
@@ -215,9 +222,9 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
   });
 
   test('each option states what it changes, in current -> proposed terms', () => {
-    assert.match(html, /Move <strong>Headline interview<\/strong> from 1 Oct, 03:30 to 1 Oct, 05:30/);
-    assert.match(html, /Move <strong>Partner briefing<\/strong> from 1 Oct, 05:30 to 1 Oct, 03:30/);
-    assert.match(html, /Move <strong>Closing panel<\/strong> from 1 Oct, 06:30 to 1 Oct, 03:30/);
+    assert.match(html, new RegExp(`Move <strong>Headline interview<\\/strong> from ${EARLY_UTC} to ${LATER_UTC}`));
+    assert.match(html, new RegExp(`Move <strong>Partner briefing<\\/strong> from ${LATER_UTC} to ${EARLY_UTC}`));
+    assert.match(html, new RegExp(`Move <strong>Closing panel<\\/strong> from ${LATEST_UTC} to ${EARLY_UTC}`));
   });
 
   test('each option states who it fixes', () => {
@@ -233,11 +240,11 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     assert.match(html, /data-option-number="1"/);
     assert.match(html, /data-option-number="2"/);
     assert.match(html, /<span class="badge tone-ok">Recommended<\/span>/);
-    assert.match(html, /Alternative: Move Headline interview to 1 Oct, 06:30/);
+    assert.match(html, new RegExp(`Alternative: Move Headline interview to ${LATEST_UTC}`));
     assert.match(html, /<span class="badge tone-neutral">Also works<\/span>/);
     // The difference is visible: the same blocked item moves to two different slots.
-    assert.match(html, /to 1 Oct, 05:30/);
-    assert.match(html, /to 1 Oct, 06:30/);
+    assert.match(html, new RegExp(`to ${LATER_UTC}`));
+    assert.match(html, new RegExp(`to ${LATEST_UTC}`));
   });
 
   test('approval still carries the real strategyRef and posts to the normal application route', () => {
@@ -279,8 +286,8 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     const facts = caseFacts() as unknown as { status: string; strategies: { changes: { currentWindow: unknown; proposedWindow: unknown }[] }[] };
     for (const change of facts.strategies[1]!.changes) change.currentWindow = change.proposedWindow;
     const executedHtml = renderProductRecoveryCase(projectRecoveryCase(facts as unknown as RecoveryCaseFacts));
-    assert.match(executedHtml, /<strong>Headline interview<\/strong> is already at 1 Oct, 06:30–1 Oct, 07:00/);
-    assert.equal(/from 1 Oct, 06:30 to 1 Oct, 06:30/.test(executedHtml), false, 'no "from X to X" move');
+    assert.match(executedHtml, new RegExp(`<strong>Headline interview<\\/strong> is already at ${LATEST_UTC}–${LATEST_END_UTC}`));
+    assert.equal(new RegExp(`from ${LATEST_UTC} to ${LATEST_UTC}`).test(executedHtml), false, 'no "from X to X" move');
     assert.match(executedHtml, /data-change-state="IN_EFFECT"/);
     // Option 1 was never executed, so it still reads as a proposal.
     assert.match(executedHtml, /data-change-state="PROPOSED"/);
