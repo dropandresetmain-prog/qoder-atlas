@@ -29,12 +29,16 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-Active A1 lanes: Luna visual on `codex/astra-a1-visual` and Luna navigation on `codex/astra-a1-navigation`, both from pushed A0; isolated worktrees, no databases. Case semantics Terra lane follows the primary graph projection handoff. Existing R4/PG-perf worktrees and root untracked work remain untouched.
+Active A1 lanes: Case semantics Terra on `codex/astra-a1-case-semantics` (review corrections after a9fcd61); Programme preview Luna on `codex/astra-a1-programme-preview`. Navigation Luna ready at `6a80c01`; Overview layout Luna ready at `f893972`. Isolated worktrees/databases. Existing R4/PG-perf worktrees and root untracked work remain untouched.
 
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
+- Current pushed primary before Activity checkpoint: `b7627bd31192f0d425ada2e0063dcc3590d6ff0f`.
+- Activity: 20-row keyset pagination; focused PG shell file 2/2 passed on `astra_a1_shell` (timestamp ties, microseconds, inserted new row, complete history, invalid/cross-workspace cursor); direct TypeScript passed. Browser proof pending restart.
+- Navigation ready: 45 focused tests and direct TypeScript passed; explicit Traveller event context replaces brittle HTML rewriting.
+- Overview layout ready: 10 focused geometry tests and direct TypeScript passed. Dependency rows no longer overlap programme; same-day cohorts stack. Physical merged proof pending.
 - Primary normal boot/browser baseline: `astra_product`, workspace `9ef64348-61b2-4e18-a291-152502a89a02`, port 4120; REPLAY, Qwen absent, execution absent; 52 PASS / 15 UNKNOWN, visible 52/67. No LIVE/provider calls.
 - New convergence counters: **postgres:fast = 0; CURRENT_TARGET = 0; full canonical PG = 0**.
 - Reused R4 counters: 1/1/1, with focused closures; opaque currentness suite-only failure remains Investigate Now. Do not claim all three broad runs were clean.
@@ -51,10 +55,10 @@ Active A1 lanes: Luna visual on `codex/astra-a1-visual` and Luna navigation on `
 
 ## Exact next action / stop-safe handoff
 
-Commit/push the graph projection handoff and A0 receipt; launch Case semantics from it. Integrate visual/navigation lanes after their focused evidence. Physical A1 acceptance remains pending.
+Commit/push Activity checkpoint, integrate navigation and Overview layout, then restart isolated product for physical paging/navigation/graph checks. Integrate Case semantics after focused review corrections. Freeze Overview semantic follow-on; restore remaining Programme/Decisions/Traveller jobs. A1 acceptance remains pending.
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
-Unfinished lanes: `codex/astra-a1-navigation` at A0; `codex/astra-a1-case-semantics` at 43d78af. Luna is also inspecting Programme/Traveller action seams read-only.
+Remaining action-seam findings: programme bilateral preview is real but unwired; generic programme preview/commit and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope.
 Browser artifacts: ignored `output/playwright/` screenshots; temporary untracked `.playwright-cli/` snapshots/logs must stay out of commits.
-Evidence not run: all new implementation and physical acceptance gates.
+Evidence not run: integrated browser acceptance, Overview semantic follow-on, A1 broad gates, A2–A5 acceptance. Applied disclosed Sarah supplier input physically in isolated REPLAY runtime; Case awaits programme approval. No execution acceptance claimed.
 Continue in this task while checkpoint context is clean; use this ledger plus A0 record for a fresh task if context becomes noisy. Never branch from the preparation pack or merge directly to main.

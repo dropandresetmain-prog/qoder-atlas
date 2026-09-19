@@ -946,6 +946,10 @@ export const ActivityFeedSchema = z.strictObject({
   })),
   /** True when older entries exist beyond the page returned. */
   truncated: z.boolean(),
+  /** Exclusive, workspace-scoped change-record cursor for the next older page. */
+  nextCursor: z.string().uuid().optional(),
+  /** Present when this is an older page, so the surface can offer the latest activity. */
+  beforeCursor: z.string().uuid().optional(),
 });
 export type ActivityFeed = z.infer<typeof ActivityFeedSchema>;
 

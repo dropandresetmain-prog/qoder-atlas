@@ -54,7 +54,13 @@ export function renderActivitySurface(view: ActivitySurfaceView): string {
   <div class="feed" data-test="activity-feed" data-ui-section="activity-feed" data-poll-region="activity-feed">
     ${body}
   </div>
-  <p class="footnote" data-poll-region="activity-footer">Showing the ${count} most recent ${count === 1 ? 'event' : 'events'}${view.truncated ? '; older activity is not shown on this page' : ''}.</p>
+  <div data-poll-region="activity-footer">
+    <p class="footnote">Showing ${count} ${view.beforeCursor ? 'earlier' : 'latest'} ${count === 1 ? 'event' : 'events'}.</p>
+    <nav aria-label="Activity pages">
+      ${view.beforeCursor ? '<a href="/api/v2/operator/activity?format=html">Latest activity</a>' : ''}
+      ${view.nextCursor ? `<a href="/api/v2/operator/activity?format=html&amp;before=${escapeHtml(encodeURIComponent(view.nextCursor))}">Older activity →</a>` : ''}
+    </nav>
+  </div>
 </main>`;
 }
 

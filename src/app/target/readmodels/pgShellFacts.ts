@@ -11,6 +11,7 @@
  * near-empty is a truthful answer, not a defect to fill in.
  */
 import type { Pool } from '../../../persistence/postgres/pool.ts';
+import { z } from 'zod';
 import type {
   ActivityFeed,
   DecisionQueue,
@@ -150,10 +151,21 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
   return value;
 }
 
-const ACTIVITY_PAGE = 50;
+const ACTIVITY_PAGE = 20;
 
-export async function loadActivityFeed(pool: Pool, workspaceId: string): Promise<ActivityFeed> {
+export class ActivityCursorError extends Error {}
+
+export async function loadActivityFeed(pool: Pool, workspaceId: string, beforeCursor?: string): Promise<ActivityFeed> {
+  if (beforeCursor !== undefined && !z.string().uuid().safeParse(beforeCursor).success) {
+    throw new ActivityCursorError('This activity page link is invalid. Open the latest activity and try again.');
+  }
   const { value } = await withProjectionSnapshot(pool, async (client) => {
+    if (beforeCursor !== undefined) {
+      const cursor = await client.query('SELECT 1 FROM change_records WHERE workspace_id = $1 AND id = $2', [workspaceId, beforeCursor]);
+      if (cursor.rowCount !== 1) throw new ActivityCursorError('This activity page is no longer available. Open the latest activity.');
+    }
+    // Compare the stored tuple inside PostgreSQL: converting the anchor through
+    // JavaScript Date would discard microseconds and skip tied audit entries.
     const rows = await client.query<{
       id: string;
       occurred_at: Date;
@@ -184,9 +196,13 @@ export async function loadActivityFeed(pool: Pool, workspaceId: string): Promise
          FROM change_records cr
          LEFT JOIN principals pr ON pr.workspace_id = cr.workspace_id AND pr.id::text = cr.actor_principal_id
         WHERE cr.workspace_id = $1
+          AND ($2::uuid IS NULL OR (cr.occurred_at, cr.id) < (
+            SELECT anchor.occurred_at, anchor.id FROM change_records anchor
+             WHERE anchor.workspace_id = $1 AND anchor.id = $2::uuid
+          ))
         ORDER BY cr.occurred_at DESC, cr.id DESC
         LIMIT ${ACTIVITY_PAGE + 1}`,
-      [workspaceId],
+      [workspaceId, beforeCursor ?? null],
     );
     const page = rows.rows.slice(0, ACTIVITY_PAGE);
     return {
@@ -204,6 +220,8 @@ export async function loadActivityFeed(pool: Pool, workspaceId: string): Promise
         ...(row.case_id ? { caseRef: row.case_id } : {}),
       })),
       truncated: rows.rows.length > ACTIVITY_PAGE,
+      ...(rows.rows.length > ACTIVITY_PAGE ? { nextCursor: page.at(-1)!.id } : {}),
+      ...(beforeCursor ? { beforeCursor } : {}),
     };
   });
   return value;

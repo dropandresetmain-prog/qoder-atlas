@@ -32,7 +32,7 @@ import type { TransportServiceCancelledWithReprotectionEvent } from './applicati
 import { disruptionEventFileFromEnv, loadDisclosedDisruptionEvent } from '../demo/providerDisruptionEventSource.ts';
 import { seedDemoWorld } from './demoSeed.ts';
 import { importProgrammeBundle } from './programmeImport.ts';
-import { loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
+import { ActivityCursorError, loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
 import { OVERVIEW_BACK, renderInShell, type ShellContext } from './productShell.ts';
 import { loadShellChrome } from './readmodels/pgShellChrome.ts';
 import { demoResetGate, resetDemoWorkspace } from '../demo/demoReset.ts';
@@ -259,7 +259,19 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'GET' && pathname === '/api/v2/operator/activity') {
-      const view = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId);
+      let view;
+      try {
+        view = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId, url.searchParams.get('before') ?? undefined);
+      } catch (error) {
+        if (!(error instanceof ActivityCursorError)) throw error;
+        if (url.searchParams.get('format') === 'html') {
+          sendHtml(res, 400, renderInShell('activity', 'Activity', await pageChrome(ctx),
+            '<main class="shell"><h1>This activity page is unavailable</h1><p>The link may be invalid or the demo may have been reset.</p><a href="/api/v2/operator/activity?format=html">Open latest activity</a></main>'));
+        } else {
+          sendJson(res, 400, { error: 'INVALID_ACTIVITY_CURSOR', message: error.message });
+        }
+        return true;
+      }
       if (url.searchParams.get('format') === 'html') {
         sendHtml(res, 200, renderInShell('activity', 'Activity', await pageChrome(ctx), renderProductActivityFeed(view)));
       } else {

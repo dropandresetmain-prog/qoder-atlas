@@ -24,6 +24,8 @@ export interface ActivitySurfaceDay extends ActivityDayGroupView {
 export interface ActivitySurfaceView extends ActivityPageView {
   days: ActivitySurfaceDay[];
   truncated: boolean;
+  nextCursor?: string;
+  beforeCursor?: string;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -75,5 +77,8 @@ export function adaptActivityFeedToActivityPage(view: ActivityFeed): ActivitySur
     }
     group.items.push(item);
   }
-  return { generatedAt: view.generatedAt, days, truncated: view.truncated };
+  return { generatedAt: view.generatedAt, days, truncated: view.truncated,
+    ...(view.nextCursor ? { nextCursor: view.nextCursor } : {}),
+    ...(view.beforeCursor ? { beforeCursor: view.beforeCursor } : {}),
+  };
 }
