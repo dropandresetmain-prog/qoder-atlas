@@ -40,6 +40,6 @@ The dataset content hash changed (`71553bcb...` -> `a9d8e7a0...`). A persistent 
 
 ## Tests
 
- run alone (14 tests): 11 pass, 3 fail. It asserts only that not every journey is green and that unassessed subjects read UNKNOWN, both still true. The 3 failures are independent of this change: (a)  500 (fixed upstream by R4-F1b , not in this branch base), (b)  expects the retired 409  (R4 replaced it with the real reset, which now returns 200), (c)  leaks  from . Also pre-existing:  (MNSYN03 harvest; fails identically on ).
+`productBaselineWorld.pgtest.ts` run alone (14 tests): 11 pass, 3 fail. It asserts only that not every journey is green and that unassessed subjects read UNKNOWN, both still true. The 3 failures are independent of this change: (a) `/api/v2/operator/programme` returns 500 (fixed upstream by R4-F1b `5443457`, not in this branch base), (b) `demo reset refuses to layer a second world` expects the retired 409 `DEMO_DATASET_PROVISIONED` (R4 replaced it with the real reset, which returns 200), (c) `boot does nothing when no demo dataset is configured` leaks `NORTHSTAR_DEMO_DATASET_DIR` from `.env.local`. Also pre-existing: `test/wave3r-m1-ait-canonical-seed.test.ts` (MNSYN03 harvest; fails identically on `integration/r4-final-acceptance`).
 
 Live check after the fix (fresh database, then Sarah disrupt via the demo flow): baseline 52 PASS / 15 UNKNOWN / 0 FAIL; after Sarah's update 51 PASS / 1 FAIL / 15 UNKNOWN with exactly one recovery case (Sarah's).
