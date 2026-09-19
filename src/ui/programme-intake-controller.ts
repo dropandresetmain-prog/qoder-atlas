@@ -67,6 +67,11 @@ function parseCsvRows(text: string): CsvRows {
   return { ok: true, rows };
 }
 
+export function toCanonicalInstant(date: string, time: string, offset: string): string | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time) || !/^[+-]\d{2}:\d{2}$/.test(offset)) return undefined;
+  return `${date}T${time}:00${offset}`;
+}
+
 /**
  * Parse the documented intake CSV template. The item indices are deliberately
  * kept as bundle indices because the importer contract has no CSV-specific
@@ -123,6 +128,7 @@ export function renderProgrammeIntakeController(): string {
 (function () {
   'use strict';
   var parseCsvRows = ${parseCsvRows.toString()};
+  var toCanonicalInstant = ${toCanonicalInstant.toString()};
   var parseProgrammeIntakeCsv = ${parseProgrammeIntakeCsv.toString()};
   var root = document.querySelector('[data-programme-intake]');
   if (!root || root.__programmeIntakeInit) return;
@@ -151,7 +157,7 @@ export function renderProgrammeIntakeController(): string {
     row.className = 'panel';
     row.setAttribute('data-intake-session-row', '');
     row.setAttribute('data-test', 'programme-intake-session');
-    row.innerHTML = '<div class="intake-row-grid"><label>Session title<input type="text" data-session-field="title" placeholder="Opening session"></label><label>Session type<input type="text" data-session-field="itemType" value="SESSION" placeholder="SESSION"></label><label>Start (ISO time with timezone)<input type="text" data-session-field="windowStart" placeholder="2031-05-01T09:00:00.000Z"></label><label>End (ISO time with timezone)<input type="text" data-session-field="windowEnd" placeholder="2031-05-01T10:00:00.000Z"></label></div><button type="button" class="btn btn-ghost" data-remove-session>Remove session</button>';
+    row.innerHTML = '<div class="intake-row-grid"><label>Session title<input type="text" data-session-field="title" placeholder="Opening session"></label><label>Session type<input type="text" data-session-field="itemType" value="SESSION" placeholder="SESSION"></label><label>Start date<input type="date" data-session-field="startDate"></label><label>Start time<input type="time" data-session-field="startTime"></label><label>End date<input type="date" data-session-field="endDate"></label><label>End time<input type="time" data-session-field="endTime"></label><label>Timezone for this session<select data-session-field="timeZoneOffset"><option value="+00:00">UTC</option><option value="+01:00">UTC+01:00</option><option value="+08:00">UTC+08:00</option><option value="-05:00">UTC-05:00</option><option value="-08:00">UTC-08:00</option></select></label></div><p class="field-help">The selected timezone is attached to both local times; nothing is inferred from the browser.</p><button type="button" class="btn btn-ghost" data-remove-session>Remove session</button>';
     var fields = row.querySelectorAll('[data-session-field]');
     if (item) Array.prototype.forEach.call(fields, function (input) { if (item[input.getAttribute('data-session-field')]) input.value = item[input.getAttribute('data-session-field')]; });
     sessions.appendChild(row);
@@ -161,10 +167,10 @@ export function renderProgrammeIntakeController(): string {
     row.className = 'panel';
     row.setAttribute('data-intake-traveller-row', '');
     row.setAttribute('data-test', 'programme-intake-traveller');
-    row.innerHTML = '<div class="intake-row-grid"><label>Traveller name<input type="text" data-traveller-field="displayName" placeholder="Avery Example"></label><label>Session indexes<input type="text" data-traveller-field="participatesInItemIndices" placeholder="0, 1"></label><label>Attendance requirement<select data-traveller-field="obligation"><option value="REQUIRED">Required</option><option value="OPTIONAL">Optional</option></select></label></div><button type="button" class="btn btn-ghost" data-remove-traveller>Remove traveller</button>';
+    row.innerHTML = '<div class="intake-row-grid"><label>Traveller name<input type="text" data-traveller-field="displayName" placeholder="Avery Example"></label><label>Sessions to attend<input type="text" data-traveller-field="participatesInItemNumbers" placeholder="1, 2"></label><label>Attendance requirement<select data-traveller-field="obligation"><option value="REQUIRED">Required</option><option value="OPTIONAL">Optional</option></select></label></div><button type="button" class="btn btn-ghost" data-remove-traveller>Remove traveller</button>';
     if (rowData) {
       row.querySelector('[data-traveller-field="displayName"]').value = rowData.displayName || '';
-      row.querySelector('[data-traveller-field="participatesInItemIndices"]').value = rowData.participatesInItemIndices.join(', ');
+      row.querySelector('[data-traveller-field="participatesInItemNumbers"]').value = rowData.participatesInItemIndices.map(function (index) { return index + 1; }).join(', ');
       row.querySelector('[data-traveller-field="obligation"]').value = rowData.obligation || 'REQUIRED';
     }
     travellers.appendChild(row);
@@ -182,19 +188,22 @@ export function renderProgrammeIntakeController(): string {
     var items = Array.prototype.map.call(sessions.querySelectorAll('[data-intake-session-row]'), function (row, index) {
       var item = {};
       Array.prototype.forEach.call(row.querySelectorAll('[data-session-field]'), function (input) { item[input.getAttribute('data-session-field')] = value(input); });
-      if (!item.title || !item.itemType || !item.windowStart || !item.windowEnd) errors.push('Complete every field for session ' + (index + 1) + '.');
+      item.windowStart = toCanonicalInstant(item.startDate, item.startTime, item.timeZoneOffset);
+      item.windowEnd = toCanonicalInstant(item.endDate, item.endTime, item.timeZoneOffset);
+      if (!item.title || !item.itemType || !item.windowStart || !item.windowEnd) errors.push('Complete the title, type, local dates, times, and timezone for session ' + (index + 1) + '.');
       if (item.windowStart && item.windowEnd && !(Date.parse(item.windowStart) < Date.parse(item.windowEnd))) errors.push('Session ' + (index + 1) + ' must end after it starts.');
-      return item;
+      return { title: item.title, itemType: item.itemType, windowStart: item.windowStart, windowEnd: item.windowEnd };
     });
     if (items.length === 0) errors.push('Add at least one session.');
     var people = Array.prototype.map.call(travellers.querySelectorAll('[data-intake-traveller-row]'), function (row, rowIndex) {
       var displayName = value(row.querySelector('[data-traveller-field="displayName"]'));
-      var rawIndices = value(row.querySelector('[data-traveller-field="participatesInItemIndices"]'));
-      var indices = rawIndices.split(/[;,]/).map(function (part) { return Number(part.trim()); }).filter(function (part) { return Number.isFinite(part); });
+      var rawNumbers = value(row.querySelector('[data-traveller-field="participatesInItemNumbers"]'));
+      var numbers = rawNumbers.split(/[;,]/).map(function (part) { return Number(part.trim()); }).filter(function (part) { return Number.isFinite(part); });
+      var indices = numbers.map(function (number) { return number - 1; });
       var obligation = value(row.querySelector('[data-traveller-field="obligation"]')) || 'REQUIRED';
       if (!displayName) errors.push('Add a name for person ' + (rowIndex + 1) + '.');
-      if (indices.length === 0 || indices.some(function (index) { return !Number.isInteger(index) || index < 0 || index >= items.length; })) errors.push('Use valid session indexes for ' + (displayName || ('person ' + (rowIndex + 1))) + '.');
-      if (new Set(indices).size !== indices.length) errors.push('Remove repeated session indexes for ' + (displayName || ('person ' + (rowIndex + 1))) + '.');
+      if (numbers.length === 0 || numbers.some(function (number) { return !Number.isInteger(number) || number < 1 || number > items.length; })) errors.push('Use valid session numbers (1 to ' + items.length + ') for ' + (displayName || ('person ' + (rowIndex + 1))) + '.');
+      if (new Set(indices).size !== indices.length) errors.push('Remove repeated session numbers for ' + (displayName || ('person ' + (rowIndex + 1))) + '.');
       return { displayName: displayName, participatesInItemIndices: indices, obligation: obligation };
     });
     if (people.length === 0) errors.push('Add at least one person.');
@@ -210,7 +219,7 @@ export function renderProgrammeIntakeController(): string {
     bundle.items.forEach(function (item) { appendText(sessionsList, 'li', item.title + ' · ' + item.windowStart + ' to ' + item.windowEnd); });
     review.appendChild(sessionsList);
     var peopleList = document.createElement('ul');
-    bundle.travellers.forEach(function (person) { appendText(peopleList, 'li', person.displayName + ' · sessions ' + person.participatesInItemIndices.join(', ') + ' · ' + person.obligation.toLowerCase()); });
+    bundle.travellers.forEach(function (person) { appendText(peopleList, 'li', person.displayName + ' · sessions ' + person.participatesInItemIndices.map(function (index) { return index + 1; }).join(', ') + ' · ' + person.obligation.toLowerCase()); });
     review.appendChild(peopleList);
     var errors = Array.isArray(response.errors) ? response.errors : (Array.isArray(response.issues) ? response.issues.map(function (issue) { return issue.field + ': ' + issue.message; }) : []);
     if (errors.length > 0) { var errorList = document.createElement('ul'); errors.forEach(function (error) { appendText(errorList, 'li', String(error)); }); review.appendChild(errorList); }
