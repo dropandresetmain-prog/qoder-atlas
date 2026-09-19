@@ -636,3 +636,57 @@ export class PgKnowledgeRepository implements KnowledgeRepository {
     );
   }
 }
+
+/** One stored preference row as read for planning (no precedence applied here). */
+export interface StoredPreferenceRow {
+  id: string;
+  ownerKind: string;
+  ownerId: string;
+  preferenceKind: string;
+  source: 'EXPLICIT' | 'INFERRED';
+  value: Record<string, unknown>;
+  valueSchemaVersion: string;
+  effectiveFrom: string;
+}
+
+/**
+ * G09 reader: the preferences of the given owners that are effective at `at`
+ * and not superseded by another effective edition. Read-only, pool-based
+ * (planning reads outside a unit of work), workspace-qualified. Precedence
+ * (EXPLICIT over INFERRED) is deliberately NOT applied here — that is planning
+ * policy and lives in `planningPreferences.ts`.
+ */
+export async function readEffectivePreferences(
+  pool: { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> },
+  workspaceId: string,
+  ownerIds: readonly string[],
+  at: string,
+): Promise<StoredPreferenceRow[]> {
+  if (ownerIds.length === 0) return [];
+  const result = await pool.query(
+    `SELECT p.id, p.owner_kind, p.owner_id, p.preference_kind, p.source, p.value,
+            p.value_schema_version, p.effective_from
+       FROM preferences p
+      WHERE p.workspace_id = $1
+        AND p.owner_id = ANY($2::uuid[])
+        AND p.effective_from <= $3::timestamptz
+        AND (p.effective_until IS NULL OR p.effective_until > $3::timestamptz)
+        AND NOT EXISTS (
+          SELECT 1 FROM preferences s
+           WHERE s.workspace_id = p.workspace_id
+             AND s.supersedes_preference_id = p.id
+             AND s.effective_from <= $3::timestamptz)
+      ORDER BY p.owner_kind, p.owner_id, p.preference_kind, p.effective_from, p.id`,
+    [workspaceId, [...ownerIds], at],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    ownerKind: row.owner_kind,
+    ownerId: row.owner_id,
+    preferenceKind: row.preference_kind,
+    source: row.source,
+    value: row.value,
+    valueSchemaVersion: row.value_schema_version,
+    effectiveFrom: new Date(row.effective_from).toISOString(),
+  }));
+}

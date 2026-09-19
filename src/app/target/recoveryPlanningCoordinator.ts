@@ -61,9 +61,16 @@ import {
   type CoordinatorMinters,
   type DomainProposerBinding,
 } from '../../resolution/planning/coordinatorCore.ts';
+import { loadPlanningPreferences, preferenceOwnerIds } from './planningPreferences.ts';
+import { suggestRecoveryDomains } from './planningDomainSuggestion.ts';
 import { advanceCasePhase } from './recoveryPlanning.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { applicationError } from './applicationCommands.ts';
+import type { IntelligenceClient } from '../../intelligence/client.ts';
+import {
+  resolveRecoveryDomainDecisions,
+} from '../../contracts/v2/planning/recoveryDomain.ts';
+import { blockingDimensionCodes } from '../../resolution/planning/coordinatorCore.ts';
 
 export const R1_COORDINATOR_VERSION = 'r1-coordinator/1';
 export const R1_COMPARATOR_VERSION = 'r1-comparator/1';
@@ -100,6 +107,11 @@ export interface RecoveryPlanningCoordinatorDeps {
     resolveAirport?: AirportResolver;
     maxOffersPerCorridor?: number;
   } & TransportPassengerSource;
+  /**
+   * Optional Model Studio / Qwen client for hybrid domain suggestion.
+   * Suggestions are registry-validated fail-closed; absence is honest (no AI).
+   */
+  intelligence?: IntelligenceClient;
 }
 
 /** The default domain-bound proposers shipped with the runtime (the PROGRAMME time-swap). */
@@ -107,7 +119,16 @@ export function defaultDomainProposers(): DomainProposerBinding[] {
   return [{ domain: 'PROGRAMME' as RecoveryDomainId, proposer: createProgrammeTimeSwapProposer() as StrategyProposer }];
 }
 
-const DEFAULT_CAPABILITIES: readonly CapabilityFamily[] = ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'];
+/**
+ * G01: the coordinator NEVER advertises a capability family it was not composed
+ * with. The only family it can derive on its own is FLIGHT, from the presence of
+ * a real `transportPlanning` transport; everything else must be passed
+ * explicitly by the composition root (derived from really-composed adapters).
+ * No composition => empty => provider-backed domains fail closed UNAVAILABLE.
+ */
+export function derivedCapabilities(transportPlanning: unknown): readonly CapabilityFamily[] {
+  return transportPlanning ? ['FLIGHT'] : [];
+}
 
 interface BasisCapture {
   failing: FailingSubject[];
@@ -116,6 +137,7 @@ interface BasisCapture {
   currentState: CurrentState;
   registry: EvaluatorRegistry;
   basisAssessmentId: string;
+  programmeIds: string[];
 }
 
 async function caseStatus(pool: Pool, workspaceId: string, caseId: string): Promise<string | undefined> {
@@ -172,7 +194,7 @@ async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseI
   });
   const effective = projectEffectiveWorld(world);
   const currentState = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, world.manifest);
-  return { failing, world, effective, currentState, registry, basisAssessmentId: failing[0]!.assessment.id };
+  return { failing, world, effective, currentState, registry, basisAssessmentId: failing[0]!.assessment.id, programmeIds: programmeRefs.map((r) => r.id as string) };
 }
 
 /** Deterministic id/version minters, mirroring the B1 seam's planning namespace. */
@@ -264,6 +286,45 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           .corridors.map((corridor) => flightSearchRequestFor(corridor, { round: 1 }))
         : [];
 
+      // G09: stored EXPLICIT/INFERRED preferences of the affected owners feed the
+      // comparator (explicit > inferred). Read-only; never a hard constraint.
+      const preferences = await loadPlanningPreferences(
+        deps.pool, deps.workspaceId,
+        preferenceOwnerIds(basis.world, basis.failing, basis.programmeIds), now,
+      );
+
+      const availableCapabilities = deps.availableCapabilities ?? derivedCapabilities(transportPlanning);
+      const domainRegistry = deps.domainRegistry ?? defaultRecoveryDomainRegistry();
+
+      // G08: optional Model Studio domain suggestion (hybrid C3). Deterministic
+      // activations run first; AI may only ADD domains the registry re-validates.
+      let aiSuggestedDomains: RecoveryDomainId[] | undefined;
+      if (deps.intelligence?.isConfigured()) {
+        const domainContext = {
+          failingSubjectKinds: new Set(basis.failing.map((f) => f.subject.kind)),
+          blockingDimensionCodes: blockingDimensionCodes(basis.failing),
+          affectedObjectKinds: new Set<string>(),
+          availableCapabilities: new Set(availableCapabilities),
+        };
+        const deterministic = resolveRecoveryDomainDecisions(domainRegistry, domainContext);
+        const already = deterministic
+          .filter((d) => d.disposition === 'INVESTIGATED')
+          .map((d) => d.domainId);
+        const suggestion = await suggestRecoveryDomains(deps.intelligence, {
+          context: domainContext,
+          alreadyInvestigated: already,
+        });
+        if (suggestion.suggestedDomains.length > 0) {
+          aiSuggestedDomains = [...suggestion.suggestedDomains];
+        }
+        if (suggestion.meta) {
+          console.log(
+            `[qwen] domain suggestion mode=${suggestion.meta.mode} model=${suggestion.meta.model}` +
+              (aiSuggestedDomains?.length ? ` added=${aiSuggestedDomains.join(',')}` : ' (no additive domains)'),
+          );
+        }
+      }
+
       // 2. Delegate ALL decision logic to the pure core.
       const core = await runRecoveryPlanning(
         {
@@ -279,11 +340,11 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           currentState: basis.currentState,
         },
         {
-          domainRegistry: deps.domainRegistry ?? defaultRecoveryDomainRegistry(),
-          availableCapabilities: deps.availableCapabilities ?? (transportPlanning
-            ? DEFAULT_CAPABILITIES
-            : DEFAULT_CAPABILITIES.filter((capability) => capability !== 'FLIGHT')),
+          domainRegistry,
+          availableCapabilities,
           proposers,
+          ...(preferences.length > 0 ? { preferences } : {}),
+          ...(aiSuggestedDomains ? { aiSuggestedDomains } : {}),
           minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,

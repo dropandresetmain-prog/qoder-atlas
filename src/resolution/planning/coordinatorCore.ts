@@ -86,6 +86,7 @@ import {
   assemblePlanningAttempt,
 } from './decisionEvidence.ts';
 import { selectRecommendation, type CandidateComparisonFacts } from './comparator.ts';
+import { satisfiedPreferenceCodes } from './preferenceMatching.ts';
 import { comparisonFactsFromEvidence, planningOutcomeOf } from './planningSelection.ts';
 
 /**
@@ -390,7 +391,9 @@ export async function runRecoveryPlanning(
       strategyRef: e.result.strategy.id as SubjectId, recommended: false, result: e.result,
       evidenceRefs: evidenceRefsForDomain(evidence, e.domainId),
     });
-    const facts = comparisonFactsFromEvidence(provisional);
+    const facts = comparisonFactsFromEvidence(provisional, deps.preferences?.length
+      ? { satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
+      : undefined);
     if (facts) provisionalFacts.push(facts);
   }
   const recommendation: StrategyRecommendation | undefined = viableCandidates.length > 0

@@ -39,6 +39,7 @@ import {
   recordConstraintDefinition,
   recordEvidence,
   recordKnowledgeCoverage,
+  recordPreference,
   recordRuleAssignment,
   recordSource,
 } from '../../persistence/postgres/commands/knowledgeCommands.ts';
@@ -664,6 +665,28 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
       `recordTraveller(${traveller.draftId})`,
     );
     bump('travellers');
+    for (const [index, preference] of traveller.preferences.entries()) {
+      const from = preference.effectiveFrom ? toInstant(preference.effectiveFrom, 'preference.effectiveFrom') : observedAt;
+      const until = preference.effectiveUntil
+        ? toInstant(preference.effectiveUntil, 'preference.effectiveUntil')
+        : new Date(Date.parse(from) + 3650 * 86_400_000).toISOString();
+      mustOk(
+        await recordPreference(uow(), {
+          ...identity,
+          idempotencyKey: ids.key('preference', traveller.draftId, String(index)),
+          preferenceId: ids.id('preference', traveller.draftId, String(index)),
+          ownerRef: { kind: 'TRAVELLER', id: travellerId },
+          preferenceKind: preference.preferenceKind,
+          source: preference.source,
+          value: { key: preference.key, summary: preference.summary, ...(preference.match ? { match: preference.match } : {}) },
+          valueSchemaVersion: 'planning-preference/1',
+          effectiveWindow: { start: from, end: until },
+          evidenceId: rosterEvidence,
+        }),
+        `recordPreference(${traveller.draftId}#${index})`,
+      );
+      bump('preferences');
+    }
     await sourceIdentity.map(SOURCE_RECORD_TYPES.TRAVELLER, traveller.draftId, {
       kind: 'TRAVELLER',
       id: travellerId,

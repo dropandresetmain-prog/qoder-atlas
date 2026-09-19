@@ -26,7 +26,9 @@ import { composeRuntimeServices, createPeriodicService, createReassessmentServic
 import { runCaseEscalation } from './target/caseEscalation.ts';
 import { runRecoveryProgressionPass } from './target/recoveryProgressionPass.ts';
 import { createRecoveryPlanningCoordinator } from './target/recoveryPlanningCoordinator.ts';
-import { buildTargetTimezoneResolver, composeTargetTransportResearch } from './targetTransportResearch.ts';
+import { buildTargetTimezoneResolver } from './targetTransportResearch.ts';
+import { composeTransportFamilies } from './targetProviderFamilies.ts';
+import { composeTargetIntelligence } from './composeTargetIntelligence.ts';
 import { runInternalExecutionPass } from './target/executionPass.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
 
@@ -190,22 +192,34 @@ export async function composeTargetBoot(
   // HTTP planning trigger through `runtimeHooks` so the product path and C4
   // cannot diverge on planning truth.
   const adapterConfig = loadConfig(resolved);
-  const transportResearch = composeTargetTransportResearch(
+  const families = composeTransportFamilies(
     adapterConfig,
     options.cwd ?? process.cwd(),
     buildTargetTimezoneResolver(endpoints.app.pool, config.workspaceId),
   );
+  const transportResearch = families.transportPlanning;
   if (!transportResearch) {
     console.log('[atlas] transport research not composed (capability not honestly available) — TRANSPORT domain unavailable');
   } else {
     console.log(`[atlas] transport research composed (mode=${adapterConfig.adapterMode}, read-only)`);
+  }
+  // G08: Model Studio / Qwen is composed from credentials, independent of Atlas
+  // ADAPTER_MODE — REPLAY Atlas must not silence a configured intelligence client.
+  const intelligence = composeTargetIntelligence(adapterConfig);
+  if (intelligence) {
+    console.log(`[qwen] Model Studio composed (model=${intelligence.model}, mode=${intelligence.mode})`);
+  } else {
+    console.log('[qwen] Model Studio not composed (credentials absent) — AI domain suggestion unavailable');
   }
   const planner = createRecoveryPlanningCoordinator({
     pool: endpoints.app.pool,
     workspaceId: config.workspaceId,
     actorPrincipalId: lifecycleActor,
     uow: () => endpoints.app.unitOfWork(),
+    // G01: advertise exactly the composed provider families (never a phantom set).
+    availableCapabilities: families.availableCapabilities,
     ...(transportResearch ? { transportPlanning: transportResearch } : {}),
+    ...(intelligence ? { intelligence } : {}),
   });
   const lifecycle = createPeriodicService({
     name: 'caseLifecycle',

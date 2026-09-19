@@ -133,6 +133,28 @@ export const DatasetEngagementImportanceSchema = z.looseObject({
   flexibility: NonEmpty.optional(),
 });
 
+/**
+ * A generic, data-carried planning preference a dataset MAY state for a
+ * traveller (G09). Materialized through the ordinary `recordPreference` command
+ * as a `planning-preference/1` value; EXPLICIT outranks INFERRED at planning
+ * time. `effectiveFrom` defaults to the dataset's `context.at`, `effectiveUntil`
+ * to ten years later. Nothing in code keys on any traveller.
+ */
+export const DatasetPreferenceSchema = z.looseObject({
+  preferenceKind: NonEmpty,
+  source: z.enum(['EXPLICIT', 'INFERRED']),
+  key: z.string().regex(/^[a-z][a-z0-9_]*$/),
+  summary: NonEmpty,
+  match: z.looseObject({
+    domains: z.array(NonEmpty).optional(),
+    proposerIds: z.array(NonEmpty).optional(),
+    changedRefKinds: z.array(NonEmpty).optional(),
+  }).optional(),
+  effectiveFrom: NonEmpty.optional(),
+  effectiveUntil: NonEmpty.optional(),
+});
+export type DatasetPreference = z.infer<typeof DatasetPreferenceSchema>;
+
 export const DatasetTravellerSchema = z.looseObject({
   draftId: NonEmpty,
   displayName: NonEmpty,
@@ -145,6 +167,7 @@ export const DatasetTravellerSchema = z.looseObject({
   travelArrangement: NonEmpty.optional(),
   declaredTravel: z.array(DatasetDeclaredTravelSchema).default([]),
   engagementImportance: z.array(DatasetEngagementImportanceSchema).default([]),
+  preferences: z.array(DatasetPreferenceSchema).default([]),
 });
 export type DatasetTraveller = z.infer<typeof DatasetTravellerSchema>;
 
