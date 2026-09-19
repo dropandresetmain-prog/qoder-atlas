@@ -166,12 +166,31 @@ test('commitment needs complete required-participant evidence before it can be g
   assert.equal(ov.landmarks[0]?.health, 'NEUTRAL');
 });
 
-test('dependency-to-traveller relations retain per-member commitment evidence', () => {
+test('dependency-to-traveller relations use dependency condition, not unrelated programme evidence', () => {
   const population = [pop(1, 'DISRUPTED', 'CURRENT'), pop(2)];
   const source: EventOverviewSourceFacts = {
     programmeItems: [item(1, 1, 9)],
     participations: [{ ...part(1, 1), commitmentHealth: 'RED' }, { ...part(2, 1), commitmentHealth: 'GREEN' }],
     journeyServices: [svc(1, 'Alpha', true), svc(2, 'Alpha', true)],
+  };
+  const ov = buildEventOverview({ source, population, items: [] });
+  const memberHealth = new Map((ov.relations ?? [])
+    .filter((relation) => relation.kind === 'DEPENDENCY_TO_TRAVELLER')
+    .map((relation) => [relation.toRef, relation.health]));
+  assert.equal(memberHealth.get('JOURNEY:001'), 'AMBER');
+  assert.equal(memberHealth.get('JOURNEY:002'), 'AMBER');
+});
+
+test('dependency-to-traveller relation may use an explicit changed blast outcome', () => {
+  const population = [pop(1, 'DISRUPTED', 'CURRENT'), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [part(1, 1), part(2, 1)],
+    journeyServices: [],
+    journeyDependencies: [
+      { journeyRef: 'JOURNEY:001', dependencyRef: 'RESOURCE:shared-kit', kindLabel: 'Shared equipment', label: 'Equipment at venue', changed: true },
+      { journeyRef: 'JOURNEY:002', dependencyRef: 'RESOURCE:shared-kit', kindLabel: 'Shared equipment', label: 'Equipment at venue', changed: true },
+    ],
   };
   const ov = buildEventOverview({ source, population, items: [] });
   const memberHealth = new Map((ov.relations ?? [])

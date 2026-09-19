@@ -1410,11 +1410,16 @@ async function loadOperatorOverviewFactsInner(
     journey_id: string;
     resource_id: string;
     resource_type: 'VEHICLE' | 'ROOM' | 'EQUIPMENT';
+    location_label: string | null;
+    bed_configuration: string | null;
   }>(
-    `SELECT DISTINCT ji.journey_id, r.id AS resource_id, r.resource_type
+    `SELECT DISTINCT ji.journey_id, r.id AS resource_id, r.resource_type,
+            place.name AS location_label, room.bed_configuration
        FROM journey_items ji
        JOIN resource_use_item_details rd ON rd.workspace_id = ji.workspace_id AND rd.journey_item_id = ji.id
        JOIN resources r ON r.workspace_id = rd.workspace_id AND r.id = rd.resource_id
+       LEFT JOIN places place ON place.workspace_id = r.workspace_id AND place.id = r.location_place_id
+       LEFT JOIN room_resource_details room ON room.workspace_id = r.workspace_id AND room.resource_id = r.id
       WHERE ji.workspace_id = $1
         AND ji.kind = 'RESOURCE_USE'
         AND ji.lifecycle_status <> 'DROPPED'
@@ -1454,7 +1459,7 @@ async function loadOperatorOverviewFactsInner(
       journeyRef: `JOURNEY:${r.journey_id}`,
       dependencyRef: `RESOURCE:${r.resource_id}`,
       kindLabel: r.resource_type === 'ROOM' ? 'Shared room' : r.resource_type === 'VEHICLE' ? 'Shared vehicle' : 'Shared equipment',
-      label: `${r.resource_type === 'ROOM' ? 'Room' : r.resource_type === 'VEHICLE' ? 'Vehicle' : 'Equipment'} ${r.resource_id.slice(0, 8)}`,
+      label: `${r.resource_type === 'ROOM' && r.bed_configuration ? `${r.bed_configuration} room` : r.resource_type === 'ROOM' ? 'Room' : r.resource_type === 'VEHICLE' ? 'Vehicle' : 'Equipment'}${r.location_label ? ` at ${r.location_label}` : ''}`,
       health: 'NEUTRAL' as const,
       changed: false,
     })),

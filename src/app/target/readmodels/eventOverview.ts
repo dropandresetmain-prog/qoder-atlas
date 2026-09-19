@@ -351,17 +351,30 @@ export function buildEventOverview(input: {
       health: commitmentHealth(dependency.feedsLandmarkRef, members),
     });
   }
+  const dependencyRelationHealth = (dependencyRef: string, journeyRef: string): EventOverviewHealth => {
+    const dependency = selected.find((candidate) => candidate.ref === dependencyRef);
+    // A connector may use the dependency's own condition. It must never reuse
+    // a programme consequence merely because that journey has both facts.
+    if (dependency?.health && dependency.health !== 'NEUTRAL') return dependency.health;
+    if (blastGroup?.ref !== dependencyRef) return 'NEUTRAL';
+    // A changed shared dependency explicitly makes this member part of the
+    // blast group, so its presented cleared/checking/unresolved outcome is
+    // meaningful for this relationship even when the dependency has no
+    // independent condition verdict.
+    const membership = blastMembers.get(journeyRef);
+    return membership === 'CLEARED' ? 'GREEN'
+      : membership === 'CHECKING' ? 'AMBER'
+        : membership === 'UNRESOLVED' ? 'RED'
+          : 'NEUTRAL';
+  };
   for (const traveller of promotedTravellers) {
     if (traveller.dependencyRef) {
-      const landmarkRef = earliestRequiredItem(traveller.journeyRef);
       addRelation({
         id: `DEPENDENCY_TO_TRAVELLER:${traveller.dependencyRef}:${traveller.journeyRef}`,
         kind: 'DEPENDENCY_TO_TRAVELLER',
         fromRef: traveller.dependencyRef,
         toRef: traveller.journeyRef,
-        health: landmarkRef
-          ? participantCommitmentHealth.get(`${traveller.journeyRef}:${landmarkRef}`) ?? 'NEUTRAL'
-          : 'NEUTRAL',
+        health: dependencyRelationHealth(traveller.dependencyRef, traveller.journeyRef),
       });
     }
     if (traveller.landmarkRef) {

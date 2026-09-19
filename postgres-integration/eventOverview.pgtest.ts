@@ -89,7 +89,7 @@ test('operator overview carries a bounded, schema-valid eventOverview', async ()
   const resourceDependency = resourceOverview.dependencies.find((dependency) => dependency.ref === `RESOURCE:${resourceId}`);
   assert.ok(resourceDependency, 'shared resource is a selected dependency');
   assert.equal(resourceDependency.kindLabel, 'Shared equipment');
-  assert.equal(resourceDependency.label, `Equipment ${resourceId.slice(0, 8)}`);
+  assert.equal(resourceDependency.label, 'Equipment at M3 Seed Resource Location');
   assert.equal(resourceDependency.travellerCount, 2);
   assert.ok(resourceJourneys.every((id) => resourceView.population.some((member) => member.journeyRef === `JOURNEY:${id}`)), 'no-programme journeys remain in the population');
   assert.ok((resourceOverview.cohorts.find((cohort) => cohort.ref === 'COHORT:unassigned')?.total ?? 0) >= 2, 'no-programme journeys form an unassigned cohort');
