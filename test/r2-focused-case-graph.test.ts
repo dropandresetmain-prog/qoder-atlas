@@ -102,7 +102,7 @@ test('A1 enrichment: uses exact reservation evidence for service node state', ()
   });
 
   const node = result.nodes[0]!;
-  assert.equal(node.semanticState, 'RECOVERED');
+  assert.equal(node.semanticState, 'HEALTHY', 'a confirmed booking alone does not prove recovery');
   assert.match(node.detail ?? '', /Booking line confirmed/);
 });
 
@@ -122,6 +122,17 @@ test('A1 enrichment: selected-service booking remains UNKNOWN when allocation is
     transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 2, lineStatus: null, reservationStatus: null }],
   });
   assert.equal(ambiguous.nodes[0]?.semanticState, 'UNKNOWN');
+  const cancelled = projectFocusedCaseGraphEnrichment({
+    ...base,
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CANCELLED' }],
+  });
+  assert.equal(cancelled.nodes[0]?.semanticState, 'UNKNOWN', 'conflicting reservation evidence cannot become confirmed recovery');
+  const recovered = projectFocusedCaseGraphEnrichment({
+    ...base,
+    changedTransportServiceRefs: new Set(['service-1']),
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CONFIRMED' }],
+  });
+  assert.equal(recovered.nodes[0]?.semanticState, 'RECOVERED');
 });
 
 test('A1 enrichment: emits a changed source edge only for the proven selected service', () => {

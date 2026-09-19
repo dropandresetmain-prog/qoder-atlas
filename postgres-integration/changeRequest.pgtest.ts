@@ -93,6 +93,10 @@ test('ChangeRequest persists immutable desired state under exact request authori
 
   const accepted = mustOk(await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 1, from: 'SUBMITTED', to: 'ACCEPTED_FOR_PLANNING', transitionedAt: AT }, trustedClock));
   assert.deepEqual(accepted, { changeRequestId: requestId, lifecycle: 'ACCEPTED_FOR_PLANNING', revision: 2 });
+  const acceptedRead = await loadChangeRequest(pool, seed.workspaceId, requestId);
+  assert.equal(acceptedRead?.revision, 2, 'read exposes the current lifecycle revision for the next CAS');
+  assert.equal(acceptedRead?.lifecycle, 'ACCEPTED_FOR_PLANNING');
+  assert.equal(acceptedRead?.sourceUtterance, input.sourceUtterance, 'lifecycle changes preserve the immutable submitted desire');
   const stale = await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 1, from: 'SUBMITTED', to: 'WITHDRAWN', transitionedAt: AT }, trustedClock);
   assert.equal(stale.ok, false);
   if (!stale.ok) assert.equal(stale.conflict.kind, 'STALE_AGGREGATE_REVISION');

@@ -302,11 +302,12 @@ export function projectFocusedCaseGraphEnrichment(
     const facts = [...journeyIds]
       .map((journeyId) => bookingFactByJourneyService.get(`${journeyId}:${serviceId}`));
     const confirmed = facts.length === journeyIds.size
-      && facts.every((fact) => fact?.lineCount === 1 && fact.lineStatus === 'CONFIRMED');
+      && facts.every((fact) => fact?.lineCount === 1 && fact.lineStatus === 'CONFIRMED'
+        && fact.reservationStatus === 'CONFIRMED');
     if (!confirmed) return { state: 'UNKNOWN' };
     const observedAt = facts.find((fact) => fact?.observedAt)?.observedAt;
     return {
-      state: 'RECOVERED',
+      state: input.changedTransportServiceRefs?.has(serviceId) ? 'RECOVERED' : 'HEALTHY',
       detail: `Booking line confirmed${observedAt ? ` · observed ${formatInstantUtc(observedAt)}` : ''}`,
     };
   };

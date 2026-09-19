@@ -31,7 +31,7 @@ export class PgChangeRequestRepository implements ChangeRequestReadRepository {
       targets: { role: string; kind: string; id: string }[];
     }>(
       `SELECT r.id, r.requester_principal_id, r.represented_traveller_id, r.journey_id, r.lifecycle_status,
-              v.revision, v.intent_kind, v.urgency, v.desired_target, v.funding_declaration,
+              h.revision, v.intent_kind, v.urgency, v.desired_target, v.funding_declaration,
               v.source_utterance, v.source_record_id, v.submitted_at,
               COALESCE((
                 SELECT jsonb_agg(jsonb_build_object('role', t.target_role, 'kind', t.target_kind, 'id', t.target_id)
@@ -40,6 +40,7 @@ export class PgChangeRequestRepository implements ChangeRequestReadRepository {
                  WHERE t.workspace_id = r.workspace_id AND t.change_request_id = r.id AND t.request_revision = v.revision
               ), '[]'::jsonb) AS targets
          FROM change_requests r
+         JOIN aggregate_heads h ON h.workspace_id = r.workspace_id AND h.aggregate_id = r.id
          JOIN change_request_revisions v ON v.workspace_id = r.workspace_id AND v.change_request_id = r.id
         WHERE r.workspace_id = $1 AND r.id = $2
         ORDER BY v.revision DESC
@@ -54,7 +55,7 @@ export class PgChangeRequestRepository implements ChangeRequestReadRepository {
       representedTravellerId: row.represented_traveller_id,
       journeyId: row.journey_id,
       lifecycle: row.lifecycle_status,
-      revision: row.revision,
+      revision: Number(row.revision),
       sourceRecordId: row.source_record_id,
       sourceUtterance: row.source_utterance,
       submittedAt: row.submitted_at.toISOString(),
