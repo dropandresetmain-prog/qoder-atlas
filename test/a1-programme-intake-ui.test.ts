@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProgrammeIntakeCsv, renderProductProgrammeIntake } from '../src/ui/programme-intake-controller.ts';
+import { parseProgrammeIntakeCsv } from '../src/ui/programme-intake-controller.ts';
+import { renderProductProgrammeIntake } from '../src/ui/screens/product-programme-intake.ts';
 
 test('programme intake CSV supports quoted session indexes and typed obligations', () => {
   const result = parseProgrammeIntakeCsv([
