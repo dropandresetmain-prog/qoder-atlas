@@ -36,6 +36,7 @@ import { datasetDirectoryFromEnv } from './datasetLoader.ts';
 import { provisionConfiguredDataset } from './provisionDataset.ts';
 import { runBaselineEvaluation } from './baselineEvaluation.ts';
 import { provisionWorkspaceAuthority } from '../target/workspaceAuthority.ts';
+import { tryAcquireWorkspaceOperationLease } from '../target/workspaceOperationLease.ts';
 
 /**
  * Tables that carry `workspace_id` but are NOT demo-mutated world state:
@@ -144,6 +145,37 @@ export interface DemoResetParams {
 }
 
 /**
+ * Reset is deliberately unavailable once this workspace has any external
+ * execution history. A reset would erase the local reconciliation identity
+ * while a provider order may continue to exist. This is a safety boundary,
+ * not a terminal judgement about the attempt outcome.
+ */
+export async function findExternalExecutionResetBlocker(
+  db: Pick<Pool, 'query'>,
+  workspaceId: string,
+): Promise<{ capabilityRef: string; status: string } | undefined> {
+  const result = await db.query<{ capability_ref: string; status: string }>(
+    `SELECT ai.capability_ref, ea.status
+       FROM execution_attempts ea
+       JOIN action_intents ai
+         ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+      WHERE ea.workspace_id = $1 AND ai.capability_ref LIKE 'external:%'
+      UNION ALL
+     SELECT ai.capability_ref, ea.status
+       FROM execution_observations eo
+       JOIN execution_attempts ea
+         ON ea.workspace_id = eo.workspace_id AND ea.id = eo.attempt_id
+       JOIN action_intents ai
+         ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+      WHERE eo.workspace_id = $1 AND eo.origin = 'EXTERNAL_PROVIDER'
+      LIMIT 1`,
+    [workspaceId],
+  );
+  const row = result.rows[0];
+  return row ? { capabilityRef: row.capability_ref, status: row.status } : undefined;
+}
+
+/**
  * In-process single-flight: a second reset for the same workspace while one is
  * running is answered immediately with IN_PROGRESS, without taking a pool
  * connection (the advisory lock below still guards other processes).
@@ -176,19 +208,21 @@ async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promis
     phaseStart = t;
   };
 
-  const client = await pool.connect();
-  let locked = false;
+  const lease = await tryAcquireWorkspaceOperationLease(pool, workspaceId);
+  if (!lease) {
+    return { status: 'IN_PROGRESS', code: 'RESET_IN_PROGRESS', message: 'A reset or external execution cycle is already running for this workspace.' };
+  }
+  const client = lease.client;
   try {
-    const lock = await client.query<{ ok: boolean }>(
-      `SELECT pg_try_advisory_lock(hashtext('northstar:demo-reset'), hashtext($1)) AS ok`,
-      [workspaceId],
-    );
-    locked = lock.rows[0]?.ok === true;
-    if (!locked) {
-      return { status: 'IN_PROGRESS', code: 'RESET_IN_PROGRESS', message: 'A demo reset is already running for this workspace.' };
-    }
-
     mark('lock');
+    const external = await findExternalExecutionResetBlocker(client, workspaceId);
+    if (external) {
+      return {
+        status: 'REFUSED',
+        code: 'EXTERNAL_EXECUTION_HISTORY_PRESENT',
+        message: `Reset is unavailable: ${external.capabilityRef} has durable external execution state (${external.status}). Reconcile and retain the workspace for audit.`,
+      };
+    }
     const tables = await listResetTables(client);
     let deletedRows = 0;
     try {
@@ -240,9 +274,6 @@ async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promis
       timingsMs,
     };
   } finally {
-    if (locked) {
-      await client.query(`SELECT pg_advisory_unlock(hashtext('northstar:demo-reset'), hashtext($1))`, [workspaceId]).catch(() => undefined);
-    }
-    client.release();
+    await lease.release();
   }
 }

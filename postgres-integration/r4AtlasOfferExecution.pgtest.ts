@@ -18,13 +18,17 @@
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import { sharedTestPool } from './harness.ts';
 import { plannedTransportCase } from './r4TransportWorld.ts';
 import { approveRecoveryStrategy, externalExecutionBlockerForStrategyId } from '../src/app/target/recoveryApproval.ts';
 import { recordTravellerBookingIdentity } from '../src/persistence/postgres/execution/providerExecutionInputs.ts';
 import {
-  EXTERNAL_OFFER_SELECT_STATEMENTS, externalRecordIdForOrder, runExternalOfferExecutionPass, runExternalReconciliation, type ExternalOfferExecutionDeps,
+  EXTERNAL_OFFER_SELECT_STATEMENTS, externalRecordIdForOrder, runExternalExecutionCycle, runExternalOfferExecutionPass, runExternalReconciliation, type ExternalOfferExecutionDeps,
 } from '../src/app/target/externalOfferExecution.ts';
+import { findExternalExecutionResetBlocker, resetDemoWorkspace } from '../src/app/demo/demoReset.ts';
+import { tryAcquireWorkspaceOperationLease } from '../src/app/target/workspaceOperationLease.ts';
 import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF } from '../src/providers/atlas/transactionAdapter.ts';
 import { capabilityError, capabilityOk } from '../src/contracts/envelope.ts';
 import type { CapabilityMeta } from '../src/contracts/envelope.ts';
@@ -277,6 +281,129 @@ describe('R4-F2 transport Recover through the Atlas sandbox seam (real PostgreSQ
     assert.deepEqual((await f.attempts()).map((a) => a.status), ['OBSERVED_SUCCESS']);
     assert.notDeepEqual(await f.selectedService(), before);
     assert.deepEqual([provider.calls.create, provider.calls.pay, ticketed.calls.create, ticketed.calls.pay], [1, 1, 0, 0], 'reconciliation never mutates');
+    await f.c.app.close();
+  });
+});
+
+describe('A3 external execution and demo reset exclusion (real PostgreSQL)', () => {
+  const resetEnv = {
+    APP_ENVIRONMENT: 'local',
+    NORTHSTAR_DEMO_RESET: '1',
+    NORTHSTAR_DEMO_DATASET_DIR: resolve('fixtures/programmes/ait-summit-2026'),
+  } as NodeJS.ProcessEnv;
+
+  test('every external attempt status blocks reset, while an internal programme attempt does not', async () => {
+    const f = await plannedTransportCase('A3 reset external status');
+    const approved = await f.approve();
+    assert.equal(approved.ok, true, JSON.stringify(approved));
+    const provider = scriptedProvider(f.c.pool, f.ws, { verify: 'PRICE_CHANGED' });
+    await runExternalOfferExecutionPass(f.execCtx(provider.deps));
+
+    for (const status of [
+      'PREPARED', 'CLAIMED', 'DISPATCHING', 'DISPATCHED', 'OUTCOME_UNKNOWN',
+      'RECONCILIATION_REQUIRED', 'OBSERVED_SUCCESS', 'OBSERVED_FAILURE',
+      'RECONCILED', 'COMPLETED', 'FAILED',
+    ]) {
+      await f.c.pool.query('UPDATE execution_attempts SET status = $2 WHERE workspace_id = $1', [f.ws, status]);
+      const blocker = await findExternalExecutionResetBlocker(f.c.pool, f.ws);
+      assert.deepEqual(blocker, { capabilityRef: 'external:offer.select', status });
+    }
+
+    await f.c.pool.query(
+      `UPDATE execution_attempts
+          SET status = 'OUTCOME_UNKNOWN', request_ref = 'atlas:order:ORDER-1'
+        WHERE workspace_id = $1`,
+      [f.ws],
+    );
+    const reset = await resetDemoWorkspace({
+      pool: f.c.pool, uow: () => f.c.app.unitOfWork(), workspaceId: f.ws, env: resetEnv,
+    });
+    assert.equal(reset.status, 'REFUSED');
+    if (reset.status === 'REFUSED') assert.equal(reset.code, 'EXTERNAL_EXECUTION_HISTORY_PRESENT');
+    assert.deepEqual(await f.attempts(), [{ status: 'OUTCOME_UNKNOWN', request_ref: 'atlas:order:ORDER-1', attempt_number: 1 }], 'refused reset preserves the durable reconciliation reference');
+    await f.c.app.close();
+
+    const internal = await plannedTransportCase('A3 reset internal attempt');
+    const strategy = (await internal.c.pool.query<{ id: string; scenario_change_id: string }>(
+      `SELECT id, scenario_change->>'id' AS scenario_change_id
+         FROM recovery_strategies WHERE workspace_id = $1 AND recovery_case_id = $2 LIMIT 1`,
+      [internal.ws, internal.c.caseId],
+    )).rows[0]!;
+    const planId = randomUUID();
+    const intentId = randomUUID();
+    await internal.c.pool.query(
+      `INSERT INTO action_plans (workspace_id, id, recovery_case_id, scenario_change_id, recovery_strategy_id, created_by_actor_id)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [internal.ws, planId, internal.c.caseId, strategy.scenario_change_id, strategy.id, internal.c.world.actorId],
+    );
+    await internal.c.pool.query(
+      `INSERT INTO action_intents (
+         workspace_id, id, action_plan_id, operation_namespace, logical_operation_key, request_fingerprint,
+         capability_ref, subject_refs, expected_observations, compensation_supported,
+         compensation_requires_separate_authority, status, created_by_actor_id
+       ) VALUES ($1,$2,$3,'internal.programme',$4,$5,'internal:programme.schedule',$6::jsonb,$7::jsonb,false,true,'AUTHORIZED',$8)`,
+      [
+        internal.ws, intentId, planId, `programme:${intentId}`, `fingerprint:${intentId}`,
+        JSON.stringify([{ kind: 'PROGRAMME_ITEM', id: randomUUID() }]),
+        JSON.stringify(['INTERNAL_COMMAND_RECEIPT:programme_schedule']), internal.c.world.actorId,
+      ],
+    );
+    await internal.c.pool.query(
+      `INSERT INTO execution_attempts (
+         workspace_id, id, action_intent_id, attempt_number, logical_operation_key, request_fingerprint, status, created_by_actor_id
+       ) VALUES ($1,$2,$3,1,$4,$5,'COMPLETED',$6)`,
+      [internal.ws, randomUUID(), intentId, `programme:${intentId}`, `fingerprint:${intentId}`, internal.c.world.actorId],
+    );
+    assert.equal(await findExternalExecutionResetBlocker(internal.c.pool, internal.ws), undefined, 'internal programme execution does not consume the persistent demo reset');
+    await internal.c.app.close();
+  });
+
+  test('reset is denied while a provider call holds the workspace lease, without deleting state', async () => {
+    const f = await plannedTransportCase('A3 reset concurrent provider');
+    const approved = await f.approve();
+    assert.equal(approved.ok, true, JSON.stringify(approved));
+    const provider = scriptedProvider(f.c.pool, f.ws, { payable: 5 });
+    const baseVerify = provider.deps.flight.verifyOffer;
+    let entered!: () => void;
+    const enteredProviderCall = new Promise<void>((resolveEntered) => { entered = resolveEntered; });
+    let release!: () => void;
+    const releaseProviderCall = new Promise<void>((resolveRelease) => { release = resolveRelease; });
+    provider.deps.flight.verifyOffer = async (input) => {
+      entered();
+      await releaseProviderCall;
+      return baseVerify(input);
+    };
+
+    const running = runExternalExecutionCycle(f.execCtx(provider.deps));
+    await enteredProviderCall;
+    const attemptsBefore = await f.count('SELECT count(*)::text AS n FROM execution_attempts WHERE workspace_id = $1');
+    const reset = await resetDemoWorkspace({
+      pool: f.c.pool, uow: () => f.c.app.unitOfWork(), workspaceId: f.ws, env: resetEnv,
+    });
+    assert.equal(reset.status, 'IN_PROGRESS');
+    assert.equal(await f.count('SELECT count(*)::text AS n FROM execution_attempts WHERE workspace_id = $1'), attemptsBefore, 'reset did not delete the live attempt');
+    release();
+    const cycle = await running;
+    assert.equal(cycle.leaseUnavailable, false);
+    assert.equal(provider.calls.create, 1, 'the already-live cycle, not reset, owns the one provider create');
+    await f.c.app.close();
+  });
+
+  test('an external cycle that cannot acquire the reset lease loads no candidates and makes no provider call', async () => {
+    const f = await plannedTransportCase('A3 reset queued external pass');
+    const approved = await f.approve();
+    assert.equal(approved.ok, true, JSON.stringify(approved));
+    const provider = scriptedProvider(f.c.pool, f.ws, { payable: 5 });
+    const lease = await tryAcquireWorkspaceOperationLease(f.c.pool, f.ws);
+    assert.ok(lease);
+    try {
+      const cycle = await runExternalExecutionCycle(f.execCtx(provider.deps));
+      assert.equal(cycle.leaseUnavailable, true);
+      assert.equal(cycle.report.candidates, 0);
+      assert.deepEqual(provider.calls, { verify: 0, create: 0, pay: 0, retrieve: 0 });
+    } finally {
+      await lease.release();
+    }
     await f.c.app.close();
   });
 });

@@ -30,7 +30,7 @@ import { buildTargetTimezoneResolver } from './targetTransportResearch.ts';
 import { composeTransportFamilies } from './targetProviderFamilies.ts';
 import { composeTargetIntelligence } from './composeTargetIntelligence.ts';
 import { runInternalExecutionPass } from './target/executionPass.ts';
-import { composeOfferExecution, runExternalOfferExecutionPass, runExternalReconciliation, EXTERNAL_OFFER_SELECT_STATEMENTS } from './target/externalOfferExecution.ts';
+import { composeOfferExecution, runExternalExecutionCycle, EXTERNAL_OFFER_SELECT_STATEMENTS } from './target/externalOfferExecution.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
 
 /** Idle cadence of the case lifecycle pass (escalation + resolution); a reassessment drain also triggers it immediately. */
@@ -278,12 +278,14 @@ export async function composeTargetBoot(
         pollMs: EXECUTION_POLL_MS,
         run: async (now) => {
           const ctx = { pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: `northstar-execution:${config.workspaceId}`, uow: () => endpoints.app.unitOfWork(), executorPrincipalId, external: offerExecution, now };
-          const report = await runExternalOfferExecutionPass(ctx);
-          const reconciliation = await runExternalReconciliation(ctx);
-          return { report, reconciliation };
+          return runExternalExecutionCycle(ctx);
         },
-        summarize: ({ report, reconciliation }) => ({ candidates: report.candidates, executed: report.executed, failed: report.failed, unknown: report.unknown, deferred: report.deferred, refused: report.refused, canonicalUpdates: report.canonicalUpdates + reconciliation.canonicalUpdates, reconciled: reconciliation.reconciled, stillUnknown: reconciliation.stillUnknown }),
-        onRun({ report, reconciliation }) {
+        summarize: ({ report, reconciliation, leaseUnavailable }) => ({ candidates: report.candidates, executed: report.executed, failed: report.failed, unknown: report.unknown, deferred: report.deferred, refused: report.refused, canonicalUpdates: report.canonicalUpdates + reconciliation.canonicalUpdates, reconciled: reconciliation.reconciled, stillUnknown: reconciliation.stillUnknown, leaseUnavailable }),
+        onRun({ report, reconciliation, leaseUnavailable }) {
+          if (leaseUnavailable) {
+            console.log('[atlas] external execution deferred: workspace operation in progress');
+            return;
+          }
           for (const outcome of report.outcomes) {
             if (outcome.result === 'DEFERRED') continue;
             console.log(`[atlas] external execution ${outcome.result} intent=${outcome.intentId}${outcome.detail ? ` (${outcome.detail})` : ''}`);
