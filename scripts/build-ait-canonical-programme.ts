@@ -33,6 +33,7 @@
  * structurally and attributed purely by the identities they declare.
  *
  * Run: node --experimental-strip-types scripts/build-ait-canonical-programme.ts
+ * Use --dossiers-only to refresh identity without replacing later programme enrichment.
  * Idempotent: writes the same bytes for the same pack inputs.
  */
 import { readdirSync, readFileSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -50,6 +51,7 @@ type JsonDoc = Record<string, any>;
  *   node --experimental-strip-types scripts/build-ait-canonical-programme.ts
  */
 const OUT_DIR = 'fixtures/programmes/ait-summit-2026';
+const dossiersOnly = process.argv.includes('--dossiers-only');
 
 function readJson(path: string): JsonDoc {
   return JSON.parse(readFileSync(join(PACK_ROOT, path), 'utf8'));
@@ -65,7 +67,7 @@ function collectPackDocuments(): Array<{ path: string; doc: JsonDoc }> {
         walk(full);
       } else if (entry.endsWith('.json')) {
         try {
-          docs.push({ path: relative(PACK_ROOT, full), doc: JSON.parse(readFileSync(full, 'utf8')) });
+          docs.push({ path: relative(PACK_ROOT, full).replaceAll('\\', '/'), doc: JSON.parse(readFileSync(full, 'utf8')) });
         } catch {
           // Non-JSON-parseable files are not pack documents; skip silently.
         }
@@ -476,7 +478,9 @@ const bundle = {
 };
 
 mkdirSync(OUT_DIR, { recursive: true });
-writeFileSync(join(OUT_DIR, 'programme.json'), `${JSON.stringify(bundle, null, 2)}\n`);
+if (!dossiersOnly) {
+  writeFileSync(join(OUT_DIR, 'programme.json'), `${JSON.stringify(bundle, null, 2)}\n`);
+}
 
 // Booking dossiers (optional): operator-validated provider-facing identity,
 // keyed by roster draftId in the pack. Mechanically mapped to the deterministic
@@ -503,7 +507,10 @@ if (packDossiers?.dossiers) {
   writeFileSync(join(OUT_DIR, 'booking-dossiers.json'), `${JSON.stringify(dossierBundle, null, 2)}\n`);
 }
 
-console.log(
+if (dossiersOnly) {
+  if (!packDossiers?.dossiers) throw new Error(`Booking dossier source not found: ${DOSSIERS_PATH}`);
+  console.log(`wrote ${join(OUT_DIR, 'booking-dossiers.json')}: ${dossierCount} booking dossiers; programme unchanged`);
+} else console.log(
   `wrote ${join(OUT_DIR, 'programme.json')}: ${travellers.length} travellers ` +
     `(${travellersWithTravel} with declared travel: ${legsTotal} legs / ${staysTotal} stays; ` +
     `${legsMissingBookingIdentity} legs without booking identity, ` +

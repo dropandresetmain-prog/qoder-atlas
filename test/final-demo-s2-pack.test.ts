@@ -4,10 +4,41 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve, sep } from 'node:path';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = join(process.cwd(), 'data/ait-demo-input-pack/scenarios/s2-missed-connection');
+
+test('dossier-only rebuild preserves programme enrichment and maps source identity on this platform', () => {
+  const parent = resolve(tmpdir());
+  const isolated = mkdtempSync(join(parent, 'northstar-dossiers-'));
+  try {
+    cpSync(join(process.cwd(), 'data/ait-demo-input-pack'), join(isolated, 'data/ait-demo-input-pack'), { recursive: true });
+    const output = join(isolated, 'fixtures/programmes/ait-summit-2026');
+    mkdirSync(output, { recursive: true });
+    const acceptedProgramme = '{"acceptedEnrichment":"must remain byte-identical"}\n';
+    writeFileSync(join(output, 'programme.json'), acceptedProgramme);
+    const run = () => execFileSync(process.execPath, [
+      join(process.cwd(), 'scripts/build-ait-canonical-programme.ts'), '--dossiers-only',
+    ], { cwd: isolated, encoding: 'utf8' });
+    assert.match(run(), /2 booking dossiers; programme unchanged/);
+    assert.equal(readFileSync(join(output, 'programme.json'), 'utf8'), acceptedProgramme);
+    const bytes = readFileSync(join(output, 'booking-dossiers.json'), 'utf8');
+    const generated = JSON.parse(bytes);
+    const source = JSON.parse(readFileSync(join(isolated, 'data/ait-demo-input-pack/global/booking-dossiers.json'), 'utf8'));
+    assert.deepEqual(generated.flight[0].passengers, source.dossiers.flight[0].passengers);
+    assert.equal(generated.flight[0].passengers[0].nationality, 'SG');
+    assert.deepEqual(generated.hotel[0].guestNames, source.dossiers.hotel[0].guestNames);
+    run();
+    assert.equal(readFileSync(join(output, 'booking-dossiers.json'), 'utf8'), bytes);
+    assert.equal(readFileSync(join(output, 'programme.json'), 'utf8'), acceptedProgramme);
+  } finally {
+    assert.ok(resolve(isolated).startsWith(parent + sep + 'northstar-dossiers-'));
+    rmSync(isolated, { recursive: true, force: true });
+  }
+});
 
 function readJson(rel: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(ROOT, rel), 'utf8')) as Record<string, unknown>;

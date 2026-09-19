@@ -32,7 +32,7 @@
     "checkIn": "2026-09-29T15:00:00+08:00",
     "checkOut": "2026-10-03T11:00:00+08:00",
     "noShowCutoff": "2026-10-01T00:00:00+08:00",
-    "note": "Baseline assumes next-morning arrival day: Jordan's SIN check-in is 30 Sep (post-NRT-overnight). The first-night no-show cutoff sits after the check-in date so the overnight story is about programme viability, not an artificial hotel cancellation hardcode."
+    "note": "Healthy baseline reserves four nights, 29 Sep through 3 Oct, with arrival in Singapore on 29 Sep. A disruption may move arrival to 30 Sep and require a Narita overnight. Compare retaining this reservation under its current no-show policy with an explicitly quoted cancellation and new three-night booking; never treat a proposed shorter stay as an already modified booking. The stated cutoff is synthetic scenario input and must not replace fresh provider policy."
   },
   "arrivalTransfer": {
     "mode": "PRIVATE_TRANSFER",
