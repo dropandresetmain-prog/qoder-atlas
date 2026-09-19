@@ -69,6 +69,10 @@ export const DesiredChangeTargetSchema = z.strictObject({
   if (new Set(objectives).size !== objectives.length) {
     ctx.addIssue({ code: 'custom', message: 'objectiveEffects may name each objective once' });
   }
+  if (value.transport?.earliestDeparture && value.transport.latestDeparture
+    && Date.parse(value.transport.earliestDeparture) > Date.parse(value.transport.latestDeparture)) {
+    ctx.addIssue({ code: 'custom', path: ['transport', 'latestDeparture'], message: 'transport earliestDeparture must not be after latestDeparture' });
+  }
 });
 export type DesiredChangeTarget = z.infer<typeof DesiredChangeTargetSchema>;
 

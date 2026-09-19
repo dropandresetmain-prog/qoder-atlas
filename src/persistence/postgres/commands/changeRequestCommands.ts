@@ -26,6 +26,15 @@ export interface ChangeRequestCommandContext {
   idempotencyKey: string;
 }
 
+/** Internal clock injection keeps authorization time out of the request payload. */
+export interface ChangeRequestCommandOptions {
+  authorizationNow?: () => string;
+}
+
+function trustedAuthorizationNow(options: ChangeRequestCommandOptions): string {
+  return InstantSchema.parse(options.authorizationNow?.() ?? new Date().toISOString());
+}
+
 export interface SubmitChangeRequestParams extends ChangeRequestCommandContext {
   changeRequestId: string;
   representedTravellerId: string;
@@ -142,7 +151,11 @@ function submissionEnvelope(context: ChangeRequestCommandContext, payload: z.out
 }
 
 /** Persists desired state only; this command deliberately does not plan or mutate travel/provider state. */
-export async function submitChangeRequest(uow: UnitOfWork, params: SubmitChangeRequestParams): Promise<ExecuteOutcome<SubmitChangeRequestResult>> {
+export async function submitChangeRequest(
+  uow: UnitOfWork,
+  params: SubmitChangeRequestParams,
+  options: ChangeRequestCommandOptions = {},
+): Promise<ExecuteOutcome<SubmitChangeRequestResult>> {
   const parsed = SubmitChangeRequestPayloadSchema.safeParse({
     changeRequestId: params.changeRequestId,
     representedTravellerId: params.representedTravellerId,
@@ -160,13 +173,14 @@ export async function submitChangeRequest(uow: UnitOfWork, params: SubmitChangeR
   const requestRef: TypedRef = { kind: 'CHANGE_REQUEST', id: input.changeRequestId };
   const envelope = submissionEnvelope(params, input);
   try {
+    const authorizationAt = trustedAuthorizationNow(options);
     return await uow.execute(envelope, async () => {
       const db = currentTransactionClient();
       const scopeDenied = await assertJourneyScope(db, params.workspaceId, input.representedTravellerId, input.journeyId);
       if (scopeDenied) return { ok: false, conflict: scopeDenied };
       const authorityDeniedResult = await assertCurrentRequestAuthority(db, {
         workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId,
-        travellerId: input.representedTravellerId, journeyId: input.journeyId, at: input.submittedAt,
+        travellerId: input.representedTravellerId, journeyId: input.journeyId, at: authorizationAt,
       });
       if (authorityDeniedResult) return { ok: false, conflict: authorityDeniedResult };
       const sourceDenied = await assertSourceAndTargets(db, { workspaceId: params.workspaceId, sourceRecordId: input.sourceRecordId, target: input.desiredTarget });
@@ -213,7 +227,11 @@ const transitionInput = z.strictObject({
 });
 
 /** Lifecycle handling is an explicit CAS and remains request-only. */
-export async function transitionChangeRequest(uow: UnitOfWork, params: TransitionChangeRequestParams): Promise<ExecuteOutcome<TransitionChangeRequestResult>> {
+export async function transitionChangeRequest(
+  uow: UnitOfWork,
+  params: TransitionChangeRequestParams,
+  options: ChangeRequestCommandOptions = {},
+): Promise<ExecuteOutcome<TransitionChangeRequestResult>> {
   const parsed = transitionInput.safeParse({
     changeRequestId: params.changeRequestId,
     expectedRevision: params.expectedRevision,
@@ -234,13 +252,14 @@ export async function transitionChangeRequest(uow: UnitOfWork, params: Transitio
     typedPayload: input, evidenceRefs: [],
   });
   try {
+    const authorizationAt = trustedAuthorizationNow(options);
     return await uow.execute(envelope, async ({ lockedHeads }) => {
       const db = currentTransactionClient();
       const request = await new PgChangeRequestRepository(db).loadChangeRequest(params.workspaceId, input.changeRequestId);
       if (!request) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `change request ${input.changeRequestId} does not exist`, [requestRef]) };
       const authorityDeniedResult = await assertCurrentRequestAuthority(db, {
         workspaceId: params.workspaceId, actorPrincipalId: params.actorPrincipalId,
-        travellerId: request.representedTravellerId, journeyId: request.journeyId, at: input.transitionedAt,
+        travellerId: request.representedTravellerId, journeyId: request.journeyId, at: authorizationAt,
       });
       if (authorityDeniedResult) return { ok: false, conflict: authorityDeniedResult };
       if (request.lifecycle !== input.from) {

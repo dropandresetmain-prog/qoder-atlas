@@ -15,3 +15,12 @@ test('typed desired target rejects an empty desire and derives only target-nativ
     { role: 'TRAVEL_WITH_TRAVELLER', targetRef: { kind: 'TRAVELLER', id: '00000000-0000-4000-8000-000000000002' } },
   ]);
 });
+
+test('typed desired target rejects an inverted transport departure window', () => {
+  assert.equal(DesiredChangeTargetSchema.safeParse({
+    transport: {
+      earliestDeparture: '2030-01-02T12:00:00.000Z',
+      latestDeparture: '2030-01-02T10:00:00.000Z',
+    },
+  }).success, false);
+});

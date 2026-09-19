@@ -44,6 +44,7 @@ test('ChangeRequest persists immutable desired state under exact request authori
   const requesterId = randomUUID();
   const systemIssuerId = randomUUID();
   const uow = () => new PgUnitOfWork(pool, seed.workspaceId);
+  const trustedClock = { authorizationNow: () => AT };
   mustOk(await createPrincipal(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), principalId: requesterId, actorType: 'HUMAN', authIssuer: 'urn:test:requester', authSubject: requesterId }));
   mustOk(await createPrincipal(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, idempotencyKey: randomUUID(), principalId: systemIssuerId, actorType: 'SYSTEM', authIssuer: 'urn:test:issuer', authSubject: systemIssuerId }));
   const grantKey = randomUUID();
@@ -65,11 +66,11 @@ test('ChangeRequest persists immutable desired state under exact request authori
     fundingDeclaration: 'TRAVELLER_FUNDED' as const,
   };
   const beforeJourney = await pool.query<{ lifecycle_status: string }>('SELECT lifecycle_status FROM journeys WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, journeyId]);
-  const first = mustOk(await submitChangeRequest(uow(), input));
+  const first = mustOk(await submitChangeRequest(uow(), input, trustedClock));
   assert.deepEqual(first, { changeRequestId: requestId, lifecycle: 'SUBMITTED', revision: 1 });
-  const replay = mustOk(await submitChangeRequest(uow(), input));
+  const replay = mustOk(await submitChangeRequest(uow(), input, trustedClock));
   assert.deepEqual(replay, first, 'same idempotency key returns the original result');
-  const hashConflict = await submitChangeRequest(uow(), { ...input, sourceUtterance: 'Changed payload under the same key.' });
+  const hashConflict = await submitChangeRequest(uow(), { ...input, sourceUtterance: 'Changed payload under the same key.' }, trustedClock);
   assert.equal(hashConflict.ok, false);
   if (!hashConflict.ok) assert.equal(hashConflict.conflict.kind, 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
 
@@ -90,37 +91,43 @@ test('ChangeRequest persists immutable desired state under exact request authori
   assert.equal(services.rows[0]?.n, 0);
   assert.equal(reservations.rows[0]?.n, 0);
 
-  const accepted = mustOk(await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 1, from: 'SUBMITTED', to: 'ACCEPTED_FOR_PLANNING', transitionedAt: AT }));
+  const accepted = mustOk(await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 1, from: 'SUBMITTED', to: 'ACCEPTED_FOR_PLANNING', transitionedAt: AT }, trustedClock));
   assert.deepEqual(accepted, { changeRequestId: requestId, lifecycle: 'ACCEPTED_FOR_PLANNING', revision: 2 });
-  const stale = await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 1, from: 'SUBMITTED', to: 'WITHDRAWN', transitionedAt: AT });
+  const stale = await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 1, from: 'SUBMITTED', to: 'WITHDRAWN', transitionedAt: AT }, trustedClock);
   assert.equal(stale.ok, false);
   if (!stale.ok) assert.equal(stale.conflict.kind, 'STALE_AGGREGATE_REVISION');
 
-  const crossTraveller = await submitChangeRequest(uow(), { ...input, idempotencyKey: randomUUID(), changeRequestId: randomUUID(), representedTravellerId: other.travellerId, journeyId: otherJourneyId });
+  const crossTraveller = await submitChangeRequest(uow(), { ...input, idempotencyKey: randomUUID(), changeRequestId: randomUUID(), representedTravellerId: other.travellerId, journeyId: otherJourneyId }, trustedClock);
   assert.equal(crossTraveller.ok, false);
   if (!crossTraveller.ok) assert.equal(crossTraveller.conflict.kind, 'AUTHORITY_DENIED');
-  const absentPrincipal = await submitChangeRequest(uow(), { ...input, actorPrincipalId: randomUUID(), idempotencyKey: randomUUID(), changeRequestId: randomUUID() });
+  const absentPrincipal = await submitChangeRequest(uow(), { ...input, actorPrincipalId: randomUUID(), idempotencyKey: randomUUID(), changeRequestId: randomUUID() }, trustedClock);
   assert.equal(absentPrincipal.ok, false);
   if (!absentPrincipal.ok) assert.equal(absentPrincipal.conflict.kind, 'AUTHORITY_DENIED');
 
   await pool.query("UPDATE principals SET status = 'SUSPENDED' WHERE workspace_id = $1 AND id = $2", [seed.workspaceId, requesterId]);
-  const inactive = await submitChangeRequest(uow(), { ...input, idempotencyKey: randomUUID(), changeRequestId: randomUUID() });
+  const inactive = await submitChangeRequest(uow(), { ...input, idempotencyKey: randomUUID(), changeRequestId: randomUUID() }, trustedClock);
   assert.equal(inactive.ok, false);
   if (!inactive.ok) assert.equal(inactive.conflict.kind, 'AUTHORITY_DENIED');
   await pool.query("UPDATE principals SET status = 'ACTIVE' WHERE workspace_id = $1 AND id = $2", [seed.workspaceId, requesterId]);
+
+  await pool.query('UPDATE authority_grants SET expires_at = $3::timestamptz WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, grant.grantId, '2029-12-31T00:00:00.000Z']);
+  const backdatedExpiry = await submitChangeRequest(uow(), { ...input, submittedAt: '2028-01-01T00:00:00.000Z', idempotencyKey: randomUUID(), changeRequestId: randomUUID() }, trustedClock);
+  assert.equal(backdatedExpiry.ok, false, 'reported event time cannot backdate an expired request grant');
+  if (!backdatedExpiry.ok) assert.equal(backdatedExpiry.conflict.kind, 'AUTHORITY_DENIED');
+  await pool.query('UPDATE authority_grants SET expires_at = NULL WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, grant.grantId]);
 
   // An execution-oriented grant for the same principal/scope is still not a
   // request grant. The command requires the distinct submit action exactly.
   await pool.query('DELETE FROM grant_actions WHERE workspace_id = $1 AND grant_id = $2', [seed.workspaceId, grant.grantId]);
   await pool.query("INSERT INTO grant_actions (workspace_id, grant_id, action_kind) VALUES ($1, $2, 'action.intent.dispatch')", [seed.workspaceId, grant.grantId]);
-  const wrongAction = await submitChangeRequest(uow(), { ...input, idempotencyKey: randomUUID(), changeRequestId: randomUUID() });
+  const wrongAction = await submitChangeRequest(uow(), { ...input, idempotencyKey: randomUUID(), changeRequestId: randomUUID() }, trustedClock);
   assert.equal(wrongAction.ok, false);
   if (!wrongAction.ok) assert.equal(wrongAction.conflict.kind, 'AUTHORITY_DENIED');
   await pool.query('DELETE FROM grant_actions WHERE workspace_id = $1 AND grant_id = $2', [seed.workspaceId, grant.grantId]);
   await pool.query("INSERT INTO grant_actions (workspace_id, grant_id, action_kind) VALUES ($1, $2, 'change.request.submit')", [seed.workspaceId, grant.grantId]);
 
   await pool.query('UPDATE authority_grants SET revoked_at = $3::timestamptz WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, grant.grantId, '2029-12-31T00:00:00.000Z']);
-  const revoked = await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 2, from: 'ACCEPTED_FOR_PLANNING', to: 'CLOSED', transitionedAt: AT });
+  const revoked = await transitionChangeRequest(uow(), { workspaceId: seed.workspaceId, actorPrincipalId: requesterId, idempotencyKey: randomUUID(), changeRequestId: requestId, expectedRevision: 2, from: 'ACCEPTED_FOR_PLANNING', to: 'CLOSED', transitionedAt: AT }, trustedClock);
   assert.equal(revoked.ok, false);
   if (!revoked.ok) assert.equal(revoked.conflict.kind, 'AUTHORITY_DENIED');
 });
