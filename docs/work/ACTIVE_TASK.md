@@ -3,6 +3,7 @@
 - Base: `main` `07c3c797b57a1c74e30c08a9097362edb57dd9d5` (accepted R3 `d9bb9a5` ancestor verified). Branch `feat/r4-product-parity-live-sarah` (worktree `.worktrees/r4`). V7.2 docs cherry-picked (`563320e` -> docs only).
 - Parity contract: `docs/work/R4_FRONTEND_PARITY_CONTRACT.md` (frozen R4-C0).
 - Test policy: focused only while iterating; CURRENT_TARGET once at integration; full PG ONCE near acceptance.
+- **Gate counters (takeover):** CURRENT_TARGET runs = **0**; full PG suite runs = **0**.
 - Frozen shared interaction contract (all lanes obey):
   1. Polling never replaces `<main>`; case/overview pages mark regions `data-poll-region="<name>"`; the poller patches only regions whose content changed (guard on `projectionRevision`, NOT the xmin cursor) and never touches `.fg-canvas` unless the graph scene changed.
   2. Controls use `data-action="<recover|decline|escalate|reset-demo|trigger-disruption>"` + `data-*` params handled by ONE document-level delegated client script (shell-owned); inline listeners on replaceable nodes are forbidden.
@@ -11,9 +12,41 @@
 - Lane ownership (branch `r4/<lane>`, worktree `.worktrees/r4-<lane>`): A shell/back/reset/polling/delegation; B overview+V7.2; C Atlas recordings/sandbox; D G01+Qwen+preferences; E1 graph V5.6 fidelity + runtime; E2 Case IA/copy/options/approval; H Decisions/Activity/Programme/Traveller adapters+jargon gate. PRIMARY integrates.
 - Collision ownership: `src/ui/page.ts`,`productShell.ts`,`casePolling.ts`,`polling.ts` = A; `product-recovery-case.ts` = E2; `src/ui/graph/*` = E1; `operatorOverviewAdapter.ts`,`product-operator-overview.ts`,`src/ui/overview-graph/*` = B; `recoveryPlanningCoordinator.ts`,`composeTargetBoot.ts` = D (C hands boot wiring to D/PRIMARY).
 - Recon (scratchpad `recon/`): legacy-archaeology, current-frontend-defects, backend-gaps, graph-gaps. Key root causes: overview queue-replaces-population (`operatorOverviewAdapter.ts:254`); poll `outerHTML` swap + listener bound to replaced node (`casePolling.ts:70`, `product-recovery-case.ts:421-462`); reset 409 (`targetHttpHandlers.ts:467`); G01 `DEFAULT_CAPABILITIES` (`recoveryPlanningCoordinator.ts:110`); no CGK->SIN Atlas recording; Qwen client never built at boot (and gated on ADAPTER_MODE); preferences reader absent.
-- Checkpoints: R4-C0 contract frozen (this commit). Others: pending.
-- Provider state: Atlas sandbox creds + Model Studio key present in `.env.local` (names only checked). Qwen state: not composed. Reset state: not implemented. Browser defects/backend defects: see recon list above.
-- Lanes A,B,C,D,E1,E2,H dispatched (2026-09-19). Next: integrate lane branches r4/<lane> in order D(G01) -> A -> E1 -> B -> H -> E2 -> C, then focused Sarah browser run.
+- Checkpoints: R4-C0 `e94f15addb53ce5dfd33ccb6de895871a7ae3f8a` (pushed). Others: pending.
+- Provider state: Atlas sandbox creds + Model Studio key present in `.env.local` (names only checked). Qwen state: **not yet composed on Lane D** (prefs WIP; G01 committed). Reset state: Lane A has uncommitted `demoReset.ts`. Browser defects/backend defects: see recon list above.
+
+## TAKEOVER INVENTORY (2026-09-19 PRIMARY takeover)
+
+Primary workspace was on unrelated `integration/pg-test-perf`; R4 recovered in `.worktrees/r4`. No R4 lane agents still running (terminals are PG-fixture work). Lane branches forked from `4e90f18` (C0-1), not `e94f15a` (docs-only delta). **Do not discard dirty lane trees.**
+
+| LANE | BRANCH | WORKTREE | HEAD | CLEAN/DIRTY | COMMITTED? | PUSHED? | STATUS | NEXT ACTION |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PRIMARY | `feat/r4-product-parity-live-sarah` | `.worktrees/r4` | `e94f15a` | CLEAN | C0 docs | yes | R4-C0 freeze | Integrate lanes |
+| A | `r4/a-shell` | `.worktrees/r4-a-shell` | `4e90f18` | **DIRTY** | no new commits | no upstream | shellRuntime + demoReset + region polling + handlers | Finish tests → commit → integrate after D |
+| B | `r4/b-overview` | `.worktrees/r4-b-overview` | `4e90f18` | **DIRTY** | no | no | overview-graph/* + eventOverview + adapter | Finish → commit → after E1 |
+| C | `r4/c-atlas` | `.worktrees/r4-c-atlas` | `4e90f18` | **DIRTY** | no | no | ~69 recordings + transportResearch + scratch | Clean scratch → commit useful RECORD → last |
+| D | `r4/d-qwen-prefs` | `.worktrees/r4-d-qwen-prefs` | `deaa710` | **DIRTY** | G01 `deaa710` | G01 yes | G01 done; G09 prefs uncommitted; **Qwen not composed** | Focused verify G01 → finish prefs+Qwen → integrate FIRST |
+| E1 | `r4/e1-graph` | `.worktrees/r4-e1-graph` | `4e90f18` | **DIRTY** | no | no | geometry/scene + graph module edits | Finish → after A |
+| E2 | `r4/e2-case` | `.worktrees/r4-e2-case` | `4e90f18` | **DIRTY** | no | no | caseWorkspacePresenter + product-recovery-case + copy | Finish → after H |
+| H | `r4/h-surfaces` | `.worktrees/r4-h-surfaces` | `4e90f18` | **DIRTY** | no | no | activity/decisions/programme/traveller adapters | Finish → after B |
+
+**Integration order (unchanged unless collisions force otherwise):** D → A → E1 → B → H → E2 → C.
+
+## Integration progress (takeover 2026-09-19)
+
+| Checkpoint | SHA | Notes |
+| --- | --- | --- |
+| R4-C0 | `e94f15addb53ce5dfd33ccb6de895871a7ae3f8a` | contract + lane dispatch |
+| R4-C1a | `18937dee4fea12fe47970b0f3f81bbfb6a39483c` | Lane D: G01 + G09 + Qwen |
+| R4-C1b | (merge A — see HEAD) | Lane A: shell region polling + demo reset |
+
+**Gate counters:** CURRENT_TARGET runs = **0**; full PG suite runs = **0**.
+
+**Lane D:** G01 `deaa710`, G09 `35e607b`, Qwen `f9f1822` — integrated. Focused 10/10 (capability+prefs+qwen).
+**Lane A:** `1a54623` — integrated. Focused shell/polling/demo-reset 22/22 on primary seam.
+**Next:** finish/commit Lane E1 graph, then B.
+
+**Takeover next:** finish Lane E1 (V5.6 graph scene/runtime), then integrate.
 
 ---
 
