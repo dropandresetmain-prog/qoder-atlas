@@ -34,6 +34,7 @@ const HEAVYWEIGHT_POSTGRES_FILES = [
   'postgres-integration/t2ProviderDisruptionReprotection.pgtest.ts',
   'postgres-integration/migrate.pgtest.ts',
   'postgres-integration/integrationCrossLane.pgtest.ts',
+  'postgres-integration/aitFixtureClone.pgtest.ts',
 ] as const;
 
 test('postgresFast is exactly the canonical postgres suite minus the accepted heavyweight exclusions', () => {

@@ -65,6 +65,7 @@ engineering checkpoints. It excludes only these heavyweight files:
 - `postgres-integration/t2ProviderDisruptionReprotection.pgtest.ts`
 - `postgres-integration/migrate.pgtest.ts`
 - `postgres-integration/integrationCrossLane.pgtest.ts`
+- `postgres-integration/aitFixtureClone.pgtest.ts` (fixture-clone isolation proof; builds its own AiT fixtures)
 
 Those tests remain required canonical PostgreSQL evidence; they are not deprecated,
 optional, or moved to migration/legacy. The `postgres` suite remains unchanged in

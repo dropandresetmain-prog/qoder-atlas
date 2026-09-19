@@ -202,6 +202,8 @@
     ],
     "postgresFast": [
       "postgres-integration/atomicCommit.pgtest.ts",
+      "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
+      "postgres-integration/r3ComposedB1Full.pgtest.ts",
       "postgres-integration/b1RecoveryLoop.pgtest.ts",
       "postgres-integration/c2InvalidationGaps.pgtest.ts",
       "postgres-integration/c3TargetedRemediation.pgtest.ts",
