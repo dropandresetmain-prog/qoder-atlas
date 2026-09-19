@@ -194,15 +194,16 @@ describe('M9 product surface renderers', () => {
   test('recovery case keeps booking state separate from trip FAIL and shows duplicate exposure', () => {
     const html = renderProductRecoveryCase(recoveryCaseView());
 
-    assert.match(html, /Booking \/ service state/);
-    assert.match(html, /Whole trip viability/);
-    assert.match(html, />FAIL</);
-    assert.match(html, /Duplicate booking exposure/);
-    assert.match(html, /Partial recovery/);
-    assert.match(html, /hotel\.book/);
-    assert.match(html, /Connection progression/);
-    assert.match(html, /EXECUTING_COORDINATED_RECOVERY|Executing coordinated recovery/);
+    // R4 Case IA: plain-language hierarchy; technical dump stays progressive.
+    assert.match(html, /data-test="product-recovery-case"/);
+    assert.match(html, /data-test="back-to-overview"/);
+    assert.match(html, /data-test="focused-case-graph-section"/);
+    assert.match(html, /data-test="technical-details"/);
+    assert.match(html, /Recovery under way|Applying the approved recovery|EXECUTING/);
     assert.doesNotMatch(html, /Sarah|Daniel|airport/i);
+    // Raw lifecycle enums must not dominate primary copy; technical details may hold them.
+    const primary = html.slice(0, html.indexOf('data-test="technical-details"'));
+    assert.doesNotMatch(primary, /AWAITING_AUTHORITY|EVALUATED/);
   });
 
   test('incident programme shows five affected travellers and programme state compare', () => {
