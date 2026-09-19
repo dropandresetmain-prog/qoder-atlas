@@ -133,6 +133,77 @@ test('RV-N7 hotel: REPLAY retrieve returns the CONFIRMED status view', async () 
   assert.deepEqual(result.data.cancellationFee, { amount: 569.4, currency: 'USD' });
 });
 
+test('A3 hotel lookup: URL-escapes client references and preserves RECORD/REPLAY observations', async () => {
+  const writeDir = mkdtempSync(join(tmpdir(), 'a3-nuitee-lookup-'));
+  const store = new FileRecordingStore({ readDirs: [writeDir], writeDir });
+  const clientReference = 'case/ref with spaces?&';
+  const raw = {
+    data: [
+      { bookingId: 'booking-2', clientReference },
+      { bookingId: 'booking-1', clientReference },
+    ],
+  };
+  let requestedUrl = '';
+  const recorded = new NuiteeAdapter({
+    mode: 'RECORD',
+    store,
+    bookingBaseUrl: 'https://book.liteapi.example/v3.0',
+    apiKey: 'test-key',
+    fetchImpl: async (input, init) => {
+      requestedUrl = String(input);
+      assert.equal(init?.method, 'GET');
+      return new Response(JSON.stringify(raw), { status: 200 });
+    },
+  });
+  const query = { clientReference };
+  const liveResult = await recorded.findBookingsByClientReference(query);
+  assert.equal(liveResult.ok, true, JSON.stringify(liveResult.ok ? undefined : liveResult.error));
+  if (!liveResult.ok) return;
+  assert.equal(requestedUrl, 'https://book.liteapi.example/v3.0/bookings?clientReference=case%2Fref%20with%20spaces%3F%26');
+  assert.deepEqual(liveResult.data.bookings, [
+    { bookingId: 'booking-1', clientReference },
+    { bookingId: 'booking-2', clientReference },
+  ]);
+  assert.equal(liveResult.meta.mode, 'RECORD');
+
+  const replayResult = await new NuiteeAdapter({ mode: 'REPLAY', store }).findBookingsByClientReference(query);
+  assert.equal(replayResult.ok, true, JSON.stringify(replayResult.ok ? undefined : replayResult.error));
+  if (!replayResult.ok) return;
+  assert.deepEqual(replayResult.data, liveResult.data);
+  assert.equal(replayResult.meta.mode, 'REPLAY');
+});
+
+test('A3 hotel lookup: empty results remain an observation, while malformed or ambiguous results fail structurally', async () => {
+  async function lookup(raw: unknown) {
+    const writeDir = mkdtempSync(join(tmpdir(), 'a3-nuitee-lookup-failure-'));
+    const store = new FileRecordingStore({ readDirs: [writeDir], writeDir });
+    const adapter = new NuiteeAdapter({
+      mode: 'RECORD',
+      store,
+      bookingBaseUrl: 'https://book.liteapi.example/v3.0',
+      apiKey: 'test-key',
+      fetchImpl: async () => new Response(JSON.stringify(raw), { status: 200 }),
+    });
+    return adapter.findBookingsByClientReference({ clientReference: 'ref-1' });
+  }
+
+  const empty = await lookup({ data: [] });
+  assert.equal(empty.ok, true);
+  if (empty.ok) assert.deepEqual(empty.data.bookings, []);
+
+  for (const raw of [
+    {},
+    { data: [{ bookingId: 'booking-1' }] },
+    { data: [{ bookingId: 'booking-1', clientReference: 'other-ref' }] },
+    { data: [{ bookingId: 'booking-1', clientReference: 'ref-1' }, { bookingId: 'booking-1', clientReference: 'ref-1' }] },
+    { data: Array.from({ length: 101 }, (_, index) => ({ bookingId: `booking-${index}`, clientReference: 'ref-1' })) },
+  ]) {
+    const result = await lookup(raw);
+    assert.equal(result.ok, false, 'invalid provider list must not become a booking observation');
+    if (!result.ok) assert.equal(result.error.category, 'PROVIDER_ERROR');
+  }
+});
+
 test('RV-N7 hotel: REPLAY cancel returns a confirmed cancel outcome with REPLAY provenance', async () => {
   const result = await replayAdapter().cancelStay(NUITEE_CAPTURE_CANCEL_QUERY);
   assert.equal(result.ok, true, JSON.stringify(result.ok ? undefined : result.error));
@@ -191,6 +262,18 @@ test('RV-N7 hotel: LIVE without credentials fails closed, never reaches the netw
   assert.equal(result.error.code, 'nuitee_missing_credentials');
   assert.equal(result.meta.providerId, NUITEE_PROVIDER_ID);
   assert.equal(result.meta.mode, 'LIVE');
+
+  const lookup = await adapter.findBookingsByClientReference({ clientReference: 'ref-1' });
+  assert.equal(lookup.ok, false);
+  assert.equal(fetchCalled, false, 'lookup must also fail closed without credentials');
+  if (!lookup.ok) {
+    assert.equal(lookup.error.category, 'NOT_CONFIGURED');
+    assert.equal(lookup.error.code, 'nuitee_missing_credentials');
+  }
+
+  const invalidLookup = await adapter.findBookingsByClientReference({ clientReference: '   ' });
+  assert.equal(invalidLookup.ok, false);
+  if (!invalidLookup.ok) assert.equal(invalidLookup.error.code, 'nuitee_client_reference_required');
 });
 
 test('RV-N7 hotel: RECORD mode writes sanitized recordings (no credential material)', async () => {

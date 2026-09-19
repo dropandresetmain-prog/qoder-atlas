@@ -596,7 +596,8 @@ export interface RoutingCapability {
  * and a provider-neutral transactional surface (search/quote/book/retrieve,
  * modify/cancel where the provider supports them). Transactional modify/cancel
  * may be simulated at the provider boundary (ADR-007); providers without
- * in-place modification are handled as cancel + rebook inside the adapter.
+ * in-place modification expose a structured unavailable result, while any
+ * cancel + rebook workflow remains separately authorized and observed.
  */
 export interface StayContextQuery {
   stayElementId: EntityId;
@@ -702,6 +703,25 @@ export interface HotelBookingStatusView {
   cancellationFee?: Money;
 }
 
+/** Provider-observed booking references returned by a client-reference lookup. */
+export interface HotelBookingReference {
+  bookingId: string;
+  clientReference: string;
+}
+
+/**
+ * A lookup is an observation of provider records, not proof of booking
+ * success or absence. An empty `bookings` array is therefore meaningful data,
+ * while malformed or ambiguous provider results must be returned as errors.
+ */
+export interface HotelBookingLookupOutcome {
+  bookings: HotelBookingReference[];
+}
+
+export interface HotelBookingLookupQuery {
+  clientReference: string;
+}
+
 export interface HotelActionQuery {
   stayElementId: EntityId;
   reason?: string;
@@ -726,9 +746,11 @@ export interface HotelCapability {
   quoteRate(query: HotelQuoteQuery): Promise<CapabilityResult<HotelQuoteOutcome>>;
   bookStay(query: HotelBookQuery): Promise<CapabilityResult<HotelBookingOutcome>>;
   retrieveBooking(query: HotelRetrieveQuery): Promise<CapabilityResult<HotelBookingStatusView>>;
+  /** Optional provider lookup for reconciling an ambiguous client-reference booking. */
+  findBookingsByClientReference?(query: HotelBookingLookupQuery): Promise<CapabilityResult<HotelBookingLookupOutcome>>;
   /**
    * In-place modification where the provider supports it; adapters without it
-   * implement this as cancel + rebook and report so in the outcome.
+   * report structured unavailability; cancel + rebook is a separate workflow.
    */
   modifyStay(query: HotelActionQuery): Promise<CapabilityResult<HotelActionOutcome>>;
   cancelStay(query: HotelActionQuery): Promise<CapabilityResult<HotelActionOutcome>>;
