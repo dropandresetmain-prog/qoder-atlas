@@ -1,300 +1,119 @@
 /**
- * M9 — product recovery case surface from v2 RecoveryCaseView read models.
- * Booking/service state and whole-trip viability stay separate; recovery
- * actions, partial recovery, duplicate exposure, and connection progression
- * render only when the projection supplies them.
+ * R4 (lane E2) — product recovery Case workspace.
+ *
+ * Restores the legacy Case information architecture onto the PostgreSQL v2
+ * `RecoveryCaseView`. The read model is first turned into a plain-language
+ * workspace model by `presentCaseWorkspace` (pure, no HTML); this file only lays
+ * that model out:
+ *
+ *   header -> lead callout -> graph (Current/Original) -> what this affects ->
+ *   recovery options (ONE recommended card) -> "What you’re approving" ->
+ *   execution progress -> what NORTHSTAR did -> what we checked -> resolution ->
+ *   Technical details (collapsed)
+ *
+ * Interaction contract (docs/work/ACTIVE_TASK.md, frozen):
+ *  - every replaceable section is a `data-poll-region="<name>"` container that is
+ *    ALWAYS emitted (possibly empty) so the region patcher can add/remove content;
+ *  - `<details>` carry `data-region-key` so open state survives patching;
+ *  - controls are `data-action="recover|decline|escalate"` + data attributes and
+ *    carry NO inline listeners — one document-level delegated handler owns them.
  */
-import type {
-  ConnectionProgression,
-  DuplicateBookingExposureView,
-  PartialRecoveryView,
-  PlanningEvidenceView,
-  RecoveryActionView,
-  RecoveryCaseView,
-  RecoveryStrategyChangeView,
-  RecoveryStrategyView,
-} from '../../contracts/v2/product/readModels.ts';
+import type { RecoveryCaseView } from '../../contracts/v2/product/readModels.ts';
 import {
-  assessmentToneClass,
-  ldgSemanticTone,
-} from '../../app/target/adapters/operatorOverviewAdapter.ts';
-import { humanizeCode } from '../../domain/v2/shared/humanize.ts';
-import { escapeHtml, formatInstant, formatMoney, formatShort } from '../html.ts';
-import { bulletList, uncertaintyList } from '../components.ts';
+  presentCaseWorkspace,
+  type CaseChangeLine,
+  type CaseOptionModel,
+  type CaseRow,
+  type CaseWorkspaceModel,
+} from '../../app/target/adapters/caseWorkspacePresenter.ts';
+import { SHELL_LINKS } from '../../app/target/productShell.ts';
+import { CASE_COPY } from '../copy.ts';
+import { escapeHtml, formatInstant } from '../html.ts';
 import { renderFocusedCaseGraph } from '../graph/index.ts';
 import { buildOriginalCurrentRegion, originalCurrentToggleScript } from '../originalCurrent.ts';
 import { casePollingScript } from '../casePolling.ts';
 
-const CONNECTION_PROGRESSION_LABEL: Record<ConnectionProgression, string> = {
-  HEALTHY: 'Connection healthy',
-  CONNECTION_SAFE: 'Connection safe',
-  CONNECTION_AT_RISK: 'Connection at risk',
-  CONNECTION_IMPOSSIBLE: 'Connection no longer works',
-  RECOVERY_PLANNING: 'Planning recovery',
-  AWAITING_APPROVAL: 'Awaiting approval',
-  EXECUTING_COORDINATED_RECOVERY: 'Executing coordinated recovery',
-  CHECKING_RESULTS: 'Checking results',
-  RECOVERED: 'Recovered',
-  STILL_UNRESOLVED: 'Still unresolved',
-};
-
-const EXECUTION_STATE_TONE: Record<RecoveryActionView['executionState'], string> = {
-  PROPOSED: 'watch',
-  AUTHORIZED: 'watch',
-  REJECTED: 'alert',
-  SUPERSEDED: 'neutral',
-  EXECUTING: 'active',
-  COMPLETED: 'ok',
-  FAILED: 'alert',
-  PENDING: 'watch',
-  RECONCILING: 'active',
-  OUTCOME_UNKNOWN: 'neutral',
-};
+const CASE_WORKSPACE_CSS = `<style>
+.case-workspace .cw-lead { margin: 0 0 18px; }
+.case-workspace .cw-lead .callout { padding: 16px 20px; }
+.case-workspace .cw-lead .callout h2 { margin: 0 0 6px; font-size: 18px; }
+.case-workspace .cw-lead .callout p { font-size: 14.5px; }
+.case-workspace .cw-stake { font-weight: 600; }
+.case-workspace .back-link { color: var(--text-soft); font-weight: 600; text-decoration: none; }
+.case-workspace .back-link:hover { color: var(--text); text-decoration: underline; }
+.case-workspace .cw-graph .graph-caption { margin: 0 0 10px; font-size: 13.5px; color: var(--text-soft); }
+.case-workspace .cw-rec { padding: 20px 22px; }
+.case-workspace .cw-rec .opt-title { font-size: 19px; }
+.case-workspace .cw-facts { display: grid; grid-template-columns: 130px 1fr; gap: 10px 16px; margin: 14px 0 0; font-size: 14px; }
+.case-workspace .cw-facts dt { color: var(--text-faint); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; padding-top: 3px; }
+.case-workspace .cw-facts dd { margin: 0; }
+.case-workspace .cw-facts ul { margin: 0; padding-left: 18px; }
+.case-workspace .cw-alt { margin-top: 12px; padding: 14px 18px; }
+.case-workspace .cw-alt .cw-facts { margin-top: 8px; }
+.case-workspace .cw-approve { background: var(--paper-warm); border: 1px solid var(--watch-border); border-radius: var(--radius); padding: 18px 20px; margin: 18px 0; }
+.case-workspace .cw-approve h2 { margin: 0 0 10px; font-size: 18px; }
+.case-workspace .cw-approve .btn-row { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.case-workspace .cw-status { min-height: 1.2em; margin: 10px 0 0; font-size: 13px; color: var(--text-soft); }
+.case-workspace .cw-progress { height: 8px; border-radius: 4px; background: var(--line-soft); overflow: hidden; margin: 6px 0 12px; }
+.case-workspace .cw-progress > i { display: block; height: 100%; background: var(--ok-f); }
+.case-workspace details.cw-details { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 10px 14px; }
+.case-workspace details.cw-details > summary { cursor: pointer; font-weight: 600; font-size: 14.5px; }
+.case-workspace .cw-tech { font-size: 12.5px; color: var(--text-soft); }
+.case-workspace .cw-tech ul { margin: 6px 0 12px; padding-left: 18px; }
+.case-workspace .cw-tech code { font-family: var(--font-mono); font-size: 11.5px; word-break: break-all; }
+.case-workspace .cw-considered { margin: 10px 0 0; padding: 0; list-style: none; }
+.case-workspace .cw-considered li { padding: 10px 0; border-top: 1px solid var(--line-soft); font-size: 13.5px; }
+.case-workspace .cw-considered li:first-child { border-top: 0; }
+.case-workspace .cw-empty { margin: 0; }
+</style>`;
 
 function badge(label: string, tone: string): string {
   return `<span class="badge tone-${tone}">${escapeHtml(label)}</span>`;
 }
 
-function viabilityPair(view: RecoveryCaseView): string {
-  const bookingTone = ldgSemanticTone(view.bookingServiceState.state);
-  const tripTone = assessmentToneClass(view.tripViability.verdict);
-  const bookingDetail = view.bookingServiceState.detail
-    ? `<p class="card-sub">${escapeHtml(view.bookingServiceState.detail)}</p>`
+function region(name: string, html: string, extra = ''): string {
+  return `<div data-poll-region="${name}"${extra ? ` ${extra}` : ''}>${html}</div>`;
+}
+
+function details(key: string, summary: string, body: string): string {
+  return `<details class="cw-details" data-region-key="${escapeHtml(key)}" data-test="${escapeHtml(key)}"><summary>${escapeHtml(summary)}</summary>${body}</details>`;
+}
+
+// --------------------------------------------------------------------------
+// Sections
+// --------------------------------------------------------------------------
+
+function headerHtml(m: CaseWorkspaceModel): string {
+  return `<div class="page-head">
+    <h1>${escapeHtml(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
+    <p class="sub">Trip recovery</p>
+    <p class="meta"><a class="back-link" href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${escapeHtml(CASE_COPY.backToOverview)}</a> · Updated <time datetime="${escapeHtml(m.generatedAt)}">${escapeHtml(formatInstant(m.generatedAt))}</time></p>
+  </div>`;
+}
+
+function leadHtml(m: CaseWorkspaceModel): string {
+  const attention = m.attention
+    ? `<div class="callout tone-alert" data-test="case-attention"><h2>${escapeHtml(m.attention.title)}</h2><p>${escapeHtml(m.attention.body)}</p></div>`
     : '';
-  const tripDetail = view.tripViability.detail
-    ? `<p class="card-sub">${escapeHtml(view.tripViability.detail)}</p>`
-    : '';
-  return `
-    <div class="trip-grid">
-      <div class="card" data-test="booking-service-state">
-        <p class="kv-label">Booking / service state</p>
-        <div class="card-head">
-          <div>
-            <p class="card-title">${escapeHtml(view.bookingServiceState.label)}</p>
-            ${bookingDetail}
-          </div>
-          ${badge(view.bookingServiceState.state, bookingTone)}
-        </div>
-      </div>
-      <div class="card" data-test="trip-viability">
-        <p class="kv-label">Whole trip viability</p>
-        <div class="card-head">
-          <div>
-            <p class="card-title">${escapeHtml(view.tripViability.label)}</p>
-            ${tripDetail}
-          </div>
-          ${badge(view.tripViability.verdict, tripTone)}
-        </div>
-      </div>
-    </div>`;
-}
-
-function recoveryActionRow(action: RecoveryActionView): string {
-  const tone = EXECUTION_STATE_TONE[action.executionState];
-  const cost = action.cost ? `<span class="chip chip-cost">${escapeHtml(formatMoney({ amount: Number(action.cost.amount), currency: action.cost.currency }))}</span>` : '';
-  const observation = action.observationResult
-    ? `<span class="chip">${escapeHtml(action.observationResult)}</span>`
-    : '';
-  const dependsOn = action.dependsOnActionRefs ?? [];
-  const depends =
-    dependsOn.length > 0
-      ? `<p class="b-extra">Depends on ${escapeHtml(dependsOn.join(', '))}</p>`
-      : '';
-  return `
-    <div class="check-row ${action.executionState === 'COMPLETED' ? 'done' : action.executionState === 'FAILED' ? 'failed' : action.executionState === 'EXECUTING' || action.executionState === 'RECONCILING' ? 'doing' : 'queued'}" data-test="recovery-action" data-action-ref="${escapeHtml(action.actionRef)}">
-      <span class="c-ic">${action.executionState === 'COMPLETED' ? '✓' : action.executionState === 'FAILED' ? '✕' : '○'}</span>
-      <div>
-        <div class="c-t">${escapeHtml(action.domain)} · ${escapeHtml(action.capability)}</div>
-        <div class="b-extra">${escapeHtml(action.authorityState)}${action.approvalState ? ` · ${escapeHtml(action.approvalState)}` : ''}</div>
-        ${depends}
-        <div class="opt-flags">${cost}${observation}${badge(action.executionState, tone)}</div>
-      </div>
-      <span class="c-sub">#${action.dependencyOrder}</span>
-    </div>`;
-}
-
-function partialRecoveryBlock(partial: PartialRecoveryView): string {
-  return `
-    <div class="callout tone-watch" data-test="partial-recovery">
-      <h3>Partial recovery</h3>
-      <p><strong>Succeeded:</strong> ${escapeHtml(partial.succeeded.join(', ') || 'None')}</p>
-      <p><strong>Failed:</strong> ${escapeHtml(partial.failed.join(', ') || 'None')}</p>
-      <p><strong>Pending:</strong> ${escapeHtml(partial.pending.join(', ') || 'None')}</p>
-    </div>`;
-}
-
-function duplicateExposureBlock(exposures: readonly DuplicateBookingExposureView[]): string {
-  const rows = exposures
-    .map(
-      (exposure) => `
-      <div class="impact-row" data-test="duplicate-booking-exposure">
-        <span class="i-count tone-alert">!</span>
-        <div>
-          <strong>Duplicate booking exposure</strong>
-          <p class="b-extra">Replacement ${escapeHtml(exposure.replacementObservation)} on ${escapeHtml(exposure.displacedSubjectRef)}; displaced cancellation ${escapeHtml(exposure.displacedCancellationObservation)}.</p>
-          ${exposure.detail ? `<p class="b-extra">${escapeHtml(exposure.detail)}</p>` : ''}
-        </div>
-      </div>`,
-    )
-    .join('');
-  return `
-    <div class="panel tone-alert" data-test="duplicate-exposure-panel">
-      <h2>Duplicate booking exposure</h2>
-      ${rows}
-    </div>`;
-}
-
-function connectionProgressionBlock(progression: ConnectionProgression): string {
-  const tone =
-    progression === 'HEALTHY' || progression === 'CONNECTION_SAFE' || progression === 'RECOVERED'
-      ? 'ok'
-      : progression === 'CONNECTION_AT_RISK' || progression === 'AWAITING_APPROVAL' || progression === 'RECOVERY_PLANNING'
-        ? 'watch'
-        : progression === 'CONNECTION_IMPOSSIBLE' || progression === 'STILL_UNRESOLVED'
-          ? 'alert'
-          : 'active';
-  return `
-    <div class="callout tone-${tone}" data-test="connection-progression">
-      <p class="callout-title">Connection progression</p>
-      <p>${escapeHtml(CONNECTION_PROGRESSION_LABEL[progression])}</p>
-    </div>`;
-}
-
-/**
- * One line of "what this option actually changes", built from the strategy's
- * own persisted ScenarioChange effect joined to canonical programme state.
- *
- * FB1-6: the founder saw two VIABLE options rendered as a truncated UUID and
- * a version number and could not tell them apart. They were never duplicates
- * — the deterministic proposer emits one option per distinct programme swap
- * pair, so two options genuinely move the same blocked item into two
- * different slots. Saying which slot is the whole difference, so that is what
- * this renders. Nothing is generated or inferred: when the read model has no
- * window for a subject, the line simply says less.
- */
-function strategyChangeLine(change: RecoveryStrategyChangeView): string {
-  const label = `<strong>${escapeHtml(change.subjectLabel)}</strong>`;
-  if (change.proposedWindow && change.currentWindow) {
-    // `currentWindow` is canonical state read now, and `proposedWindow` is
-    // what this option asked for. Once an approved option has executed, the
-    // two are equal — so say the change is already in effect rather than
-    // printing a "from 06:30 to 06:30" move that reads like a bug.
-    const alreadyInEffect = change.currentWindow.start === change.proposedWindow.start
-      && change.currentWindow.end === change.proposedWindow.end;
-    if (alreadyInEffect) {
-      return `<li data-test="strategy-change" data-change-state="IN_EFFECT" data-subject-ref="${escapeHtml(change.subjectRef)}">
-        ${label} is already at ${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))}
-      </li>`;
-    }
-    return `<li data-test="strategy-change" data-change-state="PROPOSED" data-subject-ref="${escapeHtml(change.subjectRef)}">
-      Move ${label} from ${escapeHtml(formatShort(change.currentWindow.start))} to ${escapeHtml(formatShort(change.proposedWindow.start))}
-      <span class="meta">(${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))})</span>
-    </li>`;
-  }
-  if (change.proposedWindow) {
-    return `<li data-test="strategy-change" data-subject-ref="${escapeHtml(change.subjectRef)}">
-      Set ${label} to ${escapeHtml(formatShort(change.proposedWindow.start))}–${escapeHtml(formatShort(change.proposedWindow.end))}
-    </li>`;
-  }
-  return `<li data-test="strategy-change" data-subject-ref="${escapeHtml(change.subjectRef)}">
-    ${escapeHtml(change.effectKind.toLowerCase().split('_').join(' '))} · ${label}
-  </li>`;
-}
-
-/** "Sarah Lim: at risk -> confirmed" — who the option fixes, per case subject. */
-function strategyResolveLine(resolve: RecoveryStrategyView['resolves'][number]): string {
-  const tone = resolve.projectedVerdict === 'PASS' ? 'done' : resolve.projectedVerdict === 'FAIL' ? 'failed' : 'neutral';
-  return `<li data-test="strategy-resolves" data-subject-ref="${escapeHtml(resolve.subjectRef)}">
-    ${escapeHtml(resolve.personLabel)} ${badge(resolve.currentVerdict, 'failed')} → ${badge(resolve.projectedVerdict, tone)}
-  </li>`;
-}
-
-/**
- * One recovery option as a card the operator can read and choose.
- *
- * The real `strategyRef` remains the value the Approve control carries — the
- * option number is presentation only, and internal refs/version stay as
- * secondary metadata rather than the headline.
- */
-function strategyCard(strategy: RecoveryStrategyView, terminal: boolean): string {
-  const approvable = !terminal
-    && strategy.viability === 'VIABLE'
-    && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED');
-  const changes = strategy.changes.length > 0
-    ? `<ul class="opt-changes">${strategy.changes.map(strategyChangeLine).join('')}</ul>`
-    : '<p class="meta">This option records no programme change.</p>';
-  const resolves = strategy.resolves.length > 0
-    ? `<ul class="opt-resolves">${strategy.resolves.map(strategyResolveLine).join('')}</ul>`
-    : '';
-  // The full reached set is large by design (it is the dependency closure the
-  // evaluator actually assessed), so it is summarised rather than listed. The
-  // complete per-subject list stays available on the JSON read model.
-  const summary = strategy.projectedSummary;
-  const reach = summary.total > 0
-    ? `<p class="meta" data-test="strategy-reach">Assessed against ${summary.total} reached ${summary.total === 1 ? 'subject' : 'subjects'}: ${summary.pass} pass · ${summary.fail} fail · ${summary.unknown} unknown.</p>`
-    : '';
-  return `<li class="strategy-row opt-card" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
-    <div class="opt-head">
-      <h3 class="opt-title">Option ${strategy.optionNumber}</h3>
-      <div class="opt-flags">${badge(strategy.viability, strategy.viability === 'VIABLE' ? 'done' : 'neutral')}${badge(strategy.status, 'neutral')}</div>
+  return `<div class="cw-lead">
+    <div class="callout tone-${m.lead.tone}" data-test="case-lead">
+      <h2>${escapeHtml(m.lead.title)}</h2>
+      <p>${escapeHtml(m.lead.body)}</p>
+      ${m.lead.stake ? `<p class="cw-stake">${escapeHtml(m.lead.stake)}</p>` : ''}
     </div>
-    ${changes}
-    ${resolves}
-    ${reach}
-    
-    <p class="meta opt-ref">Strategy <span class="mono">${escapeHtml(strategy.strategyRef)}</span> · v${strategy.version}</p>
-    ${approvable ? `<button type="button" class="btn" data-test="approve-strategy" data-strategy-ref="${escapeHtml(strategy.strategyRef)}">Approve Option ${strategy.optionNumber} and execute</button>` : ''}
-  </li>`;
+    ${attention}
+  </div>`;
 }
 
-/**
- * R2 — the focused Case graph as one component inside the decision workspace.
- *
- * The graph itself is rendered by the single semantic layer (renderFocusedCaseGraph
- * -> presentDependencyGraph); this wrapper only supplies workspace context AROUND
- * it: the backend-mapped first breakpoint (FIG-5b, never frontend-traversed), the
- * honest unmapped-step note, and the Original/Current toggle. Planning is shown
- * AROUND the graph (banner via caseStatus PLANNING inside the renderer), never as
- * graph nodes. Current-world causal map only.
- */
-/** Human label for a typed subject ref from the read model's own labels; never the bare id. */
-function subjectDisplay(view: RecoveryCaseView, ref: string): string {
-  return view.subjectLabels[ref] ?? ref.split(':')[0]!.toLowerCase().replace(/_/g, ' ');
-}
-
-function focusedGraphSection(view: RecoveryCaseView): string {
-  const graphHtml = renderFocusedCaseGraph({
+function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
+  const currentHtml = renderFocusedCaseGraph({
     ldg: view.ldg,
     ...(view.focusedGraph ? { focusedGraph: view.focusedGraph } : {}),
     caseStatus: view.status,
   });
-
-  // First breakpoint is backend-supplied (causalPath[0] mapped to a visible ref);
-  // the frontend renders it verbatim and never derives it from topology.
-  const firstBreak = view.focusedGraph?.firstBreakpoint
-    ? `<div class="callout tone-alert" data-test="focused-graph-first-breakpoint">
-         <p class="callout-title">First break point</p>
-         <p><strong>${escapeHtml(view.focusedGraph.firstBreakpoint.label)}</strong> — ${escapeHtml(humanizeCode(view.focusedGraph.firstBreakpoint.dimension))}: ${escapeHtml(humanizeCode(view.focusedGraph.firstBreakpoint.reasonCode))}</p>
-       </div>`
-    : '';
-
-  // Causal steps with no visible graph object are surfaced explicitly, never
-  // silently dropped (contract §5, FIG-5b honesty).
-  const unmapped = view.focusedGraph && view.focusedGraph.unmappedCausalSteps.length > 0
-    ? `<details class="panel" data-test="focused-graph-unmapped" data-details-ref="focused-graph-unmapped">
-         <summary>${view.focusedGraph.unmappedCausalSteps.length} causal step${view.focusedGraph.unmappedCausalSteps.length === 1 ? '' : 's'} not shown on the graph</summary>
-         <ul>${view.focusedGraph.unmappedCausalSteps
-           .map((step) => `<li><strong>${escapeHtml(step.dimension)}</strong> ${escapeHtml(step.reasonCode)} <span class="meta">${escapeHtml(step.subjectRef)} · ${escapeHtml(step.reason)}</span></li>`)
-           .join('')}</ul>
-       </details>`
-    : '';
-
-  // Original/Current is a workspace toggle around the same graph component. The
-  // Original is the persisted immutable snapshot, rendered by the SAME renderer
-  // (assets already emitted with Current); absent => honest unavailable state.
   const stored = view.originalFocusedGraph;
-  const region = buildOriginalCurrentRegion({
-    currentHtml: graphHtml,
+  const toggle = buildOriginalCurrentRegion({
+    currentHtml,
     ...(stored
       ? {
           original: {
@@ -311,207 +130,242 @@ function focusedGraphSection(view: RecoveryCaseView): string {
         }
       : {}),
   });
+  const where = m.whereItBreaks
+    ? `<p class="graph-caption" data-test="focused-graph-first-breakpoint">Where it breaks: <strong>${escapeHtml(m.whereItBreaks.label)}</strong> — ${escapeHtml(m.whereItBreaks.phrase)}.</p>`
+    : '';
+  const resolvedNote = m.phase === 'recovered'
+    ? `<p class="graph-caption" data-test="graph-resolved-note">${escapeHtml(CASE_COPY.graphResolvedNote)}</p>`
+    : '';
+  return `<section class="section cw-graph" data-test="focused-case-graph-section">
+    <h2>${escapeHtml(CASE_COPY.graphHeading)}</h2>
+    ${where}${resolvedNote}
+    ${toggle}
+  </section>`;
+}
 
-  return `<section class="section" data-test="focused-case-graph-section">
-    <h2>What broke and why</h2>
-    ${firstBreak}
-    ${region}
+function affectsHtml(m: CaseWorkspaceModel): string {
+  if (m.affects.items.length === 0 && !m.affects.healthyNote) return '';
+  const rows = m.affects.items
+    .map((item) => `<li data-tone="${item.tone}"><strong>${escapeHtml(item.label)}</strong> <span class="meta">— ${escapeHtml(item.note)}</span></li>`)
+    .join('');
+  return `<section class="section" data-test="case-affects">
+    <h2>${escapeHtml(CASE_COPY.whatThisAffects)}</h2>
+    <div class="panel">
+      ${rows ? `<ul class="plain-list">${rows}</ul>` : ''}
+      ${m.affects.healthyNote ? `<p class="meta">${escapeHtml(m.affects.healthyNote)}</p>` : ''}
+    </div>
+  </section>`;
+}
+
+function changeLineHtml(line: CaseChangeLine): string {
+  const subject = `<strong>${escapeHtml(line.subject)}</strong>`;
+  const ref = `data-subject-ref="${escapeHtml(line.subjectRef)}"`;
+  switch (line.kind) {
+    case 'IN_EFFECT':
+      return `<li data-test="strategy-change" data-change-state="IN_EFFECT" ${ref}>${subject} is already at ${escapeHtml(line.toWindow ?? '')}</li>`;
+    case 'MOVE':
+      return `<li data-test="strategy-change" data-change-state="PROPOSED" ${ref}>Move ${subject} from ${escapeHtml(line.from ?? '')} to ${escapeHtml(line.to ?? '')} <span class="meta">(${escapeHtml(line.toWindow ?? '')})</span></li>`;
+    case 'SET':
+      return `<li data-test="strategy-change" ${ref}>Set ${subject} to ${escapeHtml(line.toWindow ?? '')}</li>`;
+    default:
+      return `<li data-test="strategy-change" ${ref}>${escapeHtml(line.phrase ?? 'Change')}</li>`;
+  }
+}
+
+function factsHtml(option: CaseOptionModel, fullApprover: boolean): string {
+  const changes = option.changes.length > 0
+    ? `<ul>${option.changes.map(changeLineHtml).join('')}</ul>`
+    : 'No schedule or booking change is recorded for this option.';
+  const people = option.people.length > 0 ? escapeHtml(option.people.join(', ')) : '';
+  const why = option.why.length > 0 ? `<ul>${option.why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : '';
+  return `<dl class="cw-facts">
+    <dt>What changes</dt><dd>${changes}</dd>
+    ${people ? `<dt>Who is affected</dt><dd>${people}</dd>` : ''}
+    ${why ? `<dt>Why it works</dt><dd>${why}</dd>` : ''}
+    ${option.costLine ? `<dt>Cost</dt><dd>${escapeHtml(option.costLine)}</dd>` : ''}
+    ${fullApprover ? `<dt>Approval</dt><dd>${escapeHtml(option.approverLine)}</dd>` : ''}
+  </dl>`;
+}
+
+function recoverButton(caseRef: string, strategyRef: string, label: string, primary: boolean, extra = ''): string {
+  const path = `/api/v2/cases/${encodeURIComponent(caseRef)}/strategies/${encodeURIComponent(strategyRef)}/approve`;
+  return `<button type="button" class="btn ${primary ? 'btn-primary' : 'btn-ghost'}" data-action="recover" data-test="approve-strategy" data-case-ref="${escapeHtml(caseRef)}" data-strategy-ref="${escapeHtml(strategyRef)}" data-request-path="${escapeHtml(path)}" data-busy-label="Recording your approval…"${extra}>${escapeHtml(label)}</button>`;
+}
+
+function optionsHtml(m: CaseWorkspaceModel): string {
+  const parts: string[] = [];
+  if (m.recommended) {
+    parts.push(`<div class="option-card is-recommended cw-rec" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(m.recommended.strategyRef)}" data-option-number="${m.recommended.optionNumber}">
+      <div class="opt-head"><h3 class="opt-title">${escapeHtml(m.recommended.title)}</h3>${badge(CASE_COPY.recommended, 'ok')}</div>
+      ${factsHtml(m.recommended, true)}
+    </div>`);
+  }
+  if (m.alternatives.length > 0) {
+    parts.push(...m.alternatives.map((alt) => `<div class="option-card cw-alt" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(alt.strategyRef)}" data-option-number="${alt.optionNumber}">
+      <div class="opt-head"><h3 class="opt-title">Alternative: ${escapeHtml(alt.title)}</h3>${badge('Also works', 'neutral')}</div>
+      ${factsHtml(alt, false)}
+      ${alt.approvable ? `<div class="btn-row">${recoverButton(m.caseRef, alt.strategyRef, 'Choose this option instead', false)}</div>` : ''}
+    </div>`));
+  }
+  if (m.showFindRecovery) {
+    parts.push(`<div class="section-primary-action" data-test="find-recovery">
+      <h3 class="opt-title">${escapeHtml(CASE_COPY.findRecovery)}</h3>
+      <p class="meta">${escapeHtml(CASE_COPY.findRecoveryHint)}</p>
+      <div class="btn-row"><button type="button" class="btn btn-primary" data-action="recover" data-test="propose-strategies" data-case-ref="${escapeHtml(m.caseRef)}" data-request-path="/api/v2/cases/${encodeURIComponent(m.caseRef)}/strategies" data-busy-label="Checking the trip…">${escapeHtml(CASE_COPY.findRecovery)}</button></div>
+      <p class="cw-status" data-test="recovery-controls-status" role="status"></p>
+    </div>`);
+  }
+  if (m.noPlan) {
+    parts.push(`<div class="panel" data-test="no-plan">
+      <p class="meta">${escapeHtml(CASE_COPY.noPlanBody)}</p>
+      <div class="btn-row"><button type="button" class="btn btn-ghost" data-action="escalate" data-test="escalate-case" data-case-ref="${escapeHtml(m.caseRef)}" data-busy-label="Handing off…">${escapeHtml(CASE_COPY.escalate)}</button></div>
+      <p class="cw-status" data-test="recovery-controls-status" role="status"></p>
+    </div>`);
+  }
+  if (m.considered.length > 0) {
+    const rows = m.considered.map((c) => `<li><strong>${escapeHtml(c.label)}</strong> — ${escapeHtml(c.reason)}${c.movements.length > 0 ? `<br><span class="meta">${c.movements.map(escapeHtml).join('; ')}</span>` : ''}${c.unchangedNote ? `<br><span class="meta">${escapeHtml(c.unchangedNote)}</span>` : ''}</li>`).join('');
+    parts.push(details('other-options', `${CASE_COPY.otherOptionsConsidered} (${m.considered.length})`, `<ul class="cw-considered">${rows}</ul>`));
+  }
+  if (parts.length === 0) return '';
+  return `<section class="section" data-test="recovery-controls" data-case-ref="${escapeHtml(m.caseRef)}">
+    <h2>${escapeHtml(CASE_COPY.recoveryOptions)}</h2>
+    ${parts.join('')}
+  </section>`;
+}
+
+function approvalHtml(m: CaseWorkspaceModel): string {
+  const a = m.approval;
+  if (!a) return '';
+  const changes = a.changeLines.length > 0 ? `<ul>${a.changeLines.map(changeLineHtml).join('')}</ul>` : '';
+  return `<section class="cw-approve" data-test="approval-panel">
+    <h2>${escapeHtml(CASE_COPY.whatYoureApproving)}</h2>
+    <dl class="cw-facts">
+      <dt>The change</dt><dd>${changes || 'No schedule or booking change is recorded.'}</dd>
+      ${a.people.length > 0 ? `<dt>Who is affected</dt><dd>${escapeHtml(a.people.join(', '))}</dd>` : ''}
+      ${a.costLine ? `<dt>Cost</dt><dd>${escapeHtml(a.costLine)}</dd>` : ''}
+      <dt>Authority</dt><dd>${escapeHtml(a.authorityLine)}</dd>
+    </dl>
+    <div class="btn-row">
+      ${recoverButton(m.caseRef, a.strategyRef, a.ctaLabel, true)}
+      <button type="button" class="btn btn-danger-ghost" data-action="decline" data-test="decline-strategy" data-case-ref="${escapeHtml(m.caseRef)}" data-strategy-ref="${escapeHtml(a.strategyRef)}" data-busy-label="Declining…">${escapeHtml(CASE_COPY.decline)}</button>
+    </div>
+    <p class="cw-status" data-test="recovery-controls-status" role="status"></p>
+  </section>`;
+}
+
+const ROW_ICON: Record<CaseRow['state'], string> = { done: '✓', doing: '⟳', queued: '○', failed: '✕', note: '–' };
+
+function rowsHtml(rows: readonly CaseRow[]): string {
+  return rows.map((r) => `<div class="check-row ${r.state === 'note' ? 'queued' : r.state}" data-row-state="${r.state}">
+    <span class="c-ic" aria-hidden="true">${ROW_ICON[r.state]}</span>
+    <span class="c-t">${escapeHtml(r.label)}</span>
+    ${r.note ? `<span class="c-sub">${escapeHtml(r.note)}</span>` : ''}
+  </div>`).join('');
+}
+
+function activityHtml(m: CaseWorkspaceModel): string {
+  if (m.activity.rows.length < 2) return '';
+  return `<section class="section" data-test="case-activity">
+    <h2>${escapeHtml(m.activity.title)}</h2>
+    <div class="panel">${rowsHtml(m.activity.rows)}</div>
+  </section>`;
+}
+
+function executionHtml(m: CaseWorkspaceModel): string {
+  const e = m.execution;
+  if (!e) return '';
+  const pct = e.total > 0 ? Math.round((e.done / e.total) * 100) : 0;
+  const warnings = e.warnings.map((w) => `<div class="callout tone-watch"><p>${escapeHtml(w)}</p></div>`).join('');
+  return `<section class="section" data-test="execution-progress" data-progress-done="${e.done}" data-progress-total="${e.total}">
+    <h2>${escapeHtml(e.title)}</h2>
+    <div class="panel">
+      <div class="cw-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+      ${rowsHtml(e.rows)}
+      ${warnings}
+    </div>
+  </section>`;
+}
+
+function checkedHtml(m: CaseWorkspaceModel): string {
+  if (m.checked.length === 0) return '';
+  const icon = (ok: boolean | null): string => (ok === true ? '✓' : ok === false ? '✕' : '?');
+  const cls = (ok: boolean | null): string => (ok === true ? 'ic-pass' : ok === false ? 'ic-fail' : 'ic-unknown');
+  return `<section class="section" data-test="case-checked">
+    <h2>${escapeHtml(CASE_COPY.whatWeChecked)}</h2>
+    <div class="panel">
+      <ul class="icon-list">${m.checked.map((c) => `<li><span class="ic ${cls(c.ok)}" aria-hidden="true">${icon(c.ok)}</span> ${escapeHtml(c.label)}</li>`).join('')}</ul>
+      ${m.checkedFootnote ? `<p class="footnote">${escapeHtml(m.checkedFootnote)}</p>` : ''}
+    </div>
+  </section>`;
+}
+
+function resolutionHtml(m: CaseWorkspaceModel): string {
+  if (!m.resolution) return '';
+  return `<section class="section-primary-action" data-test="resolution-panel">
+    <p class="kv-label">Trip recovered</p>
+    <h2>${escapeHtml(m.resolution.title)}</h2>
+    <p class="meta">${escapeHtml(m.resolution.body)}</p>
+    <div class="btn-row"><a class="btn btn-primary" href="${SHELL_LINKS.dashboard}" data-test="back-to-overview-cta">${escapeHtml(CASE_COPY.backToOverviewButton)}</a></div>
+  </section>`;
+}
+
+function technicalHtml(m: CaseWorkspaceModel, caseRef: string): string {
+  const t = m.technical;
+  const list = (items: readonly string[]): string => (items.length > 0 ? `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : '');
+  const unmapped = t.unmappedSteps.length > 0
+    ? `<div data-test="focused-graph-unmapped"><p><strong>${t.unmappedSteps.length} causal step${t.unmappedSteps.length === 1 ? '' : 's'} not shown on the graph</strong></p>${list(t.unmappedSteps)}</div>`
+    : '';
+  const body = `<div class="cw-tech">
+    <p>Case <code>${escapeHtml(caseRef)}</code> · status ${escapeHtml(t.caseStatus)} · authority ${escapeHtml(t.authorityState)} · execution ${escapeHtml(t.executionState)} · reconciliation ${escapeHtml(t.reconciliationState)}</p>
+    ${list(t.strategies)}
+    ${list(t.planning)}
     ${unmapped}
-  </section>`;
+    <p>Full evidence: <a href="/api/v2/cases/${encodeURIComponent(caseRef)}">JSON view</a></p>
+  </div>`;
+  return details('technical-details', CASE_COPY.technicalDetails, body);
 }
 
-/**
- * R2 — planning-time decision evidence, shown AROUND the current-world graph and
- * structurally separated from it (phase/asOf make decision-time explicit). Never
- * rendered as graph nodes; the graph stays a current-world causal map.
- */
-function planningEvidenceSection(evidence: PlanningEvidenceView): string {
-  const domains = evidence.domains.length > 0
-    ? `<ul data-test="planning-domains">${evidence.domains
-        .map((d) => `<li>${escapeHtml(d.domain.label)} — ${escapeHtml(d.disposition.label)}${d.reason ? ` <span class="meta">(${escapeHtml(d.reason)})</span>` : ''}</li>`)
-        .join('')}</ul>`
+function railHtml(m: CaseWorkspaceModel): string {
+  const stake = m.lead.stake
+    ? `<div class="rail-card ink" data-test="rail-stake"><p class="kv-label">${m.phase === 'recovered' ? 'The commitment that held' : 'The commitment at stake'}</p><p class="rc-body">${escapeHtml(m.lead.stake.replace(/^At stake: /, ''))}</p></div>`
     : '';
-  const candidates = evidence.candidates.length > 0
-    ? `<ul data-test="planning-candidates">${evidence.candidates
-        .map((c) => {
-          const outcomes = c.outcomeDelta
-            .map((d) => `${escapeHtml(d.subject.label)}: ${escapeHtml(humanizeCode(d.baseline ?? 'unknown'))} → ${escapeHtml(humanizeCode(d.candidate))}`)
-            .join('; ');
-          return `<li>Option <strong>${escapeHtml(c.disposition.label)}</strong> · ${escapeHtml(c.domain.label)} · ${escapeHtml(c.proposer.label)}${c.reasons.length > 0 ? ` <span class="meta">— ${c.reasons.map(escapeHtml).join('; ')}</span>` : ''}${outcomes ? ` <span class="meta">(${outcomes})</span>` : ''}</li>`;
-        })
-        .join('')}</ul>`
-    : '';
-  // Read-only research the coordinator performed. A tool that produced no
-  // provider evidence makes no provenance claim.
-  const tools = evidence.tools.length > 0
-    ? `<ul data-test="planning-tools">${evidence.tools
-        .map((t) => {
-          const provenance = t.status.code === 'UNAVAILABLE' ? 'no provider evidence obtained' : t.provenanceMode.label;
-          const observed = t.observedAt ? `, ${escapeHtml(formatInstant(t.observedAt))}` : '';
-          return `<li>Research: ${escapeHtml(t.tool.label)} — ${escapeHtml(t.status.label)} · ${escapeHtml(provenance)} <span class="meta">(${escapeHtml(t.summary)}${observed})</span></li>`;
-        })
-        .join('')}</ul>`
-    : '';
-  const recommendation = evidence.recommendation
-    ? `<p data-test="planning-recommendation"><strong>${escapeHtml(evidence.recommendation.recommended.label)}</strong> · basis ${evidence.recommendation.basis.map((b) => escapeHtml(b.kind.label)).join(', ')} · ${escapeHtml(evidence.recommendation.provenance.label)}</p>`
-    : '';
-  return `<section class="section" data-test="planning-evidence">
-    <h2>What NORTHSTAR investigated</h2>
-    <p class="meta">Decision-time evidence as of ${escapeHtml(formatInstant(evidence.asOf))} — this is what was weighed then, not current authoritative state.</p>
-    <p data-test="planning-outcome">Outcome: <strong>${escapeHtml(evidence.outcome.label)}</strong></p>
-    ${domains}
-    ${tools}
-    ${candidates}
-    ${recommendation}
-  </section>`;
+  return `${stake}<div class="rail-card" data-test="rail-authority"><p class="kv-label">Authority</p><p class="rc-body">NORTHSTAR checks who is allowed to approve each change before anything is applied. Every action is recorded.</p></div>`;
 }
 
-function caseHeading(view: RecoveryCaseView): string {
-  const traveller = Object.entries(view.subjectLabels).find(([key]) => key.startsWith('JOURNEY:'))?.[1];
-  return traveller ? `Recovery case · ${traveller}` : 'Recovery case';
-}
+// --------------------------------------------------------------------------
+// Entry
+// --------------------------------------------------------------------------
 
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {
-  const actions =
-    view.recoveryActions.length > 0
-      ? `<div class="panel" data-test="recovery-actions"><h2>Recovery actions</h2>${view.recoveryActions.map(recoveryActionRow).join('')}</div>`
-      : '';
-  const partial = view.partialRecovery ? partialRecoveryBlock(view.partialRecovery) : '';
-  const duplicate =
-    view.duplicateBookingExposure.length > 0
-      ? duplicateExposureBlock(view.duplicateBookingExposure)
-      : '';
-  const progression = view.connectionProgression
-    ? connectionProgressionBlock(view.connectionProgression)
-    : '';
-  const remaining =
-    view.remainingRecoveryWork.length > 0
-      ? `<section class="section"><h2>Remaining recovery work</h2>${bulletList(view.remainingRecoveryWork, 'No remaining work listed.')}</section>`
-      : '';
-  const aggregateCost = view.aggregateRecoveryCost
-    ? `<p class="meta">Aggregate recovery cost ${escapeHtml(formatMoney({ amount: Number(view.aggregateRecoveryCost.amount), currency: view.aggregateRecoveryCost.currency }))}</p>`
-    : '';
-  const requirementVsActual = view.requirementVsActual
-    ? `<div class="callout tone-watch"><p class="callout-title">Requirement vs actual</p><p>Required: ${escapeHtml(view.requirementVsActual.requirement)}</p><p>Actual: ${escapeHtml(view.requirementVsActual.actual)}</p></div>`
-    : '';
-  // T3: cause and causal path come from the read model (change signal +
-  // evaluator explanations). Rendered verbatim — no inference here.
-  const cause = view.cause
-    ? `<div class="callout tone-watch" data-test="case-cause"><p class="callout-title">Cause</p><p>${escapeHtml(humanizeCode(view.cause.changeType))} · ${escapeHtml(humanizeCode(view.cause.originKind))} · received ${escapeHtml(formatInstant(view.cause.receivedAt))}${view.cause.applied ? '' : ' · application in progress'}</p></div>`
-    : '';
-  // B1: operator controls over the normal application routes. The buttons
-  // only POST and re-read; every outcome shown is the server's own response.
-  const terminal = view.status === 'RESOLVED' || view.status === 'CLOSED' || view.status === 'CANCELLED' || view.status === 'SUPERSEDED';
-  const hidePropose = terminal || (view.status === 'AWAITING_AUTHORITY' && view.strategies.length >= 1) || view.status === 'EXECUTING';
-  const strategyRows = view.strategies.map((strategy) => strategyCard(strategy, terminal)).join('');
-  // Several viable options are alternatives, not revisions of one another:
-  // each is a different change to the programme. Say so, so the operator
-  // knows they are choosing rather than looking at duplicates.
-  const viableCount = view.strategies.filter((strategy) => strategy.viability === 'VIABLE').length;
-  const choiceNote = viableCount > 1
-    ? `<p class="meta" data-test="strategy-choice-note">${viableCount} viable options — each changes the programme differently. Choose one.</p>`
-    : '';
-  const recoveryControls = `<section class="section" data-test="recovery-controls" data-case-ref="${escapeHtml(view.caseRef)}">
-    <h2>Recovery options</h2>
-    ${hidePropose ? '' : `<button type="button" class="btn" data-test="propose-strategies">Propose recovery options</button>`}
-    <p class="meta" data-test="recovery-controls-status"></p>
-    ${choiceNote}
-    <ul class="strategy-list">${strategyRows || '<li class="meta">No options proposed yet.</li>'}</ul>
-  </section>`;
-  const controlsScript = terminal ? '' : `<script>
-(function () {
-  'use strict';
-  var root = document.querySelector('[data-test="recovery-controls"]');
-  if (!root) return;
-  var caseRef = root.getAttribute('data-case-ref');
-  var status = root.querySelector('[data-test="recovery-controls-status"]');
-  function say(text) { if (status) status.textContent = text; }
-  function post(path, done) {
-    fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
-      .then(done)
-      .catch(function (e) { say('Request failed: ' + e); });
-  }
-  root.addEventListener('click', function (event) {
-    var target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.getAttribute('data-test') === 'propose-strategies') {
-      target.disabled = true;
-      say('Proposing and evaluating options…');
-      post('/api/v2/cases/' + encodeURIComponent(caseRef) + '/strategies', function (r) {
-        if (!r.ok) { say('Refused (' + r.status + '): ' + (r.body && r.body.error ? r.body.error.message : '')); target.disabled = false; return; }
-        var outcomeLabels = { AWAITING_AUTHORITY: 'options are awaiting authority', NEEDS_EVIDENCE_OR_DECISION: 'more evidence or a human decision is needed', NO_RECOVERY_FOUND: 'no viable recovery was found', STALE_RETRY_REQUIRED: 'the case changed; planning will retry' };
-        var outcome = r.body.result && r.body.result.outcome;
-        var label = outcomeLabels[outcome] || outcome;
-        say('Planning completed (' + label + '). Reloading…');
-        window.location.reload();
-      });
-    }
-    if (target.getAttribute('data-test') === 'approve-strategy') {
-      var strategyRef = target.getAttribute('data-strategy-ref');
-      target.disabled = true;
-      say('Recording authority decision and approval…');
-      post('/api/v2/cases/' + encodeURIComponent(caseRef) + '/strategies/' + encodeURIComponent(strategyRef) + '/approve', function (r) {
-        if (!r.ok) { say('Refused (' + r.status + '): ' + (r.body && r.body.error ? r.body.error.message : '')); target.disabled = false; return; }
-        say('Approved by ' + r.body.principal.id.slice(0, 8) + '; execution and reassessment run in the background. Reloading…');
-        window.location.reload();
-      });
-    }
-  });
-})();
-</script>`;
-  const causalPath = view.causalPath.length > 0
-    ? `<section class="section" data-test="case-causal-path"><h2>Why</h2><ul>${view.causalPath
-        .map((step) => {
-          const facts = Object.entries(step.facts)
-            .map(([key, value]) => `${escapeHtml(key)}=${escapeHtml(value === null ? 'null' : String(value))}`)
-            .join(', ');
-          return `<li><strong>${escapeHtml(humanizeCode(step.dimension))}</strong>: ${escapeHtml(humanizeCode(step.reasonCode))} <span class="meta">${escapeHtml(subjectDisplay(view, step.subjectRef))}</span>${facts ? `<details class="meta" data-details-ref="why-evidence-${escapeHtml(step.dimension)}"><summary>Evidence</summary>${facts}</details>` : ''}</li>`;
-        })
-        .join('')}</ul></section>`
-    : '';
-  // R2: the focused Case graph (one component in the workspace) and the
-  // planning evidence shown around it. Both render only when the projection
-  // supplies them — nothing is fabricated for cases that carry no causal path.
-  const focusedGraph = focusedGraphSection(view);
-  const planningEvidence = view.planningEvidence
-    ? planningEvidenceSection(view.planningEvidence)
-    : '';
-
-  // R2: change-awareness attributes the polling + Original/Current scripts read.
-  // changeCursor/projectionRevision come from the backend ChangeAwareness block;
-  // they drive the no-op redraw guard and sinceCursor echo, never client truth.
+  const m = presentCaseWorkspace(view);
+  // Change-awareness attributes read by the polling + Original/Current scripts.
   const changeAttrs = [
     `data-case-ref="${escapeHtml(view.caseRef)}"`,
     `data-case-status="${escapeHtml(view.status)}"`,
+    `data-case-phase="${m.phase}"`,
     `data-projection-revision="${escapeHtml(String(view.change.projectionRevision))}"`,
     view.change.changeCursor ? `data-change-cursor="${escapeHtml(view.change.changeCursor)}"` : '',
   ].filter(Boolean).join(' ');
 
-  return `
-<main class="shell product-recovery-case" data-test="product-recovery-case" ${changeAttrs}>
-  <div class="page-head">
-    <h1>${escapeHtml(caseHeading(view))} ${badge(view.status, view.status === 'RESOLVED' || view.status === 'CLOSED' ? 'done' : view.status === 'EXECUTING' ? 'active' : view.status === 'OPEN' || view.status === 'PLANNING' ? 'watch' : 'neutral')}</h1>
-    <p class="sub">${escapeHtml(view.changeSummary)}</p>
-    <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))} · Authority ${escapeHtml(view.authorityState)} · Execution ${escapeHtml(view.executionState)} · Reconciliation ${escapeHtml(view.reconciliationState)}</p>
-    ${aggregateCost}
+  return `${CASE_WORKSPACE_CSS}
+<main class="shell product-recovery-case case-workspace" data-test="product-recovery-case" ${changeAttrs}>
+  ${region('header', headerHtml(m))}
+  ${region('lead', leadHtml(m))}
+  ${region('graph', graphHtml(view, m))}
+  <div class="case-grid">
+    <div class="case-flow">
+      ${region('affects', affectsHtml(m))}
+      ${region('options', optionsHtml(m))}
+      ${region('approval', approvalHtml(m))}
+      ${region('execution', executionHtml(m))}
+      ${region('activity', activityHtml(m))}
+      ${region('checked', checkedHtml(m))}
+      ${region('resolution', resolutionHtml(m))}
+      ${region('technical', technicalHtml(m, view.caseRef))}
+    </div>
+    <aside class="case-rail">${region('rail', railHtml(m))}</aside>
   </div>
-  ${progression}
-  ${cause}
-  ${focusedGraph}
-  ${viabilityPair(view)}
-  ${requirementVsActual}
-  ${causalPath}
-  ${planningEvidence}
-  ${recoveryControls}
-  ${partial}
-  ${duplicate}
-  ${actions}
-  ${remaining}
-  ${uncertaintyList(view.uncertainty)}
-  ${view.resolutionSummary ? `<div class="resolution is-full"><p class="res-title">Resolution</p><p>${escapeHtml(view.resolutionSummary)}</p></div>` : ''}
 </main>
-${controlsScript}
 ${originalCurrentToggleScript()}
 ${casePollingScript({ caseRef: view.caseRef })}`;
 }
