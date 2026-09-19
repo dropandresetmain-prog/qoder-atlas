@@ -74,6 +74,11 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
  * emits a runtime `Date#toString` (host-timezone text).
  */
 export function formatWindowUtc(start: unknown, end: unknown): string {
+  return formatWindowInTimeZone(start, end, 'UTC');
+}
+
+/** Format a canonical programme window in its supplied zone, defaulting to UTC. */
+export function formatWindowInTimeZone(start: unknown, end: unknown, timeZone?: string | null): string {
   const parse = (v: unknown): Date | undefined => {
     const d = v instanceof Date ? v : new Date(String(v));
     return Number.isNaN(d.getTime()) ? undefined : d;
@@ -81,10 +86,33 @@ export function formatWindowUtc(start: unknown, end: unknown): string {
   const a = parse(start);
   const b = parse(end);
   if (!a || !b) return `${String(start)} → ${String(end)}`;
-  const day = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
-  const clock = (d: Date) => `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-  const sameDay = day(a) === day(b);
-  return sameDay ? `${day(a)} ${clock(a)} → ${clock(b)} UTC` : `${day(a)} ${clock(a)} → ${day(b)} ${clock(b)} UTC`;
+  const zone = timeZone || 'UTC';
+  const parts = (d: Date, requestedZone: string) => {
+    const format = (tz: string) => new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      hour12: false, timeZone: tz, timeZoneName: 'short',
+    }).formatToParts(d);
+    try {
+      const values = Object.fromEntries(format(requestedZone).map((part) => [part.type, part.value]));
+      return {
+        day: `${values.day} ${values.month}`,
+        clock: `${values.hour}:${values.minute}`,
+        zone: values.timeZoneName || requestedZone,
+      };
+    } catch {
+      const values = Object.fromEntries(format('UTC').map((part) => [part.type, part.value]));
+      return {
+        day: `${values.day} ${values.month}`,
+        clock: `${values.hour}:${values.minute}`,
+        zone: 'UTC',
+      };
+    }
+  };
+  const first = parts(a, zone);
+  const second = parts(b, zone);
+  return first.day === second.day
+    ? `${first.day} ${first.clock} → ${second.clock} ${first.zone}`
+    : `${first.day} ${first.clock} → ${second.day} ${second.clock} ${first.zone}`;
 }
 
 /** `19 Sep 22:00 UTC` for a single instant (Date or ISO string). */
@@ -154,6 +182,7 @@ export interface ProgrammeItemRow {
   item_type: string;
   window_start: string | null;
   window_end: string | null;
+  time_zone?: string | null;
   lifecycle_status: string;
 }
 
@@ -510,7 +539,7 @@ export function projectFocusedCaseGraphEnrichment(
     const programmeItemRef = `PROGRAMME_ITEM:${programmeItem.id}`;
     const label = programmeItem.title;
     const detail = programmeItem.window_start && programmeItem.window_end
-      ? formatWindowUtc(programmeItem.window_start, programmeItem.window_end)
+      ? formatWindowInTimeZone(programmeItem.window_start, programmeItem.window_end, programmeItem.time_zone)
       : undefined;
 
     const programmeItemSubjectRef = `PROGRAMME_ITEM:${programmeItem.id}`;

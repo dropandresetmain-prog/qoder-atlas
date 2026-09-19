@@ -199,6 +199,7 @@ export interface RecoveryStrategyChangeFact {
   effectKind: string;
   subjectRef: string;
   subjectLabel: string;
+  timeZone?: string;
   currentWindow?: { start: string; end: string };
   proposedWindow?: { start: string; end: string };
 }

@@ -251,6 +251,21 @@ describe('R4-F2 execution blocker: a blocked option is never offered as approvab
   });
 });
 
+test('Case strategy windows use canonical programme zone and explicit UTC fallback', () => {
+  const zoned = strategy(1, 1, '11:30', 'b');
+  zoned.changes[0] = {
+    ...zoned.changes[0]!,
+    timeZone: 'Asia/Singapore',
+  };
+  const zonedModel = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [zoned] } as Partial<RecoveryCaseView>));
+  assert.match(zonedModel.recommended!.changes[0]!.from!, /GMT\+8/);
+  assert.match(zonedModel.recommended!.changes[0]!.toWindow!, /GMT\+8/);
+
+  const utc = strategy(1, 2, '11:30', 'b');
+  const utcModel = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [utc] } as Partial<RecoveryCaseView>));
+  assert.match(utcModel.recommended!.changes[0]!.toWindow!, /UTC/);
+});
+
 describe('R4 transport option cards: leg label and strategy-scoped cost', () => {
   const itemRef = 'JOURNEY_ITEM:00000000-0000-4000-8000-000000000001';
   const transportStrategy = (n: number): RecoveryStrategyView => ({

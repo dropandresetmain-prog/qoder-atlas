@@ -51,6 +51,23 @@ test('determinism: same input produces identical HTML', () => {
     'Initial stage must give the SVG a viewport before the first changed poll');
 });
 
+test('selected node exposes full human detail in an accessible inspector', () => {
+  const html = renderFocusedCaseGraph({
+    ldg: makeLdg({ nodes: [
+      { ref: 'A', kind: 'TRAVELLER', label: 'Traveller <Alice>', detail: 'Full detail & context', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+      { ref: 'B', kind: 'SERVICE_BOOKING', label: 'Booking', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+    ] }),
+    caseStatus: 'OPEN',
+  });
+  assert.match(html, /data-graph-inspector/);
+  assert.match(html, /data-inspector-title/);
+  assert.match(html, /data-inspector-detail/);
+  assert.match(html, /data-inspector-state/);
+  assert.match(html, /textContent/);
+  assert.match(html, /Full detail &amp; context/);
+  assert.match(html, /hidden/);
+});
+
 test('arrival cards format supplied instants and historical workflow omission does not mutate Original', () => {
   const original = makeLdg({ nodes: [
     { ref: 'workflow', kind: 'RECOVERY_PROPOSAL', label: 'Workflow plumbing', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },

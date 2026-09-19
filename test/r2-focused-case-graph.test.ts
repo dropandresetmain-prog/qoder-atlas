@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { projectFocusedCaseGraphEnrichment } from '../src/app/target/readmodels/projectFocusedCaseGraph.ts';
+import { formatWindowInTimeZone, projectFocusedCaseGraphEnrichment } from '../src/app/target/readmodels/projectFocusedCaseGraph.ts';
 
 test('R2 enrichment: creates SERVICE_BOOKING node for transport item with service', () => {
   const result = projectFocusedCaseGraphEnrichment({
@@ -491,4 +491,28 @@ test('A1 enrichment: a commitment fails only from its own assessment or particip
   const specific = projectFocusedCaseGraphEnrichment({ ...input, causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'PROGRAMME_ITEM:programme-1', dimension: 'programme_participation', reasonCode: 'arrival_after_required_start', evaluatorId: 'm6.participation', facts: {}, relatedSubjectRefs: [] }] });
   assert.equal(generic.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.semanticState, 'UNKNOWN');
   assert.equal(specific.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.semanticState, 'FAILED');
+});
+
+test('A1 enrichment: programme commitment detail uses its canonical zone and UTC fallback', () => {
+  assert.equal(
+    formatWindowInTimeZone('2031-04-05T03:30:00.000Z', '2031-04-05T04:30:00.000Z', 'Asia/Singapore'),
+    '5 Apr 11:30 → 12:30 GMT+8',
+  );
+  assert.equal(
+    formatWindowInTimeZone('2031-04-05T03:30:00.000Z', '2031-04-05T04:30:00.000Z'),
+    '5 Apr 03:30 → 04:30 UTC',
+  );
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [],
+    transportServices: [],
+    participations: [{ id: 'p-1', programme_item_id: 'programme-1', traveller_id: 'traveller-1', obligation: 'REQUIRED', accepted: true }],
+    programmeItems: [{ id: 'programme-1', programme_id: 'programme', title: 'Required session', item_type: 'SESSION', window_start: '2031-04-05T03:30:00.000Z', window_end: '2031-04-05T04:30:00.000Z', time_zone: 'Asia/Singapore', lifecycle_status: 'SCHEDULED' }],
+    objectives: [],
+    assessmentViews: new Map(),
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
+    caseId: 'case-1',
+  });
+  assert.equal(result.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.detail, '5 Apr 11:30 → 12:30 GMT+8');
 });

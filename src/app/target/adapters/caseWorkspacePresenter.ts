@@ -40,7 +40,7 @@ import {
   FORBIDDEN_UI_TERMS,
   UUID_PATTERN,
 } from '../../../ui/copy.ts';
-import { formatMoney, formatShort } from '../../../ui/html.ts';
+import { formatMoney } from '../../../ui/html.ts';
 
 export type CasePhase =
   | 'disrupted'
@@ -62,6 +62,21 @@ export interface CaseChangeLine {
   readonly to?: string;
   readonly toWindow?: string;
   readonly phrase?: string;
+}
+
+function formatCaseWindowInstant(iso: string, timeZone?: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const requestedZone = timeZone || 'UTC';
+  const format = (zone: string): string => new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    hour12: false, timeZone: zone, timeZoneName: 'short',
+  }).format(date);
+  try { return format(requestedZone); } catch { return format('UTC'); }
+}
+
+function formatCaseWindow(start: string, end: string, timeZone?: string): string {
+  return `${formatCaseWindowInstant(start, timeZone)}–${formatCaseWindowInstant(end, timeZone)}`;
 }
 
 export interface CaseOptionModel {
@@ -317,18 +332,18 @@ function changeLine(view: RecoveryCaseView, change: RecoveryStrategyView['change
     const alreadyInEffect = change.currentWindow.start === change.proposedWindow.start
       && change.currentWindow.end === change.proposedWindow.end;
     if (alreadyInEffect) {
-      return { ...base, kind: 'IN_EFFECT', to: change.proposedWindow.start, toWindow: `${formatShort(change.proposedWindow.start)}–${formatShort(change.proposedWindow.end)}` };
+      return { ...base, kind: 'IN_EFFECT', to: formatCaseWindowInstant(change.proposedWindow.start, change.timeZone), toWindow: formatCaseWindow(change.proposedWindow.start, change.proposedWindow.end, change.timeZone) };
     }
     return {
       ...base,
       kind: 'MOVE',
-      from: formatShort(change.currentWindow.start),
-      to: formatShort(change.proposedWindow.start),
-      toWindow: `${formatShort(change.proposedWindow.start)}–${formatShort(change.proposedWindow.end)}`,
+      from: formatCaseWindowInstant(change.currentWindow.start, change.timeZone),
+      to: formatCaseWindowInstant(change.proposedWindow.start, change.timeZone),
+      toWindow: formatCaseWindow(change.proposedWindow.start, change.proposedWindow.end, change.timeZone),
     };
   }
   if (change.proposedWindow) {
-    return { ...base, kind: 'SET', toWindow: `${formatShort(change.proposedWindow.start)}–${formatShort(change.proposedWindow.end)}` };
+    return { ...base, kind: 'SET', toWindow: formatCaseWindow(change.proposedWindow.start, change.proposedWindow.end, change.timeZone) };
   }
   const phrase = CASE_EFFECT_PHRASE[change.effectKind];
   const leg = change.effectKind === 'SELECT_OFFER' ? selectOfferTransportLeg(view, change) : undefined;

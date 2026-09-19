@@ -32,6 +32,10 @@ export interface ScenePulse {
 
 export interface SceneNode {
   readonly ref: string;
+  readonly entityLabel: string;
+  readonly label: string;
+  readonly secondaryLabel?: string;
+  readonly stateLabel: string;
   readonly x: number;
   readonly y: number;
   readonly w: number;
@@ -135,7 +139,20 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
       isCausal: causalSet.has(ln.ref),
       isChecking: pn.evaluationState === 'pending-reassessment',
     };
-    return [{ ref: ln.ref, x: ln.x, y: ln.y, w: ln.width, h: ln.height, cls: nodeClass(ctx), attrs: nodeAttrs(ctx), html: nodeInnerHtml(ctx) }];
+    return [{
+      ref: ln.ref,
+      entityLabel: pn.entityLabel,
+      label: pn.label,
+      ...(pn.secondaryLabel ? { secondaryLabel: pn.secondaryLabel } : {}),
+      stateLabel: pn.indicator.label,
+      x: ln.x,
+      y: ln.y,
+      w: ln.width,
+      h: ln.height,
+      cls: nodeClass(ctx),
+      attrs: nodeAttrs(ctx),
+      html: nodeInnerHtml(ctx),
+    }];
   });
 
   const edges: SceneEdge[] = layout.edges.flatMap((le) => {
