@@ -107,6 +107,9 @@ export async function persistRecoveryPlanningAttempt(
     uuidIdOrConflict('recovery_planning_attempts.id', attempt.id),
     uuidIdOrConflict('recovery_planning_attempts.recovery_case_id', attempt.recoveryCaseId),
     uuidIdOrConflict('recovery_planning_attempts.basis_assessment_id', attempt.basisAssessmentId),
+    ...(attempt.requestBasis
+      ? [uuidIdOrConflict('recovery_planning_attempts.request_change_request_id', attempt.requestBasis.changeRequestId)]
+      : []),
   ]) {
     if (check) return { ok: false, conflict: check };
   }
@@ -115,6 +118,7 @@ export async function persistRecoveryPlanningAttempt(
     attemptId: attempt.id,
     recoveryCaseId: attempt.recoveryCaseId,
     basisAssessmentId: attempt.basisAssessmentId,
+    ...(attempt.requestBasis ? { requestBasis: attempt.requestBasis } : {}),
     outcome,
   };
   const envelope: DomainCommandEnvelope = DomainCommandEnvelopeSchema.parse({
@@ -134,11 +138,29 @@ export async function persistRecoveryPlanningAttempt(
     return await uow.execute<RecoveryPlanningAttemptPersistedResult>(envelope, async () => {
       const client = currentTransactionClient();
 
+      if (attempt.requestBasis) {
+        const requestHead = await client.query<{ revision: string }>(
+          `SELECT revision FROM aggregate_heads
+            WHERE workspace_id = $1 AND aggregate_id = $2`,
+          [params.workspaceId, attempt.requestBasis.changeRequestId],
+        );
+        if (Number(requestHead.rows[0]?.revision) !== attempt.requestBasis.lifecycleRevision) {
+          return { ok: false, conflict: typedConflict('STALE_AGGREGATE_REVISION', `change request ${attempt.requestBasis.changeRequestId} is no longer at planning lifecycle revision ${attempt.requestBasis.lifecycleRevision}`, []) };
+        }
+      }
+
       // At most one attempt per basis: an existing row is a replay, never a
       // second evidence record. The stored outcome is returned unchanged.
       const existing = await client.query<{ id: string; outcome: string }>(
-        'SELECT id, outcome FROM recovery_planning_attempts WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3',
-        [params.workspaceId, attempt.recoveryCaseId, attempt.basisAssessmentId],
+        `SELECT id, outcome FROM recovery_planning_attempts
+          WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3
+            AND request_change_request_id IS NOT DISTINCT FROM $4::uuid
+            AND request_content_revision IS NOT DISTINCT FROM $5::integer
+            AND request_lifecycle_revision IS NOT DISTINCT FROM $6::integer`,
+        [params.workspaceId, attempt.recoveryCaseId, attempt.basisAssessmentId,
+          attempt.requestBasis?.changeRequestId ?? null,
+          attempt.requestBasis?.contentRevision ?? null,
+          attempt.requestBasis?.lifecycleRevision ?? null],
       );
       const prior = existing.rows[0];
       if (prior) {
@@ -189,19 +211,24 @@ export async function persistRecoveryPlanningAttempt(
 
       await client.query(
         `INSERT INTO recovery_planning_attempts (
-           workspace_id, id, recovery_case_id, basis_assessment_id, basis_manifest,
+           workspace_id, id, recovery_case_id, basis_assessment_id, request_change_request_id,
+           request_content_revision, request_lifecycle_revision, request_basis, basis_manifest,
            started_at, completed_at, coordinator_version, domains, evidence,
            material_candidates, viable_strategy_refs, recommendation, outcome,
            created_by_actor_id
          ) VALUES (
-           $1,$2,$3,$4,$5::jsonb,$6::timestamptz,$7::timestamptz,$8,$9::jsonb,$10::jsonb,
-           $11::jsonb,$12::jsonb,$13::jsonb,$14,$15
+           $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::timestamptz,$11::timestamptz,$12,$13::jsonb,$14::jsonb,
+           $15::jsonb,$16::jsonb,$17::jsonb,$18,$19
          )`,
         [
           params.workspaceId,
           attempt.id,
           attempt.recoveryCaseId,
           attempt.basisAssessmentId,
+          attempt.requestBasis?.changeRequestId ?? null,
+          attempt.requestBasis?.contentRevision ?? null,
+          attempt.requestBasis?.lifecycleRevision ?? null,
+          attempt.requestBasis === undefined ? null : JSON.stringify(attempt.requestBasis),
           JSON.stringify(attempt.basisManifest),
           attempt.startedAt,
           attempt.completedAt,
@@ -269,6 +296,9 @@ export async function persistRecoveryPlanningCompletion(
     uuidIdOrConflict('recovery_planning_attempts.id', attempt.id),
     uuidIdOrConflict('recovery_planning_attempts.recovery_case_id', attempt.recoveryCaseId),
     uuidIdOrConflict('recovery_planning_attempts.basis_assessment_id', attempt.basisAssessmentId),
+    ...(attempt.requestBasis
+      ? [uuidIdOrConflict('recovery_planning_attempts.request_change_request_id', attempt.requestBasis.changeRequestId)]
+      : []),
   ]) {
     if (check) return { ok: false, conflict: check };
   }
@@ -295,6 +325,7 @@ export async function persistRecoveryPlanningCompletion(
     attemptId: attempt.id,
     recoveryCaseId: attempt.recoveryCaseId,
     basisAssessmentId: attempt.basisAssessmentId,
+    ...(attempt.requestBasis ? { requestBasis: attempt.requestBasis } : {}),
     outcome,
     viableStrategyIds: suppliedRefs,
   };
@@ -342,10 +373,27 @@ export async function persistRecoveryPlanningCompletion(
         return { ok: false, conflict: typedConflict('STALE_AGGREGATE_REVISION', `planning basis ${attempt.basisAssessmentId} has pending reassessment work`, []) };
       }
 
+      if (attempt.requestBasis) {
+        const requestHead = await client.query<{ revision: string }>(
+          `SELECT revision FROM aggregate_heads
+            WHERE workspace_id = $1 AND aggregate_id = $2`,
+          [params.workspaceId, attempt.requestBasis.changeRequestId],
+        );
+        if (Number(requestHead.rows[0]?.revision) !== attempt.requestBasis.lifecycleRevision) {
+          return { ok: false, conflict: typedConflict('STALE_AGGREGATE_REVISION', `change request ${attempt.requestBasis.changeRequestId} is no longer at planning lifecycle revision ${attempt.requestBasis.lifecycleRevision}`, []) };
+        }
+      }
+
       const existing = await client.query<{ id: string; outcome: string }>(
         `SELECT id, outcome FROM recovery_planning_attempts
-          WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3`,
-        [params.workspaceId, attempt.recoveryCaseId, attempt.basisAssessmentId],
+          WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3
+            AND request_change_request_id IS NOT DISTINCT FROM $4::uuid
+            AND request_content_revision IS NOT DISTINCT FROM $5::integer
+            AND request_lifecycle_revision IS NOT DISTINCT FROM $6::integer`,
+        [params.workspaceId, attempt.recoveryCaseId, attempt.basisAssessmentId,
+          attempt.requestBasis?.changeRequestId ?? null,
+          attempt.requestBasis?.contentRevision ?? null,
+          attempt.requestBasis?.lifecycleRevision ?? null],
       );
       if (existing.rows[0]) {
         return {
@@ -372,13 +420,18 @@ export async function persistRecoveryPlanningCompletion(
 
       await client.query(
         `INSERT INTO recovery_planning_attempts (
-           workspace_id, id, recovery_case_id, basis_assessment_id, basis_manifest,
+           workspace_id, id, recovery_case_id, basis_assessment_id, request_change_request_id,
+           request_content_revision, request_lifecycle_revision, request_basis, basis_manifest,
            started_at, completed_at, coordinator_version, domains, evidence,
            material_candidates, viable_strategy_refs, recommendation, outcome,
            created_by_actor_id
-         ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::timestamptz,$7::timestamptz,$8,$9::jsonb,$10::jsonb,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15)`,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::timestamptz,$11::timestamptz,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,$17::jsonb,$18,$19)`,
         [
           params.workspaceId, attempt.id, attempt.recoveryCaseId, attempt.basisAssessmentId,
+          attempt.requestBasis?.changeRequestId ?? null,
+          attempt.requestBasis?.contentRevision ?? null,
+          attempt.requestBasis?.lifecycleRevision ?? null,
+          attempt.requestBasis === undefined ? null : JSON.stringify(attempt.requestBasis),
           JSON.stringify(attempt.basisManifest), attempt.startedAt, attempt.completedAt,
           attempt.coordinatorVersion, JSON.stringify(attempt.domains), JSON.stringify(attempt.evidence),
           JSON.stringify(attempt.materialCandidates), JSON.stringify(attempt.viableStrategyRefs),
@@ -421,7 +474,7 @@ export async function loadRecoveryPlanningAttempt(
   attemptId: string,
 ): Promise<RecoveryPlanningAttemptRow | undefined> {
   const result = await db.query<RecoveryPlanningAttemptRawRow>(
-    `SELECT id, recovery_case_id, basis_assessment_id, basis_manifest, started_at, completed_at,
+    `SELECT id, recovery_case_id, basis_assessment_id, request_basis, basis_manifest, started_at, completed_at,
             coordinator_version, domains, evidence, material_candidates, viable_strategy_refs,
             recommendation, outcome
        FROM recovery_planning_attempts
@@ -431,7 +484,9 @@ export async function loadRecoveryPlanningAttempt(
   return rowToAttempt(result.rows[0]);
 }
 
-/** Read helper: the single attempt for a (case, basis), if any. */
+/** Read helper: the ordinary failure-driven attempt for a (case, basis), if any.
+ * Request-driven attempts carry a separate request identity and are intentionally
+ * not treated as a failure-path replay by lifecycle progression. */
 export async function findRecoveryPlanningAttemptForBasis(
   db: Queryable,
   workspaceId: string,
@@ -439,11 +494,12 @@ export async function findRecoveryPlanningAttemptForBasis(
   basisAssessmentId: string,
 ): Promise<RecoveryPlanningAttemptRow | undefined> {
   const result = await db.query<RecoveryPlanningAttemptRawRow>(
-    `SELECT id, recovery_case_id, basis_assessment_id, basis_manifest, started_at, completed_at,
+    `SELECT id, recovery_case_id, basis_assessment_id, request_basis, basis_manifest, started_at, completed_at,
             coordinator_version, domains, evidence, material_candidates, viable_strategy_refs,
             recommendation, outcome
-       FROM recovery_planning_attempts
-      WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3`,
+      FROM recovery_planning_attempts
+      WHERE workspace_id = $1 AND recovery_case_id = $2 AND basis_assessment_id = $3
+        AND request_change_request_id IS NULL`,
     [workspaceId, recoveryCaseId, basisAssessmentId],
   );
   return rowToAttempt(result.rows[0]);
@@ -463,7 +519,7 @@ export async function findLatestRecoveryPlanningAttemptForCase(
   recoveryCaseId: string,
 ): Promise<RecoveryPlanningAttemptRow | undefined> {
   const result = await db.query<RecoveryPlanningAttemptRawRow>(
-    `SELECT id, recovery_case_id, basis_assessment_id, basis_manifest, started_at, completed_at,
+    `SELECT id, recovery_case_id, basis_assessment_id, request_basis, basis_manifest, started_at, completed_at,
             coordinator_version, domains, evidence, material_candidates, viable_strategy_refs,
             recommendation, outcome
        FROM recovery_planning_attempts
@@ -480,6 +536,7 @@ interface RecoveryPlanningAttemptRawRow {
   id: string;
   recovery_case_id: string;
   basis_assessment_id: string;
+  request_basis: unknown | null;
   basis_manifest: unknown;
   started_at: Date;
   completed_at: Date;
@@ -500,6 +557,7 @@ function rowToAttempt(
     id: row.id,
     recoveryCaseId: row.recovery_case_id,
     basisAssessmentId: row.basis_assessment_id,
+    ...(row.request_basis === null || row.request_basis === undefined ? {} : { requestBasis: row.request_basis }),
     basisManifest: row.basis_manifest,
     startedAt: row.started_at.toISOString(),
     completedAt: row.completed_at.toISOString(),

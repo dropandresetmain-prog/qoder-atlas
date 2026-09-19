@@ -88,6 +88,7 @@ import {
 import { selectRecommendation, type CandidateComparisonFacts } from './comparator.ts';
 import { satisfiedPreferenceCodes } from './preferenceMatching.ts';
 import { comparisonFactsFromEvidence, planningOutcomeOf } from './planningSelection.ts';
+import type { RequestPlanningContext } from './changeRequestConstraints.ts';
 
 /**
  * A proposer bound to the single recovery domain it serves. The binding accepts
@@ -117,6 +118,8 @@ export interface PlanningBasis {
   registry: EvaluatorRegistry;
   /** When present, the base manifest is checked for currentness (STALE_BASE). */
   currentState?: CurrentState;
+  /** Typed desired state; never folded into failing assessments. */
+  requestContext?: RequestPlanningContext;
 }
 
 /** Deterministic identity/version allocation, injected so the core stays pure. */
@@ -202,6 +205,7 @@ interface EvaluatedCandidate {
   proposerId: string;
   domainId: RecoveryDomainId;
   result: EvaluateStrategyResult;
+  satisfiedRequestConstraintCodes: readonly string[];
 }
 
 /**
@@ -255,6 +259,7 @@ export async function runRecoveryPlanning(
   deps: CoordinatorCoreDeps,
 ): Promise<CoordinatorCoreOutput> {
   const { world, effective, now, registry, failing, recoveryCaseId, basisAssessmentId, workspaceId } = basis;
+  const preferences = [...(deps.preferences ?? []), ...(basis.requestContext?.comparatorPreferences ?? [])];
 
   // 1. Deterministic domain selection from the REAL blocking dimensions.
   const domainContext: RecoveryDomainContext = {
@@ -262,6 +267,7 @@ export async function runRecoveryPlanning(
     blockingDimensionCodes: blockingDimensionCodes(failing),
     affectedObjectKinds: new Set<string>(),
     availableCapabilities: new Set(deps.availableCapabilities),
+    ...(basis.requestContext ? { requestedDomains: basis.requestContext.domains } : {}),
   };
   const domains = resolveRecoveryDomainDecisions(deps.domainRegistry, domainContext, deps.aiSuggestedDomains ?? []);
   const investigated = domains.filter((d) => d.disposition === 'INVESTIGATED');
@@ -328,9 +334,12 @@ export async function runRecoveryPlanning(
       : []);
     for (const bound of domainProposers) {
       const proposer = isDomainProposer(bound)
-        ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences: deps.preferences ?? [] })
+        ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences })
         : bound;
-      const raw = await proposer.propose({ workspaceId, recoveryCaseId, now, failing, world: planningWorld, effective: planningEffective });
+      const raw = await proposer.propose({
+        workspaceId, recoveryCaseId, now, failing, world: planningWorld, effective: planningEffective,
+        ...(basis.requestContext ? { requestedSubjects: basis.requestContext.requestedSubjects, requestContext: basis.requestContext } : {}),
+      });
       const { accepted, rejected } = validateProposalCandidates(raw);
       for (const r of rejected) {
         rejectedEvidence.push(materialCandidateFromValidationRejection({
@@ -342,6 +351,21 @@ export async function runRecoveryPlanning(
         }));
       }
       for (const candidate of accepted) {
+        const hardRequestConstraints = basis.requestContext?.constraints.filter((constraint) => constraint.mode === 'HARD') ?? [];
+        const satisfiedRequestConstraintCodes = candidate.satisfiedRequestConstraintCodes ?? [];
+        const unsatisfiedHardConstraints = hardRequestConstraints
+          .filter((constraint) => !satisfiedRequestConstraintCodes.includes(constraint.code))
+          .map((constraint) => constraint.code);
+        if (unsatisfiedHardConstraints.length > 0) {
+          rejectedEvidence.push(materialCandidateFromValidationRejection({
+            candidateKey: candidate.key,
+            proposerId: proposer.id,
+            domainId: domain.domainId,
+            validationReasonCodes: unsatisfiedHardConstraints.map((code) => `hard_request_constraint_unsatisfied:${code}`),
+            evidenceRefs: domainEvidenceRefs,
+          }));
+          continue;
+        }
         const strategyId = deps.minters.mintStrategyId(candidate.key);
         const scenarioChange = ScenarioChangeSchema.parse({
           id: deps.minters.mintScenarioChangeId(strategyId),
@@ -350,6 +374,7 @@ export async function runRecoveryPlanning(
           affectedSubjectRefs: candidate.affectedSubjectRefs,
           effects: candidate.effects,
           basisAssessmentId,
+          ...(basis.requestContext ? { requestBasis: basis.requestContext.basis } : {}),
         });
         const evaluatedResult = evaluateRecoveryStrategy({
           recoveryCaseId, strategyId, strategyVersion: nextVersion,
@@ -369,7 +394,7 @@ export async function runRecoveryPlanning(
           continue;
         }
         if (evaluatedResult.value.strategy.viability === 'STALE_BASE') anyStale = true;
-        evaluated.push({ candidateKey: candidate.key, proposerId: proposer.id, domainId: domain.domainId, result: evaluatedResult.value });
+        evaluated.push({ candidateKey: candidate.key, proposerId: proposer.id, domainId: domain.domainId, result: evaluatedResult.value, satisfiedRequestConstraintCodes });
         if (evaluatedResult.value.strategy.viability === 'VIABLE') nextVersion += 1;
       }
     }
@@ -391,15 +416,15 @@ export async function runRecoveryPlanning(
       strategyRef: e.result.strategy.id as SubjectId, recommended: false, result: e.result,
       evidenceRefs: evidenceRefsForDomain(evidence, e.domainId),
     });
-    const facts = comparisonFactsFromEvidence(provisional, deps.preferences?.length
-      ? { satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
-      : undefined);
+    const facts = comparisonFactsFromEvidence(provisional, preferences.length
+      ? { satisfiedPreferenceCodes: [...satisfiedPreferenceCodes(provisional, preferences), ...e.satisfiedRequestConstraintCodes] }
+      : e.satisfiedRequestConstraintCodes.length > 0 ? { satisfiedPreferenceCodes: e.satisfiedRequestConstraintCodes } : undefined);
     if (facts) provisionalFacts.push(facts);
   }
   const recommendation: StrategyRecommendation | undefined = viableCandidates.length > 0
     ? selectRecommendation({
         recoveryCaseId, viableCandidates, facts: provisionalFacts,
-        preferences: deps.preferences, comparatorVersion: deps.comparatorVersion,
+        preferences, comparatorVersion: deps.comparatorVersion,
       })
     : undefined;
   const recommendedRef = recommendation?.recommendedStrategyRef;
@@ -424,7 +449,7 @@ export async function runRecoveryPlanning(
   const outcome: RecoveryPlanningOutcome = planningOutcomeOf({
     basisStale: anyStale,
     researchBudgetExhausted,
-    operatorDecisionRequired: false,
+    operatorDecisionRequired: (basis.requestContext?.unresolved.length ?? 0) > 0,
     viableStrategyCount: viableStrategies.length,
     recommendationProduced: recommendation !== undefined,
   });
@@ -433,6 +458,7 @@ export async function runRecoveryPlanning(
     id: deps.minters.attemptId,
     recoveryCaseId,
     basisAssessmentId,
+    ...(basis.requestContext ? { requestBasis: basis.requestContext.basis } : {}),
     basisManifest: world.manifest,
     startedAt: deps.minters.startedAt,
     completedAt: now,

@@ -126,6 +126,8 @@ export interface RecoveryDomainContext {
   readonly affectedObjectKinds: ReadonlySet<string>;
   /** Capability families actually available to this planning composition. */
   readonly availableCapabilities: ReadonlySet<CapabilityFamily>;
+  /** Explicit typed request activation, kept separate from failure dimensions. */
+  readonly requestedDomains?: ReadonlySet<RecoveryDomainId>;
 }
 
 /**

@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import { SubjectIdSchema, TypedRefSchema } from '../../../domain/v2/shared/identity.ts';
 import { ExactMoneySchema } from '../../../domain/v2/shared/money.ts';
+import { ChangeRequestPlanningBasisSchema } from '../planning/changeRequestPlanning.ts';
 
 export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
   z.strictObject({
@@ -70,5 +71,6 @@ export const ScenarioChangeSchema = z.strictObject({
   affectedSubjectRefs: z.array(TypedRefSchema).min(1),
   effects: z.array(ScenarioEffectSchema).min(1),
   basisAssessmentId: SubjectIdSchema,
+  requestBasis: ChangeRequestPlanningBasisSchema.optional(),
 });
 export type ScenarioChange = z.infer<typeof ScenarioChangeSchema>;

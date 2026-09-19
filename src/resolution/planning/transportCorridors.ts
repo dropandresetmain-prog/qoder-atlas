@@ -180,7 +180,7 @@ function indexPlaces(world: CapturedWorld): Map<string, WPlace> {
 
 function collectTransportJourneyItems(
   world: CapturedWorld,
-  failing: readonly FailingSubject[],
+  subjects: readonly (FailingSubject | Pick<FailingSubject, 'subject'>)[],
 ): { items: WJourneyItem[]; journeysWithoutTransport: string[] } {
   const items: WJourneyItem[] = [];
   const journeysWithoutTransport: string[] = [];
@@ -193,7 +193,7 @@ function collectTransportJourneyItems(
     items.push(item);
   };
 
-  for (const subject of failing) {
+  for (const subject of subjects) {
     const { kind, id } = subject.subject;
     if (kind === 'JOURNEY') {
       let foundForJourney = false;
@@ -219,10 +219,10 @@ function collectTransportJourneyItems(
 /** Pure: from the failing subjects, find their TRANSPORT journey items in the world and resolve each into a flight corridor (or an honest gap). Deterministic order: by journeyItemId. */
 export function transportCorridors(
   world: CapturedWorld,
-  failing: readonly FailingSubject[],
+  subjects: readonly (FailingSubject | Pick<FailingSubject, 'subject'>)[],
   opts: TransportCorridorOpts,
 ): { corridors: TransportCorridor[]; gaps: TransportCorridorGap[] } {
-  const { items, journeysWithoutTransport } = collectTransportJourneyItems(world, failing);
+  const { items, journeysWithoutTransport } = collectTransportJourneyItems(world, subjects);
   const places = indexPlaces(world);
 
   const corridors: TransportCorridor[] = [];

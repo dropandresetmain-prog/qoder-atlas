@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { SubjectIdSchema, type SubjectId } from '../../../domain/v2/shared/identity.ts';
 import { compareInstants, InstantSchema } from '../../../domain/v2/shared/time.ts';
 import { WorldSnapshotManifestSchema } from '../scope/readScope.ts';
+import { ChangeRequestPlanningBasisSchema, type ChangeRequestPlanningBasis } from './changeRequestPlanning.ts';
 import { StrategyViabilitySchema, type StrategyViability } from '../scenario/recoveryStrategy.ts';
 import {
   RecoveryDomainDecisionSchema,
@@ -112,6 +113,7 @@ export const RecoveryPlanningAttemptSchema = z.strictObject({
   id: SubjectIdSchema,
   recoveryCaseId: SubjectIdSchema,
   basisAssessmentId: SubjectIdSchema,
+  requestBasis: ChangeRequestPlanningBasisSchema.optional(),
   basisManifest: WorldSnapshotManifestSchema,
   startedAt: InstantSchema,
   completedAt: InstantSchema,
@@ -166,6 +168,11 @@ export type RecoveryPlanningResult = z.infer<typeof RecoveryPlanningResultSchema
 export interface RecoveryPlanningInput {
   recoveryCaseId: SubjectId;
   reason: RecoveryPlanningReason;
+  /**
+   * A submitted desired future state. It accompanies a truthful current
+   * assessment and is bound into the attempt and world-currentness manifest.
+   */
+  requestBasis?: ChangeRequestPlanningBasis;
 }
 
 /**

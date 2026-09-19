@@ -10,6 +10,7 @@ export * from './planningTool.ts';
 export * from './impactSemantics.ts';
 export * from './strategyRecommendation.ts';
 export * from './recoveryPlanningAttempt.ts';
+export * from './changeRequestPlanning.ts';
 export * from './proposerAdaptation.ts';
 export * from './recoveryProgression.ts';
 export * from './recoveryCaseAttention.ts';

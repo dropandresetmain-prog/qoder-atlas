@@ -86,13 +86,16 @@ function activator(
     producesExecutableStrategy,
     isApplicable(context) {
       const matched = anyBlocking(context, dimensions);
+      const requested = context.requestedDomains?.has(domainId) ?? false;
       return {
         domainId,
         source: 'DETERMINISTIC',
-        activated: matched !== undefined,
+        activated: matched !== undefined || requested,
         requiredCapabilities: [...capabilities],
         ...(matched !== undefined
           ? { reasonCode: `blocking_${matched}` as const }
+          : requested
+            ? { reasonCode: 'typed_change_request' as const }
           : { reasonCode: 'no_blocking_dimension_match' as const }),
       };
     },
@@ -127,11 +130,13 @@ export function recoveryDomainContext(input: {
   blockingDimensionCodes: Iterable<string>;
   affectedObjectKinds: Iterable<string>;
   availableCapabilities: Iterable<CapabilityFamily>;
+  requestedDomains?: Iterable<RecoveryDomainId>;
 }): RecoveryDomainContext {
   return {
     failingSubjectKinds: new Set(input.failingSubjectKinds),
     blockingDimensionCodes: new Set(input.blockingDimensionCodes),
     affectedObjectKinds: new Set(input.affectedObjectKinds),
     availableCapabilities: new Set(input.availableCapabilities),
+    ...(input.requestedDomains ? { requestedDomains: new Set(input.requestedDomains) } : {}),
   };
 }

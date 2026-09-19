@@ -31,6 +31,7 @@
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import type { TypedRef, SubjectId } from '../../domain/v2/shared/identity.ts';
+import type { ChangeRequestPlanningBasis } from '../../contracts/v2/planning/changeRequestPlanning.ts';
 import type { ApplicationError } from '../../contracts/v2/product/readModels.ts';
 import type { CapturedWorld } from '../../resolution/world/world.ts';
 import type { EffectiveWorld } from '../../resolution/world/effectiveTypes.ts';
@@ -74,6 +75,7 @@ import {
   resolveRecoveryDomainDecisions,
 } from '../../contracts/v2/planning/recoveryDomain.ts';
 import { blockingDimensionCodes } from '../../resolution/planning/coordinatorCore.ts';
+import { deriveRequestPlanningContext, type RequestPlanningContext } from '../../resolution/planning/changeRequestConstraints.ts';
 
 export const R1_COORDINATOR_VERSION = 'r1-coordinator/1';
 export const R1_COMPARATOR_VERSION = 'r1-comparator/1';
@@ -141,6 +143,7 @@ interface BasisCapture {
   registry: EvaluatorRegistry;
   basisAssessmentId: string;
   programmeIds: string[];
+  requestContext?: RequestPlanningContext;
 }
 
 async function caseStatus(pool: Pool, workspaceId: string, caseId: string): Promise<string | undefined> {
@@ -178,9 +181,32 @@ export async function loadFailingCaseSubjects(pool: Pool, workspaceId: string, c
   return failing;
 }
 
-async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseId: string, now: string): Promise<BasisCapture | undefined> {
+function addRequestCurrentness(world: CapturedWorld, requestBasis: ChangeRequestPlanningBasis): CapturedWorld {
+  const aggregateReads = [
+    ...world.manifest.aggregateReads.filter((read) => !(read.aggregateRef.kind === 'CHANGE_REQUEST' && read.aggregateRef.id === requestBasis.changeRequestId)),
+    { aggregateRef: { kind: 'CHANGE_REQUEST' as const, id: requestBasis.changeRequestId }, revision: requestBasis.lifecycleRevision },
+  ].sort((a, b) => `${a.aggregateRef.kind}:${a.aggregateRef.id}`.localeCompare(`${b.aggregateRef.kind}:${b.aggregateRef.id}`));
+  return { ...world, manifest: { ...world.manifest, aggregateReads } };
+}
+
+async function capturePlanningBasis(
+  deps: RecoveryPlanningCoordinatorDeps,
+  caseId: string,
+  now: string,
+  requestBasis?: ChangeRequestPlanningBasis,
+): Promise<BasisCapture | undefined> {
   const failing = await loadFailingCaseSubjects(deps.pool, deps.workspaceId, caseId, now);
-  if (failing.length === 0) return undefined;
+  const requestContext = requestBasis
+    ? deriveRequestPlanningContext({ basis: requestBasis, journeyId: requestBasis.journeyId, representedTravellerId: requestBasis.representedTravellerId })
+    : undefined;
+  if (failing.length === 0 && !requestContext) return undefined;
+
+  const baseline = requestContext
+    ? await currentAssessmentView(deps.pool, deps.workspaceId, { kind: 'JOURNEY', id: requestContext.basis.journeyId }, 'VIABILITY', now)
+    : undefined;
+  if (requestContext && (!baseline?.assessment || baseline.status !== 'CURRENT')) {
+    throw new Error(`request ${requestContext.basis.changeRequestId} has no current Journey viability assessment`);
+  }
 
   const unmetItemIds = [...new Set(failing.flatMap((f) => unmetProgrammeItems(f.assessment).map((r) => r.id)))];
   const programmeRefs: TypedRef[] = unmetItemIds.length === 0 ? [] : (await deps.pool.query<{ programme_id: string }>(
@@ -189,25 +215,36 @@ async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseI
   )).rows.map((r) => ({ kind: 'PROGRAMME' as const, id: r.programme_id }));
 
   const registry = createM6Registry();
-  const world = await captureWorld(deps.pool, {
+  const capturedWorld = await captureWorld(deps.pool, {
     workspaceId: deps.workspaceId,
-    focus: [...failing.map((f) => f.subject), ...programmeRefs],
+    focus: [...failing.map((f) => f.subject), ...(requestContext?.requestedSubjects ?? []), ...programmeRefs],
     at: now,
     informationTopics: registry.informationTopics,
   });
+  const world = requestContext ? addRequestCurrentness(capturedWorld, requestContext.basis) : capturedWorld;
   const effective = projectEffectiveWorld(world);
   const currentState = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, world.manifest);
-  return { failing, world, effective, currentState, registry, basisAssessmentId: failing[0]!.assessment.id, programmeIds: programmeRefs.map((r) => r.id as string) };
+  return {
+    failing,
+    world,
+    effective,
+    currentState,
+    registry,
+    basisAssessmentId: failing[0]?.assessment.id ?? baseline!.assessment!.id,
+    programmeIds: programmeRefs.map((r) => r.id as string),
+    ...(requestContext ? { requestContext } : {}),
+  };
 }
 
 /** Deterministic id/version minters, mirroring the B1 seam's planning namespace. */
-function planningMinters(deps: RecoveryPlanningCoordinatorDeps, caseId: string, basisAssessmentId: string, now: string, baseStrategyVersion: number): CoordinatorMinters {
-  const attemptId = deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|planning-attempt|${caseId}|${basisAssessmentId}`);
+function planningMinters(deps: RecoveryPlanningCoordinatorDeps, caseId: string, basisAssessmentId: string, now: string, baseStrategyVersion: number, requestBasis?: ChangeRequestPlanningBasis): CoordinatorMinters {
+  const requestKey = requestBasis ? `|request|${requestBasis.changeRequestId}|${requestBasis.contentRevision}|${requestBasis.lifecycleRevision}` : '';
+  const attemptId = deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|planning-attempt|${caseId}|${basisAssessmentId}${requestKey}`);
   return {
     attemptId: attemptId as SubjectId,
     startedAt: now,
     mintStrategyId: (candidateKey) =>
-      deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|strategy|${caseId}|${basisAssessmentId}|${candidateKey}`) as SubjectId,
+      deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${deps.workspaceId}|strategy|${caseId}|${basisAssessmentId}${requestKey}|${candidateKey}`) as SubjectId,
     mintScenarioChangeId: (strategyId) =>
       deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${strategyId}|scenario-change`) as SubjectId,
     baseStrategyVersion,
@@ -242,7 +279,13 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       if (!status) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.recoveryCaseId} does not exist`) };
       if (TERMINAL.has(status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.recoveryCaseId} is ${status}`) };
 
-      const basis = await capturePlanningBasis(deps, input.recoveryCaseId, now);
+      let basis: BasisCapture | undefined;
+      try {
+        basis = await capturePlanningBasis(deps, input.recoveryCaseId, now, input.requestBasis);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { ok: false, error: applicationError('UNKNOWN_VIABILITY', message) };
+      }
       if (!basis) {
         // No currently-failing subject: nothing to plan. This is an honest empty
         // result, not an error — the case simply has no recovery basis right now.
@@ -285,7 +328,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         });
       }
       const transportResearch = transportPlanning
-        ? transportCorridors(basis.world, basis.failing, { resolveAirport: resolveAirport!, ...passengerSource! })
+        ? transportCorridors(basis.world, [...basis.failing, ...(basis.requestContext?.requestedSubjects.map((subject) => ({ subject })) ?? [])], { resolveAirport: resolveAirport!, ...passengerSource! })
           .corridors.map((corridor) => flightSearchRequestFor(corridor, { round: 1 }))
         : [];
 
@@ -347,6 +390,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           failing: basis.failing,
           registry: basis.registry,
           currentState: basis.currentState,
+          ...(basis.requestContext ? { requestContext: basis.requestContext } : {}),
         },
         {
           domainRegistry,
@@ -354,7 +398,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           proposers,
           ...(preferences.length > 0 ? { preferences } : {}),
           ...(aiSuggestedDomains ? { aiSuggestedDomains } : {}),
-          minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
+          minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion, basis.requestContext?.basis),
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
           ...(transportPlanning ? {
@@ -363,7 +407,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
               if (domainId !== 'TRANSPORT') return undefined;
               const materialized = materializeTransportOffers({
                 world: domainBasis.world,
-                failing: domainBasis.failing,
+                failing: [...domainBasis.failing, ...(domainBasis.requestContext?.requestedSubjects.map((subject) => ({ subject })) ?? [])],
                 toolResults: evidence.toolResults,
                 now: domainBasis.now,
                 resolveAirport: resolveAirport!,
@@ -383,7 +427,10 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       const attemptPersisted = await persistRecoveryPlanningCompletion(deps.uow(), {
         workspaceId: deps.workspaceId,
         actorPrincipalId: deps.actorPrincipalId,
-        idempotencyKey: `planning:completion:${input.recoveryCaseId}:${basis.basisAssessmentId}`,
+        idempotencyKey: `planning:completion:${input.recoveryCaseId}:${basis.basisAssessmentId}` +
+          (basis.requestContext
+            ? `:${basis.requestContext.basis.changeRequestId}:${basis.requestContext.basis.contentRevision}:${basis.requestContext.basis.lifecycleRevision}`
+            : ''),
         attempt: core.attempt,
         outcome: core.result.outcome,
         viableStrategies: core.viableStrategies,

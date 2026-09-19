@@ -80,7 +80,7 @@ function materializeOffer(
  */
 export function materializeTransportOffers(input: TransportPassengerSource & {
   world: CapturedWorld;
-  failing: readonly FailingSubject[];
+  failing: readonly (FailingSubject | Pick<FailingSubject, 'subject'>)[];
   toolResults: readonly PlanningToolResult[];
   now: Instant;
   resolveAirport: AirportResolver;

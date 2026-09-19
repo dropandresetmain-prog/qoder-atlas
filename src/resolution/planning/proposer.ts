@@ -26,6 +26,7 @@ import { TypedRefSchema, type TypedRef } from '../../domain/v2/shared/identity.t
 import type { Instant } from '../../domain/v2/shared/time.ts';
 import type { CapturedWorld } from '../world/world.ts';
 import type { EffectiveWorld } from '../world/effectiveTypes.ts';
+import type { RequestPlanningContext } from './changeRequestConstraints.ts';
 
 export interface FailingSubject {
   subject: TypedRef;
@@ -41,6 +42,9 @@ export interface ProposerInput {
   /** Planning world: the failing subjects' closure plus the programmes their obligations belong to. */
   world: CapturedWorld;
   effective: EffectiveWorld;
+  /** Request subjects are distinct from current failing assessment subjects. */
+  requestedSubjects?: readonly TypedRef[];
+  requestContext?: RequestPlanningContext;
 }
 
 export const ProposalCandidateSchema = z.strictObject({
@@ -50,6 +54,8 @@ export const ProposalCandidateSchema = z.strictObject({
   affectedSubjectRefs: z.array(TypedRefSchema).min(1).max(64),
   rationale: z.string().min(1).max(2048),
   assumptions: z.array(StrategyAssumptionSchema).max(16).default([]),
+  /** Deterministic request constraint codes this candidate satisfies. */
+  satisfiedRequestConstraintCodes: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(32).optional(),
 });
 export type ProposalCandidate = z.infer<typeof ProposalCandidateSchema>;
 
