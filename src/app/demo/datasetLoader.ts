@@ -23,6 +23,7 @@ import {
   type DatasetJurisdictions,
   type DatasetProgramme,
 } from './datasetSchema.ts';
+import { mergeEnvWithDotenvFiles } from '../../config/config.ts';
 
 /** Required: the programme/roster document. */
 export const PROGRAMME_FILE = 'programme.json';
@@ -55,7 +56,8 @@ export class DatasetLoadError extends Error {
 
 /** Configured dataset directory, or undefined when no demo dataset is configured. */
 export function datasetDirectoryFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const raw = (env.NORTHSTAR_DEMO_DATASET_DIR ?? '').trim();
+  const merged = mergeEnvWithDotenvFiles(env);
+  const raw = (merged.NORTHSTAR_DEMO_DATASET_DIR ?? '').trim();
   return raw === '' ? undefined : path.resolve(raw);
 }
 

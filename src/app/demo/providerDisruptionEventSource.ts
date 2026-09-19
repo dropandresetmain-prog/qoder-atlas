@@ -11,10 +11,14 @@
 import { readFile } from 'node:fs/promises';
 import { toInstant } from './datasetMapping.ts';
 import type { TransportServiceCancelledWithReprotectionEvent } from '../target/providerDisruptionIngress.ts';
+import { mergeEnvWithDotenvFiles } from '../../config/config.ts';
 
 /** Configured disclosed-disruption input file, or undefined when unset. */
 export function disruptionEventFileFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const raw = (env.NORTHSTAR_DEMO_DISRUPTION_EVENT_FILE ?? '').trim();
+  // Boot merges `.env.local` for provisioning; request-time helpers must use the
+  // same precedence or the founder trigger silently reports "not configured".
+  const merged = mergeEnvWithDotenvFiles(env);
+  const raw = (merged.NORTHSTAR_DEMO_DISRUPTION_EVENT_FILE ?? '').trim();
   return raw === '' ? undefined : raw;
 }
 
