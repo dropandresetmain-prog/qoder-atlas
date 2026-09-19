@@ -669,6 +669,28 @@ export const PlanningRecommendationViewSchema = z.strictObject({
 });
 export type PlanningRecommendationView = z.infer<typeof PlanningRecommendationViewSchema>;
 
+/** Bounded model-call provenance captured with the planning attempt. */
+export const PlanningModelActivityViewSchema = z.strictObject({
+  operation: z.literal('recovery.domain_suggestion'),
+  providerId: z.string().min(1),
+  model: z.string().min(1),
+  mode: z.enum(['LIVE', 'REPLAY']),
+  status: z.enum(['SUCCEEDED', 'FAILED']),
+  observedAt: z.string().datetime({ offset: true }),
+  latencyMs: z.number().int().nonnegative().optional(),
+  errorCategory: z.enum([
+    'NOT_CONFIGURED',
+    'AUTH',
+    'NETWORK',
+    'TIMEOUT',
+    'RATE_LIMITED',
+    'PROVIDER_ERROR',
+    'INVALID_OUTPUT',
+    'UNAVAILABLE',
+  ]).optional(),
+});
+export type PlanningModelActivityView = z.infer<typeof PlanningModelActivityViewSchema>;
+
 /**
  * C9 — the planning-time decision-evidence block. `phase` is a hard literal and
  * `asOf` is the attempt's completion instant, so this evidence is VISIBLY
@@ -689,6 +711,7 @@ export const PlanningEvidenceViewSchema = z.strictObject({
   outcome: PlanningEvidenceLabelSchema,
   domains: z.array(PlanningDomainEvidenceViewSchema).default([]),
   tools: z.array(PlanningToolEvidenceViewSchema).default([]),
+  modelActivities: z.array(PlanningModelActivityViewSchema).default([]),
   candidates: z.array(PlanningCandidateViewSchema).default([]),
   /**
    * Decision-time viable strategy refs (Q8). Their rich human detail (option

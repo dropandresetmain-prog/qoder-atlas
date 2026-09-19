@@ -151,6 +151,7 @@ export function projectPlanningEvidence(
       ...(d.reasonCode ? { reason: humanize(d.reasonCode) } : {}),
     })),
     tools: attempt.evidence.map(projectToolEvidence),
+    modelActivities: attempt.modelActivities.map((activity) => ({ ...activity })),
     candidates: attempt.materialCandidates.map((candidate) => projectCandidate(candidate, humanLabels)),
     // Q8: the refs this attempt promoted to viable RecoveryStrategy rows. Their
     // rich human detail (option number, who each fixes, cost) lives in the

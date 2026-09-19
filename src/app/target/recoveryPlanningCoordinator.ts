@@ -36,10 +36,12 @@ import type { CapturedWorld } from '../../resolution/world/world.ts';
 import type { EffectiveWorld } from '../../resolution/world/effectiveTypes.ts';
 import type { CurrentState } from '../../resolution/world/currentness.ts';
 import type { EvaluatorRegistry } from '../../resolution/evaluation/assess.ts';
+import { RecoveryPlanningAttemptSchema } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type {
   RecoveryPlanningCoordinator,
   RecoveryPlanningInput,
   RecoveryPlanningResult,
+  PlanningModelActivity,
 } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type { RecoveryDomainId } from '../../contracts/v2/planning/recoveryDomain.ts';
 import type { StrategyProposer } from '../../resolution/planning/proposer.ts';
@@ -80,6 +82,16 @@ export const R1_COMPARATOR_VERSION = 'r1-comparator/1';
 
 const TERMINAL = new Set(['RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED']);
 
+function completedAtAfterEvidence(
+  completedAt: string,
+  modelActivities: readonly PlanningModelActivity[],
+  toolObservedAt: readonly string[],
+  assembledAt: string,
+): string {
+  return [completedAt, assembledAt, ...modelActivities.map((activity) => activity.observedAt), ...toolObservedAt]
+    .reduce((latest, candidate) => Date.parse(candidate) > Date.parse(latest) ? candidate : latest);
+}
+
 /** Dependencies of the coordinator adapter, all injected by the composition root. */
 export interface RecoveryPlanningCoordinatorDeps {
   pool: Pool;
@@ -95,6 +107,8 @@ export interface RecoveryPlanningCoordinatorDeps {
   domainRegistry?: ReturnType<typeof defaultRecoveryDomainRegistry>;
   coordinatorVersion?: string;
   comparatorVersion?: string;
+  /** Wall-clock completion time for durable evidence; injectable only for tests. */
+  completionClock?: () => string;
   /**
    * Optional provider read-only transport capability. Supplying it activates
    * generalized TRANSPORT research; omitting it leaves the domain unavailable
@@ -302,6 +316,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       // G08: optional Model Studio domain suggestion (hybrid C3). Deterministic
       // activations run first; AI may only ADD domains the registry re-validates.
       let aiSuggestedDomains: RecoveryDomainId[] | undefined;
+      const modelActivities: PlanningModelActivity[] = [];
       if (deps.intelligence?.isConfigured()) {
         const domainContext = {
           failingSubjectKinds: new Set(basis.failing.map((f) => f.subject.kind)),
@@ -317,12 +332,19 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           context: domainContext,
           alreadyInvestigated: already,
         });
+        // Captured after the structured ModelCallResult resolves. This records
+        // operational provenance, never the prompt, raw output or rationale.
+        modelActivities.push({
+          operation: 'recovery.domain_suggestion',
+          ...suggestion.activity,
+          observedAt: new Date().toISOString(),
+        });
         if (suggestion.suggestedDomains.length > 0) {
           aiSuggestedDomains = [...suggestion.suggestedDomains];
         }
-        if (suggestion.meta) {
+        if (suggestion.activity.status === 'SUCCEEDED') {
           console.log(
-            `[qwen] domain suggestion mode=${suggestion.meta.mode} model=${suggestion.meta.model}` +
+            `[qwen] domain suggestion mode=${suggestion.activity.mode} model=${suggestion.activity.model}` +
               (aiSuggestedDomains?.length ? ` added=${aiSuggestedDomains.join(',')}` : ' (no additive domains)'),
           );
         }
@@ -377,6 +399,20 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           } : {}),
         },
       );
+      const assembledAt = deps.completionClock?.() ?? new Date().toISOString();
+      const attempt = RecoveryPlanningAttemptSchema.parse({
+        ...core.attempt,
+        modelActivities,
+        // The deterministic planning basis time remains `now`; the durable
+        // evidence horizon is the actual assembly time, never before any model
+        // or read-only provider observation retained in this attempt.
+        completedAt: completedAtAfterEvidence(
+          core.attempt.completedAt,
+          modelActivities,
+          core.attempt.evidence.flatMap((evidence) => evidence.provenance.observedAt ? [evidence.provenance.observedAt] : []),
+          assembledAt,
+        ),
+      });
 
       // 3. One UnitOfWork makes viable strategies, their immutable decision
       // evidence, and the final case phase mutually visible to operators.
@@ -384,7 +420,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         workspaceId: deps.workspaceId,
         actorPrincipalId: deps.actorPrincipalId,
         idempotencyKey: `planning:completion:${input.recoveryCaseId}:${basis.basisAssessmentId}`,
-        attempt: core.attempt,
+        attempt,
         outcome: core.result.outcome,
         viableStrategies: core.viableStrategies,
       });
