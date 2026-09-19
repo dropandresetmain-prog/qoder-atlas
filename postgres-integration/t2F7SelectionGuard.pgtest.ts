@@ -16,36 +16,34 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
-import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from '../src/app/demo/externalIdentity.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { updateJourneyItem } from '../src/persistence/postgres/commands/travelCommands.ts';
-import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
+import { aitWorldModeFromEnv, obtainAitSummitWorld } from './aitFixtureClone.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:t2-f7-selection-guard-test';
 
 let pool: Pool;
-let dataset: LoadedDataset;
+let dataset: LoadedDataset | undefined;
+let sharedPool: Pool | undefined;
+let disposeWorld: (() => Promise<void>) | undefined;
 
 before(async () => {
-  pool = await sharedTestPool();
-  dataset = await loadDataset(BUNDLE_DIR);
+  if (aitWorldModeFromEnv() === 'fresh') {
+    sharedPool = await sharedTestPool();
+    pool = sharedPool;
+    dataset = await loadDataset(BUNDLE_DIR);
+  }
 });
 
 after(async () => {
-  await pool.end();
+  await disposeWorld?.().catch(() => undefined);
+  await sharedPool?.end().catch(() => undefined);
 });
-
-async function freshWorkspace(): Promise<string> {
-  const workspaceId = randomUUID();
-  await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, `t2-f7:${workspaceId}`]);
-  return workspaceId;
-}
 
 async function count(workspaceId: string, table: string): Promise<number> {
   const result = await pool.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${table} WHERE workspace_id = $1`, [
@@ -53,6 +51,7 @@ async function count(workspaceId: string, table: string): Promise<number> {
   ]);
   return Number(result.rows[0]!.n);
 }
+
 
 // ---------------------------------------------------------------------------
 // Shared state across the ordered test steps.
@@ -71,30 +70,28 @@ const state: Partial<TestState> = {};
 
 describe('F7 selection guard', () => {
   test('step 1: provision workspace and run baseline evaluation', async () => {
-    const workspaceId = await freshWorkspace();
-    state.workspaceId = workspaceId;
-
-    const outcome = await provisionDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
-    assert.equal(outcome.status, 'MATERIALIZED');
-    if (outcome.status !== 'MATERIALIZED') return;
-
-    const connectionResult = await pool.query<{ connection_id: string }>(
-      `SELECT DISTINCT connection_id FROM external_records WHERE workspace_id = $1 LIMIT 1`,
-      [workspaceId],
+    const world = await obtainAitSummitWorld({
+      actorPrincipalId: ACTOR,
+      includeBaseline: true,
+      sharedPool,
+      dataset,
+    });
+    disposeWorld = world.dispose;
+    pool = world.pool;
+    state.workspaceId = world.workspaceId;
+    state.connectionId = world.connectionId;
+    assert.ok(
+      world.provisionStatus === 'MATERIALIZED' || world.provisionStatus === 'CLONED',
+      `world ready via ${world.provisionStatus}`,
     );
-    assert.equal(connectionResult.rowCount, 1, 'exactly one provisioning connection');
-    state.connectionId = connectionResult.rows[0]!.connection_id;
+    assert.ok((world.baselineEvaluated ?? 0) > 0, 'baseline evaluation assessed at least one journey');
+    console.log(`[timing] F7 setup mode=${world.mode} setupMs=${world.setupMs.toFixed(0)}`);
 
-    const mapping = await resolveSourceSubjects(pool, workspaceId, state.connectionId);
+    const mapping = await resolveSourceSubjects(pool, world.workspaceId, world.connectionId);
     const originalServiceExternalId = 'ID7159@2026-09-30T10:45:00.000Z';
     const originalServiceMapping = mapping.get(`${SOURCE_RECORD_TYPES.TRANSPORT_SERVICE}:${originalServiceExternalId}`);
     assert.ok(originalServiceMapping, `original service ${originalServiceExternalId} resolves`);
     state.originalServiceId = originalServiceMapping.subject.id;
-
-    // Run baseline evaluation to create assessment_inputs rows.
-    // The reassessment trigger only enqueues when assessment_inputs exist.
-    const baseline = await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId: ACTOR });
-    assert.ok(baseline.evaluated > 0, 'baseline evaluation assessed at least one journey');
   });
 
   test('step 2a: non-TRANSPORT journey item + selectedServiceId → throws JOURNEY_ITEM_UPDATED_VALIDATION_FAILED, revision unchanged, no receipt', async () => {

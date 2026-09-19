@@ -25,7 +25,7 @@ rituals.
 
 | Class | Suites | Meaning | Gating? |
 |---|---|---|---|
-| `CURRENT_TARGET` | `current`, `postgres` | Current PostgreSQL/runtime/product/domain/contract/UI behaviour. Active engineering evidence. | **Yes** |
+| `CURRENT_TARGET` | `current`, `postgres`, `postgresFast` | Current PostgreSQL/runtime/product/domain/contract/UI behaviour. Active engineering evidence. | **Yes** |
 | `MIGRATION_BOUNDARY` | `migration` | Tests that intentionally use SQLite because M10 tooling must read historical SQLite sources — read-only exporter, deterministic migration bundle, SQLite source fixtures, import/reconciliation/restore. | **Yes** |
 | `HISTORICAL_LEGACY` | `legacy` | Tests of the **retired** SQLite application runtime. Archaeology. | **No** |
 
@@ -37,6 +37,7 @@ Historical legacy failures are **not** current product correctness and **never**
 |---|---|---|
 | `npm test` | boundary gate + `current` | Default NORTHSTAR surface. No database, no browser. Cannot reach retired SQLite runtime tests. |
 | `npm run test:postgres` | `postgres` | Full PostgreSQL integration gate. Needs `npm run db:postgres:up`. |
+| `npm run test:postgres:fast` | `postgresFast` | Fast PostgreSQL engineering checkpoint. Explicit canonical subset; needs `npm run db:postgres:up`. Not a replacement for the full gate. |
 | `npm run test:migration` | `migration` | Migration-boundary tests, including the allowed SQLite source tests. Needs PostgreSQL for the migration pgtest. |
 | `npm run test:legacy` | `legacy` | **NON-GATING / HISTORICAL / MANUAL ONLY.** Retired SQLite runtime. Needs `npx playwright install chromium`. |
 | `npm run gate:test-boundary` | — | Enforces the classification (see below). |
@@ -45,8 +46,31 @@ Historical legacy failures are **not** current product correctness and **never**
 ### Current runner-performance note
 
 `scripts/run-suite.mjs` applies bounded `--test-concurrency=4` to the CURRENT no-DB /
-no-browser suite and keeps PostgreSQL, migration, and historical legacy suites serial
-(`--test-concurrency=1`). Pass an explicit `--test-concurrency=` extra arg to override.
+no-browser suite and keeps PostgreSQL, fast PostgreSQL, migration, and historical legacy
+suites serial (`--test-concurrency=1`). Pass an explicit `--test-concurrency=` extra arg
+to override.
+
+### PostgreSQL fast checkpoint tier
+
+`postgresFast` is an explicit manifest-backed subset of `postgres` for coherent
+engineering checkpoints. It excludes only these heavyweight files:
+
+- `postgres-integration/b1SarahWorldRecovery.pgtest.ts`
+- `postgres-integration/productBaselineWorld.pgtest.ts`
+- `postgres-integration/t2F1FailureInjection.pgtest.ts`
+- `postgres-integration/t2F3HttpValidation.pgtest.ts`
+- `postgres-integration/t2F5ServiceIdentity.pgtest.ts`
+- `postgres-integration/t2F7SelectionGuard.pgtest.ts`
+- `postgres-integration/t2N1ReplacementCorridorGuard.pgtest.ts`
+- `postgres-integration/t2ProviderDisruptionReprotection.pgtest.ts`
+- `postgres-integration/migrate.pgtest.ts`
+- `postgres-integration/integrationCrossLane.pgtest.ts`
+- `postgres-integration/aitFixtureClone.pgtest.ts` (fixture-clone isolation proof; builds its own AiT fixtures)
+
+Those tests remain required canonical PostgreSQL evidence; they are not deprecated,
+optional, or moved to migration/legacy. The `postgres` suite remains unchanged in
+purpose and coverage. The manifest contract test and boundary gate protect the subset
+relationship and the explicit exclusions from drift.
 
 A 2026-09-18 audit measured the serial CURRENT suite at 72 files / 802 tests in ~30.4s
 plus ~7.1s for the boundary gate. CURRENT has no PostgreSQL and no browser; the old
@@ -55,6 +79,19 @@ always-serial default was historical carry-over, not a correctness requirement.
 Do **not** infer that PostgreSQL should also be parallelized. The PG suite shares one schema
 and includes global queue claims, concurrency/fencing tests and heavy AiT E2Es. It remains
 serial until its isolation/connection-budget constraints are explicitly changed.
+
+### Canonical AiT fixture clones (test infrastructure)
+
+Heavyweight AiT consumers listed in `test/suites.json` → `aitFixtureCloneConsumers`
+receive an isolated PostgreSQL database cloned from a suite-scoped TEMPLATE fixture
+(`CREATE DATABASE … TEMPLATE`). The fixture is rebuilt once per `npm run test:postgres`
+invocation (migrate + real materialize + 67-journey baseline), then discarded.
+
+- Clone accelerates **setup only**; assertions are unchanged.
+- Fresh forever: `productBaselineWorld`, migration-from-empty, materialization/idempotency/
+  replay proofs, and `t2ProviderDisruptionReprotection` step-1 baseline proofs.
+- Override: `NORTHSTAR_PG_AIT_WORLD=fresh` skips fixture construction for diagnostics.
+- PG concurrency remains `1`. Parallelism is Park for Later.
 
 Do not use raw `node --test` as a substitute for the manifest commands: it can discover
 PostgreSQL, migration and historical suites together. `npm test` is the canonical current
@@ -136,11 +173,14 @@ Suites are currently separated by explicit manifest rather than by directory. Mo
 
 1. the focused relevant unit/integration test for the behaviour you changed;
 2. the focused PostgreSQL seam test for the same behaviour;
-3. typecheck/build/lint only when the change plausibly affects them.
+3. `npm run test:postgres:fast` at a coherent implementation checkpoint;
+4. typecheck/build/lint only when the change plausibly affects them.
 
 Do **not** run the broad suite after every edit. Using broad suites as the debugging loop is the failure mode this topology exists to prevent.
 
-**At a coherent checkpoint** — the appropriate broader PostgreSQL gate for what changed.
+**At a milestone, major integration, or final-candidate gate** — run the full canonical
+`npm run test:postgres` suite once on the appropriate clean/fresh database. The fast tier
+is not a replacement for this promotion evidence.
 
 **Final candidate** — the full canonical CURRENT target gate once, on a **fresh database**: `npm test`, `npm run test:postgres`, `npm run test:migration`, build, typecheck, lint, `gate:anti-hardcoding`, and a normal PostgreSQL boot smoke.
 

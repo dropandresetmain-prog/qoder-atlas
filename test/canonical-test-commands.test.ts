@@ -25,6 +25,7 @@ test('package.json suite scripts go through run-suite.mjs, not raw node --test',
   assert.match(script('test'), /run-suite\.mjs current/);
   assert.match(script('test:current'), /run-suite\.mjs current/);
   assert.match(script('test:postgres'), /run-suite\.mjs postgres/);
+  assert.match(script('test:postgres:fast'), /run-suite\.mjs postgresFast/);
   assert.match(script('test:migration'), /run-suite\.mjs migration/);
   assert.match(script('test:legacy'), /run-suite\.mjs legacy/);
   for (const [name, command] of Object.entries(pkg.scripts)) {

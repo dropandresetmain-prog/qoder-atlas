@@ -11,7 +11,11 @@
  * runner. Do not treat raw `node --test` as the suite command: without the
  * manifest it can discover PostgreSQL, migration and historical files together.
  *
- * Usage: node scripts/run-suite.mjs <current|postgres|migration|legacy> [--list] [extra node --test args]
+ * When the suite intersects `aitFixtureCloneConsumers`, a canonical AiT fixture
+ * database is built once, exposed via NORTHSTAR_AIT_FIXTURE_DB, and dropped
+ * after the suite. Explicit NORTHSTAR_PG_AIT_WORLD=fresh skips fixture build.
+ *
+ * Usage: node scripts/run-suite.mjs <current|postgres|postgresFast|migration|legacy> [--list] [extra node --test args]
  */
 
 import { readFileSync } from 'node:fs';
@@ -19,6 +23,12 @@ import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTestConcurrencyArg, suiteTestConcurrency } from './suite-concurrency.mjs';
+import {
+  dropSuiteAitFixture,
+  prepareSuiteAitFixture,
+  shouldSkipFixtureForEnv,
+  suiteNeedsAitFixture,
+} from './ait-fixture-suite.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(repoRoot, 'test/suites.json'), 'utf8'));
@@ -58,10 +68,50 @@ const nodeArgs = ['--test'];
 if (concurrencyArg) nodeArgs.push(concurrencyArg);
 nodeArgs.push(...extra, ...files);
 
+const needsFixture = suiteNeedsAitFixture(manifest, suiteName, files);
+const skipFixture = shouldSkipFixtureForEnv(process.env);
+
 console.log(
   `suite "${suiteName}" (${classification}): ${files.length} file(s) concurrency=${suiteTestConcurrency(suiteName)}${concurrencyArg ? '' : ' (overridden)'}`,
 );
 
-const result = spawnSync(process.execPath, nodeArgs, { cwd: repoRoot, stdio: 'inherit' });
+let fixtureDatabaseName;
+let exitCode = 1;
 
-process.exit(result.status ?? 1);
+try {
+  const childEnv = { ...process.env };
+  if (needsFixture && !skipFixture) {
+    console.log('[ait-fixture] preparing canonical AiT TEMPLATE fixture for this suite…');
+    const prepared = await prepareSuiteAitFixture();
+    fixtureDatabaseName = prepared.databaseName;
+    childEnv.NORTHSTAR_AIT_FIXTURE_DB = fixtureDatabaseName;
+    if (!(childEnv.NORTHSTAR_PG_AIT_WORLD ?? '').trim()) {
+      childEnv.NORTHSTAR_PG_AIT_WORLD = 'clone';
+    }
+    console.log(
+      `[ait-fixture] ready db=${fixtureDatabaseName} buildMs=${Math.round(prepared.buildMs)} ` +
+        `baselineEvaluated=${prepared.baselineEvaluated} hash=${prepared.contentHash.slice(0, 12)}…`,
+    );
+  } else if (needsFixture && skipFixture) {
+    console.log('[ait-fixture] skipped (NORTHSTAR_PG_AIT_WORLD=fresh)');
+  }
+
+  const result = spawnSync(process.execPath, nodeArgs, {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: childEnv,
+  });
+  exitCode = result.status ?? 1;
+} finally {
+  if (fixtureDatabaseName) {
+    console.log(`[ait-fixture] dropping fixture ${fixtureDatabaseName}`);
+    try {
+      await dropSuiteAitFixture(fixtureDatabaseName);
+    } catch (error) {
+      console.error(`[ait-fixture] drop failed: ${error}`);
+      exitCode = exitCode === 0 ? 1 : exitCode;
+    }
+  }
+}
+
+process.exit(exitCode);

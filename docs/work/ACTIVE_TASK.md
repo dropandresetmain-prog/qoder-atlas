@@ -1,3 +1,12 @@
+# R4 FINAL INTEGRATION + ACCEPTANCE (integration/r4-final-acceptance)
+
+- Base R4 `8c44c30`; merged PG-perf `2534175` (common main `07c3c79`). Worktree `.worktrees/r4-final`.
+- **Run counters:** postgres:fast runs = **0**; CURRENT_TARGET runs = **0**; full canonical PG runs = **0**.
+- R4-F0 merge: ACTIVE_TASK conflict resolved (R4 ledger on top, PG-perf record kept below as history); `test/suites.json` auto-merged = union; R4's `eventOverview` + `r4PlanningPreferences` pgtests added to `postgresFast` (contract test demanded canonical-minus-heavyweights).
+- Focused checks PASS: canonical-test-commands, postgres-fast contract, ait-fixture-suite contract, suite-concurrency (13/13), `gate:test-boundary` (243 files), `aitFixtureClone.pgtest` (7/7).
+
+---
+
 # ACTIVE TASK — R4 PRODUCT PARITY + LIVE SARAH VERTICAL (ledger)
 
 - Base: `main` `07c3c797b57a1c74e30c08a9097362edb57dd9d5` (accepted R3 `d9bb9a5` ancestor verified). Branch `feat/r4-product-parity-live-sarah` (worktree `.worktrees/r4`). V7.2 docs cherry-picked (`563320e` -> docs only).
@@ -60,6 +69,105 @@ Primary workspace was on unrelated `integration/pg-test-perf`; R4 recovered in `
 
 ---
 
+# HISTORICAL (ACCEPTED) — PG TEST-PERFORMANCE LANE RECORD (merged from integration/pg-test-perf 2534175)
+
+﻿# ACTIVE TASK — PG AiT FIXTURE CLONE PRODUCTIONIZATION
+
+Live ledger for productionizing proven TEMPLATE fixture clones onto the
+authoritative main line. Prior R3/main history below is preserved.
+
+## Identity
+
+- Branch: `feat/pg-fixture-clone`
+- Authoritative base: `origin/main` @ `07c3c797b57a1c74e30c08a9097362edb57dd9d5`
+- Spike ported via cherry-pick: `c5d4100` → `0fe1974`, `6b1ef17` → `34e605e`
+- Fast-tier `d1762f0` is **not** on this line (`test:postgres:fast` absent).
+  Fixture lifecycle is gated on clone-consumer membership so a future fast
+  suite that excludes heavyweights will not pay fixture construction.
+- Role: PRIMARY PostgreSQL test-fixture productionization engineer
+- Date: 2026-09-19
+- Scope: test infrastructure only; **`src/**` unchanged**
+
+## Integration strategy
+
+Start from current `main` (includes accepted R3). Cherry-pick spike test-only
+commits; do **not** merge spike branch (diverges from newer main). Do **not**
+force-integrate fast-tier in this milestone.
+
+## Fixture contract (FROZEN)
+
+1. Fixture built **once per suite invocation** that intersects
+   `aitFixtureCloneConsumers` (rebuild always; no cross-session cache).
+2. Each clone-backed acceptance test / crash world gets its **own database**.
+3. Working pools must never equal the fixture DB name.
+4. Disposable names only: fixtures `ns_ait_fx_*`, clones `ns_ait_cl_*`.
+5. `DROP DATABASE … WITH (FORCE)` only against disposable names; never
+   `northstar_test` / templates / unrelated DBs.
+6. Fresh-path forever: `productBaselineWorld`, migrate-from-empty,
+   materialization/idempotency/replay proofs.
+7. PG suite concurrency remains **1** (Park: parallelism).
+8. Default suite behaviour: clone when fixture env prepared; explicit
+   `NORTHSTAR_PG_AIT_WORLD=fresh` forces fresh and skips fixture build.
+9. Product `src/**` untouched; assertions unchanged.
+
+## Acceptance criteria
+
+- Inbox adversarial isolation PASS
+- F3/F5/F7 clone by default under suite fixture PASS
+- F1 three pristine clones PASS with material timing win
+- N1 two pristine clones PASS
+- B1/T2 adopted only if A/B identical
+- Canonical `npm run test:postgres` once at promotion
+- Target wall: <1100s worthwhile; ~900–950s good
+
+## Candidates
+
+| File | Disposition |
+|---|---|
+| F3/F5/F7 | **ADOPTED** |
+| F1 | **ADOPTED** (1 clone per crash world) |
+| N1 | **ADOPTED** (1 clone per scenario) |
+| B1 Sarah | **ADOPTED** (A/B identical; clone baseline only) |
+| T2 provider reprotection | **FRESH ONLY** (step 1 is baseline-construction proof) |
+| productBaselineWorld / migrate | **FRESH ONLY** |
+
+## Checklist
+
+- [x] Phase 0 contract + base from main + cherry-pick spike
+- [x] Checkpoint 1: lifecycle + inbox + runner (`ba5e95d`)
+- [x] Checkpoint 2: F3/F5/F7 + F1 + N1 (`79fed1d`)
+- [x] Checkpoint 3: B1 A/B adopt; T2 remain fresh (`11318a3`)
+- [x] Checkpoint 4 / Final: suite reuse fix + canonical PG once (`6aee7dc`, `9c31682`)
+
+## Timings
+
+| Item | Value |
+|---|---|
+| Suite fixture build (canonical) | **74.4s** |
+| Clone median (prod proof n=8) | ~920ms |
+| Spike clone min/med/max | 762 / 817 / 907 ms |
+| F1 three-world setup | **3.4s** (was ~190.8s prep) |
+| B1 fresh / clone | 152.7s / **84.6s** |
+| Heavyweight subset F3–N1 | 18/18 in 32.3s (+83.5s fixture) |
+| Canonical `test:postgres` wall | **1059.1s** (576 pass / 1 pre-existing fail / 1 skip) |
+| vs ~1433s baseline | **−374s (−26%)** |
+
+## Current blocker
+
+None — productionization complete on `feat/pg-fixture-clone` @ `9c31682`.
+
+## Next action
+
+Merge/PR when ready. Optional later: T2 step-1 split, PG parallelism (Park).
+
+## Unresolved risks
+
+- composeTargetApplication double-pool on clones — close app before DROP (**Accept Risk**)
+- Fast-tier `d1762f0` not on main — fixture gated by consumer membership (**Park**)
+- T2 remains fresh until step-1 split (**Park**)
+- `m10RuntimePurgeBoot` 200≠404 pre-existing (**Park** / R3 accepted)
+
+---
 # MAIN <- R3 DOCUMENTATION RECONCILIATION
 
 Status: **READY FOR MAIN FAST-FORWARD AFTER THE RECONCILIATION MERGE COMMIT**.
@@ -77,7 +185,7 @@ Status: **READY FOR MAIN FAST-FORWARD AFTER THE RECONCILIATION MERGE COMMIT**.
 
 ---
 
-# ACTIVE TASK — R3 LOCAL ACCEPTANCE (real PostgreSQL + normal runtime + browser)
+# ACTIVE TASK ΓÇö R3 LOCAL ACCEPTANCE (real PostgreSQL + normal runtime + browser)
 
 Live ledger for the R3 local acceptance lane. The R3 Cloud, R2 and R1 history below is preserved
 unchanged; Cloud claims are NOT rewritten as local evidence.
@@ -113,23 +221,23 @@ unchanged; Cloud claims are NOT rewritten as local evidence.
 
 ## Fixes made locally (all generic, no scenario keys)
 
-1. `test/r3-import-guard.test.ts` — normalise Windows path separators (guard compared `\` vs `/`; product code was correct).
-2. `test/r3-transport-research-composition.test.ts` — the LIVE-without-credentials test read the developer's `.env.local` (holds Atlas creds); now loads config from an empty cwd.
-3. `postgres-integration/r3ComposedB1Full.pgtest.ts` — asserted the Original snapshot existed at case open; by the R2 design the progression pass captures it at the FIRST SETTLED FAILING basis. Assertion moved after wake 1 (and asserts absence before it).
-4. `src/ui/screens/product-recovery-case.ts` — browser finding: planning evidence never rendered researched tools/provenance, and the three rejected transport options were identical lines. Now renders `Research: <tool> — <status> · <provenance>` (an UNAVAILABLE tool makes no provenance claim) and each option's per-subject outcome (`Participant 1: Fail → Fail`). New pure test in `test/r2-case-workspace-integration.test.ts`.
+1. `test/r3-import-guard.test.ts` ΓÇö normalise Windows path separators (guard compared `\` vs `/`; product code was correct).
+2. `test/r3-transport-research-composition.test.ts` ΓÇö the LIVE-without-credentials test read the developer's `.env.local` (holds Atlas creds); now loads config from an empty cwd.
+3. `postgres-integration/r3ComposedB1Full.pgtest.ts` ΓÇö asserted the Original snapshot existed at case open; by the R2 design the progression pass captures it at the FIRST SETTLED FAILING basis. Assertion moved after wake 1 (and asserts absence before it).
+4. `src/ui/screens/product-recovery-case.ts` ΓÇö browser finding: planning evidence never rendered researched tools/provenance, and the three rejected transport options were identical lines. Now renders `Research: <tool> ΓÇö <status> ┬╖ <provenance>` (an UNAVAILABLE tool makes no provenance claim) and each option's per-subject outcome (`Participant 1: Fail ΓåÆ Fail`). New pure test in `test/r2-case-workspace-integration.test.ts`.
 
 ## Real-runtime findings
 
-- **Normal boot, founder dataset (`ait-summit-2026` + disclosed airline event)**: the disruption opens a Case for the reprotected traveller; TRANSPORT + PROGRAMME both investigated; programme time-swap candidates evaluated (one RECOMMENDED, one VIABLE_NOT_RECOMMENDED, rest rejected deterministically). `flight.search` is honestly `UNAVAILABLE: recording_not_found` — the checked-in Atlas REPLAY recordings cover only MNL→CEB on 2026-09-05, not the founder programme's corridors. Not an R3 defect; a **recording-coverage gap** carried to provider restoration. Consequently the founder-dataset browser flow does NOT show a researched travel alternative; that was shown on the recording-matching world below.
-- **Normal boot, recording-matching world (`main.ts`, REPLAY)**: `flight.search SUCCEEDED / REPLAY`; 3 transport alternatives rejected deterministically (retained, visible on the page); programme strategy recommended from VIABLE only. Offers departing before the wall clock are filtered (documented honest filter), so planning used an **acceptance-only JS clock shim in the launch script** (runtime code untouched). The shim breaks reassessment claiming (DB `next_run_at` is real-time), so approval→execution→resolution ran on the real clock after restart.
-- Approve via the page button → one ActionPlan, two `internal:programme.schedule` intents (only internal capabilities; no Atlas mutation) → observation → reassessment → C4 RESOLVE (`resolution_gate_passed_and_reconciled`). Current graph: traveller Healthy, whole-trip PASS. Original tab still shows the failing graph, JSON-identical across approve/execute/resolve. `POST /strategies`: 200 `{ok,result}`, repeat idempotent (same attempt), unknown case 404, RESOLVED case 409.
-- **Second generality, normal boot**: connection world (no programme) → TRANSPORT + TRANSFER investigated, PROGRAMME not applicable, REPLAY flight search, transport option recommended; same coordinator/RC-6/comparator. (External SELECT_OFFER approval remains B2/provider-restoration scope, not approved here.)
-- Passenger derivation: allocations for the journey item → else the journey's 1:1 traveller → else `passengers_unknown` fail-closed (`transportCorridors.ts`); no env variable, no runtime constant.
+- **Normal boot, founder dataset (`ait-summit-2026` + disclosed airline event)**: the disruption opens a Case for the reprotected traveller; TRANSPORT + PROGRAMME both investigated; programme time-swap candidates evaluated (one RECOMMENDED, one VIABLE_NOT_RECOMMENDED, rest rejected deterministically). `flight.search` is honestly `UNAVAILABLE: recording_not_found` ΓÇö the checked-in Atlas REPLAY recordings cover only MNLΓåÆCEB on 2026-09-05, not the founder programme's corridors. Not an R3 defect; a **recording-coverage gap** carried to provider restoration. Consequently the founder-dataset browser flow does NOT show a researched travel alternative; that was shown on the recording-matching world below.
+- **Normal boot, recording-matching world (`main.ts`, REPLAY)**: `flight.search SUCCEEDED / REPLAY`; 3 transport alternatives rejected deterministically (retained, visible on the page); programme strategy recommended from VIABLE only. Offers departing before the wall clock are filtered (documented honest filter), so planning used an **acceptance-only JS clock shim in the launch script** (runtime code untouched). The shim breaks reassessment claiming (DB `next_run_at` is real-time), so approvalΓåÆexecutionΓåÆresolution ran on the real clock after restart.
+- Approve via the page button ΓåÆ one ActionPlan, two `internal:programme.schedule` intents (only internal capabilities; no Atlas mutation) ΓåÆ observation ΓåÆ reassessment ΓåÆ C4 RESOLVE (`resolution_gate_passed_and_reconciled`). Current graph: traveller Healthy, whole-trip PASS. Original tab still shows the failing graph, JSON-identical across approve/execute/resolve. `POST /strategies`: 200 `{ok,result}`, repeat idempotent (same attempt), unknown case 404, RESOLVED case 409.
+- **Second generality, normal boot**: connection world (no programme) ΓåÆ TRANSPORT + TRANSFER investigated, PROGRAMME not applicable, REPLAY flight search, transport option recommended; same coordinator/RC-6/comparator. (External SELECT_OFFER approval remains B2/provider-restoration scope, not approved here.)
+- Passenger derivation: allocations for the journey item ΓåÆ else the journey's 1:1 traveller ΓåÆ else `passengers_unknown` fail-closed (`transportCorridors.ts`); no env variable, no runtime constant.
 
 ## Browser findings (physical, Chromium screenshots)
 
 - Disrupted/Planning: first break point + cause clear; Current shows failed traveller; planning section separate from the graph.
-- **Causal spine**: the R3 layout places backend causal refs left-to-right (traveller → programme commitment) with context nodes (disruption, service, case) in a secondary column. The backend causal path currently contains only the failing participation step, so the visual story is NOT the fuller "changed service → arrival consequence → breakpoint → commitment" chain; that requires backend causality (not changed here). Parked.
+- **Causal spine**: the R3 layout places backend causal refs left-to-right (traveller ΓåÆ programme commitment) with context nodes (disruption, service, case) in a secondary column. The backend causal path currently contains only the failing participation step, so the visual story is NOT the fuller "changed service ΓåÆ arrival consequence ΓåÆ breakpoint ΓåÆ commitment" chain; that requires backend causality (not changed here). Parked.
 - The replacement flight shows "Unknown / unconfirmed", not green, in the seeded worlds (no service-level evaluation). Parked.
 - Known R2 debt still visible: raw UUIDs in Partial Recovery / Recovery Actions and a "Strategy <uuid>" line. Not blocking; left.
 
@@ -154,7 +262,7 @@ unchanged; Cloud claims are NOT rewritten as local evidence.
 
 ---
 
-# ACTIVE TASK — R3 FULL-REBASED-B1 INTEGRATION (CLOUD)
+# ACTIVE TASK ΓÇö R3 FULL-REBASED-B1 INTEGRATION (CLOUD)
 
 Live working-memory ledger for the R3 Cloud lane. Reread before every phase, before every
 checkpoint commit/push, and before the final report. The R2 local-acceptance ledger, the R2
@@ -178,32 +286,32 @@ Cloud ledger and the R1 history below are preserved unchanged and are NOT rewrit
 ## R3 objective
 
 Prove the complete rebased B1 flow through the **normal production composition**. R3 is
-composition + end-to-end product integration over the accepted R1/R2 foundation — no rebuild
+composition + end-to-end product integration over the accepted R1/R2 foundation ΓÇö no rebuild
 of the PostgreSQL ownership/state model, M6, RC-6, the coordinator core, decision evidence,
 the comparator, the domain registry, the proposers, durable attention, C4 progression,
 internal ActionPlan execution, authority, reconciliation, the Case workspace, focused V5.6
 graph semantics, the immutable Original snapshot, the polling model or the renderer
 architecture.
 
-## Phase 0 recon — COMPLETE (six parallel read-only lanes, reconciled by PRIMARY)
+## Phase 0 recon ΓÇö COMPLETE (six parallel read-only lanes, reconciled by PRIMARY)
 
 Verified: **exactly two** real composition gaps exist at the R2 base; every other B1 step
 already exists and is composed.
 
 | Lane | Finding |
 | --- | --- |
-| A1 runtime composition | `composeTargetBoot.ts:182-187` builds the coordinator with only `pool/workspaceId/actorPrincipalId/uow` — no `transportPlanning`. C4 already receives that one instance (`recoveryProgressionPass.ts:237`). **No provider adapter is composed in target boot at all.** |
-| A2 stale HTTP seam | `POST /api/v2/cases/:id/strategies` (`targetHttpHandlers.ts:317-327`) calls the pre-R1 `proposeRecoveryStrategies`; sole importer is `targetHttpHandlers.ts:5`. `planCaseDetailed` has **zero** production callers. `runtimeHooks` is the established boot→HTTP seam. |
-| A3 passengers | `transportPlanning.passengers` is a **static** value threaded into 4 call sites. **Age categories exist nowhere in canonical state** — `travellers` has no DOB/age/type; `allocation_role` is free-form. |
+| A1 runtime composition | `composeTargetBoot.ts:182-187` builds the coordinator with only `pool/workspaceId/actorPrincipalId/uow` ΓÇö no `transportPlanning`. C4 already receives that one instance (`recoveryProgressionPass.ts:237`). **No provider adapter is composed in target boot at all.** |
+| A2 stale HTTP seam | `POST /api/v2/cases/:id/strategies` (`targetHttpHandlers.ts:317-327`) calls the pre-R1 `proposeRecoveryStrategies`; sole importer is `targetHttpHandlers.ts:5`. `planCaseDetailed` has **zero** production callers. `runtimeHooks` is the established bootΓåÆHTTP seam. |
+| A3 passengers | `transportPlanning.passengers` is a **static** value threaded into 4 call sites. **Age categories exist nowhere in canonical state** ΓÇö `travellers` has no DOB/age/type; `allocation_role` is free-form. |
 | A4 acceptance map | Only the two expected gaps. No other real gap. |
-| A5 graph layout | `computeLayout` (`layout.ts:48`) ranks longest-path from sources → traveller-rooted star. `causalNodeRefs` is ordered and already computed (`index.ts:53`) but **not passed** to `computeLayout` (`index.ts:68`). |
+| A5 graph layout | `computeLayout` (`layout.ts:48`) ranks longest-path from sources ΓåÆ traveller-rooted star. `causalNodeRefs` is ordered and already computed (`index.ts:53`) but **not passed** to `computeLayout` (`index.ts:68`). |
 | A6 test plan | `test/suites.json` must register every new file or the boundary gate fails `UNCLASSIFIED`. Anti-hardcoding scans `src/` only; tests/fixtures are exempt. |
 
 ### PRIMARY overrides of recon recommendations (binding on all lanes)
 
 1. **A3's "count Trip co-travellers" default is REJECTED as unsafe.**
    `pgWorldReader.ts:100-104` loads `journeys` only for ids in the manifest focus, so a Trip's
-   sibling journeys are generally absent from the captured planning world — that derivation
+   sibling journeys are generally absent from the captured planning world ΓÇö that derivation
    would silently return 1, i.e. a hardcoded `adults: 1` disguised as state derivation.
    Authoritative path instead: `world.allocations` by `journeyItemId` (includes peer-traveller
    expansion, `pgWorldReader.ts:258-366`), else the corridor's own journey's single traveller
@@ -218,8 +326,8 @@ already exists and is composed.
 3. **A4's "migration 0126 / `original_case_graph_snapshots`" is CORRECTED**: the Original
    snapshot is migration **0127**, table `recovery_case_graph_snapshots`. Migrations apply
    through 0127.
-4. **A1's "passengers may come from env/config" is REJECTED** — no runtime constant, no
-   env-var demo value. It must be derived per §3 of the R3 contract.
+4. **A1's "passengers may come from env/config" is REJECTED** ΓÇö no runtime constant, no
+   env-var demo value. It must be derived per ┬º3 of the R3 contract.
 
 ### New risk surfaced by PRIMARY (not in any lane report)
 
@@ -231,13 +339,13 @@ execute them: migration is typechecked here and proven locally.
 
 ## Lane ownership
 
-- LANE A — normal runtime transport-research composition (`composeTargetBoot`, provider
+- LANE A ΓÇö normal runtime transport-research composition (`composeTargetBoot`, provider
   capabilities, passenger resolver). PRIMARY owns the shared contract; write lane delegated.
-- LANE B — retire the stale product planning seam; route HTTP through the shared coordinator;
+- LANE B ΓÇö retire the stale product planning seam; route HTTP through the shared coordinator;
   UI control contract; migrate the two CURRENT_TARGET PG tests; static regression guard.
-- LANE C — author the full B1 PostgreSQL acceptance test + preserve the second generality proof.
-- LANE D — causal-spine layout (presentation only).
-- LANE V — independent verification / anti-hardcoding audit.
+- LANE C ΓÇö author the full B1 PostgreSQL acceptance test + preserve the second generality proof.
+- LANE D ΓÇö causal-spine layout (presentation only).
+- LANE V ΓÇö independent verification / anti-hardcoding audit.
 - PRIMARY retains: architecture, shared contracts, runtime composition, provider/research
   boundary decisions, integration, final acceptance judgement, and all edits to
   `test/suites.json`.
@@ -259,12 +367,12 @@ milestone-acceptance activity only and never runs here.
 | R3-C2 | Product planning path uses the accepted coordinator + regression guard | part 1 `ac1b644` + part 2 `4f3de02` (pushed) |
 | R3-C3 | Full B1 PostgreSQL acceptance test authored + typechecked | `4323d2e` (pushed; PG execution is a LOCAL proof) |
 | R3-C4 | Causal-spine layout improvement | `053e6b0` (pushed) |
-| R3-C5 | Cloud integration (focused + adjacent + typecheck + lint + boundary + anti-hardcoding + CURRENT_TARGET once) | verified at HEAD `4323d2e`: focused R3 suites 24/24 + adjacent R1 20/20, CURRENT_TARGET **1036/1036** (v24 binary — bare `npm test` uses node v20 which cannot strip TS types), typecheck clean, full ESLint clean, boundary 232 CLEAN, anti-hardcoding CLEAN |
+| R3-C5 | Cloud integration (focused + adjacent + typecheck + lint + boundary + anti-hardcoding + CURRENT_TARGET once) | verified at HEAD `4323d2e`: focused R3 suites 24/24 + adjacent R1 20/20, CURRENT_TARGET **1036/1036** (v24 binary ΓÇö bare `npm test` uses node v20 which cannot strip TS types), typecheck clean, full ESLint clean, boundary 232 CLEAN, anti-hardcoding CLEAN |
 | docs | Local acceptance handoff (20 proofs + exact commands) | `6d72a16` (pushed) |
 
 R3 commit log on `feat/r3-full-rebased-b1-cloud` (base `6118f427`):
-`50ec443` → `edc0b52` (C1) → `053e6b0` (C4) → `6d72a16` (handoff) → `ac1b644` (C2.1)
-→ `4f3de02` (C2.2, HEAD). Cloud-verified so far: typecheck clean, focused R3 suites
+`50ec443` ΓåÆ `edc0b52` (C1) ΓåÆ `053e6b0` (C4) ΓåÆ `6d72a16` (handoff) ΓåÆ `ac1b644` (C2.1)
+ΓåÆ `4f3de02` (C2.2, HEAD). Cloud-verified so far: typecheck clean, focused R3 suites
 green, import guard 7/7, boundary gate 231 files CLASSIFIED, anti-hardcoding CLEAN.
 
 ## Unresolved local proofs
@@ -283,7 +391,7 @@ Cloud may be reported as PG-proven, browser-proven or LIVE-proven.
    NEW pure `r3-import-guard.test.ts` 7/7; suites registered; boundary 231 CLEAN.
    Commit `4f3de02` pushed.
 5. [DONE] Lane C (`r3ComposedB1Full.pgtest.ts`) committed as R3-C3 `4323d2e`; Lane V audit
-   complete — 9/10 PASS, one HIGH finding (materialization dropped `passengersFor`) FIXED in
+   complete ΓÇö 9/10 PASS, one HIGH finding (materialization dropped `passengersFor`) FIXED in
    the same commit with a resolver-only regression test; the two LOW items (formatting glitch,
    suites.json classification) also resolved.
 6. [DONE] R3-C5 Cloud integration verified at HEAD (see checkpoint table). Ledger updated.
@@ -292,7 +400,7 @@ Cloud may be reported as PG-proven, browser-proven or LIVE-proven.
 
 ---
 
-# ACTIVE TASK — R2 LOCAL ACCEPTANCE (durable Original + PG + browser)
+# ACTIVE TASK ΓÇö R2 LOCAL ACCEPTANCE (durable Original + PG + browser)
 
 Ledger for the R2 LOCAL integration/product-acceptance lane. The R2 Cloud ledger and the
 R1 history below are preserved unchanged.
@@ -344,7 +452,7 @@ title; place names + UTC windows; `humanizeCode` + subject labels; init-on-show/
 - Browser (`accept.mjs`, 31/31): stored Original renders; pan/zoom/home/views/selection; alert no pulse, watch 3.6s, reduced-motion none;
   polling ~4s with `sinceCursor`, no swap when unchanged, hidden pauses, terminal stops; Original tab + graph state survive swaps;
   Original byte-identical after approve/execute/resolve, page refresh and full browser restart; Current becomes healthy; no WS/SSE; no console errors.
-- Generality: connection world (no programme) renders through the same code — no programme/objective nodes, no Sarah geometry.
+- Generality: connection world (no programme) renders through the same code ΓÇö no programme/objective nodes, no Sarah geometry.
 
 ## R3 / carry-forward (not R2)
 
@@ -355,7 +463,7 @@ header subtitle is backend `changeSummary` prose with raw codes.
 
 ---
 
-# ACTIVE TASK — R2 Case Decision Surface + Focused Graph (CLOUD)
+# ACTIVE TASK ΓÇö R2 Case Decision Surface + Focused Graph (CLOUD)
 
 Live working-memory ledger for the R2 Cloud implementation lane. Reread before every
 major phase, before every checkpoint commit/push, and before the final report. The
@@ -371,7 +479,7 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 - Role: PRIMARY R2 Case-decision-surface + focused-graph implementation lead.
 - Harness: Qoder Cloud sandbox. Node v24 for tests is `/opt/playwright-driver/node`
   (v24.15.0); the default `node` is v20 and CANNOT strip TS types. Pure `current`
-  tests DO run here via the v24 binary. **No PostgreSQL, no browser** — physical/visual
+  tests DO run here via the v24 binary. **No PostgreSQL, no browser** ΓÇö physical/visual
   acceptance DEFERRED to local.
 - Authoritative contract: `docs/work/R2_CASE_DECISION_SURFACE_CONTRACT.md` (R2-C0 freeze).
 
@@ -389,7 +497,7 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 ## R2 lane status
 
 - Phase 0 recon (A1-A5 read-only): COMPLETE. Findings reconciled by PRIMARY.
-- R2-C1 part 1 (contract + pure causal mapping): DONE — SHA
+- R2-C1 part 1 (contract + pure causal mapping): DONE ΓÇö SHA
   `333615dcb8030d181dad3dffec10843ed0ff2f2b` (pushed). `FocusedGraphView` frozen;
   `projectFocusedGraph` pure; 8/8 focused tests; current suite 941/941.
 
@@ -397,7 +505,7 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 
 - **Lane B renderer entry** (`src/ui/graph/index.ts`):
   `renderFocusedCaseGraph(input: { ldg: LiveDependencyGraph; focusedGraph?: FocusedGraphView; caseStatus: RecoveryCaseView['status']; }): string`
-  — server-rendered HTML/SVG string. B internally calls the EXISTING
+  ΓÇö server-rendered HTML/SVG string. B internally calls the EXISTING
   `presentDependencyGraph` (single semantic mapping layer) with `causalRefs`
   from `focusedGraph.causalNodeRefs` and `causalEdgeIndices` looked up from
   `focusedGraph.causalEdgeIds` (index lookup, never traversal). Pulse = CSS
@@ -410,7 +518,7 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 - **Lane C** consumes B + D via PRIMARY integration after wave 1 lands.
 - Children never commit; PRIMARY reviews every diff, runs gates, commits/pushes
   per lane. New test files must be reported for `test/suites.json` classification
-  (shared file — PRIMARY edits only).
+  (shared file ΓÇö PRIMARY edits only).
 - Test runtime in Cloud: `/opt/playwright-driver/node --test <files>` (v24).
   Default `node` is v20 and cannot strip TS types.
 
@@ -421,7 +529,7 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
     `attention`, `strategies`, `recoveryActions`, `connectionProgression`, `ldg`,
     `change`. Missing: explicit causal-ref mapping, first-breakpoint pointer, Original
     snapshot. HTTP: `GET /api/v2/cases/:id` (+`?sinceCursor`, `?format=html`).
-  - A2 Case archaeology: TWO case UIs — rich `operator-case.ts` (18 sections, served
+  - A2 Case archaeology: TWO case UIs ΓÇö rich `operator-case.ts` (18 sections, served
     ONLY by retired SQLite `src/server/http.ts`) and PG-served `product-recovery-case.ts`
     (poorer). R2 enriches `product-recovery-case.ts` over `RecoveryCaseView`; uses
     `operator-case.ts` as IA reference ONLY; never rewires SQLite. "blast radius" is a
@@ -429,10 +537,10 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
   - A3 renderer: NO visual graph renderer in `src/ui` (only semantic adapter + grid
     contract-lab). V5.6 prototype uses manual CSS positions + hardcoded Sarah scenario;
     production needs a deterministic left-to-right layout, no scenario tokens.
-  - A4 conflict audit: 10 statements; all resolved in C0 §9.
+  - A4 conflict audit: 10 statements; all resolved in C0 ┬º9.
   - A5 test map: pure tests run on v24 binary; PG/browser deferred. New pure tests
     proposed under `test/r2-*.test.ts` (classify in `test/suites.json`).
-- LANE A (focused projection): COMPLETE — integrated C1 part 2, SHA
+- LANE A (focused projection): COMPLETE ΓÇö integrated C1 part 2, SHA
   `8d434e1` (pushed). `projectFocusedCaseGraph.ts` pure enrichment +
   `pgFactAssembler.ts` wiring; SERVICE_BOOKING/TRANSFER_STAY/PROGRAMME_COMMITMENT
   nodes + RELIES_ON/MUST_HAPPEN_BEFORE/PARTICIPATES_IN edges; traveller display
@@ -440,18 +548,18 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
   `JOURNEY:<id>` (matches contract + refLabel). **OBJECTIVE contract gap: PRIMARY
   VERDICT = DO NOT add an OBJECTIVE LdgNodeKind in R2.** Trip purpose stays in the
   existing `objectives` ontology and is presented AROUND the graph (planning
-  evidence / first-breakpoint wording), never as a causal-map node — consistent with
+  evidence / first-breakpoint wording), never as a causal-map node ΓÇö consistent with
   frozen decisions 002/006 (current-world causal map only). `objectiveContractGap`
   is retained as an honest uncertainty note, not a defect.
-- LANE B (renderer): COMPLETE — C2, SHA `62dda44` (pushed). `src/ui/graph/*`
+- LANE B (renderer): COMPLETE ΓÇö C2, SHA `62dda44` (pushed). `src/ui/graph/*`
   (1520 lines) `renderFocusedCaseGraph` via `presentDependencyGraph` single
   semantic layer; deterministic layout; CSS-only pulse from tone; no backend
   liveness; 29 tests.
-- LANE C (Case workspace): COMPLETE — C3, SHA `545e8d7` (pushed).
+- LANE C (Case workspace): COMPLETE ΓÇö C3, SHA `545e8d7` (pushed).
   `product-recovery-case.ts` composes graph + Original/Current toggle + planning
   evidence AROUND the graph + change-awareness data attrs + polling/toggle scripts;
   12 integration tests (`r2-case-workspace-integration.test.ts`).
-- LANE D (Original/Current + polling): COMPLETE — C4, SHA `144c951` (pushed).
+- LANE D (Original/Current + polling): COMPLETE ΓÇö C4, SHA `144c951` (pushed).
   `casePolling.ts` (4s complete-snapshot, sinceCursor echo, revision-gated, no
   WS/SSE) + `originalCurrent.ts` (session-local memory-only capture, honest
   labels/empty state); 31 tests. PRIMARY VERDICT: durable disruption-time
@@ -461,13 +569,13 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
 
 ## R2 checkpoint SHAs
 
-- R2-C0 contract freeze: DONE — SHA `df3d8bffaf477da04d5b802104fa3356b7304816` (pushed, local == origin).
-- R2-C1 focused projector: DONE — part 1 `333615d` (pure causal mapping + contract);
+- R2-C0 contract freeze: DONE ΓÇö SHA `df3d8bffaf477da04d5b802104fa3356b7304816` (pushed, local == origin).
+- R2-C1 focused projector: DONE ΓÇö part 1 `333615d` (pure causal mapping + contract);
   part 2 `8d434e1` (Lane A backend enrichment + subjectHumanLabels). Both pushed.
-- R2-C2 renderer: DONE — `62dda44` (pushed).
-- R2-C3 Case workspace: DONE — `545e8d7` (pushed).
-- R2-C4 Original/Current + polling: DONE — `144c951` (pushed).
-- R2-C5 Cloud integration: DONE — all four lanes integrated into ONE Case decision
+- R2-C2 renderer: DONE ΓÇö `62dda44` (pushed).
+- R2-C3 Case workspace: DONE ΓÇö `545e8d7` (pushed).
+- R2-C4 Original/Current + polling: DONE ΓÇö `144c951` (pushed).
+- R2-C5 Cloud integration: DONE ΓÇö all four lanes integrated into ONE Case decision
   workspace (`product-recovery-case.ts`), PG integration proof authored/typechecked
   (`2c290ad`), local acceptance handoff written (`f11baab`), and the required
   `subjectLabels` contract field + `projectRecoveryCase` wiring committed (`19d85bd`,
@@ -475,8 +583,8 @@ completed R1 acceptance/history is preserved below and is NOT rewritten.
   verification on committed HEAD `19d85bd`: typecheck clean, full ESLint clean
   (exit 0), boundary gate 225 files, anti-hardcoding gate clean, `current` suite
   1013/1013 pass. Working tree clean; local == origin.
-  Terminal status: **R2 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION
-  ACCEPTANCE** (proofs 8–14 in `docs/work/R2_LOCAL_ACCEPTANCE_HANDOFF.md` need real
+  Terminal status: **R2 CLOUD IMPLEMENTATION COMPLETE ΓÇö REQUIRES LOCAL INTEGRATION
+  ACCEPTANCE** (proofs 8ΓÇô14 in `docs/work/R2_LOCAL_ACCEPTANCE_HANDOFF.md` need real
   PostgreSQL + a browser, neither available in Cloud).
 
 ## R2 Cloud limitations
@@ -493,7 +601,7 @@ passed / transaction behaviour proven / visual acceptance unless it actually ran
 
 ---
 
-# ACTIVE TASK — R1 Planning + Decision-Evidence Parity (LOCAL INTEGRATION)
+# ACTIVE TASK ΓÇö R1 Planning + Decision-Evidence Parity (LOCAL INTEGRATION)
 
 Live working-memory ledger for the R1 local integration and acceptance lane. Reread this
 file before every major phase, before every checkpoint commit/push, and before the final
@@ -501,48 +609,48 @@ report. The completed Cloud implementation record remains below as historical ha
 evidence. The completed truth-rebase/contract-freeze planning ledger is preserved at
 `docs/work/TRUTH_REBASE_CONTRACT_FREEZE_ACTIVE_TASK.md` and is NOT rewritten here.
 
-## Local integration snapshot — 2026-09-19
+## Local integration snapshot ΓÇö 2026-09-19
 
 - Branch: `feat/r1-local-integration`, created directly from accepted Cloud handoff
   `e3598642058e6329e8a7e800d052a15773686488`.
 - PostgreSQL: isolated disposable PostGIS 16 container on port `55433`; migrations through
   `0126_recovery_case_attention.sql` apply cleanly through the normal test harness.
-- L1 status: **COMPLETE — commit `2c46bd4535402db780815de0557a98d1e5e2595e` pushed.** The Cloud coordinator
+- L1 status: **COMPLETE ΓÇö commit `2c46bd4535402db780815de0557a98d1e5e2595e` pushed.** The Cloud coordinator
   committed viable strategies, PlanningAttempt, and final case phase in separate Units of
   Work. It now uses one `RECOVERY_PLANNING_COMPLETED` UnitOfWork command, with fresh basis
   and pending-reassessment guards before promotion. Fault injection proves strategy,
   PlanningAttempt, and `AWAITING_AUTHORITY` roll back together; success commits together.
 - LangGraph decision resolved: **REJECTED** (runtime-spiked; history below is preserved and the
   old DEFERRED-LANGGRAPH classification is superseded). C4: **BESPOKE RECONCILE-FROM-POSTGRES
-  IMPLEMENTED** — see L4B. No LangGraph package/table, no RuntimeOrchestrator, no cursor.
-- L2 transport status: **COMPLETE — commit `acc83b45bf24b5cbb75ae6bde01da3d4dbe222dc` pushed.**
+  IMPLEMENTED** ΓÇö see L4B. No LangGraph package/table, no RuntimeOrchestrator, no cursor.
+- L2 transport status: **COMPLETE ΓÇö commit `acc83b45bf24b5cbb75ae6bde01da3d4dbe222dc` pushed.**
   `PgWorldReader` retains `place_external_refs`; the coordinator optionally composes the
   read-only transport seam; searched offers become provenance-carrying services only in an
   isolated planning capture, never bookings or canonical PostgreSQL transport rows.
-- L3 C9 PG status: **COMPLETE — commit `8a78f8c39c136de00be19c3742da7380b72cc15a` pushed.**
+- L3 C9 PG status: **COMPLETE ΓÇö commit `8a78f8c39c136de00be19c3742da7380b72cc15a` pushed.**
   `postgres-integration/r1PlanningEvidenceProjection.pgtest.ts` (5/5) runs the REAL coordinator on
   the generic programme world and reads the attempt through `findLatestRecoveryPlanningAttemptForCase
   -> loadRecoveryCaseFactsInner -> projectRecoveryCase`: no attempt => no planning block; domains,
   rejected/viable candidates + deterministic reasons, recommendation, the three impact concepts,
   decision-time `asOf`; a later canonical change (approve/execute/resolve) does not rewrite the
-  attempt. Known R2 gap: outcome-delta subject labels are generic ("Journey") — refs are secondary
+  attempt. Known R2 gap: outcome-delta subject labels are generic ("Journey") ΓÇö refs are secondary
   but the human label does not yet name the traveller (current-state `strategies[]` does).
-- L4A ESCALATE: **COMPLETE — commit `c6791bf6a780fef179d0e9c4dae36dd4eab66b34` pushed.** Design
+- L4A ESCALATE: **COMPLETE ΓÇö commit `c6791bf6a780fef179d0e9c4dae36dd4eab66b34` pushed.** Design
   hypothesis confirmed: escalation is ORTHOGONAL to case phase. No ESCALATED phase; migration
   `0126_recovery_case_attention.sql` adds a Case-owned `recovery_case_attention` record
   (case + basis assessment + closed reason; OPEN -> RESOLVED only; never deleted), idempotent per
   (case, basis, reason), cleared by a superseding basis or by `resolveRecoveryCase` (same tx),
   surfaced as `RecoveryCaseView.attention[]`. Reasons: `no_safe_recovery_remaining`,
   `human_evidence_or_decision_required`. Not a new ontology entity.
-- L4B C4 progression: **COMPLETE — commit `5fb337b627c2234c9bc75e6c196425e5f16519cf` pushed.**
+- L4B C4 progression: **COMPLETE ΓÇö commit `5fb337b627c2234c9bc75e6c196425e5f16519cf` pushed.**
   `src/app/target/recoveryProgressionPass.ts`, composed once in the `caseLifecycle` runtime service
   (replaces the resolve-only pass; existing periodic + `runNow` semantics). Per wake, per
   non-terminal case with a JOURNEY/TRIP subject: settled current basis -> resolution gate +
   attempt facts -> frozen C8 decision -> one dispatch (`resolveRecoveryCase` / `planCase` /
   attention). Unsettled assessment => WAIT. Progression never dispatches or retries execution.
   Focused PG `r1RecoveryProgression.pgtest.ts` 8/8.
-- L5 composed B1: **COMPLETE — commit `e8036bb401f63975b9ed886b77de7047aadc83ff` pushed.**
-  `postgres-integration/r1ComposedB1.pgtest.ts` — one PostgreSQL-backed loop driven only by C4 wakes:
+- L5 composed B1: **COMPLETE ΓÇö commit `e8036bb401f63975b9ed886b77de7047aadc83ff` pushed.**
+  `postgres-integration/r1ComposedB1.pgtest.ts` ΓÇö one PostgreSQL-backed loop driven only by C4 wakes:
   provider-shaped change -> whole-trip FAIL -> REPLAN (coordinator) -> TRANSPORT + PROGRAMME investigated
   (an arrival-readiness deficit now activates TRANSPORT through a dimension-scoped reason token) ->
   read-only REPLAY flight research (provider/provenance on the Case view) -> RC-6 rejects the boardable
@@ -551,13 +659,13 @@ evidence. The completed truth-rebase/contract-freeze planning ledger is preserve
   two internal intents -> existing internal execution -> canonical programme change -> reassessment ->
   C4 RESOLVE. The winning strategy was not encoded; it emerged from domains + evidence + RC-6 + comparator.
   The Case read model now also surfaces the stored `resolution_summary`.
-- L6 unknown outcome / reconciliation: **COMPLETE — commit `de2f5088fbb1e970a8b8497e54606dceb0c92156` pushed.**
+- L6 unknown outcome / reconciliation: **COMPLETE ΓÇö commit `de2f5088fbb1e970a8b8497e54606dceb0c92156` pushed.**
   `r1UnknownOutcome.pgtest.ts` (4/4) on the real stored-execution/provider boundary: LOST_RESPONSE ->
   OUTCOME_UNKNOWN -> repeated C4 wakes only WAIT; dispatcher (provider mutation) call count stays 1; blind
   redispatch refused; STILL_UNKNOWN / FOUND_FAILURE keep WAITing with no retry; FOUND_SUCCESS is the only
   path to RESOLVE (through the gate). Also `r1RecoveryProgression.pgtest.ts`: an approved plan that completed
   without changing the basis escalates rather than replanning the same basis.
-- Second generality: **COMPLETE (same commit).** `r1ConnectionRecovery.pgtest.ts` — no programme at all: a
+- Second generality: **COMPLETE (same commit).** `r1ConnectionRecovery.pgtest.ts` ΓÇö no programme at all: a
   broken connection (`connection_feasibility`) through the same coordinator/registry/evidence/RC-6/
   comparator/C4 (TRANSPORT+TRANSFER investigated, PROGRAMME not applicable; one recorded corridor searched,
   the corridor with an unresolvable airport skipped, not invented; one viable offer recommended, later offers
@@ -573,20 +681,20 @@ evidence. The completed truth-rebase/contract-freeze planning ledger is preserve
 - Delegated lanes: none (shared mutable working tree; primary retains integration).
 - Next action: R2.
 
-## R1 local acceptance — 2026-09-19
+## R1 local acceptance ΓÇö 2026-09-19
 
-Status: **R1 ACCEPTED — READY FOR R2**
+Status: **R1 ACCEPTED ΓÇö READY FOR R2**
 
 - C9 real-PG projection proof, truthful durable escalation, C4 focused proof, composed B1 through C4,
   unknown-outcome safety and a second generality case: all proven on PostgreSQL (L3-L6 above).
 - `CURRENT_TARGET` (`npm test`): 933/933. Typecheck, full ESLint and the anti-hardcoding gate: clean.
 - Full PostgreSQL suite (fresh DB, run once): 552/556. Of the 4 failures: 2 were stale expectations of
-  mine (migration-lane allocation list for 0125/0126; jsonb allowlist for the 0125 attempts table) — fixed and
+  mine (migration-lane allocation list for 0125/0126; jsonb allowlist for the 0125 attempts table) ΓÇö fixed and
   re-verified; 1 was `r1ConnectionRecovery.pgtest.ts` failing at file start in 0.7s with no assertion (the
   documented PGTEST-FILE-STARTUP-RACE), passing on rerun; 1 is `m10RuntimePurgeBoot.pgtest.ts`, which fails
   identically at baseline with these changes stashed (pre-existing, unrelated).
 - The fixed/rerun files passed together sequentially (25/25). A second full-suite run was not repeated.
-- Docs reconciled: this ledger, `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` §11 (R1 local resolution of C8) and
+- Docs reconciled: this ledger, `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` ┬º11 (R1 local resolution of C8) and
   `docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md` (historical DEFERRED-LANGGRAPH rows preserved, reconciliation note added).
 - Carry-forward for R2/B2 (not R1 defects): external approval/execution composition (external `SELECT_OFFER` is
   recommended but refused at approval); outcome-delta subject labels are generic ("Journey").
@@ -610,14 +718,14 @@ and left alone; the working branch stays pinned to `456be3e`.
 Implement as much of R1 "Planning + Decision-Evidence Parity" as can be TRUTHFULLY
 completed in the Cloud sandbox: materialize the frozen recovery-planning contracts,
 author (not execute) the PostgreSQL persistence, build the production coordinator
-that extends the existing `recoveryPlanning.ts` seam, and prove generality — while
+that extends the existing `recoveryPlanning.ts` seam, and prove generality ΓÇö while
 deferring every check that genuinely requires PostgreSQL/LIVE providers to a LOCAL
 integration-acceptance ledger.
 
 Terminal status for this task is EXACTLY one of:
-- `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`
-- `R1 CLOUD IMPLEMENTATION BLOCKED — <blocker>`
-NEVER `R1 ACCEPTED — READY FOR R2`.
+- `R1 CLOUD IMPLEMENTATION COMPLETE ΓÇö REQUIRES LOCAL INTEGRATION ACCEPTANCE`
+- `R1 CLOUD IMPLEMENTATION BLOCKED ΓÇö <blocker>`
+NEVER `R1 ACCEPTED ΓÇö READY FOR R2`.
 
 ## Product truth (non-negotiable)
 
@@ -639,30 +747,30 @@ migrations, author PG commands/repositories, run pure/unit/module tests, use
 checked-in credential-free REPLAY recordings, typecheck, lint, run anti-hardcoding
 gates, inspect code, and build production implementation.
 
-## Frozen contracts materialized (Phase B — PRIMARY)
+## Frozen contracts materialized (Phase B ΓÇö PRIMARY)
 
 All under `src/contracts/v2/planning/`, exported via `src/contracts/v2/index.ts`:
 
-- [x] C1 `recoveryPlanningAttempt.ts` — RecoveryPlanningCoordinator port, bounded
+- [x] C1 `recoveryPlanningAttempt.ts` ΓÇö RecoveryPlanningCoordinator port, bounded
       immutable attempt record, closed outcome/reason vocabularies, materiality rules.
-- [x] C2 `planningTool.ts` — read-only PlanningTool request/result protocol,
+- [x] C2 `planningTool.ts` ΓÇö read-only PlanningTool request/result protocol,
       canonical fingerprint, dedupe, bounded research budget.
-- [x] C3 `recoveryDomain.ts` — recovery-domain registry, hybrid deterministic+AI
+- [x] C3 `recoveryDomain.ts` ΓÇö recovery-domain registry, hybrid deterministic+AI
       selection, fail-closed.
-- [x] C4 `proposerAdaptation.ts` — additive domain/evidence context for proposers;
+- [x] C4 `proposerAdaptation.ts` ΓÇö additive domain/evidence context for proposers;
       base StrategyProposer port unchanged.
 - [x] C5 (with C1) material decision evidence inside the attempt record.
-- [x] C6 `strategyRecommendation.ts` — viable-only recommendation + deterministic
+- [x] C6 `strategyRecommendation.ts` ΓÇö viable-only recommendation + deterministic
       validation rejecting non-viable/stale/foreign refs; preference precedence.
-- [x] C7 `impactSemantics.ts` — three distinct impact projections as pure functions.
-- [x] C8 `recoveryProgression.ts` — single post-reassessment progression decision
+- [x] C7 `impactSemantics.ts` ΓÇö three distinct impact projections as pure functions.
+- [x] C8 `recoveryProgression.ts` ΓÇö single post-reassessment progression decision
       (RuntimeOrchestrator stays retired).
 - [x] barrel `index.ts`.
-- [x] C9 Case projection — decision-time planning evidence surfaced on the
+- [x] C9 Case projection ΓÇö decision-time planning evidence surfaced on the
       PostgreSQL Case read model (human labels primary, typed refs/codes
       secondary; `phase:'DECISION_TIME'`+`asOf` visibly separate it from current
       authoritative state). Part 9, `a9024c4`.
-- [x] C10 B1/B2 acceptance — coverage map + PRIMARY gap reconciliation
+- [x] C10 B1/B2 acceptance ΓÇö coverage map + PRIMARY gap reconciliation
       (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`). Part 10, `ac668e6`.
 
 ## Ownership map (PRIMARY retains)
@@ -675,20 +783,20 @@ All under `src/contracts/v2/planning/`, exported via `src/contracts/v2/index.ts`
 
 ## Phase C write lanes (fan out ONLY after C1 push)
 
-- Lane P — planner core: extend `src/app/target/recoveryPlanning.ts` into the C1
+- Lane P ΓÇö planner core: extend `src/app/target/recoveryPlanning.ts` into the C1
   coordinator; read-only tool dispatch; transport proposer; comparator/preferences.
-- Lane E — persistence: RecoveryPlanningAttempt repository/command over migration
+- Lane E ΓÇö persistence: RecoveryPlanningAttempt repository/command over migration
   0125; impact-projection projections wired into the attempt record.
-- Lane V — verification: pure Cloud-runnable tests (contracts, coordinator with
+- Lane V ΓÇö verification: pure Cloud-runnable tests (contracts, coordinator with
   injected fakes at the SEAM only, REPLAY-based) + the LOCAL-required pg list.
-- Lane X — Case projection (C9): static review of the PostgreSQL Case read model.
+- Lane X ΓÇö Case projection (C9): static review of the PostgreSQL Case read model.
 
 Each lane branches from the C1 SHA and returns exact-path diffs; PRIMARY
 reconciles and integrates.
 
 ## Checkpoints
 
-- [x] Phase A recon (A1-A5 read-only) — complete.
+- [x] Phase A recon (A1-A5 read-only) ΓÇö complete.
 - [x] Phase B contracts materialized + typecheck clean.
 - [x] C1 checkpoint: contracts + migration 0125 authored + pure tests green +
       suites.json classification + ACTIVE_TASK ledger + this doc.
@@ -696,7 +804,7 @@ reconciles and integrates.
       - branch: `feat/r1-planning-parity-cloud`
       - C1 SHA: `c7bb86a740b2370f97998e14b3fe3fa7fe13e9ef` (local == origin)
       - Phase C lanes branch from this SHA.
-- [x] C3 foundation — pure decision-evidence assembly
+- [x] C3 foundation ΓÇö pure decision-evidence assembly
       (`src/resolution/planning/decisionEvidence.ts`): the bridge from real RC-6
       `EvaluateStrategyResult` + closure to the three frozen impact projections
       (C7) and MaterialCandidateEvidence (C5), validated against the contract.
@@ -704,7 +812,7 @@ reconciles and integrates.
       migration 0125 CHECK). 46 pure tests pass; full `current` suite 876/876.
       Commit `feat(r1): assemble decision evidence from real RC-6 output`.
       - SHA: `a183cebf165287dd1093cc606cea1d12cffa7bf0` (local == origin)
-- [x] Lane E — RecoveryPlanningAttempt persistence
+- [x] Lane E ΓÇö RecoveryPlanningAttempt persistence
       (`src/persistence/postgres/commands/r1PlanningAttemptCommands.ts`): idempotent
       command over migration 0125 (not an aggregate root; `advanced: []`, mirrors
       `completeChangeSignal`), uuid-narrowing at the DB boundary, FK pre-checks,
@@ -713,8 +821,8 @@ reconciles and integrates.
       `postgres`; NOT executed in Cloud). Typecheck/lint/boundary clean.
       Commit `feat(r1): persist RecoveryPlanningAttempt over migration 0125`.
       - SHA: `4aefbd0` (local == origin)
-- [x] Lane P (part 1) — C6 comparator
-      (`src/resolution/planning/comparator.ts`): pure viable-only ranking —
+- [x] Lane P (part 1) ΓÇö C6 comparator
+      (`src/resolution/planning/comparator.ts`): pure viable-only ranking ΓÇö
       precedence-ordered preference alignment, then deterministic facts
       (regressions, improvements, blast radius, declared cost; absent cost sorts
       last), then stable ref tiebreak; refusal (undefined) when no usable
@@ -723,7 +831,7 @@ reconciles and integrates.
       full `current` suite 887/887; typecheck/lint/boundary/anti-hardcoding clean.
       Commit `feat(r1): select viable-only recommendation deterministically (C6 comparator)`.
       - SHA: `b6ed62ee0c4d595c1b027c054df099325ddc0da2` (local == origin)
-- [x] Lane P (part 2) — C3 domain registry + C2 research dispatcher foundations
+- [x] Lane P (part 2) ΓÇö C3 domain registry + C2 research dispatcher foundations
       (`src/resolution/planning/recoveryDomains.ts`,
       `src/resolution/planning/researchDispatcher.ts`): deterministic domain
       activation from REAL M6 blocking dimension codes only (no scenario
@@ -735,7 +843,7 @@ reconciles and integrates.
       anti-hardcoding clean.
       Commit `feat(r1): deterministic recovery-domain registry and bounded read-only research dispatcher`.
       - SHA: `8101ced6a49ba7740472a62a38d792fc2e971c81` (local == origin)
-- [x] Lane P (part 3) — pure selection layer
+- [x] Lane P (part 3) ΓÇö pure selection layer
       (`src/resolution/planning/planningSelection.ts`): comparator-fact
       derivation from the frozen impact projections (worseCount/betterCount from
       outcomeDelta, blastRadiusSize from immediate blast radius; no facts for a
@@ -745,9 +853,9 @@ reconciles and integrates.
       enum). `test/r1-planning-selection.test.ts` 4/4 pass (fact derivation
       exercised through REAL RC-6 output); full `current` suite 904/904;
       typecheck/lint/boundary/anti-hardcoding clean.
-- [x] Lane P (part 4) — C1 coordinator CORE + C5 generality proof
+- [x] Lane P (part 4) ΓÇö C1 coordinator CORE + C5 generality proof
       (`src/resolution/planning/coordinatorCore.ts`): the single generalized
-      `runRecoveryPlanning` pipeline — deterministic domain registry -> optional
+      `runRecoveryPlanning` pipeline ΓÇö deterministic domain registry -> optional
       bounded read-only research -> proposer port per investigated domain ->
       validate -> REAL `evaluateRecoveryStrategy` (RC-6) -> decision-evidence
       assembly (three separate projections) -> frozen comparator -> closed
@@ -763,7 +871,7 @@ reconciles and integrates.
       typecheck/lint/boundary/anti-hardcoding clean.
       Commit `feat(r1): generalized recovery planning coordinator core (C1)`.
       - SHA: `9740c1818ee6832bffdfcdbefa01561746632327` (local == origin)
-- [x] Lane P (part 5) — C1 PostgreSQL ADAPTER
+- [x] Lane P (part 5) ΓÇö C1 PostgreSQL ADAPTER
       (`src/app/target/recoveryPlanningCoordinator.ts`): implements the frozen
       `RecoveryPlanningCoordinator.planCase` port. Reads the CURRENT basis from
       canonical PG with the SAME public helpers the accepted B1 seam uses, then
@@ -772,17 +880,17 @@ reconciles and integrates.
       attempt over migration 0125) and advances the case phase only on
       AWAITING_AUTHORITY. Deterministic id/version minting mirrors the B1
       planning namespace (idempotent per case/basis/candidate). Reuses
-      `advanceCasePhase` from the existing seam — no second engine, no
+      `advanceCasePhase` from the existing seam ΓÇö no second engine, no
       RuntimeOrchestrator. Requires PG: TYPECHECKED + LINTED in Cloud, NOT
       executed here (LOCAL integration-acceptance item). Typecheck/lint/boundary/
       anti-hardcoding clean; full `current` suite 907/907.
       Commit `feat(r1): bind recovery planning coordinator core to PostgreSQL (C1 adapter)`.
       - SHA: `f0fe4489d1d8e6328ba5d91e98d71a227b9400d4` (local == origin)
-- [x] Lane P (part 6) — C8 progression FACT MAPPER (pure)
+- [x] Lane P (part 6) ΓÇö C8 progression FACT MAPPER (pure)
       (`src/resolution/planning/progressionFacts.ts`): honest projection from what
-      EXISTING owners OBSERVE — the deterministic resolution gate result
+      EXISTING owners OBSERVE ΓÇö the deterministic resolution gate result
       (`ResolutionGateResult`), an explicit authority/execution-pending flag,
-      recovery-remains-possible and the settled basis assessment id — onto the
+      recovery-remains-possible and the settled basis assessment id ΓÇö onto the
       frozen `RecoveryProgressionInput`, then through the already-frozen
       `decideRecoveryProgression` precedence. Re-derives no gate verdict, invents
       no progress. `test/r1-progression-facts.test.ts` 9/9 pass (RESOLVE; the three
@@ -793,15 +901,15 @@ reconciles and integrates.
       CASE_NOT_OPEN -> ESCALATE; idempotency; executionReconciled false ONLY for a
       genuine unreconciled-execution denial). Full `current` suite 916/916;
       typecheck/lint/boundary (207 files)/anti-hardcoding (414 files) clean.
-      **ESCALATE SURFACE — CONTRACT GAP reported (not papered over):** the existing
+      **ESCALATE SURFACE ΓÇö CONTRACT GAP reported (not papered over):** the existing
       case lifecycle has OPEN->PLANNING->AWAITING_AUTHORITY->EXECUTING plus terminal
       RESOLVED/CLOSED/CANCELLED/SUPERSEDED but NO dedicated escalated/needs-human
       state or command. Per the C8 contract's own instruction this is reported for
       PRIMARY/local resolution rather than fabricating a new phase; the mapper still
       returns the truthful ESCALATE decision.
-      Commit `feat(r1): C8 progression fact mapper — observed gate/authority facts onto frozen decision`.
+      Commit `feat(r1): C8 progression fact mapper ΓÇö observed gate/authority facts onto frozen decision`.
       - SHA: `e3cd300e35c3ed182a5b067a011360ecc2420945` (local == origin)
-- [x] Lane P (part 7) — evidence-threading seam (C2/C4)
+- [x] Lane P (part 7) ΓÇö evidence-threading seam (C2/C4)
       Three additive core edits so a `DomainStrategyProposer` receives raw
       normalized tool results: `researchDispatcher` returns index-aligned
       `results: PlanningToolResult[]`; `coordinatorCore` zips evidence+results
@@ -809,7 +917,7 @@ reconciles and integrates.
       via the previously-DEAD frozen `bindDomainProposer` (base
       `StrategyProposer` unchanged). `test/r1-evidence-seam.test.ts` 4/4.
       - SHA: `0761de6` (local == origin)
-- [x] Lane P (part 8) — concrete provider-assisted TRANSPORT PROPOSER
+- [x] Lane P (part 8) ΓÇö concrete provider-assisted TRANSPORT PROPOSER
       (`transportCorridors.ts` + `replayPlanningTransport.ts` +
       `proposers/transportProposer.ts` + an additive domain-agnostic
       `resolveOffersForDomain` seam in `coordinatorCore.ts`). Closes the OPEN R1
@@ -820,7 +928,7 @@ reconciles and integrates.
       Intl API at the origin place tz, no offset table; deterministic SubjectId-safe
       request ids). The production `PlanningToolTransport` bridges C2
       request->result by REUSING `dispatchToolRequest` (no second engine, no direct
-      provider call) — wired over REPLAY Atlas + checked-in recordings in Cloud, the
+      provider call) ΓÇö wired over REPLAY Atlas + checked-in recordings in Cloud, the
       SAME code wires LIVE/RECORD locally. The proposer turns normalized
       `FlightOffer[]` into ranked, bounded `SELECT_OFFER` candidates (historical
       northstar ordering segments->price->key); raw Atlas routingIdentifiers are NOT
@@ -845,7 +953,7 @@ reconciles and integrates.
       network/credentials/PG.
       Commit `feat(r1): concrete provider-assisted TRANSPORT proposer over REPLAY evidence`.
       - SHA: `adc805367de10c8a9f05712b75bd251b0247b455` (local == origin)
-- [x] Lane P (part 9) — C9 Case projection (decision-time planning evidence)
+- [x] Lane P (part 9) ΓÇö C9 Case projection (decision-time planning evidence)
       (`contracts/v2/product/readModels.ts` additive `PlanningEvidenceViewSchema`
       block + optional field on `RecoveryCaseViewSchema`;
       `app/target/readmodels/projectPlanningEvidence.ts` PURE projector;
@@ -853,7 +961,7 @@ reconciles and integrates.
       `projectRecoveryCase.ts`; barrel export; authored
       `findLatestRecoveryPlanningAttemptForCase` loader in
       `r1PlanningAttemptCommands.ts` + wired into `loadRecoveryCaseFactsInner`).
-      Surfaces freeze §12 Q4-Q12 (domains investigated, read-only tools +
+      Surfaces freeze ┬º12 Q4-Q12 (domains investigated, read-only tools +
       provenance/uncertainty, material candidates + rejection reasons, the three
       distinct impact projections kept SEPARATE, viable refs, recommendation +
       human basis). Human labels PRIMARY, typed refs/closed-vocab codes
@@ -868,12 +976,12 @@ reconciles and integrates.
       acceptance item. `test/r1-case-projection.test.ts` 5/5 pure Cloud (labels
       primary; three impact semantics separate; no bare-uuid explanation;
       no-recommendation case; end-to-end spread via `projectRecoveryCase`).
-      Commit `feat(r1): C9 Case projection — decision-time planning evidence in the read model`.
+      Commit `feat(r1): C9 Case projection ΓÇö decision-time planning evidence in the read model`.
       - SHA: `a9024c4621813ac4c5ecaeafd320db7bdb09f0c2` (local == origin)
-- [x] Lane V (part 10) — C10 B1/B2 acceptance ↔ test coverage map
-      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`): every B1 (rebase §12, 18
-      criteria + freeze §13 structural) and B2 (rebase §13, 12 items + freeze
-      §14 structural) criterion mapped to REAL passing test titles, or the gap
+- [x] Lane V (part 10) ΓÇö C10 B1/B2 acceptance Γåö test coverage map
+      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`): every B1 (rebase ┬º12, 18
+      criteria + freeze ┬º13 structural) and B2 (rebase ┬º13, 12 items + freeze
+      ┬º14 structural) criterion mapped to REAL passing test titles, or the gap
       classified CLOUD-NOW / DEFERRED-LANGGRAPH / LOCAL-RUNTIME. PRIMARY
       reconciliation of the recon finding ("no test composes the lifecycle
       through the coordinator"): the individual deterministic units ARE
@@ -882,15 +990,15 @@ reconciles and integrates.
       DEFERRED-LANGGRAPH (+ LOCAL-RUNTIME for the canonical-PG stages + the open
       ESCALATE-surface contract gap), NOT a plain Cloud gap and NOT silently
       downgraded. No criterion left unclassified. Commit
-      `docs(r1): C10 B1/B2 acceptance ↔ test coverage map + PRIMARY gap reconciliation`.
+      `docs(r1): C10 B1/B2 acceptance Γåö test coverage map + PRIMARY gap reconciliation`.
       - SHA: `ac668e614153ed1b87ceabb15f84a658225c4b19` (local == origin)
 
 ### Contract-milestone status (Phase C)
 
-- [x] C2 — planner core integrated: generalized coordinator CORE (part 4) + PG
+- [x] C2 ΓÇö planner core integrated: generalized coordinator CORE (part 4) + PG
       ADAPTER (part 5); read-only bounded research dispatch (part 2); viable-only
       comparator (part 1); evidence-threading seam (part 7); and the **concrete
-      provider-assisted TRANSPORT PROPOSER (part 8, `adc8053`)** — the previously
+      provider-assisted TRANSPORT PROPOSER (part 8, `adc8053`)** ΓÇö the previously
       OPEN R1 TRANSPORT gap is now IMPLEMENTED as far as Cloud truthfully permits.
       It is fully generalized: corridors derived from canonical world state, airport
       refs + passengers INJECTED, evidence replayed from a CHECKED-IN Atlas recording
@@ -907,11 +1015,11 @@ reconciles and integrates.
       place->IATA externalRefs from PgWorldReader into WPlace; materialize a net-new
       researched offer into a captured WTransportService; wire research +
       resolveOffersForDomain into the PG coordinator adapter. The capability is NOT
-      reclassified optional — these are integration/runtime seams only.
-- [x] C3 — decision evidence end-to-end at the seam: the coordinator assembles the
+      reclassified optional ΓÇö these are integration/runtime seams only.
+- [x] C3 ΓÇö decision evidence end-to-end at the seam: the coordinator assembles the
       three separate impact projections + material candidate evidence and persists
       the ONE immutable attempt over migration 0125 (parts 3-5).
-- [HOLD] C4 — Recovery Lifecycle Progression (PRIMARY): pure fact mapper DONE +
+- [HOLD] C4 ΓÇö Recovery Lifecycle Progression (PRIMARY): pure fact mapper DONE +
       tested (part 6, `e3cd300`) and KEPT. **CONCRETE LIFECYCLE RUNNER = PAUSED
       PENDING LANGGRAPH SPIKE** (intentional architecture hold, NOT a Cloud
       limitation). A separate accepted architecture investigation concluded
@@ -926,10 +1034,10 @@ reconciles and integrates.
       authored during recon then REMOVED uncommitted to honour the hold; the pure
       mapper it depended on is unchanged.) All R1 work that survives either
       orchestration decision continues below.
-- [x] C5 — integration + generality proof: THREE materially different situations
+- [x] C5 ΓÇö integration + generality proof: THREE materially different situations
       through ONE `runRecoveryPlanning` (part 4, `9740c18`), no scenario branch.
-- [x] C9 — Case projection (part 9, `a9024c4`): decision-time planning evidence
-      (freeze §12 Q4-Q12) surfaced on the PostgreSQL Case read model. Additive
+- [x] C9 ΓÇö Case projection (part 9, `a9024c4`): decision-time planning evidence
+      (freeze ┬º12 Q4-Q12) surfaced on the PostgreSQL Case read model. Additive
       `PlanningEvidenceViewSchema` + optional field on `RecoveryCaseViewSchema`;
       PURE `projectPlanningEvidence` projector; additive `planningAttempt` fact +
       conditional spread through `projectRecoveryCase`; authored
@@ -940,16 +1048,16 @@ reconciles and integrates.
       impact semantics stay SEPARATE; a case that never planned carries none.
       Cloud-authored/typechecked/linted + 5 pure tests; LOADER RUNTIME (real PG
       read) = LOCAL acceptance item (handoff ledger).
-- [x] C10 — B1/B2 acceptance ↔ test coverage map (part 10, `ac668e6`,
-      `docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`): every B1 (rebase §12, 18 +
-      freeze §13 structural) and B2 (rebase §13, 12 + freeze §14 structural)
+- [x] C10 ΓÇö B1/B2 acceptance Γåö test coverage map (part 10, `ac668e6`,
+      `docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md`): every B1 (rebase ┬º12, 18 +
+      freeze ┬º13 structural) and B2 (rebase ┬º13, 12 + freeze ┬º14 structural)
       criterion mapped to REAL passing test titles or classified
       CLOUD-NOW / DEFERRED-LANGGRAPH / LOCAL-RUNTIME. PRIMARY reconciliation: the
       composed-lifecycle gap is the concrete C4 outer runner (DEFERRED-LANGGRAPH)
-      + canonical-PG stages (LOCAL-RUNTIME) + the ESCALATE-surface contract gap —
+      + canonical-PG stages (LOCAL-RUNTIME) + the ESCALATE-surface contract gap ΓÇö
       NOT a plain Cloud gap and NOT silently downgraded. No criterion unclassified.
 
-## Verification — DONE in Cloud (cumulative through `a9024c4` / `ac668e6`)
+## Verification ΓÇö DONE in Cloud (cumulative through `a9024c4` / `ac668e6`)
 
 - [x] R1 pure test files green under Node v24 type-stripping:
       `r1-planning-contracts`, `r1-decision-evidence`, `r1-comparator` (11),
@@ -958,8 +1066,8 @@ reconciles and integrates.
       `r1-evidence-seam` (4), `r1-transport-proposer` (4),
       `r1-case-projection` (5).
 - [x] Full `current` suite via `run-suite.mjs current`: 929/929 pass, 0 fail.
-- [x] `npm run gate:test-boundary`: CLEAN — 210 test files classified.
-- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN — 418 files scanned.
+- [x] `npm run gate:test-boundary`: CLEAN ΓÇö 210 test files classified.
+- [x] `node scripts/anti-hardcoding-gate.mjs`: CLEAN ΓÇö 418 files scanned.
 - [x] `npm run typecheck`: exit 0 (includes the PG-requiring C1 adapter, the C8
       mapper's resolution->app type import, the three transport modules, the C9
       projector + the authored C9 loader, and the C9/transport tests with NO
@@ -980,7 +1088,7 @@ Note: the sandbox default `node` is v20.18; the project requires `>=24`. Cloud
 verification of TS tests uses the available v24 runtime (`/opt/playwright-driver/node`)
 which matches the documented engine and the `run-suite.mjs` `--test` invocation.
 
-## Verification — UNAVAILABLE in Cloud (LOCAL handoff ledger)
+## Verification ΓÇö UNAVAILABLE in Cloud (LOCAL handoff ledger)
 
 Every item below genuinely requires PostgreSQL/Docker/LIVE and is DEFERRED to local
 integration acceptance. It is NOT claimed as passed here:
@@ -994,7 +1102,7 @@ integration acceptance. It is NOT claimed as passed here:
 - [ ] Coordinator pg integration: attempt written in the same UoW as viable
       RecoveryStrategy promotion; recommendation references only VIABLE rows.
       Specifically the C1 PG ADAPTER (`src/app/target/recoveryPlanningCoordinator.ts`,
-      `f0fe448`) — typechecked + linted in Cloud, NEVER executed here: verify
+      `f0fe448`) ΓÇö typechecked + linted in Cloud, NEVER executed here: verify
       `capturePlanningBasis` reads the real CURRENT/FAIL basis, `persistRecoveryStrategy`
       + `persistRecoveryPlanningAttempt` commit as separate idempotent commands,
       `advanceCasePhase(PLANNING)` / `advanceCasePhase(AWAITING_AUTHORITY)` transition
@@ -1007,10 +1115,10 @@ integration acceptance. It is NOT claimed as passed here:
       recovery-remains-possible, current basis assessment), applies
       `decideProgressionFromFacts`, and acts through EXISTING owners (RESOLVE via
       `resolveRecoveryCase`; REPLAN via the C1 coordinator from the NEW basis;
-      WAIT = no-op; ESCALATE = recorded) is NOT yet authored — it is PRIMARY-owned
+      WAIT = no-op; ESCALATE = recorded) is NOT yet authored ΓÇö it is PRIMARY-owned
       and requires PG to run. Must be idempotent per settled basis, must NOT create a
       second status machine, must NOT restore RuntimeOrchestrator.
-- [ ] **ESCALATE SURFACE — CONTRACT GAP (needs PRIMARY/local decision, NOT a Cloud
+- [ ] **ESCALATE SURFACE ΓÇö CONTRACT GAP (needs PRIMARY/local decision, NOT a Cloud
       guess):** the existing case lifecycle (OPEN->PLANNING->AWAITING_AUTHORITY->
       EXECUTING + terminal RESOLVED/CLOSED/CANCELLED/SUPERSEDED) has NO dedicated
       "escalated / needs human evidence or decision" state or command. The frozen C8
@@ -1022,7 +1130,7 @@ integration acceptance. It is NOT claimed as passed here:
 - [ ] Generality proof run against real PG fixtures (>=2 materially different
       planning situations through the same coordinator).
 - [ ] Any LIVE/RECORD provider evidence (Cloud is REPLAY-only, credential-free).
-- [ ] **TRANSPORT PROPOSER — three LOCAL integration/runtime closures** (the
+- [ ] **TRANSPORT PROPOSER ΓÇö three LOCAL integration/runtime closures** (the
       proposer + corridor + REPLAY transport are Cloud-implemented + tested at
       `adc8053`; these three are the seams that genuinely need PG/runtime and are
       NOT papered over with a fabricated mapping or a hardcoded route):
@@ -1037,7 +1145,7 @@ integration acceptance. It is NOT claimed as passed here:
          `externalRefs:{system,value}[]` to `WPlace` (`world.ts:101`) + the reader
          projection, and build the production `AirportResolver` from it. NOTE the
          namespace inconsistency: ingest writes `'IATA'` while legacy
-         `src/intelligence` reads `'airport-code'` — the resolver must accept both
+         `src/intelligence` reads `'airport-code'` ΓÇö the resolver must accept both
          (cf. `AIRPORT_REF_SYSTEMS` in `app/planningLoop.ts:298`). Cloud-authorable
          (TS+SQL, no new migration); runtime acceptance is LOCAL (needs PG).
       2. **materialize a net-new researched offer into a captured
@@ -1073,11 +1181,11 @@ integration acceptance. It is NOT claimed as passed here:
       `(workspace_id, recovery_case_id, completed_at DESC)` index serves the
       query. (Add to `postgres-integration/r1RecoveryPlanningAttempt.pgtest.ts`
       or a sibling pg test.)
-- [ ] **Composed lifecycle (B1-15..18 / B2 full-lifecycle) — DEFERRED-LANGGRAPH +
+- [ ] **Composed lifecycle (B1-15..18 / B2 full-lifecycle) ΓÇö DEFERRED-LANGGRAPH +
       LOCAL-RUNTIME.** No single test composes
       coordinator -> authority -> external dispatch -> observation ->
       reconciliation -> reassessment -> resolution. Per the C10 map
-      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md` §3) the deterministic UNITS are
+      (`docs/work/R1_C10_B1_B2_ACCEPTANCE_MAP.md` ┬º3) the deterministic UNITS are
       Cloud-tested (m8 authority/gate, wave3r-dr2 REPLAY dispatch/reconcile/
       observe, m9-jordan RECORD partial failure, r1-progression-facts pure C8,
       r1-coordinator-generality planning); the COMPOSITION is the concrete C4
@@ -1087,19 +1195,19 @@ integration acceptance. It is NOT claimed as passed here:
       decision lands, compose the lifecycle and assert the full B1/B2 path
       end-to-end (REPLAY/RECORD suffices for the behavioural proof; canonical
       writes need PG).
-- [ ] **ESCALATE case surface — CONTRACT GAP (reiterated for B2-12).** The
+- [ ] **ESCALATE case surface ΓÇö CONTRACT GAP (reiterated for B2-12).** The
       composed lifecycle's "explicit escalation" branch cannot ACT until local
       integration decides the truthful escalated/needs-human surface (new phase
       vs. reuse of an existing escalation owner); see the dedicated ESCALATE
-      SURFACE item above. Reported per freeze §11/§14, not fabricated.
+      SURFACE item above. Reported per freeze ┬º11/┬º14, not fabricated.
 
 ## Next action
 
 1. [DONE] C8 pure fact mapper committed + pushed (`e3cd300`); ledger current.
-2. [HOLD] C4 concrete lifecycle runner — PAUSED PENDING LANGGRAPH SPIKE (see
+2. [HOLD] C4 concrete lifecycle runner ΓÇö PAUSED PENDING LANGGRAPH SPIKE (see
    Contract-milestone status). Pure mapper kept; concrete runner NOT built here.
    Do NOT start LangGraph work on this branch.
-3. [DONE] TRANSPORT PROPOSER (OPEN R1 GAP, in-scope, NOT optional) — concrete
+3. [DONE] TRANSPORT PROPOSER (OPEN R1 GAP, in-scope, NOT optional) ΓÇö concrete
    generalized provider-assisted proposer implemented as far as Cloud truthfully
    permits (`adc8053`); three LOCAL integration closures remain (above).
 4. [DONE] C9 Case projection contract/read-model integration for R2 (`a9024c4`);
@@ -1114,7 +1222,7 @@ integration acceptance. It is NOT claimed as passed here:
    PostgreSQL/runtime checks; three transport-provider closures; C9 loader
    runtime; composed lifecycle; ESCALATE surface contract gap).
 7. Produce the final report ending EXACTLY with
-   `R1 CLOUD IMPLEMENTATION COMPLETE — REQUIRES LOCAL INTEGRATION ACCEPTANCE`
+   `R1 CLOUD IMPLEMENTATION COMPLETE ΓÇö REQUIRES LOCAL INTEGRATION ACCEPTANCE`
    (permitted only if all Cloud-capable R1 work other than the deliberately
    paused concrete lifecycle runner is complete). CONDITION MET.
 
@@ -1125,3 +1233,4 @@ push to source/default branch. No weakened tests, no domain-logic mocks, no fake
 evidence. No claim of a passing check that could not run. No restoring
 RuntimeOrchestrator or building a second engine. If anything is unclear enough to
 require redefining NORTHSTAR, STOP and report instead of guessing.
+
