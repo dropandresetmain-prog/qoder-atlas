@@ -8,19 +8,26 @@
  * value it cannot phrase becomes a neutral sentence, never the raw token.
  */
 import type { ActivityGlyphTone } from '../../../ui/operator-surfaces-view-model.ts';
+import { CASE_CHANGE_FALLBACK, CASE_CHANGE_TYPE_SENTENCE } from '../../../ui/copy.ts';
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const KIND_REF = /\b[A-Z][A-Z_]{2,}:[^\s,;]+/g;
 const SNAKE_WORD = /\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g;
 const RAW_ENUM = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g;
+/** Placeholder summaries the projection layer writes when it has nothing human to say. */
+const PROJECTION_PLACEHOLDER = /postgres|assembled from/i;
+const ISO_INSTANT = /\b\d{4}-\d{2}-\d{2}T[\d:.]+Z?\b/g;
+const CODE_PAIR = /\b[A-Z]{2,}(?:[/+][A-Z]{2,})+\b/g;
 
 /** Remove identifiers and raw enum tokens from free text a backend supplied. */
 export function scrubText(text: string): string {
   return text
     .replace(KIND_REF, '')
     .replace(UUID, '')
-    .replace(SNAKE_WORD, (token) => token.replace(/_/g, ' '))
+    .replace(ISO_INSTANT, '')
+    .replace(CODE_PAIR, '')
     .replace(RAW_ENUM, '')
+    .replace(SNAKE_WORD, (token) => token.replace(/_/g, ' '))
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([.,;:])/g, '$1')
     .trim();
@@ -182,4 +189,21 @@ export function relativeAge(iso: string, generatedAt: string): string | undefine
   const hours = Math.floor(minutes / 60);
   if (hours < 48) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
+}
+
+/**
+ * A "what changed" line the backend assembled as `<CHANGE_TYPE> (<ORIGIN>)
+ * received <instant>` (or similar machine text) becomes the plain sentence for
+ * that change type. Unknown codes fall back to a neutral sentence — never the
+ * raw token.
+ */
+export function plainChangeText(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  const raw = text.trim();
+  if (raw.length === 0) return undefined;
+  if (PROJECTION_PLACEHOLDER.test(raw)) return CASE_CHANGE_FALLBACK;
+  const code = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/.exec(raw)?.[0];
+  if (code) return CASE_CHANGE_TYPE_SENTENCE[code] ?? CASE_CHANGE_FALLBACK;
+  const cleaned = scrubText(raw);
+  return cleaned.length > 0 ? cleaned : CASE_CHANGE_FALLBACK;
 }
