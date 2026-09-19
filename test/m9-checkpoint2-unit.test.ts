@@ -17,6 +17,7 @@ import { evaluateSharedDisruptionCohort } from '../src/app/target/cohortDisrupti
 import { previewBilateralProgrammeTimeSwap } from '../src/app/target/programmeTimeSwapPreview.ts';
 import { sharedSupplierProgrammeCohortFoundation } from '../src/app/target/primaryScenarioFoundation.ts';
 import { commandPreviewBilateralProgrammeTimeSwap } from '../src/app/target/applicationCommands.ts';
+import { programmeTimeSwapStrategyIdentity } from '../src/app/target/programmeTimeSwapStaging.ts';
 import { PolicyRuleSchema } from '../src/domain/rules.ts';
 
 const generatedAt = '2031-09-15T00:00:00.000Z';
@@ -337,5 +338,34 @@ describe('M9 CK2 bilateral programme time-swap preview', () => {
       evaluate: () => ({ verdict: 'PASS' }),
     });
     assert.equal(again.mutatesAuthoritativeState, false);
+  });
+
+  test('staging identity binds the exact case, pair, and programme revision', () => {
+    const first = programmeTimeSwapStrategyIdentity({
+      workspaceId: 'workspace-1',
+      recoveryCaseId: 'case-1',
+      itemARef: 'item-a',
+      itemBRef: 'item-b',
+      programmeRevisions: [{ programmeId: 'programme-1', revision: 4 }],
+    });
+    const reversed = programmeTimeSwapStrategyIdentity({
+      workspaceId: 'workspace-1',
+      recoveryCaseId: 'case-1',
+      itemARef: 'item-b',
+      itemBRef: 'item-a',
+      programmeRevisions: [{ programmeId: 'programme-1', revision: 4 }],
+    });
+    const stale = programmeTimeSwapStrategyIdentity({
+      workspaceId: 'workspace-1',
+      recoveryCaseId: 'case-1',
+      itemARef: 'item-a',
+      itemBRef: 'item-b',
+      programmeRevisions: [{ programmeId: 'programme-1', revision: 5 }],
+    });
+
+    assert.equal(first.strategyId, reversed.strategyId);
+    assert.equal(first.scenarioChangeId, reversed.scenarioChangeId);
+    assert.notEqual(first.strategyId, stale.strategyId);
+    assert.notEqual(first.scenarioChangeId, stale.scenarioChangeId);
   });
 });

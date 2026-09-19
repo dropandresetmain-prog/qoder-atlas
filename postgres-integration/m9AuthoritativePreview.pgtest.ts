@@ -24,6 +24,10 @@ import {
 } from './m6WorldSeed.ts';
 import { seedEvent, seedParticipation, seedProgramme, seedProgrammeItem } from './m4Seed.ts';
 import { commandPreviewAuthoritativeBilateralProgrammeTimeSwap } from '../src/app/target/applicationCommands.ts';
+import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
+import { stageProgrammeTimeSwap } from '../src/app/target/programmeTimeSwapStaging.ts';
+import { seedRootSubject } from './m2Seed.ts';
+import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -81,6 +85,29 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     });
     await seedParticipation(seed, { programmeItemId: earlyItem.programmeItemId, travellerId: aliceId, obligation: 'REQUIRED', accepted: true });
     await seedParticipation(seed, { programmeItemId: lateItem.programmeItemId, travellerId: bobId, obligation: 'REQUIRED', accepted: true });
+    const recoveryCaseId = await seedRootSubject(seed, { kind: 'RECOVERY_CASE' });
+    await seed.client.query(
+      `INSERT INTO recovery_cases (workspace_id, id, lifecycle_status, created_by_actor_id)
+       VALUES ($1, $2, 'OPEN', $3)`,
+      [seed.workspaceId, recoveryCaseId, seed.actorId],
+    );
+    await seed.client.query(
+      `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role)
+       VALUES ($1, $2, 'JOURNEY', $3, 'AFFECTED')`,
+      [seed.workspaceId, recoveryCaseId, aliceJourney],
+    );
+    const unrelatedCaseId = await seedRootSubject(seed, { kind: 'RECOVERY_CASE' });
+    await seed.client.query(
+      `INSERT INTO recovery_cases (workspace_id, id, lifecycle_status, created_by_actor_id)
+       VALUES ($1, $2, 'OPEN', $3)`,
+      [seed.workspaceId, unrelatedCaseId, seed.actorId],
+    );
+    const terminalCaseId = await seedRootSubject(seed, { kind: 'RECOVERY_CASE' });
+    await seed.client.query(
+      `INSERT INTO recovery_cases (workspace_id, id, lifecycle_status, closed_at, created_by_actor_id)
+       VALUES ($1, $2, 'CANCELLED', $3, $4)`,
+      [seed.workspaceId, terminalCaseId, NOW, seed.actorId],
+    );
     await commitSeed(seed);
 
     // Complete knowledge coverage for both jurisdictions so the m6.entry /
@@ -93,6 +120,8 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
         await knowledge.coverage({ topic, completeness: 'COMPLETE', jurisdictionId });
       }
     }
+    const baseline = await runBaselineEvaluation({ pool, workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, now: NOW });
+    assert.equal(baseline.evaluated, 2);
 
     const beforeWindows = await pool.query<{ id: string; window_start: Date }>(
       `SELECT id, window_start FROM programme_items WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
@@ -127,6 +156,70 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     assert.equal(result.othersRemainViable, true);
     assert.equal(result.previewAccepted, true);
     assert.equal(result.strategyViability, 'VIABLE');
+
+    const staged = await stageProgrammeTimeSwap(
+      { pool, uow: () => new PgUnitOfWork(pool, seed.workspaceId) },
+      {
+        workspaceId: seed.workspaceId,
+        actorPrincipalId: seed.actorId,
+        recoveryCaseId,
+        itemARef: earlyItem.programmeItemId,
+        itemBRef: lateItem.programmeItemId,
+        now: NOW,
+      },
+    );
+    assert.equal(staged.ok, true, !staged.ok ? staged.error : '');
+    if (staged.ok) {
+      assert.equal(staged.value.recoveryCaseId, recoveryCaseId);
+      assert.ok(staged.value.strategyId);
+      assert.ok(staged.value.scenarioChangeId);
+      const replay = await stageProgrammeTimeSwap(
+        { pool, uow: () => new PgUnitOfWork(pool, seed.workspaceId) },
+        {
+          workspaceId: seed.workspaceId,
+          actorPrincipalId: seed.actorId,
+          recoveryCaseId,
+          itemARef: lateItem.programmeItemId,
+          itemBRef: earlyItem.programmeItemId,
+          now: NOW,
+        },
+      );
+      assert.deepEqual(replay, staged, 'the same pair/case/revision replays the staged strategy');
+      const stored = await pool.query<{ viability: string; status: string }>(
+        `SELECT viability, status FROM recovery_strategies WHERE workspace_id = $1 AND id = $2`,
+        [seed.workspaceId, staged.value.strategyId],
+      );
+      assert.deepEqual(stored.rows[0], { viability: 'VIABLE', status: 'EVALUATED' });
+    }
+
+    const programmeRevision = await pool.query<{ revision: string }>(
+      `SELECT revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2`,
+      [seed.workspaceId, programmeId],
+    );
+    const stale = await stageProgrammeTimeSwap(
+      { pool, uow: () => new PgUnitOfWork(pool, seed.workspaceId) },
+      {
+        workspaceId: seed.workspaceId,
+        actorPrincipalId: seed.actorId,
+        recoveryCaseId,
+        itemARef: earlyItem.programmeItemId,
+        itemBRef: lateItem.programmeItemId,
+        now: NOW,
+        expectedProgrammeRevisions: [{ aggregateRef: { kind: 'PROGRAMME', id: programmeId }, expectedRevision: Number(programmeRevision.rows[0]!.revision) + 1 }],
+      },
+    );
+    assert.deepEqual(stale, { ok: false, error: 'PROGRAMME_REVISION_STALE' });
+
+    const unrelated = await stageProgrammeTimeSwap(
+      { pool, uow: () => new PgUnitOfWork(pool, seed.workspaceId) },
+      { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, recoveryCaseId: unrelatedCaseId, itemARef: earlyItem.programmeItemId, itemBRef: lateItem.programmeItemId, now: NOW },
+    );
+    assert.deepEqual(unrelated, { ok: false, error: 'RECOVERY_CASE_SCOPE_MISMATCH' });
+    const terminal = await stageProgrammeTimeSwap(
+      { pool, uow: () => new PgUnitOfWork(pool, seed.workspaceId) },
+      { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, recoveryCaseId: terminalCaseId, itemARef: earlyItem.programmeItemId, itemBRef: lateItem.programmeItemId, now: NOW },
+    );
+    assert.deepEqual(terminal, { ok: false, error: 'RECOVERY_CASE_NOT_ACTIVE' });
 
     // Canonical state genuinely untouched.
     const afterWindows = await pool.query<{ id: string; window_start: Date }>(
