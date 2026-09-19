@@ -110,7 +110,7 @@ const M8_ACTIVATED_KINDS = [
 /** Kinds R0 activates (0124 change signals) — installed_by 'R0'. */
 const R0_ACTIVATED_KINDS = ['CHANGE_SIGNAL'] as const;
 
-/** M2-M8 integration: every activated kind, checked together. */
+/** M2-M8, R0 and A1 integration: every activated kind, checked together. */
 const INTEGRATED_ACTIVATED_KINDS = [
   ...M2_ACTIVATED_KINDS,
   ...M3_ACTIVATED_KINDS,
@@ -120,7 +120,13 @@ const INTEGRATED_ACTIVATED_KINDS = [
   ...M7_ACTIVATED_KINDS,
   ...M8_ACTIVATED_KINDS,
   ...R0_ACTIVATED_KINDS,
+  'CHANGE_REQUEST',
 ];
+
+// This kind exists only inside the negative-test transaction. It deliberately
+// has no production checker migration, so the trigger's fail-closed path stays
+// covered after every frozen subject kind becomes activated.
+const TRANSACTION_ONLY_UNACTIVATED_KIND = 'M2_UNACTIVATED_PROBE';
 
 describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
   test('every registered subtype checker function is actually installed', async () => {
@@ -162,31 +168,20 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       'every kind an integrated lane activates must have its checker row',
     );
 
-    // The kinds are pre-registered (that is the frozen contract) but unactivated.
-    const pending = await pool.query<{ kind: string }>(
-      `SELECT k.kind FROM subject_kinds k
-        WHERE NOT EXISTS (SELECT 1 FROM subject_subtype_checkers c WHERE c.kind = k.kind)`,
-    );
-    const pendingKinds = pending.rows.map((row) => row.kind);
-    // CHANGE_REQUEST is pre-registered for M7 and activated by no integrated lane.
-    for (const kind of ['CHANGE_REQUEST']) {
-      assert.ok(pendingKinds.includes(kind), `${kind} must remain registered-but-unactivated`);
-    }
   });
 
-  test('a pre-registered kind with no checker cannot commit even with a head row', async () => {
+  test('a transaction-only kind with no checker cannot commit even with a head row', async () => {
     const pool = await sharedTestPool();
-    // CHANGE_REQUEST is pre-registered for M7 and activated by no integrated lane.
-    for (const kind of ['CHANGE_REQUEST']) {
-      const seed = await beginSeed(pool, `M2 closed ${kind}`);
-      await seedRootSubject(seed, { kind });
-      await assert.rejects(
-        () => commitSeed(seed),
-        /has no installed typed-table enforcement/i,
-        `${kind} must fail closed`,
-      );
-      await rollbackSeed(seed);
-    }
+    const kind = TRANSACTION_ONLY_UNACTIVATED_KIND;
+    const seed = await beginSeed(pool, `M2 closed ${kind}`);
+    await seed.client.query('INSERT INTO subject_kinds (kind) VALUES ($1)', [kind]);
+    await seedRootSubject(seed, { kind });
+    await assert.rejects(
+      () => commitSeed(seed),
+      /has no installed typed-table enforcement/i,
+      `${kind} must fail closed`,
+    );
+    await rollbackSeed(seed);
   });
 
   test('an activated subject cannot commit without its typed row', async () => {
@@ -263,15 +258,18 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
   test('a registered checker whose function is missing still fails closed', async () => {
     const pool = await sharedTestPool();
     const seed = await beginSeed(pool, 'M2 phantom checker');
+    const kind = TRANSACTION_ONLY_UNACTIVATED_KIND;
     try {
+      await seed.client.query('INSERT INTO subject_kinds (kind) VALUES ($1)', [kind]);
       await seed.client.query(
         `INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by)
-         VALUES ('CHANGE_REQUEST', 'enforce_subject_subtype_change_request', 'M2-probe')`,
+         VALUES ($1, 'enforce_subject_subtype_m2_missing', 'M2-probe')`,
+        [kind],
       );
-      await seedRootSubject(seed, { kind: 'CHANGE_REQUEST' });
+      await seedRootSubject(seed, { kind });
       await assert.rejects(
         () => seed.client.query('SET CONSTRAINTS domain_subjects_subtype_check IMMEDIATE'),
-        /registered for kind CHANGE_REQUEST is not installed/i,
+        new RegExp(`registered for kind ${kind} is not installed`, 'i'),
       );
     } finally {
       await rollbackSeed(seed);
@@ -281,9 +279,11 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
   test('a lane can activate its own kind without touching the dispatcher', async () => {
     const pool = await sharedTestPool();
     const seed = await beginSeed(pool, 'M2 extension contract');
+    const probeKind = TRANSACTION_ONLY_UNACTIVATED_KIND;
     const probeTable = 'm2_probe_change_request_subject';
     const probeFunction = 'enforce_subject_subtype_probe_change_request';
     try {
+      await seed.client.query('INSERT INTO subject_kinds (kind) VALUES ($1)', [probeKind]);
       // Exactly the two steps 0010 documents as the lane's whole obligation.
       await seed.client.query(
         `CREATE TABLE ${probeTable} (
@@ -298,19 +298,19 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
          BEGIN
            IF NOT EXISTS (SELECT 1 FROM ${probeTable} t
                            WHERE t.workspace_id = p_workspace_id AND t.id = p_id) THEN
-             RAISE EXCEPTION 'domain_subjects subtype violation: CHANGE_REQUEST subject % has no % row',
-               p_id, '${probeTable}';
+             RAISE EXCEPTION 'domain_subjects subtype violation: % subject % has no % row',
+               p_kind, p_id, '${probeTable}';
            END IF;
          END;
          $fn$`,
       );
       await seed.client.query(
         `INSERT INTO subject_subtype_checkers (kind, checker_function, installed_by)
-         VALUES ('CHANGE_REQUEST', $1, 'M2-probe')`,
-        [probeFunction],
+         VALUES ($1, $2, 'M2-probe')`,
+        [probeKind, probeFunction],
       );
 
-      const subjectId = await seedRootSubject(seed, { kind: 'CHANGE_REQUEST' });
+      const subjectId = await seedRootSubject(seed, { kind: probeKind });
       await seed.client.query(`INSERT INTO ${probeTable} (workspace_id, id) VALUES ($1, $2)`, [
         seed.workspaceId,
         subjectId,
@@ -320,8 +320,8 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // Negative control in the same probe: the lane's own checker is what gates
       // the kind, so a second subject with no backer row is rejected outright.
       await assert.rejects(
-        () => seedRootSubject(seed, { kind: 'CHANGE_REQUEST' }),
-        /subtype violation: CHANGE_REQUEST .* has no .* row/i,
+        () => seedRootSubject(seed, { kind: probeKind }),
+        new RegExp(`subtype violation: ${probeKind} .* has no .* row`, 'i'),
       );
     } finally {
       await rollbackSeed(seed);
@@ -330,10 +330,11 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
     // The rolled-back transaction must leave the shared registry untouched.
     const residue = await pool.query<{ checkers: string; functions: string; tables: string; subjects: string }>(
       `SELECT
-         (SELECT count(*) FROM subject_subtype_checkers WHERE kind = 'CHANGE_REQUEST') AS checkers,
+         (SELECT count(*) FROM subject_subtype_checkers WHERE kind = $1) AS checkers,
          (SELECT count(*) FROM pg_proc WHERE proname = 'enforce_subject_subtype_probe_change_request') AS functions,
          (SELECT count(*) FROM pg_class WHERE relname = 'm2_probe_change_request_subject') AS tables,
-         (SELECT count(*) FROM domain_subjects WHERE kind = 'CHANGE_REQUEST') AS subjects`,
+         (SELECT count(*) FROM domain_subjects WHERE kind = $1) AS subjects`,
+      [probeKind],
     );
     assert.deepEqual(residue.rows[0], { checkers: '0', functions: '0', tables: '0', subjects: '0' });
   });
@@ -585,6 +586,9 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // R4-F2 (0128): bounded offer-binding itinerary for external:offer.select —
       // object-shaped and size-checked (pg_column_size <= 16384); never a fact bucket.
       'offer_execution_bindings.itinerary',
+      // A1 (0130): typed desired target for an immutable ChangeRequest revision;
+      // relational target refs remain separately queryable and FK-validated.
+      'change_request_revisions.desired_target',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns
