@@ -155,6 +155,32 @@ test('commitment-specific evidence controls landmark and traveller relation heal
   assert.equal(relation?.health, 'RED');
 });
 
+test('commitment needs complete required-participant evidence before it can be green', () => {
+  const population = [pop(1), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [{ ...part(1, 1), commitmentHealth: 'GREEN' }, part(2, 1)],
+    journeyServices: [],
+  };
+  const ov = buildEventOverview({ source, population, items: [] });
+  assert.equal(ov.landmarks[0]?.health, 'NEUTRAL');
+});
+
+test('dependency-to-traveller relations retain per-member commitment evidence', () => {
+  const population = [pop(1, 'DISRUPTED', 'CURRENT'), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [{ ...part(1, 1), commitmentHealth: 'RED' }, { ...part(2, 1), commitmentHealth: 'GREEN' }],
+    journeyServices: [svc(1, 'Alpha', true), svc(2, 'Alpha', true)],
+  };
+  const ov = buildEventOverview({ source, population, items: [] });
+  const memberHealth = new Map((ov.relations ?? [])
+    .filter((relation) => relation.kind === 'DEPENDENCY_TO_TRAVELLER')
+    .map((relation) => [relation.toRef, relation.health]));
+  assert.equal(memberHealth.get('JOURNEY:001'), 'RED');
+  assert.equal(memberHealth.get('JOURNEY:002'), 'GREEN');
+});
+
 test('typed shared resource dependency is selected without transport-specific grouping', () => {
   const population = [pop(1), pop(2)];
   const src: EventOverviewSourceFacts = {
@@ -183,11 +209,20 @@ test('overview graph model consumes supplied relation condition without endpoint
     generatedAt: '2031-03-10T08:00:00.000Z', projectionRevision: 1, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'HEALTHY',
     nodes: [], edges: [], items: [], population, eventOverviewSource: source,
   });
-  const graph = buildOverviewGraphModel(view);
-  const backendRelation = view.eventOverview?.relations?.find((relation) => relation.kind === 'DEPENDENCY_TO_COMMITMENT');
+  const eventOverview = view.eventOverview!;
+  const relationId = eventOverview.relations?.find((relation) => relation.kind === 'DEPENDENCY_TO_COMMITMENT')?.id;
+  const graph = buildOverviewGraphModel({
+    ...view,
+    eventOverview: {
+      ...eventOverview,
+      relations: eventOverview.relations?.map((relation) => relation.id === relationId ? { ...relation, health: 'NEUTRAL' } : relation),
+    },
+  });
+  const backendRelation = eventOverview.relations?.find((relation) => relation.id === relationId);
   const renderedRelation = graph?.relations.find((relation) => relation.id === backendRelation?.id);
-  assert.equal(backendRelation?.health, 'NEUTRAL');
+  assert.equal(backendRelation?.health, 'RED');
   assert.equal(renderedRelation?.health, 'neutral');
+  assert.equal(renderedRelation?.kind, backendRelation?.kind);
 });
 
 test('ordinary population without programme days stays in a date-free cohort', () => {

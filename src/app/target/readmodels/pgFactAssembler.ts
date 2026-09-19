@@ -1158,20 +1158,11 @@ async function loadOperatorOverviewFactsInner(
   // POPULATION, not from `recovery_cases` — so a subject can render before
   // any case exists (closing the FIG-4 "no node before escalation" gap).
   //
-  // Explicit scope key: every JOURNEY whose traveller holds an accepted
-  // REQUIRED participation in an ACTIVE programme's programme_item. This
-  // reuses the exact REQUIRED+accepted membership predicate
-  // `loadIncidentProgrammeFacts` already treats as authoritative, bounded to
-  // programmes with lifecycle_status = 'ACTIVE' — the schema has no single
-  // per-workspace "the current programme" key (a workspace can hold many
-  // events/programmes), so an unbounded `workspace_id` scan would not be "an
-  // explicit scope key"; ACTIVE-programme membership is the smallest
-  // additive population that is authoritative, bounded, and exercisable
-  // before any case exists. Journeys exclude only CANCELLED — DRAFT is this
-  // schema's normal pre-booking-confirmation status (seedJourney's own
-  // default), not an out-of-scope state, and evaluation/assessment do not
-  // gate on it elsewhere in this producer. LIMIT mirrors the existing
-  // cases-query page size.
+  // Population includes every non-CANCELLED Journey in the workspace, bounded
+  // to this projection's page. This keeps a no-programme event population
+  // observable as a date-free cohort. Dashboard graph nodes remain the
+  // accepted REQUIRED-participation subset below, so widening population does
+  // not widen that older graph contract.
   //
   // `traveller_label` is the node's label: the authoritative traveller
   // display name, taken through the exact join the overview queue above
@@ -1180,14 +1171,10 @@ async function loadOperatorOverviewFactsInner(
   // NOT NULL and 0012's subtype trigger guarantees the ref selects exactly
   // one row for that traveller, so this stays an inner join with no
   // fabricated fallback — and no second lookup path.
-  // One query now serves both collections, because both are the same
-  // authoritative membership question asked at two widths, and asking it
-  // twice on the same snapshot would just double the work:
+  // One query serves both collections on the same snapshot:
   //
-  //  - `population` (additive): every Journey whose traveller holds ANY
-  //    accepted participation in an ACTIVE programme. This is "whose travel
-  //    am I responsible for", which is what the baseline operator surface
-  //    must show before any case exists.
+  //  - `population`: every non-CANCELLED Journey. Journeys without an active
+  //    programme participation remain intentionally unassigned.
   //  - `ldg.nodes` (unchanged): the REQUIRED+accepted subset, exactly the
   //    scope described below. Widening the graph would change an accepted
   //    contract; the wider population gets its own collection instead.
@@ -1205,7 +1192,7 @@ async function loadOperatorOverviewFactsInner(
     `SELECT j.id AS journey_id,
             j.trip_id,
             n.display_value AS traveller_label,
-            bool_or(p.obligation = 'REQUIRED') AS has_required,
+            COALESCE(bool_or(p.obligation = 'REQUIRED'), false) AS has_required,
             CASE
               WHEN bool_or(p.obligation = 'REQUIRED') THEN 'REQUIRED'
               WHEN bool_or(p.obligation = 'OPTIONAL') THEN 'OPTIONAL'
@@ -1214,13 +1201,19 @@ async function loadOperatorOverviewFactsInner(
        FROM journeys j
        JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
        JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
-       JOIN participations p ON p.workspace_id = j.workspace_id AND p.traveller_id = j.traveller_id
-       JOIN programme_items pi ON pi.workspace_id = p.workspace_id AND pi.id = p.programme_item_id
-       JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
+       LEFT JOIN participations p ON p.workspace_id = j.workspace_id
+         AND p.traveller_id = j.traveller_id
+         AND p.accepted = true
+         AND EXISTS (
+           SELECT 1
+             FROM programme_items pi
+             JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
+            WHERE pi.workspace_id = p.workspace_id
+              AND pi.id = p.programme_item_id
+              AND prog.lifecycle_status = 'ACTIVE'
+         )
       WHERE j.workspace_id = $1
         AND j.lifecycle_status <> 'CANCELLED'
-        AND p.accepted = true
-        AND prog.lifecycle_status = 'ACTIVE'
       GROUP BY j.id, j.trip_id, n.display_value
       ORDER BY j.id
       LIMIT 200`,
@@ -1229,6 +1222,10 @@ async function loadOperatorOverviewFactsInner(
 
   const dashboardNodes: OperatorOverviewFacts['nodes'][number][] = [];
   const populationFacts: OperatorPopulationFact[] = [];
+  // Current Journey assessments are already read for the population. Retain
+  // only participant-specific programme explanations for the Overview source;
+  // a Journey's aggregate FAIL is never commitment evidence.
+  const commitmentHealthByJourneyItem = new Map<string, 'GREEN' | 'AMBER' | 'RED' | 'NEUTRAL'>();
   const subjectStamps: bigint[] = [];
   const changedNodeRefs: string[] = [];
   for (const p of population.rows) {
@@ -1244,6 +1241,20 @@ async function loadOperatorOverviewFactsInner(
     const tone: AssessmentTone = view.status === 'CURRENT' && view.assessment
       ? (view.assessment.overallVerdict === 'PASS' ? 'PASS' : view.assessment.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN')
       : 'UNKNOWN';
+    const programmeDimension = view.assessment?.dimensions.find((dimension) => dimension.dimension === 'programme_participation');
+    for (const explanation of programmeDimension?.explanations ?? []) {
+      const programmeRefs = [explanation.cause.subjectRef, ...explanation.relatedSubjects]
+        .filter((ref): ref is TypedRef => ref?.kind === 'PROGRAMME_ITEM');
+      const health = view.status === 'CURRENT'
+        ? explanation.status === 'FAIL' ? 'RED' : explanation.status === 'PASS' ? 'GREEN' : 'NEUTRAL'
+        : view.status === 'PENDING_REASSESSMENT' ? 'AMBER' : 'NEUTRAL';
+      for (const programmeRef of programmeRefs) {
+        const key = `${ref}:${programmeRef.id}`;
+        const current = commitmentHealthByJourneyItem.get(key) ?? 'NEUTRAL';
+        const rank = { NEUTRAL: 0, GREEN: 1, AMBER: 2, RED: 3 } as const;
+        commitmentHealthByJourneyItem.set(key, rank[health] > rank[current] ? health : current);
+      }
+    }
     // caseRef (FIG-4): the most recently opened case this subject is
     // attached to, if any — an escalation marker, never identity.
     const caseLink = await client.query<{ recovery_case_id: string }>(
@@ -1425,6 +1436,9 @@ async function loadOperatorOverviewFactsInner(
       itemRef: `PROGRAMME_ITEM:${r.programme_item_id}`,
       journeyRef: `JOURNEY:${r.journey_id}`,
       obligation: r.obligation,
+      ...(commitmentHealthByJourneyItem.has(`JOURNEY:${r.journey_id}:${r.programme_item_id}`)
+        ? { commitmentHealth: commitmentHealthByJourneyItem.get(`JOURNEY:${r.journey_id}:${r.programme_item_id}`)! }
+        : {}),
     })),
     journeyServices: overviewServices.rows.map((r) => ({
       journeyRef: `JOURNEY:${r.journey_id}`,
@@ -1440,7 +1454,7 @@ async function loadOperatorOverviewFactsInner(
       journeyRef: `JOURNEY:${r.journey_id}`,
       dependencyRef: `RESOURCE:${r.resource_id}`,
       kindLabel: r.resource_type === 'ROOM' ? 'Shared room' : r.resource_type === 'VEHICLE' ? 'Shared vehicle' : 'Shared equipment',
-      label: r.resource_type === 'ROOM' ? 'Room resource' : r.resource_type === 'VEHICLE' ? 'Vehicle resource' : 'Equipment resource',
+      label: `${r.resource_type === 'ROOM' ? 'Room' : r.resource_type === 'VEHICLE' ? 'Vehicle' : 'Equipment'} ${r.resource_id.slice(0, 8)}`,
       health: 'NEUTRAL' as const,
       changed: false,
     })),

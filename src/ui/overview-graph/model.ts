@@ -12,6 +12,7 @@ import type {
   EventOverview,
   EventOverviewHealth,
   EventOverviewMembership,
+  EventOverviewRelationKind,
   OperatorOverview,
 } from '../../contracts/v2/product/readModels.ts';
 import { presentOperationalStatus } from '../semantics/adapter.ts';
@@ -44,6 +45,8 @@ export interface OgNode {
 
 export interface OgRelation {
   readonly id: string;
+  /** Optional for existing manual geometry fixtures; producer relations carry it. */
+  readonly kind?: EventOverviewRelationKind;
   readonly from: string;
   readonly to: string;
   readonly health: OgHealth;
@@ -205,6 +208,7 @@ export function buildOverviewGraphModel(view: OperatorOverview): OverviewGraphMo
     const health = HEALTH[relation.health];
     add({
       id: relation.id,
+      kind: relation.kind,
       from: relation.fromRef,
       to: relation.toRef,
       health,

@@ -73,18 +73,15 @@ export function buildEventOverview(input: {
   // Required participants per item (distinct journeys, population members only).
   const requiredByItem = new Map<string, Set<string>>();
   const partsByJourney = new Map<string, { itemRef: string; obligation: string }[]>();
-  const commitmentHealthByItem = new Map(source.programmeItems.map((item) => [item.itemRef, item.health ?? 'NEUTRAL'] as const));
-  const mergeCommitmentHealth = (current: EventOverviewHealth, next: EventOverviewHealth): EventOverviewHealth => {
-    const rank: Record<EventOverviewHealth, number> = { NEUTRAL: 0, GREEN: 1, AMBER: 2, RED: 3 };
-    return rank[next] > rank[current] ? next : current;
-  };
+  const directCommitmentHealthByItem = new Map(source.programmeItems.map((item) => [item.itemRef, item.health ?? 'NEUTRAL'] as const));
+  const participantCommitmentHealth = new Map<string, EventOverviewHealth>();
   for (const p of source.participations) {
     if (!popByRef.has(p.journeyRef)) continue;
     const list = partsByJourney.get(p.journeyRef) ?? [];
     list.push({ itemRef: p.itemRef, obligation: p.obligation });
     partsByJourney.set(p.journeyRef, list);
     if (p.commitmentHealth) {
-      commitmentHealthByItem.set(p.itemRef, mergeCommitmentHealth(commitmentHealthByItem.get(p.itemRef) ?? 'NEUTRAL', p.commitmentHealth));
+      participantCommitmentHealth.set(`${p.journeyRef}:${p.itemRef}`, p.commitmentHealth);
     }
     if (p.obligation === 'REQUIRED' && itemByRef.has(p.itemRef)) {
       const set = requiredByItem.get(p.itemRef) ?? new Set<string>();
@@ -127,6 +124,18 @@ export function buildEventOverview(input: {
     }
     if (!g.journeys.includes(row.journeyRef)) g.journeys.push(row.journeyRef);
   }
+  const commitmentHealth = (itemRef: string, journeyRefs: readonly string[]): EventOverviewHealth => {
+    const direct = directCommitmentHealthByItem.get(itemRef) ?? 'NEUTRAL';
+    const evidence = journeyRefs.map((journeyRef) => participantCommitmentHealth.get(`${journeyRef}:${itemRef}`) ?? 'NEUTRAL');
+    if (evidence.some((health) => health === 'RED')) return 'RED';
+    if (direct === 'RED') return 'RED';
+    if (evidence.some((health) => health === 'AMBER')) return 'AMBER';
+    if (direct === 'AMBER') return 'AMBER';
+    if (direct === 'GREEN') return 'GREEN';
+    if (journeyRefs.length === 0) return 'NEUTRAL';
+    if (evidence.every((health) => health === 'GREEN')) return 'GREEN';
+    return 'NEUTRAL';
+  };
   for (const row of source.journeyDependencies ?? []) {
     if (!popByRef.has(row.journeyRef)) continue;
     let g = groups.get(row.dependencyRef);
@@ -196,7 +205,7 @@ export function buildEventOverview(input: {
     .filter((i) => chosenSet.has(i.itemRef))
     .map((i) => {
       const participants = [...(requiredByItem.get(i.itemRef) ?? [])].sort(cmp);
-      const health = commitmentHealthByItem.get(i.itemRef) ?? 'NEUTRAL';
+      const health = commitmentHealth(i.itemRef, participants);
       // Population status and blast membership are not commitment evidence.
       // Count them as operational attention only; never derive the landmark's
       // semantic health from an unrelated Journey assessment.
@@ -332,23 +341,27 @@ export function buildEventOverview(input: {
   };
   for (const dependency of dependencies) {
     if (!dependency.feedsLandmarkRef) continue;
+    const group = selected.find((candidate) => candidate.ref === dependency.ref);
+    const members = (group?.journeys ?? []).filter((journeyRef) => requiredByItem.get(dependency.feedsLandmarkRef!)?.has(journeyRef));
     addRelation({
       id: `DEPENDENCY_TO_COMMITMENT:${dependency.ref}:${dependency.feedsLandmarkRef}`,
       kind: 'DEPENDENCY_TO_COMMITMENT',
       fromRef: dependency.ref,
       toRef: dependency.feedsLandmarkRef,
-      health: dependency.health,
+      health: commitmentHealth(dependency.feedsLandmarkRef, members),
     });
   }
   for (const traveller of promotedTravellers) {
     if (traveller.dependencyRef) {
-      const dependency = dependencies.find((candidate) => candidate.ref === traveller.dependencyRef);
+      const landmarkRef = earliestRequiredItem(traveller.journeyRef);
       addRelation({
         id: `DEPENDENCY_TO_TRAVELLER:${traveller.dependencyRef}:${traveller.journeyRef}`,
         kind: 'DEPENDENCY_TO_TRAVELLER',
         fromRef: traveller.dependencyRef,
         toRef: traveller.journeyRef,
-        health: dependency?.health ?? 'NEUTRAL',
+        health: landmarkRef
+          ? participantCommitmentHealth.get(`${traveller.journeyRef}:${landmarkRef}`) ?? 'NEUTRAL'
+          : 'NEUTRAL',
       });
     }
     if (traveller.landmarkRef) {
@@ -357,7 +370,7 @@ export function buildEventOverview(input: {
         kind: 'TRAVELLER_TO_COMMITMENT',
         fromRef: traveller.journeyRef,
         toRef: traveller.landmarkRef,
-        health: commitmentHealthByItem.get(traveller.landmarkRef) ?? 'NEUTRAL',
+        health: participantCommitmentHealth.get(`${traveller.journeyRef}:${traveller.landmarkRef}`) ?? 'NEUTRAL',
       });
     }
   }
