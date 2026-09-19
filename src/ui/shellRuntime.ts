@@ -264,6 +264,9 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
       if (box && box.getAttribute('data-configured') === 'false') return null;
       return {
         url: endpoint || '/api/v2/demo/provider-event/airline-rebooking',
+        // Zero body bytes: the handler loads the disclosed event file. A JSON
+        // '{}' body is treated as direct delivery and fails validation.
+        emptyBody: true,
         progress: 'Applying…',
         fail: 'The simulated update was not applied.',
         sticky: false,
@@ -291,7 +294,12 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
     if (existing && (existing.state === 'pending' || (existing.state === 'done' && existing.sticky))) return;
     if (spec.confirm && !window.confirm(spec.confirm)) return;
     setState(el, key, 'pending', spec.progress, false);
-    fetch(spec.url, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: '{}' })
+    var init: any = { method: 'POST', headers: { 'Accept': 'application/json' } };
+    if (!spec.emptyBody) {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = '{}';
+    }
+    fetch(spec.url, init)
       .then(readBody)
       .then(function (r: any) {
         if (!r.ok) {

@@ -56,6 +56,14 @@ test('renderShellRuntimeScript is document-level: data-action + region patch, no
   assert.ok(!script.includes('EventSource'));
 });
 
+test('trigger-disruption posts zero body bytes so the disclosed event file is used', () => {
+  const script = renderShellRuntimeScript({ intervalMs: 4000 });
+  assert.ok(script.includes('emptyBody'));
+  assert.ok(script.includes('airline-rebooking'));
+  // Must not unconditionally POST '{}' for every action (that breaks file load).
+  assert.match(script, /if\s*\(\s*!spec\.emptyBody\s*\)/);
+});
+
 test('casePollingScript only configures the shell poller (no outerHTML main swap)', () => {
   const script = casePollingScript({ caseRef: 'CASE-001' });
   assert.ok(script.includes('CASE-001'));
