@@ -7,6 +7,11 @@
  */
 export const OVERVIEW_GRAPH_CSS = `
 .og { margin: 22px 0 8px; }
+/* The graph's own z-indexes (toolbar 90, focus pill 85, legend 80, nodes up to 28)
+   must never compete with the page shell: isolate them in ONE stacking context
+   so the sticky header, nav, Reset demo and the controls below the graph stay
+   clickable when the graph scrolls underneath them. */
+.og, .og-frame, .og-viewport { isolation: isolate; }
 .og-frame { border: 1px solid var(--border); background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 .og-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
 .og-head h2 { margin: 0; font-size: 16px; letter-spacing: -0.01em; }
