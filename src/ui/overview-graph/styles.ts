@@ -102,7 +102,7 @@ export const OVERVIEW_GRAPH_CSS = `
 .og-legend { position: absolute; right: 12px; bottom: 10px; z-index: 80; display: flex; gap: 12px; align-items: center; padding: 5px 10px; border: 1px solid rgba(220,227,236,.9); border-radius: 999px; background: rgba(255,255,255,.8); font-size: 11.5px; color: #4d5c70; }
 .og-legend span { display: inline-flex; gap: 5px; align-items: center; }
 .og-legend i { width: 8px; height: 8px; border-radius: 50%; }
-.og-focus-pill { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; z-index: 85; display: flex; gap: 10px; align-items: center; padding: 6px 8px 6px 14px; border-radius: 999px; border: 1px solid #edc477; background: #fff9ea; font-size: 13px; font-weight: 700; color: #7c5306; max-width: calc(100% - 210px); }
+.og-focus-pill { display: flex; gap: 10px; align-items: center; margin: 10px 16px 0; padding: 6px 8px 6px 14px; border-radius: 999px; border: 1px solid #edc477; background: #fff9ea; font-size: 13px; font-weight: 700; color: #7c5306; }
 .og-focus-pill span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-focus-pill button { border: 0; background: #17345f; color: #fff; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .og-note { margin: 0; padding: 8px 16px; font-size: 12.5px; color: var(--text-soft); border-top: 1px solid var(--line-soft); }
@@ -110,6 +110,6 @@ export const OVERVIEW_GRAPH_CSS = `
   .og-viewport, .og-node, .og-edge { transition: none; }
 }
 @media (max-width: 720px) {
-  .og-focus-pill { top: 56px; max-width: calc(100% - 24px); }
+  .og-focus-pill { margin: 8px 12px 0; font-size: 12px; }
 }
 `;

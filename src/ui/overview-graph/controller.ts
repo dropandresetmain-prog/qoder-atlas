@@ -65,13 +65,30 @@ export const OVERVIEW_GRAPH_SCRIPT = `
       return { w: r.width, h: r.height };
     }
 
+    function frameInsets() {
+      // Toolbar and legend intentionally float over the canvas. Reserve their
+      // vertical lanes while framing so canonical views never park a card
+      // beneath a control. The active-change callout lives above the viewport,
+      // keeping its supplied message visible without covering graph content.
+      var top = 8, bottom = 8;
+      var toolbar = canvas.querySelector('.og-toolbar');
+      var legend = canvas.querySelector('.og-legend');
+      if (toolbar) top = Math.max(top, toolbar.offsetTop + toolbar.offsetHeight + 8);
+      if (legend) bottom = Math.max(bottom, viewport.clientHeight - legend.offsetTop + 8);
+      return { top: top, bottom: bottom };
+    }
+
     function frame(box, maxScale, pad, animate) {
       var s = size();
       if (!box || s.w <= 0 || s.h <= 0) return false;
-      var scale = Math.max(0.01, Math.min((s.w - pad * 2) / box.w, (s.h - pad * 2) / box.h, maxScale));
+      var inset = frameInsets();
+      var availableW = s.w - pad * 2;
+      var availableH = s.h - inset.top - inset.bottom - pad * 2;
+      if (availableW <= 0 || availableH <= 0) return false;
+      var scale = Math.max(0.01, Math.min(availableW / box.w, availableH / box.h, maxScale));
       st.scale = scale;
       st.x = (s.w - box.w * scale) / 2 - box.x * scale;
-      st.y = (s.h - box.h * scale) / 2 - box.y * scale;
+      st.y = inset.top + (availableH - box.h * scale) / 2 - box.y * scale;
       st.fitted = true;
       apply(animate);
       return true;

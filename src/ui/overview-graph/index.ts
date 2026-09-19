@@ -100,6 +100,7 @@ export function renderEventOverviewGraph(view: OperatorOverview): string {
       </div>
       <div class="og-controls">${viewSwitch}${pill}</div>
     </header>
+    ${focusPill}
     <div class="og-viewport">
       <div class="og-toolbar" role="toolbar" aria-label="Graph controls">
         <button type="button" data-og-action="zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
@@ -107,7 +108,6 @@ export function renderEventOverviewGraph(view: OperatorOverview): string {
         <button type="button" data-og-action="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
         <button type="button" data-og-action="expand" title="Expand graph" aria-label="Expand graph" aria-pressed="false">&#9974;</button>
       </div>
-      ${focusPill}
       <div class="og-legend" aria-label="Legend"><span><i style="background:#1f9d78"></i>Healthy</span><span><i style="background:#d58a13"></i>Checking</span><span><i style="background:#df3b49"></i>Needs attention</span><span><i style="background:#bcc6d2"></i>Unconfirmed</span></div>
       <div class="og-world" style="width:${layout.width}px;height:${layout.height}px">${lane}${edges}${cards}</div>
     </div>
