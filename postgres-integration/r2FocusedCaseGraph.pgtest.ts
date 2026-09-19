@@ -29,10 +29,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { attachSeedSession, commitSeed } from './m2Seed.ts';
-import { seedPlace } from './m4Seed.ts';
+import { seedParticipation, seedPlace } from './m4Seed.ts';
 import { CONN_SPEC, seedConnectionWorld } from './r2ConnectionWorld.ts';
 import { openDisruptionCase, worldAt, type DisruptedWorld, type OpenCase } from './r1ProgrammeWorld.ts';
-import { seedStayIntent } from './m6WorldSeed.ts';
+import { seedEngagementIntent, seedStayIntent } from './m6WorldSeed.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
 import { ensureOriginalCaseGraph } from '../src/app/target/originalCaseGraphCapture.ts';
@@ -97,6 +97,52 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     for (const node of v.ldg.nodes) {
       assert.doesNotMatch(node.label, UUID, `node label is human, not a uuid: ${node.label}`);
     }
+  });
+
+  test('the read model projects a current participant PASS onto its exact commitment', async () => {
+    const seed = await attachSeedSession(c.pool, c.world.workspaceId, c.world.actorId);
+    const participationId = await seedParticipation(seed, {
+      programmeItemId: c.world.lateItemId,
+      travellerId: c.world.people[0]!.travellerId,
+      obligation: 'REQUIRED',
+      accepted: true,
+    });
+    await seedEngagementIntent(seed, {
+      journeyId: c.world.people[0]!.journeyId,
+      orderKey: '021',
+      participationId,
+    });
+    await commitSeed(seed);
+    await c.drain();
+
+    const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
+    const commitment = v.ldg.nodes.find((node) => node.ref === `PROGRAMME_ITEM:${c.world.lateItemId}`);
+    assert.ok(commitment, 'the newly linked programme commitment is visible');
+    assert.equal(commitment.semanticState, 'HEALTHY', 'exact participant PASS is retained on the Case commitment');
+    assert.equal(commitment.evaluation, 'CURRENT');
+  });
+
+  test('the read model keeps a shared commitment unknown when another case journey lacks participant evidence', async () => {
+    const seed = await attachSeedSession(c.pool, c.world.workspaceId, c.world.actorId);
+    const unassessedJourney = c.world.people[2]!;
+    await seedParticipation(seed, {
+      programmeItemId: c.world.lateItemId,
+      travellerId: unassessedJourney.travellerId,
+      obligation: 'REQUIRED',
+      accepted: true,
+    });
+    await seed.client.query(
+      `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role)
+       VALUES ($1, $2, 'JOURNEY', $3, 'AFFECTED')`,
+      [c.world.workspaceId, c.caseId, unassessedJourney.journeyId],
+    );
+    await commitSeed(seed);
+
+    const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
+    const commitment = v.ldg.nodes.find((node) => node.ref === `PROGRAMME_ITEM:${c.world.lateItemId}`);
+    assert.ok(commitment, 'the shared programme commitment is visible');
+    assert.equal(commitment.semanticState, 'UNKNOWN', 'one exact PASS cannot establish a shared commitment for an unassessed participant');
+    assert.notEqual(commitment.evaluation, 'CURRENT', 'missing participant evidence does not claim a current programme verdict');
   });
 
   test('the Stay card uses the authoritative endpoint place time zone', async () => {

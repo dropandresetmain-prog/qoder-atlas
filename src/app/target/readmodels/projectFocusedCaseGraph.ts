@@ -205,6 +205,22 @@ export interface SubjectAssessmentView {
   tone: AssessmentTone;
 }
 
+/**
+ * A participant-scoped programme explanation from a Journey assessment.
+ * Programme-item assessments are not participant-specific, so the Case
+ * projection carries this exact scope separately instead of copying an
+ * aggregate Journey verdict onto every commitment.
+ */
+export interface ProgrammeParticipationAssessment {
+  journeyId: string;
+  travellerId: string;
+  participationId: string;
+  programmeId: string;
+  programmeItemId: string;
+  status: AssessmentViewStatus;
+  tone: AssessmentTone;
+}
+
 /** Input to the focused case graph enrichment. */
 export interface FocusedCaseGraphEnrichmentInput {
   /** The case's subject rows (from case_subjects). */
@@ -225,6 +241,8 @@ export interface FocusedCaseGraphEnrichmentInput {
   objectives: readonly ObjectiveRow[];
   /** Assessment views for subjects (keyed by `<KIND>:<id>`). */
   assessmentViews: ReadonlyMap<string, SubjectAssessmentView>;
+  /** Currentness-aware participant-scoped programme explanations. */
+  programmeParticipationAssessments?: readonly ProgrammeParticipationAssessment[];
   /** Blocking evaluator explanations, including optional persisted cause refs. */
   causalPath?: readonly import('../../../contracts/v2/product/readModels.ts').CausalPathStep[];
   /** Traveller display names (keyed by journey_id). */
@@ -531,6 +549,50 @@ export function projectFocusedCaseGraphEnrichment(
     (p) => p.accepted && (p.obligation === 'REQUIRED' || p.obligation === 'OPTIONAL'),
   );
 
+  const participantAssessmentsFor = (
+    participation: ParticipationRow,
+    programmeItem: ProgrammeItemRow,
+  ): ProgrammeParticipationAssessment[] => {
+    const caseJourneyIdsForTraveller = new Set(
+      input.journeys
+        .filter((journey) => journey.traveller_id === participation.traveller_id)
+        .map((journey) => journey.id),
+    );
+    return (input.programmeParticipationAssessments ?? []).filter(
+      (assessment) => assessment.travellerId === participation.traveller_id
+        && assessment.participationId === participation.id
+        && assessment.programmeId === programmeItem.programme_id
+        && assessment.programmeItemId === programmeItem.id
+        && caseJourneyIdsForTraveller.has(assessment.journeyId),
+    );
+  };
+
+  const scopedAssessmentsFor = (programmeItem: ProgrammeItemRow): ProgrammeParticipationAssessment[] => {
+    const relevantParticipations = acceptedParticipations.filter(
+      (participation) => participation.programme_item_id === programmeItem.id,
+    );
+    const direct = relevantParticipations.flatMap((participation) => participantAssessmentsFor(participation, programmeItem));
+    if (direct.length === 0) return [];
+    // If one relevant accepted participant has no scoped record, retain that
+    // missing evidence as UNKNOWN so another participant's PASS cannot make a
+    // shared commitment look healthy. The assembler normally supplies this
+    // record; synthesising it here keeps the pure projector conservative too.
+    return relevantParticipations.flatMap((participation) => {
+      const records = participantAssessmentsFor(participation, programmeItem);
+      return records.length > 0
+        ? records
+        : [{
+            journeyId: '',
+            travellerId: participation.traveller_id,
+            participationId: participation.id,
+            programmeId: programmeItem.programme_id,
+            programmeItemId: programmeItem.id,
+            status: 'NONE' as AssessmentViewStatus,
+            tone: 'UNKNOWN' as AssessmentTone,
+          }];
+    });
+  };
+
   for (const participation of acceptedParticipations) {
     const programmeItem = programmeItemById.get(participation.programme_item_id);
     if (!programmeItem) continue;
@@ -546,11 +608,37 @@ export function projectFocusedCaseGraphEnrichment(
 
     const programmeItemSubjectRef = `PROGRAMME_ITEM:${programmeItem.id}`;
     const state = stateFor(programmeItemSubjectRef);
-    // A journey-wide failure is not a programme consequence. The only fallback
-    // is the participation evaluator's own failing explanation for this item.
-    const semanticState = assessmentFor(programmeItemSubjectRef)
-      ? state.semanticState
-      : hasProgrammeFailure(programmeItemSubjectRef) ? 'FAILED' : 'UNKNOWN';
+    // A journey-wide failure is not a programme consequence. Prefer exact
+    // participant explanations, and fall back only to a standalone item
+    // assessment or that item's own failing explanation.
+    const scopedAssessments = scopedAssessmentsFor(programmeItem);
+    const lifecycleRank: Record<AssessmentViewStatus, number> = {
+      NONE: 0,
+      CURRENT: 1,
+      STALE: 2,
+      PENDING_REASSESSMENT: 3,
+      UNAVAILABLE: 4,
+    };
+    const scopedEvaluation = scopedAssessments.length > 0
+      ? scopedAssessments.some((assessment) => assessment.status === 'NONE')
+        ? 'NONE' as const
+        : scopedAssessments.reduce((worst, assessment) =>
+            lifecycleRank[assessment.status] > lifecycleRank[worst]
+              ? assessment.status
+              : worst, 'NONE' as AssessmentViewStatus)
+      : undefined;
+    const scopedSemanticState = scopedAssessments.length > 0
+      ? scopedAssessments.some((assessment) => assessment.status === 'CURRENT' && assessment.tone === 'FAIL')
+        ? 'FAILED' as const
+        : scopedAssessments.some((assessment) => assessment.status !== 'CURRENT' || assessment.tone !== 'PASS')
+          ? 'UNKNOWN' as const
+          : 'HEALTHY' as const
+      : undefined;
+    const semanticState = scopedSemanticState
+      ?? (assessmentFor(programmeItemSubjectRef)
+        ? state.semanticState
+        : hasProgrammeFailure(programmeItemSubjectRef) ? 'FAILED' : 'UNKNOWN');
+    const evaluation = scopedEvaluation ?? state.evaluation;
 
     pushNode({
       ref: programmeItemRef,
@@ -560,13 +648,20 @@ export function projectFocusedCaseGraphEnrichment(
       authority: 'AUTHORITATIVE',
       caseRef: input.caseId,
       subjectRefs: [programmeItemSubjectRef],
-      ...(state.evaluation ? { evaluation: state.evaluation } : {}),
+      ...(evaluation ? { evaluation } : {}),
       ...(detail ? { detail } : {}),
     });
 
-    // Emit PARTICIPATES_IN edges from the journey to the programme item.
-    // We need to find the journey for this traveller.
-    const journey = input.journeys.find((j) => j.traveller_id === participation.traveller_id);
+    // Emit PARTICIPATES_IN edges from the exact assessed journey when the
+    // participant evidence supplies one. The traveller fallback preserves
+    // the pre-existing composition path for worlds without explanations.
+    const scopedJourneyId = participantAssessmentsFor(participation, programmeItem).find(
+      (assessment) => assessment.journeyId,
+    )?.journeyId;
+    const journey = (scopedJourneyId
+      ? input.journeys.find((candidate) => candidate.id === scopedJourneyId)
+      : undefined)
+      ?? input.journeys.find((candidate) => candidate.traveller_id === participation.traveller_id);
     if (journey) {
       const journeyRef = `JOURNEY:${journey.id}`;
       pushEdge({

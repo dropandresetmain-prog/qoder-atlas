@@ -493,6 +493,125 @@ test('A1 enrichment: a commitment fails only from its own assessment or particip
   assert.equal(specific.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.semanticState, 'FAILED');
 });
 
+test('A2 enrichment: an exact current participant PASS makes its commitment healthy', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [],
+    transportServices: [],
+    participations: [{ id: 'participation-1', programme_item_id: 'programme-1', traveller_id: 'traveller-1', obligation: 'REQUIRED', accepted: true }],
+    programmeItems: [{ id: 'programme-1', programme_id: 'programme', title: 'Required session', item_type: 'SESSION', window_start: '2031-04-05T09:00:00.000Z', window_end: '2031-04-05T10:00:00.000Z', lifecycle_status: 'SCHEDULED' }],
+    objectives: [],
+    assessmentViews: new Map(),
+    programmeParticipationAssessments: [{
+      journeyId: 'journey-1', travellerId: 'traveller-1', participationId: 'participation-1', programmeId: 'programme', programmeItemId: 'programme-1', status: 'CURRENT', tone: 'PASS',
+    }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
+    caseId: 'case-1',
+  });
+  const node = result.nodes.find((candidate) => candidate.ref === 'PROGRAMME_ITEM:programme-1');
+  assert.ok(node);
+  assert.equal(node.semanticState, 'HEALTHY');
+  assert.equal(node.evaluation, 'CURRENT');
+});
+
+test('A2 enrichment: contradictory participant scopes never average to green', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [
+      { subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' },
+      { subject_kind: 'JOURNEY', subject_id: 'journey-2', role: 'AFFECTED_TRAVELLER' },
+    ],
+    journeys: [
+      { id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null },
+      { id: 'journey-2', trip_id: 'trip-1', traveller_id: 'traveller-2', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null },
+    ],
+    journeyItems: [],
+    transportServices: [],
+    participations: [
+      { id: 'participation-1', programme_item_id: 'programme-1', traveller_id: 'traveller-1', obligation: 'REQUIRED', accepted: true },
+      { id: 'participation-2', programme_item_id: 'programme-1', traveller_id: 'traveller-2', obligation: 'REQUIRED', accepted: true },
+    ],
+    programmeItems: [{ id: 'programme-1', programme_id: 'programme', title: 'Shared session', item_type: 'SESSION', window_start: '2031-04-05T09:00:00.000Z', window_end: '2031-04-05T10:00:00.000Z', lifecycle_status: 'SCHEDULED' }],
+    objectives: [],
+    assessmentViews: new Map(),
+    programmeParticipationAssessments: [
+      { journeyId: 'journey-1', travellerId: 'traveller-1', participationId: 'participation-1', programmeId: 'programme', programmeItemId: 'programme-1', status: 'CURRENT', tone: 'PASS' },
+      { journeyId: 'journey-2', travellerId: 'traveller-2', participationId: 'participation-2', programmeId: 'programme', programmeItemId: 'programme-1', status: 'PENDING_REASSESSMENT', tone: 'UNKNOWN' },
+      { journeyId: 'journey-outside', travellerId: 'traveller-outside', participationId: 'participation-outside', programmeId: 'programme', programmeItemId: 'programme-1', status: 'CURRENT', tone: 'FAIL' },
+    ],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice'], ['journey-2', 'Bob']]),
+    caseId: 'case-1',
+  });
+  const node = result.nodes.find((candidate) => candidate.ref === 'PROGRAMME_ITEM:programme-1');
+  assert.ok(node);
+  assert.equal(node.semanticState, 'UNKNOWN');
+  assert.equal(node.evaluation, 'PENDING_REASSESSMENT');
+});
+
+test('A2 enrichment: missing participant scope does not inherit CURRENT lifecycle', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [
+      { subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' },
+      { subject_kind: 'JOURNEY', subject_id: 'journey-2', role: 'AFFECTED_TRAVELLER' },
+    ],
+    journeys: [
+      { id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null },
+      { id: 'journey-2', trip_id: 'trip-1', traveller_id: 'traveller-2', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null },
+    ],
+    journeyItems: [],
+    transportServices: [],
+    participations: [
+      { id: 'participation-1', programme_item_id: 'programme-1', traveller_id: 'traveller-1', obligation: 'REQUIRED', accepted: true },
+      { id: 'participation-2', programme_item_id: 'programme-1', traveller_id: 'traveller-2', obligation: 'REQUIRED', accepted: true },
+    ],
+    programmeItems: [{ id: 'programme-1', programme_id: 'programme', title: 'Shared session', item_type: 'SESSION', window_start: '2031-04-05T09:00:00.000Z', window_end: '2031-04-05T10:00:00.000Z', lifecycle_status: 'SCHEDULED' }],
+    objectives: [],
+    assessmentViews: new Map(),
+    programmeParticipationAssessments: [{
+      journeyId: 'journey-1', travellerId: 'traveller-1', participationId: 'participation-1', programmeId: 'programme', programmeItemId: 'programme-1', status: 'CURRENT', tone: 'PASS',
+    }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice'], ['journey-2', 'Bob']]),
+    caseId: 'case-1',
+  });
+  const node = result.nodes.find((candidate) => candidate.ref === 'PROGRAMME_ITEM:programme-1');
+  assert.ok(node);
+  assert.equal(node.semanticState, 'UNKNOWN');
+  assert.equal(node.evaluation, 'NONE');
+});
+
+test('A2 enrichment: a stale participant failure remains unknown and outside scope cannot fail the item', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [
+      { subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' },
+      { subject_kind: 'JOURNEY', subject_id: 'journey-2', role: 'AFFECTED_TRAVELLER' },
+    ],
+    journeys: [
+      { id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null },
+      { id: 'journey-2', trip_id: 'trip-1', traveller_id: 'traveller-2', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null },
+    ],
+    journeyItems: [],
+    transportServices: [],
+    participations: [
+      { id: 'participation-1', programme_item_id: 'programme-1', traveller_id: 'traveller-1', obligation: 'REQUIRED', accepted: true },
+      { id: 'participation-2', programme_item_id: 'programme-1', traveller_id: 'traveller-2', obligation: 'REQUIRED', accepted: true },
+    ],
+    programmeItems: [{ id: 'programme-1', programme_id: 'programme', title: 'Shared session', item_type: 'SESSION', window_start: '2031-04-05T09:00:00.000Z', window_end: '2031-04-05T10:00:00.000Z', lifecycle_status: 'SCHEDULED' }],
+    objectives: [],
+    assessmentViews: new Map(),
+    programmeParticipationAssessments: [
+      { journeyId: 'journey-1', travellerId: 'traveller-1', participationId: 'participation-1', programmeId: 'programme', programmeItemId: 'programme-1', status: 'CURRENT', tone: 'PASS' },
+      { journeyId: 'journey-2', travellerId: 'traveller-2', participationId: 'participation-2', programmeId: 'programme', programmeItemId: 'programme-1', status: 'STALE', tone: 'FAIL' },
+      { journeyId: 'journey-outside', travellerId: 'traveller-outside', participationId: 'participation-outside', programmeId: 'programme', programmeItemId: 'programme-1', status: 'CURRENT', tone: 'FAIL' },
+    ],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice'], ['journey-2', 'Bob']]),
+    caseId: 'case-1',
+  });
+  const node = result.nodes.find((candidate) => candidate.ref === 'PROGRAMME_ITEM:programme-1');
+  assert.ok(node);
+  assert.equal(node.semanticState, 'UNKNOWN');
+  assert.equal(node.evaluation, 'STALE');
+});
+
 test('A1 enrichment: programme commitment detail uses its canonical zone and UTC fallback', () => {
   assert.equal(
     formatWindowInTimeZone('2031-04-05T03:30:00.000Z', '2031-04-05T04:30:00.000Z', 'Asia/Singapore'),
