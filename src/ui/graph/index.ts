@@ -1,17 +1,23 @@
 /**
- * R2 LANE B — focused case graph renderer entry point.
+ * Focused case graph renderer entry point.
  *
- * Assembles: semantic adapter -> layout -> cards/edges -> styles -> interactions.
- * Returns server-rendered HTML string. No client framework.
+ * semantic adapter -> layout -> scene -> server HTML (+ embedded scene JSON).
+ * The client runtime (`runtime.ts`, exposed as `window.NorthstarGraph`) drives
+ * pan/zoom/views/selection and patches the live DOM from later scenes so polling
+ * never rebuilds the canvas.
+ *
+ * Public surface is unchanged: `renderFocusedCaseGraph(input) -> string`.
+ * The graph root (`.fg-canvas`) carries `data-graph-scene-hash` (hash of the scene
+ * JSON): a poller only needs to touch the graph when that value changed.
  */
 import type {
   FocusedGraphView,
   LiveDependencyGraph,
   RecoveryCaseView,
 } from '../../contracts/v2/product/readModels.ts';
-import { presentDependencyGraph } from '../semantics/adapter.ts';
-import { computeLayout } from './layout.ts';
-import { renderNodeCard } from './cards.ts';
+import { escapeHtml as esc } from '../html.ts';
+import { attrsToHtml } from './cards.ts';
+import { buildGraphScene, sceneHash, sceneJson, type GraphScene } from './scene.ts';
 import { FOCUSED_GRAPH_CSS } from './styles.ts';
 import { INTERACTIONS_SCRIPT } from './interactions.ts';
 
@@ -21,171 +27,72 @@ export interface RenderFocusedCaseGraphInput {
   readonly caseStatus: RecoveryCaseView['status'];
   /**
    * Which graph of the Original/Current pair this is (`data-graph-role`). The
-   * interaction script keys each canvas's pan/zoom/view/selection by it so a
-   * polling swap can restore what the operator was looking at. Default `current`.
+   * runtime keys each canvas's pan/zoom/view/selection by it so a polling swap can
+   * restore what the operator was looking at. Default `current`.
    */
   readonly role?: 'current' | 'original';
   /**
-   * Emit the stylesheet + interaction script with the graph (default true). A page
+   * Emit the stylesheet + runtime script with the graph (default true). A page
    * that renders two graphs emits them once, with the first.
    */
   readonly includeAssets?: boolean;
 }
 
-/**
- * Render the focused case graph as an HTML string.
- *
- * Single semantic mapping layer: calls presentDependencyGraph with focus
- * derived from focusedGraph (causalRefs, causalEdgeIndices via index lookup).
- *
- * Deterministic layout: longest-path ranking from source nodes.
- * V5.6 visual language: type label, title, state badge, health border.
- * Focal emphasis: firstBreakpoint gets larger card + amber ring.
- * Causal emphasis: causal chain nodes/edges highlighted.
- * Checking presentation: pending-reassessment shows "Checking…" badge.
- * Pulse: pure CSS animation derived from tone (ok/watch/alert).
- * Planning wrapper: when caseStatus is PLANNING, wraps graph in animated border.
- */
+const VIEW_LABELS = { path: 'Disruption Path', trip: 'Full trip', prog: 'Programme' } as const;
+
+function stageHtml(scene: GraphScene): string {
+  const paths = scene.edges.map((e) =>
+    `<path class="${esc(e.cls)}" d="${e.d}" data-edge-key="${esc(e.key)}" data-source="${esc(e.source)}" data-target="${esc(e.target)}" data-focus="${e.focus}" data-tone="${e.tone}" fill="none"/>`).join('\n');
+  const pulses = scene.edges.filter((e) => e.pulse).map((e) =>
+    `<circle class="fg-pulse-dot sem-${e.tone}" r="3" data-pulse-for="${esc(e.key)}"><animateMotion dur="${e.pulse!.dur}" begin="${e.pulse!.begin}" repeatCount="indefinite" path="${e.d}"/></circle>`).join('\n');
+  const svg = `<svg class="fg-edges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<g class="fg-edge-layer">${paths}</g>
+<g class="fg-pulses">${pulses}</g>
+</svg>`;
+  const nodes = scene.nodes.map((n) =>
+    `<article class="${esc(n.cls)}" style="left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;" ${attrsToHtml(n.attrs)}>
+${n.html}
+</article>`).join('\n');
+  return `<div class="fg-stage" data-view="${scene.defaultView}">
+${svg}
+${nodes}
+</div>`;
+}
+
+/** Render the focused case graph as an HTML string. */
 export function renderFocusedCaseGraph(input: RenderFocusedCaseGraphInput): string {
   const { ldg, focusedGraph, caseStatus } = input;
+  const role = input.role ?? 'current';
+  const scene = buildGraphScene({ ldg, focusedGraph, role });
+  const json = sceneJson(scene);
+  const hash = sceneHash(json);
 
-  // Build focus for semantic adapter
-  const causalRefs = focusedGraph?.causalNodeRefs ?? [];
-  const causalEdgeIds = new Set(focusedGraph?.causalEdgeIds ?? []);
+  const viewButtons = (['path', 'trip', 'prog'] as const)
+    .filter((name) => name !== 'prog' || scene.views.prog)
+    .map((name) => {
+      const disabled = name === 'path' && !scene.views.path ? ' disabled' : '';
+      const active = name === scene.defaultView ? ' active' : '';
+      return `<button type="button" class="${active.trim()}" data-view="${name}"${disabled}>${VIEW_LABELS[name]}</button>`;
+    }).join('\n  ');
 
-  // Map causalEdgeIds to indices (LOOKUP, never topology traversal)
-  const causalEdgeIndices = ldg.edges
-    .map((edge, index) => (causalEdgeIds.has(edge.id) ? index : -1))
-    .filter((index) => index >= 0);
-
-  // Call semantic adapter (single mapping layer)
-  const presentationGraph = presentDependencyGraph(ldg, {
-    causalRefs,
-    causalEdgeIndices,
-  });
-
-  // Compute deterministic layout (causal spine when causalRefs present)
-  const layout = computeLayout(presentationGraph, causalRefs);
-
-  // Build node map for quick lookup
-  const nodeByRef = new Map(presentationGraph.nodes.map((n) => [n.ref, n]));
-
-  // Focal node (firstBreakpoint)
-  const focalRef = focusedGraph?.firstBreakpoint?.nodeRef;
-
-  // Causal node set
-  const causalRefSet = new Set(causalRefs);
-
-  // Render node cards with pulse classes
-  const nodeCardsHtml = layout.nodes.map((layoutNode) => {
-    const presentationNode = nodeByRef.get(layoutNode.ref);
-    if (!presentationNode) return '';
-
-    const isFocal = layoutNode.ref === focalRef;
-    const isCausal = causalRefSet.has(layoutNode.ref);
-    const isChecking = presentationNode.evaluationState === 'pending-reassessment';
-
-    // Pulse: ok/watch get pulse, alert gets none
-    const shouldPulse = presentationNode.indicator.tone === 'ok' || presentationNode.indicator.tone === 'watch';
-
-    const card = renderNodeCard({
-      layoutNode,
-      presentationNode,
-      isFocal,
-      isCausal,
-      isChecking,
-      pulseClass: shouldPulse ? 'fg-pulse' : '',
-    });
-
-    return card;
-  }).join('\n');
-
-  // Render edges with focus roles
-  const edgeElements = layout.edges.map((layoutEdge) => {
-    const presentationEdge = presentationGraph.edges.find(
-      (e) => e.renderKey === layoutEdge.renderKey
-    );
-    if (!presentationEdge) return null;
-
-    const toneClass = `sem-${presentationEdge.indicator.tone}`;
-    const focusRole = presentationEdge.focusRole;
-
-    // Pulse class: ok/watch get pulse, alert gets none
-    const shouldPulse = presentationEdge.indicator.tone === 'ok' || presentationEdge.indicator.tone === 'watch';
-    const pulseClass = shouldPulse ? 'fg-pulse' : '';
-
-    return {
-      ...layoutEdge,
-      toneClass,
-      focusRole,
-      pulseClass,
-    };
-  }).filter((e): e is NonNullable<typeof e> => e !== null);
-
-  // Build edge SVG with proper classes
-  const edgeSvg = edgeElements.length > 0
-    ? `<svg class="fg-edges" xmlns="http://www.w3.org/2000/svg">
-${edgeElements.map((edge) => {
-  const dx = edge.targetX - edge.sourceX;
-  const handle = Math.max(4, Math.min(72, dx * 0.36));
-  const d = `M${edge.sourceX} ${edge.sourceY} C${edge.sourceX + handle} ${edge.sourceY},${edge.targetX - handle} ${edge.targetY},${edge.targetX} ${edge.targetY}`;
-
-  return `<path
-    class="fg-edge ${edge.toneClass} ${edge.pulseClass}"
-    d="${d}"
-    data-edge-key="${edge.renderKey}"
-    data-source="${edge.sourceRef}"
-    data-target="${edge.targetRef}"
-    data-focus="${edge.focusRole}"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-  />`;
-}).join('\n')}
-</svg>`
-    : '';
-
-  // Named views
-  const hasFocusedGraph = focusedGraph !== undefined && causalRefs.length > 0;
-  const disruptionDisabled = !hasFocusedGraph ? 'disabled' : '';
-
-  const viewsHtml = `
-<div class="fg-views">
-  <button type="button" class="active" data-view="overview">Trip Overview</button>
-  <button type="button" data-view="disruption" ${disruptionDisabled}>Disruption Path</button>
-</div>`;
-
-  // Toolbar
-  const toolbarHtml = `
-<div class="fg-toolbar">
-  <button type="button" data-action="zoom-out" aria-label="Zoom out">−</button>
-  <button type="button" data-action="home" aria-label="Reset view">⌂</button>
-  <button type="button" data-action="zoom-in" aria-label="Zoom in">+</button>
-  <div class="fg-zoom-readout">100%</div>
-</div>`;
-
-  // Stage content
-  const stageHtml = `
-<div class="fg-stage" style="width:${layout.width}px;height:${layout.height}px;">
-  ${edgeSvg}
-  ${nodeCardsHtml}
-</div>`;
-
-  // Viewport
-  const viewportHtml = `
-<div class="fg-viewport">
-  ${stageHtml}
-</div>`;
-
-  // Canvas
   const canvasHtml = `
-<div class="fg-canvas" data-test="focused-case-graph" data-graph-role="${input.role ?? 'current'}">
-  ${viewsHtml}
-  ${toolbarHtml}
-  ${viewportHtml}
+<div class="fg-canvas" data-test="focused-case-graph" data-graph-role="${role}" data-graph-scene-hash="${hash}" data-default-view="${scene.defaultView}">
+  <div class="fg-views">
+  ${viewButtons}
+  </div>
+  <div class="fg-toolbar">
+    <button type="button" data-action="zoom-out" aria-label="Zoom out">−</button>
+    <button type="button" data-action="home" aria-label="Reset view" title="Return to current view">⌂</button>
+    <button type="button" data-action="zoom-in" aria-label="Zoom in">+</button>
+    <div class="fg-zoom-readout">100%</div>
+  </div>
+  <div class="fg-hint">Drag to pan · scroll to zoom · click a node to trace dependencies</div>
+  <div class="fg-viewport" tabindex="0" aria-label="Dependency graph">
+${stageHtml(scene)}
+  </div>
+  <script type="application/json" class="fg-scene">${json}</script>
 </div>`;
 
-  // Planning wrapper (when caseStatus is PLANNING)
   const graphContent = caseStatus === 'PLANNING'
     ? `
 <div class="fg-planning-wrapper">
@@ -194,7 +101,6 @@ ${edgeElements.map((edge) => {
 </div>`
     : canvasHtml;
 
-  // Full output with styles and script (once per page when two graphs are rendered)
   if (input.includeAssets === false) return graphContent;
   return `
 <style>
