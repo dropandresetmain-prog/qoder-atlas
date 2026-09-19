@@ -122,6 +122,29 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     assert.equal(commitment.evaluation, 'CURRENT');
   });
 
+  test('the read model keeps a shared commitment unknown when another case journey lacks participant evidence', async () => {
+    const seed = await attachSeedSession(c.pool, c.world.workspaceId, c.world.actorId);
+    const unassessedJourney = c.world.people[2]!;
+    await seedParticipation(seed, {
+      programmeItemId: c.world.lateItemId,
+      travellerId: unassessedJourney.travellerId,
+      obligation: 'REQUIRED',
+      accepted: true,
+    });
+    await seed.client.query(
+      `INSERT INTO case_subjects (workspace_id, recovery_case_id, subject_kind, subject_id, role)
+       VALUES ($1, $2, 'JOURNEY', $3, 'AFFECTED')`,
+      [c.world.workspaceId, c.caseId, unassessedJourney.journeyId],
+    );
+    await commitSeed(seed);
+
+    const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
+    const commitment = v.ldg.nodes.find((node) => node.ref === `PROGRAMME_ITEM:${c.world.lateItemId}`);
+    assert.ok(commitment, 'the shared programme commitment is visible');
+    assert.equal(commitment.semanticState, 'UNKNOWN', 'one exact PASS cannot establish a shared commitment for an unassessed participant');
+    assert.notEqual(commitment.evaluation, 'CURRENT', 'missing participant evidence does not claim a current programme verdict');
+  });
+
   test('the Stay card uses the authoritative endpoint place time zone', async () => {
     const seed = await attachSeedSession(c.pool, c.world.workspaceId, c.world.actorId);
     const placeId = await seedPlace(seed, { name: 'Case stay endpoint', placeType: 'HOTEL', timeZone: 'Asia/Singapore' });

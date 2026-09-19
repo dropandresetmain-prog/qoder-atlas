@@ -891,11 +891,12 @@ async function loadRecoveryCaseFactsInner(
   // copied safely onto all commitments.
   const programmeParticipationAssessments: ProgrammeParticipationAssessment[] = [];
   for (const journey of journeys.rows) {
-    const journeyView = programmeParticipationViews.get(journey.id);
-    if (!journeyView || journeyView.status === 'NONE') continue;
     for (const participation of participations.rows.filter((candidate) => candidate.traveller_id === journey.traveller_id)) {
       if (!participation.accepted || (participation.obligation !== 'REQUIRED' && participation.obligation !== 'OPTIONAL')) continue;
-      const matching = journeyView.status === 'CURRENT'
+      const programmeItem = programmeItems.rows.find((candidate) => candidate.id === participation.programme_item_id);
+      if (!programmeItem) continue;
+      const journeyView = programmeParticipationViews.get(journey.id);
+      const matching = journeyView?.status === 'CURRENT'
         ? journeyView.explanations.filter((explanation) => {
             if (explanation.affectedSubject.kind !== 'JOURNEY' || explanation.affectedSubject.id !== journey.id) return false;
             const refs = [explanation.cause.subjectRef, ...explanation.relatedSubjects].filter(
@@ -909,24 +910,31 @@ async function loadRecoveryCaseFactsInner(
         for (const explanation of matching) {
           programmeParticipationAssessments.push({
             journeyId: journey.id,
+            travellerId: journey.traveller_id,
             participationId: participation.id,
+            programmeId: programmeItem.programme_id,
             programmeItemId: participation.programme_item_id,
-            status: journeyView.status,
+            status: journeyView?.status ?? 'NONE',
             tone: explanation.status,
           });
         }
-      } else if (journeyView.status !== 'CURRENT') {
+      } else {
         programmeParticipationAssessments.push({
           journeyId: journey.id,
+          travellerId: journey.traveller_id,
           participationId: participation.id,
+          programmeId: programmeItem.programme_id,
           programmeItemId: participation.programme_item_id,
-          status: journeyView.status,
+          // A current Journey assessment without an exact participant
+          // explanation is not a current programme verdict. Keep the
+          // participant scope UNKNOWN with NONE lifecycle rather than making
+          // an item-level CURRENT claim from unrelated Journey evidence.
+          status: journeyView?.status === 'CURRENT' ? 'NONE' : journeyView?.status ?? 'NONE',
           tone: 'UNKNOWN',
         });
       }
     }
   }
-
   // Objective rows owned by the case's explicit JOURNEY/TRIP subjects, plus the
   // Trip owning every affected Journey. Trip objectives govern their member
   // journeys even when RecoveryCase subjects carry only JOURNEY refs.
