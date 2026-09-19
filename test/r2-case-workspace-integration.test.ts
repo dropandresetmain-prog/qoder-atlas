@@ -192,6 +192,7 @@ describe('R2 Case workspace composition', () => {
           outcome: { label: 'Awaiting operator authority', code: 'AWAITING_AUTHORITY' },
           domains: [{ domain: { label: 'Transport', code: 'TRANSPORT' }, disposition: { label: 'Investigated', code: 'INVESTIGATED' } }],
           tools: [],
+          modelActivities: [],
           candidates: [],
           viableStrategies: [],
         },
@@ -223,6 +224,7 @@ describe('R2 Case workspace composition', () => {
             { tool: { label: 'Flight search', code: 'flight.search' }, status: { label: 'Succeeded', code: 'SUCCEEDED' }, provenanceMode: { label: 'Replay', code: 'REPLAY' }, observedAt: generatedAt, summary: 'flight.search succeeded', uncertainties: [], evidenceRef: 'evidence:1' },
             { tool: { label: 'Flight search', code: 'flight.search' }, status: { label: 'Unavailable', code: 'UNAVAILABLE' }, provenanceMode: { label: 'Internal canonical state', code: 'INTERNAL' }, summary: 'flight.search unavailable', uncertainties: [], evidenceRef: 'evidence:2' },
           ],
+          modelActivities: [],
           candidates: [
             {
               candidateKey: 'k1',

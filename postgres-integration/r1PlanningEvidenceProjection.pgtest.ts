@@ -28,6 +28,7 @@ import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
 import type { PlanningEvidenceView } from '../src/contracts/v2/product/readModels.ts';
+import { IntelligenceClient, ScriptedModelTransport } from '../src/intelligence/client.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -59,6 +60,13 @@ describe('C9 planning evidence on the PostgreSQL Case read model (coordinator-pr
     const coordinator = createRecoveryPlanningCoordinator({
       pool: c.pool, workspaceId: c.world.workspaceId, actorPrincipalId: c.world.actorId,
       uow: () => c.app.unitOfWork(), now: R1_NOW,
+      intelligence: new IntelligenceClient({
+        providerId: 'model-studio',
+        apiKey: 'scripted',
+        model: 'qwen-flash',
+        transport: new ScriptedModelTransport([JSON.stringify({ suggestedDomains: ['TRANSPORT'] })]),
+      }),
+      completionClock: () => '2031-06-02T00:00:02.000Z',
     });
     const result = await coordinator.planCase({ recoveryCaseId: c.caseId as never, reason: 'CASE_OPENED' });
     assert.equal(result.outcome, 'AWAITING_AUTHORITY');
@@ -68,6 +76,21 @@ describe('C9 planning evidence on the PostgreSQL Case read model (coordinator-pr
     const stored = await findLatestRecoveryPlanningAttemptForCase(c.pool, c.world.workspaceId, c.caseId);
     assert.ok(stored, 'attempt persisted through the normal PG path');
     assert.equal(stored.attempt.id, result.planningAttemptRef);
+    assert.equal(stored.attempt.completedAt, '2031-06-02T00:00:02.000Z', 'completion is captured after the planning work, not at deterministic basis time');
+    assert.deepEqual(stored.attempt.modelActivities.map((activity) => ({
+      operation: activity.operation,
+      providerId: activity.providerId,
+      model: activity.model,
+      mode: activity.mode,
+      status: activity.status,
+    })), [{
+      operation: 'recovery.domain_suggestion',
+      providerId: 'model-studio',
+      model: 'qwen-flash',
+      mode: 'REPLAY',
+      status: 'SUCCEEDED',
+    }]);
+    assert.ok(Date.parse(stored.attempt.completedAt) >= Date.parse(stored.attempt.modelActivities[0]!.observedAt));
 
     const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId });
     const pe = v.planningEvidence;
@@ -208,6 +231,16 @@ describe('C9 read-only tool provenance through the real loader', () => {
         provenance: { mode: 'REPLAY', providerId: 'provider-a', observedAt: R1_NOW, sourceRefs: [], recordingRef: 'rec-1' },
         uncertainty: [{ code: 'price_volatility', summary: 'Fares may change before booking' }],
       }],
+      modelActivities: [{
+        operation: 'recovery.domain_suggestion',
+        providerId: 'model-studio',
+        model: 'qwen-flash',
+        mode: 'LIVE',
+        status: 'FAILED',
+        observedAt: '2031-06-02T00:00:01.000Z',
+        latencyMs: 412,
+        errorCategory: 'TIMEOUT',
+      }],
       materialCandidates: [{
         candidateKey: 'transport#0', proposerId: 'proposer.transport-offer', domainId: 'TRANSPORT', disposition: 'REJECTED_DETERMINISTIC',
         evidenceRefs: [evidenceRef], validationReasonCodes: [], viability: 'NOT_VIABLE', viabilityDecisionCodes: ['arrival_after_requirement'],
@@ -230,6 +263,16 @@ describe('C9 read-only tool provenance through the real loader', () => {
     assert.equal(pe.tools[0]?.provenanceMode.code, 'REPLAY');
     assert.equal(pe.tools[0]?.provider, 'provider-a');
     assert.deepEqual(pe.tools[0]?.uncertainties, ['Fares may change before booking']);
+    assert.deepEqual(pe.modelActivities, [{
+      operation: 'recovery.domain_suggestion',
+      providerId: 'model-studio',
+      model: 'qwen-flash',
+      mode: 'LIVE',
+      status: 'FAILED',
+      observedAt: '2031-06-02T00:00:01.000Z',
+      latencyMs: 412,
+      errorCategory: 'TIMEOUT',
+    }]);
     assert.equal(pe.candidates[0]?.disposition.code, 'REJECTED_DETERMINISTIC');
     assert.deepEqual(pe.candidates[0]?.reasons, ['Not viable', 'Arrival after requirement']);
     assert.equal(pe.recommendation, undefined, 'no viable option => no recommendation');

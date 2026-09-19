@@ -575,9 +575,12 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // R1 (0125): the single immutable, bounded decision-evidence record per planning basis —
       // every column is object/array-shaped and size-checked in the migration (pg_column_size CHECKs).
       'recovery_planning_attempts.basis_manifest',
-      'recovery_planning_attempts.domains',
-      'recovery_planning_attempts.evidence',
-      'recovery_planning_attempts.material_candidates',
+       'recovery_planning_attempts.domains',
+       'recovery_planning_attempts.evidence',
+       // A2 (0131): bounded operational model-call provenance only; the typed
+       // application schema excludes prompts, raw output and private reasoning.
+       'recovery_planning_attempts.model_activities',
+       'recovery_planning_attempts.material_candidates',
       'recovery_planning_attempts.viable_strategy_refs',
       'recovery_planning_attempts.recommendation',
       // R2 (0127): the single immutable semantic Original Case graph — object-shaped and size-checked
