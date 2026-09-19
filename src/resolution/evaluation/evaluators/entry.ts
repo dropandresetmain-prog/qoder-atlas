@@ -352,7 +352,7 @@ function evaluate(subject: TypedRef, { now, world, effective }: EvaluationContex
 
 export const entryEvaluator: Evaluator = {
   id: ENTRY_EVALUATOR_ID,
-  version: '1',
+  version: '2',
   assessmentKind: 'ENTRY',
   subjectKinds: ['JOURNEY'],
   dimensions: [DIMENSION.ENTRY, DIMENSION.TRANSIT],

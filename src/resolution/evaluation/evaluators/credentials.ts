@@ -90,6 +90,18 @@ function evaluate(subject: TypedRef, { world }: EvaluationContext): EvaluatorOut
         continue;
       }
       let issues = 0;
+      // A valid passport edition is insufficient when the traveller cannot
+      // present it. This is possession evidence, separate from legal validity;
+      // do not require physical possession of electronic authorisations.
+      if (r.credential.kind === IDENTITY_DOCUMENT_KIND && r.version.physicallyAvailable !== true) {
+        const unavailable = r.version.physicallyAvailable === false;
+        push(unavailable ? 'FAIL' : 'UNKNOWN', unavailable ? 'passport_not_available' : 'passport_availability_unknown',
+          { ...facts, physicallyAvailable: r.version.physicallyAvailable ?? null }, {
+            evidence,
+            ...(unavailable ? {} : { uncertainty: [{ kind: 'MISSING_INPUT' as const, code: 'passport_availability', subjectRef: travellerRef }] }),
+          });
+        issues += 1;
+      }
       if (r.credential.travellerId !== journey.travellerId) { push('FAIL', 'credential_not_travellers', { ...facts, credentialTravellerId: r.credential.travellerId }, { evidence }); issues += 1; }
       if (r.version.credentialId !== r.credential.id) { push('FAIL', 'version_mismatch', { ...facts, versionCredentialId: r.version.credentialId }, { evidence }); issues += 1; }
       if (r.version.issuerStatus === 'REVOKED' || r.version.issuerStatus === 'SUSPENDED') { push('FAIL', 'credential_not_valid', facts, { evidence }); issues += 1; }
@@ -161,7 +173,7 @@ function evaluate(subject: TypedRef, { world }: EvaluationContext): EvaluatorOut
 
 export const credentialsEvaluator: Evaluator = {
   id: CREDENTIALS_EVALUATOR_ID,
-  version: '1',
+  version: '2',
   assessmentKind: 'VIABILITY',
   subjectKinds: ['JOURNEY'],
   dimensions: [DIMENSION],

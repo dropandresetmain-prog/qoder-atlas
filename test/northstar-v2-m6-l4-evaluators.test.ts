@@ -246,6 +246,27 @@ test('credentials: a selected version belonging to a different credential FAILs 
   assert.ok(dim?.explanations.some((e) => e.status === 'FAIL' && e.reasonCode === 'version_mismatch'));
 });
 
+test('credentials: a passport must be available to present, with missing possession evidence UNKNOWN', () => {
+  for (const physicallyAvailable of [true, false, null] as const) {
+    const journeyId = id();
+    const travellerId = id();
+    const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+    const visit = visitRow(journeyId, 'jurisdiction-a');
+    const { credential, version } = passportCredential(travellerId, { physicallyAvailable });
+    world.intendedVisits.push(visit);
+    world.credentials.push(credential);
+    world.credentialVersions.push(version);
+    world.credentialSelections.push(selectionRow(journeyId, credential.id, version.id, [visit.id]));
+    const out = credentialsEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+    const dim = out.dimensions[0];
+    assert.equal(dim?.verdict, physicallyAvailable === true ? 'PASS' : physicallyAvailable === false ? 'FAIL' : 'UNKNOWN');
+    if (physicallyAvailable !== true) {
+      assert.ok(dim?.explanations.some((e) => e.reasonCode === (physicallyAvailable === false ? 'passport_not_available' : 'passport_availability_unknown')));
+      assert.ok(!dim?.explanations.some((e) => e.reasonCode === 'credential_valid_for_visit'));
+    }
+  }
+});
+
 test('credentials: a REVOKED credential FAILs credential_not_valid', () => {
   const journeyId = id();
   const travellerId = id();

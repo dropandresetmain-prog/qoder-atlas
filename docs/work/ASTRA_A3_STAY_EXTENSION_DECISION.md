@@ -207,3 +207,11 @@ must remain UNKNOWN without selected current document and scoped entry evidence;
 inputs must drive the real credentials/entry evaluators. Wrong owner, wrong jurisdiction,
 non-covering visit, malformed dates and conflicting selection fail before persistence.
 Preserve the immutable base world and same Journey authority in all tests.
+
+Passport presentability closure: current credentials evaluator stored but ignored
+`physicallyAvailable`. For a selected passport, false now fails and missing availability
+is UNKNOWN; electronic authorisations do not acquire a physical-possession requirement.
+This was Act Now because landside overnight feasibility cannot rely on a passport that
+cannot be presented. Credentials and scoped-entry evaluator editions advance to2 so the
+assessment manifest distinguishes these semantics. Focused/adjacent evaluator tests57/57
+and TypeScript passed. No canonical credential facts were authored or changed.
