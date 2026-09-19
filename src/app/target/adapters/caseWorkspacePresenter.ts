@@ -732,7 +732,7 @@ function buildChecked(view: RecoveryCaseView, phase: CasePhase, recommended?: Ca
     }
     const s = strategy.projectedSummary;
     if (s.total > 0) {
-      out.push({ ok: s.fail === 0 ? true : false, label: `${s.pass} of ${s.total} checked parts of the trip stay confirmed` });
+      out.push({ ok: s.fail === 0 ? true : false, label: `${s.pass} of ${s.total} travel plans checked stay confirmed` });
       if (s.unknown > 0) out.push({ ok: null, label: `${s.unknown} could not be confirmed yet` });
     }
   }

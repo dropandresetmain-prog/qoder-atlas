@@ -1,7 +1,7 @@
 # ACTIVE TASK — POST-R4 CONVERGENCE / A1 IN PROGRESS
 
-- Goal: legacy-quality frontend, faithful V5.6/V7.2, physical Sarah and Jordan through one generalized PostgreSQL recovery engine.
-- Founder steering after connection interruption: **continue and pause at A1**. Do not proceed to A2–A5 after accepting/pushing A1.
+- Goal: strong current-product surfaces, faithful V5.6/V7.2, physical Sarah and Jordan through one generalized PostgreSQL recovery engine.
+- Latest founder steering supersedes pause-at-A1: **close A1 with justified deferrals, then immediately A2 Sarah and A3 Jordan**. Healthy-trip requests, broad programme changes and non-critical parity are Park for Later. See ROADMAP.
 - Immutable accepted R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
 - Primary: `integration/astra-post-r4`; `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Accepted/pushed A0 SHA: `f55899b15200de692dd749bbcfb795c67f6a22e0` (remote verified). Current integration work starts from that checkpoint.
@@ -30,13 +30,13 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-Active A1 lanes: Sol closes critical request-planning/currentness/lifecycle findings on `be69d056` (not integrated); Luna request admission; Luna investigates remaining programme action parity. Intake correction `bfabd0f5` and Traveller composer `0cb5f436` await integration. Programme staging, Case canonical time zones/full card inspector, import retry and intake UI are integrated. Each lane uses an isolated worktree/database. Root checkout remains untouched. Founder now permits Sol wherever more effective/efficient.
+Active A1 lanes: Terra Overview overlay/card interaction fix; Luna Traveller timezone correction; Luna bounded importer visibility investigation. Intake `bfabd0f5`, unwired Traveller composer `0cb5f436` and unwired admission `840f577` integrated. Request planner `be69d056` NOT integrated; partial critical corrections retained dirty on isolated `codex/astra-a1-request-gates`, no tests. Authority draft retained dirty on `codex/a1-request-authority` (two new files, no tests). Do not integrate either. Sol only for named high-risk uncertainty under latest routing.
 
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
-- Current pushed primary: `1f045e2`; local integrations through `fa67eb6` plus intake reachability/read-only request interpretation. Named A1 remains unaccepted.
+- Current pushed primary: `47bba6567c30adfff0c522eb6b2f149e382ce229`, remote verified and clean before resumed implementation. No merge in progress. Named A1 remains unaccepted.
 - New focused evidence: importer real HTTP preview/import/retry PG 4/4; programme preview PG 2/2; intake 3/3; interpretation 3/3 (clarification when unavailable, authored identity/strength preserved, invalid output/invented IDs rejected). Case readability lane: Case 23, renderer 14, language 32, PG 7 passed; integrated physical proof pending restart.
 - Latest physical baseline-to-disruption: 52/67 and nobody needs attention -> 51/67, one needs attention/decision; graph camera transform unchanged; 4 cleared/1 attention. No recovery execution performed.
 - Integration proof: Programme/Decisions/Activity PG seam 3/3; focused product/request/Case 37/37; final Case additions 22/22; request PG 1/1; TypeScript and boundary gate clean (257 classified files). One focused request failure exposed bigint-to-number decoding, fixed and re-proven. No broad run used.
@@ -65,10 +65,10 @@ Active A1 lanes: Sol closes critical request-planning/currentness/lifecycle find
 
 ## Exact next action / stop-safe handoff
 
-Push integrated programme/Case/intake work; integrate intake usability correction and request UI. Complete canonical request admission/planning/lifecycle fixes, request HTTP/authority integration, remaining programme action parity; then browser/mobile and A1 gates. Pause only after genuine A1 acceptance/push; no A2 execution.
+Integrate visible Overview overlap and Traveller timezone fixes; conclude bounded importer investigation; finish browser/mobile and coherent A1 checks, push A1. Then immediately run A2 Sarah physical acceptance and A3 Jordan runtime. Do not continue deferred request/programme architecture work.
 
-Act Now A1 blocker: Sol identified caller-authored request basis, request-blind passive resolution, proposer-claimed hard-constraint satisfaction and stale existing-plan authority issuance. Fixes assigned before integrating request planner. Investigate Now: requested-day research and durable unsupported reasons. Jordan requirement/semantics conflict remains pending primary resolution before A3.
-Remaining action-seam findings: programme bilateral preview is now wired and integrated; generic programme preview/commit, intake and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope. No retirement/deferral decision has been accepted.
+Act Now A1: Overview focus pill intercepts disrupted-service card click; root physical evidence provided to Terra. Case canonical time labels/full inspector now physically visible; poll/mobile proof pending. Request gate findings are Park for Later with the whole unintegrated healthy-trip planning extension. Jordan requirement/semantics conflict remains pending primary resolution before A3.
+Action seams: programme bilateral preview/staging and intake are wired. Generic programme changes and healthy-trip composer/planning are explicitly deferred by founder; composer/admission code remains unwired and is not claimed as product capability. Legacy message/export controls were inert, not lost functional APIs.
 New architecture evidence: current coordinator admits only CURRENT FAIL; healthy-trip requests require explicit desired-state context while retaining the actual current assessment. Never fabricate failure. Import is resumable, not one atomic transaction; partial visibility remains Investigate Now before exposing success semantics.
 Browser artifacts: ignored `output/playwright/` screenshots; temporary untracked `.playwright-cli/` snapshots/logs must stay out of commits.
 Evidence not run: integrated browser acceptance, Overview semantic follow-on, A1 broad gates, A2–A5 acceptance. Applied disclosed Sarah supplier input physically in isolated REPLAY runtime; Case awaits programme approval. No execution acceptance claimed.

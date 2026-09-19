@@ -87,7 +87,7 @@ export function renderProductProgrammeIntake(options: ProgrammeIntakeRenderOptio
   <div class="page-head">
     <h1>Load a programme</h1>
     <p class="sub">Add the event, its sessions, and the people who need to attend. Review the server check before anything is added.</p>
-    <p class="meta">The intake accepts sessions with confirmed ISO times and traveller attendance rows.</p>
+    <p class="meta">Add confirmed session times and choose who needs to attend.</p>
   </div>
   <form data-programme-intake-form novalidate>
     <section class="section" aria-label="Programme details">
