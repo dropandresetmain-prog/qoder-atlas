@@ -131,6 +131,33 @@ async function sweep(page: Page): Promise<string[]> {
   return problems;
 }
 
+async function activeDependencyCardsAreReachable(page: Page): Promise<void> {
+  const cards = page.locator('.og-node.og-dependency:not(.og-dim)');
+  assert.ok(await cards.count() > 0, 'the active shared dependency is rendered');
+  const ids = await cards.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-og-node')));
+  for (const id of ids) {
+    assert.ok(id, 'dependency card has an identity');
+    const blockedBy = await page.locator(`[data-og-node="${id}"]`).evaluate((card) => {
+      const rect = card.getBoundingClientRect();
+      const viewport = card.closest('.og-viewport')!.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const hit = document.elementFromPoint(centerX, centerY);
+      if (centerX < viewport.left || centerX > viewport.right || centerY < viewport.top || centerY > viewport.bottom) {
+        return 'outside the graph viewport';
+      }
+      return hit === card || card.contains(hit) ? null : hit?.className || hit?.tagName || 'nothing';
+    });
+    assert.equal(blockedBy, null, `active shared dependency ${id} is visible and receives its own click`);
+    await page.locator(`[data-og-node="${id}"]`).click({ timeout: 3000 });
+    assert.equal(
+      await page.locator('[data-og-inspector]').evaluate((inspector) => (inspector as HTMLElement).hidden),
+      false,
+      'selecting a dependency reveals its supplied description',
+    );
+  }
+}
+
 for (const mode of ['collapsed', 'expanded'] as const) {
   test(`overview controls stay clickable at every scroll position (${mode} graph)`, async (t) => {
     if (skipReason || !browser) { t.skip(skipReason ?? 'no browser'); return; }
@@ -143,6 +170,24 @@ for (const mode of ['collapsed', 'expanded'] as const) {
       if (mode === 'expanded') await page.locator('.og-toolbar button[aria-label="Expand graph"]').click();
       const problems = await sweep(page);
       assert.deepEqual(problems, [], problems.slice(0, 8).join('\n'));
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const [name, viewport, expand] of [
+  ['default desktop', { width: 1440, height: 1000 }, false],
+  ['expanded desktop', { width: 1440, height: 1000 }, true],
+  ['expanded mobile', { width: 390, height: 844 }, true],
+] as const) {
+  test(`active shared dependency cards are visible and selectable (${name})`, async (t) => {
+    if (skipReason || !browser) { t.skip(skipReason ?? 'no browser'); return; }
+    const page = await browser.newPage({ viewport });
+    try {
+      await page.goto(baseUrl);
+      if (expand) await page.locator('.og-toolbar button[aria-label="Expand graph"]').click();
+      await activeDependencyCardsAreReachable(page);
     } finally {
       await page.close();
     }
