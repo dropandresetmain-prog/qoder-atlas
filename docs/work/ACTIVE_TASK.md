@@ -51,38 +51,48 @@ force-integrate fast-tier in this milestone.
 
 | File | Disposition |
 |---|---|
-| F3/F5/F7 | ADOPT |
-| F1 | ADOPT (1 clone per crash world) |
-| N1 | ADOPT (1 clone per scenario) |
-| B1 Sarah | A/B then decide |
-| T2 provider reprotection | A/B then decide |
-| productBaselineWorld / migrate | FRESH ONLY |
+| F3/F5/F7 | **ADOPTED** |
+| F1 | **ADOPTED** (1 clone per crash world) |
+| N1 | **ADOPTED** (1 clone per scenario) |
+| B1 Sarah | **ADOPTED** (A/B identical; clone baseline only) |
+| T2 provider reprotection | **FRESH ONLY** (step 1 is baseline-construction proof) |
+| productBaselineWorld / migrate | **FRESH ONLY** |
 
 ## Checklist
 
 - [x] Phase 0 contract + base from main + cherry-pick spike
-- [ ] Checkpoint 1: lifecycle + inbox + runner
-- [ ] Checkpoint 2: F3/F5/F7 + F1 + N1
-- [ ] Checkpoint 3: B1/T2 A/B
-- [ ] Checkpoint 4 / Final: heavyweight subset + canonical PG once
+- [x] Checkpoint 1: lifecycle + inbox + runner (`ba5e95d`)
+- [x] Checkpoint 2: F3/F5/F7 + F1 + N1 (`79fed1d`)
+- [x] Checkpoint 3: B1 A/B adopt; T2 remain fresh (`11318a3`)
+- [x] Checkpoint 4 / Final: suite reuse fix + canonical PG once (`6aee7dc`, `9c31682`)
 
 ## Timings
 
-_(fill as measured)_
+| Item | Value |
+|---|---|
+| Suite fixture build (canonical) | **74.4s** |
+| Clone median (prod proof n=8) | ~920ms |
+| Spike clone min/med/max | 762 / 817 / 907 ms |
+| F1 three-world setup | **3.4s** (was ~190.8s prep) |
+| B1 fresh / clone | 152.7s / **84.6s** |
+| Heavyweight subset F3–N1 | 18/18 in 32.3s (+83.5s fixture) |
+| Canonical `test:postgres` wall | **1059.1s** (576 pass / 1 pre-existing fail / 1 skip) |
+| vs ~1433s baseline | **−374s (−26%)** |
 
 ## Current blocker
 
-None.
+None — productionization complete on `feat/pg-fixture-clone` @ `9c31682`.
 
 ## Next action
 
-Implement suite fixture lifecycle + inbox isolation + disposable-name guards.
+Merge/PR when ready. Optional later: T2 step-1 split, PG parallelism (Park).
 
 ## Unresolved risks
 
-- composeTargetApplication double-pool on clones — close app before DROP
-- Fast-tier not on main — document only
-- B1/T2 may retain process/runtime state outside fixture
+- composeTargetApplication double-pool on clones — close app before DROP (**Accept Risk**)
+- Fast-tier `d1762f0` not on main — fixture gated by consumer membership (**Park**)
+- T2 remains fresh until step-1 split (**Park**)
+- `m10RuntimePurgeBoot` 200≠404 pre-existing (**Park** / R3 accepted)
 
 ---
 # MAIN <- R3 DOCUMENTATION RECONCILIATION
