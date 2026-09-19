@@ -14,6 +14,7 @@ import type {
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
 import type {
+  EventOverviewSourceFacts,
   IncidentProgrammeFacts,
   OperatorOverviewFacts,
   OperatorPopulationFact,
@@ -1270,6 +1271,109 @@ async function loadOperatorOverviewFactsInner(
     });
   }
 
+  // ---- Event Overview source rows (bounded, same snapshot). Scope is the
+  // same ACTIVE-programme predicate as the population above; the journey ids
+  // are reused from `population`, so no per-journey assessment read repeats.
+  // Local dates/times are computed here, in each row's own time zone, so the
+  // pure builder holds no time-zone logic. ----
+  const overviewJourneyIds = population.rows.map((r) => r.journey_id);
+  const overviewItems = await client.query<{
+    id: string;
+    title: string;
+    window_start_utc: string;
+    local_date: string;
+    local_time: string;
+  }>(
+    `SELECT pi.id, pi.title,
+            to_char(pi.window_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS window_start_utc,
+            to_char(pi.window_start AT TIME ZONE COALESCE(pi.time_zone, 'UTC'), 'YYYY-MM-DD') AS local_date,
+            to_char(pi.window_start AT TIME ZONE COALESCE(pi.time_zone, 'UTC'), 'HH24:MI') AS local_time
+       FROM programme_items pi
+       JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
+      WHERE pi.workspace_id = $1
+        AND prog.lifecycle_status = 'ACTIVE'
+        AND pi.lifecycle_status <> 'CANCELLED'
+        AND pi.window_start IS NOT NULL
+      ORDER BY pi.window_start, pi.id
+      LIMIT 500`,
+    [workspaceId],
+  );
+  const overviewParticipations = await client.query<{
+    programme_item_id: string;
+    journey_id: string;
+    obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED';
+  }>(
+    `SELECT p.programme_item_id, j.id AS journey_id, p.obligation
+       FROM participations p
+       JOIN programme_items pi ON pi.workspace_id = p.workspace_id AND pi.id = p.programme_item_id
+       JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
+       JOIN journeys j ON j.workspace_id = p.workspace_id AND j.traveller_id = p.traveller_id
+      WHERE p.workspace_id = $1
+        AND p.accepted = true
+        AND prog.lifecycle_status = 'ACTIVE'
+        AND pi.lifecycle_status <> 'CANCELLED'
+        AND j.id = ANY($2::uuid[])
+      ORDER BY pi.window_start NULLS LAST, p.programme_item_id, j.id
+      LIMIT 2000`,
+    [workspaceId, overviewJourneyIds],
+  );
+  const overviewServices = await client.query<{
+    journey_id: string;
+    service_id: string;
+    mode: 'AIR' | 'RAIL' | 'ROAD' | 'SEA';
+    operator: string;
+    arrival_local_date: string | null;
+    arrival_local_time: string | null;
+    published_arrival_local_time: string | null;
+    changed: boolean;
+  }>(
+    `SELECT DISTINCT ji.journey_id, s.id AS service_id, s.mode, s.operator,
+            to_char(COALESCE(s.actual_arrival, s.estimated_arrival, s.published_arrival) AT TIME ZONE dp.time_zone, 'YYYY-MM-DD') AS arrival_local_date,
+            to_char(COALESCE(s.actual_arrival, s.estimated_arrival, s.published_arrival) AT TIME ZONE dp.time_zone, 'HH24:MI') AS arrival_local_time,
+            to_char(s.published_arrival AT TIME ZONE dp.time_zone, 'HH24:MI') AS published_arrival_local_time,
+            ((COALESCE(s.actual_arrival, s.estimated_arrival) IS NOT NULL
+              AND s.published_arrival IS NOT NULL
+              AND COALESCE(s.actual_arrival, s.estimated_arrival) IS DISTINCT FROM s.published_arrival)
+             OR (COALESCE(s.actual_departure, s.estimated_departure) IS NOT NULL
+              AND s.published_departure IS NOT NULL
+              AND COALESCE(s.actual_departure, s.estimated_departure) IS DISTINCT FROM s.published_departure)) AS changed
+       FROM journey_items ji
+       JOIN transport_item_details td ON td.workspace_id = ji.workspace_id AND td.journey_item_id = ji.id
+       JOIN transport_services s ON s.workspace_id = td.workspace_id AND s.id = td.selected_service_id
+       JOIN places dp ON dp.workspace_id = s.workspace_id AND dp.id = s.destination_place_id
+      WHERE ji.workspace_id = $1
+        AND ji.kind = 'TRANSPORT'
+        AND ji.lifecycle_status <> 'DROPPED'
+        AND ji.journey_id = ANY($2::uuid[])
+      ORDER BY s.id, ji.journey_id
+      LIMIT 1000`,
+    [workspaceId, overviewJourneyIds],
+  );
+  const eventOverviewSource: EventOverviewSourceFacts = {
+    programmeItems: overviewItems.rows.map((r) => ({
+      itemRef: `PROGRAMME_ITEM:${r.id}`,
+      title: r.title,
+      localDate: r.local_date,
+      localTime: r.local_time,
+      windowStart: r.window_start_utc,
+    })),
+    participations: overviewParticipations.rows.map((r) => ({
+      itemRef: `PROGRAMME_ITEM:${r.programme_item_id}`,
+      journeyRef: `JOURNEY:${r.journey_id}`,
+      obligation: r.obligation,
+    })),
+    journeyServices: overviewServices.rows.map((r) => ({
+      journeyRef: `JOURNEY:${r.journey_id}`,
+      serviceRef: `SERVICE:${r.service_id}`,
+      mode: r.mode,
+      operator: r.operator,
+      ...(r.arrival_local_date ? { arrivalLocalDate: r.arrival_local_date } : {}),
+      ...(r.arrival_local_time ? { arrivalLocalTime: r.arrival_local_time } : {}),
+      ...(r.published_arrival_local_time ? { publishedArrivalLocalTime: r.published_arrival_local_time } : {}),
+      changed: r.changed,
+    })),
+  };
+
   // Defect-5 edge gap: a subject's dependency on a transport service is real
   // (journey_items/transport_item_details), but that service has no
   // authoritative semantic-state source of its own and is not one of the
@@ -1330,6 +1434,7 @@ async function loadOperatorOverviewFactsInner(
     edges: dashboardEdges,
     items,
     population: populationFacts,
+    eventOverviewSource,
     ...(eventRow
       ? {
         eventContext: {

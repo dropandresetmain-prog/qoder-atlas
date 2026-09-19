@@ -3,6 +3,7 @@ import {
   type OperatorOverview,
 } from '../../../contracts/v2/product/readModels.ts';
 import { buildChangeAwareness } from './changeAwareness.ts';
+import { buildEventOverview } from './eventOverview.ts';
 import { projectLiveDependencyGraph } from './liveDependencyGraph.ts';
 import type { OperatorOverviewFacts } from './types.ts';
 
@@ -71,6 +72,9 @@ export function projectOperatorOverview(input: OperatorOverviewFacts): OperatorO
     populationSummary,
     populationAssessmentLifecycle,
     ...(input.eventContext ? { eventContext: input.eventContext } : {}),
+    ...(input.eventOverviewSource
+      ? { eventOverview: buildEventOverview({ source: input.eventOverviewSource, population: input.population ?? [], items: input.items }) }
+      : {}),
     ldg,
     change: buildChangeAwareness(input),
     ...(input.demoIngress ? { demoIngress: input.demoIngress } : {}),

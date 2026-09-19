@@ -8,6 +8,7 @@ import {
   overviewCountedTotal,
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
+import { renderEventOverviewGraph, renderOverviewGraphAssets } from '../overview-graph/index.ts';
 
 export function renderProductOperatorOverview(view: OperatorOverview): string {
   const surface = adaptOperatorOverviewToDashboard(view);
@@ -24,6 +25,8 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
     <p class="sub" data-test="overview-reconciling"${reconciling ? '' : ' hidden'}>Reconciling changes…</p>
   </div>
   ${surface.summaryHtml}
+  ${renderOverviewGraphAssets()}
+  ${renderEventOverviewGraph(view)}
   <details class="section" data-test="simulated-airline-update" data-configured="${airlineConfigured ? "true" : "false"}">
     <summary><strong>Simulated airline update</strong></summary>
     <p class="b-extra">Disclosed demo control: applies the organiser-supplied simulated airline cancellation and rebooking through the normal provider-event boundary.</p>
