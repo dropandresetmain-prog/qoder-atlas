@@ -151,6 +151,7 @@ const RAW_PATTERNS: readonly RegExp[] = [
   /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, // ISO instant
   /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/, // UPPER_SNAKE enum literal
   /\b[A-Z][A-Z_]{2,}:[\w-]{3,}/, // typed ref KIND:id
+  /\b[A-Z]{2,}(?:[/+][A-Z]{2,})+\b/, // machine pair (JOURNEY/TRIP, CURRENT+PASS)
   /\b[a-z]+(?:\.[a-z]+)+\b(?!\s)/, // dotted capability code (flight.search)
   /\b[a-z]+_[a-z_]+\b/, // snake_case reason code
   /postgres|assembled from/i, // placeholder summaries from the projection layer
@@ -395,6 +396,46 @@ function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<
     });
   }
   return out;
+}
+
+/**
+ * Stable semantic identity of an option: WHAT it changes (effect kind, subject,
+ * from/to windows) and WHAT it projects (per-person verdicts). Never the label
+ * and never the strategy ref/version: every planning attempt persists a fresh
+ * strategy row per candidate, so re-planning the same case yields byte-for-byte
+ * identical options under new refs. An option that carries no evidenced change
+ * has no semantic identity and is never collapsed (distinct providers/fares
+ * must stay visible).
+ */
+export function strategySemanticKey(strategy: RecoveryStrategyView): string | undefined {
+  if (strategy.changes.length === 0) return undefined;
+  const changes = strategy.changes
+    .map((c) => [c.effectKind, c.subjectRef, c.currentWindow?.start ?? '', c.currentWindow?.end ?? '', c.proposedWindow?.start ?? '', c.proposedWindow?.end ?? ''].join('|'))
+    .sort();
+  const resolves = strategy.resolves.map((r) => `${r.subjectRef}=${r.projectedVerdict}`).sort();
+  return JSON.stringify([changes, resolves, strategy.viability]);
+}
+
+/**
+ * Collapse semantically identical options into one card. The representative is
+ * the one the planner recommended (so the approval still targets the evidenced
+ * strategy), else the newest version. Order of first appearance is preserved.
+ */
+export function dedupeStrategies(
+  strategies: readonly RecoveryStrategyView[],
+  recommendedRef: string | undefined,
+): RecoveryStrategyView[] {
+  const groups = new Map<string, RecoveryStrategyView>();
+  const order: (string | RecoveryStrategyView)[] = [];
+  for (const strategy of strategies) {
+    const key = strategySemanticKey(strategy);
+    if (key === undefined) { order.push(strategy); continue; }
+    const current = groups.get(key);
+    if (!current) { groups.set(key, strategy); order.push(key); continue; }
+    const isRec = (x: RecoveryStrategyView) => recommendedRef !== undefined && (recommendedRef === x.strategyRef || recommendedRef.endsWith(x.strategyRef));
+    if (isRec(strategy) || (!isRec(current) && strategy.version > current.version)) groups.set(key, strategy);
+  }
+  return order.map((entry) => (typeof entry === 'string' ? groups.get(entry)! : entry));
 }
 
 function pickRecommended(view: RecoveryCaseView, viable: RecoveryStrategyView[]): RecoveryStrategyView | undefined {
@@ -650,13 +691,22 @@ export function presentCaseWorkspace(view: RecoveryCaseView): CaseWorkspaceModel
   const statusLabel = phase === 'no_plan' ? 'Needs a person' : phase === 'disrupted' ? 'Disrupted' : badge.label;
   const statusTone: Tone = phase === 'no_plan' ? 'alert' : phase === 'disrupted' ? 'alert' : badge.tone;
 
-  const viable = terminal ? [] : viableStrategies(view);
+  const allViable = terminal ? [] : viableStrategies(view);
+  const viable = dedupeStrategies(allViable, view.planningEvidence?.recommendation?.recommended.ref);
   const rec = phase === 'awaiting_approval' ? pickRecommended(view, viable) : undefined;
-  const recommended = rec ? buildOption(view, rec, false) : undefined;
-  const alternatives = rec
+  const builtRecommended = rec ? buildOption(view, rec, false) : undefined;
+  const builtAlternatives = rec
     ? viable.filter((s) => s.strategyRef !== rec.strategyRef).map((s) => buildOption(view, s, false))
     : [];
-  const shown = new Set(viable.map((s) => s.strategyRef));
+  // Distinct options that would read identically get their option number, so
+  // the difference is at least addressable ("Option 2" vs "Option 5").
+  const titleCounts = new Map<string, number>();
+  for (const o of [...(builtRecommended ? [builtRecommended] : []), ...builtAlternatives]) titleCounts.set(o.title, (titleCounts.get(o.title) ?? 0) + 1);
+  const numbered = (o: CaseOptionModel): CaseOptionModel =>
+    (titleCounts.get(o.title) ?? 0) > 1 ? { ...o, title: `${o.title} (option ${o.optionNumber})` } : o;
+  const recommended = builtRecommended ? numbered(builtRecommended) : undefined;
+  const alternatives = builtAlternatives.map(numbered);
+  const shown = new Set(allViable.map((s) => s.strategyRef));
   const considered = phase === 'awaiting_approval' || phase === 'no_plan' || phase === 'executing' || phase === 'recovered'
     ? buildConsidered(view, shown)
     : [];
