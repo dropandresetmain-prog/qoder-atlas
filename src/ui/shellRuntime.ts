@@ -252,7 +252,8 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
       return {
         url: endpoint || '/api/v2/demo/reset',
         confirm: confirmText || 'Reset the demo to its starting state? This clears every case and decision.',
-        progress: 'Resetting the demo…',
+        progress: 'Resetting the demo. This takes about a minute; please keep this page open.',
+        blocking: true,
         fail: 'The demo could not be reset.',
         sticky: true,
         redirect: '/operator',
@@ -280,6 +281,29 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
     return null;
   }
 
+  /** Page-level busy state for long-running actions (demo reset takes ~1 min). */
+  function showBusyOverlay(message: string): void {
+    var overlay = document.querySelector('[data-busy-overlay]');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.setAttribute('data-busy-overlay', '');
+      overlay.setAttribute('role', 'alertdialog');
+      overlay.setAttribute('aria-live', 'assertive');
+      overlay.setAttribute('aria-busy', 'true');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.72);color:#fff;font:600 18px/1.4 system-ui,sans-serif;text-align:center;padding:24px';
+      var box = document.createElement('div');
+      box.setAttribute('data-busy-overlay-text', '');
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+    }
+    var text = overlay.querySelector('[data-busy-overlay-text]');
+    if (text) text.textContent = message;
+  }
+  function hideBusyOverlay(): void {
+    var overlay = document.querySelector('[data-busy-overlay]');
+    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+
   document.addEventListener('click', function (event: any) {
     var target = event.target;
     var el = target && target.closest
@@ -294,6 +318,7 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
     if (existing && (existing.state === 'pending' || (existing.state === 'done' && existing.sticky))) return;
     if (spec.confirm && !window.confirm(spec.confirm)) return;
     setState(el, key, 'pending', spec.progress, false);
+    if (spec.blocking) showBusyOverlay(spec.progress);
     var init: any = { method: 'POST', headers: { 'Accept': 'application/json' } };
     if (!spec.emptyBody) {
       init.headers['Content-Type'] = 'application/json';
@@ -303,6 +328,7 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
       .then(readBody)
       .then(function (r: any) {
         if (!r.ok) {
+          if (spec.blocking) hideBusyOverlay();
           setState(el, key, 'error', failureText(r, spec.fail), false);
           return;
         }
@@ -314,6 +340,7 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
         return refresh(true);
       })
       .catch(function () {
+        if (spec.blocking) hideBusyOverlay();
         setState(el, key, 'error', spec.fail + ' Check the connection and try again.', false);
       });
   });

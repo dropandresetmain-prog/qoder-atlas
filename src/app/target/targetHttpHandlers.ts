@@ -517,6 +517,7 @@ export async function handleTargetProductHttp(
             tableCount: outcome.tables.length,
             provisioning: outcome.provisioning,
             baselineEvaluated: outcome.baselineEvaluated,
+            timingsMs: outcome.timingsMs,
           });
         } else if (outcome.status === 'IN_PROGRESS') {
           sendJson(res, 409, { error: outcome.code, message: outcome.message });
