@@ -26,6 +26,7 @@ export interface WorkingCaseRowView {
 
 export interface DecisionsSurfaceView extends DecisionsPageView {
   working: WorkingCaseRowView[];
+  recent: NonNullable<DecisionQueue['recentDecisions']>;
 }
 
 function travellerName(labels: readonly string[]): string {
@@ -58,5 +59,5 @@ export function adaptDecisionQueueToDecisionsPage(view: DecisionQueue): Decision
       });
     }
   }
-  return { generatedAt: view.generatedAt, pending, decided, working };
+  return { generatedAt: view.generatedAt, pending, decided, working, recent: view.recentDecisions ?? [] };
 }

@@ -923,6 +923,14 @@ export const DecisionQueueSchema = z.strictObject({
     /** Only cases the backend reports as awaiting authority require a decision. */
     awaitingAuthority: z.boolean(),
   })),
+  /** Immutable human approval outcomes, including later revocations. */
+  recentDecisions: z.array(z.strictObject({
+    caseRef: z.string().min(1).optional(),
+    label: z.string().min(1),
+    decisionAt: z.string().datetime({ offset: true }),
+    actorLabel: z.string().min(1),
+    kind: z.enum(['approval', 'revocation']),
+  })).max(20).optional(),
 });
 export type DecisionQueue = z.infer<typeof DecisionQueueSchema>;
 

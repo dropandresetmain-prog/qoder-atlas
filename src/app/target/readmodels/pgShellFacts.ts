@@ -136,6 +136,106 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
         LIMIT 100`,
       [workspaceId],
     );
+    const recent = await client.query<{
+      event_id: string;
+      case_id: string;
+      operation_namespace: string;
+      capability_ref: string;
+      decision_at: Date;
+      decision_kind: 'approval' | 'revocation';
+      actor_role: string;
+      required_party_kind: string | null;
+      organisation_label: string | null;
+      traveller_label: string | null;
+    }>(
+      `WITH decision_events AS (
+         SELECT a.id AS event_id, ap.recovery_case_id AS case_id,
+                ai.operation_namespace, ai.capability_ref,
+                a.approved_at AS decision_at, 'approval'::text AS decision_kind,
+                ar.actor_role, ar.required_party_kind,
+                COALESCE(org.display_name, org.legal_name) AS organisation_label,
+                tn.display_value AS traveller_label
+           FROM approvals a
+           JOIN authority_decisions ad
+             ON ad.workspace_id = a.workspace_id AND ad.id = a.decision_id
+           JOIN action_plans ap
+             ON ap.workspace_id = ad.workspace_id AND ap.id = ad.action_plan_id
+           JOIN action_intents ai
+             ON ai.workspace_id = ad.workspace_id AND ai.id = ad.action_intent_id
+           JOIN approval_requirements ar
+             ON ar.workspace_id = a.workspace_id AND ar.id = a.requirement_id
+           LEFT JOIN organisations org
+             ON org.workspace_id = ar.workspace_id
+            AND ar.required_party_kind = 'ORGANISATION'
+            AND org.id = ar.required_party_id
+           LEFT JOIN LATERAL (
+             SELECT tn.display_value
+               FROM case_subjects cs
+               JOIN journeys j ON j.workspace_id = cs.workspace_id AND j.id = cs.subject_id
+               JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
+               JOIN traveller_names tn ON tn.workspace_id = t.workspace_id AND tn.id = t.display_name_ref
+              WHERE cs.workspace_id = ap.workspace_id AND cs.recovery_case_id = ap.recovery_case_id
+                AND cs.subject_kind = 'JOURNEY'
+              ORDER BY cs.subject_id
+              LIMIT 1
+           ) tn ON true
+          WHERE a.workspace_id = $1
+         UNION ALL
+         SELECT r.id AS event_id, ap.recovery_case_id AS case_id,
+                ai.operation_namespace, ai.capability_ref,
+                r.revoked_at AS decision_at, 'revocation'::text AS decision_kind,
+                ar.actor_role, ar.required_party_kind,
+                COALESCE(org.display_name, org.legal_name) AS organisation_label,
+                tn.display_value AS traveller_label
+           FROM approval_revocations r
+           JOIN approvals a
+             ON a.workspace_id = r.workspace_id AND a.id = r.approval_id
+           JOIN authority_decisions ad
+             ON ad.workspace_id = a.workspace_id AND ad.id = a.decision_id
+           JOIN action_plans ap
+             ON ap.workspace_id = ad.workspace_id AND ap.id = ad.action_plan_id
+           JOIN action_intents ai
+             ON ai.workspace_id = ad.workspace_id AND ai.id = ad.action_intent_id
+           JOIN approval_requirements ar
+             ON ar.workspace_id = a.workspace_id AND ar.id = a.requirement_id
+           LEFT JOIN organisations org
+             ON org.workspace_id = ar.workspace_id
+            AND ar.required_party_kind = 'ORGANISATION'
+            AND org.id = ar.required_party_id
+           LEFT JOIN LATERAL (
+             SELECT tn.display_value
+               FROM case_subjects cs
+               JOIN journeys j ON j.workspace_id = cs.workspace_id AND j.id = cs.subject_id
+               JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
+               JOIN traveller_names tn ON tn.workspace_id = t.workspace_id AND tn.id = t.display_name_ref
+              WHERE cs.workspace_id = ap.workspace_id AND cs.recovery_case_id = ap.recovery_case_id
+                AND cs.subject_kind = 'JOURNEY'
+              ORDER BY cs.subject_id
+              LIMIT 1
+           ) tn ON true
+          WHERE r.workspace_id = $1
+       )
+       SELECT event_id, case_id, operation_namespace, capability_ref, decision_at,
+              decision_kind, actor_role, required_party_kind, organisation_label,
+              traveller_label
+         FROM decision_events
+        ORDER BY decision_at DESC, event_id DESC
+        LIMIT 20`,
+      [workspaceId],
+    );
+    const actorLabel = (row: { actor_role: string; required_party_kind: string | null; organisation_label: string | null }): string => {
+      if (row.required_party_kind === 'TRAVELLER' || /traveller/i.test(row.actor_role)) return 'Traveller';
+      if (row.organisation_label) return row.organisation_label;
+      return 'Organiser';
+    };
+    const operationLabel = (row: { operation_namespace: string; capability_ref: string; traveller_label: string | null }): string => {
+      const operation = (row.operation_namespace || row.capability_ref)
+        .replace(/[_:.-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const humanOperation = operation ? `${operation[0]!.toUpperCase()}${operation.slice(1)}` : 'Recovery action';
+      return row.traveller_label ? `${row.traveller_label} · ${humanOperation}` : humanOperation;
+    };
     return {
       generatedAt: new Date().toISOString(),
       decisions: rows.rows.map((row) => ({
@@ -146,6 +246,17 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
         subjectLabels: row.subject_labels ?? [],
         awaitingAuthority: row.lifecycle_status === 'AWAITING_AUTHORITY',
       })),
+      ...(recent.rows.length > 0
+        ? {
+            recentDecisions: recent.rows.map((row) => ({
+              caseRef: row.case_id,
+              label: operationLabel(row),
+              decisionAt: row.decision_at.toISOString(),
+              actorLabel: actorLabel(row),
+              kind: row.decision_kind,
+            })),
+          }
+        : {}),
     };
   });
   return value;

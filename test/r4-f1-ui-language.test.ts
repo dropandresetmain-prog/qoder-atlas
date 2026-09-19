@@ -328,6 +328,43 @@ describe('R4 transport option cards: leg label and strategy-scoped cost', () => 
   });
 });
 
+test('Decisions preserves waiting now and renders recent approval history with case navigation', () => {
+  const html = renderProductDecisionQueue({
+    generatedAt,
+    decisions: [{
+      caseRef: 'case-pending',
+      status: 'AWAITING_AUTHORITY',
+      openedAtLabel: '15 Sep 07:55',
+      subjectLabels: ['Traveller One'],
+      awaitingAuthority: true,
+    }],
+    recentDecisions: [{
+      caseRef: 'case-closed',
+      label: 'Traveller One · Programme change',
+      decisionAt: '2031-09-14T07:55:00.000Z',
+      actorLabel: 'Organiser',
+      kind: 'approval',
+    }, {
+      caseRef: 'case-revoked',
+      label: 'Traveller Two · Programme change',
+      decisionAt: '2031-09-13T07:55:00.000Z',
+      actorLabel: 'Traveller',
+      kind: 'revocation',
+    }],
+  } satisfies DecisionQueue);
+
+  assert.match(html, /Waiting now/);
+  assert.match(html, /Traveller One/);
+  assert.match(html, /Decided recently/);
+  assert.match(html, /data-test="recent-decision-row" data-case-ref="case-closed"/);
+  assert.match(html, /Approved/);
+  assert.match(html, /Revoked/);
+  assert.match(html, /Organiser/);
+  assert.match(html, /Traveller/);
+  assert.match(html, /href="\/operator\/cases\/case-closed"/);
+  assert.doesNotMatch(html, /principal:[0-9a-f-]{36}/i);
+});
+
 describe('R4 acceptance: a blocked option is never headlined over an executable one', () => {
   const blockedOf = (n: number): RecoveryStrategyView => ({ ...strategy(n, n, '05:00', 'p'), executionBlocker: { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: 'PASSENGER_NAME_MISSING: traveller x has no structured given/family name' } } as RecoveryStrategyView);
   test('the executable option is recommended and the blocked one carries a plain, specific reason', () => {

@@ -42,6 +42,20 @@ function workingRow(row: WorkingCaseRowView): string {
 </tr>`;
 }
 
+function recentRow(row: NonNullable<DecisionQueue['recentDecisions']>[number]): string {
+  const decision = row.kind === 'approval' ? 'Approved' : 'Revoked';
+  const caseCell = row.caseRef
+    ? `<a href="${escapeHtml(caseHref(row.caseRef))}" data-test="recent-decision-link">Open case →</a>`
+    : '—';
+  return `<tr data-test="recent-decision-row"${row.caseRef ? ` data-case-ref="${escapeHtml(row.caseRef)}"` : ''}>
+  <td><strong>${escapeHtml(row.label)}</strong></td>
+  <td><span class="badge tone-done">${decision}</span></td>
+  <td>${escapeHtml(row.actorLabel)}</td>
+  <td class="num">${escapeHtml(formatInstant(row.decisionAt))}</td>
+  <td>${caseCell}</td>
+</tr>`;
+}
+
 export function renderDecisionsSurface(view: DecisionsSurfaceView): string {
   const waiting = view.pending.length > 0
     ? `<div class="panel">
@@ -62,8 +76,16 @@ export function renderDecisionsSurface(view: DecisionsSurfaceView): string {
       </table>
       <p class="footnote">These cases do not need a person yet. They move to “Waiting now” if approval is needed.</p>
     </div>
-  </section>`
+    </section>`
     : '';
+  const recent = view.recent.length > 0
+    ? `<div class="panel">
+  <table class="traveller-table" data-test="recent-decisions">
+    <thead><tr><th>Change</th><th>Decision</th><th>Decided by</th><th>When</th><th></th></tr></thead>
+    <tbody>${view.recent.map(recentRow).join('')}</tbody>
+  </table>
+</div>`
+    : '<div class="panel"><p class="empty-note">No recent decisions to show yet.</p></div>';
   const pendingCountClass = view.pending.length > 0 ? 'count c-alert' : 'count';
   return `
 <main class="shell product-decision-queue" data-test="product-decision-queue" data-ui-screen="decisions">
@@ -75,6 +97,10 @@ export function renderDecisionsSurface(view: DecisionsSurfaceView): string {
   <section class="section" aria-label="Waiting now" data-poll-region="decisions-waiting">
     <h2>Waiting now <span class="${pendingCountClass}">${view.pending.length}</span></h2>
     ${waiting}
+  </section>
+  <section class="section" aria-label="Decided recently" data-poll-region="decisions-recent">
+    <h2>Decided recently <span class="count">${view.recent.length}</span></h2>
+    ${recent}
   </section>${working}
 </main>`;
 }
