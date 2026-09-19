@@ -10,8 +10,7 @@ this update where it describes current composition or delivery order.
 
 Current evidence: normal PostgreSQL boot, LIVE Atlas research and Qwen, physical
 Sarah programme recovery, separate protected Atlas sandbox flight execution,
-bounded Event Overview implementation and Case graph. Neither faithful graph
-convergence nor physical Jordan acceptance is yet claimed.
+A1 accepted desktop V5.6/V7.2 and A2 repeated LIVE Sarah acceptance at `f0c79f2412513e3a676737ac32c3c3694c03388a`. Physical Jordan acceptance remains pending.
 
 Sequence: A0 freeze/diagnose -> A1 strong current-product surfaces plus faithful V5.6/V7.2
 -> A2 Sarah LIVE/video-ready -> A3 Jordan multi-domain composition -> A4 Jordan sandbox/video-ready ->
@@ -22,7 +21,7 @@ ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 | Scope | Current disposition / revisit condition |
 |---|---|
 | Booking identities/budget and per-offer flight/time/cost visibility | Act Now for Jordan; R4 parks reclassified because executable repeatable recovery requires them. |
-| Recent decisions, Activity, Programme/Traveller readability, persistent Reset | Act Now for A1; physically prove current Sarah product usability. |
+| Recent decisions, Activity, Programme/Traveller readability, persistent Reset | A1/A2 accepted; preserve current desktop hero usability. |
 | Healthy-trip traveller change-request planning | Park for Later by founder scope decision; genuine canonical request/planning/progression/authority/resolution gap. Preserve actual assessments; never fake FAIL. Revisit after generalized Sarah/Jordan verticals and deliberate desired-state design. |
 | Programme relocation/cancellation | Act Now for the small typed set required by Sarah/Jordan; retain impact, authority, execution and observation gates. Operations beyond hero needs stay parked; no untyped OTHER mutation. |
 | Non-critical legacy parity | Park for Later; revisit when it materially improves Sarah, Jordan, graph fidelity or submission. Message/export footer controls were inert at the legacy baseline. |
@@ -30,6 +29,9 @@ ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 | Jordan multi-domain recovery | Act Now: Narita overnight, authoritative contextual entry check, Singapore stay actions when selected recovery requires them, material transfers, finals and evidenced insurance reasoning. Supported required provider actions use real sandbox execution; unsupported seams remain explicit. |
 | Provider restoration | Investigate Now for each hero-required provider: normal boot, live research, downstream use and protected sandbox actions. Unrelated historical adapters remain Park for Later. |
 | Desktop presenter quality and LIVE proof | Act Now across hero-visible graphs, consequences, alternatives, recommendation, authority, progress/provenance and resolution. Mobile is a separate post-hackathon milestone. |
+| Reset after external execution | Act Now guard integrated: shared lease and refusal after any external attempt/observation. Retain workspace for reconciliation/audit; repeat external heroes in fresh workspaces. Cleanup/archive workflow remains Park for Later. |
+| Full programme regeneration alignment | Park for Later: current generator drops accepted enrichment. Safe dossier-only correction is implemented; revisit when full source regeneration is required. |
+| Richer direct-attendee/rejected-option labels and reset duration copy | Park for Later until final presentation pass; current Sarah proof is readable and deterministic. Do not fabricate impact identities or promise an exact reset duration. |
 | Multiple independent Overview blast centres | Park for Later; revisit when a required scenario needs simultaneous independent incidents. |
 | R4 N5-N7 and budget-injection replan issue | Existing R4 dispositions retained; revisit on objective-blocking reproduction. |
 | Opaque R4 m9ReadModelCurrentness suite-only failure | Investigate Now on concrete focused/new integration evidence; no ceremonial broad rerun. |

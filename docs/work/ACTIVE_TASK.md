@@ -12,7 +12,7 @@
 
 - [x] A0 exact base, pack reconciliation, current truth inspection, docs pushed.
 - [x] A1 strong desktop surfaces, faithful V5.6/V7.2, focused/PG/browser evidence; checkpoint pushed and verified.
-- [x] A2 Sarah LIVE Qwen/API, recorded full desktop recovery. Source/pushed candidate `565f56165932238221f05620655a1b3cb38a0691`; checkpoint evidence in ASTRA_A2_LIVE_EVIDENCE.md.
+- [x] A2 Sarah LIVE Qwen/API, recorded full desktop recovery. Pushed checkpoint `f0c79f2412513e3a676737ac32c3c3694c03388a`; source565f561. Checkpoint evidence in ASTRA_A2_LIVE_EVIDENCE.md.
 - [ ] A3 Jordan generalized multi-domain planning/recovery fully composed.
 - [ ] A4 Jordan real supported sandbox actions, observation, video-ready recovery.
 - [ ] A5 repeat both LIVE, final presentation/gates/freeze.
@@ -32,10 +32,10 @@
 ## Lanes and preserved work
 
 - A2 integrated: provider display5df1196, model metadata312c6816, model UI7eddb2c/root copyc83e8a5, exact participation graph0e72cc7+431f135. Focused evidence in A2 report. No active A2 lane.
-- A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, `codex/a3-jordan-connection-foundation`: real PG baseline160mPASS→D195mPASS→D230mFAIL opensCase→D3-65mFAIL sameCase. Not integrated; register its new test.
-- A3 data pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`: SG/source dates; safe dossiers-only generation;4focused+TypeScript. Not integrated.
-- A3 external/reset safety pushed `8939a491fc94610d90c70fec61cded92eb37e21a`, `codex/a3-external-reset-safety`: shared session lease, refuse any external execution history, no blind reset; PG9/9, reset focused tests,TypeScript. Root reviewed guard/composition/unlock eviction. Not integrated.
-- Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
+- A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, `codex/a3-jordan-connection-foundation`: real PG baseline160mPASS→D195mPASS→D230mFAIL opensCase→D3-65mFAIL sameCase. Integrated; focused PG test registered in canonical/fast and fixture consumer lists.
+- A3 data pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`: SG/source dates; safe dossiers-only generation;4focused+TypeScript. Integrated after A2.
+- A3 external/reset safety pushed `8939a491fc94610d90c70fec61cded92eb37e21a`, `codex/a3-external-reset-safety`: shared session lease, refuse any external execution history, no blind reset; PG9/9, reset focused tests,TypeScript. Root reviewed guard/composition/unlock eviction. Integrated after A2.
+- Luna building isolated explicit sandbox input provisioner (CLI only; no invented fixture facts or boot wiring). Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
 - Preserve, never merge as-is: request plannerbe69d056, partial `codex/astra-a1-request-gates`, two-file `codex/a1-request-authority`, rejected importer namespace7b8236ed. Root worktree remains untouched.
 ## Runtime and triage
 
@@ -48,6 +48,6 @@
 
 ## Exact next action / stop-safe handoff
 
-Push the A2 docs checkpoint, then integrate reviewed Jordan foundation/data/reset branches and register the focused PG test. Freeze new-STAY/composite/entry contracts before parallel implementation. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
+A2 checkpoint pushed clean atf0c79f2. Jordan foundation/data/reset integrated; integrated11focused tests,TypeScript,boundary261passed. Push this preparatory slice. Freeze new-STAY/composite/entry contracts before parallel implementation. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
 
 Root worktree remains untouched. No merge to main. Preserve isolated drafts and local visual/log artifacts; never commit secrets/generated junk. Continue same task while context is clean; this ledger and linked evidence are the compact fresh-chat handoff.

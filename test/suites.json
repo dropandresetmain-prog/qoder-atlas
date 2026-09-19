@@ -17,6 +17,7 @@
   "aitFixtureCloneConsumers": {
     "$comment": "Suite files that may use TEMPLATE clones of the canonical AiT baseline. The runner builds the fixture once only when the suite intersects this list. productBaselineWorld / migrate remain fresh-path forever.",
     "postgres": [
+      "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/t2F3HttpValidation.pgtest.ts",
       "postgres-integration/t2F5ServiceIdentity.pgtest.ts",
       "postgres-integration/t2F7SelectionGuard.pgtest.ts",
@@ -146,6 +147,7 @@
       "test/wave3r-transport-concentration.test.ts"
     ],
     "postgres": [
+      "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/aitFixtureClone.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
@@ -226,6 +228,7 @@
       "postgres-integration/witLiveReadModelContract.pgtest.ts"
     ],
     "postgresFast": [
+      "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/r3ComposedB1Full.pgtest.ts",
