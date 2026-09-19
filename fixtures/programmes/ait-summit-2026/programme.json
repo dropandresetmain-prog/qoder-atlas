@@ -2931,8 +2931,8 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T08:10:00+08:00",
-            "scheduledArrival": "2026-09-30T09:05:00+08:00",
+            "scheduledDeparture": "2026-09-30T06:10:00+08:00",
+            "scheduledArrival": "2026-09-30T07:05:00+08:00",
             "carrierRef": {
               "system": "flight-number",
               "value": "MN228"
@@ -3867,8 +3867,8 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-30T08:10:00+08:00",
-            "scheduledArrival": "2026-09-30T09:05:00+08:00",
+            "scheduledDeparture": "2026-09-30T06:10:00+08:00",
+            "scheduledArrival": "2026-09-30T07:05:00+08:00",
             "carrierRef": {
               "system": "flight-number",
               "value": "MN228"
