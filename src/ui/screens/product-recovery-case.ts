@@ -333,7 +333,23 @@ function planningEvidenceSection(evidence: PlanningEvidenceView): string {
     : '';
   const candidates = evidence.candidates.length > 0
     ? `<ul data-test="planning-candidates">${evidence.candidates
-        .map((c) => `<li>Option <strong>${escapeHtml(c.disposition.label)}</strong> · ${escapeHtml(c.domain.label)} · ${escapeHtml(c.proposer.label)}${c.reasons.length > 0 ? ` <span class="meta">— ${c.reasons.map(escapeHtml).join('; ')}</span>` : ''}</li>`)
+        .map((c) => {
+          const outcomes = c.outcomeDelta
+            .map((d) => `${escapeHtml(d.subject.label)}: ${escapeHtml(humanizeCode(d.baseline ?? 'unknown'))} → ${escapeHtml(humanizeCode(d.candidate))}`)
+            .join('; ');
+          return `<li>Option <strong>${escapeHtml(c.disposition.label)}</strong> · ${escapeHtml(c.domain.label)} · ${escapeHtml(c.proposer.label)}${c.reasons.length > 0 ? ` <span class="meta">— ${c.reasons.map(escapeHtml).join('; ')}</span>` : ''}${outcomes ? ` <span class="meta">(${outcomes})</span>` : ''}</li>`;
+        })
+        .join('')}</ul>`
+    : '';
+  // Read-only research the coordinator performed. A tool that produced no
+  // provider evidence makes no provenance claim.
+  const tools = evidence.tools.length > 0
+    ? `<ul data-test="planning-tools">${evidence.tools
+        .map((t) => {
+          const provenance = t.status.code === 'UNAVAILABLE' ? 'no provider evidence obtained' : t.provenanceMode.label;
+          const observed = t.observedAt ? `, ${escapeHtml(formatInstant(t.observedAt))}` : '';
+          return `<li>Research: ${escapeHtml(t.tool.label)} — ${escapeHtml(t.status.label)} · ${escapeHtml(provenance)} <span class="meta">(${escapeHtml(t.summary)}${observed})</span></li>`;
+        })
         .join('')}</ul>`
     : '';
   const recommendation = evidence.recommendation
@@ -344,6 +360,7 @@ function planningEvidenceSection(evidence: PlanningEvidenceView): string {
     <p class="meta">Decision-time evidence as of ${escapeHtml(formatInstant(evidence.asOf))} — this is what was weighed then, not current authoritative state.</p>
     <p data-test="planning-outcome">Outcome: <strong>${escapeHtml(evidence.outcome.label)}</strong></p>
     ${domains}
+    ${tools}
     ${candidates}
     ${recommendation}
   </section>`;

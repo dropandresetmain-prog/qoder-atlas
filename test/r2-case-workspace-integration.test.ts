@@ -209,6 +209,41 @@ describe('R2 Case workspace composition', () => {
     assert.doesNotMatch(graphSection, /What NORTHSTAR investigated/);
   });
 
+  test('planning evidence shows researched tools with provenance, and never claims provenance for an unavailable tool', () => {
+    const html = renderProductRecoveryCase(
+      baseCase({
+        planningEvidence: {
+          phase: 'DECISION_TIME',
+          asOf: generatedAt,
+          attemptRef: 'attempt-1',
+          coordinatorVersion: 'v1',
+          outcome: { label: 'Awaiting operator authority', code: 'AWAITING_AUTHORITY' },
+          domains: [],
+          tools: [
+            { tool: { label: 'Flight search', code: 'flight.search' }, status: { label: 'Succeeded', code: 'SUCCEEDED' }, provenanceMode: { label: 'Replay', code: 'REPLAY' }, observedAt: generatedAt, summary: 'flight.search succeeded', uncertainties: [], evidenceRef: 'evidence:1' },
+            { tool: { label: 'Flight search', code: 'flight.search' }, status: { label: 'Unavailable', code: 'UNAVAILABLE' }, provenanceMode: { label: 'Internal canonical state', code: 'INTERNAL' }, summary: 'flight.search unavailable', uncertainties: [], evidenceRef: 'evidence:2' },
+          ],
+          candidates: [
+            {
+              candidateKey: 'k1',
+              domain: { label: 'Transport', code: 'TRANSPORT' },
+              proposer: { label: 'Proposer transport offer', code: 'proposer.transport-offer' },
+              disposition: { label: 'Rejected by deterministic evaluation', code: 'REJECTED_DETERMINISTIC' },
+              reasons: ['Not viable'],
+              outcomeDelta: [{ subject: { label: 'Participant 1', ref: 'JOURNEY:j1' }, direction: { label: 'Unchanged', code: 'UNCHANGED' }, baseline: 'FAIL', candidate: 'FAIL' }],
+            },
+          ],
+          viableStrategies: [],
+        },
+      }),
+    );
+    assert.match(html, /data-test="planning-tools"/);
+    assert.match(html, /Research: Flight search — Succeeded · Replay/);
+    assert.match(html, /Flight search — Unavailable · no provider evidence obtained/);
+    assert.doesNotMatch(html, /Unavailable · Internal canonical state/);
+    assert.match(html, /Participant 1: Fail → Fail/);
+  });
+
   test('PLANNING status wraps the graph with the investigating banner', () => {
     const html = renderProductRecoveryCase(baseCase({ status: 'PLANNING' }));
     assert.match(html, /fg-planning-wrapper/);
