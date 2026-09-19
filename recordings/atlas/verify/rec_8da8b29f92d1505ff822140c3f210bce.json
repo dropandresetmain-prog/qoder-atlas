@@ -1,0 +1,211 @@
+{
+  "id": "rec_8da8b29f92d1505ff822140c3f210bce",
+  "providerId": "atlas",
+  "operation": "verify",
+  "recordedAt": "2026-09-19T08:13:03.435Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "sessionId": "ce44b45e-c1cf-4eb7-bb13-4064a29b76c5",
+    "maxSeats": 7,
+    "priceChange": {
+      "isPriceChange": false,
+      "newAdultPrice": 36.01,
+      "newAdultTax": 11.06,
+      "newChildPrice": 36.01,
+      "newChildTax": 11.06,
+      "newInfantPrice": 0,
+      "newInfantTax": 0,
+      "originalAdultPrice": 36.01,
+      "originalAdultTax": 11.06,
+      "originalChildPrice": 36.01,
+      "originalChildTax": 11.06,
+      "originalInfantPrice": 0,
+      "originalInfantTax": 0
+    },
+    "bookingRequirement": {
+      "passenger": {
+        "birthday": {
+          "required": true,
+          "type": "string"
+        },
+        "cardIssuePlace": {
+          "required": true,
+          "type": "string"
+        },
+        "cardNum": {
+          "required": true,
+          "type": "string"
+        },
+        "passengerType": {
+          "required": true,
+          "type": "int"
+        },
+        "gender": {
+          "required": true,
+          "type": "string"
+        },
+        "nationality": {
+          "required": true,
+          "type": "string"
+        },
+        "cardExpired": {
+          "required": true,
+          "type": "string"
+        },
+        "name": {
+          "required": true,
+          "type": "string"
+        },
+        "cardType": {
+          "required": true,
+          "type": "string"
+        }
+      }
+    },
+    "routing": {
+      "routingIdentifier": "SktUX1NJTl8xXzIwMjYwOTMwX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDQ3LjA3XzQ3LjA3XzAuMDBfMC4wMF85NC4xNF9VU0R8SktUX1NJTl8xXzIwMjYwOTMwX18xXzBfMF5DR0stSUQ3MTUxLUstU0lOLTIwMjYwOTMwMTIzMC0yMDI2MDkzMDE1MTUtRWNvbm9teS0xLV40Ny4wN180Ny4wN18wLjAwXzAuMDBfOTQuMTReQUpUQVBJX0FKVF5eQUpUMUpLVFNJTjIwMDIwMjYwOTMwXlNHRF42MC4wMF42MC4wMF4wLjAwXjB8MHwyMDI2MDkxOTE2MTMwM3wwfDE3ODk4MDU1ODMyOTA2MzQ2MzhiOXx8fHx8MC4wMHwzfDB8fG5vcm1hbHxmYWxzZXx8.Mi+Kc9MJBPAzDB8UTl5B3eR5ro5xBPK8wcxtcT92YJQ=",
+      "fid": "svHinnNjydRng1VfGOL1-eDU6uX4_lvp-xRgnkeVdc_Jcc1q2Te0odhdb239v6gV",
+      "currency": "USD",
+      "adultPrice": 36.01,
+      "adultTax": 11.06,
+      "childPrice": 36.01,
+      "childTax": 11.06,
+      "infantPrice": 0,
+      "infantTax": 0,
+      "expireTime": null,
+      "refreshTime": null,
+      "fromSegments": [
+        {
+          "carrier": "ID",
+          "operatingCarrier": "ID",
+          "flightNumber": "ID7151",
+          "depAirport": "CGK",
+          "arrAirport": "SIN",
+          "depTime": "202609301230",
+          "arrTime": "202609301515",
+          "duration": 105,
+          "cabin": "K",
+          "cabinClass": 1,
+          "fareFamily": "Economy",
+          "seatCount": 7,
+          "segmentIndex": 1
+        }
+      ],
+      "retSegments": [],
+      "riskSellout": false,
+      "rule": {
+        "changesRules": [
+          {
+            "changesFee": 60,
+            "changesStatus": "H",
+            "currency": "SGD",
+            "revNoshow": "H",
+            "revNoshowFee": 60,
+            "ruleDetailList": [
+              {
+                "amount": 60,
+                "currency": "SGD",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 0
+              },
+              {
+                "amount": 60,
+                "currency": "SGD",
+                "status": "H",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "refundRules": [
+          {
+            "refundFee": 0,
+            "refundStatus": "T",
+            "refundMethod": null,
+            "currency": "SGD",
+            "refNoshow": "T",
+            "refNoshowFee": 0,
+            "ruleDetailList": [
+              {
+                "amount": 60,
+                "currency": "SGD",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 240
+              },
+              {
+                "amount": 0,
+                "currency": "SGD",
+                "status": "T",
+                "startMinute": 240,
+                "endMinute": 0
+              },
+              {
+                "amount": 0,
+                "currency": "SGD",
+                "status": "T",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "baggageElements": [
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "40*30*20cm",
+            "baggageType": "CabinBaggageUnderSeat",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "40*30*20cm",
+            "baggageType": "CabinBaggageUnderSeat",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "40*30*20cm",
+            "baggageType": "CabinBaggageUnderSeat",
+            "passengerType": 2,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 20,
+            "baggageSize": "35*35*30cm",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 20,
+            "baggageSize": "35*35*30cm",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "35*35*30cm",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 2,
+            "segmentNo": 1
+          }
+        ],
+        "hasBaggage": 1
+      }
+    }
+  }
+}
