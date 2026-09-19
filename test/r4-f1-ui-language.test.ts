@@ -187,8 +187,14 @@ describe('Case planning activity provider evidence', () => {
     outcome: { label: 'Waiting on approval', code: 'AWAITING_AUTHORITY' },
     domains: [],
     tools: [tool],
+    modelActivities: [],
     candidates: [],
     viableStrategies: [],
+  });
+
+  const planningEvidenceWithModel = (tool: object, modelActivity: object) => ({
+    ...planningEvidence(tool),
+    modelActivities: [modelActivity],
   });
 
   test('successful live evidence names the provider and provenance mode', () => {
@@ -239,6 +245,32 @@ describe('Case planning activity provider evidence', () => {
     } as Partial<RecoveryCaseView>));
     const row = model.activity.rows.find((entry) => entry.label === 'Replacement flights could not be checked');
     assert.equal(row?.note, 'replacement-flight information could not be obtained; provider was not recorded and source mode was not recorded. No flight availability was obtained, so no replacement flight is being suggested.');
+  });
+
+  test('successful model review names provider, model, mode and UTC check time', () => {
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      planningEvidence: planningEvidenceWithModel(
+        { tool: { label: 'Flight search', code: 'flight.search' }, status: { label: 'Succeeded', code: 'SUCCEEDED' }, provenanceMode: { label: 'Live provider call', code: 'LIVE' }, provider: 'atlas', summary: 'Replacement flights returned.', uncertainties: [], evidenceRef: 'evidence-4' },
+        { operation: 'recovery.domain_suggestion', providerId: 'model-studio', model: 'qwen-flash', mode: 'LIVE', status: 'SUCCEEDED', observedAt: generatedAt },
+      ),
+    } as Partial<RecoveryCaseView>));
+    const row = model.activity.rows.find((entry) => entry.label === 'Reviewed recovery needs');
+    assert.match(row?.note ?? '', /^Model Studio · qwen-flash · Live · review completed · checked .+ UTC\.$/);
+  });
+
+  test('failed replay model review says deterministic planning continued', () => {
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      planningEvidence: planningEvidenceWithModel(
+        { tool: { label: 'Flight search', code: 'flight.search' }, status: { label: 'Succeeded', code: 'SUCCEEDED' }, provenanceMode: { label: 'Replayed recording', code: 'REPLAY' }, provider: 'atlas', summary: 'Replacement flights returned.', uncertainties: [], evidenceRef: 'evidence-5' },
+        { operation: 'recovery.domain_suggestion', providerId: 'model-studio', model: 'qwen-flash', mode: 'REPLAY', status: 'FAILED', observedAt: generatedAt, errorCategory: 'UNAVAILABLE' },
+      ),
+    } as Partial<RecoveryCaseView>));
+    const row = model.activity.rows.find((entry) => entry.label === 'Recovery needs could not be reviewed');
+    assert.equal(row?.state, 'failed');
+    assert.match(row?.note ?? '', /^Model Studio · qwen-flash · Saved replay · review failed; deterministic planning continued/);
+    assert.ok(!row?.note?.includes('UNAVAILABLE'));
   });
 });
 
