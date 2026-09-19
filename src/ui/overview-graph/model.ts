@@ -12,6 +12,7 @@ import type {
   EventOverview,
   EventOverviewHealth,
   EventOverviewMembership,
+  EventOverviewRelationKind,
   OperatorOverview,
 } from '../../contracts/v2/product/readModels.ts';
 import { presentOperationalStatus } from '../semantics/adapter.ts';
@@ -44,6 +45,8 @@ export interface OgNode {
 
 export interface OgRelation {
   readonly id: string;
+  /** Optional for existing manual geometry fixtures; producer relations carry it. */
+  readonly kind?: EventOverviewRelationKind;
   readonly from: string;
   readonly to: string;
   readonly health: OgHealth;
@@ -199,53 +202,19 @@ export function buildOverviewGraphModel(view: OperatorOverview): OverviewGraphMo
     if (nodeIds.has(rel.from) && nodeIds.has(rel.to)) relations.push(rel);
   };
 
-  for (const dep of eo.dependencies) {
-    if (!dep.feedsLandmarkRef) continue;
-    const health = HEALTH[dep.health];
+  // Relations are backend-owned semantic facts. Old projections without them
+  // render no invented topology or endpoint-derived condition.
+  for (const relation of eo.relations ?? []) {
+    const health = HEALTH[relation.health];
     add({
-      id: `dep:${dep.ref}>${dep.feedsLandmarkRef}`,
-      from: dep.ref,
-      to: dep.feedsLandmarkRef,
+      id: relation.id,
+      kind: relation.kind,
+      from: relation.fromRef,
+      to: relation.toRef,
       health,
-      live: health !== 'red',
-      dim: active && blast?.dependencyRef !== dep.ref,
+      live: health === 'green' || health === 'amber',
+      dim: false,
     });
-  }
-
-  // Cohort routes are quiet context. While travellers are promoted the cohort
-  // recedes (the prototype hides those routes), so the connectors are omitted.
-  if (promoted.length === 0) {
-    for (const c of eo.cohorts) {
-      if (!c.landmarkRef) continue;
-      add({ id: `cohort:${c.ref}>${c.landmarkRef}`, from: c.ref, to: c.landmarkRef, health: 'green', live: true, dim: false });
-    }
-  }
-
-  for (const t of promoted) {
-    const health = MEMBERSHIP_HEALTH[t.membership];
-    if (t.dependencyRef) {
-      // The shared dependency still reflects the change while the traveller is
-      // unresolved; a cleared traveller has settled green.
-      const depHealth: OgHealth = t.membership === 'CLEARED' ? 'green' : 'amber';
-      add({
-        id: `trav-dep:${t.journeyRef}`,
-        from: t.dependencyRef,
-        to: t.journeyRef,
-        health: depHealth,
-        live: true,
-        dim: false,
-      });
-    }
-    if (t.landmarkRef && t.membership !== 'CLEARED') {
-      add({
-        id: `trav-lm:${t.journeyRef}`,
-        from: t.journeyRef,
-        to: t.landmarkRef,
-        health,
-        live: health === 'amber',
-        dim: false,
-      });
-    }
   }
 
   let focus: OgFocus | undefined;

@@ -113,12 +113,16 @@ export interface EventOverviewSourceFacts {
     localTime: string;
     /** UTC ISO instant of window_start (ordering only). */
     windowStart: string;
+    /** Direct commitment assessment, when the producer has current evidence. */
+    health?: 'GREEN' | 'AMBER' | 'RED' | 'NEUTRAL';
   }[];
   /** Accepted participations, expanded to the participant's journeys. */
   participations: readonly {
     itemRef: string;
     journeyRef: string;
     obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED';
+    /** Participant-specific programme consequence, never copied from Journey status. */
+    commitmentHealth?: 'GREEN' | 'AMBER' | 'RED' | 'NEUTRAL';
   }[];
   /** One row per (journey, selected transport service). */
   journeyServices: readonly {
@@ -131,6 +135,18 @@ export interface EventOverviewSourceFacts {
     arrivalLocalTime?: string;
     publishedArrivalLocalTime?: string;
     /** Effective timing differs from published. */
+    changed: boolean;
+  }[];
+  /** Provider-neutral shared dependency rows. Selected transport remains supported above. */
+  journeyDependencies?: readonly {
+    journeyRef: string;
+    dependencyRef: string;
+    kindLabel: string;
+    label: string;
+    detailLabel?: string;
+    dayIndex?: number;
+    /** Evidence owned by the dependency itself; omission is neutral. */
+    health?: 'GREEN' | 'AMBER' | 'RED' | 'NEUTRAL';
     changed: boolean;
   }[];
 }

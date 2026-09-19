@@ -12,6 +12,7 @@ import { renderProductOperatorOverview } from '../src/ui/screens/product-operato
 import type { EventOverviewSourceFacts, OperatorOverviewFacts, OperatorPopulationFact } from '../src/app/target/readmodels/types.ts';
 import { computeOverviewLayout } from '../src/ui/overview-graph/layout.ts';
 import type { OgNode, OverviewGraphModel } from '../src/ui/overview-graph/model.ts';
+import { buildOverviewGraphModel } from '../src/ui/overview-graph/model.ts';
 
 type Status = OperatorPopulationFact['status'];
 type Evaluation = OperatorPopulationFact['evaluation'];
@@ -78,9 +79,9 @@ test('healthy world: shared dependencies, capped landmarks, cohorts cover popula
   assert.equal(ov.promotedTravellers.length, 0);
   assert.equal(ov.promotedOverflow, 0);
   assert.equal(ov.cohorts.reduce((s, c) => s + c.total, 0), population.length);
-  assert.ok(ov.dependencies.length === 2 && ov.dependencies.every((d) => !d.changed && d.health === 'GREEN' && d.clearedCount === 0));
+  assert.ok(ov.dependencies.length === 2 && ov.dependencies.every((d) => !d.changed && d.health === 'NEUTRAL' && d.clearedCount === 0));
   for (let d = 1; d <= 3; d++) assert.ok(ov.landmarks.filter((l) => l.dayIndex === d).length <= 4);
-  assert.ok(ov.landmarks.every((l) => l.health === 'GREEN'));
+  assert.ok(ov.landmarks.every((l) => l.health === 'NEUTRAL'));
   assert.ok(ov.dependencies.every((d) => d.feedsLandmarkRef));
 });
 
@@ -111,7 +112,7 @@ test('changed shared dependency: memberships, blast counts, landmark health, pro
   assert.deepEqual(ov.promotedTravellers.slice(0, 5).map((t) => t.membership), Array(5).fill('UNRESOLVED'));
   assert.ok(ov.promotedTravellers.every((t) => t.dependencyRef === 'SERVICE:Alpha' && t.roleLabel === 'Required attendee'));
   assert.equal(ov.promotedTravellers.length + ov.cohorts.reduce((s, c) => s + c.total, 0), population.length);
-  assert.ok(ov.landmarks.some((l) => l.health === 'RED'));
+  assert.ok(ov.landmarks.every((l) => l.health === 'NEUTRAL'), 'shared Journey disruption alone does not colour commitments');
   assert.ok(br.landmarkRefs.length > 0 && br.landmarkRefs.length <= 12);
 });
 
@@ -125,11 +126,11 @@ test('cleared members remain promoted and listed after the others', () => {
   const ov = buildEventOverview({ source: src, population, items: [] });
   assert.deepEqual(ov.promotedTravellers.map((t) => t.membership), ['UNRESOLVED', 'CHECKING', 'CLEARED', 'CLEARED']);
   assert.deepEqual(ov.blastRadius && [ov.blastRadius.clearedCount, ov.blastRadius.checkingCount, ov.blastRadius.unresolvedCount], [2, 1, 1]);
-  assert.equal(ov.landmarks[0]!.health, 'RED');
+  assert.equal(ov.landmarks[0]!.health, 'NEUTRAL');
   assert.equal(ov.landmarks[0]!.affectedCount, 2);
 });
 
-test('AMBER landmark when a participant is only being checked', () => {
+test('participant currentness alone leaves commitment health neutral', () => {
   const population = [pop(1), pop(2, 'UNKNOWN', 'PENDING_REASSESSMENT')];
   const src: EventOverviewSourceFacts = {
     programmeItems: [item(1, 1, 9)],
@@ -137,8 +138,118 @@ test('AMBER landmark when a participant is only being checked', () => {
     journeyServices: [],
   };
   const ov = buildEventOverview({ source: src, population, items: [] });
-  assert.equal(ov.landmarks[0]!.health, 'AMBER');
+  assert.equal(ov.landmarks[0]!.health, 'NEUTRAL');
   assert.equal(ov.blastRadius, undefined);
+});
+
+test('commitment-specific evidence controls landmark and traveller relation health', () => {
+  const population = [pop(1, 'DISRUPTED', 'CURRENT', { caseRef: 'CASE:one' })];
+  const src: EventOverviewSourceFacts = {
+    programmeItems: [{ ...item(1, 1, 9), health: 'GREEN' }],
+    participations: [{ ...part(1, 1), commitmentHealth: 'RED' }],
+    journeyServices: [],
+  };
+  const ov = buildEventOverview({ source: src, population, items: [] });
+  assert.equal(ov.landmarks[0]!.health, 'RED');
+  const relation = ov.relations?.find((candidate) => candidate.kind === 'TRAVELLER_TO_COMMITMENT');
+  assert.equal(relation?.health, 'RED');
+});
+
+test('commitment needs complete required-participant evidence before it can be green', () => {
+  const population = [pop(1), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [{ ...part(1, 1), commitmentHealth: 'GREEN' }, part(2, 1)],
+    journeyServices: [],
+  };
+  const ov = buildEventOverview({ source, population, items: [] });
+  assert.equal(ov.landmarks[0]?.health, 'NEUTRAL');
+});
+
+test('dependency-to-traveller relations use dependency condition, not unrelated programme evidence', () => {
+  const population = [pop(1, 'DISRUPTED', 'CURRENT'), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [{ ...part(1, 1), commitmentHealth: 'RED' }, { ...part(2, 1), commitmentHealth: 'GREEN' }],
+    journeyServices: [svc(1, 'Alpha', true), svc(2, 'Alpha', true)],
+  };
+  const ov = buildEventOverview({ source, population, items: [] });
+  const memberHealth = new Map((ov.relations ?? [])
+    .filter((relation) => relation.kind === 'DEPENDENCY_TO_TRAVELLER')
+    .map((relation) => [relation.toRef, relation.health]));
+  assert.equal(memberHealth.get('JOURNEY:001'), 'AMBER');
+  assert.equal(memberHealth.get('JOURNEY:002'), 'AMBER');
+});
+
+test('dependency-to-traveller relation may use an explicit changed blast outcome', () => {
+  const population = [pop(1, 'DISRUPTED', 'CURRENT'), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [part(1, 1), part(2, 1)],
+    journeyServices: [],
+    journeyDependencies: [
+      { journeyRef: 'JOURNEY:001', dependencyRef: 'RESOURCE:shared-kit', kindLabel: 'Shared equipment', label: 'Equipment at venue', changed: true },
+      { journeyRef: 'JOURNEY:002', dependencyRef: 'RESOURCE:shared-kit', kindLabel: 'Shared equipment', label: 'Equipment at venue', changed: true },
+    ],
+  };
+  const ov = buildEventOverview({ source, population, items: [] });
+  const memberHealth = new Map((ov.relations ?? [])
+    .filter((relation) => relation.kind === 'DEPENDENCY_TO_TRAVELLER')
+    .map((relation) => [relation.toRef, relation.health]));
+  assert.equal(memberHealth.get('JOURNEY:001'), 'RED');
+  assert.equal(memberHealth.get('JOURNEY:002'), 'GREEN');
+});
+
+test('typed shared resource dependency is selected without transport-specific grouping', () => {
+  const population = [pop(1), pop(2)];
+  const src: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: [part(1, 1), part(2, 1)],
+    journeyServices: [],
+    journeyDependencies: [
+      { journeyRef: 'JOURNEY:001', dependencyRef: 'RESOURCE:room-1', kindLabel: 'Shared room', label: 'Room resource', health: 'NEUTRAL', changed: false },
+      { journeyRef: 'JOURNEY:002', dependencyRef: 'RESOURCE:room-1', kindLabel: 'Shared room', label: 'Room resource', health: 'NEUTRAL', changed: false },
+    ],
+  };
+  const ov = buildEventOverview({ source: src, population, items: [] });
+  assert.equal(ov.dependencies[0]?.ref, 'RESOURCE:room-1');
+  assert.equal(ov.dependencies[0]?.health, 'NEUTRAL');
+  assert.equal(ov.relations?.find((candidate) => candidate.kind === 'DEPENDENCY_TO_COMMITMENT')?.health, 'NEUTRAL');
+});
+
+test('overview graph model consumes supplied relation condition without endpoint inference', () => {
+  const population = [pop(1), pop(2)];
+  const source: EventOverviewSourceFacts = {
+    programmeItems: [{ ...item(1, 1, 9), health: 'RED' }],
+    participations: [part(1, 1), part(2, 1)],
+    journeyServices: [svc(1, 'Alpha'), svc(2, 'Alpha')],
+  };
+  const view = projectOperatorOverview({
+    generatedAt: '2031-03-10T08:00:00.000Z', projectionRevision: 1, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'HEALTHY',
+    nodes: [], edges: [], items: [], population, eventOverviewSource: source,
+  });
+  const eventOverview = view.eventOverview!;
+  const relationId = eventOverview.relations?.find((relation) => relation.kind === 'DEPENDENCY_TO_COMMITMENT')?.id;
+  const graph = buildOverviewGraphModel({
+    ...view,
+    eventOverview: {
+      ...eventOverview,
+      relations: eventOverview.relations?.map((relation) => relation.id === relationId ? { ...relation, health: 'NEUTRAL' } : relation),
+    },
+  });
+  const backendRelation = eventOverview.relations?.find((relation) => relation.id === relationId);
+  const renderedRelation = graph?.relations.find((relation) => relation.id === backendRelation?.id);
+  assert.equal(backendRelation?.health, 'RED');
+  assert.equal(renderedRelation?.health, 'neutral');
+  assert.equal(renderedRelation?.kind, backendRelation?.kind);
+});
+
+test('ordinary population without programme days stays in a date-free cohort', () => {
+  const population = [pop(1), pop(2, 'UNKNOWN', 'STALE')];
+  const ov = buildEventOverview({ source: { programmeItems: [], participations: [], journeyServices: [] }, population, items: [] });
+  assert.deepEqual(ov.days, []);
+  assert.deepEqual(ov.cohorts.map((cohort) => [cohort.ref, cohort.dayIndex, cohort.total]), [['COHORT:unassigned', undefined, 2]]);
+  assert.equal(ov.cohorts.reduce((total, cohort) => total + cohort.total, 0) + ov.promotedTravellers.length, population.length);
 });
 
 test('generic: no case and no change means no promotion; case with non-ready status promotes as ATTENTION', () => {

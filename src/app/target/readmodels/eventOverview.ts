@@ -14,6 +14,7 @@ const LANDMARKS_PER_DAY = 4;
 const MAX_DEPENDENCIES = 12;
 const MAX_PROMOTED = 16;
 const MAX_BLAST_LANDMARKS = 12;
+const MAX_RELATIONS = 256;
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -39,12 +40,14 @@ function membershipOf(p: OperatorPopulationFact): Exclude<EventOverviewMembershi
 
 interface ServiceGroup {
   ref: string;
-  mode: 'AIR' | 'RAIL' | 'ROAD' | 'SEA';
-  operator: string;
+  kindLabel: string;
+  label: string;
+  detailLabel?: string;
   arrivalLocalDate?: string;
   arrivalLocalTime?: string;
   publishedArrivalLocalTime?: string;
   changed: boolean;
+  health: EventOverviewHealth;
   journeys: string[];
 }
 
@@ -70,11 +73,16 @@ export function buildEventOverview(input: {
   // Required participants per item (distinct journeys, population members only).
   const requiredByItem = new Map<string, Set<string>>();
   const partsByJourney = new Map<string, { itemRef: string; obligation: string }[]>();
+  const directCommitmentHealthByItem = new Map(source.programmeItems.map((item) => [item.itemRef, item.health ?? 'NEUTRAL'] as const));
+  const participantCommitmentHealth = new Map<string, EventOverviewHealth>();
   for (const p of source.participations) {
     if (!popByRef.has(p.journeyRef)) continue;
     const list = partsByJourney.get(p.journeyRef) ?? [];
     list.push({ itemRef: p.itemRef, obligation: p.obligation });
     partsByJourney.set(p.journeyRef, list);
+    if (p.commitmentHealth) {
+      participantCommitmentHealth.set(`${p.journeyRef}:${p.itemRef}`, p.commitmentHealth);
+    }
     if (p.obligation === 'REQUIRED' && itemByRef.has(p.itemRef)) {
       const set = requiredByItem.get(p.itemRef) ?? new Set<string>();
       set.add(p.journeyRef);
@@ -101,15 +109,47 @@ export function buildEventOverview(input: {
     if (!g) {
       g = {
         ref: row.serviceRef,
-        mode: row.mode,
-        operator: row.operator,
+        kindLabel: KIND_LABELS[row.mode],
+        label: row.operator,
         ...(row.arrivalLocalDate ? { arrivalLocalDate: row.arrivalLocalDate } : {}),
         ...(row.arrivalLocalTime ? { arrivalLocalTime: row.arrivalLocalTime } : {}),
         ...(row.publishedArrivalLocalTime ? { publishedArrivalLocalTime: row.publishedArrivalLocalTime } : {}),
         changed: row.changed,
+        // A timing difference evidences change, never health. Unchanged service
+        // timing has no independent condition verdict and stays neutral.
+        health: row.changed ? 'AMBER' : 'NEUTRAL',
         journeys: [],
       };
       groups.set(row.serviceRef, g);
+    }
+    if (!g.journeys.includes(row.journeyRef)) g.journeys.push(row.journeyRef);
+  }
+  const commitmentHealth = (itemRef: string, journeyRefs: readonly string[]): EventOverviewHealth => {
+    const direct = directCommitmentHealthByItem.get(itemRef) ?? 'NEUTRAL';
+    const evidence = journeyRefs.map((journeyRef) => participantCommitmentHealth.get(`${journeyRef}:${itemRef}`) ?? 'NEUTRAL');
+    if (evidence.some((health) => health === 'RED')) return 'RED';
+    if (direct === 'RED') return 'RED';
+    if (evidence.some((health) => health === 'AMBER')) return 'AMBER';
+    if (direct === 'AMBER') return 'AMBER';
+    if (direct === 'GREEN') return 'GREEN';
+    if (journeyRefs.length === 0) return 'NEUTRAL';
+    if (evidence.every((health) => health === 'GREEN')) return 'GREEN';
+    return 'NEUTRAL';
+  };
+  for (const row of source.journeyDependencies ?? []) {
+    if (!popByRef.has(row.journeyRef)) continue;
+    let g = groups.get(row.dependencyRef);
+    if (!g) {
+      g = {
+        ref: row.dependencyRef,
+        kindLabel: row.kindLabel,
+        label: row.label,
+        ...(row.detailLabel ? { detailLabel: row.detailLabel } : {}),
+        changed: row.changed,
+        health: row.health ?? 'NEUTRAL',
+        journeys: [],
+      };
+      groups.set(row.dependencyRef, g);
     }
     if (!g.journeys.includes(row.journeyRef)) g.journeys.push(row.journeyRef);
   }
@@ -165,17 +205,11 @@ export function buildEventOverview(input: {
     .filter((i) => chosenSet.has(i.itemRef))
     .map((i) => {
       const participants = [...(requiredByItem.get(i.itemRef) ?? [])].sort(cmp);
-      let red = false;
-      const affected = new Set<string>();
-      for (const ref of participants) {
-        const p = popByRef.get(ref)!;
-        if (p.status === 'DISRUPTED') {
-          red = true;
-          affected.add(ref);
-        }
-        if (nonCleared(ref) || p.evaluation === 'PENDING_REASSESSMENT') affected.add(ref);
-      }
-      const health: EventOverviewHealth = red ? 'RED' : affected.size > 0 ? 'AMBER' : 'GREEN';
+      const health = commitmentHealth(i.itemRef, participants);
+      // Population status and blast membership are not commitment evidence.
+      // Count them as operational attention only; never derive the landmark's
+      // semantic health from an unrelated Journey assessment.
+      const affected = new Set(participants.filter((ref) => nonCleared(ref)));
       return {
         ref: i.itemRef,
         dayIndex: dayIndexOf.get(i.localDate)!,
@@ -214,13 +248,14 @@ export function buildEventOverview(input: {
         ? `Arrives ${g.arrivalLocalTime} · was ${g.publishedArrivalLocalTime}`
         : `Arrives ${g.arrivalLocalTime}`
       : undefined;
+    const detailLabel = detail ?? g.detailLabel;
     return {
       ref: g.ref,
-      kindLabel: KIND_LABELS[g.mode],
-      label: g.operator,
-      ...(detail ? { detailLabel: detail } : {}),
+      kindLabel: g.kindLabel,
+      label: g.label,
+      ...(detailLabel ? { detailLabel } : {}),
       ...(dayIndex ? { dayIndex } : {}),
-      health: (g.changed ? 'AMBER' : 'GREEN') as EventOverviewHealth,
+      health: g.health,
       changed: g.changed,
       travellerCount: g.journeys.length,
       clearedCount: counts.CLEARED,
@@ -264,27 +299,27 @@ export function buildEventOverview(input: {
   });
 
   // ---- cohorts ----
-  const buckets = new Map<number, OperatorPopulationFact[]>();
+  const buckets = new Map<number | undefined, OperatorPopulationFact[]>();
   for (const p of population) {
-    if (promotedRefs.has(p.journeyRef) || days.length === 0) continue;
+    if (promotedRefs.has(p.journeyRef)) continue;
     let earliest: (typeof items)[number] | undefined;
     for (const part of partsByJourney.get(p.journeyRef) ?? []) {
       const it = itemByRef.get(part.itemRef);
       if (it && (!earliest || cmp(it.windowStart, earliest.windowStart) < 0)) earliest = it;
     }
-    const idx = earliest ? dayIndexOf.get(earliest.localDate)! : 1;
+    const idx = days.length === 0 ? undefined : earliest ? dayIndexOf.get(earliest.localDate)! : undefined;
     const list = buckets.get(idx) ?? [];
     list.push(p);
     buckets.set(idx, list);
   }
-  const cohorts = [...buckets.keys()].sort((a, b) => a - b).map((idx) => {
+  const cohorts = [...buckets.keys()].sort((a, b) => (a ?? 0) - (b ?? 0)).slice(0, 15).map((idx) => {
     const members = buckets.get(idx)!;
-    const two = String(idx).padStart(2, '0');
-    const landmarkRef = bestLandmark((lref) => requiredCount(lref), (l) => l.dayIndex === idx);
+    const two = idx === undefined ? undefined : String(idx).padStart(2, '0');
+    const landmarkRef = idx === undefined ? undefined : bestLandmark((lref) => requiredCount(lref), (l) => l.dayIndex === idx);
     return {
-      ref: `COHORT:day-${two}`,
-      dayIndex: idx,
-      label: `Day ${two} cohort`,
+      ref: idx === undefined ? 'COHORT:unassigned' : `COHORT:day-${two}`,
+      ...(idx === undefined ? {} : { dayIndex: idx }),
+      label: idx === undefined ? 'Unassigned travellers' : `Day ${two} cohort`,
       total: members.length,
       ready: members.filter((m) => m.status === 'READY').length,
       unknown: members.filter((m) => m.status === 'UNKNOWN').length,
@@ -292,6 +327,76 @@ export function buildEventOverview(input: {
       ...(landmarkRef ? { landmarkRef } : {}),
     };
   });
+
+  // ---- explicit presentation relations ----
+  // Relation condition is supplied here from the evidence that establishes the
+  // relation. Endpoint health and browser topology never colour a connector.
+  const relations: NonNullable<EventOverview['relations']> = [];
+  const relationIds = new Set<string>();
+  const addRelation = (relation: NonNullable<EventOverview['relations']>[number]): void => {
+    if (relations.length < MAX_RELATIONS && !relationIds.has(relation.id)) {
+      relationIds.add(relation.id);
+      relations.push(relation);
+    }
+  };
+  for (const dependency of dependencies) {
+    if (!dependency.feedsLandmarkRef) continue;
+    const group = selected.find((candidate) => candidate.ref === dependency.ref);
+    const members = (group?.journeys ?? []).filter((journeyRef) => requiredByItem.get(dependency.feedsLandmarkRef!)?.has(journeyRef));
+    addRelation({
+      id: `DEPENDENCY_TO_COMMITMENT:${dependency.ref}:${dependency.feedsLandmarkRef}`,
+      kind: 'DEPENDENCY_TO_COMMITMENT',
+      fromRef: dependency.ref,
+      toRef: dependency.feedsLandmarkRef,
+      health: commitmentHealth(dependency.feedsLandmarkRef, members),
+    });
+  }
+  const dependencyRelationHealth = (dependencyRef: string, journeyRef: string): EventOverviewHealth => {
+    const dependency = selected.find((candidate) => candidate.ref === dependencyRef);
+    // A connector may use the dependency's own condition. It must never reuse
+    // a programme consequence merely because that journey has both facts.
+    if (dependency?.health && dependency.health !== 'NEUTRAL') return dependency.health;
+    if (blastGroup?.ref !== dependencyRef) return 'NEUTRAL';
+    // A changed shared dependency explicitly makes this member part of the
+    // blast group, so its presented cleared/checking/unresolved outcome is
+    // meaningful for this relationship even when the dependency has no
+    // independent condition verdict.
+    const membership = blastMembers.get(journeyRef);
+    return membership === 'CLEARED' ? 'GREEN'
+      : membership === 'CHECKING' ? 'AMBER'
+        : membership === 'UNRESOLVED' ? 'RED'
+          : 'NEUTRAL';
+  };
+  for (const traveller of promotedTravellers) {
+    if (traveller.dependencyRef) {
+      addRelation({
+        id: `DEPENDENCY_TO_TRAVELLER:${traveller.dependencyRef}:${traveller.journeyRef}`,
+        kind: 'DEPENDENCY_TO_TRAVELLER',
+        fromRef: traveller.dependencyRef,
+        toRef: traveller.journeyRef,
+        health: dependencyRelationHealth(traveller.dependencyRef, traveller.journeyRef),
+      });
+    }
+    if (traveller.landmarkRef) {
+      addRelation({
+        id: `TRAVELLER_TO_COMMITMENT:${traveller.journeyRef}:${traveller.landmarkRef}`,
+        kind: 'TRAVELLER_TO_COMMITMENT',
+        fromRef: traveller.journeyRef,
+        toRef: traveller.landmarkRef,
+        health: participantCommitmentHealth.get(`${traveller.journeyRef}:${traveller.landmarkRef}`) ?? 'NEUTRAL',
+      });
+    }
+  }
+  for (const cohort of cohorts) {
+    if (!cohort.landmarkRef) continue;
+    addRelation({
+      id: `COHORT_TO_COMMITMENT:${cohort.ref}:${cohort.landmarkRef}`,
+      kind: 'COHORT_TO_COMMITMENT',
+      fromRef: cohort.ref,
+      toRef: cohort.landmarkRef,
+      health: 'NEUTRAL',
+    });
+  }
 
   return {
     days,
@@ -301,5 +406,6 @@ export function buildEventOverview(input: {
     promotedTravellers,
     promotedOverflow,
     ...(blastRadius ? { blastRadius } : {}),
+    relations,
   };
 }
