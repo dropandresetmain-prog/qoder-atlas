@@ -258,6 +258,8 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
         `option ${strategy.optionNumber} approves by its real strategy id`,
       );
     }
+    assert.match(html, /Approve and apply this option/);
+    assert.equal(html.includes('Choose this option instead'), false);
     // The propose control posts to the case strategies route.
     const noPlan = renderProductRecoveryCase(projectRecoveryCase({ ...caseFacts(), strategies: [], status: 'OPEN' } as unknown as RecoveryCaseFacts));
     assert.match(noPlan, new RegExp(`data-test="propose-strategies" data-case-ref="${CASE_REF}" data-request-path="/api/v2/cases/${CASE_REF}/strategies"`));

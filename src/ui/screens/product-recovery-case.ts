@@ -204,7 +204,7 @@ function optionsHtml(m: CaseWorkspaceModel): string {
     parts.push(...m.alternatives.map((alt) => `<div class="option-card cw-alt" data-test="recovery-strategy" data-strategy-ref="${escapeHtml(alt.strategyRef)}" data-option-number="${alt.optionNumber}">
       <div class="opt-head"><h3 class="opt-title">Alternative: ${escapeHtml(alt.title)}</h3>${badge('Also works', 'neutral')}</div>
       ${factsHtml(alt, false)}
-      ${alt.approvable ? `<div class="btn-row">${recoverButton(m.caseRef, alt.strategyRef, 'Choose this option instead', false)}</div>` : ''}
+      ${alt.approvable ? `<div class="btn-row">${recoverButton(m.caseRef, alt.strategyRef, 'Approve and apply this option', false)}</div>` : ''}
     </div>`));
   }
   if (m.showFindRecovery) {
