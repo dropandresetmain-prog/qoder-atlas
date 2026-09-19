@@ -41,15 +41,22 @@ Primary workspace was on unrelated `integration/pg-test-perf`; R4 recovered in `
 | R4-C1b | `5f83d5de4c4195c2d3edb487c69a4068d8fcc2a1` | Lane A: shell region polling + demo reset |
 | docs | `ebdcc1796f15c9a91279ee420eca4d8e1f5795a4` | takeover inventory |
 | R4-C2a | `7493746836b4473008831dd65ee6a78f84556d24` | Lane E1: V5.6 scene runtime |
+| R4-C2b | `3aa8a3d` | Lane B Overview V7.2 + population |
+| R4-C3a | `ccbae68` | Lane H surfaces |
+| R4-C3b | `2b40d6b` | Lane E2 Case workspace |
+| R4-C4a | `2fa9376` | Lane C Atlas Sarah recordings |
+| fix | `3ed8440` | demo disrupt/dataset dotenv merge |
+| fix | `4e71cb9` | trigger-disruption empty body (file load) |
 
 **Gate counters:** CURRENT_TARGET runs = **0**; full PG suite runs = **0**.
 
-**Lane D:** G01 `deaa710`, G09 `35e607b`, Qwen `f9f1822` — integrated. Focused 10/10 (capability+prefs+qwen).
-**Lane A:** `1a54623` — integrated. Focused shell/polling/demo-reset 22/22 on primary seam.
-**Lane E1:** `92efc03` — integrated. Focused graph/workspace 23/23.
-**Next:** finish/commit Lane B overview (+ parallel finish H/E2/C), then integrate.
+**Sarah vertical (2026-09-19):** disrupt APPLIED → case `c3ea21a5` → programme Move Headline approve 200 → EXECUTED → RESOLVED (`Sarah Lim Recovered`; Overview Sarah Confirmed). Qwen LIVE + Atlas REPLAY search evidenced. See `docs/work/r4-evidence/sarah-run.txt`.
 
-**Takeover next:** finish Lane B (V7.2 + population), then integrate remaining lanes.
+**Act Now (block FINAL):** (1) CURRENT_TARGET once + full PG once; (2) strip user-visible jargon in overview trip titles + recovery banner; (3) when `external:offer.select` absent, do not soft-fail Recover on recommended transport (prefer executable / clear error).
+
+**Park:** overview-graph overlay intercepts Apply; pool exhaustion after heavy reassessment; Farah/Mei baseline FAIL; duplicate transport option cards.
+
+**Primary HEAD:** `4e71cb99cdc922286e2587d6bd2cd6cb00b572a5` (pushed).
 
 ---
 
