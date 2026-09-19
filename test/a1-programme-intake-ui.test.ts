@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProgrammeIntakeCsv } from '../src/ui/programme-intake-controller.ts';
+import { parseProgrammeIntakeCsv, toCanonicalInstant } from '../src/ui/programme-intake-controller.ts';
 import { renderProductProgrammeIntake } from '../src/ui/screens/product-programme-intake.ts';
 
 test('programme intake CSV supports quoted session indexes and typed obligations', () => {
@@ -23,6 +23,12 @@ test('programme intake CSV reports malformed input without inventing rows', () =
   assert.match(result.errors[0]!, /unterminated quoted field/);
 });
 
+test('programme intake converts explicit local date/time and offset to canonical instants', () => {
+  assert.equal(toCanonicalInstant('2031-05-01', '09:15', '+08:00'), '2031-05-01T09:15:00+08:00');
+  assert.equal(toCanonicalInstant('2031-05-01', '09:15', '-05:00'), '2031-05-01T09:15:00-05:00');
+  assert.equal(toCanonicalInstant('2031-05-01', '09:15', ''), undefined);
+});
+
 test('programme intake escapes untrusted draft values and gates import on preview', () => {
   const html = renderProductProgrammeIntake({
     initialBundle: {
@@ -42,6 +48,10 @@ test('programme intake escapes untrusted draft values and gates import on previe
   assert.match(html, /\/api\/v2\/programme\/import\/preview/);
   assert.match(html, /\/api\/v2\/programme\/import/);
   assert.match(html, /body: JSON\.stringify\(bundle\)/);
+  assert.match(html, /Start date/);
+  assert.match(html, /Timezone for this session/);
+  assert.match(html, /Sessions to attend/);
+  assert.match(html, /Advanced CSV format/);
   const controllerScript = html.match(/<script data-programme-intake-controller>([\s\S]*)<\/script>/)?.[1];
   assert.ok(controllerScript);
   assert.doesNotThrow(() => new Function(controllerScript));

@@ -7,14 +7,44 @@ export interface ProgrammeIntakeRenderOptions {
   initialBundle?: Partial<ProgrammeImportBundle>;
 }
 
+const TIMEZONE_OFFSETS = ['+00:00', '+01:00', '+08:00', '-05:00', '-08:00'] as const;
+
+function offsetMinutes(offset: string): number {
+  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset);
+  if (!match) return 0;
+  const minutes = Number(match[2]) * 60 + Number(match[3]);
+  return match[1] === '-' ? -minutes : minutes;
+}
+
+function localParts(instant: string | undefined, displayOffset?: string): { date: string; time: string; offset: string } {
+  if (!instant) return { date: '', time: '', offset: '+00:00' };
+  const match = /([+-]\d{2}:\d{2}|Z)$/.exec(instant);
+  const sourceOffset = displayOffset ?? (match?.[1] === 'Z' ? '+00:00' : match?.[1] ?? '+00:00');
+  const local = new Date(Date.parse(instant) + (offsetMinutes(sourceOffset) * 60_000));
+  if (Number.isNaN(local.getTime())) return { date: '', time: '', offset: sourceOffset };
+  return { date: local.toISOString().slice(0, 10), time: local.toISOString().slice(11, 16), offset: sourceOffset };
+}
+
+function timezoneOptions(selected: string): string {
+  const offsets = Array.from(new Set([...TIMEZONE_OFFSETS, selected]));
+  return offsets.map((offset) => `<option value="${offset}"${offset === selected ? ' selected' : ''}>UTC${offset === '+00:00' ? '' : offset}</option>`).join('');
+}
+
 function sessionRow(item: Partial<ProgrammeImportBundle['items'][number]> = {}): string {
+  const start = localParts(item.windowStart);
+  const selectedOffset = start.offset;
+  const end = localParts(item.windowEnd, selectedOffset);
   return `<div class="panel" data-intake-session-row data-test="programme-intake-session">
     <div class="intake-row-grid">
       <label>Session title<input type="text" data-session-field="title" value="${escapeHtml(item.title ?? '')}" placeholder="Opening session"></label>
       <label>Session type<input type="text" data-session-field="itemType" value="${escapeHtml(item.itemType ?? 'SESSION')}" placeholder="SESSION"></label>
-      <label>Start (ISO time with timezone)<input type="text" data-session-field="windowStart" value="${escapeHtml(item.windowStart ?? '')}" placeholder="2031-05-01T09:00:00.000Z"></label>
-      <label>End (ISO time with timezone)<input type="text" data-session-field="windowEnd" value="${escapeHtml(item.windowEnd ?? '')}" placeholder="2031-05-01T10:00:00.000Z"></label>
+      <label>Start date<input type="date" data-session-field="startDate" value="${escapeHtml(start.date)}"></label>
+      <label>Start time<input type="time" data-session-field="startTime" value="${escapeHtml(start.time)}"></label>
+      <label>End date<input type="date" data-session-field="endDate" value="${escapeHtml(end.date)}"></label>
+      <label>End time<input type="time" data-session-field="endTime" value="${escapeHtml(end.time)}"></label>
+      <label>Timezone for this session<select data-session-field="timeZoneOffset">${timezoneOptions(selectedOffset)}</select></label>
     </div>
+    <p class="field-help">The selected timezone is attached to both local times; nothing is inferred from the browser.</p>
     <button type="button" class="btn btn-ghost" data-remove-session>Remove session</button>
   </div>`;
 }
@@ -24,7 +54,7 @@ function travellerRow(traveller: Partial<ProgrammeImportBundle['travellers'][num
   return `<div class="panel" data-intake-traveller-row data-test="programme-intake-traveller">
     <div class="intake-row-grid">
       <label>Traveller name<input type="text" data-traveller-field="displayName" value="${escapeHtml(traveller.displayName ?? '')}" placeholder="Avery Example"></label>
-      <label>Session indexes<input type="text" data-traveller-field="participatesInItemIndices" value="${escapeHtml(traveller.participatesInItemIndices?.join(', ') ?? '')}" placeholder="0, 1"></label>
+      <label>Sessions to attend<input type="text" data-traveller-field="participatesInItemNumbers" value="${escapeHtml(traveller.participatesInItemIndices?.map((index) => index + 1).join(', ') ?? '')}" placeholder="1, 2"></label>
       <label>Attendance requirement<select data-traveller-field="obligation"><option value="REQUIRED"${obligation === 'REQUIRED' ? ' selected' : ''}>Required</option><option value="OPTIONAL"${obligation === 'OPTIONAL' ? ' selected' : ''}>Optional</option></select></label>
     </div>
     <button type="button" class="btn btn-ghost" data-remove-traveller>Remove traveller</button>
@@ -71,17 +101,17 @@ export function renderProductProgrammeIntake(options: ProgrammeIntakeRenderOptio
     </section>
     <section class="section" aria-label="Programme sessions">
       <div class="section-head"><h2>Sessions</h2><button type="button" class="btn btn-ghost" data-add-session>Add session</button></div>
-      <p class="sub">Use the session index shown by its order below when assigning people.</p>
+      <p class="sub">People choose session numbers as they appear here, starting at 1.</p>
       <div data-intake-sessions>${items.map((item) => sessionRow(item)).join('')}</div>
     </section>
     <section class="section" aria-label="Programme travellers">
       <div class="section-head"><h2>People and attendance</h2><button type="button" class="btn btn-ghost" data-add-traveller>Add traveller</button></div>
-      <p class="sub">Session indexes start at 0. Required attendance is checked during preview.</p>
+      <p class="sub">Use the human session numbers above. Required attendance is checked during preview.</p>
       <div data-intake-travellers>${travellers.map((traveller) => travellerRow(traveller)).join('')}</div>
     </section>
     <section class="section" aria-label="CSV roster">
       <h2>Paste or upload a roster CSV</h2>
-      <p class="sub">Supported columns: <code>displayName</code>, <code>participatesInItemIndices</code>, and <code>obligation</code>. Quote values such as <code>"0, 1"</code>.</p>
+      <p class="sub">Advanced CSV format: <code>displayName</code>, <code>participatesInItemIndices</code>, and <code>obligation</code>. This column stays zero-based for imports: <code>0</code> means the first session. Quote values such as <code>"0, 1"</code>.</p>
       <textarea data-intake-csv rows="5" placeholder="displayName,participatesInItemIndices,obligation&#10;Avery Example,\"0, 1\",REQUIRED"></textarea>
       <div class="btn-row"><button type="button" class="btn btn-ghost" data-apply-csv>Apply CSV to people</button><label class="btn btn-ghost file-button">Choose CSV file<input type="file" accept=".csv,text/csv" data-csv-file hidden></label></div>
       <p class="field-help">Applying a CSV replaces the people rows and leaves programme details and sessions unchanged.</p>
