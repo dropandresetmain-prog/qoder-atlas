@@ -985,6 +985,8 @@ export const ApplicationErrorCodeSchema = z.enum([
   // R4-F2 additive: truthful refusal reasons for provider-executed (external) options.
   'EXTERNAL_EXECUTION_NOT_COMPOSED',
   'EXECUTION_INPUTS_UNAVAILABLE',
+  // R4-F2f additive: a REPLAY/SIMULATED-researched option needs a fresh live provider quote first.
+  'FRESH_PROVIDER_QUOTE_REQUIRED',
   'BUDGET_UNAVAILABLE',
 ]);
 export type ApplicationErrorCode = z.infer<typeof ApplicationErrorCodeSchema>;

@@ -43,6 +43,27 @@ export interface TransportWorld extends DisruptedWorld { organisationId: string 
 let seedBudgets = true;
 const BUDGET_CURRENCIES = ['USD', 'PHP', 'SGD', 'MYR', 'JPY', 'VND'];
 
+/**
+ * The immutable binding's research-mode stamp is what the N4 gate reads. Scripted worlds research from
+ * REPLAY recordings, so by default the stamp is set to what a fresh provider-backed quote would carry
+ * (`RECORD`); tests of the gate pass `researchMode: 'REPLAY'` (unchanged) or flip it afterwards.
+ * Bypasses the immutability trigger for this fixture write only (session_replication_role, superuser test DB).
+ */
+export async function stampBindingResearchMode(pool: Pool, workspaceId: string, mode: 'SIMULATED' | 'REPLAY' | 'RECORD' | 'LIVE'): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL session_replication_role = replica');
+    await client.query('UPDATE offer_execution_bindings SET research_mode = $2 WHERE workspace_id = $1', [workspaceId, mode]);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export function replayTransport(observedAt: string) {
   const adapter = new AtlasFlightAdapter({
     mode: 'REPLAY',
@@ -113,7 +134,7 @@ async function seedConnectionWorld(label: string, spec: WorldSpec): Promise<Tran
 // Fixture: a planned case with a recommended viable SELECT_OFFER strategy.
 // ---------------------------------------------------------------------------
 
-export async function plannedTransportCase(label: string, options: { identity?: boolean; budget?: boolean; allowMultipleViable?: boolean; spec?: WorldSpec; transport?: (now: string) => ReturnType<typeof replayTransport>; transportPlanning?: (world: { pool: Pool; workspaceId: string; now: string }) => NonNullable<Parameters<typeof createRecoveryPlanningCoordinator>[0]['transportPlanning']> } = {}) {
+export async function plannedTransportCase(label: string, options: { researchMode?: 'SIMULATED' | 'REPLAY' | 'RECORD' | 'LIVE'; identity?: boolean; budget?: boolean; allowMultipleViable?: boolean; spec?: WorldSpec; transport?: (now: string) => ReturnType<typeof replayTransport>; transportPlanning?: (world: { pool: Pool; workspaceId: string; now: string }) => NonNullable<Parameters<typeof createRecoveryPlanningCoordinator>[0]['transportPlanning']> } = {}) {
   const SPEC_IN_USE = options.spec ?? SPEC;
   seedBudgets = options.budget !== false;
   const c: OpenCase<TransportWorld> = await openDisruptionCase<TransportWorld>(label, SPEC_IN_USE, { seed: seedConnectionWorld, delayedArrival: worldAt(SPEC_IN_USE, '12:30') });
@@ -132,6 +153,8 @@ export async function plannedTransportCase(label: string, options: { identity?: 
   assert.ok(strategy.length >= 1, 'at least one viable transport strategy');
   // With several viable options (live research) approve the cheapest: least sandbox spend, deterministic.
   const cheapest = [...strategy].sort((a, b) => Number(a.scenario_change.effects[0]!.offerPrice!.amount) - Number(b.scenario_change.effects[0]!.offerPrice!.amount) || a.id.localeCompare(b.id))[0]!;
+  // Live research (RECORD/LIVE) already stamped its own mode; scripted REPLAY research is stamped as a fresh quote unless asked otherwise.
+  if (!options.transportPlanning) await stampBindingResearchMode(c.pool, ws, options.researchMode ?? 'RECORD');
   const strategyId = cheapest.id;
   const effect = cheapest.scenario_change.effects[0]!;
   assert.equal(effect.effectKind, 'SELECT_OFFER');

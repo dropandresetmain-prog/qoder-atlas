@@ -457,6 +457,8 @@ export async function runExternalOfferExecutionPass(ctx: ExternalExecutionContex
   for (const intentId of candidates) {
     const outcome: ExternalExecutionOutcome = { intentId, attemptNumber: 1, result: 'REFUSED' };
     report.outcomes.push(outcome);
+    // N4: an executor that is not LIVE/RECORD never mutates (no attempt, no network).
+    if (ctx.external.mode !== 'LIVE' && ctx.external.mode !== 'RECORD') { outcome.detail = `EXECUTOR_MODE_NOT_LIVE: executor runs in ${ctx.external.mode}; provider mutation needs LIVE or RECORD`; report.refused += 1; continue; }
     // 1. Protected inputs: refuse (NO attempt row, NO network) when they cannot support execution.
     const inputs = await resolveOfferExecutionInputs(ctx.pool, ctx.workspaceId, intentId);
     if (!inputs.ready) { outcome.detail = `${inputs.reason}: ${inputs.detail}`; report.refused += 1; continue; }
