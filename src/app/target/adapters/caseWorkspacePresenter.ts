@@ -610,9 +610,10 @@ function buildActivity(view: RecoveryCaseView, phase: CasePhase): CaseWorkspaceM
     const vocab = CASE_TOOL_ACTIVITY[tool.tool.code ?? ''] ?? CASE_TOOL_FALLBACK;
     const ok = tool.status.code === 'SUCCEEDED' || tool.status.code === 'PARTIAL';
     if (ok) {
-      rows.push({ label: vocab.checking, state: 'done' });
+      rows.push({ label: vocab.checking, state: 'done', note: toolActivityNote(tool) });
     } else {
-      rows.push({ label: vocab.unavailable, state: 'failed', ...(vocab.note ? { note: vocab.note } : {}) });
+      const note = [toolActivityNote(tool), vocab.note].filter((value): value is string => Boolean(value)).join(' ');
+      rows.push({ label: vocab.unavailable, state: 'failed', ...(note ? { note } : {}) });
     }
   }
 
@@ -643,6 +644,61 @@ function buildActivity(view: RecoveryCaseView, phase: CasePhase): CaseWorkspaceM
 
   const finished = phase !== 'investigating' && phase !== 'disrupted';
   return { title: finished ? CASE_COPY.activityDone : CASE_COPY.activityDoing, rows };
+}
+
+const TOOL_MODE_COPY: Record<string, string> = {
+  LIVE: 'live provider evidence',
+  RECORD: 'recorded provider evidence',
+  REPLAY: 'saved replay evidence',
+  INTERNAL: 'current trip records',
+};
+
+function toolProviderLabel(provider: string | undefined): string | undefined {
+  const safe = plain(provider);
+  if (!safe) return undefined;
+  return {
+    atlas: 'Atlas',
+    nuitee: 'Nuitée',
+    'google-routes': 'Google Routes',
+    'model-studio': 'Model Studio',
+  }[safe.toLowerCase()] ?? safe;
+}
+
+/**
+ * Keep planning activity factual without making configuration look like a
+ * provider result. The read model carries the status and provenance; this
+ * helper only turns those closed values into concise operator copy.
+ */
+function toolActivityNote(tool: NonNullable<RecoveryCaseView['planningEvidence']>['tools'][number]): string | undefined {
+  const provider = toolProviderLabel(tool.provider);
+  const mode = TOOL_MODE_COPY[tool.provenanceMode?.code ?? ''];
+  const source = [provider, mode].filter((value): value is string => value !== undefined).join(' · ');
+  const missing: string[] = [];
+  if (!provider) missing.push('provider was not recorded');
+  if (!mode) missing.push('source mode was not recorded');
+  const caveat = missing.length > 0 ? `; ${missing.join(' and ')}` : '';
+  const subject = tool.tool.code === 'flight.search' ? 'replacement-flight information' : 'research information';
+
+  switch (tool.status.code) {
+    case 'SUCCEEDED':
+      return source
+        ? `${source} returned ${subject}${caveat}.`
+        : `${subject} was returned${caveat}.`;
+    case 'PARTIAL':
+      return source
+        ? `${source} returned some ${subject}; other checks remain uncertain${caveat}.`
+        : `Some ${subject} was returned; other checks remain uncertain${caveat}.`;
+    case 'FAILED':
+      return source
+        ? `${source} could not complete this check${caveat}.`
+        : `${subject} could not be obtained${caveat}.`;
+    case 'UNAVAILABLE':
+      return source
+        ? `${source} was unavailable for this check${caveat}.`
+        : `No provider result was recorded for this check${caveat}.`;
+    default:
+      return undefined;
+  }
 }
 
 // --------------------------------------------------------------------------

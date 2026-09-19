@@ -229,8 +229,8 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
 
   test('each option states who it fixes', () => {
     // R4 intentionally replaced the per-person FAIL -> PASS badge row with plain
-    // "Who is affected" / "Why it works" facts on each option card.
-    assert.match(html, /<dt>Who is affected<\/dt><dd>Sarah Lim<\/dd>/);
+    // "Trip recovery for" / "Why it works" facts on each option card.
+    assert.match(html, /<dt>Trip recovery for<\/dt><dd>Sarah Lim<\/dd>/);
     assert.match(html, /Sarah Lim’s trip goes from not working to working\./);
   });
 

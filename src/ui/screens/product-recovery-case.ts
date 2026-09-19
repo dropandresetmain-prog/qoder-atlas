@@ -180,7 +180,7 @@ function factsHtml(option: CaseOptionModel, fullApprover: boolean): string {
   const why = option.why.length > 0 ? `<ul>${option.why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : '';
   return `<dl class="cw-facts">
     <dt>What changes</dt><dd>${changes}</dd>
-    ${people ? `<dt>Who is affected</dt><dd>${people}</dd>` : ''}
+    ${people ? `<dt>Trip recovery for</dt><dd>${people}</dd>` : ''}
     ${why ? `<dt>Why it works</dt><dd>${why}</dd>` : ''}
     ${option.costLine ? `<dt>Cost</dt><dd>${escapeHtml(option.costLine)}</dd>` : ''}
     ${fullApprover ? `<dt>Approval</dt><dd>${escapeHtml(option.approverLine)}</dd>` : ''}
@@ -241,7 +241,7 @@ function approvalHtml(m: CaseWorkspaceModel): string {
     <h2>${escapeHtml(CASE_COPY.whatYoureApproving)}</h2>
     <dl class="cw-facts">
       <dt>The change</dt><dd>${changes || 'No schedule or booking change is recorded.'}</dd>
-      ${a.people.length > 0 ? `<dt>Who is affected</dt><dd>${escapeHtml(a.people.join(', '))}</dd>` : ''}
+      ${a.people.length > 0 ? `<dt>Trip recovery for</dt><dd>${escapeHtml(a.people.join(', '))}</dd>` : ''}
       ${a.costLine ? `<dt>Cost</dt><dd>${escapeHtml(a.costLine)}</dd>` : ''}
       <dt>Authority</dt><dd>${escapeHtml(a.authorityLine)}</dd>
     </dl>
