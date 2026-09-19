@@ -86,6 +86,7 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
     type AssessmentFact = {
       status: 'READY' | 'DISRUPTED' | 'UNKNOWN';
       assessmentStatus: 'CURRENT' | 'STALE' | 'PENDING_REASSESSMENT' | 'UNAVAILABLE' | 'NONE';
+      failedProgrammeItemRefs: Set<string>;
       missingInformation?: string;
     };
     const assessmentByJourney = new Map<string, AssessmentFact>();
@@ -94,9 +95,20 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
       if (cached) return cached;
       const view = await currentAssessmentView(client, workspaceId, { kind: 'JOURNEY', id: journeyId }, 'VIABILITY', generatedAt);
       const currentVerdict = view.status === 'CURRENT' && view.assessment?.overallVerdict;
+      const failedProgrammeItemRefs = new Set<string>();
+      if (view.status === 'CURRENT') {
+        const participation = view.assessment?.dimensions.find((dimension) => dimension.dimension === 'programme_participation');
+        for (const explanation of participation?.explanations ?? []) {
+          if (explanation.status !== 'FAIL') continue;
+          for (const subject of explanation.relatedSubjects) {
+            if (subject.kind === 'PROGRAMME_ITEM') failedProgrammeItemRefs.add(subject.id);
+          }
+        }
+      }
       const fact: AssessmentFact = {
         status: currentVerdict === 'PASS' ? 'READY' : currentVerdict === 'FAIL' ? 'DISRUPTED' : 'UNKNOWN',
         assessmentStatus: view.status,
+        failedProgrammeItemRefs,
         ...(view.status === 'NONE' ? { missingInformation: 'No current readiness assessment is available.' } : {}),
         ...(view.status === 'PENDING_REASSESSMENT' ? { missingInformation: 'Readiness is being checked after a change.' } : {}),
         ...(view.status === 'STALE' ? { missingInformation: 'The readiness check needs refreshing.' } : {}),
@@ -157,11 +169,11 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
         traveller.facts.push(fact);
         if (row.active_case_id) {
           traveller.caseRefs.add(row.active_case_id);
-          item.caseRefs.add(row.active_case_id);
         }
-        if (fact.status === 'DISRUPTED') {
+        if (row.obligation === 'REQUIRED' && fact.failedProgrammeItemRefs.has(row.id)) {
           item.affectedTravellerRefs.add(traveller.travellerRef);
           item.affectedTravellerLabels.add(traveller.label);
+          if (row.active_case_id) item.caseRefs.add(row.active_case_id);
         }
       }
     }
@@ -176,7 +188,8 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
             : traveller.facts.some((fact) => fact.status === 'UNKNOWN')
               ? 'UNKNOWN' as const
               : 'READY' as const;
-        const assessmentStatus = traveller.facts[0]?.assessmentStatus;
+        const assessmentStatuses = new Set(traveller.facts.map((fact) => fact.assessmentStatus));
+        const assessmentStatus = assessmentStatuses.size === 1 ? traveller.facts[0]?.assessmentStatus : undefined;
         const missingInformation = [...new Set(traveller.facts.flatMap((fact) => fact.missingInformation ? [fact.missingInformation] : []))];
         return {
           travellerRef: traveller.travellerRef,
