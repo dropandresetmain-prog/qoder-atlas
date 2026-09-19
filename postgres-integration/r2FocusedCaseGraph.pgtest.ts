@@ -28,8 +28,11 @@ import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
+import { attachSeedSession, commitSeed } from './m2Seed.ts';
+import { seedPlace } from './m4Seed.ts';
 import { CONN_SPEC, seedConnectionWorld } from './r2ConnectionWorld.ts';
 import { openDisruptionCase, worldAt, type DisruptedWorld, type OpenCase } from './r1ProgrammeWorld.ts';
+import { seedStayIntent } from './m6WorldSeed.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
 import { ensureOriginalCaseGraph } from '../src/app/target/originalCaseGraphCapture.ts';
@@ -94,6 +97,25 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     for (const node of v.ldg.nodes) {
       assert.doesNotMatch(node.label, UUID, `node label is human, not a uuid: ${node.label}`);
     }
+  });
+
+  test('the Stay card uses the authoritative endpoint place time zone', async () => {
+    const seed = await attachSeedSession(c.pool, c.world.workspaceId, c.world.actorId);
+    const placeId = await seedPlace(seed, { name: 'Case stay endpoint', placeType: 'HOTEL', timeZone: 'Asia/Singapore' });
+    await seedStayIntent(seed, {
+      journeyId: c.world.people[0]!.journeyId,
+      orderKey: '015',
+      placeId,
+      window: { start: '2031-06-02T07:00:00.000Z', end: '2031-06-03T03:00:00.000Z' },
+      requiredNights: 1,
+    });
+    await commitSeed(seed);
+    await c.drain();
+
+    const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
+    const stay = v.ldg.nodes.find((node) => node.kind === 'TRANSFER_STAY');
+    assert.ok(stay, 'the canonical STAY journey item is visible');
+    assert.equal(stay.detail, '2 Jun 15:00 → 3 Jun 11:00 GMT+8');
   });
 
   test('subjectLabels carries authoritative traveller display names keyed <KIND>:<id>', async () => {
