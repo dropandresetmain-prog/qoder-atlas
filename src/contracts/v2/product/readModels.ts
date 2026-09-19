@@ -894,6 +894,12 @@ export const ProgrammeScheduleSchema = z.strictObject({
     requiredParticipants: z.number().int().min(0),
     optionalParticipants: z.number().int().min(0),
     requiresPhysicalPresence: z.boolean(),
+    /** ISO window bounds so a surface can group by event day without re-parsing labels. */
+    windowStart: z.string().datetime({ offset: true }).optional(),
+    windowEnd: z.string().datetime({ offset: true }).optional(),
+    /** An open recovery case touching a person committed to this item, when one exists. */
+    affectedCaseRef: z.string().min(1).optional(),
+    affectedCaseCount: z.number().int().min(0).optional(),
   })),
 });
 export type ProgrammeSchedule = z.infer<typeof ProgrammeScheduleSchema>;
@@ -904,6 +910,8 @@ export const DecisionQueueSchema = z.strictObject({
     caseRef: z.string().min(1),
     status: z.string().min(1),
     openedAtLabel: z.string().min(1),
+    /** ISO instant the case opened, so a surface can show a relative age. */
+    openedAt: z.string().datetime({ offset: true }).optional(),
     subjectLabels: z.array(z.string().min(1)),
     /** Only cases the backend reports as awaiting authority require a decision. */
     awaitingAuthority: z.boolean(),
@@ -920,6 +928,14 @@ export const ActivityFeedSchema = z.strictObject({
     subjectLabel: z.string().min(1),
     what: z.string().min(1),
     reason: z.string().min(1).optional(),
+    /** Resolved display name of the traveller the change concerns, when it concerns one. */
+    subjectName: z.string().min(1).optional(),
+    /** Kind of the changed record (e.g. JOURNEY) — presentation maps it to a noun, never shows it. */
+    subjectKind: z.string().min(1).optional(),
+    /** Whether the recorded actor is a person, a service or the system, when known. */
+    actorKind: z.enum(['HUMAN', 'SERVICE', 'SYSTEM']).optional(),
+    /** Recovery case this change belongs to, when one is known. */
+    caseRef: z.string().min(1).optional(),
   })),
   /** True when older entries exist beyond the page returned. */
   truncated: z.boolean(),

@@ -275,7 +275,7 @@ export async function handleTargetProductHttp(
       }
       const view = projectIncidentProgramme(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderInShell('case', 'Incident', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductIncidentProgramme(view)));
+        sendHtml(res, 200, renderInShell('case', 'Programme impact', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductIncidentProgramme(view, { caseRef: caseId })));
       } else {
         sendJson(res, 200, view);
       }
@@ -292,7 +292,7 @@ export async function handleTargetProductHttp(
       }
       const view = projectTravellerTrip(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderInShell('traveller', 'Trip', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductTravellerTrip(view)));
+        sendHtml(res, 200, renderInShell('traveller', 'Your trip', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductTravellerTrip(view)));
       } else {
         sendJson(res, 200, view);
       }

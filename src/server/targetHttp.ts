@@ -106,6 +106,19 @@ async function handle(
     return;
   }
 
+  // Traveller-facing page: `/traveller?trip=<journey id>` serves the plain-language
+  // trip view. Case HTML is served in place by the product handlers (no redirect).
+  if (req.method === 'GET' && url.pathname === '/traveller') {
+    const trip = url.searchParams.get('trip');
+    if (trip) {
+      res.writeHead(302, { location: `/api/v2/travellers/journeys/${encodeURIComponent(trip)}?format=html` });
+      res.end();
+    } else {
+      sendJson(res, 400, { error: 'TRIP_REQUIRED', message: 'Open a traveller page with ?trip=<journey id>' });
+    }
+    return;
+  }
+
   const uiAsset = url.pathname.startsWith('/assets/') ? url.pathname.slice('/assets/'.length) : '';
   if (req.method === 'GET' && uiAsset && (await serveStaticAsset(res, uiAsset))) return;
 
