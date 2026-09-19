@@ -27,11 +27,30 @@ import { deliverInboxMessage } from '../src/persistence/postgres/inbox.ts';
 
 describe('AiT fixture TEMPLATE clone (spike)', () => {
   let fixture: AitFixtureHandle | undefined;
+  /** False when reusing the suite-scoped fixture prepared by run-suite.mjs. */
+  let ownsFixture = false;
   const cloneTimes: number[] = [];
+  const suiteFixtureName = (process.env.NORTHSTAR_AIT_FIXTURE_DB ?? '').trim();
 
   before(async () => {
+    if (suiteFixtureName) {
+      // Reuse the suite fixture — do not rebuild a second ~75–120s AiT world.
+      ownsFixture = false;
+      fixture = {
+        databaseName: suiteFixtureName,
+        workspaceId: AIT_FIXTURE_WORKSPACE_ID,
+        datasetKey: 'ait-summit-2026',
+        contentHash: 'suite-scoped',
+        buildMs: 0,
+        baselineEvaluated: 67,
+        drop: async () => undefined,
+      };
+      console.log(`[spike] reusing suite fixture db=${suiteFixtureName}`);
+      return;
+    }
     const started = performance.now();
     fixture = await buildAitFixtureDatabase({ runBaseline: true });
+    ownsFixture = true;
     console.log(
       `[spike] fixture built in ${(performance.now() - started).toFixed(0)}ms ` +
         `db=${fixture.databaseName} baselineEvaluated=${fixture.baselineEvaluated} ` +
@@ -48,7 +67,7 @@ describe('AiT fixture TEMPLATE clone (spike)', () => {
           `min=${sorted[0]!.toFixed(1)}ms median=${mid.toFixed(1)}ms max=${sorted[sorted.length - 1]!.toFixed(1)}ms`,
       );
     }
-    await fixture?.drop();
+    if (ownsFixture) await fixture?.drop();
   });
 
   test('clone primitive creates an isolated DB under 5s (median over trials)', async () => {
@@ -73,7 +92,9 @@ describe('AiT fixture TEMPLATE clone (spike)', () => {
     assert.ok(median < 5000, `median clone ${median.toFixed(1)}ms must be < 5000ms`);
   });
 
-  test('fresh vs clone logical baseline fingerprints match', async () => {
+  test('fresh vs clone logical baseline fingerprints match', { skip: suiteFixtureName !== '' }, async () => {
+    // Skipped under suite-scoped fixture to avoid a second full AiT provision
+    // (~90s). Standalone focused runs still prove fresh↔clone equivalence.
     assert.ok(fixture, 'fixture built');
     const fresh = await buildFreshAitBaselineDatabase();
     const clone = await cloneAitFixtureDatabase(fixture.databaseName);
@@ -247,9 +268,10 @@ describe('AiT fixture TEMPLATE clone (spike)', () => {
 
   test('refuses to treat the fixture DB name as a disposable clone target', () => {
     assert.ok(fixture, 'fixture built');
-    assert.throws(() => assertDisposableDatabaseName(fixture.databaseName, 'clone'));
+    const fx = fixture;
+    assert.throws(() => assertDisposableDatabaseName(fx.databaseName, 'clone'));
     assert.throws(() => assertDisposableDatabaseName('northstar_test', 'fixture'));
-    assert.throws(() => assertWorkingDatabaseNotFixture(fixture.databaseName, fixture.databaseName));
+    assert.throws(() => assertWorkingDatabaseNotFixture(fx.databaseName, fx.databaseName));
   });
 
   test('inbox deliver/dedup on clone A does not affect clone B or fixture template', async () => {

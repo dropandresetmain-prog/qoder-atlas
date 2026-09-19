@@ -6,8 +6,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { suiteTestConcurrency } from '../scripts/suite-concurrency.mjs';
-import { shouldSkipFixtureForEnv, suiteNeedsAitFixture } from '../scripts/ait-fixture-suite.mjs';
+
+const require = createRequire(import.meta.url);
+const { shouldSkipFixtureForEnv, suiteNeedsAitFixture } = require('../scripts/ait-fixture-suite.mjs') as {
+  shouldSkipFixtureForEnv: (env?: NodeJS.ProcessEnv) => boolean;
+  suiteNeedsAitFixture: (manifest: unknown, suiteName: string, files: string[]) => boolean;
+};
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'test/suites.json'), 'utf8'));
