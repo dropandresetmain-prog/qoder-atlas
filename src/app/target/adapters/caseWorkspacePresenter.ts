@@ -203,7 +203,7 @@ function disruptedTransportLegs(view: RecoveryCaseView): readonly { label: strin
  */
 function selectOfferTransportLeg(
   view: RecoveryCaseView,
-  change: RecoveryStrategyView['changes'][number],
+  _change: RecoveryStrategyView['changes'][number],
 ): string | undefined {
   const legs = disruptedTransportLegs(view);
   if (legs.length === 0) return undefined;
