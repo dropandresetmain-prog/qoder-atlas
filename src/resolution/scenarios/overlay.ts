@@ -12,6 +12,8 @@
  */
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
 import { typedConflict, type TypedResult, ok, conflict } from '../../domain/v2/shared/errors.ts';
+import { compareExactMoney, type ExactMoney } from '../../domain/v2/shared/money.ts';
+import { compareInstants, type Instant } from '../../domain/v2/shared/time.ts';
 import type { ScenarioChange, ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
 import type {
   CapturedWorld,
@@ -28,11 +30,25 @@ export interface ResolvedOffer {
   transportServiceId: string;
 }
 
+/**
+ * A captured stay quote used only to build a candidate overlay. Unlike a
+ * transport offer it does not pretend to be a TransportService, and it never
+ * creates a Reservation/ReservationLine before external observation.
+ */
+export interface ResolvedStayOffer {
+  offerId: string;
+  placeId: string;
+  stayWindow: { start: Instant; end: Instant };
+  price: ExactMoney;
+}
+
 export interface OverlayApplyInput {
   baseWorld: CapturedWorld;
   scenarioChange: ScenarioChange;
   /** Known offers from search/capture — never fabricated inside the overlay. */
   resolvedOffers?: readonly ResolvedOffer[];
+  /** Known stay offers from search/capture — separate from transport offers. */
+  resolvedStayOffers?: readonly ResolvedStayOffer[];
 }
 
 export interface OverlayApplyResult {
@@ -76,6 +92,31 @@ function findSupportAssignment(world: CapturedWorld, constraintDefinitionId: str
   return world.supportAssignments.find((a) => a.requirementId === constraintDefinitionId);
 }
 
+/** Derive the calendar-night count at the captured stay place, never from a guessed offset. */
+function localNights(window: { start: Instant; end: Instant }, timeZone: string): number | undefined {
+  const localDay = (instant: Instant): { year: number; month: number; day: number } | undefined => {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(new Date(instant));
+      const lookup = new Map(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value] as const));
+      const year = Number(lookup.get('year'));
+      const month = Number(lookup.get('month'));
+      const day = Number(lookup.get('day'));
+      return Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day) ? { year, month, day } : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const start = localDay(window.start);
+  const end = localDay(window.end);
+  if (!start || !end) return undefined;
+  return Math.round((Date.UTC(end.year, end.month - 1, end.day) - Date.UTC(start.year, start.month - 1, start.day)) / 86_400_000);
+}
+
 /**
  * Apply a closed ScenarioEffect set to a deep clone. Rejects any attempt to
  * invent supplier confirmation, mutate judging criteria, or reference missing
@@ -88,12 +129,13 @@ export function applyScenarioOverlay(input: OverlayApplyInput): TypedResult<Over
   }
 
   const offers = new Map((input.resolvedOffers ?? []).map((o) => [o.offerId, o]));
+  const stayOffers = new Map((input.resolvedStayOffers ?? []).map((o) => [o.offerId, o]));
   const affected = new Map<string, TypedRef>();
   const authority = new Set<string>();
   const applied: ScenarioEffect[] = [];
 
   for (const effect of input.scenarioChange.effects) {
-    const appliedOne = applyEffect(proposedWorld, effect, offers, affected, authority);
+    const appliedOne = applyEffect(proposedWorld, effect, offers, stayOffers, affected, authority);
     if (!appliedOne.ok) return appliedOne;
     applied.push(effect);
   }
@@ -119,6 +161,7 @@ function applyEffect(
   world: CapturedWorld,
   effect: ScenarioEffect,
   offers: Map<string, ResolvedOffer>,
+  stayOffers: Map<string, ResolvedStayOffer>,
   affected: Map<string, TypedRef>,
   authority: Set<string>,
 ): TypedResult<true> {
@@ -146,6 +189,93 @@ function applyEffect(
       addAffected(affected, { kind: 'JOURNEY_ITEM', id: item.id });
       addAffected(affected, { kind: 'JOURNEY', id: item.journeyId });
       authority.add('journey.service_selection');
+      return ok(true);
+    }
+    case 'ADD_JOURNEY_STAY': {
+      const journey = world.journeys.find((candidate) => candidate.id === effect.journeyId);
+      if (!journey) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY journey not in captured world', [
+          { kind: 'JOURNEY', id: effect.journeyId },
+        ]));
+      }
+      if (!world.travellers.some((traveller) => traveller.id === journey.travellerId)) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY journey traveller not in captured world', [
+          { kind: 'JOURNEY', id: journey.id },
+          { kind: 'TRAVELLER', id: journey.travellerId },
+        ]));
+      }
+      if (world.journeyItems.some((item) => item.id === effect.proposedJourneyItemId)) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY proposed journey item id already exists', [
+          { kind: 'JOURNEY', id: journey.id },
+        ]));
+      }
+      const offer = stayOffers.get(effect.offerId);
+      if (!offer) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer is not resolved; cannot fabricate supplier selection', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      const place = world.places.find((candidate) => candidate.id === offer.placeId);
+      if (!place) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer place is not in captured world', [
+          { kind: 'OFFER', id: effect.offerId },
+          { kind: 'PLACE', id: offer.placeId },
+        ]));
+      }
+      if (compareInstants(offer.stayWindow.start, offer.stayWindow.end) >= 0) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer window must be positive', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      let pricesMatch = false;
+      try {
+        pricesMatch = effect.offerPrice.currency === offer.price.currency
+          && compareExactMoney(effect.offerPrice, offer.price) === 0;
+      } catch {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer price is not an exact supported amount', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      if (!pricesMatch) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY effect price does not match resolved offer', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      const requiredNights = localNights(offer.stayWindow, place.timeZone);
+      if (requiredNights === undefined || requiredNights <= 0) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer window does not contain a positive number of local nights', [
+          { kind: 'OFFER', id: effect.offerId },
+          { kind: 'PLACE', id: place.id },
+        ]));
+      }
+      // This row exists only in the cloned candidate world. It carries intent
+      // facts from the captured offer, never a reservation, allocation, or
+      // supplier-observed status. The overlay itself is the proposed-state
+      // convention; PLANNED remains the canonical JourneyItem lifecycle shape.
+      world.journeyItems.push({
+        id: effect.proposedJourneyItemId,
+        journeyId: journey.id,
+        kind: 'STAY',
+        orderKey: effect.orderKey,
+        lifecycleStatus: 'PLANNED',
+        flexible: false,
+        intendedWindow: { ...offer.stayWindow },
+        desiredOriginPlaceId: null,
+        desiredDestinationPlaceId: null,
+        selectedServiceId: null,
+        intendedPlaceId: place.id,
+        requiredNights,
+        participationId: null,
+        standaloneTitle: null,
+        standaloneWindow: null,
+        resourceId: null,
+        intendedLocationPlaceId: null,
+      });
+      // The proposed item has no canonical identity and therefore is never an
+      // authority/impact subject. Its existing owning Journey and Traveller are.
+      addAffected(affected, { kind: 'JOURNEY', id: journey.id });
+      addAffected(affected, { kind: 'TRAVELLER', id: journey.travellerId });
+      authority.add('journey.stay');
       return ok(true);
     }
     case 'PROPOSE_ALLOCATION': {

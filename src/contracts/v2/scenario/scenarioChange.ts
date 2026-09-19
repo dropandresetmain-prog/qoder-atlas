@@ -28,6 +28,19 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     offerPrice: ExactMoneySchema.optional(),
   }),
   z.strictObject({
+    /**
+     * A candidate-only stay item, bound to an already captured stay offer.
+     * It cannot carry reservation or supplier-observation fields: those arise
+     * only from consequential execution and later observation.
+     */
+    effectKind: z.literal('ADD_JOURNEY_STAY'),
+    proposedJourneyItemId: SubjectIdSchema,
+    journeyId: SubjectIdSchema,
+    orderKey: z.string().min(1),
+    offerId: SubjectIdSchema,
+    offerPrice: ExactMoneySchema,
+  }),
+  z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),
     reservationLineId: SubjectIdSchema,
     travellerId: SubjectIdSchema,

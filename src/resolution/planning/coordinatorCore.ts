@@ -46,7 +46,7 @@ import { ScenarioChangeSchema } from '../../contracts/v2/scenario/scenarioChange
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { EvaluateStrategyResult } from '../scenarios/evaluate.ts';
 import { evaluateRecoveryStrategy } from '../scenarios/evaluate.ts';
-import type { ResolvedOffer } from '../scenarios/overlay.ts';
+import type { ResolvedOffer, ResolvedStayOffer } from '../scenarios/overlay.ts';
 import {
   validateProposalCandidates,
   type FailingSubject,
@@ -160,6 +160,12 @@ export interface CoordinatorCoreDeps {
     evidence: PlanningEvidenceContext;
     basis: PlanningBasis;
   }) => readonly ResolvedOffer[];
+  /** Optional stay-offer resolver; kept separate from transport offer binding. */
+  resolveStayOffersForDomain?: (ctx: {
+    domainId: RecoveryDomainId;
+    evidence: PlanningEvidenceContext;
+    basis: PlanningBasis;
+  }) => readonly ResolvedStayOffer[];
   /**
    * Optional planning-local evidence materialization. It may enrich only an
    * isolated captured-world copy (for example a searched flight offer) before
@@ -169,7 +175,11 @@ export interface CoordinatorCoreDeps {
     domainId: RecoveryDomainId;
     evidence: PlanningEvidenceContext;
     basis: PlanningBasis;
-  }) => { world: CapturedWorld; resolvedOffers?: readonly ResolvedOffer[] } | undefined;
+  }) => {
+    world: CapturedWorld;
+    resolvedOffers?: readonly ResolvedOffer[];
+    resolvedStayOffers?: readonly ResolvedStayOffer[];
+  } | undefined;
 }
 
 export interface CoordinatorCoreOutput {
@@ -326,6 +336,9 @@ export async function runRecoveryPlanning(
     const resolvedOffers = materialized?.resolvedOffers ?? (deps.resolveOffersForDomain
       ? deps.resolveOffersForDomain({ domainId: domain.domainId, evidence: evidenceContext, basis: evaluationBasis })
       : []);
+    const resolvedStayOffers = materialized?.resolvedStayOffers ?? (deps.resolveStayOffersForDomain
+      ? deps.resolveStayOffersForDomain({ domainId: domain.domainId, evidence: evidenceContext, basis: evaluationBasis })
+      : []);
     for (const bound of domainProposers) {
       const proposer = isDomainProposer(bound)
         ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences: deps.preferences ?? [] })
@@ -357,6 +370,7 @@ export async function runRecoveryPlanning(
           scenarioChange, now, registry,
           ...(basis.currentState ? { currentState: basis.currentState } : {}),
           ...(resolvedOffers.length > 0 ? { resolvedOffers } : {}),
+          ...(resolvedStayOffers.length > 0 ? { resolvedStayOffers } : {}),
           assumptions: candidate.assumptions,
           resolveSubjectRefs: failing.map((f) => f.subject),
         });
