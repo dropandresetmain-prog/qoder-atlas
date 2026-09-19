@@ -113,6 +113,7 @@
     ],
     "postgres": [
       "postgres-integration/atomicCommit.pgtest.ts",
+      "postgres-integration/aitFixtureClone.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/r3ComposedB1Full.pgtest.ts",
       "postgres-integration/b1RecoveryLoop.pgtest.ts",
