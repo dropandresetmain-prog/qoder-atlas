@@ -11,10 +11,11 @@
  * source + evidence record citing the seeded Organisation must commit
  * before any Traveller identity can cite that evidence.
  */
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
+import { canonicalPayloadHash } from '../../persistence/postgres/canonicalHash.ts';
+import { InstantSchema, compareInstants } from '../../domain/v2/shared/time.ts';
 import { createOrganisation, recordTraveller } from '../../persistence/postgres/commands/peopleCommands.ts';
 import { recordSource, recordEvidence } from '../../persistence/postgres/commands/knowledgeCommands.ts';
 import { createTrip, createJourney } from '../../persistence/postgres/commands/travelCommands.ts';
@@ -28,8 +29,11 @@ import {
 export const ProgrammeImportItemSchema = z.strictObject({
   title: z.string().min(1),
   itemType: z.string().min(1),
-  windowStart: z.string().min(1),
-  windowEnd: z.string().min(1),
+  windowStart: InstantSchema,
+  windowEnd: InstantSchema,
+}).refine((item) => compareInstants(item.windowStart, item.windowEnd) < 0, {
+  path: ['windowEnd'],
+  message: 'windowStart must be strictly before windowEnd',
 });
 
 export const ProgrammeImportTravellerSchema = z.strictObject({
@@ -40,11 +44,34 @@ export const ProgrammeImportTravellerSchema = z.strictObject({
 });
 
 export const ProgrammeImportBundleSchema = z.strictObject({
+  /** Caller supplied key for intentional re-imports; content hash is the fallback. */
+  importKey: z.string().trim().min(1).max(256).optional(),
   organisationLegalName: z.string().min(1),
   eventTitle: z.string().min(1),
   programmeTitle: z.string().min(1),
   items: z.array(ProgrammeImportItemSchema).min(1),
   travellers: z.array(ProgrammeImportTravellerSchema).min(1),
+}).superRefine((bundle, ctx) => {
+  for (const [travellerIndex, traveller] of bundle.travellers.entries()) {
+    const seen = new Set<number>();
+    for (const itemIndex of traveller.participatesInItemIndices) {
+      if (seen.has(itemIndex)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['travellers', travellerIndex, 'participatesInItemIndices'],
+          message: `references item index ${itemIndex} more than once`,
+        });
+      }
+      seen.add(itemIndex);
+      if (itemIndex >= bundle.items.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['travellers', travellerIndex, 'participatesInItemIndices'],
+          message: `references item index ${itemIndex}, but only ${bundle.items.length} item(s) exist`,
+        });
+      }
+    }
+  }
 });
 export type ProgrammeImportBundle = z.infer<typeof ProgrammeImportBundleSchema>;
 
@@ -63,6 +90,12 @@ function mustOk<T>(outcome: { ok: boolean; value?: T; conflict?: unknown }, labe
   return outcome.value as T;
 }
 
+function stableUuid(seed: string): string {
+  const hex = canonicalPayloadHash(seed).slice(0, 32);
+  const variantByte = ((Number.parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variantByte}${hex.slice(18, 20)}-${hex.slice(20, 32)}`;
+}
+
 export async function importProgrammeBundle(
   pool: Pool,
   workspaceId: string,
@@ -70,14 +103,39 @@ export async function importProgrammeBundle(
   bundleInput: unknown,
 ): Promise<ProgrammeImportResult> {
   const bundle = ProgrammeImportBundleSchema.parse(bundleInput);
+  const importIdentity = bundle.importKey
+    ? canonicalPayloadHash({ importKey: bundle.importKey })
+    : canonicalPayloadHash(bundle);
+  const importContentHash = canonicalPayloadHash(bundle);
+  const commandKey = (step: string) => `programme-import:${importIdentity}:${step}`;
+  const organisationId = stableUuid(`${importIdentity}:organisation`);
+  const sourceId = stableUuid(`${importIdentity}:source`);
+  const evidenceId = stableUuid(`${importIdentity}:evidence`);
+  const eventId = stableUuid(`${importIdentity}:event`);
+  const programmeId = stableUuid(`${importIdentity}:programme`);
+  const itemIds = bundle.items.map((_, index) => stableUuid(`${importIdentity}:item:${index}`));
+  const travellerIds = bundle.travellers.map((_, index) => stableUuid(`${importIdentity}:traveller:${index}`));
+  const tripIds = bundle.travellers.map((_, index) => stableUuid(`${importIdentity}:trip:${index}`));
+  const journeyIds = bundle.travellers.map((_, index) => stableUuid(`${importIdentity}:journey:${index}`));
+  const participationIds = bundle.travellers.flatMap((traveller, travellerIndex) =>
+    traveller.participatesInItemIndices.map((itemIndex) => stableUuid(`${importIdentity}:participation:${travellerIndex}:${itemIndex}`)));
+
+  // A retry after SOURCE_RECORDED must reuse the first receipt's timestamp;
+  // otherwise the stable key would correctly reject a changed provenance
+  // payload. This read is admission-only and does not create a new contract.
+  const existingSource = await pool.query<{ received_at: Date }>(
+    'SELECT received_at FROM source_records WHERE workspace_id = $1 AND id = $2',
+    [workspaceId, sourceId],
+  );
+  const now = existingSource.rows[0]?.received_at?.toISOString() ?? new Date().toISOString();
   const uow = () => new PgUnitOfWork(pool, workspaceId);
-  const now = new Date().toISOString();
 
   const org = mustOk(
     await createOrganisation(uow(), {
       workspaceId,
       actorPrincipalId,
-      idempotencyKey: `programme-import:org:${randomUUID()}`,
+      idempotencyKey: commandKey('organisation'),
+      organisationId,
       legalName: bundle.organisationLegalName,
       defaultCurrencyCode: 'USD',
     }),
@@ -88,10 +146,11 @@ export async function importProgrammeBundle(
     await recordSource(uow(), {
       workspaceId,
       actorPrincipalId,
-      idempotencyKey: `programme-import:source:${randomUUID()}`,
-      sourceIdentity: `programme-import:${org.organisationId}:${randomUUID()}`,
+      idempotencyKey: commandKey('source'),
+      sourceId,
+      sourceIdentity: `programme-import:${importIdentity}`,
       receivedAt: now,
-      contentHash: `programme-import-${org.organisationId}`,
+      contentHash: importContentHash,
       contentType: 'application/x-northstar-programme-import',
     }),
     'recordSource',
@@ -101,7 +160,8 @@ export async function importProgrammeBundle(
     await recordEvidence(uow(), {
       workspaceId,
       actorPrincipalId,
-      idempotencyKey: `programme-import:evidence:${randomUUID()}`,
+      idempotencyKey: commandKey('evidence'),
+      evidenceId,
       assertionType: 'PROGRAMME_IMPORT_PROVENANCE',
       observedAt: now,
       schemaVersion: '1',
@@ -115,7 +175,8 @@ export async function importProgrammeBundle(
     await createEvent(uow(), {
       workspaceId,
       actorPrincipalId,
-      idempotencyKey: `programme-import:event:${randomUUID()}`,
+      idempotencyKey: commandKey('event'),
+      eventId,
       title: bundle.eventTitle,
       organiserOrganisationId: org.organisationId,
       lifecycleStatus: 'ACTIVE',
@@ -127,7 +188,8 @@ export async function importProgrammeBundle(
     await createProgramme(uow(), {
       workspaceId,
       actorPrincipalId,
-      idempotencyKey: `programme-import:programme:${randomUUID()}`,
+      idempotencyKey: commandKey('programme'),
+      programmeId,
       eventId: event.eventId,
       title: bundle.programmeTitle,
       lifecycleStatus: 'ACTIVE',
@@ -136,16 +198,17 @@ export async function importProgrammeBundle(
   );
 
   let programmeRevision = programme.revision;
-  const itemIds: string[] = [];
+  let itemIndex = 0;
   for (const item of bundle.items) {
     const added = mustOk(
       await addProgrammeItem(uow(), {
         workspaceId,
         actorPrincipalId,
-        idempotencyKey: `programme-import:item:${randomUUID()}`,
+        idempotencyKey: commandKey(`item:${itemIndex}`),
         programmeId: programme.programmeId,
         expectedProgrammeRevision: programmeRevision,
         item: {
+          id: itemIds[itemIndex],
           title: item.title,
           itemType: item.itemType,
           window: { start: item.windowStart, end: item.windowEnd },
@@ -154,17 +217,20 @@ export async function importProgrammeBundle(
       `addProgrammeItem(${item.title})`,
     );
     programmeRevision = added.programmeRevision;
-    itemIds.push(added.programmeItemId);
+    itemIndex += 1;
   }
 
   const travellers: ProgrammeImportResult['travellers'] = [];
-  for (const travellerSpec of bundle.travellers) {
+  let participationOffset = 0;
+  for (const [travellerIndex, travellerSpec] of bundle.travellers.entries()) {
     const traveller = mustOk(
       await recordTraveller(uow(), {
         workspaceId,
         actorPrincipalId,
-        idempotencyKey: `programme-import:traveller:${randomUUID()}`,
+        idempotencyKey: commandKey(`traveller:${travellerIndex}`),
+        travellerId: travellerIds[travellerIndex],
         displayName: {
+          id: stableUuid(`${importIdentity}:traveller:${travellerIndex}:display-name`),
           nameKind: 'DISPLAY',
           displayValue: travellerSpec.displayName,
           effectiveRange: { start: now.slice(0, 10) },
@@ -177,7 +243,8 @@ export async function importProgrammeBundle(
       await createTrip(uow(), {
         workspaceId,
         actorPrincipalId,
-        idempotencyKey: `programme-import:trip:${randomUUID()}`,
+        idempotencyKey: commandKey(`trip:${travellerIndex}`),
+        tripId: tripIds[travellerIndex],
         purpose: `${bundle.programmeTitle} attendance`,
         businessContextOrganisationId: org.organisationId,
       }),
@@ -187,7 +254,8 @@ export async function importProgrammeBundle(
       await createJourney(uow(), {
         workspaceId,
         actorPrincipalId,
-        idempotencyKey: `programme-import:journey:${randomUUID()}`,
+        idempotencyKey: commandKey(`journey:${travellerIndex}`),
+        journeyId: journeyIds[travellerIndex],
         tripId: trip.tripId,
         travellerId: traveller.travellerId,
         lifecycleStatus: 'ACTIVE',
@@ -196,18 +264,14 @@ export async function importProgrammeBundle(
     );
     for (const itemIndex of travellerSpec.participatesInItemIndices) {
       const itemId = itemIds[itemIndex];
-      if (!itemId) {
-        throw new Error(
-          `programme import: traveller "${travellerSpec.displayName}" references item index ${itemIndex}, but only ${itemIds.length} item(s) exist`,
-        );
-      }
       const participation = mustOk(
         await addParticipation(uow(), {
           workspaceId,
           actorPrincipalId,
-          idempotencyKey: `programme-import:participation:${randomUUID()}`,
+          idempotencyKey: commandKey(`participation:${participationOffset}`),
+          participationId: participationIds[participationOffset]!,
           programmeId: programme.programmeId,
-          programmeItemId: itemId,
+          programmeItemId: itemId!,
           travellerId: traveller.travellerId,
           obligation: travellerSpec.obligation,
           expectedProgrammeRevision: programmeRevision,
@@ -216,6 +280,7 @@ export async function importProgrammeBundle(
         `addParticipation(${travellerSpec.displayName})`,
       );
       programmeRevision = participation.programmeRevision;
+      participationOffset += 1;
     }
     travellers.push({ travellerId: traveller.travellerId, tripId: trip.tripId, journeyId: journey.journeyId });
   }
