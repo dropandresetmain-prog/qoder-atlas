@@ -12,8 +12,8 @@
  */
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
 import { typedConflict, type TypedResult, ok, conflict } from '../../domain/v2/shared/errors.ts';
-import { compareExactMoney, type ExactMoney } from '../../domain/v2/shared/money.ts';
-import { compareInstants, type Instant } from '../../domain/v2/shared/time.ts';
+import { ExactMoneySchema, compareExactMoney, type ExactMoney } from '../../domain/v2/shared/money.ts';
+import { InstantIntervalSchema, type Instant } from '../../domain/v2/shared/time.ts';
 import type { ScenarioChange, ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
 import type {
   CapturedWorld,
@@ -129,7 +129,17 @@ export function applyScenarioOverlay(input: OverlayApplyInput): TypedResult<Over
   }
 
   const offers = new Map((input.resolvedOffers ?? []).map((o) => [o.offerId, o]));
-  const stayOffers = new Map((input.resolvedStayOffers ?? []).map((o) => [o.offerId, o]));
+  const resolvedStayOffers = input.resolvedStayOffers ?? [];
+  const seenStayOfferIds = new Set<string>();
+  for (const offer of resolvedStayOffers) {
+    if (seenStayOfferIds.has(offer.offerId)) {
+      return conflict(typedConflict('VALIDATION_FAILED', 'resolved stay offers contain a duplicate offer id; offer resolution is ambiguous', [
+        { kind: 'OFFER', id: offer.offerId },
+      ]));
+    }
+    seenStayOfferIds.add(offer.offerId);
+  }
+  const stayOffers = new Map(resolvedStayOffers.map((offer) => [offer.offerId, offer]));
   const affected = new Map<string, TypedRef>();
   const authority = new Set<string>();
   const applied: ScenarioEffect[] = [];
@@ -222,17 +232,44 @@ function applyEffect(
           { kind: 'PLACE', id: offer.placeId },
         ]));
       }
-      if (compareInstants(offer.stayWindow.start, offer.stayWindow.end) >= 0) {
-        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer window must be positive', [
+      let window: ReturnType<typeof InstantIntervalSchema.safeParse>;
+      try {
+        window = InstantIntervalSchema.safeParse(offer.stayWindow);
+      } catch {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer window is not a valid positive offset-bearing interval', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      if (!window.success) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer window is not a valid positive offset-bearing interval', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      const offerPrice = ExactMoneySchema.safeParse(offer.price);
+      if (!offerPrice.success) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer price is not exact money', [
           { kind: 'OFFER', id: effect.offerId },
         ]));
       }
       let pricesMatch = false;
+      let hasNegativePrice = false;
       try {
-        pricesMatch = effect.offerPrice.currency === offer.price.currency
-          && compareExactMoney(effect.offerPrice, offer.price) === 0;
+        pricesMatch = effect.offerPrice.currency === offerPrice.data.currency
+          && compareExactMoney(effect.offerPrice, offerPrice.data) === 0;
+        hasNegativePrice = compareExactMoney(
+          effect.offerPrice,
+          { amount: '0', currency: effect.offerPrice.currency },
+        ) < 0 || compareExactMoney(
+          offerPrice.data,
+          { amount: '0', currency: offerPrice.data.currency },
+        ) < 0;
       } catch {
         return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer price is not an exact supported amount', [
+          { kind: 'OFFER', id: effect.offerId },
+        ]));
+      }
+      if (hasNegativePrice) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY purchase price cannot be negative', [
           { kind: 'OFFER', id: effect.offerId },
         ]));
       }
@@ -241,7 +278,7 @@ function applyEffect(
           { kind: 'OFFER', id: effect.offerId },
         ]));
       }
-      const requiredNights = localNights(offer.stayWindow, place.timeZone);
+      const requiredNights = localNights(window.data, place.timeZone);
       if (requiredNights === undefined || requiredNights <= 0) {
         return conflict(typedConflict('VALIDATION_FAILED', 'ADD_JOURNEY_STAY offer window does not contain a positive number of local nights', [
           { kind: 'OFFER', id: effect.offerId },
@@ -259,7 +296,7 @@ function applyEffect(
         orderKey: effect.orderKey,
         lifecycleStatus: 'PLANNED',
         flexible: false,
-        intendedWindow: { ...offer.stayWindow },
+        intendedWindow: { ...window.data },
         desiredOriginPlaceId: null,
         desiredDestinationPlaceId: null,
         selectedServiceId: null,

@@ -827,7 +827,13 @@ test('ADD_JOURNEY_STAY rejects unbound, inconsistent, and colliding offer facts'
     resolvedStayOffers: [{ ...resolved, stayWindow: { start: resolved.stayWindow.end, end: resolved.stayWindow.start } }],
   });
   assert.equal(badWindow.ok, false);
-  if (!badWindow.ok) assert.match(badWindow.conflict.message, /window must be positive/i);
+  if (!badWindow.ok) assert.match(badWindow.conflict.message, /valid positive offset-bearing interval/i);
+  const malformedWindow = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange,
+    resolvedStayOffers: [{ ...resolved, stayWindow: { start: 'not-an-instant', end: resolved.stayWindow.end } } as never],
+  });
+  assert.equal(malformedWindow.ok, false);
+  if (!malformedWindow.ok) assert.match(malformedWindow.conflict.message, /valid positive offset-bearing interval/i);
   const zeroLocalNights = applyScenarioOverlay({
     baseWorld: world, scenarioChange: baseChange,
     resolvedStayOffers: [{ ...resolved, stayWindow: { start: resolved.stayWindow.start, end: '2030-06-02T09:00:00.000Z' } }],
@@ -839,6 +845,18 @@ test('ADD_JOURNEY_STAY rejects unbound, inconsistent, and colliding offer facts'
   });
   assert.equal(badPrice.ok, false);
   if (!badPrice.ok) assert.match(badPrice.conflict.message, /price does not match/i);
+  const negativeChange = addStayChange(journey.id, id(), offerId, { amount: '-1.00', currency: 'NZD' });
+  const negativePrice = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: negativeChange,
+    resolvedStayOffers: [{ ...resolved, price: { amount: '-1.00', currency: 'NZD' } }],
+  });
+  assert.equal(negativePrice.ok, false);
+  if (!negativePrice.ok) assert.match(negativePrice.conflict.message, /cannot be negative/i);
+  const duplicateOffer = applyScenarioOverlay({
+    baseWorld: world, scenarioChange: baseChange, resolvedStayOffers: [resolved, { ...resolved }],
+  });
+  assert.equal(duplicateOffer.ok, false);
+  if (!duplicateOffer.ok) assert.match(duplicateOffer.conflict.message, /duplicate offer id/i);
   const collision = addStayChange(journey.id, arrival.id, offerId);
   const colliding = applyScenarioOverlay({ baseWorld: world, scenarioChange: collision, resolvedStayOffers: [resolved] });
   assert.equal(colliding.ok, false);
