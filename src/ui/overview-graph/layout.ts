@@ -88,9 +88,10 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
   const cohorts = byKind('cohort');
   const travellers = byKind('traveller');
 
-  // Content width is decided first so wide dependency rows never push the lane off-centre.
-  const depsWidth = deps.length * (CARD.dependency.w + GAP) - GAP + MARGIN * 2;
-  const width = Math.max(MIN_WIDTH, laneW + MARGIN * 2, depsWidth);
+  // Keep the world bounded by the programme territories. Dependencies wrap
+  // within that world instead of widening it until the whole overview becomes
+  // unreadably small at its canonical camera scale.
+  const width = Math.max(MIN_WIDTH, laneW + MARGIN * 2);
   const laneX = Math.round((width - laneW) / 2);
   const zones: DayZone[] = Array.from({ length: zoneCount }, (_, i) => ({
     index: days[i]?.index ?? i + 1,
@@ -110,8 +111,37 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
     perDay.set(zoneOf(node.dayIndex).index, list);
   }
   const rowsNeeded = Math.max(2, ...[...perDay.values()].map((l) => Math.ceil(l.length / cols)));
+
+  // Landmark X positions do not depend on the lane's Y position. Calculate
+  // them first so dependency targets can be packed before the lane is placed.
+  const landmarkCenterX = new Map<string, number>();
+  for (const [dayIndex, list] of perDay) {
+    const zone = zoneOf(dayIndex);
+    const used = Math.min(cols, list.length);
+    const gridW = used * lm.w + (used - 1) * GAP;
+    const startX = zone.x + Math.round((DAY_W - gridW) / 2);
+    list.forEach((node, i) => {
+      landmarkCenterX.set(node.id, startX + (i % cols) * (lm.w + GAP) + lm.w / 2);
+    });
+  }
+
+  // Shared dependencies sit above the landmark they feed; unlinked ones use
+  // their day. The packed bottom is part of the geometry contract: every
+  // dependency row must clear the programme lane below it.
+  const feeds = new Map<string, string>();
+  for (const rel of model.relations) {
+    if (rel.id.startsWith('dep:')) feeds.set(rel.from, rel.to);
+  }
   const depTop = deps.length > 0 ? 6 : 0;
-  const laneY = deps.length > 0 ? depTop + CARD.dependency.h + 34 : 8;
+  const depItems = deps.map((node) => ({
+    node,
+    cx: (feeds.get(node.id) ? landmarkCenterX.get(feeds.get(node.id)!) : undefined)
+      ?? (zoneOf(node.dayIndex).x + DAY_W / 2),
+  }));
+  const depPack = deps.length > 0
+    ? packRow(depItems, CARD.dependency, depTop, MARGIN, width - MARGIN, GAP)
+    : null;
+  const laneY = depPack ? depPack.bottom + 34 : 8;
   const laneH = LANE_HEAD + rowsNeeded * (lm.h + GAP) + 4;
 
   const boxes = new Map<string, Box>();
@@ -138,17 +168,7 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
     return b ? b.x + b.w / 2 : undefined;
   };
 
-  // Shared dependencies sit above the landmark they feed; unlinked ones use their day.
-  const feeds = new Map<string, string>();
-  for (const rel of model.relations) {
-    if (rel.id.startsWith('dep:')) feeds.set(rel.from, rel.to);
-  }
-  const depItems = deps.map((node) => ({
-    node,
-    cx: cx(feeds.get(node.id)) ?? (zoneOf(node.dayIndex).x + DAY_W / 2),
-  }));
-  const depPack = packRow(depItems, CARD.dependency, depTop, MARGIN, width - MARGIN, GAP);
-  depPack.placed.forEach((box, id) => boxes.set(id, box));
+  depPack?.placed.forEach((box, id) => boxes.set(id, box));
 
   // Promoted travellers sit under the landmark (or dependency) they connect to.
   const travellerTarget = new Map<string, string>();
@@ -166,15 +186,30 @@ export function computeOverviewLayout(model: OverviewGraphModel): OverviewLayout
     pack.placed.forEach((box, id) => boxes.set(id, box));
     below = pack.bottom + 26;
   }
+  // Cohorts retain their day territory. Multiple cohorts on the same day
+  // stack into rows instead of sharing one coordinate and overlapping.
+  const cohortsByDay = new Map<number, OgNode[]>();
   for (const node of cohorts) {
-    const zone = zoneOf(node.dayIndex);
-    boxes.set(node.id, {
-      x: Math.round(zone.x + (DAY_W - CARD.cohort.w) / 2),
-      y: below,
-      w: CARD.cohort.w,
-      h: CARD.cohort.h,
-    });
+    const day = zoneOf(node.dayIndex).index;
+    const list = cohortsByDay.get(day) ?? [];
+    list.push(node);
+    cohortsByDay.set(day, list);
   }
+  let cohortBottom = below;
+  for (const [dayIndex, list] of cohortsByDay) {
+    const zone = zoneOf(dayIndex);
+    const cohortPack = packRow(
+      list.map((node) => ({ node, cx: zone.x + zone.w / 2 })),
+      CARD.cohort,
+      below,
+      zone.x + MARGIN,
+      zone.x + zone.w - MARGIN,
+      GAP,
+    );
+    cohortPack.placed.forEach((box, id) => boxes.set(id, box));
+    cohortBottom = Math.max(cohortBottom, cohortPack.bottom);
+  }
+  if (cohorts.length > 0) below = cohortBottom + 26;
   const bottom = Math.max(
     laneBottom,
     ...[...boxes.values()].map((b) => b.y + b.h),

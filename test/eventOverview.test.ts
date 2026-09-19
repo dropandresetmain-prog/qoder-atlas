@@ -10,6 +10,8 @@ import { EventOverviewSchema, OperatorOverviewSchema } from '../src/contracts/v2
 import { adaptOperatorOverviewToDashboard } from '../src/app/target/adapters/operatorOverviewAdapter.ts';
 import { renderProductOperatorOverview } from '../src/ui/screens/product-operator-overview.ts';
 import type { EventOverviewSourceFacts, OperatorOverviewFacts, OperatorPopulationFact } from '../src/app/target/readmodels/types.ts';
+import { computeOverviewLayout } from '../src/ui/overview-graph/layout.ts';
+import type { OgNode, OverviewGraphModel } from '../src/ui/overview-graph/model.ts';
 
 type Status = OperatorPopulationFact['status'];
 type Evaluation = OperatorPopulationFact['evaluation'];
@@ -234,4 +236,72 @@ test('operator overview keeps attention queue and full managed population', () =
   assert.match(html, /data-test="event-overview-graph"/);
   assert.match(html, /Traveller 001/);
   assert.match(html, /Traveller 002/);
+});
+
+function geometryNode(id: string, kind: OgNode['kind'], dayIndex?: number): OgNode {
+  return {
+    id,
+    kind,
+    health: kind === 'cohort' ? 'neutral' : 'green',
+    type: kind,
+    title: id,
+    ...(dayIndex === undefined ? {} : { dayIndex }),
+    dim: false,
+    faded: false,
+    attention: false,
+  };
+}
+
+function overviewGeometryFixture(): OverviewGraphModel {
+  const days = Array.from({ length: 14 }, (_, i) => ({ index: i + 1, title: `Day ${i + 1}`, sub: `Date ${i + 1}` }));
+  const landmarks = Array.from({ length: 42 }, (_, i) => geometryNode(`landmark-${i}`, 'landmark', (i % 14) + 1));
+  const dependencies = Array.from({ length: 12 }, (_, i) => geometryNode(`dependency-${i}`, 'dependency', (i % 14) + 1));
+  const travellers = Array.from({ length: 16 }, (_, i) => geometryNode(`traveller-${i}`, 'traveller'));
+  const cohorts = [
+    geometryNode('cohort-1', 'cohort', 4),
+    geometryNode('cohort-2', 'cohort', 4),
+    geometryNode('cohort-3', 'cohort', 4),
+  ];
+  const relations = dependencies.map((node, i) => ({
+    id: `dep:${node.id}>landmark-${i}`,
+    from: node.id,
+    to: `landmark-${i}`,
+    health: 'green' as const,
+    live: true,
+    dim: false,
+  }));
+  return { days, nodes: [...dependencies, ...landmarks, ...travellers, ...cohorts], relations, active: false };
+}
+
+test('overview layout keeps packed dependencies above the spine and cards disjoint at stress counts', () => {
+  const fixture = overviewGeometryFixture();
+  const layout = computeOverviewLayout(fixture);
+  const entries = [...layout.boxes.entries()];
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const [leftId, left] = entries[i]!;
+    assert.ok(left.x >= 0 && left.y >= 0, `${leftId} starts inside the world`);
+    assert.ok(left.x + left.w <= layout.width, `${leftId} ends inside the world width`);
+    assert.ok(left.y + left.h <= layout.height, `${leftId} ends inside the world height`);
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const [rightId, right] = entries[j]!;
+      const overlaps = left.x < right.x + right.w && right.x < left.x + left.w
+        && left.y < right.y + right.h && right.y < left.y + left.h;
+      assert.equal(overlaps, false, `${leftId} must not overlap ${rightId}`);
+    }
+  }
+
+  const dependencyBoxes = entries.filter(([id]) => id.startsWith('dependency-')).map(([, box]) => box);
+  assert.ok(dependencyBoxes.every((box) => box.y + box.h <= layout.lane.y), 'all dependency rows clear the programme lane');
+  assert.equal(layout.width, 14 * 330 + 40, 'world width stays bounded by programme territories');
+
+  const sameDayCohorts = entries.filter(([id]) => id.startsWith('cohort-')).map(([, box]) => box);
+  assert.equal(new Set(sameDayCohorts.map((box) => box.y)).size, sameDayCohorts.length, 'same-day cohorts stack into distinct rows');
+
+  const wrapped = computeOverviewLayout({ ...fixture, days: fixture.days.slice(0, 2) });
+  const wrappedDependencies = [...wrapped.boxes.entries()]
+    .filter(([id]) => id.startsWith('dependency-'))
+    .map(([, box]) => box);
+  assert.ok(new Set(wrappedDependencies.map((box) => box.y)).size > 1, 'bounded dependency packing exercises multiple rows');
+  assert.ok(wrappedDependencies.every((box) => box.y + box.h <= wrapped.lane.y), 'wrapped dependency rows clear the programme lane');
 });
