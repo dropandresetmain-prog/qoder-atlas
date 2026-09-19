@@ -97,7 +97,9 @@ test('seedProgrammeBundle promotes AiT pack: 67/42/25, declared travel + booking
     assert.ok(transportLegs >= 13, `expected >=13 declared transport legs, got ${transportLegs}`);
     assert.ok(stays >= 4, `expected >=4 declared stays, got ${stays}`);
     assert.ok(legsWithBookingRef >= 7, `expected >=7 legs carrying booking refs, got ${legsWithBookingRef}`);
-    for (const expected of ['ZGSYN09', 'MNSYN03', 'MNSYN10', 'MNSYN11', 'MNSYN14', 'MNSYN30']) {
+    // Stale-expectation fix: commit 3727dcb rehomed the S1 cohort to CGK, so those PNRs are
+    // now IDSYN*; the MN228 KUL timing change (ca05386) is unrelated to this list.
+    for (const expected of ['ZGSYN09', 'IDSYN03', 'IDSYN10', 'IDSYN11', 'IDSYN14', 'IDSYN30']) {
       assert.ok(bookingRefs.has(expected), `harvested PNR ${expected} must appear on a promoted leg`);
     }
   } finally {
