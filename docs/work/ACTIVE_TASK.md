@@ -98,12 +98,18 @@ milestone-acceptance activity only and never runs here.
 
 | Checkpoint | Scope | SHA |
 | --- | --- | --- |
-| R3-C0 | Integration contract + acceptance map frozen; recon reconciled | see commit below |
-| R3-C1 | Normal runtime planner/provider composition | pending |
-| R3-C2 | Product planning path uses the accepted coordinator + regression guard | pending |
-| R3-C3 | Full B1 PostgreSQL acceptance test authored + typechecked | pending |
-| R3-C4 | Causal-spine layout improvement | pending |
+| R3-C0 | Integration contract + acceptance map frozen; recon reconciled | `50ec443fe4b748712cad5cd1a6935bb14f417e40` (pushed) |
+| R3-C1 | Normal runtime planner/provider composition | `edc0b52` (pushed) |
+| R3-C2 | Product planning path uses the accepted coordinator + regression guard | part 1 `ac1b644` + part 2 `4f3de02` (pushed) |
+| R3-C3 | Full B1 PostgreSQL acceptance test authored + typechecked | pending (Lane C) |
+| R3-C4 | Causal-spine layout improvement | `053e6b0` (pushed) |
 | R3-C5 | Cloud integration (focused + adjacent + typecheck + lint + boundary + anti-hardcoding + CURRENT_TARGET once) | pending |
+| docs | Local acceptance handoff (20 proofs + exact commands) | `6d72a16` (pushed) |
+
+R3 commit log on `feat/r3-full-rebased-b1-cloud` (base `6118f427`):
+`50ec443` → `edc0b52` (C1) → `053e6b0` (C4) → `6d72a16` (handoff) → `ac1b644` (C2.1)
+→ `4f3de02` (C2.2, HEAD). Cloud-verified so far: typecheck clean, focused R3 suites
+green, import guard 7/7, boundary gate 231 files CLASSIFIED, anti-hardcoding CLEAN.
 
 ## Unresolved local proofs
 
@@ -114,8 +120,14 @@ Cloud may be reported as PG-proven, browser-proven or LIVE-proven.
 
 1. [DONE] Phase 0 recon (six lanes) reconciled; PRIMARY overrides recorded.
 2. [DONE] R3-C0 contract freeze (`docs/work/R3_INTEGRATION_CONTRACT.md`) + this ledger; commit + PUSH.
-3. Fan out write lanes A/B/C/D from the C0 SHA on clearly-owned paths; V verifies independently.
-4. R3-C1 → C5 per the checkpoint table, committing and pushing at each.
+3. [DONE] Lanes A (C1 runtime composition), D (C4 causal-spine layout), B part 1 (C2.1 product seam) committed + pushed.
+4. [DONE] Lane B part 2 (C2.2): migrated `b1RecoveryLoop` + `b1SarahWorldRecovery` to the
+   `{ ok, result }` coordinator contract via `app.runtimeHooks.planner`; NEW
+   `b1ProductPlanningCoordinator.pgtest.ts` (200/AWAITING_AUTHORITY/evidence/idempotency/404/409);
+   NEW pure `r3-import-guard.test.ts` 7/7; suites registered; boundary 231 CLEAN.
+   Commit `4f3de02` pushed.
+5. [PENDING] Lane C (`r3ComposedB1Full.pgtest.ts`) → R3-C3 commit; Lane V audit findings.
+6. R3-C5 Cloud integration run + ledger + final report.
 
 ---
 
