@@ -442,20 +442,60 @@ test('the operator shell serves Overview / Programme / Decisions / Activity, rea
   }
 });
 
-test('demo reset refuses to layer a second world onto a provisioned dataset', async () => {
+/**
+ * Hermetic process env for the reset route: the handler reads `process.env`
+ * (and dotenv files) for the demo gate, so every variable the gate depends on
+ * is set explicitly here and restored afterwards. A developer's `.env.local`
+ * can therefore neither open nor close the gate for this test.
+ */
+async function withDemoResetEnv<T>(fn: () => Promise<T>): Promise<T> {
+  const keys = ['NORTHSTAR_DEMO_DATASET_DIR', 'NORTHSTAR_DEMO_RESET', 'APP_ENVIRONMENT', 'NORTHSTAR_OPERATOR_AUTH_SUBJECT'];
+  const previous = new Map(keys.map((key) => [key, process.env[key]]));
+  process.env.NORTHSTAR_DEMO_DATASET_DIR = BUNDLE_DIR;
+  process.env.NORTHSTAR_DEMO_RESET = '1';
+  process.env.APP_ENVIRONMENT = 'local';
+  // An explicit empty value wins over dotenv files (see mergeEnvWithDotenvFiles).
+  process.env.NORTHSTAR_OPERATOR_AUTH_SUBJECT = '';
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+test('demo reset rebuilds the same world once (R4 real reset) and single-flights a concurrent reset', async () => {
+  // R4 intentionally replaced the old "refuse with 409 DEMO_DATASET_PROVISIONED"
+  // behaviour with a real workspace-scoped reset: it deletes the demo workspace's
+  // rows and deterministically re-provisions the same bundle (200). A second reset
+  // for the same workspace while one runs is answered 409 RESET_IN_PROGRESS.
   const { workspaceId } = world;
   const app = await composeTargetApplication({ workspaceId });
-  const previousDir = process.env.NORTHSTAR_DEMO_DATASET_DIR;
-  process.env.NORTHSTAR_DEMO_DATASET_DIR = BUNDLE_DIR;
   try {
-    const travellersBefore = await count(workspaceId, 'travellers');
-    const response = await post(app, '/api/v2/demo/reset');
-    assert.equal(response.status, 409);
-    assert.match(response.body, /DEMO_DATASET_PROVISIONED/);
-    assert.equal(await count(workspaceId, 'travellers'), travellersBefore, 'no second world was seeded');
+    await withDemoResetEnv(async () => {
+      const expectedTravellers = dataset.programme.importDraft.travellers.length;
+      const first = post(app, '/api/v2/demo/reset');
+      const second = post(app, '/api/v2/demo/reset');
+      const [firstResponse, secondResponse] = await Promise.all([first, second]);
+
+      assert.equal(firstResponse.status, 200, firstResponse.body);
+      const firstBody = JSON.parse(firstResponse.body) as { ok: boolean; workspaceId: string; deletedRows: number; provisioning: string };
+      assert.equal(firstBody.ok, true);
+      assert.equal(firstBody.workspaceId, workspaceId);
+      assert.ok(firstBody.deletedRows > 0, 'the previous world was actually deleted');
+      assert.equal(firstBody.provisioning, 'MATERIALIZED', 'the same bundle was re-materialized');
+
+      assert.equal(secondResponse.status, 409, secondResponse.body);
+      assert.match(secondResponse.body, /RESET_IN_PROGRESS/);
+
+      // One world, not two: the population is exactly the bundle's roster.
+      assert.equal(await count(workspaceId, 'travellers'), expectedTravellers, 'reset produced one world, not a layered second one');
+      assert.equal(await count(workspaceId, 'programmes'), 1);
+      assert.equal(await count(workspaceId, 'events'), 1);
+    });
   } finally {
-    if (previousDir === undefined) delete process.env.NORTHSTAR_DEMO_DATASET_DIR;
-    else process.env.NORTHSTAR_DEMO_DATASET_DIR = previousDir;
     await app.close();
   }
 });
@@ -493,7 +533,8 @@ test('boot does nothing when no demo dataset is configured', async () => {
     pool,
     workspaceId,
     actorPrincipalId: ACTOR,
-    env: {} as NodeJS.ProcessEnv,
+    // Hermetic: an explicit empty value wins over a developer .env/.env.local dataset dir.
+    env: { NORTHSTAR_DEMO_DATASET_DIR: '' } as NodeJS.ProcessEnv,
   });
   assert.equal(outcome.status, 'NOT_CONFIGURED');
   assert.equal(await count(workspaceId, 'travellers'), 0);
