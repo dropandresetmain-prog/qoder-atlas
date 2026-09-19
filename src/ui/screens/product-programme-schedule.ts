@@ -14,7 +14,7 @@ import {
   type ProgrammeSurfaceItem,
   type ProgrammeSurfaceView,
 } from '../../app/target/adapters/programmeAdapter.ts';
-import { caseHref } from '../../app/target/productShell.ts';
+import { caseHref, travellerHref } from '../../app/target/productShell.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 import { renderProgrammeTimeSwapController } from '../programme-time-swap-controller.ts';
 
@@ -88,6 +88,98 @@ function timeSwapSection(view: ProgrammeSchedule): string {
   </section>`;
 }
 
+function populationSummary(view: ProgrammeSurfaceView): string {
+  const summary = view.populationSummary;
+  if (!summary) return '';
+  return `
+  <section class="section" aria-label="Programme population" data-poll-region="programme-population" data-test="programme-population">
+    <h2>Programme population</h2>
+    <p class="sub" data-test="programme-population-scale">${summary.total} ${summary.total === 1 ? 'person' : 'people'} · ${summary.withJourney} journey${summary.withJourney === 1 ? '' : 's'} recorded · ${summary.withoutJourney} without a journey record</p>
+    <div class="tiles" role="group" aria-label="Current readiness summary">
+      ${tile('ready', summary.ready, 'Current checks okay', 'ok')}
+      ${tile('disrupted', summary.disrupted, 'Needs attention', summary.disrupted > 0 ? 'watch' : 'ok', true)}
+      ${tile('unknown', summary.unknown, 'Needs information', summary.unknown > 0 ? 'neutral' : 'ok')}
+    </div>
+  </section>`;
+}
+
+function firstJourneyHref(travellerRef: string, travellers: ProgrammeSurfaceView['travellers']): string | undefined {
+  const traveller = travellers.find((entry) => entry.travellerRef === travellerRef);
+  const journey = traveller?.journeyRefs[0];
+  return journey ? travellerHref(journey) : undefined;
+}
+
+function caseLinks(caseRefs: readonly string[]): string {
+  return caseRefs
+    .map((caseRef) => `<a class="tag" href="${escapeHtml(caseHref(caseRef))}" data-test="programme-roster-case-link">Open case →</a>`)
+    .join(' ');
+}
+
+function endangeredSection(view: ProgrammeSurfaceView): string {
+  if (view.endangeredCommitments.length === 0) return '';
+  return `
+  <section class="section" aria-label="Endangered commitments" data-poll-region="programme-endangered" data-test="programme-endangered">
+    <h2>Endangered commitments <span class="count c-alert">${view.endangeredCommitments.length}</span></h2>
+    ${view.endangeredCommitments.map((item) => {
+      const affectedLinks = item.affectedTravellerRefs.map((ref, index) => {
+        const href = firstJourneyHref(ref, view.travellers);
+        const traveller = view.travellers.find((entry) => entry.travellerRef === ref);
+        const label = traveller?.label ?? item.affectedTravellerLabels[index] ?? 'Traveller';
+        return href
+          ? `<a href="${escapeHtml(href)}" data-test="programme-endangered-traveller-link">${escapeHtml(label)}</a>`
+          : `<span>${escapeHtml(label)}</span>`;
+      }).join(', ');
+      return `<div class="callout tone-alert" data-test="programme-endangered-item">
+        <h3>${escapeHtml(item.label)}</h3>
+        <p>${escapeHtml(item.reason)} ${affectedLinks ? `Affected: ${affectedLinks}.` : ''}</p>
+        ${caseLinks(item.caseRefs)}
+      </div>`;
+    }).join('')}
+  </section>`;
+}
+
+function missingInformationSection(view: ProgrammeSurfaceView): string {
+  if (view.missingInformation.length === 0) return '';
+  return `
+  <section class="section" aria-label="Missing traveller information" data-poll-region="programme-missing-information" data-test="programme-missing-information">
+    <h2>Missing traveller information <span class="count">${view.missingInformation.length}</span></h2>
+    <div class="panel"><ul class="plain-list">
+      ${view.missingInformation.map((entry) => {
+        const href = firstJourneyHref(entry.travellerRef, view.travellers);
+        const label = href ? `<a href="${escapeHtml(href)}" data-test="programme-missing-traveller-link">${escapeHtml(entry.label)}</a>` : escapeHtml(entry.label);
+        return `<li><span class="ic ic-unknown" aria-hidden="true">?</span><span><strong>${label}</strong> — ${escapeHtml(entry.reason)}</span></li>`;
+      }).join('')}
+    </ul></div>
+  </section>`;
+}
+
+function travellerRoster(view: ProgrammeSurfaceView): string {
+  if (view.travellers.length === 0) return '';
+  const rows = view.travellers.map((traveller) => {
+    const journeyHref = traveller.journeyRefs[0] ? travellerHref(traveller.journeyRefs[0]) : undefined;
+    const status = traveller.status === 'READY' ? 'Ready' : traveller.status === 'DISRUPTED' ? 'Needs attention' : traveller.status === 'UNKNOWN' ? 'Needs information' : 'No journey record';
+    const statusTone = traveller.status === 'READY' ? 'ok' : traveller.status === 'DISRUPTED' ? 'watch' : 'neutral';
+    const name = journeyHref
+      ? `<a href="${escapeHtml(journeyHref)}" data-test="programme-traveller-link"><strong>${escapeHtml(traveller.label)}</strong></a>`
+      : `<strong>${escapeHtml(traveller.label)}</strong>`;
+    return `<tr data-test="programme-traveller-row" data-search-text="${escapeHtml(traveller.label.toLowerCase())}">
+      <td>${name}</td>
+      <td>${traveller.journeyRefs.length > 0 ? `${traveller.journeyRefs.length} journey${traveller.journeyRefs.length === 1 ? '' : 's'}` : '—'}</td>
+      <td><span class="badge tone-${statusTone}">${status}</span></td>
+      <td>${caseLinks(traveller.caseRefs)}</td>
+    </tr>`;
+  }).join('');
+  return `
+  <section class="section" aria-label="Traveller roster" data-poll-region="programme-roster" data-test="programme-roster">
+    <div class="section-head"><h2>Traveller roster <span class="count">${view.travellers.length}</span></h2><label class="kv-label">Search travellers <input type="search" placeholder="Search by name" data-programme-traveller-search></label></div>
+    <div class="panel table-wrap"><table class="traveller-table" style="table-layout:fixed;width:100%">
+      <thead><tr><th scope="col">Traveller</th><th scope="col">Journeys</th><th scope="col">Current state</th><th scope="col">Case</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <script>(function(){const input=document.querySelector('[data-programme-traveller-search]');if(!input)return;const rows=[...document.querySelectorAll('[data-test="programme-traveller-row"]')];input.addEventListener('input',function(){const q=input.value.trim().toLowerCase();rows.forEach(function(row){row.hidden=Boolean(q)&&!(row.getAttribute('data-search-text')||'').includes(q);});});})();</script>
+  </section>`;
+}
+
 export function renderProgrammeSurface(view: ProgrammeSurfaceView, schedule?: ProgrammeSchedule): string {
   const scheduledCount = view.days
     .filter((day) => day.dateLabel !== 'Not yet scheduled')
@@ -119,7 +211,11 @@ export function renderProgrammeSurface(view: ProgrammeSurfaceView, schedule?: Pr
     ${tile('in-person', inPerson, 'In person', 'neutral')}
     ${tile('unscheduled', view.sessionCount - scheduledCount, 'Not yet scheduled', 'neutral')}
   </div>
+  ${populationSummary(view)}
+  ${endangeredSection(view)}
   ${attentionSection(view)}
+  ${missingInformationSection(view)}
+  ${travellerRoster(view)}
   ${timeline}
   ${schedule ? timeSwapSection(schedule) : ''}
 </main>`;

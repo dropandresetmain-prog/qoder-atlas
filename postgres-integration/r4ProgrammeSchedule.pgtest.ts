@@ -7,22 +7,57 @@ import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
-import { openDisruptionCase } from './r1ProgrammeWorld.ts';
+import { openDisruptionCase, seedProgrammeWorld } from './r1ProgrammeWorld.ts';
+import { attachSeedSession, commitSeed, rollbackSeed } from './m2Seed.ts';
+import { seedParticipation } from './m4Seed.ts';
 import { persistStrategyChangeRow } from './m8ExecutionGateHelpers.ts';
 import { ActivityCursorError, loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts.ts';
 import { renderProductActivityFeed } from '../src/ui/screens/product-activity-feed.ts';
 import { issueAuthorityDecision, persistActionPlan, recordApproval, revokeApproval } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
-import { DecisionQueueSchema } from '../src/contracts/v2/product/readModels.ts';
+import { DecisionQueueSchema, ProgrammeScheduleSchema } from '../src/contracts/v2/product/readModels.ts';
 
 after(async () => { await (await sharedTestPool()).end(); });
 
 test('loadProgrammeSchedule runs on PG and reports the affected case per item', async () => {
-  const c = await openDisruptionCase('r4 programme schedule');
+  const c = await openDisruptionCase('r4 programme schedule', undefined, {
+    seed: async (label, spec) => {
+      const world = await seedProgrammeWorld(label, spec);
+      const seed = await attachSeedSession((await sharedTestPool()), world.workspaceId, world.actorId);
+      let committed = false;
+      try {
+        // The same failed Journey has one required commitment that fails and a
+        // second required commitment whose own participation remains feasible.
+        await seedParticipation(seed, {
+          programmeItemId: world.peerItemId,
+          travellerId: world.people[0]!.travellerId,
+          obligation: 'REQUIRED',
+          accepted: true,
+        });
+        await commitSeed(seed);
+        committed = true;
+        return world;
+      } finally {
+        if (!committed) await rollbackSeed(seed);
+      }
+    },
+  });
   const schedule = await loadProgrammeSchedule(c.pool, c.world.workspaceId);
+  ProgrammeScheduleSchema.parse(schedule);
   assert.ok(Array.isArray(schedule.items));
   assert.ok(schedule.items.length > 0, 'the world has programme items');
+  assert.ok(schedule.populationSummary);
+  assert.equal(schedule.populationSummary!.total, schedule.travellers!.length);
+  assert.ok(schedule.travellers!.some((traveller) => traveller.journeyRefs.includes(c.world.people[0]!.journeyId)));
+  assert.equal(new Set(schedule.items.map((item) => item.itemRef)).size, schedule.items.length, 'schedule items are not duplicated by participation rows');
+  assert.ok(schedule.items.some((item) => item.affectedCaseRef), 'an affected programme item keeps its case link');
+  assert.ok(schedule.endangeredCommitments?.some((commitment) => commitment.caseRefs.length > 0), 'endangered commitments keep case links');
+  assert.ok(schedule.endangeredCommitments?.every((commitment) => new Set(commitment.affectedTravellerRefs).size === commitment.affectedTravellerRefs.length));
+  const endangeredRefs = new Set(schedule.endangeredCommitments?.map((commitment) => commitment.commitmentRef));
+  assert.ok(endangeredRefs.has(`PROGRAMME_ITEM:${c.world.earlyItemId}`), 'the failing required participation endangers its own item');
+  assert.equal(endangeredRefs.has(`PROGRAMME_ITEM:${c.world.peerItemId}`), false, 'an unrelated required participation on the failed Journey stays safe');
+  assert.equal(schedule.items.find((item) => item.itemRef === `PROGRAMME_ITEM:${c.world.peerItemId}`)?.affectedCaseRef, undefined);
 });
 
 test('Decision history reads approvals and revocations through their case plan without changing Waiting now', async () => {
