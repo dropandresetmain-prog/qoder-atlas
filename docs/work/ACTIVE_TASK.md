@@ -32,7 +32,8 @@
 ## Lanes and preserved work
 
 - Terra A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, branch `codex/a3-jordan-connection-foundation`: PG1/1 baseline160m PASS→D1 95m PASS→D2 30m FAIL opens Case→D3 -65m FAIL same Case. Not integrated; register new test at integration. Minimum new-STAY contract investigation returned. Current Terra lane: durable model activity metadata; Luna lanes: provider provenance/recovery wording and exact programme participation graph truth. Isolated branches; focused tests only.
-- Luna prior registry, Case timezone/approval and importer test closures integrated. A2 follow-ons are bounded as above.
+- Luna prior registry, Case timezone/approval and importer test closures integrated. A2 provider display5df1196 integrated (56/56); Terra metadata312c6816 integrated (17unit,5PG+15PG). Model UI and exact participation projection lanes finishing.
+- A3 data preparation pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`, 4focused+TypeScript; not integrated. Safe dossier-only regeneration preserves accepted programme.
 - Rejected importer namespace change `7b8236ed` remains isolated; do not merge (retry/duplicate risk).
 - Request planner `be69d056` and partial untested `codex/astra-a1-request-gates` work remain isolated; never merge as-is. Untested `codex/a1-request-authority` two-file draft also preserved.
 - Request admission/persistence groundwork is integrated but normal submission unwired; no healthy-trip planning claim.

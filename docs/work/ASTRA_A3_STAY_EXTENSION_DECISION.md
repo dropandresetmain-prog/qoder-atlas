@@ -71,3 +71,48 @@ and [Japan Embassy Singapore FAQ](https://www.sg.emb-japan.go.jp/itpr_en/visa_fa
 These are sources to retrieve with provenance and evaluate against declared travel-document
 facts; they do not establish any traveller's admission. Programme/input pack says SG while
 booking dossier says US: reconcile authoritative fixture truth before provider use.
+
+## Additional bounded composition findings — 2026-09-20
+
+**WHAT WE KNOW:** `coordinatorCore.ts` currently researches before running per-domain
+proposers and evaluates each candidate immediately. A flight and a necessary overnight
+stay must be evaluated as one effect set; independently approving two incomplete options
+is not whole-trip recovery. Existing `deriveEncounters` derives transit from transport and
+entry from intended visits, but not landside entry from an added stay. Overnight coverage
+is enforced only when an `overnight_accommodation_required` constraint is present; current
+normal dataset materialization does not load that requirement.
+
+**WHAT WE DO NOT KNOW:** the smallest shared evidence/proposer binding needed to propose
+flight-plus-stay candidates; which existing typed visit/credential commands can supply the
+landside encounter in the proposed world; current sandbox-safe protected contact inputs.
+
+**KEY ASSUMPTION:** one bounded multi-effect proposer/evidence composition can reuse the
+existing coordinator, RC-6 and action plan. Required accommodation/entry semantics must be
+explicit typed source/proposal facts. Neither UI context nor successful flight booking can
+substitute for their deterministic assessment.
+
+**WHAT SHOULD BE TESTED NEXT:** after A2, prove a synthetic flight-only candidate fails a
+real overnight requirement, a flight-plus-stay candidate still stays UNKNOWN without entry
+coverage, and the fully evidenced composite passes. Do not implement isolated hotel booking
+and claim this composite planning seam is complete.
+
+Canonical observation decision: existing public commands each open their own transaction.
+Do not nest them and call the result atomic. Prefer one bounded typed observed-stay command
+using existing repositories, validation, aggregate revision locks, audit/outbox and receipt
+rules for item/reservation/line/allocation, with zero partial canonical graph on failure.
+Exact API contract is still to be frozen after A2.
+
+- **Act Now for A3:** composite proposal and entry encounter/evidence composition; omission
+  would permit a false flight-only recovery or make the required overnight unplannable.
+- **Investigate Now for A4/A5:** Reset currently removes workspace execution state. Establish
+  safe handling of unresolved external outcomes and confirmed sandbox bookings before repeat
+  hero runs; do not delete reconciliation identity and then redispatch blindly.
+- **Park for Later:** broad full-programme regeneration alignment. The historical generator
+  currently drops accepted provider/place/itinerary enrichment; do not rebuild the accepted
+  programme wholesale merely to fix a dossier. Revisit when full source regeneration is needed.
+
+Prepared data closure (not integrated into A2): `codex/a3-canonical-dossier-reconciliation`
+@ `710faf584fbb49b96e58ff0fd289e22536bbe152`, four focused tests and TypeScript passed.
+Windows path normalization fixes silently skipped dossier discovery; `--dossiers-only`
+regenerates SG nationality and source stay dates without touching `programme.json`.
+The contradictory overnight-baseline note is corrected; no gender/contact facts invented.
