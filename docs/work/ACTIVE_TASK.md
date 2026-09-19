@@ -13,7 +13,7 @@
 - Recon (scratchpad `recon/`): legacy-archaeology, current-frontend-defects, backend-gaps, graph-gaps. Key root causes: overview queue-replaces-population (`operatorOverviewAdapter.ts:254`); poll `outerHTML` swap + listener bound to replaced node (`casePolling.ts:70`, `product-recovery-case.ts:421-462`); reset 409 (`targetHttpHandlers.ts:467`); G01 `DEFAULT_CAPABILITIES` (`recoveryPlanningCoordinator.ts:110`); no CGK->SIN Atlas recording; Qwen client never built at boot (and gated on ADAPTER_MODE); preferences reader absent.
 - Checkpoints: R4-C0 contract frozen (this commit). Others: pending.
 - Provider state: Atlas sandbox creds + Model Studio key present in `.env.local` (names only checked). Qwen state: not composed. Reset state: not implemented. Browser defects/backend defects: see recon list above.
-- Next action: dispatch lanes A,B,C,D,E1,E2,H.
+- Lanes A,B,C,D,E1,E2,H dispatched (2026-09-19). Next: integrate lane branches r4/<lane> in order D(G01) -> A -> E1 -> B -> H -> E2 -> C, then focused Sarah browser run.
 
 ---
 
