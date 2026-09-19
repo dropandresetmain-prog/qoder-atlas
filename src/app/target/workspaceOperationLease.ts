@@ -8,6 +8,27 @@ import type { Pool, PoolClient } from '../../persistence/postgres/pool.ts';
 
 const LEASE_NAMESPACE = 'northstar:workspace-operation';
 
+function poolReleaseError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(`Could not release workspace operation lease: ${String(error)}`);
+}
+
+/**
+ * An advisory lock belongs to this PostgreSQL session. If its unlock query
+ * fails, discard that session so node-postgres closes it and cannot hand a
+ * possibly lock-holding connection to another operation. Cleanup deliberately
+ * remains best-effort so it never replaces the operation error from a caller's
+ * `finally` block.
+ */
+async function unlockAndReleaseClient(client: PoolClient, workspaceId: string): Promise<void> {
+  try {
+    await client.query(`SELECT pg_advisory_unlock(hashtext($1), hashtext($2))`, [LEASE_NAMESPACE, workspaceId]);
+  } catch (error) {
+    client.release(poolReleaseError(error));
+    return;
+  }
+  client.release();
+}
+
 export interface WorkspaceOperationLease {
   readonly client: PoolClient;
   release(): Promise<void>;
@@ -36,18 +57,15 @@ export async function tryAcquireWorkspaceOperationLease(
     return {
       client,
       async release() {
-        try {
-          await client.query(`SELECT pg_advisory_unlock(hashtext($1), hashtext($2))`, [LEASE_NAMESPACE, workspaceId]);
-        } finally {
-          client.release();
-        }
+        await unlockAndReleaseClient(client, workspaceId);
       },
     };
   } catch (error) {
     if (held) {
-      await client.query(`SELECT pg_advisory_unlock(hashtext($1), hashtext($2))`, [LEASE_NAMESPACE, workspaceId]).catch(() => undefined);
+      await unlockAndReleaseClient(client, workspaceId);
+    } else {
+      client.release();
     }
-    client.release();
     throw error;
   }
 }

@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetDemoWorkspace } from '../src/app/demo/demoReset.ts';
+import { tryAcquireWorkspaceOperationLease } from '../src/app/target/workspaceOperationLease.ts';
 import { renderShellRuntimeScript } from '../src/ui/shellRuntime.ts';
 
 const env = {
@@ -53,4 +54,40 @@ test('client reset control is single-flight with a page-level busy overlay', () 
   assert.ok(/existing\.state\s*===\s*["']pending["']/.test(script));
   // The overlay is removed when the request fails so the user can retry.
   assert.match(script, /hideBusyOverlay\(\)/);
+});
+
+test('a failed advisory unlock evicts its session without replacing the operation failure', async () => {
+  const unlockFailure = new Error('connection lost while unlocking');
+  let queries = 0;
+  let releasedWith: Error | boolean | undefined;
+  const client = {
+    async query() {
+      queries += 1;
+      if (queries === 1) {
+        return { rows: [{ ok: true }] };
+      }
+      throw unlockFailure;
+    },
+    release(error?: Error | boolean) {
+      releasedWith = error;
+    },
+  };
+  const pool = { connect: async () => client } as never;
+  const lease = await tryAcquireWorkspaceOperationLease(pool, 'ws-unlock-failure');
+  assert.ok(lease);
+
+  const operationFailure = new Error('the protected operation failed');
+  let observedFailure: unknown;
+  try {
+    try {
+      throw operationFailure;
+    } finally {
+      await lease.release();
+    }
+  } catch (error) {
+    observedFailure = error;
+  }
+
+  assert.equal(observedFailure, operationFailure);
+  assert.equal(releasedWith, unlockFailure);
 });
