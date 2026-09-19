@@ -105,7 +105,13 @@ export interface BuildSceneInput {
 }
 
 export function buildGraphScene(input: BuildSceneInput): GraphScene {
-  const { ldg, focusedGraph } = input;
+  const { focusedGraph } = input;
+  // Historical Original payloads stay immutable. Workflow plumbing is omitted
+  // from their presentation just as it is from the current semantic graph.
+  const visibleNodes = input.ldg.nodes.filter((node) => node.kind !== 'RECOVERY_PROPOSAL');
+  const visibleRefs = new Set(visibleNodes.map((node) => node.ref));
+  const ldg: LiveDependencyGraph = { ...input.ldg, nodes: visibleNodes,
+    edges: input.ldg.edges.filter((edge) => visibleRefs.has(edge.fromRef) && visibleRefs.has(edge.toRef)) };
   const causalRefs = focusedGraph?.causalNodeRefs ?? [];
   const causalEdgeIds = new Set(focusedGraph?.causalEdgeIds ?? []);
   const causalEdgeIndices = ldg.edges

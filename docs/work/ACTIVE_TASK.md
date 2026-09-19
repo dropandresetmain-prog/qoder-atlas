@@ -1,6 +1,7 @@
 # ACTIVE TASK — POST-R4 CONVERGENCE / A1 IN PROGRESS
 
 - Goal: legacy-quality frontend, faithful V5.6/V7.2, physical Sarah and Jordan through one generalized PostgreSQL recovery engine.
+- Founder steering after connection interruption: **continue and pause at A1**. Do not proceed to A2–A5 after accepting/pushing A1.
 - Immutable accepted R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
 - Primary: `integration/astra-post-r4`; `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Accepted/pushed A0 SHA: `f55899b15200de692dd749bbcfb795c67f6a22e0` (remote verified). Current integration work starts from that checkpoint.
@@ -29,16 +30,19 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-Active A1 lanes: Case semantics Terra on `codex/astra-a1-case-semantics` (review corrections after a9fcd61); Programme preview Luna on `codex/astra-a1-programme-preview`. Navigation Luna ready at `6a80c01`; Overview layout Luna ready at `f893972`. Isolated worktrees/databases. Existing R4/PG-perf worktrees and root untracked work remain untouched.
+Active A1 lanes: Overview semantics Terra `codex/astra-a1-overview-semantics`; Traveller read restoration Luna `codex/astra-a1-traveller-read`; Decisions history Luna `codex/astra-a1-decision-history`. Shared schema/assembler sections have explicit disjoint ownership. Navigation, Overview layout, programme preview and Case semantics are integrated. Existing R4/PG-perf worktrees and root untracked work remain untouched.
 
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
-- Current pushed primary before Activity checkpoint: `b7627bd31192f0d425ada2e0063dcc3590d6ff0f`.
+- Current pushed primary before Case presentation follow-on: `4f98aec` (Activity, navigation, Overview geometry, programme preview, Case semantics and Overview handoff).
 - Activity: 20-row keyset pagination; focused PG shell file 2/2 passed on `astra_a1_shell` (timestamp ties, microseconds, inserted new row, complete history, invalid/cross-workspace cursor); direct TypeScript passed. Browser proof pending restart.
 - Navigation ready: 45 focused tests and direct TypeScript passed; explicit Traveller event context replaces brittle HTML rewriting.
 - Overview layout ready: 10 focused geometry tests and direct TypeScript passed. Dependency rows no longer overlap programme; same-day cohorts stack. Physical merged proof pending.
+- Integrated Case follow-on: arrival-before-commitment emphasis, explicit failed arrival relation, formatted timing, historical workflow presentation omission without snapshot mutation. 33 renderer/enrichment tests pass; focused causal tests pass (11); primary PG Case seam 7/7 on `astra_a1_shell`; direct TypeScript passes. One test initially lacked its import, corrected with focused closure.
+- Physical navigation: 1–10 of 67 roster; search Sarah returns real Case and Traveller links; Show interaction opens separate traveller shell with event context. Screenshot exposed engine copy/missing itinerary and inappropriate implied traveller authority, now owned by Traveller lane.
+- Physical polling finding: summary stayed stale while graph changed after supplier input. Primary adds summary/heading refresh regions; integrated browser closure pending.
 - Primary normal boot/browser baseline: `astra_product`, workspace `9ef64348-61b2-4e18-a291-152502a89a02`, port 4120; REPLAY, Qwen absent, execution absent; 52 PASS / 15 UNKNOWN, visible 52/67. No LIVE/provider calls.
 - New convergence counters: **postgres:fast = 0; CURRENT_TARGET = 0; full canonical PG = 0**.
 - Reused R4 counters: 1/1/1, with focused closures; opaque currentness suite-only failure remains Investigate Now. Do not claim all three broad runs were clean.
@@ -55,7 +59,7 @@ Active A1 lanes: Case semantics Terra on `codex/astra-a1-case-semantics` (review
 
 ## Exact next action / stop-safe handoff
 
-Commit/push Activity checkpoint, integrate navigation and Overview layout, then restart isolated product for physical paging/navigation/graph checks. Integrate Case semantics after focused review corrections. Freeze Overview semantic follow-on; restore remaining Programme/Decisions/Traveller jobs. A1 acceptance remains pending.
+Commit/push Case presentation/polling follow-on. Integrate active semantic/read lanes; complete Overview compact readability and remaining Programme/Traveller jobs; run integrated browser checks and appropriate A1 gates. Pause only after A1 is genuinely accepted/pushed; no A2 execution.
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
 Remaining action-seam findings: programme bilateral preview is real but unwired; generic programme preview/commit and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope.

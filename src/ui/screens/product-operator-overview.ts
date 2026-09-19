@@ -19,13 +19,13 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
   const reconciling = lifecycle.state === 'RECONCILING';
   return `
 <main class="shell product-operator-overview" data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle.state}" data-assessment-pending-count="${lifecycle.pendingCount}" data-stable-revision="${view.change.projectionRevision}">
-  <div class="page-head">
+  <div class="page-head" data-poll-region="overview-heading">
     <h1>${escapeHtml(surface.title)}</h1>
-    <p class="sub">Managed travel readiness across the programme — state colour follows status meaning.</p>
+    <p class="sub">Who is on track, what changed, and where your attention is needed.</p>
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
     <p class="sub" data-test="overview-reconciling"${reconciling ? '' : ' hidden'}>Reconciling changes…</p>
   </div>
-  ${surface.summaryHtml}
+  <div data-poll-region="overview-summary">${surface.summaryHtml}</div>
   ${renderOverviewGraphAssets()}
   ${renderEventOverviewGraph(view)}
   <details class="section" data-test="simulated-airline-update" data-configured="${airlineConfigured ? "true" : "false"}">

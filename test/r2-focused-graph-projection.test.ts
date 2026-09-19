@@ -154,6 +154,25 @@ test('A1: a third presentation mapping cannot restore an ambiguous canonical sub
   assert.equal(focused?.unmappedCausalSteps[0]?.subjectRef, 'TRANSPORT_SERVICE:s1');
 });
 
+test('A1: an evidenced arrival precedes the commitment it prevents, with the traveller kept in context', () => {
+  const ldg = graph([
+    ...programmeNodes,
+    { ref: 'SERVICE_BOOKING:inbound', kind: 'SERVICE_BOOKING', label: 'Replacement flight', semanticState: 'UNKNOWN' },
+    { ref: 'TIMING:arrival', kind: 'TIMING', label: 'Arrival timing', semanticState: 'FAILED', subjectRefs: ['JOURNEY_ITEM:inbound'], timing: { currentAt: NOW } },
+  ], [
+    ...programmeEdges,
+    { id: 'arrival-result', fromRef: 'SERVICE_BOOKING:inbound', toRef: 'TIMING:arrival', kind: 'MUST_HAPPEN_BEFORE' },
+    { id: 'arrival-break', fromRef: 'TIMING:arrival', toRef: 'PROGRAMME_ITEM:p1', kind: 'MUST_HAPPEN_BEFORE', semanticState: 'FAILED' },
+  ]);
+  const focused = projectFocusedGraph(ldg, [{
+    ...step('JOURNEY:j1', 'programme_participation', 'insufficient_arrival_readiness', ['JOURNEY_ITEM:inbound', 'PROGRAMME_ITEM:p1']),
+    causeSubjectRef: 'PROGRAMME_ITEM:p1',
+  }]);
+  assert.equal(focused?.firstBreakpoint?.nodeRef, 'TIMING:arrival');
+  assert.deepEqual(focused?.causalNodeRefs, ['sig:s1', 'SERVICE_BOOKING:inbound', 'TIMING:arrival', 'PROGRAMME_ITEM:p1']);
+  assert.ok(focused?.causalEdgeIds.includes('arrival-break'));
+});
+
 test('R2: a causal step with no visible node is an explicit honest gap', () => {
   // The connection case references a transfer subject that the sparse focused
   // graph does not carry as a visible node.

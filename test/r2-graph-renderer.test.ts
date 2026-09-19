@@ -10,6 +10,7 @@ import type { LiveDependencyGraph, FocusedGraphView } from '../src/contracts/v2/
 import { renderFocusedCaseGraph } from '../src/ui/graph/index.ts';
 import { computeLayout } from '../src/ui/graph/layout.ts';
 import { presentDependencyGraph } from '../src/ui/semantics/adapter.ts';
+import { buildGraphScene } from '../src/ui/graph/scene.ts';
 
 // Helper: build a minimal valid LDG
 function makeLdg(overrides?: Partial<LiveDependencyGraph>): LiveDependencyGraph {
@@ -44,6 +45,21 @@ test('determinism: same input produces identical HTML', () => {
   const html2 = renderFocusedCaseGraph({ ldg, focusedGraph, caseStatus: 'OPEN' });
 
   assert.equal(html1, html2, 'Renderer must be deterministic');
+});
+
+test('arrival cards format supplied instants and historical workflow omission does not mutate Original', () => {
+  const original = makeLdg({ nodes: [
+    { ref: 'workflow', kind: 'RECOVERY_PROPOSAL', label: 'Workflow plumbing', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
+    { ref: 'arrival', kind: 'TIMING', label: 'Arrival timing', semanticState: 'CHANGED', authority: 'AUTHORITATIVE',
+      timing: { currentAt: '2031-05-01T08:00:00.000Z', publishedAt: '2031-05-01T06:00:00.000Z', timeZone: 'Asia/Singapore' } },
+  ], edges: [] });
+  const before = JSON.stringify(original);
+  const scene = buildGraphScene({ ldg: original, role: 'original' });
+  assert.equal(JSON.stringify(original), before);
+  assert.equal(scene.nodes.some((node) => node.ref === 'workflow'), false);
+  assert.match(scene.nodes[0]!.html, /16:00/);
+  assert.match(scene.nodes[0]!.html, /Published:.*14:00/);
+  assert.match(scene.nodes[0]!.html, /datetime="2031-05-01T08:00:00.000Z"/);
 });
 
 test('layout: chain graph assigns correct ranks', () => {

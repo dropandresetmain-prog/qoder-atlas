@@ -33,11 +33,7 @@ export function renderProgrammeTimeSwapController(): string {
     return 'The time-swap preview could not be completed. Your programme was not changed. Try again.';
   }
 
-  function commandItemRef(ref) {
-    return ref.indexOf('PROGRAMME_ITEM:') === 0
-      ? ref.slice('PROGRAMME_ITEM:'.length)
-      : ref;
-  }
+  var commandItemRef = ${programmeItemCommandRef.toString()};
 
   function init(root) {
     if (root.__programmeTimeSwapInit) return;

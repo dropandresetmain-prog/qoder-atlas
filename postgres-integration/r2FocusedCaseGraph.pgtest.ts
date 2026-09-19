@@ -69,6 +69,8 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     assert.ok(timing, 'provider delay plus real evaluator explanation projects canonical arrival timing');
     assert.equal(timing.semanticState, 'CHANGED');
     assert.ok(timing.timing?.currentAt, 'timing carries canonical effective arrival');
+    assert.equal(v.focusedGraph?.firstBreakpoint?.nodeRef, timing.ref, 'arrival is the operational breakpoint before its commitment consequence');
+    assert.ok(v.ldg.edges.some((edge) => edge.fromRef === timing.ref && edge.semanticState === 'FAILED'), 'the failed arrival-to-commitment relationship has explicit backend condition');
 
     // Composition edges are producer-owned ids, never array position (FIG-1).
     const edgeKinds = new Set(v.ldg.edges.map((e) => e.kind));

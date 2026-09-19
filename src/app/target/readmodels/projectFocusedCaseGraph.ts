@@ -482,6 +482,9 @@ export function projectFocusedCaseGraphEnrichment(
             toRef: programmeItemRef,
             kind: 'MUST_HAPPEN_BEFORE',
             authority: 'AUTHORITATIVE',
+            // This specific arrival-to-participation relationship failed in the
+            // stored evaluator explanation; no endpoint tone is substituted.
+            semanticState: 'FAILED',
           });
         }
       }

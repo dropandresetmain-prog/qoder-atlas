@@ -61,6 +61,18 @@ export function projectFocusedGraph(
     }
   }
   const resolveVisibleRef = (subjectRef: string): string | undefined => nodeForSubjectRef.get(subjectRef);
+  const nodeByRef = new Map(ldg.nodes.map((node) => [node.ref, node]));
+  const arrivalFor = (step: CausalPathStep): string | undefined => {
+    // The enrichment producer already established this arrival's evaluator role.
+    // A requirement can be the explanation cause while arrival is the earlier
+    // operational breakpoint. Only an explicit, unambiguous timing mapping qualifies.
+    const refs = [step.causeSubjectRef, ...step.relatedSubjectRefs]
+      .filter((ref): ref is string => ref !== undefined)
+      .map(resolveVisibleRef)
+      .filter((ref): ref is string => ref !== undefined && nodeByRef.get(ref)?.timing !== undefined);
+    const unique = [...new Set(refs)];
+    return unique.length === 1 ? unique[0] : undefined;
+  };
 
   const causalNodeRefs: string[] = [];
   const seenNode = new Set<string>();
@@ -75,13 +87,23 @@ export function projectFocusedGraph(
   for (const step of causalPath) {
     const causeRef = step.causeSubjectRef ? resolveVisibleRef(step.causeSubjectRef) : undefined;
     const affectedRef = resolveVisibleRef(step.subjectRef);
-    const breakpointRef = causeRef ?? affectedRef;
+    const arrivalRef = arrivalFor(step);
+    const breakpointRef = arrivalRef ?? causeRef ?? affectedRef;
     if (breakpointRef) {
+      if (arrivalRef) {
+        for (const edge of ldg.edges) {
+          if (edge.fromRef === affectedRef && nodeByRef.get(edge.toRef)?.kind === 'DISRUPTION') pushNode(edge.toRef);
+        }
+        for (const edge of ldg.edges) {
+          if (edge.toRef === arrivalRef && nodeByRef.get(edge.fromRef)?.kind === 'SERVICE_BOOKING') pushNode(edge.fromRef);
+        }
+      }
       pushNode(breakpointRef);
-      if (affectedRef) pushNode(affectedRef);
+      if (causeRef) pushNode(causeRef);
+      if (affectedRef && !arrivalRef) pushNode(affectedRef);
       for (const related of step.relatedSubjectRefs) {
         const relatedRef = resolveVisibleRef(related);
-        if (relatedRef) pushNode(relatedRef);
+        if (relatedRef && !(arrivalRef && nodeByRef.get(relatedRef)?.kind === 'TRAVELLER')) pushNode(relatedRef);
       }
     } else {
       unmappedCausalSteps.push({
@@ -102,7 +124,7 @@ export function projectFocusedGraph(
   // affected subject. Never fabricate a visual target when neither is mapped.
   const firstStep = causalPath[0];
   const firstBreakpointRef = firstStep
-    ? (firstStep.causeSubjectRef ? resolveVisibleRef(firstStep.causeSubjectRef) : undefined) ?? resolveVisibleRef(firstStep.subjectRef)
+    ? arrivalFor(firstStep) ?? (firstStep.causeSubjectRef ? resolveVisibleRef(firstStep.causeSubjectRef) : undefined) ?? resolveVisibleRef(firstStep.subjectRef)
     : undefined;
   const firstBreakpoint = firstStep && firstBreakpointRef && visibleRefs.has(firstBreakpointRef)
     ? {

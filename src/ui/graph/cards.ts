@@ -40,7 +40,15 @@ export function nodeInnerHtml(ctx: CardContext): string {
   const { presentationNode: node, isChecking } = ctx;
   const toneClass = TONE_CLASS[node.indicator.tone];
   const glyph = SEMANTIC_GLYPHS[node.indicator.glyph];
-  const detail = node.secondaryLabel
+  const timing = node.timing;
+  const formatTime = (instant: string): string => {
+    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short', timeZone: timing?.timeZone ?? 'UTC' };
+    try { return new Intl.DateTimeFormat('en-GB', options).format(new Date(instant)); }
+    catch { return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(new Date(instant)); }
+  };
+  const detail = timing
+    ? `<p class="fg-detail"><time datetime="${esc(timing.currentAt)}">${esc(formatTime(timing.currentAt))}</time>${timing.publishedAt && timing.publishedAt !== timing.currentAt ? `<br><span>Published: ${esc(formatTime(timing.publishedAt))}</span>` : ''}</p>`
+    : node.secondaryLabel
     ? `<p class="fg-detail">${esc(node.secondaryLabel)}</p>`
     : '';
   const checking = isChecking ? `<span class="fg-checking-badge">Checking…</span>` : '';
@@ -62,7 +70,7 @@ export function nodeAttrs(ctx: CardContext): Record<string, string> {
     title: node.secondaryLabel ? `${node.label} — ${node.secondaryLabel}` : node.label,
     role: 'button',
     tabindex: '0',
-    'aria-label': `${node.label} — ${node.indicator.label}`,
+    'aria-label': `${node.label} — ${node.indicator.label}${node.timing ? ` — ${node.timing.currentAt}` : ''}`,
   };
 }
 
