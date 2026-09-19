@@ -112,6 +112,31 @@ export interface TransportServiceRow {
   destination_time_zone?: string | null;
 }
 
+function transportModeLabel(mode: string): string {
+  const labels: Record<string, string> = {
+    AIR: 'flight',
+    FLIGHT: 'flight',
+    RAIL: 'train',
+    TRAIN: 'train',
+    ROAD: 'ground journey',
+    BUS: 'bus',
+    SEA: 'ferry',
+    FERRY: 'ferry',
+  };
+  const normalized = mode.trim().toUpperCase();
+  return labels[normalized] ?? (mode.trim().toLowerCase() || 'transport');
+}
+
+/** Exact reservation evidence for a journey's selected transport service. */
+export interface TransportBookingFact {
+  journeyId: string;
+  serviceId: string;
+  lineCount: number;
+  lineStatus: string | null;
+  reservationStatus: string | null;
+  observedAt?: string | null;
+}
+
 /** Minimal participation row shape (from participations table, migration 0057). */
 export interface ParticipationRow {
   id: string;
@@ -159,6 +184,8 @@ export interface FocusedCaseGraphEnrichmentInput {
   journeyItems: readonly JourneyItemRow[];
   /** Transport service rows referenced by TRANSPORT items. */
   transportServices: readonly TransportServiceRow[];
+  /** Reservation evidence joined to the exact selected service and journey item. */
+  transportBookingFacts?: readonly TransportBookingFact[];
   /** Participation rows for the case's travellers. */
   participations: readonly ParticipationRow[];
   /** Programme item rows referenced by participations. */
@@ -173,6 +200,10 @@ export interface FocusedCaseGraphEnrichmentInput {
   travellerLabelsByJourney: ReadonlyMap<string, string>;
   /** The case id (for caseRef on nodes). */
   caseId: string;
+  /** Applied linked change signal that may causally create/update a service. */
+  changeSignalRef?: string;
+  /** Service ids proven by change_records to be changed under that signal. */
+  changedTransportServiceRefs?: ReadonlySet<string>;
 }
 
 /** Output: additional nodes and edges to append to the case's ldg. */
@@ -255,6 +286,30 @@ export function projectFocusedCaseGraphEnrichment(
   // ---------------------------------------------------------------------------
   const serviceById = new Map(input.transportServices.map((s) => [s.id, s]));
   const programmeItemById = new Map(input.programmeItems.map((p) => [p.id, p]));
+  const selectedJourneysByService = new Map<string, Set<string>>();
+  for (const item of input.journeyItems) {
+    if (item.kind !== 'TRANSPORT' || !item.selectedServiceId) continue;
+    const journeys = selectedJourneysByService.get(item.selectedServiceId) ?? new Set<string>();
+    journeys.add(item.journey_id);
+    selectedJourneysByService.set(item.selectedServiceId, journeys);
+  }
+  const bookingFactByJourneyService = new Map(
+    (input.transportBookingFacts ?? []).map((fact) => [`${fact.journeyId}:${fact.serviceId}`, fact]),
+  );
+  const bookingStateFor = (serviceId: string): { state: LdgSemanticState; detail?: string } => {
+    const journeyIds = selectedJourneysByService.get(serviceId);
+    if (!journeyIds || journeyIds.size === 0) return { state: 'UNKNOWN' };
+    const facts = [...journeyIds]
+      .map((journeyId) => bookingFactByJourneyService.get(`${journeyId}:${serviceId}`));
+    const confirmed = facts.length === journeyIds.size
+      && facts.every((fact) => fact?.lineCount === 1 && fact.lineStatus === 'CONFIRMED');
+    if (!confirmed) return { state: 'UNKNOWN' };
+    const observedAt = facts.find((fact) => fact?.observedAt)?.observedAt;
+    return {
+      state: 'RECOVERED',
+      detail: `Booking line confirmed${observedAt ? ` · observed ${formatInstantUtc(observedAt)}` : ''}`,
+    };
+  };
 
   // Group journey items by journey_id.
   const itemsByJourney = new Map<string, JourneyItemRow[]>();
@@ -297,7 +352,7 @@ export function projectFocusedCaseGraphEnrichment(
         ref = `SERVICE_BOOKING:${serviceId}`;
         transportService = serviceById.get(serviceId);
         if (transportService) {
-          label = `${transportService.mode} ${transportService.operator}`;
+          label = `${transportService.operator} ${transportModeLabel(transportService.mode)}`;
           if (transportService.origin_place_name && transportService.destination_place_name) {
             detail = `${transportService.origin_place_name} → ${transportService.destination_place_name}`;
           }
@@ -324,7 +379,15 @@ export function projectFocusedCaseGraphEnrichment(
 
       itemRefs.push(ref);
 
-      const state = stateFor(ref);
+      const bookingState = item.kind === 'TRANSPORT' && item.selectedServiceId
+        ? bookingStateFor(item.selectedServiceId)
+        : undefined;
+      const state = item.kind === 'TRANSPORT'
+        ? { semanticState: bookingState?.state ?? 'UNKNOWN' as LdgSemanticState }
+        : stateFor(ref);
+      if (bookingState?.detail) {
+        detail = detail ? `${detail} · ${bookingState.detail}` : bookingState.detail;
+      }
 
       const serviceSubjectRef = item.kind === 'TRANSPORT' && item.selectedServiceId
         ? `TRANSPORT_SERVICE:${item.selectedServiceId}`
@@ -350,6 +413,18 @@ export function projectFocusedCaseGraphEnrichment(
         ...(state.evaluation ? { evaluation: state.evaluation } : {}),
         ...(detail ? { detail } : {}),
       });
+
+      if (item.kind === 'TRANSPORT' && item.selectedServiceId
+        && input.changeSignalRef && input.changedTransportServiceRefs?.has(item.selectedServiceId)) {
+        pushEdge({
+          id: `AFFECTED_BY:${input.changeSignalRef}:${ref}`,
+          fromRef: input.changeSignalRef,
+          toRef: ref,
+          kind: 'AFFECTED_BY',
+          authority: 'AUTHORITATIVE',
+          semanticState: 'CHANGED',
+        });
+      }
 
       if (item.kind === 'TRANSPORT' && transportService && currentAt && timingImplicated) {
           const timingRef = `TIMING:${item.id}:ARRIVAL`;

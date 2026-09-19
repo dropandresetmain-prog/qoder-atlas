@@ -36,11 +36,21 @@ import { formatInstantUtc } from './projectFocusedCaseGraph.ts';
 import { listRecoveryCaseAttention } from '../../../persistence/postgres/commands/caseAttentionCommands.ts';
 import { loadOriginalCaseGraphSnapshot } from '../../../persistence/postgres/commands/caseGraphSnapshotCommands.ts';
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
-import { projectFocusedCaseGraphEnrichment } from './projectFocusedCaseGraph.ts';
+import { projectFocusedCaseGraphEnrichment, type TransportBookingFact } from './projectFocusedCaseGraph.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
 function isoNow(at?: string): string {
   return at ?? new Date().toISOString();
+}
+
+const CHANGE_SIGNAL_LABELS: Readonly<Record<string, string>> = {
+  TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION: 'Booking replaced by supplier',
+  TRANSPORT_SCHEDULE_OBSERVED: 'Transport schedule observed',
+  TRIP_PURPOSE_CHANGED: 'Trip purpose changed',
+};
+
+function humanizeChangeSignal(changeType: string): string {
+  return CHANGE_SIGNAL_LABELS[changeType] ?? 'Recovery event';
 }
 
 /** Either a checked-out client already inside a transaction, or a bare pool. */
@@ -615,6 +625,29 @@ async function loadRecoveryCaseFactsInner(
     [workspaceId, caseId],
   );
 
+  // The latest linked signal is the only eligible causal source for this case.
+  // Its completion marks an applied signal; change_records below then proves
+  // whether that signal actually created or updated the selected service.
+  const signalRows = await client.query<{ id: string; origin_kind: string; change_type: string; received_at: Date; completed_at: Date | null }>(
+    `SELECT s.id, s.origin_kind, s.change_type, s.received_at, c.completed_at
+       FROM case_signals cs
+       JOIN change_signals s ON s.workspace_id = cs.workspace_id AND s.id = cs.change_signal_id
+       LEFT JOIN change_signal_completions c ON c.workspace_id = s.workspace_id AND c.change_signal_id = s.id
+      WHERE cs.workspace_id = $1 AND cs.recovery_case_id = $2
+      ORDER BY s.received_at DESC, s.id`,
+    [workspaceId, caseId],
+  );
+  const causeRow = signalRows.rows[0];
+  const cause: CaseCauseView | undefined = causeRow
+    ? {
+        changeSignalRef: `CHANGE_SIGNAL:${causeRow.id}`,
+        originKind: causeRow.origin_kind,
+        changeType: causeRow.change_type,
+        receivedAt: causeRow.received_at.toISOString(),
+        applied: causeRow.completed_at !== null,
+      }
+    : undefined;
+
   let tripVerdict: AssessmentTone = 'UNKNOWN';
   const uncertainty: string[] = [];
   if (subjects.rows.length === 0) uncertainty.push('no case subjects attached');
@@ -732,6 +765,59 @@ async function loadRecoveryCaseFactsInner(
            LEFT JOIN places pd ON pd.workspace_id = ts.workspace_id AND pd.id = ts.destination_place_id
           WHERE ts.workspace_id = $1 AND ts.id = ANY($2::uuid[])`,
         [workspaceId, serviceIds],
+      )
+    : { rows: [] };
+
+  // Reservation truth is scoped to the exact JourneyItem-selected service.
+  // A broad allocation or LIMIT 1 join can attach an unrelated reservation to
+  // the replacement card, so ambiguity and missing evidence remain UNKNOWN.
+  const transportBookingFacts = journeys.rows.length > 0 && serviceIds.length > 0
+    ? await client.query<{
+        journey_id: string;
+        service_id: string;
+        line_count: number;
+        line_status: string | null;
+        reservation_status: string | null;
+        observed_at: Date | null;
+      }>(
+        `SELECT ji.journey_id,
+                tid.selected_service_id AS service_id,
+                count(DISTINCT rl.id)::int AS line_count,
+                CASE WHEN count(DISTINCT rl.id) = 1 THEN max(rl.observed_status) END AS line_status,
+                CASE WHEN count(DISTINCT r.id) = 1 THEN max(r.observed_status) END AS reservation_status,
+                CASE WHEN count(DISTINCT rl.id) = 1 THEN max(rl.observed_status_at) END AS observed_at
+           FROM journey_items ji
+           JOIN journeys j ON j.workspace_id = ji.workspace_id AND j.id = ji.journey_id
+           JOIN transport_item_details tid ON tid.workspace_id = ji.workspace_id AND tid.journey_item_id = ji.id
+           JOIN reservation_allocations ra
+             ON ra.workspace_id = ji.workspace_id
+            AND ra.journey_item_id = ji.id
+            AND ra.traveller_id = j.traveller_id
+           JOIN reservation_lines rl
+             ON rl.workspace_id = ra.workspace_id AND rl.id = ra.line_id
+           JOIN reservations r
+             ON r.workspace_id = rl.workspace_id AND r.id = rl.reservation_id
+           JOIN transport_line_details tld
+             ON tld.workspace_id = rl.workspace_id
+            AND tld.line_id = rl.id
+            AND tld.transport_service_id = tid.selected_service_id
+          WHERE ji.workspace_id = $1
+            AND ji.journey_id = ANY($2::uuid[])
+            AND tid.selected_service_id = ANY($3::uuid[])
+          GROUP BY ji.journey_id, tid.selected_service_id`,
+        [workspaceId, journeys.rows.map((j) => j.id), [...new Set(serviceIds)]],
+      )
+    : { rows: [] };
+
+  const changedTransportServiceRefs = causeRow?.completed_at !== null && causeRow
+    ? await client.query<{ subject_id: string }>(
+        `SELECT DISTINCT cr.subject_id
+           FROM change_records cr
+          WHERE cr.workspace_id = $1
+            AND cr.change_signal_id = $2
+            AND cr.subject_kind = 'TRANSPORT_SERVICE'
+            AND cr.subject_id = ANY($3::uuid[])`,
+        [workspaceId, causeRow.id, [...new Set(serviceIds)]],
       )
     : { rows: [] };
 
@@ -884,6 +970,14 @@ async function loadRecoveryCaseFactsInner(
       actual_arrival: s.actual_arrival?.toISOString() ?? null,
       destination_time_zone: s.destination_time_zone,
     })),
+    transportBookingFacts: transportBookingFacts.rows.map((fact): TransportBookingFact => ({
+      journeyId: fact.journey_id,
+      serviceId: fact.service_id,
+      lineCount: fact.line_count,
+      lineStatus: fact.line_status,
+      reservationStatus: fact.reservation_status,
+      observedAt: fact.observed_at?.toISOString() ?? null,
+    })),
     participations: participations.rows,
     programmeItems: programmeItems.rows,
     objectives: objectives.rows,
@@ -891,6 +985,8 @@ async function loadRecoveryCaseFactsInner(
     causalPath,
     travellerLabelsByJourney,
     caseId,
+    ...(cause ? { changeSignalRef: cause.changeSignalRef } : {}),
+    changedTransportServiceRefs: new Set(changedTransportServiceRefs.rows.map((fact) => fact.subject_id)),
   });
 
   // ---------------------------------------------------------------------
@@ -907,27 +1003,6 @@ async function loadRecoveryCaseFactsInner(
   // ---------------------------------------------------------------------
   const strategies = await projectCaseStrategies(client, workspaceId, strategyRows.rows, subjectFacts, uncertainty);
 
-  // T3: the case's cause is the change signal linked through case_signals
-  // (migration 0124) — the latest received one when several are linked.
-  const signalRows = await client.query<{ id: string; origin_kind: string; change_type: string; received_at: Date; completed_at: Date | null }>(
-    `SELECT s.id, s.origin_kind, s.change_type, s.received_at, c.completed_at
-       FROM case_signals cs
-       JOIN change_signals s ON s.workspace_id = cs.workspace_id AND s.id = cs.change_signal_id
-       LEFT JOIN change_signal_completions c ON c.workspace_id = s.workspace_id AND c.change_signal_id = s.id
-      WHERE cs.workspace_id = $1 AND cs.recovery_case_id = $2
-      ORDER BY s.received_at DESC, s.id`,
-    [workspaceId, caseId],
-  );
-  const causeRow = signalRows.rows[0];
-  const cause: CaseCauseView | undefined = causeRow
-    ? {
-        changeSignalRef: `CHANGE_SIGNAL:${causeRow.id}`,
-        originKind: causeRow.origin_kind,
-        changeType: causeRow.change_type,
-        receivedAt: causeRow.received_at.toISOString(),
-        applied: causeRow.completed_at !== null,
-      }
-    : undefined;
   const firstBreak = causalPath[0];
 
   const partialIncomplete = recoveryActions.some((a) =>
@@ -981,7 +1056,7 @@ async function loadRecoveryCaseFactsInner(
       // The change signal is a first-class current-world input. Recovery case
       // workflow state stays in the Case workspace, never in this graph.
       ...(cause
-        ? [{ ref: cause.changeSignalRef, kind: 'DISRUPTION' as const, label: humanizeCode(cause.changeType), semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const, detail: `${humanizeCode(cause.originKind)} · received ${formatInstantUtc(cause.receivedAt)}` }]
+        ? [{ ref: cause.changeSignalRef, kind: 'DISRUPTION' as const, label: humanizeChangeSignal(cause.changeType), semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const, detail: `${humanizeCode(cause.originKind)} · received ${formatInstantUtc(cause.receivedAt)}` }]
         : []),
       ...subjects.rows.map((s) => {
         const ref = `${s.subject_kind}:${s.subject_id}`;
