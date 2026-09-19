@@ -1805,8 +1805,7 @@ export async function loadTravellerTripFacts(
       engagement_title: string | null;
       engagement_place_name: string | null;
       engagement_time_zone: string | null;
-      line_status: string | null;
-      reservation_status: string | null;
+      booking_status: string | null;
     }>(
       `SELECT ji.kind, ji.lifecycle_status, ji.intended_window_start, ji.intended_window_end, ji.order_key,
               ts.operator, ts.mode,
@@ -1818,14 +1817,26 @@ export async function loadTravellerTripFacts(
               sp.name AS stay_place_name, sp.time_zone AS stay_time_zone,
               COALESCE(epi.title, eid.standalone_title) AS engagement_title,
               ep.name AS engagement_place_name, ep.time_zone AS engagement_time_zone,
-              booking.line_status, booking.reservation_status
+              booking.booking_status
          FROM journey_items ji
          LEFT JOIN transport_item_details tid
            ON tid.workspace_id = ji.workspace_id AND tid.journey_item_id = ji.id
          LEFT JOIN LATERAL (
-           SELECT rl.observed_status AS line_status,
-                  r.observed_status AS reservation_status,
-                  tld.transport_service_id
+           SELECT CASE
+                    WHEN count(DISTINCT tld.transport_service_id) = 1
+                    THEN (array_agg(tld.transport_service_id))[1]
+                    ELSE NULL
+                  END AS transport_service_id,
+                  CASE
+                    WHEN count(*) = 0
+                      OR count(DISTINCT tld.transport_service_id) <> 1
+                      OR count(DISTINCT (rl.observed_status, r.observed_status)) <> 1
+                      OR bool_or(rl.observed_status IS DISTINCT FROM r.observed_status)
+                    THEN NULL
+                    ELSE COALESCE(max(rl.observed_status), max(r.observed_status))
+                  END AS booking_status,
+                  max(rl.observed_status) AS line_status,
+                  max(r.observed_status) AS reservation_status
              FROM reservation_allocations ra
              JOIN reservation_lines rl
                ON rl.workspace_id = ra.workspace_id AND rl.id = ra.line_id
@@ -1836,8 +1847,7 @@ export async function loadTravellerTripFacts(
             WHERE ra.workspace_id = ji.workspace_id
               AND ra.journey_item_id = ji.id
               AND ra.traveller_id = $3
-            ORDER BY ra.id
-            LIMIT 1
+              AND (tid.selected_service_id IS NULL OR tld.transport_service_id = tid.selected_service_id)
          ) booking ON true
          LEFT JOIN transport_services ts
            ON ts.workspace_id = ji.workspace_id
@@ -1864,8 +1874,9 @@ export async function loadTravellerTripFacts(
     );
 
     const itinerary = travellerItems.rows.map((row) => {
-      const bookingStatus = row.line_status ?? row.reservation_status;
-      const status = bookingStatus ?? row.lifecycle_status;
+      const status = row.kind === 'TRANSPORT'
+        ? row.booking_status ?? 'UNKNOWN'
+        : row.lifecycle_status;
       if (row.kind === 'TRANSPORT') {
         const startsAt = row.actual_departure ?? row.estimated_departure ?? row.published_departure;
         const endsAt = row.actual_arrival ?? row.estimated_arrival ?? row.published_arrival;
@@ -1945,10 +1956,10 @@ export async function loadTravellerTripFacts(
       ? ({
         OPEN: 'Northstar is monitoring a travel change affecting your trip.',
         PLANNING: 'Northstar is checking recovery options for your trip.',
-        AWAITING_AUTHORITY: 'Northstar has prepared a recovery and is waiting for organiser approval.',
+        AWAITING_AUTHORITY: 'Northstar has prepared a recovery and is waiting for approval.',
         EXECUTING: 'Northstar is applying the approved recovery for your trip.',
         RESOLVED: 'Northstar completed the recovery for your trip.',
-        CLOSED: 'Northstar completed the recovery for your trip.',
+        CLOSED: 'Northstar has closed the recovery work for your trip.',
         CANCELLED: 'Northstar closed the recovery work for your trip.',
       } as Record<string, string>)[linked.lifecycle_status] ?? 'Northstar is monitoring a recovery case for your trip.'
       : undefined;
@@ -1966,9 +1977,9 @@ export async function loadTravellerTripFacts(
           : 'We are still checking your trip.',
       ...(caseProgress ? { whatNorthstarIsDoing: caseProgress } : {}),
       ...(linked?.lifecycle_status === 'AWAITING_AUTHORITY'
-        ? { whatDoYouNeedFromMe: 'Nothing required from you right now. The organiser is reviewing the recovery.' }
+        ? { whatDoYouNeedFromMe: 'Nothing required from you right now. The recovery is waiting for approval.' }
         : {}),
-      ...(linked && (linked.lifecycle_status === 'RESOLVED' || linked.lifecycle_status === 'CLOSED') && amIOkay === 'YES'
+      ...(linked?.lifecycle_status === 'RESOLVED' && amIOkay === 'YES'
         ? { whatChangedAfterRecovery: 'The recovery for this trip is complete.' }
         : {}),
       ...(itinerary.length > 0 ? { itinerary } : {}),
