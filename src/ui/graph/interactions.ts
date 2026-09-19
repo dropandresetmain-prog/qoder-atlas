@@ -56,6 +56,11 @@ export const INTERACTIONS_SCRIPT = String.raw`
     this.toolbar = canvas.querySelector('.fg-toolbar');
     this.viewsBar = canvas.querySelector('.fg-views');
     this.readout = canvas.querySelector('.fg-zoom-readout');
+    this.inspector = canvas.querySelector('[data-graph-inspector]');
+    this.inspectorType = canvas.querySelector('[data-inspector-type]');
+    this.inspectorTitle = canvas.querySelector('[data-inspector-title]');
+    this.inspectorDetail = canvas.querySelector('[data-inspector-detail]');
+    this.inspectorState = canvas.querySelector('[data-inspector-state]');
     this.role = canvas.getAttribute('data-graph-role') || 'current';
     this.scene = readScene(canvas);
     this.sceneStr = this.scene ? JSON.stringify(this.scene) : '';
@@ -226,7 +231,24 @@ export const INTERACTIONS_SCRIPT = String.raw`
     for (key in this.edgeEls) toggle(this.edgeEls[key], 'fg-dimmed', false);
     for (key in this.pulseEls) toggle(this.pulseEls[key], 'fg-dimmed', false);
     this.selected = null;
+    this.renderInspector(null);
     this.remember();
+  };
+
+  Controller.prototype.renderInspector = function(ref) {
+    if (!this.inspector) return;
+    var node = ref && this.scene && this.scene.nodes ? this.scene.nodes.find(function(n) { return n.ref === ref; }) : null;
+    if (!node) {
+      this.inspector.hidden = true;
+      return;
+    }
+    // textContent is deliberate: full backend detail must remain readable and
+    // must never become executable markup when a node is selected.
+    this.inspectorType.textContent = node.entityLabel || '';
+    this.inspectorTitle.textContent = node.label || '';
+    this.inspectorDetail.textContent = node.secondaryLabel || 'No additional detail';
+    this.inspectorState.textContent = node.stateLabel || 'State unavailable';
+    this.inspector.hidden = false;
   };
 
   Controller.prototype.selectRef = function(ref) {
@@ -252,6 +274,7 @@ export const INTERACTIONS_SCRIPT = String.raw`
       toggle(e, 'fg-dimmed', !touches);
       toggle(this.pulseEls[key], 'fg-dimmed', !touches);
     }
+    this.renderInspector(ref);
     this.remember();
   };
 

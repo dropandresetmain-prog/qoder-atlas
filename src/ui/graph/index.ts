@@ -90,6 +90,12 @@ export function renderFocusedCaseGraph(input: RenderFocusedCaseGraphInput): stri
   <div class="fg-viewport" tabindex="0" aria-label="Dependency graph">
 ${stageHtml(scene)}
   </div>
+  <aside class="fg-inspector" data-graph-inspector hidden aria-live="polite" aria-label="Selected graph item">
+    <p class="fg-inspector-type" data-inspector-type></p>
+    <h3 class="fg-inspector-title" data-inspector-title></h3>
+    <p class="fg-inspector-detail" data-inspector-detail></p>
+    <p class="fg-inspector-state" data-inspector-state></p>
+  </aside>
   <script type="application/json" class="fg-scene">${json}</script>
 </div>`;
 

@@ -189,6 +189,8 @@ export const RecoveryStrategyChangeViewSchema = z.strictObject({
    * canonical state has no title for it — never an invented name.
    */
   subjectLabel: z.string().min(1),
+  /** Canonical programme item's IANA zone, or UTC when no zone is available. */
+  timeZone: z.string().min(1).optional(),
   /** Canonical window before the change, when the subject has one. */
   currentWindow: z.strictObject({ start: z.string().min(1), end: z.string().min(1) }).optional(),
   /** Window this option proposes, when the effect carries one. */

@@ -475,10 +475,10 @@ async function projectCaseStrategies(
 
   // 4. Canonical programme state for the items those effects move, so the
   //    option can state current-vs-proposed timing rather than an id.
-  const programmeItems = new Map<string, { title: string; window?: { start: string; end: string } }>();
+  const programmeItems = new Map<string, { title: string; timeZone?: string; window?: { start: string; end: string } }>();
   if (programmeItemIds.size > 0) {
-    const items = await client.query<{ id: string; title: string; window_start: Date | null; window_end: Date | null }>(
-      `SELECT id, title, window_start, window_end
+    const items = await client.query<{ id: string; title: string; window_start: Date | null; window_end: Date | null; time_zone: string | null }>(
+      `SELECT id, title, window_start, window_end, time_zone
          FROM programme_items
         WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
       [workspaceId, [...programmeItemIds]],
@@ -486,6 +486,7 @@ async function projectCaseStrategies(
     for (const item of items.rows) {
       programmeItems.set(item.id, {
         title: item.title,
+        ...(item.time_zone ? { timeZone: item.time_zone } : {}),
         ...(item.window_start && item.window_end
           ? { window: { start: item.window_start.toISOString(), end: item.window_end.toISOString() } }
           : {}),
@@ -509,6 +510,7 @@ async function projectCaseStrategies(
         effectKind: effect.effectKind,
         subjectRef,
         subjectLabel: item?.title ?? subjectRef,
+        ...(item?.timeZone ? { timeZone: item.timeZone } : {}),
         ...(item?.window ? { currentWindow: item.window } : {}),
         ...(effect.proposedWindow ? { proposedWindow: effect.proposedWindow } : {}),
       };
@@ -851,8 +853,8 @@ async function loadRecoveryCaseFactsInner(
   // Programme item rows referenced by participations.
   const programmeItemIds = participations.rows.map((p) => p.programme_item_id);
   const programmeItems = programmeItemIds.length > 0
-    ? await client.query<{ id: string; programme_id: string; title: string; item_type: string; window_start: string | null; window_end: string | null; lifecycle_status: string }>(
-        `SELECT id, programme_id, title, item_type, window_start, window_end, lifecycle_status
+    ? await client.query<{ id: string; programme_id: string; title: string; item_type: string; window_start: string | null; window_end: string | null; time_zone: string | null; lifecycle_status: string }>(
+        `SELECT id, programme_id, title, item_type, window_start, window_end, time_zone, lifecycle_status
            FROM programme_items
           WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
         [workspaceId, [...new Set(programmeItemIds)]],

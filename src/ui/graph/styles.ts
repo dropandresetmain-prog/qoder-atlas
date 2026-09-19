@@ -41,6 +41,34 @@ export const FOCUSED_GRAPH_CSS = `
 }
 .fg-viewport.fg-dragging { cursor: grabbing; }
 
+/* Selected-node detail stays available without expanding the graph stage. */
+.fg-inspector {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 40;
+  width: min(320px, calc(100% - 28px));
+  box-sizing: border-box;
+  padding: 11px 13px;
+  border: 1px solid var(--fg-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 24px rgba(18, 38, 68, 0.12);
+  color: var(--fg-ink);
+  pointer-events: none;
+}
+.fg-inspector-type,
+.fg-inspector-state {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.fg-inspector-title { margin: 3px 0 4px; font-size: 15px; line-height: 1.2; }
+.fg-inspector-detail { margin: 0 0 6px; color: #526784; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+
 .fg-stage {
   position: absolute;
   left: 0;
