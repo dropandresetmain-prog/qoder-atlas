@@ -326,7 +326,16 @@ export function requiredAuthorityScope(
   resolvedAssessableSubjects: readonly TypedRef[],
 ): TypedRef[] {
   const map = new Map<string, TypedRef>();
+  const journeyResolved = resolvedAssessableSubjects.some((ref) => ref.kind === 'JOURNEY');
   for (const ref of [...intentSubjectRefs, ...resolvedAssessableSubjects]) {
+    // R4-F2: a SELECT_OFFER intent names an OFFER (a content-hash offer key, not a
+    // registered subject: no grant can enumerate it; its identity and price are
+    // bound by the envelope's offerFingerprint/requestFingerprint instead) and
+    // the JOURNEY_ITEM it acts on. Authority for an item is authority over the
+    // JOURNEY that owns it (already in the resolved set), so neither is an
+    // independent exact-coverage requirement.
+    if (ref.kind === 'OFFER') continue;
+    if (ref.kind === 'JOURNEY_ITEM' && journeyResolved) continue;
     map.set(`${ref.kind}:${ref.id}`, ref);
   }
   return [...map.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
@@ -464,6 +473,27 @@ export async function evaluateStoredExecutionGate(
     // is left unexplained below.
     const unexplained: typeof currentness.reasons = [];
     for (const reason of currentness.reasons) {
+      // R4-F2: a costed intent's own approval-time budget HOLD advances the Budget
+      // aggregate the strategy base manifest read. Explained ONLY when this intent
+      // itself holds a HELD commitment on that budget and every intervening revision
+      // is a BUDGET_HOLD_CREATED change record (never an edit, release or other write).
+      // Holds by other actions do not weaken this intent's own reserved funds.
+      if (reason.kind === 'AGGREGATE_ADVANCED' && reason.aggregateRef.kind === 'BUDGET') {
+        const own = await pool.query(
+          `SELECT 1 FROM budget_commitments WHERE workspace_id = $1 AND budget_id = $2 AND action_intent_id = $3 AND status = 'HELD'`,
+          [params.workspaceId, reason.aggregateRef.id, intent.id],
+        );
+        const intervening = await pool.query<{ n: string; holds: string }>(
+          `SELECT count(*)::text AS n, count(*) FILTER (WHERE command_namespace = 'BUDGET_HOLD_CREATED')::text AS holds
+             FROM change_records
+            WHERE workspace_id = $1 AND subject_kind = 'BUDGET' AND subject_id = $2 AND after_revision > $3 AND after_revision <= $4`,
+          [params.workspaceId, reason.aggregateRef.id, reason.readRevision, reason.currentRevision],
+        );
+        const row = intervening.rows[0]!;
+        if ((own.rowCount ?? 0) > 0 && Number(row.n) === reason.currentRevision - reason.readRevision && row.n === row.holds) continue;
+        unexplained.push(reason);
+        continue;
+      }
       if (reason.kind === 'AGGREGATE_ADVANCED' && reason.aggregateRef.kind === 'PROGRAMME') {
         const observed = await observedProgrammeRevisionFromPrerequisites(
           pool, params.workspaceId, intent.id, reason.aggregateRef.id,

@@ -12,7 +12,7 @@ import { loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts
 after(async () => { await (await sharedTestPool()).end(); });
 
 test('loadProgrammeSchedule runs on PG and reports the affected case per item', async () => {
-  const c = await openDisruptionCase();
+  const c = await openDisruptionCase('r4 programme schedule');
   const schedule = await loadProgrammeSchedule(c.pool, c.world.workspaceId);
   assert.ok(Array.isArray(schedule.items));
   assert.ok(schedule.items.length > 0, 'the world has programme items');

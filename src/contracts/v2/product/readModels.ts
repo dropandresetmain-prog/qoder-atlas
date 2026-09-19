@@ -219,6 +219,13 @@ export const RecoveryStrategyViewSchema = z.strictObject({
   }).default({ total: 0, pass: 0, fail: 0, unknown: 0 }),
   /** Every assessed subject, as persisted. Complete, and usually large. */
   projectedPeople: z.array(RecoveryStrategySubjectViewSchema),
+  /**
+   * R4-F2: present when this viable option cannot genuinely be EXECUTED by this
+   * runtime (provider execution not composed, protected booking inputs or budget
+   * missing). Surfaces must not offer such an option as an executable Recover;
+   * `message` is the explicit reason. Absent for options that can run.
+   */
+  executionBlocker: z.strictObject({ code: z.string().min(1), message: z.string().min(1) }).optional(),
 });
 export type RecoveryStrategyView = z.infer<typeof RecoveryStrategyViewSchema>;
 
@@ -975,6 +982,10 @@ export const ApplicationErrorCodeSchema = z.enum([
   'AUTHORITY_DECISION_FAILED',
   'APPROVAL_FAILED',
   'PRINCIPAL_UNRESOLVED',
+  // R4-F2 additive: truthful refusal reasons for provider-executed (external) options.
+  'EXTERNAL_EXECUTION_NOT_COMPOSED',
+  'EXECUTION_INPUTS_UNAVAILABLE',
+  'BUDGET_UNAVAILABLE',
 ]);
 export type ApplicationErrorCode = z.infer<typeof ApplicationErrorCodeSchema>;
 

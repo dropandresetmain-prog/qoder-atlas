@@ -2,7 +2,7 @@
  * Target PostgreSQL HTTP handlers for M9 product read models and commands.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { approveRecoveryStrategy } from './recoveryApproval.ts';
+import { approveRecoveryStrategy, externalExecutionBlockerForStrategyId } from './recoveryApproval.ts';
 import { resolveRequestPrincipal, workspacePrincipalId } from './workspaceAuthority.ts';
 import type { TargetApplication } from './composeTargetApplication.ts';
 import {
@@ -157,7 +157,16 @@ async function serveCase(ctx: TargetHttpContext, res: ServerResponse, url: URL, 
     else sendJson(res, 404, { error: 'CASE_NOT_FOUND' });
     return;
   }
-  const view = projectRecoveryCase(facts);
+  const projected = projectRecoveryCase(facts);
+  // R4-F2 truthfulness: a viable option this runtime cannot actually execute carries an explicit blocker.
+  const view = {
+    ...projected,
+    strategies: await Promise.all(projected.strategies.map(async (strategy) => {
+      if (strategy.viability !== 'VIABLE') return strategy;
+      const blocker = await externalExecutionBlockerForStrategyId(ctx.app.pool, ctx.app.workspaceId, strategy.strategyRef, ctx.app.runtimeHooks?.externalCapabilities);
+      return blocker ? { ...strategy, executionBlocker: blocker } : strategy;
+    })),
+  };
   if (html) {
     // The shell carries the event name, open-decision count and Reset demo on
     // the Case page too; the Back link itself is rendered by the case screen
@@ -382,7 +391,7 @@ export async function handleTargetProductHttp(
       }
       const executorPrincipalId = ctx.app.runtimeHooks?.executorPrincipalId ?? workspacePrincipalId(ctx.app.workspaceId, 'executor');
       const outcome = await approveRecoveryStrategy(
-        { pool: ctx.app.pool, workspaceId: ctx.app.workspaceId, actorPrincipalId: commandCtx(ctx.app).actorPrincipalId, uow: () => ctx.app.unitOfWork(), executorPrincipalId, ...(body?.now ? { now: body.now } : {}) },
+        { pool: ctx.app.pool, workspaceId: ctx.app.workspaceId, actorPrincipalId: commandCtx(ctx.app).actorPrincipalId, uow: () => ctx.app.unitOfWork(), executorPrincipalId, ...(ctx.app.runtimeHooks?.externalCapabilities ? { externalCapabilities: ctx.app.runtimeHooks.externalCapabilities } : {}), ...(body?.now ? { now: body.now } : {}) },
         { caseId, strategyId, approverPrincipalId: principal.principalId },
       );
       if (outcome.ok) {

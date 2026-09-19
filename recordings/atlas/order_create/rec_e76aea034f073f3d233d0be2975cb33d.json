@@ -1,0 +1,24 @@
+{
+  "id": "rec_e76aea034f073f3d233d0be2975cb33d",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-09-19T13:56:32.825Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "c40b7d88-cb52-4188-ae8f-dce90e9df31f",
+    "orderNo": "TESTA20260919215632741",
+    "pnrCode": "PTZBTF",
+    "totalPrice": 31.29,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-09-19 22:26:32",
+    "paxTicketInfos": [
+      {
+        "ticketNos": []
+      }
+    ],
+    "duplicateOrders": null
+  }
+}

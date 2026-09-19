@@ -1,0 +1,24 @@
+{
+  "id": "rec_5f99e1f65c8a40bd911dc054efb731e7",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-09-19T14:00:34.103Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "7c2be663-b833-480a-9c1c-00e56d0974d2",
+    "orderNo": "TESTA20260919220034032",
+    "pnrCode": "CANXEE",
+    "totalPrice": 26.6,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-09-19 22:30:34",
+    "paxTicketInfos": [
+      {
+        "ticketNos": []
+      }
+    ],
+    "duplicateOrders": null
+  }
+}

@@ -59,6 +59,8 @@ export interface TargetApplication {
     executorPrincipalId: string;
     afterApproval?: () => Promise<void>;
     afterExecution?: () => Promise<void>;
+    /** R4-F2: declared external capability truth (present only when the Atlas sandbox execution seam is composed). */
+    externalCapabilities?: readonly { capabilityRef: string; supported: boolean }[];
     planner?: RecoveryPlanningCoordinator & {
       planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome>;
     };
