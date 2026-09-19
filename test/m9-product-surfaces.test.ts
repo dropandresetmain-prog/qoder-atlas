@@ -183,6 +183,21 @@ function programmeSchedule(): ProgrammeSchedule {
   return {
     generatedAt,
     eventTitle: 'Synthetic programme',
+    populationSummary: { total: 3, withJourney: 3, withoutJourney: 0, ready: 1, disrupted: 1, unknown: 1 },
+    travellers: [
+      { travellerRef: 'TRAVELLER:trav-a', label: 'Traveller A', journeyRefs: ['journey-a'], caseRefs: [], status: 'READY', assessmentStatus: 'CURRENT' },
+      { travellerRef: 'TRAVELLER:trav-b', label: 'Traveller B', journeyRefs: ['journey-b'], caseRefs: ['case-b'], status: 'DISRUPTED', assessmentStatus: 'CURRENT' },
+      { travellerRef: 'TRAVELLER:trav-c', label: 'Traveller C', journeyRefs: ['journey-c'], caseRefs: [], status: 'UNKNOWN', assessmentStatus: 'STALE', missingInformation: ['The readiness check needs refreshing.'] },
+    ],
+    endangeredCommitments: [{
+      commitmentRef: 'PROGRAMME_ITEM:item-b',
+      label: 'Afternoon session',
+      reason: 'One or more current readiness checks show this commitment is endangered.',
+      affectedTravellerRefs: ['TRAVELLER:trav-b'],
+      affectedTravellerLabels: ['Traveller B'],
+      caseRefs: ['case-b'],
+    }],
+    missingInformation: [{ travellerRef: 'TRAVELLER:trav-c', label: 'Traveller C', reason: 'The readiness check needs refreshing.' }],
     items: [
       {
         itemRef: 'PROGRAMME_ITEM:item-a', label: 'Morning session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
@@ -280,6 +295,19 @@ describe('M9 product surface renderers', () => {
     assert.match(html, /api\/v2\/programme\/time-swap\/preview\?format=html/);
     assert.match(html, /See how exchanging these session times would affect attendees/i);
     assert.match(html, /Your programme was not changed/);
+  });
+
+  test('programme schedule keeps population context, deduplicates endangered commitments, and links real people and cases', () => {
+    const html = renderProductProgrammeSchedule(programmeSchedule());
+
+    assert.match(html, /3 people · 3 journeys recorded · 0 without a journey record/);
+    assert.match(html, /data-test="programme-roster"/);
+    assert.match(html, /data-programme-traveller-search/);
+    assert.match(html, /href="\/traveller\?trip=journey-a"/);
+    assert.match(html, /href="\/operator\/cases\/case-b"/);
+    assert.equal((html.match(/data-test="programme-endangered-item"/g) ?? []).length, 1);
+    assert.match(html, /Missing traveller information/);
+    assert.match(html, /The readiness check needs refreshing/);
   });
 
   test('programme item refs are normalized for the command while raw ids remain valid', () => {

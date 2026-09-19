@@ -9,14 +9,23 @@ import { sharedTestPool } from './harness.ts';
 import { openDisruptionCase } from './r1ProgrammeWorld.ts';
 import { ActivityCursorError, loadActivityFeed, loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts.ts';
 import { renderProductActivityFeed } from '../src/ui/screens/product-activity-feed.ts';
+import { ProgrammeScheduleSchema } from '../src/contracts/v2/product/readModels.ts';
 
 after(async () => { await (await sharedTestPool()).end(); });
 
 test('loadProgrammeSchedule runs on PG and reports the affected case per item', async () => {
   const c = await openDisruptionCase('r4 programme schedule');
   const schedule = await loadProgrammeSchedule(c.pool, c.world.workspaceId);
+  ProgrammeScheduleSchema.parse(schedule);
   assert.ok(Array.isArray(schedule.items));
   assert.ok(schedule.items.length > 0, 'the world has programme items');
+  assert.ok(schedule.populationSummary);
+  assert.equal(schedule.populationSummary!.total, schedule.travellers!.length);
+  assert.ok(schedule.travellers!.some((traveller) => traveller.journeyRefs.includes(c.world.people[0]!.journeyId)));
+  assert.equal(new Set(schedule.items.map((item) => item.itemRef)).size, schedule.items.length, 'schedule items are not duplicated by participation rows');
+  assert.ok(schedule.items.some((item) => item.affectedCaseRef), 'an affected programme item keeps its case link');
+  assert.ok(schedule.endangeredCommitments?.some((commitment) => commitment.caseRefs.length > 0), 'endangered commitments keep case links');
+  assert.ok(schedule.endangeredCommitments?.every((commitment) => new Set(commitment.affectedTravellerRefs).size === commitment.affectedTravellerRefs.length));
 });
 
 test('Activity pages preserve complete PG ordering across timestamp ties and new arrivals', async () => {

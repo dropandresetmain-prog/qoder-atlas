@@ -37,6 +37,10 @@ export interface ProgrammeSurfaceView {
   dayCount: number;
   /** Sessions with an open recovery case among their attendees. */
   affected: ProgrammeSurfaceItem[];
+  populationSummary?: NonNullable<ProgrammeSchedule['populationSummary']>;
+  travellers: NonNullable<ProgrammeSchedule['travellers']>;
+  endangeredCommitments: NonNullable<ProgrammeSchedule['endangeredCommitments']>;
+  missingInformation: NonNullable<ProgrammeSchedule['missingInformation']>;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -100,6 +104,10 @@ export function adaptProgrammeScheduleToTimeline(view: ProgrammeSchedule): Progr
     sessionCount: view.items.length,
     dayCount: byDay.size,
     affected,
+    populationSummary: view.populationSummary,
+    travellers: view.travellers ?? [],
+    endangeredCommitments: view.endangeredCommitments ?? [],
+    missingInformation: view.missingInformation ?? [],
   };
 }
 

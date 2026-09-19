@@ -19,6 +19,7 @@ import type {
 } from '../../../contracts/v2/product/readModels.ts';
 import { formatInstant, formatShort } from '../../../ui/html.ts';
 import { withProjectionSnapshot } from './pgFactAssembler.ts';
+import { currentAssessmentView } from '../../../persistence/postgres/world/pgAssessments.ts';
 
 /** Commands name themselves in the past tense already; present them as words. */
 function phraseCommand(namespace: string): string {
@@ -48,48 +49,186 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
       lifecycle_status: string;
       place_name: string | null;
       operating_requirements: { requiresPhysicalPresence?: boolean } | null;
-      required_participants: number;
-      optional_participants: number;
-      affected_case_id: string | null;
-      affected_case_count: number;
+      participation_id: string | null;
+      obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED' | null;
+      traveller_id: string | null;
+      traveller_label: string | null;
+      journey_id: string | null;
+      trip_id: string | null;
+      active_case_id: string | null;
     }>(
       `SELECT pi.id, pi.title, pi.item_type, pi.window_start, pi.window_end,
               pi.lifecycle_status, pl.name AS place_name, pi.operating_requirements,
-              count(p.id) FILTER (WHERE p.obligation = 'REQUIRED' AND p.accepted)::int AS required_participants,
-              count(p.id) FILTER (WHERE p.obligation <> 'REQUIRED' AND p.accepted)::int AS optional_participants,
-              (SELECT (array_agg(DISTINCT rc.id::text))[1]
-                 FROM participations pp
-                 JOIN journeys jj ON jj.workspace_id = pp.workspace_id AND jj.traveller_id = pp.traveller_id
-                 JOIN case_subjects cs ON cs.workspace_id = jj.workspace_id AND cs.subject_kind = 'JOURNEY'
-                                       AND cs.subject_id = jj.id
+              p.id AS participation_id, p.obligation,
+              t.id AS traveller_id, n.display_value AS traveller_label,
+              j.id AS journey_id, j.trip_id,
+              (SELECT cs.recovery_case_id
+                 FROM case_subjects cs
                  JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
-                WHERE pp.workspace_id = pi.workspace_id AND pp.programme_item_id = pi.id
-                  AND pp.accepted AND rc.closed_at IS NULL) AS affected_case_id,
-              (SELECT count(DISTINCT rc.id)::int
-                 FROM participations pp
-                 JOIN journeys jj ON jj.workspace_id = pp.workspace_id AND jj.traveller_id = pp.traveller_id
-                 JOIN case_subjects cs ON cs.workspace_id = jj.workspace_id AND cs.subject_kind = 'JOURNEY'
-                                       AND cs.subject_id = jj.id
-                 JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
-                WHERE pp.workspace_id = pi.workspace_id AND pp.programme_item_id = pi.id
-                  AND pp.accepted AND rc.closed_at IS NULL) AS affected_case_count
+                WHERE cs.workspace_id = j.workspace_id AND cs.subject_kind = 'JOURNEY'
+                  AND cs.subject_id = j.id AND rc.closed_at IS NULL
+                ORDER BY rc.opened_at DESC, rc.id DESC
+                LIMIT 1) AS active_case_id
          FROM programme_items pi
          JOIN programmes prog ON prog.workspace_id = pi.workspace_id AND prog.id = pi.programme_id
          LEFT JOIN places pl ON pl.workspace_id = pi.workspace_id AND pl.id = pi.place_id
          LEFT JOIN participations p
-                ON p.workspace_id = pi.workspace_id AND p.programme_item_id = pi.id
+                ON p.workspace_id = pi.workspace_id AND p.programme_item_id = pi.id AND p.accepted
+         LEFT JOIN travellers t ON t.workspace_id = p.workspace_id AND t.id = p.traveller_id
+         LEFT JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+         LEFT JOIN journeys j ON j.workspace_id = t.workspace_id AND j.traveller_id = t.id
+                               AND j.lifecycle_status <> 'CANCELLED'
         WHERE pi.workspace_id = $1 AND prog.lifecycle_status = 'ACTIVE'
-        GROUP BY pi.workspace_id, pi.id, pi.title, pi.item_type, pi.window_start, pi.window_end,
-                 pi.lifecycle_status, pl.name, pi.operating_requirements
-        ORDER BY pi.window_start NULLS LAST, pi.title`,
+        ORDER BY pi.window_start NULLS LAST, pi.title, n.display_value NULLS LAST, t.id, j.id`,
       [workspaceId],
     );
+
+    type AssessmentFact = {
+      status: 'READY' | 'DISRUPTED' | 'UNKNOWN';
+      assessmentStatus: 'CURRENT' | 'STALE' | 'PENDING_REASSESSMENT' | 'UNAVAILABLE' | 'NONE';
+      missingInformation?: string;
+    };
+    const assessmentByJourney = new Map<string, AssessmentFact>();
+    const assessJourney = async (journeyId: string): Promise<AssessmentFact> => {
+      const cached = assessmentByJourney.get(journeyId);
+      if (cached) return cached;
+      const view = await currentAssessmentView(client, workspaceId, { kind: 'JOURNEY', id: journeyId }, 'VIABILITY', generatedAt);
+      const currentVerdict = view.status === 'CURRENT' && view.assessment?.overallVerdict;
+      const fact: AssessmentFact = {
+        status: currentVerdict === 'PASS' ? 'READY' : currentVerdict === 'FAIL' ? 'DISRUPTED' : 'UNKNOWN',
+        assessmentStatus: view.status,
+        ...(view.status === 'NONE' ? { missingInformation: 'No current readiness assessment is available.' } : {}),
+        ...(view.status === 'PENDING_REASSESSMENT' ? { missingInformation: 'Readiness is being checked after a change.' } : {}),
+        ...(view.status === 'STALE' ? { missingInformation: 'The readiness check needs refreshing.' } : {}),
+        ...(view.status === 'UNAVAILABLE' ? { missingInformation: 'The readiness check is unavailable.' } : {}),
+        ...(view.status === 'CURRENT' && currentVerdict === 'UNKNOWN'
+          ? { missingInformation: 'Readiness is unknown because the available information is incomplete.' }
+          : {}),
+      };
+      assessmentByJourney.set(journeyId, fact);
+      return fact;
+    };
+
+    type TravellerAccumulator = {
+      travellerRef: string;
+      label: string;
+      journeyRefs: Set<string>;
+      caseRefs: Set<string>;
+      facts: AssessmentFact[];
+    };
+    const travellers = new Map<string, TravellerAccumulator>();
+    const itemAccumulators = new Map<string, {
+      affectedTravellerRefs: Set<string>;
+      affectedTravellerLabels: Set<string>;
+      caseRefs: Set<string>;
+      requiredParticipantRefs: Set<string>;
+      optionalParticipantRefs: Set<string>;
+    }>();
+
+    for (const row of rows.rows) {
+      let item = itemAccumulators.get(row.id);
+      if (!item) {
+        item = {
+          affectedTravellerRefs: new Set(),
+          affectedTravellerLabels: new Set(),
+          caseRefs: new Set(),
+          requiredParticipantRefs: new Set(),
+          optionalParticipantRefs: new Set(),
+        };
+        itemAccumulators.set(row.id, item);
+      }
+      if (!row.participation_id || !row.traveller_id || !row.traveller_label || !row.obligation) continue;
+      if (row.obligation === 'REQUIRED') item.requiredParticipantRefs.add(row.traveller_id);
+      else item.optionalParticipantRefs.add(row.traveller_id);
+      let traveller = travellers.get(row.traveller_id);
+      if (!traveller) {
+        traveller = {
+          travellerRef: `TRAVELLER:${row.traveller_id}`,
+          label: row.traveller_label,
+          journeyRefs: new Set(),
+          caseRefs: new Set(),
+          facts: [],
+        };
+        travellers.set(row.traveller_id, traveller);
+      }
+      if (row.journey_id) {
+        const fact = await assessJourney(row.journey_id);
+        traveller.journeyRefs.add(row.journey_id);
+        traveller.facts.push(fact);
+        if (row.active_case_id) {
+          traveller.caseRefs.add(row.active_case_id);
+          item.caseRefs.add(row.active_case_id);
+        }
+        if (fact.status === 'DISRUPTED') {
+          item.affectedTravellerRefs.add(traveller.travellerRef);
+          item.affectedTravellerLabels.add(traveller.label);
+        }
+      }
+    }
+
+    const travellerRows = [...travellers.values()]
+      .sort((a, b) => a.label.localeCompare(b.label) || a.travellerRef.localeCompare(b.travellerRef))
+      .map((traveller) => {
+        const status = traveller.facts.some((fact) => fact.status === 'DISRUPTED')
+          ? 'DISRUPTED' as const
+          : traveller.facts.length === 0
+            ? 'UNSPECIFIED' as const
+            : traveller.facts.some((fact) => fact.status === 'UNKNOWN')
+              ? 'UNKNOWN' as const
+              : 'READY' as const;
+        const assessmentStatus = traveller.facts[0]?.assessmentStatus;
+        const missingInformation = [...new Set(traveller.facts.flatMap((fact) => fact.missingInformation ? [fact.missingInformation] : []))];
+        return {
+          travellerRef: traveller.travellerRef,
+          label: traveller.label,
+          journeyRefs: [...traveller.journeyRefs].sort(),
+          caseRefs: [...traveller.caseRefs].sort(),
+          status,
+          ...(assessmentStatus ? { assessmentStatus } : {}),
+          ...(missingInformation.length > 0 ? { missingInformation } : {}),
+        };
+      });
+    const missingInformation = travellerRows
+      .flatMap((traveller) => (traveller.missingInformation ?? []).map((reason) => ({
+        travellerRef: traveller.travellerRef,
+        label: traveller.label,
+        reason,
+      })));
+    const populationSummary = {
+      total: travellerRows.length,
+      withJourney: travellerRows.filter((row) => row.journeyRefs.length > 0).length,
+      withoutJourney: travellerRows.filter((row) => row.journeyRefs.length === 0).length,
+      ready: travellerRows.filter((row) => row.status === 'READY').length,
+      disrupted: travellerRows.filter((row) => row.status === 'DISRUPTED').length,
+      unknown: travellerRows.filter((row) => row.status === 'UNKNOWN').length,
+    };
+    const uniqueRows = rows.rows
+      .filter((row, index, all) => all.findIndex((candidate) => candidate.id === row.id) === index);
+    const endangeredCommitments = uniqueRows
+      .map((row) => {
+        const item = itemAccumulators.get(row.id)!;
+        return item.affectedTravellerRefs.size > 0
+          ? {
+              commitmentRef: `PROGRAMME_ITEM:${row.id}`,
+              label: row.title,
+              reason: 'One or more current readiness checks show this commitment is endangered.',
+              affectedTravellerRefs: [...item.affectedTravellerRefs].sort(),
+              affectedTravellerLabels: [...item.affectedTravellerLabels].sort(),
+              caseRefs: [...item.caseRefs].sort(),
+            }
+          : undefined;
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== undefined);
     return {
       generatedAt,
       // No ACTIVE programme, or more than one, means the workspace has no
       // single "the event you are working" — say so rather than pick one.
       eventTitle: event.rowCount === 1 ? event.rows[0]!.title : 'No single active programme',
-      items: rows.rows.map((row) => ({
+      populationSummary,
+      travellers: travellerRows,
+      ...(endangeredCommitments.length > 0 ? { endangeredCommitments } : {}),
+      ...(missingInformation.length > 0 ? { missingInformation } : {}),
+      items: uniqueRows.map((row) => ({
         itemRef: `PROGRAMME_ITEM:${row.id}`,
         label: row.title,
         itemType: row.item_type,
@@ -100,12 +239,14 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
             windowEnd: row.window_end.toISOString(),
           }
           : {}),
-        ...(row.affected_case_id ? { affectedCaseRef: row.affected_case_id } : {}),
-        ...(row.affected_case_count > 0 ? { affectedCaseCount: row.affected_case_count } : {}),
+        ...(itemAccumulators.get(row.id)!.caseRefs.values().next().value
+          ? { affectedCaseRef: itemAccumulators.get(row.id)!.caseRefs.values().next().value as string } : {}),
+        ...(itemAccumulators.get(row.id)!.caseRefs.size > 0
+          ? { affectedCaseCount: itemAccumulators.get(row.id)!.caseRefs.size } : {}),
         ...(row.place_name ? { placeLabel: row.place_name } : {}),
         lifecycleStatus: row.lifecycle_status,
-        requiredParticipants: row.required_participants,
-        optionalParticipants: row.optional_participants,
+        requiredParticipants: itemAccumulators.get(row.id)!.requiredParticipantRefs.size,
+        optionalParticipants: itemAccumulators.get(row.id)!.optionalParticipantRefs.size,
         requiresPhysicalPresence: row.operating_requirements?.requiresPhysicalPresence === true,
       })),
     };
