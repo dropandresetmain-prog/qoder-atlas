@@ -14,8 +14,9 @@ bounded Event Overview implementation and Case graph. Neither faithful graph
 convergence nor physical Jordan acceptance is yet claimed.
 
 Sequence: A0 freeze/diagnose -> A1 strong current-product surfaces plus faithful V5.6/V7.2
--> A2 physical Sarah -> A3 generalized Jordan runtime -> A4 physical Jordan ->
-A5 repeatable cross-scenario final candidate. Contracts, triage and implementation
+-> A2 Sarah LIVE/video-ready -> A3 Jordan multi-domain composition -> A4 Jordan sandbox/video-ready ->
+A5 both heroes LIVE/final freeze. Latest scope is [hero depth](work/ASTRA_HERO_DEPTH_SCOPE.md),
+which supersedes prior flight-only/ancillary deferrals. Contracts, triage and implementation
 ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 
 | Scope | Current disposition / revisit condition |
@@ -23,11 +24,12 @@ ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 | Booking identities/budget and per-offer flight/time/cost visibility | Act Now for Jordan; R4 parks reclassified because executable repeatable recovery requires them. |
 | Recent decisions, Activity, Programme/Traveller readability, persistent Reset | Act Now for A1; physically prove current Sarah product usability. |
 | Healthy-trip traveller change-request planning | Park for Later by founder scope decision; genuine canonical request/planning/progression/authority/resolution gap. Preserve actual assessments; never fake FAIL. Revisit after generalized Sarah/Jordan verticals and deliberate desired-state design. |
-| Broad programme relocation/cancellation/OTHER | Park for Later; typed scenario effects, source-announcement distinction and execution support require deliberate design. Current bilateral time swap remains supported. |
+| Programme relocation/cancellation | Act Now for the small typed set required by Sarah/Jordan; retain impact, authority, execution and observation gates. Operations beyond hero needs stay parked; no untyped OTHER mutation. |
 | Non-critical legacy parity | Park for Later; revisit when it materially improves Sarah, Jordan, graph fidelity or submission. Message/export footer controls were inert at the legacy baseline. |
-| Programme importer partial-prefix visibility | Investigate Now, bounded: determine actual normal/demo visibility and resumable integrity before deciding whether atomicity blocks reliability. |
-| Narita hotel booking, Singapore hotel replacement, transfer transaction, insurance submission, composite provider action plan | Park for Later; outside closed Sarah/Jordan hero, revisit after A5 or an expanded acceptance requirement. |
-| Remaining historical providers including Nuitée, Google Routes, Frankfurter and optional model routes | Park for Later for this convergence; no claim of normal-runtime parity, revisit after the two required verticals or when a required decision needs that provider. |
+| Programme importer partial-prefix visibility | Park for Later after focused PG interruption/retry proof (5/5). Partial inventory remains valid and UNKNOWN; identical retry converges without duplicates, another workspace unchanged, no supplier/authority effects. Revisit for explicit import-status/hide-incomplete requirements. |
+| Jordan multi-domain recovery | Act Now: Narita overnight, authoritative contextual entry check, Singapore stay actions when selected recovery requires them, material transfers, finals and evidenced insurance reasoning. Supported required provider actions use real sandbox execution; unsupported seams remain explicit. |
+| Provider restoration | Investigate Now for each hero-required provider: normal boot, live research, downstream use and protected sandbox actions. Unrelated historical adapters remain Park for Later. |
+| Desktop presenter quality and LIVE proof | Act Now across hero-visible graphs, consequences, alternatives, recommendation, authority, progress/provenance and resolution. Mobile is a separate post-hackathon milestone. |
 | Multiple independent Overview blast centres | Park for Later; revisit when a required scenario needs simultaneous independent incidents. |
 | R4 N5-N7 and budget-injection replan issue | Existing R4 dispositions retained; revisit on objective-blocking reproduction. |
 | Opaque R4 m9ReadModelCurrentness suite-only failure | Investigate Now on concrete focused/new integration evidence; no ceremonial broad rerun. |

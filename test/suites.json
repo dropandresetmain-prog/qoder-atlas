@@ -285,6 +285,8 @@
       "postgres-integration/r1ComposedB1.pgtest.ts",
       "postgres-integration/r1UnknownOutcome.pgtest.ts",
       "postgres-integration/r1ConnectionRecovery.pgtest.ts",
+      "postgres-integration/a1TravellerRead.pgtest.ts",
+      "postgres-integration/changeRequest.pgtest.ts",
       "postgres-integration/r2FocusedCaseGraph.pgtest.ts",
       "postgres-integration/r2OriginalGraphSnapshot.pgtest.ts",
       "postgres-integration/revisionConflicts.pgtest.ts",
