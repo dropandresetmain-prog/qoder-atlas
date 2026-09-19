@@ -136,6 +136,93 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
         LIMIT 100`,
       [workspaceId],
     );
+    const recent = await client.query<{
+      event_id: string;
+      case_id: string;
+      operation_namespace: string;
+      capability_ref: string;
+      decision_at: Date;
+      decision_kind: 'approval' | 'revocation';
+      actor_principal_id: string;
+      actor_label: string | null;
+    }>(
+      `WITH decision_events AS (
+         SELECT a.id AS event_id, ap.recovery_case_id AS case_id,
+                ai.operation_namespace, ai.capability_ref,
+                a.approved_at AS decision_at, 'approval'::text AS decision_kind,
+                a.approver_principal_id AS actor_principal_id
+           FROM approvals a
+           JOIN authority_decisions ad
+             ON ad.workspace_id = a.workspace_id AND ad.id = a.decision_id
+           JOIN action_plans ap
+             ON ap.workspace_id = ad.workspace_id AND ap.id = ad.action_plan_id
+           JOIN action_intents ai
+             ON ai.workspace_id = ad.workspace_id AND ai.id = ad.action_intent_id
+          WHERE a.workspace_id = $1
+         UNION ALL
+         SELECT r.id AS event_id, ap.recovery_case_id AS case_id,
+                ai.operation_namespace, ai.capability_ref,
+                r.revoked_at AS decision_at, 'revocation'::text AS decision_kind,
+                r.revoked_by_principal_id AS actor_principal_id
+           FROM approval_revocations r
+           JOIN approvals a
+             ON a.workspace_id = r.workspace_id AND a.id = r.approval_id
+           JOIN authority_decisions ad
+             ON ad.workspace_id = a.workspace_id AND ad.id = a.decision_id
+           JOIN action_plans ap
+             ON ap.workspace_id = ad.workspace_id AND ap.id = ad.action_plan_id
+           JOIN action_intents ai
+             ON ai.workspace_id = ad.workspace_id AND ai.id = ad.action_intent_id
+          WHERE r.workspace_id = $1
+       )
+       SELECT de.event_id, de.case_id, de.operation_namespace, de.capability_ref,
+              de.decision_at, de.decision_kind, de.actor_principal_id,
+              actor.actor_label
+         FROM decision_events de
+         LEFT JOIN LATERAL (
+           SELECT CASE
+                    WHEN grant_party.represented_party_kind = 'ORGANISATION'
+                         AND COALESCE(org.display_name, org.legal_name) IS NOT NULL
+                      THEN COALESCE(org.display_name, org.legal_name)
+                    WHEN p.actor_type = 'HUMAN' THEN 'Person'
+                    ELSE 'Reviewer'
+                  END AS actor_label
+             FROM principals p
+             LEFT JOIN LATERAL (
+               SELECT g.represented_party_kind, g.represented_party_id
+                 FROM authority_grants g
+                WHERE g.workspace_id = $1
+                  AND g.principal_id = de.actor_principal_id
+                  AND g.issued_at <= de.decision_at
+                  AND (g.revoked_at IS NULL OR g.revoked_at >= de.decision_at)
+                  AND (g.expires_at IS NULL OR g.expires_at > de.decision_at)
+                ORDER BY g.issued_at DESC, g.id DESC
+                LIMIT 1
+             ) grant_party ON true
+             LEFT JOIN organisations org
+               ON org.workspace_id = $1
+              AND grant_party.represented_party_kind = 'ORGANISATION'
+              AND org.id = grant_party.represented_party_id
+            WHERE p.workspace_id = $1 AND p.id = de.actor_principal_id
+            LIMIT 1
+         ) actor ON true
+        ORDER BY decision_at DESC, event_id DESC
+        LIMIT 20`,
+      [workspaceId],
+    );
+    const operationLabels: Record<string, string> = {
+      'internal.programme': 'Programme time change',
+      'internal.reservation': 'Reservation change',
+      'internal.journey': 'Journey change',
+      'internal.support': 'Traveller support change',
+      'internal.objective': 'Programme objective change',
+      'provider.flight': 'Flight booking',
+      'provider.offer': 'Flight booking',
+      'provider.hotel': 'Hotel booking',
+      'provider.transfer': 'Transfer booking',
+    };
+    const operationLabel = (row: { operation_namespace: string; capability_ref: string }): string =>
+      operationLabels[row.operation_namespace] ?? operationLabels[row.capability_ref] ?? 'Recovery action';
     return {
       generatedAt: new Date().toISOString(),
       decisions: rows.rows.map((row) => ({
@@ -146,6 +233,17 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
         subjectLabels: row.subject_labels ?? [],
         awaitingAuthority: row.lifecycle_status === 'AWAITING_AUTHORITY',
       })),
+      ...(recent.rows.length > 0
+        ? {
+            recentDecisions: recent.rows.map((row) => ({
+              caseRef: row.case_id,
+              label: operationLabel(row),
+              decisionAt: row.decision_at.toISOString(),
+              actorLabel: row.actor_label ?? 'Reviewer',
+              kind: row.decision_kind,
+            })),
+          }
+        : {}),
     };
   });
   return value;

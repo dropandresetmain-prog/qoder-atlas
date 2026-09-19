@@ -5,10 +5,16 @@
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { openDisruptionCase } from './r1ProgrammeWorld.ts';
-import { ActivityCursorError, loadActivityFeed, loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts.ts';
+import { persistStrategyChangeRow } from './m8ExecutionGateHelpers.ts';
+import { ActivityCursorError, loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts.ts';
 import { renderProductActivityFeed } from '../src/ui/screens/product-activity-feed.ts';
+import { issueAuthorityDecision, persistActionPlan, recordApproval, revokeApproval } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
+import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
+import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
+import { DecisionQueueSchema } from '../src/contracts/v2/product/readModels.ts';
 
 after(async () => { await (await sharedTestPool()).end(); });
 
@@ -17,6 +23,110 @@ test('loadProgrammeSchedule runs on PG and reports the affected case per item', 
   const schedule = await loadProgrammeSchedule(c.pool, c.world.workspaceId);
   assert.ok(Array.isArray(schedule.items));
   assert.ok(schedule.items.length > 0, 'the world has programme items');
+});
+
+test('Decision history reads approvals and revocations through their case plan without changing Waiting now', async () => {
+  const c = await openDisruptionCase('r4 decision history');
+  const journeyId = c.world.people[0]!.journeyId;
+  const planId = randomUUID();
+  const intentId = randomUUID();
+  const recoveryStrategyId = randomUUID();
+  const scenarioChangeId = randomUUID();
+  await persistStrategyChangeRow(c.pool, c.world.workspaceId, c.world.actorId, c.caseId, {
+    id: scenarioChangeId,
+    recoveryStrategyId,
+    strategyVersion: 1,
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: journeyId }],
+    effects: [],
+  });
+  const plan: ActionPlan = {
+    id: planId,
+    recoveryCaseId: c.caseId,
+    scenarioChangeId,
+    intents: [{
+      id: intentId,
+      actionPlanId: planId,
+      operationNamespace: 'internal.programme',
+      logicalOperationKey: `decision-history:${intentId}`,
+      requestFingerprint: `fingerprint:${intentId}`,
+      capabilityRef: 'internal.programme',
+      subjectRefs: [{ kind: 'JOURNEY', id: journeyId }],
+      expectedRevisions: [],
+      preconditions: [],
+      requiredAuthorityScopes: [],
+      expectedObservations: ['programme_state'],
+      compensationPolicy: { supported: false, requiresSeparateAuthority: true },
+      status: 'PROPOSED',
+    }],
+    dependencies: [],
+  };
+  const persisted = await persistActionPlan(c.app.unitOfWork(), {
+    workspaceId: c.world.workspaceId,
+    actorPrincipalId: c.world.actorId,
+    idempotencyKey: randomUUID(),
+    plan,
+    recoveryStrategyId,
+  });
+  assert.equal(persisted.ok, true, JSON.stringify(persisted));
+  const scope = [{ kind: 'JOURNEY' as const, id: journeyId }];
+  const decision = await issueAuthorityDecision(c.app.unitOfWork(), {
+    workspaceId: c.world.workspaceId,
+    actorPrincipalId: c.world.actorId,
+    idempotencyKey: randomUUID(),
+    envelopeInput: {
+      actionPlanId: planId,
+      actionPlanVersion: 1,
+      actionIntentId: intentId,
+      actionIntentVersion: 1,
+      requiredActorRoles: ['CASE_OWNER'],
+      scope,
+      grantRefs: [],
+      ruleInputs: [],
+    },
+    requirements: [{ actorRole: 'CASE_OWNER' }],
+    issuedAt: c.now,
+  });
+  assert.equal(decision.ok, true, JSON.stringify(decision));
+  const approval = await recordApproval(c.app.unitOfWork(), {
+    workspaceId: c.world.workspaceId,
+    actorPrincipalId: c.operatorPrincipalId,
+    idempotencyKey: randomUUID(),
+    decisionId: decision.value.decisionId,
+    requirementId: decision.value.requirementIds[0]!,
+    envelopeFingerprint: decision.value.fingerprint,
+    scope,
+    approvedAt: '2031-09-15T08:00:00.000Z',
+  });
+  assert.equal(approval.ok, true, JSON.stringify(approval));
+  const revokerId = randomUUID();
+  const revoker = await createPrincipal(c.app.unitOfWork(), {
+    workspaceId: c.world.workspaceId,
+    actorPrincipalId: c.operatorPrincipalId,
+    idempotencyKey: randomUUID(),
+    principalId: revokerId,
+    actorType: 'SERVICE',
+    authIssuer: 'urn:test:decision-history',
+    authSubject: revokerId,
+  });
+  assert.equal(revoker.ok, true, JSON.stringify(revoker));
+  const revoked = await revokeApproval(c.app.unitOfWork(), {
+    workspaceId: c.world.workspaceId,
+    actorPrincipalId: revokerId,
+    idempotencyKey: randomUUID(),
+    approvalId: approval.value.approvalId,
+    revokedAt: '2031-09-15T09:00:00.000Z',
+  });
+  assert.equal(revoked.ok, true, JSON.stringify(revoked));
+
+  const queue = await loadDecisionQueue(c.pool, c.world.workspaceId);
+  DecisionQueueSchema.parse(queue);
+  assert.equal(queue.decisions.find((row) => row.caseRef === c.caseId)?.awaitingAuthority, false, 'history must not turn an open case into a waiting decision');
+  assert.deepEqual(queue.recentDecisions?.map((row) => row.kind), ['revocation', 'approval']);
+  assert.ok(queue.recentDecisions?.every((row) => row.caseRef === c.caseId));
+  assert.deepEqual(queue.recentDecisions?.map((row) => row.actorLabel), ['Reviewer', 'Person']);
+  assert.deepEqual(queue.recentDecisions?.map((row) => row.label), ['Programme time change', 'Programme time change']);
+  assert.ok(queue.recentDecisions?.every((row) => !row.label.includes('Participant')));
+  assert.ok(queue.recentDecisions?.every((row) => !row.actorLabel.includes(c.operatorPrincipalId)));
 });
 
 test('Activity pages preserve complete PG ordering across timestamp ties and new arrivals', async () => {
