@@ -79,7 +79,7 @@ describe('R3 import guard — legacy proposeRecoveryStrategies seam retired', ()
 
     const violations: string[] = [];
     for (const file of tsFiles) {
-      const relativePath = file.replace(ROOT + '/', '');
+      const relativePath = file.replaceAll('\\', '/').replace(ROOT.replaceAll('\\', '/') + '/', '');
       // recoveryPlanning.ts itself is allowed to define/proposeRecoveryStrategies
       if (relativePath === 'src/app/target/recoveryPlanning.ts') continue;
 

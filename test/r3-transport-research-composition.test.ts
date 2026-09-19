@@ -122,7 +122,7 @@ describe('R3 transport research composition', () => {
       ADAPTER_MODE: 'LIVE',
       PG_TARGET_WORKSPACE_ID: randomUUID(),
     };
-    const research = composeTargetTransportResearch(loadConfig(env), process.cwd());
+    const research = composeTargetTransportResearch(loadConfig(env, mkdtempSync(join(tmpdir(), 'r3-nodotenv-'))), process.cwd());
     assert.equal(research, undefined, 'LIVE without credentials must not fabricate a capability');
   });
 

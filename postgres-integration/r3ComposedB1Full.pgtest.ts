@@ -94,7 +94,8 @@ describe('R3 composed B1 (real PostgreSQL, normal boot composition)', () => {
     const count = async (table: string) =>
       Number((await c.pool.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${table} WHERE workspace_id = $1`, [ws])).rows[0]!.n);
 
-    // ---- ORIGINAL snapshot: captured at case open, must stay byte-identical.
+    // ---- ORIGINAL snapshot: captured by the progression pass at the FIRST SETTLED
+    // FAILING basis (R2 design, migration 0127), then must stay byte-identical.
     const originalSnapshot = async () => {
       const rows = await c.pool.query<{ snapshot: unknown }>(
         `SELECT snapshot FROM recovery_case_graph_snapshots
@@ -103,13 +104,14 @@ describe('R3 composed B1 (real PostgreSQL, normal boot composition)', () => {
       );
       return JSON.stringify(rows.rows[0]?.snapshot);
     };
-    const originalBefore = await originalSnapshot();
-    assert.ok(originalBefore && originalBefore !== 'undefined', 'migration 0127: ORIGINAL row exists at case open');
+    assert.equal(await originalSnapshot(), undefined, 'no ORIGINAL exists before the first progression wake');
 
     // ---- wake 1: the failing case is planned by the composed coordinator.
     assert.equal(await count('recovery_planning_attempts'), 0);
     await wake();
     assert.equal(await count('recovery_planning_attempts'), 1);
+    const originalBefore = await originalSnapshot();
+    assert.ok(originalBefore && originalBefore !== 'undefined', 'migration 0127: ORIGINAL row exists after the first settled failing basis');
     const planned = projectRecoveryCase((await loadRecoveryCaseFacts(c.pool, ws, c.caseId, now))!);
     const pe = planned.planningEvidence;
     assert.ok(pe, 'the planning attempt is on the Case read model');
