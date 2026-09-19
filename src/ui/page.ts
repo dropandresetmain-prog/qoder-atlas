@@ -16,7 +16,7 @@ import { escapeHtml } from './html.ts';
 import { renderFormEnhancementScript } from './interaction.ts';
 import { renderProgrammeChangeEnhancementScript } from './programme-change-interaction.ts';
 import { renderCaseResolutionEnhancementScript } from './case-resolution-interaction.ts';
-import { renderOverviewPollingScript } from './polling.ts';
+import { renderShellRuntimeScript } from './shellRuntime.ts';
 
 export type NavTarget = 'dashboard' | 'programme' | 'case' | 'decisions' | 'activity' | 'traveller';
 
@@ -51,6 +51,14 @@ export interface PageOptions {
    * explanation of what external calls (if any) the current mode permits.
    * Must never be wired in production.
    */
+  /**
+   * Render the persistent `Reset demo` control (data-action="reset-demo").
+   * Set only on runtimes where the backend reset gate is open; the shell
+   * never decides that itself.
+   */
+  resetDemo?: boolean;
+  /** Back link rendered above the page body (`renderBackLink`). */
+  backLink?: { label: string; href: string };
   demoBanner?: {
     adapterMode: 'LIVE' | 'RECORD' | 'REPLAY';
     plannerMode?: 'MODEL_STUDIO' | 'OPENROUTER' | 'DETERMINISTIC_FALLBACK';
@@ -69,8 +77,13 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
   const caseResolutionScript = isOperator
     ? renderCaseResolutionEnhancementScript()
     : '';
-  const pollingScript = isOperator && options.active === 'dashboard'
-    ? renderOverviewPollingScript()
+  // ONE runtime per full page load (delegated controls + region poller). It
+  // lives outside <main>, so a poll can never replace or re-run it.
+  const shellRuntime = isOperator
+    ? renderShellRuntimeScript({ intervalMs: options.active === 'dashboard' ? 2000 : 4000 })
+    : '';
+  const backLink = options.backLink
+    ? `<div class="shell shell-back">${renderBackLink(options.backLink.label, options.backLink.href)}</div>`
     : '';
   return `<!doctype html>
 <html lang="en">
@@ -78,20 +91,41 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(options.title)} · Northstar</title>
-<style>${THEME_CSS}</style>
+<style>${THEME_CSS}${SHELL_CSS}</style>
 </head>
 <body class="${isOperator ? 'surface-operator' : 'surface-traveller'}">
 ${chrome}
 ${banner}
+${backLink}
 ${bodyHtml}
 ${programmeChangeScript}
 ${caseResolutionScript}
-${pollingScript}
 ${renderFormEnhancementScript()}
 ${isOperator ? renderProfileMenuScript() : ''}
+${shellRuntime}
 </body>
 </html>`;
 }
+
+/**
+ * The shell's back affordance (`← Back to Overview`). Pages call this instead
+ * of hand-writing a link so wording, styling and the test hook stay one thing.
+ */
+export function renderBackLink(label: string, href: string): string {
+  return `<a class="back-link" data-test="back-link" href="${escapeHtml(href)}"><span aria-hidden="true">←</span> ${escapeHtml(label)}</a>`;
+}
+
+const SHELL_CSS = `
+.back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-soft); text-decoration: none; padding: 4px 0; }
+.back-link:hover { color: var(--text); text-decoration: underline; }
+.shell-back { padding-top: 12px; padding-bottom: 0; }
+.reset-demo { display: inline-flex; align-items: center; gap: 8px; }
+.reset-demo-btn { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-soft); cursor: pointer; }
+.reset-demo-btn:hover:not(:disabled) { color: var(--text); border-color: rgba(20, 23, 28, 0.32); }
+.reset-demo-btn:disabled, [data-action]:disabled { opacity: .55; cursor: progress; }
+.reset-demo-status, [data-action-status] { font-size: 12px; color: var(--text-soft); }
+[data-action-status]:empty { display: none; }
+`;
 
 /** Closes the profile popover when the operator clicks anywhere outside it. */
 function renderProfileMenuScript(): string {
@@ -149,8 +183,11 @@ function renderOperatorTopbar(options: PageOptions): string {
   if (options.operatorInitials || options.profileResetAction) {
     right.push(renderProfileMenu(options.operatorInitials ?? 'A', options.profileResetAction, options.eventName));
   }
+  if (options.resetDemo) {
+    right.unshift(`<span class="reset-demo" data-test="reset-demo"><button type="button" class="reset-demo-btn" data-action="reset-demo" data-test="reset-demo-btn" title="Return the demo to its starting state">Reset demo</button><span class="reset-demo-status" data-action-status role="status" aria-live="polite"></span></span>`);
+  }
   const tbRight = right.length > 0 ? `<div class="tb-right">${right.join('')}</div>` : '';
-  return `<header class="topbar" data-surface="operator">
+  return `<header class="topbar" data-surface="operator" data-poll-region="shell-topbar">
   <div class="brand"><img class="mark" src="/assets/northstar-logo.png" alt="" aria-hidden="true" width="128" height="128">Northstar<small>AI Travel Resolution Engine</small></div>
   ${eventSelect}
   ${nav}

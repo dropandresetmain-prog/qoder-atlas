@@ -1,16 +1,13 @@
 /**
- * F4 — Overview polling swap: disclosure survival + trigger status re-application.
- *
- * Evaluates the inline <script> from renderOverviewPollingScript() inside a
- * hand-rolled minimal DOM stub. No refactoring of polling.ts required.
+ * R4 — Overview polling via shell runtime (region/fallback patch; never replace <main>).
+ * Uses a minimal DOM stub against the stringified shellRuntime + overview config hook.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderOverviewPollingScript } from '../src/ui/polling.ts';
+import { renderShellRuntimeScript } from '../src/ui/shellRuntime.ts';
 
-// ── Minimal DOM stub ────────────────────────────────────────────────────────
-
-type TriggerEvent = { type: string; target: StubElement; preventDefault: () => void };
+type TriggerEvent = { type: string; target: StubElement; preventDefault: () => void; detail?: unknown };
 
 class StubElement {
   tagName: string;
@@ -20,32 +17,44 @@ class StubElement {
   parent: StubElement | null = null;
   text = '';
   disabled = false;
+  value = '';
+  scrollTop = 0;
   private _listeners = new Map<string, Array<(ev: TriggerEvent) => void>>();
 
   constructor(tag: string, attrs: Record<string, string> = {}) {
-    this.tagName = tag;
+    this.tagName = tag.toUpperCase();
     this.attrs = new Map(Object.entries(attrs));
     this.classes = new Set();
     this.children = [];
   }
 
+  get isConnected(): boolean {
+    let n: StubElement | null = this;
+    while (n) {
+      if (n.tagName === 'DOCUMENT' || n.tagName === '#DOCUMENT') return true;
+      n = n.parent;
+    }
+    return false;
+  }
+
   appendChild(child: StubElement) {
     child.parent = this;
     this.children.push(child);
+    return child;
+  }
+
+  get innerHTML(): string {
+    return this.children.map((c) => serialize(c)).join('') + (this.children.length ? '' : escapeText(this.text));
+  }
+
+  set innerHTML(html: string) {
+    this.children = [];
+    this.text = '';
+    for (const n of parse(html)) this.appendChild(n);
   }
 
   get outerHTML(): string {
     return serialize(this);
-  }
-
-  set outerHTML(html: string) {
-    if (!this.parent) return;
-    const nodes = parse(html);
-    const idx = this.parent.children.indexOf(this);
-    if (idx >= 0) {
-      this.parent.children.splice(idx, 1, ...nodes);
-      for (const n of nodes) n.parent = this.parent;
-    }
   }
 
   hasAttribute(name: string): boolean {
@@ -73,20 +82,50 @@ class StubElement {
     return null;
   }
 
+  querySelectorAll(sel: string): StubElement[] {
+    const out: StubElement[] = [];
+    const walk = (el: StubElement) => {
+      if (matchFull(el, sel)) out.push(el);
+      for (const c of el.children) walk(c);
+    };
+    for (const c of this.children) walk(c);
+    return out;
+  }
+
   closest(sel: string): StubElement | null {
     if (matchFull(this, sel)) return this;
     return this.parent?.closest(sel) ?? null;
+  }
+
+  contains(other: StubElement): boolean {
+    let n: StubElement | null = other;
+    while (n) {
+      if (n === this) return true;
+      n = n.parent;
+    }
+    return false;
+  }
+
+  replaceWith(node: StubElement): void {
+    if (!this.parent) return;
+    const idx = this.parent.children.indexOf(this);
+    if (idx < 0) return;
+    node.parent = this.parent;
+    this.parent.children.splice(idx, 1, node);
+    this.parent = null;
   }
 
   get classList() {
     return {
       add: (c: string) => { this.classes.add(c); },
       remove: (c: string) => { this.classes.delete(c); },
+      contains: (c: string) => this.classes.has(c),
     };
   }
 
   get textContent(): string {
-    return this.text;
+    if (this.children.length === 0) return this.text;
+    return this.children.map((c) => c.textContent).join('');
   }
 
   set textContent(v: string) {
@@ -99,104 +138,77 @@ class StubElement {
     this._listeners.get(type)!.push(fn);
   }
 
-  dispatchEvent(ev: { type: string; target: StubElement; preventDefault: () => void }) {
-    for (const fn of this._listeners.get(ev.type) || []) fn(ev);
+  dispatchEvent(ev: TriggerEvent) {
+    const list = this._listeners.get(ev.type) ?? [];
+    for (const fn of list) fn(ev);
+    return true;
   }
+
+  focus(_opts?: unknown) {}
+}
+
+function escapeText(t: string): string {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function serialize(el: StubElement): string {
-  const a = Array.from(el.attrs.entries())
-    .map(([k, v]) => (v ? `${k}="${v}"` : k))
-    .join(' ');
+  const attrs = [...el.attrs.entries()].map(([k, v]) => ` ${k}="${v}"`).join('');
   const cls = el.classes.size ? ` class="${[...el.classes].join(' ')}"` : '';
-  const attr = (a ? ' ' + a : '') + cls;
-  const inner = el.text + el.children.map(serialize).join('');
-  return `<${el.tagName}${attr}>${inner}</${el.tagName}>`;
+  const open = `<${el.tagName.toLowerCase()}${cls}${attrs}>`;
+  if (['BR', 'IMG', 'INPUT', 'HR'].includes(el.tagName)) return open.replace(/>$/, ' />');
+  return `${open}${el.children.map(serialize).join('')}${escapeText(el.children.length ? '' : el.text)}</${el.tagName.toLowerCase()}>`;
 }
 
 function parse(html: string): StubElement[] {
-  let pos = 0;
-  function nodes(parent: StubElement | null): StubElement[] {
-    const out: StubElement[] = [];
-    while (pos < html.length) {
-      if (html[pos] === '<') {
-        if (html[pos + 1] === '/') {
-          const end = html.indexOf('>', pos);
-          pos = end + 1;
-          return out;
-        }
-        pos++;
-        let tag = '';
-        while (pos < html.length && !/[\s>/]/.test(html[pos]!)) {
-          tag += html[pos];
-          pos++;
-        }
-        const attrs: Record<string, string> = {};
-        const cls: string[] = [];
-        while (pos < html.length && html[pos] !== '>' && html[pos] !== '/') {
-          while (pos < html.length && /\s/.test(html[pos]!)) pos++;
-          if (html[pos] === '>' || html[pos] === '/') break;
-          let name = '';
-          while (pos < html.length && !/[\s=>/]/.test(html[pos]!)) {
-            name += html[pos];
-            pos++;
-          }
-          if (html[pos] === '=') {
-            pos++;
-            const q = html[pos]!;
-            pos++;
-            let val = '';
-            while (pos < html.length && html[pos] !== q) {
-              val += html[pos];
-              pos++;
-            }
-            pos++;
-            if (name === 'class') cls.push(...val.split(/\s+/));
-            else attrs[name] = val;
-          } else if (name) {
-            attrs[name] = '';
-          }
-        }
-        const selfClose = html[pos] === '/';
-        if (selfClose) pos++;
-        pos++; // skip >
-        const el = new StubElement(tag, attrs);
-        for (const c of cls) el.classes.add(c);
-        if (!selfClose) {
-          for (const child of nodes(el)) el.appendChild(child);
-        }
-        out.push(el);
-      } else {
-        let txt = '';
-        while (pos < html.length && html[pos] !== '<') {
-          txt += html[pos];
-          pos++;
-        }
-        txt = txt.trim();
-        if (txt && parent) {
-          parent.text = txt;
-        }
+  const nodes: StubElement[] = [];
+  const re = /<([a-z0-9]+)([^>]*)>([\s\S]*?)<\/\1>|<([a-z0-9]+)([^>]*)\s*\/>/gi;
+  let m: RegExpExecArray | null;
+  let last = 0;
+  while ((m = re.exec(html))) {
+    if (m.index > last) {
+      const t = html.slice(last, m.index).trim();
+      if (t) {
+        const span = new StubElement('span');
+        span.text = t;
+        nodes.push(span);
       }
     }
-    return out;
+    if (m[4]) {
+      nodes.push(new StubElement(m[4], parseAttrs(m[5] ?? '')));
+    } else {
+      const el = new StubElement(m[1]!, parseAttrs(m[2] ?? ''));
+      for (const c of parse(m[3] ?? '')) el.appendChild(c);
+      if (!(m[3] ?? '').includes('<') && (m[3] ?? '').length) el.text = m[3]!;
+      nodes.push(el);
+    }
+    last = m.index + m[0].length;
   }
-  return nodes(null);
+  return nodes;
+}
+
+function parseAttrs(s: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const re = /([a-zA-Z0-9:-]+)(?:=\"([^\"]*)\"|=\'([^\']*)\')?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) out[m[1]!] = m[2] ?? m[3] ?? '';
+  return out;
 }
 
 function matchSimple(el: StubElement, sel: string): boolean {
-  let r = sel;
-  const tm = r.match(/^([a-zA-Z]+)/);
-  if (tm) {
-    if (el.tagName !== tm[1]) return false;
-    r = r.slice(tm[0].length);
+  let r = sel.trim();
+  const tag = r.match(/^[a-z0-9]+/i);
+  if (tag) {
+    if (el.tagName !== tag[0]!.toUpperCase()) return false;
+    r = r.slice(tag[0]!.length);
   }
-  const cm = r.match(/^\.([a-zA-Z0-9_-]+)/);
-  if (cm) {
-    if (!el.classes.has(cm[1]!)) return false;
-    r = r.slice(cm[0].length);
+  const cls = r.match(/^\.([a-zA-Z0-9_-]+)/);
+  if (cls) {
+    if (!el.classes.has(cls[1]!)) return false;
+    r = r.slice(cls[0].length);
   }
-  const am = r.match(/^\[([a-zA-Z-]+)(?:="([^"]*)")?\]/);
-  if (am) {
+  while (r.startsWith('[')) {
+    const am = r.match(/^\[([a-zA-Z0-9:-]+)(?:=\"([^\"]*)\")?\]/);
+    if (!am) return false;
     if (!el.attrs.has(am[1]!)) return false;
     if (am[2] !== undefined && el.attrs.get(am[1]!) !== am[2]) return false;
     r = r.slice(am[0].length);
@@ -223,8 +235,6 @@ function matchFull(el: StubElement, sel: string): boolean {
   return true;
 }
 
-// ── Test environment ────────────────────────────────────────────────────────
-
 function responseHTML(opts: {
   disclosureOpen?: boolean;
   statusText?: string;
@@ -240,26 +250,13 @@ function responseHTML(opts: {
   const revision = opts.revision ?? '1';
   const ready = opts.readyCount ?? '50';
   const reconcilingHidden = lifecycle === 'RECONCILING' ? '' : ' hidden';
-  return `<main data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle}" data-assessment-pending-count="${pending}" data-stable-revision="${revision}"><p data-test="overview-reconciling"${reconcilingHidden}>Reconciling changes…</p><div data-test="ready-count">${ready}</div><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply">Apply</button></details></main><header class="topbar">Nav</header>`;
-}
-
-interface TriggerResponseShape {
-  ok: boolean;
-  status: number;
-  body?: unknown;
-  raw?: string;
-}
-
-interface WindowStub {
-  __northstarRefreshOverview?: () => void;
-  [key: string]: unknown;
+  return `<main data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle}" data-assessment-pending-count="${pending}" data-stable-revision="${revision}"><p data-test="overview-reconciling"${reconcilingHidden}>Reconciling changes…</p><div data-test="ready-count">${ready}</div><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply" data-action="trigger-disruption">Apply</button></details></main>`;
 }
 
 interface Env {
-  window: WindowStub;
+  window: { __northstarRefreshOverview?: () => Promise<void> | void; [k: string]: unknown };
   doc: StubElement;
   setOverviewHTML: (html: string) => void;
-  setTriggerResponse: (r: TriggerResponseShape) => void;
   intervals: Array<{ cb: () => void; ms: number }>;
 }
 
@@ -271,246 +268,112 @@ function createEnv(domOpts: {
   revision?: string;
   readyCount?: string;
 } = {}): Env {
-  // Build initial DOM.
   const doc = new StubElement('document');
-  const lifecycle = domOpts.lifecycle ?? 'SETTLED';
-  const main = new StubElement('main', {
-    'data-test': 'product-operator-overview',
-    'data-assessment-lifecycle': lifecycle,
-    'data-assessment-pending-count': String(domOpts.pendingCount ?? 0),
-    'data-stable-revision': domOpts.revision ?? '1',
-  });
-  const reconciling = new StubElement('p', { 'data-test': 'overview-reconciling' });
-  if (lifecycle !== 'RECONCILING') reconciling.setAttribute('hidden', '');
-  reconciling.text = 'Reconciling changes…';
-  main.appendChild(reconciling);
-  const ready = new StubElement('div', { 'data-test': 'ready-count' });
-  ready.text = domOpts.readyCount ?? '50';
-  main.appendChild(ready);
-  const detailsAttrs: Record<string, string> = {
-    'data-test': 'simulated-airline-update',
-    'data-configured': 'true',
-  };
-  if (domOpts.disclosureOpen) detailsAttrs['open'] = '';
-  const details = new StubElement('details', detailsAttrs);
-  const status = new StubElement('span', { 'data-test': 'simulated-airline-update-status' });
-  status.text = domOpts.statusText ?? '';
-  const button = new StubElement('button', { 'data-test': 'simulated-airline-update-apply' });
-  button.text = 'Apply';
-  details.appendChild(status);
-  details.appendChild(button);
-  main.appendChild(details);
-  doc.appendChild(main);
-  const topbar = new StubElement('header');
-  topbar.classes.add('topbar');
-  topbar.text = 'Nav';
-  doc.appendChild(topbar);
+  for (const n of parse(responseHTML(domOpts))) doc.appendChild(n);
 
-  const win: WindowStub = {};
-  let overviewHTML = responseHTML({
-    lifecycle: domOpts.lifecycle,
-    pendingCount: domOpts.pendingCount,
-    revision: domOpts.revision,
-    readyCount: domOpts.readyCount,
-  });
-  let triggerResp = { ok: true, status: 200, raw: '{}' };
+  const win: Env['window'] = { scrollY: 0, hidden: false };
+  Object.defineProperty(win, 'document', { get: () => doc });
+  let overviewHTML = responseHTML(domOpts);
+  const intervals: Env['intervals'] = [];
 
   const fetchStub = (url: string) => {
     if (url.includes('/api/v2/operator/overview')) {
       return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(overviewHTML) });
     }
-    if (url.includes('/api/v2/demo/provider-event/airline-rebooking')) {
-      return Promise.resolve({
-        ok: triggerResp.ok,
-        status: triggerResp.status,
-        text: () => Promise.resolve(triggerResp.raw),
-      });
-    }
     return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('') });
-  };
-
-  const intervals: Array<{ cb: () => void; ms: number }> = [];
-  const setIntervalStub = (cb: () => void, ms: number) => {
-    intervals.push({ cb, ms });
-    return intervals.length;
   };
 
   class StubDOMParser {
     parseFromString(html: string) {
-      const nodes = parse(html);
+      const root = new StubElement('document');
+      for (const n of parse(html)) root.appendChild(n);
       return {
-        querySelector(sel: string) {
-          for (const n of nodes) {
-            if (matchFull(n, sel)) return n;
-            const f = n.querySelector(sel);
-            if (f) return f;
-          }
-          return null;
-        },
+        querySelector: (sel: string) => root.querySelector(sel),
+        querySelectorAll: (sel: string) => root.querySelectorAll(sel),
       };
     }
   }
 
-  const script = renderOverviewPollingScript();
-  const body = script.replace(/<\/?script>/g, '');
+  (doc as unknown as { importNode: (n: StubElement, _deep: boolean) => StubElement }).importNode = (n) => n;
+  (doc as unknown as { hidden: boolean }).hidden = false;
+
+  const shell = renderShellRuntimeScript({ intervalMs: 2000 }).replace(/<\/?script[^>]*>/g, '');
+  const overview = renderOverviewPollingScript({ intervalMs: 2000 }).replace(/<\/?script>/g, '');
+  const CustomEvent = function (this: { type: string; detail: unknown }, type: string, init?: { detail?: unknown }) {
+    this.type = type;
+    this.detail = init?.detail;
+  };
   const fn = new Function(
-    'window', 'document', 'DOMParser', 'fetch', 'setInterval', 'console', body,
-  ) as (w: Record<string, unknown>, d: StubElement, p: unknown, f: unknown, s: unknown, c: unknown) => void;
-  fn(win, doc, StubDOMParser, fetchStub, setIntervalStub, { warn() {} });
+    'window', 'document', 'DOMParser', 'fetch', 'setInterval', 'console', 'CustomEvent',
+    `${overview}\n${shell}`,
+  );
+  fn(win, doc, StubDOMParser, fetchStub, (cb: () => void, ms: number) => { intervals.push({ cb, ms }); return intervals.length; }, { warn() {} }, CustomEvent);
 
   return {
     window: win,
     doc,
     setOverviewHTML: (html: string) => { overviewHTML = html; },
-    setTriggerResponse: (r) => {
-      triggerResp = {
-        ok: r.ok,
-        status: r.status,
-        raw: r.raw ?? (r.body ? JSON.stringify(r.body) : ''),
-      };
-    },
     intervals,
   };
 }
 
 async function flush() {
-  for (let i = 0; i < 20; i++) await new Promise(r => setTimeout(r, 0));
+  for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
 }
 
-// ── Tests ───────────────────────────────────────────────────────────────────
-
-test('setInterval captures default 2000ms interval', () => {
+test('overview config + shell runtime register a 2000ms interval', () => {
   const env = createEnv();
-  assert.equal(env.intervals.length, 1, 'exactly one interval registered');
-  assert.equal(env.intervals[0]!.ms, 2000, 'default interval is 2000ms');
+  assert.ok(env.intervals.some((i) => i.ms === 2000));
+  assert.equal(typeof env.window.__northstarRefreshOverview, 'function');
 });
 
-test('Scenario A: user-opened disclosure survives the main swap', async () => {
+test('RECONCILING holds settled ready count (no 0 rebuild)', async () => {
+  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
+  env.setOverviewHTML(responseHTML({
+    lifecycle: 'RECONCILING',
+    pendingCount: 5,
+    revision: '11',
+    readyCount: '0',
+  }));
+  await env.window.__northstarRefreshOverview!();
+  await flush();
+  const ready = env.doc.querySelector('[data-test="ready-count"]');
+  assert.ok(ready);
+  assert.equal(ready.textContent, '50');
+  const indicator = env.doc.querySelector('[data-test="overview-reconciling"]');
+  assert.ok(indicator);
+  assert.equal(indicator.hasAttribute('hidden'), false);
+});
+
+test('SETTLED result replaces held content once', async () => {
+  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
+  env.setOverviewHTML(responseHTML({ lifecycle: 'RECONCILING', pendingCount: 5, revision: '11', readyCount: '0' }));
+  await env.window.__northstarRefreshOverview!();
+  await flush();
+  env.setOverviewHTML(responseHTML({ lifecycle: 'SETTLED', revision: '12', readyCount: '48' }));
+  await env.window.__northstarRefreshOverview!();
+  await flush();
+  const ready = env.doc.querySelector('[data-test="ready-count"]');
+  assert.ok(ready);
+  assert.equal(ready.textContent, '48');
+});
+
+test('unchanged SETTLED poll does not rewrite ready count', async () => {
+  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
+  env.setOverviewHTML(responseHTML({ lifecycle: 'SETTLED', revision: '10', readyCount: '999' }));
+  await env.window.__northstarRefreshOverview!();
+  await flush();
+  const ready = env.doc.querySelector('[data-test="ready-count"]');
+  assert.ok(ready);
+  assert.equal(ready.textContent, '50', 'same projection revision must not rewrite');
+});
+
+test('user-opened disclosure survives content patch', async () => {
   const env = createEnv({ disclosureOpen: true, revision: '1' });
-  // Response HTML has details WITHOUT open attribute; new revision forces apply.
   env.setOverviewHTML(responseHTML({ disclosureOpen: false, revision: '2' }));
-  env.window.__northstarRefreshOverview!();
+  await env.window.__northstarRefreshOverview!();
   await flush();
   const details = env.doc.querySelector('[data-test="simulated-airline-update"]');
-  assert.ok(details, 'details element must exist after swap');
-  assert.ok(details.hasAttribute('open'), 'open attribute must be restored after swap');
-});
-
-test('Scenario B1: APPLIED status re-applied after swap', async () => {
-  const env = createEnv({ disclosureOpen: true, revision: '1' });
-  // Simulate click on apply button.
-  const button = env.doc.querySelector('[data-test="simulated-airline-update-apply"]')!;
-  env.doc.dispatchEvent({ type: 'click', target: button, preventDefault() {} });
-  // Trigger response: APPLIED.
-  env.setTriggerResponse({ ok: true, status: 200, body: { status: 'APPLIED' } });
-  // Overview response (from refresh after apply) has empty status text.
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: '', revision: '2' }));
-  await flush();
-  const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
-  assert.ok(status);
-  assert.equal(status.textContent, 'Applied. Authoritative state will refresh automatically.');
-  const btn = env.doc.querySelector('[data-test="simulated-airline-update-apply"]');
-  assert.ok(btn);
-  assert.equal(btn.disabled, false, 'button must be re-enabled after response');
-});
-
-test('Scenario B2: ALREADY_APPLIED status re-applied after swap', async () => {
-  const env = createEnv({ disclosureOpen: true, revision: '1' });
-  const button = env.doc.querySelector('[data-test="simulated-airline-update-apply"]')!;
-  env.doc.dispatchEvent({ type: 'click', target: button, preventDefault() {} });
-  env.setTriggerResponse({ ok: true, status: 200, body: { status: 'ALREADY_APPLIED' } });
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: '', revision: '2' }));
-  await flush();
-  const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
-  assert.ok(status);
-  assert.equal(status.textContent, 'Already applied. No duplicate incident created.');
-});
-
-test('Scenario C1: error response sets error status and re-enables button', async () => {
-  const env = createEnv({ disclosureOpen: true });
-  // Set error response BEFORE click (click handler calls fetch immediately).
-  env.setTriggerResponse({ ok: false, status: 500, body: { code: 'BOOM', message: 'kaboom' } });
-  const button = env.doc.querySelector('[data-test="simulated-airline-update-apply"]')!;
-  env.doc.dispatchEvent({ type: 'click', target: button, preventDefault() {} });
-  await flush();
-  const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
-  assert.ok(status);
-  assert.ok(status.textContent.startsWith('The simulated update was not applied.'), `expected error text, got: ${status.textContent}`);
-  assert.ok(status.textContent.includes('BOOM: kaboom'), `expected error text, got: ${status.textContent}`);
-  const btn = env.doc.querySelector('[data-test="simulated-airline-update-apply"]');
-  assert.ok(btn);
-  assert.equal(btn.disabled, false, 'button must be re-enabled after error');
-});
-
-test('Scenario C2: no invented business state on plain refresh', async () => {
-  const serverStatusText = 'Server-provided status';
-  const env = createEnv({ disclosureOpen: false, statusText: 'Initial' });
-  // No click — lastTriggerStatus stays null.
-  env.setOverviewHTML(responseHTML({ disclosureOpen: false, statusText: serverStatusText, revision: '2' }));
-  env.window.__northstarRefreshOverview!();
-  await flush();
-  const status = env.doc.querySelector('[data-test="simulated-airline-update-status"]');
-  assert.ok(status);
-  assert.equal(status.textContent, serverStatusText, 'status must come from server HTML, not invented');
-});
-
-test('Founder defect: RECONCILING holds settled ready count (no 0 rebuild)', async () => {
-  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
-  env.setOverviewHTML(responseHTML({
-    lifecycle: 'RECONCILING',
-    pendingCount: 5,
-    revision: '11',
-    readyCount: '0',
-  }));
-  env.window.__northstarRefreshOverview!();
-  await flush();
-  const ready = env.doc.querySelector('[data-test="ready-count"]');
-  assert.ok(ready);
-  assert.equal(ready.textContent, '50', 'must hold last SETTLED ready count during RECONCILING');
-  const indicator = env.doc.querySelector('[data-test="overview-reconciling"]');
-  assert.ok(indicator);
-  assert.equal(indicator.hasAttribute('hidden'), false, 'reconciling indicator must be visible');
-});
-
-test('Founder defect: SETTLED result replaces held content once', async () => {
-  const env = createEnv({ revision: '10', readyCount: '50', lifecycle: 'SETTLED' });
-  env.setOverviewHTML(responseHTML({
-    lifecycle: 'RECONCILING',
-    pendingCount: 5,
-    revision: '11',
-    readyCount: '0',
-  }));
-  env.window.__northstarRefreshOverview!();
-  await flush();
-  env.setOverviewHTML(responseHTML({
-    lifecycle: 'SETTLED',
-    pendingCount: 0,
-    revision: '12',
-    readyCount: '49',
-  }));
-  env.window.__northstarRefreshOverview!();
-  await flush();
-  const ready = env.doc.querySelector('[data-test="ready-count"]');
-  assert.ok(ready);
-  assert.equal(ready.textContent, '49', 'SETTLED snapshot must apply after reconciliation');
-  const indicator = env.doc.querySelector('[data-test="overview-reconciling"]');
-  assert.ok(indicator);
-  assert.equal(indicator.hasAttribute('hidden'), true, 'reconciling indicator must hide when SETTLED');
-});
-
-test('Founder defect: unchanged SETTLED poll does not rewrite DOM', async () => {
-  const env = createEnv({ revision: '10', readyCount: '49', lifecycle: 'SETTLED' });
-  const before = env.doc.querySelector('main[data-test="product-operator-overview"]');
-  assert.ok(before);
-  env.setOverviewHTML(responseHTML({
-    lifecycle: 'SETTLED',
-    pendingCount: 0,
-    revision: '10',
-    readyCount: '49',
-    statusText: 'Generated later',
-  }));
-  env.window.__northstarRefreshOverview!();
-  await flush();
-  const after = env.doc.querySelector('main[data-test="product-operator-overview"]');
-  assert.equal(after, before, 'identical stable revision must keep the same main node');
+  assert.ok(details);
+  assert.ok(details.hasAttribute('open'), 'open attribute must be restored');
 });

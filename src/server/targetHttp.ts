@@ -46,18 +46,12 @@ const SHELL_ROUTES: Record<string, string | undefined> = {
   '/activity': '/api/v2/operator/activity',
 };
 
-/**
- * The clean focused-case product route (FB1-2/FB1-3). It maps onto the same
- * read-only case handler every other product route uses, which renders the
- * case inside the product shell — so the operator never has to navigate to
- * an `/api/v2/...` URL to work a case. The API route stays available for API
- * and debug use.
- *
- * The retired SQLite composition has its own `/operator/cases/:id` behaviour.
- * That runtime is not imported, reactivated or ported here: this is the
- * equivalent route implemented in the normal PostgreSQL target server.
+/*
+ * The clean focused-case route `/operator/cases/:id` is answered by the
+ * product handlers (`endpoints.handle`, first in `handle`), which render the
+ * case IN PLACE inside the shell — there is deliberately no redirect to an
+ * `/api/v2/...` URL here. The API route stays available for API/debug use.
  */
-const CASE_ROUTE = /^\/operator\/cases\/([^/]+)$/;
 
 async function serveStaticAsset(res: ServerResponse, assetName: string): Promise<boolean> {
   if (!UI_ASSETS.includes(assetName)) return false;
@@ -108,14 +102,6 @@ async function handle(
   const shellRoute = SHELL_ROUTES[url.pathname];
   if (req.method === 'GET' && shellRoute) {
     res.writeHead(302, { location: `${shellRoute}?format=html` });
-    res.end();
-    return;
-  }
-
-  const caseRoute = CASE_ROUTE.exec(url.pathname);
-  if (req.method === 'GET' && caseRoute) {
-    const caseRef = decodeURIComponent(caseRoute[1]!);
-    res.writeHead(302, { location: `/api/v2/cases/${encodeURIComponent(caseRef)}?format=html` });
     res.end();
     return;
   }

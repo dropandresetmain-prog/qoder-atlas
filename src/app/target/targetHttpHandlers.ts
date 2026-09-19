@@ -33,7 +33,9 @@ import { disruptionEventFileFromEnv, loadDisclosedDisruptionEvent } from '../dem
 import { seedDemoWorld } from './demoSeed.ts';
 import { importProgrammeBundle } from './programmeImport.ts';
 import { loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
-import { renderInShell } from './productShell.ts';
+import { OVERVIEW_BACK, renderInShell, type ShellContext } from './productShell.ts';
+import { loadShellChrome } from './readmodels/pgShellChrome.ts';
+import { demoResetGate, resetDemoWorkspace } from '../demo/demoReset.ts';
 import { datasetDirectoryFromEnv } from '../demo/datasetLoader.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
 import { renderProductProgrammeSchedule } from '../../ui/screens/product-programme-schedule.ts';
@@ -124,11 +126,46 @@ export interface TargetHttpContext {
  * present only when the backend identified one event for this workspace, so
  * the event select is either true or absent.
  */
-function shellContext(view: OperatorOverview): { eventName?: string; decisionCount: number } {
+function shellContext(view: OperatorOverview): ShellContext {
   return {
     ...(view.eventContext ? { eventName: view.eventContext.title } : {}),
     decisionCount: view.items.filter((item) => item.decisionRequired).length,
+    ...resetChrome(),
   };
+}
+
+/** The persistent Reset demo control renders only where the reset gate is open. */
+function resetChrome(): { resetDemo?: true } {
+  return demoResetGate(process.env).open ? { resetDemo: true } : {};
+}
+
+/** Event name + decision count + reset gate for pages whose read model lacks them. */
+async function pageChrome(ctx: TargetHttpContext): Promise<ShellContext> {
+  return { ...(await loadShellChrome(ctx.app.pool, ctx.app.workspaceId)), ...resetChrome() };
+}
+
+/**
+ * Serve one focused case. Used by BOTH the API route and the clean product
+ * route `/operator/cases/:id`, so the case renders in place inside the shell
+ * (no redirect to an API URL).
+ */
+async function serveCase(ctx: TargetHttpContext, res: ServerResponse, url: URL, caseId: string, html: boolean): Promise<void> {
+  const sinceCursor = parseSinceCursor(url);
+  const facts = await loadRecoveryCaseFacts(ctx.app.pool, ctx.app.workspaceId, caseId, undefined, sinceCursor);
+  if (!facts) {
+    if (html) sendHtml(res, 404, renderInShell('case', 'Case not found', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, '<main class="shell" data-test="case-not-found"><div class="page-head"><h1>Case not found</h1></div><p class="meta">This case does not exist in this workspace.</p></main>'));
+    else sendJson(res, 404, { error: 'CASE_NOT_FOUND' });
+    return;
+  }
+  const view = projectRecoveryCase(facts);
+  if (html) {
+    // The shell carries the event name, open-decision count and Reset demo on
+    // the Case page too; the Back link itself is rendered by the case screen
+    // (renderBackLink) inside its page head.
+    sendHtml(res, 200, renderInShell('case', 'Recovery case', await pageChrome(ctx), renderProductRecoveryCase(view)));
+  } else {
+    sendJson(res, 200, view);
+  }
 }
 
 /**
@@ -141,6 +178,19 @@ export async function handleTargetProductHttp(
   url: URL,
 ): Promise<boolean> {
   const { pathname } = url;
+
+  // Clean product route for one focused case: served IN PLACE (no redirect to
+  // an /api/v2 URL), inside the shell.
+  const cleanCase = pathname.match(/^\/operator\/cases\/([^/]+)$/);
+  if (req.method === 'GET' && cleanCase) {
+    try {
+      await serveCase(ctx, res, url, decodeURIComponent(cleanCase[1]!), true);
+    } catch (err) {
+      sendJson(res, 500, { error: 'TARGET_HTTP_FAILURE', message: err instanceof Error ? err.message : 'unknown' });
+    }
+    return true;
+  }
+
   if (!pathname.startsWith('/api/v2/')) return false;
 
   try {
@@ -180,7 +230,7 @@ export async function handleTargetProductHttp(
         sendHtml(
           res,
           200,
-          renderInShell('programme', 'Programme', { eventName: view.eventTitle }, renderProductProgrammeSchedule(view)),
+          renderInShell('programme', 'Programme', { eventName: view.eventTitle, ...(await pageChrome(ctx)) }, renderProductProgrammeSchedule(view)),
         );
       } else {
         sendJson(res, 200, view);
@@ -192,7 +242,7 @@ export async function handleTargetProductHttp(
       const view = await loadDecisionQueue(ctx.app.pool, ctx.app.workspaceId);
       if (url.searchParams.get('format') === 'html') {
         const decisionCount = view.decisions.filter((decision) => decision.awaitingAuthority).length;
-        sendHtml(res, 200, renderInShell('decisions', 'Decisions', { decisionCount }, renderProductDecisionQueue(view)));
+        sendHtml(res, 200, renderInShell('decisions', 'Decisions', { ...(await pageChrome(ctx)), decisionCount }, renderProductDecisionQueue(view)));
       } else {
         sendJson(res, 200, view);
       }
@@ -202,7 +252,7 @@ export async function handleTargetProductHttp(
     if (req.method === 'GET' && pathname === '/api/v2/operator/activity') {
       const view = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderInShell('activity', 'Activity', {}, renderProductActivityFeed(view)));
+        sendHtml(res, 200, renderInShell('activity', 'Activity', await pageChrome(ctx), renderProductActivityFeed(view)));
       } else {
         sendJson(res, 200, view);
       }
@@ -211,29 +261,7 @@ export async function handleTargetProductHttp(
 
     const caseMatch = pathname.match(/^\/api\/v2\/cases\/([^/]+)$/);
     if (req.method === 'GET' && caseMatch) {
-      const caseId = decodeURIComponent(caseMatch[1]!);
-      const sinceCursor = parseSinceCursor(url);
-      const facts = await loadRecoveryCaseFacts(ctx.app.pool, ctx.app.workspaceId, caseId, undefined, sinceCursor);
-      if (!facts) {
-        sendJson(res, 404, { error: 'CASE_NOT_FOUND' });
-        return true;
-      }
-      const view = projectRecoveryCase(facts);
-      if (url.searchParams.get('format') === 'html') {
-        // FB1-3: the focused case is a product surface, so it renders in the
-        // same chrome as Overview. It previously returned the bare fragment,
-        // which is why the founder landed on browser-default HTML. No shell
-        // context is invented here: the case read model knows its own case,
-        // not the workspace's event or open-decision count, and the shell
-        // omits what it is not given.
-        sendHtml(
-          res,
-          200,
-          renderInShell('case', 'Recovery case', {}, renderProductRecoveryCase(view)),
-        );
-      } else {
-        sendJson(res, 200, view);
-      }
+      await serveCase(ctx, res, url, decodeURIComponent(caseMatch[1]!), url.searchParams.get('format') === 'html');
       return true;
     }
 
@@ -247,7 +275,7 @@ export async function handleTargetProductHttp(
       }
       const view = projectIncidentProgramme(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductIncidentProgramme(view));
+        sendHtml(res, 200, renderInShell('case', 'Incident', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductIncidentProgramme(view)));
       } else {
         sendJson(res, 200, view);
       }
@@ -264,7 +292,7 @@ export async function handleTargetProductHttp(
       }
       const view = projectTravellerTrip(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductTravellerTrip(view));
+        sendHtml(res, 200, renderInShell('traveller', 'Trip', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductTravellerTrip(view)));
       } else {
         sendJson(res, 200, view);
       }
@@ -465,19 +493,38 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'POST' && pathname === '/api/v2/demo/reset') {
-      // `seedDemoWorld` mints a fresh small world every call; it is not
-      // idempotent by dataset identity. Once a dataset has been provisioned
-      // into this workspace, calling it would add a second, unrelated world
-      // alongside the provisioned one — so the route refuses instead, and
-      // names the bounded way to get a clean baseline. Resetting a
-      // provisioned world is the next increment's work, not a table wipe.
+      // A runtime with a demo dataset gets the SAFE workspace-scoped reset
+      // (src/app/demo/demoReset.ts): one locked transaction deleting only the
+      // configured demo workspace's rows, then deterministic re-provisioning of
+      // the healthy baseline. It is refused unless the demo/dev gate is open.
+      // A runtime with NO dataset keeps the small placeholder-world seeder.
       if (datasetDirectoryFromEnv() !== undefined) {
-        sendJson(res, 409, {
-          error: 'DEMO_DATASET_PROVISIONED',
-          message:
-            'This runtime is configured with a demo dataset, so seeding a second world here would corrupt it. '
-            + 'Start from a fresh demo workspace or database instead (see docs/TESTING.md).',
+        const gate = demoResetGate(process.env);
+        if (!gate.open) {
+          sendJson(res, 403, { error: gate.code, message: gate.message });
+          return true;
+        }
+        const outcome = await resetDemoWorkspace({
+          pool: ctx.app.pool,
+          uow: () => ctx.app.unitOfWork(),
+          workspaceId: ctx.app.workspaceId,
         });
+        if (outcome.status === 'RESET') {
+          sendJson(res, 200, {
+            ok: true,
+            workspaceId: outcome.workspaceId,
+            deletedRows: outcome.deletedRows,
+            tableCount: outcome.tables.length,
+            provisioning: outcome.provisioning,
+            baselineEvaluated: outcome.baselineEvaluated,
+          });
+        } else if (outcome.status === 'IN_PROGRESS') {
+          sendJson(res, 409, { error: outcome.code, message: outcome.message });
+        } else if (outcome.status === 'UNSUPPORTED') {
+          sendJson(res, 409, { error: outcome.code, message: outcome.message });
+        } else {
+          sendJson(res, 403, { error: outcome.code, message: outcome.message });
+        }
         return true;
       }
       try {

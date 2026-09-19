@@ -9,7 +9,10 @@
  * authoritative read models; this module invents neither, and renders the
  * event select only when the backend identified one event.
  */
-import { renderPage, type NavTarget } from '../../ui/page.ts';
+import { renderPage, renderBackLink, type NavTarget } from '../../ui/page.ts';
+
+/** Re-exported so screens depend on the shell module for navigation chrome. */
+export { renderBackLink };
 
 export const SHELL_LINKS = {
   dashboard: '/',
@@ -39,7 +42,14 @@ export interface ShellContext {
   eventName?: string;
   /** Number of items the backend reports as requiring a decision. */
   decisionCount?: number;
+  /** Show the persistent Reset demo control (backend reset gate is open). */
+  resetDemo?: boolean;
+  /** Back link above the page body (Incident / Traveller pages). */
+  backLink?: { label: string; href: string };
 }
+
+/** The standard "back to the overview" link target. */
+export const OVERVIEW_BACK = { label: 'Back to Overview', href: SHELL_LINKS.dashboard } as const;
 
 export function renderInShell(
   active: NavTarget,
@@ -55,6 +65,8 @@ export function renderInShell(
       surface: 'operator',
       ...(context.eventName ? { eventName: context.eventName } : {}),
       ...(context.decisionCount !== undefined ? { decisionCount: context.decisionCount } : {}),
+      ...(context.resetDemo ? { resetDemo: true } : {}),
+      ...(context.backLink ? { backLink: context.backLink } : {}),
     },
     bodyHtml,
   );
