@@ -14,3 +14,4 @@ export type * from './arrangementQueries.ts';
 export type * from './programmes.ts';
 export type * from './programmeQueries.ts';
 export type * from './knowledge.ts';
+export type * from './changeRequests.ts';
