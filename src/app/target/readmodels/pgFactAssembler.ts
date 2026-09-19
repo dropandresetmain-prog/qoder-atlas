@@ -660,6 +660,9 @@ async function loadRecoveryCaseFactsInner(
             if (explanation.status !== 'FAIL') continue;
             causalPath.push({
               subjectRef: `${explanation.affectedSubject.kind}:${explanation.affectedSubject.id}`,
+              ...(explanation.cause.subjectRef
+                ? { causeSubjectRef: `${explanation.cause.subjectRef.kind}:${explanation.cause.subjectRef.id}` }
+                : {}),
               dimension: dim.dimension,
               reasonCode: explanation.reasonCode,
               evaluatorId: explanation.evaluatorId,
@@ -719,10 +722,11 @@ async function loadRecoveryCaseFactsInner(
   // Transport service rows referenced by TRANSPORT items.
   const serviceIds = journeyItems.rows.filter((i) => i.kind === 'TRANSPORT' && i.selected_service_id).map((i) => i.selected_service_id!);
   const transportServices = serviceIds.length > 0
-    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; origin_place_name: string | null; destination_place_name: string | null; published_departure: string | null; published_arrival: string | null }>(
+    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; origin_place_name: string | null; destination_place_name: string | null; published_departure: Date | null; published_arrival: Date | null; estimated_arrival: Date | null; actual_arrival: Date | null; destination_time_zone: string | null }>(
         `SELECT ts.id, ts.mode, ts.operator, ts.origin_place_id, ts.destination_place_id,
                 po.name AS origin_place_name, pd.name AS destination_place_name,
-                ts.published_departure, ts.published_arrival
+                ts.published_departure, ts.published_arrival, ts.estimated_arrival,
+                ts.actual_arrival, pd.time_zone AS destination_time_zone
            FROM transport_services ts
            LEFT JOIN places po ON po.workspace_id = ts.workspace_id AND po.id = ts.origin_place_id
            LEFT JOIN places pd ON pd.workspace_id = ts.workspace_id AND pd.id = ts.destination_place_id
@@ -805,6 +809,34 @@ async function loadRecoveryCaseFactsInner(
       assessmentViews.set(itemRef, { status: view.status, tone });
     }
   }
+  // Programme/objective state is only used when it belongs to that canonical
+  // subject. A journey-wide failure must never colour every commitment/objective.
+  for (const programmeItem of programmeItems.rows) {
+    const view = await currentAssessmentView(
+      client,
+      workspaceId,
+      { kind: 'PROGRAMME_ITEM', id: programmeItem.id } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    if (view.status !== 'NONE') {
+      const tone: AssessmentTone = view.assessment?.overallVerdict === 'PASS' ? 'PASS' : view.assessment?.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
+      assessmentViews.set(`PROGRAMME_ITEM:${programmeItem.id}`, { status: view.status, tone });
+    }
+  }
+  for (const objective of objectives.rows) {
+    const view = await currentAssessmentView(
+      client,
+      workspaceId,
+      { kind: 'OBJECTIVE', id: objective.id } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    if (view.status !== 'NONE') {
+      const tone: AssessmentTone = view.assessment?.overallVerdict === 'PASS' ? 'PASS' : view.assessment?.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
+      assessmentViews.set(`OBJECTIVE:${objective.id}`, { status: view.status, tone });
+    }
+  }
 
   // Call the pure enrichment projector.
   const enrichment = projectFocusedCaseGraphEnrichment({
@@ -835,20 +867,20 @@ async function loadRecoveryCaseFactsInner(
       destination_place_id: s.destination_place_id,
       origin_place_name: s.origin_place_name,
       destination_place_name: s.destination_place_name,
-      published_departure: s.published_departure,
-      published_arrival: s.published_arrival,
+      published_departure: s.published_departure?.toISOString() ?? null,
+      published_arrival: s.published_arrival?.toISOString() ?? null,
+      estimated_arrival: s.estimated_arrival?.toISOString() ?? null,
+      actual_arrival: s.actual_arrival?.toISOString() ?? null,
+      destination_time_zone: s.destination_time_zone,
     })),
     participations: participations.rows,
     programmeItems: programmeItems.rows,
     objectives: objectives.rows,
     assessmentViews,
+    causalPath,
     travellerLabelsByJourney,
     caseId,
   });
-
-  if (enrichment.objectiveContractGap) {
-    uncertainty.push('objectives exist but no LdgNodeKind can carry them (contract gap)');
-  }
 
   // ---------------------------------------------------------------------
   // Recovery options, as an operator has to read them.
@@ -935,10 +967,8 @@ async function loadRecoveryCaseFactsInner(
     changedEdgeIds: [],
     currentSemanticState: tripVerdict === 'FAIL' ? 'FAILED' : tripVerdict === 'PASS' ? 'RECOVERED' : 'AFFECTED',
     nodes: [
-      { ref: caseRefStr, kind: 'RECOVERY_PROPOSAL', label: 'Recovery case', semanticState: 'ACTIVE', authority: 'AUTHORITATIVE' },
-      // T3: the cause is a first-class node (same DISRUPTION kind the
-      // incident/programme producer uses), so the focal chain
-      // change -> subject -> case is graph truth, not adjacency guesswork.
+      // The change signal is a first-class current-world input. Recovery case
+      // workflow state stays in the Case workspace, never in this graph.
       ...(cause
         ? [{ ref: cause.changeSignalRef, kind: 'DISRUPTION' as const, label: humanizeCode(cause.changeType), semanticState: 'CHANGED' as const, authority: 'AUTHORITATIVE' as const, detail: `${humanizeCode(cause.originKind)} · received ${formatInstantUtc(cause.receivedAt)}` }]
         : []),
@@ -967,15 +997,6 @@ async function loadRecoveryCaseFactsInner(
       ...enrichment.nodes,
     ],
     edges: [
-      ...subjects.rows.map((s) => ({
-        // FIG-1: derived from the canonical relation, never array position —
-        // stable across revisions and unique per (subject, case) pair.
-        id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:${caseRefStr}`,
-        fromRef: `${s.subject_kind}:${s.subject_id}`,
-        toRef: caseRefStr,
-        kind: 'AFFECTED_BY' as const,
-        authority: 'AUTHORITATIVE' as const,
-      })),
       ...(cause
         ? subjects.rows.map((s) => ({
             id: `AFFECTED_BY:${s.subject_kind}:${s.subject_id}:${cause.changeSignalRef}`,

@@ -54,6 +54,9 @@ export const LdgNodeKindSchema = z.enum([
   'TIMING',
   'TRANSFER_STAY',
   'PROGRAMME_COMMITMENT',
+  /** Presentation of an existing canonical Objective; never a new domain entity. */
+  'TRIP_OBJECTIVE',
+  /** Kept for immutable pre-A1 Original snapshots; current focused projection no longer emits it. */
   'RECOVERY_PROPOSAL',
 ]);
 export type LdgNodeKind = z.infer<typeof LdgNodeKindSchema>;
@@ -117,6 +120,21 @@ export const LdgNodeSchema = z.strictObject({
    * semanticState/changeState/tone.
    */
   evaluation: AssessmentViewStatusSchema.optional(),
+  /**
+   * Canonical subject refs represented by this presentation node. They let the
+   * backend map an evaluator explanation onto a visual object without asking
+   * the browser to traverse or infer graph meaning.
+   */
+  subjectRefs: z.array(z.string().min(1)).max(16).optional(),
+  /**
+   * Canonical timing facts for a TIMING presentation node. The renderer may
+   * format them but must not calculate lateness or a semantic condition.
+   */
+  timing: z.strictObject({
+    currentAt: z.string().datetime({ offset: true }),
+    publishedAt: z.string().datetime({ offset: true }).optional(),
+    timeZone: z.string().min(1).optional(),
+  }).optional(),
   detail: z.string().max(2048).optional(),
 });
 export type LdgNode = z.infer<typeof LdgNodeSchema>;
@@ -534,6 +552,8 @@ export type CaseCauseView = z.infer<typeof CaseCauseViewSchema>;
  */
 export const CausalPathStepSchema = z.strictObject({
   subjectRef: z.string().min(1),
+  /** Canonical cause from the persisted evaluator explanation, when one exists. */
+  causeSubjectRef: z.string().min(1).optional(),
   dimension: z.string().min(1),
   reasonCode: z.string().min(1),
   evaluatorId: z.string().min(1),

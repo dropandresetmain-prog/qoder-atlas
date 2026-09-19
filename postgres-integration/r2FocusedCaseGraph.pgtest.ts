@@ -58,6 +58,7 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     // The focused graph carries the case scope and the enriched node kinds.
     assert.equal(v.ldg.scope, 'FOCUSED_CASE');
     const kinds = new Set(v.ldg.nodes.map((n) => n.kind));
+    assert.ok(!kinds.has('RECOVERY_PROPOSAL'), 'Case workflow state is not a focused-graph node');
     assert.ok(kinds.has('SERVICE_BOOKING'), `transport composition present: ${[...kinds].join(',')}`);
     assert.ok(kinds.has('PROGRAMME_COMMITMENT'), `programme commitment present: ${[...kinds].join(',')}`);
 
@@ -151,6 +152,7 @@ describe('R2 focused Case graph generality — connection world, no programme (r
 
     assert.equal(v.ldg.scope, 'FOCUSED_CASE');
     const kinds = new Set(v.ldg.nodes.map((n) => n.kind));
+    assert.ok(!kinds.has('RECOVERY_PROPOSAL'), 'Case workflow state is not fabricated for connection world');
     // Transport composition is enriched identically to the programme world.
     assert.ok(kinds.has('SERVICE_BOOKING'), `transport composition present: ${[...kinds].join(',')}`);
     // There is no programme in this world, so no PROGRAMME_COMMITMENT is fabricated.

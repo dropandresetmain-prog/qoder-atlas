@@ -46,7 +46,12 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
   // R2: backend-supplied mapping of the ordered causalPath onto the visible focused
   // graph, so the frontend never traverses topology for causality (FIG-5b). Pure
   // function of the produced `ldg` + `causalPath`; undefined when there is no path.
-  const causalPath = (input.causalPath ?? []).map((step) => ({ ...step, facts: { ...step.facts }, relatedSubjectRefs: [...step.relatedSubjectRefs] }));
+  const causalPath = (input.causalPath ?? []).map((step) => ({
+    ...step,
+    ...(step.causeSubjectRef ? { causeSubjectRef: step.causeSubjectRef } : {}),
+    facts: { ...step.facts },
+    relatedSubjectRefs: [...step.relatedSubjectRefs],
+  }));
   const focusedGraph = projectFocusedGraph(ldg, causalPath);
 
   return RecoveryCaseViewSchema.parse({

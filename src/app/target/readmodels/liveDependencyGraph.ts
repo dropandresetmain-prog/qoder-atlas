@@ -19,6 +19,8 @@ export function projectLiveDependencyGraph(input: LiveDependencyGraphInput): Liv
     authority: node.authority ?? 'AUTHORITATIVE',
     ...(node.caseRef ? { caseRef: node.caseRef } : {}),
     ...(node.evaluation ? { evaluation: node.evaluation } : {}),
+    ...(node.subjectRefs ? { subjectRefs: [...node.subjectRefs] } : {}),
+    ...(node.timing ? { timing: { ...node.timing } } : {}),
     ...(node.detail ? { detail: node.detail } : {}),
   }));
   const edges = input.edges

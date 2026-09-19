@@ -32,6 +32,8 @@ export interface ProductNodeFact {
   authority?: 'AUTHORITATIVE' | 'PROPOSED';
   caseRef?: string;
   evaluation?: AssessmentViewStatus;
+  subjectRefs?: readonly string[];
+  timing?: { currentAt: string; publishedAt?: string; timeZone?: string };
   detail?: string;
 }
 

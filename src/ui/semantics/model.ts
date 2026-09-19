@@ -35,6 +35,8 @@ export interface PresentationNode {
   readonly iconKind: IconKind;
   readonly evaluationState: EvaluationState;
   readonly caseRef?: string;
+  readonly subjectRefs?: readonly string[];
+  readonly timing?: { readonly currentAt: string; readonly publishedAt?: string; readonly timeZone?: string };
 }
 
 export interface PresentationEdge {
