@@ -140,6 +140,20 @@ test('A1: persisted cause maps to an explicit presentation subject while affecte
   assert.deepEqual(focused?.causalNodeRefs, ['TIMING:item-1:ARRIVAL', 'JOURNEY:j1']);
 });
 
+test('A1: a third presentation mapping cannot restore an ambiguous canonical subject', () => {
+  const ldg = graph([
+    { ref: 'SERVICE_BOOKING:one', kind: 'SERVICE_BOOKING', label: 'One', semanticState: 'UNKNOWN', subjectRefs: ['TRANSPORT_SERVICE:s1'] },
+    { ref: 'SERVICE_BOOKING:two', kind: 'SERVICE_BOOKING', label: 'Two', semanticState: 'UNKNOWN', subjectRefs: ['TRANSPORT_SERVICE:s1'] },
+    { ref: 'SERVICE_BOOKING:three', kind: 'SERVICE_BOOKING', label: 'Three', semanticState: 'UNKNOWN', subjectRefs: ['TRANSPORT_SERVICE:s1'] },
+  ], []);
+  const focused = projectFocusedGraph(ldg, [{
+    subjectRef: 'JOURNEY:j1', causeSubjectRef: 'TRANSPORT_SERVICE:s1', dimension: 'arrival_readiness', reasonCode: 'arrival_after_required_by', evaluatorId: 'm6.arrival', facts: {}, relatedSubjectRefs: [],
+  }]);
+  assert.equal(focused?.firstBreakpoint, undefined);
+  assert.deepEqual(focused?.causalNodeRefs, []);
+  assert.equal(focused?.unmappedCausalSteps[0]?.subjectRef, 'TRANSPORT_SERVICE:s1');
+});
+
 test('R2: a causal step with no visible node is an explicit honest gap', () => {
   // The connection case references a transfer subject that the sparse focused
   // graph does not carry as a visible node.

@@ -773,14 +773,25 @@ async function loadRecoveryCaseFactsInner(
       )
     : { rows: [] };
 
-  // Objective rows owned by the case's JOURNEY or TRIP subjects.
-  const objectiveOwnerRefs = subjects.rows.filter((s) => s.subject_kind === 'JOURNEY' || s.subject_kind === 'TRIP');
-  const objectives = objectiveOwnerRefs.length > 0
+  // Objective rows owned by the case's explicit JOURNEY/TRIP subjects, plus the
+  // Trip owning every affected Journey. Trip objectives govern their member
+  // journeys even when RecoveryCase subjects carry only JOURNEY refs.
+  const objectiveOwnerRefs = new Map<string, { kind: 'JOURNEY' | 'TRIP'; id: string }>();
+  for (const subject of subjects.rows) {
+    if (subject.subject_kind === 'JOURNEY' || subject.subject_kind === 'TRIP') {
+      objectiveOwnerRefs.set(`${subject.subject_kind}:${subject.subject_id}`, { kind: subject.subject_kind, id: subject.subject_id });
+    }
+  }
+  for (const journey of journeys.rows) {
+    objectiveOwnerRefs.set(`TRIP:${journey.trip_id}`, { kind: 'TRIP', id: journey.trip_id });
+  }
+  const objectiveOwners = [...objectiveOwnerRefs.values()];
+  const objectives = objectiveOwners.length > 0
     ? await client.query<{ id: string; owner_kind: string; owner_id: string; success_predicate: string; success_predicate_kind: string; hardness: string; priority: number }>(
         `SELECT id, owner_kind, owner_id, success_predicate, success_predicate_kind, hardness, priority
            FROM objectives
-          WHERE workspace_id = $1 AND (owner_kind, owner_id) IN (SELECT unnest($2::text[]), unnest($3::uuid[]))`,
-        [workspaceId, objectiveOwnerRefs.map((r) => r.subject_kind), objectiveOwnerRefs.map((r) => r.subject_id)],
+          WHERE workspace_id = $1 AND (owner_kind, owner_id) IN (SELECT * FROM unnest($2::text[], $3::uuid[]))`,
+        [workspaceId, objectiveOwners.map((owner) => owner.kind), objectiveOwners.map((owner) => owner.id)],
       )
     : { rows: [] };
 

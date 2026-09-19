@@ -40,13 +40,24 @@ export function projectFocusedGraph(
   const visibleRefs = new Set(ldg.nodes.map((node) => node.ref));
   const labelByRef = new Map(ldg.nodes.map((node) => [node.ref, node.label]));
   const nodeForSubjectRef = new Map<string, string>();
+  const ambiguousSubjectRefs = new Set<string>();
+  const registerSubjectRef = (subjectRef: string, nodeRef: string): void => {
+    if (ambiguousSubjectRefs.has(subjectRef)) return;
+    const existing = nodeForSubjectRef.get(subjectRef);
+    if (!existing) {
+      nodeForSubjectRef.set(subjectRef, nodeRef);
+    } else if (existing !== nodeRef) {
+      // A third mapping must not restore a mapping already found ambiguous.
+      nodeForSubjectRef.delete(subjectRef);
+      ambiguousSubjectRefs.add(subjectRef);
+    }
+  };
   for (const node of ldg.nodes) {
-    nodeForSubjectRef.set(node.ref, node.ref);
+    registerSubjectRef(node.ref, node.ref);
     for (const subjectRef of node.subjectRefs ?? []) {
       // A producer must not map one canonical fact to two visual nodes. Ignore
       // ambiguity here so the graph under-claims rather than arbitrarily picks.
-      if (!nodeForSubjectRef.has(subjectRef)) nodeForSubjectRef.set(subjectRef, node.ref);
-      else if (nodeForSubjectRef.get(subjectRef) !== node.ref) nodeForSubjectRef.delete(subjectRef);
+      registerSubjectRef(subjectRef, node.ref);
     }
   }
   const resolveVisibleRef = (subjectRef: string): string | undefined => nodeForSubjectRef.get(subjectRef);

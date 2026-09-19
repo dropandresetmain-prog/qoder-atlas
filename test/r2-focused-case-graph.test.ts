@@ -351,7 +351,7 @@ test('A1 enrichment: leaves an objective UNKNOWN without objective-specific evid
   assert.equal(node.semanticState, 'UNKNOWN');
 });
 
-test('A1 enrichment: emits changed arrival timing only from canonical timing plus explanation refs', () => {
+test('A1 enrichment: maps service and timing facts one-to-one from canonical timing plus explanation refs', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
@@ -366,13 +366,33 @@ test('A1 enrichment: emits changed arrival timing only from canonical timing plu
   assert.ok(timing);
   assert.equal(timing.ref, 'TIMING:item-1:ARRIVAL');
   assert.equal(timing.semanticState, 'CHANGED');
-  assert.deepEqual(timing.subjectRefs, ['TRANSPORT_SERVICE:service-1', 'JOURNEY_ITEM:item-1']);
+  assert.deepEqual(timing.subjectRefs, ['JOURNEY_ITEM:item-1']);
   assert.deepEqual(timing.timing, {
     currentAt: '2031-04-05T10:45:00.000Z',
     publishedAt: '2031-04-05T08:00:00.000Z',
     timeZone: 'Asia/Singapore',
   });
+  assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:service-1')?.subjectRefs, ['TRANSPORT_SERVICE:service-1']);
   assert.ok(result.edges.some((edge) => edge.fromRef === 'SERVICE_BOOKING:service-1' && edge.toRef === timing.ref));
+});
+
+test('A1 enrichment: shows an evaluator-implicated replacement arrival without inventing a delay', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'replacement-service' }],
+    transportServices: [{ id: 'replacement-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T10:30:00.000Z', estimated_arrival: null, actual_arrival: null, destination_time_zone: 'Asia/Singapore' }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'OBJECTIVE:obj-1', dimension: 'hard_objectives', reasonCode: 'arrival_after_deadline', evaluatorId: 'm6.objective', facts: {}, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+
+  const timing = result.nodes.find((node) => node.kind === 'TIMING');
+  assert.ok(timing);
+  assert.equal(timing.semanticState, 'FAILED');
+  assert.deepEqual(timing.timing, { currentAt: '2031-04-05T10:30:00.000Z', publishedAt: '2031-04-05T10:30:00.000Z', timeZone: 'Asia/Singapore' });
+  assert.deepEqual(timing.subjectRefs, ['JOURNEY_ITEM:item-1']);
+  assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:replacement-service')?.subjectRefs, ['TRANSPORT_SERVICE:replacement-service']);
 });
 
 test('A1 enrichment: a commitment fails only from its own assessment or participation explanation', () => {

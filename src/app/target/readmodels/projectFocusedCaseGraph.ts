@@ -309,6 +309,17 @@ export function projectFocusedCaseGraphEnrichment(
 
       const state = stateFor(ref);
 
+      const serviceSubjectRef = item.kind === 'TRANSPORT' && item.selectedServiceId
+        ? `TRANSPORT_SERVICE:${item.selectedServiceId}`
+        : undefined;
+      const itemSubjectRef = `JOURNEY_ITEM:${item.id}`;
+      const currentAt = transportService
+        ? transportService.actual_arrival ?? transportService.estimated_arrival ?? transportService.published_arrival
+        : null;
+      const timingImplicated = currentAt !== null && serviceSubjectRef !== undefined && (
+        hasCausalReference(serviceSubjectRef) || hasCausalReference(itemSubjectRef)
+      );
+
       pushNode({
         ref,
         kind,
@@ -316,28 +327,32 @@ export function projectFocusedCaseGraphEnrichment(
         semanticState: state.semanticState,
         authority: 'AUTHORITATIVE',
         caseRef: input.caseId,
+        ...(serviceSubjectRef
+          ? { subjectRefs: timingImplicated ? [serviceSubjectRef] : [serviceSubjectRef, itemSubjectRef] }
+          : {}),
         ...(state.evaluation ? { evaluation: state.evaluation } : {}),
         ...(detail ? { detail } : {}),
       });
 
-      if (item.kind === 'TRANSPORT' && transportService) {
-        const currentAt = transportService.actual_arrival ?? transportService.estimated_arrival ?? transportService.published_arrival;
-        const timingChanged = currentAt !== null
-          && transportService.published_arrival !== null
-          && currentAt !== transportService.published_arrival;
-        const serviceSubjectRef = `TRANSPORT_SERVICE:${transportService.id}`;
-        const itemSubjectRef = `JOURNEY_ITEM:${item.id}`;
-        if (timingChanged && currentAt && (hasCausalReference(serviceSubjectRef) || hasCausalReference(itemSubjectRef))) {
+      if (item.kind === 'TRANSPORT' && transportService && currentAt && timingImplicated) {
           const timingRef = `TIMING:${item.id}:ARRIVAL`;
           timingRefByJourneyItem.set(item.id, timingRef);
           pushNode({
             ref: timingRef,
             kind: 'TIMING',
             label: 'Arrival timing',
-            semanticState: 'CHANGED',
+            // CHANGED requires a canonical published baseline that differs. A
+            // replacement schedule matching its own published time (or a timing
+            // fact without that baseline) is still shown when a blocking
+            // evaluator explanation implicates it, as FAILED rather than falsely
+            // calling that schedule change itself.
+            semanticState: transportService.published_arrival !== null && currentAt !== transportService.published_arrival ? 'CHANGED' : 'FAILED',
             authority: 'AUTHORITATIVE',
             caseRef: input.caseId,
-            subjectRefs: [serviceSubjectRef, itemSubjectRef],
+            // The service remains the visual home of TRANSPORT_SERVICE; the
+            // timing node is the visual home of a causal JOURNEY_ITEM when it
+            // exists. This keeps every canonical ref one-to-one.
+            subjectRefs: [itemSubjectRef],
             timing: {
               currentAt,
               ...(transportService.published_arrival ? { publishedAt: transportService.published_arrival } : {}),
@@ -351,7 +366,6 @@ export function projectFocusedCaseGraphEnrichment(
             kind: 'MUST_HAPPEN_BEFORE',
             authority: 'AUTHORITATIVE',
           });
-        }
       }
     }
 
