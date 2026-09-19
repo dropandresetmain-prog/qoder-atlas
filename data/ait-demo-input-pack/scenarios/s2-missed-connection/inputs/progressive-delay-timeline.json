@@ -22,9 +22,9 @@
       "eventId": "sim-zg-evt-s2-delay-01",
       "eventType": "SCHEDULE_CHANGE",
       "depTime": "2026-09-28T12:10:00-07:00",
-      "arrTime": "2026-09-29T15:25:00+09:00",
-      "connectionRemainingMinutes": 85,
-      "narrative": "Delay begins; ~85min remains before ZG053 — still viable for a short international connection."
+      "arrTime": "2026-09-29T15:15:00+09:00",
+      "connectionRemainingMinutes": 95,
+      "narrative": "Delay begins; 95min remains before ZG053 — still viable above the 90-minute minimum connection requirement."
     },
     {
       "id": "delay_increases_connection_at_risk",
