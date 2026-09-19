@@ -16,6 +16,7 @@ import {
 } from '../../app/target/adapters/programmeAdapter.ts';
 import { caseHref } from '../../app/target/productShell.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
+import { renderProgrammeTimeSwapController } from '../programme-time-swap-controller.ts';
 
 function tile(key: string, count: number, label: string, tone: string, attention = false): string {
   return `
@@ -56,7 +57,38 @@ function attentionSection(view: ProgrammeSurfaceView): string {
   </section>`;
 }
 
-export function renderProgrammeSurface(view: ProgrammeSurfaceView): string {
+function timeSwapSection(view: ProgrammeSchedule): string {
+  const eligible = view.items.filter((item) => item.windowStart && item.windowEnd);
+  if (eligible.length < 2) return '';
+  const options = eligible.map((item) =>
+    `<option value="${escapeHtml(item.itemRef)}">${escapeHtml(item.label)}</option>`).join('');
+  return `
+  <section class="section" aria-label="Preview a programme time swap" data-programme-time-swap data-test="programme-time-swap">
+    <h2>Preview a time swap</h2>
+    <p class="sub">Compare two scheduled sessions by exchanging their current time windows. This preview does not reschedule, relocate, cancel, or commit anything.</p>
+    <div class="panel" style="margin-top:14px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+        <label class="kv-label" for="programme-time-swap-a">First session
+          <select id="programme-time-swap-a" data-programme-item-a style="display:block;width:100%;margin-top:6px;font:inherit;padding:8px">
+            ${options}
+          </select>
+        </label>
+        <label class="kv-label" for="programme-time-swap-b">Second session
+          <select id="programme-time-swap-b" data-programme-item-b style="display:block;width:100%;margin-top:6px;font:inherit;padding:8px">
+            ${options}
+          </select>
+        </label>
+      </div>
+      <div class="btn-row" style="margin-top:14px">
+        <button type="button" class="btn btn-primary" data-programme-time-swap-preview data-test="programme-time-swap-preview">Preview time swap</button>
+      </div>
+      <p data-programme-time-swap-status data-test="programme-time-swap-status" role="status" aria-live="polite" style="margin:10px 0 0"></p>
+    </div>
+    <div data-programme-time-swap-result data-test="programme-time-swap-result" hidden style="margin-top:16px"></div>
+  </section>`;
+}
+
+export function renderProgrammeSurface(view: ProgrammeSurfaceView, schedule?: ProgrammeSchedule): string {
   const scheduledCount = view.days
     .filter((day) => day.dateLabel !== 'Not yet scheduled')
     .reduce((sum, day) => sum + day.items.length, 0);
@@ -85,13 +117,14 @@ export function renderProgrammeSurface(view: ProgrammeSurfaceView): string {
     ${tile('days', view.dayCount, 'Days', 'ok')}
     ${tile('watch', view.affected.length, 'Sessions to watch', view.affected.length > 0 ? 'watch' : 'ok', true)}
     ${tile('in-person', inPerson, 'In person', 'neutral')}
-    ${tile('unscheduled', view.sessionCount - scheduledCount, 'Not yet scheduled', 'neutral')}
+  ${tile('unscheduled', view.sessionCount - scheduledCount, 'Not yet scheduled', 'neutral')}
   </div>
   ${attentionSection(view)}
   ${timeline}
+  ${schedule ? timeSwapSection(schedule) : ''}
 </main>`;
 }
 
 export function renderProductProgrammeSchedule(view: ProgrammeSchedule): string {
-  return renderProgrammeSurface(adaptProgrammeScheduleToTimeline(view));
+  return `${renderProgrammeSurface(adaptProgrammeScheduleToTimeline(view), view)}${renderProgrammeTimeSwapController()}`;
 }

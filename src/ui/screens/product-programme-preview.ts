@@ -71,7 +71,7 @@ export function renderProductProgrammePreview(preview: BilateralProgrammeTimeSwa
   </div>
   <div class="page-head">
     <h1>Programme time swap preview</h1>
-    <p class="sub">Compare the current times with the proposed exchange before committing anything.</p>
+    <p class="sub">Compare two scheduled sessions after exchanging their current time windows. This is a preview only; it does not reschedule, relocate, cancel, or commit anything.</p>
   </div>
   <section class="section" data-test="preview-current" data-poll-region="preview-current">
     <h2>Current</h2>
@@ -83,7 +83,7 @@ export function renderProductProgrammePreview(preview: BilateralProgrammeTimeSwa
     ${projectionRows(preview.current.projections, 'current')}
   </section>
   <section class="section" data-test="preview-proposed" data-poll-region="preview-proposed">
-    <h2>Proposed</h2>
+    <h2>Proposed time swap</h2>
     <div class="change-compare">
       ${itemBox('Session A', preview.proposed.itemA, true)}
       <div class="cc-arrow" aria-hidden="true">↔</div>
@@ -97,7 +97,7 @@ export function renderProductProgrammePreview(preview: BilateralProgrammeTimeSwa
       Both attendees can still make their sessions: ${yesNo(preview.bothPartiesProjectedViable)} ·
       Everyone else is unaffected: ${yesNo(preview.othersRemainViable)}
     </p>
-    <p class="footnote">Nothing has been changed. Applying a swap is a separate step that needs approval.</p>
+    <p class="footnote">Nothing has been changed. This surface only previews a bilateral time swap; applying programme changes is not available here.</p>
   </div>
 </main>`;
 }

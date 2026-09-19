@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import type {
   IncidentProgrammeView,
   OperatorOverview,
+  ProgrammeSchedule,
   RecoveryCaseView,
   TravellerTripView,
 } from '../src/contracts/v2/product/readModels.ts';
@@ -17,6 +18,7 @@ import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-ca
 import { renderProductIncidentProgramme } from '../src/ui/screens/product-incident-programme.ts';
 import { renderProductTravellerTrip } from '../src/ui/screens/product-traveller-trip.ts';
 import { renderProductProgrammePreview } from '../src/ui/screens/product-programme-preview.ts';
+import { renderProductProgrammeSchedule } from '../src/ui/screens/product-programme-schedule.ts';
 
 const generatedAt = '2031-09-15T08:00:00.000Z';
 
@@ -176,6 +178,29 @@ function programmePreview(): BilateralProgrammeTimeSwapPreview {
   };
 }
 
+function programmeSchedule(): ProgrammeSchedule {
+  return {
+    generatedAt,
+    eventTitle: 'Synthetic programme',
+    items: [
+      {
+        itemRef: 'item-a', label: 'Morning session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
+        requiredParticipants: 2, optionalParticipants: 0, requiresPhysicalPresence: true,
+        windowStart: '2031-09-15T09:00:00.000Z', windowEnd: '2031-09-15T10:00:00.000Z',
+      },
+      {
+        itemRef: 'item-b', label: 'Afternoon session', itemType: 'SESSION', lifecycleStatus: 'SCHEDULED',
+        requiredParticipants: 2, optionalParticipants: 1, requiresPhysicalPresence: true,
+        windowStart: '2031-09-15T14:00:00.000Z', windowEnd: '2031-09-15T15:00:00.000Z',
+      },
+      {
+        itemRef: 'item-c', label: 'Time to be set', itemType: 'SESSION', lifecycleStatus: 'PLANNED',
+        requiredParticipants: 1, optionalParticipants: 0, requiresPhysicalPresence: false,
+      },
+    ],
+  };
+}
+
 describe('M9 product surface renderers', () => {
   test('operator overview adapter surfaces five travellers and summary buckets', () => {
     const view = fivePersonOverview();
@@ -240,6 +265,20 @@ describe('M9 product surface renderers', () => {
     assert.match(html, /Current/);
     assert.match(html, /Proposed/);
     assert.doesNotMatch(html, /Sarah|Daniel|airport/i);
+  });
+
+  test('programme schedule offers a truthful bilateral time-swap preview for eligible items', () => {
+    const html = renderProductProgrammeSchedule(programmeSchedule());
+
+    assert.match(html, /data-test="programme-time-swap"/);
+    assert.match(html, /data-programme-item-a/);
+    assert.match(html, /data-programme-item-b/);
+    assert.match(html, /value="item-a"/);
+    assert.match(html, /value="item-b"/);
+    assert.doesNotMatch(html, /value="item-c"/);
+    assert.match(html, /api\/v2\/programme\/time-swap\/preview\?format=html/);
+    assert.match(html, /does not reschedule, relocate, cancel, or commit anything/i);
+    assert.match(html, /Your programme was not changed/);
   });
 });
 
