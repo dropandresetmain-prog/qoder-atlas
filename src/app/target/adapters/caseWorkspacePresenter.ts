@@ -17,6 +17,7 @@
 import type {
   RecoveryActionView,
   RecoveryCaseView,
+  PlanningModelActivityView,
   RecoveryStrategyView,
 } from '../../../contracts/v2/product/readModels.ts';
 import {
@@ -606,6 +607,8 @@ function buildActivity(view: RecoveryCaseView, phase: CasePhase): CaseWorkspaceM
       : { label: vocab.checking, state: 'done' });
   }
 
+  rows.push(...buildModelActivityRows(view));
+
   for (const tool of evidence?.tools ?? []) {
     const vocab = CASE_TOOL_ACTIVITY[tool.tool.code ?? ''] ?? CASE_TOOL_FALLBACK;
     const ok = tool.status.code === 'SUCCEEDED' || tool.status.code === 'PARTIAL';
@@ -652,6 +655,58 @@ const TOOL_MODE_COPY: Record<string, string> = {
   REPLAY: 'saved replay evidence',
   INTERNAL: 'current trip records',
 };
+
+function modelActivities(view: RecoveryCaseView): readonly PlanningModelActivityView[] {
+  return view.planningEvidence?.modelActivities ?? [];
+}
+
+const MODEL_MODE_COPY: Record<PlanningModelActivityView['mode'], string> = {
+  LIVE: 'Live',
+  REPLAY: 'Saved replay',
+};
+
+function modelProviderLabel(providerId: string): string {
+  const safe = plain(providerId);
+  if (!safe) return 'Provider not recorded';
+  return {
+    'model-studio': 'Model Studio',
+  }[safe.toLowerCase()] ?? safe;
+}
+
+function modelCheckTime(observedAt: string): string | undefined {
+  const date = new Date(observedAt);
+  if (Number.isNaN(date.getTime())) return undefined;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      hour12: false, timeZone: 'UTC', timeZoneName: 'short',
+    }).format(date);
+  } catch {
+    return undefined;
+  }
+}
+
+function modelActivityRow(activity: PlanningModelActivityView): CaseRow {
+  const source = `${modelProviderLabel(activity.providerId)} · ${plain(activity.model) ?? 'model not recorded'} · ${MODEL_MODE_COPY[activity.mode]}`;
+  const checkedAt = modelCheckTime(activity.observedAt);
+  const time = checkedAt ? ` · checked ${checkedAt}` : '';
+  if (activity.status === 'FAILED') {
+    return {
+      label: 'Recovery needs could not be reviewed',
+      state: 'failed',
+      note: `${source} · review failed; deterministic planning continued${time}.`,
+    };
+  }
+  return {
+    label: 'Reviewed recovery needs',
+    state: 'done',
+    note: `${source} · review completed${time}.`,
+  };
+}
+
+function buildModelActivityRows(view: RecoveryCaseView): CaseRow[] {
+  return modelActivities(view).map(modelActivityRow);
+}
 
 function toolProviderLabel(provider: string | undefined): string | undefined {
   const safe = plain(provider);
