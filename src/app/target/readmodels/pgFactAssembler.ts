@@ -1567,6 +1567,8 @@ export function buildTravellerTripFacts(input: {
   whatMattersNow?: string;
   whatNorthstarIsDoing?: string;
   whatDoYouNeedFromMe?: string;
+  itinerary?: readonly NonNullable<TravellerTripFacts['itinerary']>[number][];
+  commitment?: TravellerTripFacts['commitment'];
   generatedAt?: string;
 }): TravellerTripFacts {
   return {
@@ -1575,7 +1577,7 @@ export function buildTravellerTripFacts(input: {
     changedVisibleRefs: [input.tripRef],
     changedEdgeIds: [],
     currentSemanticState: input.amIOkay === 'NO' ? 'FAILED' : input.amIOkay === 'YES' ? 'HEALTHY' : 'UNKNOWN',
-    nodes: [{ ref: input.tripRef, kind: 'TRAVELLER', label: 'Your trip', semanticState: input.amIOkay === 'NO' ? 'FAILED' : 'HEALTHY', authority: 'AUTHORITATIVE' }],
+    nodes: [{ ref: input.tripRef, kind: 'TRAVELLER', label: 'Your trip', semanticState: input.amIOkay === 'NO' ? 'FAILED' : input.amIOkay === 'YES' ? 'HEALTHY' : 'UNKNOWN', authority: 'AUTHORITATIVE' }],
     edges: [],
     tripRef: input.tripRef,
     amIOkay: input.amIOkay,
@@ -1584,6 +1586,8 @@ export function buildTravellerTripFacts(input: {
     ...(input.whatNorthstarIsDoing ? { whatNorthstarIsDoing: input.whatNorthstarIsDoing } : {}),
     ...(input.whatDoYouNeedFromMe ? { whatDoYouNeedFromMe: input.whatDoYouNeedFromMe } : {}),
     doesTheRestWork: input.doesTheRestWork,
+    ...(input.itinerary && input.itinerary.length > 0 ? { itinerary: input.itinerary } : {}),
+    ...(input.commitment ? { commitment: input.commitment } : {}),
   };
 }
 
@@ -1756,56 +1760,220 @@ export async function loadTravellerTripFacts(
   journeyId: string,
   at?: string,
 ): Promise<TravellerTripFacts | null> {
-  const journey = await pool.query<{ trip_id: string; traveller_id: string; lifecycle_status: string }>(
-    `SELECT trip_id, traveller_id, lifecycle_status FROM journeys WHERE workspace_id = $1 AND id = $2`,
-    [workspaceId, journeyId],
-  );
-  const j = journey.rows[0];
-  if (!j) return null;
+  const { value } = await withProjectionSnapshot(pool, async (client) => {
+    const generatedAt = isoNow(at);
+    const journey = await client.query<{ trip_id: string; traveller_id: string }>(
+      `SELECT trip_id, traveller_id FROM journeys WHERE workspace_id = $1 AND id = $2`,
+      [workspaceId, journeyId],
+    );
+    const j = journey.rows[0];
+    if (!j) return null;
 
-  const assessment = await pool.query<{ overall_verdict: string }>(
-    `SELECT a.overall_verdict
-       FROM assessments a
-       JOIN assessment_subjects s ON s.workspace_id = a.workspace_id AND s.assessment_id = a.id
-      WHERE a.workspace_id = $1 AND a.kind = 'VIABILITY'
-        AND s.subject_kind = 'JOURNEY' AND s.subject_id = $2
-      ORDER BY a.evaluated_at DESC LIMIT 1`,
-    [workspaceId, journeyId],
-  );
-  const verdict = assessment.rows[0]?.overall_verdict;
-  const amIOkay: 'YES' | 'NO' | 'UNKNOWN' =
-    verdict === 'PASS' ? 'YES' : verdict === 'FAIL' ? 'NO' : 'UNKNOWN';
-  const doesTheRestWork: RemainderViability =
-    verdict === 'PASS' ? 'VIABLE' : verdict === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN';
+    const assessment = await currentAssessmentView(
+      client,
+      workspaceId,
+      { kind: 'JOURNEY', id: journeyId } as TypedRef,
+      'VIABILITY',
+      generatedAt,
+    );
+    const verdict = assessment.status === 'CURRENT' ? assessment.assessment?.overallVerdict : undefined;
+    const amIOkay: 'YES' | 'NO' | 'UNKNOWN' =
+      verdict === 'PASS' ? 'YES' : verdict === 'FAIL' ? 'NO' : 'UNKNOWN';
+    const doesTheRestWork: RemainderViability =
+      verdict === 'PASS' ? 'VIABLE' : verdict === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN';
 
-  const caseLink = await pool.query<{ recovery_case_id: string; lifecycle_status: string }>(
-    `SELECT cs.recovery_case_id, rc.lifecycle_status
-       FROM case_subjects cs
-       JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
-      WHERE cs.workspace_id = $1 AND cs.subject_kind = 'JOURNEY' AND cs.subject_id = $2
-      ORDER BY rc.opened_at DESC LIMIT 1`,
-    [workspaceId, journeyId],
-  );
-  const linked = caseLink.rows[0];
+    const travellerItems = await client.query<{
+      kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE';
+      lifecycle_status: string;
+      intended_window_start: Date | null;
+      intended_window_end: Date | null;
+      order_key: string;
+      operator: string | null;
+      mode: string | null;
+      origin_place_name: string | null;
+      origin_time_zone: string | null;
+      destination_place_name: string | null;
+      destination_time_zone: string | null;
+      published_departure: Date | null;
+      published_arrival: Date | null;
+      estimated_departure: Date | null;
+      estimated_arrival: Date | null;
+      actual_departure: Date | null;
+      actual_arrival: Date | null;
+      stay_place_name: string | null;
+      stay_time_zone: string | null;
+      engagement_title: string | null;
+      engagement_place_name: string | null;
+      engagement_time_zone: string | null;
+      line_status: string | null;
+      reservation_status: string | null;
+    }>(
+      `SELECT ji.kind, ji.lifecycle_status, ji.intended_window_start, ji.intended_window_end, ji.order_key,
+              ts.operator, ts.mode,
+              po.name AS origin_place_name, po.time_zone AS origin_time_zone,
+              pd.name AS destination_place_name, pd.time_zone AS destination_time_zone,
+              ts.published_departure, ts.published_arrival,
+              ts.estimated_departure, ts.estimated_arrival,
+              ts.actual_departure, ts.actual_arrival,
+              sp.name AS stay_place_name, sp.time_zone AS stay_time_zone,
+              COALESCE(epi.title, eid.standalone_title) AS engagement_title,
+              ep.name AS engagement_place_name, ep.time_zone AS engagement_time_zone,
+              booking.line_status, booking.reservation_status
+         FROM journey_items ji
+         LEFT JOIN transport_item_details tid
+           ON tid.workspace_id = ji.workspace_id AND tid.journey_item_id = ji.id
+         LEFT JOIN LATERAL (
+           SELECT rl.observed_status AS line_status,
+                  r.observed_status AS reservation_status,
+                  tld.transport_service_id
+             FROM reservation_allocations ra
+             JOIN reservation_lines rl
+               ON rl.workspace_id = ra.workspace_id AND rl.id = ra.line_id
+             JOIN reservations r
+               ON r.workspace_id = ra.workspace_id AND r.id = ra.reservation_id
+             LEFT JOIN transport_line_details tld
+               ON tld.workspace_id = rl.workspace_id AND tld.line_id = rl.id
+            WHERE ra.workspace_id = ji.workspace_id
+              AND ra.journey_item_id = ji.id
+              AND ra.traveller_id = $3
+            ORDER BY ra.id
+            LIMIT 1
+         ) booking ON true
+         LEFT JOIN transport_services ts
+           ON ts.workspace_id = ji.workspace_id
+          AND ts.id = COALESCE(tid.selected_service_id, booking.transport_service_id)
+         LEFT JOIN places po
+           ON po.workspace_id = ts.workspace_id AND po.id = ts.origin_place_id
+         LEFT JOIN places pd
+           ON pd.workspace_id = ts.workspace_id AND pd.id = ts.destination_place_id
+         LEFT JOIN stay_item_details sid
+           ON sid.workspace_id = ji.workspace_id AND sid.journey_item_id = ji.id
+         LEFT JOIN places sp
+           ON sp.workspace_id = sid.workspace_id AND sp.id = sid.intended_place_id
+         LEFT JOIN engagement_item_details eid
+           ON eid.workspace_id = ji.workspace_id AND eid.journey_item_id = ji.id
+         LEFT JOIN participations epart
+           ON epart.workspace_id = eid.workspace_id AND epart.id = eid.participation_id
+         LEFT JOIN programme_items epi
+           ON epi.workspace_id = epart.workspace_id AND epi.id = epart.programme_item_id
+         LEFT JOIN places ep
+           ON ep.workspace_id = epi.workspace_id AND ep.id = epi.place_id
+        WHERE ji.workspace_id = $1 AND ji.journey_id = $2
+        ORDER BY ji.order_key, ji.id`,
+      [workspaceId, journeyId, j.traveller_id],
+    );
 
-  return buildTravellerTripFacts({
-    tripRef: j.trip_id,
-    amIOkay,
-    doesTheRestWork,
-    generatedAt: isoNow(at),
-    whatChanged: linked
-      ? `Linked recovery case ${linked.recovery_case_id} is ${linked.lifecycle_status}`
-      : 'No open recovery case linked to this journey',
-    whatMattersNow: amIOkay === 'NO'
-      ? 'Your participation is not viable under current assessments'
-      : amIOkay === 'YES'
-        ? 'Current assessment reports your journey as viable'
-        : 'Viability is not yet known',
-    whatNorthstarIsDoing: linked
-      ? `Recovery case status: ${linked.lifecycle_status}`
-      : 'Monitoring journey state',
-    whatDoYouNeedFromMe: linked?.lifecycle_status === 'AWAITING_AUTHORITY'
-      ? 'Authority decision may be required'
-      : 'Nothing required from you right now unless contacted',
+    const itinerary = travellerItems.rows.map((row) => {
+      const bookingStatus = row.line_status ?? row.reservation_status;
+      const status = bookingStatus ?? row.lifecycle_status;
+      if (row.kind === 'TRANSPORT') {
+        const startsAt = row.actual_departure ?? row.estimated_departure ?? row.published_departure;
+        const endsAt = row.actual_arrival ?? row.estimated_arrival ?? row.published_arrival;
+        return {
+          label: row.operator || (row.mode ? `${row.mode} journey` : 'Travel segment'),
+          ...(row.origin_place_name ? { originLabel: row.origin_place_name } : {}),
+          ...(row.destination_place_name ? { destinationLabel: row.destination_place_name } : {}),
+          ...(startsAt ? { startsAt: startsAt.toISOString() } : {}),
+          ...(endsAt ? { endsAt: endsAt.toISOString() } : {}),
+          ...(row.origin_time_zone ? { startTimeZone: row.origin_time_zone } : {}),
+          ...(row.destination_time_zone ? { endTimeZone: row.destination_time_zone } : {}),
+          status,
+        };
+      }
+      const label = row.kind === 'STAY'
+        ? row.stay_place_name ? `Stay at ${row.stay_place_name}` : 'Stay'
+        : row.kind === 'ENGAGEMENT'
+          ? row.engagement_title || 'Programme commitment'
+          : 'Planned activity';
+      const placeLabel = row.kind === 'STAY' ? row.stay_place_name : row.engagement_place_name;
+      const timeZone = row.kind === 'STAY' ? row.stay_time_zone : row.engagement_time_zone;
+      return {
+        label,
+        ...(placeLabel ? { placeLabel } : {}),
+        ...(row.intended_window_start ? { startsAt: row.intended_window_start.toISOString() } : {}),
+        ...(row.intended_window_end ? { endsAt: row.intended_window_end.toISOString() } : {}),
+        ...(timeZone ? { startTimeZone: timeZone, endTimeZone: timeZone } : {}),
+        status,
+      };
+    });
+
+    const commitment = await client.query<{
+      title: string;
+      window_start: Date | null;
+      window_end: Date | null;
+      place_name: string | null;
+      time_zone: string | null;
+    }>(
+      `SELECT pi.title, pi.window_start, pi.window_end, pz.name AS place_name, pz.time_zone
+         FROM journey_items ji
+         JOIN engagement_item_details eid
+           ON eid.workspace_id = ji.workspace_id AND eid.journey_item_id = ji.id
+         JOIN participations p
+           ON p.workspace_id = eid.workspace_id AND p.id = eid.participation_id
+          AND p.accepted AND p.obligation = 'REQUIRED'
+         JOIN programme_items pi
+           ON pi.workspace_id = p.workspace_id AND pi.id = p.programme_item_id
+         LEFT JOIN places pz
+           ON pz.workspace_id = pi.workspace_id AND pz.id = pi.place_id
+        WHERE ji.workspace_id = $1 AND ji.journey_id = $2
+        ORDER BY pi.window_start NULLS LAST, pi.id
+        LIMIT 1`,
+      [workspaceId, journeyId],
+    );
+    const commitmentRow = commitment.rows[0];
+    const commitmentFact = commitmentRow
+      ? {
+        label: commitmentRow.title,
+        ...(commitmentRow.window_start ? { windowStart: commitmentRow.window_start.toISOString() } : {}),
+        ...(commitmentRow.window_end ? { windowEnd: commitmentRow.window_end.toISOString() } : {}),
+        ...(commitmentRow.time_zone ? { timeZone: commitmentRow.time_zone } : {}),
+        ...(commitmentRow.place_name ? { placeLabel: commitmentRow.place_name } : {}),
+      }
+      : undefined;
+
+    const caseLink = await client.query<{ recovery_case_id: string; lifecycle_status: string }>(
+      `SELECT cs.recovery_case_id, rc.lifecycle_status
+         FROM case_subjects cs
+         JOIN recovery_cases rc ON rc.workspace_id = cs.workspace_id AND rc.id = cs.recovery_case_id
+        WHERE cs.workspace_id = $1 AND cs.subject_kind = 'JOURNEY' AND cs.subject_id = $2
+        ORDER BY (rc.closed_at IS NULL) DESC, rc.opened_at DESC
+        LIMIT 1`,
+      [workspaceId, journeyId],
+    );
+    const linked = caseLink.rows[0];
+    const caseProgress = linked
+      ? ({
+        OPEN: 'Northstar is monitoring a travel change affecting your trip.',
+        PLANNING: 'Northstar is checking recovery options for your trip.',
+        AWAITING_AUTHORITY: 'Northstar has prepared a recovery and is waiting for organiser approval.',
+        EXECUTING: 'Northstar is applying the approved recovery for your trip.',
+        RESOLVED: 'Northstar completed the recovery for your trip.',
+        CLOSED: 'Northstar completed the recovery for your trip.',
+        CANCELLED: 'Northstar closed the recovery work for your trip.',
+      } as Record<string, string>)[linked.lifecycle_status] ?? 'Northstar is monitoring a recovery case for your trip.'
+      : undefined;
+
+    return buildTravellerTripFacts({
+      tripRef: j.trip_id,
+      amIOkay,
+      doesTheRestWork,
+      generatedAt,
+      ...(linked ? { whatChanged: 'A travel change is affecting this trip.' } : {}),
+      whatMattersNow: amIOkay === 'NO'
+        ? 'Your current plan needs attention.'
+        : amIOkay === 'YES'
+          ? 'Your current plan is viable.'
+          : 'We are still checking your trip.',
+      ...(caseProgress ? { whatNorthstarIsDoing: caseProgress } : {}),
+      ...(linked?.lifecycle_status === 'AWAITING_AUTHORITY'
+        ? { whatDoYouNeedFromMe: 'Nothing required from you right now. The organiser is reviewing the recovery.' }
+        : {}),
+      ...(linked && (linked.lifecycle_status === 'RESOLVED' || linked.lifecycle_status === 'CLOSED') && amIOkay === 'YES'
+        ? { whatChangedAfterRecovery: 'The recovery for this trip is complete.' }
+        : {}),
+      ...(itinerary.length > 0 ? { itinerary } : {}),
+      ...(commitmentFact ? { commitment: commitmentFact } : {}),
+    });
   });
+  return value;
 }

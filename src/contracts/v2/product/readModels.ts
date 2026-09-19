@@ -885,6 +885,28 @@ export const RecoveryCaseViewSchema = z.strictObject({
 });
 export type RecoveryCaseView = z.infer<typeof RecoveryCaseViewSchema>;
 
+export const TravellerItineraryItemSchema = z.strictObject({
+  label: z.string().min(1),
+  originLabel: z.string().min(1).optional(),
+  destinationLabel: z.string().min(1).optional(),
+  placeLabel: z.string().min(1).optional(),
+  startsAt: z.string().datetime({ offset: true }).optional(),
+  endsAt: z.string().datetime({ offset: true }).optional(),
+  startTimeZone: z.string().min(1).optional(),
+  endTimeZone: z.string().min(1).optional(),
+  status: z.string().min(1),
+});
+export type TravellerItineraryItem = z.infer<typeof TravellerItineraryItemSchema>;
+
+export const TravellerCommitmentSchema = z.strictObject({
+  label: z.string().min(1),
+  windowStart: z.string().datetime({ offset: true }).optional(),
+  windowEnd: z.string().datetime({ offset: true }).optional(),
+  timeZone: z.string().min(1).optional(),
+  placeLabel: z.string().min(1).optional(),
+});
+export type TravellerCommitment = z.infer<typeof TravellerCommitmentSchema>;
+
 export const TravellerTripViewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   tripRef: z.string().min(1),
@@ -895,6 +917,8 @@ export const TravellerTripViewSchema = z.strictObject({
   whatDoYouNeedFromMe: z.string().optional(),
   doesTheRestWork: RemainderViabilitySchema,
   whatChangedAfterRecovery: z.string().optional(),
+  itinerary: z.array(TravellerItineraryItemSchema).optional(),
+  commitment: TravellerCommitmentSchema.optional(),
   change: ChangeAwarenessSchema,
 });
 export type TravellerTripView = z.infer<typeof TravellerTripViewSchema>;
