@@ -324,9 +324,11 @@ async function resolveAssessableSubjects(db: Queryable, workspaceId: string, see
 export function requiredAuthorityScope(
   intentSubjectRefs: readonly TypedRef[],
   resolvedAssessableSubjects: readonly TypedRef[],
+  /** DB-derived owning journey id per JOURNEY_ITEM id (never proposer-supplied). */
+  itemOwnerJourneyIds: ReadonlyMap<string, string> = new Map(),
 ): TypedRef[] {
   const map = new Map<string, TypedRef>();
-  const journeyResolved = resolvedAssessableSubjects.some((ref) => ref.kind === 'JOURNEY');
+  const resolvedJourneys = new Set(resolvedAssessableSubjects.filter((ref) => ref.kind === 'JOURNEY').map((ref) => ref.id));
   for (const ref of [...intentSubjectRefs, ...resolvedAssessableSubjects]) {
     // R4-F2: a SELECT_OFFER intent names an OFFER (a content-hash offer key, not a
     // registered subject: no grant can enumerate it; its identity and price are
@@ -335,10 +337,30 @@ export function requiredAuthorityScope(
     // JOURNEY that owns it (already in the resolved set), so neither is an
     // independent exact-coverage requirement.
     if (ref.kind === 'OFFER') continue;
-    if (ref.kind === 'JOURNEY_ITEM' && journeyResolved) continue;
+    // Dropped ONLY when the item's own owning journey (looked up in PostgreSQL) is itself
+    // in the required set; an unknown owner or a different journey keeps the item required.
+    if (ref.kind === 'JOURNEY_ITEM') {
+      const owner = itemOwnerJourneyIds.get(ref.id);
+      if (owner !== undefined && resolvedJourneys.has(owner)) continue;
+    }
     map.set(`${ref.kind}:${ref.id}`, ref);
   }
   return [...map.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+}
+
+/** Owning journey per JOURNEY_ITEM named by the intent, from PostgreSQL truth. */
+async function loadItemOwnerJourneyIds(
+  db: Queryable, workspaceId: string, intentSubjectRefs: readonly TypedRef[],
+): Promise<Map<string, string>> {
+  const owners = new Map<string, string>();
+  for (const ref of intentSubjectRefs) {
+    if (ref.kind !== 'JOURNEY_ITEM') continue;
+    const result = await db.query<{ journey_id: string }>(
+      'SELECT journey_id FROM journey_items WHERE workspace_id = $1 AND id = $2', [workspaceId, ref.id],
+    );
+    if (result.rows[0]) owners.set(ref.id, result.rows[0].journey_id);
+  }
+  return owners;
 }
 
 async function loadStrategySubjectSeeds(
@@ -368,8 +390,10 @@ export async function loadRequiredAuthorityScope(
   const strategy = await loadStrategyForPlan(pool, workspaceId, intent.actionPlanId);
   if ('allowed' in strategy) return strategy;
   const seeds = await loadStrategySubjectSeeds(pool, workspaceId, strategy);
+  // The intent's own items always contribute their owning journey to the required scope.
+  seeds.push(...intent.subjectRefs.filter((ref) => ref.kind === 'JOURNEY_ITEM'));
   const assessable = await resolveAssessableSubjects(pool, workspaceId, seeds);
-  const required = requiredAuthorityScope(intent.subjectRefs, assessable);
+  const required = requiredAuthorityScope(intent.subjectRefs, assessable, await loadItemOwnerJourneyIds(pool, workspaceId, intent.subjectRefs));
   if (required.length === 0) {
     return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED', detail: 'required authority scope is empty' };
   }
@@ -552,11 +576,12 @@ export async function evaluateStoredExecutionGate(
     const ref = subjectRef(summary.subjectRef);
     if (ref) seeds.push(ref);
   }
+  seeds.push(...intent.subjectRefs.filter((ref) => ref.kind === 'JOURNEY_ITEM'));
   const subjects = await resolveAssessableSubjects(pool, params.workspaceId, seeds);
   const assessmentView = await requireAllAssessmentsCurrent(pool, params.workspaceId, subjects, params.now);
   if ('allowed' in assessmentView && assessmentView.allowed === false) return assessmentView;
 
-  const requiredScopes = requiredAuthorityScope(intent.subjectRefs, subjects);
+  const requiredScopes = requiredAuthorityScope(intent.subjectRefs, subjects, await loadItemOwnerJourneyIds(pool, params.workspaceId, intent.subjectRefs));
   if (requiredScopes.length === 0) {
     return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED', detail: 'required authority scope is empty' };
   }

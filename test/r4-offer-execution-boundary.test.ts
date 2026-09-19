@@ -50,3 +50,20 @@ test('the external execution module only mutates after the stored gate and durab
   const worker = readFileSync(join(ROOT, 'src/persistence/postgres/execution/pgExecutionWorker.ts'), 'utf8');
   assert.ok(worker.indexOf("to: 'DISPATCHING'") < worker.indexOf('await params.dispatcher(claim)'), 'DISPATCHING is committed before the dispatcher runs');
 });
+
+import { requiredAuthorityScope } from '../src/persistence/postgres/execution/storedExecutionGate.ts';
+
+test('B1: a JOURNEY_ITEM requirement is dropped only when its own owning journey is required', () => {
+  const item = { kind: 'JOURNEY_ITEM', id: 'item-2' } as never;
+  const j1 = { kind: 'JOURNEY', id: 'j1' } as never;
+  const j2 = { kind: 'JOURNEY', id: 'j2' } as never;
+  const kinds = (refs: { kind: string; id: string }[]) => refs.map((r) => `${r.kind}:${r.id}`);
+  // item owned by j2, but only j1 is resolved: the item stays required (no weaker authority).
+  assert.deepEqual(kinds(requiredAuthorityScope([item], [j1], new Map([['item-2', 'j2']]))), ['JOURNEY:j1', 'JOURNEY_ITEM:item-2']);
+  // unknown owner: fail closed.
+  assert.ok(kinds(requiredAuthorityScope([item], [j1])).includes('JOURNEY_ITEM:item-2'));
+  // owner resolved: the item is covered by its journey.
+  assert.deepEqual(kinds(requiredAuthorityScope([item], [j1, j2], new Map([['item-2', 'j2']]))), ['JOURNEY:j1', 'JOURNEY:j2']);
+  // OFFER refs are never independent requirements.
+  assert.deepEqual(kinds(requiredAuthorityScope([{ kind: 'OFFER', id: 'o' } as never], [j1])), ['JOURNEY:j1']);
+});
