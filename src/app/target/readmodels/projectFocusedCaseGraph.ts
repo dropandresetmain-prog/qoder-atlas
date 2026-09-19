@@ -62,6 +62,8 @@ export interface JourneyItemRow {
   lifecycle_status: string;
   intended_window_start: string | null;
   intended_window_end: string | null;
+  /** Canonical endpoint/place zone for STAY windows, when the place is known. */
+  timeZone?: string | null;
   /** For TRANSPORT items: the selected transport service id (from transport_item_details). */
   selectedServiceId?: string | null;
 }
@@ -395,7 +397,7 @@ export function projectFocusedCaseGraphEnrichment(
         ref = `TRANSFER_STAY:${item.id}`;
         label = 'Stay';
         if (item.intended_window_start && item.intended_window_end) {
-          detail = formatWindowUtc(item.intended_window_start, item.intended_window_end);
+          detail = formatWindowInTimeZone(item.intended_window_start, item.intended_window_end, item.timeZone);
         }
       } else if (item.kind === 'ENGAGEMENT') {
         // ENGAGEMENT items link to programme_items via engagement_item_details.participation_id.

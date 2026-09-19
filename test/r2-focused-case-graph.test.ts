@@ -177,7 +177,7 @@ test('R2 enrichment: creates TRANSFER_STAY node for stay item', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
-    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'STAY', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: '2026-01-15T14:00:00Z', intended_window_end: '2026-01-16T10:00:00Z', selectedServiceId: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'STAY', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: '2026-01-15T14:00:00Z', intended_window_end: '2026-01-16T10:00:00Z', timeZone: 'Asia/Singapore', selectedServiceId: null }],
     transportServices: [],
     participations: [],
     programmeItems: [],
@@ -191,7 +191,7 @@ test('R2 enrichment: creates TRANSFER_STAY node for stay item', () => {
   const node = result.nodes[0]!;
   assert.equal(node.kind, 'TRANSFER_STAY');
   assert.equal(node.ref, 'TRANSFER_STAY:item-1');
-  assert.equal(node.detail, '15 Jan 14:00 → 16 Jan 10:00 UTC');
+  assert.equal(node.detail, '15 Jan 22:00 → 16 Jan 18:00 GMT+8');
 });
 
 test('R2 enrichment: creates PROGRAMME_COMMITMENT node for accepted participation', () => {

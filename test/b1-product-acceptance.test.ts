@@ -218,7 +218,7 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     assert.equal(html.includes('>Traveller<'), false);
     // The reached set is summarised rather than dumped row by row.
     // R4 intentionally moved this into the case workspace's "Why it works" copy.
-    assert.match(html, /We re-checked 3 parts of the trip against this option: 2 confirmed, 1 not yet confirmed\./);
+    assert.match(html, /We re-checked 3 travel plans against this option: 2 confirmed, 1 not yet confirmed\./);
   });
 
   test('each option states what it changes, in current -> proposed terms', () => {

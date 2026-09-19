@@ -266,6 +266,23 @@ test('Case strategy windows use canonical programme zone and explicit UTC fallba
   assert.match(utcModel.recommended!.changes[0]!.toWindow!, /UTC/);
 });
 
+test('Case option counts use travel-plan wording only for JOURNEY projections', () => {
+  const journey = {
+    ...strategy(1, 1, '05:00', 'p'),
+    projectedSummary: { total: 1, pass: 1, fail: 0, unknown: 0 },
+    projectedPeople: [{ subjectRef: 'JOURNEY:j1', personLabel: 'Alice', verdict: 'PASS' as const }],
+  } as RecoveryStrategyView;
+  const journeyModel = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [journey] } as Partial<RecoveryCaseView>));
+  assert.ok(journeyModel.recommended!.why.some((line) => /1 travel plan against this option/.test(line)));
+
+  const nonJourney = {
+    ...journey,
+    projectedPeople: [{ subjectRef: 'PROGRAMME_ITEM:item-1', personLabel: 'Opening session', verdict: 'PASS' as const }],
+  } as RecoveryStrategyView;
+  const nonJourneyModel = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [nonJourney] } as Partial<RecoveryCaseView>));
+  assert.ok(nonJourneyModel.recommended!.why.some((line) => /1 part of the trip against this option/.test(line)));
+});
+
 describe('R4 transport option cards: leg label and strategy-scoped cost', () => {
   const itemRef = 'JOURNEY_ITEM:00000000-0000-4000-8000-000000000001';
   const transportStrategy = (n: number): RecoveryStrategyView => ({

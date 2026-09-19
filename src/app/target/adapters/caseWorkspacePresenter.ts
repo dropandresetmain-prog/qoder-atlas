@@ -402,7 +402,13 @@ function optionWhy(strategy: RecoveryStrategyView): string[] {
     const parts: string[] = [`${summary.pass} confirmed`];
     if (summary.fail > 0) parts.push(`${summary.fail} still need attention`);
     if (summary.unknown > 0) parts.push(`${summary.unknown} not yet confirmed`);
-    lines.push(`We re-checked ${summary.total} ${summary.total === 1 ? "part" : "parts"} of the trip against this option: ${parts.join(', ')}.`);
+    const allProjectedSubjectsAreJourneys = strategy.projectedPeople.length === summary.total
+      && strategy.projectedPeople.length > 0
+      && strategy.projectedPeople.every((person) => person.subjectRef.startsWith('JOURNEY:'));
+    const checkedSubject = allProjectedSubjectsAreJourneys
+      ? `${summary.total} travel plan${summary.total === 1 ? '' : 's'}`
+      : `${summary.total} ${summary.total === 1 ? 'part' : 'parts'} of the trip`;
+    lines.push(`We re-checked ${checkedSubject} against this option: ${parts.join(', ')}.`);
     if (summary.fail === 0) lines.push('Nothing else in the trip breaks.');
   }
   return lines;

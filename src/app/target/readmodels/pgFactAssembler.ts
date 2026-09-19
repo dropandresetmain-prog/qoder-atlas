@@ -743,11 +743,13 @@ async function loadRecoveryCaseFactsInner(
 
   // Journey item rows for those journeys.
   const journeyItems = journeys.rows.length > 0
-    ? await client.query<{ id: string; journey_id: string; kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE'; order_key: string; lifecycle_status: string; intended_window_start: string | null; intended_window_end: string | null; selected_service_id: string | null }>(
+    ? await client.query<{ id: string; journey_id: string; kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE'; order_key: string; lifecycle_status: string; intended_window_start: string | null; intended_window_end: string | null; selected_service_id: string | null; stay_time_zone: string | null }>(
         `SELECT ji.id, ji.journey_id, ji.kind, ji.order_key, ji.lifecycle_status, ji.intended_window_start, ji.intended_window_end,
-                tid.selected_service_id
+                tid.selected_service_id, stay_place.time_zone AS stay_time_zone
            FROM journey_items ji
            LEFT JOIN transport_item_details tid ON tid.workspace_id = ji.workspace_id AND tid.journey_item_id = ji.id
+           LEFT JOIN stay_item_details sid ON sid.workspace_id = ji.workspace_id AND sid.journey_item_id = ji.id
+           LEFT JOIN places stay_place ON stay_place.workspace_id = sid.workspace_id AND stay_place.id = sid.intended_place_id
           WHERE ji.workspace_id = $1 AND ji.journey_id = ANY($2::uuid[])
           ORDER BY ji.journey_id, ji.order_key, ji.id`,
         [workspaceId, journeys.rows.map((j) => j.id)],
@@ -956,6 +958,7 @@ async function loadRecoveryCaseFactsInner(
       lifecycle_status: i.lifecycle_status,
       intended_window_start: i.intended_window_start,
       intended_window_end: i.intended_window_end,
+      timeZone: i.stay_time_zone,
       selectedServiceId: i.selected_service_id,
     })),
     transportServices: transportServices.rows.map((s) => ({
