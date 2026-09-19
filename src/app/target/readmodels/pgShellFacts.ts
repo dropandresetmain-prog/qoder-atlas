@@ -78,7 +78,7 @@ export async function loadProgrammeSchedule(pool: Pool, workspaceId: string): Pr
          LEFT JOIN participations p
                 ON p.workspace_id = pi.workspace_id AND p.programme_item_id = pi.id
         WHERE pi.workspace_id = $1 AND prog.lifecycle_status = 'ACTIVE'
-        GROUP BY pi.id, pi.title, pi.item_type, pi.window_start, pi.window_end,
+        GROUP BY pi.workspace_id, pi.id, pi.title, pi.item_type, pi.window_start, pi.window_end,
                  pi.lifecycle_status, pl.name, pi.operating_requirements
         ORDER BY pi.window_start NULLS LAST, pi.title`,
       [workspaceId],
