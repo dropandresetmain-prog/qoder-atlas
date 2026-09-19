@@ -19,8 +19,10 @@ export interface ProgrammeItemWindowFact {
   itemRef: string;
   title: string;
   window: { start: Instant; end: Instant };
+  timeZone?: string;
   participantTravellerRef: string;
   participantLabel: string;
+  participantLabels?: string[];
 }
 
 export interface ProgrammeParticipantProjection {
@@ -210,14 +212,15 @@ export interface AuthoritativeSwapParticipantProjection {
   personLabel: string;
   /** Which side of the swap this journey's participation sits on, or 'other' for a linked/collision subject. */
   side: 'ITEM_A' | 'ITEM_B' | 'OTHER';
+  currentVerdict: AssessmentTone;
   verdict: AssessmentTone;
 }
 
 export interface AuthoritativeProgrammeSwapPreviewResult {
   mutatesAuthoritativeState: false;
   expectedProgrammeRevisions?: ExpectedRevision[];
-  itemA: { itemRef: string; title: string; currentWindow: { start: string; end: string }; proposedWindow: { start: string; end: string } };
-  itemB: { itemRef: string; title: string; currentWindow: { start: string; end: string }; proposedWindow: { start: string; end: string } };
+  itemA: { itemRef: string; title: string; timeZone?: string; participantLabels: string[]; currentWindow: { start: string; end: string }; proposedWindow: { start: string; end: string } };
+  itemB: { itemRef: string; title: string; timeZone?: string; participantLabels: string[]; currentWindow: { start: string; end: string }; proposedWindow: { start: string; end: string } };
   projections: AuthoritativeSwapParticipantProjection[];
   bothPartiesProjectedViable: boolean;
   othersRemainViable: boolean;
@@ -234,9 +237,9 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
   input: AuthoritativeProgrammeSwapPreviewInput,
 ): Promise<AuthoritativeProgrammeSwapPreviewOutcome> {
   const itemRows = await pool.query<{
-    id: string; programme_id: string; title: string; window_start: Date; window_end: Date; schedule_authority: string;
+    id: string; programme_id: string; title: string; window_start: Date | null; window_end: Date | null; time_zone: string | null; schedule_authority: string;
   }>(
-    `SELECT id, programme_id, title, window_start, window_end, schedule_authority
+    `SELECT id, programme_id, title, window_start, window_end, time_zone, schedule_authority
        FROM programme_items WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
     [input.workspaceId, [input.itemARef, input.itemBRef]],
   );
@@ -302,7 +305,10 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
   });
   if (!evaluated.ok) return { ok: false, error: evaluated.conflict.message };
 
-  const travellerIds = [...new Set(baseWorld.journeys.map((j) => j.travellerId))];
+  const travellerIds = [...new Set([
+    ...baseWorld.journeys.map((j) => j.travellerId),
+    ...participantRows.rows.map((row) => row.traveller_id),
+  ])];
   const names = travellerIds.length === 0
     ? { rows: [] as { id: string; display_value: string }[] }
     : await pool.query<{ id: string; display_value: string }>(
@@ -314,7 +320,15 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
       );
   const nameByTraveller = new Map(names.rows.map((r) => [r.id, r.display_value]));
 
+  const labelsFor = (itemRef: string): string[] => participantRows.rows
+    .filter((row) => row.programme_item_id === itemRef)
+    .map((row) => nameByTraveller.get(row.traveller_id) ?? `Traveller ${row.traveller_id.slice(0, 8)}`)
+    .sort((a, b) => a.localeCompare(b));
+  const itemAParticipantLabels = labelsFor(itemA.id);
+  const itemBParticipantLabels = labelsFor(itemB.id);
+
   const { strategy } = evaluated.value;
+  const baselineByJourney = new Map(evaluated.value.baselineAssessments.map((assessment) => [assessment.subjectRef.id, assessment]));
   const projections: AuthoritativeSwapParticipantProjection[] = strategy.candidateAssessments.map((c) => {
     const journeyId = c.subjectRef.id;
     const travellerId = baseWorld.journeys.find((j) => j.id === journeyId)?.travellerId ?? '';
@@ -328,13 +342,16 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
       travellerRef: travellerId,
       personLabel: nameByTraveller.get(travellerId) ?? `Traveller ${travellerId.slice(0, 8)}`,
       side,
+      currentVerdict: (baselineByJourney.get(journeyId)?.overallVerdict ?? 'UNKNOWN') as AssessmentTone,
       verdict: c.overallVerdict as AssessmentTone,
     };
   });
 
-  const itemAViable = projections.filter((p) => p.side === 'ITEM_A').every((p) => p.verdict === 'PASS');
-  const itemBViable = projections.filter((p) => p.side === 'ITEM_B').every((p) => p.verdict === 'PASS');
-  const othersRemainViable = projections.filter((p) => p.side === 'OTHER').every((p) => p.verdict === 'PASS');
+  const allPass = (rows: readonly AuthoritativeSwapParticipantProjection[]): boolean => rows.length > 0 && rows.every((p) => p.verdict === 'PASS');
+  const itemAViable = allPass(projections.filter((p) => p.side === 'ITEM_A'));
+  const itemBViable = allPass(projections.filter((p) => p.side === 'ITEM_B'));
+  const others = projections.filter((p) => p.side === 'OTHER');
+  const othersRemainViable = others.length === 0 || allPass(others);
   const bothPartiesProjectedViable = itemAViable && itemBViable;
 
   return {
@@ -348,19 +365,23 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
       itemA: {
         itemRef: itemA.id,
         title: itemA.title,
+        ...(itemA.time_zone ? { timeZone: itemA.time_zone } : {}),
+        participantLabels: itemAParticipantLabels,
         currentWindow: { start: itemA.window_start.toISOString(), end: itemA.window_end.toISOString() },
         proposedWindow: { start: itemB.window_start.toISOString(), end: itemB.window_end.toISOString() },
       },
       itemB: {
         itemRef: itemB.id,
         title: itemB.title,
+        ...(itemB.time_zone ? { timeZone: itemB.time_zone } : {}),
+        participantLabels: itemBParticipantLabels,
         currentWindow: { start: itemB.window_start.toISOString(), end: itemB.window_end.toISOString() },
         proposedWindow: { start: itemA.window_start.toISOString(), end: itemA.window_end.toISOString() },
       },
       projections,
       bothPartiesProjectedViable,
       othersRemainViable,
-      previewAccepted: bothPartiesProjectedViable && othersRemainViable,
+      previewAccepted: strategy.viability === 'VIABLE',
       strategyViability: strategy.viability,
     },
   };
@@ -377,46 +398,45 @@ export function toLegacyRenderableShape(
 ): BilateralProgrammeTimeSwapPreview {
   const itemAParticipant = result.projections.find((p) => p.side === 'ITEM_A');
   const itemBParticipant = result.projections.find((p) => p.side === 'ITEM_B');
-  const others = result.projections.filter((p) => p.side === 'OTHER');
   const windowFact = (
     itemRef: string,
     title: string,
     window: { start: string; end: string },
+    timeZone: string | undefined,
+    participantLabels: string[],
     participant?: AuthoritativeSwapParticipantProjection,
   ): ProgrammeItemWindowFact => ({
     itemRef,
     title,
+    ...(timeZone ? { timeZone } : {}),
     window,
     participantTravellerRef: participant?.travellerRef ?? 'unresolved',
-    participantLabel: participant?.personLabel ?? 'Unresolved participant',
+    participantLabel: participant?.personLabel ?? participantLabels[0] ?? 'Unresolved participant',
+    participantLabels,
   });
   const projectionOf = (
     itemRef: string,
-    p: AuthoritativeSwapParticipantProjection | undefined,
+    p: AuthoritativeSwapParticipantProjection,
+    verdict: AssessmentTone,
   ): ProgrammeParticipantProjection => ({
-    travellerRef: p?.travellerRef ?? 'unresolved',
-    personLabel: p?.personLabel ?? 'Unresolved participant',
+    travellerRef: p.travellerRef,
+    personLabel: p.personLabel,
     itemRef,
-    verdict: p?.verdict ?? 'UNKNOWN',
+    verdict,
   });
+  const itemRefFor = (p: AuthoritativeSwapParticipantProjection): string =>
+    p.side === 'ITEM_A' ? result.itemA.itemRef : p.side === 'ITEM_B' ? result.itemB.itemRef : 'OTHER';
   return {
     mutatesAuthoritativeState: false,
     current: {
-      itemA: windowFact(result.itemA.itemRef, result.itemA.title, result.itemA.currentWindow, itemAParticipant),
-      itemB: windowFact(result.itemB.itemRef, result.itemB.title, result.itemB.currentWindow, itemBParticipant),
-      projections: [
-        projectionOf(result.itemA.itemRef, itemAParticipant),
-        projectionOf(result.itemB.itemRef, itemBParticipant),
-      ],
+      itemA: windowFact(result.itemA.itemRef, result.itemA.title, result.itemA.currentWindow, result.itemA.timeZone, result.itemA.participantLabels, itemAParticipant),
+      itemB: windowFact(result.itemB.itemRef, result.itemB.title, result.itemB.currentWindow, result.itemB.timeZone, result.itemB.participantLabels, itemBParticipant),
+      projections: result.projections.map((p) => projectionOf(itemRefFor(p), p, p.currentVerdict)),
     },
     proposed: {
-      itemA: windowFact(result.itemA.itemRef, result.itemA.title, result.itemA.proposedWindow, itemAParticipant),
-      itemB: windowFact(result.itemB.itemRef, result.itemB.title, result.itemB.proposedWindow, itemBParticipant),
-      projections: [
-        projectionOf(result.itemA.itemRef, itemAParticipant),
-        projectionOf(result.itemB.itemRef, itemBParticipant),
-        ...others.map((p) => projectionOf(p.side, p)),
-      ],
+      itemA: windowFact(result.itemA.itemRef, result.itemA.title, result.itemA.proposedWindow, result.itemA.timeZone, result.itemA.participantLabels, itemAParticipant),
+      itemB: windowFact(result.itemB.itemRef, result.itemB.title, result.itemB.proposedWindow, result.itemB.timeZone, result.itemB.participantLabels, itemBParticipant),
+      projections: result.projections.map((p) => projectionOf(itemRefFor(p), p, p.verdict)),
     },
     bothPartiesProjectedViable: result.bothPartiesProjectedViable,
     othersRemainViable: result.othersRemainViable,
