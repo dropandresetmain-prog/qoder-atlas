@@ -9,24 +9,16 @@ deferred scope. Detailed contracts live in
 PostgreSQL + PostGIS is the sole normal runtime. SQLite is offline/read-only migration input
 or historical evidence only.
 
-Accepted foundations remain:
+Accepted foundations now include F01-F18, M0-M10/C5, M6/RC-6, durable ChangeSignal,
+R1 generalized planning/evidence/recommendation, R2 Case + immutable Original/current graph,
+and R3 full rebased B1 with one runtime coordinator, C4 continuation, internal execution,
+observation/reassessment/resolution and a second non-programme proof.
 
-- F01-F18 ontology/ownership and logical schema;
-- M0-M10/C5 PostgreSQL convergence;
-- subject-bound M6 assessment;
-- durable ChangeSignal + deterministic escalation;
-- current StrategyProposer/ScenarioChange contracts;
-- RC-6 deterministic counterfactual viability;
-- M8 authority/approval/durable execution;
-- internal programme execution and observation;
-- M9 resolution correctness;
-- Overview population + work/attention semantics;
-- provider-neutral adapters and LIVE/RECORD/REPLAY normalization.
+Normal boot now proves provider-neutral Atlas `flight.search` in REPLAY.
 
-The 2026-09-18 product-parity audit supersedes the earlier interpretation that the
-programme-only internal loop constituted complete B1. The gap is concentrated in
-planning/reasoning parity, decision evidence, continued recovery and the Case decision
-surface.
+The current risk is no longer missing B1 planning composition. It is **provider capability
+parity/reachability**: historical adapters/capabilities may still exist in source/config
+without accepted proof that the normal PostgreSQL target runtime can use them.
 
 ## Architecture source of truth
 
@@ -49,15 +41,15 @@ Historical milestone evidence stays historical and is not rewritten.
 |---|---|---|
 | F01-F18 + logical schema | **COMPLETE / APPROVED** | Do not reopen absent contradiction. |
 | M0-M10 / C0-C5 | **COMPLETE / ACCEPTED** | PostgreSQL state/persistence foundation. |
-| R0/T3/T4 operational composition | **COMPLETE** | Useful accepted runtime foundation. |
-| Internal programme recovery slice | **IMPLEMENTED** | Valid StrategyProposer -> RC-6 -> approval -> internal execution -> observation -> resolution proof; not complete rebased B1. |
-| B1 product-boundary repair | **IMPLEMENTED SLICE** | Navigation/shell/readability fixes remain useful; does not provide planning parity. |
-| Truth rebase + contract freeze | **CURRENT / PLANNING** | Convert accepted audit into forward SSOT/contracts. |
-| R1 — planning + decision-evidence parity | **NEXT IMPLEMENTATION** | Coordinator, read-only research, travel proposer, bounded PlanningAttempt evidence, viable-only recommendation, blast semantics. |
-| R2 — Case decision surface | **PLANNED AFTER/FOLLOWING R1 CONTRACTS** | PG read model + rich Case adaptation. |
-| R3 — full rebased B1 | **PLANNED** | Sarah full reasoning + internal execution + continuation + second planning proof. |
-| B2 — consequential external execution | **BLOCKED ON R3/B1** | Same engine; external ActionIntent/dispatch/reconciliation/uncertain outcomes; Jordan proof. |
-| Post-E2E product work | **PLANNED** | Semantic operational history, accepted Event Overview, provider/demo hardening. |
+| R1 — planning + decision evidence | **COMPLETE / ACCEPTED** | Generalized coordinator, read-only research boundary, durable evidence, recommendation. |
+| R2 — Case decision surface | **COMPLETE / ACCEPTED** | PG Case workspace + focused graph + immutable Original. |
+| R3 — full rebased B1 | **COMPLETE / ACCEPTED** | Real PG + normal boot + Chromium; second non-programme proof. |
+| Provider parity audit | **IN PROGRESS** | Find every historical capability missing/unreachable/partially ported. |
+| ALL Atlas capability restoration | **NEXT IMPLEMENTATION** | Restore and reachability-test each Atlas operation; add founder-corridor evidence. |
+| Remaining historical adapter restoration | **PLANNED AFTER ATLAS** | Restore only capabilities still required by parity audit. |
+| B2 — consequential external execution | **PLANNED AFTER PROVIDER RESTORATION** | Same R3 engine/gates; external dispatch/reconciliation/uncertain outcomes. |
+| Event Overview V7.2 implementation | **DESIGN ACCEPTED / IMPLEMENT FROM POST-R3 BASE** | Design commit `563320e4` is future input only. |
+| Semantic operational history / product hardening | **POST-E2E** | Case/Activity/Overview projections over authoritative events. |
 | M11 / C6 | **PLANNED** | Operational activation/retirement + final candidate evidence. |
 
 ## R1 — planning + decision-evidence parity
@@ -156,31 +148,29 @@ Do not review every micro-milestone.
 
 ## Act Now
 
-- freeze/reconcile current docs/contracts;
-- R1 coordinator/read tools/travel proposer/recommendation/evidence;
-- three blast semantics;
-- R2 Case projection;
-- continued-recovery owner;
-- behaviour-first parity tests;
-- full rebased B1 acceptance;
-- foundational no-silent-retirement gate.
+- finish the exhaustive pre-refactor -> current runtime parity audit;
+- restore/reachability-test every Atlas operation required by the product;
+- add REPLAY recordings or LIVE evidence for founder-programme flight corridors;
+- after Atlas, restore remaining historical adapters classified as required;
+- preserve focused-test-first discipline and one generalized engine.
 
 ## Investigate Now
 
-- cheapest existing second B1 planning proof (S4/S5 or equivalent fixture-ready case);
-- exact migration/index/JSON bounds for PlanningAttempt;
-- exact existing preference/rule projections needed by comparator.
+- complete the zombie-capability inventory from the parity audit;
+- determine the correct backend causal projection for the full
+  `changed flight -> arrival consequence -> breakpoint -> commitment` story;
+- determine why the replacement service remains `Unknown / unconfirmed` in the Case graph
+  and whether provider/state projection already contains the missing truth.
 
 ## Park for Later
 
-- B2 external dispatch composition until B1 passes;
-- budget holds until a money-moving path requires them;
-- Event Overview redesign;
-- whole-event graph / semantic zoom;
-- SSE/WebSockets;
-- broad provider-reference auto-correlation;
-- physical deletion of historical SQLite;
-- final presenter polish.
+- B2 consequential provider dispatch until provider restoration is ready;
+- stale `m10RuntimePurgeBoot` 404 expectation;
+- raw UUID / repeated-line cleanup in older Case blocks;
+- semantic operational-history implementation;
+- Event Overview V7.2 implementation after accepted post-R3 is promoted;
+- SSE/WebSockets, whole-event semantic zoom and presenter polish;
+- physical deletion of historical SQLite code.
 
 ## Ignore / Accept Risk
 

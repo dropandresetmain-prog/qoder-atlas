@@ -32,18 +32,21 @@ These are implemented architectural constraints, not an unbuilt target.
 ## Current delivery plan
 
 - **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) §22** — authoritative current plan:
-  runtime closure through B1 is complete; next is Founder B1 physical acceptance, then B2
-  generalized external recovery / Jordan, generalisation verification, post-E2E product
-  work and M11/C6.
+  R1-R3/B1 are accepted; next is provider parity + all-Atlas restoration, then remaining
+  required adapters, B2 consequential external execution, post-E2E product work and M11/C6.
 - **[IMPLEMENTATION_PLAN_HISTORY.md](IMPLEMENTATION_PLAN_HISTORY.md)** — preserved
   historical M0-M11 decomposition and prior post-C5 Slice A/B plans. Use for provenance,
   not current sequencing.
-- **[work/ACTIVE_TASK.md](work/ACTIVE_TASK.md)** — lightweight working-memory ledger for
-  the active gate/next milestone.
+- **[work/ACTIVE_TASK.md](work/ACTIVE_TASK.md)** — working-memory/acceptance ledger; its
+  R3 local section is current acceptance evidence.
 - **[refactor/evidence/POST_C5_RUNTIME_ARCHITECTURE_AUDIT.md](refactor/evidence/POST_C5_RUNTIME_ARCHITECTURE_AUDIT.md)** —
-  historical evidence for the Fable runtime audit and resulting R0/T3/B1 closure.
+  historical evidence for the post-C5 runtime audit.
 - **[work/TEST_PERFORMANCE_AUDIT_2026-09-18.md](work/TEST_PERFORMANCE_AUDIT_2026-09-18.md)** —
   read-only test/dev-startup performance findings and triage.
+
+The accepted Event Overview V7.2 design currently lives separately on
+`design/event-overview-v7-2` @ `563320e4e9ef7c2ea7dc4f53f0d07b3045dcfeb1`; production
+implementation must start from the accepted post-R3 base.
 
 ## Agent / implementation workflow
 

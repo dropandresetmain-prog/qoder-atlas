@@ -30,47 +30,30 @@ AI proposal -> validation -> deterministic viability -> authority
 
 An LLM cannot directly mutate authoritative state or invoke an irreversible or money-moving action.
 
-## Architecture status: truth-rebased recovery loop
+## Architecture status: accepted R3 recovery loop
 
-The M0-M10 data/state refactor is implemented and accepted through **C5**. PostgreSQL +
-PostGIS is the sole normal runtime; SQLite is migration/historical input only.
+The M0-M10 data/state refactor is accepted through C5. PostgreSQL + PostGIS is the sole
+normal runtime; SQLite is migration/historical input only.
 
-The post-C5 R0/T3/T4/internal-programme work materially improved runtime composition and
-proved the deterministic internal execution slice. The accepted 2026-09-18 product-parity
-audit then established that this slice had been over-interpreted as the complete NORTHSTAR
-recovery engine. Useful pre-refactor planning/reasoning and Case capabilities had no
-equivalent new home.
+The 2026-09-18 truth rebase identified missing planning/product composition. R1-R3 have now
+closed the rebased B1 loop without restoring the retired RuntimeOrchestrator or SQLite
+runtime. R3 local acceptance at
+`d9bb9a5f03785db60b6657ca7dfe7c182b07dbd3` proved the normal `main.ts` PostgreSQL
+runtime and real browser flow.
 
-The forward recovery contract is now frozen in
-[`RECOVERY_PLANNING_CONTRACT_FREEZE.md`](RECOVERY_PLANNING_CONTRACT_FREEZE.md).
+Implemented through R3: generalized recovery-domain/evidence coordination; durable bounded
+PlanningAttempt evidence; material deterministic rejection evidence; viable-only
+recommendation; three distinct impact semantics; one Recovery Lifecycle Progression owner;
+Case decision workspace + immutable Original/current graph semantics; normal-boot read-only
+Atlas `flight.search`; internal programme execution/observation/reassessment/resolution;
+and a materially different non-programme connection proof.
 
-Current delivery:
+The next architecture work is provider capability reachability/composition, not another
+engine rewrite:
 
-1. R1 — generalized planning + decision-evidence parity;
-2. R2 — PostgreSQL Case decision projection/surface;
-3. R3 — full rebased B1 (Sarah reasoning + internal execution);
-4. B2 — same engine with consequential external execution/reconciliation;
-5. post-E2E product/observability/provider hardening;
-6. M11/C6.
-
-Historical R0/T3/T4/B1 evidence remains valid for what those checkpoints proved. It no
-longer defines the complete B1 product boundary.
-
-Normative/current architecture documents:
-
-- [`DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md`](DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md) —
-  frozen F01-F18 ontology/ownership/lifecycle decisions;
-- [`DATA_STRUCTURE_LOGICAL_SCHEMA.md`](DATA_STRUCTURE_LOGICAL_SCHEMA.md) — persistence
-  and transaction model;
-- [`RECOVERY_PLANNING_CONTRACT_FREEZE.md`](RECOVERY_PLANNING_CONTRACT_FREEZE.md) —
-  forward planning/evidence/recommendation/blast/continuation/B1-B2 contracts;
-- [`CAPABILITIES_AND_LIMITATIONS.md`](CAPABILITIES_AND_LIMITATIONS.md) — implemented
-  capability truth;
-- [`ROADMAP.md`](ROADMAP.md) and [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)
-  §22 — delivery sequence.
-
-Historical milestone evidence under `docs/refactor/evidence/**` remains historical truth
-and is not rewritten.
+`provider parity audit -> all Atlas capability restoration -> remaining required adapter
+restoration -> B2 consequential external execution -> post-E2E product/observability ->
+M11/C6`.
 
 ## Recovery architecture
 
@@ -292,7 +275,8 @@ No graph database, event-sourcing requirement, Kafka, Kubernetes or microservice
 
 ## Provider and external-system boundaries
 
-Atlas, Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio and future GDS/TMC/advisory/entry/weather systems are provider/source adapters, not the product architecture.
+Atlas, Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio/Qwen, optional OpenRouter
+and future external systems are provider/source adapters, not product architecture.
 
 Where practical:
 
@@ -302,9 +286,15 @@ RECORD -> provider/source -> sanitized provider-shaped recording -> normalizatio
 REPLAY -> recording -> normalization -> NORTHSTAR
 ```
 
-LIVE and REPLAY share downstream semantics. Mocks remain at external boundaries; internal state, evaluation, authority and reconciliation stay real.
+R3 proves this downstream identity for the normal-boot Atlas read-only search seam in
+REPLAY. It does **not** prove that every surviving historical adapter is normal-boot
+reachable. Provider restoration must explicitly prove composition and callers per
+operation.
 
-Future external systems may be observation-only, serviceable through a partner, or authoritative owners of specific field groups. Observability never implies mutability.
+Consequential provider operations remain behind:
+
+`proposal -> validation -> deterministic viability -> authority -> durable execution
+attempt -> provider -> observation/reconciliation -> canonical state -> reassessment`.
 
 ## Read models and interfaces
 
@@ -322,9 +312,14 @@ The final Event Overview visual design is unresolved. Do not create backend-spec
 
 ## Current delivery boundary
 
-Implementation proceeds against the frozen recovery-planning contract:
+R1, R2 and R3 are accepted.
 
-`R1 planning/evidence parity -> R2 Case decision surface -> R3 full rebased B1 -> B2 external execution`.
+Current sequence:
 
-Event Overview redesign remains separate. M11 remains operational activation/retirement,
-not a return to an active SQLite runtime.
+`provider parity audit -> ALL Atlas capability restoration -> remaining required historical
+adapter restoration -> B2 consequential external execution -> accepted Event Overview /
+semantic operational history -> M11/C6`.
+
+The accepted Event Overview V7.2 design remains a separate future implementation input.
+M11 remains operational activation/retirement, not a return to an active SQLite runtime.
+

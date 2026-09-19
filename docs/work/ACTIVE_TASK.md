@@ -1,3 +1,20 @@
+# MAIN <- R3 DOCUMENTATION RECONCILIATION
+
+Status: **READY FOR MAIN FAST-FORWARD AFTER THE RECONCILIATION MERGE COMMIT**.
+
+- Compared current `main` `d6c845eee1fbe3e610528124d9655edac5582e39` against accepted R3
+  `d9bb9a5f03785db60b6657ca7dfe7c182b07dbd3`.
+- `main` had one docs-only planning commit after the common ancestor; most of its T2/T3/T4
+  sequencing is superseded by the later truth-rebase + accepted R1/R2/R3 state.
+- Preserved from main: the dedicated `IMPLEMENTATION_PLAN_HISTORY.md` archival split,
+  sparse-review/routing intent where still compatible, and the principle that Overview /
+  observability do not redefine the recovery engine.
+- Current R3 docs now state the accepted R3 runtime truth and the new sequence:
+  provider parity -> all Atlas -> remaining required adapters -> B2 -> post-E2E product work.
+- No production code changed in this reconciliation.
+
+---
+
 # ACTIVE TASK — R3 LOCAL ACCEPTANCE (real PostgreSQL + normal runtime + browser)
 
 Live ledger for the R3 local acceptance lane. The R3 Cloud, R2 and R1 history below is preserved

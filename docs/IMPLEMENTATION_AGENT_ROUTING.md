@@ -6,6 +6,25 @@ This file gives **three viable model + harness routes** for every M0-M11 milesto
 
 Last routing review: **2026-09-13**.
 
+## Current delivery routing addendum — post-R3 2026-09-19
+
+R1, R2 and R3 are accepted. The truth-rebased R1-R3 rows below remain useful evidence and
+can be reused for similar bounded work, but they are no longer pending milestones.
+
+Current sequence:
+
+`provider parity audit -> all-Atlas restoration -> remaining required adapter restoration
+-> B2 consequential execution -> Event Overview / operational history -> M11/C6`.
+
+Current routing rules:
+
+- parity audit is read-only architecture/reachability investigation; delegate bounded archaeology aggressively;
+- provider restoration proceeds one provider family and operation at a time;
+- consequential provider operations remain Critical even when adapter code already exists;
+- Event Overview V7.2 implementation must branch from accepted post-R3, not the old design branch;
+- three listed routes are alternatives, not a committee;
+- focused tests first; full PostgreSQL only at meaningful acceptance checkpoints.
+
 ## Current delivery routing addendum — truth-rebased 2026-09-18
 
 The M0-M11/C0-C6 table below remains useful historical/provider-risk context. Current

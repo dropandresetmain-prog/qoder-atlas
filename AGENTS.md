@@ -18,28 +18,37 @@ The PostgreSQL/PostGIS data/state refactor through M10/C5 remains accepted. Post
 the sole normal NORTHSTAR runtime; SQLite is migration/historical input only and is never a
 fallback.
 
-The accepted 2026-09-18 product-parity audit established that the refactor also disconnected
-material generalized planning and product-decision capabilities. The existing
-state/evaluation/authority/execution spine is retained; the missing work is **planning
-composition and product parity**, not another engine rewrite.
+The 2026-09-18 product-parity audit correctly identified planning/product capability loss
+during the refactor. R1, R2 and R3 have now closed the rebased B1 path on the PostgreSQL
+runtime. **R3 is accepted locally at `d9bb9a5f03785db60b6657ca7dfe7c182b07dbd3`** with real
+PostgreSQL, normal `main.ts` boot and Chromium product acceptance.
 
-Forward architecture is frozen in
-`docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md`.
+Accepted R3 proves one generalized coordinator, provider-neutral read-only Atlas
+`flight.search`, durable planning evidence, viable-only recommendation, internal
+programme execution, observation, reassessment, resolution, immutable Original/Current
+graph semantics and a materially different non-programme connection case.
 
-Current sequence:
+Current delivery sequence:
 
-`R1 planning + decision-evidence parity
--> R2 Case decision surface
--> R3 full rebased B1
--> B2 consequential external execution
--> post-E2E product/observability/provider hardening
+`provider parity audit
+-> restore/reachability-test ALL Atlas capabilities
+-> restore the remaining required historical adapters
+-> B2 consequential external execution on the same deterministic gates
+-> Event Overview / semantic operational-history implementation
 -> M11/C6`.
 
-The earlier internal programme loop and B1 product-boundary repair remain valid implemented
-slices, but they are **not accepted as the complete B1 product reasoning proof**.
+Provider restoration is a composition/reachability milestone, not permission to bypass
+`AI proposal -> validation -> deterministic viability -> authority -> executor -> observe
+-> state update`.
 
-Do not reopen the ontology, RC-6, M8 authority/execution, Atlas adapters or PostgreSQL
-runtime absent a concrete contradiction. Do not begin B2 before full rebased B1 acceptance.
+Known R3 carry-forwards do not reopen R3: founder-dataset REPLAY recordings do not cover
+its real travel corridors; the backend causal path is thinner than the desired full graph
+story; the replacement service is still shown as Unknown/unconfirmed; some older Case
+blocks still expose UUID-heavy copy.
+
+The Event Overview V7.2 design is accepted separately on
+`design/event-overview-v7-2` @ `563320e4e9ef7c2ea7dc4f53f0d07b3045dcfeb1`. Implement it
+from the accepted post-R3 base, not from that old design branch.
 
 ## Source-of-truth order
 
@@ -47,23 +56,24 @@ Before broad implementation, inspect the actual branch/head and read the relevan
 
 1. `docs/DATA_STRUCTURE_ARCHITECTURE_CLOSURE.md` — frozen F01-F18 architecture decisions, ownership/cardinality/lifecycle semantics.
 2. `docs/DATA_STRUCTURE_LOGICAL_SCHEMA.md` — approved persistence and transaction model.
-3. `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` — frozen forward recovery-planning, evidence, recommendation, blast-radius, continuation and B1/B2 contracts.
+3. `docs/RECOVERY_PLANNING_CONTRACT_FREEZE.md` — frozen recovery-planning, evidence, recommendation, blast-radius, continuation and B1/B2 contracts.
 4. `docs/ARCHITECTURE.md` — concise **current** architecture map.
 5. `docs/CAPABILITIES_AND_LIMITATIONS.md` — implemented reality and current limitations.
 6. `docs/ROADMAP.md` — milestone status, current delivery sequence and intentionally deferred scope.
-7. `docs/IMPLEMENTATION_PLAN.md` — historical M0-M11 decomposition plus the authoritative current programme in Section 22.
-8. `docs/TESTING.md` — canonical suite classification, focused-test-first rules and foundational parity gate.
-9. `docs/work/ACTIVE_TASK.md` — current working-memory ledger.
-10. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
-11. `docs/MODELS_ARSENAL.md` — deeper, more volatile model/harness evidence; load only when routing genuinely needs reevaluation.
-12. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for current phases/checkpoints.
-13. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
+7. `docs/IMPLEMENTATION_PLAN.md` §22 — authoritative current programme and accepted R1-R3 execution record.
+8. `docs/IMPLEMENTATION_PLAN_HISTORY.md` — preserved M0-M11 / prior post-C5 planning history; historical reference only.
+9. `docs/TESTING.md` — canonical suite classification, focused-test-first rules and foundational parity gate.
+10. `docs/work/ACTIVE_TASK.md` — current working-memory/acceptance ledger.
+11. `docs/AGENT_MODEL_SELECTION.md` — operational model/harness routing policy.
+12. `docs/MODELS_ARSENAL.md` — deeper model/harness evidence; load only when routing genuinely needs reevaluation.
+13. `docs/IMPLEMENTATION_AGENT_ROUTING.md` — alternative model+harness routes for current phases/checkpoints.
+14. `docs/ENVIRONMENT.md` and `.qoder/rules/environment-recovery.md` when environment/provider execution is involved.
 
-Historical milestone evidence under `docs/refactor/evidence/**` is evidence of what was true at that checkpoint. Do not rewrite it to match the current runtime.
+Historical milestone evidence under `docs/refactor/evidence/**` is historical truth. Do not rewrite it.
 
 `docs/BUILD_WITH_QODER.md` is historical build context, not current routing policy.
 
-For Atlas capability questions, consult the authoritative research in `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
+For Atlas capability questions, consult `dropandresetmain-prog/atlas-hackathon-lab`; do not guess.
 
 ## Orchestration roles
 
@@ -154,57 +164,46 @@ M11 is no longer a database-runtime migration. It is the final **operational act
 
 ## Product delivery discipline
 
-### R1 — planning + decision-evidence parity
+### Accepted through R3
 
-Extend the current target planning composition; do not create another engine.
+R1, R2 and R3 are accepted. Preserve the generalized recovery path already proven:
 
-Required path:
+`change -> canonical state -> reassessment -> RecoveryCase -> domains/evidence ->
+StrategyProposers -> validation -> RC-6 -> durable decision evidence -> viable-only
+recommendation -> authority -> internal execution where permitted -> observation ->
+reassessment -> resolve/replan/escalate`.
 
-`RecoveryCase/current failure
--> recovery-domain identification
--> bounded read-only evidence gathering
--> StrategyProposer candidates
--> schema validation
--> RC-6 deterministic viability
--> material decision evidence
--> viable-only recommendation`.
+Do not reopen the ontology, RC-6, recovery-planning contracts, immutable Original semantics
+or the one-coordinator/C4 progression ownership without a concrete contradiction.
 
-Read tools cannot express consequential operations. Material rejected alternatives remain
-explainable without being promoted into executable RecoveryStrategy rows.
+### Provider restoration
 
-### R2 — Case decision surface
+The next product-infrastructure milestone is capability parity from the accepted R3 base.
+First restore/reachability-test **all Atlas capability surfaces** deliberately. Then restore
+the remaining required historical adapters.
 
-Adapt the rich pre-refactor Case information architecture onto PostgreSQL read models. The
-backend must explicitly project what changed, investigated/rejected/viable options,
-recommendation, immediate proposed-change blast radius, reassessment closure, outcome
-delta, approval, execution/observation and current recovery truth.
+For every capability distinguish:
 
-Do not redesign Event Overview in this phase.
+`implementation exists -> configured -> normal-boot composed -> product/worker reachable
+-> authoritative inputs -> downstream use -> focused proof`.
 
-### R3 — full rebased B1
-
-B1 proves Sarah's complete recovery **reasoning** plus internal programme execution:
-provider reprotection -> whole-trip FAIL -> travel research/evaluation -> programme-side
-candidates where relevant -> RC-6 -> comparison/recommendation -> operator approval ->
-internal execution -> observation -> reassessment -> PASS/resolution.
-
-This must emerge from generalized state/domains/evidence. No Sarah branch and no global
-flight-first/programme-second pipeline.
-
-A second materially different planning case must use the same coordinator/contracts before
-B1 acceptance. B1 does not require consequential external booking/payment execution.
+Adapter files or config keys alone do not count as restored capability.
 
 ### B2 — consequential external execution
 
-B2 uses the same coordinator/evidence/proposer/RC-6/recommendation/ActionPlan/authority
-path and adds external ActionIntent dispatch, durable attempt-before-network, uncertain and
-partial outcomes, reconciliation before retry, provider observation, reassessment and
-continued recovery. Jordan is proof of generality, not a Jordan engine.
+B2 reuses the R3 coordinator/evidence/proposer/RC-6/recommendation/ActionPlan/authority
+path and adds externally owned consequential dispatch, durable attempt-before-network,
+unknown/partial outcome handling, reconciliation-before-retry, provider observation and
+continued recovery.
 
-### After B2
+Restoring an Atlas transaction adapter does not authorize it. Consequential calls remain
+behind deterministic viability, authority and execution gates.
 
-Proceed to accepted Event Overview implementation, semantic operational history/provider
-hardening, final demo polish and M11/C6.
+### Post-E2E product work
+
+Implement the accepted Event Overview V7.2 from the accepted post-R3 base, plus semantic
+operational history/provider hardening and final demo polish. Overview/Case remain
+projections of authoritative state, not new workflow engines.
 
 ## Anti-hardcoding
 
@@ -219,12 +218,13 @@ If the approved ontology/contracts cannot express a requirement, report an **arc
 ## External capability boundaries
 
 - Atlas is a flight adapter, not the architecture.
-- Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio and future providers are adapters/capabilities, not domain owners by default.
+- R3 normal boot currently proves provider-neutral **read-only Atlas `flight.search`** in REPLAY; LIVE was intentionally not an R3 acceptance requirement.
+- Other Atlas read/state/transaction surfaces and the historical Nuitée/liteAPI, Google Routes, Frankfurter, Model Studio/Qwen and optional OpenRouter capabilities must be classified by actual normal-runtime reachability during provider restoration.
 - Mocks are allowed only at external provider/action boundaries.
 - Internal ingestion, mutation, propagation, planning, viability, authority, observation and lifecycle logic stay real.
-- LIVE / RECORD / REPLAY should share normalisation/downstream paths where practical.
+- LIVE / RECORD / REPLAY should share normalization/downstream paths where practical.
 - Record/replay external boundary inputs/results, not precomputed internal assessments/cases/UI outcomes.
-- A new provider, GDS/TMC system, advisory source, entry-data source or weather source must enter through the approved ownership/information/capability boundaries rather than force scenario logic into the engine.
+- A new provider/source must enter through approved ownership/information/capability boundaries rather than force scenario logic into the engine.
 
 ## Agent routing
 
