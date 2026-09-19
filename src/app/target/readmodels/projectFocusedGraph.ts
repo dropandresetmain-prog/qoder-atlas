@@ -4,9 +4,9 @@
  *
  * The frontend must NOT traverse graph topology to infer causality
  * (FRONTEND_SEMANTIC_CONTRACT FIG-5b). This module is the backend's answer: it
- * intersects the evaluator-ordered causal steps with the graph's own visible node
- * refs and producer-owned edge ids, and reports any step that has no visible graph
- * object as an explicit honest gap rather than guessing or dropping it.
+ * maps evaluator-owned cause/affected refs onto the graph's explicit visible-node
+ * mappings and producer-owned edge ids, and reports any step that has no visible
+ * graph object as an explicit honest gap rather than guessing or dropping it.
  *
  * Pure and deterministic: a function of the already-produced `ldg` and the case's
  * `causalPath`. No PostgreSQL, no scenario branch, no topology search.
@@ -20,11 +20,11 @@ import type {
 /**
  * Map the ordered causal path onto the visible graph.
  *
- * Ordering: `causalPath` is already in evaluator order and its first entry is the
- * first operational breakpoint. We preserve that order for `causalNodeRefs`,
- * de-duplicated, keeping only refs that are actually visible nodes. A causal edge
- * is included when BOTH its endpoints are on the causal node set — the chain the
- * operator should read — using the producer-owned stable `LdgEdge.id`.
+ * Ordering: `causalPath` is already in evaluator order. Each step's persisted
+ * cause is preferred as the operational breakpoint; its affected subject remains
+ * separate context. `subjectRefs` provide the explicit backend mapping from
+ * canonical refs to presentation nodes. A causal edge is included when BOTH its
+ * endpoints are on that backend-selected node set.
  *
  * `relatedSubjectRefs` on a step are part of the same causal explanation, so they
  * join the visible chain too (still only when visible). A step whose own subject is
@@ -39,6 +39,28 @@ export function projectFocusedGraph(
 
   const visibleRefs = new Set(ldg.nodes.map((node) => node.ref));
   const labelByRef = new Map(ldg.nodes.map((node) => [node.ref, node.label]));
+  const nodeForSubjectRef = new Map<string, string>();
+  const ambiguousSubjectRefs = new Set<string>();
+  const registerSubjectRef = (subjectRef: string, nodeRef: string): void => {
+    if (ambiguousSubjectRefs.has(subjectRef)) return;
+    const existing = nodeForSubjectRef.get(subjectRef);
+    if (!existing) {
+      nodeForSubjectRef.set(subjectRef, nodeRef);
+    } else if (existing !== nodeRef) {
+      // A third mapping must not restore a mapping already found ambiguous.
+      nodeForSubjectRef.delete(subjectRef);
+      ambiguousSubjectRefs.add(subjectRef);
+    }
+  };
+  for (const node of ldg.nodes) {
+    registerSubjectRef(node.ref, node.ref);
+    for (const subjectRef of node.subjectRefs ?? []) {
+      // A producer must not map one canonical fact to two visual nodes. Ignore
+      // ambiguity here so the graph under-claims rather than arbitrarily picks.
+      registerSubjectRef(subjectRef, node.ref);
+    }
+  }
+  const resolveVisibleRef = (subjectRef: string): string | undefined => nodeForSubjectRef.get(subjectRef);
 
   const causalNodeRefs: string[] = [];
   const seenNode = new Set<string>();
@@ -51,16 +73,22 @@ export function projectFocusedGraph(
 
   const unmappedCausalSteps: FocusedGraphView['unmappedCausalSteps'] = [];
   for (const step of causalPath) {
-    const subjectVisible = visibleRefs.has(step.subjectRef);
-    if (subjectVisible) {
-      pushNode(step.subjectRef);
-      for (const related of step.relatedSubjectRefs) pushNode(related);
+    const causeRef = step.causeSubjectRef ? resolveVisibleRef(step.causeSubjectRef) : undefined;
+    const affectedRef = resolveVisibleRef(step.subjectRef);
+    const breakpointRef = causeRef ?? affectedRef;
+    if (breakpointRef) {
+      pushNode(breakpointRef);
+      if (affectedRef) pushNode(affectedRef);
+      for (const related of step.relatedSubjectRefs) {
+        const relatedRef = resolveVisibleRef(related);
+        if (relatedRef) pushNode(relatedRef);
+      }
     } else {
       unmappedCausalSteps.push({
-        subjectRef: step.subjectRef,
+        subjectRef: step.causeSubjectRef ?? step.subjectRef,
         dimension: step.dimension,
         reasonCode: step.reasonCode,
-        reason: 'no visible graph node for subject',
+        reason: 'no visible graph node for explanation cause or affected subject',
       });
     }
   }
@@ -70,14 +98,16 @@ export function projectFocusedGraph(
     .filter((edge) => causalNodeSet.has(edge.fromRef) && causalNodeSet.has(edge.toRef))
     .map((edge) => edge.id);
 
-  // First operational breakpoint = causalPath[0], but only surfaced as a focal
-  // point when it actually maps to a visible node. Otherwise the honest gap above
-  // carries it and there is no focal emphasis (never a fabricated breakpoint).
+  // First operational breakpoint = persisted cause where mappable, otherwise the
+  // affected subject. Never fabricate a visual target when neither is mapped.
   const firstStep = causalPath[0];
-  const firstBreakpoint = firstStep && visibleRefs.has(firstStep.subjectRef)
+  const firstBreakpointRef = firstStep
+    ? (firstStep.causeSubjectRef ? resolveVisibleRef(firstStep.causeSubjectRef) : undefined) ?? resolveVisibleRef(firstStep.subjectRef)
+    : undefined;
+  const firstBreakpoint = firstStep && firstBreakpointRef && visibleRefs.has(firstBreakpointRef)
     ? {
-        nodeRef: firstStep.subjectRef,
-        label: labelByRef.get(firstStep.subjectRef) ?? firstStep.subjectRef,
+        nodeRef: firstBreakpointRef,
+        label: labelByRef.get(firstBreakpointRef) ?? firstBreakpointRef,
         dimension: firstStep.dimension,
         reasonCode: firstStep.reasonCode,
       }

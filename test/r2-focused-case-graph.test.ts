@@ -301,7 +301,38 @@ test('R2 enrichment: deterministic ordering by order_key', () => {
   assert.equal(mustHappenBeforeEdges[1]!.toRef, 'SERVICE_BOOKING:service-3');
 });
 
-test('R2 enrichment: reports objective contract gap when objectives exist', () => {
+test('A1 enrichment: projects canonical objectives without copying a journey failure', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [],
+    transportServices: [],
+    participations: [],
+    programmeItems: [],
+    objectives: [{ id: 'obj-1', owner_kind: 'JOURNEY', owner_id: 'journey-1', success_predicate: 'Arrive on time', success_predicate_kind: 'ARRIVAL_BY', hardness: 'HARD', priority: 1 }],
+    assessmentViews: new Map(),
+    causalPath: [{
+      subjectRef: 'JOURNEY:journey-1',
+      causeSubjectRef: 'OBJECTIVE:obj-1',
+      dimension: 'hard_objectives',
+      reasonCode: 'arrival_after_deadline',
+      evaluatorId: 'm6.objective',
+      facts: {},
+      relatedSubjectRefs: ['OBJECTIVE:obj-1'],
+    }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
+    caseId: 'case-1',
+  });
+
+  const node = result.nodes.find((candidate) => candidate.ref === 'OBJECTIVE:obj-1');
+  assert.ok(node);
+  assert.equal(node.kind, 'TRIP_OBJECTIVE');
+  assert.equal(node.label, 'Arrive on time');
+  assert.equal(node.semanticState, 'FAILED');
+  assert.deepEqual(node.subjectRefs, ['OBJECTIVE:obj-1']);
+});
+
+test('A1 enrichment: leaves an objective UNKNOWN without objective-specific evidence', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
@@ -315,24 +346,99 @@ test('R2 enrichment: reports objective contract gap when objectives exist', () =
     caseId: 'case-1',
   });
 
-  assert.equal(result.objectiveContractGap, true);
-  // Objectives are not emitted as nodes (no LdgNodeKind can carry them)
-  assert.equal(result.nodes.length, 0);
+  const node = result.nodes.find((candidate) => candidate.ref === 'OBJECTIVE:obj-1');
+  assert.ok(node);
+  assert.equal(node.semanticState, 'UNKNOWN');
 });
 
-test('R2 enrichment: no objective contract gap when no objectives', () => {
+test('A1 enrichment: maps service and timing facts one-to-one from canonical timing plus explanation refs', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
-    journeyItems: [],
-    transportServices: [],
-    participations: [],
-    programmeItems: [],
-    objectives: [],
-    assessmentViews: new Map(),
-    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
-    caseId: 'case-1',
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-1' }],
+    transportServices: [{ id: 'service-1', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: '2031-04-05T10:30:00.000Z', actual_arrival: '2031-04-05T10:45:00.000Z', destination_time_zone: 'Asia/Singapore' }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'JOURNEY_ITEM:item-1', dimension: 'connection_feasibility', reasonCode: 'connection_impossible', evaluatorId: 'm6.connection', facts: { upstreamArrival: '2031-04-05T10:45:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
   });
 
-  assert.equal(result.objectiveContractGap, false);
+  const timing = result.nodes.find((node) => node.kind === 'TIMING');
+  assert.ok(timing);
+  assert.equal(timing.ref, 'TIMING:item-1:ARRIVAL');
+  assert.equal(timing.semanticState, 'CHANGED');
+  assert.deepEqual(timing.subjectRefs, ['JOURNEY_ITEM:item-1']);
+  assert.deepEqual(timing.timing, {
+    currentAt: '2031-04-05T10:45:00.000Z',
+    publishedAt: '2031-04-05T08:00:00.000Z',
+    timeZone: 'Asia/Singapore',
+  });
+  assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:service-1')?.subjectRefs, ['TRANSPORT_SERVICE:service-1']);
+  assert.ok(result.edges.some((edge) => edge.fromRef === 'SERVICE_BOOKING:service-1' && edge.toRef === timing.ref));
+});
+
+test('A1 enrichment: shows an evaluator-implicated replacement arrival without inventing a delay', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'replacement-service' }],
+    transportServices: [{ id: 'replacement-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T10:30:00.000Z', estimated_arrival: null, actual_arrival: null, destination_time_zone: 'Asia/Singapore' }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'OBJECTIVE:obj-1', dimension: 'hard_objectives', reasonCode: 'arrival_after_deadline', evaluatorId: 'm6.objective', facts: { arrival: '2031-04-05T10:30:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:item-1'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+
+  const timing = result.nodes.find((node) => node.kind === 'TIMING');
+  assert.ok(timing);
+  assert.equal(timing.semanticState, 'FAILED');
+  assert.deepEqual(timing.timing, { currentAt: '2031-04-05T10:30:00.000Z', publishedAt: '2031-04-05T10:30:00.000Z', timeZone: 'Asia/Singapore' });
+  assert.deepEqual(timing.subjectRefs, ['JOURNEY_ITEM:item-1']);
+  assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:replacement-service')?.subjectRefs, ['TRANSPORT_SERVICE:replacement-service']);
+});
+
+test('A1 enrichment: connection facts mark only the upstream arrival, never its related onward service', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [
+      { id: 'inbound', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'inbound-service' },
+      { id: 'onward', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '002', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'onward-service' },
+    ],
+    transportServices: [
+      { id: 'inbound-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'hub', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: '2031-04-05T10:30:00.000Z', actual_arrival: null },
+      { id: 'onward-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'hub', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T12:00:00.000Z', estimated_arrival: '2031-04-05T12:15:00.000Z', actual_arrival: null },
+    ],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'CONSTRAINT_DEFINITION:min-connection', dimension: 'connection_feasibility', reasonCode: 'connection_below_minimum', evaluatorId: 'm6.connection', facts: { upstreamArrival: '2031-04-05T10:30:00.000Z', downstreamDeparture: '2031-04-05T10:40:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:inbound', 'JOURNEY_ITEM:onward'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+  assert.deepEqual(result.nodes.filter((node) => node.kind === 'TIMING').map((node) => node.ref), ['TIMING:inbound:ARRIVAL']);
+});
+
+test('A1 enrichment: departure failure does not mark its arrival context as failed timing', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'inbound', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'inbound-service' }],
+    transportServices: [{ id: 'inbound-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'venue', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: null, actual_arrival: null }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'PROGRAMME_ITEM:session', dimension: 'programme_participation', reasonCode: 'departs_before_item_ends', evaluatorId: 'm6.participation', facts: { arrival: '2031-04-05T08:00:00.000Z', actualDeparture: '2031-04-05T09:00:00.000Z' }, relatedSubjectRefs: ['JOURNEY_ITEM:inbound', 'JOURNEY_ITEM:onward'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+  assert.equal(result.nodes.some((node) => node.kind === 'TIMING'), false);
+  assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:inbound-service')?.subjectRefs, ['TRANSPORT_SERVICE:inbound-service', 'JOURNEY_ITEM:inbound']);
+});
+
+test('A1 enrichment: a commitment fails only from its own assessment or participation explanation', () => {
+  const input = {
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [], transportServices: [],
+    participations: [{ id: 'p-1', programme_item_id: 'programme-1', traveller_id: 'traveller-1', obligation: 'REQUIRED' as const, accepted: true }],
+    programmeItems: [{ id: 'programme-1', programme_id: 'programme', title: 'Required session', item_type: 'SESSION', window_start: '2031-04-05T09:00:00.000Z', window_end: '2031-04-05T10:00:00.000Z', lifecycle_status: 'SCHEDULED' }],
+    objectives: [], assessmentViews: new Map(), travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  };
+  const generic = projectFocusedCaseGraphEnrichment({ ...input, causalPath: [{ subjectRef: 'JOURNEY:journey-1', dimension: 'connection_feasibility', reasonCode: 'connection_impossible', evaluatorId: 'm6.connection', facts: {}, relatedSubjectRefs: [] }] });
+  const specific = projectFocusedCaseGraphEnrichment({ ...input, causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'PROGRAMME_ITEM:programme-1', dimension: 'programme_participation', reasonCode: 'arrival_after_required_start', evaluatorId: 'm6.participation', facts: {}, relatedSubjectRefs: [] }] });
+  assert.equal(generic.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.semanticState, 'UNKNOWN');
+  assert.equal(specific.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.semanticState, 'FAILED');
 });

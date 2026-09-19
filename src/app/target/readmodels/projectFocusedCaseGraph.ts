@@ -12,12 +12,12 @@
  *     uuid or persona lookup.
  *   - Journey composition: SERVICE_BOOKING nodes for transport items (labels from
  *     transport_services canonical columns), TRANSFER_STAY nodes for stay/transfer
- *     items, TIMING nodes only where meaningful arrival/timing state exists.
+ *     items, and TIMING nodes only where a canonical changed arrival is explicitly
+ *     implicated by a persisted evaluator explanation.
  *   - Programme commitments: PROGRAMME_COMMITMENT nodes via participations with
  *     REQUIRED/OPTIONAL accepted status in an ACTIVE programme.
- *   - Trip purpose/objectives: objectives exist in the ontology (0072_objectives.sql)
- *     but the closed LdgNodeKind enum has no OBJECTIVE kind. This module does NOT
- *     emit objective nodes (would violate the contract). The gap is reported.
+ *   - Trip purpose/objectives: TRIP_OBJECTIVE is a presentation of the existing
+ *     canonical objective, never a new domain entity or copied journey verdict.
  *   - semanticState: derived ONLY from authoritative assessment truth (TONE_TO_STATE)
  *     or CHANGED for the disruption node. Items with no assessment: UNKNOWN.
  *   - Refs: `<KIND>:<id>` format matching causalPath subjectRef format so causal
@@ -106,6 +106,10 @@ export interface TransportServiceRow {
   destination_place_name?: string | null;
   published_departure: string | null;
   published_arrival: string | null;
+  estimated_arrival?: string | null;
+  actual_arrival?: string | null;
+  /** Canonical IANA time zone of the arrival place, where available. */
+  destination_time_zone?: string | null;
 }
 
 /** Minimal participation row shape (from participations table, migration 0057). */
@@ -163,6 +167,8 @@ export interface FocusedCaseGraphEnrichmentInput {
   objectives: readonly ObjectiveRow[];
   /** Assessment views for subjects (keyed by `<KIND>:<id>`). */
   assessmentViews: ReadonlyMap<string, SubjectAssessmentView>;
+  /** Blocking evaluator explanations, including optional persisted cause refs. */
+  causalPath?: readonly import('../../../contracts/v2/product/readModels.ts').CausalPathStep[];
   /** Traveller display names (keyed by journey_id). */
   travellerLabelsByJourney: ReadonlyMap<string, string>;
   /** The case id (for caseRef on nodes). */
@@ -173,8 +179,6 @@ export interface FocusedCaseGraphEnrichmentInput {
 export interface FocusedCaseGraphEnrichment {
   nodes: ProductNodeFact[];
   edges: ProductEdgeFact[];
-  /** Contract gap: objectives exist but no LdgNodeKind can carry them. */
-  objectiveContractGap: boolean;
 }
 
 /**
@@ -202,6 +206,39 @@ export function projectFocusedCaseGraphEnrichment(
       edges.push(edge);
     }
   };
+  const assessmentFor = (ref: string): SubjectAssessmentView | undefined => input.assessmentViews.get(ref);
+  const stateFor = (ref: string): { semanticState: LdgSemanticState; evaluation?: AssessmentViewStatus } => {
+    const assessment = assessmentFor(ref);
+    return assessment
+      ? { semanticState: TONE_TO_STATE[assessment.tone], evaluation: assessment.status }
+      : { semanticState: 'UNKNOWN' };
+  };
+  const hasArrivalExplanation = (itemRef: string, serviceRef: string, currentAt: string): boolean => (input.causalPath ?? []).some((step) => {
+    const referencesArrivalSubject = step.causeSubjectRef === itemRef
+      || step.causeSubjectRef === serviceRef
+      || step.relatedSubjectRefs.includes(itemRef)
+      || step.relatedSubjectRefs.includes(serviceRef);
+    if (!referencesArrivalSubject) return false;
+    const factAt = (...keys: string[]): boolean => keys.some((key) => step.facts[key] === currentAt);
+    // Connection facts explicitly distinguish upstream arrival from downstream
+    // departure. Related refs alone cover both legs and cannot establish which
+    // arrival is operationally responsible.
+    if (step.dimension === 'connection_feasibility') return factAt('upstreamArrival');
+    // Participation/objective arrival checks carry the reach/readiness instant.
+    // A departure-after-engagement failure includes that same arrival context,
+    // but the failed fact is the departure and must not turn arrival red.
+    if ((step.dimension === 'programme_participation' || step.dimension === 'hard_objectives')
+      && step.reasonCode !== 'departs_before_item_ends') {
+      return factAt('arrival', 'readyAt', 'scheduledArrival');
+    }
+    return false;
+  });
+  const hasProgrammeFailure = (ref: string): boolean => (input.causalPath ?? []).some((step) =>
+    step.dimension === 'programme_participation' && step.causeSubjectRef === ref,
+  );
+  const hasObjectiveFailure = (ref: string): boolean => (input.causalPath ?? []).some((step) =>
+    step.dimension === 'hard_objectives' && step.causeSubjectRef === ref,
+  );
 
   // ---------------------------------------------------------------------------
   // 1. Human labels for case-subject nodes (JOURNEY subjects).
@@ -221,6 +258,7 @@ export function projectFocusedCaseGraphEnrichment(
 
   // Group journey items by journey_id.
   const itemsByJourney = new Map<string, JourneyItemRow[]>();
+  const timingRefByJourneyItem = new Map<string, string>();
   for (const item of input.journeyItems) {
     const list = itemsByJourney.get(item.journey_id) ?? [];
     list.push(item);
@@ -249,6 +287,7 @@ export function projectFocusedCaseGraphEnrichment(
       let ref: string;
       let label: string;
       let detail: string | undefined;
+      let transportService: TransportServiceRow | undefined;
 
       if (item.kind === 'TRANSPORT') {
         // SERVICE_BOOKING: ref is SERVICE_BOOKING:<service_id>, label from transport_services.
@@ -256,11 +295,11 @@ export function projectFocusedCaseGraphEnrichment(
         const serviceId = item.selectedServiceId;
         if (!serviceId) continue; // Skip transport items without a selected service.
         ref = `SERVICE_BOOKING:${serviceId}`;
-        const service = serviceById.get(serviceId);
-        if (service) {
-          label = `${service.mode} ${service.operator}`;
-          if (service.origin_place_name && service.destination_place_name) {
-            detail = `${service.origin_place_name} → ${service.destination_place_name}`;
+        transportService = serviceById.get(serviceId);
+        if (transportService) {
+          label = `${transportService.mode} ${transportService.operator}`;
+          if (transportService.origin_place_name && transportService.destination_place_name) {
+            detail = `${transportService.origin_place_name} → ${transportService.destination_place_name}`;
           }
         } else {
           label = 'Transport service';
@@ -285,21 +324,66 @@ export function projectFocusedCaseGraphEnrichment(
 
       itemRefs.push(ref);
 
-      // semanticState: from assessment view if available, else UNKNOWN.
-      const assessment = input.assessmentViews.get(ref);
-      const semanticState = assessment ? TONE_TO_STATE[assessment.tone] : 'UNKNOWN';
-      const evaluation = assessment?.status;
+      const state = stateFor(ref);
+
+      const serviceSubjectRef = item.kind === 'TRANSPORT' && item.selectedServiceId
+        ? `TRANSPORT_SERVICE:${item.selectedServiceId}`
+        : undefined;
+      const itemSubjectRef = `JOURNEY_ITEM:${item.id}`;
+      const currentAt = transportService
+        ? transportService.actual_arrival ?? transportService.estimated_arrival ?? transportService.published_arrival
+        : null;
+      const timingImplicated = currentAt !== null && serviceSubjectRef !== undefined && (
+        hasArrivalExplanation(itemSubjectRef, serviceSubjectRef, currentAt)
+      );
 
       pushNode({
         ref,
         kind,
         label,
-        semanticState,
+        semanticState: state.semanticState,
         authority: 'AUTHORITATIVE',
         caseRef: input.caseId,
-        ...(evaluation ? { evaluation } : {}),
+        ...(serviceSubjectRef
+          ? { subjectRefs: timingImplicated ? [serviceSubjectRef] : [serviceSubjectRef, itemSubjectRef] }
+          : {}),
+        ...(state.evaluation ? { evaluation: state.evaluation } : {}),
         ...(detail ? { detail } : {}),
       });
+
+      if (item.kind === 'TRANSPORT' && transportService && currentAt && timingImplicated) {
+          const timingRef = `TIMING:${item.id}:ARRIVAL`;
+          timingRefByJourneyItem.set(item.id, timingRef);
+          pushNode({
+            ref: timingRef,
+            kind: 'TIMING',
+            label: 'Arrival timing',
+            // CHANGED requires a canonical published baseline that differs. A
+            // replacement schedule matching its own published time (or a timing
+            // fact without that baseline) is still shown when a blocking
+            // evaluator explanation implicates it, as FAILED rather than falsely
+            // calling that schedule change itself.
+            semanticState: transportService.published_arrival !== null && currentAt !== transportService.published_arrival ? 'CHANGED' : 'FAILED',
+            authority: 'AUTHORITATIVE',
+            caseRef: input.caseId,
+            // The service remains the visual home of TRANSPORT_SERVICE; the
+            // timing node is the visual home of a causal JOURNEY_ITEM when it
+            // exists. This keeps every canonical ref one-to-one.
+            subjectRefs: [itemSubjectRef],
+            timing: {
+              currentAt,
+              ...(transportService.published_arrival ? { publishedAt: transportService.published_arrival } : {}),
+              ...(transportService.destination_time_zone ? { timeZone: transportService.destination_time_zone } : {}),
+            },
+          });
+          pushEdge({
+            id: `MUST_HAPPEN_BEFORE:${ref}:${timingRef}`,
+            fromRef: ref,
+            toRef: timingRef,
+            kind: 'MUST_HAPPEN_BEFORE',
+            authority: 'AUTHORITATIVE',
+          });
+      }
     }
 
     // Emit MUST_HAPPEN_BEFORE edges between consecutive items (deterministic order).
@@ -353,10 +437,13 @@ export function projectFocusedCaseGraphEnrichment(
       ? formatWindowUtc(programmeItem.window_start, programmeItem.window_end)
       : undefined;
 
-    // semanticState: from assessment view if available, else UNKNOWN.
-    const assessment = input.assessmentViews.get(`PROGRAMME_ITEM:${programmeItem.id}`);
-    const semanticState = assessment ? TONE_TO_STATE[assessment.tone] : 'UNKNOWN';
-    const evaluation = assessment?.status;
+    const programmeItemSubjectRef = `PROGRAMME_ITEM:${programmeItem.id}`;
+    const state = stateFor(programmeItemSubjectRef);
+    // A journey-wide failure is not a programme consequence. The only fallback
+    // is the participation evaluator's own failing explanation for this item.
+    const semanticState = assessmentFor(programmeItemSubjectRef)
+      ? state.semanticState
+      : hasProgrammeFailure(programmeItemSubjectRef) ? 'FAILED' : 'UNKNOWN';
 
     pushNode({
       ref: programmeItemRef,
@@ -365,7 +452,8 @@ export function projectFocusedCaseGraphEnrichment(
       semanticState,
       authority: 'AUTHORITATIVE',
       caseRef: input.caseId,
-      ...(evaluation ? { evaluation } : {}),
+      subjectRefs: [programmeItemSubjectRef],
+      ...(state.evaluation ? { evaluation: state.evaluation } : {}),
       ...(detail ? { detail } : {}),
     });
 
@@ -381,20 +469,49 @@ export function projectFocusedCaseGraphEnrichment(
         kind: 'PARTICIPATES_IN',
         authority: 'AUTHORITATIVE',
       });
+
+      for (const participationStep of input.causalPath ?? []) {
+        if (participationStep.dimension !== 'programme_participation' || participationStep.causeSubjectRef !== programmeItemSubjectRef) continue;
+        for (const relatedRef of participationStep.relatedSubjectRefs) {
+          if (!relatedRef.startsWith('JOURNEY_ITEM:')) continue;
+          const timingRef = timingRefByJourneyItem.get(relatedRef.slice('JOURNEY_ITEM:'.length));
+          if (!timingRef) continue;
+          pushEdge({
+            id: `MUST_HAPPEN_BEFORE:${timingRef}:${programmeItemRef}`,
+            fromRef: timingRef,
+            toRef: programmeItemRef,
+            kind: 'MUST_HAPPEN_BEFORE',
+            authority: 'AUTHORITATIVE',
+          });
+        }
+      }
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Objectives (contract gap).
+  // 4. Objectives — presentation of existing canonical rows only.
   // ---------------------------------------------------------------------------
-  // The closed LdgNodeKind enum has no OBJECTIVE kind. We cannot emit objective
-  // nodes without violating the contract. Report the gap.
-  // ---------------------------------------------------------------------------
-  const objectiveContractGap = input.objectives.length > 0;
+  for (const objective of input.objectives) {
+    const objectiveSubjectRef = `OBJECTIVE:${objective.id}`;
+    const state = stateFor(objectiveSubjectRef);
+    const semanticState = assessmentFor(objectiveSubjectRef)
+      ? state.semanticState
+      : hasObjectiveFailure(objectiveSubjectRef) ? 'FAILED' : 'UNKNOWN';
+    const objectiveRef = `OBJECTIVE:${objective.id}`;
+    pushNode({
+      ref: objectiveRef,
+      kind: 'TRIP_OBJECTIVE',
+      label: objective.success_predicate,
+      semanticState,
+      authority: 'AUTHORITATIVE',
+      caseRef: input.caseId,
+      subjectRefs: [objectiveSubjectRef],
+      ...(state.evaluation ? { evaluation: state.evaluation } : {}),
+    });
+  }
 
   return {
     nodes,
     edges,
-    objectiveContractGap,
   };
 }

@@ -26,6 +26,7 @@
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { CONN_SPEC, seedConnectionWorld } from './r2ConnectionWorld.ts';
 import { openDisruptionCase, worldAt, type DisruptedWorld, type OpenCase } from './r1ProgrammeWorld.ts';
@@ -58,8 +59,16 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     // The focused graph carries the case scope and the enriched node kinds.
     assert.equal(v.ldg.scope, 'FOCUSED_CASE');
     const kinds = new Set(v.ldg.nodes.map((n) => n.kind));
+    assert.ok(!kinds.has('RECOVERY_PROPOSAL'), 'Case workflow state is not a focused-graph node');
     assert.ok(kinds.has('SERVICE_BOOKING'), `transport composition present: ${[...kinds].join(',')}`);
     assert.ok(kinds.has('PROGRAMME_COMMITMENT'), `programme commitment present: ${[...kinds].join(',')}`);
+    for (const service of v.ldg.nodes.filter((node) => node.kind === 'SERVICE_BOOKING')) {
+      assert.ok(service.subjectRefs?.some((ref) => ref.startsWith('TRANSPORT_SERVICE:')), 'service carries an explicit canonical transport mapping');
+    }
+    const timing = v.ldg.nodes.find((node) => node.kind === 'TIMING');
+    assert.ok(timing, 'provider delay plus real evaluator explanation projects canonical arrival timing');
+    assert.equal(timing.semanticState, 'CHANGED');
+    assert.ok(timing.timing?.currentAt, 'timing carries canonical effective arrival');
 
     // Composition edges are producer-owned ids, never array position (FIG-1).
     const edgeKinds = new Set(v.ldg.edges.map((e) => e.kind));
@@ -121,6 +130,22 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     }
   });
 
+  test('the read model includes a Trip-owned objective for a Journey-only Case subject', async () => {
+    const tripId = c.world.people[0]!.tripId;
+    const objectiveId = randomUUID();
+    await c.pool.query(
+      `INSERT INTO objectives (workspace_id, id, owner_kind, owner_id, success_predicate, hardness, priority, created_by_actor_id)
+       VALUES ($1, $2, 'TRIP', $3, 'Keep the shared undertaking viable', 'HARD', 1, $4)`,
+      [c.world.workspaceId, objectiveId, tripId, c.world.actorId],
+    );
+    const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
+    const objective = v.ldg.nodes.find((node) => node.ref === `OBJECTIVE:${objectiveId}`);
+    assert.ok(objective, 'Trip-owned objective is projected through its affected Journey');
+    assert.equal(objective.kind, 'TRIP_OBJECTIVE');
+    assert.equal(objective.label, 'Keep the shared undertaking viable');
+    assert.equal(objective.semanticState, 'UNKNOWN', 'no unrelated journey failure is copied onto the new objective');
+  });
+
   test('CHECKING is presented from evaluation PENDING_REASSESSMENT, never a new verdict', async () => {
     const v = await view({ pool: c.pool, workspaceId: c.world.workspaceId, caseId: c.caseId }, c.now);
     for (const node of v.ldg.nodes) {
@@ -151,6 +176,7 @@ describe('R2 focused Case graph generality — connection world, no programme (r
 
     assert.equal(v.ldg.scope, 'FOCUSED_CASE');
     const kinds = new Set(v.ldg.nodes.map((n) => n.kind));
+    assert.ok(!kinds.has('RECOVERY_PROPOSAL'), 'Case workflow state is not fabricated for connection world');
     // Transport composition is enriched identically to the programme world.
     assert.ok(kinds.has('SERVICE_BOOKING'), `transport composition present: ${[...kinds].join(',')}`);
     // There is no programme in this world, so no PROGRAMME_COMMITMENT is fabricated.

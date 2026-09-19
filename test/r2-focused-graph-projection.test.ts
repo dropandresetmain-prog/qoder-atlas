@@ -37,6 +37,8 @@ function graph(nodes: ProductNodeFact[], edges: ProductEdgeFact[]): LiveDependen
       authority: n.authority ?? 'AUTHORITATIVE',
       ...(n.caseRef ? { caseRef: n.caseRef } : {}),
       ...(n.evaluation ? { evaluation: n.evaluation } : {}),
+      ...(n.subjectRefs ? { subjectRefs: [...n.subjectRefs] } : {}),
+      ...(n.timing ? { timing: { ...n.timing } } : {}),
       ...(n.detail ? { detail: n.detail } : {}),
     })),
     edges: edges.map((e) => ({
@@ -124,6 +126,32 @@ test('R2: first operational breakpoint is causalPath[0] mapped to a visible node
   assert.equal(focused?.firstBreakpoint?.label, 'Arrival readiness');
   assert.equal(focused?.firstBreakpoint?.dimension, 'arrival_readiness');
   assert.equal(focused?.firstBreakpoint?.reasonCode, 'arrival_after_required_by');
+});
+
+test('A1: persisted cause maps to an explicit presentation subject while affected journey remains context', () => {
+  const ldg = graph([
+    { ref: 'JOURNEY:j1', kind: 'TRAVELLER', label: 'Traveller', semanticState: 'FAILED' },
+    { ref: 'TIMING:item-1:ARRIVAL', kind: 'TIMING', label: 'Arrival timing', semanticState: 'CHANGED', subjectRefs: ['JOURNEY_ITEM:item-1'] },
+  ], [{ id: 'e1', fromRef: 'JOURNEY:j1', toRef: 'TIMING:item-1:ARRIVAL', kind: 'RELIES_ON' }]);
+  const focused = projectFocusedGraph(ldg, [{
+    subjectRef: 'JOURNEY:j1', causeSubjectRef: 'JOURNEY_ITEM:item-1', dimension: 'connection_feasibility', reasonCode: 'connection_impossible', evaluatorId: 'm6.connection', facts: {}, relatedSubjectRefs: [],
+  }]);
+  assert.equal(focused?.firstBreakpoint?.nodeRef, 'TIMING:item-1:ARRIVAL');
+  assert.deepEqual(focused?.causalNodeRefs, ['TIMING:item-1:ARRIVAL', 'JOURNEY:j1']);
+});
+
+test('A1: a third presentation mapping cannot restore an ambiguous canonical subject', () => {
+  const ldg = graph([
+    { ref: 'SERVICE_BOOKING:one', kind: 'SERVICE_BOOKING', label: 'One', semanticState: 'UNKNOWN', subjectRefs: ['TRANSPORT_SERVICE:s1'] },
+    { ref: 'SERVICE_BOOKING:two', kind: 'SERVICE_BOOKING', label: 'Two', semanticState: 'UNKNOWN', subjectRefs: ['TRANSPORT_SERVICE:s1'] },
+    { ref: 'SERVICE_BOOKING:three', kind: 'SERVICE_BOOKING', label: 'Three', semanticState: 'UNKNOWN', subjectRefs: ['TRANSPORT_SERVICE:s1'] },
+  ], []);
+  const focused = projectFocusedGraph(ldg, [{
+    subjectRef: 'JOURNEY:j1', causeSubjectRef: 'TRANSPORT_SERVICE:s1', dimension: 'arrival_readiness', reasonCode: 'arrival_after_required_by', evaluatorId: 'm6.arrival', facts: {}, relatedSubjectRefs: [],
+  }]);
+  assert.equal(focused?.firstBreakpoint, undefined);
+  assert.deepEqual(focused?.causalNodeRefs, []);
+  assert.equal(focused?.unmappedCausalSteps[0]?.subjectRef, 'TRANSPORT_SERVICE:s1');
 });
 
 test('R2: a causal step with no visible node is an explicit honest gap', () => {

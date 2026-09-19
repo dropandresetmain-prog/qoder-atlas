@@ -57,6 +57,7 @@ const ENTITIES: Record<LdgNodeKind, { label: string; icon: IconKind }> = {
   TIMING: { label: 'Timing', icon: 'time' },
   TRANSFER_STAY: { label: 'Transfer / stay', icon: 'support' },
   PROGRAMME_COMMITMENT: { label: 'Programme commitment', icon: 'commitment' },
+  TRIP_OBJECTIVE: { label: 'Trip objective', icon: 'commitment' },
   RECOVERY_PROPOSAL: { label: 'Recovery proposal / case', icon: 'proposal' },
 };
 const RELATIONSHIPS: Record<LdgEdgeKind, string> = {
@@ -115,6 +116,8 @@ export function presentDependencyGraph(input: unknown, focus: PresentationFocus 
         label: node.label, secondaryLabel: node.detail, iconKind: entity.icon,
         evaluationState: presentEvaluationState(node.evaluation),
         ...(node.caseRef ? { caseRef: node.caseRef } : {}),
+        ...(node.subjectRefs ? { subjectRefs: [...node.subjectRefs] } : {}),
+        ...(node.timing ? { timing: { ...node.timing } } : {}),
       };
     }),
     edges: graph.edges.map((edge, index) => ({
