@@ -115,7 +115,8 @@ describe('R1 second situation: a broken connection, no programme (real PostgreSQ
     // Different failure => different domains, from the same registry.
     const disposition = Object.fromEntries(pe.domains.map((d) => [d.domain.code, d.disposition.code]));
     assert.equal(disposition.TRANSPORT, 'INVESTIGATED');
-    assert.equal(disposition.TRANSFER, 'INVESTIGATED');
+    // G01: TRANSFER has no composed adapter, so it fails closed instead of a fake INVESTIGATED.
+    assert.equal(disposition.TRANSFER, 'UNAVAILABLE');
     assert.equal(disposition.PROGRAMME, 'NOT_APPLICABLE');
     assert.equal(disposition.STAY, 'NOT_APPLICABLE');
 

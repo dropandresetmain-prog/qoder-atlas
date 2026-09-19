@@ -107,7 +107,16 @@ export function defaultDomainProposers(): DomainProposerBinding[] {
   return [{ domain: 'PROGRAMME' as RecoveryDomainId, proposer: createProgrammeTimeSwapProposer() as StrategyProposer }];
 }
 
-const DEFAULT_CAPABILITIES: readonly CapabilityFamily[] = ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'];
+/**
+ * G01: the coordinator NEVER advertises a capability family it was not composed
+ * with. The only family it can derive on its own is FLIGHT, from the presence of
+ * a real `transportPlanning` transport; everything else must be passed
+ * explicitly by the composition root (derived from really-composed adapters).
+ * No composition => empty => provider-backed domains fail closed UNAVAILABLE.
+ */
+export function derivedCapabilities(transportPlanning: unknown): readonly CapabilityFamily[] {
+  return transportPlanning ? ['FLIGHT'] : [];
+}
 
 interface BasisCapture {
   failing: FailingSubject[];
@@ -280,9 +289,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         },
         {
           domainRegistry: deps.domainRegistry ?? defaultRecoveryDomainRegistry(),
-          availableCapabilities: deps.availableCapabilities ?? (transportPlanning
-            ? DEFAULT_CAPABILITIES
-            : DEFAULT_CAPABILITIES.filter((capability) => capability !== 'FLIGHT')),
+          availableCapabilities: deps.availableCapabilities ?? derivedCapabilities(transportPlanning),
           proposers,
           minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
