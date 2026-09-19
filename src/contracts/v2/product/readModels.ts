@@ -271,6 +271,95 @@ export const OperatorPopulationEntrySchema = z.strictObject({
 });
 export type OperatorPopulationEntry = z.infer<typeof OperatorPopulationEntrySchema>;
 
+/**
+ * Bounded Event Overview projection (V7.2 contract, docs/design/event-overview-graph).
+ *
+ * Everything the Overview graph draws AND everything the browser must not
+ * infer is supplied here: programme days/landmarks, shared-dependency
+ * concentration, traveller cohorts, promoted travellers, blast-radius
+ * membership (cleared vs unresolved) and the routing case. Every collection is
+ * capped; the projection is curated, never a dump of the topology. Health is
+ * the producer's verdict (GREEN functioning, AMBER changed/being checked, RED
+ * cannot be satisfied, NEUTRAL context) — the renderer maps it to colour and
+ * motion only.
+ */
+export const EventOverviewHealthSchema = z.enum(['GREEN', 'AMBER', 'RED', 'NEUTRAL']);
+export type EventOverviewHealth = z.infer<typeof EventOverviewHealthSchema>;
+
+export const EventOverviewMembershipSchema = z.enum(['CLEARED', 'CHECKING', 'UNRESOLVED', 'ATTENTION']);
+export type EventOverviewMembership = z.infer<typeof EventOverviewMembershipSchema>;
+
+export const EventOverviewSchema = z.strictObject({
+  /** Programme territories, ascending. `index` is 1-based and dense. */
+  days: z.array(z.strictObject({
+    index: z.number().int().min(1),
+    localDate: z.string().min(1),
+    dateLabel: z.string().min(1),
+  })).max(14),
+  /** Major programme commitments only (bounded per day). */
+  landmarks: z.array(z.strictObject({
+    ref: z.string().min(1),
+    dayIndex: z.number().int().min(1),
+    title: z.string().min(1),
+    timeLabel: z.string().min(1).optional(),
+    health: EventOverviewHealthSchema,
+    participantCount: z.number().int().min(0),
+    /** Participants of this commitment currently in the blast radius or disrupted. */
+    affectedCount: z.number().int().min(0),
+  })).max(42),
+  /** Shared service dependencies that concentrate several travellers. */
+  dependencies: z.array(z.strictObject({
+    ref: z.string().min(1),
+    kindLabel: z.string().min(1),
+    label: z.string().min(1),
+    detailLabel: z.string().min(1).optional(),
+    dayIndex: z.number().int().min(1).optional(),
+    health: EventOverviewHealthSchema,
+    /** True when the service's authoritative timing differs from what was published. */
+    changed: z.boolean(),
+    travellerCount: z.number().int().min(0),
+    clearedCount: z.number().int().min(0),
+    checkingCount: z.number().int().min(0),
+    unresolvedCount: z.number().int().min(0),
+    /** The landmark this dependency materially feeds, when one is in the projection. */
+    feedsLandmarkRef: z.string().min(1).optional(),
+  })).max(12),
+  /** Compressed healthy population, one per programme day. */
+  cohorts: z.array(z.strictObject({
+    ref: z.string().min(1),
+    dayIndex: z.number().int().min(1),
+    label: z.string().min(1),
+    total: z.number().int().min(0),
+    ready: z.number().int().min(0),
+    unknown: z.number().int().min(0),
+    attention: z.number().int().min(0),
+    landmarkRef: z.string().min(1).optional(),
+  })).max(14),
+  /** Travellers promoted out of their cohort by current operational importance. */
+  promotedTravellers: z.array(z.strictObject({
+    journeyRef: z.string().min(1),
+    label: z.string().min(1),
+    roleLabel: z.string().min(1),
+    status: ProductOperationalStatusSchema,
+    membership: EventOverviewMembershipSchema,
+    dependencyRef: z.string().min(1).optional(),
+    landmarkRef: z.string().min(1).optional(),
+    caseRef: z.string().min(1).optional(),
+  })).max(16),
+  /** Travellers eligible for promotion beyond the cap; they stay in their cohort. */
+  promotedOverflow: z.number().int().min(0),
+  /** The active shared change, when one exists. */
+  blastRadius: z.strictObject({
+    dependencyRef: z.string().min(1),
+    affectedCount: z.number().int().min(0),
+    clearedCount: z.number().int().min(0),
+    checkingCount: z.number().int().min(0),
+    unresolvedCount: z.number().int().min(0),
+    landmarkRefs: z.array(z.string().min(1)).max(12),
+  }).optional(),
+});
+export type EventOverview = z.infer<typeof EventOverviewSchema>;
+
 export const OperatorOverviewSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   items: z.array(OperatorOverviewItemSchema),
@@ -314,6 +403,8 @@ export const OperatorOverviewSchema = z.strictObject({
     organiserLabel: z.string().min(1).optional(),
     programmeRef: z.string().min(1).optional(),
   }).optional(),
+  /** Bounded curated projection for the Event Overview graph; see EventOverviewSchema. */
+  eventOverview: EventOverviewSchema.optional(),
   ldg: LiveDependencyGraphSchema,
   change: ChangeAwarenessSchema,
   /** Demo ingress configuration flags */

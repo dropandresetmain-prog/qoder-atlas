@@ -92,6 +92,45 @@ export interface EventContextFact {
   programmeRef?: string;
 }
 
+/**
+ * Raw authoritative rows behind the bounded Event Overview projection.
+ * Local dates/times are computed by the store in each row's own time zone so
+ * the pure builder stays free of time-zone logic. All arrays are bounded by
+ * the producer; refs are typed (`PROGRAMME_ITEM:`, `SERVICE:`, `JOURNEY:`).
+ */
+export interface EventOverviewSourceFacts {
+  /** Windowed, non-cancelled items of ACTIVE programmes. */
+  programmeItems: readonly {
+    itemRef: string;
+    title: string;
+    /** Local `YYYY-MM-DD` of window_start in the item's time zone. */
+    localDate: string;
+    /** Local `HH:MM` of window_start. */
+    localTime: string;
+    /** UTC ISO instant of window_start (ordering only). */
+    windowStart: string;
+  }[];
+  /** Accepted participations, expanded to the participant's journeys. */
+  participations: readonly {
+    itemRef: string;
+    journeyRef: string;
+    obligation: 'REQUIRED' | 'OPTIONAL' | 'INFORMED';
+  }[];
+  /** One row per (journey, selected transport service). */
+  journeyServices: readonly {
+    journeyRef: string;
+    serviceRef: string;
+    mode: 'AIR' | 'RAIL' | 'ROAD' | 'SEA';
+    operator: string;
+    /** Effective (actual > estimated > published) arrival in the destination's zone. */
+    arrivalLocalDate?: string;
+    arrivalLocalTime?: string;
+    publishedArrivalLocalTime?: string;
+    /** Effective timing differs from published. */
+    changed: boolean;
+  }[];
+}
+
 export interface OperatorOverviewFacts extends ProductWorldFacts {
   items: readonly OperatorItemFact[];
   /**
@@ -101,6 +140,8 @@ export interface OperatorOverviewFacts extends ProductWorldFacts {
    */
   population?: readonly OperatorPopulationFact[];
   eventContext?: EventContextFact;
+  /** Raw rows for the bounded Event Overview projection; see `buildEventOverview`. */
+  eventOverviewSource?: EventOverviewSourceFacts;
   /** Demo ingress configuration flags */
   demoIngress?: {
     airlineRebookingConfigured: boolean;
