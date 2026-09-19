@@ -15,6 +15,7 @@ import { typedConflict, type TypedResult, ok, conflict } from '../../domain/v2/s
 import { ExactMoneySchema, compareExactMoney, type ExactMoney } from '../../domain/v2/shared/money.ts';
 import { InstantIntervalSchema, type Instant } from '../../domain/v2/shared/time.ts';
 import type { ScenarioChange, ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
+import { applyStayVisitOverlay } from './stayVisitOverlay.ts';
 import type {
   CapturedWorld,
   WAllocation,
@@ -308,6 +309,14 @@ function applyEffect(
         resourceId: null,
         intendedLocationPlaceId: null,
       });
+      const visitApplied = applyStayVisitOverlay({
+        world,
+        journey,
+        effect,
+        placeId: place.id,
+        stayWindow: window.data,
+      });
+      if (!visitApplied.ok) return visitApplied;
       // The proposed item has no canonical identity and therefore is never an
       // authority/impact subject. Its existing owning Journey and Traveller are.
       addAffected(affected, { kind: 'JOURNEY', id: journey.id });
