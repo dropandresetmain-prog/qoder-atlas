@@ -103,6 +103,47 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
     assert.equal(jordanJourney.rowCount, 1, 'configured traveller resolves to one canonical journey');
     const journeyId = jordanJourney.rows[0]!.journey_id;
 
+    const journeyRequirement = await pool.query<{
+      registered_type: string;
+      hardness: string;
+      owner_kind: string;
+      owner_id: string;
+      minimum_gap_hours: string;
+      provenance_evidence_id: string;
+    }>(
+      `SELECT c.registered_type, c.hardness, c.owner_kind, c.owner_id,
+              o.number_value::text AS minimum_gap_hours, c.provenance_evidence_id
+         FROM constraint_definitions c
+         JOIN constraint_operands o
+           ON o.workspace_id = c.workspace_id AND o.constraint_definition_id = c.id
+          AND o.operand_key = 'minimum_gap_hours'
+        WHERE c.workspace_id = $1
+          AND c.registered_type = 'overnight_accommodation_required'
+          AND c.owner_kind = 'JOURNEY'
+          AND c.owner_id = $2`,
+      [workspaceId, journeyId],
+    );
+    assert.deepEqual(journeyRequirement.rows, [
+      {
+        registered_type: 'overnight_accommodation_required',
+        hardness: 'HARD',
+        owner_kind: 'JOURNEY',
+        owner_id: journeyId,
+        minimum_gap_hours: '8',
+        provenance_evidence_id: journeyRequirement.rows[0]?.provenance_evidence_id,
+      },
+    ], 'synthetic organiser policy is imported as one scoped Journey requirement');
+    assert.ok(journeyRequirement.rows[0]?.provenance_evidence_id, 'Journey requirement retains source evidence');
+    const requirementSources = await pool.query<{ source_identity: string }>(
+      `SELECT s.source_identity
+         FROM evidence_sources es
+         JOIN source_records s
+           ON s.workspace_id = es.workspace_id AND s.id = es.source_record_id
+        WHERE es.workspace_id = $1 AND es.evidence_record_id = $2`,
+      [workspaceId, journeyRequirement.rows[0]!.provenance_evidence_id],
+    );
+    assert.ok(requirementSources.rows.some((row) => row.source_identity.endsWith(':source:src-syn-ait-organiser-policy')), 'requirement evidence cites the declared organiser-policy source');
+
     const inboundService = await pool.query<{ service_id: string }>(
       `SELECT l.canonical_subject_id AS service_id
          FROM external_record_links l

@@ -17,9 +17,11 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   DatasetGroundTransfersSchema,
+  DatasetJourneyRequirementsSchema,
   DatasetJurisdictionsSchema,
   DatasetProgrammeSchema,
   type DatasetGroundTransfers,
+  type DatasetJourneyRequirements,
   type DatasetJurisdictions,
   type DatasetProgramme,
 } from './datasetSchema.ts';
@@ -31,6 +33,8 @@ export const PROGRAMME_FILE = 'programme.json';
 export const GROUND_TRANSFERS_FILE = 'ground-transfers.json';
 /** Optional: place->jurisdiction attribution and knowledge coverage. */
 export const JURISDICTIONS_FILE = 'jurisdictions.json';
+/** Optional typed Journey requirements declared by the source organiser. */
+export const JOURNEY_REQUIREMENTS_FILE = 'journey-requirements.json';
 
 export interface LoadedDataset {
   /** Stable dataset identity, derived from the configured directory name. */
@@ -43,6 +47,7 @@ export interface LoadedDataset {
   programme: DatasetProgramme;
   groundTransfers: DatasetGroundTransfers | undefined;
   jurisdictions: DatasetJurisdictions | undefined;
+  journeyRequirements?: DatasetJourneyRequirements;
 }
 
 export class DatasetLoadError extends Error {
@@ -119,6 +124,21 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     jurisdictions = parsed.data;
   }
 
+  const journeyRequirementsRaw = await readJsonFile(directory, JOURNEY_REQUIREMENTS_FILE);
+  let journeyRequirements: DatasetJourneyRequirements | undefined;
+  if (journeyRequirementsRaw) {
+    const parsed = DatasetJourneyRequirementsSchema.safeParse(journeyRequirementsRaw.parsed);
+    if (!parsed.success) {
+      throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} does not match the dataset contract: ${parsed.error.message}`, directory);
+    }
+    const knownTravellerDraftIds = new Set(programme.data.importDraft.travellers.map((traveller) => traveller.draftId));
+    const unknown = parsed.data.requirements.find((requirement) => !knownTravellerDraftIds.has(requirement.travellerDraftId));
+    if (unknown) {
+      throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} references unknown traveller draft ${unknown.travellerDraftId}`, directory);
+    }
+    journeyRequirements = parsed.data;
+  }
+
   return {
     datasetKey: path.basename(directory),
     directory,
@@ -127,5 +147,6 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     programme: programme.data,
     groundTransfers,
     jurisdictions,
+    journeyRequirements,
   };
 }
