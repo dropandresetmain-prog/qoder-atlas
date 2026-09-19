@@ -11,8 +11,16 @@ import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(resolve(ROOT, 'test/suites.json'), 'utf8')) as {
-  classification: Record<string, string>;
-  suites: Record<string, string[]>;
+  classification: {
+    postgres: string;
+    postgresFast: string;
+  };
+  suites: {
+    postgres: string[];
+    postgresFast: string[];
+    migration: string[];
+    legacy: string[];
+  };
 };
 
 const HEAVYWEIGHT_POSTGRES_FILES = [
