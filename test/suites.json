@@ -96,6 +96,7 @@
       "test/r3-transport-research-composition.test.ts",
       "test/r4-capability-composition.test.ts",
       "test/r4-planning-preferences.test.ts",
+      "test/r4-qwen-domain-suggestion.test.ts",
       "test/r3d-user-contracts.test.ts",
       "test/runtime-services.test.ts",
       "test/scenarios.test.ts",

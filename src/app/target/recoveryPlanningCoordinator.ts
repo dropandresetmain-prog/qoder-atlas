@@ -62,9 +62,15 @@ import {
   type DomainProposerBinding,
 } from '../../resolution/planning/coordinatorCore.ts';
 import { loadPlanningPreferences, preferenceOwnerIds } from './planningPreferences.ts';
+import { suggestRecoveryDomains } from './planningDomainSuggestion.ts';
 import { advanceCasePhase } from './recoveryPlanning.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { applicationError } from './applicationCommands.ts';
+import type { IntelligenceClient } from '../../intelligence/client.ts';
+import {
+  resolveRecoveryDomainDecisions,
+} from '../../contracts/v2/planning/recoveryDomain.ts';
+import { blockingDimensionCodes } from '../../resolution/planning/coordinatorCore.ts';
 
 export const R1_COORDINATOR_VERSION = 'r1-coordinator/1';
 export const R1_COMPARATOR_VERSION = 'r1-comparator/1';
@@ -101,6 +107,11 @@ export interface RecoveryPlanningCoordinatorDeps {
     resolveAirport?: AirportResolver;
     maxOffersPerCorridor?: number;
   } & TransportPassengerSource;
+  /**
+   * Optional Model Studio / Qwen client for hybrid domain suggestion.
+   * Suggestions are registry-validated fail-closed; absence is honest (no AI).
+   */
+  intelligence?: IntelligenceClient;
 }
 
 /** The default domain-bound proposers shipped with the runtime (the PROGRAMME time-swap). */
@@ -282,6 +293,38 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         preferenceOwnerIds(basis.world, basis.failing, basis.programmeIds), now,
       );
 
+      const availableCapabilities = deps.availableCapabilities ?? derivedCapabilities(transportPlanning);
+      const domainRegistry = deps.domainRegistry ?? defaultRecoveryDomainRegistry();
+
+      // G08: optional Model Studio domain suggestion (hybrid C3). Deterministic
+      // activations run first; AI may only ADD domains the registry re-validates.
+      let aiSuggestedDomains: RecoveryDomainId[] | undefined;
+      if (deps.intelligence?.isConfigured()) {
+        const domainContext = {
+          failingSubjectKinds: new Set(basis.failing.map((f) => f.subject.kind)),
+          blockingDimensionCodes: blockingDimensionCodes(basis.failing),
+          affectedObjectKinds: new Set<string>(),
+          availableCapabilities: new Set(availableCapabilities),
+        };
+        const deterministic = resolveRecoveryDomainDecisions(domainRegistry, domainContext);
+        const already = deterministic
+          .filter((d) => d.disposition === 'INVESTIGATED')
+          .map((d) => d.domainId);
+        const suggestion = await suggestRecoveryDomains(deps.intelligence, {
+          context: domainContext,
+          alreadyInvestigated: already,
+        });
+        if (suggestion.suggestedDomains.length > 0) {
+          aiSuggestedDomains = [...suggestion.suggestedDomains];
+        }
+        if (suggestion.meta) {
+          console.log(
+            `[qwen] domain suggestion mode=${suggestion.meta.mode} model=${suggestion.meta.model}` +
+              (aiSuggestedDomains?.length ? ` added=${aiSuggestedDomains.join(',')}` : ' (no additive domains)'),
+          );
+        }
+      }
+
       // 2. Delegate ALL decision logic to the pure core.
       const core = await runRecoveryPlanning(
         {
@@ -297,10 +340,11 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           currentState: basis.currentState,
         },
         {
-          domainRegistry: deps.domainRegistry ?? defaultRecoveryDomainRegistry(),
-          availableCapabilities: deps.availableCapabilities ?? derivedCapabilities(transportPlanning),
+          domainRegistry,
+          availableCapabilities,
           proposers,
           ...(preferences.length > 0 ? { preferences } : {}),
+          ...(aiSuggestedDomains ? { aiSuggestedDomains } : {}),
           minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
