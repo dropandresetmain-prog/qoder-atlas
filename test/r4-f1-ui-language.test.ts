@@ -250,3 +250,25 @@ describe('R4-F2 execution blocker: a blocked option is never offered as approvab
     assert.equal([model.recommended, ...model.alternatives].find((o) => o)!.approvable, true);
   });
 });
+
+describe('R4 acceptance: a blocked option is never headlined over an executable one', () => {
+  const blockedOf = (n: number): RecoveryStrategyView => ({ ...strategy(n, n, '05:00', 'p'), executionBlocker: { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: 'PASSENGER_NAME_MISSING: traveller x has no structured given/family name' } } as RecoveryStrategyView);
+  test('the executable option is recommended and the blocked one carries a plain, specific reason', () => {
+    const blocked = blockedOf(1);
+    const ok = { ...strategy(2, 2, '05:10', 'q') } as RecoveryStrategyView;
+    const view = caseView({ status: 'AWAITING_AUTHORITY', strategies: [blocked, ok] } as Partial<RecoveryCaseView>);
+    const model = presentCaseWorkspace(view);
+    assert.equal(model.recommended?.strategyRef, ok.strategyRef);
+    assert.equal(model.recommended?.approvable, true);
+    const alt = model.alternatives.find((o) => o.strategyRef === blocked.strategyRef)!;
+    assert.equal(alt.approvable, false);
+    assert.match(alt.approverLine, /booking details/);
+    assert.deepEqual(findInternalLanguage(alt.approverLine), []);
+  });
+  test('with only blocked options the first is still shown, with its reason', () => {
+    const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [blockedOf(1)] } as Partial<RecoveryCaseView>));
+    assert.equal(model.recommended?.approvable, false);
+    assert.match(model.recommended!.approverLine, /booking details/);
+    assert.equal(model.approval, undefined);
+  });
+});

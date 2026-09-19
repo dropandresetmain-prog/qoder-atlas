@@ -325,7 +325,7 @@ function optionWhy(strategy: RecoveryStrategyView): string[] {
     const parts: string[] = [`${summary.pass} confirmed`];
     if (summary.fail > 0) parts.push(`${summary.fail} still need attention`);
     if (summary.unknown > 0) parts.push(`${summary.unknown} not yet confirmed`);
-    lines.push(`We re-checked ${summary.total} parts of the trip against this option: ${parts.join(', ')}.`);
+    lines.push(`We re-checked ${summary.total} ${summary.total === 1 ? "part" : "parts"} of the trip against this option: ${parts.join(', ')}.`);
     if (summary.fail === 0) lines.push('Nothing else in the trip breaks.');
   }
   return lines;
@@ -352,7 +352,7 @@ function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, ter
     ...(cost ? { costLine: `Added cost: ${cost}` } : {}),
     approverLine: approvable
       ? 'Needs your approval as organiser before anything changes.'
-      : strategy.executionBlocker ? plain(strategy.executionBlocker.message) ?? 'This option cannot be carried out yet.' : 'Not open for approval.',
+      : strategy.executionBlocker ? executionBlockerLine(strategy.executionBlocker) : 'Not open for approval.',
     approvable,
   };
 }
@@ -444,9 +444,22 @@ function pickRecommended(view: RecoveryCaseView, viable: RecoveryStrategyView[])
   const ref = view.planningEvidence?.recommendation?.recommended.ref;
   if (ref) {
     const hit = viable.find((s) => ref === s.strategyRef || ref.endsWith(s.strategyRef));
-    if (hit) return hit;
+    // Never headline an option that cannot be carried out while another one can:
+    // a recommendation the organiser cannot approve is not a recommendation.
+    if (hit && (!hit.executionBlocker || !viable.some((s) => !s.executionBlocker))) return hit;
   }
-  return [...viable].sort((a, b) => a.optionNumber - b.optionNumber)[0];
+  const ordered = [...viable].sort((a, b) => a.optionNumber - b.optionNumber);
+  return ordered.find((s) => !s.executionBlocker) ?? ordered[0];
+}
+
+/** Plain-language reason a viable option cannot be carried out (by blocker code). */
+const EXECUTION_BLOCKER_COPY: Record<string, string> = {
+  EXTERNAL_EXECUTION_NOT_COMPOSED: 'This would work, but booking with the airline is not switched on for this session.',
+  EXECUTION_INPUTS_UNAVAILABLE: 'This would work, but we do not yet hold the traveller’s booking details (legal name and contact), so it cannot be booked automatically.',
+  FRESH_PROVIDER_QUOTE_REQUIRED: 'This fare was checked from saved records, not with the airline. A fresh live price check is needed before it can be booked.',
+};
+function executionBlockerLine(blocker: { code: string; message: string }): string {
+  return EXECUTION_BLOCKER_COPY[blocker.code] ?? plain(blocker.message) ?? 'This option cannot be carried out yet.';
 }
 
 // --------------------------------------------------------------------------
