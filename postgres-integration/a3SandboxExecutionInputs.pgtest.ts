@@ -66,7 +66,7 @@ async function createMappedWorld(pool: Awaited<ReturnType<typeof sharedTestPool>
     link: { id: randomUUID(), externalRecordId: travellerRecordId, canonicalSubject: { kind: 'TRAVELLER', id: traveller.travellerId }, linkKind: 'SYSTEM_OF_RECORD', evidenceId: travellerEvidence, linkedAt: '2030-01-01T00:00:00.000Z' },
   })).connectionRevision;
   assert.ok(revision > 1);
-  return { workspaceId: seed.workspaceId, actorId: seed.actorId, connectionId, travellerId: traveller.travellerId, organisationId };
+  return { workspaceId: seed.workspaceId, actorId: seed.actorId, connectionId, travellerId: traveller.travellerId, organisationId, travellerEvidence };
 }
 
 function input(budgetId: string) {
@@ -127,4 +127,50 @@ test('sandbox provision resolves source refs, is repeatable, isolated, and refus
   assert.equal(secondRun.budgetsCreated, 1);
   assert.deepEqual(await counts(pool, second.workspaceId), { identities: '1', budgets: '1' });
   assert.deepEqual(await counts(pool, first.workspaceId), { identities: '1', budgets: '1' });
+});
+
+test('sandbox provision rejects source aliases for one canonical traveller before any writes', async () => {
+  const pool = await sharedTestPool();
+  const world = await createMappedWorld(pool, 'A3 sandbox inputs alias');
+  const revision = (await pool.query<{ revision: string }>(
+    'SELECT revision::text AS revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2',
+    [world.workspaceId, world.connectionId],
+  )).rows[0]!.revision;
+  const aliasRecordId = randomUUID();
+  const observed = mustOk(await observeExternalRecord(new PgUnitOfWork(pool, world.workspaceId), {
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    idempotencyKey: 'A3 sandbox inputs alias-record',
+    connectionId: world.connectionId,
+    expectedRevision: Number(revision),
+    record: { id: aliasRecordId, recordType: 'SOURCE_TRAVELLER_DRAFT', externalId: 'traveller-source-alias', identityState: 'UNVERIFIED', observedAt: '2030-01-01T00:00:00.000Z' },
+  }));
+  mustOk(await linkExternalRecord(new PgUnitOfWork(pool, world.workspaceId), {
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    idempotencyKey: 'A3 sandbox inputs alias-link',
+    connectionId: world.connectionId,
+    expectedRevision: observed.connectionRevision,
+    link: { id: randomUUID(), externalRecordId: aliasRecordId, canonicalSubject: { kind: 'TRAVELLER', id: world.travellerId }, linkKind: 'SYSTEM_OF_RECORD', evidenceId: world.travellerEvidence, linkedAt: '2030-01-01T00:00:00.000Z' },
+  }));
+  const before = await counts(pool, world.workspaceId);
+  await assert.rejects(
+    () => provisionSandboxExecutionInputs({
+      db: pool,
+      uow: () => new PgUnitOfWork(pool, world.workspaceId),
+      workspaceId: world.workspaceId,
+      actorPrincipalId: world.actorId,
+      connectionId: world.connectionId,
+      input: {
+        ...input(randomUUID()),
+        travellers: [
+          input(randomUUID()).travellers[0],
+          { sourceRef: 'SOURCE_TRAVELLER_DRAFT:traveller-source-alias', bookingIdentity: { gender: 'FEMALE', contactEmail: 'synthetic@example.test', nationality: 'SG' } },
+        ],
+      },
+      env: ENV,
+    }),
+    (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'DUPLICATE_RESOLVED_TRAVELLER',
+  );
+  assert.deepEqual(await counts(pool, world.workspaceId), before, 'alias rejection leaves identities and budgets untouched');
 });

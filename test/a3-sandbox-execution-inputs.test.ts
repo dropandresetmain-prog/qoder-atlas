@@ -36,4 +36,6 @@ test('malformed, duplicate, and inferred identity inputs fail before database ac
   assert.throws(() => parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], sourceRef: valid.travellers[0].sourceRef }, { ...valid.travellers[0] }] }), /duplicate traveller/);
   assert.throws(() => parseSandboxExecutionInputs({ ...valid, travellers: [{ sourceRef: valid.travellers[0].sourceRef, bookingIdentity: { contactEmail: 'synthetic@example.test' } }] }), /strict schema/);
   assert.throws(() => parseSandboxExecutionInputs({ ...valid, budgets: [{ ...valid.budgets[0], budget: { ...valid.budgets[0].budget, amount: { amount: 100, currency: 'SGD' } } }] }), /strict schema/);
+  assert.throws(() => parseSandboxExecutionInputs({ ...valid, budgets: [valid.budgets[0], { ...valid.budgets[0], budget: { ...valid.budgets[0].budget, id: '22222222-2222-4222-8222-222222222222' } }] }), /duplicate budget idempotency key/);
+  assert.throws(() => parseSandboxExecutionInputs({ ...valid, budgets: [{ ...valid.budgets[0], budget: { ...valid.budgets[0].budget, validFrom: '2030-01-02T00:00:00Z', validUntil: '2030-01-01T00:00:00Z' } }] }), /validUntil must be after validFrom/);
 });

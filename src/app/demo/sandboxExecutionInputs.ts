@@ -70,9 +70,15 @@ export function parseSandboxExecutionInputs(value: unknown): SandboxExecutionInp
     travellerRefs.add(item.sourceRef);
   }
   const budgetIds = new Set<string>();
+  const budgetIdempotencyKeys = new Set<string>();
   for (const item of parsed.data.budgets) {
     if (budgetIds.has(item.budget.id)) throw new SandboxExecutionInputError('DUPLICATE_INPUT', `duplicate budget id ${item.budget.id}`);
+    if (budgetIdempotencyKeys.has(item.idempotencyKey)) throw new SandboxExecutionInputError('DUPLICATE_INPUT', `duplicate budget idempotency key ${item.idempotencyKey}`);
+    if (item.budget.validFrom && item.budget.validUntil && Date.parse(item.budget.validUntil) <= Date.parse(item.budget.validFrom)) {
+      throw new SandboxExecutionInputError('INVALID_INPUT', `budget ${item.budget.id} validUntil must be after validFrom`);
+    }
     budgetIds.add(item.budget.id);
+    budgetIdempotencyKeys.add(item.idempotencyKey);
   }
   return parsed.data;
 }
@@ -182,6 +188,13 @@ export async function provisionSandboxExecutionInputs(params: SandboxProvisionPa
     ...item,
     travellerId: subjectIdFor(mapping, item.sourceRef, SOURCE_RECORD_TYPES.TRAVELLER, 'TRAVELLER'),
   }));
+  const resolvedTravellerIds = new Set<string>();
+  for (const item of travellerWrites) {
+    if (resolvedTravellerIds.has(item.travellerId)) {
+      throw new SandboxExecutionInputError('DUPLICATE_RESOLVED_TRAVELLER', `multiple source references resolve to traveller ${item.travellerId}`);
+    }
+    resolvedTravellerIds.add(item.travellerId);
+  }
   const budgetWrites = input.budgets.map((item) => ({
     ...item,
     organisationId: subjectIdFor(mapping, item.organisationSourceRef, SOURCE_RECORD_TYPES.ORGANISATION, 'ORGANISATION'),
@@ -244,8 +257,15 @@ export async function provisionSandboxExecutionInputs(params: SandboxProvisionPa
       travellerId: item.item.travellerId,
       ...item.item.bookingIdentity,
     });
-    const check = await params.db.query('SELECT 1 FROM traveller_booking_identities WHERE workspace_id = $1 AND traveller_id = $2', [params.workspaceId, item.item.travellerId]);
-    if (check.rowCount !== 1) throw new SandboxExecutionInputError('WRITE_FAILED', `booking identity was not persisted for ${item.item.sourceRef}`);
+    const check = (await params.db.query<{ gender: 'MALE' | 'FEMALE'; contact_email: string | null; date_of_birth: Date | string | null; nationality: string | null }>(
+      `SELECT gender, contact_email, date_of_birth, nationality
+         FROM traveller_booking_identities WHERE workspace_id = $1 AND traveller_id = $2`,
+      [params.workspaceId, item.item.travellerId],
+    )).rows[0];
+    if (!check || check.gender !== item.item.bookingIdentity.gender || check.contact_email !== item.item.bookingIdentity.contactEmail ||
+      !sameDate(check.date_of_birth, item.item.bookingIdentity.dateOfBirth) || check.nationality !== (item.item.bookingIdentity.nationality ?? null)) {
+      throw new SandboxExecutionInputError('WRITE_FAILED', `persisted booking identity did not match the requested input for ${item.item.sourceRef}`);
+    }
     travellersCreated++;
   }
 
