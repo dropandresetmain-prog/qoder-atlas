@@ -55,6 +55,11 @@ test('importProgrammeBundle rejects an out-of-range item reference with a clear 
   const seed = await beginSeed(pool, 'M10 programme import bad ref');
   await commitSeed(seed);
 
+  const before = await pool.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM organisations WHERE workspace_id = $1',
+    [seed.workspaceId],
+  );
+
   await assert.rejects(
     () => importProgrammeBundle(pool, seed.workspaceId, seed.actorId, {
       organisationLegalName: 'Bad Ref Org',
@@ -65,6 +70,45 @@ test('importProgrammeBundle rejects an out-of-range item reference with a clear 
     }),
     /references item index 5/,
   );
+
+  const after = await pool.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM organisations WHERE workspace_id = $1',
+    [seed.workspaceId],
+  );
+  assert.equal(after.rows[0]!.count, before.rows[0]!.count, 'bundle validation must happen before the first write');
+});
+
+test('importProgrammeBundle retries by stable import key without duplicate rows', async () => {
+  const pool = await sharedTestPool();
+  const seed = await beginSeed(pool, 'M10 programme import retry');
+  await commitSeed(seed);
+
+  const bundle = {
+    importKey: 'retryable-programme-bundle',
+    organisationLegalName: 'Retry Test Org',
+    eventTitle: 'Retry Test Event',
+    programmeTitle: 'Retry Test Programme',
+    items: [{ title: 'Retry Session', itemType: 'SESSION', windowStart: '2031-05-01T09:00:00.000Z', windowEnd: '2031-05-01T10:00:00.000Z' }],
+    travellers: [{ displayName: 'Retry Traveller', participatesInItemIndices: [0], obligation: 'REQUIRED' as const }],
+  };
+
+  const first = await importProgrammeBundle(pool, seed.workspaceId, seed.actorId, bundle);
+  const second = await importProgrammeBundle(pool, seed.workspaceId, seed.actorId, bundle);
+  assert.deepEqual(second, first, 'a retry must replay the same authoritative identifiers');
+
+  const counts = await Promise.all([
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM organisations WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, first.organisationId]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM events WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, first.eventId]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM programmes WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, first.programmeId]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM programme_items WHERE workspace_id = $1 AND id = ANY($2)', [seed.workspaceId, first.itemIds]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM travellers WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, first.travellers[0]!.travellerId]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM trips WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, first.travellers[0]!.tripId]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM journeys WHERE workspace_id = $1 AND id = $2', [seed.workspaceId, first.travellers[0]!.journeyId]),
+    pool.query<{ count: string }>('SELECT count(*)::text AS count FROM participations WHERE workspace_id = $1 AND programme_item_id = ANY($2)', [seed.workspaceId, first.itemIds]),
+  ]);
+  for (const [index, result] of counts.entries()) {
+    assert.equal(result.rows[0]!.count, '1', `replay count ${index}`);
+  }
 });
 
 test('POST /api/v2/programme/import is reachable over HTTP and commits real state', async () => {
