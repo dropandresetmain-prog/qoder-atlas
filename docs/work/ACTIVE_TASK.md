@@ -34,10 +34,11 @@ Active A1 lanes: Luna visual on `codex/astra-a1-visual` and Luna navigation on `
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
-- No new product, PostgreSQL, browser or provider test run yet.
+- A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
+- Primary normal boot/browser baseline: `astra_product`, workspace `9ef64348-61b2-4e18-a291-152502a89a02`, port 4120; REPLAY, Qwen absent, execution absent; 52 PASS / 15 UNKNOWN, visible 52/67. No LIVE/provider calls.
 - New convergence counters: **postgres:fast = 0; CURRENT_TARGET = 0; full canonical PG = 0**.
 - Reused R4 counters: 1/1/1, with focused closures; opaque currentness suite-only failure remains Investigate Now. Do not claim all three broad runs were clean.
-- Node 24.15 available; root dependencies available by normal Node ancestor resolution. Local PG container exists on 55432. Isolated lane databases must be created before writes/tests.
+- Node 24.15 available; root dependencies available by normal Node ancestor resolution. Local PG container on 55432; primary created `astra_product` and lane-only `astra_a1_case`.
 
 ## Current issues
 
@@ -53,6 +54,7 @@ Active A1 lanes: Luna visual on `codex/astra-a1-visual` and Luna navigation on `
 Commit/push the graph projection handoff and A0 receipt; launch Case semantics from it. Integrate visual/navigation lanes after their focused evidence. Physical A1 acceptance remains pending.
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
-Unfinished lane heads: none (read-only investigations only).
+Unfinished lanes: `codex/astra-a1-navigation` at A0; `codex/astra-a1-case-semantics` at 43d78af. Luna is also inspecting Programme/Traveller action seams read-only.
+Browser artifacts: ignored `output/playwright/` screenshots; temporary untracked `.playwright-cli/` snapshots/logs must stay out of commits.
 Evidence not run: all new implementation and physical acceptance gates.
 Continue in this task while checkpoint context is clean; use this ledger plus A0 record for a fresh task if context becomes noisy. Never branch from the preparation pack or merge directly to main.
