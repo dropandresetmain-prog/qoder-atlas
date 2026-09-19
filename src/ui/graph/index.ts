@@ -38,7 +38,7 @@ export interface RenderFocusedCaseGraphInput {
   readonly includeAssets?: boolean;
 }
 
-const VIEW_LABELS = { path: 'Disruption Path', trip: 'Full trip', prog: 'Programme' } as const;
+const VIEW_LABELS = { path: 'Disruption Path', trip: 'Trip Overview', prog: 'Programme' } as const;
 
 function stageHtml(scene: GraphScene): string {
   const paths = scene.edges.map((e) =>

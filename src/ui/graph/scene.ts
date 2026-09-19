@@ -135,11 +135,9 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
   const edges: SceneEdge[] = layout.edges.flatMap((le) => {
     const pe = edgeByKey.get(le.renderKey);
     if (!pe) return [];
-    // An edge with no state of its own shows the state of the dependency it leads to
-    // (display rule only; nothing is inferred beyond the target's own semantic tone).
-    const tone: VisualTone = pe.semanticState === undefined
-      ? (nodeByRef.get(pe.targetRef)?.indicator.tone ?? 'neutral')
-      : pe.indicator.tone;
+    // The semantic adapter maps an omitted edge state to neutral. Keep that
+    // neutral condition intact; a relationship cannot inherit truth from its target.
+    const tone: VisualTone = pe.indicator.tone;
     const pulseSpec = pulseFor(tone);
     const pulse = pulseSpec
       ? { dur: pulseSpec.dur, begin: `-${(stableUnit(le.renderKey) * 2.2).toFixed(2)}s` }
@@ -155,9 +153,12 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
 
   const hasPath = focusedGraph !== undefined && causalRefs.some((r) => nodeByRef.has(r));
   const causalPresent = causalRefs.filter((r) => nodeByRef.has(r));
+  const causalRect = causalPresent.length > 0
+    ? unionRect(nodes.filter((n) => causalSet.has(n.ref)).map(rectOf), 0)
+    : allRect;
   const pathView: SceneView | undefined = hasPath
     ? {
-        rect: allRect,
+        rect: causalRect,
         keepNodes: causalPresent,
         keepEdges: edges.filter((e) => e.focus === 'causal').map((e) => e.key),
       }
