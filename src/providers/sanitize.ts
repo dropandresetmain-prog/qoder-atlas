@@ -44,12 +44,35 @@ function redactSecretSubstrings(raw: unknown, secrets: ReadonlyArray<string>): u
   return JSON.parse(redacted) as unknown;
 }
 
+/**
+ * Passenger identity that provider order payloads (`paxTicketInfos`) echo back. Recordings keep the
+ * shape but never the person: names, birth dates, document and contact values are redacted.
+ */
+const PAX_IDENTITY_KEYS = new Set(['name', 'passengername', 'birthday', 'cardnum', 'cardissueplace', 'cardexpired', 'contactemails', 'contactphones']);
+
+function redactPaxEntry(entry: unknown): unknown {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return redactSensitiveTree(entry);
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(entry as Record<string, unknown>)) {
+    if (PAX_IDENTITY_KEYS.has(key.toLowerCase())) {
+      if (typeof child === 'string' && child.length > 0) out[key] = REDACTED;
+      else if (Array.isArray(child)) out[key] = child.map((item) => (typeof item === 'string' && item.length > 0 ? REDACTED : item));
+      else out[key] = child;
+    } else {
+      out[key] = redactSensitiveTree(child);
+    }
+  }
+  return out;
+}
+
 function redactSensitiveTree(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactSensitiveTree);
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-      if (SENSITIVE_KEY_PATTERN.test(key) && typeof child === 'string' && child.length > 0) {
+      if (key === 'paxTicketInfos' && Array.isArray(child)) {
+        out[key] = child.map(redactPaxEntry);
+      } else if (SENSITIVE_KEY_PATTERN.test(key) && typeof child === 'string' && child.length > 0) {
         out[key] = REDACTED;
       } else {
         out[key] = redactSensitiveTree(child);

@@ -119,6 +119,7 @@
       "test/r3-causal-spine-layout.test.ts",
       "test/r3-import-guard.test.ts",
       "test/r4-offer-execution-boundary.test.ts",
+      "test/r4-existing-order-validation.test.ts",
       "test/r3-transport-research-composition.test.ts",
       "test/r4-capability-composition.test.ts",
       "test/r4-planning-preferences.test.ts",

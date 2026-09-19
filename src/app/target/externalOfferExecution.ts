@@ -45,6 +45,8 @@ import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
+import { validateExistingOrder, type ExpectedOrderTerms } from './existingOrderValidation.ts';
+import type { FlightOrderStatus } from '../../contracts/capabilities.ts';
 
 export const EXTERNAL_OFFER_SELECT_CAPABILITY = 'external:offer.select';
 
@@ -139,6 +141,8 @@ async function loadCandidates(pool: Pool, workspaceId: string): Promise<string[]
 const DEFAULT_POLL = { attempts: 6, delayMs: 1000 };
 const ORDER_REF_PREFIX = 'atlas:order:';
 const CLIENT_REF_PREFIX = 'atlas:clientref:';
+/** A provider order the create pointed at (duplicate detection) that could not be proven to be this intent's: reference kept for humans, NEVER a reconcile key. */
+const DUPLICATE_UNPROVEN_PREFIX = 'atlas:duplicate-unproven:';
 const HOLD_EXPIRY_MARGIN_MS = 60_000;
 
 /** execution_observations.external_record_id is a uuid: the provider order number maps to a stable uuid; the raw ref stays in source_owned_fields + request_ref. */
@@ -156,6 +160,8 @@ export function buildAtlasOfferDispatcher(
   ceiling: { amount: number; currency: string },
   intentId: string,
   counters: { verify: number; create: number; pay: number },
+  /** Approved terms an existing (duplicate) order must match. Absent => a duplicate can never be adopted. */
+  expected?: ExpectedOrderTerms,
 ): ExternalDispatcher {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const poll = deps.ticketingPoll ?? DEFAULT_POLL;
@@ -190,10 +196,29 @@ export function buildAtlasOfferDispatcher(
       if (create.error.category === 'TIMEOUT') return { kind: 'LOST_RESPONSE', requestRef: `${CLIENT_REF_PREFIX}${clientReference}` };
       return { kind: 'FAILURE', error: `order_create_failed:${create.error.category}/${create.error.code}` };
     }
-    const orderRef = create.data.transactionState?.orderRef;
+    let orderRef = create.data.transactionState?.orderRef;
     if (create.data.status === 'FAILED' || !orderRef) return { kind: 'FAILURE', error: create.data.detail ?? 'order_create_refused' };
-    const orderMarker = `${ORDER_REF_PREFIX}${orderRef}`;
     await fault('AFTER_CREATE');
+
+    // 2a. N3: a duplicate-detection hit is a POINTER to some existing order, not proof it is this
+    // intent's. Retrieve it read-only and prove it against the approved terms BEFORE adopting or paying.
+    let payable = create.data.totalPrice;
+    let adoptedState: FlightOrderStatus | undefined;
+    if (create.data.duplicateOfExisting) {
+      const refs = create.data.duplicateOfExisting.orderRefs;
+      const unproven = (why: string): { kind: 'LOST_RESPONSE'; requestRef: string } => ({ kind: 'LOST_RESPONSE', requestRef: `${DUPLICATE_UNPROVEN_PREFIX}${refs.join(',')}:${why}` });
+      if (refs.length !== 1) return unproven('ambiguous_multiple_existing_orders');
+      if (!expected) return unproven('approved_terms_unavailable');
+      const existing = await deps.transactions.retrieveOrder({ orderRef: refs[0]! });
+      if (!existing.ok) return unproven('existing_order_unreadable');
+      const verdict = validateExistingOrder(existing.data, expected);
+      if (verdict.verdict === 'MISMATCH') return { kind: 'FAILURE', error: `duplicate_order_mismatch: existing order ${refs[0]} is not this intent's order (${verdict.reasons.join(',')}); not adopted, not paid` };
+      if (verdict.verdict === 'INSUFFICIENT') return unproven(verdict.reasons.join('+'));
+      orderRef = refs[0]!;
+      adoptedState = verdict.orderStatus;
+      payable = existing.data.totalPrice;
+    }
+    const orderMarker = `${ORDER_REF_PREFIX}${orderRef}`;
 
     // 2b. N1: the provider order now exists. Durably checkpoint its reference onto THIS attempt
     // BEFORE any pay call. If the write does not land we must not pay: the order stays HELD at the
@@ -201,27 +226,29 @@ export function buildAtlasOfferDispatcher(
     if (!(await control.checkpointRequestRef(orderMarker))) return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
     await fault('AFTER_CHECKPOINT');
 
-    // 3. Ceiling gate: only pay a provider-observed payable within the authority-frozen ceiling.
-    let payable = create.data.totalPrice;
-    if (!payable) {
-      const check = await deps.transactions.retrieveOrder({ orderRef, clientReference });
-      if (check.ok && check.data.totalPrice) payable = check.data.totalPrice;
-    }
-    if (!payable) return { kind: 'FAILURE', error: `payable_total_missing: order ${orderRef} remains HELD` };
-    if (payable.currency !== ceiling.currency) return { kind: 'FAILURE', error: `payable_currency_mismatch: order ${orderRef} remains HELD` };
-    if (payable.amount > ceiling.amount) return { kind: 'FAILURE', error: `payable_exceeds_ceiling: order ${orderRef} remains HELD; re-enter authority with the observed price` };
+    // An adopted (proven) existing order that is already beyond HELD needs no payment: observe only.
+    if (adoptedState === undefined || adoptedState === 'HELD') {
+      // 3. Ceiling gate: only pay a provider-observed payable within the authority-frozen ceiling.
+      if (!payable) {
+        const check = await deps.transactions.retrieveOrder({ orderRef, clientReference });
+        if (check.ok && check.data.totalPrice) payable = check.data.totalPrice;
+      }
+      if (!payable) return { kind: 'FAILURE', error: `payable_total_missing: order ${orderRef} remains HELD` };
+      if (payable.currency !== ceiling.currency) return { kind: 'FAILURE', error: `payable_currency_mismatch: order ${orderRef} remains HELD` };
+      if (payable.amount > ceiling.amount) return { kind: 'FAILURE', error: `payable_exceeds_ceiling: order ${orderRef} remains HELD; re-enter authority with the observed price` };
 
-    // 4. Mutation #2: pay the held order with the sandbox test-balance handle.
-    counters.pay += 1;
-    const pay = await deps.transactions.payOrder({
-      orderRef, paymentRef: deps.paymentRef, authorisedAmount: { amount: ceiling.amount, currency: ceiling.currency }, clientReference,
-    });
-    if (!pay.ok) {
-      if (pay.error.category === 'TIMEOUT' || pay.error.code === 'payment_in_progress') return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
-      return { kind: 'FAILURE', error: `order_pay_failed:${pay.error.category}/${pay.error.code}; order ${orderRef} remains HELD` };
+      // 4. Mutation #2: pay the held order with the sandbox test-balance handle.
+      counters.pay += 1;
+      const pay = await deps.transactions.payOrder({
+        orderRef, paymentRef: deps.paymentRef, authorisedAmount: { amount: ceiling.amount, currency: ceiling.currency }, clientReference,
+      });
+      if (!pay.ok) {
+        if (pay.error.category === 'TIMEOUT' || pay.error.code === 'payment_in_progress') return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
+        return { kind: 'FAILURE', error: `order_pay_failed:${pay.error.category}/${pay.error.code}; order ${orderRef} remains HELD` };
+      }
+      if (pay.data.status === 'HELD' || pay.data.status === 'FAILED') return { kind: 'FAILURE', error: `payment_not_accepted; order ${orderRef} remains HELD` };
+      await fault('AFTER_PAY');
     }
-    if (pay.data.status === 'HELD' || pay.data.status === 'FAILED') return { kind: 'FAILURE', error: `payment_not_accepted; order ${orderRef} remains HELD` };
-    await fault('AFTER_PAY');
 
     // 5. Observe (read-only) until ticketed; otherwise the outcome is UNKNOWN, never assumed.
     for (let i = 0; i < poll.attempts; i += 1) {
@@ -239,6 +266,37 @@ export function buildAtlasOfferDispatcher(
       if (i < poll.attempts - 1) await sleep(poll.delayMs);
     }
     return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
+  };
+}
+
+/**
+ * The approved terms an existing order must match, resolved from persisted truth only (binding +
+ * protected identities + place IATA refs/time zones). Undefined when any piece is missing: a
+ * duplicate order then fails closed instead of being adopted.
+ */
+export async function loadExpectedOrderTerms(
+  pool: Pool, workspaceId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, ceiling: { amount: number; currency: string },
+): Promise<ExpectedOrderTerms | undefined> {
+  const b = inputs.binding;
+  const rows = (await pool.query<{ id: string; time_zone: string; code: string }>(
+    `SELECT p.id, p.time_zone, x.external_key AS code
+       FROM places p JOIN place_external_refs x ON x.workspace_id = p.workspace_id AND x.place_id = p.id AND x.provider_namespace = 'IATA'
+      WHERE p.workspace_id = $1 AND p.id = ANY($2::uuid[])`,
+    [workspaceId, [b.itinerary.originPlaceId, b.itinerary.destinationPlaceId]],
+  )).rows;
+  const origin = rows.find((r) => r.id === b.itinerary.originPlaceId);
+  const destination = rows.find((r) => r.id === b.itinerary.destinationPlaceId);
+  if (!origin || !destination) return undefined;
+  return {
+    passengers: inputs.passengers.map((p) => ({
+      givenName: p.givenName, familyName: p.familyName, gender: p.gender,
+      ...(p.dateOfBirth ? { dateOfBirth: p.dateOfBirth } : {}), ...(p.nationality ? { nationality: p.nationality } : {}),
+    })),
+    contactEmail: inputs.contactEmail,
+    origin: { code: origin.code, timeZone: origin.time_zone },
+    destination: { code: destination.code, timeZone: destination.time_zone },
+    departure: b.itinerary.departure, arrival: b.itinerary.arrival,
+    ceiling, quoted: { amount: Number(b.quotedAmount), currency: b.quotedCurrency },
   };
 }
 
@@ -427,7 +485,9 @@ export async function runExternalOfferExecutionPass(ctx: ExternalExecutionContex
     const claim = await worker.claimPrepared(ctx.workspaceId, attemptId);
     if (!claim) { outcome.result = 'DEFERRED'; outcome.detail = 'attempt not claimable'; report.deferred += 1; continue; }
     const counters: ExternalDispatchCounters = { verify: 0, create: 0, pay: 0 };
-    const dispatcher = buildAtlasOfferDispatcher(ctx.external, inputs, { amount: Number(stored.costAmount), currency: stored.costCurrency }, intentId, counters);
+    const ceiling = { amount: Number(stored.costAmount), currency: stored.costCurrency };
+    const expected = await loadExpectedOrderTerms(ctx.pool, ctx.workspaceId, inputs, ceiling);
+    const dispatcher = buildAtlasOfferDispatcher(ctx.external, inputs, ceiling, intentId, counters, expected);
     const dispatched = await worker.dispatchClaimed(claim, {
       principalId: ctx.executorPrincipalId, now, observed: { capabilityKind: 'SERVICE', supported: true } /* external:offer.select maps to SERVICE in externalCapabilityKindFromRef */, dispatcher,
     });

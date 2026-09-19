@@ -27,7 +27,7 @@ import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecu
 import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF } from '../src/providers/atlas/transactionAdapter.ts';
 import { capabilityOk } from '../src/contracts/envelope.ts';
 import type { CapabilityMeta } from '../src/contracts/envelope.ts';
-import type { FlightOrderOutcome, FlightOrderStatus, FlightTransactionCapability } from '../src/contracts/capabilities.ts';
+import type { FlightOrderIdentity, FlightOrderOutcome, FlightOrderStatus, FlightTransactionCapability } from '../src/contracts/capabilities.ts';
 
 after(async () => {
   const pool = await sharedTestPool();
@@ -35,7 +35,9 @@ after(async () => {
 });
 
 /** The provider-side truth that survives a process crash. */
-interface ProviderWorld { orderRef?: string; status: FlightOrderStatus; holdExpiresAt?: string; payable: number; payLandsAs?: FlightOrderStatus }
+interface ProviderWorld { orderRef?: string; status: FlightOrderStatus; holdExpiresAt?: string; payable: number; payLandsAs?: FlightOrderStatus;
+  /** N3: the provider answers create with duplicate detection pointing at this existing order. */
+  duplicateRef?: string; identity?: FlightOrderIdentity }
 
 function scriptedProvider(world: ProviderWorld, faultAt?: DispatchFaultPoint, onFault?: () => Promise<void>, hang = true) {
   const calls = { verify: 0, create: 0, pay: 0, retrieve: 0 };
@@ -47,6 +49,10 @@ function scriptedProvider(world: ProviderWorld, faultAt?: DispatchFaultPoint, on
     descriptor: { family: 'FLIGHT', providerId: 'atlas', mode: 'RECORD', supportedOperations: [], maxSideEffectLevel: 'MONEY_MOVING' },
     async createOrder() {
       calls.create += 1;
+      if (world.duplicateRef) {
+        world.orderRef = world.duplicateRef;
+        return capabilityOk({ status: 'HELD' as const, provenance: 'LIVE' as const, duplicateOfExisting: { orderRefs: [world.duplicateRef] }, transactionState: { orderRef: world.duplicateRef } }, meta());
+      }
       world.orderRef = 'ORDER-1'; world.status = 'HELD';
       return capabilityOk(outcome('HELD'), meta());
     },
@@ -59,6 +65,7 @@ function scriptedProvider(world: ProviderWorld, faultAt?: DispatchFaultPoint, on
       calls.retrieve += 1;
       return capabilityOk({
         orderRef: query.orderRef, status: world.status, provenance: 'LIVE' as const, totalPrice: { amount: world.payable, currency: 'USD' },
+        ...(world.identity ? { identity: world.identity } : {}),
         ...(world.holdExpiresAt ? { transactionState: { orderRef: query.orderRef, holdExpiresAt: world.holdExpiresAt } } : {}),
       }, meta());
     },
@@ -124,6 +131,72 @@ async function assertNeverDispatchEligible(t: Awaited<ReturnType<typeof setup>>)
   assert.equal(await new PgExecutionWorker(t.f.c.pool, { actorId: 'crash-test' }).claimNext(t.f.ws), undefined, 'the generic claimer never reclaims a dispatching attempt');
   assert.deepEqual(idle.calls, { verify: 0, create: 0, pay: 0, retrieve: 0 });
 }
+
+/** YYYYMMDDHHmm wall clock of an instant in an IANA zone (what Atlas reports). */
+function localWall(iso: string, timeZone: string): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    .formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
+  return `${parts['year']}${parts['month']}${parts['day']}${parts['hour']}${parts['minute']}`;
+}
+
+async function duplicateIdentity(t: Awaited<ReturnType<typeof setup>>, over: Partial<FlightOrderIdentity> = {}): Promise<FlightOrderIdentity> {
+  const b = (await t.f.c.pool.query<{ itinerary: { departure: string; arrival: string } }>('SELECT itinerary FROM offer_execution_bindings WHERE workspace_id = $1', [t.f.ws])).rows[0]!.itinerary;
+  return {
+    passengers: [{ familyName: 'CONNECTION', givenName: 'JANE', gender: 'FEMALE', nationality: 'PH' }],
+    contactEmails: ['r4.traveller@example.com'],
+    segments: [{ originCode: 'MNL', destinationCode: 'CEB', departureLocal: localWall(b.departure, 'Asia/Manila'), arrivalLocal: localWall(b.arrival, 'Asia/Manila') }],
+    ...over,
+  };
+}
+
+describe('R4-F2e N3 duplicate detection is a pointer, not proof (real PostgreSQL, real expected-terms loader)', () => {
+  test('exact intended duplicate (proven from persisted binding + identities) is adopted, checkpointed and paid exactly once', async () => {
+    const t = await setup('R4F2e duplicate match');
+    const world: ProviderWorld = { status: 'HELD', payable: t.cost, duplicateRef: 'TESTA-EXISTING', payLandsAs: 'TICKETED' };
+    world.identity = await duplicateIdentity(t);
+    const provider = scriptedProvider(world);
+    const report = await runExternalOfferExecutionPass(t.f.execCtx(provider.deps));
+    assert.equal(report.executed, 1, JSON.stringify(report.outcomes));
+    assert.deepEqual([provider.calls.create, provider.calls.pay], [1, 1]);
+    const [row] = await t.attempt();
+    assert.equal(row!.status, 'OBSERVED_SUCCESS');
+    assert.equal(row!.request_ref, 'atlas:order:TESTA-EXISTING');
+    await t.f.c.app.close();
+  });
+
+  test('a duplicate that is provably NOT this intents order (wrong traveller) is neither adopted nor paid: OBSERVED_FAILURE, no order ref stored', async () => {
+    const t = await setup('R4F2e duplicate mismatch');
+    const world: ProviderWorld = { status: 'HELD', payable: t.cost, duplicateRef: 'TESTA-STRANGER' };
+    world.identity = await duplicateIdentity(t, { passengers: [{ familyName: 'STRANGER', givenName: 'SAM', gender: 'FEMALE' }] });
+    const provider = scriptedProvider(world);
+    const report = await runExternalOfferExecutionPass(t.f.execCtx(provider.deps));
+    assert.equal(report.failed, 1, JSON.stringify(report.outcomes));
+    assert.match(report.outcomes[0]!.detail ?? '', /duplicate_order_mismatch/);
+    assert.equal(provider.calls.pay, 0);
+    const [row] = await t.attempt();
+    assert.equal(row!.status, 'OBSERVED_FAILURE');
+    assert.equal(row!.request_ref, null);
+    await t.f.c.app.close();
+  });
+
+  test('a duplicate whose identity the provider does not expose fails closed: OUTCOME_UNKNOWN for a human, never paid, no reconcile lookup', async () => {
+    const t = await setup('R4F2e duplicate insufficient');
+    const world: ProviderWorld = { status: 'HELD', payable: t.cost, duplicateRef: 'TESTA-OPAQUE' };
+    const provider = scriptedProvider(world);
+    const report = await runExternalOfferExecutionPass(t.f.execCtx(provider.deps));
+    assert.equal(report.unknown, 1, JSON.stringify(report.outcomes));
+    assert.equal(provider.calls.pay, 0);
+    const [row] = await t.attempt();
+    assert.equal(row!.status, 'OUTCOME_UNKNOWN');
+    assert.match(row!.request_ref ?? '', /^atlas:duplicate-unproven:TESTA-OPAQUE:/);
+    const retrievesBefore = provider.calls.retrieve;
+    const swept = await runExternalReconciliation(t.f.execCtx(provider.deps));
+    assert.deepEqual([swept.reconciled, swept.stillUnknown], [0, 1]);
+    assert.equal(provider.calls.retrieve, retrievesBefore, 'an unproven pointer is never a reconcile key');
+    assert.equal(provider.calls.pay, 0);
+    await t.f.c.app.close();
+  });
+});
 
 describe('R4-F2d N1 crash recovery of the external Atlas execution path (real PostgreSQL)', () => {
   test('A: crash after the create response, BEFORE the orderRef checkpoint => no reference on disk => OUTCOME_UNKNOWN for a human; zero provider calls on restart; never redispatched', async () => {
