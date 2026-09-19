@@ -103,9 +103,12 @@ export async function importProgrammeBundle(
   bundleInput: unknown,
 ): Promise<ProgrammeImportResult> {
   const bundle = ProgrammeImportBundleSchema.parse(bundleInput);
+  // Stable replay identity is workspace-scoped. The same bundle or import key
+  // may legitimately be admitted into two workspaces, but those imports are
+  // separate aggregate roots and must not mint the same cross-workspace IDs.
   const importIdentity = bundle.importKey
-    ? canonicalPayloadHash({ importKey: bundle.importKey })
-    : canonicalPayloadHash(bundle);
+    ? canonicalPayloadHash({ workspaceId, importKey: bundle.importKey })
+    : canonicalPayloadHash({ workspaceId, bundle });
   const importContentHash = canonicalPayloadHash(bundle);
   const commandKey = (step: string) => `programme-import:${importIdentity}:${step}`;
   const organisationId = stableUuid(`${importIdentity}:organisation`);
