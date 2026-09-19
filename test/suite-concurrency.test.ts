@@ -14,11 +14,13 @@ test('CURRENT suite concurrency is bounded at 4', () => {
   assert.equal(resolveTestConcurrencyArg('current'), '--test-concurrency=4');
 });
 
-test('PostgreSQL, migration and legacy suites stay serial', () => {
+test('PostgreSQL, fast PostgreSQL, migration and legacy suites stay serial', () => {
   assert.equal(suiteTestConcurrency('postgres'), 1);
+  assert.equal(suiteTestConcurrency('postgresFast'), 1);
   assert.equal(suiteTestConcurrency('migration'), 1);
   assert.equal(suiteTestConcurrency('legacy'), 1);
   assert.equal(resolveTestConcurrencyArg('postgres'), '--test-concurrency=1');
+  assert.equal(resolveTestConcurrencyArg('postgresFast'), '--test-concurrency=1');
   assert.equal(resolveTestConcurrencyArg('migration'), '--test-concurrency=1');
   assert.equal(resolveTestConcurrencyArg('legacy'), '--test-concurrency=1');
 });

@@ -25,7 +25,8 @@
     "gate:anti-hardcoding": "node scripts/anti-hardcoding-gate.mjs",
     "db:postgres:up": "docker compose -f docker-compose.postgres-test.yml up -d --wait",
     "db:postgres:down": "docker compose -f docker-compose.postgres-test.yml down -v",
-    "test:postgres": "node scripts/run-suite.mjs postgres"
+    "test:postgres": "node scripts/run-suite.mjs postgres",
+    "test:postgres:fast": "node scripts/run-suite.mjs postgresFast"
   },
   "dependencies": {
     "pg": "^8.23.0",

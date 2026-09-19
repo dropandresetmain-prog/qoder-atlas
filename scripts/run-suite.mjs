@@ -11,7 +11,7 @@
  * runner. Do not treat raw `node --test` as the suite command: without the
  * manifest it can discover PostgreSQL, migration and historical files together.
  *
- * Usage: node scripts/run-suite.mjs <current|postgres|migration|legacy> [--list] [extra node --test args]
+ * Usage: node scripts/run-suite.mjs <current|postgres|postgresFast|migration|legacy> [--list] [extra node --test args]
  */
 
 import { readFileSync } from 'node:fs';
