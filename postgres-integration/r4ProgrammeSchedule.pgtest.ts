@@ -12,6 +12,7 @@ import { persistStrategyChangeRow } from './m8ExecutionGateHelpers.ts';
 import { ActivityCursorError, loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from '../src/app/target/readmodels/pgShellFacts.ts';
 import { renderProductActivityFeed } from '../src/ui/screens/product-activity-feed.ts';
 import { issueAuthorityDecision, persistActionPlan, recordApproval, revokeApproval } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
+import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import type { ActionPlan } from '../src/contracts/v2/action/actionPlan.ts';
 import { DecisionQueueSchema } from '../src/contracts/v2/product/readModels.ts';
 
@@ -97,9 +98,20 @@ test('Decision history reads approvals and revocations through their case plan w
     approvedAt: '2031-09-15T08:00:00.000Z',
   });
   assert.equal(approval.ok, true, JSON.stringify(approval));
-  const revoked = await revokeApproval(c.app.unitOfWork(), {
+  const revokerId = randomUUID();
+  const revoker = await createPrincipal(c.app.unitOfWork(), {
     workspaceId: c.world.workspaceId,
     actorPrincipalId: c.operatorPrincipalId,
+    idempotencyKey: randomUUID(),
+    principalId: revokerId,
+    actorType: 'SERVICE',
+    authIssuer: 'urn:test:decision-history',
+    authSubject: revokerId,
+  });
+  assert.equal(revoker.ok, true, JSON.stringify(revoker));
+  const revoked = await revokeApproval(c.app.unitOfWork(), {
+    workspaceId: c.world.workspaceId,
+    actorPrincipalId: revokerId,
     idempotencyKey: randomUUID(),
     approvalId: approval.value.approvalId,
     revokedAt: '2031-09-15T09:00:00.000Z',
@@ -111,8 +123,9 @@ test('Decision history reads approvals and revocations through their case plan w
   assert.equal(queue.decisions.find((row) => row.caseRef === c.caseId)?.awaitingAuthority, false, 'history must not turn an open case into a waiting decision');
   assert.deepEqual(queue.recentDecisions?.map((row) => row.kind), ['revocation', 'approval']);
   assert.ok(queue.recentDecisions?.every((row) => row.caseRef === c.caseId));
-  assert.ok(queue.recentDecisions?.every((row) => row.actorLabel === 'Organiser'));
-  assert.ok(queue.recentDecisions?.every((row) => row.label.includes('Participant')));
+  assert.deepEqual(queue.recentDecisions?.map((row) => row.actorLabel), ['Reviewer', 'Person']);
+  assert.deepEqual(queue.recentDecisions?.map((row) => row.label), ['Programme time change', 'Programme time change']);
+  assert.ok(queue.recentDecisions?.every((row) => !row.label.includes('Participant')));
   assert.ok(queue.recentDecisions?.every((row) => !row.actorLabel.includes(c.operatorPrincipalId)));
 });
 

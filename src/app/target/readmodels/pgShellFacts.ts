@@ -143,18 +143,14 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
       capability_ref: string;
       decision_at: Date;
       decision_kind: 'approval' | 'revocation';
-      actor_role: string;
-      required_party_kind: string | null;
-      organisation_label: string | null;
-      traveller_label: string | null;
+      actor_principal_id: string;
+      actor_label: string | null;
     }>(
       `WITH decision_events AS (
          SELECT a.id AS event_id, ap.recovery_case_id AS case_id,
                 ai.operation_namespace, ai.capability_ref,
                 a.approved_at AS decision_at, 'approval'::text AS decision_kind,
-                ar.actor_role, ar.required_party_kind,
-                COALESCE(org.display_name, org.legal_name) AS organisation_label,
-                tn.display_value AS traveller_label
+                a.approver_principal_id AS actor_principal_id
            FROM approvals a
            JOIN authority_decisions ad
              ON ad.workspace_id = a.workspace_id AND ad.id = a.decision_id
@@ -162,31 +158,12 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
              ON ap.workspace_id = ad.workspace_id AND ap.id = ad.action_plan_id
            JOIN action_intents ai
              ON ai.workspace_id = ad.workspace_id AND ai.id = ad.action_intent_id
-           JOIN approval_requirements ar
-             ON ar.workspace_id = a.workspace_id AND ar.id = a.requirement_id
-           LEFT JOIN organisations org
-             ON org.workspace_id = ar.workspace_id
-            AND ar.required_party_kind = 'ORGANISATION'
-            AND org.id = ar.required_party_id
-           LEFT JOIN LATERAL (
-             SELECT tn.display_value
-               FROM case_subjects cs
-               JOIN journeys j ON j.workspace_id = cs.workspace_id AND j.id = cs.subject_id
-               JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
-               JOIN traveller_names tn ON tn.workspace_id = t.workspace_id AND tn.id = t.display_name_ref
-              WHERE cs.workspace_id = ap.workspace_id AND cs.recovery_case_id = ap.recovery_case_id
-                AND cs.subject_kind = 'JOURNEY'
-              ORDER BY cs.subject_id
-              LIMIT 1
-           ) tn ON true
           WHERE a.workspace_id = $1
          UNION ALL
          SELECT r.id AS event_id, ap.recovery_case_id AS case_id,
                 ai.operation_namespace, ai.capability_ref,
                 r.revoked_at AS decision_at, 'revocation'::text AS decision_kind,
-                ar.actor_role, ar.required_party_kind,
-                COALESCE(org.display_name, org.legal_name) AS organisation_label,
-                tn.display_value AS traveller_label
+                r.revoked_by_principal_id AS actor_principal_id
            FROM approval_revocations r
            JOIN approvals a
              ON a.workspace_id = r.workspace_id AND a.id = r.approval_id
@@ -196,46 +173,56 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
              ON ap.workspace_id = ad.workspace_id AND ap.id = ad.action_plan_id
            JOIN action_intents ai
              ON ai.workspace_id = ad.workspace_id AND ai.id = ad.action_intent_id
-           JOIN approval_requirements ar
-             ON ar.workspace_id = a.workspace_id AND ar.id = a.requirement_id
-           LEFT JOIN organisations org
-             ON org.workspace_id = ar.workspace_id
-            AND ar.required_party_kind = 'ORGANISATION'
-            AND org.id = ar.required_party_id
-           LEFT JOIN LATERAL (
-             SELECT tn.display_value
-               FROM case_subjects cs
-               JOIN journeys j ON j.workspace_id = cs.workspace_id AND j.id = cs.subject_id
-               JOIN travellers t ON t.workspace_id = j.workspace_id AND t.id = j.traveller_id
-               JOIN traveller_names tn ON tn.workspace_id = t.workspace_id AND tn.id = t.display_name_ref
-              WHERE cs.workspace_id = ap.workspace_id AND cs.recovery_case_id = ap.recovery_case_id
-                AND cs.subject_kind = 'JOURNEY'
-              ORDER BY cs.subject_id
-              LIMIT 1
-           ) tn ON true
           WHERE r.workspace_id = $1
        )
-       SELECT event_id, case_id, operation_namespace, capability_ref, decision_at,
-              decision_kind, actor_role, required_party_kind, organisation_label,
-              traveller_label
-         FROM decision_events
+       SELECT de.event_id, de.case_id, de.operation_namespace, de.capability_ref,
+              de.decision_at, de.decision_kind, de.actor_principal_id,
+              actor.actor_label
+         FROM decision_events de
+         LEFT JOIN LATERAL (
+           SELECT CASE
+                    WHEN grant_party.represented_party_kind = 'ORGANISATION'
+                         AND COALESCE(org.display_name, org.legal_name) IS NOT NULL
+                      THEN COALESCE(org.display_name, org.legal_name)
+                    WHEN p.actor_type = 'HUMAN' THEN 'Person'
+                    ELSE 'Reviewer'
+                  END AS actor_label
+             FROM principals p
+             LEFT JOIN LATERAL (
+               SELECT g.represented_party_kind, g.represented_party_id
+                 FROM authority_grants g
+                WHERE g.workspace_id = $1
+                  AND g.principal_id = de.actor_principal_id
+                  AND g.issued_at <= de.decision_at
+                  AND (g.revoked_at IS NULL OR g.revoked_at >= de.decision_at)
+                  AND (g.expires_at IS NULL OR g.expires_at > de.decision_at)
+                ORDER BY g.issued_at DESC, g.id DESC
+                LIMIT 1
+             ) grant_party ON true
+             LEFT JOIN organisations org
+               ON org.workspace_id = $1
+              AND grant_party.represented_party_kind = 'ORGANISATION'
+              AND org.id = grant_party.represented_party_id
+            WHERE p.workspace_id = $1 AND p.id = de.actor_principal_id
+            LIMIT 1
+         ) actor ON true
         ORDER BY decision_at DESC, event_id DESC
         LIMIT 20`,
       [workspaceId],
     );
-    const actorLabel = (row: { actor_role: string; required_party_kind: string | null; organisation_label: string | null }): string => {
-      if (row.required_party_kind === 'TRAVELLER' || /traveller/i.test(row.actor_role)) return 'Traveller';
-      if (row.organisation_label) return row.organisation_label;
-      return 'Organiser';
+    const operationLabels: Record<string, string> = {
+      'internal.programme': 'Programme time change',
+      'internal.reservation': 'Reservation change',
+      'internal.journey': 'Journey change',
+      'internal.support': 'Traveller support change',
+      'internal.objective': 'Programme objective change',
+      'provider.flight': 'Flight booking',
+      'provider.offer': 'Flight booking',
+      'provider.hotel': 'Hotel booking',
+      'provider.transfer': 'Transfer booking',
     };
-    const operationLabel = (row: { operation_namespace: string; capability_ref: string; traveller_label: string | null }): string => {
-      const operation = (row.operation_namespace || row.capability_ref)
-        .replace(/[_:.-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const humanOperation = operation ? `${operation[0]!.toUpperCase()}${operation.slice(1)}` : 'Recovery action';
-      return row.traveller_label ? `${row.traveller_label} · ${humanOperation}` : humanOperation;
-    };
+    const operationLabel = (row: { operation_namespace: string; capability_ref: string }): string =>
+      operationLabels[row.operation_namespace] ?? operationLabels[row.capability_ref] ?? 'Recovery action';
     return {
       generatedAt: new Date().toISOString(),
       decisions: rows.rows.map((row) => ({
@@ -252,7 +239,7 @@ export async function loadDecisionQueue(pool: Pool, workspaceId: string): Promis
               caseRef: row.case_id,
               label: operationLabel(row),
               decisionAt: row.decision_at.toISOString(),
-              actorLabel: actorLabel(row),
+              actorLabel: row.actor_label ?? 'Reviewer',
               kind: row.decision_kind,
             })),
           }
