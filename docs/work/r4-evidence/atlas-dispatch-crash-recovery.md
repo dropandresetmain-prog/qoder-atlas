@@ -30,3 +30,6 @@ Pending canonical updates are reported in `ExternalExecutionReport.canonicalPend
 ## Remaining gaps
 * A crash between the provider accepting `order.do` and the checkpoint (fault point A) leaves no reference: Atlas has no lookup by client reference (see `atlas-create-idempotency-decision.md`), so a human must find the order at the provider. The order is an unpaid hold and lapses on its own.
 * A live dispatcher slower than the lease (60 s, refreshed at the checkpoint) could be swept; its later writes are fenced and it can no longer pay, so the failure mode is "unknown", never a double action.
+
+## Real sandbox evidence (RECORD, `R4_ATLAS_SANDBOX=1 R4_ATLAS_DAY_OFFSET=66 node --test postgres-integration/r4AtlasSandboxLive.pgtest.ts`, 1/1 pass, 88 s)
+With the checkpoint in place: search -> verify -> real `order.do` (order `TESTA20260919234948196`, USD, quote 37.49) -> attempt durably carried `request_ref = atlas:order:TESTA20260919234948196` -> real `pay.do` -> ticketing asynchronous => `OUTCOME_UNKNOWN` with the reference -> 6 read-only reconciliation lookups (still PAID/ticketing) -> provider TICKETED -> `OBSERVED_SUCCESS` + canonical update -> reassessed PASS -> case RESOLVED. Exactly one order and one payment. Five sanitized recordings added (passenger identity redacted by the new sanitizer rule; no e-mails, names or credentials).

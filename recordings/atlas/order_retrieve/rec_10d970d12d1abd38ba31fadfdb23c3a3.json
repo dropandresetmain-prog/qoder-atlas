@@ -1,0 +1,63 @@
+{
+  "id": "rec_10d970d12d1abd38ba31fadfdb23c3a3",
+  "providerId": "atlas",
+  "operation": "order_retrieve",
+  "recordedAt": "2026-09-19T15:51:08.355Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "orderNo": "TESTA20260919234948196",
+    "orderStatus": "2",
+    "ticketStatus": "1",
+    "totalPrice": 37.49,
+    "currency": "USD",
+    "payTime": "2026-09-19 23:49:49",
+    "tktLimitTime": "2026-09-20 01:09:54",
+    "pnrCode": "JQBLZ5",
+    "paxTicketInfos": [
+      {
+        "ticketNos": [
+          "S36217"
+        ],
+        "name": "[REDACTED]",
+        "gender": "F",
+        "birthday": "",
+        "nationality": "PH",
+        "contactEmails": [
+          "[REDACTED]"
+        ]
+      }
+    ],
+    "routing": {
+      "fromSegments": [
+        {
+          "carrier": "Z2",
+          "flightNumber": "Z2781",
+          "depAirport": "MNL",
+          "depTime": "202611240835",
+          "arrAirport": "CEB",
+          "arrTime": "202611241005"
+        }
+      ],
+      "retSegments": []
+    },
+    "airlineBookings": [
+      {
+        "airlinePnr": "S36217",
+        "airlineCode": "Z2",
+        "airlineName": "AirAsia Philippines",
+        "airlineWebSiteAddress": "https://www.airasia.com",
+        "mmbEmail": "[REDACTED]",
+        "tailDigitsOfPaymentCard": null,
+        "extras": [
+          {
+            "name": "email",
+            "remark": "email",
+            "value": "[REDACTED]"
+          }
+        ]
+      }
+    ]
+  }
+}

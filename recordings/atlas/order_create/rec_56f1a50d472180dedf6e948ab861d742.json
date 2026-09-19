@@ -1,0 +1,44 @@
+{
+  "id": "rec_56f1a50d472180dedf6e948ab861d742",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-09-19T15:49:48.206Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "1ad3c5c0-039d-48bb-9b97-f2bed56f0d9a",
+    "orderNo": "TESTA20260919234948196",
+    "pnrCode": "JQBLZ5",
+    "totalPrice": 37.49,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-09-20 00:19:48",
+    "paxTicketInfos": [
+      {
+        "ticketNos": [],
+        "name": "[REDACTED]",
+        "gender": "F",
+        "birthday": "",
+        "nationality": "PH",
+        "contactEmails": [
+          "[REDACTED]"
+        ]
+      }
+    ],
+    "routing": {
+      "fromSegments": [
+        {
+          "carrier": "Z2",
+          "flightNumber": "Z2781",
+          "depAirport": "MNL",
+          "depTime": "202611240835",
+          "arrAirport": "CEB",
+          "arrTime": "202611241005"
+        }
+      ],
+      "retSegments": []
+    },
+    "duplicateOrders": null
+  }
+}
