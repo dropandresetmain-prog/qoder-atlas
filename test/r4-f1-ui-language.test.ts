@@ -251,6 +251,81 @@ describe('R4-F2 execution blocker: a blocked option is never offered as approvab
   });
 });
 
+describe('R4 transport option cards: leg label and strategy-scoped cost', () => {
+  const itemRef = 'JOURNEY_ITEM:00000000-0000-4000-8000-000000000001';
+  const transportStrategy = (n: number): RecoveryStrategyView => ({
+    strategyRef: `transport-${n}`,
+    version: n,
+    viability: 'VIABLE',
+    status: 'EVALUATED',
+    optionNumber: n,
+    changes: [{ effectKind: 'SELECT_OFFER', subjectRef: itemRef, subjectLabel: itemRef }],
+    resolves: [{ subjectRef: 'JOURNEY:j1', personLabel: 'Sarah Lim', currentVerdict: 'FAIL', projectedVerdict: 'PASS' }],
+    projectedSummary: { total: 1, pass: 1, fail: 0, unknown: 0 },
+    projectedPeople: [],
+  } as RecoveryStrategyView);
+
+  test('SELECT_OFFER uses disrupted transport on the case graph instead of generic rebook copy', () => {
+    const ldgWithLeg = {
+      ...ldg,
+      nodes: [{
+        ref: 'SERVICE_BOOKING:s1',
+        kind: 'SERVICE_BOOKING' as const,
+        label: 'FLIGHT Z2',
+        semanticState: 'FAILED' as const,
+        authority: 'AUTHORITATIVE' as const,
+        detail: 'Manila → Cebu',
+      }],
+    };
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      strategies: [transportStrategy(1)],
+      ldg: ldgWithLeg,
+    } as Partial<RecoveryCaseView>));
+    const option = model.recommended!;
+    assert.match(option.title, /Replace travel \(FLIGHT Z2 · Manila → Cebu\)/);
+    assert.match(option.changes[0]!.phrase!, /Book replacement travel \(FLIGHT Z2 · Manila → Cebu\)/);
+    assert.ok(!option.title.includes('replacement service'));
+  });
+
+  test('strategy cost comes from matching recovery actions, not case-wide aggregate, when several options exist', () => {
+    const itemA = 'JOURNEY_ITEM:00000000-0000-4000-8000-000000000001';
+    const itemB = 'JOURNEY_ITEM:00000000-0000-4000-8000-000000000002';
+    const stratA = { ...transportStrategy(1), strategyRef: 'transport-a', changes: [{ effectKind: 'SELECT_OFFER', subjectRef: itemA, subjectLabel: itemA }] } as RecoveryStrategyView;
+    const stratB = { ...transportStrategy(2), strategyRef: 'transport-b', changes: [{ effectKind: 'SELECT_OFFER', subjectRef: itemB, subjectLabel: itemB }] } as RecoveryStrategyView;
+    const actionCost = { amount: '20.95', currency: 'USD' as const };
+    const model = presentCaseWorkspace(caseView({
+      status: 'AWAITING_AUTHORITY',
+      strategies: [stratA, stratB],
+      aggregateRecoveryCost: { amount: '999.00', currency: 'USD' },
+      recoveryActions: [{
+        actionRef: 'a1',
+        domain: 'travel',
+        capability: 'external:offer.select',
+        subjectRefs: [itemA, 'OFFER:offer-a'],
+        cost: actionCost,
+        authorityState: 'awaiting',
+        dependencyOrder: 0,
+        executionState: 'PENDING',
+      }],
+      ldg: {
+        ...ldg,
+        nodes: [{
+          ref: 'SERVICE_BOOKING:s1',
+          kind: 'SERVICE_BOOKING' as const,
+          label: 'FLIGHT Z2',
+          semanticState: 'FAILED' as const,
+          authority: 'AUTHORITATIVE' as const,
+        }],
+      },
+    } as Partial<RecoveryCaseView>));
+    const priced = [model.recommended, ...model.alternatives].find((o) => o!.strategyRef === 'transport-a')!;
+    const other = [model.recommended, ...model.alternatives].find((o) => o!.strategyRef === 'transport-b')!;
+    assert.equal(priced.costLine, 'Added cost: US$20.95');
+    assert.equal(other.costLine, undefined);
+  });
+});
+
 describe('R4 acceptance: a blocked option is never headlined over an executable one', () => {
   const blockedOf = (n: number): RecoveryStrategyView => ({ ...strategy(n, n, '05:00', 'p'), executionBlocker: { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: 'PASSENGER_NAME_MISSING: traveller x has no structured given/family name' } } as RecoveryStrategyView);
   test('the executable option is recommended and the blocked one carries a plain, specific reason', () => {

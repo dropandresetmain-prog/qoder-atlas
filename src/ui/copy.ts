@@ -500,7 +500,7 @@ export const CASE_TOOL_FALLBACK = { checking: 'Researching options', unavailable
 /** Recovery effects -> plain phrasing. `{subject}` is the item's own title. */
 export const CASE_EFFECT_PHRASE: Record<string, { title: string; generic: string }> = {
   CHANGE_PROGRAMME_ITEM_TIME: { title: 'Move {subject}', generic: 'Change a programme time' },
-  SELECT_OFFER: { title: 'Rebook {subject}', generic: 'Rebook onto a replacement service' },
+  SELECT_OFFER: { title: 'Rebook {subject}', generic: 'Book a replacement flight' },
   PROPOSE_ALLOCATION: { title: 'Reserve space for {subject}', generic: 'Reserve a place on a replacement booking' },
   ALTER_JOURNEY_ITEM_INTENT: { title: 'Adjust {subject}', generic: 'Adjust part of the journey' },
   CHANGE_SUPPORT_ASSIGNMENT: { title: 'Reassign {subject}', generic: 'Reassign support cover' },

@@ -7,28 +7,24 @@
 
 ---
 
-## HANDOFF STATE (2026-09-20, primary paused by user request)
+## HANDOFF STATE (2026-09-20, primary continuing — physical Sarah programme GREEN)
 
-**Branch:** `integration/r4-final-acceptance` (pushed). Merged: F0 PG-perf, F1 UI language/overlay/dup-cards, F3 baseline/pool/reset, F2 Atlas exec, F2 safety N1-N4 (`r4f/safety-n1-n4`), stale tests (`r4f/stale-tests`), F4a presenter fix `85aaeba`.
-**Broad-run counters:** postgres:fast = **0**; CURRENT_TARGET = **0**; full canonical PG = **0**. DO NOT run them until the items below are closed.
+**Branch:** `integration/r4-final-acceptance`. Merged: F0 PG-perf, F1 UI language/overlay/dup-cards, F3 baseline/pool/reset, F2 Atlas exec, F2 safety N1-N4, stale tests, F4a presenter `85aaeba`, transport-card presentation fix (this continuation).
+**Broad-run counters:** postgres:fast = **0**; CURRENT_TARGET = **0**; full canonical PG = **0**. Run only after findings closed (now closed/parked — see `docs/work/r4-evidence/open-findings-dispositions.md`).
 
-**Physical evidence so far (local app on port 4110, DB `r4final` on docker PG 55432, ADAPTER_MODE=LIVE, Qwen LIVE, Atlas LIVE research + sandbox execution composed):**
-- Boot baseline clean: 52 PASS / 0 FAIL / 15 UNKNOWN. UI Reset: overlay shown, ~74 s, clean baseline again.
-- Apply control hit-test OK; Sarah becomes Needs attention (51/67), 67 participants listed, plain copy; Case page has no jargon leaks.
-- TRANSPORT SANDBOX PROVEN IN BROWSER: after recording Sarah legal name + booking identity + USD 5000 budget via existing commands (local DB only), replan yielded 12 executable LIVE-bound SELECT_OFFER options; UI approve (HTTP 200) -> exactly one execution_attempt -> DISPATCHING with order ref checkpointed -> RECONCILIATION_REQUIRED (ticketing lag, last_error lost_response) -> read-only reconcile -> OBSERVED_SUCCESS -> case RESOLVED (trip PASS), attempt count stayed 1. Screenshots: `docs/work/r4-evidence/shots/` (untracked, not committed).
-- **NOT PROVEN:** Sarah programme-path (Reset -> disrupt -> Recover programme move -> RESOLVED -> Overview Confirmed). My last driver script clicked the wrong element (`getByRole('button',{name:/Recover/}).first()` matched the graph node "RECOVERY PROPOSAL / CASE"); case `3a1e3b04-4bf3-5add-9a48-30f0e255df50` is still AWAITING_AUTHORITY with the executable programme move now RECOMMENDED. Redo by clicking the button named exactly `Recover Sarah's trip` (data-action recover). Also verify the Original/Current toggle (my selector failed -> check the real control), and graph camera stability across a poll (my selector returned n/a, so unproven).
+**Physical evidence (port 4110, DB `r4final`, ADAPTER_MODE=LIVE, Qwen LIVE, Atlas LIVE research + sandbox execution):**
+- Reset: overlay shown, **~78–85 s**, baseline **52/67**.
+- Apply (expand Simulated airline update `<details>` first — intentional): Sarah Needs attention (**51/67**), 67 listed, plain copy; Qwen LIVE domain suggestion in boot log.
+- **Sarah PROGRAMME path PROVEN:** case `521d1e3b-0c22-5bf6-87ad-6255c1aa0eb0`; recommended Move Headline Interview…; exact button `Recover Sarah’s trip` (`data-action=recover` + `data-test=approve-strategy`, filtered by label — never `/Recover/` first()); two EXECUTED intents; RESOLVE → RESOLVED (CURRENT+PASS); Overview **52/67**, Nobody needs attention, Sarah Viable/Confirmed. Shots `40–45` under `docs/work/r4-evidence/shots/` (untracked).
+- **Original/Current toggle PROVEN:** `[data-oc-view=original|current]` / `[data-test=original-current-toggle]`; Original panel visible.
+- **Graph camera PROVEN stable across poll:** pan transform unchanged after 6.5 s poll (`matrix(1.36705…)` identical).
+- TRANSPORT SANDBOX still proven (prior handoff): identities+budget via commands → SELECT_OFFER approve → durable attempt → checkpoint → reconcile → OBSERVED_SUCCESS; attempt count 1.
 
-**Open findings (unfixed):**
-1. Demo dataset ships no legal given names, booking identities (gender/DOB/email) or organiser travel budget -> costed transport options are truthfully blocked (BLOCKER codes EXECUTION_INPUTS_UNAVAILABLE / BUDGET_UNAVAILABLE). Decide: add synthetic identities+budget to the dataset (changes content hash -> fresh DB) or Park with an operator entry surface.
-2. Replan loop: after a plan exists, case progression repeatedly attempts REPLAN and logs `PLAN_PERSIST_FAILED: SERIALIZATION_RETRY_EXHAUSTED` (seen in case 98fd643c after adding a budget). Investigate whether it recurs in the normal Sarah flow; strategies doubled 8 -> 16.
-3. Transport option card reads only "Rebook onto a replacement service" (no flight/time/price) and approval panel shows no cost. UX gap for an organiser approving spend.
-4. Post-recovery graph still shows the service node "Unknown / unconfirmed"; Overview recovered row keeps the "booked service was cancelled…" change text; "Back to Overview" lands on `/api/v2/operator/overview?format=html`.
-5. Independent review non-blocking items open: none of N1/N3/N4/N2 remain (closed in F2d-g), N5 (raw PII in traveller_booking_identities, no correction API), N6 float ceiling compare, N7 missing FK are Park.
-6. Screenshot/evidence dir `docs/work/r4-evidence/shots/` is untracked; decide whether to commit a few.
+**Findings dispositions:** see `docs/work/r4-evidence/open-findings-dispositions.md` — dataset PARK; replan PARK (not reproduced); transport card FIXED; minor UI PARK/Accept; N5–N7 remain Park.
 
-**Remaining gates (in order):** finish Sarah programme run + camera/toggle checks -> `postgres:fast` ONCE -> CURRENT_TARGET ONCE -> lint/typecheck/boundary/anti-hardcoding/jargon gates -> full canonical PG ONCE on a fresh DB. Final line must be `R4 ACCEPTED — SARAH LIVE VERTICAL + PRODUCT PARITY READY` or `R4 NOT ACCEPTED — <blocker>`.
+**Remaining gates (in order):** `postgres:fast` ONCE → CURRENT_TARGET ONCE → lint/typecheck/boundary/anti-hardcoding/jargon → full canonical PG ONCE on fresh suite fixture.
 
-**Env notes:** `.env.local` was copied into `.worktrees/r4-final` (gitignored, never commit). Restart app: `cd .worktrees/r4-final && PG_TARGET_DATABASE=r4final HTTP_PORT=4110 ADAPTER_MODE=LIVE node src/main.ts`. Playwright is in node_modules; the Browser MCP pane renders unreliably here. Agent worktrees `.worktrees/r4-f1`, `r4-f2`, `r4-f3`, `r4-safety`, `r4-stale` and scratch DBs r4f1/r4f3/r4f3b/r4prefs may be deleted after merge. Sandbox residue: ~6 unpaid HELD probe orders (lapse on their own) plus one real paid sandbox order from the transport run.
+**Env notes:** `.env.local` in worktree (gitignored). App: `PG_TARGET_DATABASE=r4final HTTP_PORT=4110 ADAPTER_MODE=LIVE node src/main.ts`.
 
 ---
 

@@ -182,6 +182,55 @@ function subjectNoun(ref: string): string {
   return CASE_SUBJECT_KIND_NOUN[kindOf(ref)] ?? 'part of the trip';
 }
 
+/** Disrupted authoritative transport bookings visible on the case graph (not proposed offers). */
+function disruptedTransportLegs(view: RecoveryCaseView): readonly { label: string; detail?: string }[] {
+  const legs: { label: string; detail?: string }[] = [];
+  for (const node of view.ldg.nodes) {
+    if (node.kind !== 'SERVICE_BOOKING') continue;
+    if (node.semanticState !== 'FAILED' && node.semanticState !== 'AFFECTED' && node.semanticState !== 'CHANGED') continue;
+    const label = plain(node.label);
+    if (!label) continue;
+    const detail = plain(node.detail);
+    legs.push(detail ? { label, detail } : { label });
+  }
+  return legs;
+}
+
+/**
+ * Best-effort human label for a SELECT_OFFER on a journey item. The persisted
+ * change carries no offer itinerary — only a typed JOURNEY_ITEM ref — so we
+ * reuse the disrupted leg the case graph already shows.
+ */
+function selectOfferTransportLeg(
+  view: RecoveryCaseView,
+  change: RecoveryStrategyView['changes'][number],
+): string | undefined {
+  const legs = disruptedTransportLegs(view);
+  if (legs.length === 0) return undefined;
+  if (legs.length === 1) {
+    const leg = legs[0]!;
+    return leg.detail ? `${leg.label} · ${leg.detail}` : leg.label;
+  }
+  const routes = [...new Set(legs.map((l) => l.detail ?? l.label).filter((r): r is string => r !== undefined))];
+  if (routes.length === 1) return routes[0];
+  return undefined;
+}
+
+function changeSubjectLabel(
+  view: RecoveryCaseView,
+  change: RecoveryStrategyView['changes'][number],
+): string {
+  const direct = plain(change.subjectLabel);
+  if (direct && direct !== change.subjectRef) return direct;
+  const mapped = plain(view.subjectLabels[change.subjectRef]);
+  if (mapped) return mapped;
+  if (change.effectKind === 'SELECT_OFFER') {
+    const leg = selectOfferTransportLeg(view, change);
+    if (leg) return leg;
+  }
+  return subjectNoun(change.subjectRef);
+}
+
 // --------------------------------------------------------------------------
 // Identity
 // --------------------------------------------------------------------------
@@ -261,8 +310,8 @@ function whatHappened(view: RecoveryCaseView, who: string | undefined): string {
 // Options
 // --------------------------------------------------------------------------
 
-function changeLine(change: RecoveryStrategyView['changes'][number]): CaseChangeLine {
-  const label = plain(change.subjectLabel) ?? subjectNoun(change.subjectRef);
+function changeLine(view: RecoveryCaseView, change: RecoveryStrategyView['changes'][number]): CaseChangeLine {
+  const label = changeSubjectLabel(view, change);
   const base = { subject: label, subjectRef: change.subjectRef };
   if (change.proposedWindow && change.currentWindow) {
     const alreadyInEffect = change.currentWindow.start === change.proposedWindow.start
@@ -282,7 +331,11 @@ function changeLine(change: RecoveryStrategyView['changes'][number]): CaseChange
     return { ...base, kind: 'SET', toWindow: `${formatShort(change.proposedWindow.start)}–${formatShort(change.proposedWindow.end)}` };
   }
   const phrase = CASE_EFFECT_PHRASE[change.effectKind];
-  const known = plain(change.subjectLabel) !== undefined;
+  const leg = change.effectKind === 'SELECT_OFFER' ? selectOfferTransportLeg(view, change) : undefined;
+  const known = plain(change.subjectLabel) !== undefined || leg !== undefined;
+  if (change.effectKind === 'SELECT_OFFER' && leg) {
+    return { ...base, kind: 'OTHER', phrase: `Book replacement travel (${leg})` };
+  }
   return {
     ...base,
     kind: 'OTHER',
@@ -290,11 +343,20 @@ function changeLine(change: RecoveryStrategyView['changes'][number]): CaseChange
   };
 }
 
-function optionTitle(strategy: RecoveryStrategyView, lines: readonly CaseChangeLine[]): string {
+function optionTitle(
+  view: RecoveryCaseView,
+  strategy: RecoveryStrategyView,
+  lines: readonly CaseChangeLine[],
+): string {
   const first = lines[0];
   if (!first) return `Recovery option ${strategy.optionNumber}`;
   const extra = lines.length - 1;
   const tail = extra > 0 ? ` and adjust ${extra} other ${extra === 1 ? 'item' : 'items'}` : '';
+  const firstChange = strategy.changes[0];
+  if (firstChange?.effectKind === 'SELECT_OFFER') {
+    const leg = selectOfferTransportLeg(view, firstChange);
+    if (leg) return `Replace travel (${leg})${tail}`;
+  }
   if (first.kind === 'MOVE' || first.kind === 'IN_EFFECT') {
     const at = first.kind === 'MOVE' ? first.to : first.toWindow?.split('–')[0];
     return `Move ${first.subject}${at ? ` to ${at}` : ''}${tail}`;
@@ -337,19 +399,40 @@ function aggregateCost(view: RecoveryCaseView): string | undefined {
     : undefined;
 }
 
+/** Prefer cost on actions tied to this strategy's subjects; else case aggregate only when it is the sole viable option. */
+function strategyCostLine(view: RecoveryCaseView, strategy: RecoveryStrategyView): string | undefined {
+  const changeRefs = new Set(strategy.changes.map((c) => c.subjectRef));
+  const matching = view.recoveryActions.filter(
+    (a) => a.cost && a.subjectRefs.some((ref) => changeRefs.has(ref)),
+  );
+  if (matching.length > 0) {
+    const currency = matching[0]!.cost!.currency;
+    if (matching.every((a) => a.cost!.currency === currency)) {
+      const total = matching.reduce((sum, a) => sum + Number(a.cost!.amount), 0);
+      return `Added cost: ${formatMoney({ amount: total, currency })}`;
+    }
+  }
+  const viable = view.strategies.filter((s) => s.viability === 'VIABLE');
+  if (viable.length === 1 && viable[0]!.strategyRef === strategy.strategyRef) {
+    const agg = aggregateCost(view);
+    if (agg) return `Added cost: ${agg}`;
+  }
+  return undefined;
+}
+
 function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, terminal: boolean): CaseOptionModel {
-  const changes = strategy.changes.map(changeLine);
-  const cost = aggregateCost(view);
+  const changes = strategy.changes.map((c) => changeLine(view, c));
+  const costLine = strategyCostLine(view, strategy);
   const people = [...new Set(strategy.resolves.map((r) => plain(r.personLabel)).filter((n): n is string => n !== undefined))];
   const approvable = !terminal && strategy.viability === 'VIABLE' && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED') && !strategy.executionBlocker;
   return {
     strategyRef: strategy.strategyRef,
     optionNumber: strategy.optionNumber,
-    title: optionTitle(strategy, changes),
+    title: optionTitle(view, strategy, changes),
     changes,
     people,
     why: optionWhy(strategy),
-    ...(cost ? { costLine: `Added cost: ${cost}` } : {}),
+    ...(costLine ? { costLine } : {}),
     approverLine: approvable
       ? 'Needs your approval as organiser before anything changes.'
       : strategy.executionBlocker ? executionBlockerLine(strategy.executionBlocker) : 'Not open for approval.',
