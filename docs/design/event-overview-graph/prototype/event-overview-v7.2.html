@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NORTHSTAR — Event Overview V7.2 Final</title>
+<style>
+:root{
+  --bg:#f5f7fb;--panel:#fff;--ink:#10203a;--muted:#6e7d92;--line:#dce3ec;--navy:#17345f;
+  --green:#1f9d78;--green-line:#74bfa7;--green-bg:#eaf8f3;
+  --amber:#d58a13;--amber-line:#d7a043;--amber-bg:#fff4d9;
+  --red:#df3b49;--red-line:#df6670;--red-bg:#fff0f2;
+  --grey:#9aa8bb;--grey2:#c6d0dc;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+body{padding:14px}
+button{font:inherit}
+.app{max-width:1380px;margin:auto}
+.topbar{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;margin-bottom:10px}
+.brand{font-weight:950;letter-spacing:.08em;font-size:15px}.brand:before{content:"✦";color:var(--navy);margin-right:8px}
+.ctx{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.ctx b{color:var(--ink)}.sep{width:1px;height:16px;background:var(--line)}
+.live{display:flex;gap:8px;align-items:center;border-radius:999px;padding:7px 11px;border:1px solid #bde3d6;background:#f6fcfa;color:var(--green);font-size:11px;font-weight:900}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(31,157,120,.09)}
+.live.disrupted{border-color:#f2c1c6;background:#fff8f9;color:var(--red)}.live.disrupted i{background:var(--red);box-shadow:0 0 0 5px rgba(223,59,73,.08)}
+.frame{border:1px solid var(--line);background:#fff;border-radius:18px;box-shadow:0 14px 34px rgba(18,38,68,.055);overflow:hidden}
+.head{display:flex;justify-content:space-between;gap:18px;padding:14px 16px;border-bottom:1px solid #edf1f5}
+.eye{font-size:10px;font-weight:900;letter-spacing:.08em;color:#7d8999;margin-bottom:4px}
+h1{font-size:23px;line-height:1.12;margin:0 0 4px;letter-spacing:-.02em}
+.sub{font-size:12px;color:var(--muted)}
+.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:flex;gap:4px;padding:3px;border:1px solid var(--line);background:#f8fafc;border-radius:10px}
+.seg button{border:0;background:transparent;padding:7px 10px;border-radius:7px;color:#607089;font-size:11px;font-weight:850;cursor:pointer}
+.seg button.active{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(20,38,68,.08)}
+.summary{display:grid;grid-template-columns:1.1fr repeat(4,.7fr);gap:8px;padding:10px 12px;border-bottom:1px solid #edf1f5;background:#fcfdff}
+.metric{border:1px solid #e4e9f0;border-radius:11px;padding:9px 11px;background:#fff}
+.metric .v{font-size:18px;font-weight:950;letter-spacing:-.02em}.metric .k{font-size:9px;color:#7d8999;text-transform:uppercase;letter-spacing:.07em;font-weight:900;margin-top:2px}
+.metric.primary .v{font-size:22px}.metric.green .v{color:var(--green)}.metric.amber .v{color:#a86c09}.metric.red .v{color:var(--red)}
+
+.viewport{position:relative;height:31vh;min-height:260px;max-height:350px;background:#fbfcfe;overflow:hidden;touch-action:none;user-select:none;transition:height .42s,max-height .42s}
+.viewport.expanded{height:76vh;max-height:840px}
+.world{position:absolute;left:0;top:0;width:1440px;height:320px;transform-origin:0 0;will-change:transform}
+svg.edges{position:absolute;inset:0;width:1440px;height:320px;z-index:3;pointer-events:none;overflow:visible}
+.edge{fill:none;stroke:#aab6c6;stroke-width:1.8;opacity:.32;transition:opacity .18s,stroke .18s,stroke-width .18s}
+.edge.green{stroke:var(--green-line)}.edge.amber{stroke:var(--amber-line)}.edge.red{stroke:var(--red-line);stroke-width:2.5;filter:drop-shadow(0 0 3px rgba(223,59,73,.25))}
+.edge.context{stroke:#c7d0dc;stroke-width:1.4;stroke-dasharray:5 6}
+.edge.dim{opacity:.08}
+.pulse.green{fill:var(--green)}.pulse.amber{fill:var(--amber)}
+.pulse.dim{opacity:.08}
+
+.toolbar{position:absolute;right:12px;top:12px;z-index:90;display:flex;gap:4px;align-items:center;padding:4px;border:1px solid rgba(220,227,236,.8);background:rgba(255,255,255,.52);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:10px;box-shadow:0 8px 20px rgba(18,38,68,.055)}
+.toolbar button{height:30px;min-width:30px;border:0;border-radius:7px;background:rgba(255,255,255,.26);font-weight:900;cursor:pointer;color:var(--ink)}
+.toolbar button:hover{background:rgba(255,255,255,.82)}
+.legend{position:absolute;right:12px;bottom:10px;z-index:80;display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.66);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid #e3e8ef;border-radius:10px;padding:7px 9px;font-size:10px;color:#718094}
+.legend span{display:flex;gap:5px;align-items:center}.legend i{width:7px;height:7px;border-radius:50%}.lg{background:var(--green)}.la{background:var(--amber)}.lr{background:var(--red)}.lx{background:#b9c3cf}
+.focus-pill{position:absolute;left:50%;transform:translateX(-50%);top:12px;z-index:85;display:none;gap:8px;align-items:center;padding:8px 11px;border-radius:999px;border:1px solid #edc477;background:#fffaf1;color:#99620a;font-size:10px;font-weight:900;box-shadow:0 7px 18px rgba(18,38,68,.06)}
+.focus-pill.show{display:flex}.focus-pill button{border:0;background:var(--navy);color:#fff;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:900;cursor:pointer}
+
+/* Continuous programme spine: equal thirds, two content rows. */
+.programme-lane{position:absolute;left:70px;top:76px;width:1300px;height:172px;z-index:2;border:1px solid #d5deea;border-radius:20px;background:linear-gradient(180deg,#f8fafe 0%,#f3f6fb 100%);overflow:hidden}
+.day-zone{position:absolute;top:0;height:100%;width:33.333%;border-right:1px solid #dbe3ed}
+.day-zone:last-child{border-right:0}.day-zone:nth-child(2){background:rgba(237,242,249,.38)}.day-zone:nth-child(3){background:rgba(242,246,251,.48)}
+.day-head{position:absolute;left:14px;top:10px}.day-title{font-size:12px;font-weight:950;letter-spacing:.08em;color:#516a86}.day-sub{font-size:9.5px;color:#8a97a8;margin-top:2px}
+.rowline{position:absolute;left:12px;right:12px;height:1px;background:#e0e6ee}.row1{top:91px}.row2{top:151px}
+
+/* Generic entity cards. */
+.entity{position:absolute;z-index:10;cursor:pointer;transition:opacity .18s,transform .18s,box-shadow .18s,border-color .18s}
+.entity:hover{transform:translateY(-1px) scale(1.025);z-index:28}
+.entity.focus{box-shadow:0 0 0 4px rgba(23,52,95,.07),0 9px 20px rgba(18,38,68,.08);z-index:27}
+.entity.dim{opacity:.13;filter:saturate(.35)}
+.entity.hidden{display:none!important}
+
+.shared{width:160px;border:1px solid #e0e6ee;border-radius:12px;background:#fff;padding:7px 9px;box-shadow:0 4px 12px rgba(18,38,68,.035)}
+.shared .type{font-size:8.5px;letter-spacing:.08em;color:#7a879a;font-weight:900;text-transform:uppercase}.shared .name{font-size:14px;font-weight:900;margin-top:2px}.shared .meta{font-size:9.5px;color:#8190a0;margin-top:2px}.shared .badge{display:inline-flex;margin-top:5px;border-radius:999px;padding:3px 6px;font-size:8.5px;font-weight:900;background:#f0f4f8;color:#63758b}
+.shared.health-green{border-color:#a7d8c9}.shared.health-amber{border-color:#edc477;background:#fffdf8}.shared.health-red{border-color:#eca7ae;background:#fffafb}
+
+.commitment{width:140px;min-height:52px;border:1px solid #dfe5ed;border-radius:10px;background:#fff;padding:7px 9px;box-shadow:0 4px 12px rgba(18,38,68,.04)}
+.commitment .when{font-size:9px;color:#8190a0;font-weight:900;letter-spacing:.06em}.commitment .name{font-size:13px;font-weight:900;margin-top:3px}.commitment .meta{font-size:9px;color:#8290a2;margin-top:3px}
+.commitment.health-green{border-color:#a7d8c9}.commitment.health-amber{border-color:#edc477;background:#fffdf8}.commitment.health-red{border-color:#eca7ae;background:#fffafb}
+
+.cohort{width:190px;padding:7px 9px;border:1px dashed #cbd4df;border-radius:11px;background:rgba(255,255,255,.9)}
+.cohort .name{font-size:10.5px;font-weight:900;color:#53677f}.cohort .meta{font-size:9px;color:#8693a4;margin-top:2px}.cohort .marks{display:flex;gap:4px;margin-top:5px}.mark{width:8px;height:8px;border-radius:50%;background:var(--green)}.mark.unknown{background:#bcc6d2}.mark.red{background:var(--red)}
+
+.traveller{width:124px;border:1px solid #dfe5ed;border-radius:10px;background:#fff;padding:7px 8px;box-shadow:0 5px 14px rgba(18,38,68,.045)}
+.traveller .type{font-size:8px;letter-spacing:.07em;color:#7a879a;font-weight:900;text-transform:uppercase}.traveller .name{font-size:12.5px;font-weight:900;margin-top:3px}.traveller .meta{font-size:9px;color:#7d8999;margin-top:2px}.traveller .badge{display:inline-block;margin-top:4px;border-radius:999px;padding:3px 5px;font-size:8px;font-weight:900;background:var(--green-bg);color:var(--green)}
+.traveller.health-green{border-color:#9fd4c3}.traveller.health-amber{border-color:#edc477}.traveller.health-red{border-color:#eca7ae;background:#fffafb}
+.traveller.health-amber .badge{background:var(--amber-bg);color:#a56800}.traveller.health-red .badge{background:var(--red-bg);color:var(--red)}
+.traveller.faded{opacity:.32;transform:scale(.95)}
+.traveller.attention{box-shadow:0 0 0 5px rgba(223,59,73,.08),0 10px 22px rgba(18,38,68,.08);z-index:19}
+
+/* V5.6 semantic LOD: preserve recognition; remove secondary copy when zoomed out. */
+.world.overview .shared .type,
+.world.overview .shared .meta,
+.world.overview .commitment .meta,
+.world.overview .cohort .meta,
+.world.overview .traveller .type,
+.world.overview .traveller .meta{display:none}
+.world.overview .shared{width:142px;padding:6px 8px}.world.overview .shared .name{font-size:13px}
+.world.overview .commitment{width:128px;min-height:47px;padding:6px 8px}.world.overview .commitment .name{font-size:12px}
+.world.overview .cohort{width:170px;padding:6px 8px}
+.world.overview .traveller{width:112px;padding:6px 7px}.world.overview .traveller .name{font-size:12px}
+
+/* Fixed layout is prototype-only presentation data; state never lives here. */
+#dep-sq322{left:85px;top:5px}#dep-sq12{left:315px;top:5px}#dep-cx902{left:665px;top:5px}#dep-jl711{left:1050px;top:5px}
+#prog-brief{left:100px;top:115px}#prog-keynote{left:218px;top:181px}#prog-panel{left:336px;top:115px}
+#prog-workshop{left:533px;top:115px}#prog-meeting{left:651px;top:181px}#prog-dinner{left:769px;top:115px}
+#prog-plenary{left:966px;top:115px}#prog-round{left:1084px;top:181px}#prog-close{left:1202px;top:115px}
+#cohort-day1{left:125px;top:258px}#cohort-day2{left:625px;top:258px}#cohort-day3{left:1080px;top:258px}
+#trav-sarah{left:85px;top:255px}#trav-daniel{left:216px;top:255px}#trav-elena{left:347px;top:255px}#trav-marcus{left:478px;top:255px}#trav-lee{left:609px;top:255px}
+
+.below{display:grid;grid-template-columns:1.15fr .9fr .9fr;gap:12px;padding:12px;background:#fbfcfe;border-top:1px solid #edf1f5}
+.panel{border:1px solid #e1e7ee;border-radius:13px;background:#fff;padding:12px}.panel h2{font-size:12px;margin:0 0 9px}.row{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:8px 0;border-top:1px solid #eef2f6}.row:first-of-type{border-top:0}.dot{width:9px;height:9px;border-radius:50%}.dot.red{background:var(--red)}.dot.amber{background:var(--amber)}.dot.green{background:var(--green)}
+.row b{font-size:10px}.row span{font-size:9px;color:#7d8999}.pill{font-size:8px;font-weight:900;border-radius:999px;padding:4px 6px;background:#f1f4f8;color:#68798d}.pill.red{background:var(--red-bg);color:var(--red)}.pill.amber{background:var(--amber-bg);color:#9b650b}.empty{font-size:10px;color:#8592a3;padding:14px 0}
+@media(max-width:900px){body{padding:8px}.ctx{display:none}.summary{grid-template-columns:repeat(2,1fr)}.head{flex-direction:column}.below{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">NORTHSTAR</div>
+    <div class="ctx"><b>AI in Travel Summit</b><span class="sep"></span><span>Singapore · 12–15 Mar 2025</span><span class="sep"></span><span>67 travellers · 61 programme items</span></div>
+    <div id="liveState" class="live"><i></i><span>EVENT MONITORED</span></div>
+  </div>
+
+  <section class="frame">
+    <header class="head">
+      <div>
+        <div class="eye">EVENT OVERVIEW · LIVE OPERATIONAL WINDOW</div>
+        <h1>Overall event health</h1>
+        <div class="sub">Programme is the spatial spine; shared travel dependencies and traveller health stay visible without exposing the entire underlying graph.</div>
+      </div>
+      <div class="controls">
+        <div class="seg">
+          <button id="normalBtn" class="active">Normal</button>
+          <button id="disruptionBtn">Sarah disruption</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="summary">
+      <div class="metric primary green"><div class="v"><span id="readyCount">50</span><span style="font-size:12px;color:#8090a3"> / 67 ready</span></div><div class="k">Population health</div></div>
+      <div class="metric"><div id="unknownCount" class="v">14</div><div class="k">Unconfirmed</div></div>
+      <div class="metric red"><div id="attentionCount" class="v">3</div><div class="k">Need attention</div></div>
+      <div class="metric amber"><div id="affectedCount" class="v">0</div><div class="k">Affected now</div></div>
+      <div class="metric"><div id="caseCount" class="v">0</div><div class="k">Active recovery</div></div>
+    </div>
+
+    <div id="viewport" class="viewport">
+      <div class="toolbar">
+        <button id="minus" title="Zoom out">−</button>
+        <button id="home" title="Reset current view">⌂</button>
+        <button id="plus" title="Zoom in">+</button>
+        <button id="expandBtn" title="Expand graph" aria-label="Expand graph">⛶</button>
+      </div>
+      <div id="focusPill" class="focus-pill"><span></span><button id="focusBtn"></button></div>
+      <div class="legend">
+        <span><i class="lg"></i>Healthy</span><span><i class="la"></i>Checking</span><span><i class="lr"></i>Disrupted</span><span><i class="lx"></i>Unknown</span>
+      </div>
+
+      <div id="world" class="world">
+        <div class="programme-lane">
+          <div class="day-zone" style="left:0"><div class="day-head"><div class="day-title">DAY 01</div><div class="day-sub">Arrival + main stage</div></div></div>
+          <div class="day-zone" style="left:33.333%"><div class="day-head"><div class="day-title">DAY 02</div><div class="day-sub">Meetings + programme</div></div></div>
+          <div class="day-zone" style="left:66.666%"><div class="day-head"><div class="day-title">DAY 03</div><div class="day-sub">Closing programme</div></div></div>
+          <div class="rowline row1"></div><div class="rowline row2"></div>
+        </div>
+        <svg id="edgeSvg" class="edges" viewBox="0 0 1440 320"><g id="edgeLayer"></g><g id="pulseLayer"></g></svg>
+        <div id="entityLayer"></div>
+      </div>
+    </div>
+
+    <div class="below">
+      <section class="panel">
+        <h2>Attention</h2>
+        <div id="attentionNormal">
+          <div class="row"><i class="dot red"></i><div><b>3 journeys need attention</b><br><span>Existing programme readiness failures</span></div><span class="pill red">Open</span></div>
+          <div class="row"><i class="dot amber"></i><div><b>14 journeys unconfirmed</b><br><span>Insufficient travel evidence</span></div><span class="pill">Watch</span></div>
+        </div>
+        <div id="attentionDisrupted" style="display:none">
+          <div class="row"><i class="dot red"></i><div><b>Sarah Chen</b><br><span>SQ322 changed and her Day 01 keynote is no longer protected</span></div><span class="pill red">Open case</span></div>
+          <div class="row"><i class="dot green"></i><div><b>4 co-travellers cleared</b><br><span>Re-evaluated and still on track</span></div><span class="pill">Cleared</span></div>
+        </div>
+      </section>
+      <section class="panel"><h2>Decisions needed</h2><div class="empty">No new operator decision required in this snapshot.</div></section>
+      <section class="panel"><h2>What NORTHSTAR is doing</h2><div id="workNormal" class="empty">Monitoring 67 traveller journeys against the programme.</div><div id="workDisrupted" style="display:none"><div class="row"><i class="dot amber"></i><div><b>Reconciliation complete</b><br><span>5 journeys checked after SQ322 changed</span></div><span class="pill amber">1 unresolved</span></div></div></section>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  // -----------------------------------------------------------------------
+  // V7.2 FINAL PROTOTYPE CONTRACT
+  //
+  // Mirrors the accepted V5.6 implementation principles:
+  // - fixture data says WHAT is true;
+  // - renderer decides HOW it is drawn;
+  // - business state is never inferred from coordinates, DOM classes or names;
+  // - connector geometry is calculated from rendered card dimensions;
+  // - pulses derive only from relationship liveness/condition;
+  // - selection is display-only and generic;
+  // - layout coordinates are prototype presentation data, not domain truth.
+  // -----------------------------------------------------------------------
+
+  const GRAPH = {
+    entities: {
+      'dep-sq322': {kind:'shared', type:'SHARED INBOUND SERVICE', title:'SQ322', meta:'Arrival 07:25', badge:'5 travellers · healthy'},
+      'dep-sq12':  {kind:'shared', type:'SHARED INBOUND SERVICE', title:'SQ12', meta:'Arrival 08:10', badge:'8 travellers · healthy'},
+      'dep-cx902': {kind:'shared', type:'SHARED INBOUND SERVICE', title:'CX902', meta:'Day 02 arrivals', badge:'6 travellers · healthy'},
+      'dep-jl711': {kind:'shared', type:'SHARED INBOUND SERVICE', title:'JL711', meta:'Day 03 arrivals', badge:'7 travellers · healthy'},
+
+      'prog-brief':    {kind:'commitment', when:'08:45', title:'Speaker briefing', meta:'Day 01'},
+      'prog-keynote':  {kind:'commitment', when:'09:30', title:'Keynote', meta:'Day 01'},
+      'prog-panel':    {kind:'commitment', when:'11:00', title:'Panel', meta:'Day 01'},
+      'prog-workshop': {kind:'commitment', when:'09:30', title:'Workshop', meta:'Day 02'},
+      'prog-meeting':  {kind:'commitment', when:'15:30', title:'Partner meeting', meta:'Day 02'},
+      'prog-dinner':   {kind:'commitment', when:'19:00', title:'VIP dinner', meta:'Day 02'},
+      'prog-plenary':  {kind:'commitment', when:'09:00', title:'Plenary', meta:'Day 03'},
+      'prog-round':    {kind:'commitment', when:'11:30', title:'Roundtable', meta:'Day 03'},
+      'prog-close':    {kind:'commitment', when:'16:00', title:'Closing', meta:'Day 03'},
+
+      'cohort-day1': {kind:'cohort', title:'Day 01 cohort · 24', meta:'Healthy journeys compressed', marks:{shown:12,unknown:4,red:1}},
+      'cohort-day2': {kind:'cohort', title:'Day 02 cohort · 21', meta:'Healthy journeys compressed', marks:{shown:12,unknown:3,red:1}},
+      'cohort-day3': {kind:'cohort', title:'Day 03 / local · 22', meta:'Later arrivals + programme-only', marks:{shown:12,unknown:4,red:1}},
+
+      'trav-sarah':  {kind:'traveller', type:'SPEAKER', title:'Sarah Chen', meta:'Keynote · Day 01', badge:'Ready', action:'case'},
+      'trav-daniel': {kind:'traveller', type:'SPEAKER', title:'Daniel Ong', meta:'Day 01', badge:'Ready'},
+      'trav-elena':  {kind:'traveller', type:'SPEAKER', title:'Elena Tan', meta:'Day 01', badge:'Ready'},
+      'trav-marcus': {kind:'traveller', type:'DELEGATE', title:'Marcus Lee', meta:'Day 01', badge:'Ready'},
+      'trav-lee':    {kind:'traveller', type:'DELEGATE', title:'Lee Wei', meta:'Day 01', badge:'Ready'}
+    },
+
+    relations: {
+      // Base overview projection. Every visible line has a real projection relationship.
+      'r-sq322-brief':    {from:'dep-sq322',to:'prog-brief',kind:'dependency'},
+      'r-sq12-panel':     {from:'dep-sq12',to:'prog-panel',kind:'dependency'},
+      'r-cx902-workshop': {from:'dep-cx902',to:'prog-workshop',kind:'dependency'},
+      'r-jl711-plenary':  {from:'dep-jl711',to:'prog-plenary',kind:'dependency'},
+
+      'r-day1-keynote': {from:'cohort-day1',to:'prog-keynote',kind:'dependency'},
+      'r-day2-meeting': {from:'cohort-day2',to:'prog-meeting',kind:'dependency'},
+      'r-day3-round':   {from:'cohort-day3',to:'prog-round',kind:'dependency'},
+
+      // Promoted blast-radius relationships. Hidden until the disruption makes them relevant.
+      'r-sq322-sarah':  {from:'dep-sq322',to:'trav-sarah',kind:'dependency'},
+      'r-sq322-daniel': {from:'dep-sq322',to:'trav-daniel',kind:'dependency'},
+      'r-sq322-elena':  {from:'dep-sq322',to:'trav-elena',kind:'dependency'},
+      'r-sq322-marcus': {from:'dep-sq322',to:'trav-marcus',kind:'dependency'},
+      'r-sq322-lee':    {from:'dep-sq322',to:'trav-lee',kind:'dependency'},
+      'r-sarah-keynote':{from:'trav-sarah',to:'prog-keynote',kind:'dependency'}
+    },
+
+    states: {
+      normal: {
+        summary:{ready:50,unknown:14,attention:3,affected:0,cases:0},
+        focus:{message:'',button:'',refs:[]},
+        nodes: {
+          'dep-sq322':{health:'green',visible:true,meta:'Arrival 07:25',badge:'5 travellers · healthy'},
+          'dep-sq12':{health:'green',visible:true},'dep-cx902':{health:'green',visible:true},'dep-jl711':{health:'green',visible:true},
+          'prog-brief':{health:'green',visible:true},'prog-keynote':{health:'green',visible:true},'prog-panel':{health:'green',visible:true},
+          'prog-workshop':{health:'green',visible:true},'prog-meeting':{health:'green',visible:true},'prog-dinner':{health:'green',visible:true},
+          'prog-plenary':{health:'green',visible:true},'prog-round':{health:'green',visible:true},'prog-close':{health:'green',visible:true},
+          'cohort-day1':{health:'neutral',visible:true},'cohort-day2':{health:'neutral',visible:true},'cohort-day3':{health:'neutral',visible:true},
+          'trav-sarah':{health:'green',visible:false,badge:'Ready'},'trav-daniel':{health:'green',visible:false,badge:'Ready'},
+          'trav-elena':{health:'green',visible:false,badge:'Ready'},'trav-marcus':{health:'green',visible:false,badge:'Ready'},'trav-lee':{health:'green',visible:false,badge:'Ready'}
+        },
+        relations:{
+          'r-sq322-brief':{health:'green',live:true,visible:true},'r-sq12-panel':{health:'green',live:true,visible:true},
+          'r-cx902-workshop':{health:'green',live:true,visible:true},'r-jl711-plenary':{health:'green',live:true,visible:true},
+          'r-day1-keynote':{health:'green',live:true,visible:true},'r-day2-meeting':{health:'green',live:true,visible:true},'r-day3-round':{health:'green',live:true,visible:true},
+          'r-sq322-sarah':{health:'green',live:false,visible:false},'r-sq322-daniel':{health:'green',live:false,visible:false},
+          'r-sq322-elena':{health:'green',live:false,visible:false},'r-sq322-marcus':{health:'green',live:false,visible:false},'r-sq322-lee':{health:'green',live:false,visible:false},
+          'r-sarah-keynote':{health:'green',live:false,visible:false}
+        },
+        incidentRefs:[]
+      },
+
+      checking: {
+        summary:{ready:45,unknown:14,attention:3,affected:5,cases:0},
+        focus:{message:'5 travellers affected by SQ322',button:'Focus incident',refs:['dep-sq322','trav-sarah','trav-daniel','trav-elena','trav-marcus','trav-lee','prog-brief','prog-keynote']},
+        nodes: {
+          'dep-sq322':{health:'amber',visible:true,meta:'Arrival 10:40 · was 07:25',badge:'5 travellers · checking'},
+          'dep-sq12':{health:'green',visible:true,dim:true},'dep-cx902':{health:'green',visible:true,dim:true},'dep-jl711':{health:'green',visible:true,dim:true},
+          'prog-brief':{health:'amber',visible:true},'prog-keynote':{health:'amber',visible:true},'prog-panel':{health:'green',visible:true,dim:true},
+          'prog-workshop':{health:'green',visible:true,dim:true},'prog-meeting':{health:'green',visible:true,dim:true},'prog-dinner':{health:'green',visible:true,dim:true},
+          'prog-plenary':{health:'green',visible:true,dim:true},'prog-round':{health:'green',visible:true,dim:true},'prog-close':{health:'green',visible:true,dim:true},
+          'cohort-day1':{health:'neutral',visible:false},'cohort-day2':{health:'neutral',visible:false},'cohort-day3':{health:'neutral',visible:false},
+          'trav-sarah':{health:'amber',visible:true,badge:'Checking'},'trav-daniel':{health:'amber',visible:true,badge:'Checking'},
+          'trav-elena':{health:'amber',visible:true,badge:'Checking'},'trav-marcus':{health:'amber',visible:true,badge:'Checking'},'trav-lee':{health:'amber',visible:true,badge:'Checking'}
+        },
+        relations:{
+          'r-sq322-brief':{health:'amber',live:true,visible:true},'r-sq12-panel':{health:'green',live:true,visible:true,dim:true},
+          'r-cx902-workshop':{health:'green',live:true,visible:true,dim:true},'r-jl711-plenary':{health:'green',live:true,visible:true,dim:true},
+          'r-day1-keynote':{health:'green',live:false,visible:false},'r-day2-meeting':{health:'green',live:false,visible:false},'r-day3-round':{health:'green',live:false,visible:false},
+          'r-sq322-sarah':{health:'amber',live:true,visible:true},'r-sq322-daniel':{health:'amber',live:true,visible:true},
+          'r-sq322-elena':{health:'amber',live:true,visible:true},'r-sq322-marcus':{health:'amber',live:true,visible:true},'r-sq322-lee':{health:'amber',live:true,visible:true},
+          'r-sarah-keynote':{health:'amber',live:true,visible:true}
+        },
+        incidentRefs:['dep-sq322','trav-sarah','trav-daniel','trav-elena','trav-marcus','trav-lee','prog-brief','prog-keynote']
+      },
+
+      settled: {
+        summary:{ready:49,unknown:14,attention:4,affected:5,cases:1},
+        focus:{message:'4 cleared · Sarah still disrupted',button:'Focus Sarah',refs:['dep-sq322','trav-sarah','prog-brief','prog-keynote']},
+        nodes: {
+          'dep-sq322':{health:'amber',visible:true,meta:'Arrival 10:40 · was 07:25',badge:'5 affected · 4 cleared · 1 unresolved'},
+          'dep-sq12':{health:'green',visible:true,dim:true},'dep-cx902':{health:'green',visible:true,dim:true},'dep-jl711':{health:'green',visible:true,dim:true},
+          'prog-brief':{health:'amber',visible:true},'prog-keynote':{health:'red',visible:true},'prog-panel':{health:'green',visible:true,dim:true},
+          'prog-workshop':{health:'green',visible:true,dim:true},'prog-meeting':{health:'green',visible:true,dim:true},'prog-dinner':{health:'green',visible:true,dim:true},
+          'prog-plenary':{health:'green',visible:true,dim:true},'prog-round':{health:'green',visible:true,dim:true},'prog-close':{health:'green',visible:true,dim:true},
+          'cohort-day1':{health:'neutral',visible:false},'cohort-day2':{health:'neutral',visible:false},'cohort-day3':{health:'neutral',visible:false},
+          'trav-sarah':{health:'red',visible:true,badge:'Disrupted',attention:true},
+          'trav-daniel':{health:'green',visible:true,badge:'On track',faded:true},'trav-elena':{health:'green',visible:true,badge:'On track',faded:true},
+          'trav-marcus':{health:'green',visible:true,badge:'On track',faded:true},'trav-lee':{health:'green',visible:true,badge:'On track',faded:true}
+        },
+        relations:{
+          'r-sq322-brief':{health:'amber',live:true,visible:true},'r-sq12-panel':{health:'green',live:true,visible:true,dim:true},
+          'r-cx902-workshop':{health:'green',live:true,visible:true,dim:true},'r-jl711-plenary':{health:'green',live:true,visible:true,dim:true},
+          'r-day1-keynote':{health:'green',live:false,visible:false},'r-day2-meeting':{health:'green',live:false,visible:false},'r-day3-round':{health:'green',live:false,visible:false},
+          'r-sq322-sarah':{health:'amber',live:true,visible:true},'r-sq322-daniel':{health:'green',live:true,visible:true},
+          'r-sq322-elena':{health:'green',live:true,visible:true},'r-sq322-marcus':{health:'green',live:true,visible:true},'r-sq322-lee':{health:'green',live:true,visible:true},
+          'r-sarah-keynote':{health:'red',live:false,visible:true}
+        },
+        incidentRefs:['dep-sq322','trav-sarah','trav-daniel','trav-elena','trav-marcus','trav-lee','prog-brief','prog-keynote']
+      }
+    },
+
+    views: {
+      normalRefs:['dep-sq322','dep-sq12','dep-cx902','dep-jl711','prog-brief','prog-keynote','prog-panel','prog-workshop','prog-meeting','prog-dinner','prog-plenary','prog-round','prog-close','cohort-day1','cohort-day2','cohort-day3'],
+      sarahRefs:['dep-sq322','trav-sarah','prog-brief','prog-keynote']
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Prototype guardrails copied from the accepted V5.6 philosophy.
+  // -----------------------------------------------------------------------
+  function validateModel(){
+    const entityIds=Object.keys(GRAPH.entities).sort();
+    const relationIds=Object.keys(GRAPH.relations).sort();
+
+    Object.entries(GRAPH.relations).forEach(([id,rel])=>{
+      if(!GRAPH.entities[rel.from]||!GRAPH.entities[rel.to]) throw new Error(`Relation ${id} references missing entity`);
+    });
+
+    Object.entries(GRAPH.states).forEach(([stateName,state])=>{
+      if(JSON.stringify(Object.keys(state.nodes).sort())!==JSON.stringify(entityIds)) throw new Error(`Node state drift: ${stateName}`);
+      if(JSON.stringify(Object.keys(state.relations).sort())!==JSON.stringify(relationIds)) throw new Error(`Relation state drift: ${stateName}`);
+
+      entityIds.forEach(id=>{
+        const n=state.nodes[id];
+        if(!('health' in n)||typeof n.visible!=='boolean') throw new Error(`Incomplete node state ${id} / ${stateName}`);
+      });
+      relationIds.forEach(id=>{
+        const r=state.relations[id];
+        if(!r.health||typeof r.visible!=='boolean'||typeof r.live!=='boolean') throw new Error(`Incomplete relation state ${id} / ${stateName}`);
+        if(r.health==='red'&&r.live) throw new Error(`Red relation cannot pulse: ${id}`);
+      });
+    });
+  }
+  validateModel();
+
+  const $=id=>document.getElementById(id);
+  const viewport=$('viewport'),world=$('world'),entityLayer=$('entityLayer'),edgeLayer=$('edgeLayer'),pulseLayer=$('pulseLayer');
+  const nodeEls={},relationEls={};
+
+  function healthClass(h){return h==='neutral'?'':`health-${h}`}
+
+  function marksHtml(spec){
+    let out='';
+    for(let i=0;i<spec.shown;i++){
+      const cls=i<spec.red?' red':(i>=spec.shown-spec.unknown?' unknown':'');
+      out+=`<i class="mark${cls}"></i>`;
+    }
+    return out;
+  }
+
+  function entityHtml(id,def){
+    if(def.kind==='shared'){
+      return `<div class="type">${def.type}</div><div class="name">${def.title}</div><div class="meta">${def.meta||''}</div><div class="badge">${def.badge||''}</div>`;
+    }
+    if(def.kind==='commitment'){
+      return `<div class="when">${def.when}</div><div class="name">${def.title}</div><div class="meta">${def.meta||''}</div>`;
+    }
+    if(def.kind==='cohort'){
+      return `<div class="name">${def.title}</div><div class="meta">${def.meta||''}</div><div class="marks">${marksHtml(def.marks)}</div>`;
+    }
+    if(def.kind==='traveller'){
+      return `<div class="type">${def.type}</div><div class="name">${def.title}</div><div class="meta">${def.meta||''}</div><div class="badge">${def.badge||''}</div>`;
+    }
+    return '';
+  }
+
+  Object.entries(GRAPH.entities).forEach(([id,def])=>{
+    const el=document.createElement('div');
+    el.id=id;
+    el.className=`entity ${def.kind}`;
+    el.innerHTML=entityHtml(id,def);
+    el.tabIndex=0;
+    el.dataset.entityId=id;
+    entityLayer.appendChild(el);
+    nodeEls[id]=el;
+  });
+
+  Object.keys(GRAPH.relations).forEach(id=>{
+    const ns='http://www.w3.org/2000/svg';
+    const p=document.createElementNS(ns,'path');
+    p.id=id;p.setAttribute('class','edge');edgeLayer.appendChild(p);relationEls[id]=p;
+  });
+
+  // -----------------------------------------------------------------------
+  // State rendering. No name/id-specific branches for styling or liveness.
+  // -----------------------------------------------------------------------
+  let stateName='normal';
+  let selectedId=null;
+  let settleTimer=null;
+  let expanded=false;
+  let dragging=false,last={x:0,y:0};
+  let cam={x:0,y:0,scale:.9};
+  let lastSemantic='';
+
+  function renderNodeState(id,state){
+    const def=GRAPH.entities[id],el=nodeEls[id];
+    el.className=`entity ${def.kind} ${healthClass(state.health)}${state.visible?'':' hidden'}${state.faded?' faded':''}${state.attention?' attention':''}`;
+    const meta=el.querySelector('.meta');
+    const badge=el.querySelector('.badge');
+    if(meta && state.meta!==undefined) meta.textContent=state.meta;
+    else if(meta) meta.textContent=def.meta||'';
+    if(badge && state.badge!==undefined) badge.textContent=state.badge;
+    else if(badge) badge.textContent=def.badge||'';
+  }
+
+  function renderRelationState(id,state){
+    const rel=GRAPH.relations[id],el=relationEls[id];
+    if(!state.visible){
+      el.style.display='none';
+      return;
+    }
+    el.style.display='';
+    el.setAttribute('class',`edge ${rel.kind==='context'?'context':state.health}${state.dim?' dim':''}`);
+  }
+
+  function renderPulses(){
+    pulseLayer.innerHTML='';
+    const state=GRAPH.states[stateName];
+    let index=0;
+    Object.entries(GRAPH.relations).forEach(([id,relDef])=>{
+      const rs=state.relations[id];
+      if(!rs.visible||!rs.live||rs.health==='red'||relDef.kind==='context') return;
+      const edge=relationEls[id];
+      const ns='http://www.w3.org/2000/svg';
+      const circle=document.createElementNS(ns,'circle');
+      circle.setAttribute('r',rs.health==='amber'?'2.8':'2.65');
+      circle.setAttribute('class',`pulse ${rs.health}${rs.dim?' dim':''}`);
+      const anim=document.createElementNS(ns,'animateMotion');
+      anim.setAttribute('dur',rs.health==='amber'?'3.7s':'2.55s');
+      anim.setAttribute('repeatCount','indefinite');
+      anim.setAttribute('begin',`${-(index%5)*.31}s`);
+      const mpath=document.createElementNS(ns,'mpath');
+      mpath.setAttribute('href',`#${edge.id}`);
+      anim.appendChild(mpath);circle.appendChild(anim);pulseLayer.appendChild(circle);
+      index++;
+    });
+  }
+
+  function renderState(name){
+    stateName=name;
+    selectedId=null;
+    const state=GRAPH.states[name];
+
+    Object.keys(GRAPH.entities).forEach(id=>renderNodeState(id,state.nodes[id]));
+    Object.keys(GRAPH.relations).forEach(id=>renderRelationState(id,state.relations[id]));
+
+    $('readyCount').textContent=state.summary.ready;
+    $('unknownCount').textContent=state.summary.unknown;
+    $('attentionCount').textContent=state.summary.attention;
+    $('affectedCount').textContent=state.summary.affected;
+    $('caseCount').textContent=state.summary.cases;
+
+    const disrupted=name!=='normal';
+    $('liveState').classList.toggle('disrupted',disrupted);
+    $('liveState').innerHTML=disrupted?'<i></i><span>ACTIVE DISRUPTION</span>':'<i></i><span>EVENT MONITORED</span>';
+    $('attentionNormal').style.display=disrupted?'none':'block';
+    $('attentionDisrupted').style.display=disrupted?'block':'none';
+    $('workNormal').style.display=disrupted?'none':'block';
+    $('workDisrupted').style.display=disrupted?'block':'none';
+
+    const fp=$('focusPill');
+    if(state.focus.message){
+      fp.classList.add('show');
+      fp.querySelector('span').textContent=state.focus.message;
+      const b=$('focusBtn');
+      b.textContent=state.focus.button;
+      b.onclick=()=>frameRefs(state.focus.refs,expanded?38:14,name==='settled'?1.04:.82);
+    }else{
+      fp.classList.remove('show');
+    }
+
+    requestAnimationFrame(()=>{
+      updateGeometry();
+      renderPulses();
+      resetSelection();
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // Connector geometry comes from the actual rendered cards.
+  // No connector endpoint is stored as business state or hand-tuned per edge.
+  // -----------------------------------------------------------------------
+  function box(id){
+    const el=nodeEls[id];
+    return {x:el.offsetLeft,y:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight};
+  }
+
+  function autoCurve(source,target){
+    const scx=source.x+source.w/2,scy=source.y+source.h/2;
+    const tcx=target.x+target.w/2,tcy=target.y+target.h/2;
+    const dx=tcx-scx,dy=tcy-scy;
+
+    if(Math.abs(dy)>=Math.abs(dx)*.42){
+      const down=dy>=0;
+      const sx=scx,sy=down?source.y+source.h:source.y;
+      const tx=tcx,ty=down?target.y:target.y+target.h;
+      const span=Math.max(1,Math.abs(ty-sy));
+      const handle=Math.max(10,Math.min(48,span*.42));
+      return down
+        ? `M${sx} ${sy} C${sx} ${sy+handle},${tx} ${ty-handle},${tx} ${ty}`
+        : `M${sx} ${sy} C${sx} ${sy-handle},${tx} ${ty+handle},${tx} ${ty}`;
+    }
+
+    const right=dx>=0;
+    const sx=right?source.x+source.w:source.x, sy=scy;
+    const tx=right?target.x:target.x+target.w, ty=tcy;
+    const span=Math.max(1,Math.abs(tx-sx));
+    const handle=Math.max(8,Math.min(52,span*.36));
+    return right
+      ? `M${sx} ${sy} C${sx+handle} ${sy},${tx-handle} ${ty},${tx} ${ty}`
+      : `M${sx} ${sy} C${sx-handle} ${sy},${tx+handle} ${ty},${tx} ${ty}`;
+  }
+
+  function updateGeometry(){
+    Object.entries(GRAPH.relations).forEach(([id,rel])=>{
+      relationEls[id].setAttribute('d',autoCurve(box(rel.from),box(rel.to)));
+    });
+  }
+
+  const geometryObserver=new ResizeObserver(()=>requestAnimationFrame(updateGeometry));
+  Object.values(nodeEls).forEach(el=>geometryObserver.observe(el));
+
+  // -----------------------------------------------------------------------
+  // Selection: generic immediate-neighbourhood highlighting, display-only.
+  // It never changes graph/business state and never moves the camera.
+  // -----------------------------------------------------------------------
+  function resetSelection(){
+    selectedId=null;
+    Object.values(nodeEls).forEach(el=>el.classList.remove('focus','dim'));
+    const state=GRAPH.states[stateName];
+    Object.entries(relationEls).forEach(([id,el])=>{
+      el.classList.remove('dim');
+      if(state.relations[id].dim) el.classList.add('dim');
+    });
+  }
+
+  function selectNode(id){
+    const state=GRAPH.states[stateName];
+    if(!state.nodes[id].visible) return;
+    selectedId=id;
+    const neighbours=new Set([id]);
+    const activeRelations=new Set();
+
+    Object.entries(GRAPH.relations).forEach(([rid,rel])=>{
+      const rs=state.relations[rid];
+      if(!rs.visible) return;
+      if(rel.from===id||rel.to===id){
+        activeRelations.add(rid);
+        neighbours.add(rel.from);neighbours.add(rel.to);
+      }
+    });
+
+    Object.entries(nodeEls).forEach(([nid,el])=>{
+      const visible=state.nodes[nid].visible;
+      el.classList.toggle('focus',nid===id);
+      el.classList.toggle('dim',visible&&!neighbours.has(nid));
+    });
+    Object.entries(relationEls).forEach(([rid,el])=>{
+      if(!state.relations[rid].visible) return;
+      el.classList.toggle('dim',!activeRelations.has(rid));
+    });
+  }
+
+  Object.entries(nodeEls).forEach(([id,el])=>{
+    el.onclick=e=>{e.stopPropagation();selectNode(id)};
+    el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectNode(id)}};
+    if(GRAPH.entities[id].action==='case'){
+      el.ondblclick=e=>{e.stopPropagation();alert("Prototype boundary: open this traveller's Case page / V5.6.")};
+    }
+  });
+
+  viewport.addEventListener('click',e=>{
+    if(!e.target.closest('.entity')&&!e.target.closest('.toolbar')&&!e.target.closest('.focus-pill')) resetSelection();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')resetSelection()});
+
+  // -----------------------------------------------------------------------
+  // Camera / semantic zoom. Matches the V5.6 information-density pattern.
+  // -----------------------------------------------------------------------
+  function semantic(){
+    const next=cam.scale<.76?'overview':cam.scale>1.14?'detail':'normal';
+    world.classList.toggle('overview',next==='overview');
+    world.classList.toggle('detailzoom',next==='detail');
+    if(next!==lastSemantic){lastSemantic=next;requestAnimationFrame(updateGeometry)}
+  }
+
+  function setCamera(next,animate=true){
+    cam={...cam,...next};
+    world.style.transition=animate?'transform .6s cubic-bezier(.2,.8,.2,1)':'none';
+    world.style.transform=`translate3d(${cam.x}px,${cam.y}px,0) scale(${cam.scale})`;
+    semantic();
+  }
+
+  function visibleBounds(refs){
+    const state=GRAPH.states[stateName];
+    const boxes=refs.filter(id=>nodeEls[id]&&state.nodes[id]?.visible).map(box);
+    if(!boxes.length) return {x1:0,y1:0,x2:1440,y2:320};
+    return {
+      x1:Math.min(...boxes.map(b=>b.x)),
+      y1:Math.min(...boxes.map(b=>b.y)),
+      x2:Math.max(...boxes.map(b=>b.x+b.w)),
+      y2:Math.max(...boxes.map(b=>b.y+b.h))
+    };
+  }
+
+  function frameRefs(refs,pad=12,maxScale=1.04){
+    const r=viewport.getBoundingClientRect(),b=visibleBounds(refs);
+    const bw=Math.max(1,b.x2-b.x1),bh=Math.max(1,b.y2-b.y1);
+    const scale=Math.max(.56,Math.min(Math.min((r.width-pad*2)/bw,(r.height-pad*2)/bh),maxScale));
+    setCamera({
+      x:(r.width-bw*scale)/2-b.x1*scale,
+      y:(r.height-bh*scale)/2-b.y1*scale,
+      scale
+    });
+  }
+
+  function frameCanonical(){
+    if(stateName==='normal') frameRefs(GRAPH.views.normalRefs,expanded?28:8,expanded?1.04:.92);
+    else frameRefs(GRAPH.states[stateName].incidentRefs,expanded?36:14,expanded?1.02:.82);
+  }
+
+  function zoomAroundCenter(nextScale){
+    const r=viewport.getBoundingClientRect(),cx=r.width/2,cy=r.height/2;
+    const wx=(cx-cam.x)/cam.scale,wy=(cy-cam.y)/cam.scale;
+    const scale=Math.max(.5,Math.min(1.42,nextScale));
+    setCamera({x:cx-wx*scale,y:cy-wy*scale,scale});
+  }
+
+  $('plus').onclick=()=>zoomAroundCenter(cam.scale*1.16);
+  $('minus').onclick=()=>zoomAroundCenter(cam.scale/1.16);
+  $('home').onclick=()=>frameCanonical();
+
+  $('expandBtn').onclick=()=>{
+    expanded=!expanded;
+    viewport.classList.toggle('expanded',expanded);
+    $('expandBtn').title=expanded?'Collapse graph':'Expand graph';
+    $('expandBtn').setAttribute('aria-label',expanded?'Collapse graph':'Expand graph');
+    setTimeout(frameCanonical,80);
+  };
+
+  document.querySelectorAll('.toolbar button,.focus-pill button').forEach(btn=>btn.addEventListener('pointerdown',e=>e.stopPropagation()));
+
+  viewport.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const r=viewport.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+    const wx=(px-cam.x)/cam.scale,wy=(py-cam.y)/cam.scale;
+    const scale=Math.max(.5,Math.min(1.42,cam.scale*Math.exp(-e.deltaY*.00115)));
+    setCamera({x:px-wx*scale,y:py-wy*scale,scale},false);
+  },{passive:false});
+
+  viewport.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.toolbar')||e.target.closest('.focus-pill')||e.target.closest('.entity')) return;
+    dragging=true;last={x:e.clientX,y:e.clientY};
+    viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    cam.x+=e.clientX-last.x;cam.y+=e.clientY-last.y;last={x:e.clientX,y:e.clientY};
+    setCamera(cam,false);
+  });
+  viewport.addEventListener('pointerup',e=>{dragging=false;try{viewport.releasePointerCapture(e.pointerId)}catch{}});
+  viewport.addEventListener('pointercancel',()=>dragging=false);
+
+  // -----------------------------------------------------------------------
+  // Scenario controls. The demo fixture changes data; renderer stays generic.
+  // -----------------------------------------------------------------------
+  $('normalBtn').onclick=()=>{
+    clearTimeout(settleTimer);
+    $('normalBtn').classList.add('active');$('disruptionBtn').classList.remove('active');
+    renderState('normal');
+    requestAnimationFrame(frameCanonical);
+  };
+
+  $('disruptionBtn').onclick=()=>{
+    clearTimeout(settleTimer);
+    $('normalBtn').classList.remove('active');$('disruptionBtn').classList.add('active');
+    renderState('checking');
+    requestAnimationFrame(frameCanonical);
+    settleTimer=setTimeout(()=>{
+      renderState('settled');
+      // Intentionally keep the whole disruption framed. Do not auto-zoom into Sarah.
+      requestAnimationFrame(frameCanonical);
+    },1700);
+  };
+
+  // Initial paint.
+  renderState('normal');
+  requestAnimationFrame(frameCanonical);
+})();
+</script>
+</body>
+</html>
