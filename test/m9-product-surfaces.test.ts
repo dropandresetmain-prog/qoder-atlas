@@ -302,6 +302,28 @@ describe('M9 product surface renderers', () => {
     assert.match(html, /data-test="traveller-commitment"/);
     assert.match(html, /Opening session/);
     assert.match(html, /Main hall/);
+    assert.match(html, /10:00/);
+    assert.match(html, /11:00/);
+    assert.match(html, /Europe\/London/);
+    assert.doesNotMatch(html, /cc-meta">[^<]*09:00 UTC/);
+  });
+
+  test('traveller commitment falls back to UTC when its timezone is missing or invalid', () => {
+    for (const timeZone of ['Not/AZone', undefined]) {
+      const html = renderProductTravellerTrip({
+        ...travellerTripView(),
+        commitment: {
+          label: 'Opening session',
+          windowStart: '2031-09-16T09:00:00.000Z',
+          windowEnd: '2031-09-16T10:00:00.000Z',
+          ...(timeZone ? { timeZone } : {}),
+        },
+      });
+
+      assert.match(html, /09:00 UTC/);
+      assert.match(html, /10:00 UTC/);
+      assert.doesNotMatch(html, /Not\/AZone/);
+    }
   });
 
   test('healthy traveller without a linked case is not told that a change happened', () => {
