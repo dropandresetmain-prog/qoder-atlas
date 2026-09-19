@@ -40,15 +40,13 @@
  *      equals event A's — one canonical service, reused, not duplicated.
  *   3. Duplicate delivery of event B → ALREADY_APPLIED (ChangeSignal-completion-granted).
  */
-import { before, describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
-import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
-import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from '../src/app/demo/externalIdentity.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import {
@@ -56,6 +54,7 @@ import {
   type TransportServiceCancelledWithReprotectionEvent,
 } from '../src/app/target/providerDisruptionIngress.ts';
 import type { TargetCommandContext } from '../src/app/target/applicationCommands.ts';
+import { aitWorldModeFromEnv, obtainAitSummitWorld } from './aitFixtureClone.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
 const ACTOR = 'principal:t2-f5-service-identity-test';
@@ -65,29 +64,41 @@ const REPLACEMENT_DEPARTURE = '2026-10-01T07:45:00+07:00';
 const REPLACEMENT_ARRIVAL = '2026-10-01T10:30:00+08:00';
 
 let pool: Pool;
-let dataset: LoadedDataset;
+let dataset: LoadedDataset | undefined;
+let sharedPool: Pool | undefined;
+let disposeWorld: (() => Promise<void>) | undefined;
 
 describe('F5 — replacement service identity resolves via external identity, not provider event identity', () => {
   before(async () => {
-    pool = await sharedTestPool();
-    dataset = await loadDataset(BUNDLE_DIR);
+    if (aitWorldModeFromEnv() === 'fresh') {
+      sharedPool = await sharedTestPool();
+      pool = sharedPool;
+      dataset = await loadDataset(BUNDLE_DIR);
+    }
+  });
+
+  after(async () => {
+    await disposeWorld?.().catch(() => undefined);
+    await sharedPool?.end().catch(() => undefined);
   });
 
   test('a second provider event referencing the same real replacement service reuses the canonical service; duplicate delivery is ALREADY_APPLIED', async () => {
-    // -- Workspace provisioning.
-    const workspaceId = randomUUID();
-    await pool.query('INSERT INTO workspaces (id, name) VALUES ($1, $2)', [workspaceId, `t2-f5:${workspaceId}`]);
-    const outcome = await provisionDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
-    assert.equal(outcome.status, 'MATERIALIZED');
-
-    const connectionResult = await pool.query<{ connection_id: string }>(
-      `SELECT DISTINCT connection_id FROM external_records WHERE workspace_id = $1 LIMIT 1`,
-      [workspaceId],
+    const world = await obtainAitSummitWorld({
+      actorPrincipalId: ACTOR,
+      includeBaseline: true,
+      sharedPool,
+      dataset,
+    });
+    disposeWorld = world.dispose;
+    pool = world.pool;
+    const workspaceId = world.workspaceId;
+    const connectionId = world.connectionId;
+    assert.ok(
+      world.provisionStatus === 'MATERIALIZED' || world.provisionStatus === 'CLONED',
+      `world ready via ${world.provisionStatus}`,
     );
-    assert.equal(connectionResult.rowCount, 1, 'exactly one provisioning connection');
-    const connectionId = connectionResult.rows[0]!.connection_id;
-
-    await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId: ACTOR });
+    assert.ok((world.baselineEvaluated ?? 0) > 0, 'baseline evaluation assessed at least one journey');
+    console.log(`[timing] F5 setup mode=${world.mode} setupMs=${world.setupMs.toFixed(0)}`);
 
     const ctx: TargetCommandContext = {
       workspaceId,

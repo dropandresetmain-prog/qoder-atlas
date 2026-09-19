@@ -1,59 +1,63 @@
-# ACTIVE TASK — PG FIXTURE CLONE FEASIBILITY SPIKE
+# PG Fixture Clone Spike — Evidence (2026-09-19)
 
-Live ledger for the bounded PostgreSQL AiT fixture-clone feasibility spike.
-Companion to `docs/work/ACTIVE_TASK.md` (R3 ledger left untouched).
+Branch: `spike/pg-fixture-clone`
+Base: `feat/r3-local-acceptance` @ `d9bb9a5`
+Checkpoint 1+2: `c5d4100`
+Mechanism: **Option A — `CREATE DATABASE … TEMPLATE`**
 
-## Identity
+## Proof suite (`aitFixtureClone.pgtest.ts`)
 
-- Branch: `spike/pg-fixture-clone`
-- Base: `feat/r3-local-acceptance` @ `d9bb9a5f03785db60b6657ca7dfe7c182b07dbd3`
-  (newer than accepted fast-tier `codex/postgres-fast-tier` @ `d1762f0`, which is
-  **not** an ancestor of this line; tiering decision is not reopened)
-- Role: PRIMARY PostgreSQL test-fixture performance engineer
-- Date: 2026-09-19
-- Scope: evidence only; test-only prototype; no product code changes
+| Metric | Value |
+|---|---|
+| Fixture build (migrate + AiT materialize + baseline 67) | **72.6s** (later rebuild 84.1s) |
+| Clone n=8 min / median / max | **761.7 / 817.1 / 907.4 ms** |
+| Fresh↔clone logical fingerprint | **MATCH** |
+| Clone A mutate / B+fixture unchanged / drop A / new C | **PASS** |
 
-## Goal
+## F3 / F5 / F7 A/B
 
-Prove whether canonical AiT baseline can be built once and cheaply cloned into
-isolated databases (`CREATE DATABASE … TEMPLATE`) so heavyweight PG tests keep
-database-per-test isolation without repeated materialization.
+| File | Fresh setup | Fresh total | Clone setup | Clone total | Setup Δ | Total Δ |
+|---|---:|---:|---:|---:|---:|---:|
+| F3 | 66.6s | 70.6s | 1.14s | 4.70s | −65.4s (−98%) | −65.9s (−93%) |
+| F5 | 64.9s | 69.2s | 0.99s | 4.01s | −63.9s (−98%) | −65.2s (−94%) |
+| F7 | 66.4s | 69.1s | 0.91s | 1.90s | −65.5s (−99%) | −67.2s (−97%) |
 
-## Chosen mechanism
+All assertions PASS on both paths. Each clone run used a **separate database**.
 
-**Option A — PostgreSQL TEMPLATE cloning** (preferred). Option C dump/restore
-not needed. Option B physical snapshots not pursued.
+Default remains `NORTHSTAR_PG_AIT_WORLD=fresh` (unchanged CI behaviour).
+Clone path requires `NORTHSTAR_PG_AIT_WORLD=clone` + `NORTHSTAR_AIT_FIXTURE_DB`.
 
-## Checklist
+## Suitability (static)
 
-- [x] Phase 1: AiT world-creation map (A/B/C/D classification)
-- [x] Checkpoint 1+2: clone primitive + equivalence + isolation proofs
-- [ ] Checkpoint 3: F3/F5/F7 A/B pilot timings
-- [ ] Phase 6–7: suitability + gate impact estimate
-- [ ] Final report + recommendation
+| Candidate | Class |
+|---|---|
+| F3 / F5 / F7 | SAFE NEXT CANDIDATE (piloted) |
+| F1 | SAFE NEXT CANDIDATE — one clean clone per crash world; never reuse mutated crash DB |
+| N1 | SAFE NEXT CANDIDATE — clone covers provision+baseline only |
+| B1 Sarah | NEEDS ADDITIONAL PROOF — clone can skip provision+baseline; authority/compose/recovery remain |
+| T2 provider reprotection | NEEDS ADDITIONAL PROOF — step 1 proves baseline construction; do not wholesale switch |
+| productBaselineWorld | NOT SUITABLE — asserts materialization/idempotency/replay |
+| migrate.pgtest | NOT SUITABLE — must migrate empty DBs |
 
-## Benchmark results (Checkpoint 1+2)
+## Gate impact (relative to ~1,433s canonical)
 
-- Fixture construction (migrate + materialize + baseline 67 journeys): **72.6s**
-- Clone trials (n=8): min **761.7ms**, median **817.1ms**, max **907.4ms**
-- Fresh↔clone logical fingerprint: **MATCH** (`f6e11807014eba0d…`)
-- Isolation (mutate A, B+fixture unchanged; drop A; new clone C matches): **PASS**
-- Empty TEMPLATE probe earlier: median ~768ms (toy table)
+One suite-scoped fixture (~75s) amortized across adopters.
 
-## Current blocker
+| Estimate | Runtime | Basis |
+|---|---:|---|
+| Conservative | ~1,240s | Only F3/F5/F7 (−~190s setup) +75s fixture ≈ −115s net |
+| Likely | ~900–950s | + F1 (3 clones) + N1 (2) + B1 setup (−~350–400s more) |
+| Optimistic | ~800–850s | + T2 after step-1 split + other post-baseline AiT consumers |
 
-None. Proceeding to F3/F5/F7 A/B pilot.
+Irreducible: materialization/migration proofs, non-AiT foundation PG, assertion/recovery wall time, per-file harness tax.
 
-## Next action
+## Parallelism
 
-Minimal setup seam on F3/F5/F7; measure fresh vs clone.
+Database-per-test isolation is a prerequisite for bounded 2–3 worker PG parallelism later.
+**Park for Later** — not enabled in this spike.
 
-## Critical safety assumptions
+## Recommendation
 
-1. Clone accelerates setup only — never bypasses behaviour under test.
-2. `productBaselineWorld` / migration / provisioning proofs stay on fresh path.
-3. Each heavyweight test receives its own database.
-4. Suite-scoped fixture rebuild preferred over cross-session cache.
-5. No PG parallelism in this spike (Park for Later).
-6. Test role is superuser: REVOKE CONNECT is soft; primary guard is never using
-   the fixture DB name as the working pool (asserted in proof test).
+**IMPLEMENT WITH CONDITIONS** — suite-scoped fixture rebuild (no cross-session cache);
+keep fresh default; adopt clone only for post-baseline consumers; never switch
+`productBaselineWorld` / migration / provisioning proofs.
