@@ -6,7 +6,12 @@ import assert from 'node:assert/strict';
 import { demoResetGate, EXCLUDED_TABLES } from '../src/app/demo/demoReset.ts';
 
 test('demoResetGate closed without dataset directory', () => {
-  const gate = demoResetGate({ NORTHSTAR_DEMO_RESET: '1' } as NodeJS.ProcessEnv);
+  const gate = demoResetGate({
+    // Hermetic: an explicit empty caller value wins over any developer .env/.env.local.
+    NORTHSTAR_DEMO_DATASET_DIR: '',
+    NORTHSTAR_DEMO_RESET: '1',
+    APP_ENVIRONMENT: 'local',
+  } as NodeJS.ProcessEnv);
   assert.equal(gate.open, false);
   if (!gate.open) assert.equal(gate.code, 'DEMO_DATASET_NOT_CONFIGURED');
 });
