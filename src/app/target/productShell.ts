@@ -10,7 +10,6 @@
  * event select only when the backend identified one event.
  */
 import { renderPage, renderBackLink, type NavTarget } from '../../ui/page.ts';
-import { escapeHtml } from '../../ui/html.ts';
 
 /** Re-exported so screens depend on the shell module for navigation chrome. */
 export { renderBackLink };
@@ -67,12 +66,6 @@ export function renderInShell(
   bodyHtml: string,
 ): string {
   const isTraveller = active === 'traveller';
-  const travellerBody = isTraveller && context.eventName
-    ? bodyHtml.replace(
-      '<div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar</div>',
-      `<div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar</div><span class="tt-right">${escapeHtml(context.eventName)}</span>`,
-    )
-    : bodyHtml;
   return renderPage(
     {
       title,
@@ -84,6 +77,6 @@ export function renderInShell(
       ...(context.resetDemo ? { resetDemo: true } : {}),
       ...(context.backLink ? { backLink: context.backLink } : {}),
     },
-    travellerBody,
+    bodyHtml,
   );
 }

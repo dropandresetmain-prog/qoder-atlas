@@ -23,12 +23,13 @@ function card(title: string, body: string | undefined, testId: string): string {
   </div>`;
 }
 
-export function renderTravellerSurface(view: TravellerSurfaceView): string {
+export function renderTravellerSurface(view: TravellerSurfaceView, eventName?: string): string {
   const kickerClass = view.kickerTone === 'ok' ? 'k-ok' : view.kickerTone === 'bad' ? 'k-bad' : '';
+  const event = eventName ? `<span class="tt-right">${escapeHtml(eventName)}</span>` : '';
   return `
 <main class="traveller-shell product-traveller-trip" data-test="product-traveller-trip" data-poll-region="traveller-trip">
   <div class="t-topbar">
-    <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar</div>
+    <div class="brand"><span class="mark" aria-hidden="true">✦</span>Northstar</div>${event}
   </div>
   <div class="t-hero">
     <div class="scrim" aria-hidden="true"></div>
@@ -48,6 +49,6 @@ export function renderTravellerSurface(view: TravellerSurfaceView): string {
 </main>`;
 }
 
-export function renderProductTravellerTrip(view: TravellerTripView): string {
-  return renderTravellerSurface(adaptTravellerTrip(view));
+export function renderProductTravellerTrip(view: TravellerTripView, eventName?: string): string {
+  return renderTravellerSurface(adaptTravellerTrip(view), eventName);
 }
