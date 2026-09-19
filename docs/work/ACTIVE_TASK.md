@@ -1,9 +1,9 @@
-# ACTIVE TASK — POST-R4 CONVERGENCE / A0
+# ACTIVE TASK — POST-R4 CONVERGENCE / A1 IN PROGRESS
 
 - Goal: legacy-quality frontend, faithful V5.6/V7.2, physical Sarah and Jordan through one generalized PostgreSQL recovery engine.
 - Immutable accepted R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
 - Primary: `integration/astra-post-r4`; `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
-- Current pushed primary SHA: pending initial A0 push. Previous accepted SHA is the R4 base above.
+- Accepted/pushed A0 SHA: `f55899b15200de692dd749bbcfb795c67f6a22e0` (remote verified). Current integration work starts from that checkpoint.
 - Reference pack: `29bb0690aa36b0e4c3a084917d120367aa61257c`, docs copied only.
 - Decisions/triage/decomposition: [A0 reconciliation](ASTRA_A0_CONVERGENCE.md).
 - Accepted R4 ledger remains available at the immutable base: `git show 2baf1f6:docs/work/ACTIVE_TASK.md`.
@@ -14,7 +14,7 @@
 - [x] Charter first; prepared pack and current contracts/code/recent R4 commits inspected.
 - [x] Graph and Jordan material findings revalidated; final R4 evidence distinguished from older audit.
 - [x] Frontend revalidation return incorporated; Activity paging remains A1 scope.
-- [ ] Docs-only A0 checked, committed, pushed and remote SHA verified.
+- [x] Docs-only A0 checked, committed, pushed and remote SHA verified.
 - [ ] A1 frontend and graph convergence, focused/PG/browser evidence, pushed candidate.
 - [ ] A2 Sarah physical product acceptance.
 - [ ] A3 Jordan generalized runtime acceptance.
@@ -29,7 +29,7 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-No implementation lanes or lane databases yet. Existing R4/PG-perf worktrees and root untracked work remain untouched.
+Active A1 lanes: Luna visual on `codex/astra-a1-visual` and Luna navigation on `codex/astra-a1-navigation`, both from pushed A0; isolated worktrees, no databases. Case semantics Terra lane follows the primary graph projection handoff. Existing R4/PG-perf worktrees and root untracked work remain untouched.
 
 ## Evidence and counters
 
@@ -50,10 +50,9 @@ No implementation lanes or lane databases yet. Existing R4/PG-perf worktrees and
 
 ## Exact next action / stop-safe handoff
 
-Finish docs-only A0 validation, exact-path commit and push, then launch isolated A1 visual/navigation lanes while primary freezes additive semantic contracts.
+Commit/push the graph projection handoff and A0 receipt; launch Case semantics from it. Integrate visual/navigation lanes after their focused evidence. Physical A1 acceptance remains pending.
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
 Unfinished lane heads: none (read-only investigations only).
 Evidence not run: all new implementation and physical acceptance gates.
 Continue in this task while checkpoint context is clean; use this ledger plus A0 record for a fresh task if context becomes noisy. Never branch from the preparation pack or merge directly to main.
-
