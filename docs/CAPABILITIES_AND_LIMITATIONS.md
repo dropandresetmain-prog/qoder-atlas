@@ -1,5 +1,13 @@
 # Capabilities and limitations
 
+**Post-R4 status (2026-09-20):** R4 is accepted at
+`2baf1f6df484319e131590d37a0b026222324d03`. It proves physical Sarah programme
+recovery on normal PostgreSQL boot with LIVE Atlas research/Qwen and separate
+protected Atlas sandbox flight execution. It does not yet prove physical Jordan,
+complete V5.6/V7.2 fidelity or every historical provider capability.
+Older R3-era status below is superseded only where final R4 proves more.
+Current triage/scope: [A0](work/ASTRA_A0_CONVERGENCE.md), [roadmap](ROADMAP.md).
+
 This is the technical truth sheet for the **currently implemented NORTHSTAR runtime** after
 the 2026-09-18 product-parity truth rebase.
 

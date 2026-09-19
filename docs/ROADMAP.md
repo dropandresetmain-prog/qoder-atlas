@@ -1,5 +1,36 @@
 # Northstar roadmap
 
+## Post-R4 delivery update — 2026-09-20
+
+**R4 ACCEPTED — SARAH LIVE VERTICAL + PRODUCT PARITY READY** at
+`2baf1f6df484319e131590d37a0b026222324d03`. Forward work is on
+`integration/astra-post-r4`, never an older R4 base or a direct merge to main.
+The older R3 status/sequence below is retained as context and is superseded by
+this update where it describes current composition or delivery order.
+
+Current evidence: normal PostgreSQL boot, LIVE Atlas research and Qwen, physical
+Sarah programme recovery, separate protected Atlas sandbox flight execution,
+bounded Event Overview implementation and Case graph. Neither faithful graph
+convergence nor physical Jordan acceptance is yet claimed.
+
+Sequence: A0 freeze/diagnose -> A1 legacy-quality frontend plus faithful V5.6/V7.2
+-> A2 physical Sarah -> A3 generalized Jordan runtime -> A4 physical Jordan ->
+A5 repeatable cross-scenario final candidate. Contracts, triage and implementation
+ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
+
+| Scope | Current disposition / revisit condition |
+|---|---|
+| Booking identities/budget and per-offer flight/time/cost visibility | Act Now for Jordan; R4 parks reclassified because executable repeatable recovery requires them. |
+| General intake, programme-change parity, recent decisions, Activity and Traveller parity | A1 gap closure; inspect and restore required backend seams, not silently retire user jobs. |
+| Narita hotel booking, Singapore hotel replacement, transfer transaction, insurance submission, composite provider action plan | Park for Later; outside closed Sarah/Jordan hero, revisit after A5 or an expanded acceptance requirement. |
+| Remaining historical providers including Nuitée, Google Routes, Frankfurter and optional model routes | Park for Later for this convergence; no claim of normal-runtime parity, revisit after the two required verticals or when a required decision needs that provider. |
+| Multiple independent Overview blast centres | Park for Later; revisit when a required scenario needs simultaneous independent incidents. |
+| R4 N5-N7 and budget-injection replan issue | Existing R4 dispositions retained; revisit on objective-blocking reproduction. |
+| Opaque R4 m9ReadModelCurrentness suite-only failure | Investigate Now on concrete focused/new integration evidence; no ceremonial broad rerun. |
+
+PostgreSQL remains the sole normal runtime. Unknown outcomes never permit blind
+redispatch; provider success alone never resolves a trip.
+
 This roadmap records current implemented truth, the truth-rebased delivery sequence and
 deferred scope. Detailed contracts live in
 [`RECOVERY_PLANNING_CONTRACT_FREEZE.md`](RECOVERY_PLANNING_CONTRACT_FREEZE.md).

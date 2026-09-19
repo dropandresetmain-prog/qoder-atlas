@@ -1,5 +1,15 @@
 # Northstar architecture
 
+**Current execution update (2026-09-20):** accepted R4 is
+`2baf1f6df484319e131590d37a0b026222324d03`. `composeTargetBoot.ts` now composes
+one provider-neutral planning coordinator, Model Studio/Qwen when configured,
+internal programme execution and protected Atlas sandbox offer execution with
+durable attempts and reconciliation. Sarah physical acceptance is programme-side;
+transport execution has separate sandbox evidence. V5.6/V7.2 production projections
+exist and are being converged; Jordan physical acceptance is pending.
+The R3-era status/forward sequence below is historical context where superseded.
+See [post-R4 A0](work/ASTRA_A0_CONVERGENCE.md) and [roadmap](ROADMAP.md).
+
 Northstar is an **AI Travel Resolution Engine** built around a persistent operational model of a journey, its purpose, dependencies, requirements and recovery state.
 
 The graph/state model is central. Chat, dashboards and traveller surfaces are interfaces over it; none is the source of truth.
