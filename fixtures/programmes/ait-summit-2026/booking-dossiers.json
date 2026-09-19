@@ -6,7 +6,7 @@
         {
           "givenName": "Jordan",
           "familyName": "Hale",
-          "nationality": "US"
+          "nationality": "SG"
         }
       ],
       "contact": {
@@ -19,7 +19,11 @@
   "hotel": [
     {
       "travellerId": "trv-evt-ait-2026-ait-draft-09",
-      "guestNames": ["Jordan Hale"]
+      "guestNames": [
+        "Jordan Hale"
+      ],
+      "checkIn": "2026-09-29T15:00:00+08:00",
+      "checkOut": "2026-10-03T11:00:00+08:00"
     }
   ]
 }
