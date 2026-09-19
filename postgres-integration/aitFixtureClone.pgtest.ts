@@ -14,12 +14,16 @@ import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { updateJourneyItem } from '../src/persistence/postgres/commands/travelCommands.ts';
 import {
   AIT_FIXTURE_WORKSPACE_ID,
+  assertDisposableDatabaseName,
+  assertWorkingDatabaseNotFixture,
   buildAitFixtureDatabase,
   buildFreshAitBaselineDatabase,
   cloneAitFixtureDatabase,
   fingerprintAitBaseline,
+  dropAitCloneDatabase,
   type AitFixtureHandle,
 } from './aitFixtureClone.ts';
+import { deliverInboxMessage } from '../src/persistence/postgres/inbox.ts';
 
 describe('AiT fixture TEMPLATE clone (spike)', () => {
   let fixture: AitFixtureHandle | undefined;
@@ -232,11 +236,89 @@ describe('AiT fixture TEMPLATE clone (spike)', () => {
     const clone = await cloneAitFixtureDatabase(fixture.databaseName);
     try {
       assert.notEqual(clone.databaseName, fixture.databaseName);
+      assertWorkingDatabaseNotFixture(clone.databaseName, fixture.databaseName);
       const db = await clone.pool.query<{ current_database: string }>('SELECT current_database()');
       assert.equal(db.rows[0]!.current_database, clone.databaseName);
       assert.notEqual(db.rows[0]!.current_database, fixture.databaseName);
     } finally {
       await clone.drop();
     }
+  });
+
+  test('refuses to treat the fixture DB name as a disposable clone target', () => {
+    assert.ok(fixture, 'fixture built');
+    assert.throws(() => assertDisposableDatabaseName(fixture.databaseName, 'clone'));
+    assert.throws(() => assertDisposableDatabaseName('northstar_test', 'fixture'));
+    assert.throws(() => assertWorkingDatabaseNotFixture(fixture.databaseName, fixture.databaseName));
+  });
+
+  test('inbox deliver/dedup on clone A does not affect clone B or fixture template', async () => {
+    assert.ok(fixture, 'fixture built');
+    const cloneA = await cloneAitFixtureDatabase(fixture.databaseName);
+    const cloneB = await cloneAitFixtureDatabase(fixture.databaseName);
+    try {
+      const inboxBeforeB = await cloneB.pool.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM inbox_deliveries WHERE workspace_id = $1`,
+        [cloneB.workspaceId],
+      );
+      assert.equal(Number(inboxBeforeB.rows[0]!.n), 0, 'B starts with empty inbox');
+
+      const deliveryKey = `spike-inbox-${randomUUID()}`;
+      const payload = { kind: 'SPIKE_INBOX_ISOLATION', n: 1 };
+      const first = await deliverInboxMessage(cloneA.pool, {
+        workspaceId: cloneA.workspaceId,
+        sourceConnectionId: 'spike-conn',
+        deliveryKey,
+        rawPayload: payload,
+        handlers: [{ handlerKey: 'spike-handler', targetKey: 'spike-target' }],
+      });
+      assert.equal(first.outcome, 'ACCEPTED');
+
+      const dup = await deliverInboxMessage(cloneA.pool, {
+        workspaceId: cloneA.workspaceId,
+        sourceConnectionId: 'spike-conn',
+        deliveryKey,
+        rawPayload: payload,
+        handlers: [{ handlerKey: 'spike-handler', targetKey: 'spike-target' }],
+      });
+      assert.equal(dup.outcome, 'DUPLICATE');
+
+      const inboxA = await cloneA.pool.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM inbox_deliveries WHERE workspace_id = $1`,
+        [cloneA.workspaceId],
+      );
+      assert.equal(Number(inboxA.rows[0]!.n), 1, 'A has exactly one inbox delivery');
+
+      const inboxB = await cloneB.pool.query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM inbox_deliveries WHERE workspace_id = $1`,
+        [cloneB.workspaceId],
+      );
+      assert.equal(Number(inboxB.rows[0]!.n), 0, 'B inbox unchanged');
+
+      const fpB = await fingerprintAitBaseline(cloneB.pool, cloneB.workspaceId);
+      const cloneC = await cloneAitFixtureDatabase(fixture.databaseName);
+      try {
+        const fpC = await fingerprintAitBaseline(cloneC.pool, cloneC.workspaceId);
+        assert.equal(fpC.digest, fpB.digest, 'new clone from fixture still matches pristine B');
+      } finally {
+        await cloneC.drop();
+      }
+    } finally {
+      await cloneA.drop().catch(() => undefined);
+      await cloneB.drop().catch(() => undefined);
+    }
+  });
+
+  test('clone teardown succeeds after leaving an open pool connection (FORCE)', async () => {
+    assert.ok(fixture, 'fixture built');
+    const clone = await cloneAitFixtureDatabase(fixture.databaseName);
+    clone.pool.on('error', () => undefined);
+    const sticky = await clone.pool.connect();
+    sticky.on('error', () => undefined);
+    await sticky.query('SELECT 1');
+    // Leave the client checked out; FORCE drop must still succeed.
+    await dropAitCloneDatabase(clone.databaseName);
+    sticky.release();
+    await clone.pool.end().catch(() => undefined);
   });
 });

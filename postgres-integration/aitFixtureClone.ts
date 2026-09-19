@@ -1,8 +1,9 @@
 /**
- * TEST-ONLY AiT fixture clone prototype (feasibility spike).
+ * TEST-ONLY AiT fixture clone infrastructure (productionized).
  *
- * Builds one migrated + provisioned + baseline-evaluated PostgreSQL database,
- * freezes it, then creates isolated clones via `CREATE DATABASE … TEMPLATE`.
+ * Builds one migrated + provisioned + baseline-evaluated PostgreSQL database
+ * per suite invocation that needs it, freezes it, then creates isolated clones
+ * via `CREATE DATABASE … TEMPLATE`.
  *
  * Must not be imported from production application code.
  */
@@ -24,6 +25,19 @@ export const AIT_FIXTURE_NOW = '2026-09-18T12:00:00.000Z';
 export const AIT_BUNDLE_DIR = fileURLToPath(
   new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url),
 );
+
+/** Disposable fixture DB prefix — never a working mutable test DB. */
+export const AIT_FIXTURE_DB_PREFIX = 'ns_ait_fx_';
+/** Disposable clone DB prefix. */
+export const AIT_CLONE_DB_PREFIX = 'ns_ait_cl_';
+
+const PROTECTED_DATABASE_NAMES = new Set([
+  'postgres',
+  'template0',
+  'template1',
+  'template_postgis',
+  'northstar_test',
+]);
 
 export type AitWorldMode = 'fresh' | 'clone';
 
@@ -54,6 +68,41 @@ export interface LogicalBaselineFingerprint {
   summary: Record<string, unknown>;
   /** Fields intentionally excluded from the digest (documented nondeterminism). */
   ignoredFields: string[];
+}
+
+export function isAitFixtureDatabaseName(databaseName: string): boolean {
+  return databaseName.startsWith(AIT_FIXTURE_DB_PREFIX);
+}
+
+export function isAitCloneDatabaseName(databaseName: string): boolean {
+  return databaseName.startsWith(AIT_CLONE_DB_PREFIX);
+}
+
+export function assertDisposableDatabaseName(
+  databaseName: string,
+  kind: 'fixture' | 'clone',
+): void {
+  if (PROTECTED_DATABASE_NAMES.has(databaseName) || databaseName.startsWith('template')) {
+    throw new Error(`refusing to operate on protected database "${databaseName}"`);
+  }
+  if (kind === 'fixture' && !isAitFixtureDatabaseName(databaseName)) {
+    throw new Error(`fixture database must start with ${AIT_FIXTURE_DB_PREFIX}, got "${databaseName}"`);
+  }
+  if (kind === 'clone' && !isAitCloneDatabaseName(databaseName)) {
+    throw new Error(`clone database must start with ${AIT_CLONE_DB_PREFIX}, got "${databaseName}"`);
+  }
+}
+
+/** Working pools must never point at the frozen fixture template. */
+export function assertWorkingDatabaseNotFixture(
+  workingDatabaseName: string,
+  fixtureDatabaseName: string,
+): void {
+  if (workingDatabaseName === fixtureDatabaseName || isAitFixtureDatabaseName(workingDatabaseName)) {
+    throw new Error(
+      `working database must not be the AiT fixture (working="${workingDatabaseName}", fixture="${fixtureDatabaseName}")`,
+    );
+  }
 }
 
 function baseConfig(): PostgresTargetConfig {
@@ -91,7 +140,8 @@ async function createEmptyDatabase(databaseName: string): Promise<void> {
   }
 }
 
-async function dropDatabase(databaseName: string): Promise<void> {
+async function dropDatabase(databaseName: string, kind: 'fixture' | 'clone'): Promise<void> {
+  assertDisposableDatabaseName(databaseName, kind);
   const admin = adminPool();
   try {
     await terminateDatabaseBackends(admin, databaseName);
@@ -108,6 +158,7 @@ async function dropDatabase(databaseName: string): Promise<void> {
  * Superuser can still CONNECT for DROP / CREATE DATABASE TEMPLATE (no session on fixture needed).
  */
 export async function freezeFixtureDatabase(databaseName: string): Promise<void> {
+  assertDisposableDatabaseName(databaseName, 'fixture');
   const admin = adminPool();
   try {
     await terminateDatabaseBackends(admin, databaseName);
@@ -121,13 +172,22 @@ export async function freezeFixtureDatabase(databaseName: string): Promise<void>
   }
 }
 
+export async function dropAitFixtureDatabase(databaseName: string): Promise<void> {
+  await dropDatabase(databaseName, 'fixture');
+}
+
+export async function dropAitCloneDatabase(databaseName: string): Promise<void> {
+  await dropDatabase(databaseName, 'clone');
+}
+
 export async function buildAitFixtureDatabase(options?: {
   databaseName?: string;
   runBaseline?: boolean;
 }): Promise<AitFixtureHandle> {
   const databaseName =
     options?.databaseName ??
-    `ns_ait_fx_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    `${AIT_FIXTURE_DB_PREFIX}${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  assertDisposableDatabaseName(databaseName, 'fixture');
   const runBaseline = options?.runBaseline !== false;
   const workspaceId = AIT_FIXTURE_WORKSPACE_ID;
   const started = performance.now();
@@ -186,7 +246,7 @@ export async function buildAitFixtureDatabase(options?: {
     buildMs,
     baselineEvaluated,
     async drop() {
-      await dropDatabase(databaseName);
+      await dropDatabase(databaseName, 'fixture');
     },
   };
 }
@@ -196,9 +256,17 @@ export async function cloneAitFixtureDatabase(
   fixtureDatabaseName: string,
   options?: { databaseName?: string },
 ): Promise<AitCloneHandle> {
+  if (!isAitFixtureDatabaseName(fixtureDatabaseName)) {
+    throw new Error(
+      `clone source must be an AiT fixture (${AIT_FIXTURE_DB_PREFIX}*), got "${fixtureDatabaseName}"`,
+    );
+  }
   const databaseName =
     options?.databaseName ??
-    `ns_ait_cl_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    `${AIT_CLONE_DB_PREFIX}${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  assertDisposableDatabaseName(databaseName, 'clone');
+  assertWorkingDatabaseNotFixture(databaseName, fixtureDatabaseName);
+
   const admin = adminPool();
   const started = performance.now();
   try {
@@ -219,8 +287,10 @@ export async function cloneAitFixtureDatabase(
     cloneMs,
     postgresOverrides,
     async drop() {
+      // Swallow late 'terminating connection' events from backends we force-close.
+      pool.on('error', () => undefined);
       await pool.end().catch(() => undefined);
-      await dropDatabase(databaseName);
+      await dropDatabase(databaseName, 'clone');
     },
   };
 }
@@ -440,7 +510,8 @@ export async function buildFreshAitBaselineDatabase(): Promise<{
   buildMs: number;
   drop: () => Promise<void>;
 }> {
-  const databaseName = `ns_ait_fresh_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  const databaseName = `${AIT_FIXTURE_DB_PREFIX}fresh_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  assertDisposableDatabaseName(databaseName, 'fixture');
   const workspaceId = AIT_FIXTURE_WORKSPACE_ID;
   const started = performance.now();
   await createEmptyDatabase(databaseName);
@@ -473,14 +544,22 @@ export async function buildFreshAitBaselineDatabase(): Promise<{
     buildMs: performance.now() - started,
     async drop() {
       await pool.end().catch(() => undefined);
-      await dropDatabase(databaseName);
+      await dropDatabase(databaseName, 'fixture');
     },
   };
 }
 
+/**
+ * Resolve world mode:
+ * - explicit `NORTHSTAR_PG_AIT_WORLD=fresh|clone` wins;
+ * - otherwise, if the suite prepared `NORTHSTAR_AIT_FIXTURE_DB`, default to clone;
+ * - otherwise fresh (focused single-file runs without suite fixture).
+ */
 export function aitWorldModeFromEnv(env: NodeJS.ProcessEnv = process.env): AitWorldMode {
-  const raw = (env.NORTHSTAR_PG_AIT_WORLD ?? 'fresh').trim().toLowerCase();
+  const raw = (env.NORTHSTAR_PG_AIT_WORLD ?? '').trim().toLowerCase();
+  if (raw === 'fresh') return 'fresh';
   if (raw === 'clone') return 'clone';
+  if ((env.NORTHSTAR_AIT_FIXTURE_DB ?? '').trim()) return 'clone';
   return 'fresh';
 }
 
@@ -524,6 +603,7 @@ export async function obtainAitSummitWorld(params: {
       throw new Error('clone mode requires NORTHSTAR_AIT_FIXTURE_DB or fixtureDatabaseName');
     }
     const clone = await cloneAitFixtureDatabase(fixture);
+    assertWorkingDatabaseNotFixture(clone.databaseName, fixture);
     const connectionResult = await clone.pool.query<{ connection_id: string }>(
       `SELECT DISTINCT connection_id FROM external_records WHERE workspace_id = $1 LIMIT 1`,
       [clone.workspaceId],
