@@ -30,6 +30,7 @@ import { buildTargetTimezoneResolver } from './targetTransportResearch.ts';
 import { composeTransportFamilies } from './targetProviderFamilies.ts';
 import { composeTargetIntelligence } from './composeTargetIntelligence.ts';
 import { runInternalExecutionPass } from './target/executionPass.ts';
+import { composeOfferExecution, runExternalOfferExecutionPass, runExternalReconciliation, EXTERNAL_OFFER_SELECT_STATEMENTS } from './target/externalOfferExecution.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
 
 /** Idle cadence of the case lifecycle pass (escalation + resolution); a reassessment drain also triggers it immediately. */
@@ -264,6 +265,33 @@ export async function composeTargetBoot(
       }
     },
   });
+  // R4-F2: `external:offer.select` through the Atlas SANDBOX. Composed only when
+  // honest (LIVE|RECORD + sandbox host + credentials); otherwise absent and
+  // approval refuses transport options with an explicit reason.
+  const offerExecution = composeOfferExecution(adapterConfig, options.cwd ?? process.cwd());
+  console.log(offerExecution
+    ? `[atlas] sandbox offer execution composed (mode=${adapterConfig.adapterMode})`
+    : '[atlas] sandbox offer execution not composed (needs ADAPTER_MODE=LIVE|RECORD + Atlas sandbox credentials) - transport Recover will be refused with an explicit reason');
+  const externalExecution = offerExecution
+    ? createPeriodicService({
+        name: 'externalExecution',
+        pollMs: EXECUTION_POLL_MS,
+        run: async (now) => {
+          const ctx = { pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: `northstar-execution:${config.workspaceId}`, uow: () => endpoints.app.unitOfWork(), executorPrincipalId, external: offerExecution, now };
+          const report = await runExternalOfferExecutionPass(ctx);
+          const reconciliation = await runExternalReconciliation(ctx);
+          return { report, reconciliation };
+        },
+        summarize: ({ report, reconciliation }) => ({ candidates: report.candidates, executed: report.executed, failed: report.failed, unknown: report.unknown, deferred: report.deferred, refused: report.refused, canonicalUpdates: report.canonicalUpdates + reconciliation.canonicalUpdates, reconciled: reconciliation.reconciled, stillUnknown: reconciliation.stillUnknown }),
+        onRun({ report, reconciliation }) {
+          for (const outcome of report.outcomes) {
+            if (outcome.result === 'DEFERRED') continue;
+            console.log(`[atlas] external execution ${outcome.result} intent=${outcome.intentId}${outcome.detail ? ` (${outcome.detail})` : ''}`);
+          }
+          if (reconciliation.reconciled > 0) console.log(`[atlas] external reconciliation: reconciled=${reconciliation.reconciled} stillUnknown=${reconciliation.stillUnknown}`);
+        },
+      })
+    : undefined;
   const escalation = lifecycle;
   const services = composeRuntimeServices([
     createReassessmentService({
@@ -282,16 +310,19 @@ export async function composeTargetBoot(
           // dependent intent proceed now that its gate can see CURRENT truth.
           void escalation.runNow();
           void execution.runNow();
+          void externalExecution?.runNow();
         }
       },
     }),
     lifecycle,
     execution,
+    ...(externalExecution ? [externalExecution] : []),
   ]);
   endpoints.app.runtimeServices = services;
   endpoints.app.runtimeHooks = {
     executorPrincipalId,
-    afterApproval: () => execution.runNow(),
+    afterApproval: async () => { await execution.runNow(); await externalExecution?.runNow(); },
+    ...(offerExecution ? { externalCapabilities: EXTERNAL_OFFER_SELECT_STATEMENTS } : {}),
     afterExecution: () => lifecycle.runNow(),
     // R3: the ONE planning coordinator instance (also used by the C4
     // progression pass above) so the product planning trigger cannot diverge

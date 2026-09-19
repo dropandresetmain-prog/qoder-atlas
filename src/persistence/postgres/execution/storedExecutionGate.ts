@@ -413,7 +413,6 @@ async function requireBudgetHold(
 
 export function externalCapabilityKindFromRef(capabilityRef: string): CapabilityKind | undefined {
   if (capabilityRef.startsWith('internal:')) return undefined;
-  if (capabilityRef === 'external:offer.select') return 'BOOK';
   if (capabilityRef.includes('RESERVATION') || capabilityRef.includes('BOOK')) return 'BOOK';
   if (capabilityRef.includes('CANCEL')) return 'CANCEL';
   if (capabilityRef.includes('MODIFY') || capabilityRef.includes('SERVICE')) return 'SERVICE';

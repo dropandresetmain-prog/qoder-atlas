@@ -219,6 +219,13 @@ export const RecoveryStrategyViewSchema = z.strictObject({
   }).default({ total: 0, pass: 0, fail: 0, unknown: 0 }),
   /** Every assessed subject, as persisted. Complete, and usually large. */
   projectedPeople: z.array(RecoveryStrategySubjectViewSchema),
+  /**
+   * R4-F2: present when this viable option cannot genuinely be EXECUTED by this
+   * runtime (provider execution not composed, protected booking inputs or budget
+   * missing). Surfaces must not offer such an option as an executable Recover;
+   * `message` is the explicit reason. Absent for options that can run.
+   */
+  executionBlocker: z.strictObject({ code: z.string().min(1), message: z.string().min(1) }).optional(),
 });
 export type RecoveryStrategyView = z.infer<typeof RecoveryStrategyViewSchema>;
 

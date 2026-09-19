@@ -38,7 +38,12 @@ import { updateJourneyItem } from '../../persistence/postgres/commands/travelCom
 import { PgAggregateHeadReader } from '../../persistence/postgres/pgAggregateHeadReader.ts';
 import { createHash } from 'node:crypto';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
-import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF } from '../../providers/atlas/transactionAdapter.ts';
+import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF, ATLAS_SANDBOX_HOST, AtlasFlightTransactionAdapter } from '../../providers/atlas/transactionAdapter.ts';
+import { AtlasFlightAdapter } from '../../providers/atlas/adapter.ts';
+import { FileRecordingStore } from '../../providers/recordingStore.ts';
+import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
 
 export const EXTERNAL_OFFER_SELECT_CAPABILITY = 'external:offer.select';
@@ -393,7 +398,7 @@ export async function runExternalOfferExecutionPass(ctx: ExternalExecutionContex
     const counters: ExternalDispatchCounters = { verify: 0, create: 0, pay: 0 };
     const dispatcher = buildAtlasOfferDispatcher(ctx.external, inputs, { amount: Number(stored.costAmount), currency: stored.costCurrency }, intentId, counters);
     const dispatched = await worker.dispatchClaimed(claim, {
-      principalId: ctx.executorPrincipalId, now, observed: { capabilityKind: 'BOOK', supported: true }, dispatcher,
+      principalId: ctx.executorPrincipalId, now, observed: { capabilityKind: 'SERVICE', supported: true } /* external:offer.select maps to SERVICE in externalCapabilityKindFromRef */, dispatcher,
     });
     outcome.detail = dispatched.detail;
     if (dispatched.outcome === 'OBSERVED_SUCCESS') {
@@ -434,3 +439,42 @@ export async function runExternalReconciliation(ctx: ExternalExecutionContext): 
 }
 
 export { ATLAS_SANDBOX_BALANCE_PAYMENT_REF };
+
+// ---------------------------------------------------------------------------
+// Boot composition: honest or absent (never a fabricated capability)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compose the Atlas SANDBOX execution seam from the shared provider config.
+ *
+ * Composed ONLY when (a) ADAPTER_MODE is LIVE or RECORD (REPLAY makes no
+ * provider call and cannot prove a mutation, so it is never advertised as
+ * executable), (b) Atlas credentials are present, and (c) the base URL is the
+ * Atlas sandbox host. Otherwise `undefined`: approval then refuses transport
+ * options with the explicit `EXTERNAL_EXECUTION_NOT_COMPOSED` reason.
+ * RECORD persists sanitized provider results under the recordings dir so REPLAY
+ * keeps a fallback corpus.
+ */
+export function composeOfferExecution(config: AppConfig, cwd: string): ExternalOfferExecutionDeps | undefined {
+  if (config.adapterMode === 'REPLAY') return undefined;
+  const atlas = config.providers.atlas;
+  if (!hasLiveCredentials(config, 'atlas') || !atlas.baseUrl) return undefined;
+  let host: string;
+  try { host = new URL(atlas.baseUrl).hostname; } catch { return undefined; }
+  if (host !== ATLAS_SANDBOX_HOST) return undefined;
+  const scenariosDir = join(cwd, config.fixturesDir, 'scenarios');
+  const scenarioRecordingDirs = existsSync(scenariosDir)
+    ? readdirSync(scenariosDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => join(config.fixturesDir, 'scenarios', e.name, 'recordings'))
+    : [];
+  const store = new FileRecordingStore({
+    readDirs: [config.recordingsDir, join(config.fixturesDir, 'recordings'), ...scenarioRecordingDirs],
+    ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
+  });
+  const common = { mode: config.adapterMode, store, baseUrl: atlas.baseUrl, clientId: atlas.clientId, clientSecret: atlas.clientSecret };
+  return {
+    flight: new AtlasFlightAdapter(common),
+    transactions: new AtlasFlightTransactionAdapter(common),
+    mode: config.adapterMode,
+    paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
+  };
+}

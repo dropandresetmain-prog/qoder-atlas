@@ -28,7 +28,7 @@ import {
 import { openDisruptionCase, worldAt, type DisruptedWorld, type OpenCase, type WorldSpec } from './r1ProgrammeWorld.ts';
 import { createRecoveryPlanningCoordinator } from '../src/app/target/recoveryPlanningCoordinator.ts';
 import { runRecoveryProgressionPass } from '../src/app/target/recoveryProgressionPass.ts';
-import { approveRecoveryStrategy } from '../src/app/target/recoveryApproval.ts';
+import { approveRecoveryStrategy, externalExecutionBlockerForStrategyId } from '../src/app/target/recoveryApproval.ts';
 import { createPlanningToolTransport } from '../src/resolution/planning/replayPlanningTransport.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
@@ -250,6 +250,10 @@ describe('R4-F2 transport Recover through the Atlas sandbox seam (real PostgreSQ
     // 0. The protected binding was written by the coordinator, not by any approval path.
     assert.equal(await f.count('SELECT count(*)::text AS n FROM offer_execution_bindings WHERE workspace_id = $1'), 1);
 
+    // The read model (what Recover is offered from) uses the SAME probe: an explicit blocker per option.
+    assert.equal((await externalExecutionBlockerForStrategyId(f.c.pool, f.ws, f.strategyId, undefined))?.code, 'EXTERNAL_EXECUTION_NOT_COMPOSED');
+    assert.equal((await externalExecutionBlockerForStrategyId(f.c.pool, f.ws, f.strategyId, EXTERNAL_OFFER_SELECT_STATEMENTS))?.code, 'EXECUTION_INPUTS_UNAVAILABLE');
+
     // 1. Execution capability not composed => explicit reason.
     const notComposed = await approveRecoveryStrategy(base, input);
     assert.equal(notComposed.ok, false);
@@ -283,6 +287,7 @@ describe('R4-F2 transport Recover through the Atlas sandbox seam (real PostgreSQ
     const f = await plannedTransportCase('R4F2 happy');
     const provider = scriptedProvider(f.c.pool, f.ws, { payable: 5 });
     const before = await f.selectedService();
+    assert.equal(await externalExecutionBlockerForStrategyId(f.c.pool, f.ws, f.strategyId, EXTERNAL_OFFER_SELECT_STATEMENTS), undefined, 'a runnable option carries no blocker: Recover is truthful');
 
     // Nothing runs before approval: no decision/approval => no candidate => no provider call.
     assert.equal((await runExternalOfferExecutionPass(f.execCtx(provider.deps))).candidates, 0);

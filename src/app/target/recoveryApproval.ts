@@ -124,7 +124,29 @@ export async function externalExecutionBlocker(
   pool: Pool, workspaceId: string, strategy: RecoveryStrategy,
   externalCapabilities: readonly CapabilityStatement[] | undefined,
 ): Promise<{ code: string; message: string } | undefined> {
-  const offers = strategy.scenarioChange.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' ? [e] : []));
+  return externalExecutionBlockerFor(pool, workspaceId, { id: strategy.id, effects: strategy.scenarioChange.effects }, externalCapabilities);
+}
+
+type StrategyEffects = { id: string; effects: RecoveryStrategy['scenarioChange']['effects'] };
+
+/** Same probe by strategy id (read-model use): loads the stored effects. Undefined for non-external strategies. */
+export async function externalExecutionBlockerForStrategyId(
+  pool: Pool, workspaceId: string, strategyId: string,
+  externalCapabilities: readonly CapabilityStatement[] | undefined,
+): Promise<{ code: string; message: string } | undefined> {
+  const row = (await pool.query<{ scenario_change: { effects?: RecoveryStrategy['scenarioChange']['effects'] } }>(
+    'SELECT scenario_change FROM recovery_strategies WHERE workspace_id = $1 AND id = $2', [workspaceId, strategyId],
+  )).rows[0];
+  const effects = row?.scenario_change?.effects;
+  if (!effects) return undefined;
+  return externalExecutionBlockerFor(pool, workspaceId, { id: strategyId, effects }, externalCapabilities);
+}
+
+async function externalExecutionBlockerFor(
+  pool: Pool, workspaceId: string, strategy: StrategyEffects,
+  externalCapabilities: readonly CapabilityStatement[] | undefined,
+): Promise<{ code: string; message: string } | undefined> {
+  const offers = strategy.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' ? [e] : []));
   if (offers.length === 0) return undefined;
   if (!externalCapabilities?.some((c) => c.capabilityRef === 'external:offer.select' && c.supported)) {
     return { code: 'EXTERNAL_EXECUTION_NOT_COMPOSED', message: 'this runtime has no provider execution capability composed for transport bookings' };
@@ -141,8 +163,8 @@ export async function externalExecutionBlocker(
 }
 
 /** Budgets that could fund the strategy's costed SELECT_OFFER effects: the trip organisation's budgets in the offer currency. */
-async function budgetCandidatesFor(pool: Pool, workspaceId: string, strategy: RecoveryStrategy): Promise<{ needed: boolean; ids: string[] }> {
-  const costed = strategy.scenarioChange.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' && e.offerPrice ? [e] : []));
+async function budgetCandidatesFor(pool: Pool, workspaceId: string, strategy: StrategyEffects): Promise<{ needed: boolean; ids: string[] }> {
+  const costed = strategy.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' && e.offerPrice ? [e] : []));
   if (costed.length === 0) return { needed: false, ids: [] };
   const ids = new Set<string>();
   for (const effect of costed) {
@@ -165,7 +187,7 @@ async function budgetCandidatesFor(pool: Pool, workspaceId: string, strategy: Re
 async function holdBudget(
   ctx: ApprovalContext, strategy: RecoveryStrategy, intentId: string, cost: ExactMoney,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const candidates = await budgetCandidatesFor(ctx.pool, ctx.workspaceId, strategy);
+  const candidates = await budgetCandidatesFor(ctx.pool, ctx.workspaceId, { id: strategy.id, effects: strategy.scenarioChange.effects });
   const heads = new PgAggregateHeadReader(ctx.pool, ctx.workspaceId);
   const failures: string[] = [];
   for (const budgetId of candidates.ids) {
