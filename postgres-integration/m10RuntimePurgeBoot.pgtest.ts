@@ -82,10 +82,11 @@ test('normal boot works end-to-end with no SQLite database reachable', async () 
     const resetBody = await reset.json() as { travellers: unknown[] };
     assert.equal(resetBody.travellers.length, 2);
 
-    // The legacy dashboard route must not exist on this server at all —
-    // not redirected, not stubbed, genuinely unmounted.
-    const legacyOperator = await fetch(`${base}/operator`);
-    assert.equal(legacyOperator.status, 404);
+    // `/operator` is the current PostgreSQL product alias, not the retired
+    // SQLite composition. Prove it reaches the same target overview handler.
+    const operator = await fetch(`${base}/operator`, { redirect: 'manual' });
+    assert.equal(operator.status, 302);
+    assert.equal(operator.headers.get('location'), '/api/v2/operator/overview?format=html');
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
