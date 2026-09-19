@@ -15,7 +15,7 @@ import {
   remainderViabilityTone,
   semanticToneDotClass,
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
-import { CHECK_RESULT_LABEL, scrubText } from '../../app/target/adapters/surfaceLabels.ts';
+import { CHECK_RESULT_LABEL, plainChangeText, scrubText } from '../../app/target/adapters/surfaceLabels.ts';
 import { caseHref } from '../../app/target/productShell.ts';
 import { presentGraphState } from '../semantics/adapter.ts';
 import { VIABILITY_LABEL } from '../copy.ts';
@@ -111,7 +111,7 @@ export function renderProductIncidentProgramme(
   const back = options.caseRef
     ? `<a href="${escapeHtml(caseHref(options.caseRef))}" data-test="back-to-case">← Back to case</a> · `
     : '';
-  const summary = scrubText(view.sourceChangeSummary) || 'A change is affecting the programme.';
+  const summary = plainChangeText(view.sourceChangeSummary) || 'A change is affecting the programme.';
   return `
 <main class="shell product-incident-programme" data-test="product-incident-programme" data-ui-screen="incident-programme">
   <div class="page-head">

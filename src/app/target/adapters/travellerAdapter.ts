@@ -8,7 +8,7 @@
  */
 import type { TravellerTripView as V2TravellerTripView } from '../../../contracts/v2/product/readModels.ts';
 import type { ReadModelStatus, RemainderViability } from '../../../contracts/readmodels.ts';
-import { STATUS_LABEL, TRAVELLER_HEADLINE, TRAVELLER_SUBLINE } from '../../../ui/copy.ts';
+import { CASE_STATUS_BADGE, STATUS_LABEL, TRAVELLER_HEADLINE, TRAVELLER_SUBLINE } from '../../../ui/copy.ts';
 import { scrubText } from './surfaceLabels.ts';
 
 export interface TravellerSurfaceView {
@@ -26,9 +26,17 @@ export interface TravellerSurfaceView {
   updatedAt: string;
 }
 
+/** Lifecycle sentences the projection assembles around a raw status code. */
+function humanizeLifecycleSentence(text: string): string {
+  const status = (code: string) => (CASE_STATUS_BADGE[code]?.label ?? 'In progress').toLowerCase();
+  return text
+    .replace(/Linked recovery case\s+\S+\s+is\s+([A-Z_]+)/g, (_m, code: string) => `A recovery case is open for your trip (${status(code)})`)
+    .replace(/Recovery case status:\s*([A-Z_]+)/g, (_m, code: string) => `Recovery status: ${status(code)}`);
+}
+
 function clean(text: string | undefined): string | undefined {
   if (!text) return undefined;
-  const value = scrubText(text);
+  const value = scrubText(humanizeLifecycleSentence(text));
   return value.length > 0 ? value : undefined;
 }
 

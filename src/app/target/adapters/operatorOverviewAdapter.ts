@@ -13,6 +13,7 @@ import type {
 } from '../../../contracts/v2/product/readModels.ts';
 import { escapeHtml } from '../../../ui/html.ts';
 import { caseHref } from '../productShell.ts';
+import { plainChangeText } from './surfaceLabels.ts';
 import {
   presentAssessment, presentGraphState, presentOperationalStatus, presentViability,
 } from '../../../ui/semantics/adapter.ts';
@@ -178,8 +179,8 @@ function queueRowShell(
 
 function overviewItemRow(item: OperatorOverviewItem): string {
   const issue =
-    item.whatChanged ??
-    item.recoveryActivity ??
+    plainChangeText(item.whatChanged) ??
+    plainChangeText(item.recoveryActivity) ??
     (item.decisionRequired ? 'Decision required before recovery can continue.' : 'No open issues reported.');
   const viability = `<span class="badge tone-${remainderViabilityTone(item.remainderViability)}">${escapeHtml(remainderViabilityLabel(item.remainderViability))}</span>`;
   const glyph = queueGlyph(item);
@@ -305,7 +306,7 @@ function rosterEntries(view: OperatorOverview, queue: readonly OperatorOverviewI
     if (seen.has(entry.journeyRef)) continue;
     seen.add(entry.journeyRef);
     const item = (entry.caseRef ? byCase.get(entry.caseRef) : undefined) ?? byJourney.get(entry.journeyRef);
-    const issue = item?.whatChanged ?? item?.recoveryActivity;
+    const issue = plainChangeText(item?.whatChanged) ?? plainChangeText(item?.recoveryActivity);
     rows.push({ entry, ...(issue ? { issue } : {}) });
   }
   return rows.sort((a, b) =>
