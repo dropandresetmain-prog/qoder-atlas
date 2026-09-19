@@ -171,6 +171,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
   }
   for (const sourceId of dataset.groundTransfers?.sourceIds ?? []) statedSourceIds.add(sourceId);
   if (dataset.jurisdictions) statedSourceIds.add(dataset.jurisdictions.sourceId);
+  if (dataset.journeyRequirements) statedSourceIds.add(dataset.journeyRequirements.sourceId);
 
   const sourceRecordIds = new Map<string, string>();
   for (const statedSourceId of [...statedSourceIds].sort()) {
@@ -210,6 +211,9 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     { family: 'policy', assertionType: 'DATASET_POLICY_DECLARATION', sources: context.ruleSets.flatMap((rs) => (rs.sourceId ? [rs.sourceId] : [])) },
     { family: 'geography', assertionType: 'DATASET_GEOGRAPHY_DECLARATION', sources: dataset.jurisdictions ? [dataset.jurisdictions.sourceId] : [] },
     { family: 'transfers', assertionType: 'DATASET_TRANSFER_DECLARATION', sources: dataset.groundTransfers?.sourceIds ?? [] },
+    ...(dataset.journeyRequirements
+      ? [{ family: 'journeyRequirements', assertionType: 'DATASET_JOURNEY_REQUIREMENT_DECLARATION', sources: [dataset.journeyRequirements.sourceId] }]
+      : []),
   ];
   const evidenceIds = new Map<string, string>();
   for (const { family, assertionType, sources } of evidenceFamilies) {
@@ -733,6 +737,27 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     ).revision;
     bump('journeys');
     await sourceIdentity.map(SOURCE_RECORD_TYPES.JOURNEY, traveller.draftId, { kind: 'JOURNEY', id: journeyId });
+
+    // These are explicit source policy statements attached to the Journey
+    // represented by this traveller draft. They are typed requirements, not
+    // inferred facts and not evaluator verdicts.
+    for (const requirement of dataset.journeyRequirements?.requirements.filter((item) => item.travellerDraftId === traveller.draftId) ?? []) {
+      mustOk(
+        await recordConstraintDefinition(uow(), {
+          ...identity,
+          idempotencyKey: ids.key('journey-requirement', requirement.id),
+          constraintDefinitionId: ids.id('journey-requirement', requirement.id),
+          registeredType: 'overnight_accommodation_required',
+          hardness: 'HARD',
+          ownerRef: { kind: 'JOURNEY', id: journeyId },
+          parameterSchemaVersion: 'northstar-demo-dataset/journey-requirement/1',
+          provenanceEvidenceId: evidenceFor('journeyRequirements'),
+          operands: [{ key: 'minimum_gap_hours', kind: 'NUMBER', value: requirement.minimumGapHours }],
+        }),
+        `recordConstraintDefinition(${requirement.id})`,
+      );
+      bump('journeyRequirements');
+    }
 
     // Declared travel, in the order the dataset states it.
     for (const [index, item] of traveller.declaredTravel.entries()) {

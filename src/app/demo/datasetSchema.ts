@@ -247,3 +247,30 @@ export const DatasetJurisdictionsSchema = z.looseObject({
   })).default([]),
 });
 export type DatasetJurisdictions = z.infer<typeof DatasetJurisdictionsSchema>;
+
+/**
+ * Optional organiser-declared Journey requirement facts. These are source
+ * policy statements, not evaluator verdicts or discovered legal requirements.
+ */
+export const DatasetJourneyRequirementSchema = z.strictObject({
+  id: NonEmpty,
+  travellerDraftId: NonEmpty,
+  kind: z.literal('OVERNIGHT_ACCOMMODATION'),
+  minimumGapHours: z.number().finite().positive(),
+});
+export type DatasetJourneyRequirement = z.infer<typeof DatasetJourneyRequirementSchema>;
+
+export const DatasetJourneyRequirementsSchema = z.strictObject({
+  sourceId: NonEmpty,
+  observedAt: z.iso.datetime({ offset: true }),
+  requirements: z.array(DatasetJourneyRequirementSchema).superRefine((requirements, context) => {
+    const ids = new Set<string>();
+    for (const requirement of requirements) {
+      if (ids.has(requirement.id)) {
+        context.addIssue({ code: 'custom', message: `duplicate journey requirement id ${requirement.id}` });
+      }
+      ids.add(requirement.id);
+    }
+  }),
+});
+export type DatasetJourneyRequirements = z.infer<typeof DatasetJourneyRequirementsSchema>;

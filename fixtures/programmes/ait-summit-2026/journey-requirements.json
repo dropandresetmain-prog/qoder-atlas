@@ -1,0 +1,12 @@
+{
+  "sourceId": "src-syn-ait-organiser-policy",
+  "observedAt": "2026-08-25T09:00:00+00:00",
+  "requirements": [
+    {
+      "id": "req-syn-ait-draft-09-overnight",
+      "travellerDraftId": "ait-draft-09",
+      "kind": "OVERNIGHT_ACCOMMODATION",
+      "minimumGapHours": 8
+    }
+  ]
+}
