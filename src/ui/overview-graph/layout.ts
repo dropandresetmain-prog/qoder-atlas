@@ -61,19 +61,20 @@ function packRow(
 ): { placed: Map<string, Box>; bottom: number } {
   const placed = new Map<string, Box>();
   const sorted = [...items].sort((a, b) => a.cx - b.cx);
-  let row = 0;
-  let cursor = minX;
-  for (const item of sorted) {
-    let x = Math.max(cursor, item.cx - size.w / 2);
-    if (x + size.w > maxRight && cursor > minX) {
-      row += 1;
-      cursor = minX;
-      x = Math.max(cursor, Math.min(item.cx - size.w / 2, maxRight - size.w));
-    }
-    placed.set(item.node.id, { x, y: top + row * (size.h + rowGap), w: size.w, h: size.h });
-    cursor = x + size.w + GAP;
+  const capacity = Math.max(1, Math.floor((maxRight - minX + GAP) / (size.w + GAP)));
+  for (let first = 0; first < sorted.length; first += capacity) {
+    const row = sorted.slice(first, first + capacity);
+    let cursor = minX;
+    row.forEach((item, index) => {
+      // Reserve space for the rest of this row. A cluster targeting a late
+      // programme item must not create a mostly empty row for every card.
+      const lastStart = maxRight - size.w - (row.length - index - 1) * (size.w + GAP);
+      const x = Math.max(cursor, Math.min(item.cx - size.w / 2, lastStart));
+      placed.set(item.node.id, { x, y: top + (first / capacity) * (size.h + rowGap), w: size.w, h: size.h });
+      cursor = x + size.w + GAP;
+    });
   }
-  const rows = sorted.length === 0 ? 0 : row + 1;
+  const rows = Math.ceil(sorted.length / capacity);
   return { placed, bottom: top + rows * size.h + Math.max(0, rows - 1) * rowGap };
 }
 

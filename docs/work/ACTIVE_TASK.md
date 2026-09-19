@@ -36,7 +36,9 @@ Active A1 lanes: Overview semantics Terra `codex/astra-a1-overview-semantics`; T
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
-- Current pushed primary before Case presentation follow-on: `4f98aec` (Activity, navigation, Overview geometry, programme preview, Case semantics and Overview handoff).
+- Current pushed primary: `422d3b3` (Case presentation/polling, initial SVG viewport/card spacing, Decisions history and Traveller read lanes integrated). Direct TypeScript passed after both merges.
+- Initial Case SVG had a zero-size viewport: fixed initial stage dimensions; physical screenshot proves visible dependency lines and arrival time. Focused renderer 13/13 passed; supporting-card height increased, final physical check pending.
+- Decisions lane `1c3358ec`: 31 UI tests and isolated PG history proof passed, including distinct revoker attribution. Traveller lane `0ea1acc`: 47 focused tests and 1 real PG test passed (itinerary/commitment, pending/stale, no-case and approval copy); primary found follow-up allocation ambiguity and lifecycle-copy issues to close.
 - Activity: 20-row keyset pagination; focused PG shell file 2/2 passed on `astra_a1_shell` (timestamp ties, microseconds, inserted new row, complete history, invalid/cross-workspace cursor); direct TypeScript passed. Browser proof pending restart.
 - Navigation ready: 45 focused tests and direct TypeScript passed; explicit Traveller event context replaces brittle HTML rewriting.
 - Overview layout ready: 10 focused geometry tests and direct TypeScript passed. Dependency rows no longer overlap programme; same-day cohorts stack. Physical merged proof pending.
@@ -59,10 +61,10 @@ Active A1 lanes: Overview semantics Terra `codex/astra-a1-overview-semantics`; T
 
 ## Exact next action / stop-safe handoff
 
-Commit/push Case presentation/polling follow-on. Integrate active semantic/read lanes; complete Overview compact readability and remaining Programme/Traveller jobs; run integrated browser checks and appropriate A1 gates. Pause only after A1 is genuinely accepted/pushed; no A2 execution.
+Integrate final Overview semantic correction (lane `9e1a7cb`, resource label/relation proof follow-up active); adapt layout to explicit relation kinds. Complete Programme roster lane, Traveller action-boundary decision and read corrections, graph physical fidelity, then A1 gates. Pause only after A1 is genuinely accepted/pushed; no A2 execution.
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
-Remaining action-seam findings: programme bilateral preview is real but unwired; generic programme preview/commit and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope.
+Remaining action-seam findings: programme bilateral preview is now wired and integrated; generic programme preview/commit, intake and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope. No retirement/deferral decision has been accepted.
 Browser artifacts: ignored `output/playwright/` screenshots; temporary untracked `.playwright-cli/` snapshots/logs must stay out of commits.
 Evidence not run: integrated browser acceptance, Overview semantic follow-on, A1 broad gates, A2–A5 acceptance. Applied disclosed Sarah supplier input physically in isolated REPLAY runtime; Case awaits programme approval. No execution acceptance claimed.
 Continue in this task while checkpoint context is clean; use this ledger plus A0 record for a fresh task if context becomes noisy. Never branch from the preparation pack or merge directly to main.

@@ -305,3 +305,12 @@ test('overview layout keeps packed dependencies above the spine and cards disjoi
   assert.ok(new Set(wrappedDependencies.map((box) => box.y)).size > 1, 'bounded dependency packing exercises multiple rows');
   assert.ok(wrappedDependencies.every((box) => box.y + box.h <= wrapped.lane.y), 'wrapped dependency rows clear the programme lane');
 });
+
+test('late-day dependency targets do not create nearly empty packing rows', () => {
+  const days = [{ index: 1, title: 'One', sub: '' }, { index: 2, title: 'Two', sub: '' }, { index: 3, title: 'Three', sub: '' }];
+  const nodes = Array.from({ length: 12 }, (_, i) => geometryNode(`shared-${i}`, 'dependency', 3));
+  const layout = computeOverviewLayout({ days, nodes, relations: [], active: false });
+  const boxes = [...layout.boxes.values()];
+  assert.equal(new Set(boxes.map((box) => box.y)).size, 3, 'twelve cards use the three rows available at five cards per row');
+  assert.ok(boxes.every((box) => box.x + box.w <= layout.width));
+});
