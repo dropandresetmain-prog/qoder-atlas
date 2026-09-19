@@ -13,7 +13,7 @@ import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { RuleExpression } from '../src/domain/v2/knowledge/information.ts';
 import { assessSubject, createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
 import { credentialsEvaluator } from '../src/resolution/evaluation/evaluators/credentials.ts';
-import { entryEvaluator } from '../src/resolution/evaluation/evaluators/entry.ts';
+import { coverageFor, entryEvaluator } from '../src/resolution/evaluation/evaluators/entry.ts';
 import { informationEvaluator } from '../src/resolution/evaluation/evaluators/information.ts';
 import { deriveEncounters, kleeneAll, kleeneAny, kleeneNot, type Encounter } from '../src/resolution/evaluation/encounters.ts';
 import { evaluateRuleExpression, type PredicateContext } from '../src/resolution/evaluation/entryPredicates.ts';
@@ -534,6 +534,48 @@ test('entry: no applicable edition with complete coverage PASSes no_applicable_r
   const dim = out.dimensions.find((d) => d.dimension === 'entry_feasibility');
   assert.equal(dim?.verdict, 'PASS');
   assert.equal(dim?.explanations[0]?.reasonCode, 'no_applicable_requirement_complete_coverage');
+});
+
+test('entry: scoped complete coverage cannot PASS another journey on the no-edition path', () => {
+  const coveredJourneyId = id();
+  const evaluatedJourneyId = id();
+  const travellerId = id();
+  const world = emptyWorld({ journeys: [journeyRow(coveredJourneyId, travellerId), journeyRow(evaluatedJourneyId, travellerId)] });
+  world.intendedVisits.push(visitRow(evaluatedJourneyId, 'jurisdiction-a'));
+  world.coverage.push(coverageRow('ENTRY_REQUIREMENT', 'jurisdiction-a', { queryBounds: { jurisdictionId: 'jurisdiction-a', journeyId: coveredJourneyId } }));
+  const out = entryEvaluator.evaluate(subjectOf(evaluatedJourneyId), { now: NOW, world, effective: effectiveOf(world) });
+  const dim = out.dimensions.find((d) => d.dimension === 'entry_feasibility');
+  assert.equal(dim?.verdict, 'UNKNOWN');
+  assert.equal(dim?.explanations[0]?.reasonCode, 'requirement_coverage_incomplete');
+});
+
+test('entry: scoped complete coverage matches the exact journey and visit, while direct callers cannot consume it without context', () => {
+  const journeyId = id();
+  const travellerId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+  const visit = visitRow(journeyId, 'jurisdiction-a');
+  world.intendedVisits.push(visit);
+  world.coverage.push(coverageRow('ENTRY_REQUIREMENT', 'jurisdiction-a', { queryBounds: { jurisdictionId: 'jurisdiction-a', journeyId, visitId: visit.id } }));
+
+  assert.equal(coverageFor(world, 'ENTRY_REQUIREMENT', 'jurisdiction-a', NOW).complete, false);
+  assert.equal(coverageFor(world, 'ENTRY_REQUIREMENT', 'jurisdiction-a', NOW, { journeyId, visitId: 'different-visit' }).complete, false);
+  assert.equal(coverageFor(world, 'ENTRY_REQUIREMENT', 'jurisdiction-a', NOW, { journeyId, visitId: visit.id }).complete, true);
+
+  const out = entryEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+  const dim = out.dimensions.find((d) => d.dimension === 'entry_feasibility');
+  assert.equal(dim?.verdict, 'PASS');
+  assert.equal(dim?.explanations[0]?.reasonCode, 'no_applicable_requirement_complete_coverage');
+});
+
+test('entry: malformed scoped coverage fails closed and unscoped jurisdiction coverage remains usable', () => {
+  const journeyId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, id())] });
+  const malformed = coverageRow('ENTRY_REQUIREMENT', 'jurisdiction-a', { queryBounds: { jurisdictionId: 'jurisdiction-a', journeyId: ' ' } });
+  world.coverage.push(malformed);
+  assert.equal(coverageFor(world, 'ENTRY_REQUIREMENT', 'jurisdiction-a', NOW, { journeyId, visitId: null }).complete, false);
+
+  world.coverage.push(coverageRow('ENTRY_REQUIREMENT', 'jurisdiction-a'));
+  assert.equal(coverageFor(world, 'ENTRY_REQUIREMENT', 'jurisdiction-a', NOW, { journeyId, visitId: null }).complete, true);
 });
 
 test('entry: no applicable edition and no coverage UNKNOWNs requirement_coverage_incomplete', () => {

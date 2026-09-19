@@ -149,9 +149,29 @@ export interface CoverageCheck {
   uncertainty: Uncertainty[];
 }
 
+export interface CoverageContext {
+  journeyId: string;
+  visitId: string | null;
+}
+
+function validCoverageScopeId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function coverageMatchesContext(coverage: WCoverage, context: CoverageContext | undefined): boolean {
+  const bounds = coverage.queryBounds;
+  const hasJourneyScope = Object.prototype.hasOwnProperty.call(bounds, 'journeyId');
+  const hasVisitScope = Object.prototype.hasOwnProperty.call(bounds, 'visitId');
+  if (!hasJourneyScope && !hasVisitScope) return true;
+  if (!context) return false;
+  if (hasJourneyScope && (!validCoverageScopeId(bounds.journeyId) || !validCoverageScopeId(context.journeyId) || bounds.journeyId !== context.journeyId)) return false;
+  if (hasVisitScope && (!validCoverageScopeId(bounds.visitId) || !validCoverageScopeId(context.visitId) || bounds.visitId !== context.visitId)) return false;
+  return true;
+}
+
 /** Complete, limitation-free, unexpired coverage for `topic` bounded to the jurisdiction. */
-export function coverageFor(world: CapturedWorld, topic: string, jurisdictionId: string, now: Instant): CoverageCheck {
-  const records = world.coverage.filter((c) => c.topic === topic && c.queryBounds.jurisdictionId === jurisdictionId).sort((a, b) => a.id.localeCompare(b.id));
+export function coverageFor(world: CapturedWorld, topic: string, jurisdictionId: string, now: Instant, context?: CoverageContext): CoverageCheck {
+  const records = world.coverage.filter((c) => c.topic === topic && c.queryBounds.jurisdictionId === jurisdictionId && coverageMatchesContext(c, context)).sort((a, b) => a.id.localeCompare(b.id));
   const unexpired = (c: WCoverage) => c.expiresAt === null || Date.parse(c.expiresAt) > Date.parse(now);
   const complete = records.some((c) => unexpired(c) && coverageSupportsUnqualifiedPass({ completeness: c.completeness as KnowledgeCoverageCompleteness, completenessLimitations: c.limitations }));
   const subjectRef: TypedRef = { kind: 'JURISDICTION', id: jurisdictionId };
@@ -222,7 +242,7 @@ function evaluateEncounter(world: CapturedWorld, now: Instant, journey: WJourney
   const lookup = requirementsFor(world, journey, e.kind, e.jurisdictionId, e.at);
   boundaries.push(...lookup.boundaries);
   const topic = TOPIC[e.kind];
-  const coverage = coverageFor(world, topic, e.jurisdictionId, now);
+  const coverage = coverageFor(world, topic, e.jurisdictionId, now, { journeyId: journey.id, visitId: e.visitId });
   for (const c of coverage.records) boundaries.push(c.expiresAt);
   const jurisdictionSubject: TypedRef = { kind: 'JURISDICTION', id: e.jurisdictionId };
 
