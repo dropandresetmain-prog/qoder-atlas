@@ -114,6 +114,16 @@ export const ComparatorPreferenceSchema = z.strictObject({
   inferred: z.boolean(),
   summary: z.string().min(1).max(512),
   subjectRef: TypedRefSchema.optional(),
+  /**
+   * Optional deterministic matcher (data, not code): which candidate properties
+   * satisfy this preference. A preference with no matcher is carried as
+   * context and never affects ranking. Every listed criterion must hold.
+   */
+  match: z.strictObject({
+    domains: z.array(z.string().min(1)).max(16).optional(),
+    proposerIds: z.array(z.string().min(1)).max(16).optional(),
+    changedRefKinds: z.array(z.string().min(1)).max(16).optional(),
+  }).optional(),
 });
 export type ComparatorPreference = z.infer<typeof ComparatorPreferenceSchema>;
 

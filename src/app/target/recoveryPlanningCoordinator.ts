@@ -61,6 +61,7 @@ import {
   type CoordinatorMinters,
   type DomainProposerBinding,
 } from '../../resolution/planning/coordinatorCore.ts';
+import { loadPlanningPreferences, preferenceOwnerIds } from './planningPreferences.ts';
 import { advanceCasePhase } from './recoveryPlanning.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { applicationError } from './applicationCommands.ts';
@@ -125,6 +126,7 @@ interface BasisCapture {
   currentState: CurrentState;
   registry: EvaluatorRegistry;
   basisAssessmentId: string;
+  programmeIds: string[];
 }
 
 async function caseStatus(pool: Pool, workspaceId: string, caseId: string): Promise<string | undefined> {
@@ -181,7 +183,7 @@ async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseI
   });
   const effective = projectEffectiveWorld(world);
   const currentState = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, world.manifest);
-  return { failing, world, effective, currentState, registry, basisAssessmentId: failing[0]!.assessment.id };
+  return { failing, world, effective, currentState, registry, basisAssessmentId: failing[0]!.assessment.id, programmeIds: programmeRefs.map((r) => r.id as string) };
 }
 
 /** Deterministic id/version minters, mirroring the B1 seam's planning namespace. */
@@ -273,6 +275,13 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           .corridors.map((corridor) => flightSearchRequestFor(corridor, { round: 1 }))
         : [];
 
+      // G09: stored EXPLICIT/INFERRED preferences of the affected owners feed the
+      // comparator (explicit > inferred). Read-only; never a hard constraint.
+      const preferences = await loadPlanningPreferences(
+        deps.pool, deps.workspaceId,
+        preferenceOwnerIds(basis.world, basis.failing, basis.programmeIds), now,
+      );
+
       // 2. Delegate ALL decision logic to the pure core.
       const core = await runRecoveryPlanning(
         {
@@ -291,6 +300,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           domainRegistry: deps.domainRegistry ?? defaultRecoveryDomainRegistry(),
           availableCapabilities: deps.availableCapabilities ?? derivedCapabilities(transportPlanning),
           proposers,
+          ...(preferences.length > 0 ? { preferences } : {}),
           minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
