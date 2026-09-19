@@ -62,6 +62,15 @@ function timeSwapSection(view: ProgrammeSchedule): string {
   if (eligible.length < 2) return '';
   const options = eligible.map((item) =>
     `<option value="${escapeHtml(item.itemRef)}">${escapeHtml(item.label)}</option>`).join('');
+  const cases = new Map<string, string>();
+  for (const traveller of view.travellers ?? []) {
+    for (const caseRef of traveller.caseRefs) cases.set(caseRef, traveller.label);
+  }
+  const caseChoice = cases.size === 0 ? '' : `<label class="kv-label" for="programme-time-swap-case">Recovery case (optional)
+    <select id="programme-time-swap-case" data-programme-case style="display:block;width:100%;margin-top:6px;font:inherit;padding:8px">
+      <option value="">Preview only</option>
+      ${[...cases].map(([ref, label]) => `<option value="${escapeHtml(ref)}">${escapeHtml(label)} — trip recovery</option>`).join('')}
+    </select></label>`;
   return `
   <section class="section" aria-label="Preview a programme time swap" data-programme-time-swap data-test="programme-time-swap">
     <h2>Preview a time swap</h2>
@@ -78,6 +87,7 @@ function timeSwapSection(view: ProgrammeSchedule): string {
             ${options}
           </select>
         </label>
+        ${caseChoice}
       </div>
       <div class="btn-row" style="margin-top:14px">
         <button type="button" class="btn btn-primary" data-programme-time-swap-preview data-test="programme-time-swap-preview">Preview time swap</button>

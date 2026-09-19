@@ -17,6 +17,7 @@ import { persistRecoveryStrategy } from '../../persistence/postgres/commands/m7S
 import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { previewAuthoritativeBilateralProgrammeTimeSwap } from './programmeTimeSwapPreview.ts';
+import { canonicalPayloadHash } from '../../persistence/postgres/canonicalHash.ts';
 
 const TERMINAL_CASE_STATUSES = new Set(['RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED']);
 
@@ -55,13 +56,14 @@ export function programmeTimeSwapStrategyIdentity(input: {
   itemARef: string;
   itemBRef: string;
   programmeRevisions: readonly { programmeId: string; revision: number }[];
+  basisKey?: string;
 }): { strategyId: string; scenarioChangeId: string; key: string } {
   const pair = [input.itemARef, input.itemBRef].sort().join('|');
   const revisions = [...input.programmeRevisions]
     .sort((a, b) => a.programmeId.localeCompare(b.programmeId))
     .map((row) => `${row.programmeId}@${row.revision}`)
     .join('|');
-  const key = `programme-time-swap|${input.workspaceId}|${input.recoveryCaseId}|${pair}|${revisions}`;
+  const key = `programme-time-swap|${input.workspaceId}|${input.recoveryCaseId}|${pair}|${revisions}|${input.basisKey ?? ''}`;
   const strategyId = deterministicUuid(RUNTIME_ID_NAMESPACES.planning, key);
   return {
     key,
@@ -241,16 +243,6 @@ export async function stageProgrammeTimeSwap(
     return { ok: false, error: 'PROGRAMME_TIME_SWAP_PREVIEW_NOT_VIABLE' };
   }
 
-  const identity = programmeTimeSwapStrategyIdentity({
-    workspaceId: input.workspaceId,
-    recoveryCaseId: input.recoveryCaseId,
-    itemARef: input.itemARef,
-    itemBRef: input.itemBRef,
-    programmeRevisions: scope.programmeRevisions,
-  });
-  const prior = await existingStage(ctx.pool, input.workspaceId, identity.strategyId, input.recoveryCaseId);
-  if (prior) return { ok: true, value: prior };
-
   const registry = createM6Registry();
   const focus: TypedRef[] = [
     { kind: 'PROGRAMME_ITEM', id: input.itemARef },
@@ -264,6 +256,20 @@ export async function stageProgrammeTimeSwap(
   });
   const basisAssessmentId = await loadBasisAssessmentId(ctx.pool, input.workspaceId, scope.affectedJourneyRefs, input.now);
   if (!basisAssessmentId) return { ok: false, error: 'RECOVERY_CASE_ASSESSMENT_UNAVAILABLE' };
+  // A peer's travel state can change without a programme revision. A fresh
+  // preview must not return the old, permanently stale strategy in that case.
+  const identity = programmeTimeSwapStrategyIdentity({
+    workspaceId: input.workspaceId, recoveryCaseId: input.recoveryCaseId,
+    itemARef: input.itemARef, itemBRef: input.itemBRef,
+    programmeRevisions: scope.programmeRevisions,
+    basisKey: canonicalPayloadHash({
+      basisAssessmentId, aggregateReads: baseWorld.manifest.aggregateReads,
+      scopeReads: baseWorld.manifest.scopeReads, evidenceReads: baseWorld.manifest.evidenceReads,
+      nextInvalidationAt: baseWorld.manifest.nextInvalidationAt,
+    }),
+  });
+  const prior = await existingStage(ctx.pool, input.workspaceId, identity.strategyId, input.recoveryCaseId);
+  if (prior) return { ok: true, value: prior };
   const scenarioChange: ScenarioChange = ScenarioChangeSchema.parse({
     id: identity.scenarioChangeId,
     recoveryStrategyId: identity.strategyId,

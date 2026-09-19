@@ -97,7 +97,7 @@ export function renderProductProgrammePreview(preview: BilateralProgrammeTimeSwa
       Both attendees can still make their sessions: ${yesNo(preview.bothPartiesProjectedViable)} ·
       Everyone else is unaffected: ${yesNo(preview.othersRemainViable)}
     </p>
-    <p class="footnote">Nothing has been changed. This surface only previews a bilateral time swap; applying programme changes is not available here.</p>
+    <p class="footnote">Nothing has been changed. A viable swap linked to a recovery case can be prepared for approval. NORTHSTAR checks permission and the latest trip state before applying it.</p>
   </div>
 </main>`;
 }

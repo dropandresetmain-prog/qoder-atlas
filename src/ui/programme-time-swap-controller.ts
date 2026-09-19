@@ -39,11 +39,18 @@ export function renderProgrammeTimeSwapController(): string {
     if (root.__programmeTimeSwapInit) return;
     var first = root.querySelector('[data-programme-item-a]');
     var second = root.querySelector('[data-programme-item-b]');
+    var caseChoice = root.querySelector('[data-programme-case]');
     var button = root.querySelector('[data-programme-time-swap-preview]');
     var status = root.querySelector('[data-programme-time-swap-status]');
     var result = root.querySelector('[data-programme-time-swap-result]');
     if (!first || !second || !button || !status || !result) return;
     root.__programmeTimeSwapInit = true;
+    function invalidatePreview() {
+      result.hidden = true;
+      result.replaceChildren();
+      status.textContent = '';
+      sync();
+    }
 
     function sync() {
       Array.prototype.forEach.call(second.options, function (option) {
@@ -62,6 +69,7 @@ export function renderProgrammeTimeSwapController(): string {
       button.disabled = true;
       first.disabled = true;
       second.disabled = true;
+      if (caseChoice) caseChoice.disabled = true;
       status.textContent = 'Checking the selected sessions…';
       result.hidden = true;
       result.replaceChildren();
@@ -69,7 +77,7 @@ export function renderProgrammeTimeSwapController(): string {
       fetch('/api/v2/programme/time-swap/preview?format=html', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'text/html' },
-        body: JSON.stringify({ itemARef: commandItemRef(first.value), itemBRef: commandItemRef(second.value) })
+        body: JSON.stringify(Object.assign({ itemARef: commandItemRef(first.value), itemBRef: commandItemRef(second.value) }, caseChoice && caseChoice.value ? { recoveryCaseId: caseChoice.value } : {}))
       }).then(function (response) {
         return response.text().then(function (body) {
           return { ok: response.ok, body: body };
@@ -90,12 +98,44 @@ export function renderProgrammeTimeSwapController(): string {
       }).then(function () {
         first.disabled = false;
         second.disabled = false;
+        if (caseChoice) caseChoice.disabled = false;
         sync();
       });
     }
 
-    first.addEventListener('change', sync);
-    second.addEventListener('change', sync);
+    result.addEventListener('click', function (event) {
+      var stage = event.target.closest('[data-programme-time-swap-stage]');
+      if (!stage || stage.disabled) return;
+      stage.disabled = true;
+      first.disabled = true; second.disabled = true; button.disabled = true;
+      if (caseChoice) caseChoice.disabled = true;
+      status.textContent = 'Checking the latest state and preparing approval…';
+      fetch('/api/v2/programme/time-swap/stage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: stage.getAttribute('data-programme-time-swap-stage')
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) throw new Error(data.message || 'The change could not be prepared. Review a fresh preview.');
+          return data;
+        });
+      }).then(function (data) {
+        status.textContent = 'Ready for approval. The programme has not changed. ';
+        var link = document.createElement('a');
+        link.href = '/operator/cases/' + encodeURIComponent(data.recoveryCaseId);
+        link.textContent = 'Open case to review and approve';
+        status.appendChild(link);
+      }).catch(function (error) {
+        status.textContent = error.message || 'Unable to prepare approval. Please try again.';
+        stage.disabled = false;
+      }).then(function () {
+        first.disabled = false; second.disabled = false;
+        if (caseChoice) caseChoice.disabled = false;
+        sync();
+      });
+    });
+    first.addEventListener('change', invalidatePreview);
+    second.addEventListener('change', invalidatePreview);
+    if (caseChoice) caseChoice.addEventListener('change', invalidatePreview);
     button.addEventListener('click', run);
     sync();
   }

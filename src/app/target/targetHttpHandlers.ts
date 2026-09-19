@@ -2,6 +2,10 @@
  * Target PostgreSQL HTTP handlers for M9 product read models and commands.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { z } from 'zod';
+import { ExpectedRevisionSchema } from '../../domain/v2/shared/identity.ts';
+import { escapeHtml } from '../../ui/html.ts';
+import { stageProgrammeTimeSwap } from './programmeTimeSwapStaging.ts';
 import { approveRecoveryStrategy, externalExecutionBlockerForStrategyId } from './recoveryApproval.ts';
 import { resolveRequestPrincipal, workspacePrincipalId } from './workspaceAuthority.ts';
 import type { TargetApplication } from './composeTargetApplication.ts';
@@ -343,7 +347,15 @@ export async function handleTargetProductHttp(
         return true;
       }
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderProductProgrammePreview(toLegacyRenderableShape(outcome.result)));
+        const stageInput = {
+          recoveryCaseId: body.recoveryCaseId, itemARef: body.itemARef, itemBRef: body.itemBRef,
+          expectedProgrammeRevisions: outcome.result.expectedProgrammeRevisions,
+        };
+        const stageControl = outcome.result.previewAccepted && outcome.result.strategyViability === 'VIABLE'
+          && typeof body.recoveryCaseId === 'string'
+          ? `<div class="btn-row"><button type="button" class="btn btn-primary" data-programme-time-swap-stage="${escapeHtml(JSON.stringify(stageInput))}">Continue to approval</button></div>`
+          : '';
+        sendHtml(res, 200, renderProductProgrammePreview(toLegacyRenderableShape(outcome.result)) + stageControl);
       } else {
         sendJson(res, 200, outcome.result);
       }
@@ -523,6 +535,31 @@ export async function handleTargetProductHttp(
         summary: { sessions: parsed.data.items.length, travellers: parsed.data.travellers.length },
         mutatesAuthoritativeState: false,
       });
+      return true;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/programme/time-swap/stage') {
+      const parsed = z.strictObject({
+        recoveryCaseId: z.string().uuid(), itemARef: z.string().uuid(), itemBRef: z.string().uuid(),
+        expectedProgrammeRevisions: z.array(ExpectedRevisionSchema).min(1).max(2),
+      }).safeParse(await readJson(req));
+      if (!parsed.success) {
+        sendJson(res, 400, { error: 'VALIDATION_FAILED', message: 'Review the session times and choose the recovery case first.' });
+        return true;
+      }
+      const header = req.headers['x-northstar-principal'];
+      const principal = await resolveRequestPrincipal(ctx.app.pool, ctx.app.workspaceId, Array.isArray(header) ? header[0] : header);
+      if (!principal.ok) {
+        sendJson(res, 403, { error: 'PRINCIPAL_UNRESOLVED', message: 'An active operator is required to prepare this change.' });
+        return true;
+      }
+      const staged = await stageProgrammeTimeSwap({ pool: ctx.app.pool, uow: () => ctx.app.unitOfWork() }, {
+        ...parsed.data, workspaceId: ctx.app.workspaceId, actorPrincipalId: principal.principalId, now: new Date().toISOString(),
+      });
+      sendJson(res, staged.ok ? 200 : 409, staged.ok ? {
+        ...staged.value, caseHref: `/operator/cases/${encodeURIComponent(staged.value.recoveryCaseId)}`,
+        requiresApproval: true, mutatesProgrammeState: false,
+      } : { error: staged.error, message: 'The programme or recovery case changed, or this swap is no longer viable. Review a fresh preview.' });
       return true;
     }
 

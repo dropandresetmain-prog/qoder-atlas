@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import type { AssessmentTone } from '../../contracts/v2/product/readModels.ts';
 import type { Instant } from '../../domain/v2/shared/time.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
-import type { TypedRef } from '../../domain/v2/shared/identity.ts';
+import type { TypedRef, ExpectedRevision } from '../../domain/v2/shared/identity.ts';
 import { captureWorld } from '../../persistence/postgres/world/pgCurrentState.ts';
 import { createM6Registry } from '../../resolution/evaluation/registry.ts';
 import { evaluateRecoveryStrategy } from '../../resolution/scenarios/evaluate.ts';
@@ -215,6 +215,7 @@ export interface AuthoritativeSwapParticipantProjection {
 
 export interface AuthoritativeProgrammeSwapPreviewResult {
   mutatesAuthoritativeState: false;
+  expectedProgrammeRevisions?: ExpectedRevision[];
   itemA: { itemRef: string; title: string; currentWindow: { start: string; end: string }; proposedWindow: { start: string; end: string } };
   itemB: { itemRef: string; title: string; currentWindow: { start: string; end: string }; proposedWindow: { start: string; end: string } };
   projections: AuthoritativeSwapParticipantProjection[];
@@ -233,9 +234,9 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
   input: AuthoritativeProgrammeSwapPreviewInput,
 ): Promise<AuthoritativeProgrammeSwapPreviewOutcome> {
   const itemRows = await pool.query<{
-    id: string; title: string; window_start: Date; window_end: Date; schedule_authority: string;
+    id: string; programme_id: string; title: string; window_start: Date; window_end: Date; schedule_authority: string;
   }>(
-    `SELECT id, title, window_start, window_end, schedule_authority
+    `SELECT id, programme_id, title, window_start, window_end, schedule_authority
        FROM programme_items WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
     [input.workspaceId, [input.itemARef, input.itemBRef]],
   );
@@ -340,6 +341,10 @@ export async function previewAuthoritativeBilateralProgrammeTimeSwap(
     ok: true,
     result: {
       mutatesAuthoritativeState: false,
+      expectedProgrammeRevisions: baseWorld.manifest.aggregateReads
+        .filter((read) => read.aggregateRef.kind === 'PROGRAMME'
+          && [itemA.programme_id, itemB.programme_id].includes(read.aggregateRef.id))
+        .map((read) => ({ aggregateRef: read.aggregateRef, expectedRevision: read.revision })),
       itemA: {
         itemRef: itemA.id,
         title: itemA.title,
