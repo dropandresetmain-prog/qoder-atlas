@@ -110,6 +110,16 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     );
     await commitSeed(seed);
 
+    await pool.query(
+      `UPDATE programme_items
+          SET time_zone = CASE id
+            WHEN $2::uuid THEN 'Asia/Singapore'
+            WHEN $3::uuid THEN 'Europe/London'
+          END
+        WHERE workspace_id = $1 AND id IN ($2::uuid, $3::uuid)`,
+      [seed.workspaceId, earlyItem.programmeItemId, lateItem.programmeItemId],
+    );
+
     // Complete knowledge coverage for both jurisdictions so the m6.entry /
     // m6.information dimensions resolve PASS instead of UNKNOWN — this test
     // targets programme-arrival-readiness (m6.participation), not entry/advisory
@@ -147,11 +157,18 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
     assert.equal(aliceProjection!.side, 'ITEM_A');
     assert.equal(bobProjection!.side, 'ITEM_B');
 
+    assert.equal(aliceProjection!.currentVerdict, 'FAIL');
+    assert.equal(bobProjection!.currentVerdict, 'PASS');
+
     // After the proposed swap (item windows exchanged, participants unchanged):
     // Alice inherits the late window (ample margin) -> PASS; Bob inherits the
     // early window but still arrives comfortably early -> PASS. Both viable.
     assert.equal(aliceProjection!.verdict, 'PASS', JSON.stringify(aliceProjection));
     assert.equal(bobProjection!.verdict, 'PASS', JSON.stringify(bobProjection));
+    assert.equal(result.itemA.timeZone, 'Asia/Singapore');
+    assert.equal(result.itemB.timeZone, 'Europe/London');
+    assert.deepEqual(result.itemA.participantLabels, ['Alice']);
+    assert.deepEqual(result.itemB.participantLabels, ['Bob']);
     assert.equal(result.bothPartiesProjectedViable, true);
     assert.equal(result.othersRemainViable, true);
     assert.equal(result.previewAccepted, true);
@@ -230,6 +247,63 @@ describe('M9 1B authoritative programme time-swap preview (real M6 evaluator)', 
       afterWindows.rows.map((r) => `${r.id}:${r.window_start.toISOString()}`).sort(),
       beforeWindows.rows.map((r) => `${r.id}:${r.window_start.toISOString()}`).sort(),
     );
+  });
+
+  test('keeps unchanged UNKNOWN peers and all attendee labels in a viable preview', async () => {
+    const pool = await sharedTestPool();
+    const seed = await beginSeed(pool, 'M9 1B preview unknown peer');
+    const host = await seedJurisdictionWithPlaces(seed, { name: 'Host regime', places: [{ name: 'Venue', placeType: 'VENUE' }] });
+    const [venueId] = host.placeIds as [string];
+
+    const firstId = (await seedTraveller(seed, { displayName: 'First attendee' })).travellerId;
+    const secondId = (await seedTraveller(seed, { displayName: 'Second attendee' })).travellerId;
+    const thirdId = (await seedTraveller(seed, { displayName: 'Third attendee' })).travellerId;
+    await seedJourney(seed, { tripId: await seedTrip(seed), travellerId: firstId });
+    await seedJourney(seed, { tripId: await seedTrip(seed), travellerId: secondId });
+    await seedJourney(seed, { tripId: await seedTrip(seed), travellerId: thirdId });
+
+    const eventId = await seedEvent(seed, { lifecycleStatus: 'ACTIVE' });
+    const programmeId = await seedProgramme(seed, { eventId, lifecycleStatus: 'ACTIVE' });
+    const firstItem = await seedProgrammeItem(seed, {
+      programmeId, title: 'First required session', placeId: venueId, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+      window: EARLY_WINDOW, operatingRequirements: { requiresPhysicalPresence: true, readinessBufferMinutes: 150 },
+    });
+    const secondItem = await seedProgrammeItem(seed, {
+      programmeId, title: 'Second required session', placeId: venueId, lifecycleStatus: 'SCHEDULED', scheduleAuthority: 'INTERNAL',
+      window: LATE_WINDOW, operatingRequirements: { requiresPhysicalPresence: true, readinessBufferMinutes: 150 },
+    });
+    await seedParticipation(seed, { programmeItemId: firstItem.programmeItemId, travellerId: firstId, obligation: 'REQUIRED', accepted: true });
+    await seedParticipation(seed, { programmeItemId: secondItem.programmeItemId, travellerId: secondId, obligation: 'REQUIRED', accepted: true });
+    await seedParticipation(seed, { programmeItemId: firstItem.programmeItemId, travellerId: thirdId, obligation: 'REQUIRED', accepted: true });
+    await commitSeed(seed);
+
+    await pool.query(
+      `UPDATE programme_items
+          SET time_zone = CASE id
+            WHEN $2::uuid THEN 'Asia/Singapore'
+            WHEN $3::uuid THEN 'Europe/London'
+          END
+        WHERE workspace_id = $1 AND id IN ($2::uuid, $3::uuid)`,
+      [seed.workspaceId, firstItem.programmeItemId, secondItem.programmeItemId],
+    );
+
+    const outcome = await commandPreviewAuthoritativeBilateralProgrammeTimeSwap(
+      { workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, uow: () => { throw new Error('preview must not open a UnitOfWork'); }, pool },
+      { itemARef: firstItem.programmeItemId, itemBRef: secondItem.programmeItemId, now: NOW },
+    );
+    assert.equal(outcome.ok, true, !outcome.ok ? outcome.error : '');
+    if (!outcome.ok) return;
+
+    const { result } = outcome;
+    assert.equal(result.previewAccepted, true);
+    assert.equal(result.strategyViability, 'VIABLE');
+    assert.equal(result.projections.length, 3);
+    assert.ok(result.projections.every((projection) => projection.currentVerdict === 'UNKNOWN'));
+    assert.ok(result.projections.every((projection) => projection.verdict === 'UNKNOWN'));
+    assert.deepEqual(result.itemA.participantLabels, ['First attendee', 'Third attendee']);
+    assert.deepEqual(result.itemB.participantLabels, ['Second attendee']);
+    assert.equal(result.itemA.timeZone, 'Asia/Singapore');
+    assert.equal(result.itemB.timeZone, 'Europe/London');
   });
 
   test('rejects a request for programme items that do not exist, without leaking an evaluate hook', async () => {
