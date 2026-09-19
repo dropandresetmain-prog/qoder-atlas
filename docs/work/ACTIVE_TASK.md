@@ -3,7 +3,7 @@
 - Goal: two rich desktop hero recoveries on one generalized PostgreSQL engine.
 - Current founder contract: [hero depth](ASTRA_HERO_DEPTH_SCOPE.md). Desktop only; Terra/Luna for bounded work. Nuitée stay changes are explicit cancel + rebook, never modify.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Primary: `integration/astra-post-r4`, `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
+- Primary: `integration/astra-post-r4`, `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`. Latest verified pushed preparation: `5669f2c03eb6ca12b776176ed65cb0bb48f020c7`.
 - A0 pushed: `f55899b15200de692dd749bbcfb795c67f6a22e0`.
 - A1 verified pushed checkpoint: `a948917c239fc02435020f6740474283dd795ea8`; remote matched, primary clean at checkpoint. Source/test head: `474f95d580c59638e5d5cfbbcdfd989d50c4a0b8`.
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A0](ASTRA_A0_CONVERGENCE.md), [stay extension](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
@@ -35,7 +35,7 @@
 - A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, `codex/a3-jordan-connection-foundation`: real PG baseline160mPASS→D195mPASS→D230mFAIL opensCase→D3-65mFAIL sameCase. Integrated; focused PG test registered in canonical/fast and fixture consumer lists.
 - A3 data pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`: SG/source dates; safe dossiers-only generation;4focused+TypeScript. Integrated after A2.
 - A3 external/reset safety pushed `8939a491fc94610d90c70fec61cded92eb37e21a`, `codex/a3-external-reset-safety`: shared session lease, refuse any external execution history, no blind reset; PG9/9, reset focused tests,TypeScript. Root reviewed guard/composition/unlock eviction. Integrated after A2.
-- Luna building isolated explicit sandbox input provisioner (CLI only); Terra proposed-STAY lane rebasing its isolated implementation onto accepted primary5f01302; Luna Nuitée client-reference lookup lane starting from5f01302. Entry coverage5f01302 integrated (49focused,TypeScript), root-reviewed exact Journey/visit scope. Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
+- Proposed-STAY b9f4d6e and Nuitée lookup6c8dc002 integrated and pushed5669f2c; lane tests17/17 +15/15, integrated TypeScript/boundary262/diff checks passed. Luna importing Journey-scoped overnight requirements, then closing provisioner duplicate-identity/verification boundaries. Terra inspecting atomic observed-stay commands; Luna inspecting bounded composite research composition. Entry coverage5f01302 integrated (49focused,TypeScript), root-reviewed exact Journey/visit scope. Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
 - Preserve, never merge as-is: request plannerbe69d056, partial `codex/astra-a1-request-gates`, two-file `codex/a1-request-authority`, rejected importer namespace7b8236ed. Root worktree remains untouched.
 ## Runtime and triage
 
@@ -48,6 +48,6 @@
 
 ## Exact next action / stop-safe handoff
 
-A2 checkpoint pushed clean atf0c79f2. Jordan foundation/data/reset integrated; integrated11focused tests,TypeScript,boundary261passed. Push this preparatory slice. Stage1 proposed-STAY contract frozen in stay decision; composite/entry/observed canonical contract remains root-owned. Official document reader4focused+TypeScript, real RECORD retrieval of both configured Japanese official sources passed; not normal-runtime entry acceptance. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
+A2 checkpoint pushed clean atf0c79f2. Jordan foundation/data/reset integrated; integrated11focused tests,TypeScript,boundary261passed. Preparation pushed5669f2c and remote verified. Stage1 proposed-STAY integrated; stage2 visit/credential contract frozen in stay decision. Composite research and observed canonical integration remain root-owned. Official document reader4focused+TypeScript, real RECORD retrieval of both configured Japanese official sources passed; not normal-runtime entry acceptance. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
 
 Root worktree remains untouched. No merge to main. Preserve isolated drafts and local visual/log artifacts; never commit secrets/generated junk. Continue same task while context is clean; this ledger and linked evidence are the compact fresh-chat handoff.

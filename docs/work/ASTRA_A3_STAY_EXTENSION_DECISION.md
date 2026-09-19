@@ -173,3 +173,37 @@ TypeScript passed. Actual RECORD reads on2026-09-19 at23:32UTC fetched both cata
 local ignored proof is `output/playwright/a3-official-source-proof.json` with sanitized recordings.
 This is adapter/source proof, not normal-boot Jordan entry acceptance. No private model
 reasoning, provider credentials or legal source assertions were fabricated.
+
+## Stage 2 frozen landside-stay association
+
+**WHAT WE KNOW:** ADD_JOURNEY_STAY stage1 and read-only Nuitée client-reference
+lookup are integrated at5669f2c. Existing IntendedVisit and CredentialSelection are
+Journey-owned intent; credential editions remain Traveller-owned immutable evidence.
+Without a visit, a candidate hotel could evade the entry evaluator entirely.
+
+**KEY ASSUMPTION:** every newly proposed landside stay in this bounded capability must
+carry `visit`, either EXISTING `{ visitId }` or PROPOSED `{ proposedVisitId,
+jurisdictionId, purpose, intendedWindow, credentialSelections: [{ proposedSelectionId,
+credentialId, credentialVersionId }] }`. Existing visits must belong to the same Journey,
+be landside, cover the stay, and match a captured jurisdiction of the stay place. Proposed
+visits obey the same interval/jurisdiction checks and enter only the cloned world with
+`transitIntent: false`. Empty selections are permitted as missing evidence, producing the
+real evaluator UNKNOWN. No credential metadata can be invented by an effect.
+
+Each selected edition must be captured, belong to the owning traveller and the stated
+credential. Duplicate IDs/credential choices and collisions are rejected. When an existing
+Journey selection already pins that credential, extend its visit scope only if the version
+matches; do not silently replace its pinned edition. The accepted full effect is fingerprinted
+under `journey.stay` authority. This authorizes the stay's stated visit/document-use intent,
+not mutation of credentials or disclosure of protected document contents. No canonical
+visit, selection, stay, reservation or allocation appears before confirmed observation.
+
+**WHAT WE DO NOT KNOW:** final atomic observed-stay command and normal research composition.
+The provider action remains unavailable until those contracts and protected inputs are wired.
+Airside hotels, domestic-stay exemption inference and arbitrary visit editing remain parked.
+
+**WHAT SHOULD BE TESTED NEXT:** flight plus accommodation with a proposed landside visit
+must remain UNKNOWN without selected current document and scoped entry evidence; verified
+inputs must drive the real credentials/entry evaluators. Wrong owner, wrong jurisdiction,
+non-covering visit, malformed dates and conflicting selection fail before persistence.
+Preserve the immutable base world and same Journey authority in all tests.
