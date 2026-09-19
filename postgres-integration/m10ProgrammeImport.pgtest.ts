@@ -124,15 +124,29 @@ test('POST /api/v2/programme/import is reachable over HTTP and commits real stat
   });
   const { port } = server.address() as AddressInfo;
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/v2/programme/import`, {
-      method: 'POST',
-      body: JSON.stringify({
+    const bundle = {
         organisationLegalName: 'HTTP Import Org',
         eventTitle: 'HTTP Import Event',
         programmeTitle: 'HTTP Import Programme',
         items: [{ title: 'HTTP Session', itemType: 'SESSION', windowStart: '2031-04-01T09:00:00.000Z', windowEnd: '2031-04-01T10:00:00.000Z' }],
         travellers: [{ displayName: 'HTTP Traveller', participatesInItemIndices: [0], obligation: 'REQUIRED' }],
-      }),
+    };
+    const before = await pool.query('SELECT id FROM events WHERE workspace_id = $1', [seed.workspaceId]);
+    const preview = await fetch(`http://127.0.0.1:${port}/api/v2/programme/import/preview`, {
+      method: 'POST', body: JSON.stringify(bundle),
+    });
+    assert.equal(preview.status, 200);
+    const reviewed = await preview.json() as { bundle: unknown; summary: { sessions: number; travellers: number }; mutatesAuthoritativeState: boolean };
+    assert.equal(reviewed.mutatesAuthoritativeState, false);
+    assert.deepEqual(reviewed.summary, { sessions: 1, travellers: 1 });
+    const afterPreview = await pool.query('SELECT id FROM events WHERE workspace_id = $1', [seed.workspaceId]);
+    assert.deepEqual(afterPreview.rows, before.rows, 'review creates no programme state');
+    const invalid = await fetch(`http://127.0.0.1:${port}/api/v2/programme/import/preview`, {
+      method: 'POST', body: JSON.stringify({ ...bundle, travellers: [{ displayName: 'Invalid reference', participatesInItemIndices: [9] }] }),
+    });
+    assert.equal(invalid.status, 400);
+    const response = await fetch(`http://127.0.0.1:${port}/api/v2/programme/import`, {
+      method: 'POST', body: JSON.stringify(reviewed.bundle),
     });
     assert.equal(response.status, 200);
     const body = await response.json() as { travellers: unknown[] };

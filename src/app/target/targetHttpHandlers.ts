@@ -31,7 +31,7 @@ import { acceptProviderDisruptionDemoEvent } from './providerDisruptionIngress.t
 import type { TransportServiceCancelledWithReprotectionEvent } from './applicationCommands.ts';
 import { disruptionEventFileFromEnv, loadDisclosedDisruptionEvent } from '../demo/providerDisruptionEventSource.ts';
 import { seedDemoWorld } from './demoSeed.ts';
-import { importProgrammeBundle } from './programmeImport.ts';
+import { importProgrammeBundle, ProgrammeImportBundleSchema } from './programmeImport.ts';
 import { ActivityCursorError, loadActivityFeed, loadDecisionQueue, loadProgrammeSchedule } from './readmodels/pgShellFacts.ts';
 import { OVERVIEW_BACK, renderInShell, type ShellContext } from './productShell.ts';
 import { loadShellChrome } from './readmodels/pgShellChrome.ts';
@@ -500,6 +500,29 @@ export async function handleTargetProductHttp(
         return true;
       }
       sendJson(res, 202, result);
+      return true;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/programme/import/preview') {
+      const read = await readJsonOrMalformed(req);
+      if (read.kind !== 'json') {
+        sendJson(res, 400, { error: 'INVALID_PROGRAMME', message: 'Provide a programme to review.' });
+        return true;
+      }
+      const parsed = ProgrammeImportBundleSchema.safeParse(read.body);
+      if (!parsed.success) {
+        sendJson(res, 400, {
+          error: 'INVALID_PROGRAMME', message: 'Check the programme details before importing.',
+          issues: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })),
+        });
+        return true;
+      }
+      // Review validates the same bundle as import and writes no canonical state.
+      sendJson(res, 200, {
+        bundle: parsed.data,
+        summary: { sessions: parsed.data.items.length, travellers: parsed.data.travellers.length },
+        mutatesAuthoritativeState: false,
+      });
       return true;
     }
 
