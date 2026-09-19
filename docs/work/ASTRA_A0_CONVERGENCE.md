@@ -144,6 +144,25 @@ after focused execution evidence. No generic review committee.
 
 ## Verification
 
+### A1 request-planning extension decision
+
+- **WHAT WE KNOW:** frozen ChangeRequest ownership exists, but R4 planning admits
+  only current failure. Legacy traveller requests include changes to healthy trips.
+  An immutable real current assessment can remain the world baseline; it must not
+  be rewritten or falsely marked FAIL to make a request plan.
+- **WHAT WE DO NOT KNOW:** every desired field's supported effect and constraint
+  coverage, and safe passage of request constraints through stale approval checks.
+- **KEY ASSUMPTION:** extend the same coordinator with explicit request identity,
+  revision and desired constraints. Keep actual failing subjects separate. Bind the
+  request and world revisions into attempt identity/currentness. Hard desires constrain
+  recommendation; soft desires remain comparator inputs. Unsupported desires must
+  produce explicit evidence/decision needs. This is an architecture gap justified by
+  the accepted product user job, not permission for a second planner.
+- **WHAT SHOULD BE TESTED NEXT:** healthy requested change through the same core,
+  no canonical mutation, no dropped desire, request staleness refusal, and unchanged
+  current-failure behavior. Consequential execution must retain every deterministic
+  gate. **Act Now:** complete the seam; enqueue-only intake is not parity evidence.
+
 A0 is docs-only: exact base/ancestry, reference provenance, diff/status and whitespace
 checks. No product tests or providers run for A0. New broad counters start at zero.
 Focused -> adjacent -> isolated PG seam -> browser/provider -> coherent fast PG ->

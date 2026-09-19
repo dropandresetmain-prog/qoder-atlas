@@ -62,6 +62,14 @@ describe('R2 focused Case graph on the PostgreSQL programme world', () => {
     assert.ok(!kinds.has('RECOVERY_PROPOSAL'), 'Case workflow state is not a focused-graph node');
     assert.ok(kinds.has('SERVICE_BOOKING'), `transport composition present: ${[...kinds].join(',')}`);
     assert.ok(kinds.has('PROGRAMME_COMMITMENT'), `programme commitment present: ${[...kinds].join(',')}`);
+    const confirmedBooking = v.ldg.nodes.find((node) => node.kind === 'SERVICE_BOOKING' && node.semanticState === 'RECOVERED');
+    assert.ok(confirmedBooking, 'selected service uses an exact confirmed allocated reservation line');
+    assert.match(confirmedBooking.detail ?? '', /Booking line confirmed/, 'canonical booking evidence is shown on the service card');
+    assert.equal(v.tripViability.verdict, 'FAIL', 'confirmed replacement service does not imply whole-trip recovery');
+    assert.ok(
+      v.ldg.edges.some((edge) => edge.fromRef === v.cause?.changeSignalRef && edge.toRef === confirmedBooking.ref && edge.semanticState === 'CHANGED'),
+      'the applied signal reaches the selected service only when change_records prove that service changed',
+    );
     for (const service of v.ldg.nodes.filter((node) => node.kind === 'SERVICE_BOOKING')) {
       assert.ok(service.subjectRefs?.some((ref) => ref.startsWith('TRANSPORT_SERVICE:')), 'service carries an explicit canonical transport mapping');
     }

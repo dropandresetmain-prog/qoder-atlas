@@ -28,7 +28,7 @@ test('R2 enrichment: creates SERVICE_BOOKING node for transport item with servic
   const node = result.nodes[0]!;
   assert.equal(node.kind, 'SERVICE_BOOKING');
   assert.equal(node.ref, 'SERVICE_BOOKING:service-1');
-  assert.equal(node.label, 'FLIGHT Airline X');
+  assert.equal(node.label, 'Airline X flight');
   assert.equal(node.detail, 'Paris CDG → New York JFK', 'human place names, never place ids');
   assert.equal(node.semanticState, 'UNKNOWN');
   assert.equal(node.caseRef, 'case-1');
@@ -86,7 +86,7 @@ test('R2 enrichment: creates MUST_HAPPEN_BEFORE edges between ordered services',
   assert.equal(mustHappenBefore.id, 'MUST_HAPPEN_BEFORE:SERVICE_BOOKING:service-1:SERVICE_BOOKING:service-2');
 });
 
-test('R2 enrichment: applies assessment view to service node', () => {
+test('A1 enrichment: uses exact reservation evidence for service node state', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
@@ -96,13 +96,63 @@ test('R2 enrichment: applies assessment view to service node', () => {
     programmeItems: [],
     objectives: [],
     assessmentViews: new Map([['SERVICE_BOOKING:service-1', { status: 'CURRENT', tone: 'FAIL' }]]),
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CONFIRMED', observedAt: '2031-04-05T08:00:00.000Z' }],
     travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
     caseId: 'case-1',
   });
 
   const node = result.nodes[0]!;
-  assert.equal(node.semanticState, 'FAILED');
-  assert.equal(node.evaluation, 'CURRENT');
+  assert.equal(node.semanticState, 'HEALTHY', 'a confirmed booking alone does not prove recovery');
+  assert.match(node.detail ?? '', /Booking line confirmed/);
+});
+
+test('A1 enrichment: selected-service booking remains UNKNOWN when allocation is absent or ambiguous', () => {
+  const base = {
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT' as const, order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-1' }],
+    transportServices: [{ id: 'service-1', mode: 'AIR', operator: 'ID', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: null }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map([['SERVICE_BOOKING:service-1', { status: 'CURRENT' as const, tone: 'PASS' as const }]]),
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  };
+  const absent = projectFocusedCaseGraphEnrichment(base);
+  assert.equal(absent.nodes[0]?.semanticState, 'UNKNOWN');
+  const ambiguous = projectFocusedCaseGraphEnrichment({
+    ...base,
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 2, lineStatus: null, reservationStatus: null }],
+  });
+  assert.equal(ambiguous.nodes[0]?.semanticState, 'UNKNOWN');
+  const cancelled = projectFocusedCaseGraphEnrichment({
+    ...base,
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CANCELLED' }],
+  });
+  assert.equal(cancelled.nodes[0]?.semanticState, 'UNKNOWN', 'conflicting reservation evidence cannot become confirmed recovery');
+  const recovered = projectFocusedCaseGraphEnrichment({
+    ...base,
+    changedTransportServiceRefs: new Set(['service-1']),
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CONFIRMED' }],
+  });
+  assert.equal(recovered.nodes[0]?.semanticState, 'RECOVERED');
+});
+
+test('A1 enrichment: emits a changed source edge only for the proven selected service', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-1' }],
+    transportServices: [{ id: 'service-1', mode: 'AIR', operator: 'ID', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: null }],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    changeSignalRef: 'CHANGE_SIGNAL:signal-1', changedTransportServiceRefs: new Set(['service-1']),
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+  assert.deepEqual(result.edges.find((edge) => edge.id === 'AFFECTED_BY:CHANGE_SIGNAL:signal-1:SERVICE_BOOKING:service-1'), {
+    id: 'AFFECTED_BY:CHANGE_SIGNAL:signal-1:SERVICE_BOOKING:service-1',
+    fromRef: 'CHANGE_SIGNAL:signal-1',
+    toRef: 'SERVICE_BOOKING:service-1',
+    kind: 'AFFECTED_BY',
+    authority: 'AUTHORITATIVE',
+    semanticState: 'CHANGED',
+  });
 });
 
 test('R2 enrichment: skips transport item without selected service', () => {

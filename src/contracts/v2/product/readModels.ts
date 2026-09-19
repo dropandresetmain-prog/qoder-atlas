@@ -950,6 +950,40 @@ export type TravellerTripView = z.infer<typeof TravellerTripViewSchema>;
 export const ProgrammeScheduleSchema = z.strictObject({
   generatedAt: z.string().datetime({ offset: true }),
   eventTitle: z.string().min(1),
+  /** Bounded participant/readiness rollup from the active programme population. */
+  populationSummary: z.strictObject({
+    total: z.number().int().min(0),
+    withJourney: z.number().int().min(0),
+    withoutJourney: z.number().int().min(0),
+    ready: z.number().int().min(0),
+    disrupted: z.number().int().min(0),
+    unknown: z.number().int().min(0),
+  }).optional(),
+  /** One row per authoritative Traveller, with links to its actual journeys/cases. */
+  travellers: z.array(z.strictObject({
+    travellerRef: z.string().min(1),
+    label: z.string().min(1),
+    journeyRefs: z.array(z.string().min(1)),
+    caseRefs: z.array(z.string().min(1)),
+    status: z.enum(['READY', 'DISRUPTED', 'UNKNOWN', 'UNSPECIFIED']),
+    assessmentStatus: z.enum(['CURRENT', 'STALE', 'PENDING_REASSESSMENT', 'UNAVAILABLE', 'NONE']).optional(),
+    missingInformation: z.array(z.string().min(1)).optional(),
+  })).optional(),
+  /** A commitment is emitted once even when several affected people share it. */
+  endangeredCommitments: z.array(z.strictObject({
+    commitmentRef: z.string().min(1),
+    label: z.string().min(1),
+    reason: z.string().min(1),
+    affectedTravellerRefs: z.array(z.string().min(1)),
+    affectedTravellerLabels: z.array(z.string().min(1)),
+    caseRefs: z.array(z.string().min(1)),
+  })).optional(),
+  /** Explicit unresolved readiness information; absent means none was supplied. */
+  missingInformation: z.array(z.strictObject({
+    travellerRef: z.string().min(1),
+    label: z.string().min(1),
+    reason: z.string().min(1),
+  })).optional(),
   items: z.array(z.strictObject({
     itemRef: z.string().min(1),
     label: z.string().min(1),

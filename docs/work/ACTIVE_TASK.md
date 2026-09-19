@@ -30,13 +30,14 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-Active A1 lanes: Terra request-authority correction; Luna programme intake reliability; Luna programme commit seam investigation. Pending integration: Programme `5d0ca246`, Traveller correctness `eb8629b`, Case supplier story `09ba640e`, request persistence `2cfa26d` (authority correction pending). Each uses an isolated worktree/database. Existing R4/PG-perf worktrees and root untracked work remain untouched.
+Active A1 lanes: Terra request-planning basis/constraints (migration 0131 reserved); Luna programme intake interface; Luna existing-case time-swap staging. Programme `5d0ca246`, Traveller `eb8629b`, Case `09ba640e` and request persistence `1912ac5` integrated. Import retry correction `9f170d9c` awaits integration. Each uses an isolated worktree/database. Existing R4/PG-perf worktrees and root untracked work remain untouched.
 
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
-- Current pushed primary: `a111d05`; Overview semantic merge `01b5a81` integrated locally. This checkpoint batch adds bounded dependency presentation and provenance-backed replacement change detection.
+- Current pushed primary: `320e8b7`; locally integrated through `a35398b` (Programme, Traveller, Case and request persistence). Primary corrected request read current revision and conservative booking state.
+- Integration proof: Programme/Decisions/Activity PG seam 3/3; focused product/request/Case 37/37; final Case additions 22/22; request PG 1/1; TypeScript and boundary gate clean (257 classified files). One focused request failure exposed bigint-to-number decoding, fixed and re-proven. No broad run used.
 - Overview follow-on: 19 focused tests, direct TypeScript, and real PG seam 1/1 on `astra_a1_shell` passed. PG proves all 69 fixture journeys retained, generic shared resource, and supplier replacement footprint 5 even when its current/published schedule agrees. Browser expanded screenshot proves visible source/commitment/traveller relations; final selection/poll/mobile acceptance remains pending.
 - Initial Case SVG had a zero-size viewport: fixed initial stage dimensions; physical screenshot proves visible dependency lines and arrival time. Focused renderer 13/13 passed; supporting-card height increased, final physical check pending.
 - Decisions lane `1c3358ec`: 31 UI tests and isolated PG history proof passed, including distinct revoker attribution. Traveller lane `0ea1acc`: 47 focused tests and 1 real PG test passed (itinerary/commitment, pending/stale, no-case and approval copy); primary found follow-up allocation ambiguity and lifecycle-copy issues to close.
@@ -66,6 +67,7 @@ Commit/push Overview follow-on, integrate completed Programme/Traveller/Case cor
 
 Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
 Remaining action-seam findings: programme bilateral preview is now wired and integrated; generic programme preview/commit, intake and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope. No retirement/deferral decision has been accepted.
+New architecture evidence: current coordinator admits only CURRENT FAIL; healthy-trip requests require explicit desired-state context while retaining the actual current assessment. Never fabricate failure. Import is resumable, not one atomic transaction; partial visibility remains Investigate Now before exposing success semantics.
 Browser artifacts: ignored `output/playwright/` screenshots; temporary untracked `.playwright-cli/` snapshots/logs must stay out of commits.
 Evidence not run: integrated browser acceptance, Overview semantic follow-on, A1 broad gates, A2–A5 acceptance. Applied disclosed Sarah supplier input physically in isolated REPLAY runtime; Case awaits programme approval. No execution acceptance claimed.
 Continue in this task while checkpoint context is clean; use this ledger plus A0 record for a fresh task if context becomes noisy. Never branch from the preparation pack or merge directly to main.
