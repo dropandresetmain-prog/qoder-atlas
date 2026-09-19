@@ -72,3 +72,45 @@ No migration/domain/executor/planner changes in this package.
 
 The primary retains shared contract integration, test-manifest registration,
 physical acceptance and any ambiguity that would otherwise weaken semantic truth.
+
+## Overview implementation freeze (A1)
+
+WHAT WE KNOW: the current producer already reads the population, programme,
+participation and selected-service rows in one projection snapshot. Browser
+relations still infer condition from endpoint health; unrelated Journey failures
+colour commitments. Non-programme populations need a date-free home.
+
+WHAT WE DO NOT KNOW: every shared dependency has a current subject assessment or
+condition observation. Unsupported condition remains NEUTRAL.
+
+KEY ASSUMPTION: canonical participation explanations, selected services, typed
+resource/stay details and explicit dependencies can express the bounded projection.
+
+WHAT SHOULD BE TESTED NEXT: unrelated failure leaves a healthy commitment alone;
+upstream relation differs from missed commitment relation; shared non-transport
+canonical resource; no programme days; overflow and complete population accounting.
+
+Add optional `relations` (maximum 256) with stable id, a closed presentation kind
+(`DEPENDENCY_TO_COMMITMENT`, `DEPENDENCY_TO_TRAVELLER`, `TRAVELLER_TO_COMMITMENT`,
+`COHORT_TO_COMMITMENT`), fromRef, toRef and explicit health. Producer owns semantic
+condition and applicability; renderer reads supplied relations directly. An old
+projection without relations has no invented coloured links.
+
+Cohort dayIndex becomes optional; permit up to 15 cohorts (14 bounded programme
+days plus date-free context). No programme date is invented. Promoted people plus
+cohort totals must account for the entire supplied population exactly once.
+
+Dependency inputs become provider-neutral typed shared-dependency facts. Keep
+selected transport source compatibility while adding one proven non-transport
+canonical dependency through actual selected resource/stay/dependency references.
+Names are labels, never grouping keys. No provider transaction is required.
+
+Commitment consequence uses its current direct assessment or participant-specific
+programme explanation; generic participant FAIL is insufficient. Currentness and
+unknown remain separate. Service/relationship health must have its own evidenced
+basis; no timing equality implies healthy service. Supply focused real PostgreSQL
+proof alongside pure boundary/renderer tests.
+
+The Overview lane owns only EventOverview contract/fact sections, Overview loader
+section, pure Overview builder and overview-graph/model.ts. Geometry/controller/
+CSS and other product read-model sections remain with their named owners.
