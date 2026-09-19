@@ -1,3 +1,124 @@
+# ACTIVE TASK — R3 FULL-REBASED-B1 INTEGRATION (CLOUD)
+
+Live working-memory ledger for the R3 Cloud lane. Reread before every phase, before every
+checkpoint commit/push, and before the final report. The R2 local-acceptance ledger, the R2
+Cloud ledger and the R1 history below are preserved unchanged and are NOT rewritten.
+
+## R3 identity
+
+- Repository: `dropandresetmain-prog/qoder-atlas`
+- Working branch: `feat/r3-full-rebased-b1-cloud`
+- Exact base SHA (accepted R2, frozen): `6118f427eb5fdaed4941e918276fa3260acd9d0c`
+  (`feat/r2-local-acceptance`). The clone is single-branch on `main`, so the base was fetched
+  explicitly (`git fetch origin feat/r2-local-acceptance:...`) before branch creation;
+  ancestry verified, clean tree, no unrelated/untracked user artifacts touched.
+- Outcome branch for publication: `qoder/general-session-dgm349`
+- Role: PRIMARY R3 full-rebased-B1 integration lead.
+- Harness: Qoder Cloud. **Test runtime is `/opt/playwright-driver/node` (v24.15.0)**; the
+  default `node` is v20.18.0 and CANNOT strip TS types. No PostgreSQL, no Docker, no
+  physical browser, no LIVE provider credentials.
+- Authoritative R3 contract: `docs/work/R3_INTEGRATION_CONTRACT.md` (R3-C0 freeze).
+
+## R3 objective
+
+Prove the complete rebased B1 flow through the **normal production composition**. R3 is
+composition + end-to-end product integration over the accepted R1/R2 foundation — no rebuild
+of the PostgreSQL ownership/state model, M6, RC-6, the coordinator core, decision evidence,
+the comparator, the domain registry, the proposers, durable attention, C4 progression,
+internal ActionPlan execution, authority, reconciliation, the Case workspace, focused V5.6
+graph semantics, the immutable Original snapshot, the polling model or the renderer
+architecture.
+
+## Phase 0 recon — COMPLETE (six parallel read-only lanes, reconciled by PRIMARY)
+
+Verified: **exactly two** real composition gaps exist at the R2 base; every other B1 step
+already exists and is composed.
+
+| Lane | Finding |
+| --- | --- |
+| A1 runtime composition | `composeTargetBoot.ts:182-187` builds the coordinator with only `pool/workspaceId/actorPrincipalId/uow` — no `transportPlanning`. C4 already receives that one instance (`recoveryProgressionPass.ts:237`). **No provider adapter is composed in target boot at all.** |
+| A2 stale HTTP seam | `POST /api/v2/cases/:id/strategies` (`targetHttpHandlers.ts:317-327`) calls the pre-R1 `proposeRecoveryStrategies`; sole importer is `targetHttpHandlers.ts:5`. `planCaseDetailed` has **zero** production callers. `runtimeHooks` is the established boot→HTTP seam. |
+| A3 passengers | `transportPlanning.passengers` is a **static** value threaded into 4 call sites. **Age categories exist nowhere in canonical state** — `travellers` has no DOB/age/type; `allocation_role` is free-form. |
+| A4 acceptance map | Only the two expected gaps. No other real gap. |
+| A5 graph layout | `computeLayout` (`layout.ts:48`) ranks longest-path from sources → traveller-rooted star. `causalNodeRefs` is ordered and already computed (`index.ts:53`) but **not passed** to `computeLayout` (`index.ts:68`). |
+| A6 test plan | `test/suites.json` must register every new file or the boundary gate fails `UNCLASSIFIED`. Anti-hardcoding scans `src/` only; tests/fixtures are exempt. |
+
+### PRIMARY overrides of recon recommendations (binding on all lanes)
+
+1. **A3's "count Trip co-travellers" default is REJECTED as unsafe.**
+   `pgWorldReader.ts:100-104` loads `journeys` only for ids in the manifest focus, so a Trip's
+   sibling journeys are generally absent from the captured planning world — that derivation
+   would silently return 1, i.e. a hardcoded `adults: 1` disguised as state derivation.
+   Authoritative path instead: `world.allocations` by `journeyItemId` (includes peer-traveller
+   expansion, `pgWorldReader.ts:258-366`), else the corridor's own journey's single traveller
+   (legitimate because `journeys` is 1:1 `traveller_id`, `0021_journeys.sql:41-42`), else fail
+   closed with a `passengers_unknown` gap. Children/infants stay `undefined`; each derived
+   person maps to `adults` because the request schema requires `adults >= 1`. This is a
+   documented uncertainty, never silent.
+2. **A4's "optionally delete `recoveryPlanning.ts`" is REJECTED.** That module still owns
+   `advanceCasePhase`, live in `recoveryApproval.ts:34` and `recoveryPlanningCoordinator.ts:64`.
+   Disposition: keep the module, retire only the `proposeRecoveryStrategies` product seam, and
+   add a static import guard against regression.
+3. **A4's "migration 0126 / `original_case_graph_snapshots`" is CORRECTED**: the Original
+   snapshot is migration **0127**, table `recovery_case_graph_snapshots`. Migrations apply
+   through 0127.
+4. **A1's "passengers may come from env/config" is REJECTED** — no runtime constant, no
+   env-var demo value. It must be derived per §3 of the R3 contract.
+
+### New risk surfaced by PRIMARY (not in any lane report)
+
+`postgres-integration/b1RecoveryLoop.pgtest.ts:178-190` and
+`postgres-integration/b1SarahWorldRecovery.pgtest.ts:159-166` assert the **legacy
+`{ report }` response shape** over HTTP and are both classified **CURRENT_TARGET (postgres)**.
+Lane B changes that shape, so these two files must be migrated in the same lane. Cloud cannot
+execute them: migration is typechecked here and proven locally.
+
+## Lane ownership
+
+- LANE A — normal runtime transport-research composition (`composeTargetBoot`, provider
+  capabilities, passenger resolver). PRIMARY owns the shared contract; write lane delegated.
+- LANE B — retire the stale product planning seam; route HTTP through the shared coordinator;
+  UI control contract; migrate the two CURRENT_TARGET PG tests; static regression guard.
+- LANE C — author the full B1 PostgreSQL acceptance test + preserve the second generality proof.
+- LANE D — causal-spine layout (presentation only).
+- LANE V — independent verification / anti-hardcoding audit.
+- PRIMARY retains: architecture, shared contracts, runtime composition, provider/research
+  boundary decisions, integration, final acceptance judgement, and all edits to
+  `test/suites.json`.
+
+## Cloud limits
+
+Cloud MAY author PG tests and runtime/provider composition, run pure tests, use checked-in
+REPLAY recordings, typecheck, lint, run CURRENT_TARGET and the static gates. Cloud MUST NOT
+claim PG E2E passed, migration/runtime transaction behaviour passed, a real browser flow
+passed, or LIVE Atlas worked. Focused tests first; the full PostgreSQL suite is a LOCAL
+milestone-acceptance activity only and never runs here.
+
+## Checkpoints
+
+| Checkpoint | Scope | SHA |
+| --- | --- | --- |
+| R3-C0 | Integration contract + acceptance map frozen; recon reconciled | see commit below |
+| R3-C1 | Normal runtime planner/provider composition | pending |
+| R3-C2 | Product planning path uses the accepted coordinator + regression guard | pending |
+| R3-C3 | Full B1 PostgreSQL acceptance test authored + typechecked | pending |
+| R3-C4 | Causal-spine layout improvement | pending |
+| R3-C5 | Cloud integration (focused + adjacent + typecheck + lint + boundary + anti-hardcoding + CURRENT_TARGET once) | pending |
+
+## Unresolved local proofs
+
+All 20 local proofs are listed in `docs/work/R3_LOCAL_ACCEPTANCE_HANDOFF.md`. Nothing in R3
+Cloud may be reported as PG-proven, browser-proven or LIVE-proven.
+
+## Next action
+
+1. [DONE] Phase 0 recon (six lanes) reconciled; PRIMARY overrides recorded.
+2. [DONE] R3-C0 contract freeze (`docs/work/R3_INTEGRATION_CONTRACT.md`) + this ledger; commit + PUSH.
+3. Fan out write lanes A/B/C/D from the C0 SHA on clearly-owned paths; V verifies independently.
+4. R3-C1 → C5 per the checkpoint table, committing and pushing at each.
+
+---
+
 # ACTIVE TASK — R2 LOCAL ACCEPTANCE (durable Original + PG + browser)
 
 Ledger for the R2 LOCAL integration/product-acceptance lane. The R2 Cloud ledger and the
