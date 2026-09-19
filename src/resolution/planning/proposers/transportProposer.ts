@@ -269,7 +269,8 @@ export function createTransportProposer(options: TransportProposerOptions): Doma
         resolveAirport: options.resolveAirport,
         ...(options.passengers ? { passengers: options.passengers } : {}),
         ...(options.passengersFor ? { passengersFor: options.passengersFor } : {}),
-      });      const { offers } = correlatedTransportOffers({
+      });
+      const { offers } = correlatedTransportOffers({
         corridors,
         toolResults: input.evidence.toolResults,
         now: input.now,

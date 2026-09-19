@@ -296,7 +296,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
                   toolResults: evidence.toolResults,
                   now: domainBasis.now,
                   resolveAirport: resolveAirport!,
-                  passengers: transportPlanning.passengers,
+                  ...passengerSource!,
                   ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
                 })
               : undefined,

@@ -29,7 +29,12 @@ import {
   travellersForJourneyItemPassengers,
   transportCorridors,
   flightSearchRequestFor,
+  transportRequestId,
 } from '../src/resolution/planning/transportCorridors.ts';
+import { materializeTransportOffers } from '../src/resolution/planning/transportOfferMaterialization.ts';
+import { createPlanningToolTransport } from '../src/resolution/planning/replayPlanningTransport.ts';
+import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
+import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import { dispatchToolRequest } from '../src/app/dispatch.ts';
 import { dimension, explain } from '../src/resolution/evaluation/explain.ts';
 import type { FailingSubject } from '../src/resolution/planning/proposer.ts';
@@ -169,8 +174,7 @@ describe('R3 transport research composition', () => {
     );
   });
 
-  test('the corridor request the coordinator dispatches is read-only flight.search', async () => {
-    const world = emptyWorld();
+  test('the corridor request the coordinator dispatches is read-only flight.search', async () => {    const world = emptyWorld();
     const journey = journeyRow(id(), id());
     const item = transportItem(journey.id);
     world.journeys = [journey];
@@ -197,5 +201,47 @@ describe('R3 transport research composition', () => {
       assert.equal(result.error.category, 'UNAVAILABLE');
       assert.equal(result.error.code, 'capability_not_wired');
     }
+  });
+
+  test('materialization honours the resolver-only passenger arm (regression: passengersFor must not be dropped)', async () => {
+    // This is the boot shape: { transport, passengersFor } with NO static
+    // passengers value. A regression that forwarded only `passengers` into
+    // materializeTransportOffers would fail every corridor with
+    // passengers_unknown and produce zero planning services.
+    const world = emptyWorld();
+    const journey = journeyRow(id(), id());
+    const item = transportItem(journey.id);
+    world.journeys = [journey];
+    world.journeyItems = [item];
+    world.places = [placeRow(ORIGIN_PLACE), placeRow(DEST_PLACE)];
+
+    const adapter = new AtlasFlightAdapter({
+      mode: 'REPLAY',
+      store: new FileRecordingStore({ readDirs: ['fixtures/recordings'] }),
+      timezoneResolver: (code: string) => (code === ORIGIN_IATA || code === DEST_IATA ? MANILA : undefined),
+    });
+    const transport = createPlanningToolTransport({ capabilities: { flight: adapter }, observedAt: NOW });
+
+    // adults:1 is the EXPECTED value matching the checked-in recording's
+    // captured party; the assertion is on derivation, not a runtime constant.
+    const { corridors } = transportCorridors(world, [failingJourney(journey.id)], { resolveAirport, passengersFor: () => ({ adults: 1 }) });
+    assert.equal(corridors.length, 1);
+    assert.deepEqual(corridors[0]!.passengers, { adults: 1 }, 'the resolver-derived party is used, not a static default');
+    const request = flightSearchRequestFor(corridors[0]!, { round: 1 });
+    const result = await transport(request);
+    assert.equal(result.status, 'SUCCEEDED');
+
+    const materialized = materializeTransportOffers({
+      world,
+      failing: [failingJourney(journey.id)],
+      toolResults: [{ ...result, requestId: transportRequestId(corridors[0]!) }],
+      now: NOW,
+      resolveAirport,
+      passengersFor: () => ({ adults: 1 }),
+    });
+    assert.ok(
+      materialized.capturedServices.length > 0,
+      'resolver-only arm must still materialize researched offers into the planning world',
+    );
   });
 });
