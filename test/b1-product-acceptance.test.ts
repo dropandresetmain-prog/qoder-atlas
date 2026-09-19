@@ -25,6 +25,7 @@ import { caseHref, renderInShell, SHELL_LINKS } from '../src/app/target/productS
 import { loadPostgresTargetConfig } from '../src/persistence/postgres/config.ts';
 import { adaptOperatorOverviewToDashboard } from '../src/app/target/adapters/operatorOverviewAdapter.ts';
 import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-case.ts';
+import { renderShellRuntimeScript } from '../src/ui/shellRuntime.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
 import { createTargetAppServer } from '../src/server/targetHttp.ts';
 import type { TargetEndpoints } from '../src/app/target/composeTargetEndpoints.ts';
@@ -208,7 +209,8 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     assert.equal(/Traveller\s+UNKNOWN/.test(html), false, html.slice(0, 400));
     assert.equal(html.includes('>Traveller<'), false);
     // The reached set is summarised rather than dumped row by row.
-    assert.match(html, /Assessed against 3 reached subjects: 2 pass · 0 fail · 1 unknown\./);
+    // R4 intentionally moved this into the case workspace's "Why it works" copy.
+    assert.match(html, /We re-checked 3 parts of the trip against this option: 2 confirmed, 1 not yet confirmed\./);
   });
 
   test('each option states what it changes, in current -> proposed terms', () => {
@@ -218,49 +220,62 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
   });
 
   test('each option states who it fixes', () => {
-    assert.match(html, /data-test="strategy-resolves"[^>]*>\s*Sarah Lim/);
-    assert.match(html, /FAIL<\/span> → <span class="badge tone-done">PASS/);
+    // R4 intentionally replaced the per-person FAIL -> PASS badge row with plain
+    // "Who is affected" / "Why it works" facts on each option card.
+    assert.match(html, /<dt>Who is affected<\/dt><dd>Sarah Lim<\/dd>/);
+    assert.match(html, /Sarah Lim’s trip goes from not working to working\./);
   });
 
   test('two viable options are presented as distinguishable alternatives, not versions', () => {
-    assert.match(html, /Option 1/);
-    assert.match(html, /Option 2/);
-    assert.match(html, /2 viable options — each changes the programme differently\. Choose one\./);
+    // R4 intentionally presents one Recommended option plus "Alternative:" cards
+    // (numbered via data-option-number) instead of an "N viable options" banner.
+    assert.match(html, /data-option-number="1"/);
+    assert.match(html, /data-option-number="2"/);
+    assert.match(html, /<span class="badge tone-ok">Recommended<\/span>/);
+    assert.match(html, /Alternative: Move Headline interview to 1 Oct, 06:30/);
+    assert.match(html, /<span class="badge tone-neutral">Also works<\/span>/);
     // The difference is visible: the same blocked item moves to two different slots.
     assert.match(html, /to 1 Oct, 05:30/);
     assert.match(html, /to 1 Oct, 06:30/);
   });
 
   test('approval still carries the real strategyRef and posts to the normal application route', () => {
+    // R4: the recommended option is approved from the approval panel, the
+    // alternative from its own card; both carry the real persisted strategy id
+    // and case ref as data attributes (attribute order is presentation).
     for (const strategy of view.strategies) {
       assert.match(
         html,
-        new RegExp(`data-test="approve-strategy" data-strategy-ref="${strategy.strategyRef}"`),
+        new RegExp(`data-test="approve-strategy" data-case-ref="${CASE_REF}" data-strategy-ref="${strategy.strategyRef}" data-request-path="/api/v2/cases/${CASE_REF}/strategies/${strategy.strategyRef}/approve"`),
         `option ${strategy.optionNumber} approves by its real strategy id`,
       );
     }
-    assert.match(html, /'\/api\/v2\/cases\/' \+ encodeURIComponent\(caseRef\) \+ '\/strategies\/' \+ encodeURIComponent\(strategyRef\) \+ '\/approve'/);
-    assert.match(html, /'\/api\/v2\/cases\/' \+ encodeURIComponent\(caseRef\) \+ '\/strategies'/);
-    // Internal refs stay available, as secondary metadata rather than the headline.
-    assert.match(html, /Strategy <span class="mono">a51540b2-59ee-574f-99a2-d99bc84fbf59<\/span> · v1/);
+    // The propose control posts to the case strategies route.
+    const noPlan = renderProductRecoveryCase(projectRecoveryCase({ ...caseFacts(), strategies: [], status: 'OPEN' } as unknown as RecoveryCaseFacts));
+    assert.match(noPlan, new RegExp(`data-test="propose-strategies" data-case-ref="${CASE_REF}" data-request-path="/api/v2/cases/${CASE_REF}/strategies"`));
+    // Internal refs stay available, as secondary metadata rather than the headline
+    // (R4: inside the collapsed "Technical details").
+    assert.match(html, /data-test="technical-details"/);
+    assert.match(html, /Option 1: a51540b2-59ee-574f-99a2-d99bc84fbf59 v1/);
   });
 
   test('propose handler reads the new RecoveryPlanningResult contract, not the legacy report', () => {
-    // The handler must not read the old .report.candidates shape.
-    assert.equal(html.includes('r.body.report'), false, 'handler must not read legacy report');
-    assert.equal(html.includes('Evaluated '), false, 'handler must not claim viable count from legacy contract');
-    // It must read the new outcome and humanize it.
-    assert.match(html, /r\.body\.result\.outcome/);
-    assert.match(html, /Planning completed/);
-    assert.match(html, /options are awaiting authority/);
-    assert.match(html, /no viable recovery was found/);
+    // R4 moved the click handlers out of the case fragment into the shared
+    // shell runtime (delegated on [data-action]); the contract check follows it.
+    const runtime = renderShellRuntimeScript({ intervalMs: 5000 });
+    assert.equal(runtime.includes('body.report'), false, 'handler must not read legacy report');
+    assert.equal(runtime.includes('Evaluated '), false, 'handler must not claim viable count from legacy contract');
+    assert.match(runtime, /b\.result && b\.result\.outcome/);
+    assert.match(runtime, /AWAITING_AUTHORITY: 'Options are ready for your decision\.'/);
+    assert.match(runtime, /NO_RECOVERY_FOUND: 'No recovery option was found\.'/);
+    // The case fragment itself wires the control by data attributes only.
+    assert.equal(html.includes('r.body.report'), false);
   });
 
   test('an option whose change already executed says so instead of a no-op move', () => {
     // After an approved option executes, canonical state has caught up with
     // what that option proposed, so current == proposed.
     const facts = caseFacts() as unknown as { status: string; strategies: { changes: { currentWindow: unknown; proposedWindow: unknown }[] }[] };
-    facts.status = 'RESOLVED';
     for (const change of facts.strategies[1]!.changes) change.currentWindow = change.proposedWindow;
     const executedHtml = renderProductRecoveryCase(projectRecoveryCase(facts as unknown as RecoveryCaseFacts));
     assert.match(executedHtml, /<strong>Headline interview<\/strong> is already at 1 Oct, 06:30–1 Oct, 07:00/);
@@ -275,8 +290,11 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     const resolvedHtml = renderProductRecoveryCase(resolved);
     assert.equal(resolvedHtml.includes('data-test="approve-strategy"'), false);
     assert.equal(resolvedHtml.includes('data-test="propose-strategies"'), false);
-    // The options themselves stay readable after resolution.
-    assert.match(resolvedHtml, /Option 1/);
+    // R4 intentionally replaces the option list with the resolution panel once
+    // resolved; the options stay recorded under Technical details.
+    assert.match(resolvedHtml, /data-test="resolution-panel"/);
+    assert.equal(resolvedHtml.includes('data-test="recovery-strategy"'), false);
+    assert.match(resolvedHtml, /Option 1: a51540b2/);
   });
 });
 
@@ -300,7 +318,10 @@ describe('B1 product acceptance — clean product routes (FB1-4)', () => {
     const endpoints: TargetEndpoints = {
       app: {} as TargetEndpoints['app'],
       async handle(_req: IncomingMessage, res: ServerResponse, url: URL) {
-        if (!url.pathname.startsWith('/api/v2/')) return false;
+        // R4: the clean case route is answered in place by the product handlers
+        // (no redirect); the stub mirrors that for exactly `/operator/cases/:id`.
+        const inPlaceCase = /^\/operator\/cases\/[^/]+$/.test(url.pathname);
+        if (!url.pathname.startsWith('/api/v2/') && !inPlaceCase) return false;
         seen.push(`${url.pathname}${url.search}`);
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end('{"stub":true}');
@@ -331,14 +352,12 @@ describe('B1 product acceptance — clean product routes (FB1-4)', () => {
       assert.equal(alias.status, 302, 'FB1-4: /operator is no longer a 404');
       assert.equal(alias.headers.get('location'), '/api/v2/operator/overview?format=html');
 
+      // The focused case is served in place by the product handlers: no redirect
+      // to an /api/v2 URL (intentional R4 change; the case renders inside the shell).
       const focused = await fetch(`${base}/operator/cases/${CASE_REF}`, { redirect: 'manual' });
-      assert.equal(focused.status, 302);
-      assert.equal(focused.headers.get('location'), `/api/v2/cases/${CASE_REF}?format=html`);
-
-      // Followed through, the focused route lands on the shell-rendering handler.
-      const followed = await fetch(`${base}/operator/cases/${CASE_REF}`, { redirect: 'follow' });
-      assert.equal(followed.status, 200);
-      assert.ok(seen.includes(`/api/v2/cases/${CASE_REF}?format=html`), JSON.stringify(seen));
+      assert.equal(focused.status, 200);
+      assert.equal(focused.headers.get('location'), null);
+      assert.ok(seen.includes(`/operator/cases/${CASE_REF}`), JSON.stringify(seen));
 
       // The API JSON route is untouched and is not forced through the product shell.
       const api = await fetch(`${base}/api/v2/cases/${CASE_REF}`);
@@ -415,9 +434,10 @@ describe('B1 product acceptance — regression guards', () => {
     for (const specifier of imports) {
       assert.equal(/compose\.ts$|server\/http\.ts$|node:sqlite|persistence\/(database|repositories|entityStore)/.test(specifier), false, specifier);
     }
-    // The new case route is served by the same target endpoints as every
-    // other product route — it introduces no second dispatcher.
-    assert.match(source, /CASE_ROUTE/);
-    assert.match(source, /\/api\/v2\/cases\//);
+    // The case route is answered by the same target endpoints as every other
+    // product route (`endpoints.handle` runs first) - no second dispatcher and
+    // no redirect. The API case route stays available for API/debug use.
+    assert.match(source, /await endpoints\.handle\(req, res, url\)/);
+    assert.equal(source.includes('/operator/cases'), true, 'documents the in-place case route');
   });
 });
