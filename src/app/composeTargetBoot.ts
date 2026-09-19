@@ -288,6 +288,7 @@ export async function composeTargetBoot(
             if (outcome.result === 'DEFERRED') continue;
             console.log(`[atlas] external execution ${outcome.result} intent=${outcome.intentId}${outcome.detail ? ` (${outcome.detail})` : ''}`);
           }
+          for (const pending of report.canonicalPending) console.log(`[atlas] canonical update pending intent=${pending.intentId} (${pending.error})`);
           if (reconciliation.reconciled > 0) console.log(`[atlas] external reconciliation: reconciled=${reconciliation.reconciled} stillUnknown=${reconciliation.stillUnknown}`);
         },
       })

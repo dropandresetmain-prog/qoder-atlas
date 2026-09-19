@@ -48,7 +48,9 @@ test('the external execution module only mutates after the stored gate and durab
   assert.ok(prepare > 0 && dispatch > prepare, 'gate + durable PREPARED attempt precede dispatch');
   assert.ok(mutate > 0, 'the dispatcher is the only mutation site');
   const worker = readFileSync(join(ROOT, 'src/persistence/postgres/execution/pgExecutionWorker.ts'), 'utf8');
-  assert.ok(worker.indexOf("to: 'DISPATCHING'") < worker.indexOf('await params.dispatcher(claim)'), 'DISPATCHING is committed before the dispatcher runs');
+  assert.ok(worker.indexOf("to: 'DISPATCHING'") < worker.indexOf('await params.dispatcher(claim'), 'DISPATCHING is committed before the dispatcher runs');
+  // N1: the provider order reference is durably checkpointed BEFORE the pay call.
+  assert.ok(source.indexOf('control.checkpointRequestRef(') > mutate && source.indexOf('control.checkpointRequestRef(') < source.indexOf('deps.transactions.payOrder('), 'orderRef checkpoint precedes payOrder');
 });
 
 import { requiredAuthorityScope } from '../src/persistence/postgres/execution/storedExecutionGate.ts';

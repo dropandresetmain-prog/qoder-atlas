@@ -29,7 +29,7 @@ import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import type { AdapterMode } from '../../contracts/envelope.ts';
 import type { FlightCapability, FlightTransactionCapability } from '../../contracts/capabilities.ts';
 import { createPreparedExecutionAttempt } from '../../persistence/postgres/commands/m8AuthorityCommands.ts';
-import { PgExecutionWorker, type ExecutionClaim, type ExternalDispatcher, type ReconcileLookup } from '../../persistence/postgres/execution/pgExecutionWorker.ts';
+import { PgExecutionWorker, type DispatchControl, type ExecutionClaim, type ExternalDispatcher, type ReconcileLookup } from '../../persistence/postgres/execution/pgExecutionWorker.ts';
 import { loadStoredIntent } from '../../persistence/postgres/execution/storedExecutionGate.ts';
 import { resolveOfferExecutionInputs, type OfferExecutionInputs } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
 import { recordSource, recordEvidence } from '../../persistence/postgres/commands/knowledgeCommands.ts';
@@ -61,7 +61,15 @@ export interface ExternalOfferExecutionDeps {
   paymentRef?: string;
   ticketingPoll?: { attempts: number; delayMs: number };
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * TEST-ONLY fault injection (never set by `composeOfferExecution`). Awaited at named points of
+   * the dispatcher; a test simulates a process crash by returning a promise that never resolves,
+   * then "restarts" by running the reconciliation sweep with fresh deps.
+   */
+  faultInjection?: (point: DispatchFaultPoint) => Promise<void>;
 }
+
+export type DispatchFaultPoint = 'AFTER_CREATE' | 'AFTER_CHECKPOINT' | 'AFTER_PAY' | 'BEFORE_FINAL_WRITE';
 
 export interface ExternalExecutionContext {
   pool: Pool;
@@ -89,6 +97,8 @@ export interface ExternalExecutionReport {
   deferred: number;
   refused: number;
   canonicalUpdates: number;
+  /** Successful attempts whose canonical update has not landed yet (retried every pass; NOT an execution failure). */
+  canonicalPending: { intentId: string; error: string }[];
   outcomes: ExternalExecutionOutcome[];
 }
 
@@ -129,6 +139,7 @@ async function loadCandidates(pool: Pool, workspaceId: string): Promise<string[]
 const DEFAULT_POLL = { attempts: 6, delayMs: 1000 };
 const ORDER_REF_PREFIX = 'atlas:order:';
 const CLIENT_REF_PREFIX = 'atlas:clientref:';
+const HOLD_EXPIRY_MARGIN_MS = 60_000;
 
 /** execution_observations.external_record_id is a uuid: the provider order number maps to a stable uuid; the raw ref stays in source_owned_fields + request_ref. */
 export function externalRecordIdForOrder(orderRef: string): string {
@@ -149,7 +160,8 @@ export function buildAtlasOfferDispatcher(
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const poll = deps.ticketingPoll ?? DEFAULT_POLL;
   const clientReference = clientReferenceFor(intentId);
-  return async () => {
+  return async (_claim: ExecutionClaim, control: DispatchControl) => {
+    const fault = deps.faultInjection ?? (async () => undefined);
     if (!deps.paymentRef) return { kind: 'FAILURE', error: 'payment_handle_unavailable: no sandbox payment handle composed' };
     // 1. Read: verify the exact researched offer and obtain the provider session state.
     counters.verify += 1;
@@ -173,11 +185,21 @@ export function buildAtlasOfferDispatcher(
     });
     if (!create.ok) {
       // Ambiguous create => unknown, reconcile before anything else. Definitive => failure.
+      // No order reference exists: nothing can be looked up (Atlas has no client-reference lookup;
+      // see docs/work/r4-evidence/atlas-create-idempotency-decision.md) => human/provider reconciliation, never a retry.
       if (create.error.category === 'TIMEOUT') return { kind: 'LOST_RESPONSE', requestRef: `${CLIENT_REF_PREFIX}${clientReference}` };
       return { kind: 'FAILURE', error: `order_create_failed:${create.error.category}/${create.error.code}` };
     }
     const orderRef = create.data.transactionState?.orderRef;
     if (create.data.status === 'FAILED' || !orderRef) return { kind: 'FAILURE', error: create.data.detail ?? 'order_create_refused' };
+    const orderMarker = `${ORDER_REF_PREFIX}${orderRef}`;
+    await fault('AFTER_CREATE');
+
+    // 2b. N1: the provider order now exists. Durably checkpoint its reference onto THIS attempt
+    // BEFORE any pay call. If the write does not land we must not pay: the order stays HELD at the
+    // provider and the attempt is reported unknown carrying the reference.
+    if (!(await control.checkpointRequestRef(orderMarker))) return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
+    await fault('AFTER_CHECKPOINT');
 
     // 3. Ceiling gate: only pay a provider-observed payable within the authority-frozen ceiling.
     let payable = create.data.totalPrice;
@@ -194,18 +216,19 @@ export function buildAtlasOfferDispatcher(
     const pay = await deps.transactions.payOrder({
       orderRef, paymentRef: deps.paymentRef, authorisedAmount: { amount: ceiling.amount, currency: ceiling.currency }, clientReference,
     });
-    const orderMarker = `${ORDER_REF_PREFIX}${orderRef}`;
     if (!pay.ok) {
       if (pay.error.category === 'TIMEOUT' || pay.error.code === 'payment_in_progress') return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
       return { kind: 'FAILURE', error: `order_pay_failed:${pay.error.category}/${pay.error.code}; order ${orderRef} remains HELD` };
     }
     if (pay.data.status === 'HELD' || pay.data.status === 'FAILED') return { kind: 'FAILURE', error: `payment_not_accepted; order ${orderRef} remains HELD` };
+    await fault('AFTER_PAY');
 
     // 5. Observe (read-only) until ticketed; otherwise the outcome is UNKNOWN, never assumed.
     for (let i = 0; i < poll.attempts; i += 1) {
       const seen = await deps.transactions.retrieveOrder({ orderRef, clientReference });
       if (seen.ok) {
         if (seen.data.status === 'TICKETED') {
+          await fault('BEFORE_FINAL_WRITE');
           return {
             kind: 'SUCCESS', responseRef: orderMarker, externalRecordId: externalRecordIdForOrder(orderRef),
             sourceOwnedFields: { providerOrderRef: orderRef, orderStatus: 'TICKETED', ...(seen.data.totalPrice ? { totalPrice: seen.data.totalPrice } : {}), provenance: seen.data.provenance },
@@ -234,8 +257,16 @@ export function buildAtlasReconcileLookup(pool: Pool, deps: ExternalOfferExecuti
     switch (seen.data.status) {
       case 'TICKETED':
         return { kind: 'FOUND_SUCCESS', responseRef: ref, externalRecordId: externalRecordIdForOrder(orderRef), sourceOwnedFields: { providerOrderRef: orderRef, orderStatus: 'TICKETED', reconciled: true } };
-      case 'HELD':
-        return { kind: 'FOUND_FAILURE', responseRef: ref, error: `reconciled: order ${orderRef} is HELD, payment did not land` };
+      case 'HELD': {
+        // A single HELD reading cannot exclude a pay request that was in flight when the dispatcher
+        // died (or timed out): HELD is a failure only once the hold has lapsed unpaid, so no payment
+        // can land any more. Until then it stays unknown (never assumed either way).
+        const expires = seen.data.transactionState?.holdExpiresAt;
+        if (expires && Date.now() > Date.parse(expires) + HOLD_EXPIRY_MARGIN_MS) {
+          return { kind: 'FOUND_FAILURE', responseRef: ref, error: `reconciled: order ${orderRef} is HELD and its hold expired unpaid` };
+        }
+        return { kind: 'STILL_UNKNOWN' };
+      }
       case 'CANCELLED':
       case 'FAILED':
         return { kind: 'FOUND_FAILURE', responseRef: ref, error: `reconciled: order ${orderRef} is ${seen.data.status}` };
@@ -253,14 +284,14 @@ const AIR_MODE: Record<string, 'AIR' | 'RAIL' | 'ROAD' | 'SEA'> = { FLIGHT: 'AIR
 
 async function applyCanonicalSelection(
   ctx: ExternalExecutionContext, intentId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, observedAt: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; already?: true } | { ok: false; error: string }> {
   const ws = ctx.workspaceId;
   const ns = RUNTIME_ID_NAMESPACES.planning;
   const id = (name: string) => deterministicUuid(ns, `${intentId}|offer-select|${name}`);
   const b = inputs.binding;
   const serviceId = id('service');
   const already = await ctx.pool.query('SELECT 1 FROM transport_item_details WHERE workspace_id = $1 AND journey_item_id = $2 AND selected_service_id = $3', [ws, b.journeyItemId, serviceId]);
-  if ((already.rowCount ?? 0) > 0) return { ok: true };
+  if ((already.rowCount ?? 0) > 0) return { ok: true, already: true };
   const base = { workspaceId: ws, actorPrincipalId: ctx.actorPrincipalId };
   const uow = () => ctx.uow();
 
@@ -344,8 +375,8 @@ async function applyPendingCanonicalUpdates(ctx: ExternalExecutionContext, repor
     const inputs = await resolveOfferExecutionInputs(ctx.pool, ctx.workspaceId, row.intent_id);
     if (!inputs.ready) continue;
     const applied = await applyCanonicalSelection(ctx, row.intent_id, inputs, row.observed_at.toISOString());
-    if (applied.ok) report.canonicalUpdates += 1;
-    else report.outcomes.push({ intentId: row.intent_id, attemptNumber: 0, result: 'FAILED', detail: `canonical update pending: ${applied.error}` });
+    if (applied.ok) { if (!applied.already) report.canonicalUpdates += 1; }
+    else report.canonicalPending.push({ intentId: row.intent_id, error: applied.error });
   }
 }
 
@@ -354,7 +385,7 @@ async function applyPendingCanonicalUpdates(ctx: ExternalExecutionContext, repor
 // ---------------------------------------------------------------------------
 
 function emptyReport(now: string): ExternalExecutionReport {
-  return { at: now, candidates: 0, executed: 0, failed: 0, unknown: 0, deferred: 0, refused: 0, canonicalUpdates: 0, outcomes: [] };
+  return { at: now, candidates: 0, executed: 0, failed: 0, unknown: 0, deferred: 0, refused: 0, canonicalUpdates: 0, canonicalPending: [], outcomes: [] };
 }
 
 export interface ExternalDispatchCounters { verify: number; create: number; pay: number }
@@ -421,7 +452,11 @@ export async function runExternalReconciliation(ctx: ExternalExecutionContext): 
   const lookup = buildAtlasReconcileLookup(ctx.pool, ctx.external);
   const unknown = await ctx.pool.query<{ id: string }>(
     `SELECT ea.id FROM execution_attempts ea JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
-      WHERE ea.workspace_id = $1 AND ai.capability_ref = $2 AND ea.status IN ('OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED')
+      WHERE ea.workspace_id = $1 AND ai.capability_ref = $2
+        AND (ea.status IN ('OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED')
+             -- N1: a DISPATCHING/DISPATCHED attempt whose dispatcher lease lapsed (crashed/abandoned) can
+             -- only ever be reconciled read-only; it is never dispatch-eligible again.
+             OR (ea.status IN ('DISPATCHING', 'DISPATCHED') AND (ea.lease_expires_at IS NULL OR ea.lease_expires_at < now())))
       ORDER BY ea.created_at`,
     [ctx.workspaceId, EXTERNAL_OFFER_SELECT_CAPABILITY],
   );
