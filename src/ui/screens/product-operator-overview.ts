@@ -9,6 +9,7 @@ import {
 } from '../../app/target/adapters/operatorOverviewAdapter.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 import { renderEventOverviewGraph, renderOverviewGraphAssets } from '../overview-graph/index.ts';
+import { renderOverviewRosterControllerScript } from '../overviewRosterController.ts';
 
 export function renderProductOperatorOverview(view: OperatorOverview): string {
   const surface = adaptOperatorOverviewToDashboard(view);
@@ -33,9 +34,13 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
     <p data-test="simulated-airline-update-status" class="sim-status">${airlineConfigured ? "Ready. Applying posts a disclosed simulated provider event through the normal HTTP boundary." : "Demo trigger not configured on this runtime."}</p>
     <button type="button" class="btn" data-test="simulated-airline-update-apply"${airlineConfigured ? "" : " disabled"}>Apply simulated airline update</button>
   </details>
-  <section class="section" aria-label="Trips">
-    <h2>All participants <span class="count">${overviewCountedTotal(view)}</span></h2>
-    ${surface.itemsHtml}
+  <section class="section" aria-label="Needs attention" data-poll-region="overview-attention">
+    <h2>Needs attention <span class="count${surface.attentionCount > 0 ? ' c-alert' : ''}">${surface.attentionCount}</span></h2>
+    ${surface.attentionHtml}
   </section>
-</main>`;
+  <section class="section" aria-label="All participants" data-poll-region="overview-roster">
+    <h2>All participants <span class="count">${overviewCountedTotal(view)}</span></h2>
+    ${surface.rosterHtml}
+  </section>
+</main>${renderOverviewRosterControllerScript()}`;
 }

@@ -179,12 +179,13 @@ describe('B1 product acceptance — Overview navigation (FB1-2)', () => {
     // Force the population branch: no open cases, so the queue shows the world.
     const view = { ...overviewView(), items: [] } as unknown as OperatorOverview;
     const { itemsHtml } = adaptOperatorOverviewToDashboard(view);
-    assert.match(itemsHtml, /<a class="qrow" href="\/operator\/cases\/419280db-eff2-5cbe-bbb8-0656348c7997"[^>]*data-test="population-row"/);
-    // Ana Costa has no case: her row stays a plain div with no href at all.
+    assert.match(itemsHtml, /<a class="traveller-link" href="\/operator\/cases\/419280db-eff2-5cbe-bbb8-0656348c7997"[^>]*data-test="population-case-link"/);
+    assert.match(itemsHtml, /<a class="traveller-link" href="\/traveller\?trip=journey-1"[^>]*data-test="population-traveller-link"/);
+    // Ana Costa has no case: her row has only the authoritative Traveller interaction.
     const anaStart = itemsHtml.lastIndexOf('<', itemsHtml.indexOf('data-journey-ref="journey-2"'));
     const anaRow = itemsHtml.slice(anaStart);
     assert.match(anaRow, /^<div class="qrow" data-test="population-row"/, anaRow.slice(0, 120));
-    assert.equal(anaRow.includes('href='), false, anaRow);
+    assert.match(anaRow, /href="\/traveller\?trip=journey-2"/);
     assert.equal(anaRow.includes('data-test-case-link'), false);
     assert.equal(itemsHtml.includes(caseHref(OTHER_CASE_REF)), false);
   });

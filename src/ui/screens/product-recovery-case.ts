@@ -264,7 +264,7 @@ function rowsHtml(rows: readonly CaseRow[]): string {
 }
 
 function activityHtml(m: CaseWorkspaceModel): string {
-  if (m.activity.rows.length < 2) return '';
+  if (m.activity.rows.length === 0) return '';
   return `<section class="section" data-test="case-activity">
     <h2>${escapeHtml(m.activity.title)}</h2>
     <div class="panel">${rowsHtml(m.activity.rows)}</div>
