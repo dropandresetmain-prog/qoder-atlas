@@ -207,17 +207,44 @@ async function existingStage(
   };
 }
 
-async function loadBasisAssessmentId(
+interface CaseFailureBasis {
+  basisAssessmentId: string;
+  resolveSubjectRefs: TypedRef[];
+}
+
+/**
+ * Staging is a recovery action for the case's active failure, not a request
+ * to prove every participant already has complete evidence. RC-6 requires
+ * the current failing case subjects to become PASS; the rest of the
+ * reassessment closure is still protected from regressions by the evaluator.
+ */
+async function loadCaseFailureBasis(
   pool: Pool,
   workspaceId: string,
-  journeyRefs: readonly TypedRef[],
+  recoveryCaseId: string,
   now: string,
-): Promise<string | undefined> {
-  for (const journey of journeyRefs) {
-    const view = await currentAssessmentView(pool, workspaceId, journey, 'VIABILITY', now);
-    if (view.status === 'CURRENT' && view.assessment) return view.assessment.id;
+): Promise<CaseFailureBasis | undefined> {
+  const subjects = await pool.query<{ subject_kind: string; subject_id: string }>(
+    `SELECT subject_kind, subject_id
+       FROM case_subjects
+      WHERE workspace_id = $1 AND recovery_case_id = $2
+        AND subject_kind IN ('JOURNEY', 'TRIP')
+      ORDER BY subject_kind, subject_id`,
+    [workspaceId, recoveryCaseId],
+  );
+  const failing: { subject: TypedRef; assessmentId: string }[] = [];
+  for (const row of subjects.rows) {
+    const subject: TypedRef = { kind: row.subject_kind as TypedRef['kind'], id: row.subject_id };
+    const view = await currentAssessmentView(pool, workspaceId, subject, 'VIABILITY', now);
+    if (view.status === 'CURRENT' && view.assessment?.overallVerdict === 'FAIL') {
+      failing.push({ subject, assessmentId: view.assessment.id });
+    }
   }
-  return undefined;
+  if (failing.length === 0) return undefined;
+  return {
+    basisAssessmentId: failing[0]!.assessmentId,
+    resolveSubjectRefs: failing.map((entry) => entry.subject),
+  };
 }
 
 export async function stageProgrammeTimeSwap(
@@ -254,8 +281,9 @@ export async function stageProgrammeTimeSwap(
     at: input.now,
     informationTopics: registry.informationTopics,
   });
-  const basisAssessmentId = await loadBasisAssessmentId(ctx.pool, input.workspaceId, scope.affectedJourneyRefs, input.now);
-  if (!basisAssessmentId) return { ok: false, error: 'RECOVERY_CASE_ASSESSMENT_UNAVAILABLE' };
+  const caseFailureBasis = await loadCaseFailureBasis(ctx.pool, input.workspaceId, input.recoveryCaseId, input.now);
+  if (!caseFailureBasis) return { ok: false, error: 'RECOVERY_CASE_ASSESSMENT_UNAVAILABLE' };
+  const { basisAssessmentId, resolveSubjectRefs } = caseFailureBasis;
   // A peer's travel state can change without a programme revision. A fresh
   // preview must not return the old, permanently stale strategy in that case.
   const identity = programmeTimeSwapStrategyIdentity({
@@ -308,7 +336,7 @@ export async function stageProgrammeTimeSwap(
     scenarioChange,
     now: input.now,
     registry,
-    resolveSubjectRefs: scope.affectedJourneyRefs,
+    resolveSubjectRefs,
   });
   if (!evaluated.ok) return { ok: false, error: `STRATEGY_EVALUATION_${evaluated.conflict.kind}` };
   const strategy: RecoveryStrategy = evaluated.value.strategy;
