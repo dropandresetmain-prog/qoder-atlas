@@ -47,6 +47,7 @@ import { join } from 'node:path';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
 import { validateExistingOrder, type ExpectedOrderTerms } from './existingOrderValidation.ts';
 import type { FlightOrderStatus } from '../../contracts/capabilities.ts';
+import { tryAcquireWorkspaceOperationLease } from './workspaceOperationLease.ts';
 
 export const EXTERNAL_OFFER_SELECT_CAPABILITY = 'external:offer.select';
 
@@ -102,6 +103,14 @@ export interface ExternalExecutionReport {
   /** Successful attempts whose canonical update has not landed yet (retried every pass; NOT an execution failure). */
   canonicalPending: { intentId: string; error: string }[];
   outcomes: ExternalExecutionOutcome[];
+}
+
+/** One complete external pass, including its read-only reconciliation. */
+export interface ExternalExecutionCycleReport {
+  report: ExternalExecutionReport;
+  reconciliation: { reconciled: number; stillUnknown: number; canonicalUpdates: number };
+  /** Another reset or provider cycle owns this workspace; no query or network work ran. */
+  leaseUnavailable: boolean;
 }
 
 const SUCCESS = ['OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED'];
@@ -533,6 +542,31 @@ export async function runExternalReconciliation(ctx: ExternalExecutionContext): 
   const report = emptyReport(ctx.now ?? new Date().toISOString());
   await applyPendingCanonicalUpdates(ctx, report);
   return { reconciled, stillUnknown, canonicalUpdates: report.canonicalUpdates };
+}
+
+/**
+ * Serializes the entire provider dispatch/reconciliation/canonical-update
+ * cycle with demo reset for one workspace. The advisory lock is session-held;
+ * individual DB operations remain short transactions and provider calls never
+ * run inside a transaction.
+ */
+export async function runExternalExecutionCycle(ctx: ExternalExecutionContext): Promise<ExternalExecutionCycleReport> {
+  const lease = await tryAcquireWorkspaceOperationLease(ctx.pool, ctx.workspaceId);
+  const at = ctx.now ?? new Date().toISOString();
+  if (!lease) {
+    return {
+      report: emptyReport(at),
+      reconciliation: { reconciled: 0, stillUnknown: 0, canonicalUpdates: 0 },
+      leaseUnavailable: true,
+    };
+  }
+  try {
+    const report = await runExternalOfferExecutionPass(ctx);
+    const reconciliation = await runExternalReconciliation(ctx);
+    return { report, reconciliation, leaseUnavailable: false };
+  } finally {
+    await lease.release();
+  }
 }
 
 export { ATLAS_SANDBOX_BALANCE_PAYMENT_REF };
