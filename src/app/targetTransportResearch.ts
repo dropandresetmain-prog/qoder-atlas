@@ -39,6 +39,8 @@ import { travellersForJourneyItemPassengers, type TransportPassengersResolver } 
 import { FileRecordingStore, type RecordingStore } from '../providers/recordingStore.ts';
 import { AtlasFlightAdapter } from '../providers/atlas/adapter.ts';
 import type { AtlasTimezoneResolver } from '../providers/atlas/normalize.ts';
+import type { FareRulesOutcome, FlightOffer, FlightVerifyOutcome } from '../contracts/capabilities.ts';
+import type { PlanningToolResult } from '../contracts/v2/planning/planningTool.ts';
 
 /**
  * Resolve an airport code to an IANA timezone from AUTHORITATIVE PostgreSQL
@@ -91,6 +93,7 @@ export function composeTargetTransportResearch(
   config: AppConfig,
   cwd: string,
   timezoneResolverFactory?: () => Promise<AtlasTimezoneResolver | undefined>,
+  options: TransportResearchOptions = {},
 ): TargetTransportResearch | undefined {
   if (!flightCapabilityIsHonest(config)) return undefined;
 
@@ -102,11 +105,14 @@ export function composeTargetTransportResearch(
     ...(config.providers.atlas.clientId ? { clientId: config.providers.atlas.clientId } : {}),
     ...(config.providers.atlas.clientSecret ? { clientSecret: config.providers.atlas.clientSecret } : {}),
   });
+  const base = createPlanningToolTransport({
+    capabilities: { flight } satisfies ToolDispatchCapabilities,
+    observedAt: () => new Date().toISOString(),
+  });
   return {
-    transport: createPlanningToolTransport({
-      capabilities: { flight } satisfies ToolDispatchCapabilities,
-      observedAt: () => new Date().toISOString(),
-    }),
+    transport: options.offerEnrichment
+      ? withOfferEnrichment(base, flight, options.offerEnrichment)
+      : base,
     passengersFor: ({ world, journeyId, journeyItemId }) =>
       travellersForJourneyItemPassengers(world, journeyItemId, journeyId),
   };
@@ -135,4 +141,103 @@ function recordingStore(config: AppConfig, cwd: string): RecordingStore {
     readDirs: [...readDirs, ...scenarioRecordingDirs],
     ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
   });
+}
+
+/**
+ * R4 (lane C) — read-only offer enrichment for transport research.
+ *
+ * `flight.search` alone yields schedule + price. Recovery decisions also need to
+ * know whether the offer is still bookable at that price (verify) and what its
+ * change / refund / no-show rules are (fare rules). Both are READ-ONLY Atlas
+ * operations that already exist on the flight adapter, but the planner only
+ * issues `flight.search` up front (it cannot know an offerId beforehand), so the
+ * composed research seam performs a bounded follow-up itself, through the same
+ * adapter and therefore the same LIVE/RECORD/REPLAY mode and normalization.
+ *
+ * The enrichment is attached to the search result's `normalizedEvidence` as an
+ * additive `offerEnrichment` array. Existing consumers read only `offers`, so
+ * nothing else changes; failure of a follow-up is recorded as data (category +
+ * code, never provider free text) and never fails the search.
+ *
+ * Targets the same offers the transport proposer ranks first (fewest segments,
+ * then lowest price) so the evidence lands where candidates are drawn from.
+ */
+export interface OfferEnrichmentOptions {
+  /** Upper bound of offers enriched per search (each costs one verify + one fare-rules read). Default 3. */
+  maxOffers?: number;
+}
+
+export interface TransportResearchOptions {
+  /** Absent = no enrichment (pre-R4 behaviour). Present = bounded verify + fare-rule reads per search. */
+  offerEnrichment?: OfferEnrichmentOptions;
+}
+
+export type OfferEnrichmentFailure = { error: { category: string; code: string } };
+
+export interface OfferEnrichmentEntry {
+  offerId: string;
+  verification: FlightVerifyOutcome | OfferEnrichmentFailure;
+  fareRules: FareRulesOutcome | OfferEnrichmentFailure;
+}
+
+export const DEFAULT_ENRICHED_OFFERS = 3;
+const RATE_LIMIT_RETRIES = 4;
+const PROVIDER_PACE_MS = 700;
+const RATE_LIMIT_BACKOFF_MS = 2_000;
+
+type ResearchFlight = Pick<AtlasFlightAdapter, 'verifyOffer' | 'getFareRules'>;
+
+function rankForEnrichment(offers: readonly FlightOffer[], now: number): FlightOffer[] {
+  return offers
+    .filter((offer) => {
+      const first = offer.segments[0];
+      return first !== undefined && Date.parse(first.departure) >= now;
+    })
+    .sort(
+      (a, b) =>
+        a.segments.length - b.segments.length
+        || a.totalPrice.amount - b.totalPrice.amount
+        || a.offerId.localeCompare(b.offerId),
+    );
+}
+
+export function withOfferEnrichment(
+  base: TargetTransportResearch['transport'],
+  flight: ResearchFlight,
+  options: OfferEnrichmentOptions,
+  clock: () => number = () => Date.now(),
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): TargetTransportResearch['transport'] {
+  const limit = Math.max(1, options.maxOffers ?? DEFAULT_ENRICHED_OFFERS);
+  return async (request) => {
+    const result: PlanningToolResult = await base(request);
+    if (request.operation !== 'flight.search' || result.status !== 'SUCCEEDED') return result;
+    const evidence = result.normalizedEvidence as { offers?: FlightOffer[] } | undefined;
+    if (!evidence || !Array.isArray(evidence.offers)) return result;
+
+    const targets = rankForEnrichment(evidence.offers, clock()).slice(0, limit);
+    const offerEnrichment: OfferEnrichmentEntry[] = [];
+    // One bounded retry on provider rate limiting; anything else stays visible data.
+    const withRetry = async <T extends { ok: boolean; error?: { category: string } }>(call: () => Promise<T>): Promise<T> => {
+      for (let attempt = 0; ; attempt += 1) {
+        const outcome = await call();
+        if (outcome.ok || outcome.error?.category !== 'RATE_LIMITED' || attempt >= RATE_LIMIT_RETRIES) return outcome;
+        await sleep(RATE_LIMIT_BACKOFF_MS * (attempt + 1));
+      }
+    };
+    // Pace real provider traffic (the sandbox rate-limits bursts); REPLAY reads files.
+    const paceMs = result.provenance.mode === 'REPLAY' ? 0 : PROVIDER_PACE_MS;
+    for (const offer of targets) {
+      if (paceMs > 0) await sleep(paceMs);
+      const verify = await withRetry(() => flight.verifyOffer({ offerId: offer.offerId }));
+      if (paceMs > 0) await sleep(paceMs);
+      const rules = await withRetry(() => flight.getFareRules({ offerId: offer.offerId }));
+      offerEnrichment.push({
+        offerId: offer.offerId,
+        verification: verify.ok ? verify.data : { error: { category: verify.error.category, code: verify.error.code } },
+        fareRules: rules.ok ? rules.data : { error: { category: rules.error.category, code: rules.error.code } },
+      });
+    }
+    return { ...result, normalizedEvidence: { ...evidence, offerEnrichment } };
+  };
 }
