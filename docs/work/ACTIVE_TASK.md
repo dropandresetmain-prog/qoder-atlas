@@ -1,4 +1,4 @@
-# ACTIVE TASK — A1 PUSHED / A2 LIVE PRESENTATION CLOSURE
+# ACTIVE TASK — A2 ACCEPTED / A3 JORDAN MULTI-DOMAIN
 
 - Goal: two rich desktop hero recoveries on one generalized PostgreSQL engine.
 - Current founder contract: [hero depth](ASTRA_HERO_DEPTH_SCOPE.md). Desktop only; Terra/Luna for bounded work. Nuitée stay changes are explicit cancel + rebook, never modify.
@@ -12,7 +12,7 @@
 
 - [x] A0 exact base, pack reconciliation, current truth inspection, docs pushed.
 - [x] A1 strong desktop surfaces, faithful V5.6/V7.2, focused/PG/browser evidence; checkpoint pushed and verified.
-- [ ] A2 Sarah LIVE Qwen/API, video-ready full recovery.
+- [x] A2 Sarah LIVE Qwen/API, recorded full desktop recovery. Source/pushed candidate `565f56165932238221f05620655a1b3cb38a0691`; checkpoint evidence in ASTRA_A2_LIVE_EVIDENCE.md.
 - [ ] A3 Jordan generalized multi-domain planning/recovery fully composed.
 - [ ] A4 Jordan real supported sandbox actions, observation, video-ready recovery.
 - [ ] A5 repeat both LIVE, final presentation/gates/freeze.
@@ -31,24 +31,23 @@
 
 ## Lanes and preserved work
 
-- Terra A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, branch `codex/a3-jordan-connection-foundation`: PG1/1 baseline160m PASS→D1 95m PASS→D2 30m FAIL opens Case→D3 -65m FAIL same Case. Not integrated; register new test at integration. Minimum new-STAY contract investigation returned. Current Terra lane: durable model activity metadata; Luna lanes: provider provenance/recovery wording and exact programme participation graph truth. Isolated branches; focused tests only.
-- Luna prior registry, Case timezone/approval and importer test closures integrated. A2 provider display5df1196 integrated (56/56); Terra metadata312c6816 integrated (17unit,5PG+15PG). Model UI and exact participation projection lanes finishing.
-- A3 data preparation pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`, 4focused+TypeScript; not integrated. Safe dossier-only regeneration preserves accepted programme.
-- Rejected importer namespace change `7b8236ed` remains isolated; do not merge (retry/duplicate risk).
-- Request planner `be69d056` and partial untested `codex/astra-a1-request-gates` work remain isolated; never merge as-is. Untested `codex/a1-request-authority` two-file draft also preserved.
-- Request admission/persistence groundwork is integrated but normal submission unwired; no healthy-trip planning claim.
-
+- A2 integrated: provider display5df1196, model metadata312c6816, model UI7eddb2c/root copyc83e8a5, exact participation graph0e72cc7+431f135. Focused evidence in A2 report. No active A2 lane.
+- A3 foundation pushed `b7500638e484a8194f4180b6e2de585931b013b6`, `codex/a3-jordan-connection-foundation`: real PG baseline160mPASS→D195mPASS→D230mFAIL opensCase→D3-65mFAIL sameCase. Not integrated; register its new test.
+- A3 data pushed `710faf584fbb49b96e58ff0fd289e22536bbe152`, `codex/a3-canonical-dossier-reconciliation`: SG/source dates; safe dossiers-only generation;4focused+TypeScript. Not integrated.
+- A3 external/reset safety pushed `8939a491fc94610d90c70fec61cded92eb37e21a`, `codex/a3-external-reset-safety`: shared session lease, refuse any external execution history, no blind reset; PG9/9, reset focused tests,TypeScript. Root reviewed guard/composition/unlock eviction. Not integrated.
+- Read-only hotel/input inventories returned. Missing protected gender/contact/budget and target hotel composition are genuine A3 seams; historical sandbox evidence is reusable.
+- Preserve, never merge as-is: request plannerbe69d056, partial `codex/astra-a1-request-gates`, two-file `codex/a1-request-authority`, rejected importer namespace7b8236ed. Root worktree remains untouched.
 ## Runtime and triage
 
-- Normal server port4120 session13808, PG `astra_product`, workspace `9ef64348-61b2-4e18-a291-152502a89a02`. Latest boot composes LIVE Atlas research, LIVE Qwen qwen-flash and protected Atlas sandbox execution. First fresh LIVE recovery completed; A2 presentation closure remains. See [A2 evidence](ASTRA_A2_LIVE_EVIDENCE.md).
-- Current Sarah Case `cecdebed-d554-5f17-828c-a2e6bcd960a6` is RESOLVED from A2 LIVE research/model plus internal programme execution. Browser headed Chromium session `astra`, desktop1440x1000. First LIVE video saved; repeat after presentation fixes.
-- Act Now: A2 LIVE Sarah proof; A3 typed new-STAY/planning/provider composition and required selected actions. Prior Narita/Concorde sandbox evidence is reusable, not current PG integration proof.
+- Normal server port4120 session16512, PG `astra_product`, workspace `9ef64348-61b2-4e18-a291-152502a89a02`. Latest boot composes LIVE Atlas research, LIVE Qwen qwen-flash and protected Atlas sandbox execution. Repeat LIVE desktop recovery accepted on565f561. See [A2 evidence](ASTRA_A2_LIVE_EVIDENCE.md).
+- Current Sarah Case `642fdce8-073a-578e-9cef-57b8c67de4b1` is RESOLVED from A2 LIVE research/model plus internal programme execution. Browser headed Chromium session `astra`, desktop1440x1000. Final A2 raw recording saved (9.55MB), graph/provenance/authority/resolution physically verified.
+- Act Now: A3 typed new-STAY/planning/provider composition and required selected actions. Prior Narita/Concorde sandbox evidence is reusable, not current PG integration proof.
 - Investigate Now: protected booking identity/budget/reset inputs, contradictory Jordan nationality, current hotel policy and authoritative entry sources. Dates determine actual stay length; historical capture is four→three nights, founder three→two is conditional operation example.
 - Park for Later: healthy-trip request architecture, general composer, mobile, unrelated providers/operations/parity, immigration breadth, multiple unrelated incidents, importer atomicity. Reasons/revisit conditions in ROADMAP/hero contract.
 - Ignore / Accept Risk: accepted R4 redirects/collapsed Apply, inert legacy message/export controls. Exact CURRENT participant PASS was found for the moved commitment; reclassified Act Now for A2 projection. No invented PASS from parent Journey; unrelated UNKNOWN stays UNKNOWN.
 
 ## Exact next action / stop-safe handoff
 
-Merge focused A2 provenance/graph lanes, inspect seams and required checks, restart normal LIVE composition and repeat Sarah with factual visible model/provider activity. First LIVE path already passed; A2 video-ready acceptance remains pending. Push A2 before integrating Jordan foundation and bounded hotel/entry contracts. Broad counters unchanged.
+Push the A2 docs checkpoint, then integrate reviewed Jordan foundation/data/reset branches and register the focused PG test. Freeze new-STAY/composite/entry contracts before parallel implementation. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
 
 Root worktree remains untouched. No merge to main. Preserve isolated drafts and local visual/log artifacts; never commit secrets/generated junk. Continue same task while context is clean; this ledger and linked evidence are the compact fresh-chat handoff.

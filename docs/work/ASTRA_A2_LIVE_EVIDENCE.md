@@ -1,3 +1,49 @@
+# A2 ACCEPTED — Sarah LIVE desktop recovery
+
+Accepted 2026-09-20 on source `565f56165932238221f05620655a1b3cb38a0691`,
+branch `integration/astra-post-r4`. This checkpoint completes the repeat LIVE product proof.
+The earlier run and findings below remain historical evidence.
+
+- Normal PostgreSQL boot: `astra_product`, workspace `9ef64348-61b2-4e18-a291-152502a89a02`,
+  port4120; headed Chromium1440x1000. Explicitly simulated supplier input; actual LIVE model/research.
+- Persistent Reset ->52/67 confirmed,15 unconfirmed,nobody needs attention ->supplier change
+  ->51/67 and Case `642fdce8-073a-578e-9cef-57b8c67de4b1`.
+- Planning attempt `e299b4f2-f927-5191-999e-c37fe6389205` durably records Model Studio
+  `qwen-flash`,LIVE,SUCCEEDED,1069ms, observed `2026-09-19T23:07:33.639Z`.
+  Atlas `flight.search` is LIVE/SUCCEEDED, observed `2026-09-19T23:07:33.670Z`.
+  Completion `2026-09-19T23:08:03.520Z` follows both observations. The visible Case renders
+  actual provider/model/mode/status; no private reasoning or configuration-as-proof.
+- Recommendation shows programme13:30/11:30 swap,67 plans rechecked, alternatives/rejections,
+  organiser authority and explicit Recover Sarah's trip approval. Programme-only execution
+  remains the selected generalized result; no unnecessary flight purchase.
+- Intents `a33e36c4-b373-4318-903b-ca8e33b8d486` and `9df62816-dcb6-4409-bebc-215824e46f4b`
+  each executed once and persist OBSERVED_SUCCESS. Reassessment drained67 real units.
+- Case durably RESOLVED/RECOVERED at `2026-09-19T23:10:25.721Z`, after the normal
+  CURRENT+PASS resolution gate. Product says two changes applied/confirmed and trip recovered.
+- Current graph shows Sarah and the exact programme participation healthy at13:30 GMT+8;
+  pending evidence was UNKNOWN during reassessment. Original retains failed arrival timing
+  and the11:30 commitment. The unrelated stay remains honestly unconfirmed.
+- Final Overview52/67,15 unconfirmed,nobody needs attention. Population/programme context remains.
+  Screenshots physically inspected: Case failing graph, alternatives, recovered graph, Overview.
+- Recording: ignored `output/playwright/a2-sarah-live-final.webm` (9,547,486bytes), with healthy
+  and recovered chapters. Raw acceptance recording is available for editing; not a finished submission video.
+  Snapshots/screenshots use `output/playwright/a2-final-*`.
+
+Validation: participant projection27unit+3PG; model metadata17unit+5PG persistence+15PG registry;
+provider UI56unit; model UI38unit; final plain-language failure copy1focused. Integrated TypeScript,
+`git diff --check`, and test-boundary gate260classified passed. Reused lane evidence; no broad rerun.
+Broad counters remain postgres:fast3 / CURRENT_TARGET1 / full canonicalPG0.
+
+Closed: exact participation/currentness truth, factual public/durable model/provider metadata,
+completion timestamp ordering, accurate Trip recovery for wording. No schema/state shortcut.
+
+Park for Later: richer direct-attendee impact labels and rejected-option identities; current
+rejections are readable and preserve deterministic viability. Reset took roughly two minutes
+on this workstation despite about-a-minute copy; revise the estimate during final presentation
+polish if repeated. Neither blocks this completed hero flow. External Atlas sandbox transaction
+proof remains separate from Sarah's internal programme execution.
+
+---
 # A2 Sarah LIVE — first physical run and remaining presentation closure
 
 2026-09-20. Source checkpoint: A1 `a948917c239fc02435020f6740474283dd795ea8`,
