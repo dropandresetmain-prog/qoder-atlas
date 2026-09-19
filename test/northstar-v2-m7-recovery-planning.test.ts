@@ -14,11 +14,13 @@ import type {
   WReservation, WReservationLine, WResource, WTransportService, WAllocation, WConstraintDefinition,
 } from '../src/resolution/world/world.ts';
 import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.ts';
-import { ScenarioChangeSchema } from '../src/contracts/v2/scenario/scenarioChange.ts';
+import { ScenarioChangeSchema, type ScenarioEffect } from '../src/contracts/v2/scenario/scenarioChange.ts';
 import { validateActionPlanAcyclic } from '../src/contracts/v2/action/actionPlan.ts';
 import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
 import { createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
 import { overnightEvaluator } from '../src/resolution/evaluation/evaluators/overnight.ts';
+import { entryEvaluator } from '../src/resolution/evaluation/evaluators/entry.ts';
+import { credentialsEvaluator } from '../src/resolution/evaluation/evaluators/credentials.ts';
 import { applyScenarioOverlay, assertCanonicalWorldUntouched } from '../src/resolution/scenarios/overlay.ts';
 import { evaluateRecoveryStrategy } from '../src/resolution/scenarios/evaluate.ts';
 import { compileActionPlan, withForcedCycle } from '../src/resolution/planning/compiler.ts';
@@ -82,10 +84,18 @@ function overnightStayWorld() {
   const travellerId = id();
   const journey = journeyRow({ travellerId });
   const placeId = id();
+  const jurisdictionId = id();
+  const visitId = id();
   const world = emptyWorld({
     travellers: [{ id: travellerId, revision: 1, lifecycleStatus: 'ACTIVE' }],
     journeys: [journey],
     places: [{ id: placeId, revision: 1, name: 'Harbour test place', placeType: 'CITY', timeZone: 'Pacific/Auckland', hasCoordinates: true }],
+    jurisdictions: [{ id: jurisdictionId, revision: 1, name: 'Test jurisdiction', regimeKind: 'NATIONAL' }],
+    placeJurisdictions: [{ placeId, jurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId: id(), evidenceId: null }],
+    intendedVisits: [{
+      id: visitId, journeyId: journey.id, jurisdictionId, purpose: 'overnight recovery',
+      intended: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' }, transitIntent: false,
+    }],
   });
   const arrival = transportItem(journey.id, {
     orderKey: '010', desiredOriginPlaceId: id(), desiredDestinationPlaceId: placeId,
@@ -97,14 +107,16 @@ function overnightStayWorld() {
   });
   world.journeyItems.push(arrival, departure);
   world.constraints.push(overnightRequirement(journey.id));
-  return { world, journey, travellerId, placeId, arrival };
+  return { world, journey, travellerId, placeId, arrival, visit: { kind: 'EXISTING' as const, visitId }, jurisdictionId };
 }
 
-function addStayChange(journeyId: string, proposedJourneyItemId: string, offerId: string, offerPrice = { amount: '245.00', currency: 'NZD' }) {
+type StayVisit = Extract<ScenarioEffect, { effectKind: 'ADD_JOURNEY_STAY' }>['visit'];
+
+function addStayChange(journeyId: string, proposedJourneyItemId: string, offerId: string, visit: StayVisit, offerPrice = { amount: '245.00', currency: 'NZD' }) {
   return ScenarioChangeSchema.parse({
     id: id(), recoveryStrategyId: id(), strategyVersion: 1,
     affectedSubjectRefs: [{ kind: 'JOURNEY', id: journeyId }], basisAssessmentId: id(),
-    effects: [{ effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId, journeyId, orderKey: '020', offerId, offerPrice }],
+    effects: [{ effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId, journeyId, orderKey: '020', offerId, offerPrice, visit }],
   });
 }
 
@@ -750,7 +762,7 @@ test('SELECT_OFFER without resolved offer is rejected (no fabrication)', () => {
 });
 
 test('ADD_JOURNEY_STAY overlays one unbooked stay from a resolved offer and closes only the overnight dimension', () => {
-  const { world, journey, travellerId, placeId, arrival } = overnightStayWorld();
+  const { world, journey, travellerId, placeId, arrival, visit } = overnightStayWorld();
   const before = structuredClone(world);
   const offerId = id();
   const proposedJourneyItemId = id();
@@ -767,7 +779,7 @@ test('ADD_JOURNEY_STAY overlays one unbooked stay from a resolved offer and clos
     'FAIL',
   );
 
-  const change = addStayChange(journey.id, proposedJourneyItemId, offerId);
+  const change = addStayChange(journey.id, proposedJourneyItemId, offerId, visit);
   const overlay = applyScenarioOverlay({
     baseWorld: world,
     scenarioChange: change,
@@ -805,9 +817,9 @@ test('ADD_JOURNEY_STAY overlays one unbooked stay from a resolved offer and clos
 });
 
 test('ADD_JOURNEY_STAY rejects unbound, inconsistent, and colliding offer facts', () => {
-  const { world, journey, placeId, arrival } = overnightStayWorld();
+  const { world, journey, placeId, arrival, visit } = overnightStayWorld();
   const offerId = id();
-  const baseChange = addStayChange(journey.id, id(), offerId);
+  const baseChange = addStayChange(journey.id, id(), offerId, visit);
   const resolved = {
     offerId,
     placeId,
@@ -845,7 +857,7 @@ test('ADD_JOURNEY_STAY rejects unbound, inconsistent, and colliding offer facts'
   });
   assert.equal(badPrice.ok, false);
   if (!badPrice.ok) assert.match(badPrice.conflict.message, /price does not match/i);
-  const negativeChange = addStayChange(journey.id, id(), offerId, { amount: '-1.00', currency: 'NZD' });
+  const negativeChange = addStayChange(journey.id, id(), offerId, visit, { amount: '-1.00', currency: 'NZD' });
   const negativePrice = applyScenarioOverlay({
     baseWorld: world, scenarioChange: negativeChange,
     resolvedStayOffers: [{ ...resolved, price: { amount: '-1.00', currency: 'NZD' } }],
@@ -857,16 +869,153 @@ test('ADD_JOURNEY_STAY rejects unbound, inconsistent, and colliding offer facts'
   });
   assert.equal(duplicateOffer.ok, false);
   if (!duplicateOffer.ok) assert.match(duplicateOffer.conflict.message, /duplicate offer id/i);
-  const collision = addStayChange(journey.id, arrival.id, offerId);
+  const collision = addStayChange(journey.id, arrival.id, offerId, visit);
   const colliding = applyScenarioOverlay({ baseWorld: world, scenarioChange: collision, resolvedStayOffers: [resolved] });
   assert.equal(colliding.ok, false);
   if (!colliding.ok) assert.match(colliding.conflict.message, /already exists/i);
 });
 
-test('ADD_JOURNEY_STAY compiles only with an explicit capability and captured owning Journey revision', () => {
-  const { world, journey, placeId } = overnightStayWorld();
+test('ADD_JOURNEY_STAY projects only valid landside visit and credential inputs into the candidate world', () => {
+  const { world, journey, placeId, jurisdictionId } = overnightStayWorld();
+  world.intendedVisits = [];
   const offerId = id();
-  const change = addStayChange(journey.id, id(), offerId);
+  const proposedVisitId = id();
+  const credentialId = id();
+  const credentialVersionId = id();
+  const selectionId = id();
+  const candidate = (credentialSelections: { proposedSelectionId: string; credentialId: string; credentialVersionId: string }[]) => addStayChange(
+    journey.id,
+    id(),
+    offerId,
+    {
+      kind: 'PROPOSED', proposedVisitId, jurisdictionId, purpose: 'recovery stay',
+      intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+      credentialSelections,
+    },
+  );
+  const resolvedStayOffers = [{
+    offerId, placeId,
+    stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+    price: { amount: '245.00', currency: 'NZD' },
+  }];
+  const before = structuredClone(world);
+
+  const missing = applyScenarioOverlay({ baseWorld: world, scenarioChange: candidate([]), resolvedStayOffers });
+  assert.equal(missing.ok, true);
+  if (!missing.ok) return;
+  assert.equal(
+    credentialsEvaluator.evaluate({ kind: 'JOURNEY', id: journey.id }, { now: NOW, world: missing.value.proposedWorld, effective: effectiveOf(missing.value.proposedWorld) }).dimensions[0]?.verdict,
+    'UNKNOWN',
+  );
+  assert.equal(
+    entryEvaluator.evaluate({ kind: 'JOURNEY', id: journey.id }, { now: NOW, world: missing.value.proposedWorld, effective: effectiveOf(missing.value.proposedWorld) }).dimensions[0]?.verdict,
+    'UNKNOWN',
+  );
+  assertCanonicalWorldUntouched(before, world);
+
+  world.credentials.push({ id: credentialId, travellerId: journey.travellerId, kind: 'PASSPORT', issuerCountry: 'ZZ', currentVersionId: credentialVersionId });
+  world.credentialVersions.push({
+    id: credentialVersionId, credentialId, kind: 'PASSPORT', editionNumber: 1, issueDate: '2028-01-01', expiryDate: '2035-01-01',
+    issuerStatus: 'VALID', physicallyAvailable: true, evidenceId: id(), issuingStateCode: 'ZZ', visaClass: null,
+    permittedActivities: [], entriesAllowed: null, permittedStayDays: null,
+  });
+  world.coverage.push({
+    id: id(), topic: 'ENTRY_REQUIREMENT', queryBounds: { jurisdictionId, journeyId: journey.id }, edition: 'test/1',
+    watermark: null, completeness: 'COMPLETE', limitations: [], expiresAt: null, evidenceId: null,
+  });
+  const matched = applyScenarioOverlay({
+    baseWorld: world,
+    scenarioChange: candidate([{ proposedSelectionId: selectionId, credentialId, credentialVersionId }]),
+    resolvedStayOffers,
+  });
+  assert.equal(matched.ok, true);
+  if (!matched.ok) return;
+  const projected = matched.value.proposedWorld;
+  assert.ok(projected.intendedVisits.some((visit) => visit.id === proposedVisitId && !visit.transitIntent));
+  assert.ok(projected.credentialSelections.some((selection) => selection.id === selectionId && selection.intendedVisitIds.includes(proposedVisitId)));
+  assert.equal(
+    credentialsEvaluator.evaluate({ kind: 'JOURNEY', id: journey.id }, { now: NOW, world: projected, effective: effectiveOf(projected) }).dimensions[0]?.verdict,
+    'PASS',
+  );
+  assert.equal(
+    entryEvaluator.evaluate({ kind: 'JOURNEY', id: journey.id }, { now: NOW, world: projected, effective: effectiveOf(projected) }).dimensions[0]?.verdict,
+    'PASS',
+  );
+  assert.equal(world.intendedVisits.length, 0);
+  assert.equal(world.credentialSelections.length, 0);
+});
+
+test('ADD_JOURNEY_STAY rejects invalid landside visit and credential association facts', () => {
+  const { world, journey, placeId, jurisdictionId, visit } = overnightStayWorld();
+  const offerId = id();
+  const resolvedStayOffers = [{
+    offerId, placeId,
+    stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+    price: { amount: '245.00', currency: 'NZD' },
+  }];
+  const proposed = (over: Partial<Extract<StayVisit, { kind: 'PROPOSED' }>> = {}) => ({
+    kind: 'PROPOSED' as const,
+    proposedVisitId: id(), jurisdictionId, purpose: 'recovery stay',
+    intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+    credentialSelections: [],
+    ...over,
+  });
+  const check = (visitInput: StayVisit) => applyScenarioOverlay({
+    baseWorld: world, scenarioChange: addStayChange(journey.id, id(), offerId, visitInput), resolvedStayOffers,
+  });
+  const wrongJurisdiction = check(proposed({ jurisdictionId: id() }));
+  assert.equal(wrongJurisdiction.ok, false);
+  if (!wrongJurisdiction.ok) assert.match(wrongJurisdiction.conflict.message, /jurisdiction/i);
+  const nonCovering = check(proposed({ intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-02T12:00:00.000Z' } }));
+  assert.equal(nonCovering.ok, false);
+  if (!nonCovering.ok) assert.match(nonCovering.conflict.message, /cover/i);
+  const visitCollision = check(proposed({ proposedVisitId: visit.visitId }));
+  assert.equal(visitCollision.ok, false);
+  if (!visitCollision.ok) assert.match(visitCollision.conflict.message, /visit id already exists/i);
+
+  const credentialId = id();
+  const firstVersion = id();
+  const secondVersion = id();
+  world.credentials.push({ id: credentialId, travellerId: journey.travellerId, kind: 'PASSPORT', issuerCountry: 'ZZ', currentVersionId: secondVersion });
+  world.credentialVersions.push(
+    { id: firstVersion, credentialId, kind: 'PASSPORT', editionNumber: 1, issueDate: '2028-01-01', expiryDate: '2035-01-01', issuerStatus: 'VALID', physicallyAvailable: true, evidenceId: id(), issuingStateCode: 'ZZ', visaClass: null, permittedActivities: [], entriesAllowed: null, permittedStayDays: null },
+    { id: secondVersion, credentialId, kind: 'PASSPORT', editionNumber: 2, issueDate: '2029-01-01', expiryDate: '2036-01-01', issuerStatus: 'VALID', physicallyAvailable: true, evidenceId: id(), issuingStateCode: 'ZZ', visaClass: null, permittedActivities: [], entriesAllowed: null, permittedStayDays: null },
+  );
+  const foreignCredentialId = id();
+  const foreignVersionId = id();
+  world.credentials.push({ id: foreignCredentialId, travellerId: id(), kind: 'PASSPORT', issuerCountry: 'ZZ', currentVersionId: foreignVersionId });
+  world.credentialVersions.push({ id: foreignVersionId, credentialId: foreignCredentialId, kind: 'PASSPORT', editionNumber: 1, issueDate: '2028-01-01', expiryDate: '2035-01-01', issuerStatus: 'VALID', physicallyAvailable: true, evidenceId: id(), issuingStateCode: 'ZZ', visaClass: null, permittedActivities: [], entriesAllowed: null, permittedStayDays: null });
+  const wrongOwner = check(proposed({ credentialSelections: [{ proposedSelectionId: id(), credentialId: foreignCredentialId, credentialVersionId: foreignVersionId }] }));
+  assert.equal(wrongOwner.ok, false);
+  if (!wrongOwner.ok) assert.match(wrongOwner.conflict.message, /Journey traveller/i);
+  const selectionId = id();
+  world.credentialSelections.push({ id: selectionId, journeyId: journey.id, credentialId, credentialVersionId: firstVersion, intendedVisitIds: [visit.visitId] });
+  const repin = check(proposed({ credentialSelections: [{ proposedSelectionId: id(), credentialId, credentialVersionId: secondVersion }] }));
+  assert.equal(repin.ok, false);
+  if (!repin.ok) assert.match(repin.conflict.message, /re-pin/i);
+  const extendedVisitId = id();
+  const extension = check(proposed({
+    proposedVisitId: extendedVisitId,
+    credentialSelections: [{ proposedSelectionId: id(), credentialId, credentialVersionId: firstVersion }],
+  }));
+  assert.equal(extension.ok, true);
+  if (!extension.ok) return;
+  assert.deepEqual(
+    extension.value.proposedWorld.credentialSelections.find((candidate) => candidate.id === selectionId)?.intendedVisitIds.sort(),
+    [extendedVisitId, visit.visitId].sort(),
+  );
+  const duplicateSelection = check(proposed({ credentialSelections: [
+    { proposedSelectionId: id(), credentialId, credentialVersionId: firstVersion },
+    { proposedSelectionId: id(), credentialId, credentialVersionId: firstVersion },
+  ] }));
+  assert.equal(duplicateSelection.ok, false);
+  if (!duplicateSelection.ok) assert.match(duplicateSelection.conflict.message, /duplicate/i);
+});
+
+test('ADD_JOURNEY_STAY compiles only with an explicit capability and captured owning Journey revision', () => {
+  const { world, journey, placeId, visit } = overnightStayWorld();
+  const offerId = id();
+  const change = addStayChange(journey.id, id(), offerId, visit);
   const manifest = emptyManifest({ aggregateReads: [{ aggregateRef: { kind: 'JOURNEY', id: journey.id }, revision: journey.revision }] });
   const evaluated = evaluateRecoveryStrategy({
     recoveryCaseId: id(), strategyId: id(), baseWorld: world, baseManifest: manifest,

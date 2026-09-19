@@ -39,6 +39,32 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     orderKey: z.string().min(1),
     offerId: SubjectIdSchema,
     offerPrice: ExactMoneySchema,
+    /**
+     * A landside stay must state the entry encounter it proposes. This is
+     * candidate-only input: no visit or credential selection becomes canonical
+     * until a confirmed external observation is applied by a later command.
+     */
+    visit: z.discriminatedUnion('kind', [
+      z.strictObject({
+        kind: z.literal('EXISTING'),
+        visitId: SubjectIdSchema,
+      }),
+      z.strictObject({
+        kind: z.literal('PROPOSED'),
+        proposedVisitId: SubjectIdSchema,
+        jurisdictionId: SubjectIdSchema,
+        purpose: z.string().min(1),
+        intendedWindow: z.strictObject({
+          start: z.iso.datetime({ offset: true }),
+          end: z.iso.datetime({ offset: true }),
+        }),
+        credentialSelections: z.array(z.strictObject({
+          proposedSelectionId: SubjectIdSchema,
+          credentialId: SubjectIdSchema,
+          credentialVersionId: SubjectIdSchema,
+        })),
+      }),
+    ]),
   }),
   z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),
