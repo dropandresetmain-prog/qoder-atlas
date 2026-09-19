@@ -2,7 +2,6 @@
  * Target PostgreSQL HTTP handlers for M9 product read models and commands.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { proposeRecoveryStrategies } from './recoveryPlanning.ts';
 import { approveRecoveryStrategy } from './recoveryApproval.ts';
 import { resolveRequestPrincipal, workspacePrincipalId } from './workspaceAuthority.ts';
 import type { TargetApplication } from './composeTargetApplication.ts';
@@ -313,16 +312,29 @@ export async function handleTargetProductHttp(
       return true;
     }
 
-    // B1: proposal -> validation -> deterministic viability -> persisted strategies.
+    // R3: proposal -> generalized coordinator (the SAME instance the C4
+    // progression pass owns). The handler only requests planning: it chooses
+    // no domains, dispatches no tools, evaluates no viability and persists no
+    // strategies itself. Outcome mapping: CASE_NOT_FOUND -> 404; terminal /
+    // persistence conflicts -> 409; an honest planning outcome reached despite
+    // provider-research failure is 200 — the failure is visible evidence in
+    // the attempt, not a server error. Idempotency is inherited from the
+    // coordinator's deterministic per-(case, basis, candidate) identity.
     const strategiesMatch = pathname.match(/^\/api\/v2\/cases\/([^/]+)\/strategies$/);
     if (req.method === 'POST' && strategiesMatch) {
       const caseId = decodeURIComponent(strategiesMatch[1]!);
-      const body = (await readJson(req)) as { now?: string } | null;
-      const outcome = await proposeRecoveryStrategies(
-        { pool: ctx.app.pool, workspaceId: ctx.app.workspaceId, actorPrincipalId: commandCtx(ctx.app).actorPrincipalId, uow: () => ctx.app.unitOfWork(), ...(body?.now ? { now: body.now } : {}) },
-        { caseId },
-      );
-      sendJson(res, outcome.ok ? 200 : outcome.error.code === 'CASE_NOT_FOUND' ? 404 : 409, outcome);
+      const planner = ctx.app.runtimeHooks?.planner;
+      if (!planner) {
+        sendJson(res, 503, { ok: false, error: { code: 'PLANNER_NOT_COMPOSED', message: 'planning coordinator is not composed in this runtime', mutatesState: false } });
+        return true;
+      }
+      const outcome = await planner.planCaseDetailed({ recoveryCaseId: caseId as never, reason: 'OPERATOR_REQUEST' });
+      if (!outcome.ok) {
+        const status = outcome.error.code === 'CASE_NOT_FOUND' ? 404 : 409;
+        sendJson(res, status, { ok: false, error: outcome.error });
+        return true;
+      }
+      sendJson(res, 200, { ok: true, result: outcome.result });
       return true;
     }
 

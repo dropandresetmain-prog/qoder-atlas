@@ -385,6 +385,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   // B1: operator controls over the normal application routes. The buttons
   // only POST and re-read; every outcome shown is the server's own response.
   const terminal = view.status === 'RESOLVED' || view.status === 'CLOSED' || view.status === 'CANCELLED' || view.status === 'SUPERSEDED';
+  const hidePropose = terminal || (view.status === 'AWAITING_AUTHORITY' && view.strategies.length >= 1) || view.status === 'EXECUTING';
   const strategyRows = view.strategies.map((strategy) => strategyCard(strategy, terminal)).join('');
   // Several viable options are alternatives, not revisions of one another:
   // each is a different change to the programme. Say so, so the operator
@@ -395,7 +396,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
     : '';
   const recoveryControls = `<section class="section" data-test="recovery-controls" data-case-ref="${escapeHtml(view.caseRef)}">
     <h2>Recovery options</h2>
-    ${terminal ? '' : `<button type="button" class="btn" data-test="propose-strategies">Propose recovery options</button>`}
+    ${hidePropose ? '' : `<button type="button" class="btn" data-test="propose-strategies">Propose recovery options</button>`}
     <p class="meta" data-test="recovery-controls-status"></p>
     ${choiceNote}
     <ul class="strategy-list">${strategyRows || '<li class="meta">No options proposed yet.</li>'}</ul>
@@ -422,8 +423,10 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
       say('Proposing and evaluating options…');
       post('/api/v2/cases/' + encodeURIComponent(caseRef) + '/strategies', function (r) {
         if (!r.ok) { say('Refused (' + r.status + '): ' + (r.body && r.body.error ? r.body.error.message : '')); target.disabled = false; return; }
-        var rep = r.body.report;
-        say('Evaluated ' + rep.candidates.length + ' option(s); ' + rep.candidates.filter(function (c) { return c.viability === 'VIABLE'; }).length + ' viable. Reloading…');
+        var outcomeLabels = { AWAITING_AUTHORITY: 'options are awaiting authority', NEEDS_EVIDENCE_OR_DECISION: 'more evidence or a human decision is needed', NO_RECOVERY_FOUND: 'no viable recovery was found', STALE_RETRY_REQUIRED: 'the case changed; planning will retry' };
+        var outcome = r.body.result && r.body.result.outcome;
+        var label = outcomeLabels[outcome] || outcome;
+        say('Planning completed (' + label + '). Reloading…');
         window.location.reload();
       });
     }

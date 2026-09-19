@@ -245,6 +245,17 @@ describe('B1 product acceptance — readable recovery options (FB1-5, FB1-6)', (
     assert.match(html, /Strategy <span class="mono">a51540b2-59ee-574f-99a2-d99bc84fbf59<\/span> · v1/);
   });
 
+  test('propose handler reads the new RecoveryPlanningResult contract, not the legacy report', () => {
+    // The handler must not read the old .report.candidates shape.
+    assert.equal(html.includes('r.body.report'), false, 'handler must not read legacy report');
+    assert.equal(html.includes('Evaluated '), false, 'handler must not claim viable count from legacy contract');
+    // It must read the new outcome and humanize it.
+    assert.match(html, /r\.body\.result\.outcome/);
+    assert.match(html, /Planning completed/);
+    assert.match(html, /options are awaiting authority/);
+    assert.match(html, /no viable recovery was found/);
+  });
+
   test('an option whose change already executed says so instead of a no-op move', () => {
     // After an approved option executes, canonical state has caught up with
     // what that option proposed, so current == proposed.
