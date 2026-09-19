@@ -30,6 +30,7 @@
   },
   "suites": {
     "current": [
+      "test/a1-programme-intake-ui.test.ts",
       "test/a2-evaluators.test.ts",
       "test/anti-hardcoding-gate.test.ts",
       "test/ait-fixture-suite-contract.test.ts",
@@ -37,6 +38,7 @@
       "test/canonical-test-commands.test.ts",
       "test/case-lifecycle-state.test.ts",
       "test/changeRequest.v2.test.ts",
+      "test/changeRequestInterpretation.test.ts",
       "test/config-env-local.test.ts",
       "test/connection-feasibility.test.ts",
       "test/contracts.test.ts",

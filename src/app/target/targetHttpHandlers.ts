@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { ExpectedRevisionSchema } from '../../domain/v2/shared/identity.ts';
 import { escapeHtml } from '../../ui/html.ts';
 import { stageProgrammeTimeSwap } from './programmeTimeSwapStaging.ts';
+import { interpretTravellerRequest, TravellerInterpretationInputSchema } from './changeRequestInterpretation.ts';
 import { approveRecoveryStrategy, externalExecutionBlockerForStrategyId } from './recoveryApproval.ts';
 import { resolveRequestPrincipal, workspacePrincipalId } from './workspaceAuthority.ts';
 import type { TargetApplication } from './composeTargetApplication.ts';
@@ -43,6 +44,7 @@ import { demoResetGate, resetDemoWorkspace } from '../demo/demoReset.ts';
 import { datasetDirectoryFromEnv } from '../demo/datasetLoader.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
 import { renderProductProgrammeSchedule } from '../../ui/screens/product-programme-schedule.ts';
+import { renderProductProgrammeIntake } from '../../ui/screens/product-programme-intake.ts';
 import { renderProductDecisionQueue } from '../../ui/screens/product-decision-queue.ts';
 import { renderProductActivityFeed } from '../../ui/screens/product-activity-feed.ts';
 import { renderProductRecoveryCase } from '../../ui/screens/product-recovery-case.ts';
@@ -192,6 +194,12 @@ export async function handleTargetProductHttp(
 ): Promise<boolean> {
   const { pathname } = url;
 
+  if (req.method === 'GET' && pathname === '/programme/intake') {
+    sendHtml(res, 200, renderInShell('programme', 'Import programme', await pageChrome(ctx),
+      renderProductProgrammeIntake({})));
+    return true;
+  }
+
   // Clean product route for one focused case: served IN PLACE (no redirect to
   // an /api/v2 URL), inside the shell.
   const cleanCase = pathname.match(/^\/operator\/cases\/([^/]+)$/);
@@ -207,6 +215,23 @@ export async function handleTargetProductHttp(
   if (!pathname.startsWith('/api/v2/')) return false;
 
   try {
+    const interpretationRoute = pathname.match(/^\/api\/v2\/travellers\/journeys\/([^/]+)\/requests\/interpret$/);
+    if (req.method === 'POST' && interpretationRoute) {
+      const journeyId = z.string().uuid().safeParse(interpretationRoute[1]);
+      const read = await readJsonOrMalformed(req);
+      const input = TravellerInterpretationInputSchema.safeParse(read.kind === 'json' ? read.body : undefined);
+      if (!journeyId.success || !input.success) {
+        sendJson(res, 400, { error: 'INVALID_REQUEST', message: 'Check the request and enter dates with a time zone.' });
+        return true;
+      }
+      const journey = await ctx.app.pool.query('SELECT id FROM journeys WHERE workspace_id = $1 AND id = $2', [ctx.app.workspaceId, journeyId.data]);
+      if (!journey.rows.length) {
+        sendJson(res, 404, { error: 'JOURNEY_NOT_FOUND', message: 'This trip is not available.' });
+        return true;
+      }
+      sendJson(res, 200, await interpretTravellerRequest(input.data, ctx.app.runtimeHooks?.intelligence, new Date().toISOString()));
+      return true;
+    }
     if (req.method === 'GET' && pathname === '/api/v2/health') {
       sendJson(res, 200, {
         kind: ctx.app.kind,
@@ -539,10 +564,11 @@ export async function handleTargetProductHttp(
     }
 
     if (req.method === 'POST' && pathname === '/api/v2/programme/time-swap/stage') {
+      const read = await readJsonOrMalformed(req);
       const parsed = z.strictObject({
         recoveryCaseId: z.string().uuid(), itemARef: z.string().uuid(), itemBRef: z.string().uuid(),
         expectedProgrammeRevisions: z.array(ExpectedRevisionSchema).min(1).max(2),
-      }).safeParse(await readJson(req));
+      }).safeParse(read.kind === 'json' ? read.body : undefined);
       if (!parsed.success) {
         sendJson(res, 400, { error: 'VALIDATION_FAILED', message: 'Review the session times and choose the recovery case first.' });
         return true;

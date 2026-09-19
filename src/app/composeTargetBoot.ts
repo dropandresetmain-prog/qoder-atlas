@@ -322,6 +322,7 @@ export async function composeTargetBoot(
   endpoints.app.runtimeServices = services;
   endpoints.app.runtimeHooks = {
     executorPrincipalId,
+    ...(intelligence ? { intelligence } : {}),
     afterApproval: async () => { await execution.runNow(); await externalExecution?.runNow(); },
     ...(offerExecution ? { externalCapabilities: EXTERNAL_OFFER_SELECT_STATEMENTS } : {}),
     afterExecution: () => lifecycle.runNow(),

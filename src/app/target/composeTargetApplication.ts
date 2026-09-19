@@ -17,6 +17,7 @@ import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import { PgReassessmentWorker } from '../../persistence/postgres/world/pgAssessments.ts';
 import type { RuntimeServices } from '../runtimeServices.ts';
+import type { IntelligenceClient } from '../../intelligence/client.ts';
 import type { CoordinatorPlanOutcome } from './recoveryPlanningCoordinator.ts';
 import type { RecoveryPlanningCoordinator, RecoveryPlanningInput } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import { M9_REPLAN_IDENTITY } from './replanIdentity.ts';
@@ -56,6 +57,8 @@ export interface TargetApplication {
    * the same planning truth as the lifecycle. Absent in test compositions.
    */
   runtimeHooks?: {
+    /** Shared provider-neutral read-only interpretation client, composed by normal boot. */
+    intelligence?: IntelligenceClient;
     executorPrincipalId: string;
     afterApproval?: () => Promise<void>;
     afterExecution?: () => Promise<void>;

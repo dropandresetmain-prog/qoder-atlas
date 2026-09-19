@@ -30,13 +30,15 @@
 | Jordan A0 revalidation | Terra High | read-only accepted base | Complete; no writes/tests |
 | Frontend A0 revalidation | Luna High | read-only accepted base | Complete; no writes/tests |
 
-Active A1 lanes: Terra request-planning basis/constraints (migration 0131 reserved); Luna programme intake interface; Luna existing-case time-swap staging. Programme `5d0ca246`, Traveller `eb8629b`, Case `09ba640e` and request persistence `1912ac5` integrated. Import retry correction `9f170d9c` awaits integration. Each uses an isolated worktree/database. Existing R4/PG-perf worktrees and root untracked work remain untouched.
+Active A1 lanes: Sol closes critical request-planning/currentness/lifecycle findings on `be69d056` (not integrated); Luna request admission; Luna investigates remaining programme action parity. Intake correction `bfabd0f5` and Traveller composer `0cb5f436` await integration. Programme staging, Case canonical time zones/full card inspector, import retry and intake UI are integrated. Each lane uses an isolated worktree/database. Root checkout remains untouched. Founder now permits Sol wherever more effective/efficient.
 
 ## Evidence and counters
 
 - Green A0: exact branch/base/provenance inspection; graph paths unchanged since audited snapshot; `git diff --check`.
 - A1a renderer lane `b5ad49e8f9372d1e9052e585faf65fb986c5375f`: 12 focused tests passed; merged as `4029fa3`. Primary direct TypeScript check passed.
-- Current pushed primary: `320e8b7`; locally integrated through `a35398b` (Programme, Traveller, Case and request persistence). Primary corrected request read current revision and conservative booking state.
+- Current pushed primary: `1f045e2`; local integrations through `fa67eb6` plus intake reachability/read-only request interpretation. Named A1 remains unaccepted.
+- New focused evidence: importer real HTTP preview/import/retry PG 4/4; programme preview PG 2/2; intake 3/3; interpretation 3/3 (clarification when unavailable, authored identity/strength preserved, invalid output/invented IDs rejected). Case readability lane: Case 23, renderer 14, language 32, PG 7 passed; integrated physical proof pending restart.
+- Latest physical baseline-to-disruption: 52/67 and nobody needs attention -> 51/67, one needs attention/decision; graph camera transform unchanged; 4 cleared/1 attention. No recovery execution performed.
 - Integration proof: Programme/Decisions/Activity PG seam 3/3; focused product/request/Case 37/37; final Case additions 22/22; request PG 1/1; TypeScript and boundary gate clean (257 classified files). One focused request failure exposed bigint-to-number decoding, fixed and re-proven. No broad run used.
 - Overview follow-on: 19 focused tests, direct TypeScript, and real PG seam 1/1 on `astra_a1_shell` passed. PG proves all 69 fixture journeys retained, generic shared resource, and supplier replacement footprint 5 even when its current/published schedule agrees. Browser expanded screenshot proves visible source/commitment/traveller relations; final selection/poll/mobile acceptance remains pending.
 - Initial Case SVG had a zero-size viewport: fixed initial stage dimensions; physical screenshot proves visible dependency lines and arrival time. Focused renderer 13/13 passed; supporting-card height increased, final physical check pending.
@@ -63,9 +65,9 @@ Active A1 lanes: Terra request-planning basis/constraints (migration 0131 reserv
 
 ## Exact next action / stop-safe handoff
 
-Commit/push Overview follow-on, integrate completed Programme/Traveller/Case corrections, then restore native request and programme action seams. Complete graph interaction/mobile checks and A1 gates. Pause only after A1 is genuinely accepted/pushed; no A2 execution.
+Push integrated programme/Case/intake work; integrate intake usability correction and request UI. Complete canonical request admission/planning/lifecycle fixes, request HTTP/authority integration, remaining programme action parity; then browser/mobile and A1 gates. Pause only after genuine A1 acceptance/push; no A2 execution.
 
-Blocker: none for A0/A1. Jordan requirement/semantics conflict is pending primary resolution before A3.
+Act Now A1 blocker: Sol identified caller-authored request basis, request-blind passive resolution, proposer-claimed hard-constraint satisfaction and stale existing-plan authority issuance. Fixes assigned before integrating request planner. Investigate Now: requested-day research and durable unsupported reasons. Jordan requirement/semantics conflict remains pending primary resolution before A3.
 Remaining action-seam findings: programme bilateral preview is now wired and integrated; generic programme preview/commit, intake and traveller composer/scoped-choice are target-native boundary work, not HTML-only restoration. These remain Act Now / Investigate Now at primary scope. No retirement/deferral decision has been accepted.
 New architecture evidence: current coordinator admits only CURRENT FAIL; healthy-trip requests require explicit desired-state context while retaining the actual current assessment. Never fabricate failure. Import is resumable, not one atomic transaction; partial visibility remains Investigate Now before exposing success semantics.
 Browser artifacts: ignored `output/playwright/` screenshots; temporary untracked `.playwright-cli/` snapshots/logs must stay out of commits.

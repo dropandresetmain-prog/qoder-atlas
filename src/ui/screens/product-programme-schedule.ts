@@ -211,6 +211,7 @@ export function renderProgrammeSurface(view: ProgrammeSurfaceView, schedule?: Pr
 <main class="shell product-programme-schedule" data-test="product-programme-schedule" data-ui-screen="programme">
   <div class="page-head">
     <h1>${escapeHtml(view.eventName)}</h1>
+    <a class="btn btn-ghost" href="/programme/intake">Load a programme</a>
     <p class="sub">Every session on the programme, day by day, and who it needs to work for.</p>
     <p class="meta">Event programme · generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
   </div>
