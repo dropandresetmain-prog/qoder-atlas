@@ -29,7 +29,7 @@ import { computeClosure, refKey } from '../impact/closure.ts';
 import { projectEffectiveWorld } from '../world/effectiveItinerary.ts';
 import type { CapturedWorld } from '../world/world.ts';
 import { assessManifestCurrentness, type CurrentState } from '../world/currentness.ts';
-import { applyScenarioOverlay, type ResolvedOffer } from './overlay.ts';
+import { applyScenarioOverlay, type ResolvedOffer, type ResolvedStayOffer } from './overlay.ts';
 
 export interface EvaluateStrategyInput {
   recoveryCaseId: string;
@@ -43,6 +43,8 @@ export interface EvaluateStrategyInput {
   /** Optional; defaults to the sole M6 registry. */
   registry?: EvaluatorRegistry;
   resolvedOffers?: readonly ResolvedOffer[];
+  /** Candidate-only stay quotes, separately typed so transport offers stay transport-only. */
+  resolvedStayOffers?: readonly ResolvedStayOffer[];
   assumptions?: readonly StrategyAssumption[];
   requiredUnknowns?: readonly RequiredUnknown[];
   /**
@@ -191,6 +193,7 @@ export function evaluateRecoveryStrategy(input: EvaluateStrategyInput): TypedRes
     baseWorld: input.baseWorld,
     scenarioChange: input.scenarioChange,
     resolvedOffers: input.resolvedOffers,
+    resolvedStayOffers: input.resolvedStayOffers,
   });
   if (!overlay.ok) return overlay;
 

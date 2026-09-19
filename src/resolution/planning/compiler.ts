@@ -59,6 +59,7 @@ const INTERNAL_SUPPORT_ASSIGNMENT = 'internal:support.assignment';
 const INTERNAL_OBJECTIVE_DISPOSITION = 'internal:objective.disposition';
 const INTERNAL_RESERVATION_ALLOCATION = 'internal:reservation.allocation';
 const EXTERNAL_SELECT_OFFER = 'external:offer.select';
+const EXTERNAL_STAY_BOOK = 'external:stay.book';
 
 function capabilitySupported(capabilities: readonly CapabilityStatement[] | undefined, ref: string): boolean {
   // Internal executors are always structurally available at compile time; M8
@@ -133,6 +134,45 @@ function intentForEffect(
         expectedObservations: ['EXTERNAL_PROVIDER:reservation_or_ticket_confirmation'],
         offerFingerprint: effect.offerId,
         ...(effect.offerPrice ? { costEstimate: effect.offerPrice } : {}),
+      });
+    }
+    case 'ADD_JOURNEY_STAY': {
+      // The new overlay item is correlation only. The owning Journey is the
+      // mutable aggregate and must have been captured in the base manifest;
+      // compiling without that revision would make a later booking stale-safe
+      // only by invention, so refuse it here.
+      const journeyRead = strategy.baseManifest.aggregateReads.find(
+        (read) => read.aggregateRef.kind === 'JOURNEY' && read.aggregateRef.id === effect.journeyId,
+      );
+      if (!journeyRead) {
+        return conflict(typedConflict(
+          'STALE_AGGREGATE_REVISION',
+          'ADD_JOURNEY_STAY requires the owning Journey revision in the strategy base manifest',
+          [{ kind: 'JOURNEY', id: effect.journeyId }],
+        ));
+      }
+      return ok({
+        ...base,
+        operationNamespace: 'provider.stay',
+        logicalOperationKey: `stay-book:${effect.journeyId}:${effect.offerId}:${effect.proposedJourneyItemId}`,
+        requestFingerprint: fingerprint({ effect, strategyVersion: strategy.strategyVersion }),
+        capabilityRef: EXTERNAL_STAY_BOOK,
+        subjectRefs: [
+          { kind: 'JOURNEY', id: effect.journeyId },
+          { kind: 'OFFER', id: effect.offerId },
+        ],
+        expectedRevisions: [{
+          aggregateRef: { kind: 'JOURNEY', id: effect.journeyId },
+          expectedRevision: journeyRead.revision,
+        }],
+        preconditions: [
+          `basisAssessment:${strategy.basisAssessmentId}`,
+          `strategyVersion:${strategy.strategyVersion}`,
+        ],
+        requiredAuthorityScopes: ['journey.stay'],
+        expectedObservations: ['EXTERNAL_PROVIDER:stay_booking_confirmation'],
+        offerFingerprint: effect.offerId,
+        costEstimate: effect.offerPrice,
       });
     }
     case 'PROPOSE_ALLOCATION': {
