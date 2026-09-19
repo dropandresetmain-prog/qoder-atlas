@@ -1,3 +1,22 @@
+# ACTIVE TASK — R4 PRODUCT PARITY + LIVE SARAH VERTICAL (ledger)
+
+- Base: `main` `07c3c797b57a1c74e30c08a9097362edb57dd9d5` (accepted R3 `d9bb9a5` ancestor verified). Branch `feat/r4-product-parity-live-sarah` (worktree `.worktrees/r4`). V7.2 docs cherry-picked (`563320e` -> docs only).
+- Parity contract: `docs/work/R4_FRONTEND_PARITY_CONTRACT.md` (frozen R4-C0).
+- Test policy: focused only while iterating; CURRENT_TARGET once at integration; full PG ONCE near acceptance.
+- Frozen shared interaction contract (all lanes obey):
+  1. Polling never replaces `<main>`; case/overview pages mark regions `data-poll-region="<name>"`; the poller patches only regions whose content changed (guard on `projectionRevision`, NOT the xmin cursor) and never touches `.fg-canvas` unless the graph scene changed.
+  2. Controls use `data-action="<recover|decline|escalate|reset-demo|trigger-disruption>"` + `data-*` params handled by ONE document-level delegated client script (shell-owned); inline listeners on replaceable nodes are forbidden.
+  3. Graph camera/view/selection/tab/open `<details>`/scroll survive patching; auto-fit only on first render + Home.
+  4. User copy goes through `src/ui/copy.ts` vocab; no UUID/enum/provider jargon in visible text (data-* and a `Technical details` `<details>` exempt).
+- Lane ownership (branch `r4/<lane>`, worktree `.worktrees/r4-<lane>`): A shell/back/reset/polling/delegation; B overview+V7.2; C Atlas recordings/sandbox; D G01+Qwen+preferences; E1 graph V5.6 fidelity + runtime; E2 Case IA/copy/options/approval; H Decisions/Activity/Programme/Traveller adapters+jargon gate. PRIMARY integrates.
+- Collision ownership: `src/ui/page.ts`,`productShell.ts`,`casePolling.ts`,`polling.ts` = A; `product-recovery-case.ts` = E2; `src/ui/graph/*` = E1; `operatorOverviewAdapter.ts`,`product-operator-overview.ts`,`src/ui/overview-graph/*` = B; `recoveryPlanningCoordinator.ts`,`composeTargetBoot.ts` = D (C hands boot wiring to D/PRIMARY).
+- Recon (scratchpad `recon/`): legacy-archaeology, current-frontend-defects, backend-gaps, graph-gaps. Key root causes: overview queue-replaces-population (`operatorOverviewAdapter.ts:254`); poll `outerHTML` swap + listener bound to replaced node (`casePolling.ts:70`, `product-recovery-case.ts:421-462`); reset 409 (`targetHttpHandlers.ts:467`); G01 `DEFAULT_CAPABILITIES` (`recoveryPlanningCoordinator.ts:110`); no CGK->SIN Atlas recording; Qwen client never built at boot (and gated on ADAPTER_MODE); preferences reader absent.
+- Checkpoints: R4-C0 contract frozen (this commit). Others: pending.
+- Provider state: Atlas sandbox creds + Model Studio key present in `.env.local` (names only checked). Qwen state: not composed. Reset state: not implemented. Browser defects/backend defects: see recon list above.
+- Next action: dispatch lanes A,B,C,D,E1,E2,H.
+
+---
+
 # MAIN <- R3 DOCUMENTATION RECONCILIATION
 
 Status: **READY FOR MAIN FAST-FORWARD AFTER THE RECONCILIATION MERGE COMMIT**.
