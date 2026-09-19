@@ -12,7 +12,7 @@ import type {
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
 import { escapeHtml } from '../../../ui/html.ts';
-import { caseHref } from '../productShell.ts';
+import { caseHref, travellerHref } from '../productShell.ts';
 import { plainChangeText } from './surfaceLabels.ts';
 import {
   presentAssessment, presentGraphState, presentOperationalStatus, presentViability,
@@ -252,18 +252,19 @@ function populationRow(entry: OperatorOverview['population'][number], issueOverr
     ? ''
     : `<p class="b-extra">Assessment ${escapeHtml(entry.evaluation.toLowerCase().split('_').join(' '))}</p>`;
   const issue = issueOverride ?? `${operationalStatusLabel(entry.status)} · ${entry.obligation === 'REQUIRED' ? 'Required commitment' : 'Optional commitment'}`;
-  return queueRowShell(
-    entry.caseRef,
-    `data-test="population-row" data-journey-ref="${escapeHtml(entry.journeyRef)}" data-status="${entry.status}"`,
-    `
+  const caseLink = entry.caseRef
+    ? `<a class="traveller-link" href="${escapeHtml(caseHref(entry.caseRef))}" data-test="population-case-link">Open case →</a>`
+    : '';
+  const travellerLink = `<a class="traveller-link" href="${escapeHtml(travellerHref(entry.journeyRef))}" data-test="population-traveller-link" data-journey-ref="${escapeHtml(entry.journeyRef)}">Show interaction →</a>`;
+  return `<div class="qrow" data-test="population-row" data-journey-ref="${escapeHtml(entry.journeyRef)}" data-status="${entry.status}">
       <span class="q-glyph" aria-hidden="true"><i class="${dotClass}"></i></span>
       <div>
         <div class="q-name">${escapeHtml(entry.travellerLabel)}</div>
         <div class="q-issue">${escapeHtml(issue)}</div>
         ${evaluationNote}
       </div>
-      <div class="b-right"><span class="badge tone-${operationalStatusTone(entry.status)}">${escapeHtml(operationalStatusLabel(entry.status))}</span>${entry.caseRef ? '<span class="b-extra">Open case</span>' : ''}</div>`,
-  );
+      <div class="b-right"><span class="badge tone-${operationalStatusTone(entry.status)}">${escapeHtml(operationalStatusLabel(entry.status))}</span>${caseLink}${travellerLink}</div>
+    </div>`;
 }
 
 const ROSTER_RANK: Record<ProductOperationalStatus, number> = {
@@ -346,11 +347,15 @@ export function adaptOperatorOverviewToDashboard(view: OperatorOverview): Produc
       const row = populationRow(entry, issue);
       // Only the first page is visible before the client controller runs; the
       // rest stay in the document so search and paging work over everything.
-      return index < ROSTER_PAGE_SIZE ? row : row.replace(' data-test="population-row"', ' data-test="population-row" hidden');
+      return index < ROSTER_PAGE_SIZE ? row : row.replace(' data-test="population-row"', ' data-test="population-row" hidden style="display:none"');
     })
     .join('');
   const rosterHtml = roster.length > 0
-    ? `<div class="queue" data-roster data-page-size="${ROSTER_PAGE_SIZE}" data-test="product-population-queue">${rosterRows}</div>`
+    ? `<div class="roster-tools" data-test="roster-tools">
+        <label class="roster-search"><span class="sr-only">Search participants</span><input class="roster-search-input" type="search" data-roster-search data-test="roster-search" placeholder="Search participants" autocomplete="off"></label>
+        <span class="roster-status" data-roster-status role="status" aria-live="polite"></span>
+        <span class="roster-pagination" data-test="roster-pagination"><button type="button" class="btn btn-ghost" data-roster-prev aria-label="Previous participants">Previous</button><button type="button" class="btn btn-ghost" data-roster-next aria-label="Next participants">Next</button></span>
+      </div><div class="queue" data-roster data-page-size="${ROSTER_PAGE_SIZE}" data-test="product-population-queue">${rosterRows}</div>`
     : '<p class="empty-note">No trips in scope.</p>';
 
   return {

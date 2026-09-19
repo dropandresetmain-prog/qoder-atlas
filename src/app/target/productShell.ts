@@ -37,6 +37,14 @@ export function caseHref(caseRef: string): string {
   return `/operator/cases/${encodeURIComponent(caseRef)}`;
 }
 
+/** Build the traveller-facing route from the journey identity supplied by PG. */
+export function travellerHref(journeyRef: string): string {
+  const journeyId = journeyRef.startsWith('JOURNEY:')
+    ? journeyRef.slice('JOURNEY:'.length)
+    : journeyRef;
+  return `/traveller?trip=${encodeURIComponent(journeyId)}`;
+}
+
 export interface ShellContext {
   /** Present only when the read model identified a single active programme. */
   eventName?: string;
@@ -57,12 +65,13 @@ export function renderInShell(
   context: ShellContext,
   bodyHtml: string,
 ): string {
+  const isTraveller = active === 'traveller';
   return renderPage(
     {
       title,
       active,
       links: { ...SHELL_LINKS },
-      surface: 'operator',
+      surface: isTraveller ? 'traveller' : 'operator',
       ...(context.eventName ? { eventName: context.eventName } : {}),
       ...(context.decisionCount !== undefined ? { decisionCount: context.decisionCount } : {}),
       ...(context.resetDemo ? { resetDemo: true } : {}),

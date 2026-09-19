@@ -313,7 +313,8 @@ export async function handleTargetProductHttp(
       }
       const view = projectTravellerTrip(facts);
       if (url.searchParams.get('format') === 'html') {
-        sendHtml(res, 200, renderInShell('traveller', 'Your trip', { ...(await pageChrome(ctx)), backLink: OVERVIEW_BACK }, renderProductTravellerTrip(view)));
+        const chrome = await pageChrome(ctx);
+        sendHtml(res, 200, renderInShell('traveller', 'Your trip', { ...chrome, backLink: OVERVIEW_BACK }, renderProductTravellerTrip(view, chrome.eventName)));
       } else {
         sendJson(res, 200, view);
       }

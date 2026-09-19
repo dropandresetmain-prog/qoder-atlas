@@ -44,7 +44,7 @@ export function adaptDecisionQueueToDecisionsPage(view: DecisionQueue): Decision
       pending.push({
         caseId: decision.caseRef,
         travellerName: name,
-        decision: `Approve the recovery plan for ${name === 'Traveller' ? 'this trip' : `${name}’s trip`}.`,
+        decision: `Approve the recovery plan for ${name === 'Traveller' ? 'this trip' : `${name}â€™s trip`}.`,
         waitingOn: 'Organiser',
         ...(age ? { age } : {}),
       });
