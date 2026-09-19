@@ -1,24 +1,24 @@
 {
-  "id": "rec_4e1e3def145b1c35dec45eaf4ecfbb54",
+  "id": "rec_10d970d12d1abd38ba31fadfdb23c3a3",
   "providerId": "atlas",
   "operation": "order_retrieve",
-  "recordedAt": "2026-09-19T15:39:41.935Z",
+  "recordedAt": "2026-09-19T15:51:08.355Z",
   "sanitized": true,
   "raw": {
     "status": 0,
     "msg": "success",
-    "orderNo": "TESTA20260919215632741",
+    "orderNo": "TESTA20260919234948196",
     "orderStatus": "2",
     "ticketStatus": "1",
-    "totalPrice": 31.29,
+    "totalPrice": 37.49,
     "currency": "USD",
-    "payTime": "2026-09-19 21:56:34",
-    "tktLimitTime": "2026-09-19 23:16:36",
-    "pnrCode": "PTZBTF",
+    "payTime": "2026-09-19 23:49:49",
+    "tktLimitTime": "2026-09-20 01:09:54",
+    "pnrCode": "JQBLZ5",
     "paxTicketInfos": [
       {
         "ticketNos": [
-          "S46068"
+          "S36217"
         ],
         "name": "[REDACTED]",
         "gender": "F",
@@ -33,18 +33,18 @@
       "fromSegments": [
         {
           "carrier": "Z2",
-          "flightNumber": "Z2783",
+          "flightNumber": "Z2781",
           "depAirport": "MNL",
-          "depTime": "202611031220",
+          "depTime": "202611240835",
           "arrAirport": "CEB",
-          "arrTime": "202611031355"
+          "arrTime": "202611241005"
         }
       ],
       "retSegments": []
     },
     "airlineBookings": [
       {
-        "airlinePnr": "S46068",
+        "airlinePnr": "S36217",
         "airlineCode": "Z2",
         "airlineName": "AirAsia Philippines",
         "airlineWebSiteAddress": "https://www.airasia.com",

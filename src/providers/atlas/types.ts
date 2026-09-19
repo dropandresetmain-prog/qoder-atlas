@@ -143,6 +143,24 @@ export type AtlasVerifyBody = z.infer<typeof AtlasVerifyBodySchema>;
 export const AtlasPaxTicketInfoSchema = z.object({
   passengerName: z.string().optional(),
   ticketNos: z.array(z.string()).optional(),
+  /** Wire reality (queryOrderDetails.do / order.do): `FAMILY/GIVEN`, gender `M|F`, birthday `YYYYMMDD` or empty. */
+  name: z.string().nullable().optional(),
+  gender: z.string().nullable().optional(),
+  birthday: z.string().nullable().optional(),
+  nationality: z.string().nullable().optional(),
+  contactEmails: z.array(z.string()).nullable().optional(),
+});
+/** The itinerary Atlas echoes on order.do / queryOrderDetails.do (`routing.fromSegments`). */
+export const AtlasOrderRoutingSchema = z.object({
+  fromSegments: z.array(z.object({
+    carrier: z.string().nullable().optional(),
+    flightNumber: z.string().nullable().optional(),
+    depAirport: z.string().nullable().optional(),
+    depTime: z.string().nullable().optional(),
+    arrAirport: z.string().nullable().optional(),
+    arrTime: z.string().nullable().optional(),
+  })).nullable().optional(),
+  retSegments: z.array(z.object({ flightNumber: z.string().nullable().optional() }).catchall(z.unknown())).nullable().optional(),
 });
 export type AtlasPaxTicketInfo = z.infer<typeof AtlasPaxTicketInfoSchema>;
 
@@ -164,6 +182,7 @@ export const AtlasOrderBodySchema = z.object({
   /** Payment/ticketing deadline for the held order, provider-local time. */
   tktLimitTime: z.string().nullable().optional(),
   paxTicketInfos: z.array(AtlasPaxTicketInfoSchema).nullable().optional(),
+  routing: AtlasOrderRoutingSchema.nullable().optional(),
   /**
    * Returned with duplicate-detection status: the existing order(s).
    * Wire reality: observed BOTH as plain order-number strings and as objects
@@ -206,6 +225,7 @@ export const AtlasOrderDetailsBodySchema = z.object({
   tktLimitTime: z.string().nullable().optional(),
   pnrCode: z.string().nullable().optional(),
   paxTicketInfos: z.array(AtlasPaxTicketInfoSchema).nullable().optional(),
+  routing: AtlasOrderRoutingSchema.nullable().optional(),
   airlineBookings: z
     .array(z.object({ airlinePnr: z.string().nullable().optional() }).catchall(z.unknown()))
     .nullable()

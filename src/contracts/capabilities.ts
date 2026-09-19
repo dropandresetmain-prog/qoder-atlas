@@ -141,10 +141,13 @@ export interface FlightOrderCreateQuery {
   /** Opaque provider workflow state carried from verify, preserved exactly. */
   workflowState?: Record<string, unknown>;
   /**
-   * Caller-owned idempotency key. Required: this is the one operation most
-   * exposed to duplicate-create risk, and it is what lets an executor
-   * retrieve-before-recreate after a timeout instead of blindly re-issuing
-   * create (ADR-042).
+   * Caller-owned reference. Required so an executor can correlate its own
+   * records. It is NOT a provider-side idempotency key: Atlas order.do neither
+   * honours nor echoes it, and has no lookup by it (empirically proven in the
+   * sandbox, docs/work/r4-evidence/atlas-create-idempotency-decision.md).
+   * After an ambiguous create (timeout) with no order reference the only safe
+   * behaviour is OUTCOME_UNKNOWN for human/provider reconciliation — never a
+   * blind re-create (ADR-042).
    */
   clientReference: string;
 }
@@ -279,9 +282,42 @@ export const FlightOrderStatusSchema = z.enum([
 ]);
 export type FlightOrderStatus = z.infer<typeof FlightOrderStatusSchema>;
 
+/**
+ * What a provider exposes about WHO/WHAT an existing order is for, normalised to provider-neutral
+ * shapes. Used only to prove that an order the provider pointed at (e.g. a duplicate-detection hit)
+ * is the order the current approved intent means. Held in memory for validation; never persisted.
+ */
+export interface FlightOrderIdentity {
+  passengers: Array<{
+    familyName: string;
+    givenName: string;
+    gender?: 'MALE' | 'FEMALE';
+    /** YYYY-MM-DD when the provider reports one. */
+    dateOfBirth?: string;
+    nationality?: string;
+  }>;
+  contactEmails?: string[];
+  /** Provider-local wall-clock strings exactly as reported (interpretation needs the airport zone). */
+  segments: Array<{
+    carrier?: string;
+    flightNumber?: string;
+    originCode: string;
+    destinationCode: string;
+    departureLocal: string;
+    arrivalLocal: string;
+  }>;
+}
+
 export interface FlightOrderOutcome {
   /** Provider-observed order lifecycle state; acceptance != final state. */
   status: FlightOrderStatus;
+  /**
+   * Set when the provider answered a create with duplicate detection and the outcome above ADOPTS an
+   * existing order it pointed at. The pointer alone is NOT proof that the existing order is the one
+   * the caller intends: a consequential caller must retrieve it read-only and validate it against its
+   * own approved terms BEFORE paying or adopting (R4-F2e / review N3).
+   */
+  duplicateOfExisting?: { orderRefs: string[] };
   transactionState?: FlightTransactionState;
   totalPrice?: Money;
   /** Structured outcome of any embedded fulfilment attempt (pay/observe). */
@@ -300,6 +336,8 @@ export interface FlightOrderStatusView {
   status: FlightOrderStatus;
   transactionState?: FlightTransactionState;
   totalPrice?: Money;
+  /** Who/what the order is for, when the provider exposes it (validation only; never persisted). */
+  identity?: FlightOrderIdentity;
   /** Last provider-observed instant for freshness reasoning. */
   observedAt?: IsoDateTime;
   detail?: string;

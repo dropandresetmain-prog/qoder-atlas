@@ -91,7 +91,7 @@ function scriptedProvider(pool: Pool, workspaceId: string, script: Script) {
     },
   };
   const deps: ExternalOfferExecutionDeps = {
-    flight, transactions, mode: 'REPLAY', paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
+    flight, transactions, mode: 'RECORD', paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
     ticketingPoll: { attempts: 2, delayMs: 0 }, sleep: async () => undefined,
   };
   return { calls, statusesAtMutation, deps };

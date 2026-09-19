@@ -153,6 +153,9 @@ async function externalExecutionBlockerFor(
   }
   for (const effect of offers) {
     const inputs = await resolveOfferExecutionInputsForStrategy(pool, workspaceId, { strategyId: strategy.id, journeyItemId: effect.journeyItemId, offerKey: effect.offerId });
+    if (!inputs.ready && inputs.reason === 'FRESH_PROVIDER_QUOTE_REQUIRED') {
+      return { code: 'FRESH_PROVIDER_QUOTE_REQUIRED', message: 'This fare was checked from saved records, not with the airline. A fresh live price check is needed before it can be booked.' };
+    }
     if (!inputs.ready) return { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: `${inputs.reason}: ${inputs.detail}` };
   }
   const budget = await budgetCandidatesFor(pool, workspaceId, strategy);

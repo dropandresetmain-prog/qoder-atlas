@@ -66,7 +66,15 @@ export type OfferExecutionInputGap =
   | 'PASSENGER_UNRESOLVED'
   | 'PASSENGER_NAME_MISSING'
   | 'BOOKING_IDENTITY_MISSING'
-  | 'CONTACT_EMAIL_MISSING';
+  | 'CONTACT_EMAIL_MISSING'
+  | 'FRESH_PROVIDER_QUOTE_REQUIRED';
+
+/**
+ * Research modes whose provider identifiers may move money. A SIMULATED/REPLAY binding carries a
+ * replayed/recorded routing identifier: it proves nothing about what the provider will sell now, so
+ * it must never become a live money-moving input (R4-F2f / review N4).
+ */
+export const LIVE_RESEARCH_MODES: readonly string[] = ['RECORD', 'LIVE'];
 
 /** Insert immutable bindings for the viable SELECT_OFFER strategies just persisted. Idempotent. */
 export async function persistOfferExecutionBindings(
@@ -159,6 +167,12 @@ export async function resolveOfferExecutionInputsForStrategy(
   )).rows[0];
   if (!bound) {
     return { ready: false, reason: 'OFFER_BINDING_MISSING', detail: 'no protected provider offer binding was recorded for this option' };
+  }
+  if (!LIVE_RESEARCH_MODES.includes(bound.research_mode)) {
+    return {
+      ready: false, reason: 'FRESH_PROVIDER_QUOTE_REQUIRED',
+      detail: `the option was priced from ${bound.research_mode} research, not from the provider; a fresh live provider quote is required before anything is booked`,
+    };
   }
   const item = (await db.query<{ journey_id: string; traveller_id: string }>(
     `SELECT ji.journey_id, j.traveller_id

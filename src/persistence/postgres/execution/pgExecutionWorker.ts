@@ -34,7 +34,19 @@ export interface ExecutionClaim {
   gatingPrincipalId: string | null;
 }
 
-export type ExternalDispatcher = (claim: ExecutionClaim) => Promise<
+/**
+ * Handed to the dispatcher by `dispatchClaimed`. `checkpointRequestRef` durably writes the
+ * provider reference obtained mid-dispatch (e.g. an order number) onto THIS attempt, fenced by
+ * the claim token + fencing token and only while the attempt is DISPATCHING. It returns false
+ * when the write did not land (fenced, lease taken over, database error): the dispatcher MUST
+ * then perform no further consequential provider call. It refreshes the lease on success.
+ * (R4-F2d N1: a crash after the provider accepted a create must leave the reference on disk.)
+ */
+export interface DispatchControl {
+  checkpointRequestRef(requestRef: string): Promise<boolean>;
+}
+
+export type ExternalDispatcher = (claim: ExecutionClaim, control: DispatchControl) => Promise<
   | { kind: 'SUCCESS'; responseRef: string; sourceOwnedFields: Record<string, unknown>; externalRecordId?: string }
   | { kind: 'FAILURE'; responseRef?: string; error: string }
   | { kind: 'LOST_RESPONSE'; requestRef: string }
@@ -143,10 +155,18 @@ export class PgExecutionWorker {
       gating_principal_id: string | null;
     }>(
       `UPDATE execution_attempts
-          SET status = 'RECONCILIATION_REQUIRED', claim_token = $4, fencing_token = fencing_token + 1,
+          SET last_error = CASE WHEN status IN ('DISPATCHING', 'DISPATCHED')
+                                THEN 'stale_dispatch_lease_expired: dispatcher lost mid-flight; outcome unknown, read-only reconciliation only'
+                                ELSE last_error END,
+              status = 'RECONCILIATION_REQUIRED', claim_token = $4, fencing_token = fencing_token + 1,
               lease_expires_at = now() + ($5 * interval '1 second'), updated_at = now()
         WHERE workspace_id = $1 AND id = $2
           AND status = ANY($3::text[])
+          -- A DISPATCHING/DISPATCHED attempt may be swept into reconciliation ONLY once its lease has
+          -- lapsed (dispatcher dead). A live dispatcher's attempt is never taken over; a lapsed one
+          -- may never return to dispatch eligibility, only to (read-only) reconciliation.
+          AND (status IN ('OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED')
+               OR lease_expires_at IS NULL OR lease_expires_at < now())
         RETURNING id, workspace_id, action_intent_id, attempt_number, logical_operation_key,
                   request_fingerprint, fencing_token, status, provider_operation_key, gating_principal_id`,
       [workspaceId, attemptId, RECONCILABLE_STATUSES, claimToken, leaseSeconds],
@@ -253,9 +273,27 @@ export class PgExecutionWorker {
     });
     if (entering !== 'APPLIED') return { outcome: 'CLAIMED', detail: 'fenced before dispatch' };
 
+    const leaseSeconds = this.options.leaseSeconds ?? 60;
+    const control: DispatchControl = {
+      checkpointRequestRef: async (requestRef) => {
+        try {
+          const written = await this.pool.query(
+            `UPDATE execution_attempts
+                SET request_ref = $3, lease_expires_at = now() + ($6 * interval '1 second'), updated_at = now()
+              WHERE workspace_id = $1 AND id = $2 AND status = 'DISPATCHING'
+                AND claim_token = $4 AND fencing_token = $5
+                AND (request_ref IS NULL OR request_ref = $3)`,
+            [claim.workspaceId, claim.id, requestRef, claim.claimToken, claim.fencingToken, leaseSeconds],
+          );
+          return (written.rowCount ?? 0) > 0;
+        } catch {
+          return false;
+        }
+      },
+    };
     let result: Awaited<ReturnType<ExternalDispatcher>>;
     try {
-      result = await params.dispatcher(claim);
+      result = await params.dispatcher(claim, control);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await transitionExecutionAttempt(this.pool, {

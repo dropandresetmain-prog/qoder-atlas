@@ -1,29 +1,27 @@
 {
-  "id": "rec_4e1e3def145b1c35dec45eaf4ecfbb54",
+  "id": "rec_5ba10135da5a8aa5e1503828c10a0bea",
   "providerId": "atlas",
   "operation": "order_retrieve",
-  "recordedAt": "2026-09-19T15:39:41.935Z",
+  "recordedAt": "2026-09-19T15:39:43.033Z",
   "sanitized": true,
   "raw": {
     "status": 0,
     "msg": "success",
-    "orderNo": "TESTA20260919215632741",
-    "orderStatus": "2",
-    "ticketStatus": "1",
-    "totalPrice": 31.29,
+    "orderNo": "TESTA20260919231816946",
+    "orderStatus": "0",
+    "ticketStatus": "0",
+    "totalPrice": 33.97,
     "currency": "USD",
-    "payTime": "2026-09-19 21:56:34",
-    "tktLimitTime": "2026-09-19 23:16:36",
-    "pnrCode": "PTZBTF",
+    "payTime": null,
+    "tktLimitTime": "2026-09-20 00:38:21",
+    "pnrCode": "HI8KYU",
     "paxTicketInfos": [
       {
-        "ticketNos": [
-          "S46068"
-        ],
+        "ticketNos": [],
         "name": "[REDACTED]",
         "gender": "F",
         "birthday": "",
-        "nationality": "PH",
+        "nationality": "",
         "contactEmails": [
           "[REDACTED]"
         ]
@@ -33,18 +31,18 @@
       "fromSegments": [
         {
           "carrier": "Z2",
-          "flightNumber": "Z2783",
+          "flightNumber": "Z2777",
           "depAirport": "MNL",
-          "depTime": "202611031220",
+          "depTime": "202611222035",
           "arrAirport": "CEB",
-          "arrTime": "202611031355"
+          "arrTime": "202611222205"
         }
       ],
       "retSegments": []
     },
     "airlineBookings": [
       {
-        "airlinePnr": "S46068",
+        "airlinePnr": "",
         "airlineCode": "Z2",
         "airlineName": "AirAsia Philippines",
         "airlineWebSiteAddress": "https://www.airasia.com",

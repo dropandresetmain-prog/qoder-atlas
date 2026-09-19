@@ -41,6 +41,7 @@ import type {
   FlightCancellationSubmitOutcome,
   FlightCancellationSubmitQuery,
   FlightOrderCreateQuery,
+  FlightOrderIdentity,
   FlightOrderOutcome,
   FlightOrderPayQuery,
   FlightOrderRetrieveQuery,
@@ -62,6 +63,7 @@ import {
   AtlasVoidQuotationBodySchema,
   type AtlasOrderBody,
   type AtlasOrderDetailsBody,
+  type AtlasPaxTicketInfo,
   type AtlasPayBody,
   type AtlasVoidBody,
   type AtlasVoidOrdersBody,
@@ -595,16 +597,53 @@ function providerDetail(raw: { status: number; msg?: string | null }): string {
   return `provider status ${raw.status}`;
 }
 
-/** First usable order reference from a duplicate-detection payload. */
-function duplicateOrderRef(entries: AtlasOrderBody['duplicateOrders']): string | undefined {
+/** Every usable order reference from a duplicate-detection payload. */
+function duplicateOrderRefs(entries: AtlasOrderBody['duplicateOrders']): string[] {
+  const refs: string[] = [];
   for (const entry of entries ?? []) {
-    if (typeof entry === 'string') {
-      if (entry !== '') return entry;
-      continue;
-    }
-    if (typeof entry.orderNo === 'string' && entry.orderNo !== '') return entry.orderNo;
+    const ref = typeof entry === 'string' ? entry : entry.orderNo;
+    if (typeof ref === 'string' && ref !== '' && !refs.includes(ref)) refs.push(ref);
   }
-  return undefined;
+  return refs;
+}
+
+/**
+ * Provider-neutral identity of an existing order (validation only). `undefined` when the provider
+ * did not expose enough to be a basis for identity proof (unparseable passenger name, no itinerary,
+ * a return itinerary this seam cannot represent): callers then fail closed.
+ */
+export function atlasOrderIdentity(raw: {
+  paxTicketInfos?: AtlasPaxTicketInfo[] | null | undefined;
+  routing?: AtlasOrderDetailsBody['routing'];
+}): FlightOrderIdentity | undefined {
+  const passengers: FlightOrderIdentity['passengers'] = [];
+  for (const pax of raw.paxTicketInfos ?? []) {
+    const slash = typeof pax.name === 'string' ? pax.name.indexOf('/') : -1;
+    if (slash <= 0 || !pax.name || slash === pax.name.length - 1) return undefined;
+    const birthday = typeof pax.birthday === 'string' && /^\d{8}$/.test(pax.birthday)
+      ? `${pax.birthday.slice(0, 4)}-${pax.birthday.slice(4, 6)}-${pax.birthday.slice(6, 8)}` : undefined;
+    passengers.push({
+      familyName: pax.name.slice(0, slash).trim(),
+      givenName: pax.name.slice(slash + 1).trim(),
+      ...(pax.gender === 'M' ? { gender: 'MALE' as const } : pax.gender === 'F' ? { gender: 'FEMALE' as const } : {}),
+      ...(birthday ? { dateOfBirth: birthday } : {}),
+      ...(typeof pax.nationality === 'string' && pax.nationality.trim() !== '' ? { nationality: pax.nationality.trim() } : {}),
+    });
+  }
+  if (passengers.length === 0) return undefined;
+  const from = raw.routing?.fromSegments ?? [];
+  if (from.length === 0 || (raw.routing?.retSegments ?? []).length > 0) return undefined;
+  const segments: FlightOrderIdentity['segments'] = [];
+  for (const seg of from) {
+    if (!seg.depAirport || !seg.arrAirport || !seg.depTime || !seg.arrTime) return undefined;
+    segments.push({
+      ...(seg.carrier ? { carrier: seg.carrier } : {}),
+      ...(seg.flightNumber ? { flightNumber: seg.flightNumber } : {}),
+      originCode: seg.depAirport, destinationCode: seg.arrAirport, departureLocal: seg.depTime, arrivalLocal: seg.arrTime,
+    });
+  }
+  const emails = (raw.paxTicketInfos ?? []).flatMap((pax) => pax.contactEmails ?? []).filter((e) => e.includes('@'));
+  return { passengers, segments, ...(emails.length > 0 ? { contactEmails: [...new Set(emails)] } : {}) };
 }
 
 export function normalizeOrderCreate(raw: AtlasOrderBody, provenance: TransactionProvenance): FlightOrderOutcome {
@@ -614,10 +653,13 @@ export function normalizeOrderCreate(raw: AtlasOrderBody, provenance: Transactio
   if (raw.status === 318) {
     // Wire reality: duplicateOrders entries arrive as either plain order-number
     // strings or objects carrying orderNo — both shapes are reconciled here.
-    const adopted = duplicateOrderRef(raw.duplicateOrders);
+    const refs = duplicateOrderRefs(raw.duplicateOrders);
+    const adopted = refs[0];
     if (adopted) {
       return {
         status: 'HELD',
+        // The pointer is NOT proof of ownership: consequential callers must validate the order first.
+        duplicateOfExisting: { orderRefs: refs },
         transactionState: { orderRef: adopted },
         detail: 'provider detected a duplicate order; existing held order adopted, no second booking created',
         provenance,
@@ -711,9 +753,11 @@ export function normalizeOrderDetails(
   if (holdExpiresAt) transactionState.holdExpiresAt = holdExpiresAt;
 
   const observedAt = new Date().toISOString();
+  const identity = atlasOrderIdentity(raw);
   const base = {
     orderRef: raw.orderNo ?? orderRef,
     transactionState,
+    ...(identity ? { identity } : {}),
     ...(money(raw.totalPrice, raw.currency) === undefined ? {} : { totalPrice: money(raw.totalPrice, raw.currency) }),
     observedAt,
     provenance,
