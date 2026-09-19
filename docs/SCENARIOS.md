@@ -1,4 +1,14 @@
 # Northstar Scenario Catalogue (Frozen)
+> **Post-R4 founder supersession, 2026-09-20:** The active hackathon target is two rich
+> desktop heroes, Sarah/S1 and Jordan/S2, under [the hero-depth contract](work/ASTRA_HERO_DEPTH_SCOPE.md).
+> The eight-scenario catalogue below remains reference scope; earlier five-scenario video
+> order and flight-only/context-only Jordan acceptance do not govern this convergence.
+> Jordan requires live multi-domain research/planning, Narita overnight and authoritative
+> entry feasibility, material Singapore stay/transfer/finals/insurance consequences, and
+> real supported sandbox actions selected by the recovery. Nuitée has no modify operation:
+> any required stay change is explicit cancel + rebook with separate observed outcomes.
+> Historical provider proof is reusable; current PostgreSQL composition and fresh LIVE
+> acceptance remain required. No broader parity or mobile work is implied.
 
 **Source of truth.** This document is the authoritative source of truth for
 Northstar scenario business narratives, capability claims, implementation
