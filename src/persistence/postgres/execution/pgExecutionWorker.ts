@@ -105,6 +105,33 @@ export class PgExecutionWorker {
     };
   }
 
+  /** Claim one specific PREPARED attempt (never an expired/dispatching one). */
+  async claimPrepared(workspaceId: string, attemptId: string): Promise<ExecutionClaim | undefined> {
+    const claimToken = randomUUID();
+    const leaseSeconds = this.options.leaseSeconds ?? 60;
+    const result = await this.pool.query<{
+      id: string; workspace_id: string; action_intent_id: string; attempt_number: number;
+      logical_operation_key: string; request_fingerprint: string; fencing_token: string;
+      provider_operation_key: string | null; gating_principal_id: string | null;
+    }>(
+      `UPDATE execution_attempts
+          SET status = 'CLAIMED', claim_token = $3, fencing_token = fencing_token + 1,
+              lease_expires_at = now() + ($4 * interval '1 second'), updated_at = now()
+        WHERE workspace_id = $1 AND id = $2 AND status = 'PREPARED'
+        RETURNING id, workspace_id, action_intent_id, attempt_number, logical_operation_key,
+                  request_fingerprint, fencing_token, provider_operation_key, gating_principal_id`,
+      [workspaceId, attemptId, claimToken, leaseSeconds],
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    return {
+      id: row.id, workspaceId: row.workspace_id, actionIntentId: row.action_intent_id, attemptNumber: row.attempt_number,
+      logicalOperationKey: row.logical_operation_key, requestFingerprint: row.request_fingerprint, claimToken,
+      fencingToken: Number(row.fencing_token), status: 'CLAIMED', providerOperationKey: row.provider_operation_key,
+      gatingPrincipalId: row.gating_principal_id,
+    };
+  }
+
   /** Claim an uncertain attempt for reconciliation without redispatching. */
   async claimForReconciliation(workspaceId: string, attemptId: string): Promise<ExecutionClaim | undefined> {
     const claimToken = randomUUID();

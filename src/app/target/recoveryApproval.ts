@@ -29,7 +29,11 @@ import { persistActionPlan, issueAuthorityDecision, recordApproval } from '../..
 import { buildEnvelopeInput, loadRequiredAuthorityScope, loadStoredIntent, loadGrantsForPrincipal } from '../../persistence/postgres/execution/storedExecutionGate.ts';
 import { AUTHORIZE_ACTION_KIND, DISPATCH_ACTION_KIND, scopeCoversRequired } from '../../resolution/authority/authorize.ts';
 import { computeEnvelopeFingerprint } from '../../resolution/authority/envelope.ts';
-import { compileActionPlan } from '../../resolution/planning/compiler.ts';
+import { compileActionPlan, type CapabilityStatement } from '../../resolution/planning/compiler.ts';
+import { resolveOfferExecutionInputsForStrategy } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
+import { holdBudgetForIntent } from '../../persistence/postgres/commands/m8AuthorityCommands.ts';
+import { PgAggregateHeadReader } from '../../persistence/postgres/pgAggregateHeadReader.ts';
+import type { ExactMoney } from '../../domain/v2/shared/money.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { advanceCasePhase } from './recoveryPlanning.ts';
 import { applicationError } from './applicationCommands.ts';
@@ -44,6 +48,12 @@ export interface ApprovalContext {
   now?: string;
   /** The runtime principal that will dispatch (holds `action.intent.dispatch`). */
   executorPrincipalId: string;
+  /**
+   * R4-F2: declared external capability truth, supplied ONLY by boot composition
+   * (e.g. `external:offer.select` supported iff the Atlas sandbox execution seam
+   * is composed). Absent => external intents fail to compile (truthful refusal).
+   */
+  externalCapabilities?: readonly CapabilityStatement[];
 }
 
 export interface ApprovalReport {
@@ -104,6 +114,79 @@ async function programmeOwnership(pool: Pool, workspaceId: string, plan: Recover
   return new Map(rows.rows.map((r) => [r.id, r.programme_id]));
 }
 
+
+/**
+ * R4-F2 truthful preflight: an option that can never execute must be refused
+ * BEFORE any authority is minted (never a decision the executor cannot honour).
+ * Returns the first reason the SELECT_OFFER effects cannot run, else undefined.
+ */
+export async function externalExecutionBlocker(
+  pool: Pool, workspaceId: string, strategy: RecoveryStrategy,
+  externalCapabilities: readonly CapabilityStatement[] | undefined,
+): Promise<{ code: string; message: string } | undefined> {
+  const offers = strategy.scenarioChange.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' ? [e] : []));
+  if (offers.length === 0) return undefined;
+  if (!externalCapabilities?.some((c) => c.capabilityRef === 'external:offer.select' && c.supported)) {
+    return { code: 'EXTERNAL_EXECUTION_NOT_COMPOSED', message: 'this runtime has no provider execution capability composed for transport bookings' };
+  }
+  for (const effect of offers) {
+    const inputs = await resolveOfferExecutionInputsForStrategy(pool, workspaceId, { strategyId: strategy.id, journeyItemId: effect.journeyItemId, offerKey: effect.offerId });
+    if (!inputs.ready) return { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: `${inputs.reason}: ${inputs.detail}` };
+  }
+  const budget = await budgetCandidatesFor(pool, workspaceId, strategy);
+  if (budget.needed && budget.ids.length === 0) {
+    return { code: 'BUDGET_UNAVAILABLE', message: 'no budget of the trip organisation can fund this costed option' };
+  }
+  return undefined;
+}
+
+/** Budgets that could fund the strategy's costed SELECT_OFFER effects: the trip organisation's budgets in the offer currency. */
+async function budgetCandidatesFor(pool: Pool, workspaceId: string, strategy: RecoveryStrategy): Promise<{ needed: boolean; ids: string[] }> {
+  const costed = strategy.scenarioChange.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' && e.offerPrice ? [e] : []));
+  if (costed.length === 0) return { needed: false, ids: [] };
+  const ids = new Set<string>();
+  for (const effect of costed) {
+    const rows = await pool.query<{ id: string }>(
+      `SELECT b.id
+         FROM journey_items ji
+         JOIN journeys j ON j.workspace_id = ji.workspace_id AND j.id = ji.journey_id
+         JOIN trips t ON t.workspace_id = j.workspace_id AND t.id = j.trip_id
+         JOIN budgets b ON b.workspace_id = t.workspace_id AND b.organisation_id = t.business_context_organisation_id
+        WHERE ji.workspace_id = $1 AND ji.id = $2 AND b.currency = $3
+        ORDER BY b.created_at, b.id`,
+      [workspaceId, effect.journeyItemId, effect.offerPrice!.currency],
+    );
+    for (const row of rows.rows) ids.add(row.id);
+  }
+  return { needed: true, ids: [...ids] };
+}
+
+/** Hold the intent's stored cost against the first candidate budget that admits it (deterministic order). */
+async function holdBudget(
+  ctx: ApprovalContext, strategy: RecoveryStrategy, intentId: string, cost: ExactMoney,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const candidates = await budgetCandidatesFor(ctx.pool, ctx.workspaceId, strategy);
+  const heads = new PgAggregateHeadReader(ctx.pool, ctx.workspaceId);
+  const failures: string[] = [];
+  for (const budgetId of candidates.ids) {
+    const head = await heads.loadHead({ kind: 'BUDGET', id: budgetId });
+    if (!head) continue;
+    const held = await holdBudgetForIntent(ctx.uow(), {
+      workspaceId: ctx.workspaceId,
+      actorPrincipalId: ctx.actorPrincipalId,
+      idempotencyKey: `approval:hold:${intentId}:${budgetId}`,
+      budgetId,
+      expectedBudgetRevision: head.revision,
+      actionIntentId: intentId,
+      requested: cost,
+      commitmentId: deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${intentId}|budget-hold|${budgetId}`),
+    });
+    if (held.ok) return { ok: true };
+    failures.push(held.conflict.message);
+  }
+  return { ok: false, message: failures[0] ?? 'no budget available' };
+}
+
 export async function approveRecoveryStrategy(
   ctx: ApprovalContext,
   input: { caseId: string; strategyId: string; approverPrincipalId: string },
@@ -115,6 +198,9 @@ export async function approveRecoveryStrategy(
   const caseRow = (await ctx.pool.query<{ lifecycle_status: string }>('SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2', [ctx.workspaceId, input.caseId])).rows[0];
   if (!caseRow) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.caseId} does not exist`) };
   if (['RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED'].includes(caseRow.lifecycle_status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.caseId} is ${caseRow.lifecycle_status}`) };
+
+  const blocker = await externalExecutionBlocker(ctx.pool, ctx.workspaceId, strategy, ctx.externalCapabilities);
+  if (blocker) return { ok: false, error: applicationError(blocker.code as ApplicationError['code'], blocker.message) };
 
   // 1. Plan: the persisted, versioned execution basis (compile once per strategy).
   let planId: string;
@@ -130,6 +216,7 @@ export async function approveRecoveryStrategy(
       now,
       currentState,
       actionPlanId: deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${strategy.id}|plan`),
+      ...(ctx.externalCapabilities ? { capabilities: ctx.externalCapabilities } : {}),
       programmeItemOwnership: await programmeOwnership(ctx.pool, ctx.workspaceId, strategy),
     });
     if (!compiled.ok) {
@@ -137,9 +224,6 @@ export async function approveRecoveryStrategy(
       return { ok: false, error: applicationError(code, `${compiled.conflict.kind}: ${compiled.conflict.message}`) };
     }
     const plan: ActionPlan = compiled.value.plan;
-    if (plan.intents.some((i) => i.costEstimate !== undefined)) {
-      return { ok: false, error: applicationError('BUDGET_HOLD_REQUIRED', 'costed intents require a budget hold, which this approval path does not yet compose') };
-    }
     const persisted = await persistActionPlan(ctx.uow(), {
       workspaceId: ctx.workspaceId,
       actorPrincipalId: ctx.actorPrincipalId,
@@ -166,6 +250,10 @@ export async function approveRecoveryStrategy(
 
     const stored = await loadStoredIntent(ctx.pool, ctx.workspaceId, intentId);
     if (!stored) return { ok: false, error: applicationError('INTENT_MISSING', `stored intent ${intentId} is incomplete`) };
+    if (stored.costAmount && stored.costCurrency) {
+      const held = await holdBudget(ctx, strategy, intentId, { amount: stored.costAmount, currency: stored.costCurrency });
+      if (!held.ok) return { ok: false, error: applicationError('BUDGET_HOLD_REQUIRED', `budget hold refused: ${held.message}`) };
+    }
     const envelopeInput = buildEnvelopeInput(stored, { scope: required, grantRefs: [], ruleInputs: [], limits: null }, [{ actorRole: APPROVAL_ACTOR_ROLE }]);
     const decisionId = deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${intentId}|decision|${computeEnvelopeFingerprint(envelopeInput)}`);
     const decision = await issueAuthorityDecision(ctx.uow(), {

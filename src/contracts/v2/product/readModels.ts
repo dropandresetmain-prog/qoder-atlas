@@ -975,6 +975,10 @@ export const ApplicationErrorCodeSchema = z.enum([
   'AUTHORITY_DECISION_FAILED',
   'APPROVAL_FAILED',
   'PRINCIPAL_UNRESOLVED',
+  // R4-F2 additive: truthful refusal reasons for provider-executed (external) options.
+  'EXTERNAL_EXECUTION_NOT_COMPOSED',
+  'EXECUTION_INPUTS_UNAVAILABLE',
+  'BUDGET_UNAVAILABLE',
 ]);
 export type ApplicationErrorCode = z.infer<typeof ApplicationErrorCodeSchema>;
 

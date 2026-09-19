@@ -145,14 +145,14 @@ describe('R1 second situation: a broken connection, no programme (real PostgreSQ
     assert.equal(second.planned, 0);
     assert.equal(await count('recovery_planning_attempts'), 1);
 
-    // The runtime approval path composes only internal capabilities: an external provider
+    // A runtime WITHOUT the composed provider execution seam (R4-F2 composes it at normal boot): an external provider
     // selection is refused rather than fabricated, and nothing was dispatched.
     const refused = await approveRecoveryStrategy(
       { pool: c.pool, workspaceId: ws, actorPrincipalId: c.world.actorId, uow: () => c.app.unitOfWork(), now, executorPrincipalId: c.executorPrincipalId },
       { caseId: c.caseId, strategyId: recommended[0]!.strategyRef!, approverPrincipalId: c.operatorPrincipalId },
     );
     assert.equal(refused.ok, false);
-    if (!refused.ok) assert.match(refused.error.message, /refusing to fabricate provider capability/);
+    if (!refused.ok) assert.equal(refused.error.code, 'EXTERNAL_EXECUTION_NOT_COMPOSED', 'the runtime without a composed execution seam refuses with an explicit reason');
     assert.equal(await count('execution_attempts'), 0);
     assert.equal((await wake()).outcomes[0]!.decision, 'WAIT');
   });

@@ -53,6 +53,9 @@ import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary
 import { unmetProgrammeItems, type FailingSubject } from '../../resolution/planning/proposer.ts';
 import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
 import { createTransportProposer } from '../../resolution/planning/proposers/transportProposer.ts';
+import { persistOfferExecutionBindings } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
+import type { WTransportService } from '../../resolution/world/world.ts';
+import type { ResolvedOffer } from '../../resolution/scenarios/overlay.ts';
 import { materializeTransportOffers } from '../../resolution/planning/transportOfferMaterialization.ts';
 import { airportResolverFromCapturedWorld, flightSearchRequestFor, transportCorridors, type AirportResolver, type TransportPassengerSource } from '../../resolution/planning/transportCorridors.ts';
 import { defaultRecoveryDomainRegistry } from '../../resolution/planning/recoveryDomains.ts';
@@ -325,6 +328,12 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         }
       }
 
+      // R4-F2: capture the planning-time provider offer identity so the external
+      // execution boundary can later resolve the SubjectId-safe offer key back to
+      // the researched provider offer (protected input, migration 0128).
+      const capturedOfferServices: WTransportService[] = [];
+      const capturedResolvedOffers: ResolvedOffer[] = [];
+
       // 2. Delegate ALL decision logic to the pure core.
       const core = await runRecoveryPlanning(
         {
@@ -350,17 +359,21 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
           ...(transportPlanning ? {
             research: { transport: transportPlanning.transport, requestsByDomain: { TRANSPORT: [transportResearch] } },
-            materializeWorldForDomain: ({ domainId, evidence, basis: domainBasis }) => domainId === 'TRANSPORT'
-              ? materializeTransportOffers({
-                  world: domainBasis.world,
-                  failing: domainBasis.failing,
-                  toolResults: evidence.toolResults,
-                  now: domainBasis.now,
-                  resolveAirport: resolveAirport!,
-                  ...passengerSource!,
-                  ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
-                })
-              : undefined,
+            materializeWorldForDomain: ({ domainId, evidence, basis: domainBasis }) => {
+              if (domainId !== 'TRANSPORT') return undefined;
+              const materialized = materializeTransportOffers({
+                world: domainBasis.world,
+                failing: domainBasis.failing,
+                toolResults: evidence.toolResults,
+                now: domainBasis.now,
+                resolveAirport: resolveAirport!,
+                ...passengerSource!,
+                ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+              });
+              capturedOfferServices.push(...materialized.capturedServices);
+              capturedResolvedOffers.push(...materialized.resolvedOffers);
+              return materialized;
+            },
           } : {}),
         },
       );
@@ -377,6 +390,18 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       });
       if (!attemptPersisted.ok) {
         return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `planning completion: ${attemptPersisted.conflict.kind}: ${attemptPersisted.conflict.message}`) };
+      }
+
+      // R4-F2: bind each viable SELECT_OFFER strategy to its researched provider offer.
+      if (capturedResolvedOffers.length > 0 && core.viableStrategies.length > 0) {
+        await persistOfferExecutionBindings(deps.pool, {
+          workspaceId: deps.workspaceId,
+          actorId: deps.actorPrincipalId,
+          recoveryCaseId: input.recoveryCaseId,
+          strategies: core.viableStrategies,
+          services: capturedOfferServices,
+          resolvedOffers: capturedResolvedOffers,
+        });
       }
 
       return { ok: true, result: { ...core.result, planningAttemptRef: attemptPersisted.value.attemptId as SubjectId } };

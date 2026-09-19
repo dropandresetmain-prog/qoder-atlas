@@ -1,0 +1,436 @@
+/**
+ * R4-F2 — `external:offer.select` execution through the Atlas SANDBOX.
+ *
+ * Chain (nothing here is reachable from a planner or an LLM):
+ *
+ *   approved intent (stored decision + approval + HELD budget)
+ *     -> resolveOfferExecutionInputs (PG protected inputs; else refuse, no attempt)
+ *     -> createPreparedExecutionAttempt  (stored authority/currentness/budget gate;
+ *                                         durable PREPARED row BEFORE any network)
+ *     -> PgExecutionWorker.claim -> dispatchClaimed
+ *          (CLAIMED -> DISPATCHING committed BEFORE the dispatcher runs)
+ *     -> Atlas dispatcher: verify -> createOrder -> payment ceiling gate -> payOrder
+ *          -> observe ticketing (read)
+ *     -> OBSERVED_SUCCESS | OBSERVED_FAILURE | OUTCOME_UNKNOWN (classified)
+ *     -> canonical update (transport service + reservation + selected service)
+ *     -> M6 triggers -> reassessment -> C4 resolution.
+ *
+ * Safety properties (each proved by test/postgres-integration/r4AtlasOfferExecution):
+ *  - One attempt per approved intent per pass; an intent with ANY prior attempt is
+ *    never re-dispatched by this pass (no blind retry; a failed/unknown attempt
+ *    stays visible until reconciled or re-approved under a new plan).
+ *  - OUTCOME_UNKNOWN is resolved only by `runExternalReconciliation`, which uses
+ *    read-only provider lookups keyed by the order reference persisted on the attempt.
+ *  - Pay only when the provider-observed payable is within the authority-frozen
+ *    ceiling (the intent's stored cost); the adapter re-checks independently.
+ */
+import type { Pool } from '../../persistence/postgres/pool.ts';
+import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
+import type { AdapterMode } from '../../contracts/envelope.ts';
+import type { FlightCapability, FlightTransactionCapability } from '../../contracts/capabilities.ts';
+import { createPreparedExecutionAttempt } from '../../persistence/postgres/commands/m8AuthorityCommands.ts';
+import { PgExecutionWorker, type ExecutionClaim, type ExternalDispatcher, type ReconcileLookup } from '../../persistence/postgres/execution/pgExecutionWorker.ts';
+import { loadStoredIntent } from '../../persistence/postgres/execution/storedExecutionGate.ts';
+import { resolveOfferExecutionInputs, type OfferExecutionInputs } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
+import { recordSource, recordEvidence } from '../../persistence/postgres/commands/knowledgeCommands.ts';
+import { createTransportService, createReservation, addReservationLine, allocateReservationLine } from '../../persistence/postgres/commands/arrangementCommands.ts';
+import { updateJourneyItem } from '../../persistence/postgres/commands/travelCommands.ts';
+import { PgAggregateHeadReader } from '../../persistence/postgres/pgAggregateHeadReader.ts';
+import { createHash } from 'node:crypto';
+import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
+import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF } from '../../providers/atlas/transactionAdapter.ts';
+import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
+
+export const EXTERNAL_OFFER_SELECT_CAPABILITY = 'external:offer.select';
+
+/** The declared capability truth boot hands to approval when (and only when) this seam is composed. */
+export const EXTERNAL_OFFER_SELECT_STATEMENTS: readonly CapabilityStatement[] = [
+  { capabilityRef: EXTERNAL_OFFER_SELECT_CAPABILITY, supported: true },
+];
+
+export interface ExternalOfferExecutionDeps {
+  flight: Pick<FlightCapability, 'verifyOffer'>;
+  transactions: FlightTransactionCapability;
+  mode: AdapterMode;
+  /** Opaque sandbox payment handle. The adapter accepts only its approved sandbox handle. */
+  paymentRef?: string;
+  ticketingPoll?: { attempts: number; delayMs: number };
+  sleep?: (ms: number) => Promise<void>;
+}
+
+export interface ExternalExecutionContext {
+  pool: Pool;
+  workspaceId: string;
+  actorPrincipalId: string;
+  uow: () => PgUnitOfWork;
+  executorPrincipalId: string;
+  external: ExternalOfferExecutionDeps;
+  now?: string;
+}
+
+export interface ExternalExecutionOutcome {
+  intentId: string;
+  attemptNumber: number;
+  result: 'SUCCEEDED' | 'FAILED' | 'OUTCOME_UNKNOWN' | 'DEFERRED' | 'REFUSED';
+  detail?: string;
+}
+
+export interface ExternalExecutionReport {
+  at: string;
+  candidates: number;
+  executed: number;
+  failed: number;
+  unknown: number;
+  deferred: number;
+  refused: number;
+  canonicalUpdates: number;
+  outcomes: ExternalExecutionOutcome[];
+}
+
+const SUCCESS = ['OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED'];
+
+// ---------------------------------------------------------------------------
+// Candidate selection (reconcile-from-state)
+// ---------------------------------------------------------------------------
+
+async function loadCandidates(pool: Pool, workspaceId: string): Promise<string[]> {
+  const result = await pool.query<{ intent_id: string }>(
+    `SELECT ai.id AS intent_id
+       FROM action_intents ai
+       JOIN action_plans ap ON ap.workspace_id = ai.workspace_id AND ap.id = ai.action_plan_id
+       JOIN recovery_cases rc ON rc.workspace_id = ap.workspace_id AND rc.id = ap.recovery_case_id
+      WHERE ai.workspace_id = $1
+        AND ai.capability_ref = $2
+        AND rc.lifecycle_status NOT IN ('RESOLVED', 'CLOSED', 'CANCELLED', 'SUPERSEDED')
+        AND EXISTS (SELECT 1 FROM authority_decisions d JOIN approvals a ON a.workspace_id = d.workspace_id AND a.decision_id = d.id
+                     WHERE d.workspace_id = ai.workspace_id AND d.action_intent_id = ai.id)
+        -- No prior attempt except a never-claimed PREPARED one (no network happened yet):
+        -- an attempted intent is never re-dispatched here.
+        AND NOT EXISTS (SELECT 1 FROM execution_attempts ea WHERE ea.workspace_id = ai.workspace_id AND ea.action_intent_id = ai.id AND ea.status <> 'PREPARED')
+        AND NOT EXISTS (
+          SELECT 1 FROM action_dependencies d
+           WHERE d.workspace_id = ai.workspace_id AND d.to_action_intent_id = ai.id
+             AND NOT EXISTS (SELECT 1 FROM execution_attempts pe WHERE pe.workspace_id = d.workspace_id AND pe.action_intent_id = d.from_action_intent_id AND pe.status = ANY($3::text[])))
+      ORDER BY ap.created_at, ai.created_at, ai.id`,
+    [workspaceId, EXTERNAL_OFFER_SELECT_CAPABILITY, SUCCESS],
+  );
+  return result.rows.map((r) => r.intent_id);
+}
+
+// ---------------------------------------------------------------------------
+// The Atlas dispatcher (the ONLY code that mutates at the provider)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_POLL = { attempts: 6, delayMs: 1000 };
+const ORDER_REF_PREFIX = 'atlas:order:';
+const CLIENT_REF_PREFIX = 'atlas:clientref:';
+
+/** execution_observations.external_record_id is a uuid: the provider order number maps to a stable uuid; the raw ref stays in source_owned_fields + request_ref. */
+export function externalRecordIdForOrder(orderRef: string): string {
+  return deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `atlas-order|${orderRef}`);
+}
+
+export function clientReferenceFor(intentId: string): string {
+  return `ns-${createHash('sha256').update(intentId).digest('hex').slice(0, 24)}`;
+}
+
+export function buildAtlasOfferDispatcher(
+  deps: ExternalOfferExecutionDeps,
+  inputs: Extract<OfferExecutionInputs, { ready: true }>,
+  ceiling: { amount: number; currency: string },
+  intentId: string,
+  counters: { verify: number; create: number; pay: number },
+): ExternalDispatcher {
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const poll = deps.ticketingPoll ?? DEFAULT_POLL;
+  const clientReference = clientReferenceFor(intentId);
+  return async () => {
+    if (!deps.paymentRef) return { kind: 'FAILURE', error: 'payment_handle_unavailable: no sandbox payment handle composed' };
+    // 1. Read: verify the exact researched offer and obtain the provider session state.
+    counters.verify += 1;
+    const verify = await deps.flight.verifyOffer({ offerId: inputs.binding.providerOfferRef });
+    if (!verify.ok) return { kind: 'FAILURE', error: `offer_verification_failed:${verify.error.category}/${verify.error.code}` };
+    if (verify.data.status === 'UNAVAILABLE') return { kind: 'FAILURE', error: 'offer_unavailable' };
+    if (verify.data.status === 'PRICE_CHANGED') return { kind: 'FAILURE', error: 'offer_price_changed: re-enter viability/authority' };
+
+    // 2. Mutation #1: create the order (hold, no money moves).
+    counters.create += 1;
+    const create = await deps.transactions.createOrder({
+      offerId: inputs.binding.providerOfferRef,
+      passengers: inputs.passengers.map((p) => ({
+        givenName: p.givenName, familyName: p.familyName, gender: p.gender,
+        ...(p.dateOfBirth ? { dateOfBirth: p.dateOfBirth } : {}),
+        ...(p.nationality ? { nationality: p.nationality } : {}),
+      })),
+      contact: { name: inputs.contactName },
+      ...(verify.data.workflowState ? { workflowState: verify.data.workflowState } : {}),
+      clientReference,
+    });
+    if (!create.ok) {
+      // Ambiguous create => unknown, reconcile before anything else. Definitive => failure.
+      if (create.error.category === 'TIMEOUT') return { kind: 'LOST_RESPONSE', requestRef: `${CLIENT_REF_PREFIX}${clientReference}` };
+      return { kind: 'FAILURE', error: `order_create_failed:${create.error.category}/${create.error.code}` };
+    }
+    const orderRef = create.data.transactionState?.orderRef;
+    if (create.data.status === 'FAILED' || !orderRef) return { kind: 'FAILURE', error: create.data.detail ?? 'order_create_refused' };
+
+    // 3. Ceiling gate: only pay a provider-observed payable within the authority-frozen ceiling.
+    let payable = create.data.totalPrice;
+    if (!payable) {
+      const check = await deps.transactions.retrieveOrder({ orderRef, clientReference });
+      if (check.ok && check.data.totalPrice) payable = check.data.totalPrice;
+    }
+    if (!payable) return { kind: 'FAILURE', error: `payable_total_missing: order ${orderRef} remains HELD` };
+    if (payable.currency !== ceiling.currency) return { kind: 'FAILURE', error: `payable_currency_mismatch: order ${orderRef} remains HELD` };
+    if (payable.amount > ceiling.amount) return { kind: 'FAILURE', error: `payable_exceeds_ceiling: order ${orderRef} remains HELD; re-enter authority with the observed price` };
+
+    // 4. Mutation #2: pay the held order with the sandbox test-balance handle.
+    counters.pay += 1;
+    const pay = await deps.transactions.payOrder({
+      orderRef, paymentRef: deps.paymentRef, authorisedAmount: { amount: ceiling.amount, currency: ceiling.currency }, clientReference,
+    });
+    const orderMarker = `${ORDER_REF_PREFIX}${orderRef}`;
+    if (!pay.ok) {
+      if (pay.error.category === 'TIMEOUT' || pay.error.code === 'payment_in_progress') return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
+      return { kind: 'FAILURE', error: `order_pay_failed:${pay.error.category}/${pay.error.code}; order ${orderRef} remains HELD` };
+    }
+    if (pay.data.status === 'HELD' || pay.data.status === 'FAILED') return { kind: 'FAILURE', error: `payment_not_accepted; order ${orderRef} remains HELD` };
+
+    // 5. Observe (read-only) until ticketed; otherwise the outcome is UNKNOWN, never assumed.
+    for (let i = 0; i < poll.attempts; i += 1) {
+      const seen = await deps.transactions.retrieveOrder({ orderRef, clientReference });
+      if (seen.ok) {
+        if (seen.data.status === 'TICKETED') {
+          return {
+            kind: 'SUCCESS', responseRef: orderMarker, externalRecordId: externalRecordIdForOrder(orderRef),
+            sourceOwnedFields: { providerOrderRef: orderRef, orderStatus: 'TICKETED', ...(seen.data.totalPrice ? { totalPrice: seen.data.totalPrice } : {}), provenance: seen.data.provenance },
+          };
+        }
+        if (seen.data.status === 'CANCELLED' || seen.data.status === 'FAILED') return { kind: 'FAILURE', error: `order_failed_after_payment:${seen.data.status}` };
+      }
+      if (i < poll.attempts - 1) await sleep(poll.delayMs);
+    }
+    return { kind: 'LOST_RESPONSE', requestRef: orderMarker };
+  };
+}
+
+/** Read-only reconciliation lookup keyed by the reference persisted on the attempt. */
+export function buildAtlasReconcileLookup(pool: Pool, deps: ExternalOfferExecutionDeps): ReconcileLookup {
+  return async (claim: ExecutionClaim) => {
+    const row = (await pool.query<{ request_ref: string | null }>(
+      'SELECT request_ref FROM execution_attempts WHERE workspace_id = $1 AND id = $2', [claim.workspaceId, claim.id],
+    )).rows[0];
+    const ref = row?.request_ref ?? '';
+    // No provider order reference was ever obtained: nothing can be looked up. Stay unknown (human owner).
+    if (!ref.startsWith(ORDER_REF_PREFIX)) return { kind: 'STILL_UNKNOWN' };
+    const orderRef = ref.slice(ORDER_REF_PREFIX.length);
+    const seen = await deps.transactions.retrieveOrder({ orderRef });
+    if (!seen.ok) return { kind: 'STILL_UNKNOWN' };
+    switch (seen.data.status) {
+      case 'TICKETED':
+        return { kind: 'FOUND_SUCCESS', responseRef: ref, externalRecordId: externalRecordIdForOrder(orderRef), sourceOwnedFields: { providerOrderRef: orderRef, orderStatus: 'TICKETED', reconciled: true } };
+      case 'HELD':
+        return { kind: 'FOUND_FAILURE', responseRef: ref, error: `reconciled: order ${orderRef} is HELD, payment did not land` };
+      case 'CANCELLED':
+      case 'FAILED':
+        return { kind: 'FOUND_FAILURE', responseRef: ref, error: `reconciled: order ${orderRef} is ${seen.data.status}` };
+      default:
+        return { kind: 'STILL_UNKNOWN' };
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Canonical update after an OBSERVED success (idempotent, no provider call)
+// ---------------------------------------------------------------------------
+
+const AIR_MODE: Record<string, 'AIR' | 'RAIL' | 'ROAD' | 'SEA'> = { FLIGHT: 'AIR', AIR: 'AIR', RAIL: 'RAIL', ROAD: 'ROAD', SEA: 'SEA' };
+
+async function applyCanonicalSelection(
+  ctx: ExternalExecutionContext, intentId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, observedAt: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ws = ctx.workspaceId;
+  const ns = RUNTIME_ID_NAMESPACES.planning;
+  const id = (name: string) => deterministicUuid(ns, `${intentId}|offer-select|${name}`);
+  const b = inputs.binding;
+  const serviceId = id('service');
+  const already = await ctx.pool.query('SELECT 1 FROM transport_item_details WHERE workspace_id = $1 AND journey_item_id = $2 AND selected_service_id = $3', [ws, b.journeyItemId, serviceId]);
+  if ((already.rowCount ?? 0) > 0) return { ok: true };
+  const base = { workspaceId: ws, actorPrincipalId: ctx.actorPrincipalId };
+  const uow = () => ctx.uow();
+
+  const sourceId = id('source');
+  const evidenceId = id('evidence');
+  const src = await recordSource(uow(), {
+    ...base, idempotencyKey: `offer-select:${intentId}:source`, sourceId,
+    sourceIdentity: `provider-order:${b.providerId}:${intentId}`, receivedAt: observedAt,
+    contentHash: createHash('sha256').update(`${intentId}|${observedAt}`).digest('hex'), contentType: 'application/json',
+  });
+  if (!src.ok) return { ok: false, error: `source: ${src.conflict.message}` };
+  const ev = await recordEvidence(uow(), {
+    ...base, idempotencyKey: `offer-select:${intentId}:evidence`, evidenceId, assertionType: 'PROVIDER_ORDER_TICKETED',
+    observedAt, schemaVersion: '1', sourceIds: [sourceId], subjectRefs: [{ kind: 'JOURNEY_ITEM', id: b.journeyItemId }],
+  });
+  if (!ev.ok) return { ok: false, error: `evidence: ${ev.conflict.message}` };
+
+  const observed = (value: string | null) => (value ? { value, observedAt: b.observedAt, sourceId: evidenceId } : undefined);
+  const dep = observed(b.itinerary.departure);
+  const arr = observed(b.itinerary.arrival);
+  const svc = await createTransportService(uow(), {
+    ...base, idempotencyKey: `offer-select:${intentId}:service`,
+    service: {
+      id: serviceId, mode: AIR_MODE[b.itinerary.mode] ?? 'AIR', operator: b.itinerary.operator,
+      originPlaceId: b.itinerary.originPlaceId, destinationPlaceId: b.itinerary.destinationPlaceId,
+      ...(dep ? { publishedDeparture: dep } : {}), ...(arr ? { publishedArrival: arr } : {}),
+    },
+    evidenceRefs: [evidenceId],
+  });
+  if (!svc.ok) return { ok: false, error: `service: ${svc.conflict.message}` };
+
+  const reservationId = id('reservation');
+  const lead = inputs.passengers[0]!;
+  const res = await createReservation(uow(), {
+    ...base, idempotencyKey: `offer-select:${intentId}:reservation`,
+    reservation: { id: reservationId, reservationType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: observedAt, responsibleTravellerId: lead.travellerId },
+    evidenceRefs: [evidenceId],
+  });
+  if (!res.ok) return { ok: false, error: `reservation: ${res.conflict.message}` };
+  const lineId = id('line');
+  const line = await addReservationLine(uow(), {
+    ...base, idempotencyKey: `offer-select:${intentId}:line`, reservationId, expectedRevision: res.value.revision,
+    line: { id: lineId, productType: 'TRANSPORT', observedStatus: 'CONFIRMED', observedStatusAt: observedAt, transportServiceId: serviceId, observationEvidenceId: evidenceId },
+    detail: { productType: 'TRANSPORT', transportServiceId: serviceId },
+    evidenceRefs: [evidenceId],
+  });
+  if (!line.ok) return { ok: false, error: `line: ${line.conflict.message}` };
+  let revision = line.value.reservationRevision;
+  for (const passenger of inputs.passengers) {
+    const allocated = await allocateReservationLine(uow(), {
+      ...base, idempotencyKey: `offer-select:${intentId}:allocation:${passenger.travellerId}`, reservationId, expectedRevision: revision,
+      allocation: { id: id(`allocation:${passenger.travellerId}`), reservationLineId: lineId, travellerId: passenger.travellerId, journeyItemId: b.journeyItemId, allocationRole: 'TRAVELLER', quantity: 1 },
+      evidenceRefs: [evidenceId],
+    });
+    if (!allocated.ok) return { ok: false, error: `allocation: ${allocated.conflict.message}` };
+    revision = allocated.value.reservationRevision;
+  }
+
+  const head = await new PgAggregateHeadReader(ctx.pool, ws).loadHead({ kind: 'JOURNEY', id: b.journeyId });
+  if (!head) return { ok: false, error: 'journey head missing' };
+  const selected = await updateJourneyItem(uow(), {
+    ...base, idempotencyKey: `offer-select:${intentId}:select`, journeyId: b.journeyId, journeyItemId: b.journeyItemId,
+    expectedRevision: head.revision, selectedServiceId: serviceId, evidenceRefs: [evidenceId],
+  });
+  if (!selected.ok) return { ok: false, error: `select: ${selected.conflict.message}` };
+  return { ok: true };
+}
+
+/** Successful attempts whose canonical update has not landed yet (safe to re-run: no provider call). */
+async function applyPendingCanonicalUpdates(ctx: ExternalExecutionContext, report: ExternalExecutionReport): Promise<void> {
+  const pending = await ctx.pool.query<{ intent_id: string; observed_at: Date }>(
+    `SELECT ai.id AS intent_id, max(eo.observed_at) AS observed_at
+       FROM action_intents ai
+       JOIN execution_attempts ea ON ea.workspace_id = ai.workspace_id AND ea.action_intent_id = ai.id AND ea.status = ANY($3::text[])
+       JOIN execution_observations eo ON eo.workspace_id = ea.workspace_id AND eo.attempt_id = ea.id
+      WHERE ai.workspace_id = $1 AND ai.capability_ref = $2
+      GROUP BY ai.id`,
+    [ctx.workspaceId, EXTERNAL_OFFER_SELECT_CAPABILITY, SUCCESS],
+  );
+  for (const row of pending.rows) {
+    const inputs = await resolveOfferExecutionInputs(ctx.pool, ctx.workspaceId, row.intent_id);
+    if (!inputs.ready) continue;
+    const applied = await applyCanonicalSelection(ctx, row.intent_id, inputs, row.observed_at.toISOString());
+    if (applied.ok) report.canonicalUpdates += 1;
+    else report.outcomes.push({ intentId: row.intent_id, attemptNumber: 0, result: 'FAILED', detail: `canonical update pending: ${applied.error}` });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Passes
+// ---------------------------------------------------------------------------
+
+function emptyReport(now: string): ExternalExecutionReport {
+  return { at: now, candidates: 0, executed: 0, failed: 0, unknown: 0, deferred: 0, refused: 0, canonicalUpdates: 0, outcomes: [] };
+}
+
+export interface ExternalDispatchCounters { verify: number; create: number; pay: number }
+
+export async function runExternalOfferExecutionPass(ctx: ExternalExecutionContext): Promise<ExternalExecutionReport> {
+  const now = ctx.now ?? new Date().toISOString();
+  const report = emptyReport(now);
+  const worker = new PgExecutionWorker(ctx.pool, { actorId: `northstar-external-execution:${ctx.workspaceId}` });
+  const candidates = await loadCandidates(ctx.pool, ctx.workspaceId);
+  report.candidates = candidates.length;
+  for (const intentId of candidates) {
+    const outcome: ExternalExecutionOutcome = { intentId, attemptNumber: 1, result: 'REFUSED' };
+    report.outcomes.push(outcome);
+    // 1. Protected inputs: refuse (NO attempt row, NO network) when they cannot support execution.
+    const inputs = await resolveOfferExecutionInputs(ctx.pool, ctx.workspaceId, intentId);
+    if (!inputs.ready) { outcome.detail = `${inputs.reason}: ${inputs.detail}`; report.refused += 1; continue; }
+    const stored = await loadStoredIntent(ctx.pool, ctx.workspaceId, intentId);
+    if (!stored?.costAmount || !stored.costCurrency) { outcome.detail = 'CEILING_MISSING: intent carries no authority-frozen cost'; report.refused += 1; continue; }
+    // 2. Stored gate + durable PREPARED attempt, written before any network.
+    const leftover = (await ctx.pool.query<{ id: string }>(
+      `SELECT id FROM execution_attempts WHERE workspace_id = $1 AND action_intent_id = $2 AND status = 'PREPARED' ORDER BY created_at LIMIT 1`,
+      [ctx.workspaceId, intentId],
+    )).rows[0];
+    let attemptId = leftover?.id;
+    if (!attemptId) {
+      const prepared = await createPreparedExecutionAttempt(ctx.uow(), {
+        workspaceId: ctx.workspaceId, actorPrincipalId: ctx.actorPrincipalId, idempotencyKey: `external-execution:${intentId}:1:prepare`,
+        planId: stored.actionPlanId, intentId, attemptNumber: 1, principalId: ctx.executorPrincipalId, now,
+      });
+      if (!prepared.ok) {
+        outcome.detail = `${prepared.conflict.kind}: ${prepared.conflict.message}`;
+        if (prepared.conflict.message.includes('ASSESSMENT_NOT_CURRENT')) { outcome.result = 'DEFERRED'; report.deferred += 1; } else { report.refused += 1; }
+        continue;
+      }
+      if (prepared.value.replayed) { outcome.result = 'DEFERRED'; outcome.detail = 'replayed known attempt'; report.deferred += 1; continue; }
+      attemptId = prepared.value.attemptId;
+    }
+    // 3. Claim exactly this attempt and dispatch (DISPATCHING is committed before the dispatcher runs).
+    const claim = await worker.claimPrepared(ctx.workspaceId, attemptId);
+    if (!claim) { outcome.result = 'DEFERRED'; outcome.detail = 'attempt not claimable'; report.deferred += 1; continue; }
+    const counters: ExternalDispatchCounters = { verify: 0, create: 0, pay: 0 };
+    const dispatcher = buildAtlasOfferDispatcher(ctx.external, inputs, { amount: Number(stored.costAmount), currency: stored.costCurrency }, intentId, counters);
+    const dispatched = await worker.dispatchClaimed(claim, {
+      principalId: ctx.executorPrincipalId, now, observed: { capabilityKind: 'BOOK', supported: true }, dispatcher,
+    });
+    outcome.detail = dispatched.detail;
+    if (dispatched.outcome === 'OBSERVED_SUCCESS') {
+      outcome.result = 'SUCCEEDED'; report.executed += 1;
+    } else if (dispatched.outcome === 'OUTCOME_UNKNOWN') {
+      outcome.result = 'OUTCOME_UNKNOWN'; report.unknown += 1;
+    } else if (dispatched.outcome === 'OBSERVED_FAILURE' || dispatched.outcome === 'FAILED') {
+      outcome.result = 'FAILED'; report.failed += 1;
+    } else {
+      outcome.result = 'DEFERRED'; report.deferred += 1;
+    }
+  }
+  await applyPendingCanonicalUpdates(ctx, report);
+  return report;
+}
+
+/** Read-only provider lookups for unknown outcomes; never dispatches. */
+export async function runExternalReconciliation(ctx: ExternalExecutionContext): Promise<{ reconciled: number; stillUnknown: number; canonicalUpdates: number }> {
+  const worker = new PgExecutionWorker(ctx.pool, { actorId: `northstar-external-reconcile:${ctx.workspaceId}` });
+  const lookup = buildAtlasReconcileLookup(ctx.pool, ctx.external);
+  const unknown = await ctx.pool.query<{ id: string }>(
+    `SELECT ea.id FROM execution_attempts ea JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+      WHERE ea.workspace_id = $1 AND ai.capability_ref = $2 AND ea.status IN ('OUTCOME_UNKNOWN', 'RECONCILIATION_REQUIRED')
+      ORDER BY ea.created_at`,
+    [ctx.workspaceId, EXTERNAL_OFFER_SELECT_CAPABILITY],
+  );
+  let reconciled = 0;
+  let stillUnknown = 0;
+  for (const row of unknown.rows) {
+    const claim = await worker.claimForReconciliation(ctx.workspaceId, row.id);
+    if (!claim) continue;
+    const result = await worker.reconcileUnknown(claim, lookup);
+    if (result.outcome === 'OBSERVED_SUCCESS' || result.outcome === 'OBSERVED_FAILURE') reconciled += 1; else stillUnknown += 1;
+  }
+  const report = emptyReport(ctx.now ?? new Date().toISOString());
+  await applyPendingCanonicalUpdates(ctx, report);
+  return { reconciled, stillUnknown, canonicalUpdates: report.canonicalUpdates };
+}
+
+export { ATLAS_SANDBOX_BALANCE_PAYMENT_REF };
