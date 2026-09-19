@@ -259,7 +259,7 @@ describe('Case planning activity provider evidence', () => {
     assert.match(row?.note ?? '', /^Model Studio · qwen-flash · Live · review completed · checked .+ UTC\.$/);
   });
 
-  test('failed replay model review says deterministic planning continued', () => {
+  test('failed replay model review says other recovery checks continued', () => {
     const model = presentCaseWorkspace(caseView({
       status: 'AWAITING_AUTHORITY',
       planningEvidence: planningEvidenceWithModel(
@@ -269,7 +269,7 @@ describe('Case planning activity provider evidence', () => {
     } as Partial<RecoveryCaseView>));
     const row = model.activity.rows.find((entry) => entry.label === 'Recovery needs could not be reviewed');
     assert.equal(row?.state, 'failed');
-    assert.match(row?.note ?? '', /^Model Studio · qwen-flash · Saved replay · review failed; deterministic planning continued/);
+    assert.match(row?.note ?? '', /^Model Studio · qwen-flash · Saved replay · review failed; other recovery checks continued/);
     assert.ok(!row?.note?.includes('UNAVAILABLE'));
   });
 });

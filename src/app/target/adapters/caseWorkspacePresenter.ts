@@ -694,7 +694,7 @@ function modelActivityRow(activity: PlanningModelActivityView): CaseRow {
     return {
       label: 'Recovery needs could not be reviewed',
       state: 'failed',
-      note: `${source} · review failed; deterministic planning continued${time}.`,
+      note: `${source} · review failed; other recovery checks continued${time}.`,
     };
   }
   return {
