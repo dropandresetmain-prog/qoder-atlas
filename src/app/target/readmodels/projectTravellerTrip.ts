@@ -16,6 +16,8 @@ export function projectTravellerTrip(input: TravellerTripFacts): TravellerTripVi
     ...(input.whatDoYouNeedFromMe ? { whatDoYouNeedFromMe: input.whatDoYouNeedFromMe } : {}),
     doesTheRestWork: input.doesTheRestWork,
     ...(input.whatChangedAfterRecovery ? { whatChangedAfterRecovery: input.whatChangedAfterRecovery } : {}),
+    ...(input.itinerary && input.itinerary.length > 0 ? { itinerary: input.itinerary } : {}),
+    ...(input.commitment ? { commitment: input.commitment } : {}),
     change: buildChangeAwareness(input),
   });
 }

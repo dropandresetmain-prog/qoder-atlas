@@ -255,6 +255,51 @@ describe('M9 product surface renderers', () => {
     assert.doesNotMatch(html, /Sarah|Daniel|airport/i);
   });
 
+  test('traveller read surface shows authoritative itinerary and required commitment', () => {
+    const html = renderProductTravellerTrip({
+      ...travellerTripView(),
+      amIOkay: 'YES',
+      doesTheRestWork: 'VIABLE',
+      itinerary: [{
+        label: 'Northstar Air',
+        originLabel: 'Origin terminal',
+        destinationLabel: 'Destination terminal',
+        startsAt: '2031-09-15T09:00:00.000Z',
+        endsAt: '2031-09-15T15:00:00.000Z',
+        startTimeZone: 'Asia/Singapore',
+        endTimeZone: 'Europe/London',
+        status: 'CONFIRMED',
+      }],
+      commitment: {
+        label: 'Opening session',
+        windowStart: '2031-09-16T09:00:00.000Z',
+        windowEnd: '2031-09-16T10:00:00.000Z',
+        timeZone: 'Europe/London',
+        placeLabel: 'Main hall',
+      },
+    });
+
+    assert.match(html, /data-test="traveller-itinerary"/);
+    assert.match(html, /Northstar Air/);
+    assert.match(html, /Origin terminal → Destination terminal/);
+    assert.match(html, /Asia\/Singapore → Europe\/London/);
+    assert.match(html, />Confirmed</);
+    assert.match(html, /data-test="traveller-commitment"/);
+    assert.match(html, /Opening session/);
+    assert.match(html, /Main hall/);
+  });
+
+  test('healthy traveller without a linked case is not told that a change happened', () => {
+    const html = renderProductTravellerTrip({
+      ...travellerTripView(),
+      amIOkay: 'YES',
+      doesTheRestWork: 'VIABLE',
+      whatChanged: undefined,
+    });
+    assert.doesNotMatch(html, /Your trip changed, but still works/);
+    assert.doesNotMatch(html, /No open recovery case linked/);
+  });
+
   test('programme preview emphasises non-mutation and shows PASS vs FAIL', () => {
     const html = renderProductProgrammePreview(programmePreview());
 

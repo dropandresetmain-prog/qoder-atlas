@@ -9,6 +9,8 @@ import type {
   LdgSemanticState,
   ProductOperationalStatus,
   RemainderViability,
+  TravellerCommitment,
+  TravellerItineraryItem,
 } from '../../../contracts/v2/product/readModels.ts';
 
 export interface ChangeAwarenessInput {
@@ -291,6 +293,8 @@ export interface TravellerTripFacts extends ProductWorldFacts {
   whatDoYouNeedFromMe?: string;
   doesTheRestWork: RemainderViability;
   whatChangedAfterRecovery?: string;
+  itinerary?: readonly TravellerItineraryItem[];
+  commitment?: TravellerCommitment;
 }
 
 export type ProductChangeAwareness = ChangeAwareness;

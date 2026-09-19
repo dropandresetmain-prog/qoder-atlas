@@ -10,7 +10,7 @@
  * endpoint for this trip, and a control that goes nowhere would be dishonest.
  */
 import type { TravellerTripView } from '../../contracts/v2/product/readModels.ts';
-import { adaptTravellerTrip, type TravellerSurfaceView } from '../../app/target/adapters/travellerAdapter.ts';
+import { adaptTravellerTrip, type TravellerItineraryView, type TravellerSurfaceView } from '../../app/target/adapters/travellerAdapter.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 import { viabilityBlock } from '../components.ts';
 
@@ -20,6 +20,65 @@ function card(title: string, body: string | undefined, testId: string): string {
   <div class="t-card" data-test="${testId}" data-ui-section="${testId}">
     <h2>${escapeHtml(title)}</h2>
     <p class="lead">${escapeHtml(body)}</p>
+  </div>`;
+}
+
+function qualifiedRange(item: TravellerItineraryView): string {
+  const start = item.startsAt ? formatInstant(item.startsAt) : '';
+  const end = item.endsAt ? formatInstant(item.endsAt) : '';
+  const times = start && end ? `${start} – ${end}` : start || end;
+  const zones = item.startTimeZone && item.endTimeZone && item.startTimeZone !== item.endTimeZone
+    ? `${item.startTimeZone} → ${item.endTimeZone}`
+    : item.startTimeZone || item.endTimeZone || '';
+  return [times, zones].filter(Boolean).join(' · ') || 'Time not confirmed';
+}
+
+function itineraryRow(item: TravellerItineraryView): string {
+  const route = item.originLabel && item.destinationLabel
+    ? `${item.originLabel} → ${item.destinationLabel}`
+    : item.placeLabel;
+  const detail = [route, qualifiedRange(item)].filter(Boolean).join(' · ');
+  return `<div class="itin-row" data-test="traveller-itinerary-row">
+    <span class="i-ic" aria-hidden="true">•</span>
+    <div class="i-main"><div class="i-title">${escapeHtml(item.label)}</div><div class="i-sub">${escapeHtml(detail)}</div></div>
+    <span class="i-state s-${item.stateTone}">${escapeHtml(item.stateLabel)}</span>
+  </div>`;
+}
+
+function itinerarySection(view: TravellerSurfaceView): string {
+  if (!view.itinerary || view.itinerary.length === 0) {
+    return `
+  <div class="t-card" data-ui-section="itinerary" data-test="traveller-itinerary">
+    <h2>Your itinerary</h2>
+    <p class="lead">No confirmed itinerary details are available yet.</p>
+  </div>`;
+  }
+  return `
+  <div class="t-card" data-ui-section="itinerary" data-test="traveller-itinerary">
+    <h2>Your itinerary</h2>
+    ${view.itinerary.map(itineraryRow).join('')}
+  </div>`;
+}
+
+function commitmentSection(view: TravellerSurfaceView): string {
+  if (!view.commitment) {
+    return `
+  <div class="commit-card" data-ui-section="commitment" data-test="traveller-commitment">
+    <p class="cc-label">Next commitment</p>
+    <p class="cc-title">No required commitment is on file yet.</p>
+  </div>`;
+  }
+  const meta = [
+    view.commitment.windowStart ? formatInstant(view.commitment.windowStart) : '',
+    view.commitment.windowEnd ? formatInstant(view.commitment.windowEnd) : '',
+    view.commitment.timeZone ?? '',
+    view.commitment.placeLabel ?? '',
+  ].filter(Boolean).join(' · ');
+  return `
+  <div class="commit-card" data-ui-section="commitment" data-test="traveller-commitment">
+    <p class="cc-label">Next commitment</p>
+    <p class="cc-title">${escapeHtml(view.commitment.label)}</p>
+    ${meta ? `<p class="cc-meta">${escapeHtml(meta)}</p>` : '<p class="cc-meta">Time and place are not confirmed yet.</p>'}
   </div>`;
 }
 
@@ -39,6 +98,8 @@ export function renderTravellerSurface(view: TravellerSurfaceView, eventName?: s
       <p>${escapeHtml(view.subline)}</p>
     </div>
   </div>
+  ${commitmentSection(view)}
+  ${itinerarySection(view)}
   ${viabilityBlock(view.remainderViable)}
   ${card('What changed', view.whatChanged, 'traveller-what-changed')}
   ${card('What matters now', view.whatMattersNow, 'traveller-what-matters')}
