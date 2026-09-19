@@ -101,9 +101,9 @@ milestone-acceptance activity only and never runs here.
 | R3-C0 | Integration contract + acceptance map frozen; recon reconciled | `50ec443fe4b748712cad5cd1a6935bb14f417e40` (pushed) |
 | R3-C1 | Normal runtime planner/provider composition | `edc0b52` (pushed) |
 | R3-C2 | Product planning path uses the accepted coordinator + regression guard | part 1 `ac1b644` + part 2 `4f3de02` (pushed) |
-| R3-C3 | Full B1 PostgreSQL acceptance test authored + typechecked | pending (Lane C) |
+| R3-C3 | Full B1 PostgreSQL acceptance test authored + typechecked | `4323d2e` (pushed; PG execution is a LOCAL proof) |
 | R3-C4 | Causal-spine layout improvement | `053e6b0` (pushed) |
-| R3-C5 | Cloud integration (focused + adjacent + typecheck + lint + boundary + anti-hardcoding + CURRENT_TARGET once) | pending |
+| R3-C5 | Cloud integration (focused + adjacent + typecheck + lint + boundary + anti-hardcoding + CURRENT_TARGET once) | verified at HEAD `4323d2e`: focused R3 suites 24/24 + adjacent R1 20/20, CURRENT_TARGET **1036/1036** (v24 binary — bare `npm test` uses node v20 which cannot strip TS types), typecheck clean, full ESLint clean, boundary 232 CLEAN, anti-hardcoding CLEAN |
 | docs | Local acceptance handoff (20 proofs + exact commands) | `6d72a16` (pushed) |
 
 R3 commit log on `feat/r3-full-rebased-b1-cloud` (base `6118f427`):
@@ -126,8 +126,13 @@ Cloud may be reported as PG-proven, browser-proven or LIVE-proven.
    `b1ProductPlanningCoordinator.pgtest.ts` (200/AWAITING_AUTHORITY/evidence/idempotency/404/409);
    NEW pure `r3-import-guard.test.ts` 7/7; suites registered; boundary 231 CLEAN.
    Commit `4f3de02` pushed.
-5. [PENDING] Lane C (`r3ComposedB1Full.pgtest.ts`) → R3-C3 commit; Lane V audit findings.
-6. R3-C5 Cloud integration run + ledger + final report.
+5. [DONE] Lane C (`r3ComposedB1Full.pgtest.ts`) committed as R3-C3 `4323d2e`; Lane V audit
+   complete — 9/10 PASS, one HIGH finding (materialization dropped `passengersFor`) FIXED in
+   the same commit with a resolver-only regression test; the two LOW items (formatting glitch,
+   suites.json classification) also resolved.
+6. [DONE] R3-C5 Cloud integration verified at HEAD (see checkpoint table). Ledger updated.
+7. [DONE] Doc reconciliation + final report; terminal status recorded. Local B1 acceptance
+   (20 proofs in `docs/work/R3_LOCAL_ACCEPTANCE_HANDOFF.md`) remains the founder's step.
 
 ---
 
