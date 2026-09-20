@@ -20,6 +20,7 @@ import type { RuntimeServices } from '../runtimeServices.ts';
 import type { IntelligenceClient } from '../../intelligence/client.ts';
 import type { CoordinatorPlanOutcome } from './recoveryPlanningCoordinator.ts';
 import type { RecoveryPlanningCoordinator, RecoveryPlanningInput } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
+import { createSelectedPlanContinuationService, type SelectedPlanContinuationRequest, type SelectedPlanContinuationResult } from './selectedPlanContinuation.ts';
 import { M9_REPLAN_IDENTITY } from './replanIdentity.ts';
 import { M9_OBJECTIVE_DISPOSITION_API_EXPOSED } from './objectiveDispositionBoundary.ts';
 
@@ -37,6 +38,8 @@ export interface TargetApplication {
   runtime: TargetRuntime;
   unitOfWork(): PgUnitOfWork;
   reassessmentWorker: PgReassessmentWorker;
+  /** Bounded selected-plan evidence only; no provider dispatch and no caller world. */
+  prepareSelectedPlanContinuation(request: SelectedPlanContinuationRequest): Promise<SelectedPlanContinuationResult>;
   /**
    * Background workers (R0): composed and started by the boot root
    * (`composeTargetBoot` -> `src/app/runtimeServices.ts`), never here —
@@ -86,13 +89,17 @@ export async function composeTargetApplication(
   const actorId = options.actorId ?? `m9-app:${options.workspaceId}`;
   const reassessmentWorker = new PgReassessmentWorker(runtime.pool, { actorId });
 
-  return {
+  const application: TargetApplication = {
     kind: 'TARGET_POSTGRES',
     workspaceId: options.workspaceId,
     pool: runtime.pool,
     runtime,
     unitOfWork: () => runtime.unitOfWorkFor(options.workspaceId),
     reassessmentWorker,
+    prepareSelectedPlanContinuation: createSelectedPlanContinuationService({
+      pool: runtime.pool, workspaceId: options.workspaceId, actorId,
+      executorPrincipalId: () => application.runtimeHooks?.executorPrincipalId,
+    }),
     replanIdentity: M9_REPLAN_IDENTITY,
     objectiveDispositionApiExposed: M9_OBJECTIVE_DISPOSITION_API_EXPOSED,
     sqliteAuthoritativeFallback: false,
@@ -100,4 +107,5 @@ export async function composeTargetApplication(
       await runtime.close();
     },
   };
+  return application;
 }

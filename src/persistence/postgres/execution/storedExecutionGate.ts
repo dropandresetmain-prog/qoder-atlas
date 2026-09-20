@@ -29,6 +29,7 @@ import { PgCurrentStateReader } from '../world/pgCurrentState.ts';
 import { assessManifestCurrentness } from '../../../resolution/world/currentness.ts';
 import { compareExactMoney } from '../../../domain/v2/shared/money.ts';
 import type { CapabilityKind } from '../../../resolution/execution/capability.ts';
+import { loadCurrentSelectedPlanContinuation, selectedPlanDependencyReadiness, ContinuationRefusal, type CurrentContinuation } from './selectedPlanContinuation.ts';
 import { observedProgrammeRevisionFromPrerequisites } from './programmeRevisionRefresh.ts';
 
 export { DISPATCH_ACTION_KIND };
@@ -153,7 +154,7 @@ async function loadAuthorityBundle(
             issued_at, expires_at
        FROM authority_decisions
       WHERE workspace_id = $1 AND action_intent_id = $2 AND envelope_fingerprint = $3
-      ORDER BY issued_at DESC LIMIT 1`,
+      ORDER BY issued_at DESC,id DESC LIMIT 1`,
     [workspaceId, intentId, envelopeFingerprint],
   );
   const row = decisions.rows[0];
@@ -456,6 +457,20 @@ export async function evaluateStoredExecutionGate(
   if (params.requiredCapabilityRef && intent.capabilityRef !== params.requiredCapabilityRef) {
     return { allowed: false, reason: 'CAPABILITY_MISMATCH', detail: `intent capability ${intent.capabilityRef} != required ${params.requiredCapabilityRef}` };
   }
+  const prerequisites = await selectedPlanDependencyReadiness(pool, params.workspaceId, intent.id);
+  if (prerequisites.hasExternalPredecessor && !prerequisites.ready) {
+    return { allowed: false, reason: 'PREREQUISITE_CANONICAL_APPLICATION_REQUIRED', detail: prerequisites.detail };
+  }
+  let continuation: CurrentContinuation | undefined;
+  try {
+    continuation = await loadCurrentSelectedPlanContinuation(pool, params.workspaceId, intent.actionPlanId, intent.id, params.now);
+  } catch (error) {
+    return { allowed: false, reason: error instanceof ContinuationRefusal ? error.code : 'CONTINUATION_INVALID',
+      detail: error instanceof Error ? error.message : String(error) };
+  }
+  if (prerequisites.hasExternalPredecessor && !continuation) {
+    return { allowed: false, reason: 'SELECTED_PLAN_CONTINUATION_REQUIRED', detail: 'Prepare exact residual evidence through the application root before this successor can dispatch.' };
+  }
   const strategy = await loadStrategyForPlan(pool, params.workspaceId, intent.actionPlanId);
   if ('allowed' in strategy) return strategy;
   const manifestValue = typeof strategy.baseManifest === 'string'
@@ -463,12 +478,13 @@ export async function evaluateStoredExecutionGate(
     : strategy.baseManifest;
   const parsedManifest = WorldSnapshotManifestSchema.safeParse(manifestValue);
   if (!parsedManifest.success) return { allowed: false, reason: 'INVALID_BASE_MANIFEST', detail: parsedManifest.error.message };
-  const manifest = parsedManifest.data;
+  const manifest = continuation?.freshManifest ?? parsedManifest.data;
   if (manifest.aggregateReads.length === 0 && manifest.scopeReads.length === 0) {
     return { allowed: false, reason: 'EMPTY_BASE_MANIFEST' };
   }
   const state = await new PgCurrentStateReader(pool).loadFor(params.workspaceId, manifest);
   const currentness = assessManifestCurrentness(manifest, state, params.now);
+  if (!currentness.current && continuation) return { allowed: false, reason: 'CHECKPOINT_STALE', detail: JSON.stringify(currentness.reasons) };
   if (!currentness.current) {
     // Narrow exemption: a dependent intent may see AGGREGATE_ADVANCED /
     // SCOPE_ADVANCED vs the original strategy base manifest when a same-plan
@@ -547,7 +563,7 @@ export async function evaluateStoredExecutionGate(
     id: string; scope: unknown; limits: unknown; grant_refs: unknown; rule_inputs: unknown; group_operator: 'AND' | 'OR';
   }>(
     `SELECT id, scope, limits, grant_refs, rule_inputs, group_operator FROM authority_decisions
-      WHERE workspace_id = $1 AND action_intent_id = $2 ORDER BY issued_at DESC LIMIT 1`,
+      WHERE workspace_id = $1 AND action_intent_id = $2 ORDER BY issued_at DESC,id DESC LIMIT 1`,
     [params.workspaceId, params.intentId],
   );
   const decisionMeta = decisionRow.rows[0];

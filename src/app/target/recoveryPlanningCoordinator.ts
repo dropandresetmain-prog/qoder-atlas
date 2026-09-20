@@ -56,6 +56,7 @@ import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary
 import { unmetProgrammeItems, type FailingSubject } from '../../resolution/planning/proposer.ts';
 import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
 import { createTransportProposer } from '../../resolution/planning/proposers/transportProposer.ts';
+import { retainSelectedPlanEvaluationInputs } from './selectedPlanEvaluationInputs.ts';
 import { persistOfferExecutionBindings } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
 import type { WTransportService } from '../../resolution/world/world.ts';
 import type { ResolvedOffer } from '../../resolution/scenarios/overlay.ts';
@@ -532,6 +533,14 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           resolvedOffers: capturedResolvedOffers,
         });
       }
+
+      // Retain read-only RC-6 inputs for exact selected-plan continuation. This
+      // does not compose hotel execution or grant any provider capability.
+      await retainSelectedPlanEvaluationInputs(deps.pool, {
+        workspaceId: deps.workspaceId, actorId: deps.actorPrincipalId, strategies: core.viableStrategies,
+        services: capturedOfferServices, offers: capturedResolvedOffers,
+        ...(capturedHotelMaterialization ? { hotel: capturedHotelMaterialization } : {}),
+      });
 
       return {
         ok: true,

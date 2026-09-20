@@ -37,6 +37,7 @@ import {
   loadRequiredAuthorityScope,
 } from '../execution/storedExecutionGate.ts';
 import type { Pool } from '../pool.ts';
+import { selectedPlanDependencyReadiness } from '../execution/selectedPlanContinuation.ts';
 
 const SCHEMA_VERSION = '1';
 
@@ -177,8 +178,8 @@ export async function persistActionPlan(
              capability_ref, subject_refs, expected_revisions, preconditions, offer_fingerprint,
              cost_amount, cost_currency, limits, required_authority_scopes, expected_observations,
              compensation_supported, compensation_requires_separate_authority, compensation_description,
-             status, created_by_actor_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19,$20,$21)`,
+             status, created_by_actor_id, source_effect_index, source_effect_fingerprint
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19,$20,$21,$22,$23)`,
           [
             params.workspaceId, intent.id, plan.id, intent.operationNamespace,
             intent.logicalOperationKey ?? null, intent.requestFingerprint ?? null,
@@ -189,6 +190,7 @@ export async function persistActionPlan(
             JSON.stringify(intent.requiredAuthorityScopes), JSON.stringify(intent.expectedObservations),
             intent.compensationPolicy.supported, intent.compensationPolicy.requiresSeparateAuthority,
             intent.compensationPolicy.description ?? null, intent.status, params.actorPrincipalId,
+            intent.sourceEffectIndex ?? null, intent.sourceEffectFingerprint ?? null,
           ],
         );
       }
@@ -575,10 +577,11 @@ export async function createPreparedExecutionAttempt(
         logical_operation_key: string | null; request_fingerprint: string | null;
       }>(
         `SELECT logical_operation_key, request_fingerprint FROM action_intents
-          WHERE workspace_id = $1 AND id = $2`,
-        [params.workspaceId, params.intentId],
+          WHERE workspace_id = $1 AND id = $2 AND action_plan_id = $3`,
+        [params.workspaceId, params.intentId, params.planId],
       );
       const intentKeys = storedIntent.rows[0];
+      if (!intentKeys) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'PLAN_INTENT_MISMATCH: intent does not belong to requested plan', [planRef]) };
       if (intentKeys?.logical_operation_key && intentKeys.request_fingerprint) {
         const knownSuccessEarly = await findKnownSuccessAttempt(
           client, params.workspaceId, intentKeys.logical_operation_key, intentKeys.request_fingerprint,
@@ -629,36 +632,12 @@ export async function createPreparedExecutionAttempt(
         return { ok: true, value: { attemptId: blocking.id, replayed: true, knownSuccess: true }, advanced: [] };
       }
 
-      // M7's ActionPlan DAG (action_dependencies) is honored here: a downstream
-      // intent may not prepare a dispatch attempt until every intent it depends
-      // on has a terminal-success execution_attempts row. A failed prerequisite
-      // permanently blocks the dependant (never silently skipped); an
-      // in-progress/not-yet-attempted prerequisite blocks until it resolves.
-      const deps = await client.query<{ from_action_intent_id: string; satisfied: boolean; failed: boolean }>(
-        `SELECT d.from_action_intent_id,
-                bool_or(ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED')) AS satisfied,
-                bool_or(ea.status IN ('OBSERVED_FAILURE', 'FAILED')) AS failed
-           FROM action_dependencies d
-           LEFT JOIN execution_attempts ea
-             ON ea.workspace_id = d.workspace_id AND ea.action_intent_id = d.from_action_intent_id
-          WHERE d.workspace_id = $1 AND d.to_action_intent_id = $2
-          GROUP BY d.from_action_intent_id`,
-        [params.workspaceId, params.intentId],
-      );
-      const failedPrerequisite = deps.rows.find((d) => d.failed);
-      if (failedPrerequisite) {
-        return {
-          ok: false,
-          conflict: typedConflict('VALIDATION_FAILED', `prerequisite intent ${failedPrerequisite.from_action_intent_id} failed; dependant is blocked`, [planRef]),
-        };
-      }
-      const unresolvedPrerequisite = deps.rows.find((d) => !d.satisfied);
-      if (unresolvedPrerequisite) {
-        return {
-          ok: false,
-          conflict: typedConflict('VALIDATION_FAILED', `prerequisite intent ${unresolvedPrerequisite.from_action_intent_id} has not completed; downstream dispatch blocked`, [planRef]),
-        };
-      }
+      // Internal/Programme success retains its accepted behavior. External
+      // predecessors additionally require their exact committed canonical bridge.
+      const readiness = await selectedPlanDependencyReadiness(client, params.workspaceId, params.intentId);
+      if (!readiness.ready) return {
+        ok: false, conflict: typedConflict('VALIDATION_FAILED', readiness.detail ?? 'prerequisite not completed; downstream dispatch blocked', [planRef]),
+      };
       await registerChildSubject({
         workspaceId: params.workspaceId, id: attemptId, kind: 'EXECUTION_ATTEMPT', aggregateId: params.planId,
       });

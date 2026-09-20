@@ -1,3 +1,52 @@
+# ACTIVE TASK — A4 SELECTED-PLAN CONTINUATION SAFETY
+
+## Identity and acceptance
+
+- Working base verified remotely: `finish/a3-operator-ui-second-pass` @ `987a6b66cc34b8d7fc327dbda76853e8ef1e761b`.
+- Candidate branch: `finish/a4-continuation-astra` (bounded child of that exact candidate).
+- A0 / A1 / A2 accepted. **A3 CONDITIONAL PASS — continue integration, not final acceptance.**
+- Scope: Checkpoint 2 only; no hotel execution, no UI/graph/copy edits, no generic orchestration.
+- Preserved source material: `codex/a4-selected-continuation` @ `b911989406d070f4a48c9783614f8256f16eb83f`; prior `fb4ff1023f44b038da3c00484b4465c5a9c85ff6`. Neither merged or modified.
+
+## Current checkpoint
+
+- [x] Verify exact base and isolate candidate branch.
+- [x] Inspect current approval/execution/canonical ownership and preserved WIP.
+- [ ] Encode exact source identities, canonical bridge, scope/revision accounting and checkpoint binding.
+- [ ] Root-owned PostgreSQL capture, retained read-only selected materialization, production residual evaluation.
+- [ ] Focused PostgreSQL / unit proofs; preserve accepted internal Programme behavior.
+- [ ] Inspect final diff, update evidence, push candidate. No acceptance implied by a push.
+
+Current state: implementation in progress; **not yet typechecked or runtime-verified**.
+Next action: finish focused tests, run available static/isolated checks, then hand exact local PostgreSQL verification to the verifier.
+Local next gate: `npm run typecheck`, then `node --test postgres-integration/a4SelectedPlanContinuation.pgtest.ts` against the dedicated migrated PostGIS test database.
+
+## Carry-forward A3 defects — PARK FOR LATER, do not expand Checkpoint 2
+
+1. Reliable operator/demo disruption trigger disappeared.
+2. Jordan progressive delay stages are not visibly/properly wired.
+3. V5.6 Jordan semantics can be amber when the connection is already impossible.
+4. Some V5.6 causal edges are missing/inconsistent.
+5. Hotel/cancellation/FX displayed cost provenance needs end-to-end verification.
+6. Graphs should move above other Case/Overview blocks before final presentation.
+7. Final wording / wall-of-text pass remains.
+8. Overview traveller-focus behavior needs final scenario QC.
+
+## Boundaries and decisions
+
+- ACT NOW: an external success observation is not a canonical receipt; successor stays blocked until exact same-plan application commits.
+- ACT NOW: no caller-supplied CapturedWorld/evaluator/viability evidence may mint continuation permission.
+- ACT NOW: record actual same-transaction scope increments, including allocation changes that do not advance Journey heads.
+- ACT NOW: keep checkpoint binding separate from current authority, revocation, funding and protected-input gates.
+- PARK FOR LATER: Checkpoint 3 stay binding SQL, Nuitée dispatch/reconciliation, cancellation commands and hotel boot.
+- Read-only retained research materialization is evaluation input, not a new hotel execution binding.
+- No claims of PostgreSQL, typecheck, provider or runtime PASS without executed evidence.
+- Source export/tooling branch is isolated from the implementation; no workflow/export files may enter the final candidate.
+
+---
+
+# Historical A3 ledger — preserved verbatim below
+
 # ACTIVE TASK — A3 OPERATOR UI SECOND PASS
 
 Live ledger for the bounded operator-UI convergence pass. Prior A2/A3 engine ledger below is preserved.

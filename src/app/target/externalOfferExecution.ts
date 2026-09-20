@@ -48,6 +48,8 @@ import type { CapabilityStatement } from '../../resolution/planning/compiler.ts'
 import { validateExistingOrder, type ExpectedOrderTerms } from './existingOrderValidation.ts';
 import type { FlightOrderStatus } from '../../contracts/capabilities.ts';
 import { tryAcquireWorkspaceOperationLease } from './workspaceOperationLease.ts';
+import { selectedPlanApplicationUnitOfWork, selectedOfferCanonicalId, selectedOfferCanonicalMode } from './selectedPlanCanonicalApplication.ts';
+import { selectedPlanDependencyReadiness } from '../../persistence/postgres/execution/selectedPlanContinuation.ts';
 
 export const EXTERNAL_OFFER_SELECT_CAPABILITY = 'external:offer.select';
 
@@ -140,7 +142,13 @@ async function loadCandidates(pool: Pool, workspaceId: string): Promise<string[]
       ORDER BY ap.created_at, ai.created_at, ai.id`,
     [workspaceId, EXTERNAL_OFFER_SELECT_CAPABILITY, SUCCESS],
   );
-  return result.rows.map((r) => r.intent_id);
+  // Candidate discovery is not authority, but do not advertise an external
+  // successor before its predecessor's exact canonical application commits.
+  const ready: string[] = [];
+  for (const row of result.rows) {
+    if ((await selectedPlanDependencyReadiness(pool, workspaceId, row.intent_id)).ready) ready.push(row.intent_id);
+  }
+  return ready;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,20 +355,31 @@ export function buildAtlasReconcileLookup(pool: Pool, deps: ExternalOfferExecuti
 // Canonical update after an OBSERVED success (idempotent, no provider call)
 // ---------------------------------------------------------------------------
 
-const AIR_MODE: Record<string, 'AIR' | 'RAIL' | 'ROAD' | 'SEA'> = { FLIGHT: 'AIR', AIR: 'AIR', RAIL: 'RAIL', ROAD: 'ROAD', SEA: 'SEA' };
 
 async function applyCanonicalSelection(
   ctx: ExternalExecutionContext, intentId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, observedAt: string,
+  attemptId: string, observationId: string,
 ): Promise<{ ok: true; already?: true } | { ok: false; error: string }> {
   const ws = ctx.workspaceId;
-  const ns = RUNTIME_ID_NAMESPACES.planning;
-  const id = (name: string) => deterministicUuid(ns, `${intentId}|offer-select|${name}`);
+  const id = (name: string) => selectedOfferCanonicalId(intentId, name);
   const b = inputs.binding;
   const serviceId = id('service');
+  // The immutable canonical receipt, not current entity existence, proves this
+  // action finished. Never reapply it over a subsequent operator/world change.
+  const completed = await ctx.pool.query(
+    `SELECT 1 FROM selected_plan_canonical_applications c
+     JOIN command_receipts r ON r.workspace_id=c.workspace_id AND r.command_namespace=c.command_namespace
+       AND r.idempotency_key=c.idempotency_key AND r.payload_hash=c.receipt_payload_hash
+     WHERE c.workspace_id=$1 AND c.action_intent_id=$2 AND c.attempt_id=$3
+       AND c.source_observation_id=$4 AND c.completes_effect`, [ws, intentId, attemptId, observationId]);
+  if ((completed.rowCount ?? 0) > 0) return { ok: true, already: true };
   const already = await ctx.pool.query('SELECT 1 FROM transport_item_details WHERE workspace_id = $1 AND journey_item_id = $2 AND selected_service_id = $3', [ws, b.journeyItemId, serviceId]);
-  if ((already.rowCount ?? 0) > 0) return { ok: true, already: true };
+  if ((already.rowCount ?? 0) > 0) return { ok: false, error: 'CANONICAL_APPLICATION_UNPROVEN: existing selection has no exact application receipt; do not infer success or redispatch' };
   const base = { workspaceId: ws, actorPrincipalId: ctx.actorPrincipalId };
-  const uow = () => ctx.uow();
+  const uow = () => selectedPlanApplicationUnitOfWork(ctx.uow(), {
+    workspaceId: ws, actionIntentId: intentId, attemptId,
+    source: { kind: 'EXTERNAL_PROVIDER', observationId },
+  });
 
   const sourceId = id('source');
   const evidenceId = id('evidence');
@@ -382,7 +401,7 @@ async function applyCanonicalSelection(
   const svc = await createTransportService(uow(), {
     ...base, idempotencyKey: `offer-select:${intentId}:service`,
     service: {
-      id: serviceId, mode: AIR_MODE[b.itinerary.mode] ?? 'AIR', operator: b.itinerary.operator,
+      id: serviceId, mode: selectedOfferCanonicalMode(b.itinerary.mode), operator: b.itinerary.operator,
       originPlaceId: b.itinerary.originPlaceId, destinationPlaceId: b.itinerary.destinationPlaceId,
       ...(dep ? { publishedDeparture: dep } : {}), ...(arr ? { publishedArrival: arr } : {}),
     },
@@ -429,19 +448,22 @@ async function applyCanonicalSelection(
 
 /** Successful attempts whose canonical update has not landed yet (safe to re-run: no provider call). */
 async function applyPendingCanonicalUpdates(ctx: ExternalExecutionContext, report: ExternalExecutionReport): Promise<void> {
-  const pending = await ctx.pool.query<{ intent_id: string; observed_at: Date }>(
-    `SELECT ai.id AS intent_id, max(eo.observed_at) AS observed_at
+  const pending = await ctx.pool.query<{ intent_id: string; attempt_id: string; observation_id: string; observed_at: Date }>(
+    `SELECT DISTINCT ON (ai.id) ai.id AS intent_id, ea.id AS attempt_id, eo.id AS observation_id, eo.observed_at
        FROM action_intents ai
-       JOIN execution_attempts ea ON ea.workspace_id = ai.workspace_id AND ea.action_intent_id = ai.id AND ea.status = ANY($3::text[])
+       JOIN execution_attempts ea ON ea.workspace_id = ai.workspace_id AND ea.action_intent_id = ai.id
+         AND ea.status = ANY($3::text[]) AND ea.request_fingerprint=ai.request_fingerprint
        JOIN execution_observations eo ON eo.workspace_id = ea.workspace_id AND eo.attempt_id = ea.id
+         AND eo.action_intent_id=ai.id AND eo.origin='EXTERNAL_PROVIDER'
+         AND eo.source_owned_fields->>'orderStatus'='TICKETED'
       WHERE ai.workspace_id = $1 AND ai.capability_ref = $2
-      GROUP BY ai.id`,
+      ORDER BY ai.id, eo.observed_at DESC, eo.id`,
     [ctx.workspaceId, EXTERNAL_OFFER_SELECT_CAPABILITY, SUCCESS],
   );
   for (const row of pending.rows) {
     const inputs = await resolveOfferExecutionInputs(ctx.pool, ctx.workspaceId, row.intent_id);
     if (!inputs.ready) continue;
-    const applied = await applyCanonicalSelection(ctx, row.intent_id, inputs, row.observed_at.toISOString());
+    const applied = await applyCanonicalSelection(ctx, row.intent_id, inputs, row.observed_at.toISOString(), row.attempt_id, row.observation_id);
     if (applied.ok) { if (!applied.already) report.canonicalUpdates += 1; }
     else report.canonicalPending.push({ intentId: row.intent_id, error: applied.error });
   }

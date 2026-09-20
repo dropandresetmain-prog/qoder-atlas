@@ -31,6 +31,7 @@
   },
   "suites": {
     "current": [
+      "test/a4-selected-plan-continuation.test.ts",
       "test/a3-recovery-research-composition.test.ts",
       "test/a3-reviewed-runtime-context.test.ts",
       "test/a3-existing-visit-entry-context.test.ts",
@@ -163,6 +164,7 @@
       "test/operator-ui-camera.test.ts"
     ],
     "postgres": [
+      "postgres-integration/a4SelectedPlanContinuation.pgtest.ts",
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a4ObservedStay.pgtest.ts",
@@ -251,6 +253,7 @@
       "postgres-integration/witLiveReadModelContract.pgtest.ts"
     ],
     "postgresFast": [
+      "postgres-integration/a4SelectedPlanContinuation.pgtest.ts",
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",

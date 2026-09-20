@@ -10,6 +10,7 @@
  * This module does not execute actions, grant authority, or call providers.
  */
 import { createHash, randomUUID } from 'node:crypto';
+import { selectedEffectFingerprint } from '../execution/selectedPlanIdentity.ts';
 import type { ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import {
@@ -118,7 +119,7 @@ function intentForEffect(
     id,
     actionPlanId: planId,
     sourceEffectIndex: index,
-    sourceEffectFingerprint: fingerprint(effect),
+    sourceEffectFingerprint: selectedEffectFingerprint(effect),
     status: 'PROPOSED' as const,
     compensationPolicy: { supported: false, requiresSeparateAuthority: true },
   };
