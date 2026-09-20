@@ -1,6 +1,16 @@
 # Selected composite plan continuation
 
-Status: Act Now; bounded implementation contract, not acceptance evidence.
+Status: **IMPLEMENTED / FOCUSED-PROVEN for A4 continuation.** The bounded contract below remains authoritative. CP2 passed on `finish/a4-continuation` @ `f7a497d984ea93fc6436c6c717a553db48602fa6`; the controlled four-action seam later passed on `5bdb6527369a2a3c34957ce718b5f690ce50adf5`. Physical provider execution remains separate A4 acceptance evidence.
+
+## Implementation status
+
+- External observed success without canonical application is blocked.
+- Canonical application is linked to exact plan/intent/attempt/provider observation/command receipt.
+- Root-owned fresh PostgreSQL capture + production M6 evaluation owns residual continuation.
+- Unknown outcome reconciles only; unrelated Journey mutation fails closed.
+- Protected hotel book/cancel integration preserves the same invariant.
+- Controlled four-action PG proof confirms flight → stay → stay → cancel progression and final reassessment gating.
+- Do not broaden this into a general workflow engine or stale-state exemption.
 
 WHAT WE KNOW: the selected composite strategy contains a flight, overnight stay,
 destination replacement and cancellation. Each confirmed canonical mutation advances
