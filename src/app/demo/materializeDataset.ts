@@ -50,6 +50,7 @@ import {
   createProgramme,
 } from '../../persistence/postgres/commands/programmeCommands.ts';
 import {
+  addIntendedVisit,
   addJourneyItem,
   createJourney,
   createTrip,
@@ -62,7 +63,7 @@ import {
 } from '../../persistence/postgres/commands/arrangementCommands.ts';
 import { DatasetIdentityMinter } from './datasetIds.ts';
 import type { LoadedDataset } from './datasetLoader.ts';
-import type { DatasetDeclaredTravel, DatasetJourneyRequirement, DatasetRule, DatasetTraveller } from './datasetSchema.ts';
+import type { DatasetDeclaredTravel, DatasetIntendedVisit, DatasetJourneyRequirement, DatasetRule, DatasetTraveller } from './datasetSchema.ts';
 import {
   DatasetMappingError,
   externalRefKey,
@@ -134,6 +135,11 @@ interface ResolvedStayArrivalRequirement {
   arrivalTransportIndex: number;
 }
 
+interface ResolvedIntendedVisit {
+  visit: DatasetIntendedVisit;
+  stayIndex: number;
+}
+
 /** Resolve source item aliases before any dataset command can write state. */
 function resolveStayArrivalRequirements(
   programme: LoadedDataset['programme'],
@@ -165,6 +171,27 @@ function resolveStayArrivalRequirements(
   return resolved;
 }
 
+function resolveIntendedVisits(
+  programme: LoadedDataset['programme'],
+  visits: readonly DatasetIntendedVisit[],
+): Map<string, ResolvedIntendedVisit[]> {
+  const resolved = new Map<string, ResolvedIntendedVisit[]>();
+  for (const visit of visits) {
+    const traveller = programme.importDraft.travellers.find((candidate) => candidate.draftId === visit.travellerDraftId);
+    if (!traveller) throw new DatasetMaterializationError(`intended visit ${visit.id} references unknown traveller draft ${visit.travellerDraftId}`);
+    const matches = traveller.declaredTravel.flatMap((item, index) =>
+      `journey-item:${traveller.draftId}#${index}` === `${visit.stayItemRef.system}:${visit.stayItemRef.value}` ? [{ item, index }] : [],
+    );
+    if (matches.length !== 1 || matches[0]!.item.itemKind !== 'STAY') {
+      throw new DatasetMaterializationError(`intended visit ${visit.id} stay item reference must resolve to exactly one declared STAY`);
+    }
+    const current = resolved.get(traveller.draftId) ?? [];
+    current.push({ visit, stayIndex: matches[0]!.index });
+    resolved.set(traveller.draftId, current);
+  }
+  return resolved;
+}
+
 /** A content hash per source capture, derived from the dataset bytes it belongs to. */
 function sourceContentHash(datasetContentHash: string, sourceId: string): string {
   return createHash('sha256').update(datasetContentHash).update('\0').update(sourceId).digest('hex');
@@ -177,6 +204,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
   const draft = programme.importDraft;
   const ids = new DatasetIdentityMinter(workspaceId, dataset.datasetKey);
   const stayArrivalRequirements = resolveStayArrivalRequirements(programme, dataset.journeyRequirements?.requirements ?? []);
+  const intendedVisits = resolveIntendedVisits(programme, dataset.intendedVisits?.visits ?? []);
   const uow = (): UnitOfWork => new PgUnitOfWork(pool, workspaceId);
   const identity = { workspaceId, actorPrincipalId };
   const counts: Record<string, number> = {};
@@ -210,6 +238,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
   for (const sourceId of dataset.groundTransfers?.sourceIds ?? []) statedSourceIds.add(sourceId);
   if (dataset.jurisdictions) statedSourceIds.add(dataset.jurisdictions.sourceId);
   if (dataset.journeyRequirements) statedSourceIds.add(dataset.journeyRequirements.sourceId);
+  if (dataset.intendedVisits) statedSourceIds.add(dataset.intendedVisits.sourceId);
 
   const sourceRecordIds = new Map<string, string>();
   for (const statedSourceId of [...statedSourceIds].sort()) {
@@ -251,6 +280,9 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     { family: 'transfers', assertionType: 'DATASET_TRANSFER_DECLARATION', sources: dataset.groundTransfers?.sourceIds ?? [] },
     ...(dataset.journeyRequirements
       ? [{ family: 'journeyRequirements', assertionType: 'DATASET_JOURNEY_REQUIREMENT_DECLARATION', sources: [dataset.journeyRequirements.sourceId], observedAt: dataset.journeyRequirements.observedAt }]
+      : []),
+    ...(dataset.intendedVisits
+      ? [{ family: 'intendedVisits', assertionType: 'DATASET_INTENDED_VISIT_DECLARATION', sources: [dataset.intendedVisits.sourceId], observedAt: dataset.intendedVisits.observedAt }]
       : []),
   ];
   const evidenceIds = new Map<string, string>();
@@ -335,6 +367,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     return id;
   };
   const placeTimeZone = new Map(context.places.map((place) => [place.id, place.timezone]));
+  const jurisdictionIds = new Map<string, string>();
 
   // ---- Jurisdictions, areas, place membership and knowledge coverage ------
   if (dataset.jurisdictions) {
@@ -342,6 +375,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     const geographyEvidence = evidenceFor('geography');
     for (const jurisdiction of geography.jurisdictions) {
       const jurisdictionId = ids.id('jurisdiction', jurisdiction.id);
+      jurisdictionIds.set(jurisdiction.id, jurisdictionId);
       mustOk(
         await createJurisdiction(uow(), {
           ...identity,
@@ -871,6 +905,42 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
       }
     }
 
+    // These are explicit source visit declarations. A stay alone is never
+    // enough to infer a landside encounter, so only a cited source declaration
+    // becomes an IntendedVisit. The referenced STAY supplies dates and the
+    // Trip's stated purpose supplies the visit purpose.
+    for (const resolved of intendedVisits.get(traveller.draftId) ?? []) {
+      const stay = traveller.declaredTravel[resolved.stayIndex]!;
+      if (stay.itemKind !== 'STAY') throw new DatasetMaterializationError(`intended visit ${resolved.visit.id} resolved to a non-stay item`);
+      const jurisdictionId = jurisdictionIds.get(resolved.visit.jurisdictionId);
+      if (!jurisdictionId) throw new DatasetMaterializationError(`intended visit ${resolved.visit.id} references unmapped jurisdiction ${resolved.visit.jurisdictionId}`);
+      journeyRevision = mustOk(
+        await addIntendedVisit(uow(), {
+          ...identity,
+          idempotencyKey: ids.key('intended-visit', resolved.visit.id),
+          journeyId,
+          expectedRevision: journeyRevision,
+          visit: {
+            id: ids.id('intended-visit', resolved.visit.id),
+            jurisdictionId,
+            purpose: anchorEvent.name,
+            intendedDates: {
+              start: toInstant(stay.checkIn, 'checkIn'),
+              end: toInstant(stay.checkOut, 'checkOut'),
+            },
+            transitIntent: resolved.visit.transitIntent,
+          },
+          evidenceRefs: [evidenceFor('intendedVisits')],
+        }),
+        `addIntendedVisit(${resolved.visit.id})`,
+      ).journeyRevision;
+      bump('intendedVisits');
+      await sourceIdentity.map(SOURCE_RECORD_TYPES.INTENDED_VISIT, resolved.visit.id, {
+        kind: 'JOURNEY',
+        id: journeyId,
+      });
+    }
+
     // Item-referencing requirements are recorded after their canonical
     // JourneyItem rows exist so the typed operand foreign keys remain real.
     for (const requirement of dataset.journeyRequirements?.requirements.filter((item) => item.travellerDraftId === traveller.draftId && item.kind === 'STAY_ARRIVAL_DATE_ALIGNED') ?? []) {
@@ -1145,7 +1215,12 @@ function rulePredicateExpression(rule: DatasetRule): { operator: 'PREDICATE'; pr
  */
 function notMaterialized(dataset: LoadedDataset, travellers: readonly DatasetTraveller[]): string[] {
   const out: string[] = [];
-  const files = dataset.contributingFiles.filter((file) => file !== 'programme.json' && file !== 'ground-transfers.json' && file !== 'jurisdictions.json');
+  const files = dataset.contributingFiles.filter((file) =>
+    file !== 'programme.json' &&
+    file !== 'ground-transfers.json' &&
+    file !== 'jurisdictions.json' &&
+    file !== 'intended-visits.json',
+  );
   for (const file of files) {
     out.push(`${file}: money/custody-shaped content whose target home (cost allocations, protected data refs) is not built in this increment`);
   }
@@ -1161,6 +1236,8 @@ function notMaterialized(dataset: LoadedDataset, travellers: readonly DatasetTra
   if (dataset.programme.importDraft.unresolvedStatements.length > 0) {
     out.push('import-draft unresolved statements: genuinely unresolved source uncertainty, preserved as UNKNOWN rather than resolved');
   }
-  out.push('intended visits: the dataset declares no visit/transit intent, so ENTRY encounters are not derivable and entry_feasibility stays NOT_APPLICABLE');
+  if (!dataset.intendedVisits) {
+    out.push('intended visits: the dataset declares no visit/transit intent, so ENTRY encounters are not derivable and entry_feasibility stays NOT_APPLICABLE');
+  }
   return out;
 }

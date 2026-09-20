@@ -17,11 +17,13 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   DatasetGroundTransfersSchema,
+  DatasetIntendedVisitsSchema,
   DatasetJourneyRequirementsSchema,
   DatasetJurisdictionsSchema,
   DatasetProgrammeSchema,
   type DatasetJourneyRequirement,
   type DatasetGroundTransfers,
+  type DatasetIntendedVisits,
   type DatasetJourneyRequirements,
   type DatasetJurisdictions,
   type DatasetProgramme,
@@ -36,6 +38,8 @@ export const GROUND_TRANSFERS_FILE = 'ground-transfers.json';
 export const JURISDICTIONS_FILE = 'jurisdictions.json';
 /** Optional typed Journey requirements declared by the source organiser. */
 export const JOURNEY_REQUIREMENTS_FILE = 'journey-requirements.json';
+/** Optional explicit source-owned landside visit declarations. */
+export const INTENDED_VISITS_FILE = 'intended-visits.json';
 
 export interface LoadedDataset {
   /** Stable dataset identity, derived from the configured directory name. */
@@ -49,6 +53,7 @@ export interface LoadedDataset {
   groundTransfers: DatasetGroundTransfers | undefined;
   jurisdictions: DatasetJurisdictions | undefined;
   journeyRequirements?: DatasetJourneyRequirements;
+  intendedVisits?: DatasetIntendedVisits;
 }
 
 export class DatasetLoadError extends Error {
@@ -96,6 +101,64 @@ function validateJourneyRequirementRefs(
     }
     if (original.index === arrival.index) {
       throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} requirement ${requirement.id} references one item twice`, directory);
+    }
+  }
+}
+
+function resolveDeclaredStayIndex(
+  traveller: DatasetProgramme['importDraft']['travellers'][number],
+  ref: { system: string; value: string },
+  directory: string,
+  label: string,
+): number {
+  const matches = traveller.declaredTravel.flatMap((item, index) =>
+    sourceJourneyItemAlias(traveller.draftId, index) === `${ref.system}:${ref.value}` ? [{ item, index }] : [],
+  );
+  if (matches.length !== 1) {
+    throw new DatasetLoadError(
+      `${INTENDED_VISITS_FILE} ${label} ${ref.system}:${ref.value} must resolve to exactly one declared item for traveller ${traveller.draftId}`,
+      directory,
+    );
+  }
+  if (matches[0]!.item.itemKind !== 'STAY') {
+    throw new DatasetLoadError(`${INTENDED_VISITS_FILE} ${label} is not a STAY`, directory);
+  }
+  return matches[0]!.index;
+}
+
+function resolveProgrammePlaceId(programme: DatasetProgramme, ref: { system: string; value?: string; reference?: string }): string | undefined {
+  const value = ref.value ?? ref.reference;
+  if (!value) return undefined;
+  return programme.context.places.find((place) =>
+    (ref.system === 'place-id' && value === place.id) ||
+    place.externalRefs.some((external) => external.system === ref.system && (external.value ?? external.reference) === value),
+  )?.id;
+}
+
+function validateIntendedVisits(
+  visits: DatasetIntendedVisits,
+  programme: DatasetProgramme,
+  jurisdictions: DatasetJurisdictions | undefined,
+  directory: string,
+): void {
+  if (!jurisdictions) {
+    throw new DatasetLoadError(`${INTENDED_VISITS_FILE} requires ${JURISDICTIONS_FILE} for source jurisdiction attribution`, directory);
+  }
+  for (const visit of visits.visits) {
+    const traveller = programme.importDraft.travellers.find((candidate) => candidate.draftId === visit.travellerDraftId);
+    if (!traveller) {
+      throw new DatasetLoadError(`${INTENDED_VISITS_FILE} references unknown traveller draft ${visit.travellerDraftId}`, directory);
+    }
+    const stayIndex = resolveDeclaredStayIndex(traveller, visit.stayItemRef, directory, `visit ${visit.id} stay item reference`);
+    const stay = traveller.declaredTravel[stayIndex]!;
+    if (stay.itemKind !== 'STAY') throw new DatasetLoadError(`${INTENDED_VISITS_FILE} visit ${visit.id} is not a STAY`, directory);
+    const placeId = resolveProgrammePlaceId(programme, stay.stayPlaceRef);
+    const jurisdiction = jurisdictions.jurisdictions.find((candidate) => candidate.id === visit.jurisdictionId);
+    if (!jurisdiction) {
+      throw new DatasetLoadError(`${INTENDED_VISITS_FILE} visit ${visit.id} references unknown jurisdiction ${visit.jurisdictionId}`, directory);
+    }
+    if (!placeId || !jurisdiction.placeIds.includes(placeId)) {
+      throw new DatasetLoadError(`${INTENDED_VISITS_FILE} visit ${visit.id} jurisdiction ${visit.jurisdictionId} does not contain its declared stay place`, directory);
     }
   }
 }
@@ -181,6 +244,17 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     journeyRequirements = parsed.data;
   }
 
+  const intendedVisitsRaw = await readJsonFile(directory, INTENDED_VISITS_FILE);
+  let intendedVisits: DatasetIntendedVisits | undefined;
+  if (intendedVisitsRaw) {
+    const parsed = DatasetIntendedVisitsSchema.safeParse(intendedVisitsRaw.parsed);
+    if (!parsed.success) {
+      throw new DatasetLoadError(`${INTENDED_VISITS_FILE} does not match the dataset contract: ${parsed.error.message}`, directory);
+    }
+    validateIntendedVisits(parsed.data, programme.data, jurisdictions, directory);
+    intendedVisits = parsed.data;
+  }
+
   return {
     datasetKey: path.basename(directory),
     directory,
@@ -190,5 +264,6 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     groundTransfers,
     jurisdictions,
     journeyRequirements,
+    intendedVisits,
   };
 }

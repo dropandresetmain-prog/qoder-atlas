@@ -13,6 +13,9 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { Pool } from '../src/persistence/postgres/pool.ts';
 import { sharedTestPool } from './harness.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
@@ -30,6 +33,9 @@ import { loadOperatorOverviewFacts } from '../src/app/target/readmodels/pgFactAs
 import { projectOperatorOverview } from '../src/app/target/readmodels/index.ts';
 
 const BUNDLE_DIR = fileURLToPath(new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url));
+const HERO_SOURCE_VISIT_PATH = path.resolve(
+  'data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/original-destination-visit.json',
+);
 const ACTOR = 'principal:product-baseline-test';
 
 let pool: Pool;
@@ -126,6 +132,8 @@ test('canonical runtime bundle materializes into a fresh PostgreSQL workspace', 
   assert.equal(await count(workspaceId, 'events'), 1);
   assert.equal(await count(workspaceId, 'programmes'), 1);
   assert.equal(await count(workspaceId, 'organisations'), 1);
+  assert.equal(await count(workspaceId, 'intended_visits'), dataset.intendedVisits?.visits.length ?? 0,
+    'only explicit source visit declarations become intended visits');
 
   console.log(`[evidence] materialized counts ${JSON.stringify(outcome.report.counts)}`);
   console.log(`[evidence] not materialized:\n  - ${outcome.report.notMaterialized.join('\n  - ')}`);
@@ -196,6 +204,67 @@ test('supplied travel, booking and stay objects survive normalization', async ()
     [workspaceId, SOURCE_RECORD_TYPES.RESERVATION],
   );
   assert.ok(Number(bookingRefs.rows[0]!.n) > 0, 'booking references are bound as linked external records');
+});
+
+test('explicit source-owned visit materializes from its declared stay without a credential claim', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'northstar-source-intended-visit-'));
+  try {
+    await cp(BUNDLE_DIR, directory, { recursive: true });
+    await writeFile(path.join(directory, 'intended-visits.json'), await readFile(HERO_SOURCE_VISIT_PATH, 'utf8'), 'utf8');
+    const visitDataset = await loadDataset(directory);
+    const declaration = visitDataset.intendedVisits?.visits[0];
+    assert.ok(declaration, 'the hero pack carries one explicit source-owned destination visit');
+    if (!declaration) return;
+    const workspaceId = await freshWorkspace();
+    const { materializeDataset } = await import('../src/app/demo/materializeDataset.ts');
+    const report = await materializeDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset: visitDataset });
+    const traveller = visitDataset.programme.importDraft.travellers.find((candidate) => candidate.draftId === declaration.travellerDraftId);
+  assert.ok(traveller, 'declared visit traveller exists in the same source bundle');
+  const stayIndex = Number(declaration.stayItemRef.value.split('#')[1]);
+  const stay = traveller?.declaredTravel[stayIndex];
+  assert.ok(stay && stay.itemKind === 'STAY', 'declared visit cites one stated STAY');
+  if (!stay || stay.itemKind !== 'STAY') return;
+
+  const mapping = await resolveSourceSubjects(pool, workspaceId, report.connectionId);
+  const resolved = mapping.get(`${SOURCE_RECORD_TYPES.INTENDED_VISIT}:${declaration.id}`);
+  assert.ok(resolved, 'the source visit resolves through the normal external identity mapping');
+  assert.equal(resolved.subject.kind, 'JOURNEY', 'the declaration is tied to its owning canonical Journey');
+
+  const row = await pool.query<{
+    id: string;
+    journey_id: string;
+    jurisdiction_id: string;
+    purpose: string;
+    intended_start: string;
+    intended_end: string;
+    transit_intent: boolean;
+  }>(
+    `SELECT id, journey_id, jurisdiction_id, purpose, intended_start::text, intended_end::text, transit_intent
+       FROM intended_visits
+      WHERE workspace_id = $1 AND journey_id = $2`,
+    [workspaceId, resolved.subject.id],
+  );
+  assert.equal(row.rowCount, 1);
+  assert.equal(row.rows[0]!.purpose, visitDataset.programme.context.anchorEvent.name, 'purpose comes from the stated Trip purpose');
+  assert.equal(new Date(row.rows[0]!.intended_start).toISOString(), new Date(stay.checkIn).toISOString());
+  assert.equal(new Date(row.rows[0]!.intended_end).toISOString(), new Date(stay.checkOut).toISOString());
+  assert.equal(row.rows[0]!.transit_intent, false);
+
+  const selected = await pool.query<{ n: string }>(
+    `SELECT count(*)::text AS n
+       FROM credential_selection_visits csv
+       JOIN credential_selections cs ON cs.workspace_id = csv.workspace_id AND cs.id = csv.selection_id
+      WHERE csv.workspace_id = $1 AND csv.intended_visit_id = $2`,
+    [workspaceId, row.rows[0]!.id],
+  );
+  assert.equal(Number(selected.rows[0]!.n), 0, 'materializing source intent neither selects a credential nor claims entry eligibility');
+  const visitsBeforeReplay = await count(workspaceId, 'intended_visits');
+  await materializeDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset: visitDataset });
+  assert.equal(await count(workspaceId, 'intended_visits'), visitsBeforeReplay,
+    'a direct replay keeps the source visit identity stable and creates no duplicate');
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('organiser rules and the constraints they state survive', async () => {
@@ -366,6 +435,7 @@ test('re-provisioning the same dataset is idempotent and does not duplicate the 
     'reservation_lines',
     'reservation_allocations',
     'transport_services',
+    'intended_visits',
   ];
   const before = new Map<string, number>();
   for (const table of tables) before.set(table, await count(workspaceId, table));
@@ -550,8 +620,10 @@ test('a repeated provisioning interrupted mid-way completes the same world, not 
   assert.equal(first.status, 'MATERIALIZED');
   const { materializeDataset } = await import('../src/app/demo/materializeDataset.ts');
   const before = await count(workspaceId, 'journeys');
+  const visitsBefore = await count(workspaceId, 'intended_visits');
   const replay = await materializeDataset({ pool, workspaceId, actorPrincipalId: ACTOR, dataset });
   assert.equal(await count(workspaceId, 'journeys'), before, 'replay created no second journey population');
+  assert.equal(await count(workspaceId, 'intended_visits'), visitsBefore, 'replay created no second intended visit population');
   if (first.status === 'MATERIALIZED') {
     assert.equal(replay.eventId, first.report.eventId, 'the event kept its identity across the replay');
     assert.equal(replay.programmeId, first.report.programmeId, 'the programme kept its identity');

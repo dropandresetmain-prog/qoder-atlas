@@ -28,6 +28,10 @@ export const SOURCE_RECORD_TYPES = {
   TRAVELLER: 'SOURCE_TRAVELLER_DRAFT',
   TRIP: 'SOURCE_TRIP',
   JOURNEY: 'SOURCE_JOURNEY',
+  // Intended visits are Journey-owned rows, not registered TypedRef subjects.
+  // The source declaration therefore resolves to its owning Journey; the
+  // command receipt and evidence retain the precise deterministic visit id.
+  INTENDED_VISIT: 'SOURCE_INTENDED_VISIT',
   TRANSPORT_SERVICE: 'SOURCE_TRANSPORT_SERVICE',
   RESERVATION: 'SOURCE_BOOKING_REFERENCE',
   RULE_SET: 'SOURCE_RULE_SET',

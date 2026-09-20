@@ -3,7 +3,8 @@
   "sourceIds": [
     "src-syn-ait-event",
     "src-syn-ait-policy",
-    "src-wave4r-atlas"
+    "src-wave4r-atlas",
+    "src-syn-ait-destination-visit"
   ],
   "note": "Expected trip state for ait-draft-09 before disruption: LAX→NRT→SIN ZIPAIR connection; nationality SG; Concorde check-in 29 Sep → 3 Oct. Provider-locked ZG023/ZG053 timings. Booking-plan state; pack does not execute provider bookings.",
   "asOf": "2026-09-28T08:00:00-07:00",

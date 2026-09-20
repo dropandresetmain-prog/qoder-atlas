@@ -42,6 +42,7 @@
       "test/a3-target-hotel-research.test.ts",
       "test/official-documents.test.ts",
       "test/a3-journey-requirements.test.ts",
+      "test/a3-source-intended-visits.test.ts",
       "test/a1-programme-intake-ui.test.ts",
       "test/a1-traveller-request-ui.test.ts",
       "test/a2-evaluators.test.ts",
