@@ -287,49 +287,50 @@ Jordan S2 is materially different from Sarah:
 - provider default may still fail the trip objective;
 - selected recovery requires external flight execution.
 
-Closed hero truth is the current S2 contract, not every historical Jordan aspiration.
+Current Jordan truth is the hard scope lock in `docs/work/ASTRA_HERO_DEPTH_SCOPE.md`; it supersedes the earlier flight-only/context-only closure.
 
 Target product progression:
 
 baseline ZG023/ZG053 viable
--> D1 still safe
+-> D1 still viable
 -> D2 tight/at risk
 -> onward connection becomes impossible
--> temporary same-night recovery may remain viable
--> further progression removes that option / overnight consequence is understood
--> provider/default morning option fails the finals requirement
--> NORTHSTAR finds a viable earlier alternative such as TR885 or current equivalent
+-> same-night recovery is eventually eliminated
+-> LIVE Atlas/Qwen/Nuitée/entry/FX research
+-> complete candidate = replacement flight + Narita overnight + scoped landside-entry evidence + required Singapore stay replacement/cancellation consequence + finals objective
+-> provider/default alternative fails deterministic whole-trip rules
+-> NORTHSTAR complete composite passes
 -> organiser authority
--> consequential external flight recovery
+-> protected external execution
 -> observation/reconciliation
--> canonical trip update
--> reassessment
+-> canonical updates
+-> whole-trip reassessment
 -> RESOLVED / VIABLE.
 
-For the closed hero, distinguish:
+For the current closed hero:
 
-### Must execute
+### Must be part of deterministic A3 viability
 
-- selected replacement flight through the current protected external action path.
+- replacement flight;
+- Narita overnight stay;
+- scoped authoritative Japan entry/landside evidence;
+- Singapore revised-stay consequence;
+- finals/event objective;
+- original provider costs plus home-currency/Frankfurter comparison where cross-currency.
 
-### Must reason/present where relevant
+### Must execute in A4
 
-- overnight consequence;
-- stay consequence;
-- transfer consequence;
-- entry/legal uncertainty;
+- selected replacement flight;
+- Narita hotel booking;
+- Singapore replacement hotel booking;
+- cancellation of the displaced Singapore hotel **after replacement confirmation**.
+
+### Must reason/present, not transact
+
+- material transfer consequences;
 - insurance applicability where evidence exists.
 
-### Not automatically required for closed hero
-
-- Narita hotel booking;
-- Singapore hotel cancel/rebook;
-- insurance claim submission;
-- Google Routes transaction;
-- transfer redispatch transaction;
-- composite multi-provider execution.
-
-Do not turn those stretch capabilities into blockers unless current authoritative scenario truth changes.
+Do not expand these bounded capabilities into generic hotel administration, immigration/credential management, transfer booking, claims processing or a new workflow engine.
 
 Jordan must not create:
 
