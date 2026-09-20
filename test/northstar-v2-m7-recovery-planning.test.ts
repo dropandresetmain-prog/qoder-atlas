@@ -1104,11 +1104,14 @@ test('overnight companion proposer pairs captured stays only with one actual unc
     },
   };
   const before = structuredClone(world);
-  const output = proposeOvernightCompanions({
+  const proposed = proposeOvernightCompanions({
     flightCandidates: [base], world, now: NOW,
     resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
     quotedStayOptions: [option],
   });
+  assert.equal(proposed.ok, true);
+  if (!proposed.ok) return;
+  const output = proposed.value;
   assert.deepEqual(output.candidates[0], base);
   assert.equal(output.candidates.length, 2);
   assert.deepEqual(output.resolvedStayOffers, [{ candidateKey: output.candidates[1]!.key, baseCandidateKey: base.key, offer: option.offer }]);
@@ -1118,6 +1121,7 @@ test('overnight companion proposer pairs captured stays only with one actual unc
   assert.equal(paired.effects.length, 2);
   assert.equal(paired.effects[0]?.effectKind, 'SELECT_OFFER');
   assert.equal(paired.effects[1]?.effectKind, 'ADD_JOURNEY_STAY');
+  assert.equal(paired.rationale, 'Add overnight accommodation to cover the itinerary gap.');
   assert.deepEqual(world, before);
 
   const evaluated = evaluateRecoveryStrategy({
@@ -1140,17 +1144,76 @@ test('overnight companion proposer pairs captured stays only with one actual unc
   assert.equal(result.dimensions.find((dimension) => dimension.dimension === 'overnight_accommodation')?.verdict, 'PASS');
   assert.equal(result.dimensions.find((dimension) => dimension.dimension === 'entry_feasibility')?.verdict, 'UNKNOWN');
 
+  const alternativeOfferId = id();
+  const alternative: ProposalCandidate = {
+    ...base,
+    key: 'transport-candidate:two',
+    effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: arrival.id, offerId: alternativeOfferId, offerPrice: { amount: '120.00', currency: 'NZD' } }],
+  };
+  const alternativeOption: QuotedStayOption = {
+    ...option,
+    baseCandidateKey: alternative.key,
+    proposedJourneyItemId: id(),
+    visit: option.visit.kind === 'PROPOSED' ? { ...option.visit, proposedVisitId: id() } : option.visit,
+  };
+  const sharedQuote = proposeOvernightCompanions({
+    flightCandidates: [base, alternative], world, now: NOW,
+    resolvedOffers: [
+      { offerId: flightOfferId, transportServiceId: serviceId },
+      { offerId: alternativeOfferId, transportServiceId: serviceId },
+    ],
+    quotedStayOptions: [option, alternativeOption],
+  });
+  assert.equal(sharedQuote.ok, true);
+  if (!sharedQuote.ok) return;
+  assert.equal(sharedQuote.value.candidates.length, 4);
+  assert.equal(sharedQuote.value.resolvedStayOffers.length, 2);
+  assert.deepEqual(sharedQuote.value.resolvedStayOffers.map((entry) => entry.offer.offerId), [stayOfferId, stayOfferId]);
+
+  const conflictingQuote = proposeOvernightCompanions({
+    flightCandidates: [base, alternative], world, now: NOW,
+    resolvedOffers: [
+      { offerId: flightOfferId, transportServiceId: serviceId },
+      { offerId: alternativeOfferId, transportServiceId: serviceId },
+    ],
+    quotedStayOptions: [option, { ...alternativeOption, offer: { ...alternativeOption.offer, price: { amount: '246.00', currency: 'NZD' } } }],
+  });
+  assert.equal(conflictingQuote.ok, false);
+
+  const zeroCap = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option], maxStayOptionsPerCandidate: 0,
+  });
+  assert.equal(zeroCap.ok, true);
+  if (!zeroCap.ok) return;
+  assert.deepEqual(zeroCap.value.candidates, [base]);
+  const invalidCap = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option], maxCombinedCandidates: Number.NaN,
+  });
+  assert.equal(invalidCap.ok, false);
+  const duplicateBase = proposeOvernightCompanions({
+    flightCandidates: [base, { ...base }], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option],
+  });
+  assert.equal(duplicateBase.ok, false);
+
   const mismatched = proposeOvernightCompanions({
     flightCandidates: [base], world, now: NOW,
     resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
     quotedStayOptions: [{ ...option, baseCandidateKey: 'other-candidate' }],
   });
-  assert.deepEqual(mismatched.candidates, [base]);
-  assert.ok(mismatched.skipped.some((skip) => skip.reason === 'no_compatible_stay_option'));
+  assert.equal(mismatched.ok, true);
+  if (!mismatched.ok) return;
+  assert.deepEqual(mismatched.value.candidates, [base]);
+  assert.ok(mismatched.value.skipped.some((skip) => skip.reason === 'no_compatible_stay_option'));
   const mismatchedOffer = proposeOvernightCompanions({
     flightCandidates: [base], world, now: NOW,
     resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
     quotedStayOptions: [{ ...option, offerId: id() }],
   });
-  assert.deepEqual(mismatchedOffer.candidates, [base]);
+  assert.equal(mismatchedOffer.ok, false);
 });

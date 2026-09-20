@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import type { ScenarioChange, ScenarioEffect } from '../../../contracts/v2/scenario/scenarioChange.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
+import { typedConflict, type TypedResult, ok, conflict } from '../../../domain/v2/shared/errors.ts';
 import type { Instant } from '../../../domain/v2/shared/time.ts';
 import { projectEffectiveWorld } from '../../world/effectiveItinerary.ts';
 import type { CapturedWorld } from '../../world/world.ts';
@@ -71,6 +72,46 @@ function uniqueRefs(refs: readonly TypedRef[]): TypedRef[] {
   return [...new Map(refs.map((ref) => [`${ref.kind}:${ref.id}`, ref] as const)).values()];
 }
 
+function reject(message: string): TypedResult<never> {
+  return conflict(typedConflict('VALIDATION_FAILED', message));
+}
+
+function validCap(value: number | undefined): value is number | undefined {
+  return value === undefined || (Number.isFinite(value) && Number.isInteger(value) && value >= 0);
+}
+
+function sameStayOffer(a: ResolvedStayOffer, b: ResolvedStayOffer): boolean {
+  return a.offerId === b.offerId
+    && a.placeId === b.placeId
+    && a.stayWindow.start === b.stayWindow.start
+    && a.stayWindow.end === b.stayWindow.end
+    && a.price.amount === b.price.amount
+    && a.price.currency === b.price.currency;
+}
+
+function validateInput(input: OvernightCompanionInput): TypedResult<true> {
+  if (!validCap(input.maxStayOptionsPerCandidate) || !validCap(input.maxCombinedCandidates)) {
+    return reject('overnight companion caps must be finite non-negative integers');
+  }
+  const candidateKeys = new Set<string>();
+  for (const candidate of input.flightCandidates) {
+    if (candidateKeys.has(candidate.key)) return reject(`duplicate base candidate key ${candidate.key}`);
+    candidateKeys.add(candidate.key);
+  }
+  const offers = new Map<string, ResolvedStayOffer>();
+  const optionsByBaseOffer = new Set<string>();
+  for (const option of input.quotedStayOptions) {
+    if (option.offerId !== option.offer.offerId) return reject(`quoted stay option ${option.offerId} does not match its resolved offer identity`);
+    const existing = offers.get(option.offerId);
+    if (existing && !sameStayOffer(existing, option.offer)) return reject(`quoted stay offer ${option.offerId} has conflicting captured facts`);
+    offers.set(option.offerId, option.offer);
+    const baseOfferKey = `${option.baseCandidateKey}\u0000${option.journeyId}\u0000${option.offerId}`;
+    if (optionsByBaseOffer.has(baseOfferKey)) return reject(`duplicate quoted stay option for base candidate ${option.baseCandidateKey}`);
+    optionsByBaseOffer.add(baseOfferKey);
+  }
+  return ok(true);
+}
+
 function scenarioFor(candidate: ProposalCandidate): ScenarioChange {
   const seed = stableId(candidate.key);
   return {
@@ -114,13 +155,15 @@ function uncoveredGaps(params: { candidate: ProposalCandidate; world: CapturedWo
  * Leaves every original flight candidate visible. A companion is emitted only
  * for one actual evaluator-reported gap and a captured, explicitly-bound quote.
  */
-export function proposeOvernightCompanions(input: OvernightCompanionInput): OvernightCompanionResult {
+export function proposeOvernightCompanions(input: OvernightCompanionInput): TypedResult<OvernightCompanionResult> {
+  const validated = validateInput(input);
+  if (!validated.ok) return validated;
   const candidates = [...input.flightCandidates];
   const resolvedStayOffers: OvernightCompanionResult['resolvedStayOffers'] = [];
   const uncovered: UncoveredOvernightGap[] = [];
   const skipped: CompanionSkip[] = [];
   const emittedKeys = new Set(candidates.map((candidate) => candidate.key));
-  const maxPerCandidate = Math.max(1, Math.min(DEFAULT_MAX_STAYS_PER_CANDIDATE, input.maxStayOptionsPerCandidate ?? DEFAULT_MAX_STAYS_PER_CANDIDATE));
+  const maxPerCandidate = Math.min(DEFAULT_MAX_STAYS_PER_CANDIDATE, input.maxStayOptionsPerCandidate ?? DEFAULT_MAX_STAYS_PER_CANDIDATE);
   const maxCombined = Math.max(
     0,
     Math.min(
@@ -128,7 +171,6 @@ export function proposeOvernightCompanions(input: OvernightCompanionInput): Over
       input.maxCombinedCandidates ?? DEFAULT_MAX_COMBINED_CANDIDATES,
     ),
   );
-  const emittedOfferIds = new Set<string>();
   let combined = 0;
 
   for (const base of input.flightCandidates) {
@@ -157,10 +199,9 @@ export function proposeOvernightCompanions(input: OvernightCompanionInput): Over
     }
     uncovered.push(gaps[0]!);
 
-    const compatible = input.quotedStayOptions.filter((option) => option.baseCandidateKey === base.key && option.journeyId === journeyId && option.offerId === option.offer.offerId);
-    const offerCounts = new Map<string, number>();
-    compatible.forEach((option) => offerCounts.set(option.offerId, (offerCounts.get(option.offerId) ?? 0) + 1));
-    const options = compatible.filter((option) => offerCounts.get(option.offerId) === 1 && !emittedOfferIds.has(option.offerId)).slice(0, maxPerCandidate);
+    const options = input.quotedStayOptions
+      .filter((option) => option.baseCandidateKey === base.key && option.journeyId === journeyId)
+      .slice(0, maxPerCandidate);
     if (options.length === 0) {
       skipped.push({ baseCandidateKey: base.key, reason: 'no_compatible_stay_option' });
       continue;
@@ -190,16 +231,15 @@ export function proposeOvernightCompanions(input: OvernightCompanionInput): Over
           { kind: 'JOURNEY', id: journeyId },
           { kind: 'OFFER', id: option.offerId },
         ]),
-        rationale: `${base.rationale} Add captured stay offer ${option.offerId} for the single overnight gap reported by m6.overnight; RC-6 evaluates the combined candidate.`,
+        rationale: 'Add overnight accommodation to cover the itinerary gap.',
         assumptions: base.assumptions,
       });
       if (!parsed.success) continue;
       emittedKeys.add(key);
-      emittedOfferIds.add(option.offerId);
       candidates.push(parsed.data);
       resolvedStayOffers.push({ candidateKey: key, baseCandidateKey: base.key, offer: option.offer });
       combined += 1;
     }
   }
-  return { candidates, resolvedStayOffers, uncoveredGaps: uncovered, skipped };
+  return ok({ candidates, resolvedStayOffers, uncoveredGaps: uncovered, skipped });
 }
