@@ -332,12 +332,12 @@ export async function attachObservedStay(
         if (approvedVisit.kind === 'PROPOSED' && journeysVisits.some((candidate) => candidate.id === visit.id)) {
           return { ok: false, conflict: typedConflict('DUPLICATE_REGISTRATION', 'approved proposed visit already exists on the Journey', [journeyRef]) };
         }
-        const scopeIds = approvedVisit.credentialSelection.scopeIntendedVisitIds;
-        if (new Set(scopeIds).size !== scopeIds.length) {
+        const approvedScopeIds = approvedVisit.credentialSelection.scopeIntendedVisitIds;
+        if (new Set(approvedScopeIds).size !== approvedScopeIds.length) {
           return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'credential selection scope must not repeat an intended visit', [journeyRef]) };
         }
         const knownVisitIds = new Set([...journeysVisits.map((candidate) => candidate.id), visit.id]);
-        if (!scopeIds.includes(visit.id) || scopeIds.some((id) => !knownVisitIds.has(id))) {
+        if (!approvedScopeIds.includes(visit.id) || approvedScopeIds.some((id) => !knownVisitIds.has(id))) {
           return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'credential selection must cover the approved visit and only visits on this Journey', [journeyRef]) };
         }
         const owner = await journeys.credentialOwner(params.workspaceId, approvedVisit.credentialSelection.credentialId);
@@ -348,11 +348,29 @@ export async function attachObservedStay(
         if (versionOwner !== approvedVisit.credentialSelection.credentialId) {
           return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved credential edition does not belong to the selected credential', [journeyRef]) };
         }
+        // One credential claim per Journey (uidx). Match stayVisitOverlay: re-selecting
+        // for an overnight/proposed encounter must UNION onto any existing visit scope,
+        // never replace and drop destination (or other) coverage already claimed.
+        const existingSelections = await journeys.listCredentialSelections(params.workspaceId, params.journeyId);
+        const existingForCredential = existingSelections.filter(
+          (candidate) => candidate.credentialId === approvedVisit.credentialSelection.credentialId,
+        );
+        if (existingForCredential.length > 1) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'Journey has duplicate credential selections for the approved credential', [journeyRef]) };
+        }
+        const prior = existingForCredential[0];
+        if (prior && prior.credentialVersionId !== approvedVisit.credentialSelection.credentialVersionId) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved credential edition cannot re-pin an existing Journey credential selection', [journeyRef]) };
+        }
+        const scopeIds = [...new Set([
+          ...(prior?.scopeIntendedVisitIds ?? []),
+          ...approvedScopeIds,
+        ])].sort();
         if (approvedVisit.kind === 'PROPOSED') {
           await journeys.addIntendedVisit({ visit, actor: actor(params) });
         }
         const selection: CredentialSelection = CredentialSelectionSchema.parse({
-          id: approvedVisit.credentialSelection.id,
+          id: prior?.id ?? approvedVisit.credentialSelection.id,
           journeyId: params.journeyId,
           credentialId: approvedVisit.credentialSelection.credentialId,
           credentialVersionId: approvedVisit.credentialSelection.credentialVersionId,

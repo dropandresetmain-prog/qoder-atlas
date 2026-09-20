@@ -189,6 +189,87 @@ describe('A4 atomic observed stay attachment', () => {
     assert.deepEqual(rows.rows[0], { visits: '1', selections: '1' });
   });
 
+  test('overnight proposed attach unions credential visit scope onto an existing destination claim', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    mustOk(await attachObservedStay(uow(), { ...input(f, randomUUID()), approvedVisit: approvedExistingVisit(f) }));
+
+    const overnightExternalId = `booking-overnight-${randomUUID()}`;
+    const overnightRecordId = randomUUID();
+    const overnightClient = await f.pool.connect();
+    try {
+      await overnightClient.query('BEGIN');
+      await overnightClient.query(
+        'INSERT INTO domain_subjects (workspace_id, id, kind, aggregate_id) VALUES ($1, $2, $3, $4)',
+        [f.seed.workspaceId, overnightRecordId, 'EXTERNAL_RECORD', f.connectionId],
+      );
+      await overnightClient.query(
+        `INSERT INTO external_records
+           (workspace_id,id,connection_id,record_type,external_id,identity_state,quarantine_reason,observed_at,payload_hash,created_by_actor_id)
+         VALUES ($1,$2,$3,'STAY_BOOKING',$4,'UNVERIFIED',NULL,$5,$6,$7)`,
+        [
+          f.seed.workspaceId,
+          overnightRecordId,
+          f.connectionId,
+          overnightExternalId,
+          OBSERVED_AT,
+          `sha256:${overnightExternalId}`,
+          f.seed.actorId,
+        ],
+      );
+      await overnightClient.query('COMMIT');
+    } catch (error) {
+      await overnightClient.query('ROLLBACK');
+      throw error;
+    } finally {
+      overnightClient.release();
+    }
+
+    const proposed = approvedProposedVisit(f);
+    const overnightParams: ObservedStayAttachmentParams = {
+      ...input(f, randomUUID(), overnightExternalId),
+      expectedJourneyRevision: 2,
+      expectedConnectionRevision: 2,
+      provider: {
+        connectionId: f.connectionId,
+        externalRecordId: overnightRecordId,
+        externalId: overnightExternalId,
+        recordType: 'STAY_BOOKING',
+        observedAt: OBSERVED_AT,
+        evidenceId: takeSeedEvidence(f.seed),
+        payloadHash: `sha256:${overnightExternalId}`,
+      },
+      journeyItem: {
+        intendedPlaceId: f.placeId,
+        requiredNights: 3,
+        orderKey: 'approved-overnight-order-2',
+      },
+      approvedVisit: proposed,
+    };
+    mustOk(await attachObservedStay(uow(), overnightParams));
+
+    const scoped = await f.pool.query<{ intended_visit_id: string }>(
+      `SELECT csv.intended_visit_id::text
+         FROM credential_selection_visits csv
+         JOIN credential_selections cs
+           ON cs.workspace_id = csv.workspace_id AND cs.id = csv.selection_id
+        WHERE csv.workspace_id = $1 AND cs.journey_id = $2
+        ORDER BY csv.intended_visit_id`,
+      [f.seed.workspaceId, f.journeyId],
+    );
+    assert.deepEqual(
+      scoped.rows.map((row) => row.intended_visit_id).sort(),
+      [f.existingVisitId, proposed.visit.id].sort(),
+    );
+    assert.equal(
+      (await f.pool.query(
+        'SELECT COUNT(*)::int AS n FROM credential_selections WHERE workspace_id=$1 AND journey_id=$2',
+        [f.seed.workspaceId, f.journeyId],
+      )).rows[0].n,
+      1,
+    );
+  });
+
   test('rolls back the complete graph when provider identity is quarantined', async () => {
     const f = await setup({ externalId: 'quarantined-provider-booking', recordState: 'QUARANTINED_UNKNOWN' });
     const staleInput = input(f, randomUUID());

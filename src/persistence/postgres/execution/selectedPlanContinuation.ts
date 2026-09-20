@@ -223,6 +223,37 @@ async function expectedScopeAdvancesFromFootprint(
         bump('JOURNEY', row.journey_id);
         break;
       }
+      case 'OBSERVED_STAY_ATTACHED': {
+        // Stay attach inserts visit/selection/item/allocation in one transaction.
+        // m6_bump_scope advances each scope at most once per xact, so the net
+        // effect is +1 JOURNEY and +1 TRAVELLER regardless of row count.
+        // Aggregate change_records may also list RESERVATION / EXTERNAL_CONNECTION
+        // for the same receipt — account only on the JOURNEY row.
+        if (change.subjectKind !== 'JOURNEY') break;
+        const journey = await db.query<{ traveller_id: string }>(
+          `SELECT traveller_id::text FROM journeys WHERE workspace_id = $1 AND id = $2`,
+          [workspaceId, change.subjectId],
+        );
+        const travellerId = journey.rows[0]?.traveller_id;
+        if (!travellerId) return undefined;
+        bump('JOURNEY', change.subjectId);
+        bump('TRAVELLER', travellerId);
+        break;
+      }
+      case 'OBSERVED_STAY_CANCELLED': {
+        // Cancel drops the journey item (and related allocation) in one xact ⇒
+        // +1 JOURNEY (and typically +1 TRAVELLER via allocation). Account on JOURNEY.
+        if (change.subjectKind !== 'JOURNEY') break;
+        const journey = await db.query<{ traveller_id: string }>(
+          `SELECT traveller_id::text FROM journeys WHERE workspace_id = $1 AND id = $2`,
+          [workspaceId, change.subjectId],
+        );
+        const travellerId = journey.rows[0]?.traveller_id;
+        if (!travellerId) return undefined;
+        bump('JOURNEY', change.subjectId);
+        bump('TRAVELLER', travellerId);
+        break;
+      }
       default:
         // Other apply receipts (SOURCE/EVIDENCE/SERVICE/RESERVATION create/line,
         // stay record) do not advance JOURNEY/TRAVELLER scopes on their own.
