@@ -3,7 +3,7 @@
 - Goal: two rich desktop hero recoveries on one generalized PostgreSQL engine.
 - Current founder contract: [hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md). Desktop only. A3 complete visible composite recommendation; A4 four real selected actions. Singapore cancel + rebook and existing Frankfurter FX are REQUIRED. No modify.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Primary: `integration/astra-post-r4`, `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`. Latest verified pushed checkpoint: `6fcfd26dd5ee407df2e78ba2ac69b5d592bbfaf2` (reviewed companions/entry/hotel foundations; clean at push).
+- Primary: `integration/astra-post-r4`, `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`. Latest verified pushed checkpoint: `6e998e09a727b534e72a27d0a0193571fb2ac017` (entry publication, protected documents and reviewed hotel policy; clean and remote verified).
 - A0 pushed: `f55899b15200de692dd749bbcfb795c67f6a22e0`.
 - A1 verified pushed checkpoint: `a948917c239fc02435020f6740474283dd795ea8`; remote matched, primary clean at checkpoint. Source/test head: `474f95d580c59638e5d5cfbbcdfd989d50c4a0b8`.
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A0](ASTRA_A0_CONVERGENCE.md), [stay extension](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
@@ -55,3 +55,5 @@ Reviewed companions d35915b6, entry gate177e49d9 and target hotel research dceba
 A3 remaining: integrate lanes/explicit inputs -> existing layered Frankfurter composition -> generic revised Singapore stay requirement/cancel+replacement with policy/fees -> whole composite viability -> LIVE normal PG desktop recommendation. A4: approval -> existing durable ActionPlan for flight/Narita book/SG cancel/SG book -> per-action observation/reconciliation -> atomic canonical stay updates -> whole-trip reassessment -> recorded resolution. Investigate Now: current SG terms and timing; do not infer supplier cancellation from changed arrival. No founder decision pending. Broad counters unchanged.
 
 Root worktree remains untouched. No merge to main. Preserve isolated drafts and local visual/log artifacts; never commit secrets/generated junk. Continue same task while context is clean; this ledger and linked evidence are the compact fresh-chat handoff.
+
+Integrated composite ecf4a6b and FX6a6dd33 at0ed97bc. Root integration:23 focused PASS, TypeScript PASS, boundary273 CLEAN, diff check clean. Reuse lane FX PG1/1 and protected-document PG2/2. Terra stay-replacement and Luna explicit sandbox passport input remain Act Now; root normal-runtime entry publication/capture integration Act Now. Further platform work remains parked. Existing accepted ordering retained: replacement stay confirmed before displaced cancellation; both actions mandatory, duplicate exposure remains unresolved on cancellation failure/unknown. No A3 acceptance or external transaction claimed. Counters unchanged.
