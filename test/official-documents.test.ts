@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { OfficialDocumentReader } from '../src/providers/research/officialDocuments.ts';
 import type { Recording } from '../src/contracts/envelope.ts';
 import type { RecordingStore } from '../src/providers/recordingStore.ts';
@@ -25,6 +26,8 @@ test('record and replay preserve fetched document provenance and identical sanit
   assert.match(recorded.data.text, /Entry & transit One day — temporary visit/);
   assert.doesNotMatch(recorded.data.text, /bad\(\)|hidden|contact@/);
   assert.match(recorded.data.contentSha256, /^[a-f0-9]{64}$/);
+  assert.equal(recorded.data.contentSha256, createHash('sha256').update(recorded.data.text, 'utf8').digest('hex'),
+    'reviewed-policy verification must independently reproduce the returned evidence digest');
   const replayed = await new OfficialDocumentReader({ catalog, mode: 'REPLAY', store, fetchImpl }).read('entry-policy');
   assert.equal(replayed.ok, true);
   if (!replayed.ok) return;

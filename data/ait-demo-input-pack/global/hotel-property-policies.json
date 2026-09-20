@@ -16,13 +16,13 @@
         "sourceId": "narita-gateway-faq",
         "url": "https://gateway-hotel.co.jp/en/faq",
         "publisher": "Narita Gateway Hotel",
-        "contentSha256": "8bef9905f31321d75dfdb2012d655f39b806789af573086c9c8282761564f4cc"
+        "contentSha256": "fdd96dca9cca2267dbddc637c2e0a84144a8bbd72d310526fc5993d7b45e1061"
       },
       {
         "sourceId": "narita-gateway-guest",
         "url": "https://gateway-hotel.co.jp/en/guest",
         "publisher": "Narita Gateway Hotel",
-        "contentSha256": "644ce0a49735b20b00ff393a51aadc424791bc07e572c8ae25c4a315619481da"
+        "contentSha256": "c143f134bd3b39aedacdc289671343beb08bbf4ec761824f45f6e32278230f8a"
       }
     ],
     "note": "Reviewed general property standard. Rate-specific accommodation-plan terms may override these times; the reviewed sources do not establish late-arrival support or a late-arrival cutoff."

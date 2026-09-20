@@ -39,7 +39,7 @@ export interface OfficialDocumentEvidence {
   publisher: string;
   url: string;
   observedAt: string;
-  /** Hash of the sanitized publisher body, identical across live and replay. */
+  /** Hash of the returned readable evidence text, identical across live and replay. */
   contentSha256: string;
   text: string;
 }
@@ -138,7 +138,7 @@ export class OfficialDocumentReader {
         const text = readableText(raw);
         if (!text) throw new Error('Publisher document has no readable evidence');
         return { sourceId: source.id, publisher: source.publisher, url: raw.url, observedAt: raw.observedAt,
-          contentSha256: createHash('sha256').update(raw.body).digest('hex'), text };
+          contentSha256: createHash('sha256').update(text, 'utf8').digest('hex'), text };
       },
     };
     return runAdapter(adapter, this.options.store, source, { operation: 'document.read' });

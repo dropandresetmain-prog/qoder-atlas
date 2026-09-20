@@ -14,13 +14,13 @@
         "sourceId": "jp-visa-exemptions",
         "url": "https://www.mofa.go.jp/j_info/visit/visa/short/novisa.html",
         "publisher": "Japan Ministry of Foreign Affairs",
-        "contentSha256": "3fed622467feb048b2ac54e8d0cf9eebde8fae8d0b03cec6557ac5ba5dad27c7"
+        "contentSha256": "2f5a6bbfb40dcefe6e7acf932689b6bbbd865a357d010771f11b0e8e29249239"
       },
       {
         "sourceId": "jp-singapore-embassy-visa-faq",
         "url": "https://www.sg.emb-japan.go.jp/itpr_en/visa_faq.html",
         "publisher": "Embassy of Japan in Singapore",
-        "contentSha256": "30d4aa233008ee5aa770a95d025f5476aa63b4b61d0bbd14ff9ca75e90b9c920"
+        "contentSha256": "2cf9d15cb23d310b932395b35398896a53f4d7add1662940dc5f30db0cc0c8f6"
       }
     ],
     "expression": {
