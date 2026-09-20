@@ -21,11 +21,13 @@ import { objectiveEvaluator } from './evaluators/objective.ts';
 import { overnightEvaluator } from './evaluators/overnight.ts';
 import { participationEvaluator } from './evaluators/participation.ts';
 import { supportEvaluator } from './evaluators/support.ts';
+import { stayArrivalDateAlignedEvaluator } from './evaluators/stayArrivalDateAligned.ts';
 
 export const M6_EVALUATORS: readonly Evaluator[] = [
   bookingEvaluator,
   connectionEvaluator,
   overnightEvaluator,
+  stayArrivalDateAlignedEvaluator,
   objectiveEvaluator,
   participationEvaluator,
   supportEvaluator,

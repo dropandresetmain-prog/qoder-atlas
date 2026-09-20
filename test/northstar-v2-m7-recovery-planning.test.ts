@@ -15,6 +15,7 @@ import type {
 } from '../src/resolution/world/world.ts';
 import type { WorldSnapshotManifest } from '../src/contracts/v2/scope/readScope.ts';
 import { ScenarioChangeSchema, type ScenarioEffect } from '../src/contracts/v2/scenario/scenarioChange.ts';
+import type { RecoveryStrategy } from '../src/contracts/v2/scenario/recoveryStrategy.ts';
 import { validateActionPlanAcyclic } from '../src/contracts/v2/action/actionPlan.ts';
 import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
 import { createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
@@ -31,6 +32,7 @@ import { createHotelCompanionPlanning } from '../src/app/targetHotelCompanionPla
 import { materializeTransportOffers } from '../src/resolution/planning/transportOfferMaterialization.ts';
 import { transportCorridors, transportRequestId } from '../src/resolution/planning/transportCorridors.ts';
 import type { PlanningToolResult } from '../src/contracts/v2/planning/planningTool.ts';
+import { stayArrivalDateAlignedEvaluator } from '../src/resolution/evaluation/evaluators/stayArrivalDateAligned.ts';
 
 const NOW = '2030-06-01T12:00:00.000Z';
 
@@ -1346,4 +1348,119 @@ test('transport planning adds a quoted hotel companion only for the real uncover
   });
   assert.deepEqual(await zeroAlternatives.nextRound({ completedRound: 1, results: [flight] }), [], 'a zero alternative cap avoids hotel reads');
   assert.deepEqual(world, before, 'research and proposal leave the captured base untouched');
+});
+
+test('CANCEL_STAY retires only intent and an arrival-aligned replacement is required', () => {
+  const travellerId = id();
+  const journey = journeyRow({ travellerId });
+  const originPlaceId = id();
+  const destinationPlaceId = id();
+  const arrival = transportItem(journey.id, {
+    desiredOriginPlaceId: originPlaceId, desiredDestinationPlaceId: destinationPlaceId,
+    intendedWindow: { start: '2030-06-02T04:00:00.000Z', end: '2030-06-02T08:00:00.000Z' },
+  });
+  const originalStay = {
+    ...transportItem(journey.id), id: id(), kind: 'STAY' as const, orderKey: '020', intendedPlaceId: destinationPlaceId,
+    intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' }, desiredOriginPlaceId: null, desiredDestinationPlaceId: null,
+  };
+  const baseService = service({ id: id(), originPlaceId, destinationPlaceId, published: { departure: observed('2030-06-02T04:00:00.000Z'), arrival: observed('2030-06-02T08:00:00.000Z') } });
+  const lateService = service({ id: id(), originPlaceId, destinationPlaceId, published: { departure: observed('2030-06-03T04:00:00.000Z'), arrival: observed('2030-06-03T08:00:00.000Z') } });
+  arrival.selectedServiceId = baseService.id;
+  const reservation: WReservation = { id: id(), revision: 4, reservationType: 'STAY', observedStatus: 'CONFIRMED', observedStatusAt: NOW, responsibleOrganisationId: null, responsibleTravellerId: travellerId };
+  const line: WReservationLine = { id: id(), reservationId: reservation.id, productType: 'STAY', observedStatus: 'CONFIRMED', observedStatusAt: NOW, evidenceId: id(), transportServiceId: null, resourceId: null, placeId: destinationPlaceId, interval: { ...originalStay.intendedWindow! } };
+  const allocation: WAllocation = { id: id(), reservationId: reservation.id, lineId: line.id, travellerId, journeyItemId: originalStay.id, role: 'TRAVELLER', quantity: 1 };
+  const jurisdictionId = id();
+  const visitId = id();
+  const constraint: WConstraintDefinition = {
+    id: id(), revision: 1, registeredType: 'stay_arrival_date_aligned', hardness: 'HARD', owner: { kind: 'JOURNEY', id: journey.id }, provenanceEvidenceId: null,
+    operands: [
+      { key: 'original_stay_item', kind: 'SUBJECT_REF', subject: { kind: 'JOURNEY_ITEM', id: originalStay.id }, text: null, number: null, boolean: null, instant: null, localDate: null },
+      { key: 'arrival_item', kind: 'SUBJECT_REF', subject: { kind: 'JOURNEY_ITEM', id: arrival.id }, text: null, number: null, boolean: null, instant: null, localDate: null },
+    ],
+  };
+  const world = emptyWorld({
+    travellers: [{ id: travellerId, revision: 1, lifecycleStatus: 'ACTIVE' }], journeys: [journey], journeyItems: [arrival, originalStay], transportServices: [baseService, lateService],
+    places: [
+      { id: originPlaceId, revision: 1, name: 'Origin', placeType: 'AIRPORT', timeZone: 'America/Los_Angeles', hasCoordinates: true },
+      { id: destinationPlaceId, revision: 1, name: 'Destination', placeType: 'CITY', timeZone: 'Pacific/Auckland', hasCoordinates: true },
+    ],
+    jurisdictions: [{ id: jurisdictionId, revision: 1, name: 'Jurisdiction', regimeKind: 'NATIONAL' }],
+    placeJurisdictions: [{ placeId: destinationPlaceId, jurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId: id(), evidenceId: null }],
+    intendedVisits: [{ id: visitId, journeyId: journey.id, jurisdictionId, purpose: 'recovery stay', intended: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' }, transitIntent: false }],
+    reservations: [reservation], reservationLines: [line], allocations: [allocation], constraints: [constraint],
+  });
+  const verdict = (candidate: typeof world) => stayArrivalDateAlignedEvaluator.evaluate(
+    { kind: 'JOURNEY', id: journey.id }, { world: candidate, effective: effectiveOf(candidate), now: NOW },
+  ).dimensions[0]!;
+  assert.equal(verdict(world).verdict, 'PASS', 'baseline stay starts on the actual arrival local date');
+  const offerId = id();
+  const cancel = { effectKind: 'CANCEL_STAY' as const, journeyItemId: originalStay.id, reservationLineId: line.id, cancellationPenalty: { amount: '50.00', currency: 'NZD' } };
+  const add = { effectKind: 'ADD_JOURNEY_STAY' as const, proposedJourneyItemId: id(), journeyId: journey.id, orderKey: '020', offerId, offerPrice: { amount: '300.00', currency: 'NZD' }, visit: { kind: 'EXISTING' as const, visitId } };
+  const lateSelect = { effectKind: 'SELECT_OFFER' as const, journeyItemId: arrival.id, offerId: id(), offerPrice: { amount: '100.00', currency: 'NZD' } };
+  const change = (effects: ScenarioEffect[]) => ScenarioChangeSchema.parse({ id: id(), recoveryStrategyId: id(), strategyVersion: 1, basisAssessmentId: id(), affectedSubjectRefs: [{ kind: 'JOURNEY', id: journey.id }], effects });
+  const resolvedOffers = [{ offerId: lateSelect.offerId, transportServiceId: lateService.id }];
+  const resolvedStayOffers = [{ offerId, placeId: destinationPlaceId, stayWindow: { start: '2030-06-03T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' }, price: { amount: '300.00', currency: 'NZD' } }];
+  const lateOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect]), resolvedOffers });
+  assert.equal(lateOnly.ok, true);
+  if (!lateOnly.ok) return;
+  assert.equal(verdict(lateOnly.value.proposedWorld).verdict, 'FAIL', 'late arrival leaves the active original stay misaligned');
+  const cancelOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, cancel]), resolvedOffers });
+  assert.equal(cancelOnly.ok, true);
+  if (!cancelOnly.ok) return;
+  assert.equal(verdict(cancelOnly.value.proposedWorld).verdict, 'FAIL', 'cancellation alone cannot satisfy the required stay policy');
+  const addOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, add]), resolvedOffers, resolvedStayOffers });
+  assert.equal(addOnly.ok, true);
+  if (!addOnly.ok) return;
+  assert.equal(verdict(addOnly.value.proposedWorld).verdict, 'FAIL', 'a replacement without retiring the original intent is insufficient');
+  const replacement = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, cancel, add]), resolvedOffers, resolvedStayOffers });
+  assert.equal(replacement.ok, true);
+  if (!replacement.ok) return;
+  assert.equal(verdict(replacement.value.proposedWorld).verdict, 'PASS');
+  assert.equal(replacement.value.proposedWorld.reservationLines[0]?.observedStatus, 'CONFIRMED');
+  assert.equal(replacement.value.proposedWorld.reservations[0]?.observedStatus, 'CONFIRMED');
+  assert.deepEqual(world.reservationLines[0], line, 'candidate cancellation cannot mutate supplier line status');
+  const wrongLine = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([{ ...cancel, reservationLineId: id() }]) });
+  assert.equal(wrongLine.ok, false, 'unlinked stay line is rejected');
+  const wrongAllocation = structuredClone(world);
+  wrongAllocation.allocations[0]!.travellerId = id();
+  const wrongTraveller = applyScenarioOverlay({ baseWorld: wrongAllocation, scenarioChange: change([cancel]) });
+  assert.equal(wrongTraveller.ok, false, 'line allocation must belong to the Journey traveller');
+
+  const strategy: RecoveryStrategy = {
+    id: id(), recoveryCaseId: id(), strategyVersion: 1, status: 'EVALUATED', basisAssessmentId: id(),
+    baseManifest: emptyManifest({ aggregateReads: [
+      { aggregateRef: { kind: 'JOURNEY', id: journey.id }, revision: journey.revision },
+      { aggregateRef: { kind: 'RESERVATION', id: reservation.id }, revision: reservation.revision },
+    ] }),
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: journey.id }], scenarioChange: change([cancel]),
+    assumptions: [], requiredUnknowns: [], candidateAssessments: [], candidateAssessmentResults: [],
+    viability: 'VIABLE', requiredAuthorityScopes: ['journey.stay.cancel'], createdAt: NOW,
+  };
+  const missingOwnership = compileActionPlan({
+    strategy, now: NOW, capabilities: [{ capabilityRef: 'external:stay.cancel', supported: true }],
+  });
+  assert.equal(missingOwnership.ok, false);
+  if (!missingOwnership.ok) assert.equal(missingOwnership.conflict.kind, 'STALE_AGGREGATE_REVISION');
+  const unsupported = compileActionPlan({
+    strategy, now: NOW, capabilities: [{ capabilityRef: 'external:stay.cancel', supported: false }],
+    stayCancellationOwnership: new Map([[line.id, { journeyId: journey.id, reservationId: reservation.id }]]),
+  });
+  assert.equal(unsupported.ok, false);
+  if (!unsupported.ok) assert.equal(unsupported.conflict.kind, 'CAPABILITY_UNSUPPORTED');
+  const compiled = compileActionPlan({
+    strategy, now: NOW, capabilities: [{ capabilityRef: 'external:stay.cancel', supported: true }],
+    stayCancellationOwnership: new Map([[line.id, { journeyId: journey.id, reservationId: reservation.id }]]),
+  });
+  assert.equal(compiled.ok, true);
+  if (!compiled.ok) return;
+  const intent = compiled.value.plan.intents[0]!;
+  assert.equal(intent.capabilityRef, 'external:stay.cancel');
+  assert.deepEqual(intent.requiredAuthorityScopes, ['journey.stay.cancel']);
+  assert.deepEqual(intent.expectedObservations, ['EXTERNAL_PROVIDER:stay_cancellation_confirmation']);
+  assert.deepEqual(intent.expectedRevisions, [
+    { aggregateRef: { kind: 'JOURNEY', id: journey.id }, expectedRevision: journey.revision },
+    { aggregateRef: { kind: 'RESERVATION', id: reservation.id }, expectedRevision: reservation.revision },
+  ]);
+  assert.deepEqual(intent.costEstimate, cancel.cancellationPenalty);
+  assert.ok(intent.preconditions.includes('cancellationPenalty:NZD:50.00'));
 });

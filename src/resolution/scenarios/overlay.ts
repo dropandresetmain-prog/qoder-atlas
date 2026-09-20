@@ -324,6 +324,47 @@ function applyEffect(
       authority.add('journey.stay');
       return ok(true);
     }
+    case 'CANCEL_STAY': {
+      const item = findJourneyItem(world, effect.journeyItemId);
+      if (!item || item.kind !== 'STAY' || item.lifecycleStatus === 'DROPPED' || item.lifecycleStatus === 'COMPLETED') {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY requires an active captured STAY journey item', [
+          { kind: 'JOURNEY_ITEM', id: effect.journeyItemId },
+        ]));
+      }
+      const journey = world.journeys.find((candidate) => candidate.id === item.journeyId);
+      const line = world.reservationLines.find((candidate) => candidate.id === effect.reservationLineId);
+      const reservation = line ? world.reservations.find((candidate) => candidate.id === line.reservationId) : undefined;
+      const allocation = line && journey ? world.allocations.find((candidate) =>
+        candidate.lineId === line.id && candidate.reservationId === line.reservationId
+          && candidate.journeyItemId === item.id && candidate.travellerId === journey.travellerId,
+      ) : undefined;
+      if (!journey || !line || line.productType !== 'STAY' || !reservation || reservation.reservationType !== 'STAY' || !allocation) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY line must be a captured STAY allocation for the owning Journey traveller', [
+          { kind: 'JOURNEY_ITEM', id: item.id },
+          { kind: 'RESERVATION_LINE', id: effect.reservationLineId },
+        ]));
+      }
+      const penalty = ExactMoneySchema.safeParse(effect.cancellationPenalty);
+      if (!penalty.success) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY penalty is not exact money', [{ kind: 'RESERVATION_LINE', id: line.id }]));
+      }
+      try {
+        if (compareExactMoney(penalty.data, { amount: '0', currency: penalty.data.currency }) < 0) {
+          return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY penalty cannot be negative', [{ kind: 'RESERVATION_LINE', id: line.id }]));
+        }
+      } catch {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY penalty is not an exact supported amount', [{ kind: 'RESERVATION_LINE', id: line.id }]));
+      }
+      // Only the candidate's Journey intent changes. Reservation and line
+      // observations remain external facts until a provider cancellation is observed.
+      item.lifecycleStatus = 'DROPPED';
+      addAffected(affected, { kind: 'JOURNEY_ITEM', id: item.id });
+      addAffected(affected, { kind: 'JOURNEY', id: journey.id });
+      addAffected(affected, { kind: 'RESERVATION', id: reservation.id });
+      addAffected(affected, { kind: 'RESERVATION_LINE', id: line.id });
+      authority.add('journey.stay.cancel');
+      return ok(true);
+    }
     case 'PROPOSE_ALLOCATION': {
       if (!world.reservationLines.some((l) => l.id === effect.reservationLineId)) {
         return conflict(typedConflict('VALIDATION_FAILED', 'PROPOSE_ALLOCATION line not in captured world', [
