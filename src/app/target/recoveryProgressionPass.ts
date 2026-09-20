@@ -35,7 +35,7 @@ import {
 } from '../../contracts/v2/planning/recoveryCaseAttention.ts';
 import type { RecoveryProgressionDecision } from '../../contracts/v2/planning/recoveryProgression.ts';
 import { decideProgressionFromFacts } from '../../resolution/planning/progressionFacts.ts';
-import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
+import { currentAssessmentView, loadAssessment } from '../../persistence/postgres/world/pgAssessments.ts';
 import { resolveRecoveryCase } from '../../persistence/postgres/commands/m9CaseResolutionCommands.ts';
 import {
   listRecoveryCaseAttention,
@@ -48,6 +48,7 @@ import {
 } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { evaluateRecoveryCaseResolution } from './recoveryCaseResolution.ts';
 import { ensureOriginalCaseGraph } from './originalCaseGraphCapture.ts';
+import { recoveryPlanningEligibleFromAssessment } from './readmodels/mapConnectionProgression.ts';
 
 /** Upper bound on cases inspected per wake; the report says when it truncated. */
 export const PROGRESSION_CANDIDATE_LIMIT = 200;
@@ -200,6 +201,11 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
 
   const gate = await evaluateRecoveryCaseResolution(ctx.pool, { workspaceId: ctx.workspaceId, recoveryCaseId: row.id, now });
   const attempt = await findRecoveryPlanningAttemptForBasis(ctx.pool, ctx.workspaceId, row.id, basis.assessmentId);
+  const basisAssessment = basis.verdict === 'FAIL'
+    ? await loadAssessment(ctx.pool, ctx.workspaceId, basis.assessmentId)
+    : undefined;
+  const planningEligible = basis.verdict === 'FAIL'
+    && (basisAssessment ? recoveryPlanningEligibleFromAssessment(basisAssessment) : true);
   const result = decideProgressionFromFacts({
     recoveryCaseId: row.id as SubjectId,
     basisAssessmentId: basis.assessmentId as SubjectId,
@@ -209,7 +215,8 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
     authorityOrExecutionPending: basis.verdict === 'FAIL' && attempt?.outcome === 'AWAITING_AUTHORITY'
       && await approvalStillOutstanding(ctx.pool, ctx.workspaceId, attempt.attempt.viableStrategyRefs),
     // One planning attempt per basis: a settled attempt for this basis is never redone.
-    recoveryRemainsPossible: basis.verdict === 'FAIL' && attempt === undefined,
+    // Tight-only connection FAIL stays monitorable (Case open) without REPLAN.
+    recoveryRemainsPossible: planningEligible && attempt === undefined,
     currentAssessmentVerdict: basis.verdict,
   });
   outcome.decision = result.decision;

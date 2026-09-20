@@ -131,6 +131,7 @@
       "test/r2-case-workspace-integration.test.ts",
       "test/r2-focused-case-graph.test.ts",
       "test/a5-founder-qc-progression.test.ts",
+      "test/a5-backend-truth-closure.test.ts",
       "test/r2-focused-graph-projection.test.ts",
       "test/r2-graph-renderer.test.ts",
       "test/r2-original-current.test.ts",

@@ -13,6 +13,8 @@ import { runCaseEscalation } from '../src/app/target/caseEscalation.ts';
 import {
   deriveConnectionViabilityFromEvaluator,
   mapConnectionProgression,
+  productStatusFromAssessment,
+  recoveryPlanningEligibleFromAssessment,
 } from '../src/app/target/readmodels/mapConnectionProgression.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { currentAssessmentView, PgReassessmentWorker, type ReassessmentPipeline } from '../src/persistence/postgres/world/pgAssessments.ts';
@@ -237,6 +239,12 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
     connection = connectionDimension(d1Result.view);
     assert.deepEqual(connection, { verdict: 'PASS', reasonCode: 'connection_meets_minimum', gapMinutes: 95 });
     assert.equal(mapConnectionProgression({ viability: deriveConnectionViabilityFromEvaluator(connection) }), 'CONNECTION_SAFE');
+    assert.equal(
+      productStatusFromAssessment(d1Result.view.assessment!.overallVerdict, deriveConnectionViabilityFromEvaluator(connection)),
+      'READY',
+      'D1 stays product GREEN/READY',
+    );
+    assert.equal(recoveryPlanningEligibleFromAssessment(d1Result.view.assessment!), false);
     const d1Escalation = await runCaseEscalation({ ...commandCtx, now: d1.at });
     assert.equal(d1Escalation.opened, 0, JSON.stringify(d1Escalation));
 
@@ -245,6 +253,24 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
     connection = connectionDimension(d2Result.view);
     assert.deepEqual(connection, { verdict: 'FAIL', reasonCode: 'connection_below_minimum', gapMinutes: 30 });
     assert.equal(mapConnectionProgression({ viability: deriveConnectionViabilityFromEvaluator(connection) }), 'CONNECTION_AT_RISK');
+    assert.equal(
+      productStatusFromAssessment(d2Result.view.assessment!.overallVerdict, deriveConnectionViabilityFromEvaluator(connection)),
+      'AT_RISK',
+      'D2 whole-trip FAIL still projects amber AT_RISK, not DISRUPTED',
+    );
+    assert.equal(
+      recoveryPlanningEligibleFromAssessment(d2Result.view.assessment!),
+      false,
+      'D2 tight connection is monitorable but not replacement-planning eligible',
+    );
+    assert.equal(
+      mapConnectionProgression({
+        viability: 'TIGHT',
+        caseStatus: 'OPEN',
+      }),
+      'CONNECTION_AT_RISK',
+      'opened Case at D2 stays CONNECTION_AT_RISK (no premature AWAITING_APPROVAL)',
+    );
     const d2Escalation = await runCaseEscalation({ ...commandCtx, now: d2.at });
     assert.equal(d2Escalation.opened, 1, JSON.stringify(d2Escalation));
     const caseId = d2Escalation.outcomes.find((outcome) => outcome.caseId)?.caseId;
@@ -260,6 +286,16 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
     connection = connectionDimension(d3Result.view);
     assert.deepEqual(connection, { verdict: 'FAIL', reasonCode: 'connection_broken', gapMinutes: -65 });
     assert.equal(mapConnectionProgression({ viability: deriveConnectionViabilityFromEvaluator(connection) }), 'CONNECTION_IMPOSSIBLE');
+    assert.equal(
+      productStatusFromAssessment(d3Result.view.assessment!.overallVerdict, deriveConnectionViabilityFromEvaluator(connection)),
+      'DISRUPTED',
+      'D3 broken connection projects product RED/DISRUPTED',
+    );
+    assert.equal(
+      recoveryPlanningEligibleFromAssessment(d3Result.view.assessment!),
+      true,
+      'D3 broken connection becomes recovery-planning eligible',
+    );
     const d3Escalation = await runCaseEscalation({ ...commandCtx, now: d3.at });
     assert.equal(d3Escalation.opened, 0, JSON.stringify(d3Escalation));
     assert.equal(d3Escalation.attached, 1, JSON.stringify(d3Escalation));

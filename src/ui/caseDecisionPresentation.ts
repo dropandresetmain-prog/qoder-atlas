@@ -31,6 +31,14 @@ export type DecisionActionState =
 
 export function decisionActionState(view: RecoveryCaseView): DecisionActionState {
   if (!['OPEN', 'AWAITING_AUTHORITY'].includes(view.status)) return { kind: 'none' };
+  // Tight / below-minimum connection remains watch-only: Case may exist, but
+  // irreversible replacement approval is not yet the product action.
+  if (view.connectionProgression === 'CONNECTION_AT_RISK') {
+    return {
+      kind: 'unavailable',
+      reason: 'The connection is below the required minimum and is being monitored. Recovery approval opens when the connection becomes impossible.',
+    };
+  }
   const options = decisionOptions(view);
   if (!options.recommended) {
     return {
@@ -71,6 +79,12 @@ export function decisionOptions(view: RecoveryCaseView): {
   issue?: string;
 } {
   if (!['OPEN', 'AWAITING_AUTHORITY'].includes(view.status)) return { alternatives: [] };
+  if (view.connectionProgression === 'CONNECTION_AT_RISK') {
+    return {
+      alternatives: [],
+      issue: 'Connection is at risk and is being monitored. Actionable recovery opens when the connection becomes impossible.',
+    };
+  }
   const eligible = view.strategies.filter((s) => s.viability === 'VIABLE'
     && (s.status === 'EVALUATED' || s.status === 'PROPOSED'));
   const ref = view.planningEvidence?.recommendation?.recommended.ref;

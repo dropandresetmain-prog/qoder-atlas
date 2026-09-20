@@ -292,6 +292,9 @@ function viableStrategies(view: RecoveryCaseView): RecoveryStrategyView[] {
 
 function derivePhase(view: RecoveryCaseView): CasePhase {
   const planningOutcome = view.planningEvidence?.outcome.code;
+  // Tight connection = monitor. Do not sell an irreversible replacement while
+  // the connection remains physically possible (CONNECTION_AT_RISK).
+  const monitoringTightConnection = view.connectionProgression === 'CONNECTION_AT_RISK';
   switch (view.status) {
     case 'RESOLVED': return 'recovered';
     case 'CLOSED':
@@ -299,8 +302,11 @@ function derivePhase(view: RecoveryCaseView): CasePhase {
     case 'SUPERSEDED': return 'closed';
     case 'EXECUTING': return 'executing';
     case 'PLANNING': return planningOutcome === 'NO_RECOVERY_FOUND' ? 'no_plan' : 'investigating';
-    case 'AWAITING_AUTHORITY': return viableStrategies(view).length > 0 ? 'awaiting_approval' : 'no_plan';
+    case 'AWAITING_AUTHORITY':
+      if (monitoringTightConnection) return 'disrupted';
+      return viableStrategies(view).length > 0 ? 'awaiting_approval' : 'no_plan';
     case 'OPEN': {
+      if (monitoringTightConnection) return 'disrupted';
       if (viableStrategies(view).length > 0) return 'awaiting_approval';
       const outcome = view.planningEvidence?.outcome.code;
       return view.planningEvidence && outcome !== 'STALE_RETRY_REQUIRED' ? 'no_plan' : 'disrupted';

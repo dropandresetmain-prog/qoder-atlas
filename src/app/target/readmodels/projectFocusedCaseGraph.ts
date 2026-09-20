@@ -511,12 +511,14 @@ export function projectFocusedCaseGraphEnrichment(
             ref: timingRef,
             kind: 'TIMING',
             label: 'Arrival timing',
-            // CHANGED requires a canonical published baseline that differs. A
-            // replacement schedule matching its own published time (or a timing
-            // fact without that baseline) is still shown when a blocking
-            // evaluator explanation implicates it, as FAILED rather than falsely
-            // calling that schedule change itself.
-            semanticState: transportService.published_arrival !== null && currentAt !== transportService.published_arrival ? 'CHANGED' : 'FAILED',
+            // CHANGED when the published baseline differs. When an evaluator
+            // implicates arrival without a published-vs-current delta, the node
+            // is AFFECTED (watch) — not FAILED — so programme readiness failures
+            // do not paint a healthy schedule as a definitive timing failure.
+            // Relationship edges carry FAILED when the link itself is broken.
+            semanticState: transportService.published_arrival !== null && currentAt !== transportService.published_arrival
+              ? 'CHANGED'
+              : 'AFFECTED',
             authority: 'AUTHORITATIVE',
             caseRef: input.caseId,
             // The service remains the visual home of TRANSPORT_SERVICE; the
@@ -540,9 +542,14 @@ export function projectFocusedCaseGraphEnrichment(
     }
 
     // Emit MUST_HAPPEN_BEFORE edges between consecutive items (deterministic order).
+    // When an upstream transport has an arrival timing node, the mediated path
+    // booking → timing → next already expresses sequence; skip the direct
+    // booking → next edge so the focused graph has one clear spine.
     for (let i = 0; i < itemRefs.length - 1; i++) {
       const fromRef = itemRefs[i]!;
       const toRef = itemRefs[i + 1]!;
+      const upstreamItem = items[i];
+      if (upstreamItem && timingRefByJourneyItem.has(upstreamItem.id)) continue;
       pushEdge({
         id: `MUST_HAPPEN_BEFORE:${fromRef}:${toRef}`,
         fromRef,
@@ -565,10 +572,9 @@ export function projectFocusedCaseGraphEnrichment(
   }
 
   // Connection feasibility owns the relationship between the delayed arrival
-  // and the onward booking. Annotate that producer-owned edge (and, when a
-  // timing node exists, the arrival→onward edge) so definitive failure is red
-  // while a merely tight connection stays amber/watch — without painting the
-  // delayed arrival itself FAILED.
+  // and the onward booking. When a timing node exists, that arrival→onward
+  // edge is the single connection story — do not also colour the booking→
+  // booking topology edge as the same causal dependency (founder dual-line).
   for (const step of input.causalPath ?? []) {
     const relationshipState = connectionRelationshipState(step);
     if (!relationshipState) continue;
@@ -583,19 +589,20 @@ export function projectFocusedCaseGraphEnrichment(
     if (!upstreamItem?.selectedServiceId || !downstreamItem?.selectedServiceId) continue;
     const upstreamBooking = `SERVICE_BOOKING:${upstreamItem.selectedServiceId}`;
     const downstreamBooking = `SERVICE_BOOKING:${downstreamItem.selectedServiceId}`;
-    pushEdge({
-      id: `MUST_HAPPEN_BEFORE:${upstreamBooking}:${downstreamBooking}`,
-      fromRef: upstreamBooking,
-      toRef: downstreamBooking,
-      kind: 'MUST_HAPPEN_BEFORE',
-      authority: 'AUTHORITATIVE',
-      semanticState: relationshipState,
-    });
     const timingRef = timingRefByJourneyItem.get(upstreamItemId);
     if (timingRef) {
       pushEdge({
         id: `MUST_HAPPEN_BEFORE:${timingRef}:${downstreamBooking}`,
         fromRef: timingRef,
+        toRef: downstreamBooking,
+        kind: 'MUST_HAPPEN_BEFORE',
+        authority: 'AUTHORITATIVE',
+        semanticState: relationshipState,
+      });
+    } else {
+      pushEdge({
+        id: `MUST_HAPPEN_BEFORE:${upstreamBooking}:${downstreamBooking}`,
+        fromRef: upstreamBooking,
         toRef: downstreamBooking,
         kind: 'MUST_HAPPEN_BEFORE',
         authority: 'AUTHORITATIVE',

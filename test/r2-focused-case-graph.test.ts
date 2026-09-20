@@ -446,7 +446,7 @@ test('A1 enrichment: shows an evaluator-implicated replacement arrival without i
 
   const timing = result.nodes.find((node) => node.kind === 'TIMING');
   assert.ok(timing);
-  assert.equal(timing.semanticState, 'FAILED');
+  assert.equal(timing.semanticState, 'AFFECTED');
   assert.deepEqual(timing.timing, { currentAt: '2031-04-05T10:30:00.000Z', publishedAt: '2031-04-05T10:30:00.000Z', timeZone: 'Asia/Singapore' });
   assert.deepEqual(timing.subjectRefs, ['JOURNEY_ITEM:item-1']);
   assert.deepEqual(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:replacement-service')?.subjectRefs, ['TRANSPORT_SERVICE:replacement-service']);
@@ -470,9 +470,11 @@ test('A1 enrichment: connection facts mark only the upstream arrival, never its 
   });
   assert.deepEqual(result.nodes.filter((node) => node.kind === 'TIMING').map((node) => node.ref), ['TIMING:inbound:ARRIVAL']);
   assert.equal(result.nodes.find((node) => node.ref === 'TIMING:inbound:ARRIVAL')?.semanticState, 'CHANGED');
+  // Topology booking→booking remains, but connection colour lives only on the
+  // arrival→onward edge when a timing node exists (one connection story).
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:SERVICE_BOOKING:inbound-service:SERVICE_BOOKING:onward-service')?.semanticState,
-    'AFFECTED',
+    undefined,
   );
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:TIMING:inbound:ARRIVAL:SERVICE_BOOKING:onward-service')?.semanticState,
@@ -499,7 +501,7 @@ test('A1 enrichment: broken connection marks the arrival→onward relationship F
   assert.equal(result.nodes.find((node) => node.ref === 'TIMING:inbound:ARRIVAL')?.semanticState, 'CHANGED');
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:SERVICE_BOOKING:inbound-service:SERVICE_BOOKING:onward-service')?.semanticState,
-    'FAILED',
+    undefined,
   );
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:TIMING:inbound:ARRIVAL:SERVICE_BOOKING:onward-service')?.semanticState,

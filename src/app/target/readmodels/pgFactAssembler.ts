@@ -24,7 +24,15 @@ import type {
   RecoveryStrategyFact,
   TravellerTripFacts,
 } from './types.ts';
-import { mapConnectionProgression, deriveConnectionViabilityFromEvaluator, type ConnectionViabilityHint } from './mapConnectionProgression.ts';
+import {
+  mapConnectionProgression,
+  deriveConnectionViabilityFromEvaluator,
+  connectionViabilityFromAssessment,
+  productStatusFromAssessment,
+  remainderViabilityFromAssessment,
+  semanticStateFromAssessment,
+  type ConnectionViabilityHint,
+} from './mapConnectionProgression.ts';
 import {
   evaluateSharedDisruptionCohort,
   type CohortTravellerEvaluationInput,
@@ -1132,7 +1140,12 @@ async function loadRecoveryCaseFactsInner(
     // AUTHORITATIVE authority) — their own presented fields never change, so
     // they are never marked changed even when an endpoint is (FIG-2/FIG-3).
     changedEdgeIds: [],
-    currentSemanticState: tripVerdict === 'FAIL' ? 'FAILED' : tripVerdict === 'PASS' ? 'RECOVERED' : 'AFFECTED',
+    currentSemanticState: tripVerdict === 'PASS'
+      ? 'RECOVERED'
+      : semanticStateFromAssessment(
+        tripVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN',
+        connectionViability,
+      ),
     nodes: [
       // The change signal is a first-class current-world input. Recovery case
       // workflow state stays in the Case workspace, never in this graph.
@@ -1261,18 +1274,28 @@ async function loadOperatorOverviewFactsInner(
     const facts = await loadRecoveryCaseFactsInner(client, workspaceId, c.id, generatedAt, undefined);
     if (!facts) continue;
     caseStamps.push(BigInt(facts.projectionRevision));
-    const status = facts.tripViability.verdict === 'FAIL'
-      ? 'DISRUPTED' as const
+    // Preserve TIGHT (watch) vs IMPOSSIBLE (broken) instead of collapsing every
+    // whole-trip FAIL into DISRUPTED — connectionProgression already carries
+    // the evaluator distinction for Case surfaces.
+    const itemTone: AssessmentTone = facts.tripViability.verdict === 'FAIL'
+      ? 'FAIL'
       : facts.tripViability.verdict === 'PASS'
-        ? 'READY' as const
-        : facts.status === 'EXECUTING'
-          ? 'RECOVERING' as const
-          : 'UNKNOWN' as const;
-    const remainder: RemainderViability = facts.tripViability.verdict === 'FAIL'
-      ? 'NOT_VIABLE'
-      : facts.tripViability.verdict === 'PASS'
-        ? 'VIABLE'
+        ? 'PASS'
         : 'UNKNOWN';
+    const itemConnection = facts.connectionProgression === 'CONNECTION_AT_RISK'
+      ? 'TIGHT' as const
+      : facts.connectionProgression === 'CONNECTION_IMPOSSIBLE'
+        || facts.connectionProgression === 'RECOVERY_PLANNING'
+        || facts.connectionProgression === 'AWAITING_APPROVAL'
+        || facts.connectionProgression === 'EXECUTING_COORDINATED_RECOVERY'
+          ? 'IMPOSSIBLE' as const
+          : facts.connectionProgression === 'CONNECTION_SAFE'
+            ? 'VIABLE' as const
+            : undefined;
+    const status = facts.status === 'EXECUTING' && itemTone !== 'PASS'
+      ? 'RECOVERING' as const
+      : productStatusFromAssessment(itemTone, itemConnection);
+    const remainder: RemainderViability = remainderViabilityFromAssessment(itemTone, itemConnection);
     const affected = facts.affectedItems ?? [];
     let travellerLabel = affected[0] ?? 'Traveller';
     const firstJourney = affected.find((a) => a.startsWith('JOURNEY:'));
@@ -1304,7 +1327,9 @@ async function loadOperatorOverviewFactsInner(
       whatChanged: facts.changeSummary,
       affectedPeople: affected,
       affectedItems: affected,
-      decisionRequired: facts.status === 'AWAITING_AUTHORITY',
+      // Tight-connection monitoring must not demand an irreversible approval.
+      decisionRequired: facts.status === 'AWAITING_AUTHORITY'
+        && facts.connectionProgression !== 'CONNECTION_AT_RISK',
       unresolvedUncertainty: facts.uncertainty ?? [],
       ...(primaryEvaluation ? { evaluation: primaryEvaluation } : {}),
     });
@@ -1397,6 +1422,7 @@ async function loadOperatorOverviewFactsInner(
     const tone: AssessmentTone = view.status === 'CURRENT' && view.assessment
       ? (view.assessment.overallVerdict === 'PASS' ? 'PASS' : view.assessment.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN')
       : 'UNKNOWN';
+    const populationConnection = connectionViabilityFromAssessment(view.assessment);
     const programmeDimension = view.assessment?.dimensions.find((dimension) => dimension.dimension === 'programme_participation');
     for (const explanation of programmeDimension?.explanations ?? []) {
       const programmeRefs = [explanation.cause.subjectRef, ...explanation.relatedSubjects]
@@ -1446,14 +1472,15 @@ async function loadOperatorOverviewFactsInner(
     // product vocabulary `items` already uses, so the frontend compares like
     // with like and computes neither. A subject whose assessment is not
     // CURRENT reads UNKNOWN with its real lifecycle in `evaluation` — it is
-    // never optimistically presented as ready.
+    // never optimistically presented as ready. Tight connection FAIL presents
+    // as AT_RISK (amber), not DISRUPTED (red).
     populationFacts.push({
       journeyRef: ref,
       tripRef: `TRIP:${p.trip_id}`,
       travellerLabel: p.traveller_label,
       obligation: p.obligation,
-      status: tone === 'PASS' ? 'READY' : tone === 'FAIL' ? 'DISRUPTED' : 'UNKNOWN',
-      remainderViability: tone === 'PASS' ? 'VIABLE' : tone === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN',
+      status: productStatusFromAssessment(tone, populationConnection),
+      remainderViability: remainderViabilityFromAssessment(tone, populationConnection),
       evaluation: view.status,
       ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
     });
@@ -1463,7 +1490,7 @@ async function loadOperatorOverviewFactsInner(
       ref,
       kind: 'TRAVELLER' as const,
       label: p.traveller_label,
-      semanticState: TONE_TO_STATE[tone],
+      semanticState: semanticStateFromAssessment(tone, populationConnection),
       authority: 'AUTHORITATIVE' as const,
       ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
       evaluation: view.status,
@@ -1689,7 +1716,11 @@ async function loadOperatorOverviewFactsInner(
     changedVisibleRefs,
     // The overview producer emits no edges (see the defect-5 gap note above).
     changedEdgeIds: [],
-    currentSemanticState: items.some((i) => i.status === 'DISRUPTED') ? 'FAILED' : 'HEALTHY',
+    currentSemanticState: items.some((i) => i.status === 'DISRUPTED')
+      ? 'FAILED'
+      : items.some((i) => i.status === 'AT_RISK')
+        ? 'AFFECTED'
+        : 'HEALTHY',
     nodes: dashboardNodes,
     edges: dashboardEdges,
     items,

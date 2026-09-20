@@ -26,7 +26,7 @@ function pop(n: number, status: Status = 'READY', evaluation: Evaluation = 'CURR
     travellerLabel: `Traveller ${id}`,
     obligation: 'REQUIRED',
     status,
-    remainderViability: status === 'READY' ? 'VIABLE' : status === 'DISRUPTED' ? 'NOT_VIABLE' : 'UNKNOWN',
+    remainderViability: status === 'READY' ? 'VIABLE' : status === 'AT_RISK' ? 'AT_RISK' : status === 'DISRUPTED' ? 'NOT_VIABLE' : 'UNKNOWN',
     evaluation,
     ...extra,
   };
