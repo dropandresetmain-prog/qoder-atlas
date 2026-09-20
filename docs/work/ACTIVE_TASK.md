@@ -15,10 +15,12 @@ Bounded provider diagnostic / robustness pass so destination stay replacement ca
 
 ## Preservation
 
-- Preservation commit: _(pending this commit)_
+- Preservation commit: `74ac4e7810e6acf63ae9fbeec27a1d36d3e3d9bf`
 - Branch: `finish/a4-destination-hotel-robustness`
 - Base: `347fcc0ac7b9a29f0547fb3d4afac13b2c8ee95b`
 - Focused proof before commit: 52/52 (`a3-stay-replacement-context`, `northstar-hotel`, `northstar-v2-m7-recovery-planning`)
+- Anti-hardcoding: CLEAN
+- Next authoritative package: A4 CP4a Jordan progression / recommendation closure from this preserved tip
 
 ## Root cause (classified)
 
@@ -70,4 +72,4 @@ Complete four-effect alternative (VIABLE_NOT_RECOMMENDED): flight USD 83.35 + Na
 
 ## Next
 
-Commit/push when requested. Do **not** approve or execute provider mutations from this package.
+Hotel robustness is preserved at `74ac4e7810e6acf63ae9fbeec27a1d36d3e3d9bf`. Proceed to A4 CP4a Jordan progression / overnight-required recommendation closure. Do **not** approve or execute provider mutations.
