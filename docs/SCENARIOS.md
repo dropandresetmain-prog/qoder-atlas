@@ -161,6 +161,9 @@ CGK→SIN).
 
 ## S2 — Traveller misses a connection; airline recovery is not good enough
 
+> **Current S2 convergence boundary (2026-09-20):** The older flight-only/context-only Jordan closure below is superseded for A3/A4 by `docs/work/ASTRA_HERO_DEPTH_SCOPE.md`. Jordan's candidate world must compose replacement flight + Narita overnight + scoped authoritative entry evidence + required Singapore stay replacement/cancellation consequence + finals viability + FX. A4 executes the selected flight, Narita booking, Singapore replacement booking, then cancellation of the displaced Singapore booking after replacement confirmation. Transfer and insurance remain reasoning/context only. No Jordan-specific application branch.
+>
+
 - **Trigger:** traveller-state report
 - **Stage:** during travel
 - **Priority:** Tier A — MVP executable
@@ -195,23 +198,22 @@ The **product-level** recovery problem includes:
 - ground transfer
 - event commitments
 
-**Final hero execution boundary:** the closed backend proof executes the
-next-morning **flight recovery + event viability** path only. Narita transit-hotel
-booking, Singapore hotel cancellation, and insurance claim submission are **not**
-executed in the current demo — Northstar may **check and present** entry,
-insurance, overnight, and stay consequences when deterministic rules/evidence exist,
-but only actions that pass proposal → validation → authority → executor → observe
-update authoritative state.
+**Current final hero execution boundary:** A3 must produce one complete, physically visible
+composite recommendation through the normal PostgreSQL runtime. The candidate world includes
+replacement flight, Narita overnight stay, scoped authoritative Japan entry evidence, the
+required Singapore stay replacement/cancellation consequence, Frankfurter/home-currency cost
+comparison and finals viability. Transfer and insurance remain bounded reasoning/evidence only.
 
-**Product capability (reasoning):** whole-trip analysis across flight, overnight
-requirement, entry/transit findings, insurance applicability, Singapore stay
-consequence, finals margin, and known executable cost.
+**Required A4 execution:** the selected protected ActionPlan executes four supported sandbox
+actions: replacement flight, Narita hotel booking, Singapore replacement hotel booking, and
+cancellation of the displaced Singapore booking. Because Nuitée does not support the required
+date change as an in-place modification, the generic operation is replacement booking plus
+cancellation; replacement confirmation must precede cancellation. Each action requires durable
+attempt state, observation/reconciliation, canonical update and whole-trip reassessment.
 
-**Implemented execution:** single validated flight rebook (simulated at provider
-boundary where configured) plus observation/state re-evaluation.
-
-**Deferred:** composite multi-provider execution in one authority cycle — see
-`docs/ROADMAP.md` § Composite multi-provider strategy execution.
+**Product capability (reasoning):** whole-trip analysis across flight, overnight requirement,
+entry/transit findings, insurance applicability, Singapore stay consequence, finals margin,
+provider costs and home-currency comparison.
 
 Pre-emptive connection failure: schedule-delay retimes may mark an onward leg
 non-viable through generic CONNECTS_TO / connection-buffer assessment **before**
@@ -256,8 +258,9 @@ rejects recoveries that do not preserve the trip's actual objectives.
 - execution + observation;
 - resolved/viable final trip state.
 
-**Not claimed in the closed hero:** transit-Stay insertion, Japanese entry
-research attachment, or insurance attachment.
+**Current closed-hero claim:** the proposed Narita STAY and scoped Japanese entry evidence are
+part of the evaluated composite world. Insurance remains contextual reasoning only; no claim
+submission is executed.
 
 **Core message:** Northstar reasons about whether what actually happened still
 leaves the trip viable.
@@ -275,11 +278,11 @@ Stable cast and programme: Jordan Hale (`ait-draft-09`); hard finals showcase
 | **zg053_impossible** | Upstream delay makes ZG053 impossible; missed-connection signal; airline may still suggest same-night options. | Onward leg **failed**; recovery search opens |
 | **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 150. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
 | **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight near Narita is required as known trip context. | Same-night **NOT_VIABLE** |
-| **overnight_context** | Narita hotel options and landside-entry/insurance needs are known contextual consequences. **They are not composed/executed/attached in the closed hero path.** | Context only; accepted-risk gaps remain |
+| **overnight_context** | Narita hotel options and landside-entry needs are composed into the candidate world; scoped authoritative entry evidence must support the overnight. Insurance remains context/evidence only. | Required composite dependency; no broad immigration/claims platform |
 | **airline_morning** | Airline-default inventory includes Scoot **TR867** (~12:30→20:45); Northstar also sees TR885 (~08:20→14:35). | TR867 fails the 20:45 finals buffer; TR885 clears it under 150 |
-| **northstar_morning** | Northstar ranks boardable next-morning flight inventory; TR885 is selected as the candidate in the closed acceptance. | Flight + event path **VIABLE** |
-| **authority / surfaces** | Organiser case exposes the proposed flight recovery and policy result; REPLAY/RECORD provenance is preserved. | **Organiser approval required** |
-| **action / observation** | Organiser approves flight change; execute through provider boundary; observe; authoritative trip update. | |
+| **northstar_morning** | Northstar ranks boardable next-morning flight inventory; TR885 or a current equivalent may be the transport component, but it is viable only as part of the complete flight + Narita stay + entry + Singapore-stay + finals candidate. | Complete composite must be **VIABLE** |
+| **authority / surfaces** | Organiser Case exposes the complete composite recommendation, rejected alternatives, provider/FX provenance, uncertainty, costs and the four selected external actions. | **Organiser approval required** |
+| **action / observation** | Organiser approves the selected plan; execute replacement flight, Narita booking, Singapore replacement booking, then displaced Singapore stay cancellation through protected provider paths; observe/reconcile each and update canonical state. | |
 | **final_state** | Northstar candidate arrives SIN 14:35; 370-minute gap clears the 150-minute policy buffer; case **RESOLVED**, trip **VIABLE**. | **RESOLVED / VIABLE** |
 
 Do **not** treat VietJet VJ823 as a direct NRT→SIN 12:55 hero option (recordings show NRT→SGN connections).
