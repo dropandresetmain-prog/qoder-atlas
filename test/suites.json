@@ -158,7 +158,9 @@
       "test/wave3r-r1-adapter-payment-guard.test.ts",
       "test/wave3r-r1-fixes.test.ts",
       "test/wave3r-s5s6-readiness.test.ts",
-      "test/wave3r-transport-concentration.test.ts"
+      "test/wave3r-transport-concentration.test.ts",
+      "test/operator-ui-convergence.test.ts",
+      "test/operator-ui-camera.test.ts"
     ],
     "postgres": [
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
