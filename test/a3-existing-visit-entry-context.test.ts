@@ -36,7 +36,7 @@ function fakePool(input: {
       if (sql.includes('FROM external_records')) {
         const recordType = params[2];
         return { rows: recordType === 'SOURCE_INTENDED_VISIT'
-          ? [{ subject_id: input.visitId, subject_kind: 'INTENDED_VISIT' }]
+          ? [{ subject_id: input.journeyId, subject_kind: 'JOURNEY' }]
           : [{ subject_id: input.travellerId, subject_kind: 'TRAVELLER' }] };
       }
       if (sql.includes('FROM traveller_booking_identities')) return { rows: [{ nationality: 'SG' }] };
@@ -64,6 +64,7 @@ test('existing visit preparation binds the configured passport and publishes sco
   const world = emptyWorld({ workspaceId });
   world.travellers = [{ id: travellerId, revision: 1, lifecycleStatus: 'ACTIVE' }];
   world.journeys = [{ id: journeyId, revision: 4, tripId: randomUUID(), travellerId, lifecycleStatus: 'ACTIVE', intendedWindow: null, responsibilityOrganisationId: null }];
+  world.jurisdictions = [{ id: jurisdictionId, revision: 1, name: 'Japan', regimeKind: 'COUNTRY' }];
   world.intendedVisits = [{ id: visitId, journeyId, jurisdictionId, purpose: 'tourism', intended: { start: '2030-06-20T00:00:00.000Z', end: '2030-06-22T00:00:00.000Z' }, transitIntent: false }];
   world.credentials = [{ id: credentialId, travellerId, kind: 'PASSPORT', issuerCountry: 'SG', currentVersionId: credentialVersionId }];
   world.credentialVersions = [{ id: credentialVersionId, credentialId, kind: 'PASSPORT', editionNumber: 1, issueDate: '2029-01-01', expiryDate: '2035-01-01', issuerStatus: 'VALID', physicallyAvailable: true, evidenceId: randomUUID(), issuingStateCode: 'SG', visaClass: null, permittedActivities: [], entriesAllowed: null, permittedStayDays: null }];
@@ -74,11 +75,12 @@ test('existing visit preparation binds the configured passport and publishes sco
     pool: fakePool({ workspaceId, connectionId, visitId, travellerId, journeyId, jurisdictionId, reviewerId }) as never,
     workspaceId, actorPrincipalId: randomUUID(), uow: () => fakeUow as never,
     reviewerRef: { kind: 'PRINCIPAL', id: reviewerId }, hotelTransport: undefined as never,
+    jurisdictionCountryCode: async () => 'JP',
     officialDocuments: { read: async () => ({ ok: true, data: { sourceId: policy.policy.sources[0]!.sourceId, publisher: policy.policy.sources[0]!.publisher, url: policy.policy.sources[0]!.url, observedAt: '2030-06-01T11:30:00.000Z', contentSha256: policy.policy.sources[0]!.contentSha256, text: policy.text }, meta: { providerId: 'test-reader', mode: 'REPLAY', requestedAt: NOW } }) },
     hotelPolicies: [], entryPolicies: [policy.policy], configuration: {
       sourceConnectionProviderKind: 'fixture-source', overnightTargets: [],
       passportSelections: [{ travellerSourceRef: 'SOURCE_TRAVELLER_DRAFT:traveller', credentialId, credentialVersionId, guestNationality: 'SG' }],
-      existingVisitTargets: [{ visitSourceRef: 'SOURCE_INTENDED_VISIT:visit', entryPolicyId: policy.policy.id, countryCode: 'JP' }],
+      existingVisitTargets: [{ visitSourceRef: 'SOURCE_INTENDED_VISIT:visit', visitId, entryPolicyId: policy.policy.id, countryCode: 'JP' }],
     },
   });
   const result = await preparer.prepare({ recoveryCaseId: randomUUID(), now: NOW, world, failing: [] });
@@ -106,7 +108,7 @@ test('existing visit preparation leaves an explicit unavailable evidence record 
     reviewerRef: { kind: 'PRINCIPAL', id: randomUUID() }, hotelTransport: undefined as never,
     officialDocuments: undefined as never, hotelPolicies: [], entryPolicies: [], configuration: {
       sourceConnectionProviderKind: 'fixture-source', overnightTargets: [], passportSelections: [],
-      existingVisitTargets: [{ visitSourceRef: 'SOURCE_INTENDED_VISIT:missing', entryPolicyId: 'missing-policy', countryCode: 'JP' }],
+      existingVisitTargets: [{ visitSourceRef: 'SOURCE_INTENDED_VISIT:missing', visitId: randomUUID(), entryPolicyId: 'missing-policy', countryCode: 'JP' }],
     },
   });
   const result = await preparer.prepare({ recoveryCaseId: randomUUID(), now: NOW, world: emptyWorld({ workspaceId }), failing: [] });

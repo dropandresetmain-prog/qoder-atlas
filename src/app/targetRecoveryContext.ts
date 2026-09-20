@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Pool } from '../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../persistence/postgres/pgUnitOfWork.ts';
-import type { CapturedWorld, WJourneyItem } from '../resolution/world/world.ts';
+import type { CapturedWorld, WIntendedVisit, WJourneyItem } from '../resolution/world/world.ts';
 import type { FailingSubject } from '../resolution/planning/proposer.ts';
 import type { HotelPlanningOptions, HotelPlanningContext } from './targetHotelCompanionPlanning.ts';
 import type { PlanningToolTransport } from '../resolution/planning/researchDispatcher.ts';
@@ -40,6 +40,8 @@ export interface PassportSelectionConfiguration {
 /** An existing canonical visit to research; this never creates a visit. */
 export interface ExistingVisitTargetConfiguration {
   visitSourceRef: string;
+  /** Canonical child id supplied by the source materializer; never recomputed here. */
+  visitId: string;
   entryPolicyId: string;
   countryCode: string;
 }
@@ -57,6 +59,8 @@ export interface TargetRecoveryContextDeps {
   actorPrincipalId: string;
   uow: () => PgUnitOfWork;
   reviewerRef: { kind: 'ORGANISATION' | 'PRINCIPAL'; id: string };
+  /** Captured/source-owned country code for an existing visit jurisdiction. */
+  jurisdictionCountryCode?: (jurisdictionId: string) => Promise<string | undefined>;
   hotelTransport: PlanningToolTransport;
   officialDocuments: { read(sourceId: string): Promise<CapabilityResult<OfficialDocumentEvidence>> };
   /** Live composition supplies wall-clock verification after provider reads; tests may pin it. */
@@ -315,15 +319,35 @@ export class TargetRecoveryContextPreparer {
     return selections;
   }
 
+  /**
+   * Intended visits are Journey-owned rows and deliberately are not registry
+   * subjects. The source link therefore names the owning Journey; the source
+   * boundary supplies the canonical child id and this module only verifies
+   * that the captured child belongs to that Journey.
+   */
+  private async resolveExistingVisitAlias(
+    connectionId: string,
+    sourceRef: string,
+    expectedVisitId: string,
+    world: CapturedWorld,
+  ): Promise<WIntendedVisit | undefined> {
+    const journeyId = await this.resolveAlias(connectionId, sourceRef, 'SOURCE_INTENDED_VISIT', 'JOURNEY');
+    if (!journeyId) return undefined;
+    const visit = world.intendedVisits.find((candidate) => candidate.id === expectedVisitId);
+    return visit?.journeyId === journeyId ? visit : undefined;
+  }
+
   private async resolveExistingVisits(connectionId: string, world: CapturedWorld): Promise<ResolvedExistingVisit[]> {
     const resolved: ResolvedExistingVisit[] = [];
     for (const config of this.deps.configuration.existingVisitTargets ?? []) {
-      const visitId = await this.resolveAlias(connectionId, config.visitSourceRef, 'SOURCE_INTENDED_VISIT', 'INTENDED_VISIT');
-      const visit = visitId ? world.intendedVisits.find((candidate) => candidate.id === visitId) : undefined;
+      const visit = await this.resolveExistingVisitAlias(connectionId, config.visitSourceRef, config.visitId, world);
       const journey = visit ? world.journeys.find((candidate) => candidate.id === visit.journeyId) : undefined;
+      const jurisdiction = visit ? world.jurisdictions.find((candidate) => candidate.id === visit.jurisdictionId) : undefined;
       const entryPolicy = ReviewedEntryPolicySchema.safeParse(this.deps.entryPolicies.find((policy) => (policy as { id?: string })?.id === config.entryPolicyId));
       const country = Iso2Schema.safeParse(config.countryCode);
-      if (!visit || !journey || !entryPolicy.success || !country.success || entryPolicy.data.countryCode !== config.countryCode) continue;
+      const capturedCountryCode = visit ? await this.deps.jurisdictionCountryCode?.(visit.jurisdictionId) : undefined;
+      if (!visit || !journey || !jurisdiction || jurisdiction.regimeKind !== 'COUNTRY' || !capturedCountryCode
+        || capturedCountryCode !== config.countryCode || !entryPolicy.success || !country.success || entryPolicy.data.countryCode !== config.countryCode) continue;
       const passport = (await this.resolvePassportSelections(connectionId, world)).get(journey.travellerId);
       if (!passport) continue;
       if (!entryPolicy.data.purposes.includes(visit.purpose) || entryPolicy.data.nationalityCodes.includes(passport.guestNationality) === false) continue;
