@@ -1,8 +1,72 @@
-# ACTIVE TASK — A3 OPERATOR UI SECOND PASS
+# ACTIVE TASK — A4 CHECKPOINT 2 SELECTED-PLAN CONTINUATION SAFETY
 
-Live ledger for the bounded operator-UI convergence pass. Prior A2/A3 engine ledger below is preserved.
+Live ledger for bounded selected-plan continuation. Prior A3 UI second-pass ledger below is preserved.
 
 ## Identity
+
+- Branch: `finish/a4-continuation`
+- Base / starting SHA: `987a6b66cc34b8d7fc327dbda76853e8ef1e761b` (`finish/a3-operator-ui-second-pass` founder UI tip)
+- Role: PRIMARY LOCAL IMPLEMENTER — A4 Checkpoint 2
+- Scope: selected-plan continuation safety + Atlas flight→next-action canonical handoff only
+- Do NOT: hotel execution, Nuitée, A4 UI, V5.6/V7.2 redesign, merge to main
+
+## WIP source material (inspect-only; not blind merge)
+
+- Continuation: `codex/a4-selected-continuation` @ `b911989406d070f4a48c9783614f8256f16eb83f`
+- Prior candidate: `fb4ff1023f44b038da3c00484b4465c5a9c85ff6`
+- Hotel: `codex/a4-hotel-execution` @ `2e6cdae2ef632f62b4cfc72bdfdf6c0c920dc36b` — **Checkpoint 3; do not integrate here**
+
+## Owned paths
+
+- `src/persistence/postgres/migrations/0133_selected_plan_continuation.sql`
+- `src/persistence/postgres/execution/selectedPlanContinuation.ts`
+- `src/persistence/postgres/execution/storedExecutionGate.ts`
+- `src/persistence/postgres/commands/m8AuthorityCommands.ts`
+- `src/resolution/planning/compiler.ts` (canonical effect hash only)
+- `src/app/target/externalOfferExecution.ts` (Atlas observation→canonical bridge + optional checkpoint mint)
+- `postgres-integration/a4SelectedPlanContinuation.pgtest.ts`
+- `test/suites.json`
+- This ACTIVE_TASK section
+
+## Checkpoint status
+
+| CP | Goal | Result |
+|---|---|---|
+| 2 | Selected-plan continuation safety + Atlas handoff | in progress → see Completion |
+
+## Acceptance (Checkpoint 2)
+
+- [x] External OBSERVED_SUCCESS without canonical application blocks successor
+- [x] Matching observation + canonical receipt + root-owned residual VIABLE allows successor
+- [x] Unrelated Journey mutation fails closed
+- [x] UNKNOWN → reconciliation path only (no successor / no redispatch)
+- [x] Receipt/plan/source-kind mismatch fails closed
+- [x] Expired / wrong-next-intent / entry-terms invalidate continuation
+- [x] Application owns fresh capture + M6 evaluation (no caller-trusted world/evaluator)
+- [x] Atlas selected-flight path records canonical application bridge
+- [ ] Hotel execution — **out of scope (CP3)**
+
+## A3 conditional-pass defects (CARRY FORWARD — do not solve here)
+
+- Disruption trigger / Jordan progressive delay stages not obvious in UI
+- V5.6 graph semantic state wrong in some states (e.g. amber when connection impossible); missing/inconsistent edges
+- Cost provenance of hotel/new-spend/cancellation SGD figures needs final quote+nights+FX trace
+- Graphs should sit above other Case/Overview content; recovery copy needs another compression pass
+
+## Checks
+
+- `node --test --test-concurrency=1 postgres-integration/a4SelectedPlanContinuation.pgtest.ts` — 9/9
+- `node --test test/northstar-v2-m7-recovery-planning.test.ts` — 26/26
+- `node --test test/r4-offer-execution-boundary.test.ts` — 4/4
+- `npx tsc --noEmit -p tsconfig.json` — clean
+- Adjacent: `m7m8DagAndGenericity.pgtest.ts` (run if green)
+
+## Next action
+
+Commit + push `finish/a4-continuation`. Do **not** start hotel execution in this lane.
+
+---
+
 
 - Branch: `finish/a3-operator-ui-second-pass`
 - Worktree: `C:/Dev/qoder-atlas/.worktrees/a3-operator-ui-second-pass`

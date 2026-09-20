@@ -9,7 +9,8 @@
  *
  * This module does not execute actions, grant authority, or call providers.
  */
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { canonicalPayloadHash } from '../../persistence/postgres/canonicalHash.ts';
 import type { ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import {
@@ -79,7 +80,7 @@ function capabilitySupported(capabilities: readonly CapabilityStatement[] | unde
 }
 
 function fingerprint(parts: Record<string, unknown>): string {
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+  return canonicalPayloadHash(parts);
 }
 
 /**

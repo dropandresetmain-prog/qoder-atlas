@@ -174,14 +174,16 @@ export async function persistActionPlan(
         await client.query(
           `INSERT INTO action_intents (
              workspace_id, id, action_plan_id, operation_namespace, logical_operation_key, request_fingerprint,
+             source_effect_index, source_effect_fingerprint,
              capability_ref, subject_refs, expected_revisions, preconditions, offer_fingerprint,
              cost_amount, cost_currency, limits, required_authority_scopes, expected_observations,
              compensation_supported, compensation_requires_separate_authority, compensation_description,
              status, created_by_actor_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19,$20,$21)`,
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14,$15,$16,$17::jsonb,$18::jsonb,$19,$20,$21,$22,$23)`,
           [
             params.workspaceId, intent.id, plan.id, intent.operationNamespace,
             intent.logicalOperationKey ?? null, intent.requestFingerprint ?? null,
+            intent.sourceEffectIndex ?? null, intent.sourceEffectFingerprint ?? null,
             intent.capabilityRef, JSON.stringify(intent.subjectRefs), JSON.stringify(intent.expectedRevisions),
             JSON.stringify(intent.preconditions), intent.offerFingerprint ?? null,
             intent.costEstimate?.amount ?? null, intent.costEstimate?.currency ?? null,
@@ -636,7 +638,28 @@ export async function createPreparedExecutionAttempt(
       // in-progress/not-yet-attempted prerequisite blocks until it resolves.
       const deps = await client.query<{ from_action_intent_id: string; satisfied: boolean; failed: boolean }>(
         `SELECT d.from_action_intent_id,
-                bool_or(ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED')) AS satisfied,
+                bool_or(
+                  ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED')
+                  AND (
+                    -- Internal commands retain the prior observation/completion path.
+                    -- Externally owned actions require the immutable observation→
+                    -- canonical-application bridge before a dependent may prepare.
+                    EXISTS (
+                      SELECT 1 FROM action_intents prerequisite_intent
+                       WHERE prerequisite_intent.workspace_id = d.workspace_id
+                         AND prerequisite_intent.id = d.from_action_intent_id
+                         AND prerequisite_intent.capability_ref NOT LIKE 'external:%'
+                    )
+                    OR EXISTS (
+                      SELECT 1 FROM selected_plan_canonical_applications application
+                      JOIN command_receipts canonical_receipt
+                        ON canonical_receipt.workspace_id = application.workspace_id
+                       AND canonical_receipt.command_namespace = application.command_namespace
+                       AND canonical_receipt.idempotency_key = application.idempotency_key
+                       WHERE application.workspace_id = d.workspace_id AND application.attempt_id = ea.id
+                    )
+                  )
+                ) AS satisfied,
                 bool_or(ea.status IN ('OBSERVED_FAILURE', 'FAILED')) AS failed
            FROM action_dependencies d
            LEFT JOIN execution_attempts ea

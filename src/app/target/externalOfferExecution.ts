@@ -36,6 +36,11 @@ import { recordSource, recordEvidence } from '../../persistence/postgres/command
 import { createTransportService, createReservation, addReservationLine, allocateReservationLine } from '../../persistence/postgres/commands/arrangementCommands.ts';
 import { updateJourneyItem } from '../../persistence/postgres/commands/travelCommands.ts';
 import { PgAggregateHeadReader } from '../../persistence/postgres/pgAggregateHeadReader.ts';
+import {
+  createSelectedPlanContinuationCheckpoint,
+  loadNextSelectedPlanIntents,
+  recordSelectedPlanCanonicalApplication,
+} from '../../persistence/postgres/execution/selectedPlanContinuation.ts';
 import { createHash } from 'node:crypto';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF, ATLAS_SANDBOX_HOST, AtlasFlightTransactionAdapter } from '../../providers/atlas/transactionAdapter.ts';
@@ -349,6 +354,64 @@ export function buildAtlasReconcileLookup(pool: Pool, deps: ExternalOfferExecuti
 
 const AIR_MODE: Record<string, 'AIR' | 'RAIL' | 'ROAD' | 'SEA'> = { FLIGHT: 'AIR', AIR: 'AIR', RAIL: 'RAIL', ROAD: 'ROAD', SEA: 'SEA' };
 
+async function ensureAtlasCanonicalApplicationBridge(
+  ctx: ExternalExecutionContext,
+  intentId: string,
+  selectKey: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ws = ctx.workspaceId;
+  const bridge = await ctx.pool.query<{
+    attempt_id: string; observation_id: string; action_plan_id: string; recovery_strategy_id: string | null;
+  }>(
+    `SELECT ea.id AS attempt_id, eo.id AS observation_id, ai.action_plan_id, ap.recovery_strategy_id
+       FROM execution_attempts ea
+       JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+       JOIN action_plans ap ON ap.workspace_id = ai.workspace_id AND ap.id = ai.action_plan_id
+       JOIN execution_observations eo ON eo.workspace_id = ea.workspace_id AND eo.attempt_id = ea.id
+      WHERE ea.workspace_id = $1 AND ea.action_intent_id = $2
+        AND ea.status = ANY($3::text[])
+        AND eo.origin = 'EXTERNAL_PROVIDER'
+      ORDER BY ea.created_at DESC, eo.observed_at DESC
+      LIMIT 1`,
+    [ws, intentId, SUCCESS],
+  );
+  const link = bridge.rows[0];
+  if (!link) return { ok: false, error: 'canonical bridge: missing successful attempt/observation' };
+  const receipt = await ctx.pool.query<{ command_namespace: string }>(
+    `SELECT command_namespace FROM command_receipts
+      WHERE workspace_id = $1 AND command_namespace = 'JOURNEY_ITEM_UPDATED' AND idempotency_key = $2`,
+    [ws, selectKey],
+  );
+  if (!receipt.rows[0]) return { ok: false, error: 'canonical bridge: missing Journey selection receipt' };
+  const recorded = await recordSelectedPlanCanonicalApplication(ctx.pool, {
+    workspaceId: ws,
+    actorId: ctx.actorPrincipalId,
+    attemptId: link.attempt_id,
+    actionPlanId: link.action_plan_id,
+    actionIntentId: intentId,
+    commandNamespace: receipt.rows[0].command_namespace,
+    idempotencyKey: selectKey,
+    source: { kind: 'EXTERNAL_PROVIDER', observationId: link.observation_id },
+  });
+  if (!recorded.ok) return { ok: false, error: `canonical bridge: ${recorded.reason}` };
+
+  if (link.recovery_strategy_id) {
+    const now = ctx.now ?? new Date().toISOString();
+    const nextIntentIds = await loadNextSelectedPlanIntents(ctx.pool, ws, link.action_plan_id, intentId);
+    for (const nextIntentId of nextIntentIds) {
+      await createSelectedPlanContinuationCheckpoint(ctx.pool, {
+        workspaceId: ws,
+        actorId: ctx.actorPrincipalId,
+        actionPlanId: link.action_plan_id,
+        nextActionIntentId: nextIntentId,
+        sourceStrategyId: link.recovery_strategy_id,
+        now,
+      });
+    }
+  }
+  return { ok: true };
+}
+
 async function applyCanonicalSelection(
   ctx: ExternalExecutionContext, intentId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, observedAt: string,
 ): Promise<{ ok: true; already?: true } | { ok: false; error: string }> {
@@ -358,7 +421,11 @@ async function applyCanonicalSelection(
   const b = inputs.binding;
   const serviceId = id('service');
   const already = await ctx.pool.query('SELECT 1 FROM transport_item_details WHERE workspace_id = $1 AND journey_item_id = $2 AND selected_service_id = $3', [ws, b.journeyItemId, serviceId]);
-  if ((already.rowCount ?? 0) > 0) return { ok: true, already: true };
+  if ((already.rowCount ?? 0) > 0) {
+    const bridged = await ensureAtlasCanonicalApplicationBridge(ctx, intentId, `offer-select:${intentId}:select`);
+    if (!bridged.ok && !bridged.error.includes('missing successful attempt')) return bridged;
+    return { ok: true, already: true };
+  }
   const base = { workspaceId: ws, actorPrincipalId: ctx.actorPrincipalId };
   const uow = () => ctx.uow();
 
@@ -419,11 +486,15 @@ async function applyCanonicalSelection(
 
   const head = await new PgAggregateHeadReader(ctx.pool, ws).loadHead({ kind: 'JOURNEY', id: b.journeyId });
   if (!head) return { ok: false, error: 'journey head missing' };
+  const selectKey = `offer-select:${intentId}:select`;
   const selected = await updateJourneyItem(uow(), {
-    ...base, idempotencyKey: `offer-select:${intentId}:select`, journeyId: b.journeyId, journeyItemId: b.journeyItemId,
+    ...base, idempotencyKey: selectKey, journeyId: b.journeyId, journeyItemId: b.journeyItemId,
     expectedRevision: head.revision, selectedServiceId: serviceId, evidenceRefs: [evidenceId],
   });
   if (!selected.ok) return { ok: false, error: `select: ${selected.conflict.message}` };
+
+  const bridged = await ensureAtlasCanonicalApplicationBridge(ctx, intentId, selectKey);
+  if (!bridged.ok) return bridged;
   return { ok: true };
 }
 
