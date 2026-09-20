@@ -31,6 +31,8 @@
   },
   "suites": {
     "current": [
+      "test/a3-sandbox-protected-documents.test.ts",
+      "test/hotel-property-policy.test.ts",
       "test/reviewed-entry-evidence.test.ts",
       "test/a3-target-hotel-research.test.ts",
       "test/official-documents.test.ts",
@@ -155,6 +157,7 @@
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
+      "postgres-integration/a3SandboxProtectedDocuments.pgtest.ts",
       "postgres-integration/aitFixtureClone.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/r3ComposedB1Full.pgtest.ts",
@@ -238,6 +241,7 @@
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
+      "postgres-integration/a3SandboxProtectedDocuments.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/r3ComposedB1Full.pgtest.ts",
       "postgres-integration/r4PlanningPreferences.pgtest.ts",

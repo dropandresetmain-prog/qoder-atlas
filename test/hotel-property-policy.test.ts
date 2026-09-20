@@ -28,7 +28,7 @@ function document(overrides: Partial<OfficialDocumentEvidence> = {}): OfficialDo
     url: 'https://hotel.example/policy',
     observedAt: '2026-09-19T12:00:00Z',
     contentSha256: POLICY.sources[0]!.contentSha256,
-    text: 'Check-in from 15:00; check-out by 11:00.',
+    text: 'policy',
     ...overrides,
   };
 }
@@ -45,12 +45,11 @@ test('builds an offset-bearing window using the property IANA timezone', () => {
 
 test('checked-in Narita policy data produces the reviewed local stay window', () => {
   const policies = JSON.parse(readFileSync('data/ait-demo-input-pack/global/hotel-property-policies.json', 'utf8')) as unknown[];
-  const policy = HotelPropertyPolicySchema.parse(policies[0]);
-  const documents = policy.sources.map((source) => ({
-    ...source,
-    observedAt: '2026-09-19T12:00:00Z',
-    text: 'Reviewed official property policy evidence',
-  }));
+  const configured = HotelPropertyPolicySchema.parse(policies[0]);
+  // Check configured property facts using synthetic source-boundary evidence.
+  // This unit test does not impersonate a live read of the reviewed official page.
+  const policy = { ...configured, sources: [...POLICY.sources] };
+  const documents = [document()];
   const result = buildHotelPropertyPolicyWindow({ policy, actualOfficialDocumentEvidence: documents, quotedLocalDates: { checkInDate: '2026-09-29', checkOutDate: '2026-09-30' }, now: '2026-09-20T00:00:00Z' });
   assert.equal(result.ok, true);
   if (!result.ok) return;

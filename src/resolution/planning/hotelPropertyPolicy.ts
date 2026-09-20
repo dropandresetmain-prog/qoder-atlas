@@ -6,6 +6,7 @@
  * source observations are present, fresh, and unchanged. It does not assert
  * that a particular rate or booking will honour the general property policy.
  */
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { OfficialDocumentEvidence } from '../../providers/research/officialDocuments.ts';
 import { normalizeExtractedTemporal } from '../../ingest/temporal.ts';
@@ -189,7 +190,8 @@ export function buildHotelPropertyPolicyWindow(
     const matches = documents.filter((document) => document.sourceId === source.sourceId);
     if (matches.length === 0) return refusal('missing_source_evidence', policy);
     const document = matches[0]!;
-    if (document.url !== source.url || document.publisher !== source.publisher || document.contentSha256 !== source.contentSha256) {
+    if (document.url !== source.url || document.publisher !== source.publisher || document.contentSha256 !== source.contentSha256
+      || createHash('sha256').update(document.text, 'utf8').digest('hex') !== document.contentSha256) {
       return refusal('source_provenance_mismatch', policy);
     }
     const observed = Date.parse(document.observedAt);
