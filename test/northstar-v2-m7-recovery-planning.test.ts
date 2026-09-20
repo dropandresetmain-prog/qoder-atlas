@@ -24,6 +24,8 @@ import { credentialsEvaluator } from '../src/resolution/evaluation/evaluators/cr
 import { applyScenarioOverlay, assertCanonicalWorldUntouched } from '../src/resolution/scenarios/overlay.ts';
 import { evaluateRecoveryStrategy } from '../src/resolution/scenarios/evaluate.ts';
 import { compileActionPlan, withForcedCycle } from '../src/resolution/planning/compiler.ts';
+import { proposeOvernightCompanions, type QuotedStayOption } from '../src/resolution/planning/proposers/overnightCompanions.ts';
+import type { ProposalCandidate } from '../src/resolution/planning/proposer.ts';
 import type { CurrentState } from '../src/resolution/world/currentness.ts';
 
 const NOW = '2030-06-01T12:00:00.000Z';
@@ -1063,4 +1065,155 @@ test('ADD_JOURNEY_STAY compiles only with an explicit capability and captured ow
   });
   assert.equal(noOwningRead.ok, false);
   if (!noOwningRead.ok) assert.equal(noOwningRead.conflict.kind, 'STALE_AGGREGATE_REVISION');
+});
+
+test('overnight companion proposer pairs captured stays only with one actual uncovered gap', () => {
+  const { world, journey, placeId, arrival, jurisdictionId } = overnightStayWorld();
+  const serviceId = id();
+  const flightOfferId = id();
+  const stayOfferId = id();
+  world.transportServices.push(service({
+    id: serviceId,
+    originPlaceId: arrival.desiredOriginPlaceId!,
+    destinationPlaceId: placeId,
+    published: { departure: observed('2030-06-02T04:00:00.000Z'), arrival: observed('2030-06-02T08:00:00.000Z') },
+  }));
+  const base: ProposalCandidate = {
+    key: 'transport-candidate:one',
+    effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: arrival.id, offerId: flightOfferId, offerPrice: { amount: '100.00', currency: 'NZD' } }],
+    affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: arrival.id }, { kind: 'JOURNEY', id: journey.id }],
+    rationale: 'Use the captured transport offer.',
+    assumptions: [],
+  };
+  const option: QuotedStayOption = {
+    baseCandidateKey: base.key,
+    journeyId: journey.id,
+    offerId: stayOfferId,
+    offer: {
+      offerId: stayOfferId,
+      placeId,
+      stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+      price: { amount: '245.00', currency: 'NZD' },
+    },
+    proposedJourneyItemId: id(),
+    orderKey: '020',
+    visit: {
+      kind: 'PROPOSED', proposedVisitId: id(), jurisdictionId, purpose: 'overnight recovery',
+      intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+      credentialSelections: [],
+    },
+  };
+  const before = structuredClone(world);
+  const proposed = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option],
+  });
+  assert.equal(proposed.ok, true);
+  if (!proposed.ok) return;
+  const output = proposed.value;
+  assert.deepEqual(output.candidates[0], base);
+  assert.equal(output.candidates.length, 2);
+  assert.deepEqual(output.resolvedStayOffers, [{ candidateKey: output.candidates[1]!.key, baseCandidateKey: base.key, offer: option.offer }]);
+  assert.equal(output.uncoveredGaps.length, 1);
+  assert.deepEqual(output.uncoveredGaps[0]?.itemRefs.map((ref) => ref.id).sort(), world.journeyItems.map((item) => item.id).sort());
+  const paired = output.candidates[1]!;
+  assert.equal(paired.effects.length, 2);
+  assert.equal(paired.effects[0]?.effectKind, 'SELECT_OFFER');
+  assert.equal(paired.effects[1]?.effectKind, 'ADD_JOURNEY_STAY');
+  assert.equal(paired.rationale, 'Add overnight accommodation to cover the itinerary gap.');
+  assert.deepEqual(world, before);
+
+  const evaluated = evaluateRecoveryStrategy({
+    recoveryCaseId: id(), strategyId: id(), baseWorld: world, baseManifest: emptyManifest(),
+    basisAssessmentId: id(),
+    scenarioChange: ScenarioChangeSchema.parse({
+      id: id(), recoveryStrategyId: id(), strategyVersion: 1, basisAssessmentId: id(),
+      affectedSubjectRefs: paired.affectedSubjectRefs, effects: paired.effects,
+    }),
+    now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    resolvedStayOffers: [option.offer],
+    resolveSubjectRefs: [{ kind: 'JOURNEY', id: journey.id }],
+    registry: createEvaluatorRegistry([overnightEvaluator, entryEvaluator, credentialsEvaluator]),
+  });
+  assert.equal(evaluated.ok, true);
+  if (!evaluated.ok) return;
+  assert.equal(evaluated.value.strategy.viability, 'NOT_EXECUTABLE');
+  const result = evaluated.value.strategy.candidateAssessmentResults.find((assessment) => assessment.subjects[0]?.subjectRef.id === journey.id)!;
+  assert.equal(result.dimensions.find((dimension) => dimension.dimension === 'overnight_accommodation')?.verdict, 'PASS');
+  assert.equal(result.dimensions.find((dimension) => dimension.dimension === 'entry_feasibility')?.verdict, 'UNKNOWN');
+
+  const alternativeOfferId = id();
+  const alternative: ProposalCandidate = {
+    ...base,
+    key: 'transport-candidate:two',
+    effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: arrival.id, offerId: alternativeOfferId, offerPrice: { amount: '120.00', currency: 'NZD' } }],
+  };
+  const alternativeOption: QuotedStayOption = {
+    ...option,
+    baseCandidateKey: alternative.key,
+    proposedJourneyItemId: id(),
+    visit: option.visit.kind === 'PROPOSED' ? { ...option.visit, proposedVisitId: id() } : option.visit,
+  };
+  const sharedQuote = proposeOvernightCompanions({
+    flightCandidates: [base, alternative], world, now: NOW,
+    resolvedOffers: [
+      { offerId: flightOfferId, transportServiceId: serviceId },
+      { offerId: alternativeOfferId, transportServiceId: serviceId },
+    ],
+    quotedStayOptions: [option, alternativeOption],
+  });
+  assert.equal(sharedQuote.ok, true);
+  if (!sharedQuote.ok) return;
+  assert.equal(sharedQuote.value.candidates.length, 4);
+  assert.equal(sharedQuote.value.resolvedStayOffers.length, 2);
+  assert.deepEqual(sharedQuote.value.resolvedStayOffers.map((entry) => entry.offer.offerId), [stayOfferId, stayOfferId]);
+
+  const conflictingQuote = proposeOvernightCompanions({
+    flightCandidates: [base, alternative], world, now: NOW,
+    resolvedOffers: [
+      { offerId: flightOfferId, transportServiceId: serviceId },
+      { offerId: alternativeOfferId, transportServiceId: serviceId },
+    ],
+    quotedStayOptions: [option, { ...alternativeOption, offer: { ...alternativeOption.offer, price: { amount: '246.00', currency: 'NZD' } } }],
+  });
+  assert.equal(conflictingQuote.ok, false);
+
+  const zeroCap = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option], maxStayOptionsPerCandidate: 0,
+  });
+  assert.equal(zeroCap.ok, true);
+  if (!zeroCap.ok) return;
+  assert.deepEqual(zeroCap.value.candidates, [base]);
+  const invalidCap = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option], maxCombinedCandidates: Number.NaN,
+  });
+  assert.equal(invalidCap.ok, false);
+  const duplicateBase = proposeOvernightCompanions({
+    flightCandidates: [base, { ...base }], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [option],
+  });
+  assert.equal(duplicateBase.ok, false);
+
+  const mismatched = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [{ ...option, baseCandidateKey: 'other-candidate' }],
+  });
+  assert.equal(mismatched.ok, true);
+  if (!mismatched.ok) return;
+  assert.deepEqual(mismatched.value.candidates, [base]);
+  assert.ok(mismatched.value.skipped.some((skip) => skip.reason === 'no_compatible_stay_option'));
+  const mismatchedOffer = proposeOvernightCompanions({
+    flightCandidates: [base], world, now: NOW,
+    resolvedOffers: [{ offerId: flightOfferId, transportServiceId: serviceId }],
+    quotedStayOptions: [{ ...option, offerId: id() }],
+  });
+  assert.equal(mismatchedOffer.ok, false);
 });
