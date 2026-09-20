@@ -1073,6 +1073,87 @@ test('ADD_JOURNEY_STAY compiles only with an explicit capability and captured ow
   if (!noOwningRead.ok) assert.equal(noOwningRead.conflict.kind, 'STALE_AGGREGATE_REVISION');
 });
 
+function selectedStayStrategy(input: {
+  journeyId: string;
+  transportItemId: string;
+  oldStayItemId: string;
+  reservationId: string;
+  reservationLineId: string;
+  secondOrderKey?: string;
+  replacementJourneyId?: string;
+}): RecoveryStrategy {
+  const scenarioChange = ScenarioChangeSchema.parse({
+    id: id(), recoveryStrategyId: id(), strategyVersion: 1, basisAssessmentId: id(),
+    affectedSubjectRefs: [{ kind: 'JOURNEY', id: input.journeyId }],
+    effects: [
+      { effectKind: 'SELECT_OFFER', journeyItemId: input.transportItemId, offerId: id() },
+      { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: id(), journeyId: input.journeyId, orderKey: '020', offerId: id(), offerPrice: { amount: '100.00', currency: 'USD' }, visit: { kind: 'EXISTING', visitId: id() } },
+      { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: id(), journeyId: input.replacementJourneyId ?? input.journeyId, orderKey: input.secondOrderKey ?? '040', offerId: id(), offerPrice: { amount: '200.00', currency: 'USD' }, visit: { kind: 'EXISTING', visitId: id() }, replacesReservationLineId: input.reservationLineId },
+      { effectKind: 'CANCEL_STAY', journeyItemId: input.oldStayItemId, reservationLineId: input.reservationLineId, cancellationPenalty: { amount: '25.00', currency: 'USD' }, cancellationPenaltyBasis: 'PROVIDER_POLICY' },
+    ],
+  });
+  return {
+    id: scenarioChange.recoveryStrategyId, recoveryCaseId: id(), strategyVersion: 1,
+    status: 'EVALUATED', baseManifest: emptyManifest({ aggregateReads: [
+      { aggregateRef: { kind: 'JOURNEY', id: input.journeyId }, revision: 1 },
+      { aggregateRef: { kind: 'RESERVATION', id: input.reservationId }, revision: 1 },
+    ] }), basisAssessmentId: scenarioChange.basisAssessmentId, affectedSubjectRefs: scenarioChange.affectedSubjectRefs,
+    scenarioChange, assumptions: [], requiredUnknowns: [], candidateAssessments: [], candidateAssessmentResults: [],
+    viability: 'VIABLE', requiredAuthorityScopes: [], createdAt: NOW, evaluatedAt: NOW,
+  };
+}
+
+function compileSelectedStayStrategy(strategy: RecoveryStrategy, input: { journeyId: string; transportItemId: string; reservationLineId: string; reservationId: string; oldStayItemId: string }) {
+  return compileActionPlan({
+    strategy, now: NOW,
+    capabilities: [
+      { capabilityRef: 'external:offer.select', supported: true },
+      { capabilityRef: 'external:stay.book', supported: true },
+      { capabilityRef: 'external:stay.cancel', supported: true },
+    ],
+    journeyItemOwnership: new Map([
+      [input.transportItemId, { journeyId: input.journeyId, orderKey: '010' }],
+      [input.oldStayItemId, { journeyId: input.journeyId, orderKey: '040' }],
+    ]),
+    stayCancellationOwnership: new Map([
+      [input.reservationLineId, { journeyId: input.journeyId, reservationId: input.reservationId, orderKey: '040' }],
+    ]),
+  });
+}
+
+test('selected stay plan requires an explicit same-Journey replacement and orders transport, stays, then cancellation', () => {
+  const journeyId = id(); const transportItemId = id(); const oldStayItemId = id(); const reservationId = id(); const reservationLineId = id();
+  const strategy = selectedStayStrategy({ journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId });
+  const compiled = compileSelectedStayStrategy(strategy, { journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId });
+  assert.equal(compiled.ok, true);
+  if (!compiled.ok) return;
+  const byIndex = new Map(compiled.value.plan.intents.map((intent) => [intent.sourceEffectIndex, intent.id]));
+  const edge = (from: number, to: number) => compiled.value.plan.dependencies.some((dependency) => dependency.fromActionIntentId === byIndex.get(from) && dependency.toActionIntentId === byIndex.get(to));
+  assert.equal(edge(0, 1), true, 'transport selection precedes the overnight stay');
+  assert.equal(edge(1, 2), true, 'itinerary order precedes the destination replacement');
+  assert.equal(edge(2, 3), true, 'replacement confirmation precedes displaced cancellation');
+  assert.ok(compiled.value.plan.intents.every((intent) => intent.sourceEffectFingerprint?.match(/^[a-f0-9]{64}$/)));
+
+  const wrongJourney = selectedStayStrategy({ journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId, replacementJourneyId: id() });
+  const refused = compileSelectedStayStrategy(wrongJourney, { journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId });
+  assert.equal(refused.ok, false, 'cross-Journey replacement cannot be inferred as a valid cancellation pair');
+});
+
+test('selected stay plan fails closed for ambiguous ordering or uncaptured replacement ownership', () => {
+  const journeyId = id(); const transportItemId = id(); const oldStayItemId = id(); const reservationId = id(); const reservationLineId = id();
+  const ambiguous = selectedStayStrategy({ journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId, secondOrderKey: '020' });
+  const ambiguousResult = compileSelectedStayStrategy(ambiguous, { journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId });
+  assert.equal(ambiguousResult.ok, false);
+
+  const strategy = selectedStayStrategy({ journeyId, transportItemId, oldStayItemId, reservationId, reservationLineId });
+  const missingOwner = compileActionPlan({
+    strategy, now: NOW,
+    capabilities: [{ capabilityRef: 'external:offer.select', supported: true }, { capabilityRef: 'external:stay.book', supported: true }, { capabilityRef: 'external:stay.cancel', supported: true }],
+    journeyItemOwnership: new Map([[transportItemId, { journeyId, orderKey: '010' }]]),
+  });
+  assert.equal(missingOwner.ok, false, 'uncaptured displaced ownership blocks execution planning');
+});
+
 test('overnight companion proposer pairs captured stays only with one actual uncovered gap', () => {
   const { world, journey, placeId, arrival, jurisdictionId } = overnightStayWorld();
   const serviceId = id();
