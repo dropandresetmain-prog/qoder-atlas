@@ -27,6 +27,10 @@ import { compileActionPlan, withForcedCycle } from '../src/resolution/planning/c
 import { proposeOvernightCompanions, type QuotedStayOption } from '../src/resolution/planning/proposers/overnightCompanions.ts';
 import type { ProposalCandidate } from '../src/resolution/planning/proposer.ts';
 import type { CurrentState } from '../src/resolution/world/currentness.ts';
+import { createHotelCompanionPlanning } from '../src/app/targetHotelCompanionPlanning.ts';
+import { materializeTransportOffers } from '../src/resolution/planning/transportOfferMaterialization.ts';
+import { transportCorridors, transportRequestId } from '../src/resolution/planning/transportCorridors.ts';
+import type { PlanningToolResult } from '../src/contracts/v2/planning/planningTool.ts';
 
 const NOW = '2030-06-01T12:00:00.000Z';
 
@@ -1216,4 +1220,130 @@ test('overnight companion proposer pairs captured stays only with one actual unc
     quotedStayOptions: [{ ...option, offerId: id() }],
   });
   assert.equal(mismatchedOffer.ok, false);
+});
+
+test('transport planning adds a quoted hotel companion only for the real uncovered gap', async () => {
+  const { world, journey, placeId, arrival, visit } = overnightStayWorld();
+  const originPlaceId = arrival.desiredOriginPlaceId!;
+  world.places.push({ id: originPlaceId, revision: 1, name: 'Origin', placeType: 'AIRPORT', timeZone: 'Pacific/Auckland', hasCoordinates: true });
+  world.places.find((place) => place.id === placeId)!.externalRefs = [
+    { system: 'hotel-provider-id', value: 'property-a' },
+    { system: 'hotel-provider-id', value: 'property-b' },
+  ];
+  const departure = world.journeyItems.find((item) => item.id !== arrival.id)!;
+  const onwardService = service({
+    originPlaceId: placeId, destinationPlaceId: departure.desiredDestinationPlaceId!,
+    published: { departure: observed('2030-06-03T02:00:00.000Z'), arrival: observed('2030-06-03T06:00:00.000Z') },
+  });
+  departure.selectedServiceId = onwardService.id;
+  world.transportServices.push(onwardService);
+  const failing = [{ subject: { kind: 'JOURNEY' as const, id: journey.id }, assessment: {} as never }];
+  const resolveAirport = (place: string) => place === originPlaceId ? { system: 'IATA', value: 'ORG' } : place === placeId ? { system: 'IATA', value: 'DST' } : undefined;
+  const before = structuredClone(world);
+  const planning = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
+    hotel: {
+      transport: async (request) => {
+        assert.ok(['hotel.search', 'hotel.quote'].includes(request.operation), 'planning route cannot reach hotel transaction operations');
+        throw new Error('the focused test supplies normalized results directly');
+      },
+      resolveContext: ({ candidate, gap }) => ({
+        baseCandidateKey: candidate.key, journeyId: gap.journeyId, placeId,
+        query: {
+          location: { externalRef: { system: 'hotel-provider-id', value: 'property-a' } },
+          checkInDate: '2030-06-02', checkOutDate: '2030-06-03', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ',
+        },
+        stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
+        proposedJourneyItemId: id(), orderKey: '020', visit,
+        provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['source-stay-context'] },
+      }),
+    },
+  });
+  const corridor = transportCorridors(world, failing, { resolveAirport, passengers: { adults: 1 } }).corridors[0]!;
+  const flight: PlanningToolResult = {
+    requestId: transportRequestId(corridor), capability: 'FLIGHT', operation: 'flight.search', status: 'SUCCEEDED',
+    normalizedEvidence: { offers: [{ offerId: 'provider flight ref', segments: [{ origin: { system: 'IATA', value: 'ORG' }, destination: { system: 'IATA', value: 'DST' }, departure: '2030-06-02T04:00:00.000Z', arrival: '2030-06-02T08:00:00.000Z' }], totalPrice: { amount: 100, currency: 'NZD' }, availability: 'AVAILABLE' }] },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+  };
+  const searches = await planning.nextRound({ completedRound: 1, results: [flight] });
+  assert.equal(searches.length, 1, 'only the actual overnight gap receives HOTEL research');
+  const search: PlanningToolResult = {
+    requestId: searches[0]!.id, capability: 'HOTEL', operation: 'hotel.search', status: 'SUCCEEDED',
+    normalizedEvidence: { properties: [{ propertyId: 'property-a', name: 'A', externalRefs: [{ system: 'hotel-provider-id', value: 'property-a' }] }], rates: [{ rateId: 'rate-a', propertyId: 'property-a', totalPrice: { amount: 245, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+  };
+  const quotes = await planning.nextRound({ completedRound: 2, results: [flight, search] });
+  assert.equal(quotes.length, 1);
+  const quote: PlanningToolResult = {
+    requestId: quotes[0]!.id, capability: 'HOTEL', operation: 'hotel.quote', status: 'SUCCEEDED',
+    normalizedEvidence: { status: 'QUOTED', quoteId: 'quote-a', quotedPrice: { amount: 245, currency: 'NZD' }, workflowState: { prebookRef: 'opaque' } },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+  };
+  const materializedTransport = materializeTransportOffers({ world, failing, toolResults: [flight, search, quote], now: NOW, resolveAirport, passengers: { adults: 1 } });
+  const candidates = await planning.proposer.propose({
+    workspaceId: world.workspaceId, recoveryCaseId: id(), now: NOW, failing, world: materializedTransport.world,
+    effective: effectiveOf(materializedTransport.world), domain: 'TRANSPORT', evidence: { domainId: 'TRANSPORT', toolResults: [flight, search, quote], evidenceRefs: [] }, preferences: [],
+  });
+  assert.equal(candidates.length, 2, 'the rejected flight-only alternative remains alongside one combined option');
+  const combined = candidates.find((candidate) => candidate.effects.some((effect) => effect.effectKind === 'ADD_JOURNEY_STAY'))!;
+  assert.ok(combined);
+  const hotelTerms = planning.materialize([flight, search, quote]);
+  assert.equal(hotelTerms.quotedStays.length, 1);
+  assert.equal(hotelTerms.quotedStays[0]?.provider.quoteId, 'quote-a');
+  const evaluated = evaluateRecoveryStrategy({
+    recoveryCaseId: id(), strategyId: id(), basisAssessmentId: id(), baseWorld: materializedTransport.world, baseManifest: emptyManifest(),
+    scenarioChange: ScenarioChangeSchema.parse({ id: id(), recoveryStrategyId: id(), strategyVersion: 1, basisAssessmentId: id(), affectedSubjectRefs: combined.affectedSubjectRefs, effects: combined.effects }),
+    now: NOW, resolvedOffers: materializedTransport.resolvedOffers, resolvedStayOffers: hotelTerms.resolvedStayOffers,
+    resolveSubjectRefs: [{ kind: 'JOURNEY', id: journey.id }], registry: createM6Registry(),
+  });
+  assert.equal(evaluated.ok, true);
+  if (evaluated.ok) {
+    const assessment = evaluated.value.strategy.candidateAssessmentResults.find((row) => row.subjects[0]?.subjectRef.id === journey.id)!;
+    assert.equal(assessment.dimensions.find((dimension) => dimension.dimension === 'overnight_accommodation')?.verdict, 'PASS');
+    assert.equal(assessment.dimensions.find((dimension) => dimension.dimension === 'entry_feasibility')?.verdict, 'UNKNOWN');
+  }
+  const failedQuote: PlanningToolResult = {
+    ...quote, status: 'FAILED', normalizedEvidence: undefined,
+    error: { category: 'PROVIDER_ERROR', code: 'quote_failed', message: 'provider refused the confirmation' },
+  };
+  assert.deepEqual(planning.materialize([flight, search, failedQuote]).resolvedStayOffers, [], 'a failed confirmation cannot become a candidate stay term');
+  const fractionalQuote: PlanningToolResult = {
+    ...quote,
+    normalizedEvidence: { status: 'QUOTED', quoteId: 'quote-fractional', quotedPrice: { amount: 245.001, currency: 'NZD' } },
+  };
+  assert.deepEqual(planning.materialize([flight, search, fractionalQuote]).resolvedStayOffers, [], 'an unrepresentable provider price cannot be rounded into a lower candidate charge');
+  const wrongProperty: PlanningToolResult = {
+    ...search,
+    normalizedEvidence: { properties: [{ propertyId: 'property-other', name: 'Other', externalRefs: [{ system: 'hotel-provider-id', value: 'property-other' }] }], rates: [{ rateId: 'rate-other', propertyId: 'property-other', totalPrice: { amount: 200, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
+  };
+  assert.deepEqual(await planning.nextRound({ completedRound: 2, results: [flight, wrongProperty] }), [], 'an unrelated returned property cannot be quoted for the captured place');
+  const alternate = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
+    hotel: {
+      transport: planning.transport,
+      resolveContext: ({ candidate, gap }) => ({
+        baseCandidateKey: candidate.key, journeyId: gap.journeyId, placeId,
+        query: { location: { externalRef: { system: 'hotel-provider-id', value: 'property-b' } }, checkInDate: '2030-06-02', checkOutDate: '2030-06-03', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ' },
+        stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' }, proposedJourneyItemId: id(), orderKey: '020', visit,
+        provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['source-stay-context'] },
+      }),
+    },
+  });
+  const alternateSearches = await alternate.nextRound({ completedRound: 1, results: [flight] });
+  const alternateSearch: PlanningToolResult = {
+    ...search, requestId: alternateSearches[0]!.id,
+    normalizedEvidence: { properties: [{ propertyId: 'property-b', name: 'B', externalRefs: [{ system: 'hotel-provider-id', value: 'property-b' }] }], rates: [{ rateId: 'rate-b', propertyId: 'property-b', totalPrice: { amount: 255, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
+  };
+  assert.equal((await alternate.nextRound({ completedRound: 2, results: [flight, alternateSearch] })).length, 1, 'a different captured property reference can be quoted when the returned property matches it');
+  const noContext = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
+    hotel: { transport: planning.transport, resolveContext: () => undefined },
+  });
+  assert.deepEqual(await noContext.nextRound({ completedRound: 1, results: [flight] }), [], 'missing authoritative context cannot produce a hotel search');
+  const zeroAlternatives = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
+    hotel: { transport: planning.transport, resolveContext: () => { throw new Error('zero alternatives must not resolve context'); }, maxCombinedCandidates: 0 },
+  });
+  assert.deepEqual(await zeroAlternatives.nextRound({ completedRound: 1, results: [flight] }), [], 'a zero alternative cap avoids hotel reads');
+  assert.deepEqual(world, before, 'research and proposal leave the captured base untouched');
 });

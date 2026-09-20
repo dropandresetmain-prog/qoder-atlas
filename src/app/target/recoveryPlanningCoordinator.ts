@@ -60,6 +60,11 @@ import type { WTransportService } from '../../resolution/world/world.ts';
 import type { ResolvedOffer } from '../../resolution/scenarios/overlay.ts';
 import { materializeTransportOffers } from '../../resolution/planning/transportOfferMaterialization.ts';
 import { airportResolverFromCapturedWorld, flightSearchRequestFor, transportCorridors, type AirportResolver, type TransportPassengerSource } from '../../resolution/planning/transportCorridors.ts';
+import {
+  createHotelCompanionPlanning,
+  type HotelPlanningMaterialization,
+  type HotelPlanningOptions,
+} from '../targetHotelCompanionPlanning.ts';
 import { defaultRecoveryDomainRegistry } from '../../resolution/planning/recoveryDomains.ts';
 import {
   runRecoveryPlanning,
@@ -124,6 +129,12 @@ export interface RecoveryPlanningCoordinatorDeps {
     resolveAirport?: AirportResolver;
     maxOffersPerCorridor?: number;
   } & TransportPassengerSource;
+  /**
+   * Optional bounded HOTEL follow-up for a researched transport alternative.
+   * The resolver supplies authoritative candidate-specific context; absence
+   * leaves existing transport-only planning unchanged and invents no stay.
+   */
+  hotelPlanning?: HotelPlanningOptions;
   /**
    * Optional Model Studio / Qwen client for hybrid domain suggestion.
    * Suggestions are registry-validated fail-closed; absence is honest (no AI).
@@ -237,7 +248,7 @@ async function nextStrategyVersion(pool: Pool, workspaceId: string, caseId: stri
 }
 
 export type CoordinatorPlanOutcome =
-  | { ok: true; result: RecoveryPlanningResult }
+  | { ok: true; result: RecoveryPlanningResult; hotelPlanningMaterialization?: HotelPlanningMaterialization }
   | { ok: false; error: ApplicationError };
 
 /**
@@ -287,11 +298,22 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           ? { passengersFor: transportPlanning.passengersFor, ...(transportPlanning.passengers ? { passengers: transportPlanning.passengers } : {}) }
           : { passengers: transportPlanning.passengers! })
         : undefined;
+      const hotelCompanionPlanning = transportPlanning && deps.hotelPlanning
+        ? createHotelCompanionPlanning({
+            world: basis.world,
+            failing: basis.failing,
+            now,
+            resolveAirport: resolveAirport!,
+            ...passengerSource!,
+            ...(transportPlanning.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+            hotel: deps.hotelPlanning,
+          })
+        : undefined;
       const proposers = [...(deps.proposers ?? defaultDomainProposers())];
       if (transportPlanning && !proposers.some((binding) => binding.domain === 'TRANSPORT')) {
         proposers.push({
           domain: 'TRANSPORT',
-          proposer: createTransportProposer({
+          proposer: hotelCompanionPlanning?.proposer ?? createTransportProposer({
             resolveAirport: resolveAirport!,
             ...passengerSource!,
             ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
@@ -355,6 +377,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       // the researched provider offer (protected input, migration 0128).
       const capturedOfferServices: WTransportService[] = [];
       const capturedResolvedOffers: ResolvedOffer[] = [];
+      let capturedHotelMaterialization: HotelPlanningMaterialization | undefined;
 
       // 2. Delegate ALL decision logic to the pure core.
       const core = await runRecoveryPlanning(
@@ -380,7 +403,15 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
           comparatorVersion: deps.comparatorVersion ?? R1_COMPARATOR_VERSION,
           ...(transportPlanning ? {
-            research: { transport: transportPlanning.transport, requestsByDomain: { TRANSPORT: [transportResearch] } },
+            research: {
+              transport: hotelCompanionPlanning
+                ? async (request) => request.capability === 'HOTEL'
+                  ? hotelCompanionPlanning.transport(request)
+                  : transportPlanning.transport(request)
+                : transportPlanning.transport,
+              requestsByDomain: { TRANSPORT: [transportResearch] },
+              ...(hotelCompanionPlanning ? { budget: hotelCompanionPlanning.budget, nextRound: hotelCompanionPlanning.nextRound } : {}),
+            },
             materializeWorldForDomain: ({ domainId, evidence, basis: domainBasis }) => {
               if (domainId !== 'TRANSPORT') return undefined;
               const materialized = materializeTransportOffers({
@@ -394,6 +425,13 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
               });
               capturedOfferServices.push(...materialized.capturedServices);
               capturedResolvedOffers.push(...materialized.resolvedOffers);
+              if (hotelCompanionPlanning) {
+                capturedHotelMaterialization = hotelCompanionPlanning.materialize(evidence.toolResults);
+                return {
+                  ...materialized,
+                  resolvedStayOffers: capturedHotelMaterialization.resolvedStayOffers,
+                };
+              }
               return materialized;
             },
           } : {}),
@@ -440,7 +478,11 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         });
       }
 
-      return { ok: true, result: { ...core.result, planningAttemptRef: attemptPersisted.value.attemptId as SubjectId } };
+      return {
+        ok: true,
+        result: { ...core.result, planningAttemptRef: attemptPersisted.value.attemptId as SubjectId },
+        ...(capturedHotelMaterialization ? { hotelPlanningMaterialization: capturedHotelMaterialization } : {}),
+      };
     },
 
     async planCase(input: RecoveryPlanningInput): Promise<RecoveryPlanningResult> {
