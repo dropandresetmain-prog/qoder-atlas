@@ -93,7 +93,11 @@ async function continuationExplainsCurrentness(
       `SELECT ea.action_intent_id, ea.status
          FROM execution_attempts ea
          JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+         JOIN selected_plan_canonical_applications application
+           ON application.workspace_id = ea.workspace_id AND application.attempt_id = ea.id
          JOIN command_receipts cr ON cr.workspace_id = ea.workspace_id
+          AND cr.command_namespace = application.command_namespace
+          AND cr.idempotency_key = application.idempotency_key
           AND cr.command_namespace = $4 AND cr.idempotency_key = $5
         WHERE ea.workspace_id = $1 AND ea.id = $2 AND ai.action_plan_id = $3`,
       [workspaceId, receipt.attemptId, intent.actionPlanId,
