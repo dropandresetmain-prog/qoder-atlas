@@ -25,6 +25,8 @@
 import { z } from 'zod';
 import { SubjectIdSchema, type SubjectId } from '../../../domain/v2/shared/identity.ts';
 import { compareInstants, InstantSchema } from '../../../domain/v2/shared/time.ts';
+import { CurrencyCodeSchema, ExactMoneySchema } from '../../../domain/v2/shared/money.ts';
+import { FxRateEvidenceSchema } from '../../../engine/fx.ts';
 import { WorldSnapshotManifestSchema } from '../scope/readScope.ts';
 import { StrategyViabilitySchema, type StrategyViability } from '../scenario/recoveryStrategy.ts';
 import {
@@ -76,6 +78,50 @@ export const MaterialCandidateDispositionSchema = z.enum([
 ]);
 export type MaterialCandidateDisposition = z.infer<typeof MaterialCandidateDispositionSchema>;
 
+/** One provider-price line and its evidenced home-currency restatement. */
+export const RecoveryCostLineEvidenceSchema = z.strictObject({
+  kind: z.enum(['SELECT_OFFER', 'ADD_JOURNEY_STAY', 'POLICY_PENALTY_ESTIMATE']),
+  providerAmount: ExactMoneySchema,
+  homeAmount: ExactMoneySchema,
+  fxEvidenceId: z.string().min(1).optional(),
+  /** Policy penalty values are estimates, never observed charges. */
+  observed: z.boolean(),
+});
+export type RecoveryCostLineEvidence = z.infer<typeof RecoveryCostLineEvidenceSchema>;
+
+export const RecoveryCostUnavailableCodeSchema = z.enum([
+  'CONTEXT_UNAVAILABLE',
+  'INVALID_INPUT',
+  'MISSING_EFFECT_PRICE',
+  'MISSING_RATE_EVIDENCE',
+  'FUTURE_RATE_EVIDENCE',
+  'STALE_RATE_EVIDENCE',
+  'UNTRUSTED_RATE_EVIDENCE',
+  'INVALID_RATE_PRECISION',
+  'UNSUPPORTED_MONEY_PRECISION',
+]);
+export type RecoveryCostUnavailableCode = z.infer<typeof RecoveryCostUnavailableCodeSchema>;
+
+/** Closed cost evidence: an unavailable comparison is explicit and never free. */
+export const MaterialCandidateCostComparisonSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('AVAILABLE'),
+    homeCurrency: CurrencyCodeSchema,
+    totalHomeAmount: ExactMoneySchema,
+    lines: z.array(RecoveryCostLineEvidenceSchema).max(32),
+    /** Full selected dated FX records, not opaque identifiers alone. */
+    selectedFxEvidence: z.array(FxRateEvidenceSchema).max(32),
+    comparedAt: InstantSchema,
+  }),
+  z.strictObject({
+    status: z.literal('UNAVAILABLE'),
+    code: RecoveryCostUnavailableCodeSchema,
+    reason: z.string().min(1).max(512),
+    comparedAt: InstantSchema,
+  }),
+]);
+export type MaterialCandidateCostComparison = z.infer<typeof MaterialCandidateCostComparisonSchema>;
+
 /**
  * Bounded evidence for ONE material candidate. `strategyRef` is present only
  * when the candidate was promoted to a persisted viable RecoveryStrategy;
@@ -99,6 +145,8 @@ export const MaterialCandidateEvidenceSchema = z.strictObject({
   immediateChangeBlastRadius: ImmediateChangeBlastRadiusSchema.optional(),
   reassessmentClosure: ReassessmentClosureSchema.optional(),
   outcomeDelta: z.array(OutcomeDeltaEntrySchema).default([]),
+  /** Optional only when no cost-comparison supplier is composed at all. */
+  costComparison: MaterialCandidateCostComparisonSchema.optional(),
 });
 export type MaterialCandidateEvidence = z.infer<typeof MaterialCandidateEvidenceSchema>;
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { effectiveFxRate, isFxRateEffective, FxRateEvidenceSchema, type FxRateEvidence } from '../../engine/fx.ts';
-import { CurrencyCodeSchema, DecimalAmountSchema, addExactMoney, convertExactMoney, type ExactMoney } from '../../domain/v2/shared/money.ts';
+import { CurrencyCodeSchema, DecimalAmountSchema, addExactMoney, convertExactMoney, currencyExponent, type ExactMoney } from '../../domain/v2/shared/money.ts';
 import { ScenarioEffectSchema, type ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
 
 const ComparisonInstantSchema = z.iso.datetime({ offset: true });
@@ -48,6 +48,28 @@ export interface RecoveryCostComparisonUnavailable {
 }
 
 export type RecoveryCostComparisonResult = RecoveryCostComparison | RecoveryCostComparisonUnavailable;
+
+/**
+ * Converts an exact normalized total to the comparator's number-only minor
+ * units only when no precision or safe-integer information is lost.
+ */
+export function safeRecoveryCostMinorUnits(amount: ExactMoney): number | undefined {
+  const parsed = DecimalAmountSchema.safeParse(amount.amount);
+  if (!parsed.success) return undefined;
+  const negative = amount.amount.startsWith('-');
+  const unsigned = negative ? amount.amount.slice(1) : amount.amount;
+  const [whole, fraction = ''] = unsigned.split('.');
+  const exponent = currencyExponent(amount.currency);
+  if (fraction.length > exponent) return undefined;
+  try {
+    const minor = BigInt(`${whole}${(fraction + '0'.repeat(exponent)).slice(0, exponent)}` || '0');
+    const signed = negative ? -minor : minor;
+    const value = Number(signed);
+    return Number.isSafeInteger(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function rateDecimal(rate: number): string | undefined {
   if (!Number.isFinite(rate) || rate <= 0) return undefined;

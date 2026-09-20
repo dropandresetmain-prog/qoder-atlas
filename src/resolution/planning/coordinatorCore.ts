@@ -35,14 +35,14 @@
  * core never mutates canonical state and never owns execution/authority.
  */
 import type { SubjectId } from '../../domain/v2/shared/identity.ts';
-import type { Instant } from '../../domain/v2/shared/time.ts';
+import { compareInstants, InstantSchema, type Instant } from '../../domain/v2/shared/time.ts';
 import type { CapabilityFamily } from '../../operational/strategy.ts';
 import type { EvaluatorRegistry } from '../evaluation/assess.ts';
 import type { CapturedWorld } from '../world/world.ts';
 import type { EffectiveWorld } from '../world/effectiveTypes.ts';
 import { projectEffectiveWorld } from '../world/effectiveItinerary.ts';
 import type { CurrentState } from '../world/currentness.ts';
-import { ScenarioChangeSchema } from '../../contracts/v2/scenario/scenarioChange.ts';
+import { ScenarioChangeSchema, type ScenarioEffect } from '../../contracts/v2/scenario/scenarioChange.ts';
 import type { RecoveryStrategy } from '../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { EvaluateStrategyResult } from '../scenarios/evaluate.ts';
 import { evaluateRecoveryStrategy } from '../scenarios/evaluate.ts';
@@ -72,12 +72,15 @@ import {
 import type { ComparatorPreference, StrategyRecommendation } from '../../contracts/v2/planning/strategyRecommendation.ts';
 import type {
   MaterialCandidateEvidence,
+  MaterialCandidateCostComparison,
   PlanningEvidenceRecord,
   RecoveryPlanningAttempt,
   RecoveryPlanningOutcome,
   RecoveryPlanningReason,
   RecoveryPlanningResult,
 } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
+import { MaterialCandidateCostComparisonSchema } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
+import type { FxRateEvidence } from '../../engine/fx.ts';
 import { dimensionReasonToken } from './recoveryDomains.ts';
 import { dispatchResearch, type PlanningToolTransport, type NextResearchRound } from './researchDispatcher.ts';
 import {
@@ -88,6 +91,7 @@ import {
 import { selectRecommendation, type CandidateComparisonFacts } from './comparator.ts';
 import { satisfiedPreferenceCodes } from './preferenceMatching.ts';
 import { comparisonFactsFromEvidence, planningOutcomeOf } from './planningSelection.ts';
+import { compareRecoveryCosts, safeRecoveryCostMinorUnits } from './recoveryCostComparison.ts';
 
 /**
  * A proposer bound to the single recovery domain it serves. The binding accepts
@@ -185,6 +189,16 @@ export interface CoordinatorCoreDeps {
     resolvedOffers?: readonly ResolvedOffer[];
     resolvedStayOffers?: readonly ResolvedStayOffer[];
   } | undefined;
+  /**
+   * Optional captured cost context. It runs only after research and candidate
+   * effects exist; it cannot alter RC-6, provider prices, or canonical state.
+   */
+  costContextForCandidate?: (input: {
+    candidateKey: string;
+    domainId: RecoveryDomainId;
+    effects: readonly ScenarioEffect[];
+    basis: PlanningBasis;
+  }) => Promise<{ homeCurrency: string; rates: readonly FxRateEvidence[]; comparedAt: Instant } | undefined>;
 }
 
 export interface CoordinatorCoreOutput {
@@ -196,6 +210,8 @@ export interface CoordinatorCoreOutput {
   viableStrategies: RecoveryStrategy[];
   /** True when the bounded research budget was exhausted with gaps remaining. */
   researchBudgetExhausted: boolean;
+  /** Latest cost-evidence instant; persistence must not complete before this. */
+  completionHorizon: Instant;
 }
 
 /** One dispatched read, tagged with the domain it was gathered for. Carries BOTH
@@ -217,6 +233,65 @@ interface EvaluatedCandidate {
   proposerId: string;
   domainId: RecoveryDomainId;
   result: EvaluateStrategyResult;
+  costComparison?: MaterialCandidateCostComparison;
+}
+
+function unavailableCost(code: 'CONTEXT_UNAVAILABLE' | 'MISSING_RATE_EVIDENCE', reason: string, comparedAt: Instant): MaterialCandidateCostComparison {
+  return MaterialCandidateCostComparisonSchema.parse({ status: 'UNAVAILABLE', code, reason, comparedAt });
+}
+
+function declaredCostFacts(cost: MaterialCandidateCostComparison | undefined): Pick<CandidateComparisonFacts, 'declaredCostMinorUnits'> | undefined {
+  if (cost?.status !== 'AVAILABLE') return undefined;
+  const declaredCostMinorUnits = safeRecoveryCostMinorUnits(cost.totalHomeAmount);
+  return declaredCostMinorUnits === undefined ? undefined : { declaredCostMinorUnits };
+}
+
+async function costComparisonForCandidate(input: {
+  candidate: EvaluatedCandidate;
+  basis: PlanningBasis;
+  supplier: NonNullable<CoordinatorCoreDeps['costContextForCandidate']>;
+}): Promise<MaterialCandidateCostComparison> {
+  let context: { homeCurrency: string; rates: readonly FxRateEvidence[]; comparedAt: Instant } | undefined;
+  try {
+    context = await input.supplier({
+      candidateKey: input.candidate.candidateKey,
+      domainId: input.candidate.domainId,
+      effects: input.candidate.result.strategy.scenarioChange.effects,
+      basis: input.basis,
+    });
+  } catch {
+    return unavailableCost('CONTEXT_UNAVAILABLE', 'captured home-currency cost context could not be obtained', input.basis.now);
+  }
+  if (!context) {
+    return unavailableCost('CONTEXT_UNAVAILABLE', 'no captured home-currency cost context is available for this candidate', input.basis.now);
+  }
+  const comparedAt = InstantSchema.safeParse(context.comparedAt);
+  if (!comparedAt.success) {
+    return unavailableCost('CONTEXT_UNAVAILABLE', 'captured home-currency comparison instant is invalid', input.basis.now);
+  }
+  const compared = compareRecoveryCosts({
+    effects: input.candidate.result.strategy.scenarioChange.effects,
+    homeCurrency: context.homeCurrency,
+    rates: context.rates,
+    comparedAt: comparedAt.data,
+  });
+  if (!compared.ok) {
+    return MaterialCandidateCostComparisonSchema.parse({
+      status: 'UNAVAILABLE', code: compared.code, reason: compared.reason, comparedAt: comparedAt.data,
+    });
+  }
+  const selectedFxEvidence = compared.selectedFxEvidence.map((id) => context.rates.find((rate) => rate.id === id));
+  if (selectedFxEvidence.some((rate) => rate === undefined)) {
+    return unavailableCost('MISSING_RATE_EVIDENCE', 'selected FX provenance is not present in the captured context', comparedAt.data);
+  }
+  return MaterialCandidateCostComparisonSchema.parse({
+    status: 'AVAILABLE',
+    homeCurrency: compared.homeCurrency,
+    totalHomeAmount: compared.totalHomeAmount,
+    lines: compared.lines,
+    selectedFxEvidence,
+    comparedAt: compared.comparedAt,
+  });
 }
 
 /**
@@ -403,6 +478,24 @@ export async function runRecoveryPlanning(
     }
   }
 
+  // Cost normalization is comparison evidence only. It happens after all
+  // candidate effects and provider research are captured, and never changes
+  // the RC-6 result already recorded above.
+  if (deps.costContextForCandidate) {
+    for (const candidate of evaluated) {
+      candidate.costComparison = await costComparisonForCandidate({
+        candidate,
+        basis,
+        supplier: deps.costContextForCandidate,
+      });
+    }
+  }
+
+  const completionHorizon = evaluated.reduce<Instant>((latest, candidate) => {
+    const comparedAt = candidate.costComparison?.comparedAt;
+    return comparedAt !== undefined && compareInstants(comparedAt, latest) > 0 ? comparedAt : latest;
+  }, now);
+
   // 6. Deterministic viable-only comparison (C6). Derive comparator facts from
   //    provisional evidence for the VIABLE set, then select the recommendation.
   const viable = evaluated.filter((e) => e.result.strategy.viability === 'VIABLE');
@@ -419,9 +512,10 @@ export async function runRecoveryPlanning(
       strategyRef: e.result.strategy.id as SubjectId, recommended: false, result: e.result,
       evidenceRefs: evidenceRefsForDomain(evidence, e.domainId),
     });
+    const costFacts = declaredCostFacts(e.costComparison);
     const facts = comparisonFactsFromEvidence(provisional, deps.preferences?.length
-      ? { satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
-      : undefined);
+      ? { ...(costFacts ?? {}), satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
+      : costFacts);
     if (facts) provisionalFacts.push(facts);
   }
   const recommendation: StrategyRecommendation | undefined = viableCandidates.length > 0
@@ -444,6 +538,7 @@ export async function runRecoveryPlanning(
       ...(strategyRef !== undefined ? { strategyRef } : {}),
       recommended, result: e.result,
       evidenceRefs: evidenceRefsForDomain(evidence, e.domainId),
+      ...(e.costComparison !== undefined ? { costComparison: e.costComparison } : {}),
     }));
     if (e.result.strategy.viability === 'VIABLE') viableStrategies.push(e.result.strategy);
   }
@@ -463,7 +558,7 @@ export async function runRecoveryPlanning(
     basisAssessmentId,
     basisManifest: world.manifest,
     startedAt: deps.minters.startedAt,
-    completedAt: now,
+    completedAt: completionHorizon,
     coordinatorVersion: deps.coordinatorVersion,
     domains,
     evidence: evidence.map((e) => e.record),
@@ -480,5 +575,5 @@ export async function runRecoveryPlanning(
     outcome,
   };
 
-  return { attempt, result, viableStrategies, researchBudgetExhausted };
+  return { attempt, result, viableStrategies, researchBudgetExhausted, completionHorizon };
 }

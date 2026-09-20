@@ -44,6 +44,7 @@ import {
   MaterialCandidateEvidenceSchema,
   type MaterialCandidateDisposition,
   type MaterialCandidateEvidence,
+  type MaterialCandidateCostComparison,
   type PlanningEvidenceRecord,
   type PlanningModelActivity,
   type RecoveryDomainDecision,
@@ -174,6 +175,7 @@ export interface EvaluatedCandidateEvidenceInput {
   strategyRef?: SubjectId;
   recommended: boolean;
   evidenceRefs?: readonly string[];
+  costComparison?: MaterialCandidateCostComparison;
   result: EvaluateStrategyResult;
 }
 
@@ -199,6 +201,7 @@ export function materialCandidateFromEvaluation(
     immediateChangeBlastRadius: immediateBlastRadiusOf(strategy),
     reassessmentClosure: reassessmentClosureOf(strategy),
     outcomeDelta: outcomeDeltaOf(input.result),
+    ...(input.costComparison !== undefined ? { costComparison: input.costComparison } : {}),
   });
 }
 
