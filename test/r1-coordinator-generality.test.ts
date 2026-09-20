@@ -34,6 +34,9 @@ import type { CapturedWorld, WJourney, WJourneyItem, WProgrammeItem } from '../s
 import type { AssessmentResult } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import { AssessmentResultSchema } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import { createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
+import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
+import { PlanningToolRequestSchema, type PlanningToolResult } from '../src/contracts/v2/planning/planningTool.ts';
+import type { DomainProposerInput } from '../src/contracts/v2/planning/proposerAdaptation.ts';
 import type { Evaluator } from '../src/resolution/evaluation/evaluator.ts';
 import { dimension, explain } from '../src/resolution/evaluation/explain.ts';
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
@@ -51,6 +54,56 @@ const EARLY = '2030-06-02T10:00:00.000Z';
 const LATE = '2030-06-02T15:00:00.000Z';
 const COORDINATOR_VERSION = 'r1-coordinator/1';
 const COMPARATOR_VERSION = 'r1-comparator/1';
+
+test('coordinator gathers dependent hotel evidence before proposing and shares the request budget across domains', async () => {
+  const { basis, journeyId } = programmeBasis();
+  basis.registry = createM6Registry();
+  const subject = subjectOfJourney(journeyId);
+  const assessment = failingAssessment(subject, 'connection_feasibility');
+  assessment.dimensions.push(...failingAssessment(subject, 'overnight_accommodation').dimensions);
+  basis.failing = [{ subject, assessment }];
+  const read = (operation: 'flight.search' | 'hotel.search' | 'hotel.quote', round: number, key: string) => PlanningToolRequestSchema.parse({
+    id: key, capability: operation === 'flight.search' ? 'FLIGHT' : 'HOTEL', operation,
+    parameters: { key }, purpose: 'Research required recovery arrangements', evidenceGapCode: 'recovery_arrangement', round,
+  });
+  const calls: string[] = [];
+  let proposedAfterResearch = false;
+  const output = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(), availableCapabilities: ['FLIGHT', 'HOTEL'],
+    minters: minters(), coordinatorVersion: COORDINATOR_VERSION, comparatorVersion: COMPARATOR_VERSION,
+    proposers: [{ domain: 'TRANSPORT', proposer: {
+      id: 'test.composite-evidence-consumer', version: '1', domains: ['TRANSPORT'],
+      async propose(input: DomainProposerInput) {
+        assert.deepEqual(input.evidence.toolResults.map((result) => result.operation), ['flight.search', 'hotel.search', 'hotel.quote']);
+        assert.equal(calls.length, 3);
+        proposedAfterResearch = true;
+        return [];
+      },
+    } }],
+    research: {
+      budget: { maxRounds: 3, maxRequests: 3 },
+      requestsByDomain: { TRANSPORT: [[read('flight.search', 1, 'flight')]], STAY: [[read('hotel.search', 1, 'separate-stay')]] },
+      transport: async (request): Promise<PlanningToolResult> => {
+        calls.push(request.operation);
+        return { requestId: request.id, capability: request.capability, operation: request.operation,
+          status: 'SUCCEEDED', normalizedEvidence: { captured: request.id },
+          provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [] };
+      },
+      nextRound: ({ completedRound, domainId, results }) => {
+        assert.equal(domainId, 'TRANSPORT');
+        assert.equal(results.length, completedRound);
+        return completedRound === 1 ? [read('hotel.search', 2, 'hotel')]
+          : completedRound === 2 ? [read('hotel.quote', 3, 'quote')] : [];
+      },
+    },
+  });
+  assert.equal(proposedAfterResearch, true);
+  assert.deepEqual(calls, ['flight.search', 'hotel.search', 'hotel.quote']);
+  assert.equal(output.researchBudgetExhausted, true, 'a second domain cannot reset the basis request allowance');
+  assert.equal(output.attempt.evidence.length, 3);
+});
+
+function subjectOfJourney(journeyId: string): TypedRef { return { kind: 'JOURNEY', id: journeyId }; }
 
 function journeyRow(travellerId: string): WJourney {
   return { id: id(), revision: 1, tripId: id(), travellerId, lifecycleStatus: 'ACTIVE', intendedWindow: null, responsibilityOrganisationId: null };

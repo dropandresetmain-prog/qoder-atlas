@@ -79,7 +79,7 @@ import type {
   RecoveryPlanningResult,
 } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import { dimensionReasonToken } from './recoveryDomains.ts';
-import { dispatchResearch, type PlanningToolTransport } from './researchDispatcher.ts';
+import { dispatchResearch, type PlanningToolTransport, type NextResearchRound } from './researchDispatcher.ts';
 import {
   materialCandidateFromEvaluation,
   materialCandidateFromValidationRejection,
@@ -144,6 +144,11 @@ export interface CoordinatorCoreDeps {
     transport: PlanningToolTransport;
     requestsByDomain: Readonly<Partial<Record<RecoveryDomainId, readonly (readonly PlanningToolRequest[])[]>>>;
     budget?: PlanningResearchBudget;
+    /** Dependent reads for a domain's whole-trip proposal, under the same budget. */
+    nextRound?: (input: Parameters<NextResearchRound>[0] & {
+      domainId: RecoveryDomainId;
+      basis: PlanningBasis;
+    }) => ReturnType<NextResearchRound>;
   };
   /**
    * Optional, DOMAIN-AGNOSTIC resolver of the offers an overlay needs to honor a
@@ -282,10 +287,19 @@ export async function runRecoveryPlanning(
   let researchBudgetExhausted = false;
   if (deps.research) {
     const budget = deps.research.budget ?? DEFAULT_PLANNING_RESEARCH_BUDGET;
+    let dispatchedRequests = 0;
     for (const d of investigated) {
       const rounds = deps.research.requestsByDomain[d.domainId];
       if (!rounds || rounds.length === 0) continue;
-      const outcome = await dispatchResearch({ rounds, transport: deps.research.transport, budget });
+      const nextRound = deps.research.nextRound;
+      const outcome = await dispatchResearch({
+        rounds, transport: deps.research.transport,
+        budget: { ...budget, maxRequests: budget.maxRequests - dispatchedRequests },
+        ...(nextRound ? { nextRound: (input) => nextRound({ ...input, domainId: d.domainId, basis }) } : {}),
+      });
+      // The request allowance belongs to the planning basis, not each domain.
+      // Hotel and entry follow-ups cannot reset it by changing their domain.
+      dispatchedRequests += outcome.results.length;
       // evidence[i] is the projected record for results[i] (dispatcher contract),
       // so zip them: each DomainEvidence keeps both the record (persisted) and the
       // raw normalized result (handed to a domain proposer, never persisted).

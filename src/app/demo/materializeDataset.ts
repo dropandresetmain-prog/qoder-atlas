@@ -205,18 +205,18 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
   // ---- Evidence, one record per family of assertion the dataset makes ------
   const observedAt = toInstant(context.at, 'context.at');
   const organisationRef: TypedRef = { kind: 'ORGANISATION', id: organisationId };
-  const evidenceFamilies: { family: string; assertionType: string; sources: string[] }[] = [
+  const evidenceFamilies: { family: string; assertionType: string; sources: string[]; observedAt?: string }[] = [
     { family: 'programme', assertionType: 'DATASET_PROGRAMME_DECLARATION', sources: [context.sourceId, ...context.anchorEvent.sourceIds] },
     { family: 'roster', assertionType: 'DATASET_ROSTER_DECLARATION', sources: [draft.sourceId] },
     { family: 'policy', assertionType: 'DATASET_POLICY_DECLARATION', sources: context.ruleSets.flatMap((rs) => (rs.sourceId ? [rs.sourceId] : [])) },
     { family: 'geography', assertionType: 'DATASET_GEOGRAPHY_DECLARATION', sources: dataset.jurisdictions ? [dataset.jurisdictions.sourceId] : [] },
     { family: 'transfers', assertionType: 'DATASET_TRANSFER_DECLARATION', sources: dataset.groundTransfers?.sourceIds ?? [] },
     ...(dataset.journeyRequirements
-      ? [{ family: 'journeyRequirements', assertionType: 'DATASET_JOURNEY_REQUIREMENT_DECLARATION', sources: [dataset.journeyRequirements.sourceId] }]
+      ? [{ family: 'journeyRequirements', assertionType: 'DATASET_JOURNEY_REQUIREMENT_DECLARATION', sources: [dataset.journeyRequirements.sourceId], observedAt: dataset.journeyRequirements.observedAt }]
       : []),
   ];
   const evidenceIds = new Map<string, string>();
-  for (const { family, assertionType, sources } of evidenceFamilies) {
+  for (const { family, assertionType, sources, observedAt: familyObservedAt } of evidenceFamilies) {
     const stated = sources.length > 0 ? sources : [context.sourceId];
     const evidenceId = ids.id('evidence', family);
     mustOk(
@@ -225,7 +225,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
         idempotencyKey: ids.key('evidence', family),
         evidenceId,
         assertionType,
-        observedAt,
+        observedAt: familyObservedAt ?? observedAt,
         schemaVersion: `northstar-demo-dataset/${family}/1`,
         sourceIds: resolveSources([...new Set(stated)].sort()),
         subjectRefs: [organisationRef],

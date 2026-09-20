@@ -3,7 +3,7 @@
   "provenance": "AUTHORED_DEMO_DATA",
   "provenanceNote": "Authored for the AiT Summit 2026 runtime bundle. Neither programme.json nor the upstream data/ait-demo-input-pack carries any place->jurisdiction attribution, so m6.information (advisories) and m6.entry (entry_feasibility / transit_feasibility) could only ever answer UNKNOWN for every travelling Journey. This file declares (a) the jurisdictions the bundle's places sit in, (b) a coarse bounding geometry per jurisdiction, (c) an explicit place->area membership per place, and (d) what advisory / entry knowledge this demo dataset actually covers. It declares source facts only. No verdict, readiness label or viability judgement is stated here: the real M6 evaluators still compute every dimension from this evidence.",
   "geometryNote": "Bounding boxes are deliberately coarse (WGS84 lon/lat), and AREA_MEMBERSHIP is the authoritative attribution basis. The boxes exist because area_versions.geometry is mandatory; they are drawn so that no box contains a bundle place belonging to another jurisdiction, which keeps the spatial-containment basis consistent with the declared memberships.",
-  "coverageNote": "Coverage is a statement about this synthetic dataset's own knowledge, not about the real world: within the AiT demo dataset, the advisory, condition, entry-requirement and transit-requirement knowledge for these jurisdictions is exactly what this bundle contains. That is what lets m6 reach a real PASS on those dimensions for a Journey whose travel evidence is complete, instead of an untruthful blanket UNKNOWN.",
+  "coverageNote": "Coverage is a statement about this synthetic dataset's own knowledge, not about the real world: within the AiT demo dataset, the advisory, condition and transit-requirement knowledge for these jurisdictions is exactly what this bundle contains. That is what lets m6 reach a real PASS on those dimensions for a Journey whose travel evidence is complete, instead of an untruthful blanket UNKNOWN. Landside ENTRY_REQUIREMENT coverage is deliberately excluded: newly proposed visits require current scoped official-source evidence, rather than this synthetic broad declaration.",
 
   "anchorEventId": "evt-ait-2026",
   "sourceId": "src-syn-ait-geography",
@@ -15,7 +15,7 @@
     "queryBoundsVersion": "knowledge-coverage/1",
     "completeness": "COMPLETE",
     "expiresAt": "2026-10-31T00:00:00.000Z",
-    "topics": ["ADVISORY", "CONDITION", "ENTRY_REQUIREMENT", "TRANSIT_REQUIREMENT"]
+    "topics": ["ADVISORY", "CONDITION", "TRANSIT_REQUIREMENT"]
   },
 
   "jurisdictions": [

@@ -287,15 +287,28 @@ test('dispatcher: nextRound cannot dispatch beyond maxRounds', async () => {
         id: `follow-up-${completedRound}`,
         capability: 'HOTEL',
         operation: 'hotel.search',
+        parameters: { searchWindow: completedRound },
         round: completedRound + 1,
       })];
     },
   });
 
-  assert.equal(outcome.ok, true);
-  if (!outcome.ok) return;
-  assert.equal(callbackCalls, 1);
+  assert.equal(outcome.ok, false);
+  if (outcome.ok) return;
+  assert.equal(outcome.refusal.attemptedRound, 3);
+  assert.equal(outcome.evidence.length, 2);
+  assert.equal(callbackCalls, 2);
   assert.deepEqual(calls, ['flight.search', 'hotel.search']);
+});
+
+test('dispatcher: invalid dynamic budgets cannot start provider research', async () => {
+  for (const maxRounds of [Infinity, NaN, -1, 1.5]) {
+    await assert.rejects(dispatchResearch({
+      rounds: [[request()]], budget: { maxRounds, maxRequests: 2 },
+      transport: async () => { assert.fail('invalid budget must not dispatch'); },
+      nextRound: () => [request()],
+    }), /finite non-negative integers/);
+  }
 });
 
 test('dispatcher: duplicate dynamic follow-ups do not create another transport call', async () => {

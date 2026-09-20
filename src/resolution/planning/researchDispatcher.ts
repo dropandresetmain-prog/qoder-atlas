@@ -83,6 +83,9 @@ export type DispatchResearchOutcome =
  */
 export async function dispatchResearch(input: DispatchResearchInput): Promise<DispatchResearchOutcome> {
   const budget = input.budget ?? DEFAULT_PLANNING_RESEARCH_BUDGET;
+  if (![budget.maxRounds, budget.maxRequests].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+    throw new Error('Planning research budgets must be finite non-negative integers');
+  }
   const evidence: PlanningEvidenceRecord[] = [];
   const results: PlanningToolResult[] = [];
   const seen = new Set<string>();
@@ -105,20 +108,6 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
   let round = 1;
   let dynamicRequests: readonly PlanningToolRequest[] = [];
   while (round <= input.rounds.length || dynamicRequests.length > 0) {
-    if (round > budget.maxRounds) {
-      return {
-        ok: false,
-        evidence,
-        results,
-        refusal: {
-          kind: 'PLANNING_BUDGET_EXCEEDED',
-          budget: { maxRounds: budget.maxRounds, maxRequests: budget.maxRequests },
-          attemptedRound: round,
-          attemptedRequests: dispatched + 1,
-        },
-      };
-    }
-
     const staticRequests = input.rounds[round - 1] ?? [];
     // Static requests retain their historical first-seen order; generated
     // requests are appended and then deduplicated against the whole basis.
@@ -136,6 +125,21 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
     const unique = dedupePlanningToolRequests([...staticRequests, ...generated]).filter(
       (request) => !seen.has(planningToolRequestFingerprint(request)),
     );
+    if (round > budget.maxRounds) {
+      // Inspect the continuation at the boundary without dispatching it. A
+      // still-needed quote is an explicit research gap, not silent completion;
+      // an already-observed duplicate requires no additional budget.
+      if (unique.length === 0) break;
+      return {
+        ok: false, evidence, results,
+        refusal: {
+          kind: 'PLANNING_BUDGET_EXCEEDED',
+          budget: { maxRounds: budget.maxRounds, maxRequests: budget.maxRequests },
+          attemptedRound: round,
+          attemptedRequests: dispatched + unique.length,
+        },
+      };
+    }
     for (const request of unique) {
       if (dispatched >= budget.maxRequests) {
         return {
@@ -165,7 +169,7 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
       round += 1;
       continue;
     }
-    if (input.nextRound && round < budget.maxRounds) {
+    if (input.nextRound) {
       const generatedNext = await input.nextRound({ completedRound: round, results: [...results] });
       if (!Array.isArray(generatedNext)) {
         throw new Error(`nextRound must return an array for round ${round + 1}`);

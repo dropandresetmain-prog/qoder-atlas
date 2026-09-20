@@ -23,6 +23,8 @@ test('dataset loader admits typed journey requirements and keeps them optional',
   assert.equal(loaded.journeyRequirements?.sourceId, 'src-syn-ait-organiser-policy');
   assert.equal(loaded.journeyRequirements?.requirements[0]?.travellerDraftId, 'ait-draft-09');
   assert.equal(loaded.journeyRequirements?.requirements[0]?.minimumGapHours, 8);
+  assert.ok(!loaded.jurisdictions?.coverage?.topics.includes('ENTRY_REQUIREMENT'),
+    'synthetic broad coverage must not certify newly proposed landside entry');
 });
 
 test('dataset loader preserves datasets without the optional requirement file', async () => {

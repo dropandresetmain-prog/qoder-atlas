@@ -32,6 +32,7 @@
   "suites": {
     "current": [
       "test/official-documents.test.ts",
+      "test/a3-journey-requirements.test.ts",
       "test/a1-programme-intake-ui.test.ts",
       "test/a1-traveller-request-ui.test.ts",
       "test/a2-evaluators.test.ts",
@@ -125,6 +126,7 @@
       "test/r3-causal-spine-layout.test.ts",
       "test/r3-import-guard.test.ts",
       "test/r4-offer-execution-boundary.test.ts",
+      "test/a3-sandbox-execution-inputs.test.ts",
       "test/r4-existing-order-validation.test.ts",
       "test/r3-transport-research-composition.test.ts",
       "test/r4-capability-composition.test.ts",
@@ -156,6 +158,7 @@
       "postgres-integration/r4PlanningPreferences.pgtest.ts",
       "postgres-integration/r4ProgrammeSchedule.pgtest.ts",
       "postgres-integration/r4AtlasOfferExecution.pgtest.ts",
+      "postgres-integration/a3SandboxExecutionInputs.pgtest.ts",
       "postgres-integration/r4AtlasCrashRecovery.pgtest.ts",
       "postgres-integration/r4AtlasResearchModeGate.pgtest.ts",
       "postgres-integration/r4AtlasSandboxLive.pgtest.ts",
@@ -236,6 +239,7 @@
       "postgres-integration/r4PlanningPreferences.pgtest.ts",
       "postgres-integration/r4ProgrammeSchedule.pgtest.ts",
       "postgres-integration/r4AtlasOfferExecution.pgtest.ts",
+      "postgres-integration/a3SandboxExecutionInputs.pgtest.ts",
       "postgres-integration/r4AtlasCrashRecovery.pgtest.ts",
       "postgres-integration/r4AtlasResearchModeGate.pgtest.ts",
       "postgres-integration/r4AtlasSandboxLive.pgtest.ts",

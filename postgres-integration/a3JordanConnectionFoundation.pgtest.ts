@@ -134,6 +134,12 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
       },
     ], 'synthetic organiser policy is imported as one scoped Journey requirement');
     assert.ok(journeyRequirement.rows[0]?.provenance_evidence_id, 'Journey requirement retains source evidence');
+    const requirementObservation = await pool.query<{ observed_at: Date }>(
+      'SELECT observed_at FROM evidence_records WHERE workspace_id = $1 AND id = $2',
+      [workspaceId, journeyRequirement.rows[0]!.provenance_evidence_id],
+    );
+    assert.equal(requirementObservation.rows[0]?.observed_at.toISOString(), '2026-08-25T09:00:00.000Z',
+      'requirement observation time comes from its source declaration, not the older programme snapshot');
     const requirementSources = await pool.query<{ source_identity: string }>(
       `SELECT s.source_identity
          FROM evidence_sources es

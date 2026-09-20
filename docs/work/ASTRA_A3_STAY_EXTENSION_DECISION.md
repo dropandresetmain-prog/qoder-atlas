@@ -215,3 +215,26 @@ This was Act Now because landside overnight feasibility cannot rely on a passpor
 cannot be presented. Credentials and scoped-entry evaluator editions advance to2 so the
 assessment manifest distinguishes these semantics. Focused/adjacent evaluator tests57/57
 and TypeScript passed. No canonical credential facts were authored or changed.
+
+## Integrated research and source requirements
+
+Journey-scoped requirement import eb8b80b uses explicit organiser policy, not a scenario
+branch. Root closure retains the requirement file's observedAt rather than the older
+programme snapshot. Dataset broad synthetic ENTRY_REQUIREMENT coverage is removed; current
+advisory/condition/transit facts remain. The final dataset's direct PostgreSQL foundation
+passes baseline160m -> D195m -> D230m/Case -> D3-65m/sameCase, including source provenance.
+
+Stage2 visit overlay27cbaf4 and explicit sandbox-input provisioner bf4e5ed are integrated.
+The provisioner refuses duplicate canonical identities and conflicting inputs; it remains
+an opt-in CLI, with infrastructure partial-prefix retry documented rather than an importer
+rewrite. No missing traveller attributes, passports or budgets have been invented.
+
+Dynamic read-only dispatcher4502bce is integrated. Root closed silent round truncation:
+needed follow-ups beyond the limit yield an explicit budget refusal without provider calls.
+The coordinator now forwards dependent reads before proposal and shares one request allowance
+across domains. Flight-only alternatives remain visible for real RC-6 rejection. Normal
+hotel/entry composition and atomic observed stay creation are still required before A3/A4.
+
+Act Now: finish these normal composition seams. Park for Later: importer atomicity and
+unrelated hotel/immigration breadth. Focused/adjacent signals and direct PG proof are reused;
+no new broad gate was run. The A2 server still runs its accepted source and retains its audit.
