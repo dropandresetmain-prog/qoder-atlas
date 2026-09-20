@@ -32,7 +32,7 @@ Live ledger for bounded selected-plan continuation. Prior A3 UI second-pass ledg
 
 | CP | Goal | Result |
 |---|---|---|
-| 2 | Selected-plan continuation safety + Atlas handoff | in progress → see Completion |
+| 2 | Selected-plan continuation safety + Atlas handoff | **PASS** @ `c21867eacddb371d391fa09123fa3049319ec851` |
 
 ## Acceptance (Checkpoint 2)
 
