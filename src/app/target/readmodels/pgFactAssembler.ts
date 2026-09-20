@@ -26,8 +26,7 @@ import type {
 } from './types.ts';
 import {
   mapConnectionProgression,
-  deriveConnectionViabilityFromEvaluator,
-  connectionViabilityFromAssessment,
+  classifyAssessmentConnection,
   productStatusFromAssessment,
   remainderViabilityFromAssessment,
   semanticStateFromAssessment,
@@ -690,8 +689,15 @@ async function loadRecoveryCaseFactsInner(
   // M9 3A: derive connection viability from the real m6.connection dimension
   // (never a caller-supplied SAFE/AT_RISK/IMPOSSIBLE hint). Worst-of across
   // case subjects — one broken connection is enough to flag the case.
+  // A5 FIX-2A/2B: use the ONE shared `classifyAssessmentConnection` so the
+  // per-subject connection hint aggregates the whole failing-explanation set
+  // (never `explanations[0]`, which is content-hash ordered, not severity
+  // ordered), and so a SEPARATE blocking dimension FAIL anywhere in the case is
+  // tracked — a merely-tight connection must not project the case amber while
+  // something else is already definitively red.
   const CONNECTION_SEVERITY: Record<ConnectionViabilityHint, number> = { VIABLE: 0, UNKNOWN: 1, TIGHT: 2, IMPOSSIBLE: 3 };
   let connectionViability: ConnectionViabilityHint | undefined;
+  let separateBlockingFailure = false;
   for (const s of subjects.rows) {
     const ref = `${s.subject_kind}:${s.subject_id}`;
     const stamp = await readEvaluationLifecycleStamp(client, workspaceId, s.subject_kind, s.subject_id, 'VIABILITY');
@@ -737,16 +743,18 @@ async function loadRecoveryCaseFactsInner(
           }
         }
       }
-      const connectionDim = view.assessment.dimensions.find((d) => d.dimension === 'connection_feasibility' && d.applicable);
-      if (connectionDim) {
-        const derived = deriveConnectionViabilityFromEvaluator({
-          verdict: connectionDim.verdict as 'PASS' | 'FAIL' | 'UNKNOWN',
-          reasonCode: connectionDim.explanations[0]?.reasonCode ?? '',
-        });
+      // A5 FIX-2A — classify this subject's CURRENT assessment through the ONE
+      // shared helper: the connection hint aggregates ALL failing explanations
+      // (worst-of severity, not `explanations[0]`), and a separate blocking
+      // dimension FAIL on any subject wins the case out of the amber watch band.
+      const classification = classifyAssessmentConnection(view.assessment);
+      if (classification.connectionViability) {
+        const derived = classification.connectionViability;
         if (!connectionViability || CONNECTION_SEVERITY[derived] > CONNECTION_SEVERITY[connectionViability]) {
           connectionViability = derived;
         }
       }
+      if (classification.separateBlockingFailure) separateBlockingFailure = true;
     } else {
       subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status, stamp });
       uncertainty.push(`${ref} assessment ${view.status.toLowerCase()}`);
@@ -1145,6 +1153,7 @@ async function loadRecoveryCaseFactsInner(
       : semanticStateFromAssessment(
         tripVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN',
         connectionViability,
+        separateBlockingFailure,
       ),
     nodes: [
       // The change signal is a first-class current-world input. Recovery case
@@ -1218,6 +1227,11 @@ async function loadRecoveryCaseFactsInner(
     reconciliationState: partialIncomplete ? 'reconciling' : 'idle',
     uncertainty,
     connectionProgression,
+    // A5 FIX-2B — internal only (like `subjectFacts`): whether a SEPARATE
+    // blocking (non-connection) dimension definitively FAILs anywhere in this
+    // case. The overview/items projection reads it so a merely-tight connection
+    // cannot project the case amber while something else is already red.
+    separateBlockingFailure,
     recoveryActions,
     subjectFacts,
     // Contract key format is `<KIND>:<id>` (types.ts subjectHumanLabels);
@@ -1294,8 +1308,8 @@ async function loadOperatorOverviewFactsInner(
             : undefined;
     const status = facts.status === 'EXECUTING' && itemTone !== 'PASS'
       ? 'RECOVERING' as const
-      : productStatusFromAssessment(itemTone, itemConnection);
-    const remainder: RemainderViability = remainderViabilityFromAssessment(itemTone, itemConnection);
+      : productStatusFromAssessment(itemTone, itemConnection, facts.separateBlockingFailure ?? false);
+    const remainder: RemainderViability = remainderViabilityFromAssessment(itemTone, itemConnection, facts.separateBlockingFailure ?? false);
     const affected = facts.affectedItems ?? [];
     let travellerLabel = affected[0] ?? 'Traveller';
     const firstJourney = affected.find((a) => a.startsWith('JOURNEY:'));
@@ -1422,7 +1436,13 @@ async function loadOperatorOverviewFactsInner(
     const tone: AssessmentTone = view.status === 'CURRENT' && view.assessment
       ? (view.assessment.overallVerdict === 'PASS' ? 'PASS' : view.assessment.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN')
       : 'UNKNOWN';
-    const populationConnection = connectionViabilityFromAssessment(view.assessment);
+    // A5 FIX-2A/2B — classify this Journey's CURRENT assessment through the ONE
+    // shared helper: the connection hint aggregates all failing explanations and
+    // a separate blocking dimension FAIL is tracked so a merely-tight connection
+    // cannot present the traveller as amber-watchable while something else is red.
+    const populationClassification = classifyAssessmentConnection(view.assessment);
+    const populationConnection = populationClassification.connectionViability;
+    const populationSeparateBlockingFailure = populationClassification.separateBlockingFailure;
     const programmeDimension = view.assessment?.dimensions.find((dimension) => dimension.dimension === 'programme_participation');
     for (const explanation of programmeDimension?.explanations ?? []) {
       const programmeRefs = [explanation.cause.subjectRef, ...explanation.relatedSubjects]
@@ -1479,8 +1499,8 @@ async function loadOperatorOverviewFactsInner(
       tripRef: `TRIP:${p.trip_id}`,
       travellerLabel: p.traveller_label,
       obligation: p.obligation,
-      status: productStatusFromAssessment(tone, populationConnection),
-      remainderViability: remainderViabilityFromAssessment(tone, populationConnection),
+      status: productStatusFromAssessment(tone, populationConnection, populationSeparateBlockingFailure),
+      remainderViability: remainderViabilityFromAssessment(tone, populationConnection, populationSeparateBlockingFailure),
       evaluation: view.status,
       ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
     });
@@ -1490,7 +1510,7 @@ async function loadOperatorOverviewFactsInner(
       ref,
       kind: 'TRAVELLER' as const,
       label: p.traveller_label,
-      semanticState: semanticStateFromAssessment(tone, populationConnection),
+      semanticState: semanticStateFromAssessment(tone, populationConnection, populationSeparateBlockingFailure),
       authority: 'AUTHORITATIVE' as const,
       ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
       evaluation: view.status,

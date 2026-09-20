@@ -30,6 +30,7 @@ function facts(over: Partial<ObservedProgressionFacts> = {}): ObservedProgressio
     gate: { allowed: false, reason: 'BLOCKING_FAIL', detail: 'still failing' },
     authorityOrExecutionPending: false,
     recoveryRemainsPossible: false,
+    failingStateMonitorable: false,
     ...over,
   };
 }
@@ -93,6 +94,50 @@ test('BLOCKING_FAIL + no recovery remaining -> ESCALATE no_safe_recovery_remaini
   const decision = decideProgressionFromFacts(facts({ recoveryRemainsPossible: false }));
   assert.equal(decision.decision, 'ESCALATE');
   assert.equal(decision.reasonCode, 'no_safe_recovery_remaining');
+});
+
+test('A5 FIX-1: BLOCKING_FAIL, monitorable (planning deferred, nothing planned) -> WAIT failing_state_monitorable', () => {
+  // A tight-only connection FAIL: not replan-eligible yet, no authority pending,
+  // nothing planned for this basis. The honest decision is WAIT (keep the case
+  // open and observe later), NOT ESCALATE no_safe_recovery_remaining.
+  const monitorable = facts({ recoveryRemainsPossible: false, failingStateMonitorable: true });
+  const input = toProgressionInput(monitorable);
+  assert.equal(input.currentStillFailing, true);
+  assert.equal(input.failingStateMonitorable, true);
+  const decision = decideProgressionFromFacts(monitorable);
+  assert.equal(decision.decision, 'WAIT');
+  assert.equal(decision.reasonCode, 'failing_state_monitorable');
+});
+
+test('A5 FIX-1: a monitorable state that already has an attempt is NOT monitorable -> ESCALATE (options exhausted)', () => {
+  // The pass only sets failingStateMonitorable when no attempt exists for the
+  // basis. With the flag false (attempt present) the failing basis escalates.
+  const exhausted = facts({ recoveryRemainsPossible: false, failingStateMonitorable: false });
+  const decision = decideProgressionFromFacts(exhausted);
+  assert.equal(decision.decision, 'ESCALATE');
+  assert.equal(decision.reasonCode, 'no_safe_recovery_remaining');
+});
+
+test('A5 FIX-1: REPLAN outranks monitorable (replan-eligible is never merely watched)', () => {
+  const decision = decideProgressionFromFacts(facts({ recoveryRemainsPossible: true, failingStateMonitorable: true }));
+  assert.equal(decision.decision, 'REPLAN');
+});
+
+test('A5 FIX-1: authority/execution pending outranks monitorable', () => {
+  const decision = decideProgressionFromFacts(facts({ authorityOrExecutionPending: true, failingStateMonitorable: true }));
+  assert.equal(decision.decision, 'WAIT');
+  assert.equal(decision.reasonCode, 'authority_or_execution_pending');
+});
+
+test('A5 FIX-1: a non-failing denial is not rescued by the monitorable flag', () => {
+  // UNKNOWN verdict: currentStillFailing false, so monitorable does not apply.
+  const decision = decideProgressionFromFacts(facts({
+    gate: { allowed: false, reason: 'BLOCKING_UNKNOWN', detail: 'unknown' },
+    currentAssessmentVerdict: 'UNKNOWN',
+    failingStateMonitorable: true,
+  }));
+  assert.equal(decision.decision, 'ESCALATE');
+  assert.equal(decision.reasonCode, 'human_evidence_or_decision_required');
 });
 
 test('non-failing denial (BLOCKING_UNKNOWN / CONSTRAINT_NOT_SATISFIED / ASSESSMENT_NOT_CURRENT) -> ESCALATE human_evidence_or_decision_required', () => {

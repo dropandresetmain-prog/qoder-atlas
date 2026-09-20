@@ -107,6 +107,20 @@ describe('R1 second situation: a broken connection, no programme (real PostgreSQ
 
     const first = await wake();
     assert.equal(first.planned, 1, JSON.stringify(first.outcomes));
+
+    // A5 FIX-2 wiring proof — the assembler classifies the REAL PostgreSQL
+    // assessment through the shared helper: a broken connection is IMPOSSIBLE
+    // (an impossible-family progression), and because the connection is the ONLY
+    // blocking failure here, `separateBlockingFailure` is false (it would be true
+    // if a separate blocking dimension also failed, pulling a tight connection
+    // out of amber into red).
+    const rawFacts = (await loadRecoveryCaseFacts(c.pool, ws, c.caseId, now))!;
+    assert.equal(rawFacts.separateBlockingFailure, false, 'the broken connection is the only blocking failure');
+    assert.ok(
+      ['CONNECTION_IMPOSSIBLE', 'RECOVERY_PLANNING', 'AWAITING_APPROVAL'].includes(rawFacts.connectionProgression!),
+      `broken connection projects an impossible-family progression, got ${rawFacts.connectionProgression}`,
+    );
+
     const v = await view();
     assert.deepEqual(v.causalPath.map((s) => s.dimension), ['connection_feasibility'], 'the failure is a broken connection');
     const pe = v.planningEvidence!;

@@ -13,26 +13,145 @@ import type {
 export type ConnectionViabilityHint = 'VIABLE' | 'TIGHT' | 'IMPOSSIBLE' | 'UNKNOWN';
 
 /**
- * M9 3A — derive the connection-viability hint from real M6 evaluator output
- * (the `connection_feasibility` dimension emitted by `resolution/evaluation/
- * evaluators/connection.ts`), never from a caller-supplied SAFE/AT_RISK/
- * IMPOSSIBLE label. The evaluator's own reason codes already distinguish a
- * broken (negative-gap) connection from one that is merely below the
- * registered minimum (positive gap, still insufficient) — this function only
- * maps that real distinction onto the existing `ConnectionViabilityHint`
- * union that `mapConnectionProgression` already consumes.
+ * Severity order used to aggregate several connection explanations into one
+ * hint. Worst-of: a single IMPOSSIBLE (broken / negative-gap) connection wins
+ * over any TIGHT one, regardless of the order the evaluator happened to sort
+ * the explanations in (they are ordered by a stable content hash, NOT by
+ * severity — see `resolution/evaluation/explain.ts` `dimension()`).
+ */
+const CONNECTION_SEVERITY: Record<ConnectionViabilityHint, number> = {
+  VIABLE: 0,
+  UNKNOWN: 1,
+  TIGHT: 2,
+  IMPOSSIBLE: 3,
+};
+
+/** The connection facts this classifier reads. Values use the evaluator's fact vocabulary (string | number | boolean | null). */
+export interface ConnectionFacts {
+  gapMinutes?: number | string | boolean | null;
+}
+
+function numericGap(value: number | string | boolean | null | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * A5 FIX-2C — derive the connection-viability hint from real M6 evaluator
+ * output (the `connection_feasibility` dimension emitted by
+ * `resolution/evaluation/evaluators/connection.ts`), never from a caller-
+ * supplied SAFE/AT_RISK/IMPOSSIBLE label.
+ *
+ * The evaluator's own reason codes AND facts distinguish:
+ *   - `connection_broken` — a same-place negative gap; waiting cannot recover
+ *     it → IMPOSSIBLE (red / actionable);
+ *   - `transfer_does_not_fit` — a different-place transfer whose gap is below
+ *     the registered transfer time. This is ONLY tight when the gap is still
+ *     positive (boardable later); a NEGATIVE gap means the downstream leg has
+ *     already departed, which is physically impossible, not merely tight, so it
+ *     is IMPOSSIBLE. The classification reads the evaluator's real `gapMinutes`
+ *     fact rather than blindly treating every non-broken FAIL as TIGHT;
+ *   - `connection_below_minimum` — a positive gap below the registered minimum
+ *     connection time → TIGHT (amber / watch).
+ *
+ * `facts` is optional so existing minimal callers (verdict + reasonCode only)
+ * keep working; an absent `gapMinutes` on `transfer_does_not_fit` stays TIGHT
+ * (the conservative watch band), never silently upgraded to red. A flattened
+ * top-level `gapMinutes` is also accepted for callers that pass a projection of
+ * the explanation facts rather than the nested `facts` object.
  */
 export function deriveConnectionViabilityFromEvaluator(dimension: {
   verdict: 'PASS' | 'FAIL' | 'UNKNOWN';
   reasonCode: string;
+  facts?: ConnectionFacts;
+  gapMinutes?: number | string | boolean | null;
 }): ConnectionViabilityHint {
   if (dimension.verdict === 'PASS') return 'VIABLE';
   if (dimension.verdict === 'UNKNOWN') return 'UNKNOWN';
-  // FAIL: 'connection_broken' / 'transfer_does_not_fit' with a negative gap is
-  // no longer recoverable by waiting; a positive-but-insufficient gap
-  // ('connection_below_minimum') is tight but not yet impossible.
+  // FAIL — use the evaluator's actual reason/facts semantics.
   if (dimension.reasonCode === 'connection_broken') return 'IMPOSSIBLE';
+  if (dimension.reasonCode === 'transfer_does_not_fit') {
+    const gap = numericGap(dimension.facts?.gapMinutes) ?? numericGap(dimension.gapMinutes);
+    // A negative transfer gap = the onward leg has departed; not recoverable by
+    // waiting. A non-negative (but below-transfer) gap stays a watch condition.
+    return gap !== undefined && gap < 0 ? 'IMPOSSIBLE' : 'TIGHT';
+  }
+  // `connection_below_minimum` (positive gap below MCT) and any other FAIL code
+  // stay in the watch band; only the explicit impossible cases above go red.
   return 'TIGHT';
+}
+
+/**
+ * A5 FIX-2 — the ONE shared deterministic connection classification every
+ * consumer reads (product status, remainder viability, graph semantic state,
+ * planning eligibility, progression). It aggregates truthfully across the WHOLE
+ * assessment so information is never lost to first-item ordering:
+ *
+ *   - `connectionViability` is the worst-of hint across ALL failing explanations
+ *     of the `connection_feasibility` dimension (a broken connection anywhere in
+ *     the set wins, independent of explanation order / content-hash sorting);
+ *   - `separateBlockingFailure` is true when some OTHER applicable, blocking
+ *     dimension definitively FAILs — so a merely-tight connection cannot project
+ *     the whole trip as watchable amber while a separate failure is already red.
+ *
+ * Pure; no scenario/traveller/route identity.
+ */
+export interface ConnectionClassification {
+  /** Worst-of connection hint, or `undefined` when no connection dimension applies. */
+  readonly connectionViability?: ConnectionViabilityHint;
+  /** True when a non-connection applicable+blocking dimension definitively FAILs. */
+  readonly separateBlockingFailure: boolean;
+}
+
+/** Minimal structural assessment shape the classifier reads (status/facts optional). */
+export interface ClassifiableAssessment {
+  overallVerdict?: 'PASS' | 'FAIL' | 'UNKNOWN';
+  dimensions: readonly {
+    dimension: string;
+    applicable: boolean;
+    blocking?: boolean;
+    verdict: 'PASS' | 'FAIL' | 'UNKNOWN';
+    explanations: readonly {
+      status?: 'PASS' | 'FAIL' | 'UNKNOWN';
+      reasonCode: string;
+      facts?: ConnectionFacts;
+    }[];
+  }[];
+}
+
+function worstHint(a: ConnectionViabilityHint | undefined, b: ConnectionViabilityHint): ConnectionViabilityHint {
+  return a === undefined || CONNECTION_SEVERITY[b] > CONNECTION_SEVERITY[a] ? b : a;
+}
+
+export function classifyAssessmentConnection(assessment: ClassifiableAssessment | undefined | null): ConnectionClassification {
+  const connectionDim = assessment?.dimensions.find((d) => d.dimension === 'connection_feasibility' && d.applicable);
+  let connectionViability: ConnectionViabilityHint | undefined;
+  if (connectionDim) {
+    if (connectionDim.verdict === 'PASS') {
+      connectionViability = 'VIABLE';
+    } else if (connectionDim.verdict === 'UNKNOWN') {
+      connectionViability = 'UNKNOWN';
+    } else {
+      // FAIL: aggregate worst-of across the FAILING explanations only. When an
+      // explanation carries no `status` (minimal callers), treat every supplied
+      // explanation as a candidate so single-explanation callers still work.
+      const failing = connectionDim.explanations.filter((e) => e.status === undefined || e.status === 'FAIL');
+      const considered = failing.length > 0 ? failing : connectionDim.explanations;
+      for (const explanation of considered) {
+        connectionViability = worstHint(
+          connectionViability,
+          deriveConnectionViabilityFromEvaluator({
+            verdict: 'FAIL',
+            reasonCode: explanation.reasonCode,
+            ...(explanation.facts ? { facts: explanation.facts } : {}),
+          }),
+        );
+      }
+    }
+  }
+  const separateBlockingFailure = (assessment?.dimensions ?? []).some(
+    (d) => d.applicable && d.blocking !== false && d.verdict === 'FAIL' && d.dimension !== 'connection_feasibility',
+  );
+  return { ...(connectionViability ? { connectionViability } : {}), separateBlockingFailure };
 }
 
 /**
@@ -41,26 +160,31 @@ export function deriveConnectionViabilityFromEvaluator(dimension: {
  * attention / red). Whole-trip FAIL alone must not collapse both into
  * DISRUPTED — Overview and Event Overview already understand AT_RISK.
  *
- * Non-connection FAIL (programme, objectives, …) stays DISRUPTED when no
- * tight-connection viability is present.
+ * A5 FIX-2B — amber means a GENUINELY watchable overall state: it is only
+ * projected when a tight connection is the failure and no SEPARATE blocking
+ * dimension (programme, objectives, …) definitively FAILs. A tight connection
+ * plus a separate definitive blocking failure is red/DISRUPTED, because the
+ * trip is not merely watchable — something else has already failed.
  */
 export function productStatusFromAssessment(
   tone: AssessmentTone,
   connectionViability?: ConnectionViabilityHint,
+  separateBlockingFailure = false,
 ): ProductOperationalStatus {
   if (tone === 'PASS') return 'READY';
   if (tone === 'UNKNOWN') return 'UNKNOWN';
-  if (connectionViability === 'TIGHT') return 'AT_RISK';
+  if (connectionViability === 'TIGHT' && !separateBlockingFailure) return 'AT_RISK';
   return 'DISRUPTED';
 }
 
 export function remainderViabilityFromAssessment(
   tone: AssessmentTone,
   connectionViability?: ConnectionViabilityHint,
+  separateBlockingFailure = false,
 ): RemainderViability {
   if (tone === 'PASS') return 'VIABLE';
   if (tone === 'UNKNOWN') return 'UNKNOWN';
-  if (connectionViability === 'TIGHT') return 'AT_RISK';
+  if (connectionViability === 'TIGHT' && !separateBlockingFailure) return 'AT_RISK';
   return 'NOT_VIABLE';
 }
 
@@ -68,10 +192,11 @@ export function remainderViabilityFromAssessment(
 export function semanticStateFromAssessment(
   tone: AssessmentTone,
   connectionViability?: ConnectionViabilityHint,
+  separateBlockingFailure = false,
 ): LdgSemanticState {
   if (tone === 'PASS') return 'HEALTHY';
   if (tone === 'UNKNOWN') return 'UNKNOWN';
-  if (connectionViability === 'TIGHT') return 'AFFECTED';
+  if (connectionViability === 'TIGHT' && !separateBlockingFailure) return 'AFFECTED';
   return 'FAILED';
 }
 
@@ -79,21 +204,15 @@ export function semanticStateFromAssessment(
  * Extract connection viability from a CURRENT assessment's connection
  * dimension, when present. Absent dimension → undefined (caller treats as
  * non-connection FAIL).
+ *
+ * A5 FIX-2A — aggregates the worst-of hint across ALL failing connection
+ * explanations (via `classifyAssessmentConnection`), so a broken connection
+ * cannot be hidden because another explanation sorts first. Explanations are
+ * ordered by a stable content hash, never by severity, so reading only
+ * `explanations[0]` was an information-loss defect.
  */
-export function connectionViabilityFromAssessment(assessment: {
-  dimensions: readonly {
-    dimension: string;
-    applicable: boolean;
-    verdict: 'PASS' | 'FAIL' | 'UNKNOWN';
-    explanations: readonly { reasonCode: string }[];
-  }[];
-} | undefined | null): ConnectionViabilityHint | undefined {
-  const connectionDim = assessment?.dimensions.find((d) => d.dimension === 'connection_feasibility' && d.applicable);
-  if (!connectionDim) return undefined;
-  return deriveConnectionViabilityFromEvaluator({
-    verdict: connectionDim.verdict,
-    reasonCode: connectionDim.explanations[0]?.reasonCode ?? '',
-  });
+export function connectionViabilityFromAssessment(assessment: ClassifiableAssessment | undefined | null): ConnectionViabilityHint | undefined {
+  return classifyAssessmentConnection(assessment).connectionViability;
 }
 
 export function mapConnectionProgression(input: {
@@ -144,27 +263,23 @@ export function mapConnectionProgression(input: {
  * gap) opens a Case for watchfulness but does not yet justify selling a
  * replacement. Physically broken connections (IMPOSSIBLE) and any other
  * blocking dimension (programme, objectives, …) remain planning-eligible.
+ *
+ * A5 FIX-2 — reads the SHARED `classifyAssessmentConnection` so eligibility
+ * aggregates the whole failing-explanation set (never `explanations[0]`): a
+ * broken connection anywhere in the set is eligible even if a tight one sorts
+ * first, and a `transfer_does_not_fit` with a negative gap is eligible.
  */
-export function recoveryPlanningEligibleFromAssessment(assessment: {
+export function recoveryPlanningEligibleFromAssessment(assessment: ClassifiableAssessment & {
   overallVerdict: 'PASS' | 'FAIL' | 'UNKNOWN';
-  dimensions: readonly {
-    dimension: string;
-    applicable: boolean;
-    blocking: boolean;
-    verdict: 'PASS' | 'FAIL' | 'UNKNOWN';
-    explanations: readonly { reasonCode: string }[];
-  }[];
 }): boolean {
   if (assessment.overallVerdict !== 'FAIL') return false;
-  const blocking = assessment.dimensions.filter(
-    (d) => d.applicable && d.blocking && d.verdict === 'FAIL',
-  );
-  if (blocking.length === 0) return false;
-  if (blocking.some((d) => d.dimension !== 'connection_feasibility')) return true;
-  return blocking.some((d) => deriveConnectionViabilityFromEvaluator({
-    verdict: 'FAIL',
-    reasonCode: d.explanations[0]?.reasonCode ?? '',
-  }) === 'IMPOSSIBLE');
+  const classification = classifyAssessmentConnection(assessment);
+  // A separate blocking (non-connection) dimension failing is always eligible.
+  if (classification.separateBlockingFailure) return true;
+  // Otherwise eligibility rests on the connection truth: only an IMPOSSIBLE
+  // (broken / negative-gap) connection justifies replacement planning; a merely
+  // TIGHT connection stays monitorable and is NOT planning-eligible.
+  return classification.connectionViability === 'IMPOSSIBLE';
 }
 
 /** Progressive delay path used by Jordan S2 acceptance (fixture timings later). */

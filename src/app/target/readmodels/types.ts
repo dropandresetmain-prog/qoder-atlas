@@ -299,6 +299,15 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
    * scale without a second stamp read.
    */
   subjectFacts?: readonly { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; stamp?: bigint }[];
+  /**
+   * A5 FIX-2B — internal only, never parsed into `RecoveryCaseView`. True when a
+   * SEPARATE blocking (non-connection) dimension definitively FAILs somewhere in
+   * this case. The overview/items projection reads it so a merely-TIGHT
+   * connection cannot project the whole case amber (watchable) while another
+   * blocking dimension is already red. Absent/undefined means "not separately
+   * blocking" (default false), preserving pre-FIX behaviour for hand-built facts.
+   */
+  separateBlockingFailure?: boolean;
 }
 
 export interface TravellerTripFacts extends ProductWorldFacts {

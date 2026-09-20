@@ -68,6 +68,16 @@ export interface ObservedProgressionFacts {
    */
   recoveryRemainsPossible: boolean;
   /**
+   * A5 FIX-1 — True when the still-failing state is MONITORABLE: replacement
+   * planning is intentionally not yet eligible for this basis (e.g. a tight-only
+   * connection) and nothing has been planned for it yet. Supplied by the pass
+   * from the deterministic planning-eligibility classification plus whether an
+   * attempt already exists for this basis; never a scenario branch. When set (and
+   * the basis is still failing, not already awaiting authority, and not
+   * replan-eligible) the honest decision is WAIT, not ESCALATE.
+   */
+  failingStateMonitorable: boolean;
+  /**
    * The CURRENT settled overall verdict the pass read from the assessment owner.
    * When supplied it is authoritative for "still failing": the resolution gate
    * checks execution/proposal state BEFORE verdicts, so a stale proposal must not
@@ -103,6 +113,7 @@ export function toProgressionInput(facts: ObservedProgressionFacts): RecoveryPro
         : isUnreconciledExecution(reason))),
     currentStillFailing: facts.currentAssessmentVerdict === undefined ? reason === 'BLOCKING_FAIL' : facts.currentAssessmentVerdict === 'FAIL',
     recoveryRemainsPossible: facts.recoveryRemainsPossible,
+    failingStateMonitorable: facts.failingStateMonitorable,
   };
 }
 

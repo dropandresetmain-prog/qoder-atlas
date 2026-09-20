@@ -168,6 +168,132 @@ describe('C4 progression — each frozen decision (controlled evaluator, spy pla
 });
 
 // ---------------------------------------------------------------------------
+// A5 FIX-1 — D2 tight-only connection is MONITORABLE (WAIT), never ESCALATE.
+//
+// The controlled evaluator emits ONLY a blocking `connection_feasibility` FAIL
+// with `connection_below_minimum` (a positive gap below the registered minimum):
+// overallVerdict FAIL, but replacement planning is intentionally NOT eligible
+// (`recoveryPlanningEligibleFromAssessment` → false) because a merely-tight
+// connection may still recover on its own. The honest progression decision is
+// therefore WAIT (failing_state_monitorable): the case stays OPEN, nothing is
+// planned, no actionable replacement recommendation is produced and NO attention
+// is opened. This is the corrected truth — before FIX-1 the same basis fell
+// through to ESCALATE / no_safe_recovery_remaining.
+// ---------------------------------------------------------------------------
+const tightVerdictFor = new Map<string, 'PASS' | 'FAIL' | 'UNKNOWN'>();
+const tightConnection: Evaluator = {
+  id: 'test.tightConnection', version: '1', assessmentKind: 'VIABILITY', subjectKinds: ['JOURNEY'], dimensions: ['connection_feasibility'], informationTopics: [],
+  evaluate: (subject) => {
+    const status = tightVerdictFor.get(subject.id) ?? 'UNKNOWN';
+    if (status === 'PASS') {
+      return {
+        dimensions: [dimension({
+          dimension: 'connection_feasibility', blocking: true,
+          explanations: [explain({
+            evaluatorId: 'test.tightConnection', dimension: 'connection_feasibility', status: 'PASS', reasonCode: 'connection_meets_minimum',
+            cause: { kind: 'REQUIREMENT' }, affectedSubject: subject, facts: { gapMinutes: 45, requiredMinutes: 30 },
+          })],
+        })],
+        evidence: [], missingCoverage: [],
+      };
+    }
+    if (status === 'UNKNOWN') {
+      return {
+        dimensions: [dimension({
+          dimension: 'connection_feasibility', blocking: true,
+          explanations: [explain({
+            evaluatorId: 'test.tightConnection', dimension: 'connection_feasibility', status: 'UNKNOWN', reasonCode: 'connection_time_unknown',
+            cause: { kind: 'MISSING_INFORMATION' }, affectedSubject: subject, facts: { gapMinutes: null, requiredMinutes: null },
+          })],
+        })],
+        evidence: [], missingCoverage: [],
+      };
+    }
+    // FAIL — a TIGHT (below-minimum, still positive-gap) connection only.
+    return {
+      dimensions: [dimension({
+        dimension: 'connection_feasibility', blocking: true,
+        explanations: [explain({
+          evaluatorId: 'test.tightConnection', dimension: 'connection_feasibility', status: 'FAIL', reasonCode: 'connection_below_minimum',
+          cause: { kind: 'REQUIREMENT' }, affectedSubject: subject, facts: { gapMinutes: 12, requiredMinutes: 30 },
+        })],
+      })],
+      evidence: [], missingCoverage: [],
+    };
+  },
+};
+const tightRegistry = createEvaluatorRegistry([tightConnection]);
+
+async function assessTight(c: Controlled, verdict: 'PASS' | 'FAIL' | 'UNKNOWN') {
+  tightVerdictFor.set(c.journey.id, verdict);
+  const world = await captureWorld(c.pool, { workspaceId: c.seed.workspaceId, focus: [c.journey], at: R1_NOW, informationTopics: tightRegistry.informationTopics });
+  const { result } = assessSubject({ registry: tightRegistry, world, effective: projectEffectiveWorld(world), subject: c.journey, now: R1_NOW, assessmentId: randomUUID() });
+  await saveAssessment(c.pool, c.seed.workspaceId, result, ACTOR);
+  return result.id;
+}
+
+describe('A5 FIX-1 progression — D2 tight-only connection is monitorable (WAIT), not ESCALATE', () => {
+  test('a tight-only connection FAIL => WAIT failing_state_monitorable: case stays OPEN, nothing planned, no attention', async () => {
+    const c = await controlledCase();
+    const basis = await assessTight(c, 'FAIL');
+    const report = await pass(c);
+    const o = report.outcomes[0]!;
+    assert.equal(o.decision, 'WAIT', JSON.stringify(o));
+    assert.equal(o.reasonCode, 'failing_state_monitorable');
+    assert.equal(o.basisAssessmentId, basis);
+    assert.equal(o.dispatch, 'NONE', 'WAIT dispatches nothing');
+    assert.equal(c.calls.length, 0, 'a monitorable tight connection never dispatches planning');
+    assert.equal(report.planned, 0);
+    assert.equal(report.escalated, 0);
+    assert.equal(report.waiting, 1);
+    // The case stays open (monitoring), never resolved/cancelled/escalated.
+    const row = await c.pool.query<{ lifecycle_status: string }>('SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2', [c.seed.workspaceId, c.caseId]);
+    assert.equal(row.rows[0]!.lifecycle_status, 'OPEN', 'a monitorable failing state keeps the case OPEN');
+    // No actionable replacement recommendation and NO operator attention.
+    const attempts = Number((await c.pool.query<{ n: string }>('SELECT count(*)::text AS n FROM recovery_planning_attempts WHERE workspace_id = $1', [c.seed.workspaceId])).rows[0]!.n);
+    assert.equal(attempts, 0, 'no planning attempt for a monitorable basis');
+    const attention = await listRecoveryCaseAttention(c.pool, c.seed.workspaceId, c.caseId);
+    assert.equal(attention.length, 0, 'WAIT opens no attention');
+
+    // Idempotent under a duplicate wake: the same settled basis WAITs again,
+    // still planning nothing and opening nothing.
+    const again = await pass(c);
+    assert.equal(again.outcomes[0]!.decision, 'WAIT');
+    assert.equal(again.outcomes[0]!.reasonCode, 'failing_state_monitorable');
+    assert.equal(again.candidates, 1, 'the OPEN case is still a progression candidate');
+    assert.equal(c.calls.length, 0);
+    assert.equal((await listRecoveryCaseAttention(c.pool, c.seed.workspaceId, c.caseId)).length, 0);
+  });
+
+  test('the SAME tight connection, once it recovers to PASS, RESOLVEs through the existing owner', async () => {
+    const c = await controlledCase();
+    // First observe the tight-only FAIL and WAIT (monitor).
+    await assessTight(c, 'FAIL');
+    assert.equal((await pass(c)).outcomes[0]!.decision, 'WAIT');
+    assert.equal((await pass(c)).outcomes[0]!.reasonCode, 'failing_state_monitorable');
+    // A later observation shows the connection now meets the minimum: the case
+    // resolves. Monitoring is a genuine holding state, not a dead end.
+    await assessTight(c, 'PASS');
+    const resolved = await pass(c);
+    assert.equal(resolved.outcomes[0]!.decision, 'RESOLVE', JSON.stringify(resolved.outcomes));
+    assert.equal(resolved.outcomes[0]!.dispatch, 'RESOLVED');
+    const row = await c.pool.query<{ lifecycle_status: string }>('SELECT lifecycle_status FROM recovery_cases WHERE workspace_id = $1 AND id = $2', [c.seed.workspaceId, c.caseId]);
+    assert.equal(row.rows[0]!.lifecycle_status, 'RESOLVED');
+  });
+
+  test('an UNKNOWN tight-connection assessment is NOT monitorable: it escalates for human evidence', async () => {
+    const c = await controlledCase();
+    await assessTight(c, 'UNKNOWN');
+    const report = await pass(c);
+    // currentStillFailing is false for UNKNOWN, so the monitorable WAIT does not
+    // apply; the frozen contract escalates for human evidence/decision.
+    assert.equal(report.outcomes[0]!.decision, 'ESCALATE', JSON.stringify(report.outcomes));
+    assert.equal(report.outcomes[0]!.reasonCode, 'human_evidence_or_decision_required');
+    assert.equal(report.outcomes[0]!.dispatch, 'ATTENTION_OPENED');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Group 2 — real coordinator on the generic programme world
 // ---------------------------------------------------------------------------
 function realPlanner(c: OpenCase, proposers?: Parameters<typeof createRecoveryPlanningCoordinator>[0]['proposers']) {

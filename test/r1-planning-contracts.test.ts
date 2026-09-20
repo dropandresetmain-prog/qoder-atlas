@@ -384,7 +384,9 @@ test('domains: an AI-suggested unregistered domain fails closed and cannot veto 
 // C8 — lifecycle progression decision precedence.
 // ---------------------------------------------------------------------------
 
-const PROG_BASE = { recoveryCaseId: 'case-1', basisAssessmentId: 'a-1' };
+// failingStateMonitorable defaults false so the existing precedence cases keep
+// their pre-FIX-1 behaviour; the monitorable WAIT case sets it explicitly below.
+const PROG_BASE = { recoveryCaseId: 'case-1', basisAssessmentId: 'a-1', failingStateMonitorable: false };
 
 test('progression: resolution gate passed + reconciled -> RESOLVE', () => {
   const r = decideRecoveryProgression({ ...PROG_BASE, resolutionGatePassed: true, executionReconciled: true, authorityOrExecutionPending: false, currentStillFailing: false, recoveryRemainsPossible: false });
@@ -415,6 +417,29 @@ test('progression: no safe recovery -> ESCALATE; resolution beats a pending flag
 test('progression: the decision function is deterministic for identical input', () => {
   const input = { ...PROG_BASE, resolutionGatePassed: false, executionReconciled: true, authorityOrExecutionPending: false, currentStillFailing: true, recoveryRemainsPossible: true };
   assert.deepEqual(decideRecoveryProgression(input), decideRecoveryProgression(input));
+});
+
+test('A5 FIX-1 progression: still failing + monitorable (planning deferred, nothing planned) -> WAIT failing_state_monitorable', () => {
+  const r = decideRecoveryProgression({ ...PROG_BASE, resolutionGatePassed: false, executionReconciled: true, authorityOrExecutionPending: false, currentStillFailing: true, recoveryRemainsPossible: false, failingStateMonitorable: true });
+  assert.equal(r.decision, 'WAIT');
+  assert.equal(r.reasonCode, 'failing_state_monitorable');
+});
+
+test('A5 FIX-1 progression: monitorable WAIT ranks below REPLAN and authority/execution pending', () => {
+  // REPLAN outranks monitorable: a replan-eligible failing basis is never merely watched.
+  const replan = decideRecoveryProgression({ ...PROG_BASE, resolutionGatePassed: false, executionReconciled: true, authorityOrExecutionPending: false, currentStillFailing: true, recoveryRemainsPossible: true, failingStateMonitorable: true });
+  assert.equal(replan.decision, 'REPLAN');
+
+  // Authority/execution pending WAIT outranks the monitorable WAIT (its reason wins).
+  const pending = decideRecoveryProgression({ ...PROG_BASE, resolutionGatePassed: false, executionReconciled: false, authorityOrExecutionPending: true, currentStillFailing: true, recoveryRemainsPossible: false, failingStateMonitorable: true });
+  assert.equal(pending.decision, 'WAIT');
+  assert.equal(pending.reasonCode, 'authority_or_execution_pending');
+});
+
+test('A5 FIX-1 progression: monitorable does not apply when not still failing', () => {
+  // A PASS/UNKNOWN basis (not still failing) with the flag set must not be watched.
+  const r = decideRecoveryProgression({ ...PROG_BASE, resolutionGatePassed: true, executionReconciled: true, authorityOrExecutionPending: false, currentStillFailing: false, recoveryRemainsPossible: false, failingStateMonitorable: true });
+  assert.equal(r.decision, 'RESOLVE');
 });
 
 // ---------------------------------------------------------------------------

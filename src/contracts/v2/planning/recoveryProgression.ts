@@ -17,7 +17,21 @@
  *       -> resolution gate passes + execution reconciled: RESOLVE
  *       -> authority/execution still pending:            WAIT
  *       -> still failing + recovery remains possible:     REPLAN (planCase from NEW basis)
+ *       -> still failing + monitorable (planning intentionally
+ *          deferred, nothing planned for this basis yet):  WAIT (monitor)
  *       -> no safe recovery / human evidence or decision:  ESCALATE
+ *
+ * A5 FIX-1 — the four-state vocabulary already expresses a monitorable failing
+ * state: it is WAIT. Before this correction WAIT was reachable only via
+ * "authority/execution pending", so a tight-only connection that is FAILing but
+ * intentionally NOT yet replacement-planning-eligible fell through to
+ * ESCALATE / no_safe_recovery_remaining — semantically wrong, because "do not
+ * replace yet" does NOT mean "no safe recovery exists". The smallest
+ * generalized correction adds an explicit `failingStateMonitorable` truth that
+ * also yields WAIT (with its own reason code), keeping the case open for a
+ * subsequent observation/time/state transition. It never fakes authority
+ * pending, never marks the assessment PASS, and is derived generically from
+ * planning eligibility, not from any scenario identity.
  *
  * Rules this contract encodes:
  *   - the progression service reuses the EXISTING case lifecycle; it invents no
@@ -72,6 +86,21 @@ export interface RecoveryProgressionInput {
    * state and a further planning basis could plausibly help.
    */
   recoveryRemainsPossible: boolean;
+  /**
+   * A5 FIX-1 — the still-failing state is MONITORABLE: planning is
+   * intentionally not yet eligible (e.g. a tight-only connection that may
+   * resolve on its own) and nothing has been planned for this basis yet. The
+   * honest decision is WAIT (keep the case open, observe again later), NOT
+   * ESCALATE — "do not replace yet" is not "no safe recovery remains".
+   *
+   * This is an explicit truth supplied by the pass from the deterministic
+   * planning-eligibility classification, never assumed and never derived from a
+   * scenario identity. It is consulted only after RESOLVE and the
+   * authority/execution-pending WAIT, and only when the state is still failing;
+   * a basis that has already been planned (an attempt exists) is NOT monitorable
+   * — its options are exhausted and it escalates as before.
+   */
+  failingStateMonitorable: boolean;
 }
 
 /**
@@ -92,11 +121,13 @@ export type RecoveryProgressionResult = z.infer<typeof RecoveryProgressionResult
  * settled input always yields the same decision, which is what makes the
  * service idempotent and safe to wake repeatedly.
  *
- * Precedence (freeze §11):
+ * Precedence (freeze §11, with the A5 FIX-1 monitorable WAIT):
  *   1. resolution gate passed AND execution reconciled -> RESOLVE
  *   2. authority/execution still pending               -> WAIT
  *   3. still failing AND recovery remains possible      -> REPLAN
- *   4. otherwise                                        -> ESCALATE
+ *   4. still failing AND monitorable (planning deferred,
+ *      nothing planned for this basis)                  -> WAIT (monitor)
+ *   5. otherwise                                        -> ESCALATE
  */
 export function decideRecoveryProgression(
   input: RecoveryProgressionInput,
@@ -127,6 +158,18 @@ export function decideRecoveryProgression(
       ...base,
       decision: 'REPLAN',
       reasonCode: 'still_failing_recovery_possible',
+    });
+  }
+
+  // A5 FIX-1 — a still-failing state that is monitorable (replacement planning
+  // intentionally deferred and nothing planned for this basis yet) WAITs: the
+  // case stays open for a subsequent observation/time/state transition. This is
+  // NOT ESCALATE: deferring replacement is not the same as exhausting recovery.
+  if (input.currentStillFailing && input.failingStateMonitorable) {
+    return RecoveryProgressionResultSchema.parse({
+      ...base,
+      decision: 'WAIT',
+      reasonCode: 'failing_state_monitorable',
     });
   }
 

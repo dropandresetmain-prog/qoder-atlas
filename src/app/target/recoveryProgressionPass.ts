@@ -206,6 +206,14 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
     : undefined;
   const planningEligible = basis.verdict === 'FAIL'
     && (basisAssessment ? recoveryPlanningEligibleFromAssessment(basisAssessment) : true);
+  // A5 FIX-1 — a still-failing basis whose replacement planning is intentionally
+  // NOT eligible (e.g. a tight-only connection) and for which nothing has been
+  // planned yet is MONITORABLE: the honest decision is WAIT (keep the case open
+  // for a later observation/time/state transition), not ESCALATE. Once an attempt
+  // exists for this basis its options are exhausted, so it is no longer monitorable
+  // and escalates as before. Derived from the deterministic planning-eligibility
+  // classification, never from a scenario identity.
+  const failingStateMonitorable = basis.verdict === 'FAIL' && !planningEligible && attempt === undefined;
   const result = decideProgressionFromFacts({
     recoveryCaseId: row.id as SubjectId,
     basisAssessmentId: basis.assessmentId as SubjectId,
@@ -217,6 +225,7 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
     // One planning attempt per basis: a settled attempt for this basis is never redone.
     // Tight-only connection FAIL stays monitorable (Case open) without REPLAN.
     recoveryRemainsPossible: planningEligible && attempt === undefined,
+    failingStateMonitorable,
     currentAssessmentVerdict: basis.verdict,
   });
   outcome.decision = result.decision;
