@@ -53,6 +53,11 @@ export interface HotelPlanningContext {
   orderKey: string;
   visit: StayVisit;
   provenance: PlanningToolProvenance;
+  /**
+   * When the search is area-scoped, prefer rates for this captured property
+   * before other nearby properties. Never required for overnight companions.
+   */
+  preferredPropertyRef?: { system: string; value: string };
 }
 
 export type HotelPlanningContextResolver = (input: {
@@ -238,12 +243,42 @@ function requestedPropertyRef(place: CapturedWorld['places'][number], context: H
   return ref;
 }
 
+function searchLocationOk(context: HotelPlanningContext, place: CapturedWorld['places'][number]): boolean {
+  const { location } = context.query;
+  if (location.coordinates) {
+    return Number.isFinite(location.coordinates.latitude)
+      && Number.isFinite(location.coordinates.longitude)
+      && (location.coordinates.radiusKm === undefined || location.coordinates.radiusKm > 0);
+  }
+  return requestedPropertyRef(place, context) !== undefined;
+}
+
 function propertyMatchesRef(
   property: HotelSearchOutcome['properties'][number],
   ref: { system: string; value: string },
 ): boolean {
   return property.propertyId === ref.value
     && property.externalRefs?.some((returned) => sameExternalRef(returned, ref)) === true;
+}
+
+function compareRatePrice(a: HotelRateView['totalPrice'], b: HotelRateView['totalPrice']): number {
+  const left = typeof a.amount === 'number' ? a.amount : Number(a.amount);
+  const right = typeof b.amount === 'number' ? b.amount : Number(b.amount);
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return 0;
+  return left - right;
+}
+
+/** Rank replacement rates: preferred captured property first, then cheaper. */
+function rankReplacementRates(
+  rates: readonly HotelRateView[],
+  preferredPropertyId: string | undefined,
+): HotelRateView[] {
+  return [...rates].sort((left, right) => {
+    const leftPreferred = preferredPropertyId && left.propertyId === preferredPropertyId ? 0 : 1;
+    const rightPreferred = preferredPropertyId && right.propertyId === preferredPropertyId ? 0 : 1;
+    if (leftPreferred !== rightPreferred) return leftPreferred - rightPreferred;
+    return compareRatePrice(left.totalPrice, right.totalPrice);
+  });
 }
 
 function operandJourneyItemId(constraint: CapturedWorld['constraints'][number], key: string): string | undefined {
@@ -360,8 +395,7 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
     const place = world.places.find((candidatePlace) => candidatePlace.id === context.placeId);
     const window = InstantIntervalSchema.safeParse(context.stayWindow);
     const provenance = PlanningToolProvenanceSchema.safeParse(context.provenance);
-    const propertyRef = place ? requestedPropertyRef(place, context) : undefined;
-    if (!place || !window.success || !provenance.success || !propertyRef
+    if (!place || !window.success || !provenance.success || !searchLocationOk(context, place)
       || !SUBJECT_ID.test(context.proposedJourneyItemId) || context.orderKey.trim().length === 0) return;
     if (!context.query.guestNationality || !/^[A-Z]{2}$/.test(context.query.guestNationality)
       || context.query.guests === undefined || context.query.rooms === undefined
@@ -369,7 +403,11 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       || localDate(window.data.end, place.timeZone) !== context.query.checkOutDate) return;
     const request = PlanningToolRequestSchema.safeParse({
       id: stableId('hotel-search', JSON.stringify(context.query)), capability: 'HOTEL', operation: 'hotel.search', parameters: context.query,
-      purpose: replacement ? 'Research replacement accommodation at the captured property' : 'Research accommodation for an uncovered overnight itinerary gap',
+      purpose: replacement
+        ? (context.query.location.coordinates
+          ? 'Research replacement accommodation covering the required destination stay window'
+          : 'Research replacement accommodation at the captured property')
+        : 'Research accommodation for an uncovered overnight itinerary gap',
       evidenceGapCode: replacement ? 'stay_replacement' : 'overnight_accommodation', round: 2,
     });
     if (!request.success) return;
@@ -426,19 +464,43 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       const outcome = asSearchOutcome(result.normalizedEvidence);
       if (!outcome || bindings.length === 0) continue;
       const isReplacement = bindings.some((binding) => binding.replacement);
-      const propertyIds = new Set(bindings.flatMap((binding) => {
-        const place = input.world.places.find((candidate) => candidate.id === binding.context.placeId);
-        const ref = place ? requestedPropertyRef(place, binding.context) : undefined;
-        if (!ref) return [];
-        return outcome.properties
-          .filter((property) => propertyMatchesRef(property, ref))
-          .slice(0, maxProperties ?? 0)
-          .map((property) => property.propertyId);
-      }));
       // Destination repair closes a hard stay dependency; give it alternate-rate
       // headroom before overnight fragments consume the shared quote budget.
       const rateLimit = (maxRates ?? 0) + (isReplacement ? DEFAULT_REPLACEMENT_RATE_BONUS : 0);
-      for (const rate of outcome.rates.filter((candidate) => candidate.availability !== 'UNKNOWN' && propertyIds.has(candidate.propertyId)).slice(0, rateLimit)) {
+      const availableRates = outcome.rates.filter((candidate) => candidate.availability !== 'UNKNOWN');
+      let selectedRates: HotelRateView[];
+      if (isReplacement && bindings.some((binding) => binding.context.query.location.coordinates)) {
+        // Area searches must not collapse back to the displaced property alone.
+        // Prefer that property when present, then try other nearby rates within budget.
+        const preferredId = bindings
+          .map((binding) => binding.context.preferredPropertyRef?.value)
+          .find((value): value is string => typeof value === 'string' && value.length > 0);
+        const propertyCap = Math.max(1, maxProperties ?? 0);
+        const ranked = rankReplacementRates(availableRates, preferredId);
+        const allowedProperties = new Set<string>();
+        const selected: HotelRateView[] = [];
+        for (const rate of ranked) {
+          if (!allowedProperties.has(rate.propertyId)) {
+            if (allowedProperties.size >= propertyCap) continue;
+            allowedProperties.add(rate.propertyId);
+          }
+          selected.push(rate);
+          if (selected.length >= rateLimit) break;
+        }
+        selectedRates = selected;
+      } else {
+        const propertyIds = new Set(bindings.flatMap((binding) => {
+          const place = input.world.places.find((candidate) => candidate.id === binding.context.placeId);
+          const ref = place ? requestedPropertyRef(place, binding.context) : undefined;
+          if (!ref) return [];
+          return outcome.properties
+            .filter((property) => propertyMatchesRef(property, ref))
+            .slice(0, maxProperties ?? 0)
+            .map((property) => property.propertyId);
+        }));
+        selectedRates = availableRates.filter((candidate) => propertyIds.has(candidate.propertyId)).slice(0, rateLimit);
+      }
+      for (const rate of selectedRates) {
         const request = PlanningToolRequestSchema.parse({
           id: stableId('hotel-quote', JSON.stringify({ rateId: rate.rateId })), capability: 'HOTEL', operation: 'hotel.quote', parameters: { rateId: rate.rateId },
           purpose: isReplacement ? 'Confirm replacement accommodation terms' : 'Confirm accommodation terms for an uncovered overnight itinerary gap',

@@ -35,6 +35,16 @@ export interface StayReplacementBinding {
   /** Opaque provider stay element, keyed by the captured reservation identity. */
   stayElementId: string;
   propertyExternalRef: ExternalRef;
+  /**
+   * Bounded destination-area search for a suitable replacement stay covering
+   * the required window. When present, research is not limited to the displaced
+   * property alone; that property remains preferred via preferredPropertyRef.
+   */
+  areaSearch?: {
+    latitude: number;
+    longitude: number;
+    radiusKm: number;
+  };
   passport: {
     credentialId: string;
     credentialVersionId: string;
@@ -123,7 +133,7 @@ function currentPassport(
 
 function validBinding(binding: StayReplacementBinding): boolean {
   const provenance = PlanningToolProvenanceSchema.safeParse(binding.provenance);
-  return SUBJECT_ID.test(binding.reservationId)
+  if (!(SUBJECT_ID.test(binding.reservationId)
     && SUBJECT_ID.test(binding.reservationLineId)
     && SUBJECT_ID.test(binding.stayElementId)
     && SUBJECT_ID.test(binding.visitId)
@@ -132,7 +142,15 @@ function validBinding(binding: StayReplacementBinding): boolean {
     && NATIONALITY.test(binding.passport.guestNationality)
     && Number.isSafeInteger(binding.guests.adults) && binding.guests.adults > 0
     && Number.isSafeInteger(binding.guests.rooms) && binding.guests.rooms > 0
-    && provenance.success && provenance.data.sourceRefs.length > 0;
+    && provenance.success && provenance.data.sourceRefs.length > 0)) return false;
+  if (!binding.areaSearch) return true;
+  return Number.isFinite(binding.areaSearch.latitude)
+    && Number.isFinite(binding.areaSearch.longitude)
+    && binding.areaSearch.latitude >= -90 && binding.areaSearch.latitude <= 90
+    && binding.areaSearch.longitude >= -180 && binding.areaSearch.longitude <= 180
+    && Number.isFinite(binding.areaSearch.radiusKm)
+    && binding.areaSearch.radiusKm > 0
+    && binding.areaSearch.radiusKm <= 50;
 }
 
 /**
@@ -226,7 +244,15 @@ export function createStayReplacementContextResolver(binding: StayReplacementBin
       || compareInstants(visit.intended.end, stayWindow.data.end) < 0) return undefined;
 
     const query: HotelSearchQuery = {
-      location: { externalRef: binding.propertyExternalRef },
+      location: binding.areaSearch
+        ? {
+          coordinates: {
+            latitude: binding.areaSearch.latitude,
+            longitude: binding.areaSearch.longitude,
+            radiusKm: binding.areaSearch.radiusKm,
+          },
+        }
+        : { externalRef: binding.propertyExternalRef },
       checkInDate: candidateArrivalParts.date,
       checkOutDate: originalCheckoutDate,
       guests: { adults: binding.guests.adults },
@@ -248,6 +274,7 @@ export function createStayReplacementContextResolver(binding: StayReplacementBin
       orderKey: old.orderKey,
       visit: { kind: 'EXISTING', visitId: visit.id },
       provenance: binding.provenance,
+      preferredPropertyRef: binding.propertyExternalRef,
     };
     return {
       oldJourneyItemId: old.id,

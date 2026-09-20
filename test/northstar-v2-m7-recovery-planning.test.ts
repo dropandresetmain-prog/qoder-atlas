@@ -1856,3 +1856,124 @@ test('hotel quote round prioritises destination-stay repair before overnight alt
   assert.ok(gaps.filter((gap) => gap === 'stay_replacement').length >= 2, 'replacement keeps alternate-rate headroom');
 });
 
+test('hotel planning area replacement quotes alternate property after preferred rate fails', async () => {
+  const { world, journey, travellerId, placeId, arrival, visit } = overnightStayWorld();
+  const originPlaceId = arrival.desiredOriginPlaceId!;
+  const departure = world.journeyItems.find((item) => item.id !== arrival.id)!;
+  departure.intendedWindow = { start: '2030-06-04T02:00:00.000Z', end: '2030-06-04T06:00:00.000Z' };
+  world.places.push(
+    { id: originPlaceId, revision: 1, name: 'Connection city', placeType: 'CITY', timeZone: 'Pacific/Auckland', hasCoordinates: true, externalRefs: [{ system: 'hotel-provider-id', value: 'property-o' }] },
+  );
+  world.places.find((place) => place.id === placeId)!.externalRefs = [{ system: 'hotel-provider-id', value: 'property-a' }];
+  const onwardService = service({
+    originPlaceId: placeId, destinationPlaceId: departure.desiredDestinationPlaceId!,
+    published: { departure: observed('2030-06-04T02:00:00.000Z'), arrival: observed('2030-06-04T06:00:00.000Z') },
+  });
+  departure.selectedServiceId = onwardService.id;
+  const originalStay = {
+    ...transportItem(journey.id), id: id(), kind: 'STAY' as const, orderKey: '025', intendedPlaceId: placeId,
+    intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' }, desiredOriginPlaceId: null, desiredDestinationPlaceId: null,
+  };
+  const reservation: WReservation = { id: id(), revision: 1, reservationType: 'STAY', observedStatus: 'CONFIRMED', observedStatusAt: NOW, responsibleOrganisationId: null, responsibleTravellerId: travellerId };
+  const line: WReservationLine = { id: id(), reservationId: reservation.id, productType: 'STAY', observedStatus: 'CONFIRMED', observedStatusAt: NOW, evidenceId: id(), transportServiceId: null, resourceId: null, placeId, interval: { ...originalStay.intendedWindow! } };
+  world.journeyItems.push(originalStay);
+  world.transportServices.push(onwardService);
+  world.reservations.push(reservation);
+  world.reservationLines.push(line);
+  world.allocations.push({ id: id(), reservationId: reservation.id, lineId: line.id, travellerId, journeyItemId: originalStay.id, role: 'TRAVELLER', quantity: 1 });
+  world.intendedVisits[0]!.intended = { start: '2030-06-02T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' };
+  world.constraints.push({
+    id: id(), revision: 1, registeredType: 'stay_arrival_date_aligned', hardness: 'HARD', owner: { kind: 'JOURNEY', id: journey.id }, provenanceEvidenceId: null,
+    operands: [
+      { key: 'original_stay_item', kind: 'SUBJECT_REF', subject: { kind: 'JOURNEY_ITEM', id: originalStay.id }, text: null, number: null, boolean: null, instant: null, localDate: null },
+      { key: 'arrival_item', kind: 'SUBJECT_REF', subject: { kind: 'JOURNEY_ITEM', id: arrival.id }, text: null, number: null, boolean: null, instant: null, localDate: null },
+    ],
+  });
+  const subject = { kind: 'JOURNEY' as const, id: journey.id };
+  const failing = [{ subject, assessment: assessSubject({ registry: createM6Registry(), world, effective: effectiveOf(world), subject, now: NOW, assessmentId: id() }).result }];
+  const resolveAirport = (place: string) => place === originPlaceId ? { system: 'IATA', value: 'ORG' } : place === placeId ? { system: 'IATA', value: 'DST' } : undefined;
+  const planning = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 }, maxOffersPerCorridor: 1,
+    hotel: {
+      transport: async () => { throw new Error('focused test supplies normalized research results'); },
+      resolveContext: () => undefined,
+      resolveStayReplacement: ({ candidate }) => ({
+        oldJourneyItemId: originalStay.id, reservationLineId: line.id, stayElementId: 'captured-stay-element',
+        replacement: {
+          baseCandidateKey: candidate.key, journeyId: journey.id, placeId,
+          query: {
+            location: { coordinates: { latitude: -36.85, longitude: 174.76, radiusKm: 5 } },
+            checkInDate: '2030-06-03', checkOutDate: '2030-06-05', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ',
+          },
+          stayWindow: { start: '2030-06-03T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' },
+          proposedJourneyItemId: id(), orderKey: '025', visit,
+          provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['replacement-area'] },
+          preferredPropertyRef: { system: 'hotel-provider-id', value: 'property-a' },
+        },
+      }),
+    },
+  });
+  const corridor = transportCorridors(world, failing, { resolveAirport, passengers: { adults: 1 } }).corridors[0]!;
+  const flight: PlanningToolResult = {
+    requestId: transportRequestId(corridor), capability: 'FLIGHT', operation: 'flight.search', status: 'SUCCEEDED',
+    normalizedEvidence: { offers: [{ offerId: 'late flight 0', segments: [{ origin: { system: 'IATA', value: 'ORG' }, destination: { system: 'IATA', value: 'DST' }, departure: '2030-06-03T04:00:00.000Z', arrival: '2030-06-03T08:00:00.000Z' }], totalPrice: { amount: 100, currency: 'NZD' }, availability: 'AVAILABLE' }] },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+  };
+  const roundTwo = await planning.nextRound({ completedRound: 1, results: [flight] });
+  const searchRequest = roundTwo.find((request) => request.operation === 'hotel.search')!;
+  const contextRequest = roundTwo.find((request) => request.operation === 'hotel.context')!;
+  assert.ok(searchRequest);
+  assert.deepEqual((searchRequest.parameters as { location: { coordinates?: unknown } }).location.coordinates, {
+    latitude: -36.85, longitude: 174.76, radiusKm: 5,
+  });
+  const searchResult: PlanningToolResult = {
+    requestId: searchRequest.id, capability: 'HOTEL', operation: 'hotel.search', status: 'SUCCEEDED',
+    normalizedEvidence: {
+      properties: [
+        { propertyId: 'property-a', name: 'Preferred', externalRefs: [{ system: 'hotel-provider-id', value: 'property-a' }] },
+        { propertyId: 'property-b', name: 'Alternate', externalRefs: [{ system: 'hotel-provider-id', value: 'property-b' }] },
+      ],
+      rates: [
+        { rateId: 'preferred-stale', propertyId: 'property-a', totalPrice: { amount: 90, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' },
+        { rateId: 'alternate-ok', propertyId: 'property-b', totalPrice: { amount: 110, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' },
+      ],
+    },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+  };
+  const policy: PlanningToolResult = {
+    requestId: contextRequest.id, capability: 'HOTEL', operation: 'hotel.context', status: 'SUCCEEDED',
+    normalizedEvidence: { cancellation: { refundable: false, maximumLoss: { amount: 425, currency: 'NZD' }, maximumLossBasis: 'NONREFUNDABLE_BOOKING_PRICE' } },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['captured-policy'] }, uncertainty: [],
+  };
+  const quoteRequests = await planning.nextRound({ completedRound: 2, results: [flight, policy, searchResult] });
+  assert.ok(quoteRequests.some((request) => (request.parameters as { rateId: string }).rateId === 'preferred-stale'));
+  assert.ok(quoteRequests.some((request) => (request.parameters as { rateId: string }).rateId === 'alternate-ok'));
+  const failedPreferred: PlanningToolResult = {
+    requestId: quoteRequests.find((request) => (request.parameters as { rateId: string }).rateId === 'preferred-stale')!.id,
+    capability: 'HOTEL', operation: 'hotel.quote', status: 'FAILED',
+    normalizedEvidence: undefined, provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+    error: { category: 'UNAVAILABLE', code: 'nuitee_2001', message: 'no availability found' },
+  };
+  const okAlternate: PlanningToolResult = {
+    requestId: quoteRequests.find((request) => (request.parameters as { rateId: string }).rateId === 'alternate-ok')!.id,
+    capability: 'HOTEL', operation: 'hotel.quote', status: 'SUCCEEDED',
+    normalizedEvidence: { status: 'QUOTED', quoteId: 'quote-b', quotedPrice: { amount: 110, currency: 'NZD' } },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['quote-b'] }, uncertainty: [],
+  };
+  const proposer = planning.proposer;
+  const domainInput = {
+    world, failing, now: NOW,
+    evidence: { toolResults: [flight, policy, searchResult, failedPreferred, okAlternate] },
+  };
+  const candidates = await proposer.propose(domainInput as never);
+  const complete = candidates.find((candidate) =>
+    candidate.effects.some((effect) => effect.effectKind === 'CANCEL_STAY')
+      && candidate.effects.some((effect) => effect.effectKind === 'ADD_JOURNEY_STAY')
+      && candidate.effects.some((effect) => effect.effectKind === 'SELECT_OFFER'),
+  );
+  assert.ok(complete, 'alternate property quote must still close replacement after preferred stale failure');
+  const add = complete.effects.find((effect) => effect.effectKind === 'ADD_JOURNEY_STAY');
+  assert.ok(add && add.effectKind === 'ADD_JOURNEY_STAY');
+  assert.equal(add.offerPrice.amount, '110');
+});
+

@@ -57,7 +57,7 @@ import type {
   StayContextQuery,
 } from '../../contracts/capabilities.ts';
 import type { RecordingStore } from '../recordingStore.ts';
-import { capabilityFailure, runAdapter } from '../runner.ts';
+import { capabilityFailure, runAdapter, CapabilityFailure } from '../runner.ts';
 
 export const NUITEE_PROVIDER_ID = 'nuitee';
 
@@ -89,6 +89,76 @@ const BOOKING_PAYMENT_METHOD = 'ACC_CREDIT_CARD';
 const MAX_RATES_PER_HOTEL = 3;
 /** Default search extent when coordinates arrive without a radius. */
 const DEFAULT_COORDINATE_RADIUS_METERS = 5000;
+
+/**
+ * Map LiteAPI/Nuitée HTTP error bodies onto stable capability codes.
+ *
+ * Provider `error.code` is authoritative when present. HTTP status alone is
+ * not enough: a 400 may be stale inventory (2001) or a malformed request (4002).
+ * Raw bodies are never returned to callers — only the structured code/message.
+ */
+export function parseNuiteeHttpFailure(httpStatus: number, bodyText: string): CapabilityFailure {
+  if (httpStatus === 401 || httpStatus === 403) {
+    return capabilityFailure('AUTH', `nuitee_http_${httpStatus}`, 'Nuitée rejected the API key');
+  }
+  if (httpStatus === 429) {
+    return capabilityFailure('RATE_LIMITED', 'nuitee_http_429', 'Nuitée rate limited', true);
+  }
+  if (httpStatus >= 500) {
+    return capabilityFailure(
+      'PROVIDER_ERROR',
+      `nuitee_http_${httpStatus}`,
+      `Nuitée failed with HTTP ${httpStatus}`,
+      true,
+    );
+  }
+
+  let providerCode: string | undefined;
+  let providerMessage: string | undefined;
+  try {
+    const parsed = JSON.parse(bodyText) as unknown;
+    const root = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : undefined;
+    const err = root?.error && typeof root.error === 'object'
+      ? root.error as Record<string, unknown>
+      : root;
+    if (err && (typeof err.code === 'number' || typeof err.code === 'string')) {
+      providerCode = String(err.code);
+    }
+    if (err && typeof err.message === 'string' && err.message.trim().length > 0) {
+      providerMessage = err.message.trim().slice(0, 200);
+    } else if (err && typeof err.description === 'string' && err.description.trim().length > 0) {
+      providerMessage = err.description.trim().slice(0, 200);
+    }
+  } catch {
+    // Non-JSON bodies fall through to HTTP-status classification.
+  }
+
+  if (providerCode !== undefined) {
+    const numeric = Number(providerCode);
+    const code = `nuitee_${providerCode}`;
+    const message = providerMessage ?? `Nuitée provider error ${providerCode}`;
+    if (numeric === 2001) {
+      // Stale/unavailable offer or search basket with no honourable inventory.
+      return capabilityFailure('UNAVAILABLE', code, message);
+    }
+    if (numeric === 4000 || numeric === 4002 || numeric === 4003) {
+      return capabilityFailure('INVALID_REQUEST', code, message);
+    }
+    if (numeric === 4016) {
+      return capabilityFailure('TIMEOUT', code, message, true);
+    }
+    if (numeric === 4011) {
+      return capabilityFailure('PROVIDER_ERROR', code, message, true);
+    }
+    return capabilityFailure('PROVIDER_ERROR', code, message);
+  }
+
+  return capabilityFailure(
+    'PROVIDER_ERROR',
+    `nuitee_http_${httpStatus}`,
+    `Nuitée failed (HTTP ${httpStatus})`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Raw provider shapes (Nuitee Connect v3). Schemas are intentionally
@@ -473,27 +543,7 @@ export class NuiteeAdapter implements HotelCapability {
     }
     const text = await response.text();
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        throw capabilityFailure('AUTH', `nuitee_http_${response.status}`, 'Nuitée rejected the API key');
-      }
-      if (response.status === 429) {
-        throw capabilityFailure('RATE_LIMITED', 'nuitee_http_429', 'Nuitée rate limited', true);
-      }
-      if (response.status >= 500) {
-        throw capabilityFailure(
-          'PROVIDER_ERROR',
-          `nuitee_http_${response.status}`,
-          `Nuitée failed with HTTP ${response.status}`,
-          true,
-        );
-      }
-      // P0.3: raw error bodies are never echoed — they can carry PII or
-      // echoed credentials; the structured HTTP-status code is enough.
-      throw capabilityFailure(
-        'PROVIDER_ERROR',
-        `nuitee_http_${response.status}`,
-        `Nuitée failed (HTTP ${response.status})`,
-      );
+      throw parseNuiteeHttpFailure(response.status, text);
     }
     try {
       return JSON.parse(text) as T;

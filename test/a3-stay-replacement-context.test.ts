@@ -75,7 +75,25 @@ test('builds a same-property replacement for a changed arrival date without muta
   assert.equal(result.replacement.query.guestNationality, 'SG');
   assert.equal(result.replacement.stayWindow.end, originalEnd);
   assert.deepEqual(result.replacement.visit, { kind: 'EXISTING', visitId: 'visit-a' });
+  assert.deepEqual(result.replacement.preferredPropertyRef, { system: 'nuitee', value: 'hotel-synthetic-a' });
   assert.deepEqual(captured, before);
+});
+
+test('area search expands replacement research beyond the displaced property while preferring it', () => {
+  const captured = world();
+  const withArea = binding();
+  withArea.areaSearch = { latitude: 1.3, longitude: 103.84, radiusKm: 5 };
+  const result = createStayReplacementContextResolver(withArea)({
+    candidate: candidate(), world: captured, resolvedOffers: offers, now: '2026-09-01T00:00:00Z',
+  });
+  assert.ok(result);
+  assert.deepEqual(result.replacement.query.location.coordinates, {
+    latitude: 1.3, longitude: 103.84, radiusKm: 5,
+  });
+  assert.equal(result.replacement.query.location.externalRef, undefined);
+  assert.deepEqual(result.replacement.preferredPropertyRef, { system: 'nuitee', value: 'hotel-synthetic-a' });
+  assert.equal(result.replacement.query.checkInDate, '2026-09-30');
+  assert.equal(result.replacement.query.checkOutDate, '2026-10-02');
 });
 
 test('fails closed for source, passport, property, or allocation ambiguity', () => {

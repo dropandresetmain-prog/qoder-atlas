@@ -501,3 +501,41 @@ test('RV-N7 hotel: RECORD book carries LIVE provenance at a genuine provider bou
   assert.equal(result.data.bookingId, 'booking_live_001');
   assert.deepEqual(result.data.totalPrice, { amount: 200, currency: 'USD' });
 });
+
+test('Nuitée HTTP failures classify by provider error.code (not HTTP status alone)', async () => {
+  const { parseNuiteeHttpFailure } = await import('../src/providers/hotel/nuiteeAdapter.ts');
+  const stale = parseNuiteeHttpFailure(400, JSON.stringify({ error: { code: 2001, message: 'no availability found' } }));
+  assert.equal(stale.capabilityError.category, 'UNAVAILABLE');
+  assert.equal(stale.capabilityError.code, 'nuitee_2001');
+  assert.match(stale.capabilityError.message, /no availability/i);
+
+  const invalid = parseNuiteeHttpFailure(400, JSON.stringify({ error: { code: 4002, message: 'required field missing' } }));
+  assert.equal(invalid.capabilityError.category, 'INVALID_REQUEST');
+  assert.equal(invalid.capabilityError.code, 'nuitee_4002');
+
+  const timeout = parseNuiteeHttpFailure(408, JSON.stringify({ error: { code: 4016, message: 'prebook timeout' } }));
+  assert.equal(timeout.capabilityError.category, 'TIMEOUT');
+  assert.equal(timeout.capabilityError.code, 'nuitee_4016');
+  assert.equal(timeout.capabilityError.retryable, true);
+
+  const writeDir = mkdtempSync(join(tmpdir(), 'rv-n7-nuitee-err-'));
+  const store = new FileRecordingStore({ readDirs: [writeDir], writeDir });
+  const stubFetch: typeof fetch = async () => new Response(
+    JSON.stringify({ error: { code: 2001, message: 'offer no longer available' } }),
+    { status: 409 },
+  );
+  const adapter = new NuiteeAdapter({
+    mode: 'LIVE',
+    store,
+    searchBaseUrl: 'https://api.liteapi.example/v3.0',
+    bookingBaseUrl: 'https://book.liteapi.example/v3.0',
+    apiKey: 'test-key',
+    fetchImpl: stubFetch,
+  });
+  const quoted = await adapter.quoteRate({ rateId: 'stale-offer' });
+  assert.equal(quoted.ok, false);
+  if (!quoted.ok) {
+    assert.equal(quoted.error.category, 'UNAVAILABLE');
+    assert.equal(quoted.error.code, 'nuitee_2001');
+  }
+});

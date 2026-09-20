@@ -45,6 +45,11 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
     reservationLineId: z.uuid(),
     stayElementId: z.string().min(1),
     propertyExternalRef: z.strictObject({ system: z.string().min(1), value: z.string().min(1) }),
+    areaSearch: z.strictObject({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      radiusKm: z.number().positive().max(50),
+    }).optional(),
     passport: z.strictObject({ credentialId: z.uuid(), credentialVersionId: z.uuid(), guestNationality: z.string().regex(/^[A-Z]{2}$/) }),
     guests: z.strictObject({ adults: z.number().int().positive(), rooms: z.number().int().positive() }),
     visitId: z.uuid(),
