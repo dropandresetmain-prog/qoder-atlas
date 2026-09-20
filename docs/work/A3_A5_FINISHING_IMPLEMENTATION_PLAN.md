@@ -28,7 +28,7 @@ This overlay supersedes older "future A4" language below.
 - **A4 CP3 protected hotel execution — PASS** @ `0c177c830a8593899147f4227aa90b2cff327785`.
 - **A4 CP3.5 controlled seam — PASS** @ `5bdb6527369a2a3c34957ce718b5f690ce50adf5`.
 - **A4 physical sandbox — ACCEPTED** @ `546adf210db8ead343ecdac22b410515665c176a`.
-- **A5 — ACTIVE.** Bounded truth/UI pass → Sarah repeat → Jordan repeat → final gates → freeze.
+- **A5 — ACTIVE, REBASED AFTER FOUNDER E2E.** A5.1 now has two parallel bounded lanes: visual-first Overview/Case redesign around accepted graphs + backend/read-model truth closure. Integrate and founder-QC once more, then A5.2 Sarah + Jordan physical proof on one candidate, then A5.3 gates/freeze.
 
 Do not rerun or reimplement completed A4 checkpoints absent a demonstrated regression. Physical acceptance details live in `docs/work/A4_PHYSICAL_SANDBOX_ACCEPTANCE.md`.
 
@@ -63,9 +63,23 @@ A4 closes only when the four required actions are complete, canonical state refl
 
 ### A5
 
-Repeat Sarah and Jordan LIVE on the same final code candidate, fix only demonstrated truth/execution/presentation defects, run final gates and freeze.
+A5 is now three consolidated checkpoints after founder E2E:
+
+**A5.1 — convergence.** Run two bounded lanes in parallel:
+- visual-first Overview + Case redesign: information architecture → image mockups → founder QC → static HTML → founder QC → production integration;
+- backend truth closure: D1/D2/D3 GREEN→AMBER→RED, D3 causal failure, duplicate-edge cleanup if confirmed, D2 recommendation gating, exact approval blocker, Sarah+Jordan coexistence, suspicious Sarah FAILED states.
+
+Then integrate and perform founder E2E again. Neither lane alone closes A5.1.
+
+**A5.2 — final physical proof.** Sarah + Jordan on the same exact candidate SHA. Destructive Jordan provider setup may still require a fresh external baseline/workspace; that is not a product reset requirement.
+
+**A5.3 — gates and freeze.** Run the canonical broad gates once, reconcile evidence/docs, boot-smoke normal PG, push and freeze.
 
 Sarah remains the accepted programme-side recovery story. Do not force an external flight purchase into Sarah.
+
+The UI lane may redesign all surrounding Overview/Case composition. V7.2 and V5.6 semantic systems remain binding and are not replaced.
+
+See `docs/work/A5_FOUNDER_QC_RECONCILIATION.md` for the post-QC source-of-truth overlay.
 
 ---
 
@@ -95,7 +109,7 @@ Do not reopen:
 - transfer transactions;
 - insurance claims;
 - unrelated providers;
-- extra scenarios or multi-incident breadth;
+- extra scenarios or multi-centre V7.2 breadth; simultaneous Sarah + Jordan Cases in one product world are now required A5.1 behaviour;
 - importer atomicity redesign;
 - unrelated parity/refactors/infrastructure.
 
@@ -581,9 +595,9 @@ Everything in the hard scope lock above, plus broad test-performance work and un
 
 NORTHSTAR is done for this hackathon when:
 
-1. A3 recommendation acceptance is physically proven;
-2. A4 Jordan executes the four selected sandbox actions and ends in current whole-trip PASS / Case RESOLVED;
-3. Sarah and Jordan both repeat LIVE on the same final code candidate;
-4. final gates pass or any exception is explicitly classified and accepted;
+1. accepted A4 execution truth remains intact;
+2. A5.1 visual redesign + backend truth closure are integrated and founder E2E is understandable/actionable;
+3. Sarah and Jordan both pass A5.2 physical proof on the same final code candidate;
+4. final A5.3 gates pass or any exception is explicitly classified and accepted;
 5. the final candidate, recordings/evidence and claims agree;
 6. the repository is frozen instead of expanded.
