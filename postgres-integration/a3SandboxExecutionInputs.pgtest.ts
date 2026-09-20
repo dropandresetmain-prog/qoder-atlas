@@ -1,12 +1,14 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedOrganisation, seedTraveller, takeSeedEvidence, type SeedSession } from './m3Seed.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { createExternalConnection, linkExternalRecord, observeExternalRecord } from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import { provisionSandboxExecutionInputs, SandboxExecutionInputError } from '../src/app/demo/sandboxExecutionInputs.ts';
 import { resolveSandboxProtectedDocument } from '../src/app/demo/sandboxProtectedDocuments.ts';
+import { putSandboxProtectedDocument } from '../src/app/demo/sandboxProtectedDocuments.ts';
+import { recordSource } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 
 const ENV = { ATLAS_ENV: 'sandbox', NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1' };
 
@@ -82,6 +84,14 @@ function passportInput() {
     physicallyAvailable: true,
     observedAt: '2030-01-01T00:00:00.000Z',
   };
+}
+
+function deterministicPassportSourceId(workspaceId: string, travellerId: string, versionId: string): string {
+  const digest = createHash('sha256').update(`northstar:sandbox:passport-source:${workspaceId}|${travellerId}|${versionId}`, 'utf8').digest();
+  digest[6] = (digest[6]! & 0x0f) | 0x40;
+  digest[8] = (digest[8]! & 0x3f) | 0x80;
+  const hex = digest.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function input(budgetId: string, passport?: ReturnType<typeof passportInput>) {
@@ -240,4 +250,63 @@ test('sandbox passport provisions encrypted marker and credential edition, then 
   assert.equal(replay.passportsReused, 1);
   assert.equal((await pool.query('SELECT count(*)::text AS count FROM credential_versions WHERE workspace_id = $1 AND credential_id = $2', [world.workspaceId, passport.credentialId])).rows[0]!.count, '1');
   await assert.rejects(() => provision(input(randomUUID(), { ...passport, issuerCountry: 'US' })), (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'CONFLICTING_EXISTING_INPUT');
+});
+
+test('sandbox passport resumes an exact source prefix but refuses a marker mismatch before canonical writes', async () => {
+  const pool = await sharedTestPool();
+  const world = await createMappedWorld(pool, 'A3 sandbox passport prefix');
+  const key = Buffer.alloc(32, 9);
+  const documentKeyId = 'sandbox-passport-prefix-key-v1';
+  const markerA = 'NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-prefix-a';
+  const markerB = 'NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-prefix-b';
+  const passportA = { ...passportInput(), syntheticDocumentMarker: markerA };
+  const passportB = { ...passportA, syntheticDocumentMarker: markerB };
+  const sourceId = deterministicPassportSourceId(world.workspaceId, world.travellerId, passportA.versionId);
+  const documentA = await putSandboxProtectedDocument({ db: pool, workspaceId: world.workspaceId, actorPrincipalId: world.actorId, plaintext: markerA, key, keyId: documentKeyId, env: ENV });
+  mustOk(await recordSource(new PgUnitOfWork(pool, world.workspaceId), {
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    idempotencyKey: 'sandbox-passport-prefix-source',
+    sourceId,
+    sourceIdentity: 'NORTHSTAR_SYNTHETIC_SANDBOX_PASSPORT',
+    receivedAt: passportA.observedAt,
+    contentHash: documentA.contentHash,
+    contentType: 'application/x-northstar-synthetic-passport-marker',
+    protectedLocationRef: documentA.storageRef,
+    rawContentHash: documentA.contentHash,
+    rawStorageRef: documentA.storageRef,
+    rawAccessPolicyId: documentA.accessPolicyId,
+    captureMetadata: { provenance: 'caller-authored synthetic sandbox passport', observedAt: passportA.observedAt },
+    captureMetadataVersion: 'sandbox-passport/1',
+  }));
+  const provision = (payload: unknown) => provisionSandboxExecutionInputs({
+    db: pool,
+    uow: () => new PgUnitOfWork(pool, world.workspaceId),
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    connectionId: world.connectionId,
+    input: payload,
+    env: ENV,
+    documentKey: key,
+    documentKeyId,
+  });
+  const before = await pool.query<{ identities: string; budgets: string; credentials: string }>(
+    `SELECT (SELECT count(*)::text FROM traveller_booking_identities WHERE workspace_id = $1) AS identities,
+            (SELECT count(*)::text FROM budgets WHERE workspace_id = $1) AS budgets,
+            (SELECT count(*)::text FROM travel_credentials WHERE workspace_id = $1) AS credentials`, [world.workspaceId],
+  );
+  const existingSource = await pool.query<{ content_hash: string }>('SELECT content_hash FROM source_records WHERE workspace_id = $1 AND id = $2', [world.workspaceId, sourceId]);
+  assert.equal(existingSource.rows.length, 1);
+  assert.notEqual(existingSource.rows[0]!.content_hash, createHash('sha256').update(markerB, 'utf8').digest('hex'));
+  const syntheticSources = (await pool.query<{ id: string }>(`SELECT id FROM source_records WHERE workspace_id = $1 AND source_identity = 'NORTHSTAR_SYNTHETIC_SANDBOX_PASSPORT'`, [world.workspaceId])).rows;
+  assert.equal(syntheticSources.length, 1);
+  assert.equal(syntheticSources[0]!.id, sourceId);
+  await assert.rejects(() => provision(input(randomUUID(), passportB)), (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'CONFLICTING_EXISTING_INPUT');
+  assert.deepEqual((await pool.query<{ identities: string; budgets: string; credentials: string }>(
+    `SELECT (SELECT count(*)::text FROM traveller_booking_identities WHERE workspace_id = $1) AS identities,
+            (SELECT count(*)::text FROM budgets WHERE workspace_id = $1) AS budgets,
+            (SELECT count(*)::text FROM travel_credentials WHERE workspace_id = $1) AS credentials`, [world.workspaceId],
+  )).rows[0], before.rows[0]);
+  const resumed = await provision(input(randomUUID(), passportA));
+  assert.equal(resumed.passportsCreated, 1);
 });

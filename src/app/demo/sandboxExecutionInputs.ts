@@ -33,6 +33,10 @@ const PassportInputSchema = z.strictObject({
   issuerStatus: z.enum(['VALID', 'REVOKED', 'SUSPENDED', 'UNKNOWN']),
   physicallyAvailable: z.boolean(),
   observedAt: DateTimeSchema,
+}).superRefine((value, ctx) => {
+  if (value.expiryDate <= value.issueDate) {
+    ctx.addIssue({ code: 'custom', path: ['expiryDate'], message: 'expiryDate must be after issueDate' });
+  }
 });
 
 export const SandboxExecutionInputsFileSchema = z.strictObject({
@@ -206,10 +210,10 @@ function documentRefMatches(actual: { content_hash: string; document_number_stor
 
 async function loadPassportRows(db: Queryable, workspaceId: string, item: PassportItem, sourceId: string, evidenceId: string): Promise<{ credentialAction: 'create' | 'reuse'; sourceAction: 'create' | 'reuse'; evidenceAction: 'create' | 'reuse'; expectedRevision: number }> {
   const passport = item.passport!;
-  const version = (await db.query<{
+  const credential = (await db.query<{
     credential_id: string; traveller_id: string; current_version_id: string; credential_kind: string; issuer_country: string;
-    version_id: string; version_kind: string; issue_date: string | Date; expiry_date: string | Date | null;
-    issuer_status: string; physically_available: boolean | null; evidence_id: string;
+    version_id: string | null; version_kind: string | null; issue_date: string | Date | null; expiry_date: string | Date | null;
+    issuer_status: string | null; physically_available: boolean | null; evidence_id: string | null;
     content_hash: string | null; document_number_storage_ref: string | null; document_number_access_policy_id: string | null;
   }>(
     `SELECT c.id AS credential_id, c.traveller_id, c.current_version_id, c.kind AS credential_kind, c.issuer_country,
@@ -217,10 +221,10 @@ async function loadPassportRows(db: Queryable, workspaceId: string, item: Passpo
             v.physically_available, v.evidence_id, p.document_number_content_hash AS content_hash,
             p.document_number_storage_ref, p.document_number_access_policy_id
        FROM travel_credentials c
-       LEFT JOIN credential_versions v ON v.workspace_id = c.workspace_id AND v.credential_id = c.id
+       LEFT JOIN credential_versions v ON v.workspace_id = c.workspace_id AND v.credential_id = c.id AND v.id = $3
        LEFT JOIN passport_details p ON p.workspace_id = v.workspace_id AND p.credential_version_id = v.id
       WHERE c.workspace_id = $1 AND c.id = $2`,
-    [workspaceId, passport.credentialId],
+    [workspaceId, passport.credentialId, passport.versionId],
   )).rows[0];
   const versionOwner = (await db.query<{ credential_id: string; traveller_id: string }>(
     `SELECT c.id AS credential_id, c.traveller_id
@@ -234,25 +238,29 @@ async function loadPassportRows(db: Queryable, workspaceId: string, item: Passpo
     [workspaceId, item.travellerId],
   )).rows[0];
   if (!head) throw new SandboxExecutionInputError('UNKNOWN_TRAVELLER', 'resolved traveller aggregate head is missing');
-  if (!version) return { credentialAction: 'create', sourceAction: 'create', evidenceAction: 'create', expectedRevision: Number(head.revision) };
-  if (version.traveller_id !== item.travellerId) conflict(`passport credential ${passport.credentialId} belongs to another traveller`);
-  if (version.version_id !== passport.versionId || version.current_version_id !== passport.versionId) conflict(`passport credential ${passport.credentialId} has a different current edition`);
-  if (version.credential_kind !== 'PASSPORT' || version.version_kind !== 'PASSPORT' || version.issuer_country !== passport.issuerCountry ||
-      !sameDate(version.issue_date, passport.issueDate) || !sameDate(version.expiry_date, passport.expiryDate) ||
-      version.issuer_status !== passport.issuerStatus || version.physically_available !== passport.physicallyAvailable ||
-      version.evidence_id !== evidenceId || version.content_hash === null || version.document_number_storage_ref === null || version.document_number_access_policy_id === null) {
+  if (!credential) return { credentialAction: 'create', sourceAction: 'create', evidenceAction: 'create', expectedRevision: Number(head.revision) };
+  if (credential.traveller_id !== item.travellerId) conflict(`passport credential ${passport.credentialId} belongs to another traveller`);
+  if (!credential.version_id || credential.current_version_id !== passport.versionId) conflict(`passport credential ${passport.credentialId} has a different current edition`);
+  if (credential.credential_kind !== 'PASSPORT' || credential.version_kind !== 'PASSPORT' || credential.issuer_country !== passport.issuerCountry ||
+      !sameDate(credential.issue_date, passport.issueDate) || !sameDate(credential.expiry_date, passport.expiryDate) ||
+      credential.issuer_status !== passport.issuerStatus || credential.physically_available !== passport.physicallyAvailable ||
+      credential.evidence_id !== evidenceId || credential.content_hash === null || credential.document_number_storage_ref === null || credential.document_number_access_policy_id === null) {
     conflict(`existing passport edition ${passport.versionId} conflicts with the requested metadata`);
   }
   return { credentialAction: 'reuse', sourceAction: 'reuse', evidenceAction: 'reuse', expectedRevision: Number(head.revision) };
 }
 
-async function loadSourceAction(db: Queryable, workspaceId: string, sourceId: string, passport: NonNullable<PassportItem['passport']>): Promise<'create' | 'reuse'> {
-  const row = (await db.query<{ source_identity: string; received_at: Date | string; content_hash: string; content_type: string }>(
-    `SELECT source_identity, received_at, content_hash, content_type FROM source_records WHERE workspace_id = $1 AND id = $2`, [workspaceId, sourceId],
+async function loadSourceAction(db: Queryable, workspaceId: string, sourceId: string, passport: NonNullable<PassportItem['passport']>, document: ProtectedDataRef): Promise<'create' | 'reuse'> {
+  const row = (await db.query<{ source_identity: string; received_at: Date | string; content_hash: string; content_type: string; raw_content_hash: string | null; raw_storage_ref: string | null; raw_access_policy_id: string | null }>(
+    `SELECT source_identity, received_at, content_hash, content_type, raw_content_hash, raw_storage_ref, raw_access_policy_id
+       FROM source_records WHERE workspace_id = $1 AND id = $2`, [workspaceId, sourceId],
   )).rows[0];
   if (!row) return 'create';
   if (row.source_identity !== 'NORTHSTAR_SYNTHETIC_SANDBOX_PASSPORT' || !sameInstant(row.received_at, passport.observedAt) ||
-      row.content_type !== 'application/x-northstar-synthetic-passport-marker') conflict(`existing passport source ${sourceId} conflicts`);
+      row.content_type !== 'application/x-northstar-synthetic-passport-marker' || row.content_hash !== document.contentHash ||
+      row.raw_content_hash !== document.contentHash || row.raw_storage_ref !== document.storageRef || row.raw_access_policy_id !== document.accessPolicyId) {
+    conflict(`existing passport source ${sourceId} conflicts`);
+  }
   return 'reuse';
 }
 
@@ -361,24 +369,19 @@ export async function provisionSandboxExecutionInputs(params: SandboxProvisionPa
   for (const item of passportItems) {
     const ids = passportIds(params.workspaceId, item.travellerId, item.passport!.versionId);
     const status = await loadPassportRows(params.db, params.workspaceId, item, ids.sourceId, ids.evidenceId);
-    const sourceAction = await loadSourceAction(params.db, params.workspaceId, ids.sourceId, item.passport!);
-    const evidenceAction = await loadEvidenceAction(params.db, params.workspaceId, ids.evidenceId, item.travellerId, ids.sourceId, item.passport!);
-    passportPlans.push({ item, ...ids, ...status, sourceAction, evidenceAction });
-  }
-
-  // The encrypted marker is durable and idempotent. It is created only after
-  // all caller IDs, aliases, and existing canonical rows have been checked.
-  for (const plan of passportPlans) {
-    plan.document = await putSandboxProtectedDocument({
+    const document = await putSandboxProtectedDocument({
       db: params.db,
       workspaceId: params.workspaceId,
       actorPrincipalId: params.actorPrincipalId,
-      plaintext: plan.item.passport!.syntheticDocumentMarker,
+      plaintext: item.passport!.syntheticDocumentMarker,
       key: params.documentKey!,
       keyId: params.documentKeyId!,
       env: params.env,
     });
-    await assertPassportDocumentRef(params.db, params.workspaceId, plan.item.passport!.versionId, plan.document);
+    await assertPassportDocumentRef(params.db, params.workspaceId, item.passport!.versionId, document);
+    const sourceAction = await loadSourceAction(params.db, params.workspaceId, ids.sourceId, item.passport!, document);
+    const evidenceAction = await loadEvidenceAction(params.db, params.workspaceId, ids.evidenceId, item.travellerId, ids.sourceId, item.passport!);
+    passportPlans.push({ item, ...ids, ...status, document, sourceAction, evidenceAction });
   }
 
   const identityStatus: Array<{ item: (typeof travellerWrites)[number]; action: 'create' | 'reuse' }> = [];

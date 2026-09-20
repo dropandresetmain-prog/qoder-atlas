@@ -54,4 +54,5 @@ test('passport input requires explicit synthetic fields and rejects document cus
   } as const;
   assert.deepEqual(parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], passport }] }).travellers[0]!.passport, passport);
   assert.throws(() => parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], passport: { ...passport, documentKey: 'secret' } }] }), /strict schema/);
+  assert.throws(() => parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], passport: { ...passport, issueDate: '2040-01-01', expiryDate: '2030-01-01' } }] }), (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'INVALID_INPUT');
 });
