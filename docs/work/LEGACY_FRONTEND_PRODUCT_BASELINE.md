@@ -1,5 +1,7 @@
 # NORTHSTAR Legacy Frontend Product Baseline — Astra Handoff
 
+> **CURRENT SCOPE OVERRIDE (2026-09-20):** This document is frontend archaeology and a **product-quality / user-job floor**, not a replication specification. Current hackathon work is desktop-only. Do not reproduce legacy wording, card/component structure, DOM, layout or pixels for their own sake; improve hierarchy, copy, spacing, progressive disclosure and interaction where that makes the current NORTHSTAR hero clearer. Mobile traveller acceptance, healthy-trip request/composer work, programme intake expansion and non-critical parity are parked by `ASTRA_HERO_DEPTH_SCOPE.md`. V5.6 and V7.2 current semantic contracts govern their respective visuals. Historical details below remain useful evidence of user jobs and regressions, not mandatory implementation checklists.
+
 Post-R4 use: baseline remains the product floor. Read [A0 reconciliation](ASTRA_A0_CONVERGENCE.md)
 for gaps checked against accepted R4 `2baf1f6`; older comparison findings below
 must not override final-R4 code/evidence or the accepted frontend decisions.
