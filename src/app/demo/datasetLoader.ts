@@ -20,6 +20,7 @@ import {
   DatasetJourneyRequirementsSchema,
   DatasetJurisdictionsSchema,
   DatasetProgrammeSchema,
+  type DatasetJourneyRequirement,
   type DatasetGroundTransfers,
   type DatasetJourneyRequirements,
   type DatasetJurisdictions,
@@ -56,6 +57,46 @@ export class DatasetLoadError extends Error {
     super(message);
     this.name = 'DatasetLoadError';
     this.directory = directory;
+  }
+}
+
+function sourceJourneyItemAlias(travellerDraftId: string, index: number): string {
+  return `journey-item:${travellerDraftId}#${index}`;
+}
+
+function validateJourneyRequirementRefs(
+  requirements: readonly DatasetJourneyRequirement[],
+  travellers: DatasetProgramme['importDraft']['travellers'],
+  directory: string,
+): void {
+  for (const requirement of requirements) {
+    if (requirement.kind !== 'STAY_ARRIVAL_DATE_ALIGNED') continue;
+    const traveller = travellers.find((candidate) => candidate.draftId === requirement.travellerDraftId);
+    if (!traveller) continue;
+    const resolve = (ref: { system: string; value: string }, label: string) => {
+      const matches = traveller.declaredTravel.flatMap((item, index) =>
+        sourceJourneyItemAlias(traveller.draftId, index) === `${ref.system}:${ref.value}` ? [{ item, index }] : [],
+      );
+      if (matches.length !== 1) {
+        throw new DatasetLoadError(
+          `${JOURNEY_REQUIREMENTS_FILE} requirement ${requirement.id} ${label} ${ref.system}:${ref.value} ` +
+            `must resolve to exactly one declared item for traveller ${traveller.draftId}`,
+          directory,
+        );
+      }
+      return matches[0]!;
+    };
+    const original = resolve(requirement.originalStayItemRef, 'original stay item reference');
+    const arrival = resolve(requirement.arrivalTransportItemRef, 'arrival transport item reference');
+    if (original.item.itemKind !== 'STAY') {
+      throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} requirement ${requirement.id} original stay item is not a STAY`, directory);
+    }
+    if (arrival.item.itemKind !== 'TRANSPORT_LEG') {
+      throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} requirement ${requirement.id} arrival item is not a TRANSPORT_LEG`, directory);
+    }
+    if (original.index === arrival.index) {
+      throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} requirement ${requirement.id} references one item twice`, directory);
+    }
   }
 }
 
@@ -136,6 +177,7 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     if (unknown) {
       throw new DatasetLoadError(`${JOURNEY_REQUIREMENTS_FILE} references unknown traveller draft ${unknown.travellerDraftId}`, directory);
     }
+    validateJourneyRequirementRefs(parsed.data.requirements, programme.data.importDraft.travellers, directory);
     journeyRequirements = parsed.data;
   }
 

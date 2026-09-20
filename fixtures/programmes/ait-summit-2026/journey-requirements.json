@@ -7,6 +7,19 @@
       "travellerDraftId": "ait-draft-09",
       "kind": "OVERNIGHT_ACCOMMODATION",
       "minimumGapHours": 8
+    },
+    {
+      "id": "req-syn-ait-draft-09-stay-arrival-date",
+      "travellerDraftId": "ait-draft-09",
+      "kind": "STAY_ARRIVAL_DATE_ALIGNED",
+      "originalStayItemRef": {
+        "system": "journey-item",
+        "value": "ait-draft-09#2"
+      },
+      "arrivalTransportItemRef": {
+        "system": "journey-item",
+        "value": "ait-draft-09#1"
+      }
     }
   ]
 }

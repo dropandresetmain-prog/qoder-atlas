@@ -22,7 +22,16 @@ test('dataset loader admits typed journey requirements and keeps them optional',
   const loaded = await loadDataset(sourceDirectory);
   assert.equal(loaded.journeyRequirements?.sourceId, 'src-syn-ait-organiser-policy');
   assert.equal(loaded.journeyRequirements?.requirements[0]?.travellerDraftId, 'ait-draft-09');
-  assert.equal(loaded.journeyRequirements?.requirements[0]?.minimumGapHours, 8);
+  const overnight = loaded.journeyRequirements?.requirements.find((requirement) => requirement.kind === 'OVERNIGHT_ACCOMMODATION');
+  assert.equal(overnight?.minimumGapHours, 8);
+  const aligned = loaded.journeyRequirements?.requirements.find((requirement) => requirement.kind === 'STAY_ARRIVAL_DATE_ALIGNED');
+  assert.deepEqual(aligned && {
+    originalStayItemRef: aligned.originalStayItemRef,
+    arrivalTransportItemRef: aligned.arrivalTransportItemRef,
+  }, {
+    originalStayItemRef: { system: 'journey-item', value: 'ait-draft-09#2' },
+    arrivalTransportItemRef: { system: 'journey-item', value: 'ait-draft-09#1' },
+  });
   assert.ok(!loaded.jurisdictions?.coverage?.topics.includes('ENTRY_REQUIREMENT'),
     'synthetic broad coverage must not certify newly proposed landside entry');
 });
@@ -55,5 +64,30 @@ test('journey requirement loader rejects unknown traveller draft before material
   const requirement = (base.requirements as Array<Record<string, unknown>>)[0]!;
   await withDatasetRequirements({ ...base, requirements: [{ ...requirement, travellerDraftId: 'unknown-draft' }] }, async (directory) => {
     await assert.rejects(() => loadDataset(directory), /references unknown traveller draft unknown-draft/);
+  });
+});
+
+test('stay-arrival requirement loader rejects missing or wrongly typed source items', async () => {
+  const base = JSON.parse(await readFile(path.join(sourceDirectory, 'journey-requirements.json'), 'utf8')) as {
+    sourceId: string;
+    observedAt: string;
+    requirements: Record<string, unknown>[];
+  };
+  const aligned = base.requirements.find((requirement) => requirement.kind === 'STAY_ARRIVAL_DATE_ALIGNED')!;
+  await withDatasetRequirements({
+    ...base,
+    requirements: base.requirements.map((requirement) => requirement === aligned
+      ? { ...requirement, originalStayItemRef: { system: 'journey-item', value: 'ait-draft-09#99' } }
+      : requirement),
+  }, async (directory) => {
+    await assert.rejects(() => loadDataset(directory), /must resolve to exactly one declared item/);
+  });
+  await withDatasetRequirements({
+    ...base,
+    requirements: base.requirements.map((requirement) => requirement === aligned
+      ? { ...requirement, originalStayItemRef: { system: 'journey-item', value: 'ait-draft-09#1' } }
+      : requirement),
+  }, async (directory) => {
+    await assert.rejects(() => loadDataset(directory), /original stay item is not a STAY/);
   });
 });
