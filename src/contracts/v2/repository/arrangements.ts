@@ -279,6 +279,8 @@ export interface CommercialAgreementRepository {
 export interface ExternalIntegrationRepository {
   createConnection(params: { connection: ExternalConnectionRecord; actor: ActorContext }): Promise<void>;
   findRecord(params: { workspaceId: string; connectionId: string; recordType: string; externalId: string }): Promise<{ id: string } | undefined>;
+  loadRecord(params: { workspaceId: string; recordId: string }): Promise<ExternalRecordRecord | undefined>;
+  findLiveCanonicalSubjects(workspaceId: string, externalRecordId: string): Promise<TypedRef[]>;
   createOrObserveRecord(params: { record: ExternalRecordRecord; actor: ActorContext }): Promise<'APPLIED' | 'STALE'>;
   linkRecord(params: { link: ExternalRecordLinkRecord; actor: ActorContext }): Promise<void>;
   createOwnershipBinding(params: { binding: OwnershipBindingRecord; actor: ActorContext }): Promise<void>;

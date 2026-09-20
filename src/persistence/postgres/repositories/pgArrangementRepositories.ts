@@ -284,6 +284,8 @@ export class PgArrangementRepositories implements ArrangementRepositories {
     this.external = {
       createConnection: (params) => this.createExternalConnection(params),
       findRecord: (params) => this.findExternalRecord(params),
+      loadRecord: (params) => this.loadExternalRecord(params),
+      findLiveCanonicalSubjects: (workspaceId, externalRecordId) => this.findLiveCanonicalSubjects(workspaceId, externalRecordId),
       createOrObserveRecord: (params) => this.createOrObserveExternalRecord(params),
       linkRecord: (params) => this.linkExternalRecord(params),
       createOwnershipBinding: (params) => this.createOwnershipBinding(params),
@@ -813,6 +815,53 @@ export class PgArrangementRepositories implements ArrangementRepositories {
       [workspaceId, params.connectionId, params.recordType, params.externalId],
     );
     return result.rows[0];
+  }
+
+  async loadExternalRecord(params: { workspaceId: string; recordId: string }): Promise<ExternalRecordRecord | undefined> {
+    const workspace = this.scope(params.workspaceId);
+    const result = await this.client().query<{
+      id: string;
+      connection_id: string;
+      record_type: string;
+      external_id: string;
+      identity_state: ExternalRecordRecord['identityState'];
+      quarantine_reason: string | null;
+      source_sequence: string | null;
+      source_version: string | null;
+      observed_at: Date | null;
+      payload_hash: string | null;
+    }>(
+      `SELECT id, connection_id, record_type, external_id, identity_state,
+              quarantine_reason, source_sequence, source_version, observed_at, payload_hash
+         FROM external_records WHERE workspace_id = $1 AND id = $2`,
+      [workspace, params.recordId],
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      connectionId: row.connection_id,
+      recordType: row.record_type,
+      externalId: row.external_id,
+      identityState: row.identity_state,
+      ...(row.quarantine_reason ? { quarantineReason: row.quarantine_reason } : {}),
+      ...(row.source_sequence === null ? {} : { sourceSequence: Number(row.source_sequence) }),
+      ...(row.source_version ? { sourceVersion: row.source_version } : {}),
+      ...(row.observed_at ? { observedAt: row.observed_at.toISOString() } : {}),
+      ...(row.payload_hash ? { payloadHash: row.payload_hash } : {}),
+    };
+  }
+
+  async findLiveCanonicalSubjects(workspaceId: string, externalRecordId: string): Promise<Array<{ kind: import('../../../domain/v2/shared/identity.ts').SubjectKind; id: string }>> {
+    const workspace = this.scope(workspaceId);
+    const result = await this.client().query<{ canonical_subject_kind: import('../../../domain/v2/shared/identity.ts').SubjectKind; canonical_subject_id: string }>(
+      `SELECT canonical_subject_kind, canonical_subject_id
+         FROM external_record_links
+        WHERE workspace_id = $1 AND external_record_id = $2 AND superseded_at IS NULL
+        ORDER BY linked_at, id`,
+      [workspace, externalRecordId],
+    );
+    return result.rows.map((row) => ({ kind: row.canonical_subject_kind, id: row.canonical_subject_id }));
   }
 
   async createOrObserveExternalRecord(params: { record: ExternalRecordRecord; actor: ActorContext }): Promise<'APPLIED' | 'STALE'> {

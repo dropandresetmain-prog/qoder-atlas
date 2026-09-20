@@ -1,0 +1,145 @@
+/** Atomic provider-observed STAY attachment against the real PostgreSQL target. */
+import { after, describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { sharedTestPool } from './harness.ts';
+import { beginSeed, commitSeed, seedChildSubject, seedExternalConnection, seedJourney, seedOrganisation, seedPlace, seedRootSubject, seedTraveller, seedTrip, takeSeedEvidence } from './m3Seed.ts';
+import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
+import { attachObservedStay, type ObservedStayAttachmentParams } from '../src/persistence/postgres/commands/observedStayCommands.ts';
+
+const OBSERVED_AT = '2030-01-01T00:00:00.000Z';
+const STAY_START = '2030-01-02T15:00:00.000Z';
+const STAY_END = '2030-01-05T11:00:00.000Z';
+
+after(async () => {
+  const pool = await sharedTestPool();
+  await pool.end();
+});
+
+function mustOk<T>(outcome: ExecuteOutcome<T>): T {
+  if (!outcome.ok) assert.fail(`${outcome.conflict.kind}: ${outcome.conflict.message}`);
+  return outcome.value;
+}
+
+async function setup(options: { externalId?: string; recordState?: 'UNVERIFIED' | 'QUARANTINED_UNKNOWN' } = {}) {
+  const pool = await sharedTestPool();
+  const seed = await beginSeed(pool, 'A4 observed stay fixture');
+  const organisationId = await seedOrganisation(seed);
+  const traveller = await seedTraveller(seed, { displayName: 'A4 Traveller' });
+  const tripId = await seedTrip(seed, { lifecycleStatus: 'ACTIVE' });
+  const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId, lifecycleStatus: 'DRAFT' });
+  const placeId = await seedPlace(seed, { name: 'A4 Stay Place' });
+  const connectionId = await seedExternalConnection(seed, organisationId);
+  const externalId = options.externalId ?? `booking-${randomUUID()}`;
+  const externalRecordId = randomUUID();
+  await seedChildSubject(seed, { id: externalRecordId, kind: 'EXTERNAL_RECORD', aggregateId: connectionId });
+  {
+    await seed.client.query(
+      `INSERT INTO external_records
+         (workspace_id,id,connection_id,record_type,external_id,identity_state,quarantine_reason,observed_at,payload_hash,created_by_actor_id)
+       VALUES ($1,$2,$3,'STAY_BOOKING',$4,$5,$6,'2030-01-01T00:00:00.000Z',$7,$8)`,
+      [seed.workspaceId, externalRecordId, connectionId, externalId, options.recordState ?? 'UNVERIFIED', options.recordState === 'QUARANTINED_UNKNOWN' ? 'seeded quarantine' : null, 'sha256:' + externalId, seed.actorId],
+    );
+  }
+  await commitSeed(seed);
+  return { pool, seed, organisationId, travellerId: traveller.travellerId, journeyId, placeId, connectionId, externalId, externalRecordId };
+}
+
+function input(f: Awaited<ReturnType<typeof setup>>, idempotencyKey: string, externalId = f.externalId): ObservedStayAttachmentParams {
+  return {
+    workspaceId: f.seed.workspaceId,
+    actorPrincipalId: f.seed.actorId,
+    idempotencyKey,
+    journeyId: f.journeyId,
+    expectedJourneyRevision: 1,
+    travellerId: f.travellerId,
+    expectedConnectionRevision: 1,
+    provider: {
+      connectionId: f.connectionId,
+      externalRecordId: f.externalRecordId,
+      externalId,
+      recordType: 'STAY_BOOKING',
+      observedAt: OBSERVED_AT,
+      evidenceId: takeSeedEvidence(f.seed),
+      payloadHash: `sha256:${externalId}`,
+    },
+    journeyItem: { intendedPlaceId: f.placeId, requiredNights: 3, orderKey: 'approved-stay-order-1' },
+    booking: { placeId: f.placeId, stayInterval: { start: STAY_START, end: STAY_END }, status: 'CONFIRMED' },
+  };
+}
+
+describe('A4 atomic observed stay attachment', () => {
+  test('creates one Journey STAY, booking graph, linked provider record, and replays without duplicates', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const params = input(f, randomUUID());
+    const first = mustOk(await attachObservedStay(uow(), params));
+    const replay = mustOk(await attachObservedStay(uow(), params));
+    assert.deepEqual(replay, first);
+
+    const counts = await f.pool.query<{ journey_items: string; reservations: string; lines: string; allocations: string; records: string; links: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM journey_items WHERE workspace_id=$1 AND journey_id=$2)::text AS journey_items,
+         (SELECT COUNT(*) FROM reservations WHERE workspace_id=$1 AND id=$3)::text AS reservations,
+         (SELECT COUNT(*) FROM reservation_lines WHERE workspace_id=$1 AND reservation_id=$3)::text AS lines,
+         (SELECT COUNT(*) FROM reservation_allocations WHERE workspace_id=$1 AND reservation_id=$3)::text AS allocations,
+         (SELECT COUNT(*) FROM external_records WHERE workspace_id=$1 AND id=$4)::text AS records,
+         (SELECT COUNT(*) FROM external_record_links WHERE workspace_id=$1 AND external_record_id=$4 AND superseded_at IS NULL)::text AS links`,
+      [f.seed.workspaceId, f.journeyId, first.reservationId, first.externalRecordId],
+    );
+    assert.deepEqual(counts.rows[0], { journey_items: '1', reservations: '1', lines: '1', allocations: '1', records: '1', links: '1' });
+  });
+
+  test('rejects the same provider booking under a different command key', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const firstInput = input(f, randomUUID());
+    const first = mustOk(await attachObservedStay(uow(), firstInput));
+    const duplicate = await attachObservedStay(uow(), {
+      ...input(f, randomUUID()),
+      expectedJourneyRevision: 2,
+      expectedConnectionRevision: 2,
+      provider: { ...firstInput.provider, evidenceId: takeSeedEvidence(f.seed) },
+    });
+    assert.equal(duplicate.ok, false);
+    if (duplicate.ok) return;
+    assert.equal(duplicate.conflict.kind, 'DUPLICATE_REGISTRATION');
+    assert.equal((await f.pool.query('SELECT COUNT(*) FROM journey_items WHERE workspace_id=$1 AND journey_id=$2', [f.seed.workspaceId, f.journeyId])).rows[0].count, '1');
+    assert.equal(first.reservationId.length, 36);
+  });
+
+  test('rolls back the complete graph when provider identity is quarantined', async () => {
+    const f = await setup({ externalId: 'quarantined-provider-booking', recordState: 'QUARANTINED_UNKNOWN' });
+    const staleInput = input(f, randomUUID());
+    const stale = await attachObservedStay(new PgUnitOfWork(f.pool, f.seed.workspaceId), {
+      ...staleInput,
+      provider: { ...staleInput.provider, payloadHash: 'sha256:' + f.externalId },
+    });
+    assert.equal(stale.ok, false);
+    if (stale.ok) return;
+    assert.match(stale.conflict.message, /quarantined/i);
+    const counts = await f.pool.query<{ items: string; reservations: string; lines: string; allocations: string; links: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM journey_items WHERE workspace_id=$1 AND journey_id=$2)::text AS items,
+         (SELECT COUNT(*) FROM reservations WHERE workspace_id=$1 AND reservation_type='STAY')::text AS reservations,
+         (SELECT COUNT(*) FROM reservation_lines WHERE workspace_id=$1)::text AS lines,
+         (SELECT COUNT(*) FROM reservation_allocations WHERE workspace_id=$1)::text AS allocations,
+         (SELECT COUNT(*) FROM external_record_links WHERE workspace_id=$1)::text AS links`,
+      [f.seed.workspaceId, f.journeyId],
+    );
+    assert.deepEqual(counts.rows[0], { items: '0', reservations: '0', lines: '0', allocations: '0', links: '0' });
+  });
+
+  test('refuses non-confirmed observations and missing approved ordering before writes', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const base = input(f, randomUUID());
+    const nonConfirmed = await attachObservedStay(uow(), { ...base, booking: { ...base.booking, status: 'CANCELLED' as 'CONFIRMED' } });
+    assert.equal(nonConfirmed.ok, false);
+    if (!nonConfirmed.ok) assert.match(nonConfirmed.conflict.message, /CONFIRMED/);
+    const missingOrder = await attachObservedStay(uow(), { ...base, idempotencyKey: randomUUID(), journeyItem: { ...base.journeyItem, orderKey: '' } });
+    assert.equal(missingOrder.ok, false);
+    if (!missingOrder.ok) assert.match(missingOrder.conflict.message, /orderKey/);
+    assert.equal((await f.pool.query('SELECT COUNT(*) FROM journey_items WHERE workspace_id=$1 AND journey_id=$2', [f.seed.workspaceId, f.journeyId])).rows[0].count, '0');
+  });
+});
