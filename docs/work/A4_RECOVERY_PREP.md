@@ -1,5 +1,7 @@
 # A4 recovery preparation — preserved WIP handoff
 
+> **SUPERSEDED FOR IMPLEMENTATION.** This file preserves the recovered WIP archaeology that was used to restart A4. Its integration instructions are no longer current. Continuation safety passed on `f7a497d`; protected hotel execution passed on `0c177c8`; the controlled four-action seam passed on `5bdb652`; planner/provider/progression closure is on `c897d296`. Do not re-port or re-merge the preserved WIP branches unless a concrete regression requires archaeology. Current execution truth is `ACTIVE_TASK.md` and `A3_A5_FINISHING_IMPLEMENTATION_PLAN.md`.
+
 Docs-only. Not acceptance. Do not integrate either WIP lane yet.
 
 ## Authoritative state
