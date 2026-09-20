@@ -38,3 +38,36 @@ Normal application components provisioned database `astra_jordan_a3_composite_20
 The reviewed Singapore rule concerns SG-issued passport eligibility. The existing credential evaluator independently checks ownership, valid status, possession and expiry. [ICA entry requirements](https://www.ica.gov.sg/enter-transit-depart/entering-singapore) separately require an SG Arrival Card for air arrivals within the three-day submission window; no submission or individual admission is claimed. **Act Now presentation:** retain this remaining operational obligation distinctly from the passport rule result; the source read must not become a blanket claim that every arrival formality is completed. No immigration transaction/admin platform is added.
 
 Focused evidence: source schema3/3, existing source materialization PG15/15 (464.3s, includes preserved default/reset behavior), entry/composition12/12, TypeScript, boundary282 clean. Atomic observed-stay attachmentf4230af adds4/4 focused PG tests; it requires a durable matching provider record before atomically attaching the canonical stay graph. Actual hotel execution remains uncomposed. Its proposed-visit persistence seam is now explicitly under integration review so Japan applicability cannot disappear after observation.
+
+## Fresh sandbox baseline source booking
+
+Explicit test/source setup created Nuitée booking `c4NsnfT_N`, confirmed for the original
+29September–3October property/window. Search explicitly returned `sandbox:true`; retrieve
+returned the provider's numeric sandbox flag1. The quoted and observed price both equal
+USD1135.63. A PostgreSQL source/audit record reserved the stable client reference before
+dispatch. Subsequent attempts can only lookup/reconcile; no cancellation was performed.
+
+The confirmed observation was ingested using normal source/evidence, external-record/link
+and reservation-line observation commands. In world2 the existing reservation is
+`b7744a07-92ef-5c95-81c8-c66cdf304b14`, line`3427e2a3-cd3c-55f0-a45d-4917f197fd81`,
+provider connection`c07ee845-c65d-4136-a826-85c461d67990`, record`1763006e-2db3-4dc3-8eda-8fed10248652`.
+Dates/property/currency/price were checked against the explicit setup before ingestion.
+Configuration now binds this active reservation to destination replacement research.
+
+This is baseline fixture preparation, not an A4 protected recovery action or acceptance.
+The fake traveller's recorded display name/email and explicitly labelled sandbox placeholder
+phone were used; no real identity or organisational budget was invented.
+
+The provider marks the booking NRFN and supplies no cancellation policy amount. Its
+[rate-policy documentation](https://docs.liteapi.travel/docs/hotel-rates-api-json-data-structure)
+says NRFN may involve partial loss. Therefore normalization preserves an explicit maximum
+loss based on observed booking price, never an invented exact fee, extra charge or refund.
+The composite carries that conservative authority ceiling and its basis. Actual cancellation
+economics remain for the provider observation. Focused adapter18/18 and planner23/23 pass.
+
+Candidate evidence now retains bounded flight/stay facts, entry results and exact failure
+timing facts; presentation formats captured local zones. Official source links retain
+retrieval timestamps, and reviewed source notes preserve outstanding arrival formalities.
+Focused UI43/43, evidence13/13, entry8/8 and existing-visit2/2 pass; TypeScript passes.
+One focused evidence failure (empty optional timing object) was fixed and passed alone.
+No A3 complete recommendation or A4 selected execution is claimed yet.

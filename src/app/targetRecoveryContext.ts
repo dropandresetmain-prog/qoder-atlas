@@ -191,7 +191,7 @@ function insertionOrder(world: CapturedWorld, upstreamJourneyItemId: string, dow
   return deterministicInsertionOrder(upstream.orderKey, downstream.orderKey);
 }
 
-function evidenceRecord(operation: 'research.entry_requirements' | 'research.local_context', evidenceRef: string, documents: readonly OfficialDocumentEvidence[], mode: PlanningToolProvenanceMode, summary: string): PlanningEvidenceRecord {
+function evidenceRecord(operation: 'research.entry_requirements' | 'research.local_context', evidenceRef: string, documents: readonly OfficialDocumentEvidence[], mode: PlanningToolProvenanceMode, summary: string, operationalNotes: readonly string[] = []): PlanningEvidenceRecord {
   const observedAt = documents.reduce((latest, document) => Date.parse(document.observedAt) > Date.parse(latest) ? document.observedAt : latest, documents[0]!.observedAt);
   return {
     evidenceRef,
@@ -201,7 +201,8 @@ function evidenceRecord(operation: 'research.entry_requirements' | 'research.loc
     status: 'SUCCEEDED',
     summary,
     provenance: { providerId: 'official-documents', mode, observedAt, sourceRefs: documents.map((document) => document.sourceId) },
-    uncertainty: [],
+    uncertainty: operationalNotes.map((summary) => ({ code: 'remaining_arrival_formality', summary })),
+    sourceLinks: documents.slice(0, 8).map(({ publisher, url, observedAt }) => ({ publisher, url, observedAt })),
   };
 }
 
@@ -445,7 +446,7 @@ export class TargetRecoveryContextPreparer {
         }
         this.publicationCache.set(publicationKey, publication.expiresAt);
       }
-      evidence.push(evidenceRecord('research.entry_requirements', evidenceRef, documents.documents, documents.mode, `Verified reviewed entry policy ${target.entryPolicy.id} for the configured existing visit.`));
+      evidence.push(evidenceRecord('research.entry_requirements', evidenceRef, documents.documents, documents.mode, `Verified reviewed entry policy ${target.entryPolicy.id} for the configured existing visit.`, target.entryPolicy.operationalNotes));
     }
   }
 
@@ -518,7 +519,7 @@ export class TargetRecoveryContextPreparer {
         const provenance: PlanningToolProvenance = { mode: hotelDocs.mode, observedAt: window.sourceProvenance.reduce((latest, source) => Date.parse(source.observedAt) > Date.parse(latest) ? source.observedAt : latest, window.sourceProvenance[0]!.observedAt), sourceRefs: window.sourceProvenance.map((source) => source.sourceId) };
         prepared.push({ target, journeyId: corridor.journeyId, corridorJourneyItemId: corridor.journeyItemId, upstreamJourneyItemId: recovery.upstreamJourneyItemId, anchorDate, checkOutDate, stayWindow: window.stayWindow, proposedJourneyItemId, proposedVisitId, proposedSelectionId, credentialId: credential.id, credentialVersionId: version.id, guestNationality: targetSelection.guestNationality, provenance });
         evidence.push(evidenceRecord('research.local_context', `hotel-policy:${target.hotelPolicy.id}:${corridor.journeyId}:${anchorDate}`, hotelDocs.documents, hotelDocs.mode, `Verified hotel policy ${target.hotelPolicy.id} for the configured arrival place and bounded local window.`));
-        evidence.push(evidenceRecord('research.entry_requirements', `entry-policy:${target.entryPolicy.id}:${corridor.journeyId}:${anchorDate}`, entryDocs.documents, entryDocs.mode, `Verified reviewed entry policy ${target.entryPolicy.id} for the configured journey visit scope.`));
+        evidence.push(evidenceRecord('research.entry_requirements', `entry-policy:${target.entryPolicy.id}:${corridor.journeyId}:${anchorDate}`, entryDocs.documents, entryDocs.mode, `Verified reviewed entry policy ${target.entryPolicy.id} for the configured journey visit scope.`, target.entryPolicy.operationalNotes));
       }
     }
     if (prepared.length === 0) return { evidence };

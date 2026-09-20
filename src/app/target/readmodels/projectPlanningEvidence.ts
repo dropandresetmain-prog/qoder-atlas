@@ -179,6 +179,7 @@ function projectToolEvidence(evidence: PlanningEvidenceRecord): PlanningEvidence
     summary: evidence.summary,
     uncertainties: evidence.uncertainty.map((u) => u.summary),
     evidenceRef: evidence.evidenceRef,
+    ...(evidence.sourceLinks ? { sourceLinks: evidence.sourceLinks } : {}),
   };
 }
 

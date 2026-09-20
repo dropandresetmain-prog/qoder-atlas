@@ -3,6 +3,7 @@
  * UI must not reconstruct business logic from raw tables.
  */
 import { z } from 'zod';
+import { MaterialCandidateProposalSchema, PlanningSourceLinkSchema } from '../planning/recoveryPlanningAttempt.ts';
 
 export const ProductOperationalStatusSchema = z.enum([
   'READY',
@@ -618,6 +619,7 @@ export const PlanningToolEvidenceViewSchema = z.strictObject({
   summary: z.string().min(1),
   uncertainties: z.array(z.string().min(1)).default([]),
   evidenceRef: z.string().min(1),
+  sourceLinks: z.array(PlanningSourceLinkSchema).max(8).optional(),
 });
 export type PlanningToolEvidenceView = z.infer<typeof PlanningToolEvidenceViewSchema>;
 
@@ -693,12 +695,7 @@ export const PlanningCandidateViewSchema = z.strictObject({
   blastRadius: PlanningBlastRadiusViewSchema.optional(),
   /** Present only when planning captured a comparison or its uncertainty. */
   costComparison: PlanningCostComparisonViewSchema.optional(),
-  proposal: z.strictObject({
-    flights: z.array(z.strictObject({ label: z.string().min(1), departure: z.string().datetime({ offset: true }), arrival: z.string().datetime({ offset: true }) })).default([]),
-    stays: z.array(z.strictObject({ placeLabel: z.string().min(1), start: z.string().datetime({ offset: true }), end: z.string().datetime({ offset: true }) })).default([]),
-    entryResults: z.array(z.strictObject({ dimension: z.string().min(1), verdict: z.enum(['FAIL', 'UNKNOWN', 'PASS']), reasonCodes: z.array(z.string().min(1)).default([]) })).default([]),
-    blockers: z.array(z.strictObject({ dimension: z.string().min(1), verdict: z.enum(['FAIL', 'UNKNOWN']), reasonCode: z.string().min(1) })).default([]),
-  }).optional(),
+  proposal: MaterialCandidateProposalSchema.optional(),
 });
 export type PlanningCandidateView = z.infer<typeof PlanningCandidateViewSchema>;
 

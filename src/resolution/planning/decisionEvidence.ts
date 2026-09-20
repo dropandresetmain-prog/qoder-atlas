@@ -178,7 +178,12 @@ function proposalFromEvaluation(result: EvaluateStrategyResult): MaterialCandida
       : undefined;
     const departure = service?.estimated.departure?.value ?? service?.published.departure?.value;
     const arrival = service?.estimated.arrival?.value ?? service?.published.arrival?.value;
-    return service && departure && arrival ? [{ label: service.operator, departure, arrival }] : [];
+    const origin = service && result.proposedWorld.places.find((place) => place.id === service.originPlaceId);
+    const destination = service && result.proposedWorld.places.find((place) => place.id === service.destinationPlaceId);
+    return service && departure && arrival ? [{ label: service.operator.trim().slice(0, 160) || 'Replacement flight', departure, arrival,
+      ...(origin?.timeZone ? { departureTimeZone: origin.timeZone } : {}),
+      ...(destination?.timeZone ? { arrivalTimeZone: destination.timeZone } : {}),
+    }] : [];
   }).slice(0, 4);
   const stays = effects.flatMap((effect) => {
     if (effect.effectKind !== 'ADD_JOURNEY_STAY') return [];
@@ -186,17 +191,23 @@ function proposalFromEvaluation(result: EvaluateStrategyResult): MaterialCandida
     const place = item?.intendedPlaceId
       ? result.proposedWorld.places.find((candidate) => candidate.id === item.intendedPlaceId)
       : undefined;
-    return item?.intendedWindow && place ? [{ placeLabel: place.name, start: item.intendedWindow.start, end: item.intendedWindow.end }] : [];
+    return item?.intendedWindow && place ? [{ placeLabel: place.name.trim().slice(0, 160) || 'Proposed accommodation', start: item.intendedWindow.start, end: item.intendedWindow.end, timeZone: place.timeZone }] : [];
   }).slice(0, 4);
   const dimensions = result.strategy.candidateAssessmentResults.flatMap((assessment) => assessment.dimensions)
     .filter((dimension) => dimension.applicable && dimension.blocking);
   const blockers = dimensions.flatMap((dimension) => dimension.explanations
     .filter((explanation): explanation is typeof explanation & { status: 'FAIL' | 'UNKNOWN' } => explanation.status === 'FAIL' || explanation.status === 'UNKNOWN')
-    .map((explanation) => ({ dimension: dimension.dimension, verdict: explanation.status, reasonCode: explanation.reasonCode })))
+    .map((explanation) => {
+      const timing = Object.fromEntries(['gapMinutes', 'requiredMinutes', 'slackMinutes', 'transferMinutes']
+        .flatMap((key) => typeof explanation.facts[key] === 'number' && Number.isFinite(explanation.facts[key]) ? [[key, explanation.facts[key]]] : []));
+      return { dimension: dimension.dimension, verdict: explanation.status, reasonCode: explanation.reasonCode,
+        ...(Object.keys(timing).length ? { timing } : {}),
+      };
+    }))
     .sort((a, b) => `${a.dimension}|${a.verdict}|${a.reasonCode}`.localeCompare(`${b.dimension}|${b.verdict}|${b.reasonCode}`))
     .filter((entry, index, all) => index === 0 || `${entry.dimension}|${entry.verdict}|${entry.reasonCode}` !== `${all[index - 1]!.dimension}|${all[index - 1]!.verdict}|${all[index - 1]!.reasonCode}`)
     .slice(0, 16);
-  const entryResults = dimensions.filter((dimension) => dimension.dimension.startsWith('entry'))
+  const entryResults = dimensions.filter((dimension) => ['entry_feasibility', 'transit_feasibility'].includes(dimension.dimension))
     .map((dimension) => ({
       dimension: dimension.dimension,
       verdict: dimension.verdict,

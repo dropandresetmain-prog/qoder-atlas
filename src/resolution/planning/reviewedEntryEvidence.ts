@@ -49,7 +49,8 @@ export const ReviewedEntryPolicySchema = z
     nationalityCodes: nationalityCodesSchema,
     effectiveWindow: InstantIntervalSchema,
     maxEvidenceAgeSeconds: z.number().int().positive().max(86_400),
-    sources: z.array(sourceSchema).min(1).max(MAX_LIST_ITEMS),
+      sources: z.array(sourceSchema).min(1).max(MAX_LIST_ITEMS),
+      operationalNotes: z.array(z.string().trim().min(1).max(512)).max(6).optional(),
     expression: RuleExpressionSchema,
   })
   .superRefine((policy, context) => {

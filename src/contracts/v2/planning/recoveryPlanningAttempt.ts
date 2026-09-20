@@ -52,6 +52,12 @@ import { StrategyRecommendationSchema } from './strategyRecommendation.ts';
  * `summary` is a short factual projection — explicitly NOT a reasoning
  * transcript and NOT a raw provider wire payload.
  */
+export const PlanningSourceLinkSchema = z.strictObject({
+  publisher: z.string().min(1).max(256),
+  url: z.url().refine((value) => new URL(value).protocol === 'https:'),
+  observedAt: InstantSchema,
+});
+
 export const PlanningEvidenceRecordSchema = z.strictObject({
   evidenceRef: z.string().min(1),
   /** Canonical `capability|operation|params` fingerprint that produced this. */
@@ -62,6 +68,7 @@ export const PlanningEvidenceRecordSchema = z.strictObject({
   summary: z.string().min(1).max(1024),
   provenance: PlanningToolProvenanceSchema,
   uncertainty: z.array(PlanningToolUncertaintySchema).default([]),
+  sourceLinks: z.array(PlanningSourceLinkSchema).max(8).optional(),
 });
 export type PlanningEvidenceRecord = z.infer<typeof PlanningEvidenceRecordSchema>;
 
@@ -128,11 +135,14 @@ export const MaterialCandidateProposalSchema = z.strictObject({
     label: z.string().min(1).max(160),
     departure: InstantSchema,
     arrival: InstantSchema,
+    departureTimeZone: z.string().min(1).max(128).optional(),
+    arrivalTimeZone: z.string().min(1).max(128).optional(),
   })).max(4).default([]),
   stays: z.array(z.strictObject({
     placeLabel: z.string().min(1).max(160),
     start: InstantSchema,
     end: InstantSchema,
+    timeZone: z.string().min(1).max(128).optional(),
   })).max(4).default([]),
   entryResults: z.array(z.strictObject({
     dimension: z.string().min(1).max(128),
@@ -143,6 +153,12 @@ export const MaterialCandidateProposalSchema = z.strictObject({
     dimension: z.string().min(1).max(128),
     verdict: z.enum(['FAIL', 'UNKNOWN']),
     reasonCode: z.string().min(1).max(160),
+    timing: z.strictObject({
+      gapMinutes: z.number().finite().optional(),
+      requiredMinutes: z.number().finite().optional(),
+      slackMinutes: z.number().finite().optional(),
+      transferMinutes: z.number().finite().optional(),
+    }).optional(),
   })).max(16).default([]),
 });
 export type MaterialCandidateProposal = z.infer<typeof MaterialCandidateProposalSchema>;

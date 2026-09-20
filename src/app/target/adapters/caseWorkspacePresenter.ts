@@ -42,6 +42,7 @@ import {
   UUID_PATTERN,
 } from '../../../ui/copy.ts';
 import { formatMoney } from '../../../ui/html.ts';
+import type { MaterialCandidateProposal } from '../../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 
 export type CasePhase =
   | 'disrupted'
@@ -90,6 +91,7 @@ export interface CaseOptionModel {
   readonly costLine?: string;
   /** Captured comparison evidence; never represents a charge or booking. */
   readonly costEvidence?: CaseCostEvidenceModel;
+  readonly proposalLines?: readonly string[];
   readonly approverLine: string;
   readonly approvable: boolean;
 }
@@ -136,6 +138,8 @@ export interface CaseWorkspaceModel {
   readonly whereItBreaks?: { readonly label: string; readonly phrase: string };
   readonly affects: { readonly items: readonly CaseAffectItem[]; readonly healthyNote?: string };
   readonly activity: { readonly title: string; readonly rows: readonly CaseRow[] };
+  readonly researchSources: readonly { publisher: string; url: string; checkedAt: string }[];
+  readonly researchNotes: readonly string[];
   readonly recommended?: CaseOptionModel;
   readonly alternatives: readonly CaseOptionModel[];
   readonly considered: readonly CaseRejectedModel[];
@@ -502,6 +506,7 @@ function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, ter
     why: optionWhy(strategy),
     ...(costLine ? { costLine } : {}),
     ...(costEvidence ? { costEvidence } : {}),
+    proposalLines: proposalLines(view.planningEvidence?.candidates.find((candidate) => candidate.strategyRef === strategy.strategyRef)?.proposal),
     approverLine: approvable
       ? 'Needs your approval as organiser before anything changes.'
       : strategy.executionBlocker ? executionBlockerLine(strategy.executionBlocker) : 'Not open for approval.',
@@ -538,6 +543,24 @@ function displayCode(code: string): string {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'A deterministic check';
 }
 
+function timingEvidence(timing: { gapMinutes?: number; requiredMinutes?: number; slackMinutes?: number; transferMinutes?: number } | undefined): string {
+  if (!timing) return '';
+  const labels = { gapMinutes: 'Time available', requiredMinutes: 'Time required', slackMinutes: 'Arrival margin', transferMinutes: 'Transfer' } as const;
+  const parts = (Object.keys(labels) as (keyof typeof labels)[]).flatMap((key) =>
+    timing[key] === undefined ? [] : [`${labels[key]}: ${timing[key]} min`]);
+  return parts.length ? ` — ${parts.join('; ')}` : '';
+}
+
+function proposalLines(proposal: MaterialCandidateProposal | undefined): string[] {
+  if (!proposal) return [];
+  return [
+    ...proposal.flights.map((flight) => `${flight.label}: ${formatCaseWindowInstant(flight.departure, flight.departureTimeZone)} to ${formatCaseWindowInstant(flight.arrival, flight.arrivalTimeZone)}`),
+    ...proposal.stays.map((stay) => `Stay at ${stay.placeLabel}: ${formatCaseWindow(stay.start, stay.end, stay.timeZone)}`),
+    ...proposal.entryResults.map((entry) => `${displayCode(entry.dimension)}: ${entry.verdict.toLowerCase()}${entry.reasonCodes.length ? ` (${entry.reasonCodes.map(displayCode).join(', ')})` : ''}`),
+    ...proposal.blockers.map((blocker) => `${displayCode(blocker.dimension)}: ${blocker.verdict.toLowerCase()} (${displayCode(blocker.reasonCode)})${timingEvidence(blocker.timing)}`),
+  ];
+}
+
 function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<string>): CaseRejectedModel[] {
   const out: CaseRejectedModel[] = [];
   for (const candidate of view.planningEvidence?.candidates ?? []) {
@@ -560,12 +583,7 @@ function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<
         ? { costLine: `Compared cost: ${candidate.costComparison.totalHomeAmount.currency} ${candidate.costComparison.totalHomeAmount.amount}` }
         : {}),
       ...(changed.length > 0 && unchanged > 0 ? { unchangedNote: `${unchanged} other ${unchanged === 1 ? 'check was' : 'checks were'} unchanged.` } : {}),
-      ...(candidate.proposal ? { proposalLines: [
-        ...candidate.proposal.flights.map((flight) => `${flight.label}: ${flight.departure} to ${flight.arrival}`),
-        ...candidate.proposal.stays.map((stay) => `Stay at ${stay.placeLabel}: ${stay.start} to ${stay.end}`),
-        ...candidate.proposal.entryResults.map((entry) => `${displayCode(entry.dimension)}: ${entry.verdict.toLowerCase()}${entry.reasonCodes.length ? ` (${entry.reasonCodes.map(displayCode).join(', ')})` : ''}`),
-        ...candidate.proposal.blockers.map((blocker) => `${displayCode(blocker.dimension)}: ${blocker.verdict.toLowerCase()} (${displayCode(blocker.reasonCode)})`),
-      ] } : {}),
+      ...(candidate.proposal ? { proposalLines: proposalLines(candidate.proposal) } : {}),
     });
   }
   return out;
@@ -1084,6 +1102,12 @@ export function presentCaseWorkspace(view: RecoveryCaseView): CaseWorkspaceModel
     ...(whereItBreaks ? { whereItBreaks } : {}),
     affects: buildAffects(view),
     activity: buildActivity(view, phase),
+    researchSources: [...new Map((view.planningEvidence?.tools ?? []).flatMap((tool) =>
+      (tool.sourceLinks ?? []).filter((source) => source.url.startsWith('https://')).map((source) => [source.url, {
+        publisher: source.publisher, url: source.url, checkedAt: formatCaseWindowInstant(source.observedAt),
+      }] as const))).values()].slice(0, 8),
+    researchNotes: [...new Set((view.planningEvidence?.tools ?? []).filter((tool) => tool.tool.code === 'research.entry_requirements')
+      .flatMap((tool) => tool.uncertainties).map(plain).filter((note): note is string => note !== undefined))].slice(0, 6),
     ...(recommended ? { recommended } : {}),
     alternatives,
     considered,

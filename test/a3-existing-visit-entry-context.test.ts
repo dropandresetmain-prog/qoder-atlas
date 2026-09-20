@@ -14,6 +14,7 @@ function fakePolicy() {
       id: randomUUID(), countryCode: 'JP', purposes: ['tourism'], nationalityCodes: ['SG'],
       effectiveWindow: { start: '2030-05-01T00:00:00.000Z', end: '2030-07-01T00:00:00.000Z' },
       maxEvidenceAgeSeconds: 3_600,
+      operationalNotes: ['Complete the arrival declaration before travel. Submission is not confirmed.'],
       sources: [{ sourceId: randomUUID(), url: 'https://authority.example/entry', publisher: 'Public authority', contentSha256: createHash('sha256').update(text).digest('hex') }],
       expression: { operator: 'PREDICATE', predicateId: 'journey.purpose_in', parameters: { purposes: ['tourism'] } },
     }),
@@ -87,6 +88,8 @@ test('existing visit preparation binds the configured passport and publishes sco
   assert.equal(result.evidence?.length, 1);
   assert.equal(result.evidence?.[0]?.status, 'SUCCEEDED');
   assert.equal(result.evidence?.[0]?.provenance.providerId, 'official-documents');
+  assert.equal(result.evidence?.[0]?.sourceLinks?.[0]?.url, 'https://authority.example/entry');
+  assert.equal(result.evidence?.[0]?.uncertainty[0]?.summary, 'Complete the arrival declaration before travel. Submission is not confirmed.');
   assert.match(result.evidence?.[0]?.summary ?? '', /existing visit/);
   const writesAfterFirstPreparation = writes;
   const retry = await preparer.prepare({ recoveryCaseId: randomUUID(), now: NOW, world, failing: [] });

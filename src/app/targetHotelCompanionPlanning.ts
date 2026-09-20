@@ -106,6 +106,7 @@ export interface CapturedHotelQuote {
     oldJourneyItemId: string;
     reservationLineId: string;
     cancellationPenalty: ExactMoney;
+    cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
     provider: {
       stayElementId: string;
       policyProvenance: PlanningToolProvenance;
@@ -150,20 +151,28 @@ function exactPrice(price: unknown): ExactMoney | undefined {
   return parsed.success && !parsed.data.amount.startsWith('-') ? parsed.data : undefined;
 }
 
-function cancellationPenalty(value: unknown, now: Instant): ExactMoney | undefined {
+function cancellationPenalty(value: unknown, now: Instant): { amount: ExactMoney; basis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING' } | undefined {
   if (value === null || typeof value !== 'object') return undefined;
   const cancellation = (value as { cancellation?: unknown }).cancellation;
   if (cancellation === null || typeof cancellation !== 'object') return undefined;
-  const raw = cancellation as { refundable?: unknown; deadline?: unknown; fee?: unknown };
+  const raw = cancellation as { refundable?: unknown; deadline?: unknown; fee?: unknown; maximumLoss?: unknown; maximumLossBasis?: unknown };
   const fee = exactPrice(raw.fee);
-  if (!fee) return undefined;
+  if (!fee) {
+    // A supplier's non-refundable tag does not establish an exact refund or
+    // charge. An explicitly normalized booking-price ceiling lets the operator
+    // authorize the conservative exposure while the actual outcome remains open.
+    const maximum = exactPrice(raw.maximumLoss);
+    return raw.fee === undefined && raw.refundable === false && raw.maximumLossBasis === 'NONREFUNDABLE_BOOKING_PRICE'
+      && maximum && compareExactMoney(maximum, { amount: '0', currency: maximum.currency }) > 0
+      ? { amount: maximum, basis: 'NONREFUNDABLE_BOOKING_PRICE_CEILING' } : undefined;
+  }
   try {
-    if (compareExactMoney(fee, { amount: '0', currency: fee.currency }) > 0) return fee;
+    if (compareExactMoney(fee, { amount: '0', currency: fee.currency }) > 0) return { amount: fee, basis: 'PROVIDER_POLICY' };
     const deadline = typeof raw.deadline === 'string' ? Date.parse(raw.deadline) : Number.NaN;
     // A zero cancellation amount is safe only when the provider explicitly
     // says this booking is refundable and its free-cancellation deadline is
     // still in the future. Missing policy evidence remains unknown.
-    if (raw.refundable === true && Number.isFinite(deadline) && deadline > Date.parse(now)) return fee;
+    if (raw.refundable === true && Number.isFinite(deadline) && deadline > Date.parse(now)) return { amount: fee, basis: 'PROVIDER_POLICY' };
   } catch {
     return undefined;
   }
@@ -446,13 +455,13 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
               const contextResult = results.find((candidate) => candidate.requestId === contextBinding.contextRequest.id
                 && candidate.operation === 'hotel.context' && candidate.status === 'SUCCEEDED');
               const penalty = contextResult ? cancellationPenalty(contextResult.normalizedEvidence, input.now) : undefined;
-              return penalty && contextResult ? { cancellationPenalty: penalty, policyProvenance: contextResult.provenance } : undefined;
+              return penalty && contextResult ? { cancellationPenalty: penalty.amount, cancellationPenaltyBasis: penalty.basis, policyProvenance: contextResult.provenance } : undefined;
             })
-            .find((candidate): candidate is { cancellationPenalty: ExactMoney; policyProvenance: PlanningToolProvenance } => candidate !== undefined)
+            .find((candidate): candidate is { cancellationPenalty: ExactMoney; cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING'; policyProvenance: PlanningToolProvenance } => candidate !== undefined)
           : undefined;
         if (replacement && !policy) continue;
         const offer: ResolvedStayOffer = {
-          offerId: stableId('stay-offer', JSON.stringify({ rateId: binding.rate.rateId, quoteId: terms.quoteId, propertyId: binding.rate.propertyId, placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price })),
+          offerId: stableId('stay-offer', JSON.stringify({ rateId: binding.rate.rateId, propertyId: binding.rate.propertyId, placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price, searchRequestFingerprint: binding.fingerprint })),
           placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price,
         };
         quotedStays.push({
@@ -465,6 +474,7 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
               oldJourneyItemId: replacement.oldJourneyItemId,
               reservationLineId: replacement.reservationLineId,
               cancellationPenalty: policy.cancellationPenalty,
+              cancellationPenaltyBasis: policy.cancellationPenaltyBasis,
               provider: { stayElementId: replacement.stayElementId, policyProvenance: policy.policyProvenance },
             },
           } : {}),
@@ -507,8 +517,8 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
           key,
           effects: [
             ...companion.effects,
-            { effectKind: 'CANCEL_STAY', journeyItemId: quote.replacement.oldJourneyItemId, reservationLineId: quote.replacement.reservationLineId, cancellationPenalty: quote.replacement.cancellationPenalty },
-            { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: quote.context.proposedJourneyItemId, journeyId: quote.journeyId, orderKey: quote.context.orderKey, offerId: quote.offer.offerId, offerPrice: quote.offer.price, visit: quote.context.visit },
+            { effectKind: 'CANCEL_STAY', journeyItemId: quote.replacement.oldJourneyItemId, reservationLineId: quote.replacement.reservationLineId, cancellationPenalty: quote.replacement.cancellationPenalty, cancellationPenaltyBasis: quote.replacement.cancellationPenaltyBasis },
+            { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: quote.context.proposedJourneyItemId, journeyId: quote.journeyId, orderKey: quote.context.orderKey, offerId: quote.offer.offerId, offerPrice: quote.offer.price, visit: quote.context.visit, replacesReservationLineId: quote.replacement.reservationLineId },
           ],
           affectedSubjectRefs: [
             ...companion.affectedSubjectRefs,

@@ -35,6 +35,7 @@
   },
   {
     "id": "sg-issued-passport-eligibility-2026-09",
+    "operationalNotes": ["Submit the SG Arrival Card within three days including arrival for this air journey. Submission is not yet confirmed; this passport eligibility check does not claim completed arrival formalities or guaranteed admission."],
     "countryCode": "SG",
     "purposes": ["AiT - AI in Travel Summit 2026"],
     "nationalityCodes": ["SG"],

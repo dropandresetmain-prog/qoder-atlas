@@ -1598,6 +1598,23 @@ test('hotel planning combines overnight and destination-stay replacement only wi
   const hotelTerms = planning.materialize(results);
   assert.equal(hotelTerms.quotedStays.filter((quote) => quote.replacement !== undefined).length, 1);
   assert.equal(hotelTerms.quotedStays.find((quote) => quote.replacement)?.replacement?.cancellationPenalty.amount, '50');
+  assert.equal(hotelTerms.quotedStays.find((quote) => quote.replacement)?.replacement?.cancellationPenaltyBasis, 'PROVIDER_POLICY');
+  const replacementEffect = full.effects.find((effect) => effect.effectKind === 'ADD_JOURNEY_STAY' && effect.replacesReservationLineId);
+  assert.equal(replacementEffect?.effectKind === 'ADD_JOURNEY_STAY' && replacementEffect.replacesReservationLineId, line.id);
+  const withCeiling = results.map((result) => result.requestId === policy.requestId ? {
+    ...result, normalizedEvidence: { cancellation: { refundable: false, maximumLoss: { amount: 425, currency: 'NZD' }, maximumLossBasis: 'NONREFUNDABLE_BOOKING_PRICE' } },
+  } : result);
+  const ceiling = planning.materialize(withCeiling).quotedStays.find((quote) => quote.replacement)?.replacement;
+  assert.deepEqual(ceiling?.cancellationPenalty, { amount: '425', currency: 'NZD' });
+  assert.equal(ceiling?.cancellationPenaltyBasis, 'NONREFUNDABLE_BOOKING_PRICE_CEILING');
+  const noBasis = withCeiling.map((result) => result.requestId === policy.requestId ? {
+    ...result, normalizedEvidence: { cancellation: { refundable: false, maximumLoss: { amount: 425, currency: 'NZD' } } },
+  } : result);
+  assert.equal(planning.materialize(noBasis).quotedStays.some((quote) => quote.replacement), false, 'an unexplained amount cannot authorize cancellation');
+  const refreshedQuotes = results.map((result) => result.operation === 'hotel.quote' ? {
+    ...result, normalizedEvidence: { ...(result.normalizedEvidence as object), quoteId: `refreshed-${result.requestId}` },
+  } : result);
+  assert.deepEqual(planning.materialize(refreshedQuotes).resolvedStayOffers.map((offer) => offer.offerId), hotelTerms.resolvedStayOffers.map((offer) => offer.offerId), 'same approved rate and terms preserve identity across refreshed quote handles');
   const evaluated = evaluateRecoveryStrategy({
     recoveryCaseId: id(), strategyId: id(), basisAssessmentId: id(), baseWorld: materializedTransport.world, baseManifest: emptyManifest(),
     scenarioChange: ScenarioChangeSchema.parse({ id: id(), recoveryStrategyId: id(), strategyVersion: 1, basisAssessmentId: id(), affectedSubjectRefs: full.affectedSubjectRefs, effects: full.effects }),

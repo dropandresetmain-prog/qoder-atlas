@@ -195,6 +195,7 @@ function factsHtml(option: CaseOptionModel, fullApprover: boolean): string {
   const why = option.why.length > 0 ? `<ul>${option.why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : '';
   return `<dl class="cw-facts">
     <dt>What changes</dt><dd>${changes}</dd>
+    ${option.proposalLines?.length ? `<dt>Proposed trip</dt><dd><ul>${option.proposalLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul></dd>` : ''}
     ${people ? `<dt>Trip recovery for</dt><dd>${people}</dd>` : ''}
     ${why ? `<dt>Why it works</dt><dd>${why}</dd>` : ''}
     ${costEvidenceHtml(option)}
@@ -297,7 +298,10 @@ function activityHtml(m: CaseWorkspaceModel): string {
   if (m.activity.rows.length === 0) return '';
   return `<section class="section" data-test="case-activity">
     <h2>${escapeHtml(m.activity.title)}</h2>
-    <div class="panel">${rowsHtml(m.activity.rows)}</div>
+    <div class="panel">${rowsHtml(m.activity.rows)}
+      ${m.researchSources.length ? `<h3>Sources checked</h3><ul>${m.researchSources.map((source) => `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.publisher)}</a> <span class="meta">— checked ${escapeHtml(source.checkedAt)}</span></li>`).join('')}</ul>` : ''}
+      ${m.researchNotes.length ? `<h3>Still to arrange</h3><ul>${m.researchNotes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>` : ''}
+    </div>
   </section>`;
 }
 

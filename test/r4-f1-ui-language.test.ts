@@ -589,10 +589,10 @@ describe('Case cost and composite-stay evidence', () => {
           candidateKey: 'flight-stay', domain: { label: 'Stay', code: 'STAY' }, proposer: { label: 'Recovery planner', code: 'planner' },
           disposition: { label: 'Rejected by deterministic checks', code: 'REJECTED_DETERMINISTIC' }, reasons: [], outcomeDelta: [],
           proposal: {
-            flights: [{ label: 'Example Air', departure: generatedAt, arrival: '2031-09-17T04:55:00.000Z' }],
+            flights: [{ label: 'Example Air', departure: generatedAt, arrival: '2031-09-17T04:55:00.000Z', departureTimeZone: 'Asia/Tokyo', arrivalTimeZone: 'Asia/Singapore' }],
             stays: [{ placeLabel: 'Airport hotel', start: '2031-09-17T05:00:00.000Z', end: '2031-09-18T05:00:00.000Z' }],
             entryResults: [{ dimension: 'entry_eligibility', verdict: 'UNKNOWN', reasonCodes: ['credential_missing'] }],
-            blockers: [{ dimension: 'entry_eligibility', verdict: 'UNKNOWN', reasonCode: 'credential_missing' }],
+            blockers: [{ dimension: 'entry_eligibility', verdict: 'UNKNOWN', reasonCode: 'credential_missing' }, { dimension: 'connection', verdict: 'FAIL', reasonCode: 'connection_too_short', timing: { gapMinutes: 30, requiredMinutes: 150 } }],
           },
         }],
       },
@@ -601,6 +601,10 @@ describe('Case cost and composite-stay evidence', () => {
     assert.match(text, /Example Air/);
     assert.match(text, /Airport hotel/);
     assert.match(text, /Credential missing/);
+    assert.match(text, /17:00/);
+    assert.match(text, /12:55/);
+    assert.doesNotMatch(text, /2031-09-17T04:55/);
+    assert.match(text, /Time available: 30 min; Time required: 150 min/);
   });
 });
 
