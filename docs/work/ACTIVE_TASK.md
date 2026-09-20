@@ -32,11 +32,11 @@ Do not touch: A4 WIP branches, handoff bundle, recovery planning/engine, SQLite,
 |---|---|---|
 | 1 | Source/runtime identity + content ownership freeze + A–D triage | `3bded3e64026213b8f3b78e6b8e83ced28f72e5f` |
 | 2 | Case default-visible hierarchy + focused tests | `ed41bd1b2493bd8d645c72a70b9eb362f53ba852` |
-| 3 | Overview/framing integrate + Chromium QC | *(this commit)* |
+| 3 | Overview/framing integrate + Chromium QC | `c6d6826a765de08c6fbdb19716675bc0e3f41fca` (tip `8343362` lint tidy) |
 
 ## Chromium QC (CP3)
 
-- Runtime SHA: `ed41bd1b2493bd8d645c72a70b9eb362f53ba852`
+- Runtime SHA: `8343362fe1898ebe17f497fb6fcdd8e19cd0c150`
 - Workspace: `C:/Dev/qoder-atlas/.worktrees/a3-operator-ui-second-pass`
 - HTTP: `http://127.0.0.1:4125` (same PG world as prior verify server: workspace `18891fc1-…`)
 - Cases: Sarah `fffa8660-16f7-5d8f-9824-c87947fa3626`; Jordan `297337f5-cda2-5397-a2ba-9ace992396b3`
