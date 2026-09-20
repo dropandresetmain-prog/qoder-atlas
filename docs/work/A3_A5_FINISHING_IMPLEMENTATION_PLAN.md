@@ -19,6 +19,19 @@ Read in this order before implementation:
 
 Older audits and plans are historical/supporting evidence where they conflict with these files.
 
+## Final status overlay — after A4 physical acceptance
+
+This overlay supersedes older "future A4" language below.
+
+- **A3 — CONDITIONAL PASS.** Recommendation and desktop surface were sufficient to continue; only bounded graph/progression/cost/copy truth debt remains.
+- **A4 CP2 continuation — PASS** @ `f7a497d984ea93fc6436c6c717a553db48602fa6`.
+- **A4 CP3 protected hotel execution — PASS** @ `0c177c830a8593899147f4227aa90b2cff327785`.
+- **A4 CP3.5 controlled seam — PASS** @ `5bdb6527369a2a3c34957ce718b5f690ce50adf5`.
+- **A4 physical sandbox — ACCEPTED** @ `546adf210db8ead343ecdac22b410515665c176a`.
+- **A5 — ACTIVE.** Bounded truth/UI pass → Sarah repeat → Jordan repeat → final gates → freeze.
+
+Do not rerun or reimplement completed A4 checkpoints absent a demonstrated regression. Physical acceptance details live in `docs/work/A4_PHYSICAL_SANDBOX_ACCEPTANCE.md`.
+
 ## Current finish line
 
 A0/A1/A2 are closed.
@@ -366,7 +379,7 @@ Normal boot can truthfully expose the protected four-action path, focused tests 
 
 ---
 
-# Checkpoint 4 — A4 physical acceptance
+# Checkpoint 4 — A4 physical acceptance — ACCEPTED
 
 ## Goal
 
