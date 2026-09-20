@@ -85,3 +85,22 @@ Normalruntime eca447d produced attempt3cdb224a-0c6e-54f0-8ecc-5f6bb60a9b7d at03:
 Actual desktop screenshot revealed wronggraphlegtitle and thincommitment evidence. Luna correctedexactitemlookup, terminalcopyandvisiblealternatives. Rootpreserves successfulreadinessfacts and projectsactualprogrammechecks/route labels;83focusedtests pass, compiler26pass, TypeScriptandboundary282pass. Root confirmed150minuteprogrammeconstraint inPGand sourcedstructuredgiven/familynames frombooking-dossiers.json viaauditedaddTravellerName; noprivatefacts invented. Optional approvedstayvisit closure integratedwith8PG laneevidence. A3signoff awaitsfinaldesktopproof.
 
 ActNow/recording source limitation: later21:00same-nightclosure exists only asnarrative, not PG-reachableschedule/availability evidence. Do not inventalaterinboundarrival or claim stagephysically proven. Insurance sourcepolicy exists, but historicalwholeTripRecoveryPlan isretiredruntime andisnot proof ofcurrentPGinsurance reasoning.
+
+
+## A4 physical closure follow-up
+
+A3 remains a **CONDITIONAL PASS** for presentation, but its downstream execution question is now closed by A4.
+
+Accepted product SHA `546adf210db8ead343ecdac22b410515665c176a` physically executed the complete selected Jordan recovery:
+
+- Atlas replacement flight ticketed;
+- Narita stay confirmed;
+- destination replacement stay confirmed;
+- displaced destination stay cancelled;
+- each provider outcome observed/reconciled and canonically applied;
+- final whole-trip assessment `4c4c5698…` CURRENT / PASS;
+- Case RESOLVED / RECOVERED.
+
+The physical run also closed selected-plan continuation defects around compound receipt/scope accounting and observed-stay credential visit scope union. Do not infer from this that the remaining A3 UI debt is closed. A5 still owns V5.6 FAIL→amber truth, progressive graph edges/state, Overview Active Change/focus, graph placement, UUID-heavy copy and final cost wording.
+
+For final recording/repeatability, provision sandbox budgets before disruption/planning and keep the synthetic scenario clock authoritative during reassessment.
