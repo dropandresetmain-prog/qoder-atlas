@@ -19,6 +19,20 @@ Read in this order before implementation:
 
 Older audits and plans are historical/supporting evidence where they conflict with these files.
 
+## Current checkpoint overlay
+
+This overlay supersedes the original sequencing language in the detailed checkpoint sections below. Do **not** rerun completed checkpoints absent a demonstrated regression.
+
+- **A3 — CONDITIONAL PASS.** The complete multi-domain recommendation and operator UI are good enough to continue. Final acceptance is withheld until carried graph/progression/cost/copy defects are closed after A4 execution truth exists.
+- **A4 CP2 continuation — PASS** @ `f7a497d984ea93fc6436c6c717a553db48602fa6`.
+- **A4 CP3 hotel execution integration — PASS** @ `0c177c830a8593899147f4227aa90b2cff327785`.
+- **A4 CP3.5 controlled four-action seam — PASS** @ `5bdb6527369a2a3c34957ce718b5f690ce50adf5`.
+- **A4 planner/provider robustness + CP4a progression closure — PASS** on `finish/a4-destination-hotel-robustness` @ `c897d2969f901a4c90f25e6e693d11a4362ac253`.
+- **A4 physical sandbox acceptance — ACTIVE / NOT YET ACCEPTED.**
+- **A5 repeat + freeze — PENDING.**
+
+Current A4 execution order remains flight → Narita book → destination replacement book → displaced stay cancel, with observation/reconciliation, canonical application and fresh reassessment between every action.
+
 ## Current finish line
 
 A0/A1/A2 are closed.
@@ -140,7 +154,7 @@ Keep architecture, integration, execution safety and milestone acceptance with t
 
 ---
 
-# Checkpoint 1 — A3 accepted
+# Checkpoint 1 — A3 acceptance — CONDITIONAL PASS
 
 ## Goal
 
@@ -200,11 +214,11 @@ Astra is review-only if A3 exposes a genuine cross-contract or acceptance ambigu
 
 ## Stop condition
 
-A3 is pushed and accepted. No more A3 feature work.
+A3 is conditionally passed for continuation. Do not reopen broad A3 feature work; carry only the explicit graph/progression/cost/copy defects into the bounded post-A4 truth/presentation pass.
 
 ---
 
-# Checkpoint 2 — A4 continuation safety
+# Checkpoint 2 — A4 continuation safety — COMPLETE
 
 ## Goal
 
@@ -281,7 +295,7 @@ Continuation safety is integrated, tested and pushed. Hotel execution remains un
 
 ---
 
-# Checkpoint 3 — A4 hotel integration
+# Checkpoint 3 — A4 hotel integration — COMPLETE
 
 ## Goal
 
