@@ -19,6 +19,7 @@
 import type { PlanningEvidenceView, PlanningEvidenceLabel } from '../../../contracts/v2/product/readModels.ts';
 import type {
   MaterialCandidateEvidence,
+  RecoveryCostLineEvidence,
   PlanningEvidenceRecord,
   RecoveryPlanningAttempt,
   RecoveryPlanningOutcome,
@@ -221,6 +222,39 @@ function projectCandidate(
           },
         }
       : {}),
+    ...(candidate.costComparison ? { costComparison: projectCostComparison(candidate.costComparison) } : {}),
+  };
+}
+
+const COST_KIND_LABELS: Record<RecoveryCostLineEvidence['kind'], string> = {
+  SELECT_OFFER: 'Replacement travel',
+  ADD_JOURNEY_STAY: 'Accommodation',
+  POLICY_PENALTY_ESTIMATE: 'Cancellation policy estimate',
+};
+
+function projectCostComparison(cost: NonNullable<MaterialCandidateEvidence['costComparison']>) {
+  if (cost.status === 'UNAVAILABLE') {
+    return { status: 'UNAVAILABLE' as const, reason: cost.reason, comparedAt: cost.comparedAt };
+  }
+  return {
+    status: 'AVAILABLE' as const,
+    homeCurrency: cost.homeCurrency,
+    totalHomeAmount: cost.totalHomeAmount,
+    lines: cost.lines.map((line) => ({
+      kind: { label: COST_KIND_LABELS[line.kind], code: line.kind },
+      providerAmount: line.providerAmount,
+      homeAmount: line.homeAmount,
+      observed: line.observed,
+    })),
+    selectedFxEvidence: cost.selectedFxEvidence.map((fx) => ({
+      source: { label: humanize(fx.sourceId), code: fx.sourceId },
+      baseCurrency: fx.baseCurrency,
+      homeCurrency: fx.homeCurrency,
+      rate: fx.rate,
+      observedAt: fx.observedAt,
+      ...(fx.validUntil ? { validUntil: fx.validUntil } : {}),
+    })),
+    comparedAt: cost.comparedAt,
   };
 }
 

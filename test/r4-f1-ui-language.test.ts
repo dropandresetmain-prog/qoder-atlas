@@ -456,6 +456,88 @@ describe('R4 transport option cards: leg label and strategy-scoped cost', () => 
   });
 });
 
+describe('Case cost and composite-stay evidence', () => {
+  const travelItem = 'JOURNEY_ITEM:flight-leg';
+  const oldStayItem = 'JOURNEY_ITEM:old-stay';
+  const newStayItem = 'JOURNEY_ITEM:new-stay';
+  const composite = (strategyRef: string, optionNumber: number): RecoveryStrategyView => ({
+    strategyRef, version: optionNumber, viability: 'VIABLE', status: 'EVALUATED', optionNumber,
+    changes: [
+      { effectKind: 'SELECT_OFFER', subjectRef: travelItem, subjectLabel: 'Replacement flight' },
+      { effectKind: 'ADD_JOURNEY_STAY', subjectRef: 'JOURNEY:trip-1', subjectLabel: 'Overnight hotel' },
+      { effectKind: 'CANCEL_STAY', subjectRef: oldStayItem, subjectLabel: 'Existing destination stay' },
+      { effectKind: 'ADD_JOURNEY_STAY', subjectRef: `${newStayItem}-${strategyRef}`, subjectLabel: 'Destination stay' },
+    ],
+    resolves: [{ subjectRef: 'JOURNEY:trip-1', personLabel: 'Traveller One', currentVerdict: 'FAIL', projectedVerdict: 'PASS' }],
+    projectedSummary: { total: 1, pass: 1, fail: 0, unknown: 0 }, projectedPeople: [],
+  } as unknown as RecoveryStrategyView);
+
+  test('desktop options show original provider amounts, dated FX and typed stay replacement steps', () => {
+    const chosen = composite('strategy-composite', 1);
+    const alternative = composite('strategy-uncertain', 2);
+    const view = caseView({
+      status: 'AWAITING_AUTHORITY', strategies: [chosen, alternative],
+      planningEvidence: {
+        phase: 'DECISION_TIME', asOf: generatedAt, attemptRef: 'attempt-cost', coordinatorVersion: 'test',
+        outcome: { label: 'Awaiting operator authority', code: 'AWAITING_AUTHORITY' },
+        domains: [], tools: [], modelActivities: [], viableStrategies: [],
+        recommendation: { recommended: { label: 'Recommended viable strategy', ref: chosen.strategyRef }, alternatives: [], basis: [], provenance: { label: 'Deterministic comparator', code: 'DETERMINISTIC' } },
+        candidates: [
+          {
+            candidateKey: 'combined-flight-and-stay', domain: { label: 'Stay', code: 'STAY' }, proposer: { label: 'Recovery planner', code: 'planner' }, disposition: { label: 'Recommended', code: 'RECOMMENDED' }, strategyRef: chosen.strategyRef, reasons: [], outcomeDelta: [],
+            costComparison: {
+              status: 'AVAILABLE', homeCurrency: 'USD', totalHomeAmount: { amount: '418.75', currency: 'USD' }, comparedAt: generatedAt,
+              lines: [
+                { kind: { label: 'Replacement travel', code: 'SELECT_OFFER' }, providerAmount: { amount: '620.00', currency: 'AED' }, homeAmount: { amount: '168.75', currency: 'USD' }, observed: false },
+                { kind: { label: 'Accommodation', code: 'ADD_JOURNEY_STAY' }, providerAmount: { amount: '34000', currency: 'JPY' }, homeAmount: { amount: '230.00', currency: 'USD' }, observed: false },
+                { kind: { label: 'Cancellation policy estimate', code: 'POLICY_PENALTY_ESTIMATE' }, providerAmount: { amount: '20.00', currency: 'USD' }, homeAmount: { amount: '20.00', currency: 'USD' }, observed: false },
+              ],
+              selectedFxEvidence: [
+                { source: { label: 'Frankfurter', code: 'frankfurter' }, baseCurrency: 'AED', homeCurrency: 'USD', rate: 0.27218, observedAt: generatedAt },
+                { source: { label: 'Frankfurter', code: 'frankfurter' }, baseCurrency: 'JPY', homeCurrency: 'USD', rate: 0.00676, observedAt: generatedAt },
+              ],
+            },
+          },
+          {
+            candidateKey: 'uncertain-alternative', domain: { label: 'Stay', code: 'STAY' }, proposer: { label: 'Recovery planner', code: 'planner' }, disposition: { label: 'Viable but not recommended', code: 'VIABLE_NOT_RECOMMENDED' }, strategyRef: alternative.strategyRef, reasons: [], outcomeDelta: [],
+            costComparison: { status: 'UNAVAILABLE', reason: 'A current exchange rate is not available for one quoted amount.', comparedAt: generatedAt },
+          },
+        ],
+      },
+    } as unknown as Partial<RecoveryCaseView>);
+    const model = presentCaseWorkspace(view);
+    assert.deepEqual(model.recommended?.changes.map((line) => line.phrase), [
+      'Rebook Replacement flight', 'Book accommodation for Overnight hotel', 'Cancel the existing stay for Existing destination stay', 'Book accommodation for Destination stay',
+    ]);
+    assert.equal(model.recommended?.costEvidence?.total, 'Compared total: USD 418.75');
+    assert.ok(model.recommended?.costEvidence?.lines.some((line) => line.includes('AED 620.00')));
+    assert.ok(model.recommended?.costEvidence?.lines.some((line) => line.includes('JPY 34000')));
+    assert.ok(model.recommended?.costEvidence?.rates.some((line) => line.includes('Frankfurter: AED to USD at 0.27218; reference dated')));
+    assert.match(model.alternatives[0]!.costEvidence?.uncertainty ?? '', /could not be compared/);
+    const visible = primaryVisibleText(renderProductRecoveryCase(view));
+    assert.match(visible, /Compared total: USD 418.75/);
+    assert.match(visible, /Cancellation policy estimate: USD 20.00/);
+    assert.match(visible, /Cost could not be compared/);
+    assert.doesNotMatch(visible, /booked|paid|charged/i);
+  });
+
+  test('a strategy with no planning cost evidence keeps the current Sarah-compatible display', () => {
+    const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [composite('strategy-no-cost', 1)] } as Partial<RecoveryCaseView>));
+    assert.equal(model.recommended?.costEvidence, undefined);
+  });
+
+  test('permuting typed stay effects leaves every accommodation line generic', () => {
+    const strategy = composite('strategy-permuted', 1);
+    const permuted = { ...strategy, changes: [strategy.changes[3]!, strategy.changes[2]!, strategy.changes[1]!, strategy.changes[0]!] } as RecoveryStrategyView;
+    const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [permuted] } as Partial<RecoveryCaseView>));
+    const phrases = model.recommended!.changes.map((line) => line.phrase);
+    assert.ok(phrases.includes('Book accommodation for Destination stay'));
+    assert.ok(phrases.includes('Book accommodation for Overnight hotel'));
+    assert.ok(!phrases.includes('Arrange overnight accommodation'));
+    assert.ok(!phrases.includes('Book a replacement stay'));
+  });
+});
+
 test('Decisions preserves waiting now and renders recent approval history with case navigation', () => {
   const html = renderProductDecisionQueue({
     generatedAt,

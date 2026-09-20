@@ -87,6 +87,22 @@ function attemptRecord(overrides: Partial<RecoveryPlanningAttempt> = {}): Recove
           directlyAffectedRefs: [{ kind: 'TRAVELLER', id: 'trav-1' }],
         },
         reassessmentClosure: { reachedRefs: [{ kind: 'JOURNEY', id: 'journey-1' }] },
+        costComparison: {
+          status: 'AVAILABLE',
+          homeCurrency: 'USD',
+          totalHomeAmount: { amount: '121.50', currency: 'USD' },
+          lines: [{
+            kind: 'SELECT_OFFER',
+            providerAmount: { amount: '160.00', currency: 'SGD' },
+            homeAmount: { amount: '121.50', currency: 'USD' },
+            observed: false,
+          }],
+          selectedFxEvidence: [{
+            id: 'fx-1', baseCurrency: 'SGD', homeCurrency: 'USD', rate: 0.759375,
+            sourceId: 'frankfurter', authority: 'AUTHORITATIVE', observedAt: NOW,
+          }],
+          comparedAt: NOW,
+        },
         outcomeDelta: [
           { subjectRef: { kind: 'JOURNEY_ITEM', id: 'item-1' }, baseline: 'FAIL', candidate: 'PASS', delta: 'BETTER' },
         ],
@@ -162,6 +178,24 @@ test('C9: material candidates keep rejection reasons + the three distinct impact
   assert.equal(recommended?.outcomeDelta[0]?.baseline, 'FAIL');
   assert.equal(recommended?.outcomeDelta[0]?.candidate, 'PASS');
   assert.equal(recommended?.outcomeDelta[0]?.subject.ref, 'JOURNEY_ITEM:item-1');
+  // Cost retains original provider terms, normalized total, and the selected
+  // dated FX source. It is comparison evidence, not an execution result.
+  assert.deepEqual(recommended?.costComparison, {
+    status: 'AVAILABLE',
+    homeCurrency: 'USD',
+    totalHomeAmount: { amount: '121.50', currency: 'USD' },
+    lines: [{
+      kind: { label: 'Replacement travel', code: 'SELECT_OFFER' },
+      providerAmount: { amount: '160.00', currency: 'SGD' },
+      homeAmount: { amount: '121.50', currency: 'USD' },
+      observed: false,
+    }],
+    selectedFxEvidence: [{
+      source: { label: 'Frankfurter', code: 'frankfurter' },
+      baseCurrency: 'SGD', homeCurrency: 'USD', rate: 0.759375, observedAt: NOW,
+    }],
+    comparedAt: NOW,
+  });
 });
 
 test('C9: every primary explanation is a human label, never a bare uuid or code', () => {

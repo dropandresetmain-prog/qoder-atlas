@@ -88,8 +88,17 @@ export interface CaseOptionModel {
   readonly people: readonly string[];
   readonly why: readonly string[];
   readonly costLine?: string;
+  /** Captured comparison evidence; never represents a charge or booking. */
+  readonly costEvidence?: CaseCostEvidenceModel;
   readonly approverLine: string;
   readonly approvable: boolean;
+}
+
+export interface CaseCostEvidenceModel {
+  readonly total?: string;
+  readonly lines: readonly string[];
+  readonly rates: readonly string[];
+  readonly uncertainty?: string;
 }
 
 export interface CaseRejectedModel {
@@ -442,9 +451,41 @@ function strategyCostLine(view: RecoveryCaseView, strategy: RecoveryStrategyView
   return undefined;
 }
 
+function formatExactMoney(amount: { amount: string; currency: string }): string {
+  return `${amount.currency} ${amount.amount}`;
+}
+
+function costSourceLabel(source: { label: string; code?: string }): string {
+  return plain(source.label) ?? 'Recorded exchange-rate source';
+}
+
+function costEvidenceForStrategy(view: RecoveryCaseView, strategy: RecoveryStrategyView): CaseCostEvidenceModel | undefined {
+  const candidate = view.planningEvidence?.candidates.find((entry) =>
+    entry.strategyRef === strategy.strategyRef);
+  const comparison = candidate?.costComparison;
+  if (!comparison) return undefined;
+  if (comparison.status === 'UNAVAILABLE') {
+    return {
+      lines: [],
+      rates: [],
+      uncertainty: `Cost could not be compared: ${plain(comparison.reason) ?? 'the required exchange-rate evidence is unavailable'}.`,
+    };
+  }
+  return {
+    total: `Compared total: ${formatExactMoney(comparison.totalHomeAmount)}`,
+    lines: comparison.lines.map((line) =>
+      `${line.kind.label}: ${formatExactMoney(line.providerAmount)} → ${formatExactMoney(line.homeAmount)}${line.observed ? ' (observed)' : ' (quoted or estimated)'}.`),
+    rates: comparison.selectedFxEvidence.map((fx) => {
+      const validUntil = fx.validUntil ? `; valid until ${formatCaseWindowInstant(fx.validUntil)}` : '';
+      return `${costSourceLabel(fx.source)}: ${fx.baseCurrency} to ${fx.homeCurrency} at ${fx.rate}; reference dated ${formatCaseWindowInstant(fx.observedAt)}${validUntil}.`;
+    }),
+  };
+}
+
 function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, terminal: boolean): CaseOptionModel {
-  const changes = strategy.changes.map((c) => changeLine(view, c));
-  const costLine = strategyCostLine(view, strategy);
+  const changes = strategy.changes.map((change) => changeLine(view, change));
+  const costEvidence = costEvidenceForStrategy(view, strategy);
+  const costLine = costEvidence?.total ?? strategyCostLine(view, strategy);
   const people = [...new Set(strategy.resolves.map((r) => plain(r.personLabel)).filter((n): n is string => n !== undefined))];
   const approvable = !terminal && strategy.viability === 'VIABLE' && (strategy.status === 'EVALUATED' || strategy.status === 'PROPOSED') && !strategy.executionBlocker;
   return {
@@ -455,6 +496,7 @@ function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, ter
     people,
     why: optionWhy(strategy),
     ...(costLine ? { costLine } : {}),
+    ...(costEvidence ? { costEvidence } : {}),
     approverLine: approvable
       ? 'Needs your approval as organiser before anything changes.'
       : strategy.executionBlocker ? executionBlockerLine(strategy.executionBlocker) : 'Not open for approval.',

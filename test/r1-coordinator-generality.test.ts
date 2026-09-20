@@ -236,6 +236,7 @@ function projectEffective(world: CapturedWorld) {
 
 test('generality A: PROGRAMME domain via the real time-swap proposer yields a VIABLE, RECOMMENDED attempt', async () => {
   const { basis, unmetItemId } = programmeBasis();
+  let costSupplierCalls = 0;
   const out = await runRecoveryPlanning(basis, {
     domainRegistry: defaultRecoveryDomainRegistry(),
     availableCapabilities: ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'],
@@ -243,6 +244,10 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
     minters: minters(),
     coordinatorVersion: COORDINATOR_VERSION,
     comparatorVersion: COMPARATOR_VERSION,
+    costContextForCandidate: async () => {
+      costSupplierCalls += 1;
+      return undefined;
+    },
   });
 
   assert.equal(out.result.outcome, 'AWAITING_AUTHORITY');
@@ -260,6 +265,7 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
   assert.ok(rec!.reassessmentClosure!.reachedRefs.length > 0);
   assert.ok(rec!.outcomeDelta.some((d) => d.delta === 'BETTER'));
   assert.equal(rec!.costComparison, undefined, 'without a composed supplier Sarah/current planning retains its existing cost-free behavior');
+  assert.equal(costSupplierCalls, 0, 'a globally composed supplier does not add unavailable-cost warnings to programme-only candidates');
 });
 
 test('coordinator compares captured provider prices with dated FX and retains unavailable cost evidence', async () => {
@@ -322,6 +328,44 @@ test('coordinator compares captured provider prices with dated FX and retains un
   });
   assert.equal(out.completionHorizon, '2030-06-01T13:00:00.000Z');
   assert.equal(out.attempt.completedAt, out.completionHorizon, 'the immutable attempt cannot complete before its captured FX comparison');
+
+  const mismatchedHomeCurrencies = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(), availableCapabilities: ['FLIGHT', 'HOTEL'], minters: minters(),
+    coordinatorVersion: COORDINATOR_VERSION, comparatorVersion: COMPARATOR_VERSION,
+    proposers: [{ domain: 'PROGRAMME', proposer: {
+      id: 'test.cost-comparison', version: '1',
+      async propose(): Promise<ProposalCandidate[]> {
+        return offers.map((offer) => ({
+          key: offer.key,
+          effects: [
+            { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME' as const, programmeItemId: unmetItemId, proposedWindow: { start: LATE, end: '2030-06-02T16:00:00.000Z' } },
+            { effectKind: 'SELECT_OFFER' as const, journeyItemId: transportItemId, offerId: offer.offerId, offerPrice: offer.price },
+          ],
+          affectedSubjectRefs: [{ kind: 'PROGRAMME_ITEM' as const, id: unmetItemId }, { kind: 'JOURNEY_ITEM' as const, id: transportItemId }, { kind: 'JOURNEY' as const, id: journeyId }],
+          rationale: 'Use a captured viable transport offer.', assumptions: [],
+        }));
+      },
+    } }],
+    resolveOffersForDomain: () => offers.map((offer) => ({ offerId: offer.offerId, transportServiceId: offer.serviceId })),
+    costContextForCandidate: async ({ candidateKey }) => {
+      const homeCurrency = candidateKey === 'nz-low' ? 'JPY' : candidateKey === 'usd-mid' ? 'NZD' : 'KRW';
+      const baseCurrency = candidateKey === 'nz-low' ? 'NZD' : candidateKey === 'usd-mid' ? 'USD' : 'EUR';
+      return {
+        homeCurrency, comparedAt: '2030-06-01T13:00:00.000Z',
+        rates: [{ id: id(), baseCurrency, homeCurrency, rate: candidateKey === 'usd-mid' ? 1 : 100, sourceId: id(), authority: 'AUTHORITATIVE', observedAt: '2030-06-01T00:00:00.000Z' }],
+      };
+    },
+  });
+  assert.equal(
+    mismatchedHomeCurrencies.attempt.recommendation?.recommendedStrategyRef,
+    'strategy:eur-unknown',
+    'different home currencies omit numeric cost facts instead of comparing unrelated minor units',
+  );
+  assert.deepEqual(
+    new Set(mismatchedHomeCurrencies.attempt.materialCandidates
+      .flatMap((candidate) => candidate.costComparison?.status === 'AVAILABLE' ? [candidate.costComparison.homeCurrency] : [])),
+    new Set(['JPY', 'NZD', 'KRW']),
+  );
 });
 
 test('generality B: STAY domain via a different proposer + effect kind flows through the SAME coordinator', async () => {

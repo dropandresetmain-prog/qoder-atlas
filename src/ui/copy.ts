@@ -501,6 +501,8 @@ export const CASE_TOOL_FALLBACK = { checking: 'Researching options', unavailable
 export const CASE_EFFECT_PHRASE: Record<string, { title: string; generic: string }> = {
   CHANGE_PROGRAMME_ITEM_TIME: { title: 'Move {subject}', generic: 'Change a programme time' },
   SELECT_OFFER: { title: 'Rebook {subject}', generic: 'Book a replacement flight' },
+  ADD_JOURNEY_STAY: { title: 'Book accommodation for {subject}', generic: 'Book accommodation' },
+  CANCEL_STAY: { title: 'Cancel the existing stay for {subject}', generic: 'Cancel the existing stay' },
   PROPOSE_ALLOCATION: { title: 'Reserve space for {subject}', generic: 'Reserve a place on a replacement booking' },
   ALTER_JOURNEY_ITEM_INTENT: { title: 'Adjust {subject}', generic: 'Adjust part of the journey' },
   CHANGE_SUPPORT_ASSIGNMENT: { title: 'Reassign {subject}', generic: 'Reassign support cover' },
