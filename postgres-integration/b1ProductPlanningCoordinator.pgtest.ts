@@ -121,8 +121,16 @@ describe('B1 product planning coordinator (real PostgreSQL)', () => {
 
     const authority = await provisionWorkspaceAuthority({ pool, uow: () => app!.unitOfWork(), workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, now: NOW });
     assert.equal(authority.status, 'PROVISIONED', JSON.stringify(authority));
+    let preparationPublished = false;
     const planner = createRecoveryPlanningCoordinator({
       pool, workspaceId: seed.workspaceId, actorPrincipalId: seed.actorId, uow: () => app!.unitOfWork(), now: NOW,
+      preparePlanningContext: async () => {
+        if (!preparationPublished) {
+          await knowledge.coverage({ topic: 'ENTRY_REQUIREMENT', completeness: 'COMPLETE', jurisdictionId: host.jurisdictionId });
+          preparationPublished = true;
+        }
+        return {};
+      },
     });
     app.runtimeHooks = { executorPrincipalId: authority.principals.executor, planner };
 
@@ -141,6 +149,23 @@ describe('B1 product planning coordinator (real PostgreSQL)', () => {
     assert.equal(escalation.opened, 1, JSON.stringify(escalation));
     const caseId = escalation.outcomes.find((o) => o.caseId)!.caseId!;
 
+    // Entry preparation uses real knowledge commands. A changed manifest must
+    // produce an audit-only retry result, then wait for the normal worker.
+    const preparing = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies`, { now: NOW });
+    assert.equal(preparing.status, 200, JSON.stringify(preparing.json));
+    const preparingResult = (preparing.json as { result: RecoveryPlanningResult }).result;
+    assert.equal(preparingResult.outcome, 'STALE_RETRY_REQUIRED');
+    assert.deepEqual(preparingResult.viableStrategyRefs, []);
+    const retainedPreparation = await pool.query<{ outcome: string; viable_strategy_refs: unknown[] }>(
+      'SELECT outcome, viable_strategy_refs FROM recovery_planning_attempts WHERE workspace_id = $1 AND id = $2',
+      [seed.workspaceId, preparingResult.planningAttemptRef]);
+    assert.equal(retainedPreparation.rows[0]?.outcome, 'STALE_RETRY_REQUIRED');
+    assert.deepEqual(retainedPreparation.rows[0]?.viable_strategy_refs, []);
+    assert.equal(Number((await pool.query<{ n: string }>(
+      'SELECT count(*)::text AS n FROM recovery_strategies WHERE workspace_id = $1 AND recovery_case_id = $2',
+      [seed.workspaceId, caseId])).rows[0]!.n), 0, 'preparation cannot promote a recommendation against the old knowledge snapshot');
+    await drain();
+
     // --- POST /cases/:id/strategies returns 200 with { ok, result } shape
     const proposed = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies`, { now: NOW });
     assert.equal(proposed.status, 200, JSON.stringify(proposed.json));
@@ -151,6 +176,8 @@ describe('B1 product planning coordinator (real PostgreSQL)', () => {
     assert.equal(planningResult.outcome, 'AWAITING_AUTHORITY');
     assert.ok(planningResult.planningAttemptRef, 'planningAttemptRef is present');
     assert.ok(planningResult.basisAssessmentId, 'basisAssessmentId is present');
+    assert.notEqual(planningResult.basisAssessmentId, preparingResult.basisAssessmentId,
+      'planning resumes against the reassessed basis after knowledge publication');
     assert.ok(planningResult.viableStrategyRefs.length >= 1, 'at least one viable strategy');
 
     // --- planning evidence visible on the Case read model

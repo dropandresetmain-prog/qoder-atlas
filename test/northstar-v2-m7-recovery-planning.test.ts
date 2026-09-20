@@ -18,7 +18,7 @@ import { ScenarioChangeSchema, type ScenarioEffect } from '../src/contracts/v2/s
 import type { RecoveryStrategy } from '../src/contracts/v2/scenario/recoveryStrategy.ts';
 import { validateActionPlanAcyclic } from '../src/contracts/v2/action/actionPlan.ts';
 import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
-import { createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
+import { assessSubject, createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
 import { overnightEvaluator } from '../src/resolution/evaluation/evaluators/overnight.ts';
 import { entryEvaluator } from '../src/resolution/evaluation/evaluators/entry.ts';
 import { credentialsEvaluator } from '../src/resolution/evaluation/evaluators/credentials.ts';
@@ -1239,7 +1239,9 @@ test('transport planning adds a quoted hotel companion only for the real uncover
   });
   departure.selectedServiceId = onwardService.id;
   world.transportServices.push(onwardService);
-  const failing = [{ subject: { kind: 'JOURNEY' as const, id: journey.id }, assessment: {} as never }];
+  const subject = { kind: 'JOURNEY' as const, id: journey.id };
+  const failing = [{ subject, assessment: assessSubject({ registry: createM6Registry(), world,
+    effective: effectiveOf(world), subject, now: NOW, assessmentId: id() }).result }];
   const resolveAirport = (place: string) => place === originPlaceId ? { system: 'IATA', value: 'ORG' } : place === placeId ? { system: 'IATA', value: 'DST' } : undefined;
   const before = structuredClone(world);
   const planning = createHotelCompanionPlanning({
@@ -1425,6 +1427,18 @@ test('CANCEL_STAY retires only intent and an arrival-aligned replacement is requ
   wrongAllocation.allocations[0]!.travellerId = id();
   const wrongTraveller = applyScenarioOverlay({ baseWorld: wrongAllocation, scenarioChange: change([cancel]) });
   assert.equal(wrongTraveller.ok, false, 'line allocation must belong to the Journey traveller');
+  for (const status of ['CANCELLED', 'FULFILLED', 'UNKNOWN'] as const) {
+    const inactive = structuredClone(world);
+    inactive.reservationLines[0]!.observedStatus = status;
+    assert.equal(applyScenarioOverlay({ baseWorld: inactive, scenarioChange: change([cancel]) }).ok, false,
+      'terminal or unknown supplier line cannot become a new cancellation proposal');
+  }
+  for (const status of ['CANCELLED', 'COMPLETED', 'UNKNOWN'] as const) {
+    const inactive = structuredClone(world);
+    inactive.reservations[0]!.observedStatus = status;
+    assert.equal(applyScenarioOverlay({ baseWorld: inactive, scenarioChange: change([cancel]) }).ok, false,
+      'terminal or unknown reservation must be reconciled before cancellation planning');
+  }
 
   const strategy: RecoveryStrategy = {
     id: id(), recoveryCaseId: id(), strategyVersion: 1, status: 'EVALUATED', basisAssessmentId: id(),

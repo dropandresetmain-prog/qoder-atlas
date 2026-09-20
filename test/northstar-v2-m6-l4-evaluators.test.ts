@@ -4,6 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { ReviewedEntryPolicySchema } from '../src/resolution/planning/reviewedEntryEvidence.ts';
 import { emptyWorld, effectiveOf, id } from './support/m6World.ts';
 import type {
   WCoverage, WCredential, WCredentialSelection, WCredentialVersion,
@@ -19,6 +21,26 @@ import { deriveEncounters, kleeneAll, kleeneAny, kleeneNot, type Encounter } fro
 import { evaluateRuleExpression, type PredicateContext } from '../src/resolution/evaluation/entryPredicates.ts';
 
 const NOW = '2030-01-01T00:00:00.000Z';
+
+test('configured short landside policy uses captured passport, purpose, duration and exit validity', () => {
+  const policies = JSON.parse(readFileSync(new URL('../data/ait-demo-input-pack/global/reviewed-entry-policies.json', import.meta.url), 'utf8'));
+  const policy = ReviewedEntryPolicySchema.parse(policies[0]);
+  const travellerId = id();
+  const journeyId = id();
+  const passport = passportCredential(travellerId, { issuingStateCode: 'SG', expiryDate: '2026-09-30' });
+  const selection = selectionRow(journeyId, passport.credential.id, passport.version.id, ['visit-1']);
+  const world = emptyWorld({ credentials: [passport.credential], credentialVersions: [passport.version] });
+  const encounter = baseEncounter({ at: '2026-09-29T15:00:00+09:00', exit: '2026-09-30T11:00:00+09:00',
+    purpose: 'transit_overnight', stayDays: 1, selections: [selection] });
+  const evaluate = (over: Partial<Encounter> = {}) => evaluateRuleExpression(policy.expression,
+    { ...ctxWith(world, journeyId, travellerId, { ...encounter, ...over }), now: '2026-09-20T00:00:00+08:00' }).status;
+  assert.equal(evaluate(), 'PASS', 'passport valid through departure suffices; no invented six-month Japanese entry rule');
+  assert.equal(evaluate({ selections: [] }), 'UNKNOWN', 'profile nationality cannot substitute for a selected passport');
+  assert.equal(evaluate({ stayDays: 91 }), 'FAIL');
+  assert.equal(evaluate({ purpose: 'employment' }), 'FAIL');
+  passport.version.expiryDate = '2026-09-28';
+  assert.equal(evaluate(), 'FAIL');
+});
 
 function subjectOf(journeyId: string): TypedRef {
   return { kind: 'JOURNEY', id: journeyId };

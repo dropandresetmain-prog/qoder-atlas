@@ -34,7 +34,7 @@ import type { TypedRef, SubjectId } from '../../domain/v2/shared/identity.ts';
 import type { ApplicationError } from '../../contracts/v2/product/readModels.ts';
 import type { CapturedWorld } from '../../resolution/world/world.ts';
 import type { EffectiveWorld } from '../../resolution/world/effectiveTypes.ts';
-import type { CurrentState } from '../../resolution/world/currentness.ts';
+import { assessManifestCurrentness, type CurrentState } from '../../resolution/world/currentness.ts';
 import type { EvaluatorRegistry } from '../../resolution/evaluation/assess.ts';
 import { RecoveryPlanningAttemptSchema } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type {
@@ -42,6 +42,7 @@ import type {
   RecoveryPlanningInput,
   RecoveryPlanningResult,
   PlanningModelActivity,
+  PlanningEvidenceRecord,
 } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import type { RecoveryDomainId } from '../../contracts/v2/planning/recoveryDomain.ts';
 import type { StrategyProposer } from '../../resolution/planning/proposer.ts';
@@ -49,7 +50,7 @@ import type { CapabilityFamily } from '../../operational/strategy.ts';
 import type { PlanningToolTransport } from '../../resolution/planning/researchDispatcher.ts';
 import { captureWorld, PgCurrentStateReader } from '../../persistence/postgres/world/pgCurrentState.ts';
 import { currentAssessmentView } from '../../persistence/postgres/world/pgAssessments.ts';
-import { persistRecoveryPlanningCompletion } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
+import { persistRecoveryPlanningAttempt, persistRecoveryPlanningCompletion } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { createM6Registry } from '../../resolution/evaluation/registry.ts';
 import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary.ts';
 import { unmetProgrammeItems, type FailingSubject } from '../../resolution/planning/proposer.ts';
@@ -136,6 +137,21 @@ export interface RecoveryPlanningCoordinatorDeps {
    */
   hotelPlanning?: HotelPlanningOptions;
   /**
+   * Bounded entry/property evidence preparation, shared by HTTP and progression.
+   * Publication uses the existing knowledge commands outside the pure planner.
+   * Its results are recaptured; a stale assessment waits for normal reassessment.
+   */
+  preparePlanningContext?: (input: {
+    recoveryCaseId: string;
+    now: string;
+    world: CapturedWorld;
+    failing: readonly FailingSubject[];
+  }) => Promise<{
+    additionalPlaceIds?: readonly string[];
+    hotelPlanning?: HotelPlanningOptions;
+    evidence?: readonly PlanningEvidenceRecord[];
+  }>;
+  /**
    * Optional Model Studio / Qwen client for hybrid domain suggestion.
    * Suggestions are registry-validated fail-closed; absence is honest (no AI).
    */
@@ -203,7 +219,7 @@ export async function loadFailingCaseSubjects(pool: Pool, workspaceId: string, c
   return failing;
 }
 
-async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseId: string, now: string): Promise<BasisCapture | undefined> {
+async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseId: string, now: string, additionalPlaceIds: readonly string[] = []): Promise<BasisCapture | undefined> {
   const failing = await loadFailingCaseSubjects(deps.pool, deps.workspaceId, caseId, now);
   if (failing.length === 0) return undefined;
 
@@ -216,7 +232,8 @@ async function capturePlanningBasis(deps: RecoveryPlanningCoordinatorDeps, caseI
   const registry = createM6Registry();
   const world = await captureWorld(deps.pool, {
     workspaceId: deps.workspaceId,
-    focus: [...failing.map((f) => f.subject), ...programmeRefs],
+    focus: [...failing.map((f) => f.subject), ...programmeRefs,
+      ...additionalPlaceIds.map((id): TypedRef => ({ kind: 'PLACE', id }))],
     at: now,
     informationTopics: registry.informationTopics,
   });
@@ -267,7 +284,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       if (!status) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.recoveryCaseId} does not exist`) };
       if (TERMINAL.has(status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.recoveryCaseId} is ${status}`) };
 
-      const basis = await capturePlanningBasis(deps, input.recoveryCaseId, now);
+      let basis = await capturePlanningBasis(deps, input.recoveryCaseId, now);
       if (!basis) {
         // No currently-failing subject: nothing to plan. This is an honest empty
         // result, not an error — the case simply has no recovery basis right now.
@@ -281,6 +298,39 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
             outcome: 'NO_RECOVERY_FOUND',
           },
         };
+      }
+
+      let prepared: Awaited<ReturnType<NonNullable<RecoveryPlanningCoordinatorDeps['preparePlanningContext']>>> | undefined;
+      if (deps.preparePlanningContext) {
+        const originalBasis = basis;
+        prepared = await deps.preparePlanningContext({ recoveryCaseId: input.recoveryCaseId, now, world: basis.world, failing: basis.failing });
+        const preparationCompletedAt = deps.completionClock?.() ?? new Date().toISOString();
+        const current = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, originalBasis.world.manifest);
+        const recaptured = await capturePlanningBasis(deps, input.recoveryCaseId, now, prepared.additionalPlaceIds);
+        if (!recaptured || recaptured.basisAssessmentId !== originalBasis.basisAssessmentId
+          || !assessManifestCurrentness(originalBasis.world.manifest, current, now).current) {
+          // Retain truthful preparation evidence against the superseded basis.
+          // This audit command promotes no strategy and does not bypass the
+          // completion command's pending-reassessment/currentness checks.
+          const attempt = RecoveryPlanningAttemptSchema.parse({
+            id: planningMinters(deps, input.recoveryCaseId, originalBasis.basisAssessmentId, now, 1).attemptId,
+            recoveryCaseId: input.recoveryCaseId, basisAssessmentId: originalBasis.basisAssessmentId,
+            basisManifest: originalBasis.world.manifest, startedAt: now,
+            completedAt: completedAtAfterEvidence(preparationCompletedAt, [],
+              (prepared.evidence ?? []).flatMap((evidence) => evidence.provenance.observedAt ? [evidence.provenance.observedAt] : []), now),
+            coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
+            evidence: prepared.evidence ?? [],
+          });
+          const retained = await persistRecoveryPlanningAttempt(deps.uow(), {
+            workspaceId: deps.workspaceId, actorPrincipalId: deps.actorPrincipalId,
+            idempotencyKey: `planning:preparation:${input.recoveryCaseId}:${originalBasis.basisAssessmentId}`,
+            attempt, outcome: 'STALE_RETRY_REQUIRED',
+          });
+          if (!retained.ok) return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `planning preparation: ${retained.conflict.kind}`) };
+          return { ok: true, result: { planningAttemptRef: retained.value.attemptId as SubjectId,
+            basisAssessmentId: originalBasis.basisAssessmentId as SubjectId, viableStrategyRefs: [], outcome: 'STALE_RETRY_REQUIRED' } };
+        }
+        basis = recaptured;
       }
 
       const baseStrategyVersion = await nextStrategyVersion(deps.pool, deps.workspaceId, input.recoveryCaseId);
@@ -298,7 +348,8 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           ? { passengersFor: transportPlanning.passengersFor, ...(transportPlanning.passengers ? { passengers: transportPlanning.passengers } : {}) }
           : { passengers: transportPlanning.passengers! })
         : undefined;
-      const hotelCompanionPlanning = transportPlanning && deps.hotelPlanning
+      const hotelPlanning = prepared?.hotelPlanning ?? deps.hotelPlanning;
+      const hotelCompanionPlanning = transportPlanning && hotelPlanning
         ? createHotelCompanionPlanning({
             world: basis.world,
             failing: basis.failing,
@@ -306,7 +357,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
             resolveAirport: resolveAirport!,
             ...passengerSource!,
             ...(transportPlanning.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
-            hotel: deps.hotelPlanning,
+            hotel: hotelPlanning,
           })
         : undefined;
       const proposers = [...(deps.proposers ?? defaultDomainProposers())];
@@ -440,6 +491,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       const assembledAt = deps.completionClock?.() ?? new Date().toISOString();
       const attempt = RecoveryPlanningAttemptSchema.parse({
         ...core.attempt,
+        evidence: [...(prepared?.evidence ?? []), ...core.attempt.evidence],
         modelActivities,
         // The deterministic planning basis time remains `now`; the durable
         // evidence horizon is the actual assembly time, never before any model
@@ -447,7 +499,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         completedAt: completedAtAfterEvidence(
           core.attempt.completedAt,
           modelActivities,
-          core.attempt.evidence.flatMap((evidence) => evidence.provenance.observedAt ? [evidence.provenance.observedAt] : []),
+          [...(prepared?.evidence ?? []), ...core.attempt.evidence].flatMap((evidence) => evidence.provenance.observedAt ? [evidence.provenance.observedAt] : []),
           assembledAt,
         ),
       });

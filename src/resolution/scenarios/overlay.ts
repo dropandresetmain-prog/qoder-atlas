@@ -344,6 +344,12 @@ function applyEffect(
           { kind: 'RESERVATION_LINE', id: effect.reservationLineId },
         ]));
       }
+      if (!['HELD', 'CONFIRMED'].includes(line.observedStatus)
+        || !['HELD', 'CONFIRMED'].includes(reservation.observedStatus ?? 'UNKNOWN')) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY requires an observed active stay; unknown or terminal supplier state must be reconciled first', [
+          { kind: 'RESERVATION', id: reservation.id }, { kind: 'RESERVATION_LINE', id: line.id },
+        ]));
+      }
       const penalty = ExactMoneySchema.safeParse(effect.cancellationPenalty);
       if (!penalty.success) {
         return conflict(typedConflict('VALIDATION_FAILED', 'CANCEL_STAY penalty is not exact money', [{ kind: 'RESERVATION_LINE', id: line.id }]));

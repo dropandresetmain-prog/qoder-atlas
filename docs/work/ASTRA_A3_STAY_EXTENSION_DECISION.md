@@ -261,3 +261,38 @@ TRAVEL markers in PostgreSQL, under sandbox-only guards and a supplied key. No p
 passport custody, document UI, key-management platform or arbitrary plaintext ingestion.
 Park all expansion beyond required evaluator/provisioner inputs. The hard scope lock in
 ASTRA_HERO_DEPTH_SCOPE.md governs remaining Singapore cancellation/rebooking and FX work.
+
+## Research publication and current planning basis
+
+**WHAT WE KNOW:** the normal coordinator captures its basis before research. Publishing
+entry rules afterward can invalidate that basis. Both HTTP and lifecycle already share
+one coordinator. Explicit PLACE focus previously omitted an alternative hotel's geography.
+**WHAT WE DO NOT KNOW:** the final LIVE composite recommendation and provider outcomes.
+**KEY ASSUMPTION:** use a bounded preparation callback on the existing coordinator, then
+recapture canonical state. Preserve the current lifecycle's reassessment ownership.
+**WHAT SHOULD BE TESTED NEXT:** compose the source/property context resolver at normal boot,
+then generate the actual flight + overnight + destination replacement recommendation.
+
+Act Now: preparation evidence is retained. If it changes the captured basis, the existing
+audit command records STALE_RETRY_REQUIRED with no viable strategy, and normal reassessment
+must settle before planning resumes. The focused HTTP/PG test proves this sequence (1/1).
+No canonical knowledge publication is placed inside the pure planner or scenario overlay.
+Candidate hotel PLACE focus uses existing workspace-filtered geography and manifest reads.
+
+Act Now: the configured Japan short-visit policy is a bounded reviewer interpretation of
+the MOFA visa-exemption page and Embassy of Japan Singapore visa FAQ, reviewed 20 September
+2026. Singapore passport eligibility, temporary overnight purpose, at most90 days and
+passport validity through departure use existing deterministic predicates. The artifact's
+window limits this review's use; it does not claim that laws are guaranteed unchanged until
+its end. Exact source hashes and observations no older than24 hours are still required.
+Carrier boarding requirements and individual admission remain distinct from this verdict.
+
+Act Now: retain existing protected ordering for displaced accommodation: replacement
+confirmed before old booking cancellation. Both transactions remain mandatory for the
+selected hero, and failed/unknown cancellation retains duplicate exposure and unresolved
+recovery. Cancellation penalty is a policy estimate, never a fabricated observed charge.
+Unknown or terminal supplier state requires reconciliation before a new cancel proposal.
+
+Park for Later: date-shopping breadth, general hotel operations and credential administration.
+The next-local-day search is enabled only by actual connection-failure evidence; ordinary
+programme recovery retains its existing search scope. No new scenario/application switches.
