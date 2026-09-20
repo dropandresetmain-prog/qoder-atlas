@@ -236,6 +236,7 @@ function projectEffective(world: CapturedWorld) {
 
 test('generality A: PROGRAMME domain via the real time-swap proposer yields a VIABLE, RECOMMENDED attempt', async () => {
   const { basis, unmetItemId } = programmeBasis();
+  let costSupplierCalls = 0;
   const out = await runRecoveryPlanning(basis, {
     domainRegistry: defaultRecoveryDomainRegistry(),
     availableCapabilities: ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'],
@@ -243,6 +244,10 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
     minters: minters(),
     coordinatorVersion: COORDINATOR_VERSION,
     comparatorVersion: COMPARATOR_VERSION,
+    costContextForCandidate: async () => {
+      costSupplierCalls += 1;
+      return undefined;
+    },
   });
 
   assert.equal(out.result.outcome, 'AWAITING_AUTHORITY');
@@ -260,6 +265,7 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
   assert.ok(rec!.reassessmentClosure!.reachedRefs.length > 0);
   assert.ok(rec!.outcomeDelta.some((d) => d.delta === 'BETTER'));
   assert.equal(rec!.costComparison, undefined, 'without a composed supplier Sarah/current planning retains its existing cost-free behavior');
+  assert.equal(costSupplierCalls, 0, 'a globally composed supplier does not add unavailable-cost warnings to programme-only candidates');
 });
 
 test('coordinator compares captured provider prices with dated FX and retains unavailable cost evidence', async () => {

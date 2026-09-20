@@ -507,12 +507,12 @@ describe('Case cost and composite-stay evidence', () => {
     } as unknown as Partial<RecoveryCaseView>);
     const model = presentCaseWorkspace(view);
     assert.deepEqual(model.recommended?.changes.map((line) => line.phrase), [
-      'Rebook Replacement flight', 'Arrange overnight accommodation', 'Cancel the existing stay for Existing destination stay', 'Book a replacement stay',
+      'Rebook Replacement flight', 'Book accommodation for Overnight hotel', 'Cancel the existing stay for Existing destination stay', 'Book accommodation for Destination stay',
     ]);
     assert.equal(model.recommended?.costEvidence?.total, 'Compared total: USD 418.75');
     assert.ok(model.recommended?.costEvidence?.lines.some((line) => line.includes('AED 620.00')));
     assert.ok(model.recommended?.costEvidence?.lines.some((line) => line.includes('JPY 34000')));
-    assert.ok(model.recommended?.costEvidence?.rates.some((line) => line.includes('Frankfurter: AED to USD at 0.27218')));
+    assert.ok(model.recommended?.costEvidence?.rates.some((line) => line.includes('Frankfurter: AED to USD at 0.27218; reference dated')));
     assert.match(model.alternatives[0]!.costEvidence?.uncertainty ?? '', /could not be compared/);
     const visible = primaryVisibleText(renderProductRecoveryCase(view));
     assert.match(visible, /Compared total: USD 418.75/);
@@ -524,6 +524,17 @@ describe('Case cost and composite-stay evidence', () => {
   test('a strategy with no planning cost evidence keeps the current Sarah-compatible display', () => {
     const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [composite('strategy-no-cost', 1)] } as Partial<RecoveryCaseView>));
     assert.equal(model.recommended?.costEvidence, undefined);
+  });
+
+  test('permuting typed stay effects leaves every accommodation line generic', () => {
+    const strategy = composite('strategy-permuted', 1);
+    const permuted = { ...strategy, changes: [strategy.changes[3]!, strategy.changes[2]!, strategy.changes[1]!, strategy.changes[0]!] } as RecoveryStrategyView;
+    const model = presentCaseWorkspace(caseView({ status: 'AWAITING_AUTHORITY', strategies: [permuted] } as Partial<RecoveryCaseView>));
+    const phrases = model.recommended!.changes.map((line) => line.phrase);
+    assert.ok(phrases.includes('Book accommodation for Destination stay'));
+    assert.ok(phrases.includes('Book accommodation for Overnight hotel'));
+    assert.ok(!phrases.includes('Arrange overnight accommodation'));
+    assert.ok(!phrases.includes('Book a replacement stay'));
   });
 });
 

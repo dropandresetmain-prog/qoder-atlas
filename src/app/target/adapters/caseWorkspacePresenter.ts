@@ -17,7 +17,6 @@
 import type {
   RecoveryActionView,
   RecoveryCaseView,
-  PlanningCostComparisonView,
   PlanningModelActivityView,
   RecoveryStrategyView,
 } from '../../../contracts/v2/product/readModels.ts';
@@ -369,28 +368,6 @@ function changeLine(view: RecoveryCaseView, change: RecoveryStrategyView['change
   };
 }
 
-/**
- * Typed stay effects are enough to make a cancellation/replacement sequence
- * clear without attaching a scenario, supplier, or route-specific meaning.
- */
-function compositeChangeLines(view: RecoveryCaseView, strategy: RecoveryStrategyView): CaseChangeLine[] {
-  const lines = strategy.changes.map((change) => changeLine(view, change));
-  const addStayIndexes = strategy.changes
-    .map((change, index) => change.effectKind === 'ADD_JOURNEY_STAY' ? index : -1)
-    .filter((index) => index >= 0);
-  if (addStayIndexes.length > 0 && strategy.changes.some((change) => change.effectKind === 'CANCEL_STAY')) {
-    const replacementIndex = addStayIndexes[addStayIndexes.length - 1]!;
-    const current = lines[replacementIndex]!;
-    lines[replacementIndex] = { ...current, phrase: 'Book a replacement stay' };
-    for (const index of addStayIndexes.slice(0, -1)) {
-      lines[index] = { ...lines[index]!, phrase: 'Arrange overnight accommodation' };
-    }
-  } else {
-    for (const index of addStayIndexes) lines[index] = { ...lines[index]!, phrase: 'Arrange overnight accommodation' };
-  }
-  return lines;
-}
-
 function optionTitle(
   view: RecoveryCaseView,
   strategy: RecoveryStrategyView,
@@ -484,7 +461,7 @@ function costSourceLabel(source: { label: string; code?: string }): string {
 
 function costEvidenceForStrategy(view: RecoveryCaseView, strategy: RecoveryStrategyView): CaseCostEvidenceModel | undefined {
   const candidate = view.planningEvidence?.candidates.find((entry) =>
-    entry.strategyRef === strategy.strategyRef || entry.strategyRef?.endsWith(strategy.strategyRef));
+    entry.strategyRef === strategy.strategyRef);
   const comparison = candidate?.costComparison;
   if (!comparison) return undefined;
   if (comparison.status === 'UNAVAILABLE') {
@@ -500,13 +477,13 @@ function costEvidenceForStrategy(view: RecoveryCaseView, strategy: RecoveryStrat
       `${line.kind.label}: ${formatExactMoney(line.providerAmount)} → ${formatExactMoney(line.homeAmount)}${line.observed ? ' (observed)' : ' (quoted or estimated)'}.`),
     rates: comparison.selectedFxEvidence.map((fx) => {
       const validUntil = fx.validUntil ? `; valid until ${formatCaseWindowInstant(fx.validUntil)}` : '';
-      return `${costSourceLabel(fx.source)}: ${fx.baseCurrency} to ${fx.homeCurrency} at ${fx.rate}; checked ${formatCaseWindowInstant(fx.observedAt)}${validUntil}.`;
+      return `${costSourceLabel(fx.source)}: ${fx.baseCurrency} to ${fx.homeCurrency} at ${fx.rate}; reference dated ${formatCaseWindowInstant(fx.observedAt)}${validUntil}.`;
     }),
   };
 }
 
 function buildOption(view: RecoveryCaseView, strategy: RecoveryStrategyView, terminal: boolean): CaseOptionModel {
-  const changes = compositeChangeLines(view, strategy);
+  const changes = strategy.changes.map((change) => changeLine(view, change));
   const costEvidence = costEvidenceForStrategy(view, strategy);
   const costLine = costEvidence?.total ?? strategyCostLine(view, strategy);
   const people = [...new Set(strategy.resolves.map((r) => plain(r.personLabel)).filter((n): n is string => n !== undefined))];

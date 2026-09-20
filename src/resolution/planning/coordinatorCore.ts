@@ -236,6 +236,14 @@ interface EvaluatedCandidate {
   costComparison?: MaterialCandidateCostComparison;
 }
 
+/** Only effects with externally priced or policy-cost terms need comparison evidence. */
+function hasComparableCostEffect(effects: readonly ScenarioEffect[]): boolean {
+  return effects.some((effect) =>
+    effect.effectKind === 'SELECT_OFFER'
+    || effect.effectKind === 'ADD_JOURNEY_STAY'
+    || effect.effectKind === 'CANCEL_STAY');
+}
+
 function unavailableCost(code: 'CONTEXT_UNAVAILABLE' | 'MISSING_RATE_EVIDENCE', reason: string, comparedAt: Instant): MaterialCandidateCostComparison {
   return MaterialCandidateCostComparisonSchema.parse({ status: 'UNAVAILABLE', code, reason, comparedAt });
 }
@@ -483,6 +491,7 @@ export async function runRecoveryPlanning(
   // the RC-6 result already recorded above.
   if (deps.costContextForCandidate) {
     for (const candidate of evaluated) {
+      if (!hasComparableCostEffect(candidate.result.strategy.scenarioChange.effects)) continue;
       candidate.costComparison = await costComparisonForCandidate({
         candidate,
         basis,
