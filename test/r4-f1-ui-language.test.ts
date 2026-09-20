@@ -606,6 +606,24 @@ describe('Case cost and composite-stay evidence', () => {
     assert.doesNotMatch(text, /2031-09-17T04:55/);
     assert.match(text, /Time available: 30 min; Time required: 150 min/);
   });
+
+  test('a durable no-recovery outcome is presented as terminal planning', () => {
+    const view = caseView({
+      status: 'PLANNING',
+      planningEvidence: {
+        phase: 'DECISION_TIME', asOf: generatedAt, attemptRef: 'attempt-no-recovery', coordinatorVersion: 'test',
+        outcome: { label: 'No safe recovery found', code: 'NO_RECOVERY_FOUND' }, domains: [], tools: [], modelActivities: [], viableStrategies: [], candidates: [],
+      },
+    } as Partial<RecoveryCaseView>);
+    const model = presentCaseWorkspace(view);
+    assert.equal(model.phase, 'no_plan');
+    assert.equal(model.activity.title, 'What NORTHSTAR did');
+    assert.ok(model.activity.rows.every((row) => row.state !== 'doing' && row.state !== 'queued'));
+    const text = primaryVisibleText(renderProductRecoveryCase(view));
+    assert.match(text, /No safe automatic fix yet/);
+    assert.doesNotMatch(text, /Finding a recovery|Checking the trip|Re-checking the whole trip/);
+    assert.match(text, /Hand off to a person/);
+  });
 });
 
 test('Decisions preserves waiting now and renders recent approval history with case navigation', () => {

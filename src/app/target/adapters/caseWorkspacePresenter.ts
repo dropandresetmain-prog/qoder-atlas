@@ -304,13 +304,14 @@ function viableStrategies(view: RecoveryCaseView): RecoveryStrategyView[] {
 }
 
 function derivePhase(view: RecoveryCaseView): CasePhase {
+  const planningOutcome = view.planningEvidence?.outcome.code;
   switch (view.status) {
     case 'RESOLVED': return 'recovered';
     case 'CLOSED':
     case 'CANCELLED':
     case 'SUPERSEDED': return 'closed';
     case 'EXECUTING': return 'executing';
-    case 'PLANNING': return 'investigating';
+    case 'PLANNING': return planningOutcome === 'NO_RECOVERY_FOUND' ? 'no_plan' : 'investigating';
     case 'AWAITING_AUTHORITY': return viableStrategies(view).length > 0 ? 'awaiting_approval' : 'no_plan';
     case 'OPEN': {
       if (viableStrategies(view).length > 0) return 'awaiting_approval';
