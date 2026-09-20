@@ -114,6 +114,56 @@ async function programmeOwnership(pool: Pool, workspaceId: string, plan: Recover
   return new Map(rows.rows.map((r) => [r.id, r.programme_id]));
 }
 
+/**
+ * Capture the owner and itinerary position of every existing item used by a
+ * selected effect. The compiler uses this only for deterministic ordering; it
+ * never derives a Journey from a provider name or candidate text.
+ */
+async function journeyItemOwnership(pool: Pool, workspaceId: string, plan: RecoveryStrategy): Promise<Map<string, { journeyId: string; orderKey: string }>> {
+  const itemIds = plan.scenarioChange.effects.flatMap((effect) => {
+    if (effect.effectKind === 'SELECT_OFFER' || effect.effectKind === 'CANCEL_STAY' || effect.effectKind === 'ALTER_JOURNEY_ITEM_INTENT') return [effect.journeyItemId];
+    return [];
+  });
+  if (itemIds.length === 0) return new Map();
+  const rows = await pool.query<{ id: string; journey_id: string; order_key: string }>(
+    `SELECT id, journey_id, order_key FROM journey_items
+      WHERE workspace_id = $1 AND id = ANY($2::uuid[])`,
+    [workspaceId, [...new Set(itemIds)]],
+  );
+  return new Map(rows.rows.map((row) => [row.id, { journeyId: row.journey_id, orderKey: row.order_key }]));
+}
+
+/** Exact canonical ownership for each supplier line that an approved effect retires. */
+async function stayCancellationOwnership(
+  pool: Pool, workspaceId: string, plan: RecoveryStrategy,
+): Promise<Map<string, { journeyId: string; reservationId: string; orderKey: string }>> {
+  const lines = plan.scenarioChange.effects.flatMap((effect) => effect.effectKind === 'CANCEL_STAY' ? [effect] : []);
+  if (lines.length === 0) return new Map();
+  const requested = new Map(lines.map((effect) => [effect.reservationLineId, effect.journeyItemId]));
+  const rows = await pool.query<{ line_id: string; journey_id: string; reservation_id: string; order_key: string }>(
+    `SELECT a.line_id, ji.journey_id, a.reservation_id, ji.order_key
+       FROM allocations a
+       JOIN journey_items ji ON ji.workspace_id = a.workspace_id AND ji.id = a.journey_item_id
+      WHERE a.workspace_id = $1 AND a.line_id = ANY($2::uuid[])
+        AND a.journey_item_id = ANY($3::uuid[])`,
+    [workspaceId, [...requested.keys()], [...new Set(requested.values())]],
+  );
+  const grouped = new Map<string, typeof rows.rows>();
+  for (const row of rows.rows) grouped.set(row.line_id, [...(grouped.get(row.line_id) ?? []), row]);
+  const owners = new Map<string, { journeyId: string; reservationId: string; orderKey: string }>();
+  for (const [lineId, itemId] of requested) {
+    const matches = (grouped.get(lineId) ?? []).filter((row) => row.order_key.length > 0);
+    if (matches.length !== 1) continue;
+    const match = matches[0]!;
+    owners.set(lineId, { journeyId: match.journey_id, reservationId: match.reservation_id, orderKey: match.order_key });
+    // The query's item constraint makes the relationship explicit; retaining
+    // the map only for a unique result prevents ambiguous allocation topology
+    // from becoming executable ownership.
+    void itemId;
+  }
+  return owners;
+}
+
 
 /**
  * R4-F2 truthful preflight: an option that can never execute must be refused
@@ -243,6 +293,8 @@ export async function approveRecoveryStrategy(
       actionPlanId: deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `${strategy.id}|plan`),
       ...(ctx.externalCapabilities ? { capabilities: ctx.externalCapabilities } : {}),
       programmeItemOwnership: await programmeOwnership(ctx.pool, ctx.workspaceId, strategy),
+      stayCancellationOwnership: await stayCancellationOwnership(ctx.pool, ctx.workspaceId, strategy),
+      journeyItemOwnership: await journeyItemOwnership(ctx.pool, ctx.workspaceId, strategy),
     });
     if (!compiled.ok) {
       const code = compiled.conflict.kind === 'STALE_AGGREGATE_REVISION' ? 'STRATEGY_BASE_STALE' : 'PLAN_COMPILE_FAILED';

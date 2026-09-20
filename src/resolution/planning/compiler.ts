@@ -52,7 +52,9 @@ export interface CompileActionPlanInput {
    * caller's authoritative world capture; the compiler never guesses it from
    * an unrelated manifest read.
    */
-  stayCancellationOwnership?: ReadonlyMap<string, { journeyId: string; reservationId: string }>;
+  stayCancellationOwnership?: ReadonlyMap<string, { journeyId: string; reservationId: string; orderKey?: string }>;
+  /** Authoritative owner of existing JourneyItems selected by transport effects. */
+  journeyItemOwnership?: ReadonlyMap<string, { journeyId: string; orderKey: string }>;
 }
 
 export interface CompileActionPlanResult {
@@ -109,12 +111,14 @@ function intentForEffect(
   effect: ScenarioEffect,
   index: number,
   ownership: ReadonlyMap<string, string> | undefined,
-  stayCancellationOwnership: ReadonlyMap<string, { journeyId: string; reservationId: string }> | undefined,
+  stayCancellationOwnership: ReadonlyMap<string, { journeyId: string; reservationId: string; orderKey?: string }> | undefined,
 ): TypedResult<ActionIntent> {
   const id = randomUUID();
   const base = {
     id,
     actionPlanId: planId,
+    sourceEffectIndex: index,
+    sourceEffectFingerprint: fingerprint(effect),
     status: 'PROPOSED' as const,
     compensationPolicy: { supported: false, requiresSeparateAuthority: true },
   };
@@ -328,7 +332,9 @@ function defaultDependencies(
   effects: ScenarioEffect[],
   ownership: ReadonlyMap<string, string> | undefined,
   strategy: RecoveryStrategy,
-): ActionDependency[] {
+  stayCancellationOwnership: ReadonlyMap<string, { journeyId: string; reservationId: string; orderKey?: string }> | undefined,
+  journeyItemOwnership: ReadonlyMap<string, { journeyId: string; orderKey: string }> | undefined,
+): TypedResult<ActionDependency[]> {
   const byEffect = intents.map((intent, i) => ({ intent, effect: effects[i]! }));
   const deps: ActionDependency[] = [];
   const select = byEffect.filter((x) => x.effect.effectKind === 'SELECT_OFFER');
@@ -376,7 +382,78 @@ function defaultDependencies(
       });
     }
   }
-  return deps;
+  // A selected transport effect is a prerequisite for candidate stays in the
+  // same Journey. Ownership comes only from the authoritative capture supplied
+  // by the application adapter; a missing owner cannot be guessed.
+  const stays = byEffect.filter((x) => x.effect.effectKind === 'ADD_JOURNEY_STAY');
+  for (const stay of stays) {
+    if (stay.effect.effectKind !== 'ADD_JOURNEY_STAY') continue;
+    for (const selected of select) {
+      if (selected.effect.effectKind !== 'SELECT_OFFER') continue;
+      const selectedOwner = journeyItemOwnership?.get(selected.effect.journeyItemId);
+      if (!selectedOwner) {
+        return conflict(typedConflict('STALE_AGGREGATE_REVISION', 'SELECT_OFFER requires captured Journey ownership for selected-plan dependency ordering', [{ kind: 'JOURNEY_ITEM', id: selected.effect.journeyItemId }]));
+      }
+      if (selectedOwner.journeyId === stay.effect.journeyId) {
+        deps.push({ fromActionIntentId: selected.intent.id, toActionIntentId: stay.intent.id });
+      }
+    }
+  }
+
+  // New stays within one Journey are ordered by their authoritative itinerary
+  // order keys. Ambiguous keys fail closed instead of depending on proposal
+  // array order.
+  const staysByJourney = new Map<string, typeof stays>();
+  for (const stay of stays) {
+    if (stay.effect.effectKind !== 'ADD_JOURNEY_STAY') continue;
+    const group = staysByJourney.get(stay.effect.journeyId) ?? [];
+    group.push(stay);
+    staysByJourney.set(stay.effect.journeyId, group);
+  }
+  for (const group of staysByJourney.values()) {
+    const ordered = [...group].sort((a, b) => {
+      const left = a.effect.effectKind === 'ADD_JOURNEY_STAY' ? a.effect.orderKey : '';
+      const right = b.effect.effectKind === 'ADD_JOURNEY_STAY' ? b.effect.orderKey : '';
+      return left.localeCompare(right);
+    });
+    for (let i = 1; i < ordered.length; i += 1) {
+      const previous = ordered[i - 1]!;
+      const next = ordered[i]!;
+      if (previous.effect.effectKind !== 'ADD_JOURNEY_STAY' || next.effect.effectKind !== 'ADD_JOURNEY_STAY') continue;
+      if (previous.effect.orderKey === next.effect.orderKey) {
+        return conflict(typedConflict('VALIDATION_FAILED', 'multiple selected stays have the same authoritative itinerary order key'));
+      }
+      deps.push({ fromActionIntentId: previous.intent.id, toActionIntentId: next.intent.id });
+    }
+  }
+
+  // A displacement is explicit in the candidate effect. The replacement must
+  // be supplier-confirmed before the old stay can be cancelled; names, dates,
+  // properties and fixture identity are never used to infer this relation.
+  const cancellations = byEffect.filter((x) => x.effect.effectKind === 'CANCEL_STAY');
+  for (const replacement of stays) {
+    const replacementEffect = replacement.effect;
+    if (!('replacesReservationLineId' in replacementEffect) || !replacementEffect.replacesReservationLineId) continue;
+    const matching = cancellations.filter((candidate) => candidate.effect.effectKind === 'CANCEL_STAY'
+      && candidate.effect.reservationLineId === replacementEffect.replacesReservationLineId);
+    if (matching.length !== 1) {
+      return conflict(typedConflict('VALIDATION_FAILED', 'replacement stay must link to exactly one selected cancellation'));
+    }
+    const old = stayCancellationOwnership?.get(replacementEffect.replacesReservationLineId);
+    if (!old || old.journeyId !== replacementEffect.journeyId || !old.orderKey) {
+      return conflict(typedConflict('STALE_AGGREGATE_REVISION', 'replacement stay requires captured displaced reservation ownership and itinerary order'));
+    }
+    deps.push({ fromActionIntentId: replacement.intent.id, toActionIntentId: matching[0]!.intent.id });
+  }
+  return ok(dedupeDependencies(deps));
+}
+
+function dedupeDependencies(dependencies: ActionDependency[]): ActionDependency[] {
+  const unique = new Map<string, ActionDependency>();
+  for (const dependency of dependencies) {
+    unique.set(`${dependency.fromActionIntentId}:${dependency.toActionIntentId}`, dependency);
+  }
+  return [...unique.values()];
 }
 
 export function compileActionPlan(input: CompileActionPlanInput): TypedResult<CompileActionPlanResult> {
@@ -426,13 +503,16 @@ export function compileActionPlan(input: CompileActionPlanInput): TypedResult<Co
     strategy.scenarioChange.effects,
     input.programmeItemOwnership,
     strategy,
+    input.stayCancellationOwnership,
+    input.journeyItemOwnership,
   );
+  if (!dependencies.ok) return dependencies;
   const plan = ActionPlanSchema.parse({
     id: planId,
     recoveryCaseId: strategy.recoveryCaseId,
     scenarioChangeId: strategy.scenarioChange.id,
     intents,
-    dependencies,
+    dependencies: dependencies.value,
   });
 
   const acyclic = validateActionPlanAcyclic(plan);

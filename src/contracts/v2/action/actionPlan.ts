@@ -37,6 +37,10 @@ export const ActionIntentSchema = z.strictObject({
   /** Immutable once dispatch is prepared; reused by every ExecutionAttempt. */
   logicalOperationKey: z.string().min(1).optional(),
   requestFingerprint: z.string().min(1).optional(),
+  /** Immutable index of the exact selected ScenarioChange effect this intent executes. */
+  sourceEffectIndex: z.number().int().min(0).optional(),
+  /** SHA-256 of the exact selected ScenarioChange effect. */
+  sourceEffectFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   capabilityRef: z.string().min(1),
   subjectRefs: z.array(TypedRefSchema).min(1),
   expectedRevisions: z.array(ExpectedRevisionSchema).default([]),

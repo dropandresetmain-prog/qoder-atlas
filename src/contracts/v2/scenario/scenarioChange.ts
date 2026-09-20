@@ -37,6 +37,8 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     proposedJourneyItemId: SubjectIdSchema,
     journeyId: SubjectIdSchema,
     orderKey: z.string().min(1),
+    /** Explicit displaced supplier line when this candidate stay replaces one. */
+    replacesReservationLineId: SubjectIdSchema.optional(),
     offerId: SubjectIdSchema,
     offerPrice: ExactMoneySchema,
     /**
@@ -72,6 +74,8 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     journeyItemId: SubjectIdSchema,
     reservationLineId: SubjectIdSchema,
     cancellationPenalty: ExactMoneySchema,
+    /** Why this is an authority ceiling, never a claim of an observed charge. */
+    cancellationPenaltyBasis: z.enum(['PROVIDER_POLICY', 'NONREFUNDABLE_BOOKING_PRICE_CEILING']).optional(),
   }),
   z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),
