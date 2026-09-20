@@ -3,7 +3,7 @@
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
 - Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Latest verified pushed checkpoint before this commit: `a5d989235733bdb452bcfaa3a634bab42485b47b`, clean at push. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) now records normal provider/PG/browser evidence; acceptance remains pending.
+- Latest verified pushed checkpoint before this commit: `560ba614a4c4f318569167359e192a8c8ecd35b7`, clean at push. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) records normal provider/PG/browser evidence and the new source-visit baseline; acceptance remains pending.
 - Accepted: A0 `f55899b15200de692dd749bbcfb795c67f6a22e0`; A1 `a948917c239fc02435020f6740474283dd795ea8`; A2 `f0c79f2412513e3a676737ac32c3c3694c03388a` (tested565f561).
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A2 LIVE](ASTRA_A2_LIVE_EVIDENCE.md), [A3 decisions](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
 
@@ -17,9 +17,9 @@
 
 ## Current lanes — all Act Now
 
-- Terra cost UI5c6e236 integrated atd16708f;51focused+TS. Now implementing explicit source-owned intended visits only, in an isolated lane. No automatic stay-to-visit inference.
-- Luna reviewed context61a859a8edc940f89125baa4cf824538ae08dac1 integrated; root7focused+TS and boundary279 pass with normal composition. Now bounded read-only official source review for the existing destination encounter.
-- Luna destination resolver9b2e46c integrated;4focused+TS. Now designing the smallest A4 atomic observed-stay attachment command; root reviews its exact contract before implementation.
+- Terra source visits8a3c7f3 integrated,3unit+15focusedPG pass. Now inspecting exact protected hotel execution/ActionPlan continuation and fresh baseline-booking path; no provider calls or new framework authorized in lane.
+- Luna existing-entry11d4609 integrated with explicit child visit ID/Journey alias/country binding. Root actual PG+LIVE source preparation succeeded before baseline52/67. Lane idle.
+- Luna atomic observed stayf4230af integrated,4focusedPG+TS. Now read-only rejected-alternatives presentation inventory and exact proposed-visit persistence seam; root retains contract decisions.
 - Root normal boot composes HOTEL/RESEARCH, reviewed context and existing layered FX through the shared coordinator. Actual LIVE proof passed preparation/reassessment, Qwen, Atlas, Nuitée and Frankfurter research;16 incomplete candidates correctly rejected. Destination completion is still required.
 
 ## Integrated A3 evidence
@@ -36,7 +36,7 @@
 ## Triage / exact next actions
 
 - **Act Now:** finish corrected context + boot composition, explicit sandbox inputs/current destination provider booking terms, LIVE whole composite recommendation, desktop evidence. Source date truth is4→3 nights (29Sep→3Oct becomes30Sep→3Oct); founder3→2 was a conditional example.
-- **Act Now:** actual PG has zero intended visits despite the source destination stay. Add one explicit source-declared original destination visit, pin the configured passport using existing commands, and supply exact scoped reviewed entry evidence. Reuse that encounter for replacement. Missing legal evidence remains UNKNOWN; never infer a visit from every hotel.
+- **Act Now closure:** second PG world has explicit source visit+selected passport+LIVE scoped ICA evidence before baseline52PASS/15UNKNOWN. DBastra_jordan_a3_composite_20260920/workspace18891fc1-6e2a-4200-8328-f33b9ca96205; metadata/config under ignored output/playwright and data/local/a3. No disruptions or external transactions in this second world. Retain SG arrival-card obligation visibly; no completed submission/admission claim.
 - **Investigate Now:** current destination cancellation fees/refund policy and real active sandbox baseline booking; old historical Nuitee references were cancelled. Missing policy stays UNKNOWN. Required home-currency evidence must not imply payment FX or future FX.
 - **Act Now A4:** flight, Narita book, destination replacement book, old-stay cancel through existing ActionPlan. Replacement confirmation precedes cancellation; both mandatory. Unknown outcome lookup before any retry; no blind redispatch. Atomic observed stay command still missing.
 - **Park for Later:** healthy-trip requests/composer, mobile, generic programme/hotel/visit/credential management, immigration/crawling breadth, unrelated providers, transfer transactions, claims, multi-incidents/extra scenarios, importer atomicity, unrelated parity/refactors/infrastructure.

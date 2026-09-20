@@ -32,5 +32,27 @@
         { "operator": "PREDICATE", "predicateId": "credential.passport_valid_days_after_exit", "parameters": { "days": 0 } }
       ]
     }
+  },
+  {
+    "id": "sg-issued-passport-eligibility-2026-09",
+    "countryCode": "SG",
+    "purposes": ["AiT - AI in Travel Summit 2026"],
+    "nationalityCodes": ["SG"],
+    "effectiveWindow": { "start": "2026-09-20T00:00:00+08:00", "end": "2026-10-04T00:00:00+08:00" },
+    "maxEvidenceAgeSeconds": 86400,
+    "sources": [{
+      "sourceId": "sg-ica-entry",
+      "url": "https://www.ica.gov.sg/enter-transit-depart/entering-singapore",
+      "publisher": "Singapore Immigration & Checkpoints Authority",
+      "contentSha256": "e720ec49664950758fb559f753d1551bb52a57148ae6585d487a107c2da5f775"
+    }],
+    "expression": {
+      "operator": "ALL",
+      "operands": [
+        { "operator": "PREDICATE", "predicateId": "traveller.nationality_in", "parameters": { "codes": ["SG"] } },
+        { "operator": "PREDICATE", "predicateId": "journey.purpose_in", "parameters": { "purposes": ["AiT - AI in Travel Summit 2026"] } },
+        { "operator": "PREDICATE", "predicateId": "credential.passport_valid_days_after_exit", "parameters": { "days": 0 } }
+      ]
+    }
   }
 ]

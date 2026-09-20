@@ -33,6 +33,7 @@
     "current": [
       "test/a3-recovery-research-composition.test.ts",
       "test/a3-reviewed-runtime-context.test.ts",
+      "test/a3-existing-visit-entry-context.test.ts",
       "test/a3-recovery-cost-comparison.test.ts",
       "test/a3-stay-replacement-context.test.ts",
       "test/a3-target-fx.test.ts",
@@ -162,6 +163,7 @@
     "postgres": [
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
+      "postgres-integration/a4ObservedStay.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
       "postgres-integration/a3CandidateGeography.pgtest.ts",
       "postgres-integration/a3StayArrivalRequirement.pgtest.ts",

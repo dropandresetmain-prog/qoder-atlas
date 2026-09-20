@@ -28,3 +28,13 @@ Hotel availability, hotel price/terms, local stay requirements and entry researc
 - **Park for Later:** immigration/admin breadth, automatic visit inference and all other hard-scope exclusions. The ICA passport-validity review is bounded; SG Arrival Card submission is a distinct obligation, never a fabricated completed fact.
 
 Next: integrate the source visit and scoped preparation lanes, bind current provider terms, then rerun the normal full composite planning path. This file does not close A3.
+
+## Source visit integration follow-up
+
+Source lane8a3c7f3 and existing-entry lane11d4609 are integrated. A fresh configured copy of the dataset includes the explicit original destination visit; the default accepted fixture remains unchanged. Source alias maps to its owning Journey, with the actual child visit ID explicitly configured. Country binding resolves the source jurisdiction identity, never a name heuristic.
+
+Normal application components provisioned database `astra_jordan_a3_composite_20260920`, workspace `18891fc1-6e2a-4200-8328-f33b9ca96205`, source connection `8e6e7f0d-f4df-5893-8beb-3c27a34117ed`. The existing source visit is56185212-7d83-5a33-b06c-8d2c3afaae80 on Journey7a990c40-9eeb-5eb2-943e-7e210f3c58c1. LIVE ICA document read at02:36:01.553Z verified the reviewed policy, selected the configured passport through the normal command, and published exact scoped evidence. Baseline evaluation afterward produced52PASS/15UNKNOWN across67. No Case or disruption was seeded in this world.
+
+The reviewed Singapore rule concerns SG-issued passport eligibility. The existing credential evaluator independently checks ownership, valid status, possession and expiry. [ICA entry requirements](https://www.ica.gov.sg/enter-transit-depart/entering-singapore) separately require an SG Arrival Card for air arrivals within the three-day submission window; no submission or individual admission is claimed. **Act Now presentation:** retain this remaining operational obligation distinctly from the passport rule result; the source read must not become a blanket claim that every arrival formality is completed. No immigration transaction/admin platform is added.
+
+Focused evidence: source schema3/3, existing source materialization PG15/15 (464.3s, includes preserved default/reset behavior), entry/composition12/12, TypeScript, boundary282 clean. Atomic observed-stay attachmentf4230af adds4/4 focused PG tests; it requires a durable matching provider record before atomically attaching the canonical stay graph. Actual hotel execution remains uncomposed. Its proposed-visit persistence seam is now explicitly under integration review so Japan applicability cannot disappear after observation.

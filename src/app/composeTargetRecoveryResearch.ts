@@ -33,6 +33,13 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
     credentialVersionId: z.uuid(),
     guestNationality: z.string().regex(/^[A-Z]{2}$/),
   })).min(1).max(32),
+  existingVisitTargets: z.array(z.strictObject({
+    visitSourceRef: SourceRef('INTENDED_VISIT'),
+    visitId: z.uuid(),
+    jurisdictionSourceRef: SourceRef('JURISDICTION'),
+    entryPolicyId: z.string().min(1),
+    countryCode: z.string().regex(/^[A-Z]{2}$/),
+  })).max(8).optional(),
   stayReplacementBinding: z.strictObject({
     reservationId: z.uuid(),
     reservationLineId: z.uuid(),
@@ -46,6 +53,14 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
 }).superRefine((value, context) => {
   if (new Set(value.passportSelections.map((selection) => selection.travellerSourceRef)).size !== value.passportSelections.length) {
     context.addIssue({ code: 'custom', path: ['passportSelections'], message: 'Each traveller needs one explicit passport selection' });
+  }
+  const countries = new Map<string, string>();
+  for (const target of [...value.overnightTargets, ...(value.existingVisitTargets ?? [])]) {
+    const previous = countries.get(target.jurisdictionSourceRef);
+    if (previous && previous !== target.countryCode) {
+      context.addIssue({ code: 'custom', message: 'A source jurisdiction cannot be bound to conflicting country codes' });
+    }
+    countries.set(target.jurisdictionSourceRef, target.countryCode);
   }
 });
 
@@ -87,6 +102,11 @@ export async function composeTargetRecoveryResearch(input: {
       throw new Error('Recovery research target references an unavailable reviewed policy');
     }
   }
+  for (const target of configuration.existingVisitTargets ?? []) {
+    if (!entryPolicies.some((policy) => policy.id === target.entryPolicyId && policy.countryCode === target.countryCode)) {
+      throw new Error('Existing visit references an unavailable reviewed entry policy');
+    }
+  }
   const hotel = composeTargetHotelResearch(input.config, input.cwd);
   if (!hotel) return undefined;
   const recordingsDir = resolve(input.cwd, input.config.recordingsDir);
@@ -103,6 +123,22 @@ export async function composeTargetRecoveryResearch(input: {
     uow: input.uow, reviewerRef: { kind: 'PRINCIPAL', id: input.reviewerPrincipalId },
     hotelTransport: hotel.transport, officialDocuments, hotelPolicies, entryPolicies, configuration,
     verificationClock: () => new Date().toISOString(),
+    jurisdictionCountryCode: async (jurisdictionId) => {
+      // Country codes are explicitly bound to source jurisdiction identities in
+      // reviewed configuration, never guessed from a jurisdiction name or UUID.
+      const rows = await input.pool.query<{ external_id: string }>(
+        `SELECT r.external_id FROM external_record_links l
+         JOIN external_records r ON r.workspace_id=l.workspace_id AND r.id=l.external_record_id
+         JOIN external_connections c ON c.workspace_id=r.workspace_id AND c.id=r.connection_id
+         WHERE l.workspace_id=$1 AND l.canonical_subject_kind='JURISDICTION'
+           AND l.canonical_subject_id=$2 AND l.superseded_at IS NULL
+           AND r.record_type='SOURCE_JURISDICTION' AND c.provider_kind=$3`,
+        [input.workspaceId, jurisdictionId, configuration.sourceConnectionProviderKind],
+      );
+      if (rows.rows.length !== 1) return undefined;
+      return [...configuration.overnightTargets, ...(configuration.existingVisitTargets ?? [])]
+        .find((target) => target.jurisdictionSourceRef === `SOURCE_JURISDICTION:${rows.rows[0]!.external_id}`)?.countryCode;
+    },
   });
   const resolveStayReplacement = configuration.stayReplacementBinding
     ? createStayReplacementContextResolver(configuration.stayReplacementBinding) : undefined;
