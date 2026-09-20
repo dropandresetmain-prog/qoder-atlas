@@ -3,7 +3,7 @@
 - Goal: two rich desktop hero recoveries on one generalized PostgreSQL engine.
 - Current founder contract: [hero depth](ASTRA_HERO_DEPTH_SCOPE.md). Desktop only; Terra/Luna for bounded work. Nuitée stay changes are explicit cancel + rebook, never modify.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Primary: `integration/astra-post-r4`, `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`. Latest verified pushed preparation before this closure: `729ed39` (passport presentability); current integration includes the lanes below.
+- Primary: `integration/astra-post-r4`, `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`. Latest verified pushed preparation before this checkpoint: `2b5e2436c6295ea2358b3f69c4cf3c14f3568afc`; reviewed companion, entry and hotel lanes now integrated at408f5d8.
 - A0 pushed: `f55899b15200de692dd749bbcfb795c67f6a22e0`.
 - A1 verified pushed checkpoint: `a948917c239fc02435020f6740474283dd795ea8`; remote matched, primary clean at checkpoint. Source/test head: `474f95d580c59638e5d5cfbbcdfd989d50c4a0b8`.
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A0](ASTRA_A0_CONVERGENCE.md), [stay extension](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
@@ -49,5 +49,7 @@
 ## Exact next action / stop-safe handoff
 
 A2 checkpoint pushed clean atf0c79f2. Jordan foundation/data/reset integrated; integrated11focused tests,TypeScript,boundary261passed. Stage1/2 proposed-STAY integrated. Final dataset foundation PG1/1 passed (112s) after removing synthetic landside ENTRY coverage; baseline/D1/D2/D3 remain truthful. Integrated focused26 coordinator/dispatcher +43 stay/provisioner/dispatcher, loader4, passport/entry57; TypeScript/boundary265 clean. Composite research and observed canonical integration remain root-owned. Official document reader4focused+TypeScript, real RECORD retrieval of both configured Japanese official sources passed; not normal-runtime entry acceptance. A3 requires whole-trip flight+overnight+entry planning, not flight-only proof. After external runs retain workspace for reconciliation/audit; repeats use fresh isolated workspace/database. Broad counters unchanged.
+
+Reviewed companions d35915b6, entry gate177e49d9 and target hotel research dceba9cd integrated. Their combined focused tests31/31, TypeScript and boundary267 pass. Broad counters unchanged. Terra next owns bounded normal multi-domain planning wiring; Luna investigates property timing evidence and explicit protected synthetic credential provisioning. Entry publication and observed-stay atomic command remain root-owned. No new external transaction or A3 acceptance claimed.
 
 Root worktree remains untouched. No merge to main. Preserve isolated drafts and local visual/log artifacts; never commit secrets/generated junk. Continue same task while context is clean; this ledger and linked evidence are the compact fresh-chat handoff.

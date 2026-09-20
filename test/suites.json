@@ -31,6 +31,8 @@
   },
   "suites": {
     "current": [
+      "test/reviewed-entry-evidence.test.ts",
+      "test/a3-target-hotel-research.test.ts",
       "test/official-documents.test.ts",
       "test/a3-journey-requirements.test.ts",
       "test/a1-programme-intake-ui.test.ts",
