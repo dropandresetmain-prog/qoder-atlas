@@ -1,5 +1,8 @@
 # Jordan Current-Runtime Readiness Audit
 
+> **HISTORICAL / SUPERSEDED FOR CURRENT EXECUTION (2026-09-20).** This audit is a snapshot of the audited R4-era SHA and remains useful evidence for what was missing then. Its flight-only closed-hero boundary and statements that Narita/Singapore hotel execution or authoritative scoped entry evidence are not required do **not** govern the current A3/A4 plan. Current execution truth is `docs/work/ACTIVE_TASK.md`, `docs/work/ASTRA_HERO_DEPTH_SCOPE.md`, `docs/work/ASTRA_A3_LIVE_PROGRESS.md`, and `docs/work/A4_RECOVERY_PREP.md`. Do not implement from this audit where those documents differ.
+
+
 Status: **READ-ONLY AUDIT**
 
 Final-R4 reconciliation: accepted base is now `2baf1f6df484319e131590d37a0b026222324d03`.
