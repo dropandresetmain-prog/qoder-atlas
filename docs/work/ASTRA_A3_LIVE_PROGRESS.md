@@ -85,3 +85,20 @@ Normalruntime eca447d produced attempt3cdb224a-0c6e-54f0-8ecc-5f6bb60a9b7d at03:
 Actual desktop screenshot revealed wronggraphlegtitle and thincommitment evidence. Luna correctedexactitemlookup, terminalcopyandvisiblealternatives. Rootpreserves successfulreadinessfacts and projectsactualprogrammechecks/route labels;83focusedtests pass, compiler26pass, TypeScriptandboundary282pass. Root confirmed150minuteprogrammeconstraint inPGand sourcedstructuredgiven/familynames frombooking-dossiers.json viaauditedaddTravellerName; noprivatefacts invented. Optional approvedstayvisit closure integratedwith8PG laneevidence. A3signoff awaitsfinaldesktopproof.
 
 ActNow/recording source limitation: later21:00same-nightclosure exists only asnarrative, not PG-reachableschedule/availability evidence. Do not inventalaterinboundarrival or claim stagephysically proven. Insurance sourcepolicy exists, but historicalwholeTripRecoveryPlan isretiredruntime andisnot proof ofcurrentPGinsurance reasoning.
+
+
+## Post-A3 convergence overlay
+
+This document preserves the chronological A3 evidence. Current finishing status is later than the original sections above:
+
+- Founder QC declared A3 a **CONDITIONAL PASS**, not final acceptance. The multi-domain recommendation exists and the operator UI is readable enough to continue, but graph/progression/cost/copy defects are carried.
+- A4 CP2 selected-plan continuation passed on `f7a497d`.
+- A4 CP3 protected Nuitée book/cancel integration passed on `0c177c8`.
+- A4 CP3.5 controlled four-action execution seam passed on `5bdb652`.
+- Destination hotel robustness removed the exclusive same-property gate: a preferred property may fail provider availability while a bounded destination-area alternate succeeds.
+- Current progression closure proves the overnight requirement through boardability at a later planning `now`, not by forcing a Narita effect. Same-night options disappear naturally once their departures are no longer boardable.
+- Current complete RECORD recommendation on `c897d296` includes replacement flight + Narita stay + destination replacement stay + displaced-stay cancellation and is `AWAITING_AUTHORITY`.
+- New-spend comparison is SGD 291.61; the displaced-booking SGD 1451.79 figure is separate maximum potential loss, not replacement-hotel price.
+- No real four-action A4 provider sequence is accepted by this document. Physical sandbox evidence is the active next milestone.
+
+Carry-forward for final demo quality: V5.6 FAIL→amber truth, progressive edges, Overview Active Change/focus, graph placement and copy compression.
