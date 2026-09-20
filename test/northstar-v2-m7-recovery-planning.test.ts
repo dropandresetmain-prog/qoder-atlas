@@ -1743,3 +1743,116 @@ test(`hotel planning combines overnight and destination-stay replacement with ca
 });
 
 }
+
+test('hotel quote round prioritises destination-stay repair before overnight alternates', async () => {
+  const { world, journey, travellerId, placeId, arrival, visit } = overnightStayWorld();
+  const originPlaceId = arrival.desiredOriginPlaceId!;
+  const departure = world.journeyItems.find((item) => item.id !== arrival.id)!;
+  departure.intendedWindow = { start: '2030-06-04T02:00:00.000Z', end: '2030-06-04T06:00:00.000Z' };
+  const priorPlaceId = id();
+  world.places.push(
+    { id: priorPlaceId, revision: 1, name: 'Prior origin', placeType: 'AIRPORT', timeZone: 'Pacific/Auckland', hasCoordinates: true },
+    { id: originPlaceId, revision: 1, name: 'Connection city', placeType: 'CITY', timeZone: 'Pacific/Auckland', hasCoordinates: true, externalRefs: [{ system: 'hotel-provider-id', value: 'property-o' }] },
+  );
+  world.places.find((place) => place.id === placeId)!.externalRefs = [{ system: 'hotel-provider-id', value: 'property-a' }];
+  const onwardService = service({
+    originPlaceId: placeId, destinationPlaceId: departure.desiredDestinationPlaceId!,
+    published: { departure: observed('2030-06-04T02:00:00.000Z'), arrival: observed('2030-06-04T06:00:00.000Z') },
+  });
+  departure.selectedServiceId = onwardService.id;
+  const originalStay = {
+    ...transportItem(journey.id), id: id(), kind: 'STAY' as const, orderKey: '025', intendedPlaceId: placeId,
+    intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' }, desiredOriginPlaceId: null, desiredDestinationPlaceId: null,
+  };
+  const preArrival = transportItem(journey.id, {
+    orderKey: '005', desiredOriginPlaceId: priorPlaceId, desiredDestinationPlaceId: originPlaceId,
+    intendedWindow: { start: '2030-06-02T04:00:00.000Z', end: '2030-06-02T08:00:00.000Z' },
+  });
+  const preArrivalService = service({
+    originPlaceId: priorPlaceId, destinationPlaceId: originPlaceId,
+    published: { departure: observed('2030-06-02T04:00:00.000Z'), arrival: observed('2030-06-02T08:00:00.000Z') },
+  });
+  preArrival.selectedServiceId = preArrivalService.id;
+  const reservation: WReservation = { id: id(), revision: 1, reservationType: 'STAY', observedStatus: 'CONFIRMED', observedStatusAt: NOW, responsibleOrganisationId: null, responsibleTravellerId: travellerId };
+  const line: WReservationLine = { id: id(), reservationId: reservation.id, productType: 'STAY', observedStatus: 'CONFIRMED', observedStatusAt: NOW, evidenceId: id(), transportServiceId: null, resourceId: null, placeId, interval: { ...originalStay.intendedWindow! } };
+  world.journeyItems.push(preArrival, originalStay);
+  world.transportServices.push(preArrivalService, onwardService);
+  world.reservations.push(reservation);
+  world.reservationLines.push(line);
+  world.allocations.push({ id: id(), reservationId: reservation.id, lineId: line.id, travellerId, journeyItemId: originalStay.id, role: 'TRAVELLER', quantity: 1 });
+  world.intendedVisits[0]!.intended = { start: '2030-06-02T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' };
+  world.constraints.push({
+    id: id(), revision: 1, registeredType: 'stay_arrival_date_aligned', hardness: 'HARD', owner: { kind: 'JOURNEY', id: journey.id }, provenanceEvidenceId: null,
+    operands: [
+      { key: 'original_stay_item', kind: 'SUBJECT_REF', subject: { kind: 'JOURNEY_ITEM', id: originalStay.id }, text: null, number: null, boolean: null, instant: null, localDate: null },
+      { key: 'arrival_item', kind: 'SUBJECT_REF', subject: { kind: 'JOURNEY_ITEM', id: arrival.id }, text: null, number: null, boolean: null, instant: null, localDate: null },
+    ],
+  });
+  const originJurisdictionId = id();
+  world.jurisdictions.push({ id: originJurisdictionId, revision: 1, name: 'Connection jurisdiction', regimeKind: 'NATIONAL' });
+  world.placeJurisdictions.push({ placeId: originPlaceId, jurisdictionId: originJurisdictionId, basis: 'AREA_MEMBERSHIP', areaVersionId: id(), evidenceId: null });
+  const subject = { kind: 'JOURNEY' as const, id: journey.id };
+  const failing = [{ subject, assessment: assessSubject({ registry: createM6Registry(), world, effective: effectiveOf(world), subject, now: NOW, assessmentId: id() }).result }];
+  const resolveAirport = (place: string) => place === originPlaceId ? { system: 'IATA', value: 'ORG' } : place === placeId ? { system: 'IATA', value: 'DST' } : undefined;
+  const planning = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 }, maxOffersPerCorridor: 1,
+    hotel: {
+      transport: async () => { throw new Error('focused test supplies normalized research results'); },
+      resolveContext: ({ candidate, gap }) => ({
+        baseCandidateKey: candidate.key, journeyId: gap.journeyId, placeId: originPlaceId,
+        query: { location: { externalRef: { system: 'hotel-provider-id', value: 'property-o' } }, checkInDate: '2030-06-02', checkOutDate: '2030-06-03', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ' },
+        stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T04:00:00.000Z' }, proposedJourneyItemId: id(), orderKey: '010a',
+        visit: { kind: 'PROPOSED' as const, proposedVisitId: id(), jurisdictionId: originJurisdictionId, purpose: 'overnight recovery', intendedWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T04:00:00.000Z' }, credentialSelections: [] },
+        provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['overnight-context'] },
+      }),
+      resolveStayReplacement: ({ candidate }) => ({
+        oldJourneyItemId: originalStay.id, reservationLineId: line.id, stayElementId: 'captured-stay-element',
+        replacement: {
+          baseCandidateKey: candidate.key, journeyId: journey.id, placeId,
+          query: { location: { externalRef: { system: 'hotel-provider-id', value: 'property-a' } }, checkInDate: '2030-06-03', checkOutDate: '2030-06-05', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ' },
+          stayWindow: { start: '2030-06-03T08:00:00.000Z', end: '2030-06-05T02:00:00.000Z' }, proposedJourneyItemId: id(), orderKey: '025', visit,
+          provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['replacement-context'] },
+        },
+      }),
+    },
+  });
+  const corridor = transportCorridors(world, failing, { resolveAirport, passengers: { adults: 1 } }).corridors[0]!;
+  const flight: PlanningToolResult = {
+    requestId: transportRequestId(corridor), capability: 'FLIGHT', operation: 'flight.search', status: 'SUCCEEDED',
+    normalizedEvidence: { offers: [{ offerId: 'late flight 0', segments: [{ origin: { system: 'IATA', value: 'ORG' }, destination: { system: 'IATA', value: 'DST' }, departure: '2030-06-03T04:00:00.000Z', arrival: '2030-06-03T08:00:00.000Z' }], totalPrice: { amount: 100, currency: 'NZD' }, availability: 'AVAILABLE' }] },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+  };
+  const roundTwo = await planning.nextRound({ completedRound: 1, results: [flight] });
+  const contextRequest = roundTwo.find((request) => request.operation === 'hotel.context')!;
+  const searchRequests = roundTwo.filter((request) => request.operation === 'hotel.search');
+  assert.equal(searchRequests.length, 2);
+  const searchResults: PlanningToolResult[] = searchRequests.map((request, index) => {
+    const propertyId = (request.parameters as { location: { externalRef: { value: string } } }).location.externalRef.value;
+    return {
+      requestId: request.id, capability: 'HOTEL', operation: 'hotel.search', status: 'SUCCEEDED',
+      normalizedEvidence: {
+        properties: [{ propertyId, name: 'Captured property', externalRefs: [{ system: 'hotel-provider-id', value: propertyId }] }],
+        rates: [
+          { rateId: `${propertyId}-rate-a`, propertyId, totalPrice: { amount: 100 + index, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' },
+          { rateId: `${propertyId}-rate-b`, propertyId, totalPrice: { amount: 110 + index, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' },
+          { rateId: `${propertyId}-rate-c`, propertyId, totalPrice: { amount: 120 + index, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' },
+          { rateId: `${propertyId}-rate-d`, propertyId, totalPrice: { amount: 130 + index, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' },
+        ],
+      },
+      provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+    };
+  });
+  const policy: PlanningToolResult = {
+    requestId: contextRequest.id, capability: 'HOTEL', operation: 'hotel.context', status: 'SUCCEEDED',
+    normalizedEvidence: { cancellation: { refundable: false, maximumLoss: { amount: 425, currency: 'NZD' }, maximumLossBasis: 'NONREFUNDABLE_BOOKING_PRICE' } },
+    provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['captured-policy'] }, uncertainty: [],
+  };
+  const quoteRequests = await planning.nextRound({ completedRound: 2, results: [flight, policy, ...searchResults] });
+  const gaps = quoteRequests.map((request) => request.evidenceGapCode);
+  const firstOvernight = gaps.indexOf('overnight_accommodation');
+  const lastReplacement = gaps.lastIndexOf('stay_replacement');
+  assert.ok(firstOvernight >= 0 && lastReplacement >= 0, 'both stay gaps still receive quote attempts');
+  assert.ok(lastReplacement < firstOvernight, 'destination-stay quotes dispatch before overnight alternates');
+  assert.ok(gaps.filter((gap) => gap === 'stay_replacement').length >= 2, 'replacement keeps alternate-rate headroom');
+});
+

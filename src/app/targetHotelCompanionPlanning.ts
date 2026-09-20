@@ -32,8 +32,13 @@ type StayVisit = Extract<ScenarioEffect, { effectKind: 'ADD_JOURNEY_STAY' }>['vi
 const SUBJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_\-:.]*$/;
 const DEFAULT_MAX_PROPERTIES = 3;
 const DEFAULT_MAX_RATES = 2;
+/** Extra quote attempts reserved for destination-stay repair after overnight rates. */
+const DEFAULT_REPLACEMENT_RATE_BONUS = 2;
 const DEFAULT_MAX_COMBINED = 8;
-const DEFAULT_BUDGET: PlanningResearchBudget = { maxRounds: 3, maxRequests: 12 };
+// Overnight search/quote plus destination replacement (policy context, search,
+// and alternate quotes) must share one bounded budget. Twelve requests is enough
+// for overnight alone but starves replacement quotes once both are required.
+const DEFAULT_BUDGET: PlanningResearchBudget = { maxRounds: 3, maxRequests: 18 };
 
 /** The authoritative facts required before hotel research can be requested. */
 export interface HotelPlanningContext {
@@ -412,12 +417,15 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
   };
 
   const quoteRequests = (results: readonly PlanningToolResult[]): PlanningToolRequest[] => {
-    const out: PlanningToolRequest[] = [];
+    type QuoteCandidate = { request: PlanningToolRequest; replacement: boolean; fingerprint: string };
+    const candidates: QuoteCandidate[] = [];
+    const seenFingerprints = new Set<string>();
     for (const result of results) {
       if (result.operation !== 'hotel.search' || result.status !== 'SUCCEEDED') continue;
       const bindings = [...searches.values()].flat().filter((binding) => binding.request.id === result.requestId);
       const outcome = asSearchOutcome(result.normalizedEvidence);
       if (!outcome || bindings.length === 0) continue;
+      const isReplacement = bindings.some((binding) => binding.replacement);
       const propertyIds = new Set(bindings.flatMap((binding) => {
         const place = input.world.places.find((candidate) => candidate.id === binding.context.placeId);
         const ref = place ? requestedPropertyRef(place, binding.context) : undefined;
@@ -427,21 +435,31 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
           .slice(0, maxProperties ?? 0)
           .map((property) => property.propertyId);
       }));
-      for (const rate of outcome.rates.filter((candidate) => candidate.availability !== 'UNKNOWN' && propertyIds.has(candidate.propertyId)).slice(0, maxRates ?? 0)) {
+      // Destination repair closes a hard stay dependency; give it alternate-rate
+      // headroom before overnight fragments consume the shared quote budget.
+      const rateLimit = (maxRates ?? 0) + (isReplacement ? DEFAULT_REPLACEMENT_RATE_BONUS : 0);
+      for (const rate of outcome.rates.filter((candidate) => candidate.availability !== 'UNKNOWN' && propertyIds.has(candidate.propertyId)).slice(0, rateLimit)) {
         const request = PlanningToolRequestSchema.parse({
           id: stableId('hotel-quote', JSON.stringify({ rateId: rate.rateId })), capability: 'HOTEL', operation: 'hotel.quote', parameters: { rateId: rate.rateId },
-          purpose: bindings.some((binding) => binding.replacement) ? 'Confirm replacement accommodation terms' : 'Confirm accommodation terms for an uncovered overnight itinerary gap',
-          evidenceGapCode: bindings.some((binding) => binding.replacement) ? 'stay_replacement' : 'overnight_accommodation', round: 3,
+          purpose: isReplacement ? 'Confirm replacement accommodation terms' : 'Confirm accommodation terms for an uncovered overnight itinerary gap',
+          evidenceGapCode: isReplacement ? 'stay_replacement' : 'overnight_accommodation', round: 3,
         });
         const fingerprint = planningToolRequestFingerprint(request);
+        if (seenFingerprints.has(fingerprint)) continue;
         const rateBindings = bindings.map((binding) => ({ ...binding, rate, quoteRequestId: request.id }));
         const existing = quotes.get(fingerprint) ?? [];
         if (existing.some((binding) => !sameRate(binding.rate, rate))) continue;
         quotes.set(fingerprint, [...existing, ...rateBindings]);
-        out.push(request);
+        seenFingerprints.add(fingerprint);
+        candidates.push({ request, replacement: isReplacement, fingerprint });
       }
     }
-    return out;
+    // Dispatch destination-repair quotes before overnight alternates so a tight
+    // research budget still materialises dependency-closed candidates first.
+    return [
+      ...candidates.filter((candidate) => candidate.replacement).map((candidate) => candidate.request),
+      ...candidates.filter((candidate) => !candidate.replacement).map((candidate) => candidate.request),
+    ];
   };
 
   const materialize = (results: readonly PlanningToolResult[]): HotelPlanningMaterialization => {
@@ -506,6 +524,7 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       const replacementQuotes = materialized.quotedStays.filter((quote): quote is CapturedHotelQuote & { replacement: NonNullable<CapturedHotelQuote['replacement']> } => quote.replacement !== undefined);
       const companionByBase = new Map(companions.value.resolvedStayOffers.map((entry) => [entry.baseCandidateKey, entry.candidateKey]));
       const companionByKey = new Map(companions.value.candidates.map((candidate) => [candidate.key, candidate]));
+      const baseByKey = new Map(candidates.map((candidate) => [candidate.key, candidate]));
       // Keep base flight alternatives, but allocate the bounded extra slots to
       // complete plans before partial overnight fragments. Otherwise a full
       // flight result set can consume every slot before destination repair.
@@ -515,27 +534,36 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       let replacementCount = 0;
       for (const quote of replacementQuotes) {
         if (replacementCount >= replacementCap) break;
+        if (!quote.replacement) continue;
+        // Prefer the overnight-extended stem when that hard gap exists; otherwise
+        // close the destination-stay dependency directly on the transport base.
         const companionKey = companionByBase.get(quote.baseCandidateKey);
-        const companion = companionKey ? companionByKey.get(companionKey) : undefined;
-        if (!companion || !quote.replacement) continue;
-        const key = stableId('stay-replacement-candidate', JSON.stringify({ companionKey, oldJourneyItemId: quote.replacement.oldJourneyItemId, reservationLineId: quote.replacement.reservationLineId, offerId: quote.offer.offerId }));
+        const stem = (companionKey ? companionByKey.get(companionKey) : undefined)
+          ?? baseByKey.get(quote.baseCandidateKey);
+        if (!stem) continue;
+        const key = stableId('stay-replacement-candidate', JSON.stringify({
+          stemKey: stem.key,
+          oldJourneyItemId: quote.replacement.oldJourneyItemId,
+          reservationLineId: quote.replacement.reservationLineId,
+          offerId: quote.offer.offerId,
+        }));
         if (emitted.has(key)) continue;
         const parsed = ProposalCandidateSchema.safeParse({
           key,
           effects: [
-            ...companion.effects,
+            ...stem.effects,
             { effectKind: 'CANCEL_STAY', journeyItemId: quote.replacement.oldJourneyItemId, reservationLineId: quote.replacement.reservationLineId, cancellationPenalty: quote.replacement.cancellationPenalty, cancellationPenaltyBasis: quote.replacement.cancellationPenaltyBasis },
             { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: quote.context.proposedJourneyItemId, journeyId: quote.journeyId, orderKey: quote.context.orderKey, offerId: quote.offer.offerId, offerPrice: quote.offer.price, visit: quote.context.visit, replacesReservationLineId: quote.replacement.reservationLineId },
           ],
           affectedSubjectRefs: [
-            ...companion.affectedSubjectRefs,
+            ...stem.affectedSubjectRefs,
             { kind: 'JOURNEY_ITEM', id: quote.replacement.oldJourneyItemId },
             { kind: 'RESERVATION_LINE', id: quote.replacement.reservationLineId },
             { kind: 'JOURNEY', id: quote.journeyId },
             { kind: 'OFFER', id: quote.offer.offerId },
           ],
           rationale: 'Replace the required destination stay after the selected arrival changes its local date.',
-          assumptions: companion.assumptions,
+          assumptions: stem.assumptions,
         });
         if (!parsed.success) continue;
         emitted.add(key);
