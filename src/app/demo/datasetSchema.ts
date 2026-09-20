@@ -292,3 +292,33 @@ export const DatasetJourneyRequirementsSchema = z.strictObject({
   }),
 });
 export type DatasetJourneyRequirements = z.infer<typeof DatasetJourneyRequirementsSchema>;
+
+/**
+ * A source-declared landside visit tied to one of that traveller's declared
+ * stays. The declaration is explicit: the materializer must never treat every
+ * stay as proof of a border encounter. The cited stay supplies the intended
+ * window and the Trip supplies the stated purpose, avoiding duplicate facts.
+ */
+export const DatasetIntendedVisitSchema = z.strictObject({
+  id: NonEmpty,
+  travellerDraftId: NonEmpty,
+  jurisdictionId: NonEmpty,
+  stayItemRef: DatasetJourneyItemSourceRefSchema,
+  transitIntent: z.literal(false),
+});
+export type DatasetIntendedVisit = z.infer<typeof DatasetIntendedVisitSchema>;
+
+export const DatasetIntendedVisitsSchema = z.strictObject({
+  sourceId: NonEmpty,
+  observedAt: z.iso.datetime({ offset: true }),
+  visits: z.array(DatasetIntendedVisitSchema).superRefine((visits, context) => {
+    const ids = new Set<string>();
+    for (const visit of visits) {
+      if (ids.has(visit.id)) {
+        context.addIssue({ code: 'custom', message: `duplicate intended visit id ${visit.id}` });
+      }
+      ids.add(visit.id);
+    }
+  }),
+});
+export type DatasetIntendedVisits = z.infer<typeof DatasetIntendedVisitsSchema>;

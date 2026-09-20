@@ -80,6 +80,14 @@
       "contentScope": "Coherent synthetic organiser policy sufficient to exercise S1-S8. All values are data, not code."
     },
     {
+      "id": "src-syn-ait-destination-visit",
+      "provenance": "ORGANISER_SUPPLIED_SYNTHETIC",
+      "title": "Synthetic AiT S2 original Singapore landside visit declaration",
+      "url": "file:data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/original-destination-visit.json",
+      "fetchedAt": "2026-08-25T09:00:00Z",
+      "contentScope": "Explicit source-owned declaration that the stated Jordan journey's existing Singapore hotel stay is a landside intended visit. It cites the stated stay item and Singapore jurisdiction; it supplies no credential selection, entry determination, or proposed Japan visit."
+    },
+    {
       "id": "src-sim-airline-mn",
       "provenance": "SIMULATED_EXTERNAL_EVENT",
       "title": "Simulated carrier 'Meridian Airways' (ICAO-designator MN) schedule-change feed",
