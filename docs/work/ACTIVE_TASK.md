@@ -3,7 +3,7 @@
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
 - Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Latest verified pushed checkpoint before this commit: `9fd842f0dd0c2df2c5982c24ed4a56820e1dad0f`. This commit checkpoints the integrated cost UI, reviewed context and normal research composition; LIVE acceptance remains pending.
+- Latest verified pushed checkpoint before this commit: `a5d989235733bdb452bcfaa3a634bab42485b47b`, clean at push. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) now records normal provider/PG/browser evidence; acceptance remains pending.
 - Accepted: A0 `f55899b15200de692dd749bbcfb795c67f6a22e0`; A1 `a948917c239fc02435020f6740474283dd795ea8`; A2 `f0c79f2412513e3a676737ac32c3c3694c03388a` (tested565f561).
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A2 LIVE](ASTRA_A2_LIVE_EVIDENCE.md), [A3 decisions](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
 
@@ -20,7 +20,7 @@
 - Terra cost UI5c6e236 integrated atd16708f;51focused+TS. Now implementing explicit source-owned intended visits only, in an isolated lane. No automatic stay-to-visit inference.
 - Luna reviewed context61a859a8edc940f89125baa4cf824538ae08dac1 integrated; root7focused+TS and boundary279 pass with normal composition. Now bounded read-only official source review for the existing destination encounter.
 - Luna destination resolver9b2e46c integrated;4focused+TS. Now designing the smallest A4 atomic observed-stay attachment command; root reviews its exact contract before implementation.
-- Root normal boot composes HOTEL/RESEARCH, reviewed context and existing layered FX through the shared coordinator. Physical PG/provider preparation proof remains next.
+- Root normal boot composes HOTEL/RESEARCH, reviewed context and existing layered FX through the shared coordinator. Actual LIVE proof passed preparation/reassessment, Qwen, Atlas, Nuitée and Frankfurter research;16 incomplete candidates correctly rejected. Destination completion is still required.
 
 ## Integrated A3 evidence
 
@@ -31,7 +31,7 @@
 - Source stay-date policy35b7865 and destination compositee70e999 integrated:28focused pass; reuse source-policyPG1/1. Explicit generic requirement drives CANCEL_STAY + ADD_STAY; penalty requires actual provider evidence, never zero by absence.
 - Exact cost helper78e94ec/core64babf6 integrated:9focused pass. Existing layered Frankfurter resolver retained; full original currency + normalized total + selected dated provenance. Root per-basis pair-cache3focused pass; normal-runtime/UI still pending.
 - New physical finding: overnight conditional requirement produced empty explanations/UNKNOWN for a known below-threshold gap. Root fixes evaluator v2 (known short gap PASS, qualifying gap still requires stay). L1 focused24/24. Focused foundation PG1/1(145s) now additionally proves whole-Journey baseline PASS then unchanged progressive path.
-- Fresh A3 database `astra_jordan_a3_20260920`, workspace `d71ba69c-5a48-49b8-b292-3b21a542c29c`, source connection `6a80479b-6d24-541e-bf8f-275ac01a3c4f`. Initial67 baseline51PASS/16UNKNOWN exposed overnight bug; real PG capture/evaluate/save now proves Jordan CURRENT/PASS. Original assessment retained/superseded. No disruptions/provider execution applied here yet.
+- Fresh A3 database `astra_jordan_a3_20260920`, workspace `d71ba69c-5a48-49b8-b292-3b21a542c29c`, source connection `6a80479b-6d24-541e-bf8f-275ac01a3c4f`. Browser baseline52/67 confirmed after overnight fix. D1/D2/D3 applied through normal HTTP; Case60e5af48-8b35-5661-a9bd-39e3b1f8d40b. LIVE evidence retained; no external transaction. Current normal server4122/session31404 runs this graph/activity correction.
 
 ## Triage / exact next actions
 

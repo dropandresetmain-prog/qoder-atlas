@@ -130,9 +130,16 @@ test('A1 enrichment: selected-service booking remains UNKNOWN when allocation is
   const recovered = projectFocusedCaseGraphEnrichment({
     ...base,
     changedTransportServiceRefs: new Set(['service-1']),
+    reprotectedTransportServiceRefs: new Set(['service-1']),
     transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CONFIRMED' }],
   });
   assert.equal(recovered.nodes[0]?.semanticState, 'RECOVERED');
+  const delayed = projectFocusedCaseGraphEnrichment({
+    ...base,
+    changedTransportServiceRefs: new Set(['service-1']),
+    transportBookingFacts: [{ journeyId: 'journey-1', serviceId: 'service-1', lineCount: 1, lineStatus: 'CONFIRMED', reservationStatus: 'CONFIRMED' }],
+  });
+  assert.equal(delayed.nodes[0]?.semanticState, 'CHANGED', 'a schedule deterioration does not prove supplier recovery');
 });
 
 test('A1 enrichment: emits a changed source edge only for the proven selected service', () => {

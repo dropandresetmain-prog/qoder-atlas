@@ -494,6 +494,11 @@ export const CASE_TOOL_ACTIVITY: Record<string, { checking: string; unavailable:
     unavailable: 'Replacement flights could not be checked',
     note: 'No flight availability was obtained, so no replacement flight is being suggested.',
   },
+  'hotel.context': { checking: 'Reviewing the existing stay', unavailable: 'Existing stay details could not be checked', note: 'Cancellation terms remain unconfirmed.' },
+  'hotel.search': { checking: 'Checking hotel availability', unavailable: 'Hotel availability could not be checked', note: 'Required accommodation remains unconfirmed.' },
+  'hotel.quote': { checking: 'Checking hotel price and cancellation terms', unavailable: 'Hotel price and terms could not be confirmed', note: 'No hotel booking has been made.' },
+  'research.entry_requirements': { checking: 'Reviewing entry requirements', unavailable: 'Entry requirements could not be verified', note: 'Entry eligibility remains uncertain.' },
+  'research.local_context': { checking: 'Checking local stay requirements', unavailable: 'Local stay requirements could not be verified', note: 'Local requirements remain uncertain.' },
 };
 export const CASE_TOOL_FALLBACK = { checking: 'Researching options', unavailable: 'Some research could not be completed', note: '' };
 

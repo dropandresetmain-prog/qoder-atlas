@@ -712,6 +712,7 @@ function modelProviderLabel(providerId: string): string {
   if (!safe) return 'Provider not recorded';
   return {
     'model-studio': 'Model Studio',
+    'official-documents': 'Official sources',
   }[safe.toLowerCase()] ?? safe;
 }
 

@@ -253,6 +253,8 @@ export interface FocusedCaseGraphEnrichmentInput {
   changeSignalRef?: string;
   /** Service ids proven by change_records to be changed under that signal. */
   changedTransportServiceRefs?: ReadonlySet<string>;
+  /** A completed supplier replacement, distinct from a schedule deterioration. */
+  reprotectedTransportServiceRefs?: ReadonlySet<string>;
 }
 
 /** Output: additional nodes and edges to append to the case's ldg. */
@@ -356,7 +358,8 @@ export function projectFocusedCaseGraphEnrichment(
     if (!confirmed) return { state: 'UNKNOWN' };
     const observedAt = facts.find((fact) => fact?.observedAt)?.observedAt;
     return {
-      state: input.changedTransportServiceRefs?.has(serviceId) ? 'RECOVERED' : 'HEALTHY',
+      state: input.reprotectedTransportServiceRefs?.has(serviceId) ? 'RECOVERED'
+        : input.changedTransportServiceRefs?.has(serviceId) ? 'CHANGED' : 'HEALTHY',
       detail: `Booking line confirmed${observedAt ? ` · observed ${formatInstantUtc(observedAt)}` : ''}`,
     };
   };

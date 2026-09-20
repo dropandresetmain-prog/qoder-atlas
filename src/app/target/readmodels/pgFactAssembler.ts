@@ -1065,6 +1065,9 @@ async function loadRecoveryCaseFactsInner(
     caseId,
     ...(cause ? { changeSignalRef: cause.changeSignalRef } : {}),
     changedTransportServiceRefs: new Set(changedTransportServiceRefs.rows.map((fact) => fact.subject_id)),
+    ...(causeRow?.change_type === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION' ? {
+      reprotectedTransportServiceRefs: new Set(changedTransportServiceRefs.rows.map((fact) => fact.subject_id)),
+    } : {}),
   });
 
   // ---------------------------------------------------------------------
