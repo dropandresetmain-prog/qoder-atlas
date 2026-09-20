@@ -10,7 +10,7 @@ this update where it describes current composition or delivery order.
 
 Current evidence: normal PostgreSQL boot, LIVE Atlas research and Qwen, physical
 Sarah programme recovery, separate protected Atlas sandbox flight execution,
-A1 accepted desktop V5.6/V7.2 and A2 repeated LIVE Sarah acceptance at `f0c79f2412513e3a676737ac32c3c3694c03388a`. Physical Jordan acceptance remains pending.
+A1 accepted desktop V5.6/V7.2 and A2 repeated LIVE Sarah acceptance at `f0c79f2412513e3a676737ac32c3c3694c03388a`. Jordan A3 has physically produced one complete LIVE composite strategy that is VIABLE / AWAITING_AUTHORITY; final desktop A3 acceptance and all A4 selected sandbox actions remain pending.
 
 Sequence: A0 freeze/diagnose -> A1 strong current-product surfaces plus faithful V5.6/V7.2
 -> A2 Sarah LIVE/video-ready -> A3 Jordan multi-domain composition -> A4 Jordan sandbox/video-ready ->
@@ -26,7 +26,7 @@ ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 | Programme relocation/cancellation | Act Now for the small typed set required by Sarah/Jordan; retain impact, authority, execution and observation gates. Operations beyond hero needs stay parked; no untyped OTHER mutation. |
 | Non-critical legacy parity | Park for Later; revisit when it materially improves Sarah, Jordan, graph fidelity or submission. Message/export footer controls were inert at the legacy baseline. |
 | Programme importer partial-prefix visibility | Park for Later after focused PG interruption/retry proof (5/5). Partial inventory remains valid and UNKNOWN; identical retry converges without duplicates, another workspace unchanged, no supplier/authority effects. Revisit for explicit import-status/hide-incomplete requirements. |
-| Jordan multi-domain recovery | Act Now: Narita overnight, authoritative contextual entry check, Singapore stay actions when selected recovery requires them, material transfers, finals and evidenced insurance reasoning. Supported required provider actions use real sandbox execution; unsupported seams remain explicit. |
+| Jordan multi-domain recovery | Act Now: A3 requires replacement flight + Narita overnight + scoped authoritative Japan entry evidence + required Singapore replacement/cancellation consequence + finals viability + Frankfurter/home-currency comparison in one deterministic composite. A4 executes exactly four selected sandbox actions: replacement flight, Narita booking, Singapore replacement booking, then displaced Singapore stay cancellation after replacement confirmation. Transfer/insurance remain reasoning/context only. |
 | Provider restoration | Investigate Now for each hero-required provider: normal boot, live research, downstream use and protected sandbox actions. Unrelated historical adapters remain Park for Later. |
 | Desktop presenter quality and LIVE proof | Act Now across hero-visible graphs, consequences, alternatives, recommendation, authority, progress/provenance and resolution. Mobile is a separate post-hackathon milestone. |
 | Reset after external execution | Act Now guard integrated: shared lease and refusal after any external attempt/observation. Retain workspace for reconciliation/audit; repeat external heroes in fresh workspaces. Cleanup/archive workflow remains Park for Later. |
