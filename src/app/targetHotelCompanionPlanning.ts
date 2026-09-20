@@ -12,7 +12,7 @@ import type { PlanningToolProvenance, PlanningToolRequest, PlanningToolResult } 
 import { PlanningToolProvenanceSchema, PlanningToolRequestSchema, planningToolRequestFingerprint, type PlanningResearchBudget } from '../contracts/v2/planning/planningTool.ts';
 import type { DomainProposerInput, DomainStrategyProposer } from '../contracts/v2/planning/proposerAdaptation.ts';
 import type { ScenarioEffect } from '../contracts/v2/scenario/scenarioChange.ts';
-import { ExactMoneySchema, currencyExponent, type ExactMoney } from '../domain/v2/shared/money.ts';
+import { ExactMoneySchema, currencyExponent, type CurrencyCode, type ExactMoney } from '../domain/v2/shared/money.ts';
 import { InstantIntervalSchema, type Instant } from '../domain/v2/shared/time.ts';
 import type { CapturedWorld } from '../resolution/world/world.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
@@ -109,7 +109,13 @@ function exactPrice(price: unknown): ExactMoney | undefined {
   if (price === null || typeof price !== 'object') return undefined;
   const raw = price as { amount?: unknown; currency?: unknown };
   if (typeof raw.amount !== 'number' || !Number.isFinite(raw.amount) || typeof raw.currency !== 'string') return undefined;
-  const parsed = ExactMoneySchema.safeParse({ amount: raw.amount.toFixed(currencyExponent(raw.currency as ExactMoney['currency'])), currency: raw.currency });
+  // Provider prices arrive as JS numbers at this boundary. Never use toFixed:
+  // it can silently lower/round a charge before viability and authority see it.
+  const amount = String(raw.amount);
+  if (/[eE]/.test(amount)) return undefined;
+  const fraction = amount.split('.')[1] ?? '';
+  if (fraction.length > currencyExponent(raw.currency as CurrencyCode)) return undefined;
+  const parsed = ExactMoneySchema.safeParse({ amount, currency: raw.currency });
   return parsed.success && !parsed.data.amount.startsWith('-') ? parsed.data : undefined;
 }
 
@@ -147,6 +153,24 @@ function quotedTerms(value: unknown): { quoteId: string; price: ExactMoney; work
 
 interface SearchBinding { context: HotelPlanningContext; fingerprint: string; request: PlanningToolRequest; }
 interface RateBinding extends SearchBinding { rate: HotelRateView; quoteRequestId: string; }
+
+function sameExternalRef(a: { system: string; value: string }, b: { system: string; value: string }): boolean {
+  return a.system === b.system && a.value === b.value;
+}
+
+function requestedPropertyRef(place: CapturedWorld['places'][number], context: HotelPlanningContext): { system: string; value: string } | undefined {
+  const ref = context.query.location.externalRef;
+  if (!ref || !place.externalRefs?.some((captured) => sameExternalRef(captured, ref))) return undefined;
+  return ref;
+}
+
+function propertyMatchesRef(
+  property: HotelSearchOutcome['properties'][number],
+  ref: { system: string; value: string },
+): boolean {
+  return property.propertyId === ref.value
+    && property.externalRefs?.some((returned) => sameExternalRef(returned, ref)) === true;
+}
 
 /**
  * A per-basis session. It records only normalized request/result correlations;
@@ -204,9 +228,8 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       const place = base.world.places.find((candidatePlace) => candidatePlace.id === context.placeId);
       const window = InstantIntervalSchema.safeParse(context.stayWindow);
       const provenance = PlanningToolProvenanceSchema.safeParse(context.provenance);
-      const hasProviderLocation = context.query.location.externalRef !== undefined
-        || context.query.location.coordinates !== undefined;
-      if (!place || !window.success || !provenance.success || !hasProviderLocation
+      const propertyRef = place ? requestedPropertyRef(place, context) : undefined;
+      if (!place || !window.success || !provenance.success || !propertyRef
         || !SUBJECT_ID.test(context.proposedJourneyItemId) || context.orderKey.trim().length === 0) continue;
       if (!context.query.guestNationality || !/^[A-Z]{2}$/.test(context.query.guestNationality)
         || context.query.guests === undefined || context.query.rooms === undefined
@@ -232,7 +255,15 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       const bindings = [...searches.values()].flat().filter((binding) => binding.request.id === result.requestId);
       const outcome = asSearchOutcome(result.normalizedEvidence);
       if (!outcome || bindings.length === 0) continue;
-      const propertyIds = new Set(outcome.properties.slice(0, maxProperties ?? 0).map((property) => property.propertyId));
+      const propertyIds = new Set(bindings.flatMap((binding) => {
+        const place = input.world.places.find((candidate) => candidate.id === binding.context.placeId);
+        const ref = place ? requestedPropertyRef(place, binding.context) : undefined;
+        if (!ref) return [];
+        return outcome.properties
+          .filter((property) => propertyMatchesRef(property, ref))
+          .slice(0, maxProperties ?? 0)
+          .map((property) => property.propertyId);
+      }));
       for (const rate of outcome.rates.filter((candidate) => candidate.availability !== 'UNKNOWN' && propertyIds.has(candidate.propertyId)).slice(0, maxRates ?? 0)) {
         const request = PlanningToolRequestSchema.parse({
           id: stableId('hotel-quote', JSON.stringify({ rateId: rate.rateId })), capability: 'HOTEL', operation: 'hotel.quote', parameters: { rateId: rate.rateId },
@@ -258,7 +289,7 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       if (!terms) continue;
       for (const binding of bindings) {
         const offer: ResolvedStayOffer = {
-          offerId: stableId('stay-offer', JSON.stringify({ rateId: binding.rate.rateId, quoteId: terms.quoteId, propertyId: binding.rate.propertyId, price: terms.price })),
+          offerId: stableId('stay-offer', JSON.stringify({ rateId: binding.rate.rateId, quoteId: terms.quoteId, propertyId: binding.rate.propertyId, placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price })),
           placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price,
         };
         quotedStays.push({

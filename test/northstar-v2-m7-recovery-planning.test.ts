@@ -1226,6 +1226,10 @@ test('transport planning adds a quoted hotel companion only for the real uncover
   const { world, journey, placeId, arrival, visit } = overnightStayWorld();
   const originPlaceId = arrival.desiredOriginPlaceId!;
   world.places.push({ id: originPlaceId, revision: 1, name: 'Origin', placeType: 'AIRPORT', timeZone: 'Pacific/Auckland', hasCoordinates: true });
+  world.places.find((place) => place.id === placeId)!.externalRefs = [
+    { system: 'hotel-provider-id', value: 'property-a' },
+    { system: 'hotel-provider-id', value: 'property-b' },
+  ];
   const departure = world.journeyItems.find((item) => item.id !== arrival.id)!;
   const onwardService = service({
     originPlaceId: placeId, destinationPlaceId: departure.desiredDestinationPlaceId!,
@@ -1246,7 +1250,7 @@ test('transport planning adds a quoted hotel companion only for the real uncover
       resolveContext: ({ candidate, gap }) => ({
         baseCandidateKey: candidate.key, journeyId: gap.journeyId, placeId,
         query: {
-          location: { coordinates: { latitude: 1.25, longitude: 103.83, radiusKm: 2 } },
+          location: { externalRef: { system: 'hotel-provider-id', value: 'property-a' } },
           checkInDate: '2030-06-02', checkOutDate: '2030-06-03', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ',
         },
         stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' },
@@ -1265,7 +1269,7 @@ test('transport planning adds a quoted hotel companion only for the real uncover
   assert.equal(searches.length, 1, 'only the actual overnight gap receives HOTEL research');
   const search: PlanningToolResult = {
     requestId: searches[0]!.id, capability: 'HOTEL', operation: 'hotel.search', status: 'SUCCEEDED',
-    normalizedEvidence: { properties: [{ propertyId: 'property-a', name: 'A' }], rates: [{ rateId: 'rate-a', propertyId: 'property-a', totalPrice: { amount: 245, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
+    normalizedEvidence: { properties: [{ propertyId: 'property-a', name: 'A', externalRefs: [{ system: 'hotel-provider-id', value: 'property-a' }] }], rates: [{ rateId: 'rate-a', propertyId: 'property-a', totalPrice: { amount: 245, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
     provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
   };
   const quotes = await planning.nextRound({ completedRound: 2, results: [flight, search] });
@@ -1303,6 +1307,34 @@ test('transport planning adds a quoted hotel companion only for the real uncover
     error: { category: 'PROVIDER_ERROR', code: 'quote_failed', message: 'provider refused the confirmation' },
   };
   assert.deepEqual(planning.materialize([flight, search, failedQuote]).resolvedStayOffers, [], 'a failed confirmation cannot become a candidate stay term');
+  const fractionalQuote: PlanningToolResult = {
+    ...quote,
+    normalizedEvidence: { status: 'QUOTED', quoteId: 'quote-fractional', quotedPrice: { amount: 245.001, currency: 'NZD' } },
+  };
+  assert.deepEqual(planning.materialize([flight, search, fractionalQuote]).resolvedStayOffers, [], 'an unrepresentable provider price cannot be rounded into a lower candidate charge');
+  const wrongProperty: PlanningToolResult = {
+    ...search,
+    normalizedEvidence: { properties: [{ propertyId: 'property-other', name: 'Other', externalRefs: [{ system: 'hotel-provider-id', value: 'property-other' }] }], rates: [{ rateId: 'rate-other', propertyId: 'property-other', totalPrice: { amount: 200, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
+  };
+  assert.deepEqual(await planning.nextRound({ completedRound: 2, results: [flight, wrongProperty] }), [], 'an unrelated returned property cannot be quoted for the captured place');
+  const alternate = createHotelCompanionPlanning({
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
+    hotel: {
+      transport: planning.transport,
+      resolveContext: ({ candidate, gap }) => ({
+        baseCandidateKey: candidate.key, journeyId: gap.journeyId, placeId,
+        query: { location: { externalRef: { system: 'hotel-provider-id', value: 'property-b' } }, checkInDate: '2030-06-02', checkOutDate: '2030-06-03', guests: { adults: 1 }, rooms: 1, guestNationality: 'NZ' },
+        stayWindow: { start: '2030-06-02T08:00:00.000Z', end: '2030-06-03T02:00:00.000Z' }, proposedJourneyItemId: id(), orderKey: '020', visit,
+        provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: ['source-stay-context'] },
+      }),
+    },
+  });
+  const alternateSearches = await alternate.nextRound({ completedRound: 1, results: [flight] });
+  const alternateSearch: PlanningToolResult = {
+    ...search, requestId: alternateSearches[0]!.id,
+    normalizedEvidence: { properties: [{ propertyId: 'property-b', name: 'B', externalRefs: [{ system: 'hotel-provider-id', value: 'property-b' }] }], rates: [{ rateId: 'rate-b', propertyId: 'property-b', totalPrice: { amount: 255, currency: 'NZD' }, refundable: true, availability: 'AVAILABLE' }] },
+  };
+  assert.equal((await alternate.nextRound({ completedRound: 2, results: [flight, alternateSearch] })).length, 1, 'a different captured property reference can be quoted when the returned property matches it');
   const noContext = createHotelCompanionPlanning({
     world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
     hotel: { transport: planning.transport, resolveContext: () => undefined },
