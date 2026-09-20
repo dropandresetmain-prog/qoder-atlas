@@ -35,6 +35,11 @@ import {
   persistActionPlan,
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { updateJourneyItem } from '../src/persistence/postgres/commands/travelCommands.ts';
+import {
+  allocateReservationLine,
+  addReservationLine,
+  createReservation,
+} from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import { recordInformationRecord, ingestInformationVersion } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 import { ScenarioChangeSchema } from '../src/contracts/v2/scenario/scenarioChange.ts';
 import { evaluateRecoveryStrategy } from '../src/resolution/scenarios/evaluate.ts';
@@ -88,7 +93,10 @@ async function transitionTo(
   }
 }
 
-async function setup(windows: WindowPair = { first: DEFAULT_FIRST_WINDOW, second: DEFAULT_SECOND_WINDOW }) {
+async function setup(
+  windows: WindowPair = { first: DEFAULT_FIRST_WINDOW, second: DEFAULT_SECOND_WINDOW },
+  options: { includePlaceInBase?: boolean; includeMissingPlaceInBase?: boolean } = {},
+) {
   const pool = await sharedTestPool();
   const seed = await beginSeed(pool, 'A4 selected-plan continuation');
   const traveller = await seedTraveller(seed, { displayName: 'Continuation traveller' });
@@ -173,6 +181,7 @@ async function setup(windows: WindowPair = { first: DEFAULT_FIRST_WINDOW, second
   const captureFocus = [
     { kind: 'JOURNEY' as const, id: journeyId },
     { kind: 'JOURNEY' as const, id: otherJourneyId },
+    ...(options.includePlaceInBase ? [{ kind: 'PLACE' as const, id: originPlaceId }] : []),
   ];
   const capture = () =>
     captureWorld(pool, {
@@ -182,6 +191,15 @@ async function setup(windows: WindowPair = { first: DEFAULT_FIRST_WINDOW, second
       informationTopics: registry.informationTopics,
     });
   const baseWorld = await capture();
+  const baseManifest = options.includeMissingPlaceInBase
+    ? {
+        ...baseWorld.manifest,
+        aggregateReads: [
+          ...baseWorld.manifest.aggregateReads,
+          { aggregateRef: { kind: 'PLACE' as const, id: randomUUID() }, revision: 1 },
+        ],
+      }
+    : baseWorld.manifest;
   const scenarioChange = ScenarioChangeSchema.parse({
     id: randomUUID(),
     recoveryStrategyId: randomUUID(),
@@ -229,7 +247,7 @@ async function setup(windows: WindowPair = { first: DEFAULT_FIRST_WINDOW, second
     ],
   };
   await persistStrategyChangeRow(pool, seed.workspaceId, seed.actorId, opened.caseId, scenarioChange, {
-    baseManifest: baseWorld.manifest,
+    baseManifest,
     candidateSummaries: [{ subjectRef: { kind: 'JOURNEY', id: journeyId } }],
   });
   mustOk(
@@ -273,6 +291,8 @@ async function setup(windows: WindowPair = { first: DEFAULT_FIRST_WINDOW, second
     otherJourneyId,
     itemId: journeyItemId,
     otherItemId,
+    originPlaceId,
+    destinationPlaceId,
     publisherOrganisationId,
     legalEvidenceId,
     registry,
@@ -690,5 +710,201 @@ describe('A4 selected-plan continuation checkpoint', () => {
     });
     assert.equal(gate.allowed, true, !gate.allowed ? `${gate.reason}: ${gate.detail ?? ''}` : '');
     void applied;
+  });
+});
+
+describe('A4 CP4b continuation revision accounting', () => {
+  async function applyCompoundStemPrerequisite(ctx: SetupCtx) {
+    const first = ctx.plan.intents[0]!;
+    const prepared = mustOk(await prepareAttempt(ctx, ctx.plan, first.id));
+    const stem = `offer-select:${first.id}`;
+    const selectKey = `${stem}:select`;
+    const siblingKey = `${stem}:window`;
+    const firstWindow = mustOk(
+      await updateJourneyItem(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: selectKey,
+        journeyId: ctx.journeyId,
+        journeyItemId: ctx.itemId,
+        expectedRevision: 1,
+        intendedWindow: ctx.windows.first,
+      }),
+    );
+    mustOk(
+      await updateJourneyItem(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: siblingKey,
+        journeyId: ctx.journeyId,
+        journeyItemId: ctx.itemId,
+        expectedRevision: 2,
+        intendedWindow: {
+          start: '2032-03-05T10:30:00.000Z',
+          end: '2032-03-05T11:30:00.000Z',
+        },
+      }),
+    );
+    assert.deepEqual(
+      await recordSelectedPlanCanonicalApplication(ctx.pool, {
+        workspaceId: ctx.seed.workspaceId,
+        actorId: ctx.seed.actorId,
+        attemptId: prepared.attemptId,
+        actionPlanId: ctx.plan.id,
+        actionIntentId: first.id,
+        commandNamespace: 'JOURNEY_ITEM_UPDATED',
+        idempotencyKey: selectKey,
+        source: { kind: 'INTERNAL_COMMAND' },
+      }),
+      { ok: true },
+    );
+    await transitionTo(ctx.pool, ctx.seed.workspaceId, prepared.attemptId, 'OBSERVED_SUCCESS');
+    return { first, prepared, firstWindow, selectKey, siblingKey };
+  }
+
+  test('compound same-plan receipts under intent stem account JOURNEY +2 and allow successor checkpoint', async () => {
+    const ctx = await setup();
+    await applyCompoundStemPrerequisite(ctx);
+    const checkpoint = await createCheckpoint(ctx, ctx.plan, ctx.plan.intents[1]!.id);
+    assert.equal(checkpoint.ok, true, !checkpoint.ok ? checkpoint.reason : '');
+  });
+
+  test('extra same-Journey mutation outside the intent stem remains UNACCOUNTED', async () => {
+    const ctx = await setup();
+    await applyCompoundStemPrerequisite(ctx);
+    mustOk(
+      await updateJourneyItem(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: randomUUID(),
+        journeyId: ctx.journeyId,
+        journeyItemId: ctx.itemId,
+        expectedRevision: 3,
+        intendedWindow: { start: '2032-03-05T16:00:00.000Z', end: '2032-03-05T17:00:00.000Z' },
+      }),
+    );
+    const checkpoint = await createCheckpoint(ctx, ctx.plan, ctx.plan.intents[1]!.id);
+    assert.deepEqual(checkpoint, { ok: false, reason: 'UNACCOUNTED_BASE_REVISION_CHANGE' });
+  });
+
+  test('unrelated Traveller scope advance outside the footprint blocks continuation', async () => {
+    const ctx = await setup();
+    const applied = await prepareAndApplyInternalFirst(ctx);
+    const serviceId = ctx.baseWorld.transportServices[0]?.id;
+    assert.ok(serviceId, 'seeded transport service required');
+    const reservation = mustOk(
+      await createReservation(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: randomUUID(),
+        reservation: {
+          reservationType: 'TRANSPORT',
+          responsibleTravellerId: ctx.travellerId,
+          observedStatus: 'UNKNOWN',
+        },
+      }),
+    );
+    const line = mustOk(
+      await addReservationLine(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: randomUUID(),
+        reservationId: reservation.id,
+        expectedRevision: 1,
+        line: { productType: 'TRANSPORT', observedStatus: 'UNKNOWN' },
+        detail: { productType: 'TRANSPORT', transportServiceId: serviceId },
+      }),
+    );
+    mustOk(
+      await allocateReservationLine(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: randomUUID(),
+        reservationId: reservation.id,
+        expectedRevision: line.reservationRevision,
+        allocation: {
+          reservationLineId: line.lineId,
+          travellerId: ctx.travellerId,
+          journeyItemId: ctx.itemId,
+          allocationRole: 'PRIMARY',
+          quantity: 1,
+        },
+      }),
+    );
+    const checkpoint = await createCheckpoint(ctx, ctx.plan, ctx.plan.intents[1]!.id);
+    assert.deepEqual(checkpoint, { ok: false, reason: 'UNACCOUNTED_BASE_REVISION_CHANGE' });
+    void applied;
+  });
+
+  test('base-manifest PLACE present in approved basis is required in fresh capture', async () => {
+    const ctx = await setup(
+      { first: DEFAULT_FIRST_WINDOW, second: DEFAULT_SECOND_WINDOW },
+      { includePlaceInBase: true },
+    );
+    await prepareAndApplyInternalFirst(ctx);
+    const checkpoint = await createCheckpoint(ctx, ctx.plan, ctx.plan.intents[1]!.id);
+    assert.equal(checkpoint.ok, true, !checkpoint.ok ? checkpoint.reason : '');
+    const stored = await ctx.pool.query<{ base_manifest: { aggregateReads: Array<{ aggregateRef: { kind: string } }> } }>(
+      'SELECT base_manifest FROM recovery_strategies WHERE workspace_id = $1 AND id = $2',
+      [ctx.seed.workspaceId, ctx.scenarioChange.recoveryStrategyId],
+    );
+    assert.ok(
+      stored.rows[0]!.base_manifest.aggregateReads.some((read) => read.aggregateRef.kind === 'PLACE'),
+      'approved basis must include PLACE',
+    );
+  });
+
+  test('base-manifest PLACE that cannot be captured fails closed', async () => {
+    const ctx = await setup(
+      { first: DEFAULT_FIRST_WINDOW, second: DEFAULT_SECOND_WINDOW },
+      { includeMissingPlaceInBase: true },
+    );
+    // Bypass prepare gate (strategy base is intentionally uncapturable) and still
+    // prove continuation accounting refuses the missing PLACE subject.
+    const first = ctx.plan.intents[0]!;
+    const attemptId = randomUUID();
+    await ctx.pool.query(
+      `INSERT INTO execution_attempts (
+         workspace_id, id, action_intent_id, attempt_number, status,
+         logical_operation_key, request_fingerprint, gating_principal_id, created_by_actor_id
+       ) VALUES ($1,$2,$3,1,'PREPARED',$4,$5,$6,$7)`,
+      [
+        ctx.seed.workspaceId,
+        attemptId,
+        first.id,
+        first.logicalOperationKey,
+        first.requestFingerprint,
+        ctx.principalId,
+        ctx.seed.actorId,
+      ],
+    );
+    const commandKey = randomUUID();
+    mustOk(
+      await updateJourneyItem(ctx.uow(), {
+        workspaceId: ctx.seed.workspaceId,
+        actorPrincipalId: ctx.seed.actorId,
+        idempotencyKey: commandKey,
+        journeyId: ctx.journeyId,
+        journeyItemId: ctx.itemId,
+        expectedRevision: 1,
+        intendedWindow: ctx.windows.first,
+      }),
+    );
+    assert.deepEqual(
+      await recordSelectedPlanCanonicalApplication(ctx.pool, {
+        workspaceId: ctx.seed.workspaceId,
+        actorId: ctx.seed.actorId,
+        attemptId,
+        actionPlanId: ctx.plan.id,
+        actionIntentId: first.id,
+        commandNamespace: 'JOURNEY_ITEM_UPDATED',
+        idempotencyKey: commandKey,
+        source: { kind: 'INTERNAL_COMMAND' },
+      }),
+      { ok: true },
+    );
+    await transitionTo(ctx.pool, ctx.seed.workspaceId, attemptId, 'OBSERVED_SUCCESS');
+    const checkpoint = await createCheckpoint(ctx, ctx.plan, ctx.plan.intents[1]!.id);
+    assert.deepEqual(checkpoint, { ok: false, reason: 'UNACCOUNTED_BASE_REVISION_CHANGE' });
   });
 });

@@ -13,6 +13,7 @@ import { ScenarioChangeSchema, type ScenarioChange, type ScenarioEffect } from '
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import { WorldSnapshotManifestSchema } from '../../../contracts/v2/scope/readScope.ts';
 import { evaluateRecoveryStrategy } from '../../../resolution/scenarios/evaluate.ts';
+import type { ResolvedStayOffer } from '../../../resolution/scenarios/overlay.ts';
 import { createM6Registry } from '../../../resolution/evaluation/registry.ts';
 import { captureWorld } from '../world/pgCurrentState.ts';
 import { canonicalPayloadHash } from '../canonicalHash.ts';
@@ -55,6 +56,182 @@ function effectFingerprint(effect: ScenarioEffect): string {
   return canonicalPayloadHash(effect);
 }
 
+interface CanonicalFootprintChange {
+  attemptId: string;
+  actionIntentId: string;
+  commandNamespace: string;
+  idempotencyKey: string;
+  subjectKind: string;
+  subjectId: string;
+  beforeRevision: number | null;
+  afterRevision: number;
+}
+
+/**
+ * Durable footprint of a completed attempt's canonical application.
+ *
+ * SPA may record one or more exact receipts. Compound applies (offer-select /
+ * stay) also write sibling receipts under the intent-scoped key stem
+ * `{family}:{actionIntentId}:…`. When the SPA-linked key embeds that intent id,
+ * every sibling command_receipt/change_record with the same stem is attributed
+ * to the attempt — without accepting foreign plans or forged namespaces.
+ */
+async function loadCanonicalFootprintChanges(
+  db: Queryable,
+  workspaceId: string,
+  prerequisiteAttemptIds: readonly string[],
+): Promise<CanonicalFootprintChange[] | undefined> {
+  if (prerequisiteAttemptIds.length === 0) return undefined;
+  const anchors = await db.query<{
+    attempt_id: string;
+    action_intent_id: string;
+    command_namespace: string;
+    idempotency_key: string;
+  }>(
+    `SELECT ea.id AS attempt_id, ea.action_intent_id,
+            application.command_namespace, application.idempotency_key
+       FROM execution_attempts ea
+       JOIN selected_plan_canonical_applications application
+         ON application.workspace_id = ea.workspace_id AND application.attempt_id = ea.id
+       JOIN command_receipts receipt
+         ON receipt.workspace_id = application.workspace_id
+        AND receipt.command_namespace = application.command_namespace
+        AND receipt.idempotency_key = application.idempotency_key
+      WHERE ea.workspace_id = $1 AND ea.id = ANY($2::uuid[])
+        AND ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED')`,
+    [workspaceId, prerequisiteAttemptIds],
+  );
+  if (anchors.rows.length === 0) return undefined;
+  const byAttempt = new Map<string, { actionIntentId: string; stems: Set<string> }>();
+  for (const row of anchors.rows) {
+    let entry = byAttempt.get(row.attempt_id);
+    if (!entry) {
+      entry = { actionIntentId: row.action_intent_id, stems: new Set() };
+      byAttempt.set(row.attempt_id, entry);
+    }
+    // Intent-scoped compound-apply stem: family:intentId:
+    const parts = row.idempotency_key.split(':');
+    if (parts.length >= 3 && parts[1] === row.action_intent_id) {
+      entry.stems.add(`${parts[0]}:${row.action_intent_id}:`);
+    }
+  }
+  // Every prerequisite attempt must have at least one SPA-linked receipt.
+  if ([...prerequisiteAttemptIds].some((id) => !byAttempt.has(id))) return undefined;
+
+  const out: CanonicalFootprintChange[] = [];
+  const seen = new Set<string>();
+  for (const [attemptId, entry] of byAttempt) {
+    const stemList = [...entry.stems];
+    const changes = await db.query<{
+      command_namespace: string;
+      idempotency_key: string;
+      subject_kind: string;
+      subject_id: string;
+      before_revision: string | null;
+      after_revision: string;
+    }>(
+      `SELECT change.command_namespace, change.idempotency_key, change.subject_kind,
+              change.subject_id::text, change.before_revision::text, change.after_revision::text
+         FROM change_records change
+         JOIN command_receipts receipt
+           ON receipt.workspace_id = change.workspace_id
+          AND receipt.command_namespace = change.command_namespace
+          AND receipt.idempotency_key = change.idempotency_key
+        WHERE change.workspace_id = $1
+          AND (
+            EXISTS (
+              SELECT 1 FROM selected_plan_canonical_applications spa
+               WHERE spa.workspace_id = change.workspace_id
+                 AND spa.attempt_id = $2
+                 AND spa.command_namespace = change.command_namespace
+                 AND spa.idempotency_key = change.idempotency_key
+            )
+            OR (
+              cardinality($3::text[]) > 0
+              AND change.idempotency_key LIKE ANY (
+                SELECT stem || '%' FROM unnest($3::text[]) AS stem
+              )
+            )
+          )
+        ORDER BY change.after_revision ASC NULLS FIRST, change.idempotency_key ASC`,
+      [workspaceId, attemptId, stemList],
+    );
+    for (const change of changes.rows) {
+      const key = `${attemptId}|${change.command_namespace}|${change.idempotency_key}|${change.subject_kind}|${change.subject_id}|${change.after_revision}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        attemptId,
+        actionIntentId: entry.actionIntentId,
+        commandNamespace: change.command_namespace,
+        idempotencyKey: change.idempotency_key,
+        subjectKind: change.subject_kind,
+        subjectId: change.subject_id,
+        beforeRevision: change.before_revision === null ? null : Number(change.before_revision),
+        afterRevision: Number(change.after_revision),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Scope advances caused by footprint commands, mirroring m6_scope_trigger
+ * causality for the command namespaces produced by selected-plan apply paths.
+ * Each command receipt is one transaction ⇒ one bump per affected scope.
+ */
+async function expectedScopeAdvancesFromFootprint(
+  db: Queryable,
+  workspaceId: string,
+  footprint: readonly CanonicalFootprintChange[],
+): Promise<Map<string, number> | undefined> {
+  const advances = new Map<string, number>();
+  const bump = (scopeKind: string, scopeId: string) => {
+    const key = `${scopeKind}:${scopeId}`;
+    advances.set(key, (advances.get(key) ?? 0) + 1);
+  };
+  for (const change of footprint) {
+    switch (change.commandNamespace) {
+      case 'JOURNEY_ITEM_UPDATED':
+      case 'JOURNEY_ITEM_ADDED':
+      case 'INTENDED_VISIT_ADDED':
+      case 'CREDENTIAL_SELECTED':
+        if (change.subjectKind === 'JOURNEY') bump('JOURNEY', change.subjectId);
+        break;
+      case 'RESERVATION_ALLOCATED': {
+        // Allocation bumps TRAVELLER and owning JOURNEY (via journey_item).
+        const travellerFromKey = change.idempotencyKey.includes(':allocation:')
+          ? change.idempotencyKey.slice(change.idempotencyKey.lastIndexOf(':') + 1)
+          : null;
+        const alloc = await db.query<{ traveller_id: string; journey_id: string }>(
+          `SELECT a.traveller_id::text, ji.journey_id::text
+             FROM reservation_allocations a
+             JOIN journey_items ji ON ji.workspace_id = a.workspace_id AND ji.id = a.journey_item_id
+            WHERE a.workspace_id = $1 AND a.reservation_id = $2
+              AND ($3::uuid IS NULL OR a.traveller_id = $3::uuid)
+            ORDER BY a.created_at, a.id`,
+          [workspaceId, change.subjectId, travellerFromKey],
+        );
+        if (alloc.rows.length === 0) return undefined;
+        // One command allocates one traveller; if the key did not name them, require exactly one row.
+        if (!travellerFromKey && alloc.rows.length !== 1) return undefined;
+        const row = travellerFromKey
+          ? alloc.rows.find((candidate) => candidate.traveller_id === travellerFromKey)
+          : alloc.rows[0];
+        if (!row) return undefined;
+        bump('TRAVELLER', row.traveller_id);
+        bump('JOURNEY', row.journey_id);
+        break;
+      }
+      default:
+        // Other apply receipts (SOURCE/EVIDENCE/SERVICE/RESERVATION create/line,
+        // stay record) do not advance JOURNEY/TRAVELLER scopes on their own.
+        break;
+    }
+  }
+  return advances;
+}
+
 async function deriveCanonicalRevisionAccounting(
   db: Queryable,
   workspaceId: string,
@@ -77,38 +254,34 @@ async function deriveCanonicalRevisionAccounting(
         WHERE ea.workspace_id = $1 AND ea.id = ANY($2::uuid[])`,
       [workspaceId, prerequisiteAttemptIds],
     )).rows[0]?.action_plan_id;
+
+  const footprint = await loadCanonicalFootprintChanges(db, workspaceId, prerequisiteAttemptIds);
+  if (!footprint) return undefined;
+
   const derived: AccountedRevision[] = [];
   for (const base of source.aggregateReads) {
     const current = freshAggregates.get(`${base.aggregateRef.kind}:${base.aggregateRef.id}`);
     if (!current) return undefined;
     if (current.revision === base.revision) continue;
-    const changes = await db.query<{ attempt_id: string; before_revision: string | null; after_revision: string }>(
-      `SELECT application.attempt_id, change.before_revision::text, change.after_revision::text
-         FROM change_records change
-         JOIN selected_plan_canonical_applications application
-           ON application.workspace_id = change.workspace_id
-          AND application.command_namespace = change.command_namespace
-          AND application.idempotency_key = change.idempotency_key
-        WHERE change.workspace_id = $1 AND change.subject_kind = $2 AND change.subject_id = $3
-          AND application.attempt_id = ANY($4::uuid[])
-          AND change.after_revision > $5 AND change.after_revision <= $6
-        ORDER BY change.after_revision ASC`,
-      [workspaceId, base.aggregateRef.kind, base.aggregateRef.id, prerequisiteAttemptIds, base.revision, current.revision],
-    );
+
+    const changes = footprint
+      .filter((change) => change.subjectKind === base.aggregateRef.kind && change.subjectId === base.aggregateRef.id
+        && change.afterRevision > base.revision && change.afterRevision <= current.revision)
+      .sort((a, b) => a.afterRevision - b.afterRevision || a.idempotencyKey.localeCompare(b.idempotencyKey));
+
     let expected = base.revision;
-    for (const change of changes.rows) {
-      if (Number(change.before_revision) !== expected || Number(change.after_revision) !== expected + 1) return undefined;
+    for (const change of changes) {
+      if (change.beforeRevision !== expected || change.afterRevision !== expected + 1) return undefined;
       derived.push({
         aggregateRef: base.aggregateRef,
         beforeRevision: expected,
         afterRevision: expected + 1,
-        prerequisiteAttemptId: change.attempt_id,
+        prerequisiteAttemptId: change.attemptId,
       });
       expected += 1;
     }
     // Approval-time budget holds for intents on this same plan are intentional
-    // selected-plan side effects, not unrelated world drift. They advance BUDGET
-    // before any attempt exists, so they cannot join through canonical applications.
+    // selected-plan side effects, not unrelated world drift.
     if (expected !== current.revision && base.aggregateRef.kind === 'BUDGET' && planId) {
       const holds = await db.query<{ before_revision: string | null; after_revision: string }>(
         `SELECT change.before_revision::text, change.after_revision::text
@@ -134,7 +307,6 @@ async function deriveCanonicalRevisionAccounting(
           aggregateRef: base.aggregateRef,
           beforeRevision: expected,
           afterRevision: expected + 1,
-          // Plan-level approval hold: anchored to the completed prerequisite that opened continuation.
           prerequisiteAttemptId: anchorAttemptId,
         });
         expected += 1;
@@ -142,20 +314,87 @@ async function deriveCanonicalRevisionAccounting(
     }
     if (expected !== current.revision) return undefined;
   }
+
+  const expectedScopes = await expectedScopeAdvancesFromFootprint(db, workspaceId, footprint);
+  if (!expectedScopes) return undefined;
   for (const base of source.scopeReads) {
     const current = freshScopes.get(`${base.scopeKind}:${base.scopeId}`);
     if (!current) return undefined;
     if (current.generation === base.generation) continue;
-    const matchingJourneyChanges = derived.filter(
-      (entry) => entry.aggregateRef.kind === 'JOURNEY' && entry.aggregateRef.id === base.scopeId,
-    ).length;
-    if (base.scopeKind !== 'JOURNEY' || current.generation - base.generation !== matchingJourneyChanges) {
-      return undefined;
-    }
+    const key = `${base.scopeKind}:${base.scopeId}`;
+    const expectedDelta = expectedScopes.get(key) ?? 0;
+    if (current.generation - base.generation !== expectedDelta) return undefined;
   }
+  // Fresh must not invent unexplained scope advances for scopes present in base.
+  for (const [key, expectedDelta] of expectedScopes) {
+    const [scopeKind, scopeId] = key.split(':') as [string, string];
+    const base = source.scopeReads.find((read) => read.scopeKind === scopeKind && read.scopeId === scopeId);
+    if (!base) continue; // scope not in approved basis — not a continuation currentness concern
+    const current = freshScopes.get(key);
+    if (!current || current.generation - base.generation !== expectedDelta) return undefined;
+  }
+
   const freshEvidence = new Set(fresh.evidenceReads);
   if (source.evidenceReads.some((evidenceId) => !freshEvidence.has(evidenceId))) return undefined;
   return derived;
+}
+
+/**
+ * Residual ADD_JOURNEY_STAY overlays require the same approved stay quotes that
+ * planning bound at strategy persistence — never re-quoted, never fabricated.
+ */
+async function loadResidualResolvedStayOffers(
+  db: Queryable,
+  workspaceId: string,
+  strategyId: string,
+  residualEffects: readonly ScenarioEffect[],
+): Promise<ResolvedStayOffer[] | undefined> {
+  const needed = residualEffects.filter(
+    (effect): effect is Extract<ScenarioEffect, { effectKind: 'ADD_JOURNEY_STAY' }> =>
+      effect.effectKind === 'ADD_JOURNEY_STAY',
+  );
+  if (needed.length === 0) return [];
+  const rows = await db.query<{
+    offer_key: string;
+    place_id: string;
+    stay_window: { start: string; end: string };
+    quoted_amount: string;
+    quoted_currency: string;
+    journey_item_id: string;
+  }>(
+    `SELECT offer_key, place_id, stay_window, quoted_amount::text AS quoted_amount, quoted_currency,
+            journey_item_id
+       FROM stay_execution_bindings
+      WHERE workspace_id = $1 AND recovery_strategy_id = $2 AND action = 'BOOK'
+        AND offer_key IS NOT NULL AND place_id IS NOT NULL AND stay_window IS NOT NULL
+        AND quoted_amount IS NOT NULL AND quoted_currency IS NOT NULL
+        AND journey_item_id IS NOT NULL`,
+    [workspaceId, strategyId],
+  );
+  const byKey = new Map(
+    rows.rows.map((row) => [`${row.offer_key}|${row.journey_item_id}`, row] as const),
+  );
+  const offers: ResolvedStayOffer[] = [];
+  const seen = new Set<string>();
+  for (const effect of needed) {
+    const row = byKey.get(`${effect.offerId}|${effect.proposedJourneyItemId}`);
+    if (
+      !row
+      || row.quoted_amount !== effect.offerPrice.amount
+      || row.quoted_currency !== effect.offerPrice.currency
+    ) {
+      return undefined;
+    }
+    if (seen.has(row.offer_key)) continue;
+    seen.add(row.offer_key);
+    offers.push({
+      offerId: row.offer_key,
+      placeId: row.place_id,
+      stayWindow: row.stay_window,
+      price: { amount: row.quoted_amount, currency: row.quoted_currency },
+    });
+  }
+  return offers;
 }
 
 async function loadAuthoritativeResidual(
@@ -342,7 +581,7 @@ export async function recordSelectedPlanCanonicalApplication(
          workspace_id, attempt_id, application_origin, source_observation_id, command_namespace,
          idempotency_key, created_by_actor_id
        ) VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (workspace_id, attempt_id) DO NOTHING`,
+       ON CONFLICT (workspace_id, attempt_id, command_namespace, idempotency_key) DO NOTHING`,
       [
         input.workspaceId,
         input.attemptId,
@@ -397,21 +636,39 @@ export async function createSelectedPlanContinuationCheckpoint(
   if (!prerequisites) return { ok: false, reason: 'PREREQUISITE_RECEIPT_NOT_PERSISTED' };
 
   const registry = createM6Registry();
-  const freshWorld = await captureWorld(pool, {
-    workspaceId: input.workspaceId,
-    focus: authoritative.resolveSubjectRefs,
-    at: input.now,
-    informationTopics: registry.informationTopics,
-  });
-  const manifest = WorldSnapshotManifestSchema.safeParse(freshWorld.manifest);
-  if (!manifest.success) return { ok: false, reason: 'INVALID_FRESH_MANIFEST' };
-
   const source = await pool.query<{ base_manifest: unknown }>(
     'SELECT base_manifest FROM recovery_strategies WHERE workspace_id = $1 AND id = $2',
     [input.workspaceId, input.sourceStrategyId],
   );
   const sourceManifest = WorldSnapshotManifestSchema.safeParse(source.rows[0]?.base_manifest);
   if (!sourceManifest.success) return { ok: false, reason: 'SOURCE_MANIFEST_MISSING' };
+
+  const residualStayOffers = await loadResidualResolvedStayOffers(
+    pool,
+    input.workspaceId,
+    input.sourceStrategyId,
+    authoritative.residualEffects,
+  );
+  if (!residualStayOffers) return { ok: false, reason: 'RESIDUAL_STAY_OFFER_BINDING_MISSING' };
+
+  // Fresh capture must include every aggregate the approved basis depended on
+  // (e.g. PLACE) plus places required by residual stay offers and assessable subjects.
+  const focusByKey = new Map<string, TypedRef>();
+  for (const ref of authoritative.resolveSubjectRefs) focusByKey.set(`${ref.kind}:${ref.id}`, ref);
+  for (const read of sourceManifest.data.aggregateReads) {
+    focusByKey.set(`${read.aggregateRef.kind}:${read.aggregateRef.id}`, read.aggregateRef);
+  }
+  for (const offer of residualStayOffers) {
+    focusByKey.set(`PLACE:${offer.placeId}`, { kind: 'PLACE', id: offer.placeId });
+  }
+  const freshWorld = await captureWorld(pool, {
+    workspaceId: input.workspaceId,
+    focus: [...focusByKey.values()],
+    at: input.now,
+    informationTopics: registry.informationTopics,
+  });
+  const manifest = WorldSnapshotManifestSchema.safeParse(freshWorld.manifest);
+  if (!manifest.success) return { ok: false, reason: 'INVALID_FRESH_MANIFEST' };
 
   const derivedAccounting = await deriveCanonicalRevisionAccounting(
     pool,
@@ -436,6 +693,7 @@ export async function createSelectedPlanContinuationCheckpoint(
     now: input.now,
     registry,
     resolveSubjectRefs: authoritative.resolveSubjectRefs,
+    ...(residualStayOffers.length > 0 ? { resolvedStayOffers: residualStayOffers } : {}),
   });
   if (!evaluation.ok || evaluation.value.strategy.viability !== 'VIABLE') {
     return { ok: false, reason: 'RESIDUAL_RC6_NOT_VIABLE' };
