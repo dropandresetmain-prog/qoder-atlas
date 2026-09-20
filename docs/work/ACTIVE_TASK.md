@@ -1,9 +1,10 @@
 # ACTIVE TASK — A2 ACCEPTED / A3 IN PROGRESS
 
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
-- Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
+- Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4` @ `d6028791683f13ec73f3e45e4808ce66f5dc8e72`.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Latest verified pushed checkpoint before this commit: `eca447d804debd4e704df9ef48db08b50f1dfcb8`. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) records normal provider/PG/browser evidence and source-complete baseline; acceptance remains pending.
+- A3 LIVE progress base: `eca447d804debd4e704df9ef48db08b50f1dfcb8`. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) records normal provider/PG/browser evidence and source-complete baseline; acceptance remains pending.
+- A4 preserved WIP handoff: [A4_RECOVERY_PREP.md](A4_RECOVERY_PREP.md) — docs-only; do not integrate WIP lanes yet.
 - Accepted: A0 `f55899b15200de692dd749bbcfb795c67f6a22e0`; A1 `a948917c239fc02435020f6740474283dd795ea8`; A2 `f0c79f2412513e3a676737ac32c3c3694c03388a` (tested565f561).
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A2 LIVE](ASTRA_A2_LIVE_EVIDENCE.md), [A3 decisions](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
 
@@ -17,10 +18,12 @@
 
 ## Current lanes — all Act Now
 
-- Terra selected continuation fb4ff102 pushed (6PG pass), not integrated; critical closure review found observed-success dependency bypass and atomic application/capture integration still open. Terra fixes m8 dependency test; root owns trusted fresh capture. Compiler tests f62d836 integrated (26focused pass).
-- Terra hotel execution: existing uncommitted lane in `.worktrees/terra-a4-hotel-execution`, codex/a4-hotel-execution e0f8f7d. Fresh-context Terra now finishes the same work in place: canonical application, binding/cancel PG tests; no provider calls in lane.
-- Luna hotel ceiling b218558 integrated and cloud-pushed through primary. Visit attachment b2f6f96 + validation b9676b1 integrated (reuse8PG pass). Luna cd8f328+b53e8f1 desktop terminal copy/exact item labels/alternatives integrated.
-- Root: durable candidate details9cd4ba6 integrated with local zones/timing facts; official source links and remaining formality notes; actual active sandbox baseline booking ingested/bound. LIVE complete composite nowrecommended/VIABLE (attempt3cdb224a); final desktop evidence/authority-readiness pending.
+- **A4 WIP preserved (not integrated):** see [A4_RECOVERY_PREP.md](A4_RECOVERY_PREP.md).
+  - Continuation: `codex/a4-selected-continuation` @ `b911989` (prior candidate `fb4ff102`; 6PG at that SHA not re-run). `b911989` attempts external dependency + source-kind guards; external-dep PG proof still missing; root owns trusted fresh capture.
+  - Hotel execution: `codex/a4-hotel-execution` @ `2e6cdae` in `.worktrees/terra-a4-hotel-execution`. Sibling fork of continuation — do not merge whole tip; port hotel-unique delta after continuation. Unit stay-boundary 7/7; cancel PG authored, not re-run; boot composition missing.
+- Compiler stay-dependency tests f62d836 / primary `0433979` already integrated (26 focused pass).
+- Luna hotel ceiling b218558 integrated. Visit attachment b2f6f96 + validation b9676b1 integrated (reuse8PG pass). Luna cd8f328+b53e8f1 desktop terminal copy/exact item labels/alternatives integrated.
+- Root: durable candidate details9cd4ba6 integrated with local zones/timing facts; official source links and remaining formality notes; actual active sandbox baseline booking ingested/bound. LIVE complete composite now recommended/VIABLE (attempt3cdb224a); final desktop evidence/authority-readiness pending.
 
 ## Integrated A3 evidence
 
@@ -38,8 +41,8 @@
 - **Act Now:** finish corrected context + boot composition, explicit sandbox inputs/current destination provider booking terms, LIVE whole composite recommendation, desktop evidence. Source date truth is4→3 nights (29Sep→3Oct becomes30Sep→3Oct); founder3→2 was a conditional example.
 - **Act Now closure:** second PG world has explicit source visit+selected passport+LIVE scoped ICA evidence before baseline52PASS/15UNKNOWN. DBastra_jordan_a3_composite_20260920/workspace18891fc1-6e2a-4200-8328-f33b9ca96205; metadata/config under ignored output/playwright and data/local/a3. Source baseline sandbox booking observed; D1/D2/D3 applied normally. LIVE attempt cabd29d2 on Case2e15c71d produced16 rejected partial candidates. Retain SG arrival-card obligation visibly; no completed submission/admission claim.
 - **Act Now closure:** candidate capacity corrected; LIVE attempt3cdb224a-0c6e-54f0-8ecc-5f6bb60a9b7d producedoneVIABLE complete composite, AWAITING_AUTHORITY. OriginalUSD and Frankfurter18Sep SGD2757.86 exposure displayed. Initial serialization conflict closed by normal fresh-basis retry; oneNuiteequote409 refused, otherquoted optionworked. Desktop finalreadability stillpending. Current booking c4NsnfT_N confirmed; NRFN full-price loss ceiling is explicitly conservative, not exact fee/refund.
-- **Act Now A4 safety:** bounded review found checkpoint JSON mismatch/refresh uniqueness, unowned receipt links, caller-asserted residual/world/revisions and unstable JSON hashes. Terra closes stored identity/provenance with isolated PG; root owns authoritative fresh capture. Nothing consequential may use this until closed.
-- **Act Now A4:** [exact selected-plan continuation contract](ASTRA_A4_SELECTED_PLAN_CONTINUATION.md); flight, overnight book, destination replacement book, old-stay cancel. Replacement confirmation precedes cancellation; unknown outcome lookup only. Atomic stay base exists; selected visit closure and new cancellation/executor proof pending.
+- **Act Now A4 safety:** bounded review findings remain open (checkpoint JSON/provenance, unowned receipt links, caller-asserted residual/world/revisions, unstable hashes). `b911989` does not close them. Root owns authoritative fresh capture. Nothing consequential may use continuation until closed — details in [A4_RECOVERY_PREP.md](A4_RECOVERY_PREP.md).
+- **Act Now A4 (later, after A3 desktop acceptance):** [exact selected-plan continuation contract](ASTRA_A4_SELECTED_PLAN_CONTINUATION.md); flight, overnight book, destination replacement book, old-stay cancel. Integration order: continuation safety → hotel-unique port → root review → four-action physical. Do not integrate either WIP branch blindly.
 - **Park for Later:** healthy-trip requests/composer, mobile, generic programme/hotel/visit/credential management, immigration/crawling breadth, unrelated providers, transfer transactions, claims, multi-incidents/extra scenarios, importer atomicity, unrelated parity/refactors/infrastructure.
 - **Ignore / Accept Risk:** accepted R4 redirect/collapsed Apply and inert legacy controls, unless new hero evidence makes them blockers.
 - No founder decision pending. No A3 acceptance yet. Next: restart4123 with desktop/actual programme timing evidence, refresh via normal reassessment/operator planning, capturefinalA3visibleproof. Structuredgiven/family source dossier copied withauditedaddTravellerName; noinventedidentity. Narrative-only21:00same-nightclosure sourcegap remains explicit. Then A4 selected execution. Initial sandbox source booking must not be counted as an A4 selected action.
@@ -48,6 +51,6 @@
 
 - Accepted Sarah server remains on565f561 port4120/session16512, DBastra_product; preserve its evidence. It predates external-reset safety; never execute A4 on that old process.
 - Root `C:/Dev/qoder-atlas` remains unrelated integration/pg-test-perf2534175; do not edit/base lanes there. No main merge.
-- Preserve rejected drafts: request plannerbe69d056, partial request-gates/authority worktrees, importer7b8236ed, wrong-base proposed-stay7ee0c431. Never merge as-is.
+- Preserve rejected drafts (pushed WIP checkpoints; never merge as-is): request planner `codex/astra-a1-request-gates` @ `bfed770` (base be69d056), request authority `codex/a1-request-authority` @ `091555c`, importer7b8236ed, wrong-base proposed-stay7ee0c431.
 - Ignore local output/playwright proof scripts, source recordings, raw A2 videos and local keys/config; never stage secrets/generated artifacts.
-- Continue same task. This ledger plus linked evidence is the compact fresh-chat handoff.
+- Continue same task. Fresh A4 engineering: read [A4_RECOVERY_PREP.md](A4_RECOVERY_PREP.md) first. This ledger plus linked evidence is the compact fresh-chat handoff.
