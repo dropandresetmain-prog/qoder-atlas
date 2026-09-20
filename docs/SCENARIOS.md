@@ -707,12 +707,23 @@ World cast, timings, and hotels: `data/ait-demo-input-pack/`.
 
 ## Status / Next Work
 
+### A5 founder-QC coexistence clarification
+
+Founder QC established a product requirement that Sarah and Jordan can be open/visible at the same time. This is **not** a request to make V7.2 render multiple independent blast centres simultaneously. The accepted interaction may keep one selected active-change focus while preserving other open Cases/incidents in the surrounding Overview.
+
+Jordan progression must preserve:
+- D1 viable/green;
+- D2 tight/watch/amber;
+- D3 impossible/failed/red.
+
+Do not let an aggregate whole-trip FAIL collapse D2 and D3 into the same Overview presentation state.
+
+
 - Final demo content SSOT and programme fixture are reconciled on
   `content/final-demo-world`; S2/S5 demo claims are aligned to proven backend
   boundaries.
 - Integrate content + final backend + approved UI.
-- Execute browser rehearsal in exact order: S2 → reset → S1 → S3 without reset
-  → reset → S7 → reset → S5.
+- For the integrated A5 hero world, S2/Jordan and S1→S3/Sarah must coexist in one normal PostgreSQL workspace; do **not** use reset as a product-level switch between those stories. V7.2 may focus one selected active change at a time while the other Case remains discoverable. Destructive Jordan provider proof may still use a fresh external baseline/workspace where supplier state requires it. S7/S5 remain separate follow-on demo worlds unless later composition deliberately combines them.
 - UI integrator consumes clickable Tier A cast + real hotel labels from content
   SSOT and must not fabricate unavailable read-model evidence.
 
