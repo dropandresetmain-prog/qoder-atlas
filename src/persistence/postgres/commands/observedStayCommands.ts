@@ -296,6 +296,16 @@ export async function attachObservedStay(
         if (visit.journeyId !== params.journeyId) {
           return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit belongs to another Journey', [journeyRef, ref('JOURNEY', visit.journeyId)]) };
         }
+        if (visit.transitIntent) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit must be a landside visit for an observed stay attachment', [journeyRef]) };
+        }
+        const visitStart = Date.parse(visit.intendedDates.start);
+        const visitEnd = Date.parse(visit.intendedDates.end);
+        const stayStart = Date.parse(bookingInterval.data.start);
+        const stayEnd = Date.parse(bookingInterval.data.end);
+        if (visitStart > stayStart || visitEnd < stayEnd) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit dates must cover the observed stay window', [journeyRef]) };
+        }
         if (!await geography.loadJurisdiction(params.workspaceId, visit.jurisdictionId)) {
           return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit jurisdiction is not present in this workspace', [journeyRef, ref('JURISDICTION', visit.jurisdictionId)]) };
         }
