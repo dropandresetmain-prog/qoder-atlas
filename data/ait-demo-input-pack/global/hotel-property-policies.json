@@ -1,0 +1,30 @@
+[
+  {
+    "id": "hotel-policy-narita-gateway-2026",
+    "canonicalPlaceId": "place-hotel-narita-gateway",
+    "sourcePlaceAliases": [
+      { "system": "nuitee-hotel-id", "value": "lp3a92f" }
+    ],
+    "timeZone": "Asia/Tokyo",
+    "standardCheckIn": "15:00",
+    "standardCheckOut": "11:00",
+    "lateArrivalSupported": null,
+    "effectiveWindow": { "start": "2026-01-01", "end": "2027-01-01" },
+    "maxEvidenceAgeSeconds": 86400,
+    "sources": [
+      {
+        "sourceId": "narita-gateway-faq",
+        "url": "https://gateway-hotel.co.jp/en/faq",
+        "publisher": "Narita Gateway Hotel",
+        "contentSha256": "8bef9905f31321d75dfdb2012d655f39b806789af573086c9c8282761564f4cc"
+      },
+      {
+        "sourceId": "narita-gateway-guest",
+        "url": "https://gateway-hotel.co.jp/en/guest",
+        "publisher": "Narita Gateway Hotel",
+        "contentSha256": "644ce0a49735b20b00ff393a51aadc424791bc07e572c8ae25c4a315619481da"
+      }
+    ],
+    "note": "Reviewed general property standard. Rate-specific accommodation-plan terms may override these times; the reviewed sources do not establish late-arrival support or a late-arrival cutoff."
+  }
+]
