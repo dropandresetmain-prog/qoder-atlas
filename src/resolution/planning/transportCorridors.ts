@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto';
 import type { ExternalRef } from '../../contracts/capabilities.ts';
 import { PlanningToolRequestSchema, type PlanningToolRequest } from '../../contracts/v2/planning/planningTool.ts';
 import type { CapturedWorld, WJourneyItem, WPlace } from '../world/world.ts';
+import { projectEffectiveWorld } from '../world/effectiveItinerary.ts';
 import type { FailingSubject } from './proposer.ts';
 
 /** Resolves a place id to a provider airport ExternalRef, or undefined. INJECTED — this module never hardcodes an airport code or ref system. Fail-closed: undefined means "no honest airport for this place". */
@@ -130,7 +131,7 @@ export interface TransportCorridor {
   destinationPlaceId: string;
   origin: ExternalRef;
   destination: ExternalRef;
-  /** Local YYYY-MM-DD departure date at the origin place timezone, derived from the item's intendedWindow.start. */
+  /** Local YYYY-MM-DD departure date at the origin place timezone. Usually the item's intended window; a proven failed connection uses its bounded recovery anchor. */
   departureDate: string;
   passengers: TransportPassengers;
 }
@@ -170,6 +171,13 @@ function localDateAtTimeZone(instant: string, timeZone: string): string {
     throw new Error(`unable to derive local date for instant ${instant} in ${timeZone}`);
   }
   return `${year}-${month}-${day}`;
+}
+
+/** Advance a local calendar date without treating it as a UTC departure time. */
+function nextLocalCalendarDate(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  if (!year || !month || !day) throw new Error(`invalid local date ${date}`);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
 }
 
 function indexPlaces(world: CapturedWorld): Map<string, WPlace> {
@@ -214,6 +222,56 @@ function collectTransportJourneyItems(
   }
 
   return { items, journeysWithoutTransport };
+}
+
+/**
+ * Return the first two local search dates for a downstream item only when its
+ * CURRENT assessment contains a real M6 connection failure. The failure must
+ * name the exact upstream/downstream effective times, so generic transport
+ * failures cannot widen search just by sharing a Journey subject.
+ */
+function connectionRecoveryDates(
+  world: CapturedWorld,
+  failing: readonly FailingSubject[],
+  item: WJourneyItem,
+  originPlace: WPlace,
+): string[] | undefined {
+  if (!item.intendedWindow) return undefined;
+  const effectiveJourney = projectEffectiveWorld(world).journeys.find((journey) => journey.journeyRef.id === item.journeyId);
+  const downstream = effectiveJourney?.items.find((candidate) => candidate.itemRef.id === item.id);
+  if (!effectiveJourney || !downstream) return undefined;
+
+  for (const failingSubject of failing) {
+    if (failingSubject.subject.kind !== 'JOURNEY' || failingSubject.subject.id !== item.journeyId) continue;
+    for (const dimension of failingSubject.assessment.dimensions) {
+      if (!dimension.applicable || !dimension.blocking || dimension.verdict !== 'FAIL' || dimension.dimension !== 'connection_feasibility') continue;
+      for (const explanation of dimension.explanations) {
+        if (explanation.evaluatorId !== 'm6.connection' || explanation.status !== 'FAIL') continue;
+        if (!explanation.relatedSubjects.some((ref) => ref.kind === 'JOURNEY_ITEM' && ref.id === item.id)) continue;
+        const upstreamArrival = explanation.facts.upstreamArrival;
+        const downstreamDeparture = explanation.facts.downstreamDeparture;
+        if (typeof upstreamArrival !== 'string' || typeof downstreamDeparture !== 'string') continue;
+        if (downstream.start.value !== downstreamDeparture || !Number.isFinite(Date.parse(upstreamArrival))) continue;
+        const upstream = explanation.relatedSubjects
+          .filter((ref) => ref.kind === 'JOURNEY_ITEM' && ref.id !== item.id)
+          .map((ref) => effectiveJourney.items.find((candidate) => candidate.itemRef.id === ref.id))
+          .find((candidate) => candidate?.end.value === upstreamArrival);
+        if (!upstream) continue;
+        try {
+          const upstreamDate = localDateAtTimeZone(upstreamArrival, originPlace.timeZone);
+          const intendedDate = localDateAtTimeZone(item.intendedWindow.start, originPlace.timeZone);
+          // A date before either the effective upstream arrival or the onward
+          // intent cannot be an honest recovery search date. The next calendar
+          // date is the only bounded extension.
+          const anchorDate = upstreamDate > intendedDate ? upstreamDate : intendedDate;
+          return [anchorDate, nextLocalCalendarDate(anchorDate)];
+        } catch {
+          return undefined;
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 /** Pure: from the failing subjects, find their TRANSPORT journey items in the world and resolve each into a flight corridor (or an honest gap). Deterministic order: by journeyItemId. */
@@ -288,19 +346,22 @@ export function transportCorridors(
       gaps.push({ journeyItemId: item.id, reasonCode: 'no_departure_window' });
       continue;
     }
-    corridors.push({
-      journeyItemId: item.id,
-      journeyId: item.journeyId,
-      originPlaceId: item.desiredOriginPlaceId,
-      destinationPlaceId: item.desiredDestinationPlaceId,
-      origin,
-      destination,
-      departureDate,
-      passengers: resolvedPassengers,
-    });
+    const dates = connectionRecoveryDates(world, failing, item, originPlace) ?? [departureDate];
+    for (const date of dates) {
+      corridors.push({
+        journeyItemId: item.id,
+        journeyId: item.journeyId,
+        originPlaceId: item.desiredOriginPlaceId,
+        destinationPlaceId: item.desiredDestinationPlaceId,
+        origin,
+        destination,
+        departureDate: date,
+        passengers: resolvedPassengers,
+      });
+    }
   }
 
-  corridors.sort((a, b) => a.journeyItemId.localeCompare(b.journeyItemId));
+  corridors.sort((a, b) => a.journeyItemId.localeCompare(b.journeyItemId) || a.departureDate.localeCompare(b.departureDate));
   gaps.sort((a, b) => (a.journeyItemId ?? '').localeCompare(b.journeyItemId ?? '') || a.reasonCode.localeCompare(b.reasonCode));
 
   return { corridors, gaps };
