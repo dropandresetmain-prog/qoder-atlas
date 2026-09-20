@@ -31,8 +31,51 @@ Do not touch: A4 WIP branches, handoff bundle, recovery planning/engine, SQLite,
 | CP | Goal | SHA |
 |---|---|---|
 | 1 | Source/runtime identity + content ownership freeze + A–D triage | `3bded3e64026213b8f3b78e6b8e83ced28f72e5f` |
-| 2 | Case default-visible hierarchy + focused tests | *(this commit)* |
-| 3 | Overview/framing integrate + Chromium QC | pending |
+| 2 | Case default-visible hierarchy + focused tests | `ed41bd1b2493bd8d645c72a70b9eb362f53ba852` |
+| 3 | Overview/framing integrate + Chromium QC | *(this commit)* |
+
+## Chromium QC (CP3)
+
+- Runtime SHA: `ed41bd1b2493bd8d645c72a70b9eb362f53ba852`
+- Workspace: `C:/Dev/qoder-atlas/.worktrees/a3-operator-ui-second-pass`
+- HTTP: `http://127.0.0.1:4125` (same PG world as prior verify server: workspace `18891fc1-…`)
+- Cases: Sarah `fffa8660-16f7-5d8f-9824-c87947fa3626`; Jordan `297337f5-cda2-5397-a2ba-9ace992396b3`
+- Screenshots (local, not staged): `output/a3-ui-second-pass/*-{1440x900,1280x800}-{viewport,full}.png` (+ Jordan 200% viewport)
+- Playwright metrics @1440×900: Overview focus pill `Active change · ID: 4 cleared · 1 still need attention` / Focus Sarah Lim; `dossierOutsideDetails=0`; `hasPause=false`; cases `hasBlocker=true`
+- Default Case scrollHeight: Sarah ≈3201px (~3.6×900); Jordan ≈3719px (~4.1×900). Over 2–3 viewport target because full-width V5.6 + recommendation remain required; dossiers no longer expand the default view.
+- 200% zoom: sticky decision panel present; Park — button may sit below sticky overflow at extreme zoom.
+
+## Default-visible removals → where evidence lives
+
+| Removed from default | Now lives |
+|---|---|
+| Four large Overview status cards + decision instruction banner | Compact bucket row inside readiness; pending-decision note beside Needs attention |
+| Unrelated traveller in active-change footprint | Dependency-scoped `incidentIds` / focus traveller |
+| “Recommendation review” / “What you’re reviewing” banners | Factual situation lead + short recommendation-status link |
+| Global `A3_EXECUTION_PAUSE` on every control | `decisionActionState` + exact `executionBlocker` when present |
+| Default-visible rejected `proposalHtml` dossiers | Closed `Inspect evaluation` / detailed evaluation disclosures |
+| Money + full action list duplicated in rail/evidence | Money primary in decision panel; cost table expanded in main column |
+| Standalone “What we checked” + repeated formality article | Outcomes under recommendation; conditions once in decision panel; sources under activity |
+| Second long evidence rail article | Compact research table + technical activity disclosure |
+
+## Checks run
+
+- `node --test test/operator-ui-convergence.test.ts` — 13/13
+- `node --test test/operator-ui-camera.test.ts` — 6/6
+- `node --test test/eventOverview.test.ts test/r4-f1-overview-hit-targets.test.ts` — 25/25
+- `npx tsc --noEmit -p tsconfig.json` — clean
+- Chromium Playwright native viewports + full pages — captured locally
+- No full suite / no PG campaign / no supplier calls
+
+## Status
+
+**UI CANDIDATE READY FOR FOUNDER QC — A3 NOT YET ACCEPTED**
+
+## Next action
+
+Founder QC. Do not start A4.
+
+---
 
 ## Presentation contract (FROZEN)
 
@@ -64,7 +107,7 @@ Authoritative fields only; no invented facts.
 - Overview blast: `SERVICE:01baf3ba-…` (label ID), cleared 4 / unresolved 1; landmark programme item supplied.
 - Promoted: Sarah `UNRESOLVED` on that dependency; Jordan `ATTENTION` with **empty** `dependencyRef`.
 - Current model includes all non-cleared promoted travellers in `incidentIds` and picks first unresolved without dependency filter → Jordan incorrectly enters Sarah’s active-change footprint.
-- **Triage: Act Now** — restrict incident membership + focus traveller to the selected `blast.dependencyRef`; label count strip as change-scoped.
+- **Triage: Act Now — CLOSED in CP2** — restrict incident membership + focus traveller to the selected `blast.dependencyRef`; label count strip as change-scoped. Chromium proves Focus Sarah Lim on ID.
 
 ### C. Authority / action path — Act Now (presentation) + Park (projection gap)
 
@@ -72,13 +115,13 @@ Authoritative fields only; no invented facts.
 - Case read-model exposes `authorityState`, per-strategy `executionBlocker`; **does not** project caller principal / grant coverage.
 - Current UI disables all approval with global `A3_EXECUTION_PAUSE` even when a programme-only strategy has no blocker.
 - Sarah’s **recorded** recommendation is externally blocked → must remain blocked with that reason.
-- **Triage: Act Now** — action-state matrix from recommended strategy + blocker; remove global pause-as-reason. **Park for Later** — explicit approver/grant projection on the case view (fail closed without inventing organiser copy).
+- **Triage: Act Now — CLOSED in CP2** — action-state matrix from recommended strategy + blocker; remove global pause-as-reason. **Park for Later** — explicit approver/grant projection on the case view (fail closed without inventing organiser copy).
 
 ### D. Entry / formality applicability — Act Now (dedupe only)
 
 - Jordan: entry tool uncertainty supplies SG Arrival Card obligation; entryResult `PASS`/`requirements_met` on recommended candidate. Notes are evidence-backed for that attempt, not inferred from name/city.
 - Default UI repeats formalities across lead/approval/evidence/activity.
-- **Triage: Act Now** — show once in decision conditions; detailed sources under evidence expansion. Do not invent legal applicability.
+- **Triage: Act Now — CLOSED in CP2** — show once in decision conditions; detailed sources under evidence expansion. Do not invent legal applicability.
 
 ## Content ownership (default view)
 
