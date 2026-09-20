@@ -1,6 +1,6 @@
 # Selected composite plan continuation
 
-Status: Act Now; bounded implementation contract, not acceptance evidence.
+Status: **IMPLEMENTED / PHYSICALLY PROVEN IN A4.** This remains the bounded contract for selected-plan continuation; it is not a general workflow framework.
 
 WHAT WE KNOW: the selected composite strategy contains a flight, overnight stay,
 destination replacement and cancellation. Each confirmed canonical mutation advances
@@ -18,6 +18,12 @@ healthy-request path or workflow engine.
 
 WHAT SHOULD BE TESTED NEXT: expected own-action mutations permit one next action;
 unrelated edits, unknown outcomes, changed terms or entry evidence refuse dispatch.
+
+## Physical acceptance note
+
+A4 physically proved continuation across the selected flight → overnight stay → destination replacement stay → displaced-stay cancellation path. The real run exposed and closed compound canonical-footprint accounting: one ActionIntent/attempt may create multiple exact command receipts and related JOURNEY/TRAVELLER scope bumps. Continuation now derives the expected same-plan footprint from durable receipts/command namespaces and authoritative fresh capture rather than fixed revision increments. Unknown outcomes remain reconcile-only; unrelated changes still fail closed.
+
+Accepted A4 product SHA: `546adf210db8ead343ecdac22b410515665c176a`. Detailed evidence: [A4_PHYSICAL_SANDBOX_ACCEPTANCE.md](A4_PHYSICAL_SANDBOX_ACCEPTANCE.md).
 
 ## Bounded contract
 
