@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Pool } from '../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../persistence/postgres/pgUnitOfWork.ts';
-import type { CapturedWorld, WJourneyItem } from '../resolution/world/world.ts';
+import type { CapturedWorld, WIntendedVisit, WJourneyItem } from '../resolution/world/world.ts';
 import type { FailingSubject } from '../resolution/planning/proposer.ts';
 import type { HotelPlanningOptions, HotelPlanningContext } from './targetHotelCompanionPlanning.ts';
 import type { PlanningToolTransport } from '../resolution/planning/researchDispatcher.ts';
@@ -15,8 +15,9 @@ import type { CapabilityResult } from '../contracts/envelope.ts';
 import type { PlanningEvidenceRecord } from '../contracts/v2/planning/recoveryPlanningAttempt.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './target/deterministicId.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
+import { selectCredential } from '../persistence/postgres/commands/travelCommands.ts';
 
-const SourceRefSchema = z.string().regex(/^SOURCE_(?:PLACE|JURISDICTION|TRAVELLER_DRAFT):\S+$/);
+const SourceRefSchema = z.string().regex(/^SOURCE_(?:PLACE|JURISDICTION|TRAVELLER_DRAFT|INTENDED_VISIT):\S+$/);
 const Iso2Schema = z.string().regex(/^[A-Z]{2}$/);
 
 export interface OvernightTargetConfiguration {
@@ -36,10 +37,20 @@ export interface PassportSelectionConfiguration {
   guestNationality: string;
 }
 
+/** An existing canonical visit to research; this never creates a visit. */
+export interface ExistingVisitTargetConfiguration {
+  visitSourceRef: string;
+  /** Canonical child id supplied by the source materializer; never recomputed here. */
+  visitId: string;
+  entryPolicyId: string;
+  countryCode: string;
+}
+
 export interface TargetRecoveryContextConfiguration {
   sourceConnectionProviderKind: string;
   overnightTargets: readonly OvernightTargetConfiguration[];
   passportSelections: readonly PassportSelectionConfiguration[];
+  existingVisitTargets?: readonly ExistingVisitTargetConfiguration[];
 }
 
 export interface TargetRecoveryContextDeps {
@@ -48,6 +59,8 @@ export interface TargetRecoveryContextDeps {
   actorPrincipalId: string;
   uow: () => PgUnitOfWork;
   reviewerRef: { kind: 'ORGANISATION' | 'PRINCIPAL'; id: string };
+  /** Captured/source-owned country code for an existing visit jurisdiction. */
+  jurisdictionCountryCode?: (jurisdictionId: string) => Promise<string | undefined>;
   hotelTransport: PlanningToolTransport;
   officialDocuments: { read(sourceId: string): Promise<CapabilityResult<OfficialDocumentEvidence>> };
   /** Live composition supplies wall-clock verification after provider reads; tests may pin it. */
@@ -82,6 +95,18 @@ interface PreparedContext {
   credentialVersionId: string;
   guestNationality: string;
   provenance: PlanningToolProvenance;
+}
+
+interface ResolvedExistingVisit {
+  config: ExistingVisitTargetConfiguration;
+  visitId: string;
+  journeyId: string;
+  travellerId: string;
+  jurisdictionId: string;
+  purpose: string;
+  visitWindow: { start: string; end: string };
+  entryPolicy: ReviewedEntryPolicy;
+  passport: PassportSelectionConfiguration;
 }
 
 function sourceParts(ref: string): { recordType: string; externalId: string } | undefined {
@@ -175,8 +200,27 @@ function evidenceRecord(operation: 'research.entry_requirements' | 'research.loc
     operation,
     status: 'SUCCEEDED',
     summary,
-    provenance: { mode, observedAt, sourceRefs: documents.map((document) => document.sourceId) },
+    provenance: { providerId: 'official-documents', mode, observedAt, sourceRefs: documents.map((document) => document.sourceId) },
     uncertainty: [],
+  };
+}
+
+function unavailableEvidenceRecord(
+  operation: 'research.entry_requirements' | 'research.local_context',
+  evidenceRef: string,
+  observedAt: string,
+  code: string,
+  summary: string,
+): PlanningEvidenceRecord {
+  return {
+    evidenceRef,
+    requestFingerprint: `${operation}:${evidenceRef}`,
+    capability: 'RESEARCH',
+    operation,
+    status: 'UNAVAILABLE',
+    summary,
+    provenance: { mode: 'INTERNAL', observedAt, sourceRefs: [] },
+    uncertainty: [{ code, summary }],
   };
 }
 
@@ -259,26 +303,177 @@ export class TargetRecoveryContextPreparer {
     return out;
   }
 
+  private async resolvePassportSelections(connectionId: string, world: CapturedWorld): Promise<Map<string, PassportSelectionConfiguration>> {
+    const selections = new Map<string, PassportSelectionConfiguration>();
+    for (const configured of this.deps.configuration.passportSelections) {
+      const travellerId = await this.resolveAlias(connectionId, configured.travellerSourceRef, 'SOURCE_TRAVELLER_DRAFT', 'TRAVELLER');
+      if (!travellerId || selections.has(travellerId) || !Iso2Schema.safeParse(configured.guestNationality).success) continue;
+      const credential = world.credentials.find((candidate) => candidate.id === configured.credentialId
+        && candidate.travellerId === travellerId && candidate.kind === 'PASSPORT');
+      const version = world.credentialVersions.find((candidate) => candidate.id === configured.credentialVersionId
+        && candidate.credentialId === configured.credentialId && candidate.kind === 'PASSPORT');
+      if (!credential || !version || version.issuingStateCode !== configured.guestNationality) continue;
+      if (!await this.authoritativeNationality(travellerId, configured.guestNationality)) continue;
+      selections.set(travellerId, configured);
+    }
+    return selections;
+  }
+
+  /**
+   * Intended visits are Journey-owned rows and deliberately are not registry
+   * subjects. The source link therefore names the owning Journey; the source
+   * boundary supplies the canonical child id and this module only verifies
+   * that the captured child belongs to that Journey.
+   */
+  private async resolveExistingVisitAlias(
+    connectionId: string,
+    sourceRef: string,
+    expectedVisitId: string,
+    world: CapturedWorld,
+  ): Promise<WIntendedVisit | undefined> {
+    const journeyId = await this.resolveAlias(connectionId, sourceRef, 'SOURCE_INTENDED_VISIT', 'JOURNEY');
+    if (!journeyId) return undefined;
+    const visit = world.intendedVisits.find((candidate) => candidate.id === expectedVisitId);
+    return visit?.journeyId === journeyId ? visit : undefined;
+  }
+
+  private async resolveExistingVisits(connectionId: string, world: CapturedWorld): Promise<ResolvedExistingVisit[]> {
+    const resolved: ResolvedExistingVisit[] = [];
+    for (const config of this.deps.configuration.existingVisitTargets ?? []) {
+      const visit = await this.resolveExistingVisitAlias(connectionId, config.visitSourceRef, config.visitId, world);
+      const journey = visit ? world.journeys.find((candidate) => candidate.id === visit.journeyId) : undefined;
+      const jurisdiction = visit ? world.jurisdictions.find((candidate) => candidate.id === visit.jurisdictionId) : undefined;
+      const entryPolicy = ReviewedEntryPolicySchema.safeParse(this.deps.entryPolicies.find((policy) => (policy as { id?: string })?.id === config.entryPolicyId));
+      const country = Iso2Schema.safeParse(config.countryCode);
+      const capturedCountryCode = visit ? await this.deps.jurisdictionCountryCode?.(visit.jurisdictionId) : undefined;
+      if (!visit || !journey || !jurisdiction || jurisdiction.regimeKind !== 'COUNTRY' || !capturedCountryCode
+        || capturedCountryCode !== config.countryCode || !entryPolicy.success || !country.success || entryPolicy.data.countryCode !== config.countryCode) continue;
+      const passport = (await this.resolvePassportSelections(connectionId, world)).get(journey.travellerId);
+      if (!passport) continue;
+      if (!entryPolicy.data.purposes.includes(visit.purpose) || entryPolicy.data.nationalityCodes.includes(passport.guestNationality) === false) continue;
+      resolved.push({
+        config, visitId: visit.id, journeyId: visit.journeyId, travellerId: journey.travellerId,
+        jurisdictionId: visit.jurisdictionId, purpose: visit.purpose, visitWindow: visit.intended,
+        entryPolicy: entryPolicy.data, passport,
+      });
+    }
+    return resolved;
+  }
+
+  private async ensureExistingVisitCredentialSelection(
+    target: ResolvedExistingVisit,
+    world: CapturedWorld,
+  ): Promise<boolean> {
+    const selections = world.credentialSelections.filter((selection) => selection.journeyId === target.journeyId);
+    const conflicting = selections.find((selection) => selection.intendedVisitIds.includes(target.visitId)
+      && selection.credentialId !== target.passport.credentialId);
+    if (conflicting) return false;
+    const exact = selections.find((selection) => selection.credentialId === target.passport.credentialId
+      && selection.credentialVersionId === target.passport.credentialVersionId
+      && selection.intendedVisitIds.includes(target.visitId));
+    if (exact) return true;
+    const sameCredential = selections.find((selection) => selection.credentialId === target.passport.credentialId);
+    const journey = world.journeys.find((candidate) => candidate.id === target.journeyId);
+    if (!journey) return false;
+    const selectionId = deterministicUuid(
+      RUNTIME_ID_NAMESPACES.planning,
+      `${this.deps.workspaceId}|existing-visit-credential|${target.journeyId}|${target.visitId}|${target.passport.credentialVersionId}`,
+    );
+    const result = await selectCredential(this.deps.uow(), {
+      workspaceId: this.deps.workspaceId,
+      actorPrincipalId: this.deps.actorPrincipalId,
+      idempotencyKey: `existing-visit-credential:${target.journeyId}:${target.visitId}:${target.passport.credentialVersionId}`,
+      journeyId: target.journeyId,
+      expectedRevision: journey.revision,
+      credentialId: target.passport.credentialId,
+      credentialVersionId: target.passport.credentialVersionId,
+      scopeIntendedVisitIds: [...new Set([...(sameCredential?.intendedVisitIds ?? []), target.visitId])],
+      selectionId,
+    });
+    return result.ok;
+  }
+
+  private async prepareExistingVisits(
+    connectionId: string,
+    input: { now: string; world: CapturedWorld },
+    evidence: PlanningEvidenceRecord[],
+  ): Promise<void> {
+    const configured = this.deps.configuration.existingVisitTargets ?? [];
+    if (configured.length === 0) return;
+    const targets = await this.resolveExistingVisits(connectionId, input.world);
+    for (const config of configured) {
+      const target = targets.find((candidate) => candidate.config === config);
+      const evidenceRef = `entry-policy:${config.entryPolicyId}:existing:${config.visitSourceRef}`;
+      if (!target) {
+        evidence.push(unavailableEvidenceRecord('research.entry_requirements', evidenceRef, input.now, 'existing_visit_context_unavailable', 'Configured existing visit or its explicit passport context could not be resolved.'));
+        continue;
+      }
+      const selected = await this.ensureExistingVisitCredentialSelection(target, input.world);
+      if (!selected) {
+        evidence.push(unavailableEvidenceRecord('research.entry_requirements', evidenceRef, input.now, 'credential_selection_unavailable', 'The configured passport could not be bound to the existing visit without a conflicting or invalid selection.'));
+        continue;
+      }
+      const documents = await this.readDocuments(target.entryPolicy.sources.map((source) => source.sourceId), target.entryPolicy.maxEvidenceAgeSeconds, input.now);
+      if (!documents) {
+        evidence.push(unavailableEvidenceRecord('research.entry_requirements', evidenceRef, input.now, 'entry_sources_unavailable', 'Reviewed entry source observations were unavailable for the existing visit.'));
+        continue;
+      }
+      const publicationKey = `${target.visitId}|${target.entryPolicy.id}|${target.passport.guestNationality}|${documents.documents.map((document) => `${document.sourceId}:${document.contentSha256}:${document.observedAt}`).sort().join(',')}`;
+      const publicationNow = this.deps.verificationClock?.() ?? input.now;
+      const cachedPublicationExpiry = this.publicationCache.get(publicationKey);
+      if (!cachedPublicationExpiry || Date.parse(cachedPublicationExpiry) <= Date.parse(publicationNow)) {
+        const publication = await publishReviewedEntryKnowledge({
+          pool: this.deps.pool, workspaceId: this.deps.workspaceId, actorPrincipalId: this.deps.actorPrincipalId,
+          reviewerRef: this.deps.reviewerRef, uow: this.deps.uow,
+        }, {
+          policy: target.entryPolicy,
+          actualOfficialDocumentEvidence: documents.documents,
+          now: publicationNow,
+          context: {
+            journeyId: target.journeyId,
+            visitId: target.visitId,
+            jurisdictionId: target.jurisdictionId,
+            countryCode: target.config.countryCode,
+            purpose: target.purpose,
+            nationalityCode: target.passport.guestNationality,
+            visitWindow: target.visitWindow,
+          },
+        });
+        if (!publication.ok) {
+          evidence.push(unavailableEvidenceRecord('research.entry_requirements', evidenceRef, publicationNow, 'entry_publication_refused', `Reviewed entry evidence was refused for the existing visit (${publication.reason}).`));
+          continue;
+        }
+        this.publicationCache.set(publicationKey, publication.expiresAt);
+      }
+      evidence.push(evidenceRecord('research.entry_requirements', evidenceRef, documents.documents, documents.mode, `Verified reviewed entry policy ${target.entryPolicy.id} for the configured existing visit.`));
+    }
+  }
+
   async prepare(input: { recoveryCaseId: string; now: string; world: CapturedWorld; failing: readonly FailingSubject[] }): Promise<{ additionalPlaceIds?: readonly string[]; hotelPlanning?: HotelPlanningOptions; evidence?: readonly PlanningEvidenceRecord[] }> {
     const connectionId = await this.connectionId();
-    if (!connectionId) return {};
+    if (!connectionId) {
+      const configured = this.deps.configuration.existingVisitTargets ?? [];
+      return configured.length > 0 ? {
+        evidence: configured.map((target) => unavailableEvidenceRecord(
+          'research.entry_requirements',
+          `entry-policy:${target.entryPolicyId}:existing:${target.visitSourceRef}`,
+          input.now,
+          'source_connection_unavailable',
+          'The configured source connection was unavailable for the existing visit.',
+        )),
+      } : {};
+    }
+    const evidence: PlanningEvidenceRecord[] = [];
+    await this.prepareExistingVisits(connectionId, input, evidence);
     const targets = await this.resolveTargets(connectionId);
-    if (targets.length === 0) return {};
+    if (targets.length === 0) return evidence.length > 0 ? { evidence } : {};
     const resolveAirport = airportResolverFromCapturedWorld(input.world);
     const corridors = transportCorridors(input.world, input.failing, {
       resolveAirport,
       passengersFor: ({ journeyId, journeyItemId, world }) => travellersForJourneyItemPassengers(world, journeyItemId, journeyId),
     }).corridors;
-    const passportSelections = new Map<string, PassportSelectionConfiguration>();
-    for (const configured of this.deps.configuration.passportSelections) {
-      const travellerId = await this.resolveAlias(connectionId, configured.travellerSourceRef, 'SOURCE_TRAVELLER_DRAFT', 'TRAVELLER');
-      if (travellerId && !passportSelections.has(travellerId) && Iso2Schema.safeParse(configured.guestNationality).success
-        && await this.authoritativeNationality(travellerId, configured.guestNationality)) {
-        passportSelections.set(travellerId, configured);
-      }
-    }
+    const passportSelections = await this.resolvePassportSelections(connectionId, input.world);
     const prepared: PreparedContext[] = [];
-    const evidence: PlanningEvidenceRecord[] = [];
     for (const target of targets) {
       for (const corridor of corridors.filter((candidate) => candidate.originPlaceId === target.arrivalAirportId)) {
         const journey = input.world.journeys.find((candidate) => candidate.id === corridor.journeyId);
