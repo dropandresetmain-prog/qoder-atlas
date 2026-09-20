@@ -10,7 +10,7 @@ this update where it describes current composition or delivery order.
 
 Current evidence: normal PostgreSQL boot, accepted Sarah LIVE programme recovery, desktop V5.6/V7.2, LIVE/RECORD Atlas + Qwen research, bounded Nuitée research, reviewed entry evidence and Frankfurter comparison. Jordan A3 is a **CONDITIONAL PASS** for presentation. A4 is now **PHYSICALLY ACCEPTED** on `546adf210db8ead343ecdac22b410515665c176a`: the selected Atlas flight ticketed, Narita and destination replacement stays confirmed, the displaced destination stay cancelled, canonical state advanced between actions, final whole-trip assessment passed and the Case resolved.
 
-Sequence: A0/A1/A2 accepted -> A3 conditional pass -> A4 physical sandbox accepted -> A5 bounded graph/UI truth pass -> repeat Sarah + Jordan on one final candidate -> final gates/freeze. Latest scope is [hero depth](work/ASTRA_HERO_DEPTH_SCOPE.md),
+Sequence: A0/A1/A2 accepted -> A3 historical conditional pass -> A4 physical sandbox accepted -> A5.1 parallel convergence (visual-first UI redesign + bounded backend truth closure) -> integrated founder E2E -> A5.2 Sarah + Jordan physical proof on one candidate -> A5.3 final gates/freeze. Latest scope is [hero depth](work/ASTRA_HERO_DEPTH_SCOPE.md),
 which supersedes prior flight-only/ancillary deferrals. Contracts, triage and implementation
 ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 
@@ -22,15 +22,28 @@ ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 | Programme relocation/cancellation | Act Now for the small typed set required by Sarah/Jordan; retain impact, authority, execution and observation gates. Operations beyond hero needs stay parked; no untyped OTHER mutation. |
 | Non-critical legacy parity | Park for Later; revisit when it materially improves Sarah, Jordan, graph fidelity or submission. Message/export footer controls were inert at the legacy baseline. |
 | Programme importer partial-prefix visibility | Park for Later after focused PG interruption/retry proof (5/5). Partial inventory remains valid and UNKNOWN; identical retry converges without duplicates, another workspace unchanged, no supplier/authority effects. Revisit for explicit import-status/hide-incomplete requirements. |
-| Jordan multi-domain recovery | **A4 ACCEPTED.** The full protected path executed: replacement flight → Narita book → destination replacement book → displaced-stay cancel, with observation/reconciliation, canonical application and reassessment between actions; final Case RESOLVED / RECOVERED. A5 now repeats the hero cleanly on the frozen candidate. |
+| Jordan multi-domain recovery | **A4 ACCEPTED.** Protected execution is frozen. A5.1 must now correct D1/D2/D3 projection/gating/approval truth discovered in founder QC before the final A5.2 repeat. |
 | Provider restoration | Hero-required Atlas/Nuitée/Qwen/entry/Frankfurter paths are composed and physically proven to the level required by A4. Unrelated historical adapters remain Park for Later. |
-| Desktop presenter quality and LIVE proof | **Act Now in A5 only for bounded truth/readability defects:** V5.6 FAIL→amber, progressive edges/state, Overview Active Change/focus, graph placement, UUID-heavy copy and cost wording. Mobile remains post-hackathon. |
+| Desktop presenter quality and LIVE proof | **Act Now in A5.1:** one-time visual-first Overview/Case redesign around accepted V7.2/V5.6 graphs, then production integration only after image + HTML founder approval. Mobile remains post-hackathon. |
 | Reset after external execution | Act Now guard integrated: shared lease and refusal after any external attempt/observation. Retain workspace for reconciliation/audit; repeat external heroes in fresh workspaces. Cleanup/archive workflow remains Park for Later. |
 | Full programme regeneration alignment | Park for Later: current generator drops accepted enrichment. Safe dossier-only correction is implemented; revisit when full source regeneration is required. |
 | Richer direct-attendee/rejected-option labels and reset duration copy | Park for Later until final presentation pass; current Sarah proof is readable and deterministic. Do not fabricate impact identities or promise an exact reset duration. |
-| Multiple independent Overview blast centres | Park for Later; revisit when a required scenario needs simultaneous independent incidents. |
+| Multiple independent Overview blast centres | **Park for Later.** A5 now requires simultaneous Sarah + Jordan Cases/stories in one product world, but V7.2 may keep one selected active focus at a time. Revisit multi-centre graph topology only if a real product need remains after that interaction model. |
 | R4 N5-N7 and budget-injection replan issue | Existing R4 dispositions retained; revisit on objective-blocking reproduction. |
 | Opaque R4 m9ReadModelCurrentness suite-only failure | Investigate Now on concrete focused/new integration evidence; no ceremonial broad rerun. |
+
+## A5.1 founder-QC overlay — 21 September 2026
+
+Founder click-through showed that remaining work is not one generic "UI polish" pass.
+
+Two bounded lanes now run in parallel:
+
+1. **Visual-first product redesign:** Overview + Case information architecture → image mockups → founder QC → HTML prototypes → founder QC → production integration. V7.2 and V5.6 are the preserved graph systems; current component structure is not a design constraint.
+2. **Backend truth closure:** preserve connection TIGHT vs IMPOSSIBLE through Overview, make D3 failure causal truth explicit, remove redundant focused connection projection if confirmed, prevent premature D2 actionable recovery, reproduce the exact approval blocker, support Sarah + Jordan in one normal workspace, and fix any false Sarah FAILED inheritance.
+
+A5.2 and A5.3 remain blocked until the two lanes converge and founder E2E passes again.
+
+See `work/A5_FOUNDER_QC_RECONCILIATION.md`.
 
 PostgreSQL remains the sole normal runtime. Unknown outcomes never permit blind
 redispatch; provider success alone never resolves a trip.
