@@ -693,6 +693,12 @@ export const PlanningCandidateViewSchema = z.strictObject({
   blastRadius: PlanningBlastRadiusViewSchema.optional(),
   /** Present only when planning captured a comparison or its uncertainty. */
   costComparison: PlanningCostComparisonViewSchema.optional(),
+  proposal: z.strictObject({
+    flights: z.array(z.strictObject({ label: z.string().min(1), departure: z.string().datetime({ offset: true }), arrival: z.string().datetime({ offset: true }) })).default([]),
+    stays: z.array(z.strictObject({ placeLabel: z.string().min(1), start: z.string().datetime({ offset: true }), end: z.string().datetime({ offset: true }) })).default([]),
+    entryResults: z.array(z.strictObject({ dimension: z.string().min(1), verdict: z.enum(['FAIL', 'UNKNOWN', 'PASS']), reasonCodes: z.array(z.string().min(1)).default([]) })).default([]),
+    blockers: z.array(z.strictObject({ dimension: z.string().min(1), verdict: z.enum(['FAIL', 'UNKNOWN']), reasonCode: z.string().min(1) })).default([]),
+  }).optional(),
 });
 export type PlanningCandidateView = z.infer<typeof PlanningCandidateViewSchema>;
 

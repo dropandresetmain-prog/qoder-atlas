@@ -294,6 +294,7 @@ test('materialCandidateFromEvaluation: a rejected candidate keeps honest rejecti
   assert.equal(evidence.disposition, 'REJECTED_DETERMINISTIC');
   assert.equal(evidence.viability, 'NOT_VIABLE');
   assert.ok(evidence.viabilityDecisionCodes.includes('UNRESOLVED_FAIL'), 'keeps the evaluator veto code');
+  assert.deepEqual(evidence.proposal?.blockers, [{ dimension: 'stub', verdict: 'FAIL', reasonCode: 'blocked' }], 'persists the evaluator explanation rather than only its viability code');
   assert.equal(evidence.strategyRef, undefined, 'a rejected candidate is not promoted to a RecoveryStrategy ref');
   assert.ok(!evidence.outcomeDelta.some((d) => d.delta === 'BETTER'), 'no fabricated healing in a rejected candidate');
 });
