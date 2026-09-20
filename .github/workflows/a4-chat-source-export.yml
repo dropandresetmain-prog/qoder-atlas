@@ -1,31 +1,108 @@
-name: Isolated A4 source export
+name: Isolated A4 continuation verification
 on:
   push:
     branches: [work/a4-continuation-source-export]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  export:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: northstar_test
+          POSTGRES_PASSWORD: northstar_test
+          POSTGRES_DB: northstar_test
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U northstar_test -d northstar_test'
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      PGTEST_HOST: 127.0.0.1
+      PGTEST_PORT: 55432
+      PGTEST_DB: northstar_test
+      PGTEST_USER: northstar_test
+      PGTEST_PASSWORD: northstar_test
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
-          persist-credentials: false
+          fetch-depth: 0
+      - name: Apply only the checksum-bound candidate to its exact base
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/a4-logs
+          python3 - <<'PY'
+          import base64, bz2, hashlib, pathlib
+          encoded = ''.join(pathlib.Path(f'.a4-patch/part{i}.b64').read_text().strip() for i in range(1, 4))
+          patch = bz2.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(patch).hexdigest() == '9758847cdfe35461c18e0872b78353bf0306c33f9dfeaadc246ae7c5994eeb8b'
+          pathlib.Path('/tmp/a4.patch').write_bytes(patch)
+          PY
+          git checkout --detach 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
+          test "$(git rev-parse HEAD)" = 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
+          git apply --index /tmp/a4.patch
+          git diff --cached --check
+          git diff --cached --name-only > /tmp/a4-logs/changed-files.txt
+          python3 - <<'PY'
+          import pathlib
+          allowed = set('''docs/work/ACTIVE_TASK.md
+          postgres-integration/a4SelectedPlanContinuation.pgtest.ts
+          src/app/target/composeTargetApplication.ts
+          src/app/target/externalOfferExecution.ts
+          src/app/target/recoveryPlanningCoordinator.ts
+          src/app/target/selectedPlanCanonicalApplication.ts
+          src/app/target/selectedPlanContinuation.ts
+          src/app/target/selectedPlanEvaluationInputs.ts
+          src/persistence/postgres/commands/m8AuthorityCommands.ts
+          src/persistence/postgres/execution/selectedPlanContinuation.ts
+          src/persistence/postgres/execution/storedExecutionGate.ts
+          src/persistence/postgres/migrations/0133_selected_plan_continuation.sql
+          src/resolution/execution/selectedPlanIdentity.ts
+          src/resolution/planning/compiler.ts
+          test/a4-selected-plan-continuation.test.ts
+          test/suites.json'''.split())
+          changed = set(pathlib.Path('/tmp/a4-logs/changed-files.txt').read_text().split())
+          assert changed == allowed, changed ^ allowed
+          PY
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm ci --ignore-scripts
-      - name: Export locked dependencies and runtime without credentials
+      - name: Static and focused unit gates
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
-          cp "$(command -v node)" a4-node
-          tar -czf a4-dependencies.tar.gz node_modules a4-node
+          npm run typecheck 2>&1 | tee /tmp/a4-logs/typecheck.log
+          node --test test/a4-selected-plan-continuation.test.ts test/northstar-v2-m7-recovery-planning.test.ts 2>&1 | tee /tmp/a4-logs/unit.log
+          npm run gate:test-boundary 2>&1 | tee /tmp/a4-logs/test-boundary.log
+          npm run gate:anti-hardcoding 2>&1 | tee /tmp/a4-logs/anti-hardcoding.log
+          git diff --cached --check
+      - name: Commit isolated verification candidate, never main or WIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'NORTHSTAR A4 candidate verification'
+          git config user.email 'noreply@users.noreply.github.com'
+          git commit -m 'feat: bind selected-plan continuation to canonical receipts and fresh authoritative evaluation'
+          test "$(git rev-parse HEAD^)" = 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
+          git push origin HEAD:refs/heads/work/a4-verify-${GITHUB_RUN_ID}
+          git show -s --format='candidate=%H%nparent=%P%ntree=%T' > /tmp/a4-logs/candidate.txt
+          git diff HEAD^ HEAD --stat >> /tmp/a4-logs/candidate.txt
+      - name: PostgreSQL continuation and accepted execution regression proofs
+        shell: bash
+        run: |
+          set +e
+          node --test --test-concurrency=1 postgres-integration/a4SelectedPlanContinuation.pgtest.ts postgres-integration/r4AtlasOfferExecution.pgtest.ts postgres-integration/r4AtlasCrashRecovery.pgtest.ts postgres-integration/m7m8DagAndGenericity.pgtest.ts postgres-integration/m7m8CurrentnessAndReconciliation.pgtest.ts > /tmp/a4-logs/postgres.log 2>&1
+          code=$?
+          echo "POSTGRES_EXIT=$code" | tee /tmp/a4-logs/postgres-exit.txt
+          cat /tmp/a4-logs/postgres.log
+          exit "$code"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: a4-dependencies-987a6b6
-          path: a4-dependencies.tar.gz
+          name: a4-verification-${{ github.run_id }}
+          path: /tmp/a4-logs
           retention-days: 1
