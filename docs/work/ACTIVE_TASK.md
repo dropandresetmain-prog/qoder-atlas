@@ -30,8 +30,8 @@ Do not touch: A4 WIP branches, handoff bundle, recovery planning/engine, SQLite,
 
 | CP | Goal | SHA |
 |---|---|---|
-| 1 | Source/runtime identity + content ownership freeze + A–D triage | *(this commit)* |
-| 2 | Case default-visible hierarchy + focused tests | pending |
+| 1 | Source/runtime identity + content ownership freeze + A–D triage | `3bded3e64026213b8f3b78e6b8e83ced28f72e5f` |
+| 2 | Case default-visible hierarchy + focused tests | *(this commit)* |
 | 3 | Overview/framing integrate + Chromium QC | pending |
 
 ## Presentation contract (FROZEN)
@@ -93,7 +93,7 @@ Authoritative fields only; no invented facts.
 
 ## Next action
 
-Implement Case hierarchy + tests (CP2), then Overview/framing (CP3). Stop before A4.
+Chromium QC on normal runtime (Overview / Sarah / Jordan), update ledger evidence, push CP3. Stop before A4.
 
 ---
 

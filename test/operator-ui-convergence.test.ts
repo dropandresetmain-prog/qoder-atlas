@@ -5,13 +5,16 @@ import { readFileSync } from 'node:fs';
 import type { OperatorOverview, PlanningCandidateView, PlanningToolEvidenceView, RecoveryCaseView, RecoveryStrategyView } from '../src/contracts/v2/product/readModels.ts';
 import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-case.ts';
 import { renderProductOperatorOverview } from '../src/ui/screens/product-operator-overview.ts';
-import { A3_EXECUTION_PAUSE, decisionCosts, decisionOptions, groupedResearch, rejectionSummary, sameStrategy, sumDisplayedMoney } from '../src/ui/caseDecisionPresentation.ts';
+import { buildOverviewGraphModel } from '../src/ui/overview-graph/model.ts';
+import {
+  decisionActionState, decisionCosts, decisionOptions, groupedResearch, rejectionSummary, sameStrategy, sumDisplayedMoney,
+} from '../src/ui/caseDecisionPresentation.ts';
 
 const at = '2032-04-03T08:00:00.000Z';
 const change = { projectionRevision: 7, changedVisibleRefs: [], changedEdgeIds: [], currentSemanticState: 'AFFECTED' as const, changeCursor: '91' };
-const strategy = (id: string, n: number): RecoveryStrategyView => ({
+const strategy = (id: string, n: number, effects: RecoveryStrategyView['changes'] = [{ effectKind: 'SELECT_OFFER', subjectRef: 'JOURNEY_ITEM:leg', subjectLabel: 'Outbound travel' }]): RecoveryStrategyView => ({
   strategyRef: id, version: n, optionNumber: n, status: 'EVALUATED', viability: 'VIABLE',
-  changes: [{ effectKind: 'SELECT_OFFER', subjectRef: 'JOURNEY_ITEM:leg', subjectLabel: 'Outbound travel' }],
+  changes: effects,
   resolves: [{ subjectRef: 'JOURNEY:traveller', personLabel: 'Traveller Alpha', currentVerdict: 'FAIL', projectedVerdict: 'PASS' }],
   projectedSummary: { total: 1, pass: 1, fail: 0, unknown: 0 }, projectedPeople: [],
 });
@@ -27,7 +30,8 @@ const candidate = (id: string, disposition: string = 'RECOMMENDED'): PlanningCan
       { kind: { code: 'SELECT_OFFER', label: 'Replacement travel' }, providerAmount: { amount: '80.00', currency: 'USD' }, homeAmount: { amount: '100.00', currency: 'SGD' }, observed: true },
       { kind: { code: 'ADD_JOURNEY_STAY', label: 'Accommodation' }, providerAmount: { amount: '32.00', currency: 'USD' }, homeAmount: { amount: '40.00', currency: 'SGD' }, observed: true },
       { kind: { code: 'POLICY_PENALTY_ESTIMATE', label: 'Cancellation exposure' }, providerAmount: { amount: '16.00', currency: 'USD' }, homeAmount: { amount: '20.00', currency: 'SGD' }, observed: false },
-    ] },
+    ],
+  },
 });
 function view(): RecoveryCaseView {
   return { generatedAt: at, caseRef: 'case-alpha', status: 'AWAITING_AUTHORITY', changeSummary: 'A booked service changed its schedule.', subjectLabels: {}, causalPath: [],
@@ -52,6 +56,10 @@ function overview(): OperatorOverview {
     ldg: { ...v.ldg, scope: 'DASHBOARD' }, change };
 }
 
+function defaultVisible(html: string): string {
+  return html.replace(/<details\b[^>]*>[\s\S]*?<\/details>/gi, '');
+}
+
 test('Overview case navigation dominates and the full searchable population remains present', () => {
   const html = renderProductOperatorOverview(overview());
   assert.match(html, /data-test="attention-open-case">Open case →/);
@@ -61,7 +69,14 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.equal((html.match(/data-test="population-row"[^>]*data-journey-ref=/g) ?? []).length, 12);
   assert.equal((html.match(/data-test="population-row" hidden[^>]*data-journey-ref=/g) ?? []).length, 2);
   assert.ok(html.indexOf('data-poll-region="overview-attention"') < html.indexOf('data-test="simulated-airline-update"'));
+  assert.match(html, /data-test="overview-readiness"/);
+  assert.match(html, /data-test="product-summary-tiles"/);
+  assert.match(html, /data-test="decisions-needed"/);
+  assert.doesNotMatch(html, /Open an affected case to review the proposed recovery/);
+  assert.ok(html.includes('readout-buckets'));
+  assert.doesNotMatch(html, /class="tiles" data-test="product-summary-tiles"/);
 });
+
 test('the recorded recommendation is not replaced by an executable alternative', () => {
   const result = decisionOptions(view());
   assert.equal(result.recommended?.strategyRef, 'selected');
@@ -70,28 +85,94 @@ test('the recorded recommendation is not replaced by an executable alternative',
   assert.ok(sameStrategy('RECOVERY_STRATEGY:selected', 'selected'));
   assert.equal(sameStrategy('unexpected-selected', 'selected'), false);
 });
+
 test('no recorded recommendation means no invented recommended card', () => {
   const v = view(); delete v.planningEvidence!.recommendation;
   const result = decisionOptions(v);
   assert.equal(result.recommended, undefined);
   assert.equal(result.alternatives.length, 2);
   assert.ok(result.issue);
+  const html = renderProductRecoveryCase(v);
+  assert.match(html, /data-test="recommendation-unavailable"/);
+  assert.doesNotMatch(html, /class="[^"]*is-recommended/);
+  assert.doesNotMatch(html, /id="cw-recommendation"[^>]*data-strategy-ref="selected"/);
 });
-test('recommendation is expanded, alternatives collapsed, execution blocked with a reason', () => {
+
+test('recommendation identity matches across main card and decision panel', () => {
   const html = renderProductRecoveryCase(view());
-  const recommended = html.indexOf('data-strategy-ref="selected"');
-  const alternatives = html.indexOf('data-region-key="viable-alternatives"');
-  assert.ok(recommended > 0 && recommended < alternatives);
-  assert.match(html, /<details[^>]+data-region-key="viable-alternatives"[^>]*><summary>1 other viable alternative/);
-  assert.doesNotMatch(html, /<details[^>]+data-region-key="viable-alternatives"[^>]*\bopen\b/);
-  assert.match(html, /data-test="approval-panel"/);
-  assert.match(html, /data-test="approval-unavailable"[^>]*disabled/);
-  assert.ok(html.includes(A3_EXECUTION_PAUSE));
-  assert.doesNotMatch(html, /<button[^>]+data-strategy-ref=/);
-  assert.doesNotMatch(html, /<button[^>]+data-action="(?:recover|decline)"/);
-  assert.match(html, /Arrival formalities remain outstanding/);
-  assert.match(html, /named approving party is not supplied/);
+  assert.match(html, /data-test="recovery-strategy"[^>]*data-strategy-ref="selected"/);
+  assert.match(html, /data-test="approval-panel"[^>]*data-strategy-ref="selected"/);
+  assert.equal(decisionActionState(view()).kind, 'blocked');
 });
+
+test('action-state matrix: blocked, ready, unavailable, terminal', () => {
+  const blocked = view();
+  assert.equal(decisionActionState(blocked).kind, 'blocked');
+  const htmlBlocked = renderProductRecoveryCase(blocked);
+  assert.match(htmlBlocked, /data-test="approval-unavailable"[^>]*disabled/);
+  assert.match(htmlBlocked, /data-test="decision-execution-blocker"/);
+  assert.doesNotMatch(htmlBlocked, /Approval and execution are not enabled/);
+
+  const ready = view();
+  delete ready.strategies[0]!.executionBlocker;
+  assert.deepEqual(decisionActionState(ready), { kind: 'ready', strategyRef: 'selected' });
+  const htmlReady = renderProductRecoveryCase(ready);
+  assert.match(htmlReady, /data-test="approve-recommendation"/);
+  assert.match(htmlReady, /data-action="recover"/);
+  assert.match(htmlReady, /data-strategy-ref="selected"/);
+  assert.doesNotMatch(htmlReady, /data-test="approval-unavailable"/);
+
+  const missing = view();
+  delete missing.planningEvidence!.recommendation;
+  assert.equal(decisionActionState(missing).kind, 'unavailable');
+
+  const terminal = { ...view(), status: 'RESOLVED' as const };
+  assert.equal(decisionActionState(terminal).kind, 'none');
+  assert.doesNotMatch(renderProductRecoveryCase(terminal), /data-test="approval-panel"/);
+});
+
+test('programme-only recommendation uses the same renderer without hotel scaffolding', () => {
+  const v = view();
+  v.strategies = [strategy('programme', 1, [
+    { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME', subjectRef: 'PROGRAMME_ITEM:a', subjectLabel: 'Opening session',
+      currentWindow: { start: at, end: '2032-04-03T09:00:00.000Z' }, proposedWindow: { start: '2032-04-03T10:00:00.000Z', end: '2032-04-03T11:00:00.000Z' } },
+  ])];
+  v.planningEvidence!.recommendation = { recommended: { label: 'Programme recovery', ref: 'RECOVERY_STRATEGY:programme' }, alternatives: [], basis: [], provenance: { label: 'Recorded comparison' } };
+  v.planningEvidence!.candidates = [{
+    ...candidate('programme'),
+    proposal: { flights: [], stays: [], entryResults: [], blockers: [], programmeChecks: [{ label: 'Opening session', verdict: 'PASS', reasonCode: 'timing_ok', arrival: '2032-04-03T09:30:00.000Z', deadline: '2032-04-03T10:00:00.000Z', timeZone: 'UTC' }] },
+    costComparison: { status: 'UNAVAILABLE', reason: 'No priced supplier change in this proposal.', comparedAt: at },
+  }];
+  const html = renderProductRecoveryCase(v);
+  assert.match(html, /Reschedule the programme commitment/);
+  assert.match(html, /data-strategy-ref="programme"/);
+  assert.doesNotMatch(defaultVisible(html), /Terminal hotel/);
+  assert.match(html, /data-test="cost-unavailable"/);
+  assert.doesNotMatch(html, /SGD 0/);
+});
+
+test('rejected preview stays compact with closed evaluations', () => {
+  const c1 = candidate('rejected-a', 'REJECTED_DETERMINISTIC');
+  c1.proposal!.blockers = [{ dimension: 'connection_feasibility', verdict: 'FAIL', reasonCode: 'connection_below_minimum', timing: { gapMinutes: 20, requiredMinutes: 50 } }];
+  const c2 = candidate('rejected-b', 'REJECTED_DETERMINISTIC');
+  c2.proposal!.flights[0]!.label = 'Second rejected flight';
+  c2.proposal!.flights[0]!.originLabel = 'Hidden origin terminal';
+  const c3 = candidate('rejected-c', 'REJECTED_VALIDATION');
+  c3.proposal!.flights[0]!.label = 'Third rejected flight';
+  c3.proposal!.flights[0]!.destinationLabel = 'Hidden destination terminal';
+  const v = view();
+  v.planningEvidence!.candidates.push(c1, c2, c3);
+  const html = renderProductRecoveryCase(v);
+  assert.match(html, /data-test="rejected-summary"/);
+  assert.match(html, /data-region-key="rejection-eval-option-rejected-a"/);
+  assert.doesNotMatch(html, /<details[^>]+data-region-key="rejection-eval-option-rejected-a"[^>]*\bopen\b/);
+  const visible = defaultVisible(html);
+  assert.doesNotMatch(visible, /Hidden origin terminal/);
+  assert.doesNotMatch(visible, /Hidden destination terminal/);
+  assert.match(visible, /Second rejected flight/);
+  assert.match(html, /Show detailed evaluation \(5 recorded options\)/);
+});
+
 test('exact price totals keep expenditure, provider currency and potential loss separate', () => {
   const cost = decisionCosts(candidate('selected').costComparison);
   assert.deepEqual(cost.newSpend, ['SGD 140.00']);
@@ -102,21 +183,18 @@ test('exact price totals keep expenditure, provider currency and potential loss 
   assert.equal(sumDisplayedMoney([{ amount: '1e5', currency: 'USD' }]), undefined);
   assert.equal(decisionCosts(undefined).unavailable?.includes('free'), true);
   const html = renderProductRecoveryCase(view());
-  assert.match(html, /not confirmed charges or refunds/);
+  assert.match(html, /data-test="cost-separated"/);
   assert.match(html, /Published reference feed/);
+  assert.match(html, /data-region-key="cost-evidence-selected"/);
 });
-test('rejection uses recorded timing failure rather than an invented ranking reason', () => {
-  const c = candidate('rejected', 'REJECTED_DETERMINISTIC');
-  c.proposal!.blockers = [{ dimension: 'connection_feasibility', verdict: 'FAIL', reasonCode: 'connection_below_minimum', timing: { gapMinutes: 20, requiredMinutes: 50 } }];
-  const result = rejectionSummary(c);
-  assert.equal(result.status, 'Rejected');
-  assert.match(result.reason, /not enough time to connect/);
-  assert.match(result.reason, /Time available: 20 min; Time required: 50 min/);
-  const v = view(); v.planningEvidence!.candidates.push(c);
-  const html = renderProductRecoveryCase(v);
-  assert.match(html, /data-test="rejected-summary"/);
-  assert.match(html, /Show detailed evaluation \(3 recorded options\)/);
+
+test('arrival formality appears once in the default decision surface', () => {
+  const html = renderProductRecoveryCase(view());
+  const visible = defaultVisible(html);
+  const matches = visible.match(/Arrival formalities remain outstanding/g) ?? [];
+  assert.equal(matches.length, 1);
 });
+
 test('partial and unavailable research are not labelled completed successes', () => {
   const tool = (status: string): PlanningToolEvidenceView => ({ tool: { label: 'Hotel search', code: 'hotel.search' }, status: { label: status, code: status }, provenanceMode: { label: 'Live', code: 'LIVE' }, provider: 'Provider A', summary: 'Recorded response.', uncertainties: [], evidenceRef: `e-${status}` });
   const v = view(); v.planningEvidence!.tools = [tool('SUCCEEDED'), tool('PARTIAL'), tool('UNAVAILABLE')];
@@ -127,24 +205,57 @@ test('partial and unavailable research are not labelled completed successes', ()
   assert.match(html, /1 completed · 1 partial · 1 unavailable/);
   assert.match(html, /Show technical activity \(3 tool\/model records\)/);
 });
-test('polling regions, immutable Original, graph and terminal behavior remain composed', () => {
+
+test('active-change footprint excludes unrelated attention travellers', () => {
+  const model = buildOverviewGraphModel({
+    ...overview(),
+    eventOverview: {
+      days: [{ index: 1, localDate: '2032-04-01', dateLabel: '1 Apr' }],
+      landmarks: [{ ref: 'PROGRAMME_ITEM:opening', title: 'Opening', dayIndex: 1, health: 'GREEN', participantCount: 12, affectedCount: 0 }],
+      dependencies: [{
+        ref: 'SERVICE:shared', kindLabel: 'Flight', label: 'Shared flight', dayIndex: 1,
+        health: 'RED', changed: true, travellerCount: 2, unresolvedCount: 1, clearedCount: 1, checkingCount: 0,
+      }],
+      cohorts: [],
+      promotedTravellers: [
+        { journeyRef: 'journey-on-dep', label: 'On dependency', roleLabel: 'Speaker', status: 'DISRUPTED', membership: 'UNRESOLVED', dependencyRef: 'SERVICE:shared' },
+        { journeyRef: 'journey-other', label: 'Other attention', roleLabel: 'Speaker', status: 'DISRUPTED', membership: 'ATTENTION' },
+        { journeyRef: 'journey-cleared', label: 'Cleared', roleLabel: 'Speaker', status: 'READY', membership: 'CLEARED', dependencyRef: 'SERVICE:shared' },
+      ],
+      promotedOverflow: 0,
+      blastRadius: { dependencyRef: 'SERVICE:shared', affectedCount: 2, clearedCount: 1, checkingCount: 0, unresolvedCount: 1, landmarkRefs: ['PROGRAMME_ITEM:opening'] },
+      relations: [],
+    },
+  });
+  assert.ok(model?.focus);
+  assert.ok(model!.focus!.incidentIds.includes('journey-on-dep'));
+  assert.ok(!model!.focus!.incidentIds.includes('journey-other'));
+  assert.equal(model!.focus!.unresolvedTravellerId, 'journey-on-dep');
+  assert.match(model!.focus!.message, /Active change · Shared flight/);
+});
+
+test('polling regions, immutable Original, graph and layout order remain composed', () => {
   const v = view(), html = renderProductRecoveryCase(v);
-  for (const name of ['header', 'lead', 'graph', 'affects', 'options', 'approval', 'execution', 'activity', 'checked', 'resolution', 'technical', 'rail', 'evidence']) {
+  for (const name of ['header', 'lead', 'affects', 'graph', 'options', 'approval', 'alternatives', 'activity', 'execution', 'resolution', 'technical']) {
     assert.equal((html.match(new RegExp(`data-poll-region="${name}"`, 'g')) ?? []).length, 1, name);
   }
+  const body = html.slice(html.indexOf('<main'));
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('case-decision-grid'));
+  assert.ok(body.indexOf('case-decision-grid') < body.indexOf('data-poll-region="alternatives"'));
   assert.match(html, /data-test="original-current-toggle"/);
   assert.match(html, /data-test="focused-case-graph"/);
   assert.match(html, /data-change-cursor="91"/);
   assert.match(html, /sinceCursor/);
-  const terminal = renderProductRecoveryCase({ ...v, status: 'RESOLVED' });
-  assert.doesNotMatch(terminal, /data-test="approval-panel"/);
-  assert.doesNotMatch(terminal, /data-test="propose-strategies"/);
+  assert.match(html, /href="#cw-recommendation"/);
+  assert.doesNotMatch(html, /Recommendation review/);
+  assert.doesNotMatch(html, /What you’re reviewing/);
 });
+
 test('labels are escaped and generic rendering contains no persona branches', () => {
   const v = view(); v.planningEvidence!.candidates[0]!.proposal!.flights[0]!.label = '<img src=x onerror=alert(1)>';
   const html = renderProductRecoveryCase(v);
   assert.doesNotMatch(html, /<img src=x/);
-  for (const file of ['src/ui/caseDecisionPresentation.ts', 'src/ui/screens/product-recovery-case.ts', 'src/ui/overview-graph/controller.ts']) {
+  for (const file of ['src/ui/caseDecisionPresentation.ts', 'src/ui/screens/product-recovery-case.ts', 'src/ui/overview-graph/controller.ts', 'src/ui/overview-graph/model.ts']) {
     assert.doesNotMatch(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), /Sarah|Jordan|Batik|Narita/);
   }
 });

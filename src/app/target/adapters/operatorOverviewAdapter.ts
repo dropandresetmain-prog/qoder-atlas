@@ -43,7 +43,7 @@ const BUCKETS: readonly { key: string; label: string; tone: VisualTone; count: (
 function summaryTiles(counted: ReturnType<typeof countedSet>): string {
   return BUCKETS.map(({ key, label, tone, count }) => {
     const n = count(counted.counts);
-    return `<div class="tile tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><div class="tile-count">${n}</div><div class="tile-label">${e(label)}</div></div>`;
+    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><strong class="tile-count">${n}</strong><span class="tile-label">${e(label)}</span></div>`;
   }).join('');
 }
 function readoutSegments(counted: ReturnType<typeof countedSet>): string {
@@ -120,14 +120,17 @@ export const ROSTER_PAGE_SIZE = 10;
 export function adaptOperatorOverviewToDashboard(view: OperatorOverview): ProductSurfaceModel {
   const counted = countedSet(view), decisions = view.items.filter((item) => item.decisionRequired).length;
   const eventLine = view.eventContext ? `<p class="sub" data-test="event-context">${e(view.eventContext.title)}${view.eventContext.organiserLabel ? ` · ${e(view.eventContext.organiserLabel)}` : ''}</p>` : '';
-  const summaryHtml = `${eventLine}<div class="readout"><div class="readout-ink"><p class="ri-label">Managed travel readiness</p>
+  // Compact bucket counts live inside the readiness block — not four extra cards.
+  const summaryHtml = `${eventLine}<div class="readout" data-test="overview-readiness"><div class="readout-ink"><p class="ri-label">Managed travel readiness</p>
     <div class="big big-settle">${counted.counts.ready}<span class="unit">/${counted.total}</span></div><p class="ri-confirmed-word">Confirmed</p>
-    <p class="sub ri-scale" data-test="managed-presentation-segments">${readoutSegments(counted)}</p></div>${fleetGrid(counted)}</div>
-    <div class="tiles" data-test="product-summary-tiles">${summaryTiles(counted)}</div>
-    ${decisions ? `<div class="callout tone-alert" data-test="decisions-needed"><p class="callout-title">${decisions} decision${decisions === 1 ? '' : 's'} needed</p><p>Open an affected case to review the proposed recovery and approval requirements.</p></div>` : ''}`;
+    <p class="sub ri-scale" data-test="managed-presentation-segments">${readoutSegments(counted)}</p>
+    <div class="readout-buckets" data-test="product-summary-tiles">${summaryTiles(counted)}</div></div>${fleetGrid(counted)}</div>`;
   const queue = dedupeQueue(view.items);
-  const attentionHtml = queue.length ? `<div class="queue" data-test="product-overview-queue">${queue.map(overviewItemRow).join('')}</div>`
-    : '<p class="empty-note" data-test="no-open-cases">Nothing needs attention right now.</p>';
+  const decisionNote = decisions > 0
+    ? `<p class="sub" data-test="decisions-needed">${decisions} pending decision${decisions === 1 ? '' : 's'} among the cases below.</p>`
+    : '';
+  const attentionHtml = `${decisionNote}${queue.length ? `<div class="queue" data-test="product-overview-queue">${queue.map(overviewItemRow).join('')}</div>`
+    : '<p class="empty-note" data-test="no-open-cases">Nothing needs attention right now.</p>'}`;
   const roster = rosterEntries(view, queue);
   const rows = roster.map(({ entry, issue }, index) => {
     const row = populationRow(entry, issue);

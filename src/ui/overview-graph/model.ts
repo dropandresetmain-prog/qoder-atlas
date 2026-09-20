@@ -220,15 +220,19 @@ export function buildOverviewGraphModel(view: OperatorOverview): OverviewGraphMo
   let focus: OgFocus | undefined;
   if (blast) {
     const dep = eo.dependencies.find((d) => d.ref === blast.dependencyRef);
-    const unresolved = promoted.find((t) => t.membership === 'UNRESOLVED' || t.membership === 'ATTENTION');
+    // Footprint and focus traveller stay on the selected shared dependency.
+    // Unrelated attention cases (empty or different dependencyRef) stay out.
+    const onDependency = promoted.filter((t) => t.dependencyRef === blast.dependencyRef);
+    const unresolved = onDependency.find((t) => t.membership === 'UNRESOLVED' || t.membership === 'ATTENTION');
     const settled = blast.checkingCount === 0;
     const label = dep?.label ?? 'a shared service';
-    const message = settled
+    const counts = settled
       ? `${blast.clearedCount} cleared · ${blast.unresolvedCount} still need attention`
-      : `${plural(blast.affectedCount, 'traveller', 'travellers')} affected by ${label}`;
+      : `${plural(blast.affectedCount, 'traveller', 'travellers')} affected`;
+    const message = `Active change · ${label}: ${counts}`;
     const incidentIds = [
       blast.dependencyRef,
-      ...promoted.filter((t) => t.dependencyRef === blast.dependencyRef || t.membership !== 'CLEARED').map((t) => t.journeyRef),
+      ...onDependency.filter((t) => t.membership !== 'CLEARED').map((t) => t.journeyRef),
       ...blast.landmarkRefs,
     ].filter((id) => nodeIds.has(id));
     focus = {

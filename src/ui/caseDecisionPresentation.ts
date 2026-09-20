@@ -10,10 +10,43 @@ import type {
 import { dedupeStrategies, plain } from '../app/target/adapters/caseWorkspacePresenter.ts';
 import { CASE_EFFECT_PHRASE, CASE_REASON_SENTENCE } from './copy.ts';
 
+/** @deprecated Do not use as a global disable reason; prefer decisionActionState(). */
 export const A3_EXECUTION_PAUSE = 'This review is read-only. Approval and execution are not enabled, so no changes can be submitted here.';
 
 export function decisionText(value: string | undefined, fallback: string): string {
   return plain(value) ?? fallback;
+}
+
+/**
+ * Consequential control availability for the recorded recommendation only.
+ * Absence of an execution blocker means the composed approve path may run;
+ * the server still resolves the principal and grant coverage. Missing
+ * recommendation or an explicit blocker fails closed in the UI.
+ */
+export type DecisionActionState =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'unavailable'; readonly reason: string }
+  | { readonly kind: 'blocked'; readonly reason: string; readonly code: string }
+  | { readonly kind: 'ready'; readonly strategyRef: string };
+
+export function decisionActionState(view: RecoveryCaseView): DecisionActionState {
+  if (!['OPEN', 'AWAITING_AUTHORITY'].includes(view.status)) return { kind: 'none' };
+  const options = decisionOptions(view);
+  if (!options.recommended) {
+    return {
+      kind: 'unavailable',
+      reason: options.issue ?? 'A current recommendation is not identified in the supplied evidence.',
+    };
+  }
+  const blocker = options.recommended.executionBlocker;
+  if (blocker) {
+    return {
+      kind: 'blocked',
+      code: blocker.code,
+      reason: decisionText(blocker.message, 'This option cannot be executed by this runtime yet.'),
+    };
+  }
+  return { kind: 'ready', strategyRef: options.recommended.strategyRef };
 }
 
 /** Display source times in their supplied zone; never infer a traveller's zone. */
