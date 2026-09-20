@@ -62,7 +62,7 @@ import {
 } from '../../persistence/postgres/commands/arrangementCommands.ts';
 import { DatasetIdentityMinter } from './datasetIds.ts';
 import type { LoadedDataset } from './datasetLoader.ts';
-import type { DatasetDeclaredTravel, DatasetRule, DatasetTraveller } from './datasetSchema.ts';
+import type { DatasetDeclaredTravel, DatasetJourneyRequirement, DatasetRule, DatasetTraveller } from './datasetSchema.ts';
 import {
   DatasetMappingError,
   externalRefKey,
@@ -128,6 +128,43 @@ export class DatasetMaterializationError extends Error {
   }
 }
 
+interface ResolvedStayArrivalRequirement {
+  requirement: Extract<DatasetJourneyRequirement, { kind: 'STAY_ARRIVAL_DATE_ALIGNED' }>;
+  originalStayIndex: number;
+  arrivalTransportIndex: number;
+}
+
+/** Resolve source item aliases before any dataset command can write state. */
+function resolveStayArrivalRequirements(
+  programme: LoadedDataset['programme'],
+  requirements: readonly DatasetJourneyRequirement[],
+): Map<string, ResolvedStayArrivalRequirement> {
+  const resolved = new Map<string, ResolvedStayArrivalRequirement>();
+  for (const requirement of requirements) {
+    if (requirement.kind !== 'STAY_ARRIVAL_DATE_ALIGNED') continue;
+    const traveller = programme.importDraft.travellers.find((candidate) => candidate.draftId === requirement.travellerDraftId);
+    if (!traveller) throw new DatasetMaterializationError(`journey requirement ${requirement.id} references unknown traveller draft ${requirement.travellerDraftId}`);
+    const resolve = (ref: { system: string; value: string }, label: string): { item: DatasetDeclaredTravel; index: number } => {
+      const matches = traveller.declaredTravel.flatMap((item, index) =>
+        `journey-item:${traveller.draftId}#${index}` === `${ref.system}:${ref.value}` ? [{ item, index }] : [],
+      );
+      if (matches.length !== 1) {
+        throw new DatasetMaterializationError(
+          `journey requirement ${requirement.id} ${label} ${ref.system}:${ref.value} must resolve to exactly one declared item for traveller ${traveller.draftId}`,
+        );
+      }
+      return matches[0]!;
+    };
+    const original = resolve(requirement.originalStayItemRef, 'original stay item reference');
+    const arrival = resolve(requirement.arrivalTransportItemRef, 'arrival transport item reference');
+    if (original.item.itemKind !== 'STAY') throw new DatasetMaterializationError(`journey requirement ${requirement.id} original stay item is not a STAY`);
+    if (arrival.item.itemKind !== 'TRANSPORT_LEG') throw new DatasetMaterializationError(`journey requirement ${requirement.id} arrival item is not a TRANSPORT_LEG`);
+    if (original.index === arrival.index) throw new DatasetMaterializationError(`journey requirement ${requirement.id} references one item twice`);
+    resolved.set(requirement.id, { requirement, originalStayIndex: original.index, arrivalTransportIndex: arrival.index });
+  }
+  return resolved;
+}
+
 /** A content hash per source capture, derived from the dataset bytes it belongs to. */
 function sourceContentHash(datasetContentHash: string, sourceId: string): string {
   return createHash('sha256').update(datasetContentHash).update('\0').update(sourceId).digest('hex');
@@ -139,6 +176,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
   const context = programme.context;
   const draft = programme.importDraft;
   const ids = new DatasetIdentityMinter(workspaceId, dataset.datasetKey);
+  const stayArrivalRequirements = resolveStayArrivalRequirements(programme, dataset.journeyRequirements?.requirements ?? []);
   const uow = (): UnitOfWork => new PgUnitOfWork(pool, workspaceId);
   const identity = { workspaceId, actorPrincipalId };
   const counts: Record<string, number> = {};
@@ -742,6 +780,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     // represented by this traveller draft. They are typed requirements, not
     // inferred facts and not evaluator verdicts.
     for (const requirement of dataset.journeyRequirements?.requirements.filter((item) => item.travellerDraftId === traveller.draftId) ?? []) {
+      if (requirement.kind !== 'OVERNIGHT_ACCOMMODATION') continue;
       mustOk(
         await recordConstraintDefinition(uow(), {
           ...identity,
@@ -830,6 +869,31 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
           allocations: [{ travellerId, journeyItemId }],
         });
       }
+    }
+
+    // Item-referencing requirements are recorded after their canonical
+    // JourneyItem rows exist so the typed operand foreign keys remain real.
+    for (const requirement of dataset.journeyRequirements?.requirements.filter((item) => item.travellerDraftId === traveller.draftId && item.kind === 'STAY_ARRIVAL_DATE_ALIGNED') ?? []) {
+      const aligned = stayArrivalRequirements.get(requirement.id);
+      if (!aligned) throw new DatasetMaterializationError(`journey requirement ${requirement.id} was not resolved`);
+      mustOk(
+        await recordConstraintDefinition(uow(), {
+          ...identity,
+          idempotencyKey: ids.key('journey-requirement', requirement.id),
+          constraintDefinitionId: ids.id('journey-requirement', requirement.id),
+          registeredType: 'stay_arrival_date_aligned',
+          hardness: 'HARD',
+          ownerRef: { kind: 'JOURNEY', id: journeyId },
+          parameterSchemaVersion: 'northstar-demo-dataset/journey-requirement/1',
+          provenanceEvidenceId: evidenceFor('journeyRequirements'),
+          operands: [
+            { key: 'original_stay_item', kind: 'SUBJECT_REF', value: { kind: 'JOURNEY_ITEM', id: ids.id('journey-item', traveller.draftId, aligned.originalStayIndex) } },
+            { key: 'arrival_item', kind: 'SUBJECT_REF', value: { kind: 'JOURNEY_ITEM', id: ids.id('journey-item', traveller.draftId, aligned.arrivalTransportIndex) } },
+          ],
+        }),
+        `recordConstraintDefinition(${requirement.id})`,
+      );
+      bump('journeyRequirements');
     }
 
     // Programme participation, and the engagement item that links this

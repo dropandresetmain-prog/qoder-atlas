@@ -252,12 +252,30 @@ export type DatasetJurisdictions = z.infer<typeof DatasetJurisdictionsSchema>;
  * Optional organiser-declared Journey requirement facts. These are source
  * policy statements, not evaluator verdicts or discovered legal requirements.
  */
-export const DatasetJourneyRequirementSchema = z.strictObject({
+const DatasetJourneyItemSourceRefSchema = z.strictObject({
+  system: z.literal('journey-item'),
+  value: NonEmpty,
+});
+export type DatasetJourneyItemSourceRef = z.infer<typeof DatasetJourneyItemSourceRefSchema>;
+
+export const DatasetStayArrivalDateAlignedRequirementSchema = z.strictObject({
   id: NonEmpty,
   travellerDraftId: NonEmpty,
-  kind: z.literal('OVERNIGHT_ACCOMMODATION'),
-  minimumGapHours: z.number().finite().positive(),
+  kind: z.literal('STAY_ARRIVAL_DATE_ALIGNED'),
+  originalStayItemRef: DatasetJourneyItemSourceRefSchema,
+  arrivalTransportItemRef: DatasetJourneyItemSourceRefSchema,
 });
+export type DatasetStayArrivalDateAlignedRequirement = z.infer<typeof DatasetStayArrivalDateAlignedRequirementSchema>;
+
+export const DatasetJourneyRequirementSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    id: NonEmpty,
+    travellerDraftId: NonEmpty,
+    kind: z.literal('OVERNIGHT_ACCOMMODATION'),
+    minimumGapHours: z.number().finite().positive(),
+  }),
+  DatasetStayArrivalDateAlignedRequirementSchema,
+]);
 export type DatasetJourneyRequirement = z.infer<typeof DatasetJourneyRequirementSchema>;
 
 export const DatasetJourneyRequirementsSchema = z.strictObject({
