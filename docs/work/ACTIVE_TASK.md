@@ -1,3 +1,102 @@
+# ACTIVE TASK — A3 OPERATOR UI SECOND PASS
+
+Live ledger for the bounded operator-UI convergence pass. Prior A2/A3 engine ledger below is preserved.
+
+## Identity
+
+- Branch: `finish/a3-operator-ui-second-pass`
+- Worktree: `C:/Dev/qoder-atlas/.worktrees/a3-operator-ui-second-pass`
+- Base / starting SHA: `ec7fb156493b08273f950fb3052fb8fe00462631` (`finish/a3-operator-ui-astra`, includes verifier fixes on `415badf` integration)
+- Active integration (docs, no UI merge yet): `integration/astra-post-r4` @ `415badfc6b23e1af7b9108d48566f43fc5c4bacb`
+- Runtime at diagnosis: `a3-operator-ui-astra-verify` worktree, same tip `ec7fb15`, `node src/main.ts` on port **4124**
+- Role: PRIMARY operator-UI second-pass implementer
+- Scope: Overview + shared Case presentation only. No A4. No recovery-engine changes. No archived-bundle copy.
+
+## Owned paths
+
+- `src/ui/screens/product-recovery-case.ts`
+- `src/ui/caseDecisionPresentation.ts`
+- `src/ui/operatorWorkspaceStyles.ts`
+- `src/ui/screens/product-operator-overview.ts`
+- `src/app/target/adapters/operatorOverviewAdapter.ts`
+- `src/ui/overview-graph/model.ts` (framing membership/message only)
+- `src/ui/overview-graph/index.ts` (label strip only if needed)
+- `test/operator-ui-convergence.test.ts` (+ adjacent focused tests as touched)
+- This ACTIVE_TASK section
+
+Do not touch: A4 WIP branches, handoff bundle, recovery planning/engine, SQLite, provider adapters.
+
+## Checkpoint status
+
+| CP | Goal | SHA |
+|---|---|---|
+| 1 | Source/runtime identity + content ownership freeze + A–D triage | *(this commit)* |
+| 2 | Case default-visible hierarchy + focused tests | pending |
+| 3 | Overview/framing integrate + Chromium QC | pending |
+
+## Presentation contract (FROZEN)
+
+Authoritative fields only; no invented facts.
+
+1. **Selected identity:** `planningEvidence.recommendation.recommended.ref` → exact `RecoveryStrategyView` via `decisionOptions`/`sameStrategy`. Candidate via `candidateFor` on that strategy. Missing/stale/mismatched ref → explicit unavailability, never fallback selection.
+2. **Current vs proposed:** strategy `changes[]` (+ proposal flights/stays/programme when joined by strategyRef). Do not zip unrelated arrays by position/city/date.
+3. **Typed action rows:** one compact row per meaningful `effectKind` / proposal element; cancellation stays “proposed, not completed”.
+4. **Outcome rows:** `strategy.resolves` + recommendation `basis` (≤3). Proposed-world checks ≠ completed recovery.
+5. **Money (decision panel primary):** home new spend; original-currency amounts; potential cancellation loss separate; “up to” only when source label establishes maximum. Expanded itemised table + FX provenance in main column.
+6. **Authority/action:** enable consequential control only when recommended strategy has no `executionBlocker` and case is awaiting authority; otherwise show exact blocker or unavailability. No global `A3_EXECUTION_PAUSE` as the reason for every disabled control. Do not invent approver identity in copy; server resolves principal on POST. No A4 hotel/external booking enablement.
+7. **Conditions:** once in decision area from uncertainty + entry research notes + proposal blockers; link to evidence details.
+8. **Research:** compact category \| outcome \| source/mode; mixed stays mixed.
+9. **Disclosure identity:** stable `candidateKey` / `strategyRef` region keys; rejected preview ≤3 compact rows; full human-readable evaluation inside closed disclosure (no default-visible `proposalHtml` dossiers).
+
+## Diagnostics A–D (Checkpoint 1)
+
+### A. Sarah recommendation identity — no presentation drift
+
+- Case `fffa8660-16f7-5d8f-9824-c87947fa3626`, status `AWAITING_AUTHORITY`.
+- `recommended.ref` = `35d0b862-4e53-5af9-9c62-9fe3022ad537` matches strategy #1 `SELECT_OFFER` and candidate `proposer.transport-offer:…` disposition `RECOMMENDED`.
+- Title path = “Book replacement travel”; cost AVAILABLE (USD 41.66 → SGD 53.26). `executionBlocker` = `EXTERNAL_EXECUTION_NOT_COMPOSED`.
+- Viable programme strategies #7/#8 exist without blocker but are **not** the recorded recommendation — do not force them.
+- Founder screenshot corridor/price (DXB–SIN / ~$645) differs from this LIVE attempt (CGK–SIN / SGD 53.26). Different LIVE recommendation ≠ UI identity bug.
+- **Triage: Park for Later** (world/story variance). **No BACKEND BLOCKER for identity.** Revisit only if a section selects a different strategy than `recommended.ref`.
+
+### B. Active-change dependency footprint — Act Now (UI)
+
+- Overview blast: `SERVICE:01baf3ba-…` (label ID), cleared 4 / unresolved 1; landmark programme item supplied.
+- Promoted: Sarah `UNRESOLVED` on that dependency; Jordan `ATTENTION` with **empty** `dependencyRef`.
+- Current model includes all non-cleared promoted travellers in `incidentIds` and picks first unresolved without dependency filter → Jordan incorrectly enters Sarah’s active-change footprint.
+- **Triage: Act Now** — restrict incident membership + focus traveller to the selected `blast.dependencyRef`; label count strip as change-scoped.
+
+### C. Authority / action path — Act Now (presentation) + Park (projection gap)
+
+- Approve HTTP: `POST /api/v2/cases/:id/strategies/:id/approve` resolves principal from `x-northstar-principal` or workspace operator; then `approveRecoveryStrategy` grant checks.
+- Case read-model exposes `authorityState`, per-strategy `executionBlocker`; **does not** project caller principal / grant coverage.
+- Current UI disables all approval with global `A3_EXECUTION_PAUSE` even when a programme-only strategy has no blocker.
+- Sarah’s **recorded** recommendation is externally blocked → must remain blocked with that reason.
+- **Triage: Act Now** — action-state matrix from recommended strategy + blocker; remove global pause-as-reason. **Park for Later** — explicit approver/grant projection on the case view (fail closed without inventing organiser copy).
+
+### D. Entry / formality applicability — Act Now (dedupe only)
+
+- Jordan: entry tool uncertainty supplies SG Arrival Card obligation; entryResult `PASS`/`requirements_met` on recommended candidate. Notes are evidence-backed for that attempt, not inferred from name/city.
+- Default UI repeats formalities across lead/approval/evidence/activity.
+- **Triage: Act Now** — show once in decision conditions; detailed sources under evidence expansion. Do not invent legal applicability.
+
+## Content ownership (default view)
+
+| Fact | Primary home | Expansion / technical |
+|---|---|---|
+| What broke + stake | Situation lead + compact impact | — |
+| Causal state | Full-width V5.6 | Original toggle |
+| Proposed changes + ≤3 reasons | Recommendation card | Technical strategy JSON |
+| Money + conditions + next action | Sticky decision panel | Cost breakdown (main width); sources |
+| Other viable / rejected | Collapsed counts + ≤3 rejection rows | Per-option closed evaluation |
+| Research | Compact rows | Tool/model technical activity |
+
+## Next action
+
+Implement Case hierarchy + tests (CP2), then Overview/framing (CP3). Stop before A4.
+
+---
+
 # ACTIVE TASK — A2 ACCEPTED / A3 IN PROGRESS
 
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
