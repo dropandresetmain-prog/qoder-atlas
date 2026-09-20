@@ -532,7 +532,7 @@ describe('Case cost and composite-stay evidence', () => {
               lines: [
                 { kind: { label: 'Replacement travel', code: 'SELECT_OFFER' }, providerAmount: { amount: '620.00', currency: 'AED' }, homeAmount: { amount: '168.75', currency: 'USD' }, observed: false },
                 { kind: { label: 'Accommodation', code: 'ADD_JOURNEY_STAY' }, providerAmount: { amount: '34000', currency: 'JPY' }, homeAmount: { amount: '230.00', currency: 'USD' }, observed: false },
-                { kind: { label: 'Cancellation policy estimate', code: 'POLICY_PENALTY_ESTIMATE' }, providerAmount: { amount: '20.00', currency: 'USD' }, homeAmount: { amount: '20.00', currency: 'USD' }, observed: false },
+                { kind: { label: 'Cancellation policy exposure (up to)', code: 'POLICY_PENALTY_ESTIMATE' }, providerAmount: { amount: '20.00', currency: 'USD' }, homeAmount: { amount: '20.00', currency: 'USD' }, observed: false },
               ],
               selectedFxEvidence: [
                 { source: { label: 'Frankfurter', code: 'frankfurter' }, baseCurrency: 'AED', homeCurrency: 'USD', rate: 0.27218, observedAt: generatedAt },
@@ -558,7 +558,7 @@ describe('Case cost and composite-stay evidence', () => {
     assert.match(model.alternatives[0]!.costEvidence?.uncertainty ?? '', /could not be compared/);
     const visible = primaryVisibleText(renderProductRecoveryCase(view));
     assert.match(visible, /Compared total: USD 418.75/);
-    assert.match(visible, /Cancellation policy estimate: USD 20.00/);
+    assert.match(visible, /Cancellation policy exposure \(up to\): USD 20.00/);
     assert.match(visible, /Cost could not be compared/);
     assert.doesNotMatch(visible, /booked|paid|charged/i);
   });
@@ -577,6 +577,30 @@ describe('Case cost and composite-stay evidence', () => {
     assert.ok(phrases.includes('Book accommodation for Overnight hotel'));
     assert.ok(!phrases.includes('Arrange overnight accommodation'));
     assert.ok(!phrases.includes('Book a replacement stay'));
+  });
+
+  test('a rejected candidate displays its captured proposal and deterministic blocker', () => {
+    const view = caseView({
+      strategies: [],
+      planningEvidence: {
+        phase: 'DECISION_TIME', asOf: generatedAt, attemptRef: 'attempt-rejected-detail', coordinatorVersion: 'test',
+        outcome: { label: 'No safe recovery found', code: 'NO_RECOVERY_FOUND' }, domains: [], tools: [], modelActivities: [], viableStrategies: [],
+        candidates: [{
+          candidateKey: 'flight-stay', domain: { label: 'Stay', code: 'STAY' }, proposer: { label: 'Recovery planner', code: 'planner' },
+          disposition: { label: 'Rejected by deterministic checks', code: 'REJECTED_DETERMINISTIC' }, reasons: [], outcomeDelta: [],
+          proposal: {
+            flights: [{ label: 'Example Air', departure: generatedAt, arrival: '2031-09-17T04:55:00.000Z' }],
+            stays: [{ placeLabel: 'Airport hotel', start: '2031-09-17T05:00:00.000Z', end: '2031-09-18T05:00:00.000Z' }],
+            entryResults: [{ dimension: 'entry_eligibility', verdict: 'UNKNOWN', reasonCodes: ['credential_missing'] }],
+            blockers: [{ dimension: 'entry_eligibility', verdict: 'UNKNOWN', reasonCode: 'credential_missing' }],
+          },
+        }],
+      },
+    } as Partial<RecoveryCaseView>);
+    const text = primaryVisibleText(renderProductRecoveryCase(view));
+    assert.match(text, /Example Air/);
+    assert.match(text, /Airport hotel/);
+    assert.match(text, /Credential missing/);
   });
 });
 

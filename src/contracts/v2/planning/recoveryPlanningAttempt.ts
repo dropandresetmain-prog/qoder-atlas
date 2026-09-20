@@ -122,6 +122,31 @@ export const MaterialCandidateCostComparisonSchema = z.discriminatedUnion('statu
 ]);
 export type MaterialCandidateCostComparison = z.infer<typeof MaterialCandidateCostComparisonSchema>;
 
+/** A bounded, presentation-safe projection of an evaluated proposed world. */
+export const MaterialCandidateProposalSchema = z.strictObject({
+  flights: z.array(z.strictObject({
+    label: z.string().min(1).max(160),
+    departure: InstantSchema,
+    arrival: InstantSchema,
+  })).max(4).default([]),
+  stays: z.array(z.strictObject({
+    placeLabel: z.string().min(1).max(160),
+    start: InstantSchema,
+    end: InstantSchema,
+  })).max(4).default([]),
+  entryResults: z.array(z.strictObject({
+    dimension: z.string().min(1).max(128),
+    verdict: z.enum(['FAIL', 'UNKNOWN', 'PASS']),
+    reasonCodes: z.array(z.string().min(1).max(160)).max(8).default([]),
+  })).max(8).default([]),
+  blockers: z.array(z.strictObject({
+    dimension: z.string().min(1).max(128),
+    verdict: z.enum(['FAIL', 'UNKNOWN']),
+    reasonCode: z.string().min(1).max(160),
+  })).max(16).default([]),
+});
+export type MaterialCandidateProposal = z.infer<typeof MaterialCandidateProposalSchema>;
+
 /**
  * Bounded evidence for ONE material candidate. `strategyRef` is present only
  * when the candidate was promoted to a persisted viable RecoveryStrategy;
@@ -145,6 +170,8 @@ export const MaterialCandidateEvidenceSchema = z.strictObject({
   immediateChangeBlastRadius: ImmediateChangeBlastRadiusSchema.optional(),
   reassessmentClosure: ReassessmentClosureSchema.optional(),
   outcomeDelta: z.array(OutcomeDeltaEntrySchema).default([]),
+  /** Bounded facts from the evaluated overlay and its deterministic explanations. */
+  proposal: MaterialCandidateProposalSchema.optional(),
   /** Optional only when no cost-comparison supplier is composed at all. */
   costComparison: MaterialCandidateCostComparisonSchema.optional(),
 });

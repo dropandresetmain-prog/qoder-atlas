@@ -108,6 +108,7 @@ export interface CaseRejectedModel {
   /** Decision-time cost comparison, when the planner captured one. */
   readonly costLine?: string;
   readonly unchangedNote?: string;
+  readonly proposalLines?: readonly string[];
 }
 
 export interface CaseRow {
@@ -531,6 +532,12 @@ function deltaWord(code: string | undefined): string {
   }
 }
 
+function displayCode(code: string): string {
+  const words = code.split(/[._\-\s]+/).filter(Boolean).map((word) => word.toLowerCase());
+  const text = words.join(' ');
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'A deterministic check';
+}
+
 function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<string>): CaseRejectedModel[] {
   const out: CaseRejectedModel[] = [];
   for (const candidate of view.planningEvidence?.candidates ?? []) {
@@ -545,7 +552,7 @@ function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<
     const reason = candidate.reasons.map(plain).find((r): r is string => r !== undefined)
       ?? REJECTION_SENTENCE[candidate.disposition.code ?? ''] ?? 'This option was not chosen.';
     out.push({
-      label: CANDIDATE_LABEL[candidate.domain.code ?? ''] ?? 'Another option',
+      label: candidate.proposal?.flights[0]?.label ?? candidate.proposal?.stays[0]?.placeLabel ?? CANDIDATE_LABEL[candidate.domain.code ?? ''] ?? 'Another option',
       reason: sentence(reason),
       movements: movements.map((d) =>
         `${plain(d.subject.label) ?? 'Part of the trip'}: ${deltaWord(d.baseline)} → ${deltaWord(d.candidate)}`),
@@ -553,6 +560,12 @@ function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<
         ? { costLine: `Compared cost: ${candidate.costComparison.totalHomeAmount.currency} ${candidate.costComparison.totalHomeAmount.amount}` }
         : {}),
       ...(changed.length > 0 && unchanged > 0 ? { unchangedNote: `${unchanged} other ${unchanged === 1 ? 'check was' : 'checks were'} unchanged.` } : {}),
+      ...(candidate.proposal ? { proposalLines: [
+        ...candidate.proposal.flights.map((flight) => `${flight.label}: ${flight.departure} to ${flight.arrival}`),
+        ...candidate.proposal.stays.map((stay) => `Stay at ${stay.placeLabel}: ${stay.start} to ${stay.end}`),
+        ...candidate.proposal.entryResults.map((entry) => `${displayCode(entry.dimension)}: ${entry.verdict.toLowerCase()}${entry.reasonCodes.length ? ` (${entry.reasonCodes.map(displayCode).join(', ')})` : ''}`),
+        ...candidate.proposal.blockers.map((blocker) => `${displayCode(blocker.dimension)}: ${blocker.verdict.toLowerCase()} (${displayCode(blocker.reasonCode)})`),
+      ] } : {}),
     });
   }
   return out;

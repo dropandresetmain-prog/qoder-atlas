@@ -239,7 +239,7 @@ function optionsHtml(m: CaseWorkspaceModel): string {
   }
   if (m.noPlan && m.consideredPreview.length > 0) {
     const rows = m.consideredPreview.map((candidate) => {
-      const evidence = [candidate.reason, ...candidate.movements, candidate.costLine].filter(Boolean).join(' ');
+      const evidence = [candidate.reason, ...candidate.movements, ...(candidate.proposalLines ?? []), candidate.costLine].filter(Boolean).join(' ');
       return `<li><strong>${escapeHtml(candidate.label)}</strong> — ${escapeHtml(evidence)}</li>`;
     }).join('');
     const omitted = m.considered.length - m.consideredPreview.length;
@@ -253,7 +253,7 @@ function optionsHtml(m: CaseWorkspaceModel): string {
     </div>`);
   }
   if (m.considered.length > 0) {
-    const rows = m.considered.map((c) => `<li><strong>${escapeHtml(c.label)}</strong> — ${escapeHtml(c.reason)}${c.movements.length > 0 ? `<br><span class="meta">${c.movements.map(escapeHtml).join('; ')}</span>` : ''}${c.unchangedNote ? `<br><span class="meta">${escapeHtml(c.unchangedNote)}</span>` : ''}</li>`).join('');
+    const rows = m.considered.map((c) => `<li><strong>${escapeHtml(c.label)}</strong> — ${escapeHtml(c.reason)}${c.movements.length > 0 ? `<br><span class="meta">${c.movements.map(escapeHtml).join('; ')}</span>` : ''}${c.proposalLines?.length ? `<br><span class="meta">${c.proposalLines.map(escapeHtml).join('; ')}</span>` : ''}${c.unchangedNote ? `<br><span class="meta">${escapeHtml(c.unchangedNote)}</span>` : ''}</li>`).join('');
     parts.push(details('other-options', `${CASE_COPY.otherOptionsConsidered} (${m.considered.length})`, `<ul class="cw-considered">${rows}</ul>`));
   }
   if (parts.length === 0) return '';

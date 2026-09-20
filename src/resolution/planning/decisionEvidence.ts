@@ -45,6 +45,7 @@ import {
   type MaterialCandidateDisposition,
   type MaterialCandidateEvidence,
   type MaterialCandidateCostComparison,
+  type MaterialCandidateProposal,
   type PlanningEvidenceRecord,
   type PlanningModelActivity,
   type RecoveryDomainDecision,
@@ -167,6 +168,43 @@ export function dispositionFor(viability: RecoveryStrategy['viability'], recomme
   return 'REJECTED_DETERMINISTIC';
 }
 
+function proposalFromEvaluation(result: EvaluateStrategyResult): MaterialCandidateProposal {
+  const effects = result.strategy.scenarioChange.effects;
+  const flights = effects.flatMap((effect) => {
+    if (effect.effectKind !== 'SELECT_OFFER') return [];
+    const item = result.proposedWorld.journeyItems.find((candidate) => candidate.id === effect.journeyItemId);
+    const service = item?.selectedServiceId
+      ? result.proposedWorld.transportServices.find((candidate) => candidate.id === item.selectedServiceId)
+      : undefined;
+    const departure = service?.estimated.departure?.value ?? service?.published.departure?.value;
+    const arrival = service?.estimated.arrival?.value ?? service?.published.arrival?.value;
+    return service && departure && arrival ? [{ label: service.operator, departure, arrival }] : [];
+  }).slice(0, 4);
+  const stays = effects.flatMap((effect) => {
+    if (effect.effectKind !== 'ADD_JOURNEY_STAY') return [];
+    const item = result.proposedWorld.journeyItems.find((candidate) => candidate.id === effect.proposedJourneyItemId);
+    const place = item?.intendedPlaceId
+      ? result.proposedWorld.places.find((candidate) => candidate.id === item.intendedPlaceId)
+      : undefined;
+    return item?.intendedWindow && place ? [{ placeLabel: place.name, start: item.intendedWindow.start, end: item.intendedWindow.end }] : [];
+  }).slice(0, 4);
+  const dimensions = result.strategy.candidateAssessmentResults.flatMap((assessment) => assessment.dimensions)
+    .filter((dimension) => dimension.applicable && dimension.blocking);
+  const blockers = dimensions.flatMap((dimension) => dimension.explanations
+    .filter((explanation): explanation is typeof explanation & { status: 'FAIL' | 'UNKNOWN' } => explanation.status === 'FAIL' || explanation.status === 'UNKNOWN')
+    .map((explanation) => ({ dimension: dimension.dimension, verdict: explanation.status, reasonCode: explanation.reasonCode })))
+    .sort((a, b) => `${a.dimension}|${a.verdict}|${a.reasonCode}`.localeCompare(`${b.dimension}|${b.verdict}|${b.reasonCode}`))
+    .filter((entry, index, all) => index === 0 || `${entry.dimension}|${entry.verdict}|${entry.reasonCode}` !== `${all[index - 1]!.dimension}|${all[index - 1]!.verdict}|${all[index - 1]!.reasonCode}`)
+    .slice(0, 16);
+  const entryResults = dimensions.filter((dimension) => dimension.dimension.startsWith('entry'))
+    .map((dimension) => ({
+      dimension: dimension.dimension,
+      verdict: dimension.verdict,
+      reasonCodes: [...new Set(dimension.explanations.map((explanation) => explanation.reasonCode))].sort().slice(0, 8),
+    })).sort((a, b) => a.dimension.localeCompare(b.dimension)).slice(0, 8);
+  return { flights, stays, entryResults, blockers };
+}
+
 export interface EvaluatedCandidateEvidenceInput {
   candidateKey: string;
   proposerId: string;
@@ -201,6 +239,7 @@ export function materialCandidateFromEvaluation(
     immediateChangeBlastRadius: immediateBlastRadiusOf(strategy),
     reassessmentClosure: reassessmentClosureOf(strategy),
     outcomeDelta: outcomeDeltaOf(input.result),
+    proposal: proposalFromEvaluation(input.result),
     ...(input.costComparison !== undefined ? { costComparison: input.costComparison } : {}),
   });
 }

@@ -223,13 +223,14 @@ function projectCandidate(
         }
       : {}),
     ...(candidate.costComparison ? { costComparison: projectCostComparison(candidate.costComparison) } : {}),
+    ...(candidate.proposal ? { proposal: candidate.proposal } : {}),
   };
 }
 
 const COST_KIND_LABELS: Record<RecoveryCostLineEvidence['kind'], string> = {
   SELECT_OFFER: 'Replacement travel',
   ADD_JOURNEY_STAY: 'Accommodation',
-  POLICY_PENALTY_ESTIMATE: 'Cancellation policy estimate',
+  POLICY_PENALTY_ESTIMATE: 'Cancellation policy exposure (up to)',
 };
 
 function projectCostComparison(cost: NonNullable<MaterialCandidateEvidence['costComparison']>) {
