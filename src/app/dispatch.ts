@@ -105,6 +105,7 @@ const HOTEL_SEARCH_PARAMETERS = z.strictObject({
     .strictObject({ adults: z.number().int().min(1), children: z.number().int().min(0).optional() })
     .optional(),
   rooms: z.number().int().min(1).default(1),
+  guestNationality: z.string().regex(/^[A-Z]{2}$/).optional(),
 });
 
 const HOTEL_QUOTE_PARAMETERS = z.strictObject({
