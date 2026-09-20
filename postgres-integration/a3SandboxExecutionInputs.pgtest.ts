@@ -1,11 +1,14 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedOrganisation, seedTraveller, takeSeedEvidence, type SeedSession } from './m3Seed.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { createExternalConnection, linkExternalRecord, observeExternalRecord } from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import { provisionSandboxExecutionInputs, SandboxExecutionInputError } from '../src/app/demo/sandboxExecutionInputs.ts';
+import { resolveSandboxProtectedDocument } from '../src/app/demo/sandboxProtectedDocuments.ts';
+import { putSandboxProtectedDocument } from '../src/app/demo/sandboxProtectedDocuments.ts';
+import { recordSource } from '../src/persistence/postgres/commands/knowledgeCommands.ts';
 
 const ENV = { ATLAS_ENV: 'sandbox', NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1' };
 
@@ -69,11 +72,33 @@ async function createMappedWorld(pool: Awaited<ReturnType<typeof sharedTestPool>
   return { workspaceId: seed.workspaceId, actorId: seed.actorId, connectionId, travellerId: traveller.travellerId, organisationId, travellerEvidence };
 }
 
-function input(budgetId: string) {
+function passportInput() {
+  return {
+    credentialId: '33333333-3333-4333-8333-333333333333',
+    versionId: '44444444-4444-4444-8444-444444444444',
+    syntheticDocumentMarker: 'NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-passport-1',
+    issuerCountry: 'SG',
+    issueDate: '2030-01-01',
+    expiryDate: '2040-01-01',
+    issuerStatus: 'UNKNOWN' as const,
+    physicallyAvailable: true,
+    observedAt: '2030-01-01T00:00:00.000Z',
+  };
+}
+
+function deterministicPassportSourceId(workspaceId: string, travellerId: string, versionId: string): string {
+  const digest = createHash('sha256').update(`northstar:sandbox:passport-source:${workspaceId}|${travellerId}|${versionId}`, 'utf8').digest();
+  digest[6] = (digest[6]! & 0x0f) | 0x40;
+  digest[8] = (digest[8]! & 0x3f) | 0x80;
+  const hex = digest.subarray(0, 16).toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function input(budgetId: string, passport?: ReturnType<typeof passportInput>) {
   return {
     schemaVersion: 1,
     sandbox: { environment: 'sandbox', marker: 'synthetic-sandbox-inputs' },
-    travellers: [{ sourceRef: 'SOURCE_TRAVELLER_DRAFT:traveller-source-1', bookingIdentity: { gender: 'FEMALE', contactEmail: 'synthetic@example.test', nationality: 'SG' } }],
+    travellers: [{ sourceRef: 'SOURCE_TRAVELLER_DRAFT:traveller-source-1', bookingIdentity: { gender: 'FEMALE', contactEmail: 'synthetic@example.test', nationality: 'SG' }, ...(passport ? { passport } : {}) }],
     budgets: [{ organisationSourceRef: 'SOURCE_ORGANISATION:org-source-1', budget: { id: budgetId, purpose: 'synthetic sandbox flight booking', amount: { amount: '100.00', currency: 'SGD' } }, idempotencyKey: `a3-budget:${budgetId}` }],
   };
 }
@@ -104,7 +129,7 @@ test('sandbox provision resolves source refs, is repeatable, isolated, and refus
   });
 
   const created = await provision(first, input(firstBudgetId));
-  assert.deepEqual(created, { workspaceId: first.workspaceId, connectionId: first.connectionId, travellersCreated: 1, travellersReused: 0, budgetsCreated: 1, budgetsReused: 0 });
+  assert.deepEqual(created, { workspaceId: first.workspaceId, connectionId: first.connectionId, travellersCreated: 1, travellersReused: 0, budgetsCreated: 1, budgetsReused: 0, passportsCreated: 0, passportsReused: 0 });
   assert.deepEqual(await counts(pool, first.workspaceId), { identities: '1', budgets: '1' });
   const replay = await provision(first, input(firstBudgetId));
   assert.equal(replay.travellersCreated, 0);
@@ -173,4 +198,115 @@ test('sandbox provision rejects source aliases for one canonical traveller befor
     (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'DUPLICATE_RESOLVED_TRAVELLER',
   );
   assert.deepEqual(await counts(pool, world.workspaceId), before, 'alias rejection leaves identities and budgets untouched');
+});
+
+test('sandbox passport provisions encrypted marker and credential edition, then reuses exact rows', async () => {
+  const pool = await sharedTestPool();
+  const world = await createMappedWorld(pool, 'A3 sandbox passport');
+  const key = Buffer.alloc(32, 7);
+  const documentKeyId = 'sandbox-passport-test-key-v1';
+  const provision = (payload: unknown) => provisionSandboxExecutionInputs({
+    db: pool,
+    uow: () => new PgUnitOfWork(pool, world.workspaceId),
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    connectionId: world.connectionId,
+    input: payload,
+    env: ENV,
+    documentKey: key,
+    documentKeyId,
+  });
+  const budgetId = randomUUID();
+  const passport = passportInput();
+  const payload = input(budgetId, passport);
+  const created = await provision(payload);
+  assert.equal(created.passportsCreated, 1);
+  assert.equal(created.passportsReused, 0);
+  const rows = (await pool.query<{ storage_ref: string; issuer_country: string; expiry_date: string; physically_available: boolean }>(
+    `SELECT p.document_number_storage_ref AS storage_ref, c.issuer_country, v.expiry_date::text AS expiry_date, v.physically_available
+       FROM travel_credentials c JOIN credential_versions v ON v.workspace_id = c.workspace_id AND v.credential_id = c.id
+       JOIN passport_details p ON p.workspace_id = v.workspace_id AND p.credential_version_id = v.id
+      WHERE c.workspace_id = $1 AND c.id = $2`, [world.workspaceId, passport.credentialId],
+  )).rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.issuer_country, 'SG');
+  assert.equal(rows[0]!.expiry_date, '2040-01-01');
+  assert.equal(rows[0]!.physically_available, true);
+  const document = await pool.query<{ document_number_content_hash: string; document_number_storage_ref: string; document_number_access_policy_id: string }>(
+    'SELECT document_number_content_hash, document_number_storage_ref, document_number_access_policy_id FROM passport_details WHERE workspace_id = $1 AND credential_version_id = $2',
+    [world.workspaceId, passport.versionId],
+  );
+  const plaintext = await resolveSandboxProtectedDocument({
+    db: pool,
+    workspaceId: world.workspaceId,
+    document: { contentHash: document.rows[0]!.document_number_content_hash, storageRef: document.rows[0]!.document_number_storage_ref, accessPolicyId: document.rows[0]!.document_number_access_policy_id },
+    key,
+    keyId: documentKeyId,
+    env: ENV,
+  });
+  assert.equal(plaintext, passport.syntheticDocumentMarker);
+  const replay = await provision(payload);
+  assert.equal(replay.passportsCreated, 0);
+  assert.equal(replay.passportsReused, 1);
+  assert.equal((await pool.query('SELECT count(*)::text AS count FROM credential_versions WHERE workspace_id = $1 AND credential_id = $2', [world.workspaceId, passport.credentialId])).rows[0]!.count, '1');
+  await assert.rejects(() => provision(input(randomUUID(), { ...passport, issuerCountry: 'US' })), (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'CONFLICTING_EXISTING_INPUT');
+});
+
+test('sandbox passport resumes an exact source prefix but refuses a marker mismatch before canonical writes', async () => {
+  const pool = await sharedTestPool();
+  const world = await createMappedWorld(pool, 'A3 sandbox passport prefix');
+  const key = Buffer.alloc(32, 9);
+  const documentKeyId = 'sandbox-passport-prefix-key-v1';
+  const markerA = 'NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-prefix-a';
+  const markerB = 'NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-prefix-b';
+  const passportA = { ...passportInput(), syntheticDocumentMarker: markerA };
+  const passportB = { ...passportA, syntheticDocumentMarker: markerB };
+  const sourceId = deterministicPassportSourceId(world.workspaceId, world.travellerId, passportA.versionId);
+  const documentA = await putSandboxProtectedDocument({ db: pool, workspaceId: world.workspaceId, actorPrincipalId: world.actorId, plaintext: markerA, key, keyId: documentKeyId, env: ENV });
+  mustOk(await recordSource(new PgUnitOfWork(pool, world.workspaceId), {
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    idempotencyKey: 'sandbox-passport-prefix-source',
+    sourceId,
+    sourceIdentity: 'NORTHSTAR_SYNTHETIC_SANDBOX_PASSPORT',
+    receivedAt: passportA.observedAt,
+    contentHash: documentA.contentHash,
+    contentType: 'application/x-northstar-synthetic-passport-marker',
+    protectedLocationRef: documentA.storageRef,
+    rawContentHash: documentA.contentHash,
+    rawStorageRef: documentA.storageRef,
+    rawAccessPolicyId: documentA.accessPolicyId,
+    captureMetadata: { provenance: 'caller-authored synthetic sandbox passport', observedAt: passportA.observedAt },
+    captureMetadataVersion: 'sandbox-passport/1',
+  }));
+  const provision = (payload: unknown) => provisionSandboxExecutionInputs({
+    db: pool,
+    uow: () => new PgUnitOfWork(pool, world.workspaceId),
+    workspaceId: world.workspaceId,
+    actorPrincipalId: world.actorId,
+    connectionId: world.connectionId,
+    input: payload,
+    env: ENV,
+    documentKey: key,
+    documentKeyId,
+  });
+  const before = await pool.query<{ identities: string; budgets: string; credentials: string }>(
+    `SELECT (SELECT count(*)::text FROM traveller_booking_identities WHERE workspace_id = $1) AS identities,
+            (SELECT count(*)::text FROM budgets WHERE workspace_id = $1) AS budgets,
+            (SELECT count(*)::text FROM travel_credentials WHERE workspace_id = $1) AS credentials`, [world.workspaceId],
+  );
+  const existingSource = await pool.query<{ content_hash: string }>('SELECT content_hash FROM source_records WHERE workspace_id = $1 AND id = $2', [world.workspaceId, sourceId]);
+  assert.equal(existingSource.rows.length, 1);
+  assert.notEqual(existingSource.rows[0]!.content_hash, createHash('sha256').update(markerB, 'utf8').digest('hex'));
+  const syntheticSources = (await pool.query<{ id: string }>(`SELECT id FROM source_records WHERE workspace_id = $1 AND source_identity = 'NORTHSTAR_SYNTHETIC_SANDBOX_PASSPORT'`, [world.workspaceId])).rows;
+  assert.equal(syntheticSources.length, 1);
+  assert.equal(syntheticSources[0]!.id, sourceId);
+  await assert.rejects(() => provision(input(randomUUID(), passportB)), (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'CONFLICTING_EXISTING_INPUT');
+  assert.deepEqual((await pool.query<{ identities: string; budgets: string; credentials: string }>(
+    `SELECT (SELECT count(*)::text FROM traveller_booking_identities WHERE workspace_id = $1) AS identities,
+            (SELECT count(*)::text FROM budgets WHERE workspace_id = $1) AS budgets,
+            (SELECT count(*)::text FROM travel_credentials WHERE workspace_id = $1) AS credentials`, [world.workspaceId],
+  )).rows[0], before.rows[0]);
+  const resumed = await provision(input(randomUUID(), passportA));
+  assert.equal(resumed.passportsCreated, 1);
 });
